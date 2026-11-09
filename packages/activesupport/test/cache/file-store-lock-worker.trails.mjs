@@ -1,0 +1,15 @@
+import { parentPort, workerData } from "node:worker_threads";
+import { getCryptoAsync } from "@blazetrails/ruby-compat";
+import { FileStore } from "../../lib/cache/file-store.js";
+
+await getCryptoAsync();
+
+const { dir, iterations } = workerData;
+const store = new FileStore(dir);
+
+parentPort.on("message", async () => {
+  for (let i = 0; i < iterations; i++) await store.increment("counter");
+  parentPort.postMessage("done");
+});
+
+parentPort.postMessage("ready");

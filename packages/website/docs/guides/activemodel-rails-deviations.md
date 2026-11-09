@@ -32,12 +32,12 @@ defined into the module `generated_attribute_methods` builds and includes,
 exactly as in Rails — so `undefine_attribute_methods` still clears them and a
 class-body method still outranks a generated one.
 
-- `AttributeMethodPattern` (`packages/activemodel/src/attribute-methods.ts`)
+- `AttributeMethodPattern` (`packages/activemodel/lib/attribute-methods.ts`)
   holds the same prefix/suffix/proxy-target concept as Rails.
 - `match()` still exists for the cases where we need to split a method name
   back into its attribute.
 - The `[key: string]: unknown` index signature on `Model`
-  (`packages/activemodel/src/model.ts:62`) means plain attribute access
+  (`packages/activemodel/lib/model.ts:62`) means plain attribute access
   (`user.name`) doesn't need a proxy — it's just a property. The price
   is that TypeScript can't type it without a per-model declaration;
   consumers usually declare their fields explicitly.
@@ -50,7 +50,7 @@ type checker.
 
 Rails scatters `@changed_attributes`, `@previously_changed`, etc. across
 instance variables. Trails puts them on a `DirtyTracker` instance held at
-`record._dirtyTracker` (`packages/activemodel/src/dirty.ts`). Accessors
+`record._dirtyTracker` (`packages/activemodel/lib/dirty.ts`). Accessors
 like `record.changed`, `record.changes`, `record.previousChanges`
 delegate. The public API is the same; the internals are one indirection
 away.
@@ -63,7 +63,7 @@ The shared rationale and signatures live at
 specific point: `before_save :do_thing` (Rails-style symbol reference
 to a method) is accepted as a method-name string or a direct function
 — either works. This is the module where `runCallbacks` lives
-(`packages/activemodel/src/callbacks.ts`), and because it awaits
+(`packages/activemodel/lib/callbacks.ts`), and because it awaits
 each handler, calling it is itself async.
 
 ## Validations: async chain
@@ -99,7 +99,7 @@ accumulation.
 ActiveModel uses `Proxy` exactly once, in `Model.withOptions(defaults,
 fn)`. Inside `fn`, calls to `validates` are rewritten to merge in the
 defaults. This is pure sugar — a one-proxy convenience for a Rails-style
-DSL block. See `packages/activemodel/src/model.ts`. Everything else in
+DSL block. See `packages/activemodel/lib/model.ts`. Everything else in
 ActiveModel is proxy-free.
 
 ## Serialization
@@ -110,7 +110,7 @@ with lazy `fetchValue()`, not just plain `Map`/object. Rails always
 materializes attributes eagerly; we don't, because TypeScript makes lazy
 stores easy and some of our adapters want them.
 
-See `packages/activemodel/src/serialization.ts`.
+See `packages/activemodel/lib/serialization.ts`.
 
 ## Small, systematic differences
 

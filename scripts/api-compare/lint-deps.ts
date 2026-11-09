@@ -576,7 +576,7 @@ export function methodUsesDepImport(
  * `ActiveModel::Type.default_value`
  * (activerecord/lib/arel/nodes/homogeneous_in.rb:51) extracts the dep ref
  * `Type`. The port is a top-level function of the file mirroring that module
- * (activemodel/src/type.ts's `defaultValue`), imported by its bare name, so
+ * (activemodel/lib/type.ts's `defaultValue`), imported by its bare name, so
  * its module is the declaring file's basename. With `depRoot`, a function
  * declared outside that package directory has no module there and answers null.
  */
@@ -721,7 +721,7 @@ export function isUnportedRubyRef(ref: string): boolean {
  * The spellings a TS ref may answer a Ruby dep ref by: its leaf constant, or
  * the whole path joined, which is how a constant whose leaf is a JS global is
  * exported (`ActiveSupport::JSON` is `ActiveSupportJSON`,
- * activesupport/src/json.ts).
+ * activesupport/lib/json.ts).
  */
 export function rubyRefSpellings(ref: string): string[] {
   const leaf = normalizeRubyRef(ref);

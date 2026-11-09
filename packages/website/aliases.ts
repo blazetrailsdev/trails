@@ -9,10 +9,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
  * build but not for the test run fails to resolve only under vitest.
  */
 export const packageEntries: Array<[string, string]> = [
-  ["@blazetrails/activesupport", "../activesupport/src/index.ts"],
+  ["@blazetrails/activesupport", "../activesupport/lib/index.ts"],
   ["@blazetrails/ruby-compat", "../ruby-compat/lib/index.ts"],
-  ["@blazetrails/arel", "../arel/src/index.ts"],
-  ["@blazetrails/activemodel", "../activemodel/src/index.ts"],
+  ["@blazetrails/arel", "../arel/lib/index.ts"],
+  ["@blazetrails/activemodel", "../activemodel/lib/index.ts"],
   ["@blazetrails/activerecord/migration", "../activerecord/src/migration.ts"],
   ["@blazetrails/activerecord/base", "../activerecord/src/base.ts"],
   ["@blazetrails/activerecord/schema", "../activerecord/src/schema.ts"],
@@ -22,38 +22,38 @@ export const packageEntries: Array<[string, string]> = [
   ],
   ["@blazetrails/activerecord/connection-adapters", "../activerecord/src/connection-adapters.ts"],
   ["@blazetrails/activerecord", "../activerecord/src/index.ts"],
-  ["@blazetrails/rack", "../rack/src/index.ts"],
+  ["@blazetrails/rack", "../rack/lib/index.ts"],
   [
     "@blazetrails/actionview/rails-dom-testing/assertions",
-    "../actionview/src/rails-dom-testing/assertions.ts",
+    "../actionview/lib/rails-dom-testing/assertions.ts",
   ],
   [
     "@blazetrails/actionview/rails-dom-testing/testing",
-    "../actionview/src/rails-dom-testing/testing.ts",
+    "../actionview/lib/rails-dom-testing/testing.ts",
   ],
-  ["@blazetrails/actionview", "../actionview/src/index.ts"],
+  ["@blazetrails/actionview", "../actionview/lib/index.ts"],
   ["@blazetrails/tse-compiler", "../tse-compiler/lib/index.ts"],
   ["@blazetrails/actionpack", "../actionpack/lib/index.ts"],
-  ["@blazetrails/trailties/all", "../trailties/src/all.ts"],
-  ["@blazetrails/trailties/generators", "../trailties/src/generators/index.ts"],
-  ["@blazetrails/globalid/wire", "../globalid/src/wire.ts"],
-  ["@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"],
-  ["@blazetrails/globalid", "../globalid/src/index.ts"],
+  ["@blazetrails/trailties/all", "../trailties/lib/all.ts"],
+  ["@blazetrails/trailties/generators", "../trailties/lib/generators/index.ts"],
+  ["@blazetrails/globalid/wire", "../globalid/lib/wire.ts"],
+  ["@blazetrails/globalid/signed-global-id", "../globalid/lib/signed-global-id.ts"],
+  ["@blazetrails/globalid", "../globalid/lib/index.ts"],
   ["@blazetrails/actioncable", "../actioncable/lib/index.ts"],
-  ["@blazetrails/solid-queue", "../solid-queue/src/index.ts"],
+  ["@blazetrails/solid-queue", "../solid-queue/lib/index.ts"],
   ["@blazetrails/solid-cable", "../solid-cable/lib/index.ts"],
   ["@blazetrails/actionmailbox", "../actionmailbox/src/index.ts"],
-  ["@blazetrails/activestorage", "../activestorage/src/index.ts"],
+  ["@blazetrails/activestorage", "../activestorage/lib/index.ts"],
   ["@blazetrails/bcrypt", "../bcrypt/lib/index.ts"],
   ["@blazetrails/date", "../date/lib/index.ts"],
   ["@blazetrails/did-you-mean", "../did-you-mean/lib/index.ts"],
-  ["@blazetrails/i18n", "../i18n/src/index.ts"],
+  ["@blazetrails/i18n", "../i18n/lib/index.ts"],
   ["@blazetrails/builder", "../builder/lib/builder.ts"],
   ["@blazetrails/marcel", "../marcel/lib/marcel.ts"],
   ["@blazetrails/chronic", "../chronic/lib/chronic.ts"],
   ["@blazetrails/tzinfo", "../tzinfo/lib/index.ts"],
   ["@blazetrails/et-orbi", "../et-orbi/lib/et-orbi.ts"],
-  ["@blazetrails/raabro", "../raabro/src/raabro.ts"],
+  ["@blazetrails/raabro", "../raabro/lib/raabro.ts"],
   ["@blazetrails/msgpack", "../msgpack/lib/index.ts"],
   ["@blazetrails/nokogiri", "../nokogiri/lib/index.ts"],
 ];
@@ -65,9 +65,9 @@ export const packageEntries: Array<[string, string]> = [
  * instead, so these are only used by vitest.
  */
 export const subpathPrefixes: Array<[string, string]> = [
-  ["@blazetrails/activesupport/", "../activesupport/src/"],
+  ["@blazetrails/activesupport/", "../activesupport/lib/"],
   ["@blazetrails/ruby-compat/", "../ruby-compat/lib/"],
-  ["@blazetrails/arel/src", "../arel/src"],
+  ["@blazetrails/arel/test", "../arel/test"],
 ];
 
 export function resolveEntries(entries: Array<[string, string]>): Array<[string, string]> {

@@ -1,0 +1,901 @@
+import { describe, it, expect, vi, afterEach } from "vitest";
+import * as ts from "typescript/unstable/ast";
+import type { Diagnostic } from "typescript/unstable/sync";
+import * as path from "node:path";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import { fileURLToPath } from "node:url";
+import { buildViews, decodeLineMappings } from "@blazetrails/trails-tsc";
+import {
+  createArSolutionBuilder,
+  createArTrailsProgram,
+  ExitStatus,
+  getPreEmitDiagnostics,
+  remapDiagnostics,
+} from "../../lib/tsc-wrapper/ar-program.js";
+import { loadTimeZoneAwareAttributes } from "../../lib/tsc-wrapper/cli.js";
+
+const createProgramWithArPlugin = createArTrailsProgram;
+const createBuilderWithArPlugin = createArSolutionBuilder;
+
+const CURRENT_DIR = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURES_DIR = path.resolve(CURRENT_DIR, "../fixtures");
+const CLI_BIN_PATH = path.resolve(CURRENT_DIR, "../../bin/trails-tsc.js");
+const CLI_DIST_PATH = path.resolve(CURRENT_DIR, "../../dist/tsc-wrapper/cli.js");
+const itIfCliBin = fs.existsSync(CLI_DIST_PATH) ? it : it.skip;
+
+describe("trails-tsc CLI — Phase 1b.1", () => {
+  it("virtualizes a single-file model: post.title types as string with no declares", () => {
+    const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+
+    const diagnostics = [...program.getSemanticDiagnostics(), ...program.getSyntacticDiagnostics()];
+
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("consumer.ts types `post.title` as string, `post.published` as boolean", () => {
+    const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+    const checker = program.getProject().checker;
+
+    const consumerFile = program.getSourceFile(path.join(FIXTURES_DIR, "consumer.ts"));
+    expect(consumerFile).toBeDefined();
+
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        const type = checker.getTypeAtLocation(node.initializer);
+        probed[node.name.text] = checker.typeToString(type);
+      }
+      node.forEachChild(visit);
+    }
+    consumerFile!.forEachChild(visit);
+
+    expect(probed["title"]).toBe("string");
+    expect(probed["published"]).toBe("boolean");
+  });
+
+  it("non-Base files pass through unchanged (no virtualization)", () => {
+    const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+
+    const modelFile = program.getSourceFile(path.join(FIXTURES_DIR, "model.ts"));
+    expect(modelFile).toBeDefined();
+    expect(modelFile!.text).not.toContain("get title()");
+  });
+
+  it("zero diagnostics across all diagnostic categories", () => {
+    const configPath = path.join(FIXTURES_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+    const allDiags = getPreEmitDiagnostics(program);
+    expect(allDiags).toHaveLength(0);
+  });
+
+  itIfCliBin(
+    "CLI binary exits 0 on clean fixture",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      const result = execFileSync(
+        "node",
+        [CLI_BIN_PATH, "-p", path.join(FIXTURES_DIR, "tsconfig.json"), "--noEmit"],
+        {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+        },
+      );
+      expect(result).toBe("");
+    },
+    30_000,
+  );
+
+  itIfCliBin(
+    "CLI binary exits non-zero on a fixture with a type error",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      let status: number | undefined;
+      let stderr = "";
+      try {
+        execFileSync(
+          "node",
+          [CLI_BIN_PATH, "-p", path.join(FIXTURES_DIR, "tsconfig-with-error.json"), "--noEmit"],
+          { encoding: "utf8", stdio: ["pipe", "pipe", "pipe"] },
+        );
+        status = 0;
+      } catch (err) {
+        const e = err as { status?: number; stderr?: string };
+        status = e.status;
+        stderr = e.stderr ?? "";
+      }
+      expect(status).not.toBe(0);
+      expect(stderr).toContain("error TS");
+    },
+    30_000,
+  );
+});
+
+describe("trails-tsc diagnostic remap — Phase 1b.2", () => {
+  it("remaps error line from virtualized coordinates to original source line", () => {
+    const configPath = path.join(FIXTURES_DIR, "tsconfig-with-error.json");
+    const { program, host } = createProgramWithArPlugin(configPath);
+    const diagnostics = getPreEmitDiagnostics(program);
+
+    expect(diagnostics.length).toBeGreaterThan(0);
+
+    const errorDiag = diagnostics.find((d) => d.code === 2322);
+    expect(errorDiag).toBeDefined();
+    expect(errorDiag!.fileName).toBeDefined();
+
+    const virtualLine = errorDiag!.startPosition!.line;
+
+    const originalText = fs.readFileSync(path.join(FIXTURES_DIR, "post-with-error.ts"), "utf8");
+    const originalLines = originalText.split("\n");
+    const errorLineIdx = originalLines.findIndex((l) => l.includes('"not a number"'));
+    expect(errorLineIdx).toBeGreaterThan(-1);
+
+    expect(virtualLine).toBeGreaterThan(errorLineIdx);
+
+    const remapped = remapDiagnostics(diagnostics, host);
+    const remappedDiag = remapped.find((d) => d.code === 2322);
+    expect(remappedDiag).toBeDefined();
+    const remappedLine = remappedDiag!.startPosition!.line;
+    expect(remappedLine).toBe(errorLineIdx);
+  });
+
+  it("non-virtualized file diagnostics pass through unchanged", () => {
+    const configPath = path.join(FIXTURES_DIR, "tsconfig-with-error.json");
+    const { program, host } = createProgramWithArPlugin(configPath);
+    const diagnostics = getPreEmitDiagnostics(program);
+    const remapped = remapDiagnostics(diagnostics, host);
+    for (let i = 0; i < diagnostics.length; i++) {
+      const d = diagnostics[i];
+      if (!d.fileName) continue;
+      const deltas = host.getDeltasForFile(path.resolve(d.fileName));
+      if (!deltas || deltas.length === 0) {
+        // eslint-disable-next-line vitest/no-conditional-expect
+        expect(remapped[i].pos).toBe(d.pos);
+      }
+    }
+  });
+});
+
+describe("trails-tsc .tse diagnostic remap", () => {
+  it("moves a compiled view's diagnostic to the .tse line and the span's column", () => {
+    const shimLine = "  _ob.append(readingTime(post.title));";
+    const character = shimLine.indexOf("post.title");
+    const diagnostic = {
+      fileName: "/app/.trails/views/posts/_post.html.tse.ts",
+      pos: 900,
+      end: 900 + "post.title".length,
+      code: 2345,
+      category: 1,
+      text: "Argument of type 'string | null' is not assignable to parameter of type 'number'.",
+      startPosition: { line: 40, character },
+      endPosition: { line: 40, character: character + "post.title".length },
+      sourceLines: [{ line: 40, text: shimLine }],
+    } as unknown as Diagnostic;
+    const sourceContent =
+      "<div>\n  <p><%= post.title %> <%= readingTime(post.title) %></p>\n</div>\n";
+    const [remapped] = remapDiagnostics([diagnostic], {
+      getDeltasForFile: () => undefined,
+      getOriginalText: () => undefined,
+      getTseSourceMap: () => ({
+        source: "/app/app/views/posts/_post.html.tse",
+        sourceContent,
+        lines: new Map([[40, [{ line: 1, genCol: 13, srcCol: 27 }]]]),
+      }),
+    });
+    expect(remapped.fileName).toBe("/app/app/views/posts/_post.html.tse");
+    expect(remapped.startPosition).toEqual({ line: 1, character: 39 });
+    expect(sourceContent.slice(remapped.pos, remapped.end)).toBe("post.title");
+    expect(remapped.messageChain?.at(-1)?.text).toBe("in <%= readingTime(post.title) %>");
+    expect(remapped.sourceLines).toEqual([
+      { line: 1, text: "  <p><%= post.title %> <%= readingTime(post.title) %></p>\n" },
+    ]);
+  });
+});
+
+describe("trails-tsc .tse diagnostic span end", () => {
+  async function remapSpan(source: string, from: string, to: string) {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-span-"));
+    fs.mkdirSync(path.join(root, "app/views/posts"), { recursive: true });
+    fs.writeFileSync(path.join(root, "app/views/posts/show.html.tse"), source);
+    await buildViews({ cwd: root });
+    const shim = path.join(root, ".trails/views/posts/show.html.tse.ts");
+    const text = fs.readFileSync(shim, "utf8");
+    const map = JSON.parse(fs.readFileSync(shim + ".map", "utf8"));
+    const lines = new Map<number, { line: number; genCol: number; srcCol: number }[]>();
+    for (const m of decodeLineMappings(map.mappings)) {
+      if (!lines.has(m.genLine)) lines.set(m.genLine, []);
+      lines.get(m.genLine)!.push({ line: m.srcLine, genCol: m.genCol!, srcCol: m.srcCol! });
+    }
+    const position = (offset: number): { line: number; character: number } => {
+      const before = text.slice(0, offset).split("\n");
+      return { line: before.length - 1, character: before[before.length - 1].length };
+    };
+    const pos = text.indexOf(from);
+    const end = text.indexOf(to, pos) + to.length;
+    const diagnostic = {
+      fileName: shim,
+      pos,
+      end,
+      code: 2345,
+      category: 1,
+      text: "x",
+      startPosition: position(pos),
+      endPosition: position(end),
+    } as unknown as Diagnostic;
+    const [remapped] = remapDiagnostics([diagnostic], {
+      getDeltasForFile: () => undefined,
+      getOriginalText: () => undefined,
+      getTseSourceMap: () => ({ source: "show.html.tse", sourceContent: source, lines }),
+    });
+    return [source.slice(remapped.pos, remapped.end), remapped] as const;
+  }
+
+  it("maps a span crossing two lines of a multi-line tag through each line's own mapping", async () => {
+    const source = "<p>\n  <% const total = sum(\n       1, 2); %>\n</p>\n";
+    const [span, remapped] = await remapSpan(source, "sum(", "2)");
+    expect(span).toBe("sum(\n       1, 2)");
+    expect(remapped.startPosition).toEqual({ line: 1, character: 19 });
+    expect(remapped.endPosition).toEqual({ line: 2, character: 12 });
+    expect(remapped.sourceLines?.map((l) => l.line)).toEqual([1, 2]);
+  });
+
+  it("names the enclosing tag for a diagnostic on a later line of a multi-line tag", async () => {
+    const source = "<p>\n  <% const total = sum(\n       1, 2); %>\n</p>\n<%= total %>\n";
+    const [, remapped] = await remapSpan(source, "2)", "2)");
+    expect(remapped.messageChain?.at(-1)?.text).toBe("in <% const total = sum( … %>");
+  });
+
+  it("clamps a span around a yield's re-emitted call to the argument the template wrote", async () => {
+    const [span] = await remapSpan("<main><%= yield(123) %></main>\n", "context.yield(", "123)");
+    expect(span).toBe("123");
+    expect((await remapSpan("<main><%= yield(123) %></main>\n", "123", "123"))[0]).toBe("123");
+  });
+});
+
+describe("trails-tsc .tse views", () => {
+  itIfCliBin(
+    "rebuilds the ts-plugin's viewsDir and reports a helper misuse at the .tse line",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-views-"));
+      const write = (rel: string, body: string): void => {
+        fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+        fs.writeFileSync(path.join(root, rel), body);
+      };
+      write(
+        "stubs/actionview.d.ts",
+        "export interface TemplateRegistry {}\nexport type TemplateLocals<T> = T;\nexport declare class Base {}\n",
+      );
+      write(
+        "stubs/actionpack.d.ts",
+        "export declare namespace ActionController { class Base {} }\n",
+      );
+      write(
+        "app/helpers/posts-helper.ts",
+        "export const PostsHelper = { readingTime(words: number): string { return String(words); } };\n",
+      );
+      write("app/models/post.ts", "export class Post { title: string | null = null; }\n");
+      write(
+        "app/views/posts/_post.html.tse",
+        "<div>\n  <p><%= readingTime(post.title) %></p>\n</div>\n",
+      );
+      write(
+        "tsconfig.json",
+        JSON.stringify({
+          compilerOptions: {
+            target: "ES2022",
+            module: "ESNext",
+            moduleResolution: "Bundler",
+            strict: true,
+            noEmit: true,
+            types: [],
+            paths: {
+              "@blazetrails/actionview": ["./stubs/actionview.d.ts"],
+              "@blazetrails/actionpack": ["./stubs/actionpack.d.ts"],
+            },
+            plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin", viewsDir: "app/views" }],
+          },
+          include: ["app", ".trails/views"],
+        }),
+      );
+      let stderr = "";
+      try {
+        execFileSync("node", [CLI_BIN_PATH, "-p", path.join(root, "tsconfig.json")], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+          cwd: root,
+        });
+      } catch (err) {
+        stderr = (err as { stderr?: string }).stderr ?? "";
+      }
+      expect(fs.existsSync(path.join(root, ".trails/views/posts/_post.html.tse.ts"))).toBe(true);
+      expect(stderr).toContain("app/views/posts/_post.html.tse(2,22): error TS2345");
+      expect(stderr).toContain("in <%= readingTime(post.title) %>");
+      fs.rmSync(path.join(root, ".trails"), { recursive: true, force: true });
+      try {
+        execFileSync("node", [CLI_BIN_PATH, "-b", root], {
+          encoding: "utf8",
+          stdio: ["pipe", "pipe", "pipe"],
+          cwd: root,
+        });
+      } catch {
+        void 0;
+      }
+      expect(fs.existsSync(path.join(root, ".trails/views/posts/_post.html.tse.ts"))).toBe(true);
+    },
+    30_000,
+  );
+});
+
+describe("trails-tsc transitive extends — Phase 1b.3", () => {
+  const TRANSITIVE_DIR = path.resolve(FIXTURES_DIR, "transitive");
+
+  it("virtualizes `class Admin extends User` where User extends Base", () => {
+    const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+    const diagnostics = getPreEmitDiagnostics(program);
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("admin.role types as string, admin.name inherited from User types as string", () => {
+    const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+    const checker = program.getProject().checker;
+
+    const consumerFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "consumer.ts"));
+    expect(consumerFile).toBeDefined();
+
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        const type = checker.getTypeAtLocation(node.initializer);
+        probed[node.name.text] = checker.typeToString(type);
+      }
+      node.forEachChild(visit);
+    }
+    consumerFile!.forEachChild(visit);
+
+    expect(probed["userName"]).toBe("string");
+    expect(probed["adminRole"]).toBe("string");
+    expect(probed["adminName"]).toBe("string");
+  });
+
+  it("User (direct extends Base) still virtualizes correctly", () => {
+    const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+    const userFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "user.ts"));
+    expect(userFile).toBeDefined();
+    expect(userFile!.text).toContain("get name(): string");
+  });
+
+  it("Admin (transitive via User) gets declares injected", () => {
+    const configPath = path.join(TRANSITIVE_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+    const adminFile = program.getSourceFile(path.join(TRANSITIVE_DIR, "admin.ts"));
+    expect(adminFile).toBeDefined();
+    expect(adminFile!.text).toContain("get role(): string");
+  });
+});
+
+describe("trails-tsc scopes and enums", () => {
+  const DIR = path.resolve(FIXTURES_DIR, "relation-scopes");
+
+  it("chains scopes off a Relation and types an enum attribute as its keys", () => {
+    const { program } = createProgramWithArPlugin(path.join(DIR, "tsconfig.json"));
+    expect(getPreEmitDiagnostics(program)).toHaveLength(0);
+
+    const checker = program.getProject().checker;
+    const consumer = program.getSourceFile(path.join(DIR, "consumer.ts"))!;
+    const probed: Record<string, string> = {};
+    consumer.forEachChild(function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        probed[node.name.text] = checker.typeToString(checker.getTypeAtLocation(node.initializer));
+      }
+      node.forEachChild(visit);
+    });
+    expect(probed["chained"]).toBe("Relation<Post, false>");
+    expect(probed["status"]).toBe('"archived" | "draft"');
+  });
+});
+
+describe("trails-tsc auto-import — Phase 1b.4", () => {
+  const AUTO_IMPORT_DIR = path.resolve(FIXTURES_DIR, "auto-import");
+
+  it("auto-injects `import type { Author }` into post.ts (no user-written import)", () => {
+    const configPath = path.join(AUTO_IMPORT_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+
+    const postFile = program.getSourceFile(path.join(AUTO_IMPORT_DIR, "post.ts"));
+    expect(postFile).toBeDefined();
+    expect(postFile!.text).toContain("import type { Author }");
+  });
+
+  it("zero diagnostics — auto-imported Author resolves for the belongsTo declare", () => {
+    const configPath = path.join(AUTO_IMPORT_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+    const diagnostics = getPreEmitDiagnostics(program);
+
+    for (const d of diagnostics) {
+      const msg = d.text;
+      const loc = d.fileName
+        ? `${path.basename(d.fileName)}:${(d.startPosition?.line ?? 0) + 1}`
+        : "?";
+      console.error(`DIAG [${d.code}] ${loc}: ${msg}`);
+    }
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("user-written import for Author prevents duplicate auto-import", () => {
+    const tempDir = fs.mkdtempSync(path.join(AUTO_IMPORT_DIR, ".dup-test-"));
+    try {
+      for (const f of fs.readdirSync(AUTO_IMPORT_DIR)) {
+        const src = path.join(AUTO_IMPORT_DIR, f);
+        if (fs.statSync(src).isFile()) {
+          fs.copyFileSync(src, path.join(tempDir, f));
+        }
+      }
+      const postPath = path.join(tempDir, "post.ts");
+      const postSource = fs.readFileSync(postPath, "utf8");
+      const explicitImport = 'import type { Author } from "./author.js";\n';
+      if (!postSource.includes(explicitImport)) {
+        fs.writeFileSync(postPath, explicitImport + postSource);
+      }
+
+      const configPath = path.join(tempDir, "tsconfig.json");
+      const { program } = createProgramWithArPlugin(configPath);
+      const postFile = program.getSourceFile(path.resolve(postPath));
+      expect(postFile).toBeDefined();
+
+      const matches = postFile!.text.match(/import type\s*\{\s*Author\s*\}/g) ?? [];
+      expect(matches).toHaveLength(1);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("trails-tsc --build composite projects — Phase 1b.5", () => {
+  const COMPOSITE_DIR = path.resolve(FIXTURES_DIR, "composite");
+
+  function withTempComposite(fn: (dir: string) => void): void {
+    const tempDir = fs.mkdtempSync(path.join(FIXTURES_DIR, ".composite-"));
+    try {
+      fs.cpSync(COMPOSITE_DIR, tempDir, { recursive: true });
+      fn(tempDir);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  it("builds a composite solution with a virtualizing host on every project", () => {
+    withTempComposite((dir) => {
+      const diagnostics: Diagnostic[] = [];
+      const builder = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
+        onDiagnostic: (d) => {
+          diagnostics.push(d);
+          const msg = d.text;
+          const loc = d.fileName
+            ? `${path.basename(d.fileName)}:${(d.startPosition?.line ?? 0) + 1}`
+            : "?";
+          console.error(`DIAG [${d.code}] ${loc}: ${msg}`);
+        },
+      });
+      const status = builder.build();
+      expect(diagnostics).toHaveLength(0);
+      expect(status).toBe(ExitStatus.Success);
+
+      expect(fs.existsSync(path.join(dir, "models", "dist", "author.d.ts"))).toBe(true);
+      expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
+
+      expect(fs.existsSync(path.join(dir, "models", "dist", "tsconfig.tsbuildinfo"))).toBe(true);
+      expect(fs.existsSync(path.join(dir, "app", "dist", "tsconfig.tsbuildinfo"))).toBe(true);
+    });
+  });
+
+  itIfCliBin(
+    "CLI binary --build exits 0 on the composite fixture",
+    async () => {
+      const { execFileSync } = await import("node:child_process");
+      withTempComposite((dir) => {
+        const result = execFileSync(
+          "node",
+          [CLI_BIN_PATH, "--build", path.join(dir, "tsconfig.json")],
+          {
+            encoding: "utf8",
+            stdio: ["pipe", "pipe", "pipe"],
+          },
+        );
+        expect(result).toBe("");
+        expect(fs.existsSync(path.join(dir, "app", "dist", "post.d.ts"))).toBe(true);
+      });
+    },
+    30_000,
+  );
+
+  it("re-build after editing a model reflects the new declares in dependents", () => {
+    withTempComposite((dir) => {
+      const firstDiags: Diagnostic[] = [];
+      const first = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
+        onDiagnostic: (d) => firstDiags.push(d),
+      });
+      expect(first.build()).toBe(ExitStatus.Success);
+      expect(firstDiags).toHaveLength(0);
+
+      const authorPath = path.join(dir, "models", "author.ts");
+      const authorSrc = fs.readFileSync(authorPath, "utf8");
+      fs.writeFileSync(
+        authorPath,
+        authorSrc.replace(
+          'this.attribute("name", "string");',
+          'this.attribute("name", "string");\n    this.attribute("bio", "string");',
+        ),
+      );
+
+      const secondDiags: Diagnostic[] = [];
+      const second = createBuilderWithArPlugin([path.join(dir, "tsconfig.json")], {
+        onDiagnostic: (d) => secondDiags.push(d),
+      });
+      expect(second.build()).toBe(ExitStatus.Success);
+      expect(secondDiags).toHaveLength(0);
+
+      const authorDts = fs.readFileSync(path.join(dir, "models", "dist", "author.d.ts"), "utf8");
+      expect(authorDts).toContain("bio");
+    });
+  }, 30_000);
+});
+
+describe("trails-tsc — schemaColumnsByTable (Phase R.3)", () => {
+  const SCHEMA_DIR = path.join(FIXTURES_DIR, "schema");
+
+  const tmpDirs: string[] = [];
+  afterEach(() => {
+    for (const dir of tmpDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  function writeSchemaJson(contents: unknown): string {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-"));
+    tmpDirs.push(dir);
+    const p = path.join(dir, "s.json");
+    fs.writeFileSync(p, JSON.stringify(contents));
+    return p;
+  }
+
+  function spyExitAndStderr() {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    return { exit, err };
+  }
+
+  it("types schema-only columns through createTrailsProgram", () => {
+    const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath, {
+      schemaColumnsByTable: {
+        users: { name: "string", age: "integer", is_admin: "boolean" },
+      },
+    });
+    const checker = program.getProject().checker;
+
+    const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
+    expect(consumer).toBeDefined();
+
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        const t = checker.getTypeAtLocation(node.initializer);
+        probed[node.name.text] = checker.typeToString(t);
+      }
+      node.forEachChild(visit);
+    }
+    consumer!.forEachChild(visit);
+
+    expect(probed["name"]).toBe("string");
+    expect(probed["age"]).toBe("number");
+    expect(probed["isAdmin"]).toBe("boolean");
+  });
+
+  it("loadSchemaColumns: --schema <path> accepts legacy string shape", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const tmp = writeSchemaJson({ users: { name: "string", age: "integer" } });
+    expect(loadSchemaColumns(["--schema", tmp])).toEqual({
+      users: { name: "string", age: "integer" },
+    });
+  });
+
+  it("loadSchemaColumns: accepts rich shape end-to-end", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const payload = {
+      posts: {
+        title: { type: "string", null: false },
+        body: { type: "text", null: true },
+        tags: { type: "array", null: true, arrayElementType: "integer" },
+      },
+    };
+    const tmp = writeSchemaJson(payload);
+    expect(loadSchemaColumns(["--schema", tmp])).toEqual(payload);
+  });
+
+  it("loadSchemaColumns: mixed legacy + rich in one file", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const payload = {
+      posts: { legacy: "string", modern: { type: "integer", null: false } },
+    };
+    const tmp = writeSchemaJson(payload);
+    expect(loadSchemaColumns(["--schema", tmp])).toEqual(payload);
+  });
+
+  it("loadSchemaColumns: rejects rich shape with non-boolean `null`", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const tmp = writeSchemaJson({ posts: { title: { type: "string", null: "yes" } } });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/`null` must be a boolean/);
+  });
+
+  it("loadSchemaColumns: rejects non-object / non-string column value", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const tmp = writeSchemaJson({ posts: { title: 42 } });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/must be a Trails type string or an object/);
+  });
+
+  it("loadSchemaColumns: reports `null` when a column value is null", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const tmp = writeSchemaJson({ posts: { title: null } });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/\(got null\)/);
+  });
+
+  it("loadSchemaColumns: rejects arrayElementType on non-array type", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const tmp = writeSchemaJson({
+      posts: { title: { type: "string", arrayElementType: "integer" } },
+    });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", tmp])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/`arrayElementType` is only valid when `type` is "array"/);
+  });
+
+  it("missingTableReporter writes one stderr line per model", async () => {
+    const { missingTableReporter } = await import("../../lib/tsc-wrapper/cli.js");
+    const { err } = spyExitAndStderr();
+    const reporter = missingTableReporter({ posts: {} });
+    const model = {
+      className: "PullRequest",
+      dynamicTableName: false,
+      abstract: false,
+      optedOut: false,
+      fileName: "pr.ts",
+    };
+    reporter.onModel(model);
+    reporter.onModel(model);
+    reporter.flush();
+    expect(err).toHaveBeenCalledTimes(1);
+    expect(String(err.mock.calls[0][0])).toMatch(
+      /PullRequest \(pr\.ts\) reads table "pull_requests"/,
+    );
+  });
+
+  it("loadSchemaColumns: merges tables from more than one --schema file", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const a = writeSchemaJson({ users: { name: "string" } });
+    const b = writeSchemaJson({ repositories: { slug: "string" } });
+    expect(loadSchemaColumns(["--schema", a, `--schema=${b}`])).toEqual({
+      users: { name: "string" },
+      repositories: { slug: "string" },
+    });
+  });
+
+  it("loadSchemaColumns: refuses a table defined in two --schema files", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const a = writeSchemaJson({ users: { name: "string" } });
+    const b = writeSchemaJson({ users: { email: "string" } });
+    const { err } = spyExitAndStderr();
+    expect(() => loadSchemaColumns(["--schema", a, "--schema", b])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toContain(`table "users" is defined in both ${a} and ${b}`);
+  });
+
+  it("loadSchemaColumns: --schema <path>.ts parses TypeScript schema file", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const schemaSrc = [
+      'schema.createTable("posts", { id: false }, (t) => {',
+      '  t.string("title", { null: false });',
+      '  t.boolean("published");',
+      "});",
+    ].join("\n");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-ts-"));
+    tmpDirs.push(dir);
+    const tsPath = path.join(dir, "schema.ts");
+    fs.writeFileSync(tsPath, schemaSrc);
+    const result = loadSchemaColumns(["--schema", tsPath]);
+    expect(result).toBeDefined();
+    expect(result!.posts.title).toEqual({ type: "string", null: false });
+    expect(result!.posts.published).toEqual({ type: "boolean", null: true });
+  });
+
+  it("loadSchemaColumns: --schema <path>.js also routes through parseSchemaTs", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const schemaSrc = 'schema.createTable("tags", { id: false }, (t) => { t.string("name"); });';
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-js-"));
+    tmpDirs.push(dir);
+    const jsPath = path.join(dir, "schema.js");
+    fs.writeFileSync(jsPath, schemaSrc);
+    const result = loadSchemaColumns(["--schema", jsPath]);
+    expect(result).toBeDefined();
+    expect(result!.tags.name).toEqual({ type: "string", null: true });
+  });
+
+  it(".ts schema drives the same virtualized declares as equivalent .json schema end-to-end", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const schemaSrc = [
+      'schema.createTable("users", { id: false }, (t) => {',
+      '  t.string("name", { null: false });',
+      '  t.integer("age", { null: false });',
+      '  t.boolean("is_admin", { null: false });',
+      "});",
+    ].join("\n");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-ts-"));
+    tmpDirs.push(dir);
+    const tsPath = path.join(dir, "schema.ts");
+    fs.writeFileSync(tsPath, schemaSrc);
+
+    const fromTs = loadSchemaColumns(["--schema", tsPath]);
+    const fromJson = loadSchemaColumns([
+      "--schema",
+      writeSchemaJson({
+        users: {
+          name: { type: "string", null: false },
+          age: { type: "integer", null: false },
+          is_admin: { type: "boolean", null: false },
+        },
+      }),
+    ]);
+    expect(fromTs).toEqual(fromJson);
+    const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath, { schemaColumnsByTable: fromTs });
+    const checker = program.getProject().checker;
+    const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
+    expect(consumer).toBeDefined();
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        probed[node.name.text] = checker.typeToString(checker.getTypeAtLocation(node.initializer));
+      }
+      node.forEachChild(visit);
+    }
+    consumer!.forEachChild(visit);
+    expect(probed["name"]).toBe("string");
+    expect(probed["age"]).toBe("number");
+    expect(probed["isAdmin"]).toBe("boolean");
+  });
+
+  it("without schema, those accesses fall back to unknown (declares weren't injected)", () => {
+    const configPath = path.join(SCHEMA_DIR, "tsconfig.json");
+    const { program } = createProgramWithArPlugin(configPath);
+    const checker = program.getProject().checker;
+
+    const consumer = program.getSourceFile(path.join(SCHEMA_DIR, "consumer.ts"));
+    const probed: Record<string, string> = {};
+    function visit(node: ts.Node): void {
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+        probed[node.name.text] = checker.typeToString(checker.getTypeAtLocation(node.initializer));
+      }
+      node.forEachChild(visit);
+    }
+    consumer!.forEachChild(visit);
+
+    const diags = [
+      ...program.getSemanticDiagnostics(consumer!.fileName),
+      ...program.getSyntacticDiagnostics(consumer!.fileName),
+    ];
+    expect(diags.length).toBeGreaterThan(0);
+  });
+});
+
+describe("trails-tsc handleHelp", () => {
+  const tmpDirs: string[] = [];
+  afterEach(() => {
+    for (const dir of tmpDirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true });
+    vi.restoreAllMocks();
+  });
+
+  function spyExitAndStdout() {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    const out = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    return { exit, out };
+  }
+
+  it("--help prints usage including --schema and tsc passthrough note, exits 0", async () => {
+    const { handleHelp } = await import("../../lib/tsc-wrapper/cli.js");
+    const { exit, out } = spyExitAndStdout();
+    expect(() => handleHelp(["--help"])).toThrow(/process\.exit\(0\)/);
+    expect(exit).toHaveBeenCalledWith(0);
+    const text = out.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toMatch(/Usage: trails-tsc/);
+    expect(text).toMatch(/db\/schema\.ts/);
+    expect(text).toMatch(/tsc --help/);
+  });
+
+  it("-h is an alias for --help", async () => {
+    const { handleHelp } = await import("../../lib/tsc-wrapper/cli.js");
+    const { out } = spyExitAndStdout();
+    expect(() => handleHelp(["-h"])).toThrow(/process\.exit\(0\)/);
+    const text = out.mock.calls.map((c) => String(c[0])).join("");
+    expect(text).toMatch(/Usage: trails-tsc/);
+  });
+
+  it("no-op when neither --help nor -h is present", async () => {
+    const { handleHelp } = await import("../../lib/tsc-wrapper/cli.js");
+    const { exit } = spyExitAndStdout();
+    handleHelp(["--schema", "schema.ts", "--noEmit"]);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("loadSchemaColumns: warns on stderr when a .ts schema file has no createTable calls", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-empty-"));
+    tmpDirs.push(dir);
+    const tsPath = path.join(dir, "schema.ts");
+    fs.writeFileSync(tsPath, "// no createTable calls here\nexport const version = 1;\n");
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const result = loadSchemaColumns(["--schema", tsPath]);
+    expect(result).toBeDefined();
+    expect(Object.keys(result!)).toHaveLength(0);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/no createTable\(\) calls found/);
+  });
+
+  it("loadSchemaColumns: rejects unsupported schema extension with a clear error", async () => {
+    const { loadSchemaColumns } = await import("../../lib/tsc-wrapper/cli.js");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-mts-"));
+    tmpDirs.push(dir);
+    const mtsPath = path.join(dir, "schema.mts");
+    fs.writeFileSync(mtsPath, "export {};\n");
+    const err = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+      throw new Error(`process.exit(${code})`);
+    }) as never);
+    expect(() => loadSchemaColumns(["--schema", mtsPath])).toThrow(/process\.exit\(1\)/);
+    const combined = err.mock.calls.map((c) => String(c[0])).join("");
+    expect(combined).toMatch(/extension ".mts" is not supported/);
+  });
+});
+
+describe("loadTimeZoneAwareAttributes", () => {
+  it("reads the railtie default, a literal override, and gives up on anything else", async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-tsc-tz-"));
+    try {
+      fs.mkdirSync(path.join(root, "config", "initializers"), { recursive: true });
+      const app = path.join(root, "config", "application.ts");
+      expect(await loadTimeZoneAwareAttributes(root)).toBeUndefined();
+      fs.writeFileSync(
+        app,
+        "export class Blog extends Application {}\n// this.config.activeRecord.timeZoneAwareTypes = [];\n",
+      );
+      expect(await loadTimeZoneAwareAttributes(root)).toBe(true);
+      fs.writeFileSync(
+        path.join(root, "config", "initializers", "tz.ts"),
+        "ActiveRecord.Base.timeZoneAwareAttributes = false;\n",
+      );
+      expect(await loadTimeZoneAwareAttributes(root)).toBe(false);
+      fs.writeFileSync(app, "this.config.activeRecord.timeZoneAwareTypes = [];\n");
+      expect(await loadTimeZoneAwareAttributes(root)).toBeUndefined();
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
+    }
+  });
+});

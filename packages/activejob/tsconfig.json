@@ -3,16 +3,27 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
-    { "path": "../activesupport" },
-    { "path": "../date" },
-    { "path": "../globalid" },
-    { "path": "../i18n" },
-    { "path": "../ruby-compat" },
-    { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../globalid"
+    },
+    {
+      "path": "../i18n"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../vitest-matchers"
+    }
+  ]
 }

@@ -3,14 +3,13 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "lib",
     "types": ["node"]
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../date" },
     { "path": "../ruby-compat" },
     { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["src/**/*.test.ts", "src/**/__fixtures__"]
+  ]
 }

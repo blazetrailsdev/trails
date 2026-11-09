@@ -28,12 +28,12 @@ const ROOT = path.resolve(__dirname, "..");
 
 // Kept in sync with the rule's enrollment block in eslint.config.mjs.
 const ENROLLED = [
-  "packages/actionview/src/**/*.test.ts",
-  "packages/arel/src/**/*.test.ts",
+  "packages/actionview/test/**/*.test.ts",
+  "packages/arel/test/**/*.test.ts",
   "packages/date/test/**/*.test.ts",
   "packages/did-you-mean/test/**/*.test.ts",
-  "packages/globalid/src/**/*.test.ts",
-  "packages/i18n/src/**/*.test.ts",
+  "packages/globalid/test/**/*.test.ts",
+  "packages/i18n/test/**/*.test.ts",
 ];
 
 async function currentMarks(): Promise<Record<string, number>> {

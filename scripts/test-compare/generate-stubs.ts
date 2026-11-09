@@ -24,11 +24,11 @@ const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 
 const PKG_DIRS: Record<string, string> = {
-  arel: "packages/arel/src/",
-  activemodel: "packages/activemodel/src/",
+  arel: "packages/arel/test/",
+  activemodel: "packages/activemodel/test/",
   activerecord: "packages/activerecord/src/",
-  activesupport: "packages/activesupport/src/",
-  rack: "packages/rack/src/",
+  activesupport: "packages/activesupport/test/",
+  rack: "packages/rack/test/",
   "rack-session": "packages/rack-session/test/",
   "rack-test": "packages/rack-test/test/",
   bcrypt: "packages/bcrypt/test/",
@@ -37,16 +37,16 @@ const PKG_DIRS: Record<string, string> = {
   chronic: "packages/chronic/test/",
   builder: "packages/builder/test/",
   "et-orbi": "packages/et-orbi/test/",
-  raabro: "packages/raabro/src/",
-  zeitwerk: "packages/zeitwerk/src/",
+  raabro: "packages/raabro/test/",
+  zeitwerk: "packages/zeitwerk/test/",
   fugit: "packages/fugit/test/",
   actiondispatch: "packages/actionpack/test/action-dispatch/",
   actioncontroller: "packages/actionpack/test/action-controller/",
   abstractcontroller: "packages/actionpack/test/abstract-controller/",
-  actionview: "packages/actionview/src/",
+  actionview: "packages/actionview/test/",
   actioncable: "packages/actioncable/test/",
-  activejob: "packages/activejob/src/",
-  thor: "packages/thor/src/",
+  activejob: "packages/activejob/test/",
+  thor: "packages/thor/test/",
 };
 
 interface ConventionFile {

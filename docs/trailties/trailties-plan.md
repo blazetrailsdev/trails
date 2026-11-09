@@ -19,11 +19,11 @@ current state.
    anywhere. See `docs/trailties-template-builder.md` for the locked
    Option B design. Per-generator tests must include (a) snapshot, (b)
    `parseTs`, (c) `assertNoRubySource`.
-1. **No `node:*` imports** in `packages/trailties/src/` except `bin.ts`.
+1. **No `node:*` imports** in `packages/trailties/lib/` except `bin.ts`.
    Known exceptions pending cleanup: `commands/destroy.ts`,
    `generators/base.ts`, `source-annotation-extractor.ts` — scheduled
    for the async-fs rollout (see "Code quality" section).
-2. **No `process.*` references** in `packages/trailties/src/` after PR 0.3.
+2. **No `process.*` references** in `packages/trailties/lib/` after PR 0.3.
    Enforced by ESLint via `blazetrails/no-process-bypass`. Use the
    `processAdapter` snapshot for `env` / `cwd` / `stdout`.
 3. **Trailties code uses async fs only** (target state). Known sync
@@ -339,7 +339,7 @@ when 3–4 target helpers gain the required setter surface.
 
 - Migrate AR + actionpack `trailtie.ts` files from `extends BaseRailtie from
 "@blazetrails/activesupport"` to `@blazetrails/trailties` `Trailtie`;
-  delete `packages/activesupport/src/railtie.ts`. Blocked on B1.
+  delete `packages/activesupport/lib/railtie.ts`. Blocked on B1.
 
 ---
 
@@ -355,7 +355,7 @@ when 3–4 target helpers gain the required setter surface.
 - **GCM in `MessageEncryptor`** (~150 LOC): flip `EncryptedFile.CIPHER` to
   `aes-128-gcm`. `crypto-adapter.ts` already exposes optional `getAuthTag()`.
 - **`ActiveSupport::Messages::Codec` port** (~250 LOC): `Codec.with(default_serializer:)`
-  global flip. Some infrastructure already exists at `packages/activesupport/src/messages/`.
+  global flip. Some infrastructure already exists at `packages/activesupport/lib/messages/`.
 
 ---
 

@@ -1,6 +1,6 @@
 [
   "packages/actionpack/lib/action-dispatch/middleware/cookies.ts::KeyError",
-  "packages/activesupport/src/core-ext/date-and-time/calculations.ts::fetch",
-  "packages/activesupport/src/core-ext/string/conversions.ts::fetch",
+  "packages/activesupport/lib/core-ext/date-and-time/calculations.ts::fetch",
+  "packages/activesupport/lib/core-ext/string/conversions.ts::fetch",
   "packages/date/lib/date.ts::spaceship"
 ]

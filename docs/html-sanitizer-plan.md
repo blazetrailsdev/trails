@@ -29,9 +29,7 @@ packages/html-sanitizer/
   package.json              # name: @blazetrails/html-sanitizer
   src/
     index.ts                # public exports
-    safe-list-sanitizer.ts  # SafeListSanitizer
-    full-sanitizer.ts       # FullSanitizer
-    link-sanitizer.ts       # LinkSanitizer
+    sanitizer.ts            # Sanitizer, HTML4/HTML5 Full/Link/SafeListSanitizer
     scrubber.ts             # Scrubber base class + PermitScrubber / TargetScrubber
     config.ts               # default allowed tags/attrs/schemes (Rails parity)
     engine.ts               # internal: translates our config → sanitize-html opts
@@ -140,7 +138,7 @@ with nothing usable would be a tiny PR (see [[feedback_no_tiny_prs]]).
 
 ### PR 2 — `SafeListSanitizer`
 
-- `safe-list-sanitizer.ts` — the bulk of the surface (`#sanitize`,
+- `sanitizer.ts` (`SafeListSanitizer`) — the bulk of the surface (`#sanitize`,
   `:tags`/`:attributes` options, default-allowlist merging).
 - Engine wiring: allowed tags + attribute filtering, URL scheme guard.
 - Tests mirroring `safe_list_sanitizer_test.rb`.
@@ -195,5 +193,5 @@ an order of magnitude.
 
 ## Recent-merge followups
 
-- **PR 1** (#1974): ~5 LOC turn `isTrivialInput(html)` into a type predicate (`html is null | undefined | ""`) so the `as string` casts in `full-sanitizer.ts` and `link-sanitizer.ts` drop. When PR 3 (Scrubber) lands, replace curated `PRESERVED_TAGS` in `engine.ts` with an htmlparser2-based walker that supports real tag blocklists (~50-100 LOC + dep change) — closes the Loofah divergence.
+- **PR 1** (#1974): ~5 LOC turn `isTrivialInput(html)` into a type predicate (`html is null | undefined | ""`) so the `as string` casts in `sanitizer.ts`'s Full/Link sanitizers drop. When PR 3 (Scrubber) lands, replace curated `PRESERVED_TAGS` in `engine.ts` with an htmlparser2-based walker that supports real tag blocklists (~50-100 LOC + dep change) — closes the Loofah divergence.
 - **PR 2 SafeListSanitizer** (#1978): ~20 LOC copy-on-write semantics for class-level allowlists — add `getAllowedTagsFor(ctor: typeof SafeListSanitizer): Set<string>` helper that walks prototype chain or caches per-constructor (Rails uses `class_attribute`; subclasses share parent's `Set` unless they explicitly assign). ~30 LOC + dep change for `sanitize_css(styleString)` — Rails' standalone CSS sanitizer via Loofah's Crass-backed scrub; sanitize-html has no equivalent. Candidates: `postcss` custom plugin (already a transitive dep), or `css.escape`-based whitelist. **PR 3 engine rework** — revisit divergences: `<script>`/`<style>` tag _contents_ unconditionally discarded by sanitize-html (Loofah preserves text — `<a><script>baz</script></a>` becomes `<a></a>` vs Rails `<a>baz</a>`); void-element self-closing (sanitize-html `<img src="foo" />` XHTML-style; Loofah `<img src="foo">`).

@@ -156,7 +156,7 @@ place of the primitive. It was rejected:
   for equal content, `typeof` is `"object"`, a `Map` / `Set` / object key no
   longer finds the entry stored under the primitive, and every bind, quote and
   serialize arm that turns on `typeof x === "string"` (197 sites in
-  `activemodel/src` and `activerecord/src`, tests excluded) falls through to
+  `activemodel/lib` and `activerecord/src`, tests excluded) falls through to
   its non-string branch. The same holds for every line of user code that reads
   an attribute, where trails cannot sweep.
 - **It still would not be a String.** `title.length`, `title.startsWith(…)`,
@@ -175,12 +175,12 @@ place of the primitive. It was rejected:
 The rejected alternative, `serializableHash` / `asJson` returning `Promise`
 unconditionally the way RFC 0063 made `isValid()` return `Promise<boolean>`,
 propagates like this: `asJson` is the recursive dispatcher at
-`activesupport/src/core-ext/object/json.ts:256`, standing in for Ruby's
+`activesupport/lib/core-ext/object/json.ts:256`, standing in for Ruby's
 `as_json` method lookup, with ~19 `asJson` definitions feeding it.
 `Array.asJson` recurses per element back through that dispatcher (`:125-137`)
 and `Enumerable.asJson` delegates to `Array.asJson` (`:85-89`), so any
 collection containing a model goes async. `JSONGemEncoder#jsonify`
-(`activesupport/src/json/encoding.ts:40`, Rails'
+(`activesupport/lib/json/encoding.ts:40`, Rails'
 `activesupport/lib/active_support/json/encoding.rb`) recurses through `asJson`
 for every nested node, so the encoder goes async; `Encoding#encode`
 (`encoding.ts:19`) and its call sites follow, and `to_json` returns a Promise
@@ -191,7 +191,7 @@ the `JSON.stringify` case, so the same sync/async split survives, relocated out
 of one contained Proxy and duplicated across every `asJson` definition.
 
 On the `JSON.stringify` path, trails' `toJSON`
-(`activesupport/src/core-ext/object/json.ts:47-60`, the port of
+(`activesupport/lib/core-ext/object/json.ts:47-60`, the port of
 `ActiveSupport::ToJsonWithActiveSupportEncoder#to_json`) returns
 `this.asJson()` from inside the synchronous call with only the property key, so
 there is no `include:` to load and nothing to await. It is a fixable coupling,
@@ -376,7 +376,7 @@ shape.
 
 The blocker is that `I18n.translate` is synchronous in Ruby while every
 `ActiveSupport::Cache` store's `read` / `write` is async
-(`packages/activesupport/src/cache/store.ts:250`, `:352`), so `Cache#_fetch`
+(`packages/activesupport/lib/cache/store.ts:250`, `:352`), so `Cache#_fetch`
 (`vendor/i18n/v1.14.8/lib/i18n/backend/cache.rb:93-99`) has no port that keeps
 both halves.
 
@@ -424,7 +424,7 @@ primitive, so a thenable translation breaks `` `Name ${error.message}` `` and
 
 What made the sync answer cheap is that trails had already put the asynchrony
 at the load: `setLoadPath`, `reloadBang` and `eagerLoadBang` are async
-(`packages/i18n/src/i18n.ts:127`, `:139`, `:144`), converged there by
+(`packages/i18n/lib/i18n.ts:127`, `:139`, `:144`), converged there by
 `i18n-async-reload-chain` and `i18n-backend-async-read-path` under RFC 0074,
 against Ruby's lazy `init_translations unless initialized?` inside
 `Backend::Simple#lookup`
@@ -449,5 +449,5 @@ The repo owner reversed two rulings on 2026-10-30, in RFC 0213.
   so a port would have no Ruby source to mirror. Vendoring v2.7.2, the version
   Rails 8.0.2 locks (`vendor/rails/v8.0.2/Gemfile.lock:676`), removes that, and
   only `Module#autoload` lacks a JS form. The application scan in
-  `packages/trailties/src/application/finisher.ts` was an invented loader with
+  `packages/trailties/lib/application/finisher.ts` was an invented loader with
   no file contract and no reload.

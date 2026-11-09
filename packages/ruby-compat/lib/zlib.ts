@@ -195,6 +195,16 @@ class Inflate {
     return ret;
   }
 
+  /** `rb_zstream_total_in` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:1505`). */
+  totalIn(): number {
+    return this.input.length;
+  }
+
+  /** `rb_zstream_total_out` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:1514`). */
+  totalOut(): number {
+    return this.produced;
+  }
+
   /**
    * `rb_zstream_finish` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:1409`). Every
    * chunk was inflated to a sync point as it arrived, so nothing is left.

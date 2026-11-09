@@ -1,0 +1,102 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { readdir, writeFile } from "fs/promises";
+import { join } from "path";
+import { run } from "../../lib/cli.js";
+import {
+  captureConsoleErrors,
+  exitReason,
+  MIGRATION_BODY,
+  mkE2eTmpDir,
+  teardownE2eFixture,
+} from "./helpers.js";
+
+const PG_URL = process.env.PG_TEST_URL;
+
+function pgUrlWithDb(url: string, dbName: string): string {
+  const parsed = new URL(url);
+  parsed.pathname = `/${dbName}`;
+  return parsed.toString();
+}
+
+describe.skipIf(!PG_URL)("postgres-happy-path E2E", { timeout: 30_000 }, () => {
+  let tmpDir: string;
+  let dbUrl: string;
+  let origTrailsEnv: string | undefined;
+
+  beforeEach(async () => {
+    tmpDir = await mkE2eTmpDir("ar-cli-e2e-pg-");
+    dbUrl = pgUrlWithDb(PG_URL!, `ar_cli_e2e_${process.hrtime.bigint()}`);
+    origTrailsEnv = process.env.TRAILS_ENV;
+    process.env.TRAILS_ENV = "development";
+  });
+
+  afterEach(async () => {
+    try {
+      await run(["db:drop"], tmpDir);
+    } catch {
+      /** @empty */
+    }
+    vi.restoreAllMocks();
+    if (origTrailsEnv === undefined) {
+      delete process.env.TRAILS_ENV;
+    } else {
+      process.env.TRAILS_ENV = origTrailsEnv;
+    }
+    await teardownE2eFixture(tmpDir);
+  }, 30_000);
+
+  it("init → db:create → generate:migration → db:migrate → db:version → db:migrate:status", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const errors = captureConsoleErrors();
+
+    const initCode = await run(["init", "--driver", "pg"], tmpDir);
+    expect(initCode, exitReason("ar init should exit 0", errors)).toBe(0);
+
+    const pgConfig = `const config = {
+  development: { adapter: "postgresql", url: "${dbUrl}" },
+  test:        { adapter: "postgresql", url: "${dbUrl}" },
+  production:  { adapter: "postgresql", url: "${dbUrl}" },
+};
+export default config;
+`;
+    await writeFile(join(tmpDir, "config", "database.ts"), pgConfig, "utf8");
+
+    const createCode = await run(["db:create"], tmpDir);
+    expect(createCode, exitReason("ar db:create should exit 0", errors)).toBe(0);
+
+    const genCode = await run(["generate:migration", "AddUsersTable"], tmpDir);
+    expect(genCode, exitReason("ar generate:migration should exit 0", errors)).toBe(0);
+
+    const migrateDir = join(tmpDir, "db", "migrate");
+    const entries = await readdir(migrateDir);
+    const migrationEntry = entries.find((e) => e.endsWith("_add_users_table.ts"));
+    expect(migrationEntry, "generated migration file should exist").toBeTruthy();
+
+    const migrationPath = join(migrateDir, migrationEntry!);
+    const version = migrationEntry!.split("_")[0];
+
+    await writeFile(migrationPath, MIGRATION_BODY, "utf8");
+
+    const migrateCode = await run(["db:migrate"], tmpDir);
+    expect(migrateCode, exitReason("ar db:migrate should exit 0", errors)).toBe(0);
+
+    const versionLines: string[] = [];
+    vi.spyOn(console, "log").mockImplementation(
+      (...args) => void versionLines.push(args.map(String).join(" ")),
+    );
+    const versionCode = await run(["db:version"], tmpDir);
+    expect(versionCode, exitReason("ar db:version should exit 0", errors)).toBe(0);
+    expect(versionLines.join("\n")).toContain(`Current version: ${version}`);
+
+    const statusChunks: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk: string | Uint8Array) => {
+      statusChunks.push(String(chunk));
+      return true;
+    });
+    const statusCode = await run(["db:migrate:status"], tmpDir);
+    expect(statusCode, exitReason("ar db:migrate:status should exit 0", errors)).toBe(0);
+    const statusText = statusChunks.join("");
+    expect(statusText).toContain("up");
+    expect(statusText).toContain(version);
+  });
+});

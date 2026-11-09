@@ -253,7 +253,7 @@ describe("statically expanded loop-generated it() titles", () => {
     ).toEqual([["rejects an adapter whose <expr> a proxy intercepts on <expr>", true]]);
   });
 
-  // activesupport/src/cache/serializer-with-fallback.test.ts:39-47 — the inner
+  // activesupport/test/cache/serializer-with-fallback.test.ts:39-47 — the inner
   // loop over LEGACY_FORMATS expands, but `loader` never resolves, so each
   // iteration re-visits the same `it()` with the same skeleton.
   it("records a dynamic it() once per call site inside an expanded loop", () => {

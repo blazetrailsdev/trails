@@ -1,0 +1,166 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { mkdtemp, mkdir, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { run } from "../lib/cli.js";
+import { Base, DatabaseTasks, MigrationContext } from "@blazetrails/activerecord";
+
+const FAKE_CONFIG = `
+const config = { development: { adapter: "sqlite3", database: ":memory:", pool: 1 } };
+export default config;
+`;
+
+const FAKE_MULTI_DB_CONFIG = `
+const config = {
+  development: {
+    primary: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+    animals: { adapter: "sqlite3", database: ":memory:", pool: 1 },
+  },
+};
+export default config;
+`;
+
+async function makeFakeProject(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "ar-db-migrate-"));
+  await mkdir(join(dir, "config"), { recursive: true });
+  await writeFile(join(dir, "config", "database.ts"), FAKE_CONFIG, "utf8");
+  return dir;
+}
+
+async function makeMultiDbFakeProject(): Promise<string> {
+  const dir = await mkdtemp(join(tmpdir(), "ar-db-migrate-multi-"));
+  await mkdir(join(dir, "config"), { recursive: true });
+  await writeFile(join(dir, "config", "database.ts"), FAKE_MULTI_DB_CONFIG, "utf8");
+  return dir;
+}
+
+describe("DbMigrateTest", () => {
+  let err: string[];
+  let out: string[];
+  let migrateSpy: ReturnType<typeof vi.fn>;
+  let rollbackSpy: ReturnType<typeof vi.fn>;
+  let loadSchemaCurrentSpy: ReturnType<typeof vi.fn>;
+  let loadSeedSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    out = [];
+    err = [];
+    vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
+    vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
+    migrateSpy = vi.fn().mockResolvedValue(undefined);
+    rollbackSpy = vi.fn().mockResolvedValue(undefined);
+    loadSchemaCurrentSpy = vi.fn().mockResolvedValue(undefined);
+    loadSeedSpy = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(DatabaseTasks, "migrate").mockImplementation(migrateSpy);
+    vi.spyOn(MigrationContext.prototype, "rollback").mockImplementation(rollbackSpy);
+    vi.spyOn(DatabaseTasks, "loadSchemaCurrent").mockImplementation(loadSchemaCurrentSpy);
+    vi.spyOn(DatabaseTasks, "loadSeed").mockImplementation(loadSeedSpy);
+    vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
+    (DatabaseTasks as unknown as { _root: null })._root = null;
+    DatabaseTasks.seedLoader = null;
+  });
+
+  it("db:migrate calls migrate with no args", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
+    expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
+    expect(migrateSpy).toHaveBeenCalledWith({ skipInitialize: true });
+  });
+
+  it("db:migrate --version passes version string", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
+    let seenTargetVersion: number | null = null;
+    migrateSpy.mockImplementation(async () => {
+      seenTargetVersion = DatabaseTasks.targetVersion();
+    });
+    expect(await run(["db:migrate", "--version", "20240101000000"], await makeFakeProject())).toBe(
+      0,
+    );
+    expect(seenTargetVersion).toBe(20240101000000);
+    expect(DatabaseTasks.targetVersion()).toBeNull();
+  });
+
+  it("db:migrate calls MigrationContext#migrations before migrate", async () => {
+    vi.mocked(DatabaseTasks.migrate).mockRestore();
+    vi.stubEnv("TRAILS_ENV", "development");
+    const discoverSpy = vi
+      .spyOn(MigrationContext.prototype, "migrations", "get")
+      .mockReturnValue([]);
+    expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
+    expect(discoverSpy).toHaveBeenCalled();
+  });
+
+  it("db:migrate takes the multi-database path when the env has several configs", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
+    expect(await run(["db:migrate"], await makeMultiDbFakeProject())).toBe(0);
+    expect(DatabaseTasks.configsFor({ envName: "development" })).toHaveLength(2);
+    expect(migrateSpy).not.toHaveBeenCalled();
+  });
+
+  it("db:migrate exits 1 on missing config", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-noconfig-"));
+    expect(await run(["db:migrate"], dir)).toBe(1);
+    expect(err.join("\n")).toContain("failed to load config/database.ts");
+  });
+
+  it("db:migrate exits 1 when migrate throws", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
+    migrateSpy.mockRejectedValueOnce(new Error("boom"));
+    expect(await run(["db:migrate"], await makeFakeProject())).toBe(1);
+    expect(err.join("\n")).toContain("db:migrate failed");
+  });
+
+  it("db:rollback calls rollback with step 1 by default", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
+    expect(await run(["db:rollback"], await makeFakeProject())).toBe(0);
+    expect(rollbackSpy).toHaveBeenCalledWith(1);
+  });
+
+  it("db:rollback runs with the environment connection established", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
+    let connected = false;
+    rollbackSpy.mockImplementationOnce(() => {
+      connected = Base.connectionPool() != null;
+      return Promise.resolve();
+    });
+    expect(await run(["db:rollback"], await makeFakeProject())).toBe(0);
+    expect(connected).toBe(true);
+  });
+
+  it("db:rollback --step 2 passes 2", async () => {
+    expect(await run(["db:rollback", "--step", "2"], await makeFakeProject())).toBe(0);
+    expect(rollbackSpy).toHaveBeenCalledWith(2);
+  });
+
+  it("db:rollback exits 1 when rollback throws", async () => {
+    rollbackSpy.mockRejectedValueOnce(new Error("boom"));
+    expect(await run(["db:rollback"], await makeFakeProject())).toBe(1);
+    expect(err.join("\n")).toContain("db:rollback failed");
+  });
+
+  it("db:schema:load calls loadSchemaCurrent", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
+    expect(await run(["db:schema:load"], await makeFakeProject())).toBe(0);
+    expect(loadSchemaCurrentSpy).toHaveBeenCalledOnce();
+  });
+
+  it("db:seed prints friendly message when db/seeds.ts is absent", async () => {
+    expect(await run(["db:seed"], await makeFakeProject())).toBe(0);
+    expect(out.join("\n")).toContain("nothing to seed");
+    expect(loadSeedSpy).not.toHaveBeenCalled();
+  });
+
+  it("db:seed calls loadSeed when db/seeds.ts exists", async () => {
+    const dir = await makeFakeProject();
+    await mkdir(join(dir, "db"), { recursive: true });
+    await writeFile(join(dir, "db", "seeds.ts"), "export default {};", "utf8");
+    expect(await run(["db:seed"], dir)).toBe(0);
+    expect(loadSeedSpy).toHaveBeenCalledOnce();
+  });
+});

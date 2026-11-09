@@ -235,7 +235,7 @@ function isOrderableObjectMember(node) {
 /**
  * Top-level `const Name = { … }` / `export const Name = { … }` mixin object
  * literals as orderable containers — the CLAUDE.md "Module mixins" port shape
- * for a Ruby module of methods (`packages/arel/src/math.ts`), which is neither
+ * for a Ruby module of methods (`packages/arel/lib/math.ts`), which is neither
  * a ClassBody nor a FunctionDeclaration and so matched nothing before.
  *
  * Reordering properties is safe for the same reason class members are: the

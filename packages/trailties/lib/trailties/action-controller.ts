@@ -1,0 +1,195 @@
+import "./action-dispatch.js";
+import "./action-view.js";
+import {
+  camelize,
+  demodulize,
+  include,
+  onLoad,
+  TopLevel,
+  type CacheStore,
+  type Logger,
+} from "@blazetrails/activesupport";
+import { ActionController, AbstractController } from "@blazetrails/actionpack";
+import {
+  Dir,
+  except,
+  File,
+  getPath,
+  loadIseqEval,
+  Module,
+  rbFSend,
+  rbObjIsKindOf,
+  rbObjRespondTo,
+  RuntimeError,
+  constSet,
+} from "@blazetrails/ruby-compat";
+import { Trailtie as BaseTrailtie } from "../trailtie.js";
+
+export interface ActionControllerConfig {
+  raiseOnOpenRedirects: boolean;
+  logQueryTagsAroundActions: boolean;
+  wrapParametersByDefault: boolean;
+  includeAllHelpers: boolean;
+  performCaching?: boolean;
+  enableFragmentCacheLogging?: boolean;
+  allowForgeryProtection?: boolean;
+  raiseOnMissingCallbackActions?: boolean;
+  defaultProtectFromForgery?: boolean;
+  logger?: Logger | null;
+  cacheStore?: CacheStore | `:${string}` | readonly [`:${string}`, ...unknown[]] | null;
+  javascriptsDir?: string | null;
+  stylesheetsDir?: string | null;
+  assetHost?: string | null;
+  relativeUrlRoot?: string | null;
+}
+
+declare module "../trailtie/configuration.js" {
+  interface Configuration {
+    actionController: ActionControllerConfig;
+  }
+}
+
+export class Trailtie extends BaseTrailtie {
+  static {
+    BaseTrailtie.register(this);
+
+    this.config.set("actionController", {
+      raiseOnOpenRedirects: false,
+      logQueryTagsAroundActions: true,
+      wrapParametersByDefault: false,
+      includeAllHelpers: true,
+    } satisfies ActionControllerConfig);
+
+    this.initializer(
+      "action_controller.deprecator",
+      { before: "load_environment_config" },
+      (app) => {
+        app.deprecators.set("actionController", ActionController.deprecator());
+      },
+    );
+
+    this.initializer(
+      "action_controller.set_helpers_path",
+      { after: "prepend_helpers_path" },
+      async (app) => {
+        const helpersPaths = app.config.helpersPaths;
+        ActionController.setHelpersPath(helpersPaths);
+
+        for (const [name, mod] of await helperConstants(helpersPaths)) {
+          let owner: object = TopLevel;
+          for (const part of name.split("::").slice(0, -1)) {
+            const tbl = owner as Record<string, unknown>;
+            owner = (Object.hasOwn(tbl, part) ? tbl[part] : constSet(owner, part, {})) as object;
+          }
+          constSet(owner, demodulize(name), mod);
+        }
+
+        onLoad("action_controller", (base: unknown) => {
+          (base as ActionController.HelpersPathControllerClass).helpersPath =
+            ActionController.helpersPath();
+        });
+      },
+    );
+
+    this.initializer("action_controller.set_configs", async (app) => {
+      const paths = app.config.paths();
+      const options = this.config.actionController;
+
+      options.logger ??= TopLevel.Trails!.logger;
+      options.cacheStore ??= TopLevel.Trails!.cache;
+
+      options.javascriptsDir ??= await paths.get("public/javascripts")!.first();
+      options.stylesheetsDir ??= await paths.get("public/stylesheets")!.first();
+
+      options.assetHost ??= app.config.assetHost;
+      options.relativeUrlRoot ??= app.config.relativeUrlRoot;
+
+      onLoad("action_controller", (base: AbstractController.RoutesHelpersControllerClass) => {
+        const routes = app.routes();
+        include(base as unknown as new (...args: never[]) => unknown, routes.mountedHelpers());
+        AbstractController.Trailties.RoutesHelpers.with(routes)(base);
+
+        if (options.wrapParametersByDefault && rbObjRespondTo(base, "wrapParameters")) {
+          (base as unknown as typeof ActionController.Base).wrapParameters({ format: [":json"] });
+        }
+
+        const filteredOptions = except(
+          options as unknown as Record<string, unknown>,
+          "defaultProtectFromForgery",
+          "logQueryTagsAroundActions",
+          "permitAllParameters",
+          "actionOnUnpermittedParameters",
+          "alwaysPermittedParameters",
+          "wrapParametersByDefault",
+        );
+
+        for (const [key, v] of Object.entries(filteredOptions)) {
+          const k = `${key}=`;
+          if (rbObjRespondTo(base, k)) {
+            rbFSend(base, k, v);
+          } else if (!rbObjRespondTo(ActionController.Base, k)) {
+            throw new RuntimeError(`Invalid option key: ${k}`);
+          }
+        }
+      });
+    });
+
+    this.initializer("action_controller.request_forgery_protection", () => {
+      const options = this.config.actionController;
+
+      onLoad("action_controller_base", (base: typeof ActionController.Base) => {
+        if (options.defaultProtectFromForgery) {
+          base.protectFromForgery({ with: "exception" });
+        }
+      });
+    });
+
+    this.initializer("action_controller.test_case", (app) => {
+      onLoad("action_controller_test_case", () => {
+        ActionController.TestCase.executorAroundEachRequest =
+          app.config.activeSupport.executorAroundTestCase;
+      });
+    });
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function helperConstants(
+  paths: readonly string[],
+): Promise<Map<string, AbstractController.HelperMethodsModule>> {
+  const path = getPath();
+  const constants = new Map<string, AbstractController.HelperMethodsModule>();
+  if (!path.pathToFileURL) return constants;
+
+  const walk = async (dir: string, namespace: readonly string[]): Promise<void> => {
+    for (const entry of Dir.children(dir).slice().sort()) {
+      const full = path.join(dir, entry);
+      if (File.isDirectory(full)) {
+        await walk(full, [...namespace, entry]);
+        continue;
+      }
+      if (!/[-_]helper\.[cm]?[tj]s$/.test(entry) || /\.(test|d)\./.test(entry)) continue;
+
+      const stem = entry
+        .replace(/\.[cm]?[tj]s$/, "")
+        .replace(/[-_]helper$/, "")
+        .replaceAll("-", "_");
+      const name = `${camelize([...namespace, stem].join("/"))}Helper`;
+      const mod = await loadIseqEval(full);
+
+      const exported = mod[demodulize(name)];
+      if (rbObjIsKindOf(exported, Module)) {
+        constants.set(name, exported as AbstractController.HelperMethodsModule);
+      } else if (exported && typeof exported === "object") {
+        constants.set(name, exported);
+      }
+    }
+  };
+
+  for (const root of paths) {
+    if (File.isDirectory(root)) await walk(root, []);
+  }
+  return constants;
+}
+
+Object.defineProperty(Trailtie, "name", { value: "ActionController::Railtie" });

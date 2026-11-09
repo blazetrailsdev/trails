@@ -87,15 +87,23 @@ const monthsL = [
 const ampm = ["AM", "PM"];
 
 /**
- * `rb_strftime_with_timespec` (`vendor/ruby/v3.3.11/strftime.c:233-917`), on its
- * `timev` arm: `ts` is always `NULL`, as `rb_strftime` passes it.
+ * The `struct timespec` `rb_strftime_timespec` passes (`vendor/ruby/v3.3.11/strftime.c:938-946`).
+ *
+ * @noRailsEquivalent PERMANENT
  */
+export interface Timespec {
+  tvSec: bigint;
+  tvNsec: number;
+}
+
+/** `rb_strftime_with_timespec` (`vendor/ruby/v3.3.11/strftime.c:233-917`). */
 function rbStrftimeWithTimespec(
   ftime: { s: string; capacity: number },
   format: string,
   time: Time,
   vtm: StrftimeVtm,
-  timev: () => Rational,
+  timev: (() => Rational) | null,
+  ts: Timespec | null,
   gmt: boolean,
   maxsize: number,
 ): boolean {
@@ -155,7 +163,7 @@ function rbStrftimeWithTimespec(
     };
     const STRFTIME = (fmt: string): boolean => {
       const len = ftime.s.length;
-      if (!rbStrftimeWithTimespec(ftime, fmt, time, vtm, timev, gmt, maxsize)) return false;
+      if (!rbStrftimeWithTimespec(ftime, fmt, time, vtm, timev, ts, gmt, maxsize)) return false;
       const s = caseConv(ftime.s.slice(len), flags);
       const n = s.length;
       ftime.s = ftime.s.slice(0, len);
@@ -267,7 +275,12 @@ function rbStrftimeWithTimespec(
           i = 2;
           break again;
         case "s": {
-          const sec = timev().div(1);
+          if (ts) {
+            const sec = Number(ts.tvSec);
+            FMTV("0", 1, Number.isSafeInteger(sec) ? sec : ts.tvSec);
+            break again;
+          }
+          const sec = timev!().div(1);
           FMTV("0", 1, Number.isSafeInteger(sec) ? sec : BigInt(sec));
           break again;
         }
@@ -443,7 +456,17 @@ function rbStrftimeWithTimespec(
           const w = format[f] === "L" ? 3 : 9;
           if (precision <= 0) precision = w;
           NEEDS(precision);
-          const subsec = timev().mod(1);
+          if (ts) {
+            let subsec = ts.tvNsec;
+            if (9 < precision) {
+              ftime.s += String(subsec).padStart(9, "0") + "0".repeat(precision - 9);
+            } else {
+              for (let i = 0; i < 9 - precision; i++) subsec = Math.trunc(subsec / 10);
+              ftime.s += String(subsec).padStart(precision, "0");
+            }
+            break again;
+          }
+          const subsec = timev!().mod(1);
           let ww = precision;
           let n = subsec.numerator;
           while (9 <= ww) {
@@ -571,7 +594,41 @@ export function rbStrftime(
 ): string | null {
   const result = { s: "", capacity: 0 };
   if (
-    !rbStrftimeWithTimespec(result, format, time, vtm, timev, gmt, strftimeSizeLimit(format.length))
+    !rbStrftimeWithTimespec(
+      result,
+      format,
+      time,
+      vtm,
+      timev,
+      null,
+      gmt,
+      strftimeSizeLimit(format.length),
+    )
+  )
+    return null;
+  return result.s;
+}
+
+/** `rb_strftime_timespec` (`vendor/ruby/v3.3.11/strftime.c:938-946`). */
+export function rbStrftimeTimespec(
+  format: string,
+  time: Time,
+  vtm: StrftimeVtm,
+  ts: Timespec,
+  gmt: boolean,
+): string | null {
+  const result = { s: "", capacity: 0 };
+  if (
+    !rbStrftimeWithTimespec(
+      result,
+      format,
+      time,
+      vtm,
+      null,
+      ts,
+      gmt,
+      strftimeSizeLimit(format.length),
+    )
   )
     return null;
   return result.s;

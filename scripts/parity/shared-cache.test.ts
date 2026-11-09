@@ -247,12 +247,12 @@ describe("resolved read-set", () => {
           root,
           "packages/actionview/node_modules/@blazetrails/activesupport/dist/index.d.ts",
         ),
-        path.join(root, "packages/actionview/src/own.ts"),
+        path.join(root, "packages/actionview/lib/own.ts"),
         path.join(root, "node_modules/typescript/lib.d.ts"),
         outside,
       ],
       root,
-      new Set(["packages/actionview/src/own.ts"]),
+      new Set(["packages/actionview/lib/own.ts"]),
     );
     expect(readSet).toEqual(["packages/activesupport/dist/index.d.ts"]);
   });
@@ -448,7 +448,7 @@ describe("foreignAbsolutePath", () => {
   });
 
   it("accepts an absolute path inside the invoking worktree", () => {
-    const body = JSON.stringify({ note: `${root}/packages/arel/src/crud.ts` });
+    const body = JSON.stringify({ note: `${root}/packages/arel/lib/crud.ts` });
     expect(foreignAbsolutePath(body, root)).toBeNull();
   });
 

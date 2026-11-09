@@ -1,0 +1,17 @@
+import { Trails } from "../../../../lib/trails.js";
+
+Trails.application!.routes().draw(function () {
+  this.get("/posts", { to: "posts#index", as: "posts" });
+  this.post("/posts", { to: "posts#create" });
+  this.get("/admin/sessions", { to: "admin/sessions#index" });
+  this.get("/admin/users", { to: "admin/users#index" });
+  this.get("/posts/show", { to: "posts#show" });
+  this.get("/posts/link", { to: "posts#link" });
+  this.get("/posts/url", { to: "posts#url" });
+  this.get("/posts/canonical", { to: "posts#canonical" });
+  this.get("/boom", { to: "posts#boom" });
+  this.get("up", { to: "trails/health#show", as: "trails_health_check" });
+  this.get("/legacy", { to: "legacy#index", as: "legacy" });
+  this.get("/ping", { to: "pings#show" });
+  this.get("/posts/likes", { to: "posts/likes#show" });
+});

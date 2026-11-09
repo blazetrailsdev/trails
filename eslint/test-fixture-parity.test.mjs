@@ -140,7 +140,7 @@ describe("test-fixture-parity rule", () => {
         },
         {
           name: "non-activerecord file → ignored",
-          filename: path.join(ROOT, "packages/arel/src/foo.test.ts"),
+          filename: path.join(ROOT, "packages/arel/lib/foo.test.ts"),
           code: `describe("X", () => { it("find single value object", () => {}); });`,
         },
         {

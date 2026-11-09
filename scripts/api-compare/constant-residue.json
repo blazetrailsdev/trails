@@ -1021,15 +1021,18 @@
     }
   },
   "html-sanitizer": {
-    "rows": 4,
-    "excluded": [
-      "full-sanitizer.ts::FullSanitizer",
-      "link-sanitizer.ts::LinkSanitizer",
-      "safe-list-sanitizer.ts::SafeListSanitizer",
-      "sanitizer.ts::Sanitizer"
-    ],
+    "rows": 11,
+    "excluded": [],
     "unwalked": [],
-    "residue": {}
+    "residue": {
+      "sanitizer.ts::HTML4FullSanitizer": "Trails::HTML4::FullSanitizer",
+      "sanitizer.ts::HTML4LinkSanitizer": "Trails::HTML4::LinkSanitizer",
+      "sanitizer.ts::HTML4SafeListSanitizer": "Trails::HTML4::SafeListSanitizer",
+      "sanitizer.ts::HTML5FullSanitizer": "Trails::HTML5::FullSanitizer",
+      "sanitizer.ts::HTML5LinkSanitizer": "Trails::HTML5::LinkSanitizer",
+      "sanitizer.ts::HTML5SafeListSanitizer": "Trails::HTML5::SafeListSanitizer",
+      "sanitizer.ts::Sanitizer": "Trails::HTML::Sanitizer"
+    }
   },
   "i18n": {
     "rows": 27,
@@ -1150,7 +1153,7 @@
     }
   },
   "nokogiri": {
-    "rows": 25,
+    "rows": 26,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1168,6 +1171,7 @@
       "html5/node.ts::Node": "Nokogiri::HTML5::Node",
       "racc/parser.ts::ParseError": "Racc::ParseError",
       "xml/attr.ts::Attr": "Nokogiri::XML::Attr",
+      "xml/document-fragment.ts::DocumentFragment": "Nokogiri::XML::DocumentFragment",
       "xml/document.ts::XmlDocument": "Nokogiri::XML::Document",
       "xml/namespace.ts::Namespace": "Nokogiri::XML::Namespace",
       "xml/node-set.ts::NodeSet": "Nokogiri::XML::NodeSet",
@@ -1297,7 +1301,7 @@
     }
   },
   "trailties": {
-    "rows": 150,
+    "rows": 151,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
@@ -1345,6 +1349,7 @@
       "commands/destroy.ts::DestroyCommand": "Trails::Command::DestroyCommand",
       "commands/dev.ts::DevCommand": "Trails::Command::DevCommand",
       "commands/encrypted.ts::EncryptedCommand": "Trails::Command::EncryptedCommand",
+      "commands/gem-help.ts::GemHelpCommand": "Trails::Command::GemHelpCommand",
       "commands/generate.ts::GenerateCommand": "Trails::Command::GenerateCommand",
       "commands/notes.ts::NotesCommand": "Trails::Command::NotesCommand",
       "commands/plugin.ts::PluginCommand": "Trails::Command::PluginCommand",

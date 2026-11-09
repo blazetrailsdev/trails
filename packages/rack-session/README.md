@@ -55,5 +55,5 @@ stores, not directly.
 ## Source layout
 
 `lib/**` mirrors `lib/rack/session/**` under the gem's module root, matching how
-`packages/rack/src/**` mirrors `lib/rack/**`. A new file lands at the path the
+`packages/rack/lib/**` mirrors `lib/rack/**`. A new file lands at the path the
 table above gives it.

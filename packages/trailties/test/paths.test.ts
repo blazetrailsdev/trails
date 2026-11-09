@@ -1,0 +1,167 @@
+import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import {
+  File,
+  fsAdapterConfig,
+  RuntimeError,
+  registerFsAdapter,
+  type FsAdapter,
+  type PathAdapter,
+} from "@blazetrails/ruby-compat";
+import { Root } from "../lib/paths.js";
+
+const posixPath: PathAdapter = {
+  join: (...p) => p.join("/").replace(/\/+/g, "/"),
+  dirname: (p) => p.replace(/\/[^/]*$/, "") || "/",
+  basename: (p) => p.split("/").pop() ?? "",
+  resolve: (...p) =>
+    p
+      .reduce((o, x) => (!x ? o : x.startsWith("/") ? x : o ? `${o}/${x}` : x), "")
+      .replace(/\/+/g, "/"),
+  extname: (p) => (p.lastIndexOf(".") > 0 ? p.slice(p.lastIndexOf(".")) : ""),
+  isAbsolute: (p) => p.startsWith("/"),
+  sep: "/",
+};
+const stat = (d: boolean) => ({
+  isDirectory: () => d,
+  isFile: () => !d,
+  size: 0,
+  atime: new Date(),
+  mtime: new Date(),
+});
+function install(isDir = false): void {
+  registerFsAdapter(
+    "test",
+    {
+      cwd: () => "/",
+      exists: async () => true,
+      stat: async () => stat(isDir),
+      statSync: () => stat(isDir),
+    } as unknown as FsAdapter,
+    posixPath,
+  );
+  fsAdapterConfig.adapter = "test";
+}
+
+const PREV = fsAdapterConfig.adapter;
+let root: Root;
+beforeEach(() => {
+  install(false);
+  root = new Root("/foo/bar");
+});
+afterEach(() => {
+  fsAdapterConfig.adapter = PREV;
+});
+
+describe("PathsTest", () => {
+  test("a paths object initialized with nil can be updated", async () => {
+    const r = new Root(null);
+    r.add("app");
+    r.path = "/root";
+    expect(r.get("app")!.toAry()).toEqual(["app"]);
+    expect(await r.get("app")!.toA()).toEqual(["/root/app"]);
+  });
+
+  test("creating a root level path", async () => {
+    root.add("app");
+    expect(await root.get("app")!.toA()).toEqual(["/foo/bar/app"]);
+  });
+
+  test("raises exception if root path never set", async () => {
+    const r = new Root(null);
+    r.add("app");
+    await expect(r.get("app")!.toA()).rejects.toThrow();
+  });
+
+  test("creating a child level path", async () => {
+    root.add("app");
+    root.add("app/models");
+    expect(await root.get("app/models")!.toA()).toEqual(["/foo/bar/app/models"]);
+  });
+
+  test("adding multiple physical paths as an array", async () => {
+    root.add("app", { with: ["/app", "/app2"] });
+    expect(await root.get("app")!.toA()).toEqual(["/app", "/app2"]);
+  });
+
+  test("adding multiple physical paths using #push", async () => {
+    root.add("app");
+    root.get("app")!.push("app2");
+    expect(await root.get("app")!.toA()).toEqual(["/foo/bar/app", "/foo/bar/app2"]);
+  });
+
+  test("a path can be added to the load path on creation", async () => {
+    install(true);
+    root = new Root("/foo/bar");
+    root.add("app", { with: "/app", loadPath: true });
+    expect(root.get("app")!.isLoadPath()).toBeTruthy();
+    expect(await root.loadPaths()).toEqual(["/app"]);
+  });
+
+  test("load paths does NOT include files", async () => {
+    root.add("app/README.md", {
+      autoloadOnce: true,
+      eagerLoad: true,
+      autoload: true,
+      loadPath: true,
+    });
+    expect(await root.autoloadOnce()).toEqual([]);
+    expect(await root.eagerLoad()).toEqual([]);
+    expect(await root.autoloadPaths()).toEqual([]);
+    expect(await root.loadPaths()).toEqual([]);
+  });
+
+  test("it is possible to remove a path that should be autoloaded only once", async () => {
+    root.add("app", { with: "/app" });
+    root.get("app")!.autoloadOnceBang();
+    expect(root.get("app")!.isAutoloadOnce()).toBeTruthy();
+
+    root.get("app")!.skipAutoloadOnceBang();
+    expect(root.get("app")!.isAutoloadOnce()).toBeFalsy();
+    expect(await root.autoloadOnce()).not.toContain((await root.get("app")!.expanded())[0]);
+  });
+
+  test("it is possible to skip a path from eager loading", async () => {
+    root.add("app", { with: "/app" });
+    root.get("app")!.eagerLoadBang();
+    expect(root.get("app")!.isEagerLoad()).toBeTruthy();
+
+    root.get("app")!.skipEagerLoadBang();
+    expect(root.get("app")!.isEagerLoad()).toBeFalsy();
+    expect(await root.eagerLoad()).not.toContain((await root.get("app")!.toA())[0]);
+  });
+});
+
+describe("PathsIntegrationTest", () => {
+  test("A failed symlink is still a valid file", async () => {
+    registerFsAdapter(
+      "sym",
+      {
+        cwd: () => "/",
+        exists: async () => false,
+        existsSync: () => false,
+        stat: async () => stat(false),
+        statSync: () => stat(false),
+        lstat: async () => ({ ...stat(false), isSymbolicLink: () => true }),
+        lstatSync: () => ({ ...stat(false), isSymbolicLink: () => true }),
+      } as unknown as FsAdapter,
+      posixPath,
+    );
+    fsAdapterConfig.adapter = "sym";
+    expect(File.isSymlink("/foo/bar.rb")).toEqual(true);
+
+    root = new Root("/foo");
+    root.add("bar.rb");
+
+    let exception: Error | undefined;
+    await expect(
+      root
+        .get("bar.rb")!
+        .existent()
+        .catch((error: Error) => {
+          exception = error;
+          throw error;
+        }),
+    ).rejects.toThrow(RuntimeError);
+    expect(exception!.message).toMatch(File.expandPath("/foo/bar.rb"));
+  });
+});

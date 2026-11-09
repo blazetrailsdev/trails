@@ -7,8 +7,8 @@
       "unsignedFloat"
     ],
     "packages/activerecord/src/connection-handling.ts": ["_connection", "connection"],
-    "packages/activesupport/src/core-ext/benchmark.ts": ["_ms", "ms"],
-    "packages/mail/src/check-delivery-params.ts": [
+    "packages/activesupport/lib/core-ext/benchmark.ts": ["_ms", "ms"],
+    "packages/mail/lib/check-delivery-params.ts": [
       "_check",
       "_checkAddr",
       "_checkFrom",

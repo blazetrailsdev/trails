@@ -138,7 +138,7 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  * source root, as a convention path is.
  *
  * A gem's `railtie_test.rb` boots a `Rails::Application`, and trails ports each
- * gem's railtie in trailties (`packages/trailties/src/trailties/<gem>.ts`,
+ * gem's railtie in trailties (`packages/trailties/lib/trailties/<gem>.ts`,
  * with its test beside it) because the gem's own package cannot depend on
  * trailties. Without a row the file can only score against a convention path
  * in a package that cannot host it.
@@ -152,7 +152,7 @@ export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile:
  * Maps a Ruby test path to the TS test path our conventions put it at. The
  * i18n gem's lib root is `lib/i18n` while its test root is `test`, so a test
  * mirroring `lib/i18n/<x>.rb` sits at `test/i18n/<x>_test.rb`; that leading
- * segment is dropped so both sides land on `packages/i18n/src/<x>`.
+ * segment is dropped so both sides land on `packages/i18n/lib/<x>`.
  *
  * A shared test-behavior mixin (a `_behavior.rb` file under a `behaviors`
  * directory) is not a test file on either side — ours is a plain module the
@@ -1730,11 +1730,11 @@ function formatGate(g?: TestGate): string {
  */
 /** Each compare package's TS source root, repo-relative with a trailing slash. */
 export const PKG_SRC_DIRS: Record<string, string> = {
-  arel: "packages/arel/src/",
-  activemodel: "packages/activemodel/src/",
+  arel: "packages/arel/test/",
+  activemodel: "packages/activemodel/test/",
   activerecord: "packages/activerecord/src/",
-  activesupport: "packages/activesupport/src/",
-  rack: "packages/rack/src/",
+  activesupport: "packages/activesupport/test/",
+  rack: "packages/rack/test/",
   "rack-session": "packages/rack-session/test/",
   "rack-test": "packages/rack-test/test/",
   rackup: "packages/rackup/test/",
@@ -1743,33 +1743,33 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   marcel: "packages/marcel/test/",
   "mini-mime": "packages/mini-mime/test/",
   "net-smtp": "packages/net-smtp/test/",
-  rake: "packages/rake/src/",
+  rake: "packages/rake/test/",
   chronic: "packages/chronic/test/",
   builder: "packages/builder/test/",
   "et-orbi": "packages/et-orbi/test/",
-  raabro: "packages/raabro/src/",
+  raabro: "packages/raabro/test/",
   fugit: "packages/fugit/test/",
-  zeitwerk: "packages/zeitwerk/src/",
+  zeitwerk: "packages/zeitwerk/test/",
   actiondispatch: "packages/actionpack/test/action-dispatch/",
   actioncontroller: "packages/actionpack/test/action-controller/",
   abstractcontroller: "packages/actionpack/test/abstract-controller/",
-  actionview: "packages/actionview/src/",
-  "rails-dom-testing": "packages/actionview/src/rails-dom-testing/assertions/",
+  actionview: "packages/actionview/test/",
+  "rails-dom-testing": "packages/actionview/test/rails-dom-testing/assertions/",
   "image-processing": "packages/image-processing/test/",
   actioncable: "packages/actioncable/test/",
-  activejob: "packages/activejob/src/",
+  activejob: "packages/activejob/test/",
   actionmailer: "packages/actionmailer/test/",
   actionmailbox: "packages/actionmailbox/src/",
-  activestorage: "packages/activestorage/src/",
-  trailties: "packages/trailties/src/",
-  globalid: "packages/globalid/src/",
+  activestorage: "packages/activestorage/test/",
+  trailties: "packages/trailties/test/",
+  globalid: "packages/globalid/test/",
   "did-you-mean": "packages/did-you-mean/test/",
-  i18n: "packages/i18n/src/",
+  i18n: "packages/i18n/test/",
   date: "packages/date/test/",
   "ruby-compat": "packages/ruby-compat/test/",
-  thor: "packages/thor/src/",
-  mail: "packages/mail/src/",
-  "solid-queue": "packages/solid-queue/src/",
+  thor: "packages/thor/test/",
+  mail: "packages/mail/test/",
+  "solid-queue": "packages/solid-queue/test/",
   "solid-cable": "packages/solid-cable/test/",
   erubi: "packages/tse-compiler/test/",
   nokogiri: "packages/nokogiri/test/",

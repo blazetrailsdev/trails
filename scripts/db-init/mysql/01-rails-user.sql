@@ -21,7 +21,7 @@
 --
 -- ar\_cli\_e2e% is trails-only, with no Rails counterpart: the activerecord-cli
 -- E2E suite drives `ar db:create` as this same user against a throwaway
--- ar_cli_e2e_<hrtime> database (activerecord-cli/src/__e2e__/*-happy-path.test.ts).
+-- ar_cli_e2e_<hrtime> database (activerecord-cli/test/__e2e__/*-happy-path.test.ts).
 -- Postgres needs no equivalent — that role has CREATEDB, which is not
 -- per-database.
 CREATE USER IF NOT EXISTS 'rails'@'%';

@@ -21,7 +21,7 @@ In trails the query is `await`ed, and that costs four shapes Rails has no
 counterpart for:
 
 - **`applyThenable`** (`relation/thenable.ts`) **/ `stripThenable`**
-  (`activesupport/src/strip-thenable.ts`). `await rel` has to evaluate the
+  (`activesupport/lib/strip-thenable.ts`). `await rel` has to evaluate the
   relation, so `Relation.prototype` carries `then` / `catch` / `finally`
   forwarding to `toArray()`. JS unwraps a thenable _returned_ from an `async`
   body, so a builder returning a relation would evaluate it; `stripThenable` is
@@ -330,7 +330,7 @@ constructor cannot await.
 
 A writer that must await, such as `has_one_attached`'s `setAvatar`
 (`activestorage/lib/active_storage/attached/model.rb:118-125`), takes the same
-shape. `awaitingAssignment` (`activemodel/src/attribute-assignment.ts`) wraps the
+shape. `awaitingAssignment` (`activemodel/lib/attribute-assignment.ts`) wraps the
 build in each create path, and the constructor's `assignAttributes` hands it
 the writer's promise instead of raising. The caller awaits the assignment, then the block, before saving, and
 nothing is parked on the record. `new` and `build` still raise.
@@ -778,7 +778,7 @@ As a consequence:
 
 - A Rails `klass.new(attributes, &block)` ports as
   `new klass(attributes, block)`, in source and in tests. Generated application
-  code says `new Post(params)` too (`trailties/src/generators/active-model.ts`).
+  code says `new Post(params)` too (`trailties/lib/generators/active-model.ts`).
 - `inheritance.rb`'s `new` has no member in `inheritance.ts`. Do not add one,
   and do not file a story to move the body out of the constructor.
 - `Persistence#becomes` (`persistence.rb:487-500`) is `klass.allocate` +

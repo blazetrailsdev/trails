@@ -98,7 +98,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
  *   (`AbstractController::Railties`, `abstract_controller/railties/`), as the
  *   `railties` path segment already reads `trailties`.
  * - `Rails` → `Trails`: top-level `module Rails` (`railties/lib/rails.rb`)
- *   maps to the `Trails` global in `packages/trailties/src/trails.ts`.
+ *   maps to the `Trails` global in `packages/trailties/lib/trails.ts`.
  *
  * Both parity tools read this one table: `parity:api` resolves the Ruby class
  * to its TS declaration through it, and `parity:api:extra` admits the renamed
@@ -1424,7 +1424,7 @@ export const RUBY_ONLY_CLASSES: RubyOnlyClass[] = [
       "to `JSON = ActiveSupport::JSON`. It is a library-selection shim, not " +
       "behavior: JavaScript has `JSON` in the language, and its " +
       "`stringify`/`parse` are that `encode`/`decode`, which is what " +
-      "`KeyValue` calls directly (`packages/i18n/src/backend/key-value.ts`). " +
+      "`KeyValue` calls directly (`packages/i18n/lib/backend/key-value.ts`). " +
       "Mirroring it would mean adding a trails class whose whole body " +
       "forwards to a global the language already provides.",
   },

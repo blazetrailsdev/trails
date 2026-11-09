@@ -306,7 +306,7 @@ const AREL_HELPER_ALIAS: Record<string, string> = {
  * The Ruby `must_be_like` above IS an assertion — it squeezes whitespace and
  * then delegates to `must_equal` (helper.rb:10-13), which is why it aliases to
  * `assert_equal` in AREL_HELPER_ALIAS. The trails port splits those two halves:
- * `packages/arel/src/test-helpers/must-be-like.ts` keeps only the squeezing,
+ * `packages/arel/test/support/must-be-like.ts` keeps only the squeezing,
  * and a native `expect(mustBeLike(a)).toBe(mustBeLike(b))` does the asserting.
  * The terminal `toBe` is therefore the whole assertion, and counting the two
  * normalizer calls beside it scores one Rails assertion as three.
@@ -410,7 +410,7 @@ export interface KindHistogram {
  * spells `toBe` — the very matcher a port also uses for `assert_equal` on a
  * primitive — so TRAILS_MAP scores `toBe` as `equal` and the only trails
  * spelling that scores `same` is the `assertSame` helper
- * (activesupport/src/testing/assertions.ts:605). A package activesupport
+ * (activesupport/lib/testing/assertions.ts:605). A package activesupport
  * itself depends on — i18n, date, ruby-compat — cannot import that helper, so
  * without the fold every faithful port of an `assert_same` down there is a
  * permanent false mismatch. Folding both sides leaves an `assertSame` port

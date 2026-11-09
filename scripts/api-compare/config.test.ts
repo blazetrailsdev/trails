@@ -28,8 +28,8 @@ describe("PACKAGE_DIRS", () => {
     ["actioncontroller", "packages/actionpack/lib/action-controller"],
     ["abstractcontroller", "packages/actionpack/lib/abstract-controller"],
     ["actionpackversion", "packages/actionpack/lib/action-pack"],
-    ["arel", "packages/arel/src"],
-    ["trailties", "packages/trailties/src"],
+    ["arel", "packages/arel/lib"],
+    ["trailties", "packages/trailties/lib"],
   ])("spells %s's src dir the way the repo does", (pkg, dir) => {
     expect(PACKAGE_DIRS[pkg]).toBe(dir);
   });
@@ -60,7 +60,7 @@ describeManifest("rails-private-methods manifest", () => {
       "packages/actionpack/lib/action-controller/metal/content-security-policy.ts",
       "contentSecurityPolicy",
     ],
-    ["packages/activemodel/src/attributes.ts", "attribute"],
+    ["packages/activemodel/lib/attributes.ts", "attribute"],
   ])("does not claim %s's %s is Rails-private on a `?` sibling's candidate", (file, name) => {
     expect(manifest.files[file] ?? []).not.toContain(name);
   });

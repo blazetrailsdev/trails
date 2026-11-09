@@ -112,130 +112,130 @@ const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);
 const alias = {
   "@blazetrails/activemodel/locale/en": path.resolve(
     __dirname,
-    "packages/activemodel/src/locale/en.ts",
+    "packages/activemodel/lib/locale/en.ts",
   ),
   "@blazetrails/activesupport/core-ext/numeric/bytes": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/numeric/bytes.ts",
+    "packages/activesupport/lib/core-ext/numeric/bytes.ts",
   ),
   "@blazetrails/activesupport/testing/isolation": path.resolve(
     __dirname,
-    "packages/activesupport/src/testing/isolation.ts",
+    "packages/activesupport/lib/testing/isolation.ts",
   ),
   "@blazetrails/activesupport/testing/file-fixtures": path.resolve(
     __dirname,
-    "packages/activesupport/src/testing/file-fixtures.ts",
+    "packages/activesupport/lib/testing/file-fixtures.ts",
   ),
   "@blazetrails/activesupport/message-verifier": path.resolve(
     __dirname,
-    "packages/activesupport/src/message-verifier.ts",
+    "packages/activesupport/lib/message-verifier.ts",
   ),
   "@blazetrails/activesupport/messages/codec": path.resolve(
     __dirname,
-    "packages/activesupport/src/messages/codec.ts",
+    "packages/activesupport/lib/messages/codec.ts",
   ),
   "@blazetrails/activesupport/messages/rotation-configuration": path.resolve(
     __dirname,
-    "packages/activesupport/src/messages/rotation-configuration.ts",
+    "packages/activesupport/lib/messages/rotation-configuration.ts",
   ),
   "@blazetrails/activesupport/messages/serializer-with-fallback": path.resolve(
     __dirname,
-    "packages/activesupport/src/messages/serializer-with-fallback.ts",
+    "packages/activesupport/lib/messages/serializer-with-fallback.ts",
   ),
   "@blazetrails/activesupport/message-encryptor": path.resolve(
     __dirname,
-    "packages/activesupport/src/message-encryptor.ts",
+    "packages/activesupport/lib/message-encryptor.ts",
   ),
   "@blazetrails/activesupport/core-ext/kernel/reporting": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/kernel/reporting.ts",
+    "packages/activesupport/lib/core-ext/kernel/reporting.ts",
   ),
   "@blazetrails/activesupport/core-ext/date/calculations": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date/calculations.ts",
+    "packages/activesupport/lib/core-ext/date/calculations.ts",
   ),
   "@blazetrails/activesupport/core-ext/date/conversions": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date/conversions.ts",
+    "packages/activesupport/lib/core-ext/date/conversions.ts",
   ),
   "@blazetrails/activesupport/core-ext/string/inflections": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/string/inflections.ts",
+    "packages/activesupport/lib/core-ext/string/inflections.ts",
   ),
   "@blazetrails/activesupport/core-ext/date-time/calculations": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date-time/calculations.ts",
+    "packages/activesupport/lib/core-ext/date-time/calculations.ts",
   ),
   "@blazetrails/activesupport/core-ext/date-time/conversions": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date-time/conversions.ts",
+    "packages/activesupport/lib/core-ext/date-time/conversions.ts",
   ),
   "@blazetrails/activesupport/core-ext/date-and-time/zones": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/date-and-time/zones.ts",
+    "packages/activesupport/lib/core-ext/date-and-time/zones.ts",
   ),
   "@blazetrails/activesupport/core-ext/hash/slice": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/hash/slice.ts",
+    "packages/activesupport/lib/core-ext/hash/slice.ts",
   ),
   "@blazetrails/activesupport/core-ext/string/inflections": path.resolve(
     __dirname,
-    "packages/activesupport/src/core-ext/string/inflections.ts",
+    "packages/activesupport/lib/core-ext/string/inflections.ts",
   ),
   "@blazetrails/activesupport/temporal": path.resolve(
     __dirname,
-    "packages/activesupport/src/temporal.ts",
+    "packages/activesupport/lib/temporal.ts",
   ),
   "@blazetrails/activesupport/key-generator": path.resolve(
     __dirname,
-    "packages/activesupport/src/key-generator.ts",
+    "packages/activesupport/lib/key-generator.ts",
   ),
   "@blazetrails/activesupport/digest": path.resolve(
     __dirname,
-    "packages/activesupport/src/digest.ts",
+    "packages/activesupport/lib/digest.ts",
   ),
   // Above the bare entry: Vite's object alias is a prefix match, so "…/cache"
   // alone would also swallow "…/cache/*".
   "@blazetrails/activesupport/cache/":
-    path.resolve(__dirname, "packages/activesupport/src/cache/") + "/",
+    path.resolve(__dirname, "packages/activesupport/lib/cache/") + "/",
   "@blazetrails/activesupport/cache": path.resolve(
     __dirname,
-    "packages/activesupport/src/cache.ts",
+    "packages/activesupport/lib/cache.ts",
   ),
   "@blazetrails/activesupport/configuration-file": path.resolve(
     __dirname,
-    "packages/activesupport/src/configuration-file.ts",
+    "packages/activesupport/lib/configuration-file.ts",
   ),
-  "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/src/glob.ts"),
+  "@blazetrails/activesupport/glob": path.resolve(__dirname, "packages/activesupport/lib/glob.ts"),
   "@blazetrails/activesupport/message-pack": path.resolve(
     __dirname,
-    "packages/activesupport/src/message-pack.ts",
+    "packages/activesupport/lib/message-pack.ts",
   ),
   "@blazetrails/activesupport/test-case": path.resolve(
     __dirname,
-    "packages/activesupport/src/test-case.ts",
+    "packages/activesupport/lib/test-case.ts",
   ),
   "@blazetrails/activesupport/log-subscriber/test-helper": path.resolve(
     __dirname,
-    "packages/activesupport/src/log-subscriber/test-helper.ts",
+    "packages/activesupport/lib/log-subscriber/test-helper.ts",
   ),
   "@blazetrails/activesupport/testing/autorun": path.resolve(
     __dirname,
-    "packages/activesupport/src/testing/autorun.ts",
+    "packages/activesupport/lib/testing/autorun.ts",
   ),
-  "@blazetrails/activesupport/gzip": path.resolve(__dirname, "packages/activesupport/src/gzip.ts"),
+  "@blazetrails/activesupport/gzip": path.resolve(__dirname, "packages/activesupport/lib/gzip.ts"),
   "@blazetrails/activesupport/encrypted-file": path.resolve(
     __dirname,
-    "packages/activesupport/src/encrypted-file.ts",
+    "packages/activesupport/lib/encrypted-file.ts",
   ),
   "@blazetrails/activesupport/testing/temporal-helpers": path.resolve(
     __dirname,
-    "packages/activesupport/src/testing/temporal-helpers.ts",
+    "packages/activesupport/lib/testing/temporal-helpers.ts",
   ),
-  "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/src/index.ts"),
-  "@blazetrails/arel/src": path.resolve(__dirname, "packages/arel/src"),
-  "@blazetrails/arel": path.resolve(__dirname, "packages/arel/src/index.ts"),
-  "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/src/index.ts"),
+  "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/lib/index.ts"),
+  "@blazetrails/arel/test": path.resolve(__dirname, "packages/arel/test"),
+  "@blazetrails/arel": path.resolve(__dirname, "packages/arel/lib/index.ts"),
+  "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/lib/index.ts"),
   "@blazetrails/activerecord/destroy-association-async-job": path.resolve(
     __dirname,
     "packages/activerecord/src/destroy-association-async-job.ts",
@@ -326,7 +326,7 @@ const alias = {
   ),
   "@blazetrails/activerecord-cli": path.resolve(
     __dirname,
-    "packages/activerecord-cli/src/index.ts",
+    "packages/activerecord-cli/lib/index.ts",
   ),
   "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
   "@blazetrails/rack-session/": path.resolve(__dirname, "packages/rack-session/lib") + "/",
@@ -335,23 +335,23 @@ const alias = {
   "@blazetrails/rack-test": path.resolve(__dirname, "packages/rack-test/lib/index.ts"),
   "@blazetrails/rackup/": path.resolve(__dirname, "packages/rackup/lib") + "/",
   "@blazetrails/rackup": path.resolve(__dirname, "packages/rackup/lib/index.ts"),
-  "@blazetrails/rack": path.resolve(__dirname, "packages/rack/src/index.ts"),
-  "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/src") + "/",
-  "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/src/index.ts"),
+  "@blazetrails/rack": path.resolve(__dirname, "packages/rack/lib/index.ts"),
+  "@blazetrails/actionview/": path.resolve(__dirname, "packages/actionview/lib") + "/",
+  "@blazetrails/actionview": path.resolve(__dirname, "packages/actionview/lib/index.ts"),
   "@blazetrails/tse-compiler": path.resolve(__dirname, "packages/tse-compiler/lib/index.ts"),
   "@blazetrails/actionpack/system-testing": path.resolve(
     __dirname,
     "packages/actionpack/lib/system-testing.ts",
   ),
   "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/lib/index.ts"),
-  "@blazetrails/globalid/wire": path.resolve(__dirname, "packages/globalid/src/wire.ts"),
+  "@blazetrails/globalid/wire": path.resolve(__dirname, "packages/globalid/lib/wire.ts"),
   "@blazetrails/globalid/signed-global-id": path.resolve(
     __dirname,
-    "packages/globalid/src/signed-global-id.ts",
+    "packages/globalid/lib/signed-global-id.ts",
   ),
-  "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
-  "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/src") + "/",
-  "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
+  "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/lib/index.ts"),
+  "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/lib") + "/",
+  "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/lib/index.ts"),
   "@blazetrails/actionmailer/": path.resolve(__dirname, "packages/actionmailer/lib") + "/",
   "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/lib/index.ts"),
   "@blazetrails/actioncable/test-helpers/":
@@ -360,22 +360,24 @@ const alias = {
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/lib/index.ts"),
   "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/lib") + "/",
   "@blazetrails/solid-cable": path.resolve(__dirname, "packages/solid-cable/lib/index.ts"),
-  "@blazetrails/activestorage/": path.resolve(__dirname, "packages/activestorage/src") + "/",
-  "@blazetrails/activestorage": path.resolve(__dirname, "packages/activestorage/src/index.ts"),
+  "@blazetrails/activestorage/test-helpers/":
+    path.resolve(__dirname, "packages/activestorage/test/support") + "/",
+  "@blazetrails/activestorage/": path.resolve(__dirname, "packages/activestorage/lib") + "/",
+  "@blazetrails/activestorage": path.resolve(__dirname, "packages/activestorage/lib/index.ts"),
   "@blazetrails/actionmailbox/": path.resolve(__dirname, "packages/actionmailbox/src") + "/",
   "@blazetrails/actionmailbox": path.resolve(__dirname, "packages/actionmailbox/src/index.ts"),
-  "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/src") + "/",
-  "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/src/index.ts"),
+  "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/lib") + "/",
+  "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/lib/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/lib/index.ts"),
-  "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/src/all.ts"),
+  "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/lib/all.ts"),
   "@blazetrails/trailties/trailties/":
-    path.resolve(__dirname, "packages/trailties/src/trailties") + "/",
-  "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
+    path.resolve(__dirname, "packages/trailties/lib/trailties") + "/",
+  "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/lib/engine.ts"),
   "@blazetrails/trailties/trailtie/configuration": path.resolve(
     __dirname,
-    "packages/trailties/src/trailtie/configuration.ts",
+    "packages/trailties/lib/trailtie/configuration.ts",
   ),
-  "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
+  "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/lib/trailtie.ts"),
   "@blazetrails/ruby-compat/": path.resolve(__dirname, "packages/ruby-compat/lib") + "/",
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/lib/index.ts"),
   "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/lib/index.ts"),
@@ -386,24 +388,24 @@ const alias = {
   "@blazetrails/vitest-matchers": path.resolve(__dirname, "packages/vitest-matchers/lib/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/lib/index.ts"),
   "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/lib/index.ts"),
-  "@blazetrails/mail/": path.resolve(__dirname, "packages/mail/src") + "/",
-  "@blazetrails/mail": path.resolve(__dirname, "packages/mail/src/index.ts"),
-  "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/src") + "/",
+  "@blazetrails/mail/": path.resolve(__dirname, "packages/mail/lib") + "/",
+  "@blazetrails/mail": path.resolve(__dirname, "packages/mail/lib/index.ts"),
+  "@blazetrails/thor/": path.resolve(__dirname, "packages/thor/lib") + "/",
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/lib/index.ts"),
-  "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
+  "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/lib/index.ts"),
   "@blazetrails/builder": path.resolve(__dirname, "packages/builder/lib/builder.ts"),
   "@blazetrails/marcel/magic": path.resolve(__dirname, "packages/marcel/lib/magic.ts"),
   "@blazetrails/marcel": path.resolve(__dirname, "packages/marcel/lib/marcel.ts"),
   "@blazetrails/mini-mime": path.resolve(__dirname, "packages/mini-mime/lib/mini-mime.ts"),
   "@blazetrails/net-smtp": path.resolve(__dirname, "packages/net-smtp/lib/smtp.ts"),
-  "@blazetrails/rake": path.resolve(__dirname, "packages/rake/src/rake.ts"),
+  "@blazetrails/rake": path.resolve(__dirname, "packages/rake/lib/rake.ts"),
   "@blazetrails/mini-magick/": path.resolve(__dirname, "packages/mini-magick/lib") + "/",
   "@blazetrails/image-processing/": path.resolve(__dirname, "packages/image-processing/lib") + "/",
   "@blazetrails/chronic": path.resolve(__dirname, "packages/chronic/lib/chronic.ts"),
   "@blazetrails/tzinfo": path.resolve(__dirname, "packages/tzinfo/lib/index.ts"),
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/lib/et-orbi.ts"),
-  "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/src/raabro.ts"),
-  "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/src/zeitwerk.ts"),
+  "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/lib/raabro.ts"),
+  "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/lib/zeitwerk.ts"),
   "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/lib/fugit.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/lib/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/lib/index.ts"),
@@ -443,7 +445,7 @@ const TRAILS_TSC_COVERAGE = process.env.TRAILS_TSC_COVERAGE === "1";
 const COVERAGE_INCLUDE = AR_COVERAGE
   ? ["packages/activerecord/src/**/*.ts", "packages/activerecord/src/**/*.mts"]
   : AR_CLI_COVERAGE
-    ? ["packages/activerecord-cli/src/**/*.ts", "packages/activerecord-cli/src/**/*.mts"]
+    ? ["packages/activerecord-cli/lib/**/*.ts", "packages/activerecord-cli/lib/**/*.mts"]
     : TRAILS_TSC_COVERAGE
       ? ["packages/trails-tsc/lib/**/*.ts", "packages/trails-tsc/lib/**/*.mts"]
       : ["packages/*/{src,lib}/**/*.ts", "packages/*/{src,lib}/**/*.mts"];
@@ -487,11 +489,11 @@ const aliasEntries = [
   },
   {
     find: /^@blazetrails\/thor$/,
-    replacement: path.resolve(__dirname, "packages/thor/src/thor.ts"),
+    replacement: path.resolve(__dirname, "packages/thor/lib/thor.ts"),
   },
   {
     find: /^@blazetrails\/trailties$/,
-    replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
+    replacement: path.resolve(__dirname, "packages/trailties/lib/index.ts"),
   },
   ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
 ];
@@ -502,11 +504,11 @@ const otherResolve = {
     // A generated app under tmp/ must share the suite's source Trails, not dist's.
     {
       find: /^@blazetrails\/trailties\/(trails|test-unit\/trailtie)$/,
-      replacement: path.resolve(__dirname, "packages/trailties/src") + "/$1.ts",
+      replacement: path.resolve(__dirname, "packages/trailties/lib") + "/$1.ts",
     },
     {
       find: /^@blazetrails\/trailties$/,
-      replacement: path.resolve(__dirname, "packages/trailties/src/index.ts"),
+      replacement: path.resolve(__dirname, "packages/trailties/lib/index.ts"),
     },
     { find: /^eslint$/, replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
   ],
@@ -516,10 +518,10 @@ const otherResolve = {
 // (it runs under activerecord, where the engine is ActiveRecord::Base).
 const otherSetupFiles = [
   "./packages/vitest-matchers/lib/setup.ts",
-  "./packages/activesupport/src/testing/autorun.ts",
-  "./packages/activesupport/src/test-setup-abstract-unit.ts",
-  "./packages/arel/src/test-setup-engine.ts",
-  "./packages/actionview/src/test-helpers/setup-compile-template.ts",
+  "./packages/activesupport/lib/testing/autorun.ts",
+  "./packages/activesupport/test/support/test-setup-abstract-unit.ts",
+  "./packages/arel/test/support/test-setup-engine.ts",
+  "./packages/actionview/test/support/setup-compile-template.ts",
   "./packages/ruby-compat/test-setup/class-paths.ts",
 ];
 
@@ -578,9 +580,9 @@ export default defineConfig({
           include: [
             "packages/activerecord/src/**/*.test.ts",
             "packages/activerecord/scripts/**/*.test.ts",
-            "packages/solid-queue/src/**/*.test.ts",
+            "packages/solid-queue/test/**/*.test.ts",
             "packages/solid-cable/test/**/*.test.ts",
-            "packages/activestorage/src/**/*.test.ts",
+            "packages/activestorage/test/**/*.test.ts",
             "packages/actionmailbox/src/**/*.test.ts",
           ],
           exclude: [
@@ -588,7 +590,7 @@ export default defineConfig({
             ...ADAPTER_SPECIFIC_EXCLUDE,
             ...SQLITE_DRIVER_TESTS,
             "packages/solid-cable/test/generators/**",
-            "packages/solid-queue/src/generators/**",
+            "packages/solid-queue/test/generators/**",
           ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
@@ -599,10 +601,10 @@ export default defineConfig({
             "./packages/vitest-matchers/lib/setup.ts",
             // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
             // which helper.rb picks up by requiring active_support/test_case.
-            "./packages/activesupport/src/testing/autorun.ts",
+            "./packages/activesupport/lib/testing/autorun.ts",
             "./packages/activerecord/src/cases/helper.ts",
             "./packages/bcrypt/lib/index.ts",
-            "./packages/actionview/src/test-helpers/setup-compile-template.ts",
+            "./packages/actionview/test/support/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
@@ -690,7 +692,7 @@ export default defineConfig({
               : ["packages/actioncable/test/subscription-adapter/redis.test.ts"]),
             ...SHARED_EXCLUDE,
           ],
-          globalSetup: ["./packages/actionview/src/test-helpers/build-precompiled-fixtures.ts"],
+          globalSetup: ["./packages/actionview/test/support/build-precompiled-fixtures.ts"],
           setupFiles: otherSetupFiles,
         },
       },
@@ -716,16 +718,16 @@ export default defineConfig({
           name: "trailties",
           globals: true,
           include: [
-            "packages/trailties/src/**/*.test.ts",
+            "packages/trailties/test/**/*.test.ts",
             "packages/solid-cable/test/generators/**/*.test.ts",
-            "packages/solid-queue/src/generators/**/*.test.ts",
+            "packages/solid-queue/test/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
-            "./packages/trailties/src/test-helpers/build-templates.ts",
-            "./packages/trailties/src/test-helpers/isolation/global-setup.ts",
+            "./packages/trailties/test/support/build-templates.ts",
+            "./packages/trailties/test/support/isolation/global-setup.ts",
             "./packages/solid-cable/test/support/build-templates.ts",
-            "./packages/solid-queue/src/test-helpers/build-templates.ts",
+            "./packages/solid-queue/test/support/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
         },
@@ -735,10 +737,10 @@ export default defineConfig({
         test: {
           name: "thor",
           globals: true,
-          include: ["packages/thor/src/**/*.test.ts"],
+          include: ["packages/thor/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           globalSetup: ["./scripts/thor-build-templates.ts"],
-          setupFiles: [...otherSetupFiles, "./packages/thor/src/test-helpers/setup.ts"],
+          setupFiles: [...otherSetupFiles, "./packages/thor/test/support/setup.ts"],
         },
       },
       {
@@ -760,7 +762,7 @@ export default defineConfig({
         test: {
           name: "zeitwerk",
           globals: true,
-          include: ["packages/zeitwerk/src/**/*.test.ts"],
+          include: ["packages/zeitwerk/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
         },
@@ -770,7 +772,7 @@ export default defineConfig({
         test: {
           name: "raabro",
           globals: true,
-          include: ["packages/raabro/src/**/*.test.ts"],
+          include: ["packages/raabro/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
         },

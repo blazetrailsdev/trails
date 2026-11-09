@@ -7530,7 +7530,7 @@ describe("declaringFile (RFC 0126)", () => {
     // `AR::Base extends AM::Model` resolves through activemodel's built
     // `.d.ts`; both spellings must name the SAME manifest path, because that is
     // what `resolveEntityByDeclaringFile` matches a candidate's `file` against.
-    expect(declaringFile(symbolAt("/repo/packages/activemodel/src/model.ts"), SRC)).toBe(
+    expect(declaringFile(symbolAt("/repo/packages/activemodel/lib/model.ts"), SRC)).toBe(
       "pkg:activemodel:model.ts",
     );
     expect(declaringFile(symbolAt("/repo/packages/activemodel/dist/model.d.ts"), SRC)).toBe(

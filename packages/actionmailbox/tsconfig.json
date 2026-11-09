@@ -8,15 +8,33 @@
   },
   "include": ["src"],
   "references": [
-    { "path": "../actionpack" },
-    { "path": "../activejob" },
-    { "path": "../activerecord" },
-    { "path": "../activestorage" },
-    { "path": "../activesupport" },
-    { "path": "../mail" },
-    { "path": "../rake" },
-    { "path": "../ruby-compat" },
-    { "path": "../trailties" }
+    {
+      "path": "../actionpack"
+    },
+    {
+      "path": "../activejob"
+    },
+    {
+      "path": "../activerecord"
+    },
+    {
+      "path": "../activestorage"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../mail"
+    },
+    {
+      "path": "../rake"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../trailties"
+    }
   ],
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
 }

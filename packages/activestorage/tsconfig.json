@@ -4,23 +4,48 @@
     "composite": true,
     "outDir": "dist",
     "declarationDir": "dist/types",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
-    { "path": "../rake" },
-    { "path": "../actionpack" },
-    { "path": "../actionview" },
-    { "path": "../activejob" },
-    { "path": "../activerecord" },
-    { "path": "../activesupport" },
-    { "path": "../image-processing" },
-    { "path": "../marcel" },
-    { "path": "../mini-magick" },
-    { "path": "../rack-test" },
-    { "path": "../ruby-compat" },
-    { "path": "../trailties" },
-    { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["src/**/*.test.ts"]
+    {
+      "path": "../rake"
+    },
+    {
+      "path": "../actionpack"
+    },
+    {
+      "path": "../actionview"
+    },
+    {
+      "path": "../activejob"
+    },
+    {
+      "path": "../activerecord"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../image-processing"
+    },
+    {
+      "path": "../marcel"
+    },
+    {
+      "path": "../mini-magick"
+    },
+    {
+      "path": "../rack-test"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../trailties"
+    },
+    {
+      "path": "../vitest-matchers"
+    }
+  ]
 }

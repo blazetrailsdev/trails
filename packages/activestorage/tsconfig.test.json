@@ -2,9 +2,17 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist-test",
-    "declarationDir": "dist-test/types"
+    "declarationDir": "dist-test/types",
+    "rootDir": "."
   },
   "exclude": [],
-  "include": ["src/**/*.test.ts"],
-  "references": [{ "path": "./tsconfig.json" }, { "path": "../activerecord/tsconfig.test.json" }]
+  "include": ["test"],
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    },
+    {
+      "path": "../activerecord/tsconfig.test.json"
+    }
+  ]
 }

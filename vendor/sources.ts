@@ -40,7 +40,7 @@ export interface PackageEntry {
    * Further lib directories, relative to the source's vendored root, whose
    * `.rb` files map onto the same TS `src/` as `libPath`'s. An engine gem keeps
    * its models under `app/models/<gem>/` beside `lib/<gem>/`, and
-   * `app/models/solid_queue/job.rb` ports to `packages/solid-queue/src/job.ts`.
+   * `app/models/solid_queue/job.rb` ports to `packages/solid-queue/lib/job.ts`.
    */
   extraLibPaths?: string[];
   /** Path relative to the source's vendored root; omitted = test-compare ignores. */
@@ -107,7 +107,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "arel",
         libPath: "activerecord/lib/arel",
         // `Arel.sql`, `Arel.star`, `Arel.arel_node?` and `Arel.fetch_attribute`
-        // are defined here and ported in `packages/arel/src/arel.ts`.
+        // are defined here and ported in `packages/arel/lib/arel.ts`.
         libEntryFile: "activerecord/lib/arel.rb",
         testPath: "activerecord/test/cases/arel",
       },
@@ -562,7 +562,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        // The date port (packages/i18n/src/date.ts today) cites
+        // The date port (packages/i18n/lib/date.ts today) cites
         // `ext/date/date_core.c` / `ext/date/date_parse.c` by line
         // throughout, so the C sources have to be readable in-tree.
         // `libPath: "lib"` covers `lib/date.rb` — the Ruby-visible surface
@@ -602,7 +602,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       url: "https://github.com/minitest/minitest.git",
       // The version scripts/parity/pipeline/schema/ruby/Gemfile.lock:32 pins.
       // Move this ref when that pin moves, so the `gem/path.rb:LINE` citations
-      // in activesupport/src/testing/assertions.ts stay checkable.
+      // in activesupport/lib/testing/assertions.ts stay checkable.
       ref: "v5.27.0",
     },
     packages: [
@@ -613,7 +613,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         // Vendored as a read-anchor only. api-compare/test-compare derive their
         // package list from this file and key each package to a TS workspace
         // dir (`packages/<name>/src`); minitest has no such package — the port
-        // is a slice of `packages/activesupport/src/testing/assertions.ts` —
+        // is a slice of `packages/activesupport/lib/testing/assertions.ts` —
         // so enrolling it would compare against a directory that does not
         // exist. Whether the comparator can be taught to map a non-Rails gem
         // onto a foreign file, and the `@noRailsEquivalent PERMANENT` tags on

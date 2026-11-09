@@ -1,0 +1,16 @@
+Usage:
+  trails COMMAND [options]
+
+You must specify a command:
+
+  new          Create a new Trails application. "trails new my_app" creates a
+               new application called MyApp in "./my_app"
+  plugin new   Create a new Trails railtie or engine
+
+All commands can be run with -h (or --help) for more information.
+
+Inside a Trails application directory, some common commands are:
+
+  console      Start the Trails console
+  server       Start the Trails server
+  test         Run tests except system tests

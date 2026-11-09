@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { SafeListSanitizer } from "../lib/safe-list-sanitizer.js";
+import { HTML4SafeListSanitizer as SafeListSanitizer } from "../lib/sanitizer.js";
 
 describe("SafeListSanitizer scrub_node", () => {
   test("keeps a stripped node's children unless pruning", () => {

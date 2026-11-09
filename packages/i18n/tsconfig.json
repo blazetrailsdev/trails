@@ -3,9 +3,15 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
-  "references": [{ "path": "../date" }, { "path": "../ruby-compat" }],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
+  "include": ["lib"],
+  "references": [
+    {
+      "path": "../date"
+    },
+    {
+      "path": "../ruby-compat"
+    }
+  ]
 }

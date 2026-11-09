@@ -1,0 +1,653 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
+   Each model below spells `include ActiveModel::Serializers::JSON` in its class body, the way the
+   Rails test model it mirrors does; the empty class/interface merge beside it is how
+   `include()` surfaces those members on the type side. */
+import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/activesupport";
+import { Dirty } from "../lib/dirty.js";
+import { JSON as SerializersJSON } from "../lib/serializers/json.js";
+import { Model } from "../lib/index.js";
+import { readAttributeForSerialization, type SerializationRecord } from "../lib/serialization.js";
+import { NoMethodError } from "../lib/attribute-assignment.js";
+import { Attributes, type AttributesClassHalf } from "../lib/attributes.js";
+
+function setAssociationAccessors(record: unknown, entries: Record<string, unknown>): void {
+  for (const [name, value] of Object.entries(entries)) {
+    (record as Record<string, unknown>)[name] = value;
+  }
+}
+
+describe("Serialization — trails-only coverage", () => {
+  class Post extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
+    static {
+      include(this, Attributes);
+      include(this, SerializersJSON);
+      this.attribute("title", "string");
+      this.attribute("body", "string");
+      this.attribute("rating", "integer");
+    }
+  }
+  interface Post extends Attributes, SerializersJSON {}
+
+  class Comment extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
+    static {
+      include(this, Attributes);
+      include(this, SerializersJSON);
+      this.attribute("text", "string");
+      this.attribute("author", "string");
+    }
+  }
+  interface Comment extends Attributes, SerializersJSON {}
+
+  class Tag extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
+    static {
+      include(this, Attributes);
+      include(this, SerializersJSON);
+      this.attribute("name", "string");
+    }
+  }
+  interface Tag extends Attributes, SerializersJSON {}
+
+  it("read_attribute_for_serialization dispatches the accessor, not a stale attributes hash", () => {
+    const host = {
+      attributes: { name: "STALE" },
+      get name(): string {
+        return "FRESH";
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization.call(host, "name")).toBe("FRESH");
+  });
+
+  it("read_attribute_for_serialization honors an overridden attribute reader (send)", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+      }
+      get name(): string {
+        return "OVERRIDE:" + (this.attribute("name") as string);
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+
+    const p = new Person({ name: "Bob" });
+    expect(p.serializableHash()).toEqual({ name: "OVERRIDE:Bob" });
+  });
+
+  it("read_attribute_for_serialization invokes a method reader (send), not the attributes hash", () => {
+    const host = {
+      attributes: { name: "STALE" },
+      name(): string {
+        return "i_am_name";
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization.call(host, "name")).toBe("i_am_name");
+  });
+
+  it("read_attribute_for_serialization returns undefined for a present reader that returns undefined", () => {
+    const host = {
+      get name(): string | undefined {
+        return undefined;
+      },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization.call(host, "name")).toBeUndefined();
+  });
+
+  it("read_attribute_for_serialization raises NoMethodError-style for a missing reader", () => {
+    const host = {
+      attributes: { name: "x" },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(() => readAttributeForSerialization.call(host, "nope")).toThrow(NoMethodError);
+    expect(() => readAttributeForSerialization.call(host, "nope")).toThrow(
+      /undefined method 'nope'/,
+    );
+  });
+
+  it("read_attribute_for_serialization raises NoMethodError-style for a reader-less attributes key", () => {
+    const host = {
+      attributes: { name: "x" },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(() => readAttributeForSerialization.call(host, "name")).toThrow(NoMethodError);
+    expect(() => readAttributeForSerialization.call(host, "name")).toThrow(
+      /undefined method 'name'/,
+    );
+  });
+
+  it("read_attribute_for_serialization invokes a method reader on an _attributes-backed record", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+      }
+      greeting(): string {
+        return "Hi " + (this._readAttribute("name") as string);
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+
+    const p = new Person({ name: "Bob" });
+    expect(
+      readAttributeForSerialization.call(p as unknown as SerializationRecord, "greeting"),
+    ).toBe("Hi Bob");
+  });
+
+  it("read_attribute_for_serialization sends the method a stored value shares its name with", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+        this.attribute("greeting", "string");
+      }
+      greeting(): string {
+        return "Hi " + (this._readAttribute("name") as string);
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+
+    const p = new Person({ name: "Bob" });
+    p._writeAttribute("greeting", "stored");
+    expect(p.attribute("greeting")).toBe("stored");
+    expect(
+      readAttributeForSerialization.call(p as unknown as SerializationRecord, "greeting"),
+    ).toBe("Hi Bob");
+    expect({ ...p.serializableHash() }).toEqual({ name: "Bob", greeting: "Hi Bob" });
+  });
+
+  it("serializable_hash leaves out a stored value an included module's method shares its name with", () => {
+    class Greets {
+      greeting(): string {
+        return "Hi";
+      }
+    }
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        include(this, Greets);
+        this.attribute("name", "string");
+        this.attribute("greeting", "string");
+      }
+    }
+    interface Person extends Attributes, SerializersJSON, Greets {}
+
+    const p = new Person({ name: "Bob" });
+    p._writeAttribute("greeting", "stored");
+    expect({ ...p.serializableHash() }).toEqual({ name: "Bob" });
+    expect({ ...p.serializableHash({ methods: ["greeting"] }) }).toEqual({
+      name: "Bob",
+      greeting: "Hi",
+    });
+  });
+
+  it("methods: takes Ruby names, keys the hash by them, and calls the TS spelling", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+      }
+      favoriteQuote(): string {
+        return "Constraints are liberating";
+      }
+      isAdmin(): boolean {
+        return false;
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+    const p = new Person({ name: "Bob" });
+    expect({ ...p.serializableHash({ methods: ["favorite_quote", "admin?"] }) }).toEqual({
+      name: "Bob",
+      favorite_quote: "Constraints are liberating",
+      "admin?": false,
+    });
+  });
+
+  it("a caller option named __sync does not hijack the internal sync re-entry", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+
+    const p = new Person({ name: "Alice" });
+    setAssociationAccessors(p, { posts: [] });
+    const hash = p.serializableHash({ include: "posts", __sync: true } as never);
+    expect(typeof (hash as unknown as PromiseLike<unknown>).then).toBe("function");
+    expect(hash["posts"]).toEqual([]);
+  });
+
+  it("only include with scalar coerces via Array() like an array", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+
+    const p = new Person({ name: "Alice", age: 25 });
+    const hash = p.serializableHash({ only: "name" });
+    expect(hash["name"]).toBe("Alice");
+    expect(hash["age"]).toBeUndefined();
+  });
+
+  it("except include with scalar coerces via Array() like an array", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+
+    const p = new Person({ name: "Alice", age: 25 });
+    const hash = p.serializableHash({ except: "age" });
+    expect(hash["name"]).toBe("Alice");
+    expect(hash["age"]).toBeUndefined();
+  });
+
+  it("asJson accepts a scalar only like the array form", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    interface Person extends Attributes, SerializersJSON {}
+
+    const p = new Person({ name: "Alice", age: 25 });
+    expect(p.asJson({ only: "name" })).toEqual(p.asJson({ only: ["name"] }));
+  });
+
+  it("include accepts mixed array of strings and option hashes", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    const comment = new Comment({ text: "Great!", author: "Bob" });
+    const tag = new Tag({ name: "rails" });
+    setAssociationAccessors(p, { comments: [comment], tags: [tag] });
+    const result = p.serializableHash({
+      include: ["tags", { comments: { only: ["text"] } }],
+    });
+    expect((result.tags as any[])[0].name).toBe("rails");
+    expect((result.comments as any[])[0].text).toBe("Great!");
+    expect((result.comments as any[])[0].author).toBeUndefined();
+  });
+
+  it("include naming a method that returns a Set raises NoMethodError", async () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: new Set([new Tag({ name: "rails" })]) });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+    await expect(p.serializableHash({ include: "tags" })).rejects.toThrow(NoMethodError);
+  });
+
+  it("include naming a to_ary that answers nil raises rather than serializing nothing", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: { toAry: () => null } });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+  });
+
+  it("include naming an object that answers toArray but not to_ary is sent serializable_hash", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: { toArray: () => Promise.resolve([]) } });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+  });
+
+  it("awaited nested include preloads through an attributes-less PORO", async () => {
+    const comment = { _attributes: new Map([["text", "Nice"]]) };
+    const comments = {
+      loaded: false,
+      load(): Promise<void> {
+        this.loaded = true;
+        return Promise.resolve();
+      },
+      toAry(): unknown[] {
+        return [comment];
+      },
+    };
+    const author = { name: "Bob", comments };
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { author });
+
+    expect(comments.loaded).toBe(false);
+    await expect(
+      p.serializableHash({ include: { author: { include: "comments" } } }),
+    ).rejects.toThrow(NoMethodError);
+    expect(comments.loaded).toBe(true);
+  });
+
+  describe("asJson type coercion (Rails ActiveSupport::JSON parity)", () => {
+    it("asJson coerces Temporal attributes to ISO 8601 strings", () => {
+      class Event extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          include(this, SerializersJSON);
+          this.attribute("startsAt", "datetime");
+        }
+      }
+      interface Event extends Attributes, SerializersJSON {}
+
+      const e = new Event({ startsAt: "2026-04-24T10:00:00.123456Z" });
+      const json = e.asJson();
+      expect(json["startsAt"]).toBe("2026-04-24T10:00:00.123Z");
+    });
+
+    it("asJson recurses into include: arrays and nested objects", () => {
+      class Post extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          include(this, SerializersJSON);
+          this.attribute("id", "big_integer");
+          this.attribute("title", "string");
+        }
+      }
+      interface Post extends Attributes, SerializersJSON {}
+
+      class Blog extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          include(this, SerializersJSON);
+          this.attribute("name", "string");
+        }
+      }
+      interface Blog extends Attributes, SerializersJSON {}
+
+      const b = new Blog({ name: "b" });
+      setAssociationAccessors(b, {
+        posts: [
+          new Post({ id: "10000000000000000000", title: "p1" }),
+          new Post({ id: "20000000000000000000", title: "p2" }),
+        ],
+      });
+      const json = b.asJson({ include: "posts" });
+      expect(Array.isArray(json.posts)).toBe(true);
+      expect((json.posts as Array<{ id: string }>)[0].id).toBe("10000000000000000000");
+      expect(() => JSON.stringify(json)).not.toThrow();
+    });
+
+    it("attribute named toJSON does not shadow Model#toJSON", () => {
+      class Weird extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          include(this, SerializersJSON);
+          this.attribute("toJSON", "string");
+          this.attribute("name", "string");
+        }
+      }
+      interface Weird extends Attributes, SerializersJSON {}
+
+      const w = new Weird({ toJSON: "raw-value", name: "w" });
+      expect(JSON.parse(JSON.stringify(w))).toEqual({ name: "w" });
+      expect(w.attribute("toJSON")).toBe("raw-value");
+    });
+
+    it("JSON.stringify(model) delegates to asJson via toJSON()", () => {
+      class Row extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          include(this, SerializersJSON);
+          this.attribute("id", "big_integer");
+          this.attribute("name", "string");
+        }
+      }
+      interface Row extends Attributes, SerializersJSON {}
+
+      const r = new Row({ id: "42", name: "row-1" });
+      expect(JSON.stringify(r)).toBe(r.toJSON());
+      const parsed = JSON.parse(JSON.stringify(r));
+      expect(parsed).toEqual({ id: 42, name: "row-1" });
+    });
+
+    it("JSON.stringify(model) with large bigint id above Number.MAX_SAFE_INTEGER", () => {
+      class Row extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          include(this, SerializersJSON);
+          this.attribute("id", "big_integer");
+          this.attribute("name", "string");
+        }
+      }
+      interface Row extends Attributes, SerializersJSON {}
+
+      const big = 2n ** 62n;
+      const r = new Row({ id: big, name: "row-2" });
+      expect(() => JSON.stringify(r)).not.toThrow();
+      const parsed = JSON.parse(JSON.stringify(r));
+      expect(typeof parsed.id).toBe("string");
+      expect(parsed.id).toBe("4611686018427387904");
+      expect(parsed.name).toBe("row-2");
+    });
+
+    it("asJson is idempotent on JSON-safe values", () => {
+      class Person extends Model {
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          include(this, SerializersJSON);
+          this.attribute("name", "string");
+          this.attribute("age", "integer");
+        }
+      }
+      interface Person extends Attributes, SerializersJSON {}
+
+      const p = new Person({ name: "Alice", age: 30 });
+      expect(p.asJson()).toEqual({ name: "Alice", age: 30 });
+    });
+  });
+});
+
+describe("Serialization", () => {
+  class Post extends Model {
+    declare static attribute: AttributesClassHalf["attribute"];
+
+    static {
+      include(this, Attributes);
+      include(this, SerializersJSON);
+      this.attribute("title", "string");
+      this.attribute("body", "string");
+      this.attribute("rating", "integer");
+    }
+
+    get summary(): string {
+      return String(this._readAttribute("title")).slice(0, 10);
+    }
+  }
+  interface Post extends Attributes, SerializersJSON {}
+
+  it("method serializable hash should work", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    expect(p.serializableHash()).toEqual({
+      title: "Hello",
+      body: "World",
+      rating: 5,
+    });
+  });
+
+  it("method serializable hash should work with only option", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    expect(p.serializableHash({ only: ["title"] })).toEqual({
+      title: "Hello",
+    });
+  });
+
+  it("method serializable hash should work with except option", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    expect(p.serializableHash({ except: ["body"] })).toEqual({
+      title: "Hello",
+      rating: 5,
+    });
+  });
+
+  it("method serializable hash should work with methods option", () => {
+    const p = new Post({ title: "Hello World!", body: "c", rating: 3 });
+    const result = p.serializableHash({ methods: ["summary"] });
+    expect(result.summary).toBe("Hello Worl");
+  });
+
+  it("method serializable hash should work with only and methods", () => {
+    const p = new Post({ title: "Test", body: "c", rating: 3 });
+    const result = p.serializableHash({
+      only: ["title"],
+      methods: ["summary"],
+    });
+    expect(Object.keys(result).sort()).toEqual(["summary", "title"]);
+  });
+
+  it("asJson returns same as serializableHash", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    expect(p.asJson()).toEqual(p.serializableHash());
+  });
+
+  it("toJson returns valid JSON string", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    const parsed = JSON.parse(p.toJSON());
+    expect(parsed.title).toBe("Hello");
+    expect(parsed.rating).toBe(5);
+  });
+
+  it("include as string for single association", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    const received: unknown[] = [];
+    const author = {
+      serializableHash(opts: unknown) {
+        received.push(opts);
+        return { name: "Alice" };
+      },
+    };
+    setAssociationAccessors(p, { author });
+    const result = p.serializableHash({ include: "author" });
+    expect(result.author).toEqual({ name: "Alice" });
+    expect(received).toEqual([{}]);
+  });
+});
+
+describe("fromJson", () => {
+  it("from_json should work without a root (class attribute)", () => {
+    class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    interface User extends Attributes, SerializersJSON {}
+
+    const u = new User({});
+    u.fromJson('{"name":"Alice","age":30}');
+    expect(u._readAttribute("name")).toBe("Alice");
+    expect(u._readAttribute("age")).toBe(30);
+  });
+
+  it("returns this for chaining", () => {
+    class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+      }
+    }
+    interface User extends Attributes, SerializersJSON {}
+
+    const u = new User({});
+    const result = u.fromJson('{"name":"Bob"}');
+    expect(result).toBe(u);
+  });
+
+  it("from_json should work with a root (method parameter)", () => {
+    class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+      }
+    }
+    interface User extends Attributes, SerializersJSON {}
+
+    const u = new User({});
+    u.fromJson('{"user":{"name":"Charlie"}}', true);
+    expect(u._readAttribute("name")).toBe("Charlie");
+  });
+
+  it("marks attributes as changed via dirty tracking", () => {
+    class User extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        include(this, Dirty);
+        include(this, SerializersJSON);
+        this.attribute("name", "string");
+      }
+    }
+    interface User extends Attributes, Dirty {}
+    interface User extends Attributes, SerializersJSON {}
+
+    const u = new User({ name: "Original" });
+    u.changesApplied();
+    u.fromJson('{"name":"Updated"}');
+    expect(u.isChanged).toBe(true);
+    expect(u.changed).toContain("name");
+  });
+});

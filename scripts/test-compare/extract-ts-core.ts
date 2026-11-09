@@ -86,7 +86,7 @@ export type HelperMap = Map<string, HelperDef[]>;
  * (activemodel/test/cases/lint_test.rb:6). Only-grow, like its twin.
  */
 export const LIB_TEST_MODULES: Record<string, string> = {
-  Tests: "packages/activemodel/src/lint.ts",
+  Tests: "packages/activemodel/lib/lint.ts",
 };
 
 /**
@@ -1536,7 +1536,7 @@ function getArgTemplateSkeleton(node: ts.CallExpression, index: number): string 
 
 export function pkgFromPath(relPath: string): string {
   const parts = relPath.split(path.sep);
-  // packages/arel/src/... -> arel
+  // packages/arel/lib/... -> arel
   if (parts[0] === "packages" && parts[1]) {
     if (parts[1] === "actionpack" && parts[3]) {
       return parts[3]; // actiondispatch, actioncontroller, actionview

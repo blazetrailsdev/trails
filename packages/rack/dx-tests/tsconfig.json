@@ -4,7 +4,7 @@
     "composite": false,
     "noEmit": true,
     "paths": {
-      "@blazetrails/rack": ["../src/index.ts"],
+      "@blazetrails/rack": ["../lib/index.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/lib/index.ts"],
       "@blazetrails/date": ["../../date/lib/index.ts"]
     }

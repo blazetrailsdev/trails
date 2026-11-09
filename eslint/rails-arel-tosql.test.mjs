@@ -47,8 +47,8 @@ const { default: rule } = await import("./rails-arel-tosql.mjs");
 
 const relationFile = path.join(REPO_ROOT, "packages/activerecord/src/relation.ts");
 const builderFile = path.join(REPO_ROOT, "packages/activerecord/src/sql-builder.ts");
-const nodeFile = path.join(REPO_ROOT, "packages/arel/src/nodes/node.ts");
-const managerFile = path.join(REPO_ROOT, "packages/arel/src/tree-manager.ts");
+const nodeFile = path.join(REPO_ROOT, "packages/arel/lib/nodes/node.ts");
+const managerFile = path.join(REPO_ROOT, "packages/arel/lib/tree-manager.ts");
 const dbStmtFile = path.join(
   REPO_ROOT,
   "packages/activerecord/src/connection-adapters/abstract/database-statements.ts",
@@ -83,7 +83,7 @@ tester.run("rails-arel-tosql", rule, {
     { filename: builderFile, code: `export const o = { toSql() { return "x"; } };\n` },
     // Out-of-scope file is ignored entirely.
     {
-      filename: path.join(REPO_ROOT, "packages/activesupport/src/x.ts"),
+      filename: path.join(REPO_ROOT, "packages/activesupport/lib/x.ts"),
       code: `export class Foo { toSql() { return ""; } }\n`,
     },
   ],

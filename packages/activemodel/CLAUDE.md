@@ -17,7 +17,7 @@ is async, so an `include:`-bearing `serializable_hash` cannot be fully
 synchronous.
 
 **The settled answer is the dual-shape return** — `thenableHash` in
-`activemodel/src/serialization.ts` builds a Proxy that is both a plain hash and
+`activemodel/lib/serialization.ts` builds a Proxy that is both a plain hash and
 a `PromiseLike`. Read a key off it and you get the synchronous hash, where an
 unloaded `include:` fails loud rather than silently serializing nothing;
 `await` it and the includes are lazily loaded first, which is where Ruby's
@@ -29,7 +29,7 @@ the Proxy calls back through.
 
 The alternative — `serializableHash` / `asJson` returning `Promise`
 unconditionally — was rejected because `asJson` is the recursive dispatcher
-behind the whole JSON encoder (`activesupport/src/core-ext/object/json.ts`,
+behind the whole JSON encoder (`activesupport/lib/core-ext/object/json.ts`,
 standing in for Ruby's `as_json` method lookup, with ~19 definitions feeding
 it): an async `asJson` makes every collection containing a model async, the
 encoder async, and **`to_json` a `Promise`** where Rails' returns a String — a

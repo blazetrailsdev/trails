@@ -98,7 +98,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     // A test file in another workspace package is linted too — the rule is
     // wired to every scan root, not just activerecord.
     {
-      filename: "packages/activesupport/src/schema-wiring.test.ts",
+      filename: "packages/activesupport/test/schema-wiring.test.ts",
       code: 'import { loadCanonicalSchema } from "../../activerecord/src/support/canonical-schema.js";',
       errors: [{ messageId: "banned", data: { name: "loadCanonicalSchema" } }],
     },

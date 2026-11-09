@@ -33,23 +33,23 @@ where Rails returns a String, and an async `translate` makes it return a
 `Promise`:
 
 - `ActiveModel::Error#message` and `#full_message`
-  (`packages/activemodel/src/error.ts:235`, `:258`), which are **getters**,
+  (`packages/activemodel/lib/error.ts:235`, `:258`), which are **getters**,
   over the statics they call (`:87`, `:148`). `Errors#full_messages`
   (`errors.ts:233`), `#messages_for` (`:241`) and `#to_hash` (`:296`) read
   them, and `as_json` reads `to_hash`.
 - `ActiveModel::Translation#human_attribute_name`
-  (`packages/activemodel/src/translation.ts:60`) and `Name#human`
+  (`packages/activemodel/lib/translation.ts:60`) and `Name#human`
   (`naming.ts:220`), which name a model and its attributes everywhere one is
   rendered.
 - `Inflector#ordinal` / `#ordinalize`
-  (`packages/activesupport/src/inflector.ts:256`, `:260`), `Array#to_sentence`
+  (`packages/activesupport/lib/inflector.ts:256`, `:260`), `Array#to_sentence`
   (`array-utils.ts:63`), `NumberConverter`'s `i18n_format_options` /
   `translate_number_value_with_default`
   (`number-helper/number-converter.ts:155`, `:177`) and
   `HtmlSafeTranslation.translate` (`html-safe-translation.ts:11`).
 - Every helper that renders a translated string:
   `ActionView::Helpers::TranslationHelper#translate` / `#localize`
-  (`packages/actionview/src/helpers/translation-helper.ts:40`, `:101`),
+  (`packages/actionview/lib/helpers/translation-helper.ts:40`, `:101`),
   `#time_tag` (`date-helper.ts:223`), `DateTimeSelector`'s private
   `translated_month_names` / `translated_date_order` (`:510`, `:566`),
   `weekday_options_for_select` (`form-options-helper.ts:271`), and
@@ -76,7 +76,7 @@ As a consequence:
   (`vendor/i18n/v1.14.8/lib/i18n/backend/cache.rb:79-111`). Its `_fetch`
   (`:93-99`) reads a cache store inside the lookup, and every
   `ActiveSupport::Cache` store's `read` / `write` is async
-  (`packages/activesupport/src/cache/store.ts`). It is an opt-in mixin — an
+  (`packages/activesupport/lib/cache/store.ts`). It is an opt-in mixin — an
   application includes it into a backend and sets `cache_store` itself — so not
   porting it costs behaviour no default configuration has. Its
   `unported-files` row cites this section.
@@ -89,19 +89,19 @@ As a consequence:
   `it.skip` under a `PERMANENT-SKIP:` line citing this section. The one
   instance is `translate caching backend`
   (`vendor/rails/v8.0.2/actionview/test/template/translation_helper_test.rb:390-410`),
-  at `packages/actionview/src/template/translation-helper.test.ts`. Its body is
+  at `packages/actionview/test/template/translation-helper.test.ts`. Its body is
   empty rather than Rails', because that body names two things the port does
   not define: `I18n::Backend::Cache`, which this section leaves unported, and
   the `I18n.cache_store` accessor it is configured through (`cache.rb:44-74`,
-  with no counterpart in `packages/i18n/src/i18n.ts`). Its
+  with no counterpart in `packages/i18n/lib/i18n.ts`). Its
   `ActiveSupport::Cache.lookup_store(:memory_store)` call does resolve
-  (`packages/activesupport/src/cache.ts:16`), so the two i18n names are the
+  (`packages/activesupport/lib/cache.ts:16`), so the two i18n names are the
   whole blocker. The receipt carries the citation instead.
 - `Backend::KeyValue` is unaffected, because the gem already requires a
   synchronous store there: Ruby's store answers `[]`, `[]=` and `keys`
   (`vendor/i18n/v1.14.8/lib/i18n/backend/key_value.rb:26-30`), and the ported
   `Store` interface is those three methods, synchronous
-  (`packages/i18n/src/backend/key-value.ts:17-21`). A store whose reads are
+  (`packages/i18n/lib/backend/key-value.ts:17-21`). A store whose reads are
   async does not satisfy that interface, in Ruby or here. How such a store
   would be adapted is not decided by this section.
 

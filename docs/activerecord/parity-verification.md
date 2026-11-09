@@ -158,7 +158,7 @@ scripts/parity/pipeline/
 #### Translation map (Arel Ruby → trails)
 
 Common cases. Full table in git history of `query-parity-verification.md`
-(this doc's predecessor) and verified against `packages/arel/src/`.
+(this doc's predecessor) and verified against `packages/arel/lib/`.
 
 | Ruby                                    | TypeScript                                                                        |
 | --------------------------------------- | --------------------------------------------------------------------------------- |

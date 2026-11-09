@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { LinkSanitizer } from "../lib/link-sanitizer.js";
+import { HTML4LinkSanitizer as LinkSanitizer } from "../lib/sanitizer.js";
 
 const linkSanitize = (input: string | null | undefined) => new LinkSanitizer().sanitize(input);
 

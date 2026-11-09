@@ -1,4 +1,10 @@
 import { Deprecation, camelize } from "@blazetrails/activesupport";
+import { HTML } from "./html4.js";
+import { TopLevel } from "@blazetrails/ruby-compat";
+
+const Trails = TopLevel.Trails as NonNullable<typeof TopLevel.Trails> & { Html: typeof HTML };
+
+Trails.Html = HTML;
 
 export const ActionView = {
   Helpers: {

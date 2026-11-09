@@ -483,7 +483,7 @@ describe("dynamically-named tests", () => {
         '  it("static one", () => {});',
         "});",
       ].join("\n"),
-      "packages/arel/src/visitors/to-sql.test.ts",
+      "packages/arel/test/visitors/to-sql.test.ts",
     );
     expect(info.testCases.map((tc) => [tc.description, tc.dynamic])).toEqual([
       ["<expr> raises UnsupportedVisitError", true],

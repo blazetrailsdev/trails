@@ -17,7 +17,7 @@ means nothing can build one at definition time.
 
 A subclass that has never written its own `__callbacks` reads its parent's
 through the prototype chain, so it needs no edge. The first own write is where
-it starts to diverge, so `setCallbacks` (`activesupport/src/callbacks.ts`)
+it starts to diverge, so `setCallbacks` (`activesupport/lib/callbacks.ts`)
 registers the class and its superclass chain with
 `DescendantsTracker.registerSubclass` there, a call `set_callbacks` does not
 make. Without it Rails' `ResetCallbackTest` "reset impacts subclasses" is red.
@@ -37,7 +37,7 @@ listed here and does not need a namespace — see root CLAUDE.md
 body calls `const_set`, and a class's qualified Ruby path is a ruby-compat internal, read only to produce a name (root CLAUDE.md
 § "Constant lookup is an import or a registry"), not the seat.
 
-- `activesupport/src/namespaces.ts`, `actionview/src/namespaces.ts`,
+- `activesupport/lib/namespaces.ts`, `actionview/lib/namespaces.ts`,
   `actionpack/lib/namespaces.ts` hold the `ActiveSupport`, `ActionView` and
   `ActionDispatch` namespace objects. Autoloaded and seated there:
   `ActionView.Base` (`action_view.rb:37`; read by `handlers/erb.rb:86`,
@@ -60,7 +60,7 @@ body calls `const_set`, and a class's qualified Ruby path is a ruby-compat inter
 - `TopLevel` in `ruby-compat/lib/object.ts` is Ruby's top-level `Object`,
   for a constant the reading gem does not depend on the defining gem for, or
   `::Rails` itself. The defining gem seats it: `TopLevel.Trails = Trails`
-  (`trailties/src/trails.ts`), `TopLevel.ActionDispatch` /
+  (`trailties/lib/trails.ts`), `TopLevel.ActionDispatch` /
   `TopLevel.ActionController` (`actionpack/lib/namespaces.ts`), and
   `TopLevel.BCrypt` (`bcrypt/lib/index.ts`; an unseated `BCrypt` is
   `has_secure_password`'s `LoadError` arm, `secure_password.rb:120-125`). A

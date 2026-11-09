@@ -1019,7 +1019,7 @@ have Y" should match behavior, not just signature.
 
 | Rails                                                          | TSE                                                                                                                                      |
 | -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `Template::Handlers.register_template_handler(:tse, TSE)`      | `TemplateHandlers.registerTemplateHandler("tse", new TseHandler())` ([existing API](../../packages/actionview/src/template/handlers.ts)) |
+| `Template::Handlers.register_template_handler(:tse, TSE)`      | `TemplateHandlers.registerTemplateHandler("tse", new TseHandler())` ([existing API](../../packages/actionview/lib/template/handlers.ts)) |
 | `Template::Handlers::ERB#call(template, source) → String`      | `Tse.call(template, source): { code: string, sourceMap: RawSourceMap }`                                                                  |
 | `Template::Handlers::ERB#supports_streaming? → true`           | `Tse.supportsStreaming = true`                                                                                                           |
 | `Template::Handlers::ERB#handles_encoding? → true`             | `Tse.handlesEncoding = true` (TS is UTF-8; mostly cosmetic)                                                                              |
@@ -1197,7 +1197,7 @@ Collected from post-merge findings across all §5 PRs. Grouped by area.
 
 **Rails fidelity**
 
-- [x] ~3 LOC (#2375/#2393): `TseRenderContextImpl.raw()` short-circuits on `SafeBuffer` inputs — Rails `raw()` always calls `.to_s.html_safe`. Remove the short-circuit, keep only the OutputBuffer guard. File: `packages/actionview/src/render-context.ts`.
+- [x] ~3 LOC (#2375/#2393): `TseRenderContextImpl.raw()` short-circuits on `SafeBuffer` inputs — Rails `raw()` always calls `.to_s.html_safe`. Remove the short-circuit, keep only the OutputBuffer guard. File: `packages/actionview/lib/render-context.ts`.
 - [x] ~1 LOC (#2416): `output-safety-helper.ts` `raw()` `OutputBuffer.toString()` coercion bug — replaced with `htmlSafe(buf.toStr())`.
 
 **Build tooling**

@@ -1,0 +1,128 @@
+import { describe, it, expect, afterEach } from "vitest";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { toTime } from "../lib/core-ext/date-time/compatibility.js";
+import { advance, change } from "../lib/time-ext.js";
+import { offsetInSeconds, secondsSinceUnixEpoch } from "../lib/core-ext/date-time/conversions.js";
+import { setPreserveTimezone } from "../lib/core-ext/date-and-time/compatibility.js";
+import { withEnvTz } from "../lib/time-zone-test-helpers.js";
+
+describe("to_time over a receiver that carries an offset", () => {
+  afterEach(() => {
+    setPreserveTimezone(null);
+  });
+
+  it("Time#to_time returns self when preserve_timezone is set", () => {
+    setPreserveTimezone(true);
+    const time = new RubyTime(2005, 2, 21, 17, 44, 30, 3600);
+    const result = time.toTime();
+    expect(result).toBe(time);
+    expect(result.hour).toBe(17);
+  });
+
+  it("Time#to_time returns getlocal when preserve_timezone is false", () => {
+    setPreserveTimezone(false);
+    const time = new RubyTime(2005, 2, 21, 17, 44, 30, 3600);
+    const result = time.toTime();
+    expect(result).not.toBe(time);
+    expect(result.toZonedDateTime().epochNanoseconds).toBe(time.toZonedDateTime().epochNanoseconds);
+  });
+
+  it("DateTime#to_time returns getlocal(utc_offset) when preserve_timezone is set", () => {
+    setPreserveTimezone(true);
+    const datetime = Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00");
+    const result = toTime(datetime);
+    expect(result.utcOffset).toBe(18000);
+    expect(result.hour).toBe(10);
+  });
+
+  it("DateTime#to_time returns getlocal when preserve_timezone is false", () => {
+    setPreserveTimezone(false);
+    const datetime = Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00");
+    const result = toTime(datetime);
+    expect(result.zone).toBe(RubyTime.now().zone);
+    expect(result.toZonedDateTime().epochNanoseconds).toBe(datetime.epochNanoseconds);
+  });
+
+  it("DateTime#to_time reads a PlainDateTime as +00:00", () => {
+    setPreserveTimezone(true);
+    const result = toTime(Temporal.PlainDateTime.from("2005-02-21T10:11:12"));
+    expect(result.utcOffset).toBe(0);
+    expect(result.hour).toBe(10);
+  });
+});
+
+describe("DateTime's private conversion helpers", () => {
+  it("offset_in_seconds reads the receiver's offset as whole seconds", () => {
+    expect(offsetInSeconds(Temporal.PlainDateTime.from("2005-02-21T10:11:12"))).toBe(0);
+    expect(
+      offsetInSeconds(Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:30")),
+    ).toBe(19800);
+  });
+
+  it("seconds_since_unix_epoch subtracts the offset from the local wall clock", () => {
+    expect(secondsSinceUnixEpoch(Temporal.PlainDateTime.from("1970-01-01T00:00:00"))).toBe(0);
+    expect(secondsSinceUnixEpoch(Temporal.PlainDateTime.from("2005-02-21T10:11:12"))).toBe(
+      Date.UTC(2005, 1, 21, 10, 11, 12) / 1000,
+    );
+    expect(
+      secondsSinceUnixEpoch(
+        Temporal.PlainDateTime.from("2005-02-21T10:11:12").toZonedDateTime("+05:00"),
+      ),
+    ).toBe(Date.UTC(2005, 1, 21, 5, 11, 12) / 1000);
+  });
+});
+
+describe("change over a ::Time receiver", () => {
+  it("returns a ::Time, cascading the reset from the largest option given", () => {
+    const t = RubyTime.utc(2012, 8, 29, 22, 35, 30);
+    const changed = change(t, { hour: 0 });
+    expect(changed).toBeInstanceOf(RubyTime);
+    expect([changed.year, changed.mon, changed.day]).toEqual([2012, 8, 29]);
+    expect([changed.hour, changed.min, changed.sec]).toEqual([0, 0, 0]);
+    expect(changed.isUtc()).toBe(true);
+  });
+
+  it("usec: 0 drops the sub-second and leaves the rest alone", () => {
+    const t = RubyTime.utc(2012, 8, 29, 22, 35, 30, 123456);
+    const changed = change(t, { usec: 0 });
+    expect(changed.nsec).toBe(0);
+    expect([changed.hour, changed.min, changed.sec]).toEqual([22, 35, 30]);
+  });
+});
+
+describe("advance over a JS Date receiver", () => {
+  it("floors a negative fractional weeks like Ruby's divmod", () => {
+    withEnvTz("US/Eastern", () => {
+      const advanced = advance(
+        new Date(RubyTime.local(2005, 4, 13, 15, 15, 10).toZonedDateTime().epochMilliseconds),
+        { weeks: -1.5 },
+      );
+      expect(new Date(advanced.epochMilliseconds)).toEqual(
+        new Date(RubyTime.local(2005, 4, 3, 4, 15, 10).toZonedDateTime().epochMilliseconds),
+      );
+    });
+  });
+
+  it("floors a negative fractional days like Ruby's divmod", () => {
+    withEnvTz("US/Eastern", () => {
+      const advanced = advance(
+        new Date(RubyTime.local(2005, 4, 8, 15, 15, 10).toZonedDateTime().epochMilliseconds),
+        { days: -5.5 },
+      );
+      expect(new Date(advanced.epochMilliseconds)).toEqual(
+        new Date(RubyTime.local(2005, 4, 3, 4, 15, 10).toZonedDateTime().epochMilliseconds),
+      );
+    });
+  });
+});
+
+describe("DateAndTime::Calculations over a ::Time receiver", () => {
+  it("before?/after? compare instants, not dates", () => {
+    const morning = RubyTime.utc(2017, 3, 6, 9, 0, 0);
+    const evening = RubyTime.utc(2017, 3, 6, 21, 0, 0);
+    expect(morning.isBefore(evening)).toBe(true);
+    expect(morning.isAfter(evening)).toBe(false);
+    expect(evening.isAfter(morning)).toBe(true);
+    expect(evening.isBefore(morning)).toBe(false);
+  });
+});

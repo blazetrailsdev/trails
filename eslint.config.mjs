@@ -144,7 +144,7 @@ export default defineConfig(
       "vendor/**",
       "**/dist/**",
       "**/*.tt.js",
-      "packages/thor/src/test-helpers/fixtures/doc/*.rb.js",
+      "packages/thor/test/fixtures/doc/*.rb.js",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of
       // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and
@@ -159,7 +159,7 @@ export default defineConfig(
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
       "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
-      "packages/activestorage/src/test-helpers/fixtures/files/**",
+      "packages/activestorage/test/fixtures/files/**",
       // Byte-for-byte copies of vendor/rack/v3.2.8/test/cgi/assets.
       "packages/rack/test/cgi/assets/**",
       "**/dist-test/**",
@@ -170,7 +170,7 @@ export default defineConfig(
       // parser's project service cannot resolve them when linted by path.
       "packages/website/vite.sw.config.ts",
       "packages/website/vitest.config.ts",
-      "packages/activerecord-cli/src/type-virtualization/fixtures/**",
+      "packages/activerecord-cli/test/type-virtualization/fixtures/**",
       // `strip-asany`'s input sample is a file full of `as any` by
       // construction — linting it would be linting the codemod's test data.
       "scripts/__fixtures__/**",
@@ -179,7 +179,7 @@ export default defineConfig(
       // part hand-edited, and its whole job is to stay shaped like the Ruby it
       // mirrors. Linting the TS half would pull it away from its twin.
       "scripts/parity/pipeline/fixtures/**",
-      "packages/activerecord-cli/src/tsc-wrapper/__fixtures__/**",
+      "packages/activerecord-cli/test/fixtures/**",
     ],
   },
   eslint.configs.recommended,
@@ -238,13 +238,13 @@ export default defineConfig(
   // ── no-node-builtins (browser compat) ──
   {
     files: [
-      "packages/arel/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/arel/lib/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
+      "packages/rack/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/ruby-compat/{lib,test}/**/*.ts",
     ],
     ignores: [
@@ -259,9 +259,9 @@ export default defineConfig(
       "packages/ruby-compat/lib/process-adapter.ts",
       "packages/ruby-compat/lib/repl-adapter.ts",
       "packages/ruby-compat/lib/zlib-adapter.ts",
-      "packages/activesupport/src/http-adapter.ts",
+      "packages/activesupport/lib/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
-      "packages/activerecord-cli/src/tsc-wrapper/**",
+      "packages/activerecord-cli/lib/tsc-wrapper/**",
       "packages/activerecord/src/sqlite/node-sqlite.ts",
       "packages/activerecord/src/sqlite/expo-sqlite.ts",
       "packages/activerecord/src/encryption/config.ts",
@@ -354,20 +354,20 @@ export default defineConfig(
   // Per-package exemptions noted inline.
   {
     files: [
-      "packages/trailties/src/**/*.ts",
-      "packages/thor/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
-      "packages/arel/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
+      "packages/arel/lib/**/*.ts",
+      "packages/rack/lib/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
     ],
     ignores: [
       "**/*.test.ts",
       // trailties: app-generator.ts contains template strings emitting
       // user-app code (which legitimately uses process.* at runtime in
       // the user's app).
-      "packages/trailties/src/generators/trails/app/app-generator.ts",
+      "packages/trailties/lib/generators/trails/app/app-generator.ts",
     ],
     rules: {
       "blazetrails/no-process-bypass": "error",
@@ -377,25 +377,25 @@ export default defineConfig(
   // ── no-native-date (Temporal migration safety net) ──
   {
     files: [
-      "packages/arel/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/arel/lib/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
+      "packages/rack/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
-      "packages/trailties/src/**/*.ts",
-      "packages/thor/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
       "packages/website/src/**/*.ts",
     ],
     ignores: [
       "**/*.test.ts",
       "**/*.test-d.ts",
       // Temporal bridge — the canonical Date↔Instant adapter.
-      "packages/activesupport/src/temporal.ts",
+      "packages/activesupport/lib/temporal.ts",
       // Test infrastructure: travelTo, fixture helpers, etc.
-      "packages/activesupport/src/testing/**",
-      "packages/activesupport/src/testing-helpers.ts",
+      "packages/activesupport/lib/testing/**",
+      "packages/activesupport/lib/testing-helpers.ts",
     ],
     rules: {
       "blazetrails/no-native-date": "error",
@@ -438,21 +438,21 @@ export default defineConfig(
   // ── rails-private-jsdoc (per-package rollout; widen as packages adopt) ──
   {
     files: [
-      "packages/arel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/arel/lib/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
-      "packages/activejob/src/**/*.ts",
+      "packages/activejob/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
-      "packages/globalid/src/**/*.ts",
-      "packages/i18n/src/**/*.ts",
+      "packages/rack/lib/**/*.ts",
+      "packages/globalid/{lib,test}/**/*.ts",
+      "packages/i18n/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
-      "packages/trailties/src/**/*.ts",
-      "packages/thor/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -468,17 +468,17 @@ export default defineConfig(
   //    in eslint/rails-private-jsdoc.config.mjs.
   {
     files: [
-      "packages/trailties/src/**/*.ts",
-      "packages/thor/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
-      "packages/globalid/src/**/*.ts",
-      "packages/i18n/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
+      "packages/globalid/{lib,test}/**/*.ts",
+      "packages/i18n/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
+      "packages/rack/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
-      "packages/arel/src/**/*.ts",
+      "packages/arel/lib/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
       // Absent from the rails-private manifest by construction, so the
       // receipt pairing is mandatory package-wide there (RFC 0129).
@@ -506,8 +506,8 @@ export default defineConfig(
   {
     files: [
       "packages/activerecord/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -520,7 +520,7 @@ export default defineConfig(
   // (assertion failures, test-double guards) have no ported class to reach for.
   // Kept as its own block so the three packages above stay strictly gated.
   {
-    files: ["packages/arel/src/**/*.ts"],
+    files: ["packages/arel/lib/**/*.ts"],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
     rules: {
       "blazetrails/rails-error-parity": "error",
@@ -530,16 +530,16 @@ export default defineConfig(
   {
     files: [
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
-      "packages/trailties/src/**/*.ts",
-      "packages/thor/src/**/*.ts",
-      "packages/activejob/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
+      "packages/rack/lib/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
+      "packages/activejob/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
       "packages/date/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
-      "packages/globalid/src/**/*.ts",
-      "packages/i18n/src/**/*.ts",
+      "packages/globalid/{lib,test}/**/*.ts",
+      "packages/i18n/lib/**/*.ts",
       "packages/msgpack/lib/**/*.ts",
       "packages/rack-session/lib/**/*.ts",
       "packages/rack-test/lib/**/*.ts",
@@ -574,8 +574,8 @@ export default defineConfig(
   {
     files: [
       "packages/activerecord/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
-      "packages/arel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
+      "packages/arel/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -595,11 +595,11 @@ export default defineConfig(
   // Requires `@deprecated` JSDoc where Rails deprecates the same method.
   {
     files: [
-      "packages/arel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/arel/lib/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -625,8 +625,8 @@ export default defineConfig(
     ? [
         {
           files: [
-            "packages/arel/src/**/*.ts",
-            "packages/activemodel/src/**/*.ts",
+            "packages/arel/lib/**/*.ts",
+            "packages/activemodel/lib/**/*.ts",
             "packages/actioncable/lib/**/*.ts",
             "packages/activerecord/src/connection-adapters/**/*.ts",
             "packages/activerecord/src/adapters/**/*.ts",
@@ -637,7 +637,7 @@ export default defineConfig(
           },
         },
         {
-          files: ["packages/activejob/src/**/*.ts", "packages/activesupport/src/**/*.ts"],
+          files: ["packages/activejob/lib/**/*.ts", "packages/activesupport/lib/**/*.ts"],
           ignores: ["**/*.test.ts", "**/test-helpers/**"],
           rules: {
             "blazetrails/class-to-string-seat": "error",
@@ -655,12 +655,12 @@ export default defineConfig(
     ? [
         {
           files: [
-            "packages/actionview/src/**/*.test.ts",
-            "packages/arel/src/**/*.test.ts",
+            "packages/actionview/{lib,test}/**/*.test.ts",
+            "packages/arel/{lib,test}/**/*.test.ts",
             "packages/date/test/**/*.test.ts",
             "packages/did-you-mean/test/**/*.test.ts",
-            "packages/globalid/src/**/*.test.ts",
-            "packages/i18n/src/**/*.test.ts",
+            "packages/globalid/test/**/*.test.ts",
+            "packages/i18n/test/**/*.test.ts",
           ],
           rules: {
             "blazetrails/rails-test-name-parity": "error",
@@ -676,10 +676,10 @@ export default defineConfig(
     files: [
       "packages/activerecord/src/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
-      "packages/actionview/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
-      "packages/arel/src/**/*.ts",
+      "packages/actionview/lib/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
+      "packages/arel/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -847,21 +847,21 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/thor/src/**/*.ts"],
+    files: ["packages/thor/{lib,test}/**/*.ts"],
     rules: {
       "blazetrails/thor-import-boundary": "error",
     },
   },
 
   {
-    files: ["packages/thor/src/**/*.ts"],
+    files: ["packages/thor/{lib,test}/**/*.ts"],
     rules: {
       "blazetrails/thor-command-registration": "error",
     },
   },
 
   {
-    files: ["packages/trailties/src/**/*.ts"],
+    files: ["packages/trailties/lib/**/*.ts"],
     rules: {
       "blazetrails/thor-command-registration": [
         "error",
@@ -916,10 +916,10 @@ export default defineConfig(
   // Applies to both app code and test files across the ported packages.
   {
     files: [
-      "packages/arel/src/**/*.ts",
-      "packages/activemodel/src/**/*.ts",
+      "packages/arel/{lib,test}/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
-      "packages/activesupport/src/**/*.ts",
+      "packages/activesupport/lib/**/*.ts",
     ],
     rules: {
       // `warn`, not `error`: `.toArray()` is the established relation
@@ -940,13 +940,13 @@ export default defineConfig(
 
   // ── activemodel ──
   {
-    files: ["packages/activemodel/src/**/*.ts"],
+    files: ["packages/activemodel/{lib,test}/**/*.ts"],
     rules: {
       "unused-imports/no-unused-vars": "off",
     },
   },
   {
-    files: ["packages/activemodel/src/**/*.test.ts"],
+    files: ["packages/activemodel/test/**/*.test.ts"],
     plugins: { vitest },
     rules: {
       ...vitest.configs.recommended.rules,
@@ -982,7 +982,7 @@ export default defineConfig(
   //    inline `eslint-disable`. Disabling the rule must itself be an error —
   //    fix the `any`. No allowlist; applies to src and tests. ──
   {
-    files: ["packages/activerecord/src/**/*.ts", "packages/arel/src/**/*.ts"],
+    files: ["packages/activerecord/src/**/*.ts", "packages/arel/{lib,test}/**/*.ts"],
     rules: {
       "blazetrails/no-explicit-any-disable": "error",
     },
@@ -990,10 +990,10 @@ export default defineConfig(
 
   {
     files: [
-      "packages/arel/src/**/*.ts",
-      "packages/globalid/src/**/*.ts",
-      "packages/i18n/src/**/*.ts",
-      "packages/rack/src/**/*.ts",
+      "packages/arel/lib/**/*.ts",
+      "packages/globalid/{lib,test}/**/*.ts",
+      "packages/i18n/lib/**/*.ts",
+      "packages/rack/lib/**/*.ts",
       "packages/rack-session/lib/**/*.ts",
     ],
     ignores: ["**/*.test.ts", "**/test-helpers/**"],
@@ -1121,7 +1121,7 @@ export default defineConfig(
 
   // ── activesupport ──
   {
-    files: ["packages/activesupport/src/**/*.ts"],
+    files: ["packages/activesupport/{lib,test}/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-this-alias": "off",
@@ -1131,7 +1131,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["packages/activesupport/src/**/*.test.ts"],
+    files: ["packages/activesupport/{lib,test}/**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-unused-expressions": "off",
     },
@@ -1139,13 +1139,13 @@ export default defineConfig(
 
   // ── rack ──
   {
-    files: ["packages/rack/src/**/*.ts"],
+    files: ["packages/rack/{lib,test}/**/*.ts"],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
   {
-    files: ["packages/rack/src/common-logger.ts"],
+    files: ["packages/rack/lib/common-logger.ts"],
     rules: {
       "no-control-regex": "off",
     },
@@ -1155,8 +1155,8 @@ export default defineConfig(
   {
     files: [
       "packages/actionpack/{lib,test}/**/*.ts",
-      "packages/trailties/src/**/*.ts",
-      "packages/thor/src/**/*.ts",
+      "packages/trailties/{lib,test}/**/*.ts",
+      "packages/thor/{lib,test}/**/*.ts",
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
@@ -1216,7 +1216,7 @@ export default defineConfig(
   //    `record.save()` whose result nobody awaits.
   {
     files: [
-      "packages/activemodel/src/**/*.ts",
+      "packages/activemodel/lib/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "scripts/**/*.ts",
     ],

@@ -3,10 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": "lib",
     "types": ["@blazetrails/vitest-matchers"]
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     { "path": "../ruby-compat" },
     { "path": "../zeitwerk" },
@@ -32,6 +32,5 @@
     { "path": "../et-orbi" },
     { "path": "../mail" },
     { "path": "../vitest-matchers" }
-  ],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers", "src/**/__fixtures__"]
+  ]
 }

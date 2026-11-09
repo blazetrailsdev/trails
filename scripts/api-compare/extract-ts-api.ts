@@ -372,7 +372,7 @@ export function declaringFile(sym: ts.Symbol | undefined, srcDir: string): strin
   // `dist/*.d.ts` a cross-package import actually resolves through) lives.
   const packagesDir = path.posix.dirname(path.posix.dirname(srcDir.replace(/\\/g, "/")));
   const rel = path.posix.relative(packagesDir, abs);
-  const m = /^([^./][^/]*)\/(?:src|dist)\/(.+)$/.exec(rel);
+  const m = /^([^./][^/]*)\/(?:src|lib|dist)\/(.+)$/.exec(rel);
   if (!m) return EXTERNAL_DECL_FILE;
   return `${PKG_DECL_PREFIX}${m[1]}:${m[2].replace(/\.d\.ts$/, ".ts")}`;
 }
@@ -3395,7 +3395,7 @@ function isInternalCallableRef(expr: ts.Expression, checker: ts.TypeChecker): bo
  * The members of the class a mixin factory returns —
  * `export function Fallbacks(Superclass) { abstract class Fallbacks extends
  * Superclass { ... } return Fallbacks; }`
- * (packages/i18n/src/backend/fallbacks.ts, the port of Ruby's
+ * (packages/i18n/lib/backend/fallbacks.ts, the port of Ruby's
  * `include I18n::Backend::Fallbacks`).
  *
  * The class is a local declaration inside the function body, so the top-level
@@ -3574,7 +3574,7 @@ function collectDefineColumnMethodsMembers(
 
 /**
  * A `classAttribute.call(Host, "name", { … })` site — the trails port of Ruby's
- * `class_attribute` macro (activesupport/src/class-attribute.ts), which is how
+ * `class_attribute` macro (activesupport/lib/class-attribute.ts), which is how
  * an `included do class_attribute :foo end` block is spelled here (CLAUDE.md,
  * _Module mixins_). Ruby's macro defines `foo`, `foo?` and `foo=`, and
  * extract-ruby-api.rb#process_mattr credits all three; ours installs the same

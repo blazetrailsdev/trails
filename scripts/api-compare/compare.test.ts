@@ -2501,7 +2501,7 @@ describe("selectMisplacedFile", () => {
   it("never resolves onto the package barrel", () => {
     // The barrel re-exports the whole package, so it out-hits every real file
     // and would clear all three thresholds. It is a re-export site, not a port
-    // location — PR #6225's `acts_like.rb ↦ activesupport/src/index.ts`.
+    // location — PR #6225's `acts_like.rb ↦ activesupport/lib/index.ts`.
     expect(selectMisplacedFile(hits(["index.ts", 8], ["a.ts", 1]), 10)).toBeNull();
   });
 
@@ -2559,7 +2559,7 @@ describe("buildEntitiesByName", () => {
 
   it("includes entities from @blazetrails/* dep packages when package.json lists them", () => {
     // activerecord depends on activemodel; Model lives in activemodel.
-    const model = cls("packages/activemodel/src/model.ts", "Model");
+    const model = cls("packages/activemodel/lib/model.ts", "Model");
     model.instanceMethods = [method("attributes")];
 
     const base = cls("packages/activerecord/src/base.ts", "Base");
@@ -2578,10 +2578,10 @@ describe("buildEntitiesByName", () => {
   });
 
   it("does not add dep-package entities for a package with no blazetrails deps (e.g. activesupport)", () => {
-    const concern = cls("packages/activesupport/src/concern.ts", "Concern");
+    const concern = cls("packages/activesupport/lib/concern.ts", "Concern");
     const ts = makeManifest({
       activesupport: { classes: { Concern: concern } },
-      activemodel: { classes: { Model: cls("packages/activemodel/src/model.ts", "Model") } },
+      activemodel: { classes: { Model: cls("packages/activemodel/lib/model.ts", "Model") } },
     });
 
     const map = buildEntitiesByName("activesupport", ts);
@@ -2610,7 +2610,7 @@ describe("buildEntitiesByName", () => {
 
   it("current-package entities appear before dep-package entities (same name)", () => {
     const localModel = cls("packages/activerecord/src/model.ts", "Model");
-    const depModel = cls("packages/activemodel/src/model.ts", "Model");
+    const depModel = cls("packages/activemodel/lib/model.ts", "Model");
     const ts = makeManifest({
       activerecord: { classes: { LocalModel: localModel } },
       activemodel: { classes: { Model: depModel } },
@@ -4516,7 +4516,7 @@ describe("ownerRecordsNothing", () => {
 });
 
 describe("declarationOnlyInFile", () => {
-  // arel/crud.rb:6-47 is four module bodies; packages/arel/src/crud.ts:10-24 is
+  // arel/crud.rb:6-47 is four module bodies; packages/arel/lib/crud.ts:10-24 is
   // a bare `interface Crud` with the four signatures, and the bodies were
   // inlined onto SelectManager (select-manager.ts:295-338).
   const bodyless = new Map([["crud.ts", new Map([["compileInsert", new Set(["Crud"])]])]]);

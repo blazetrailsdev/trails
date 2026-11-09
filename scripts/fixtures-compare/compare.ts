@@ -12,7 +12,7 @@ import {
   pluralize,
   singularize,
   underscore,
-} from "../../packages/activesupport/src/index.js";
+} from "../../packages/activesupport/lib/index.js";
 import { parse as tseParse } from "../../packages/tse-compiler/lib/index.js";
 import {
   ARUNIT2_SCHEMA,
@@ -1191,7 +1191,7 @@ async function main(): Promise<void> {
 
 // Rails shorthand validation macros that map to named TS helpers rather than
 // the generic this.validates(). Helpers are implemented in:
-//   packages/activemodel/src/model.ts       — all *Of helpers + acceptance/confirmation/comparison
+//   packages/activemodel/lib/model.ts       — all *Of helpers + acceptance/confirmation/comparison
 //   packages/activerecord/src/validations.ts — uniqueness (validatesUniqueness, no "Of")
 //                                              + validatesAssociated
 const VALIDATION_KIND_TO_TS: Record<string, string> = {
@@ -1212,7 +1212,7 @@ const VALIDATION_KIND_TO_TS: Record<string, string> = {
 
 const MODELS_TS_DIRS: Record<string, string> = {
   activerecord: path.join(ROOT, "packages/activerecord/src/test-helpers/models"),
-  activemodel: path.join(ROOT, "packages/activemodel/src/test-helpers/models"),
+  activemodel: path.join(ROOT, "packages/activemodel/test/models"),
 };
 const RUBY_EXTRACTOR = path.join(HERE, "extract-ruby-models.rb");
 export const MODELS_RUBY_DIRS: Record<string, string> = {
