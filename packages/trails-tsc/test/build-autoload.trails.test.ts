@@ -208,7 +208,7 @@ describe("buildAutoload", () => {
     }
   });
 
-  it("writes a boot file that registers the routes, environments, initializers and seeds", async () => {
+  it("writes a boot file that registers the routes, environments, initializers, seeds and helpers", async () => {
     const tmp = Dir.mktmpdir("build-autoload");
     Dir.chdir(tmp);
     try {
@@ -217,6 +217,7 @@ describe("buildAutoload", () => {
         "config/initializers/deep",
         "config/routes",
         "db",
+        "app/helpers/admin",
       ]) {
         FileUtils.mkdirP(dir);
       }
@@ -232,6 +233,10 @@ describe("buildAutoload", () => {
       File.write("config/environments/production.d.ts", "export {};\n");
       File.write("config/initializers/deep/inflections.ts", "export {};\n");
       File.write("db/seeds.ts", "export {};\n");
+      File.write("app/helpers/application-helper.ts", "export {};\n");
+      File.write("app/helpers/admin/users_helper.ts", "export {};\n");
+      File.write("app/helpers/format.ts", "export {};\n");
+      File.write("app/helpers/posts-helper.test.ts", "export {};\n");
       const root = Dir.pwd();
       const globs: Record<string, string> = {
         "config/routes": "**/*.{ts,js}",
@@ -274,12 +279,16 @@ describe("buildAutoload", () => {
         "config/environments/test.ts",
         "config/initializers/deep/inflections.ts",
         "db/seeds.ts",
+        "app/helpers/application-helper.ts",
+        "app/helpers/admin/users_helper.ts",
         "vendor/blog/config/routes.ts",
         "vendor/blog/config/initializers/blog.ts",
       ]) {
         expect(boot).toContain(`${JSON.stringify(rel)}: () => import("../${rel}"),`);
       }
       expect(boot).not.toContain("production.d.ts");
+      expect(boot).not.toContain("app/helpers/format.ts");
+      expect(boot).not.toContain("posts-helper.test.ts");
       expect(File.read(".trails/autoload/install.generated.js")).toContain(
         'import "../boot.generated.js";',
       );
