@@ -1,5 +1,5 @@
 import { presence, reverseMerge, TopLevel, trailsRoot } from "@blazetrails/activesupport";
-import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { getFs, getPath, loadIseqEval } from "@blazetrails/ruby-compat";
 import { env } from "@blazetrails/ruby-compat";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
 import type { SchemaFormat } from "@blazetrails/activerecord";
@@ -66,11 +66,7 @@ export async function loadDatabaseConfigModule(
 
   let mod: { default?: unknown } & Record<string, unknown>;
   try {
-    const pathToFileURL = path.pathToFileURL;
-    if (!pathToFileURL) {
-      throw new Error("Config loading requires a path adapter with pathToFileURL support.");
-    }
-    mod = (await import(pathToFileURL(configPath).href)) as typeof mod;
+    mod = (await loadIseqEval(configPath)) as typeof mod;
   } catch (error: unknown) {
     const rel = path.relative?.(resolvedCwd, configPath) || configPath;
     const rawMessage = error instanceof Error ? error.message : formatUnknown(error);
