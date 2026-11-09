@@ -363,14 +363,13 @@ export default { development: env("development"), test: env("test"), production:
       File.join(appPath, "config/application.ts"),
       "utf-8",
     );
-    if (/\bawait\b/.test(str)) {
+    if (/^\s*(?:const .*=\s*)?await\b/m.test(str)) {
       const classEnd = /(\n(?:\/\/.*\n)*await [\s\S]*)$/.exec(environment);
-      if (classEnd) {
-        await puts(
-          File.join(appPath, "config/application.ts"),
-          environment.slice(0, classEnd.index) + `\n${str}\n` + classEnd[1],
-        );
-      }
+      if (!classEnd) throw new Error("addToConfig: no top-level await in config/application.ts");
+      await puts(
+        File.join(appPath, "config/application.ts"),
+        environment.slice(0, classEnd.index) + `\n${str}\n` + classEnd[1],
+      );
       return;
     }
     const match = /(\n\s*\}\n(?:\s*\/\/.*\n)*}\n\n(?:\/\/.*\n)*await [\s\S]*)$/.exec(environment);

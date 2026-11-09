@@ -255,9 +255,10 @@ Ruby's class body is ordinary code, so `add_to_config`
 and it resolves because `Application.inherited` has already run
 `add_lib_to_load_path!` (`railties/lib/rails/application.rb`). The generated
 `config/application.ts` holds its configuration in a `static {}` block, which
-cannot `await`, and ESM has no synchronous `require` (root § "An adapter file is
-loaded by an awaited step"). So `addToConfig` inserts a string that awaits at
-module top level directly after the class, before `autoloadLib`: the same point
+cannot `await`, and `Kernel.require` is an awaited step (root § "An adapter
+file is loaded by an awaited step"). So `addToConfig` inserts a string that awaits at
+module top level directly after the class, before `autoloadLib` (the
+template's first top-level `await`): the same point
 in load order, after `Application.register` has put `lib` on `LOAD_PATH`. Such
 a string has no `this` and imports what it names with `await import(...)`. A
 string that does not await goes into the `static {}` block, as before.

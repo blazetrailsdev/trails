@@ -2,7 +2,13 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { isCompiledFile, rbFLoad, rbFRequireFile, registerCompiledFiles } from "../lib/load.js";
+import {
+  LOAD_PATH,
+  isCompiledFile,
+  rbFLoad,
+  rbFRequireFile,
+  registerCompiledFiles,
+} from "../lib/load.js";
 import { TopLevel } from "../lib/object.js";
 import { constGet, rbModRemoveConst } from "../lib/variable.js";
 
@@ -90,5 +96,44 @@ describe("registerCompiledFiles", () => {
     await rbFLoad("/nonexistent-trails-root/repeat.js");
     await rbFLoad("/nonexistent-trails-root/repeat.js");
     expect(calls).toBe(2);
+  });
+});
+
+describe("rbFRequireFile", () => {
+  async function withLoadPath(block: (root: string) => Promise<void>): Promise<void> {
+    const root = await mkdtemp(join(tmpdir(), "trails-rb-f-require-"));
+    LOAD_PATH.push(root);
+    try {
+      await block(root);
+    } finally {
+      LOAD_PATH.splice(LOAD_PATH.indexOf(root), 1);
+      await rm(root, { recursive: true, force: true });
+    }
+  }
+
+  it("finds feature.ts when no feature.js is on the load path", async () => {
+    await withLoadPath(async (root) => {
+      await writeFile(join(root, "rb_f_require_ts.ts"), `export const RbFRequireTs = "ts";\n`);
+      expect(await rbFRequireFile("rb_f_require_ts")).toBe(true);
+      expect(rbModRemoveConst(Object, "RbFRequireTs")).toBe("ts");
+    });
+  });
+
+  it("prefers feature.js over feature.ts in the same directory", async () => {
+    await withLoadPath(async (root) => {
+      await writeFile(join(root, "rb_f_require_both.js"), `export const RbFRequireBoth = "js";\n`);
+      await writeFile(join(root, "rb_f_require_both.ts"), `export const RbFRequireBoth = "ts";\n`);
+      expect(await rbFRequireFile("rb_f_require_both")).toBe(true);
+      expect(rbModRemoveConst(Object, "RbFRequireBoth")).toBe("js");
+    });
+  });
+
+  it("searches a feature with an explicit extension as given", async () => {
+    await withLoadPath(async (root) => {
+      await writeFile(join(root, "rb_f_require_ext.js"), `export const RbFRequireExt = "js";\n`);
+      await writeFile(join(root, "rb_f_require_ext.ts"), `export const RbFRequireExt = "ts";\n`);
+      expect(await rbFRequireFile("rb_f_require_ext.ts")).toBe(true);
+      expect(rbModRemoveConst(Object, "RbFRequireExt")).toBe("ts");
+    });
   });
 });
