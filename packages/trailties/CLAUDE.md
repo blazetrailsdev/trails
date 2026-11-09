@@ -247,6 +247,22 @@ Root § "Templates are precompiled" keeps eval out of what serves production; a
 CLI command evaluating the string its own operator passed is not that. Ruled by
 the repo owner on 2026-11-02 (trails#9630).
 
+## A `require` in the `Application` class body runs after the class (`add_to_config`)
+
+Ruby's class body is ordinary code, so `add_to_config`
+(`vendor/rails/v8.0.2/railties/test/isolation/abstract_unit.rb`) can put a
+`require "foo"` there (`test/application/initializers/load_path_test.rb:27-43`),
+and it resolves because `Application.inherited` has already run
+`add_lib_to_load_path!` (`railties/lib/rails/application.rb`). The generated
+`config/application.ts` holds its configuration in a `static {}` block, which
+cannot `await`, and `Kernel.require` is an awaited step (root § "An adapter
+file is loaded by an awaited step"). So `addToConfig` inserts a string that awaits at
+module top level directly after the class, before `autoloadLib` (the
+template's first top-level `await`): the same point
+in load order, after `Application.register` has put `lib` on `LOAD_PATH`. Such
+a string has no `this` and imports what it names with `await import(...)`. A
+string that does not await goes into the `static {}` block, as before.
+
 ## `method_missing` definers in this package
 
 Class-specific rules under root § "Ruby protocol methods with a different JS
