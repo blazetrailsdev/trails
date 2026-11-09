@@ -101,9 +101,10 @@ const loadableExt = [".js", ".ts"];
 /**
  * `Kernel#require` of a file (`require_internal`,
  * `vendor/ruby/v3.3.11/load.c:1236`): searches `$LOAD_PATH` for
- * `feature.js`, then `feature.ts`, and loads it once. A feature that already ends in a source
- * extension is searched as given (`search_required`'s `IS_RBEXT` arm,
- * `vendor/ruby/v3.3.11/load.c:1058-1072`). A miss raises `LoadError`.
+ * `feature.js`, then `feature.ts`, and loads it once. A feature that
+ * already ends in a source extension is searched as given
+ * (`search_required`'s `IS_RBEXT` arm, `vendor/ruby/v3.3.11/load.c:1058-1072`).
+ * A miss raises `LoadError`.
  *
  * @noRailsEquivalent PERMANENT
  */
