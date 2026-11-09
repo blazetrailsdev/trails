@@ -152,7 +152,7 @@ export function fetch(
   ...more: unknown[]
 ): unknown {
   if (more.length === 0) {
-    return arguments.length === 2 ? fetchFast(receiver, key) : fetchFast(receiver, key, arg);
+    return arguments.length === 2 ? _fetchFast(receiver, key) : _fetchFast(receiver, key, arg);
   }
   const rest = [arg, ...more];
   const plain = Object.getPrototypeOf(receiver) === Object.prototype;
@@ -160,22 +160,22 @@ export function fetch(
     const own = ownMethod(receiver, "fetch");
     if (own) return own.call(receiver, key, ...rest);
   }
-  return hashFetch(receiver as Record<string, unknown> | Map<unknown, unknown>, plain, key, rest);
+  return _hashFetch(receiver as Record<string, unknown> | Map<unknown, unknown>, plain, key, rest);
 }
 
-/** @perf 10x — PERMANENT */
-function fetchFast(receiver: object, key: unknown, arg?: unknown): unknown {
+/** @perf 1.8x — PERMANENT */
+function _fetchFast(receiver: object, key: unknown, arg?: unknown): unknown {
   const argc = arguments.length;
   if (Object.getPrototypeOf(receiver) === Object.prototype) {
     const hash = receiver as Record<string, unknown>;
     const value = hash[key as string];
     if (value !== undefined && Object.hasOwn(hash, key as string)) return value;
-    if (argc === 2) return hashFetch(hash, true, key, []);
+    if (argc === 2) return _hashFetch(hash, true, key, []);
     return rbBlockGivenP(arg) ? arg(key as string) : arg;
   }
   const own = ownMethod(receiver, "fetch");
   if (own) return argc === 2 ? own.call(receiver, key) : own.call(receiver, key, arg);
-  return hashFetch(
+  return _hashFetch(
     receiver as Record<string, unknown> | Map<unknown, unknown>,
     false,
     key,
@@ -183,8 +183,8 @@ function fetchFast(receiver: object, key: unknown, arg?: unknown): unknown {
   );
 }
 
-/** @perf 10x — PERMANENT */
-function hashFetch(
+/** @perf 1.8x — PERMANENT */
+function _hashFetch(
   hash: Record<string, unknown> | Map<unknown, unknown>,
   plain: boolean,
   key: unknown,

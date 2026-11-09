@@ -39,9 +39,9 @@ export class Builder {
   }
 }
 
-/** @perf 10x — PERMANENT */
+/** @perf 1.8x — PERMANENT */
 const MISSING: unique symbol = Symbol("missing");
-/** @perf 10x — PERMANENT */
+/** @perf 1.8x — PERMANENT */
 const NO_VALUE = rbBlock((): typeof MISSING => MISSING);
 
 export class LazyAttributeSet extends AttributeSet {
@@ -99,20 +99,26 @@ export class LazyAttributeSet extends AttributeSet {
       return hashAref(this.castedValues, name);
     }
 
-    const value = fetch<unknown>(this.values, name, NO_VALUE);
-    const valuePresent = value !== MISSING;
+    return fetch<unknown>(
+      this.castedValues,
+      name,
+      rbBlock(() => {
+        const value = fetch<unknown>(this.values, name, NO_VALUE);
+        const valuePresent = value !== MISSING;
 
-    if (valuePresent) {
-      const type = fetch<ValueType>(
-        this.additionalTypes,
-        name,
-        hashAref(this.types, name) as ValueType,
-      );
-      return hashAset(this.castedValues, name, type.deserialize(value));
-    } else {
-      const attr = this.defaultAttribute(name, valuePresent, null);
-      return attr.value(block);
-    }
+        if (valuePresent) {
+          const type = fetch<ValueType>(
+            this.additionalTypes,
+            name,
+            hashAref(this.types, name) as ValueType,
+          );
+          return hashAset(this.castedValues, name, type.deserialize(value));
+        } else {
+          const attr = this.defaultAttribute(name, valuePresent, value);
+          return attr.value(block);
+        }
+      }),
+    );
   }
 
   protected override attributes(): RbHash<Attribute> {
