@@ -1,11 +1,21 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController, Response, URL } from "@blazetrails/actionpack";
-import { Base } from "@blazetrails/activerecord";
+import { Base, ScopeRegistry } from "@blazetrails/activerecord";
 import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
+import { Dependencies } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { File, FileUtils, include } from "@blazetrails/ruby-compat";
+import {
+  File,
+  FileUtils,
+  env as ENV,
+  include,
+  rbObjRespondTo,
+  setEnv,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
+import { Trails } from "../../../lib/trails.js";
 import { EnvHelpers } from "../../support/env-helpers.js";
 import type { Generation, Rack } from "../../support/isolation/abstract-unit.js";
 import "../../support/isolation/abstract-unit.js";
@@ -124,71 +134,144 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(Base.connectionPool().isActiveConnection()).toBeFalsy();
   });
 
-  it.skip("includes URL helpers as action methods", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+  it("includes URL helpers as action methods", async () => {
+    await t.appFile(
+      "config/routes.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        Trails.application.routes().draw(function () {
+          this.get("/foo", { to: (env) => [200, {}, []], as: "foo" });
+        });
+`,
+    );
+
+    await t.appFile(
+      "app/mailers/foo.ts",
+      `
+        import { Base } from "@blazetrails/actionmailer";
+        export class Foo extends Base {
+          notify() {}
+        }
+`,
+    );
+
+    await (t as unknown as Rack).app("development");
+    const Foo = (TopLevel as unknown as Record<string, unknown>).Foo as new () => object;
+    expect(rbObjRespondTo(new Foo(), "fooUrl")).toBeTruthy();
+    expect(rbObjRespondTo(new Foo(), "mainApp")).toBeTruthy();
   });
 
   it.skip("allows to not load all helpers for controllers", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("action_controller api executes using all the middleware stack", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: isolation-build-app-production-secret-key-base
   });
 
   it.skip("if there's no config.active_support.bare, all of ActiveSupport is required", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("config.active_support.bare does not require all of ActiveSupport", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("database middleware doesn't initialize when activerecord is not in frameworks", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("use schema cache dump", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("expire schema cache dump", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("expire schema cache dump if the version can't be checked because the database is unhealthy", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("does not expire schema cache dump if check_schema_cache_dump_version is false", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("does not expire schema cache dump if check_schema_cache_dump_version is false and the database unhealthy", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
   it.skip("define attribute methods when schema cache is present and check_schema_cache_dump_version is false", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 
-  it.skip("active record establish_connection uses Trails.env if DATABASE_URL is not set", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+  it("active record establish_connection uses Trails.env if DATABASE_URL is not set", async () => {
+    await (t as unknown as Rack).app("development");
+    const origDatabaseUrl = ENV["DATABASE_URL"];
+    setEnv("DATABASE_URL", undefined);
+    const origTrailsEnv = Trails.env;
+    Trails.env = "development";
+    try {
+      await Base.establishConnection();
+      expect(await Base.leaseConnection()).toBeTruthy();
+      expect(Base.connectionDbConfig().database).toMatch(
+        new RegExp(
+          Base.configurations().configsFor({ envName: String(Trails.env), name: "primary" })!
+            .database!,
+        ),
+      );
+      const dbConfig = Base.configurations().configsFor({
+        envName: String(Trails.env),
+        name: "primary",
+      })!;
+      expect(Base.connectionDbConfig().database).toMatch(new RegExp(dbConfig.database!));
+    } finally {
+      await Base.removeConnection();
+      if (origDatabaseUrl != null) setEnv("DATABASE_URL", origDatabaseUrl);
+      if (origTrailsEnv != null) Trails.env = origTrailsEnv;
+    }
   });
 
   it.skip("active record establish_connection uses DATABASE_URL even if Trails.env is set", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: establish-connection-reads-database-url-set-after-boot
   });
 
-  it.skip("Current scopes in AR models are reset on reloading", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+  it("Current scopes in AR models are reset on reloading", async () => {
+    await t.trails("generate", "model", "post");
+    await t.trails("db:migrate");
+
+    await t.appFile("app/models/a.ts", "export const A = 1;");
+    await t.appFile("app/models/m.ts", "export const M = {};");
+    await t.appFile(
+      "app/models/post.ts",
+      `
+        import { Base } from "@blazetrails/activerecord";
+        export class Post extends Base {
+          static [Symbol.hasInstance](_) {
+            return false;
+          }
+        }
+`,
+    );
+
+    await (t as unknown as Rack).app("development");
+
+    expect((TopLevel as unknown as Record<string, unknown>).A).toBeTruthy();
+    expect((TopLevel as unknown as Record<string, unknown>).M).toBeTruthy();
+    const Post = (TopLevel as unknown as Record<string, unknown>).Post as typeof Base;
+    Post.setCurrentScope(Post as never);
+    expect(ScopeRegistry.currentScope(Post)).not.toBeNull();
+
+    await Dependencies.clear();
+
+    expect(ScopeRegistry.currentScope(Post)).toBeNull();
   });
 
   it.skip("filters for Active Record encrypted attributes are added to config.filter_parameters only once", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: reload-autoloads-constant-on-first-reference
   });
 
   it.skip("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-remaining
+    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
   });
 });
