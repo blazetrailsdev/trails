@@ -260,7 +260,7 @@ export class Node {
       indentText?: string;
       preserveNewline?: boolean;
     };
-    const saveOptions = opts.saveWith || (options[1] as number | undefined) || SaveOptions.FORMAT;
+    const saveOptions = opts.saveWith || SaveOptions.FORMAT;
 
     const config = new SaveOptions(Number(saveOptions));
     if (block) block(config);

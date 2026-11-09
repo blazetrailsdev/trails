@@ -122,6 +122,12 @@ describe("HTML5 node mutation", () => {
     expect(copy.document).not.toBe(fragment.document);
   });
 
+  it("dups a node shallowly at level 0", () => {
+    const div = DocumentFragment.parse("<div><p>x</p></div>").atCss("div")!;
+    expect(div.dup(0).toHtml()).toBe("<div></div>");
+    expect(div.dup().toHtml()).toBe("<div><p>x</p></div>");
+  });
+
   it("iterates a css result", () => {
     const fragment = DocumentFragment.parse("<p>a</p><p>b</p>");
     fragment.css("p").each((node) => node.replace(`<b>${node.text}</b>`));
