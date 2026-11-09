@@ -37,6 +37,7 @@ defineConstants([
   [() => m8.Node, "Nokogiri::HTML5::Node"],
   [() => m10.Attr, "Nokogiri::XML::Attr"],
   [() => m12.XmlDocument, "Nokogiri::XML::Document"],
+  [() => m11.DocumentFragment, "Nokogiri::XML::DocumentFragment"],
   [() => m13.Namespace, "Nokogiri::XML::Namespace"],
   [() => m15.XmlNode, "Nokogiri::XML::Node"],
   [() => m14.NodeSet, "Nokogiri::XML::NodeSet"],
@@ -48,5 +49,4 @@ defineConstants([
   [() => m20.XPathContext, "Nokogiri::XML::XPathContext"],
   [() => m9.ParseError, "Racc::ParseError"],
   [() => m9.Parser, "Racc::Parser"],
-  [() => m11.DocumentFragment, "Xml::DocumentFragment"],
 ]);
