@@ -37,8 +37,7 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
     expect(LOAD_PATH).not.toContain(`${await t.appPath()}/app/models`);
   });
 
-  // BLOCKED: trailties-load-path-require-in-application-class-body
-  it.skip("initializing an application allows to load code on lib path inside application class definition", async () => {
+  it("initializing an application allows to load code on lib path inside application class definition", async () => {
     await t.appFile(
       "lib/foo.ts",
       `
@@ -47,7 +46,8 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
     );
 
     await t.addToConfig(`
-        await rbFRequire("foo");
+        const { rbFRequireFile, TopLevel } = await import("@blazetrails/ruby-compat");
+        await rbFRequireFile("foo");
         if (!("Foo" in TopLevel)) throw new Error("Expected Foo to be defined");
 `);
 

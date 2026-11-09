@@ -96,10 +96,13 @@ export const LOAD_PATH: string[] = [];
 /** @noRailsEquivalent PERMANENT — `$"`, `vendor/ruby/v3.3.11/load.c:1606`. */
 export const LOADED_FEATURES: string[] = [];
 
+/** `loadable_ext` (`vendor/ruby/v3.3.11/load.c:43`): `.rb`, then the extension library suffix. */
+const loadableExt = [".js", ".ts"];
+
 /**
  * `Kernel#require` of a file (`require_internal`,
  * `vendor/ruby/v3.3.11/load.c:1236`): searches `$LOAD_PATH` for
- * `feature.js` and loads it once. A feature that already ends in a source
+ * `feature.js`, then `feature.ts`, and loads it once. A feature that already ends in a source
  * extension is searched as given (`search_required`'s `IS_RBEXT` arm,
  * `vendor/ruby/v3.3.11/load.c:1058-1072`). A miss raises `LoadError`.
  *
@@ -107,16 +110,16 @@ export const LOADED_FEATURES: string[] = [];
  */
 export async function rbFRequireFile(feature: string): Promise<boolean> {
   const explicit = /^(\/|\.\.?\/|~)/.test(feature);
+  const hasExt = feature.endsWith(".js") || feature.endsWith(".ts");
   for (const path of explicit ? [Dir.pwd()] : LOAD_PATH) {
-    const full = File.expandPath(
-      feature.endsWith(".js") || feature.endsWith(".ts") ? feature : `${feature}.js`,
-      path,
-    );
-    if (!isCompiledFile(full) && !(await File.isExistAsync(full))) continue;
-    if (LOADED_FEATURES.includes(full)) return false;
-    await rbFLoad(full);
-    LOADED_FEATURES.push(full);
-    return true;
+    for (const ext of hasExt ? [""] : loadableExt) {
+      const full = File.expandPath(`${feature}${ext}`, path);
+      if (!isCompiledFile(full) && !(await File.isExistAsync(full))) continue;
+      if (LOADED_FEATURES.includes(full)) return false;
+      await rbFLoad(full);
+      LOADED_FEATURES.push(full);
+      return true;
+    }
   }
   const error = new LoadError(`cannot load such file -- ${feature}`);
   error.path = feature;
