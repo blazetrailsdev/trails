@@ -12,7 +12,7 @@ const FORBIDDEN_PACKAGES = new Set([
   "typescript-5",
 ]);
 const FORBIDDEN_MODULES =
-  /\/action-dispatch\/system-t|\/server\/dev-server\.ts$|\/trailties\/src\/(?:command|commands|generators)(?:\/|\.ts$)/;
+  /\/action-dispatch\/system-t|\/server\/dev-server\.ts$|\/trailties\/lib\/(?:command|commands|generators)(?:\/|\.ts$)/;
 const SPECIFIER =
   /^\s*(?:import|export)\b(?!\s+type\b)[^;]*?from\s+"([^"]+)"|^\s*import\s+"([^"]+)"|\bimport\(\s*"([^"]+)"\s*\)/gm;
 
