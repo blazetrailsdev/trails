@@ -2,7 +2,7 @@ import "../constants.generated-attribute.generated.js";
 import { humanize, pluralize, singularize } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import { Trails } from "../trails.js";
-import { Error as GeneratorError } from "./base.js";
+import { Error } from "./base.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 export type AttrOptions = Record<string, unknown>;
@@ -54,17 +54,15 @@ export class GeneratedAttribute {
     // eslint-disable-next-line prefer-const
     [type, attrOptions] = parseTypeAndOptions(type);
     if (GeneratedAttribute.isDangerousName(name)) {
-      throw new GeneratorError(
+      throw new Error(
         `Could not generate field '${name}', as it is already defined by Active Record.`,
       );
     }
     if (type && !GeneratedAttribute.validType(type)) {
-      throw new GeneratorError(`Could not generate field '${name}' with unknown type '${type}'.`);
+      throw new Error(`Could not generate field '${name}' with unknown type '${type}'.`);
     }
     if (indexType && !GeneratedAttribute.validIndexType(indexType)) {
-      throw new GeneratorError(
-        `Could not generate field '${name}' with unknown index '${indexType}'.`,
-      );
+      throw new Error(`Could not generate field '${name}' with unknown index '${indexType}'.`);
     }
     if (type && GeneratedAttribute.reference(type) && indexType === "uniq") {
       attrOptions.index = { unique: true };

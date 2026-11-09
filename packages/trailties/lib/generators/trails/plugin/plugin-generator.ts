@@ -13,7 +13,7 @@ import {
 import { AppGenerator } from "../app/app-generator.js";
 import { AppBase, type AppBaseOptions } from "../../app-base.js";
 import { AppName } from "../../app-name.js";
-import { Error as GeneratorError } from "../../base.js";
+import { Error } from "../../base.js";
 import { Trails } from "../../../trails.js";
 import { APP_PATH } from "../../../app-path.js";
 
@@ -583,25 +583,25 @@ export class PluginGenerator extends AppBase {
   /** @internal */
   override isValidConst = function (this: PluginGenerator): void {
     if (/-\d/.test(this.originalName())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}. Please give a name which does not contain a namespace starting with numeric characters.`,
       );
     } else if (/[^\w-]+/.test(this.originalName())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}. Please give a name which uses only alphabetic, numeric, "_" or "-" characters.`,
       );
     } else if (/^\d/.test(this.camelized())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}. Please give a name which does not start with numbers.`,
       );
     } else if (AppName.RESERVED_NAMES.includes(this.name())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}. Please give a ` +
           `name which does not match one of the reserved trails ` +
           `words: ${AppName.RESERVED_NAMES.join(", ")}`,
       );
     } else if (constDefined(TopLevel, this.camelized())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}, constant ${this.camelized()} is already in use. Please choose another plugin name.`,
       );
     }

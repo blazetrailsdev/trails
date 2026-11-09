@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { GeneratedAttribute } from "../../lib/generators/generated-attribute.js";
-import { Error as GeneratorError } from "../../lib/generators/base.js";
+import { Error } from "../../lib/generators/base.js";
 import {
   assertFieldDefaultValue,
   assertFieldType,
@@ -11,7 +11,7 @@ import {
 describe("GeneratedAttribute", () => {
   it("test_field_name_with_dangerous_attribute_raises_error", () => {
     const message = "Could not generate field 'save', as it is already defined by Active Record.";
-    expect(() => GeneratedAttribute.parse("save:string")).toThrow(GeneratorError);
+    expect(() => GeneratedAttribute.parse("save:string")).toThrow(Error);
     expect(() => GeneratedAttribute.parse("save:string")).toThrow(message);
   });
 
@@ -83,8 +83,8 @@ describe("GeneratedAttribute", () => {
   });
 
   it("test_field_type_with_unknown_type_raises_error", () => {
-    expect(() => GeneratedAttribute.parse("title:bogus")).toThrow(GeneratorError);
-    expect(() => GeneratedAttribute.parse("title:string:bogus")).toThrow(GeneratorError);
+    expect(() => GeneratedAttribute.parse("title:bogus")).toThrow(Error);
+    expect(() => GeneratedAttribute.parse("title:string:bogus")).toThrow(Error);
   });
 
   it("test_human_name", () => {

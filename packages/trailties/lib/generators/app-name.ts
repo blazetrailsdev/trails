@@ -1,7 +1,7 @@
 import "../constants.app-name.generated.js";
 import { File, TopLevel, constDefined } from "@blazetrails/ruby-compat";
 import { camelize, parameterize, underscore } from "@blazetrails/activesupport";
-import { Error as GeneratorError } from "./base.js";
+import { Error } from "./base.js";
 
 interface AppNameHost {
   options: { name?: string };
@@ -51,17 +51,17 @@ export const AppName = {
   /** @internal */
   isValidConst(this: AppNameHost): void {
     if (/^\d/.test(this.appConst())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid application name ${this.originalAppName()}. Please give a name which does not start with numbers.`,
       );
     } else if (AppName.RESERVED_NAMES.includes(this.originalAppName())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid application name ${this.originalAppName()}. Please give a ` +
           `name which does not match one of the reserved trails ` +
           `words: ${AppName.RESERVED_NAMES.join(", ")}`,
       );
     } else if (constDefined(TopLevel, this.appConstBase()) || this.appConstBase() in globalThis) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid application name ${this.originalAppName()}, constant ${this.appConstBase()} is already in use. Please choose another application name.`,
       );
     }

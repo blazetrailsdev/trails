@@ -22,7 +22,7 @@ import { Trails } from "../trails.js";
 import { Generators } from "../generators.js";
 import { Base, type GeneratorOptions, type GeneratorConfig } from "./base.js";
 import { DATABASES, Database, type DatabaseName } from "./database.js";
-import { Error as GeneratorError } from "./base.js";
+import { Error } from "./base.js";
 import { AppName } from "./app-name.js";
 import { getPackageManager, packageManagerInstall } from "../package-manager.js";
 
@@ -677,7 +677,7 @@ ${requireStatements.join("\n")}`;
       if (this.trailsTemplate != null) await this.apply(this.trailsTemplate);
     } catch (e) {
       if (e instanceof ThorError || e instanceof LoadError || e instanceof Errno.ENOENT) {
-        throw new GeneratorError(
+        throw new Error(
           `The template [${this.trailsTemplate}] could not be loaded. Error: ${(e as Error).message}`,
         );
       }

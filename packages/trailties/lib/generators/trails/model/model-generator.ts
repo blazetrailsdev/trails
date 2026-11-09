@@ -9,7 +9,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { format } from "@blazetrails/ruby-compat";
-import { Error as GeneratorError } from "../../base.js";
+import { Error } from "../../base.js";
 import { NamedBase } from "../../named-base.js";
 import { ModelHelpers, type ModelHelpersOptions } from "../../model-helpers.js";
 
@@ -34,7 +34,7 @@ export class ModelGenerator extends NamedBase {
     if (this.isInflectionImpossible(this.name)) {
       const option1 = underscore(singularize(this.name));
       const option2 = singularize(underscore(pluralize(this.name)));
-      throw new GeneratorError(
+      throw new Error(
         format(ModelHelpers.INFLECTION_IMPOSSIBLE_ERROR_MESSAGE, this.name, option1, option2),
       );
     }

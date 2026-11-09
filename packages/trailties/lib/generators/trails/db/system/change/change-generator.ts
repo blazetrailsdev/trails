@@ -21,7 +21,7 @@ import {
   type PkgDependency,
 } from "../../../../database.js";
 import { AppName } from "../../../../app-name.js";
-import { Error as GeneratorError } from "../../../../base.js";
+import { Error } from "../../../../base.js";
 
 const BASE_PACKAGES = ["curl", "libvips"];
 const BUILD_PACKAGES = ["build-essential", "git"];
@@ -62,7 +62,7 @@ export class ChangeGenerator extends Base {
     super(args, localOptions, config);
 
     if (!(DATABASES as readonly string[]).includes((this.options as ChangeGeneratorOptions).to)) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid value for --to option. Supported preconfigurations are: ${DATABASES.join(", ")}.`,
       );
     }
