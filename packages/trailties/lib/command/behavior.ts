@@ -9,6 +9,7 @@ import {
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
 import type { Base } from "./base.js";
+import { commandType, fileLookupPaths, lookupPaths } from "../command.js";
 
 const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
 const FRAMEWORK_LIB = File.expandPath(decodeURIComponent(new URL("..", import.meta.url).pathname));
@@ -74,25 +75,6 @@ export async function lookupBang(): Promise<void> {
       }
     }
   }
-}
-
-let _commandType: string | undefined;
-let _lookupPaths: string[] | undefined;
-let _fileLookupPaths: string[] | undefined;
-
-/** @internal */
-function commandType(): string {
-  return (_commandType ??= "command");
-}
-
-/** @internal */
-function lookupPaths(): string[] {
-  return (_lookupPaths ??= ["trails/commands", "commands"]);
-}
-
-/** @internal */
-function fileLookupPaths(): string[] {
-  return (_fileLookupPaths ??= [`{${lookupPaths().join(",")}}`, "**", `*${EXTENSION}`]);
 }
 
 /** @internal */
