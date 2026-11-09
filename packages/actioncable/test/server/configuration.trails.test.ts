@@ -3,6 +3,7 @@ import { LoadError } from "@blazetrails/ruby-compat";
 import { SubscriptionAdapter } from "../../lib/namespaces.js";
 import { Configuration } from "../../lib/server/configuration.js";
 import { Inline } from "../../lib/subscription-adapter/inline.js";
+import { Test } from "../../lib/subscription-adapter/test.js";
 
 class Async {}
 class PostgreSQL {}
@@ -59,7 +60,7 @@ describe("ActionCable::Server::Configuration", () => {
     const config = new Configuration();
     config.cable = { adapter: "test" };
     await config.loadPubsubAdapter();
-    expect((config.pubsubAdapter() as { name: string }).name).toBe("Test");
+    expect(config.pubsubAdapter()).toBe(Test);
   });
 
   it("fixes up PostgreSQL", async () => {
