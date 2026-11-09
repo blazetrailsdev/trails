@@ -463,7 +463,6 @@ export class Configuration extends EngineConfiguration {
   /** @internal */
   private _sessionOptions: Record<string, unknown> = {};
 
-  /** @missingRailsCall application — CONVERGEABLE secret-key-base-credentials-arm */
   get secretKeyBase(): string {
     return (
       this._secretKeyBase ??
@@ -471,6 +470,7 @@ export class Configuration extends EngineConfiguration {
         getEnv("SECRET_KEY_BASE_DUMMY") != null
           ? this.generateLocalSecret()
           : (getEnv("SECRET_KEY_BASE") ??
+            (Trails.application!._credentials?.dig("secret_key_base") as string | undefined) ??
             (Trails.env["local?"]() && this.generateLocalSecret()))) as string)
     );
   }

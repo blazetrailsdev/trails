@@ -71,7 +71,8 @@ export class Application extends Engine {
   private _orderedRailties?: Array<Trailtie | Trailtie[] | string>;
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
   private _appEnvConfig?: Record<string, unknown>;
-  private _credentials?: EncryptedConfiguration;
+  /** @internal */
+  _credentials?: EncryptedConfiguration;
   private _deprecators?: Deprecators;
   private _messageVerifiers?: MessageVerifiers;
   private _ranLoadHooks = false;
@@ -307,6 +308,8 @@ export class Application extends Engine {
     setSourceMapsSupport(true);
     setTrailsRoot(() => this.config.root);
     this._resetAutoloadState();
+    /** @inventedArm credentials — PERMANENT */
+    await this.credentials();
     await this.runInitializers(group, this);
     this._initialized = true;
     return this;
