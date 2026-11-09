@@ -13,7 +13,6 @@ import {
   rbCallSuper,
   rbFCaller,
   rbInspect,
-  rbModName,
   rbObjDup,
   rbObjMethod,
   rbObjRespondTo,
@@ -96,14 +95,14 @@ export const Subprocess = {
     } else {
       const tmpfile = Tempfile.new("isolation");
       try {
-        const className = rbModName(this.constructor) ?? "";
+        const className = this.constructor.name;
         const childEnv = {
           ISOLATION_TEST: className,
           ISOLATION_OUTPUT: tmpfile.path(),
         };
 
         const description = this.name.slice("test_".length).split("_");
-        const testName = [...className.split("::").filter(Boolean), ...description]
+        const testName = [className, ...description]
           .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
           .join("[\\s_]+");
         const testOpts = `-t=^${testName}$`;

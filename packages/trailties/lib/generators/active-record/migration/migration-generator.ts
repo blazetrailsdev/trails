@@ -1,23 +1,10 @@
 import "../../../constants.active-record-migration-migration-generator.generated.js";
-import { File, extend, include, type Extended, type Included } from "@blazetrails/ruby-compat";
+import { File } from "@blazetrails/ruby-compat";
 import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import type { GeneratorOptions } from "../../base.js";
-import { NamedBase } from "../../named-base.js";
-import { ClassMethods, Migration } from "../../migration.js";
-import {
-  configuredMigratePath,
-  dbMigratePath,
-  defaultMigratePath,
-  nextMigrationNumber,
-} from "../migration.js";
+import { Base, indexNameLiteral, kwargs } from "../../active-record.js";
 import { GeneratedAttribute } from "../../generated-attribute.js";
-import {
-  camelize,
-  foreignKey,
-  pluralize,
-  singularize,
-  underscore,
-} from "@blazetrails/activesupport";
+import { foreignKey, pluralize, singularize, underscore } from "@blazetrails/activesupport";
 
 export interface MigrationGeneratorOptions extends GeneratorOptions {
   timestamps?: boolean;
@@ -26,23 +13,7 @@ export interface MigrationGeneratorOptions extends GeneratorOptions {
   [key: string]: unknown;
 }
 
-function indexNameLiteral(attribute: GeneratedAttribute): string {
-  const indexName = attribute.indexName();
-  return Array.isArray(indexName)
-    ? `[${indexName.map((n) => `"${n}"`).join(", ")}]`
-    : `"${indexName}"`;
-}
-
-function kwargs(...options: Array<string | undefined>): string {
-  const pairs = options.join("");
-  return pairs === "" ? "" : `, { ${pairs.slice(2)} }`;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface MigrationGenerator extends Included<typeof Migration> {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class MigrationGenerator extends NamedBase {
+export class MigrationGenerator extends Base {
   static {
     this.argument("attributes", {
       type: "array",
@@ -63,19 +34,7 @@ export class MigrationGenerator extends NamedBase {
 
   declare ["constructor"]: typeof MigrationGenerator;
   declare options: MigrationGeneratorOptions;
-  migrationNumber = "";
-  migrationFileName = "";
-  migrationClassName = "";
-
-  declare static migrationLookupAt: Extended<typeof ClassMethods>["migrationLookupAt"];
-  declare static migrationExists: Extended<typeof ClassMethods>["migrationExists"];
-  declare static currentMigrationNumber: Extended<typeof ClassMethods>["currentMigrationNumber"];
-  static nextMigrationNumber = nextMigrationNumber;
-
   private _migrationTemplate = "migration.ts";
-  dbMigratePath = dbMigratePath;
-  defaultMigratePath = defaultMigratePath;
-  configuredMigratePath = configuredMigratePath;
   private migrationAction: string | undefined;
   private joinTables: string[] = [];
 
@@ -87,41 +46,6 @@ export class MigrationGenerator extends NamedBase {
       this._migrationTemplate,
       File.join(this.dbMigratePath(), `${underscore(name)}${this.ext()}`),
     );
-  }
-
-  protected createTableMigration(): string {
-    const table = this.tableName();
-    const colLines: string[] = [];
-    for (const attribute of this.attributes) {
-      if (attribute.passwordDigest()) {
-        colLines.push(`      t.string("password_digest"${kwargs(attribute.injectOptions())});`);
-      } else if (attribute.token()) {
-        colLines.push(`      t.string("${attribute.name}"${kwargs(attribute.injectOptions())});`);
-      } else if (attribute.reference()) {
-        colLines.push(
-          `      t.${camelize(attribute.type, false)}("${attribute.name}"${kwargs(attribute.injectOptions(), this.foreignKeyType())});`,
-        );
-      } else if (!attribute.virtual()) {
-        colLines.push(
-          `      t.${attribute.type}("${attribute.name}"${kwargs(attribute.injectOptions())});`,
-        );
-      }
-    }
-    if (this.options.timestamps ?? true) colLines.push("      t.timestamps();");
-    const parts = [
-      `    await this.createTable("${table}"${kwargs(this.primaryKeyType())}, (t) => {\n${colLines.join("\n")}\n    });`,
-    ];
-    for (const attribute of this.attributes.filter((a) => a.token())) {
-      parts.push(
-        `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions() || ", unique: true")});`,
-      );
-    }
-    for (const attribute of this.attributesWithIndex()) {
-      parts.push(
-        `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions())});`,
-      );
-    }
-    return parts.join("\n");
   }
 
   protected migration(): string {
@@ -190,16 +114,6 @@ export class MigrationGenerator extends NamedBase {
     return lines.join("\n");
   }
 
-  private primaryKeyType(): string | undefined {
-    const keyType = this.options.primaryKeyType;
-    if (keyType) return `, id: "${keyType}"`;
-  }
-
-  private foreignKeyType(): string | undefined {
-    const keyType = this.options.primaryKeyType;
-    if (keyType) return `, type: "${keyType}"`;
-  }
-
   /** @internal */
   private validateFileName(): void {
     if (!/^[_a-z0-9]+$/.test(this.fileName)) throw new IllegalMigrationNameError(this.fileName);
@@ -238,7 +152,8 @@ export class MigrationGenerator extends NamedBase {
     return attribute.foreignKey() ? attribute.name : foreignKey(singularize(attribute.name));
   }
 
-  private attributesWithIndex(): GeneratedAttribute[] {
+  /** @internal */
+  protected attributesWithIndex(): GeneratedAttribute[] {
     return this.attributes.filter((a) => !a.reference() && a.hasIndex());
   }
 
@@ -246,9 +161,6 @@ export class MigrationGenerator extends NamedBase {
     return this.isPluralizeTableNames() ? pluralize(tableName) : singularize(tableName);
   }
 }
-
-include(MigrationGenerator, Migration);
-extend(MigrationGenerator, ClassMethods);
 
 Object.defineProperty(MigrationGenerator, "name", {
   value: "ActiveRecord::Generators::MigrationGenerator",

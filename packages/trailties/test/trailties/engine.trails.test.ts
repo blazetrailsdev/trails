@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Dir, getFs, include } from "@blazetrails/ruby-compat";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
@@ -10,6 +11,7 @@ interface ActiveStorageInstallTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ActiveStorageInstallTest extends TestCase {}
 include(ActiveStorageInstallTest, Isolation);
+registerSpecType(/^active_storage:install$/, ActiveStorageInstallTest);
 
 describe("active_storage:install", () => {
   let t: ActiveStorageInstallTest;
