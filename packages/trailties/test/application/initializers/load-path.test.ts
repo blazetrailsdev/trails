@@ -51,7 +51,7 @@ describe("LoadPathTest", { timeout: 120_000 }, () => {
         if (!("Foo" in TopLevel)) throw new Error("Expected Foo to be defined");
 `);
 
-    await expect(import(`${await t.appPath()}/config/environment.ts`)).resolves.toBeDefined();
+    await expect(import(`${await t.appPath()}/config/environment.ts`)).resolves.not.toThrow();
 
     expect(LOAD_PATH).toContain(`${await t.appPath()}/lib`);
   });
