@@ -509,25 +509,32 @@ function rbStrftimeAlloc(
   format: string,
   time: Time,
   vtm: StrftimeVtm,
-  ts: Timespec | null,
-  timev: () => Rational,
+  timew: { epochNs: bigint; subnano: Rational },
   gmt: boolean,
 ): string | null {
-  if (ts) return rbStrftimeTimespec(format, time, vtm, ts, gmt);
-  return rbStrftime(format, time, vtm, timev, gmt);
+  let timev: Rational | null = null;
+  const ts = timew2timespecExact(timew);
+  if (!ts)
+    timev = new Rational(timew.epochNs, 1_000_000_000n).add(timew.subnano.quo(1_000_000_000));
+
+  if (timev == null) {
+    return rbStrftimeTimespec(format, time, vtm, ts!, gmt);
+  } else {
+    return rbStrftime(format, time, vtm, () => timev, gmt);
+  }
 }
 
 /** `timew2timespec_exact` (`vendor/ruby/v3.3.11/time.c:1973-1989`). */
-function timew2timespecExact(epochNs: bigint, subnano: Rational): Timespec | null {
-  if (!subnano.isZero()) return null;
-  let tvSec = epochNs / 1_000_000_000n;
-  let tvNsec = epochNs % 1_000_000_000n;
-  if (tvNsec < 0n) {
+function timew2timespecExact(timew: { epochNs: bigint; subnano: Rational }): Timespec | null {
+  let tvSec = timew.epochNs / 1_000_000_000n;
+  let subsecx = timew.epochNs % 1_000_000_000n;
+  if (subsecx < 0n) {
     tvSec -= 1n;
-    tvNsec += 1_000_000_000n;
+    subsecx += 1_000_000_000n;
   }
   if (tvSec < TIMET_MIN || tvSec > TIMET_MAX) return null;
-  return { tvSec, tvNsec: Number(tvNsec) };
+  if (!timew.subnano.isZero()) return null;
+  return { tvSec, tvNsec: Number(subsecx) };
 }
 
 /** `TIMET_MIN` (`vendor/ruby/v3.3.11/internal/time.h:15-20`). */
@@ -1697,13 +1704,11 @@ export class Time extends rbCTime {
       rbWarning("strftime called with empty format string");
       return "";
     }
-    let timev: Rational | undefined;
     const str = rbStrftimeAlloc(
       format,
       this,
       new TimeVtm(this),
-      timew2timespecExact(this.#epochNs, this.#subnano),
-      () => (timev ??= this.toR()),
+      { epochNs: this.#epochNs, subnano: this.#subnano },
       this.#tzmodeUtc,
     );
     if (str == null) throw new ArgumentError(`invalid format: ${format}`);
@@ -1733,17 +1738,6 @@ export class Time extends rbCTime {
   /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`), whose `MEMCPY` copies the whole `time_object`. */
   initializeCopy(time: Time): this {
     if ((this as Time) === time) return this;
-    return this.#initCopy(time);
-  }
-
-  /** `time_dup` (`vendor/ruby/v3.3.11/time.c:4058-4064`). */
-  #dup(): Time {
-    const klass = rbObjClass(this) as typeof Time;
-    return timeSAlloc(klass).#initCopy(this);
-  }
-
-  /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`). */
-  #initCopy(time: Time): this {
     this.#vtmMemo = time.#vtmMemo;
     this.#instantMemo = time.#instantMemo;
     this.#epochNsMemo = time.#epochNsMemo;
@@ -1853,6 +1847,13 @@ export class Time extends rbCTime {
   }
 
   /** `time_getgmtime` (`vendor/ruby/v3.3.11/time.c:4291`). */
+  /** `time_dup` (`vendor/ruby/v3.3.11/time.c:4058-4064`). */
+  #dup(): Time {
+    const dup = timeSAlloc(rbObjClass(this) as typeof Time);
+    Time.prototype.initializeCopy.call(dup, this);
+    return dup;
+  }
+
   getutc(): Time {
     return this.#dup().utc();
   }
