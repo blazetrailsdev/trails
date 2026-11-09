@@ -263,9 +263,8 @@ export class SourceAnnotationExtractor {
   }
 
   display(results: Map<string, Annotation[]>, options: AnnotationOptions = {}): void {
-    let maxLine = 0;
-    for (const arr of results.values()) for (const a of arr) if (a.line > maxLine) maxLine = a.line;
-    options.indent = String(maxLine).length;
+    const lines = [...results.values()].flatMap((a) => a.map((note) => note.line));
+    options.indent = String(lines.length > 0 ? Math.max(...lines) : "").length;
     for (const file of [...results.keys()].sort()) {
       STDOUT.puts(`${file}:`);
       for (const note of results.get(file)!) {

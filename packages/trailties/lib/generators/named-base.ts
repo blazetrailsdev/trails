@@ -51,6 +51,7 @@ export class NamedBase extends GeneratorBase {
   private _insideTemplate: boolean | null = null;
   private _namespacedClassPath?: string[];
   private _filePath?: string;
+  private _urlHelperPrefix?: string;
 
   constructor(args: unknown[] = [], localOptions: unknown = {}, config: GeneratorConfig = {}) {
     super(args, localOptions, config);
@@ -165,8 +166,9 @@ export class NamedBase extends GeneratorBase {
       this.pluralFileName()
     );
   }
+
   urlHelperPrefix(): string {
-    return [...this.classPath(), this.fileName].join("_");
+    return (this._urlHelperPrefix ??= [...this.classPath(), this.fileName].join("_"));
   }
 
   /** @missingRailsArgs model_resource_name — PERMANENT */
