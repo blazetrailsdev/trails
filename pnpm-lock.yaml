@@ -364,6 +364,10 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
 
   packages/actionview:
     dependencies:
