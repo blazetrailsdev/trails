@@ -73,6 +73,8 @@ export interface PlanInput {
   /** Files (relative to `libDir`) a non-test library file imports. */
   libImported: ReadonlySet<string>;
   comparison: readonly ComparedPackage[];
+  /** Each non-`.ts` file under `libDir` to the files there naming it by a relative path. */
+  assetRefs?: ReadonlyMap<string, readonly string[]>;
 }
 
 export interface Plan {
@@ -133,6 +135,19 @@ export function planTestMoves(input: PlanInput): Plan {
       placed.set(file, `test/${MAIN_TEST_DIR[pkg] ?? ""}${file}`);
     }
   }
+  for (const [asset, refs] of input.assetRefs ?? []) {
+    if (refs.length === 0) continue;
+    const dirs = new Set(
+      refs.map((ref) => (placed.has(ref) ? path.posix.dirname(placed.get(ref)!) : null)),
+    );
+    const [dir] = dirs;
+    if (dirs.size !== 1 || dir == null) {
+      flagged.push(`${libDir}/${asset}`);
+      continue;
+    }
+    const from = path.posix.relative(path.posix.dirname(refs[0]), asset);
+    placed.set(asset, path.posix.normalize(path.posix.join(dir, from)));
+  }
   const moves = [...placed]
     .map(([old, to]): [string, string] => [`${libDir}/${old}`, to])
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
@@ -140,6 +155,66 @@ export function planTestMoves(input: PlanInput): Plan {
   for (const [, to] of moves) seen.set(to, (seen.get(to) ?? 0) + 1);
   const collisions = [...seen].filter(([, n]) => n > 1).map(([to]) => to);
   return { moves, flagged: flagged.sort(), collisions: collisions.sort() };
+}
+
+const SPECIFIER_RE =
+  /(\bfrom\s*|\bimport\s*\(?\s*|\bdeclare\s+module\s+|\bvi\.(?:mock|doMock|doUnmock|importActual)\s*(?:<[^>]*>)?\(\s*)(["'])(\.{1,2}\/[^"'\n]*)\2/g;
+
+/**
+ * Rewrites each relative module specifier in `source`, a file moving from
+ * `from` to `to` (package-root-relative), so it names the same target after
+ * the move, `moved` (old path to new path) included.
+ */
+export function rewriteSpecifiers(
+  source: string,
+  from: string,
+  to: string,
+  moved: ReadonlyMap<string, string>,
+): string {
+  return source.replace(SPECIFIER_RE, (whole, lead: string, quote: string, spec: string) => {
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
+    const ts = target.replace(/\.js$/, ".ts");
+    const dest = moved.has(ts)
+      ? moved.get(ts)!.replace(/\.ts$/, path.posix.extname(target))
+      : target;
+    let rel = path.posix.relative(path.posix.dirname(to), dest);
+    if (!rel.startsWith(".")) rel = `./${rel}`;
+    if (spec.endsWith("/") && !rel.endsWith("/")) rel += "/";
+    return rel === spec ? whole : `${lead}${quote}${rel}${quote}`;
+  });
+}
+
+/** Adds `pkg` to the `LIB_TEST_PACKAGES` set literal in `source`, sorted. */
+export function registerLibTestPackage(source: string, pkg: string): string {
+  return source.replace(
+    /(LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>\(\[)([^\]]*)(\]\))/,
+    (_, open: string, body: string, close: string) => {
+      const names = new Set([...body.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+      names.add(pkg);
+      return `${open}\n${[...names]
+        .sort()
+        .map((n) => `  "${n}",\n`)
+        .join("")}${close}`;
+    },
+  );
+}
+
+/** Each non-`.ts` committed file under `libPath` to the `.ts` files naming it by a relative path. */
+async function assetReferences(
+  libPath: string,
+  files: readonly string[],
+): Promise<Map<string, string[]>> {
+  const { stdout } = await promisify(execFile)("git", ["ls-files"], { cwd: libPath });
+  const assets = stdout.split("\n").filter((f) => f !== "" && !f.endsWith(".ts"));
+  const refs = new Map(assets.map((a): [string, string[]] => [a, []]));
+  for (const file of files) {
+    const source = await fs.readFile(path.join(libPath, file), "utf-8");
+    for (const [, spec] of source.matchAll(/["'`](\.{1,2}\/[^"'`\n$]+)["'`]/g)) {
+      const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec));
+      if (refs.has(target)) refs.get(target)!.push(file);
+    }
+  }
+  return refs;
 }
 
 /** Files under `libDir` that a non-test file there imports by relative specifier. */
@@ -186,6 +261,7 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
     files,
     libImported: await libImportedFiles(libPath, files),
     comparison: comparison.results,
+    assetRefs: await assetReferences(libPath, files),
   });
   if (plan.collisions.length > 0) {
     throw new Error(`plan-test-moves: two files land on:\n  ${plan.collisions.join("\n  ")}`);
@@ -196,6 +272,16 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
       await fs.mkdir(path.dirname(path.join(pkgDir, to)), { recursive: true });
       await git("git", ["mv", from, to], { cwd: pkgDir });
     }
+    const moved = new Map(plan.moves);
+    for (const [from, to] of plan.moves) {
+      if (!to.endsWith(".ts")) continue;
+      const file = path.join(pkgDir, to);
+      const source = await fs.readFile(file, "utf-8");
+      const rewritten = rewriteSpecifiers(source, from, to, moved);
+      if (rewritten !== source) await fs.writeFile(file, rewritten);
+    }
+    const roots = path.join(cwd, "scripts/layout/package-roots.mts");
+    await fs.writeFile(roots, registerLibTestPackage(await fs.readFile(roots, "utf-8"), pkg));
   }
   return [
     ...plan.moves.map(([from, to]) => `${from} → ${to}`),
