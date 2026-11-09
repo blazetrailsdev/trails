@@ -33,7 +33,9 @@ export class One extends Attached {
    * @noRailsEquivalent PERMANENT
    */
   async load(): Promise<void> {
-    await this.attachment;
+    await (
+      await this.attachment
+    )?.blob;
   }
 
   isBlank(): boolean {

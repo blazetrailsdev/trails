@@ -36,7 +36,7 @@ import { DEFAULT_PORTS, type RackApp, type RackMiddleware } from "@blazetrails/r
 import { TestCase } from "@blazetrails/activesupport/test-case";
 
 export interface IntegrationRequestOptions {
-  params?: Record<string, unknown> | string | StringIO;
+  params?: Record<string, unknown> | string | Uint8Array | StringIO;
   headers?: Record<string, unknown>;
   xhr?: boolean;
   env?: Record<string, unknown>;
