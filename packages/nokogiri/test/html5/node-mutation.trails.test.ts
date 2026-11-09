@@ -11,6 +11,13 @@ describe("HTML5 node mutation", () => {
     expect(node.toHtml()).toBe('<div class="container">contents</div>');
   });
 
+  it("yields the new element to a block", () => {
+    const node = new Document().createElement("div", (n: { set(k: string, v: string): void }) =>
+      n.set("class", "blue"),
+    );
+    expect(node.toHtml()).toBe('<div class="blue"></div>');
+  });
+
   it("sets and checks attributes", () => {
     const node = new Document().createElement("figure");
     expect(node.isKey("data-x")).toBe(false);

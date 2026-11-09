@@ -92,7 +92,12 @@ export class Document {
   }
 
   createElement(name: string, ...contentsOrAttrs: unknown[]): Node {
+    const block =
+      typeof contentsOrAttrs.at(-1) === "function"
+        ? (contentsOrAttrs.pop() as (node: Node) => void)
+        : undefined;
     const elm = new Node(defaultTreeAdapter.createElement(name, html.NS.HTML, []), this);
+    if (block) block(elm);
     for (const arg of contentsOrAttrs) {
       if (arg !== null && typeof arg === "object") {
         for (const [k, v] of Object.entries(arg)) {
