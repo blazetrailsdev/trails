@@ -1,17 +1,19 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ActionController, Response, URL } from "@blazetrails/actionpack";
-import { Base, ScopeRegistry } from "@blazetrails/activerecord";
+import { Base, ConnectionNotEstablished, ScopeRegistry } from "@blazetrails/activerecord";
 import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
 import { Dependencies } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import {
+  Dir,
   File,
   FileUtils,
   env as ENV,
   extend,
   include,
+  rbEqual,
   rbObjRespondTo,
   setEnv,
   TopLevel,
@@ -163,8 +165,87 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(rbObjRespondTo(new Foo(), "mainApp")).toBeTruthy();
   });
 
-  it.skip("allows to not load all helpers for controllers", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it("allows to not load all helpers for controllers", async () => {
+    await t.addToConfig("this.config.actionController.includeAllHelpers = false;");
+
+    await t.appFile(
+      "app/controllers/application-controller.ts",
+      `
+        import { ActionController } from "@blazetrails/actionpack";
+        export class ApplicationController extends ActionController.Base {}
+`,
+    );
+
+    await t.appFile(
+      "app/controllers/foo-controller.ts",
+      `
+        import { ApplicationController } from "./application-controller.ts";
+        export class FooController extends ApplicationController {
+          async includedHelpers() {
+            await this.render({ inline: "<%= fromAppHelper() -%> <%= fromFooHelper() %>" });
+          }
+
+          async notIncludedHelper() {
+            await this.render({ inline: "<%= 'fromBarHelper' in this -%>" });
+          }
+        }
+`,
+    );
+
+    await t.appFile(
+      "app/helpers/application-helper.ts",
+      `
+        export const ApplicationHelper = {
+          fromAppHelper() {
+            return "from_app_helper";
+          },
+        };
+`,
+    );
+
+    await t.appFile(
+      "app/helpers/foo-helper.ts",
+      `
+        export const FooHelper = {
+          fromFooHelper() {
+            return "from_foo_helper";
+          },
+        };
+`,
+    );
+
+    await t.appFile(
+      "app/helpers/bar-helper.ts",
+      `
+        export const BarHelper = {
+          fromBarHelper() {
+            return "from_bar_helper";
+          },
+        };
+`,
+    );
+
+    await t.appFile(
+      "config/routes.ts",
+      `
+        import { Trails } from "@blazetrails/trailties";
+        Trails.application.routes().draw(function () {
+          this.get("/:controller(/:action)");
+        });
+`,
+    );
+
+    extend(t, Methods);
+    await (t as unknown as Rack).app();
+    const rack = t as unknown as Omit<Rack, "get"> & {
+      get(path: string): Promise<unknown>;
+      lastResponse(): { body: string };
+    };
+    await rack.get("/foo/includedHelpers");
+    expect(rack.lastResponse().body).toBe("from_app_helper from_foo_helper");
+
+    await rack.get("/foo/notIncludedHelper");
+    expect(rack.lastResponse().body).toBe("false");
   });
 
   it("action_controller api executes using all the middleware stack", async () => {
@@ -212,39 +293,149 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
   });
 
   it.skip("if there's no config.active_support.bare, all of ActiveSupport is required", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+    // BLOCKED: frameworks-test-use-frameworks-and-active-support-bare
   });
 
   it.skip("config.active_support.bare does not require all of ActiveSupport", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+    // BLOCKED: frameworks-test-use-frameworks-and-active-support-bare
   });
 
   it.skip("database middleware doesn't initialize when activerecord is not in frameworks", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+    // BLOCKED: frameworks-test-use-frameworks-and-active-support-bare
   });
 
-  it.skip("use schema cache dump", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it("use schema cache dump", async () => {
+    try {
+      await t.trails("generate", "model", "post", "title:string");
+      await t.trails("db:migrate", "db:schema:cache:dump");
+
+      await t.addToConfig(`
+          this.config.eagerLoad = true;
+`);
+
+      await Dir.chdir(await t.appPath(), async () => {
+        await (t as unknown as Rack).app("development");
+
+        expect(await Base.schemaCache().dataSources("posts")).toBeTruthy();
+      });
+    } finally {
+      await (await Base.leaseConnection()).dropTable("posts", { ifExists: true });
+    }
   });
 
-  it.skip("expire schema cache dump", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it("expire schema cache dump", async () => {
+    await t.trails("generate", "model", "post", "title:string");
+    await t.trails("db:migrate", "db:schema:cache:dump", "db:rollback");
+
+    await t.addToConfig(`
+        this.config.eagerLoad = true;
+`);
+
+    await Dir.chdir(await t.appPath(), async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+      await (t as unknown as Rack).app("development");
+
+      try {
+        expect(await Base.schemaCache().dataSources("posts")).toBeFalsy();
+        expect(warn.mock.calls.flat().join("\n")).toMatch(
+          /Ignoring db\/schema_cache\.yml because it has expired/,
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
   });
 
-  it.skip("expire schema cache dump if the version can't be checked because the database is unhealthy", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it("expire schema cache dump if the version can't be checked because the database is unhealthy", async () => {
+    await t.trails("generate", "model", "post", "title:string");
+    await t.trails("db:migrate", "db:schema:cache:dump");
+
+    await t.addToConfig(`
+        this.config.eagerLoad = true;
+`);
+
+    await t.withUnhealthyDatabase(async () =>
+      Dir.chdir(await t.appPath(), async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+        try {
+          await (t as unknown as Rack).app("development");
+
+          await expect(
+            Base.leaseConnection().then((connection) => connection.execute("SELECT 1")),
+          ).rejects.toThrow(ConnectionNotEstablished);
+
+          await expect(Base.schemaCache().columns("posts")).rejects.toThrow(
+            ConnectionNotEstablished,
+          );
+          expect(warn.mock.calls.flat().join("\n")).toMatch(
+            /Failed to validate the schema cache because of ActiveRecord::(ConnectionNotEstablished|DatabaseConnectionError)/,
+          );
+        } finally {
+          warn.mockRestore();
+        }
+      }),
+    );
   });
 
-  it.skip("does not expire schema cache dump if check_schema_cache_dump_version is false", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it("does not expire schema cache dump if check_schema_cache_dump_version is false", async () => {
+    await t.trails("generate", "model", "post", "title:string");
+    await t.trails("db:migrate", "db:schema:cache:dump", "db:rollback");
+
+    await t.addToConfig(`
+        this.config.eagerLoad = true;
+        this.config.activeRecord.checkSchemaCacheDumpVersion = false;
+`);
+
+    await Dir.chdir(await t.appPath(), async () => {
+      await (t as unknown as Rack).app("development");
+
+      expect(
+        await Base.connectionPool().schemaReflection.dataSources("__unused__" as never, "posts"),
+      ).toBeTruthy();
+    });
   });
 
-  it.skip("does not expire schema cache dump if check_schema_cache_dump_version is false and the database unhealthy", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it("does not expire schema cache dump if check_schema_cache_dump_version is false and the database unhealthy", async () => {
+    await t.trails("generate", "model", "post", "title:string");
+    await t.trails("db:migrate", "db:schema:cache:dump", "db:rollback");
+
+    await t.addToConfig(`
+        this.config.eagerLoad = true;
+        this.config.activeRecord.checkSchemaCacheDumpVersion = false;
+`);
+
+    await t.withUnhealthyDatabase(async () =>
+      Dir.chdir(await t.appPath(), async () => {
+        await (t as unknown as Rack).app("development");
+
+        expect(
+          await Base.connectionPool().schemaReflection.dataSources("__unused__" as never, "posts"),
+        ).toBeTruthy();
+        await expect(
+          Base.leaseConnection().then((connection) => connection.execute("SELECT 1")),
+        ).rejects.toThrow(ConnectionNotEstablished);
+      }),
+    );
   });
 
-  it.skip("define attribute methods when schema cache is present and check_schema_cache_dump_version is false", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it.skip("define attribute methods when schema cache is present and check_schema_cache_dump_version is false", async () => {
+    // BLOCKED: port-active-record-define-attribute-methods-initializer
+    await t.trails("generate", "model", "post", "title:string");
+    await t.trails("db:migrate", "db:schema:cache:dump");
+
+    await t.addToConfig(`
+        this.config.eagerLoad = true;
+        this.config.activeRecord.checkSchemaCacheDumpVersion = false;
+`);
+
+    await Dir.chdir(await t.appPath(), async () => {
+      await (t as unknown as Rack).app();
+
+      const Post = (
+        TopLevel as unknown as Record<string, { isAttributeMethodsGenerated(): boolean }>
+      ).Post;
+      expect(Post.isAttributeMethodsGenerated()).toBe(true);
+    });
   });
 
   it("active record establish_connection uses Trails.env if DATABASE_URL is not set", async () => {
@@ -336,7 +527,20 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(Trails.application!.config.filterParameters).toEqual(filterParameters);
   });
 
-  it.skip("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", () => {
-    // BLOCKED: trailties-port-application-initializers-frameworks-tests-rest
+  it.skip("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", async () => {
+    // BLOCKED: port-active-record-message-pack-initializer
+    await t.trails("generate", "model", "post", "title:string");
+    await t.trails("db:migrate");
+
+    await t.addToConfig(`
+        this.config.cacheStore = [":file_store", ${JSON.stringify(await t.appPath("tmp/cache"))}, { serializer: ":message_pack" }];
+`);
+
+    await (t as unknown as Rack).app("development");
+
+    const Post = (TopLevel as unknown as Record<string, typeof Base>).Post;
+    const post = await Post.createBang({ title: "Hello World" });
+    await TopLevel.Trails!.cache!.write("hello", post);
+    expect(rbEqual(post, await TopLevel.Trails!.cache!.read("hello"))).toBe(true);
   });
 });
