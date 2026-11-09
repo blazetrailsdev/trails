@@ -1,8 +1,7 @@
 import { afterAll } from "vitest";
-import { EnvironmentInquirer, I18n, TopLevel, setTrailsRoot } from "@blazetrails/activesupport";
-import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
+import { I18n, TopLevel, setTrailsRoot } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, Migration, Migrator } from "@blazetrails/activerecord";
-import { Application } from "@blazetrails/trailties";
+import { Application, Trails } from "@blazetrails/trailties";
 import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
 import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailties/active-record";
 import { File } from "@blazetrails/ruby-compat";
@@ -14,24 +13,11 @@ import "./dummy/app/models/page.js";
 import "./dummy/app/models/person.js";
 import "./dummy/app/models/review.js";
 
-const envName = String(ActiveRecord.ConnectionHandling.DEFAULT_ENV());
-
-const configuration = new Configuration();
-TopLevel.Trails = {
-  ...TopLevel.Trails,
-  env: TopLevel.Trails?.env ?? new EnvironmentInquirer(envName),
-  root: () => File.expandPath("dummy", import.meta.dirname),
-  application: {
-    get executor() {
-      return app.executor;
-    },
-  },
-  configuration: { generators: configuration.appGenerators.bind(configuration) },
-} as unknown as typeof TopLevel.Trails;
-
 class Dummy extends Application {}
 Application.register(Dummy, File.expandPath("dummy", import.meta.dirname));
 export const app = Dummy.instance();
+Trails.application = app;
+app.config.setRoot(File.expandPath("dummy", import.meta.dirname));
 app.config.loadDefaults("8.0");
 setTrailsRoot(TopLevel.Trails!.root()!);
 const configurations = Base.configurations();
@@ -43,7 +29,6 @@ for (const railtie of [ActiveSupportRailtie, ActiveRecordRailtie]) {
 }
 
 DatabaseTasks.root = TopLevel.Trails!.root()!;
-DatabaseTasks.dbDir = File.expandPath("dummy/db", import.meta.dirname);
 
 Migrator.migrationsPaths = [File.expandPath("dummy/db/migrate", import.meta.dirname)];
 await Base.establishConnection();
