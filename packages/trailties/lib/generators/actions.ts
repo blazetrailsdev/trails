@@ -309,6 +309,24 @@ export function optimizeIndentation(value: unknown, amount: number = 0): string 
 export const rebaseIndentation = optimizeIndentation;
 
 /** @internal */
+export function indentation(this: { _indentation: number }): string {
+  return "  ".repeat(this._indentation);
+}
+
+/** @internal */
+export async function withIndentation<H extends { _indentation: number }>(
+  this: H,
+  block: (this: H) => unknown,
+): Promise<void> {
+  this._indentation += 1;
+  try {
+    await block.call(this);
+  } finally {
+    this._indentation -= 1;
+  }
+}
+
+/** @internal */
 async function matchFile(path: string, pattern: RegExp): Promise<RegExpMatchArray | null> {
   if (await File.isExistAsync(path)) return (await File.readAsync(path)).match(pattern);
   return null;
