@@ -52,12 +52,13 @@ describe("server-path-closure", () => {
       "packages/c/package.json",
       JSON.stringify({
         name: "@blazetrails/c",
-        exports: { "./*": { default: "./dist/*.js" }, "./hidden/*": null },
+        exports: { "./*": { default: "./dist/*.js" }, "./hidden/*": null, "./shut": null },
       }),
     );
     await write(root, "packages/c/dist/open.js", 'import "./helpers/t.js";\n');
     await write(root, "packages/c/dist/helpers/t.js", 'import "vitest";\n');
     await write(root, "packages/c/dist/hidden/h.js", 'import "vitest";\n');
+    await write(root, "packages/c/dist/shut.js", 'import "vitest";\n');
     const violations = await findViolations(root);
     expect(violations.map((v) => v.module)).toEqual([
       "packages/b/dist/testing/x.js",

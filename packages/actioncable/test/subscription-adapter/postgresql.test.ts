@@ -1,5 +1,5 @@
 import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
-import { driverConfig, postgresSettings } from "@blazetrails/activerecord/support/config";
+import { driverConfig, postgresSettings } from "@blazetrails/activerecord/test/support/config";
 import { Logger, getEnv } from "@blazetrails/activesupport";
 import { Process, StringIO } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
