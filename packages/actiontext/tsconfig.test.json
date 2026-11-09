@@ -10,6 +10,12 @@
   "references": [
     {
       "path": "./tsconfig.json"
+    },
+    {
+      "path": "../activerecord/tsconfig.test.json"
+    },
+    {
+      "path": "../trailties"
     }
   ]
 }

@@ -1,0 +1,9 @@
+export const messages = {
+  hello_alice: {
+    subject: "A message to Alice",
+  },
+
+  hello_world: {
+    subject: "A greeting",
+  },
+};
