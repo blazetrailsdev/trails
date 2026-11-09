@@ -1,8 +1,8 @@
 import { RuleTester } from "eslint";
 import rule from "./thor-import-boundary.mjs";
 
-const TOP = "packages/thor/src/actions.ts";
-const NESTED = "packages/thor/src/actions/create-file.ts";
+const TOP = "packages/thor/lib/actions.ts";
+const NESTED = "packages/thor/lib/actions/create-file.ts";
 
 const tester = new RuleTester({
   languageOptions: {

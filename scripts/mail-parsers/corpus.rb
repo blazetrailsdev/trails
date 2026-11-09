@@ -1,4 +1,4 @@
-# Usage: ruby scripts/mail-parsers/corpus.rb packages/mail/src/parsers/fixtures/corpus.ts
+# Usage: ruby scripts/mail-parsers/corpus.rb packages/mail/test/parsers/fixtures/corpus.ts
 $LOAD_PATH.unshift File.expand_path("../../vendor/mail/2.8.1/lib", __dir__)
 require "json"
 require "mail"

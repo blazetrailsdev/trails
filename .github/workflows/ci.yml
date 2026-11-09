@@ -1199,7 +1199,7 @@ jobs:
       - if: needs.changes.outputs.thor_only == 'true'
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
-          $(git ls-files 'packages/thor/src/*.ts')
+          $(git ls-files 'packages/thor/lib/*.ts')
 
   generated-app-tests:
     name: Generated App Tests
@@ -2083,7 +2083,7 @@ jobs:
           key: vendor-sources-${{ hashFiles('vendor/sources.ts', 'vendor/sources.lock.json', 'vendor/fetch.ts') }}
       - name: Fetch upstream Ruby sources
         run: pnpm vendor:fetch
-      # RFC 0204: packages/mail/src/parsers/*-parser.ts are transliterated
+      # RFC 0204: packages/mail/lib/parsers/*-parser.ts are transliterated
       # from the vendored gem's Ragel output; fail on any drift.
       - name: Mail parsers regeneration check
         run: pnpm mail:parsers --check
@@ -2123,7 +2123,7 @@ jobs:
           test-names-manifest after ruby-tests: pnpm exec tsx scripts/build-rails-test-names-manifest.ts
           rails-private after privates-manifest: pnpm exec eslint --no-inline-config --config eslint/rails-private-jsdoc.config.mjs packages
           method-order after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/arel/lib packages/activemodel/lib
-          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/test packages/arel/test packages/date/test packages/did-you-mean/test packages/globalid/src packages/i18n/test --max-warnings 0
+          test-names after privates-manifest,eslint-excludes,method-order-manifest,test-names-manifest: pnpm exec eslint packages/actionview/test packages/arel/test packages/date/test packages/did-you-mean/test packages/globalid/test packages/i18n/test --max-warnings 0
           dep-lint after ruby-api: pnpm exec tsx scripts/api-compare/lint-deps.ts
           detached-jsdoc: pnpm exec tsx scripts/api-compare/lint-detached-jsdoc-tags.ts
           test-compare after ruby-tests: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/compare.ts --gates --check

@@ -1,7 +1,7 @@
 # trailties: the Thor port
 
 Thor `v1.3.2` is ported in full as the `@blazetrails/thor` package, under
-`packages/thor/src/`, mirroring `vendor/thor/v1.3.2/lib/thor/`. Trailties
+`packages/thor/lib/`, mirroring `vendor/thor/v1.3.2/lib/thor/`. Trailties
 depends on it by package name, and `eslint/thor-import-boundary.mjs` keeps Thor
 from importing anything but `@blazetrails/ruby-compat` and
 `@blazetrails/did-you-mean`.

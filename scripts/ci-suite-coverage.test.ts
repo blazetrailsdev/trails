@@ -1343,8 +1343,8 @@ describe("CI runs every tooling test suite", () => {
 
       const thorOnly = await runGate(
         [
-          "packages/thor/src/actions.ts",
-          "packages/thor/src/actions.test.ts",
+          "packages/thor/lib/actions.ts",
+          "packages/thor/test/actions.test.ts",
           "scripts/parity/unported-files/thor.ts",
           "scripts/api-compare/call-mismatches-exclude/thor/actions.json",
           "scripts/api-compare/call-mismatches-unreviewed/thor/actions.json",
@@ -1356,13 +1356,13 @@ describe("CI runs every tooling test suite", () => {
       expect(thorOnly.activerecord_affected).toBe("false");
 
       const withTrailties = await runGate(
-        "packages/thor/src/actions.ts\npackages/trailties/src/generators/base.ts",
+        "packages/thor/lib/actions.ts\npackages/trailties/src/generators/base.ts",
       );
       expect(withTrailties.thor_only).toBe("false");
       expect(withTrailties.trailties_affected).toBe("true");
 
       const withLockfile = await runGate(
-        "packages/thor/src/actions.ts\npnpm-lock.yaml",
+        "packages/thor/lib/actions.ts\npnpm-lock.yaml",
         await diffRepo({ "pnpm-lock.yaml": "packages: {}\n" }),
       );
       expect(withLockfile.thor_only).toBe("false");
@@ -1408,7 +1408,7 @@ describe("CI runs every tooling test suite", () => {
       expect(withLockfile.actioncable_only).toBe("false");
       expect(withLockfile.activerecord_affected).toBe("true");
 
-      const withThor = await runGate(`${cable}\npackages/thor/src/actions.ts`);
+      const withThor = await runGate(`${cable}\npackages/thor/lib/actions.ts`);
       expect(withThor.actioncable_only).toBe("false");
       expect(withThor.thor_only).toBe("false");
 
@@ -1484,7 +1484,7 @@ describe("CI runs every tooling test suite", () => {
         "packages/activerecord-cli packages/solid-cable packages/solid-queue",
       );
       expect(
-        (await runGate("packages/solid-queue/src/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
+        (await runGate("packages/solid-queue/lib/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
       ).toBe("");
       expect(
         (await runGate("packages/ruby-compat/lib/a.ts\npackages/activestorage/lib/b.ts"))
@@ -1520,7 +1520,7 @@ describe("CI runs every tooling test suite", () => {
     { timeout: 60_000 },
     async () => {
       const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
-      expect((await runGate("packages/zeitwerk/src/a.ts")).unit_packages).toBe("packages/zeitwerk");
+      expect((await runGate("packages/zeitwerk/lib/a.ts")).unit_packages).toBe("packages/zeitwerk");
       expect((await runGate("packages/trailties/src/a.ts")).unit_packages).toBe("none");
       expect((await runGate("scripts/tasks/a.ts")).unit_packages).toBe("none");
       expect((await runGate("packages/activemodel/lib/a.ts")).unit_packages.split(" ")).toEqual(
@@ -1531,7 +1531,7 @@ describe("CI runs every tooling test suite", () => {
       expect((await runGate("eslint/no-raw-sql.mjs")).unit_packages).toBe("");
       expect((await runGate("vendor/sources.ts")).unit_packages).toBe("");
       expect(
-        (await runGate("packages/solid-queue/src/a.ts\nscripts/ci/scoped-only.sh")).ar_scope,
+        (await runGate("packages/solid-queue/lib/a.ts\nscripts/ci/scoped-only.sh")).ar_scope,
       ).toBe("");
     },
   );

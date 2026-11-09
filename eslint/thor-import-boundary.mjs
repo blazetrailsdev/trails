@@ -1,6 +1,6 @@
 import path from "path";
 
-const THOR_ROOT = "packages/thor/src/";
+const THOR_ROOT = "packages/thor/lib/";
 const ALLOWED_PACKAGES = ["@blazetrails/ruby-compat", "@blazetrails/did-you-mean"];
 
 /** `filename`'s path below the thor root, or null when it is not a thor file. */
@@ -25,7 +25,7 @@ export function violation(rel, source) {
 /**
  * ESLint rule: thor-import-boundary
  *
- * `packages/thor/src/` is the port of the thor gem, `@blazetrails/thor`. Thor depends on
+ * `packages/thor/lib/` is the port of the thor gem, `@blazetrails/thor`. Thor depends on
  * nothing but Ruby's standard library (`vendor/thor/v1.3.2/thor.gemspec`), so
  * its port may reach only what stands in for that: `@blazetrails/ruby-compat`
  * and `@blazetrails/did-you-mean`. A relative import that leaves `thor/` would
@@ -44,7 +44,7 @@ export default {
     schema: [],
     messages: {
       outside:
-        "'{{source}}' leaves packages/thor/src/. Thor does not depend on railties; " +
+        "'{{source}}' leaves packages/thor/lib/. Thor does not depend on railties; " +
         "railties depends on Thor.",
       package:
         "'{{source}}' is not a Thor dependency. The thor port may import only " +

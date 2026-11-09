@@ -22,13 +22,13 @@
     "packages/ruby-compat/lib/string/method-table.ts -> packages/ruby-compat/lib/string/byte-methods.ts [rbStrBytesplice, rbStrSetbyte]",
     "packages/ruby-compat/lib/string/method-table.ts -> packages/ruby-compat/lib/string/each.ts [rbStrBytes, rbStrChars, rbStrCodepoints, rbStrEachByte, rbStrEachChar, rbStrEachCodepoint, rbStrEachGraphemeCluster, rbStrEachLine, rbStrGraphemeClusters, rbStrLines, rbStrUpto]",
     "packages/ruby-compat/lib/string/method-table.ts -> packages/ruby-compat/lib/string/sub.ts [rbStrMatchM, rbStrMatchMP, rbStrScan, rbStrSub, rbStrSubBang]",
-    "packages/solid-queue/src/blocked-execution.ts -> packages/solid-queue/src/execution.ts [Execution]",
-    "packages/solid-queue/src/claimed-execution.ts -> packages/solid-queue/src/execution.ts [Execution]",
-    "packages/solid-queue/src/failed-execution.ts -> packages/solid-queue/src/execution.ts [Execution]",
-    "packages/solid-queue/src/failed-execution.ts -> packages/solid-queue/src/execution/dispatching.ts [Dispatching]",
-    "packages/solid-queue/src/job.ts -> packages/solid-queue/src/job/executable.ts [Executable]",
-    "packages/solid-queue/src/ready-execution.ts -> packages/solid-queue/src/execution.ts [Execution]",
-    "packages/solid-queue/src/scheduled-execution.ts -> packages/solid-queue/src/execution.ts [Execution]",
-    "packages/solid-queue/src/scheduled-execution.ts -> packages/solid-queue/src/execution/dispatching.ts [Dispatching]"
+    "packages/solid-queue/lib/blocked-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
+    "packages/solid-queue/lib/claimed-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
+    "packages/solid-queue/lib/failed-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
+    "packages/solid-queue/lib/failed-execution.ts -> packages/solid-queue/lib/execution/dispatching.ts [Dispatching]",
+    "packages/solid-queue/lib/job.ts -> packages/solid-queue/lib/job/executable.ts [Executable]",
+    "packages/solid-queue/lib/ready-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
+    "packages/solid-queue/lib/scheduled-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
+    "packages/solid-queue/lib/scheduled-execution.ts -> packages/solid-queue/lib/execution/dispatching.ts [Dispatching]"
   ]
 }

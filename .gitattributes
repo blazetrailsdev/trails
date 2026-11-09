@@ -21,4 +21,4 @@ packages/actionpack/test/fixtures/public/**/*.br binary
 packages/actionpack/test/fixtures/公共/**/*.gz binary
 packages/actionpack/test/fixtures/公共/**/*.br binary
 # Byte-for-byte copies of vendor/mail/2.8.1/spec/fixtures: the CRLF and LF emails differ only in line endings.
-packages/mail/src/fixtures/** binary
+packages/mail/test/fixtures/** binary

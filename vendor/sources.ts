@@ -40,7 +40,7 @@ export interface PackageEntry {
    * Further lib directories, relative to the source's vendored root, whose
    * `.rb` files map onto the same TS `src/` as `libPath`'s. An engine gem keeps
    * its models under `app/models/<gem>/` beside `lib/<gem>/`, and
-   * `app/models/solid_queue/job.rb` ports to `packages/solid-queue/src/job.ts`.
+   * `app/models/solid_queue/job.rb` ports to `packages/solid-queue/lib/job.ts`.
    */
   extraLibPaths?: string[];
   /** Path relative to the source's vendored root; omitted = test-compare ignores. */
