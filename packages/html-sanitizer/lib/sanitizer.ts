@@ -80,14 +80,16 @@ export class HTML4SafeListSanitizer extends Sanitizer {
 
   /** @internal */
   private allowedTags(options: SanitizeOptions): Iterable<string> {
-    return options.tags ?? (this.constructor as typeof HTML4SafeListSanitizer).allowedTags;
+    return options.tags != null && (options.tags as unknown) !== false
+      ? options.tags
+      : (this.constructor as typeof HTML4SafeListSanitizer).allowedTags;
   }
 
   /** @internal */
   private allowedAttributes(options: SanitizeOptions): Iterable<string> {
-    return (
-      options.attributes ?? (this.constructor as typeof HTML4SafeListSanitizer).allowedAttributes
-    );
+    return options.attributes != null && (options.attributes as unknown) !== false
+      ? options.attributes
+      : (this.constructor as typeof HTML4SafeListSanitizer).allowedAttributes;
   }
 }
 
@@ -132,14 +134,16 @@ export class HTML5SafeListSanitizer extends Sanitizer {
 
   /** @internal */
   private allowedTags(options: SanitizeOptions): Iterable<string> {
-    return options.tags ?? (this.constructor as typeof HTML5SafeListSanitizer).allowedTags;
+    return options.tags != null && (options.tags as unknown) !== false
+      ? options.tags
+      : (this.constructor as typeof HTML5SafeListSanitizer).allowedTags;
   }
 
   /** @internal */
   private allowedAttributes(options: SanitizeOptions): Iterable<string> {
-    return (
-      options.attributes ?? (this.constructor as typeof HTML5SafeListSanitizer).allowedAttributes
-    );
+    return options.attributes != null && (options.attributes as unknown) !== false
+      ? options.attributes
+      : (this.constructor as typeof HTML5SafeListSanitizer).allowedAttributes;
   }
 }
 
