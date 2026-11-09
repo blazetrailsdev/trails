@@ -40,11 +40,8 @@ export class CaptureEndEngine extends Engine {
     };
     properties.regexp ||= /<%(\|?={1,2}|-|#|%|\|)?(.*?)([-=])?%>([ \t]*\r?\n)?/s;
     _pending = state;
-    try {
-      super(input, properties);
-    } finally {
-      _pending = null;
-    }
+    super(input, properties);
+    _pending = null;
     Object.assign(this, state);
     if (new.target === CaptureEndEngine) Object.freeze(this);
   }
