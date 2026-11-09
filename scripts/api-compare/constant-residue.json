@@ -284,6 +284,12 @@
       "action-dispatch/testing/integration.ts::IntegrationTest": "ActionDispatch::IntegrationTest"
     }
   },
+  "actiontext": {
+    "rows": 1,
+    "excluded": [],
+    "unwalked": [],
+    "residue": { "gem-version.ts::VERSION": "ActionText::VERSION" }
+  },
   "actionview": {
     "rows": 168,
     "excluded": ["helpers/form-helper.ts::FormBuilder", "template/handlers/builder.ts::Builder"],
@@ -1176,6 +1182,7 @@
       "xml/namespace.ts::Namespace": "Nokogiri::XML::Namespace",
       "xml/node-set.ts::NodeSet": "Nokogiri::XML::NodeSet",
       "xml/node.ts::XmlNode": "Nokogiri::XML::Node",
+      "xml/node/save-options.ts::SaveOptions": "Nokogiri::XML::Node::SaveOptions",
       "xml/parse-options.ts::ParseOptions": "Nokogiri::XML::ParseOptions",
       "xml/sax/document.ts::SaxDocument": "Nokogiri::XML::SAX::Document",
       "xml/sax/parser.ts::SaxParser": "Nokogiri::XML::SAX::Parser",
