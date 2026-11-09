@@ -26,7 +26,7 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { PKG_SRC_DIRS } from "../test-compare/compare.js";
 import { moduleSpecifiers } from "../ruby-compat-leaf.js";
-import { LIB_TEST_PACKAGES } from "./package-roots.js";
+import { LIB_TEST_PACKAGES } from "./package-roots.mjs";
 import { COMMITTED_TS_FILES, walkTsFiles } from "../api-compare/ts-file-walk.js";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");

@@ -17,11 +17,7 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import * as packageRootsModule from "../layout/package-roots.js";
-
-const { sourceRoots } = (
-  "default" in packageRootsModule ? packageRootsModule.default : packageRootsModule
-) as typeof packageRootsModule;
+import { sourceRoots } from "../layout/package-roots.mjs";
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MARK_FILE = path.join(ROOT_DIR, "scripts/parity/module-count-mark.json");

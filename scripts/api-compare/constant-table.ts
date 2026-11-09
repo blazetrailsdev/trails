@@ -19,7 +19,7 @@ import {
   rubyFileToTs,
 } from "../parity/conventions.js";
 import { DIR_TO_PACKAGES, ROOT_DIR } from "./config.js";
-import { libRoot } from "../layout/package-roots.js";
+import { libRoot } from "../layout/package-roots.mjs";
 
 /** The `TS_CLASS_RENAMES` a Ruby path keeps: `Rails::Railtie` is `Rails::Trailtie`. */
 export const BRAND_RENAMES = ["Railtie", "Railties"];

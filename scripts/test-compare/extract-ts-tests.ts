@@ -11,7 +11,7 @@ import {
   type HelperMap,
 } from "./extract-ts-core.js";
 import { scopeOf } from "../api-compare/scope.js";
-import { testRoots } from "../layout/package-roots.js";
+import { testRoots } from "../layout/package-roots.mjs";
 
 function globInTestRoots(pkg: string, pattern: string): string[] {
   return testRoots(pkg).flatMap((root) =>

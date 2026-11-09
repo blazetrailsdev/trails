@@ -8,7 +8,7 @@ import {
   GUARDED_PACKAGES,
   namesPackage,
 } from "./rack-activesupport-free.js";
-import { libRoot } from "./layout/package-roots.js";
+import { libRoot } from "./layout/package-roots.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = (name: string) => path.join(HERE, "..", "packages", name);

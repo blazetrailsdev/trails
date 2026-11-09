@@ -18,7 +18,7 @@
 import { readFile, stat } from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { libRoot } from "../scripts/layout/package-roots.ts";
+import { libRoot } from "../scripts/layout/package-roots.mts";
 import { describe, it, expect } from "vitest";
 // Reuse the rule's own namespace map + path mapping so this file-independent
 // check can never drift from the file-driven rule it backstops.

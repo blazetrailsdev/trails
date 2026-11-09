@@ -33,7 +33,7 @@ import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { resolveTsClassForRuby } from "./compare.js";
 import { BRAND_RENAMES, derivedConstantPath, walkConstants } from "./constant-table.js";
 import { PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
-import { libRoot } from "../layout/package-roots.js";
+import { libRoot } from "../layout/package-roots.mjs";
 import type { ClassInfo } from "@blazetrails/parity/types";
 
 const run = promisify(execFile);
