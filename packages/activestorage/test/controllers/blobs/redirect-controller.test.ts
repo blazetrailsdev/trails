@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { currentTimeInstant, Duration, TopLevel } from "@blazetrails/activesupport";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { IntegrationTest } from "@blazetrails/actionpack";
+import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
 import type { Blob } from "../../../lib/blob.js";

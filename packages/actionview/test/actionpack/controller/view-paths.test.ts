@@ -3,6 +3,7 @@ import "../../support/abstract-unit.js";
 import { File, getPath, constSet, rbObjIvarSet } from "@blazetrails/ruby-compat";
 
 import { ActionController, ActionDispatch, type RouteSet } from "@blazetrails/actionpack";
+import { TestCase, ControllerTestRequest } from "@blazetrails/actionpack/testing";
 import { Base } from "../../../lib/base.js";
 import { DetailsKey } from "../../../lib/lookup-context.js";
 import { PathSet } from "../../../lib/path-set.js";
@@ -40,7 +41,7 @@ class TestController extends ActionController.Base {
 }
 TestController.viewPaths([FIXTURE_LOAD_PATH]);
 
-class ViewLoadPathsTest extends ActionController.TestCase {
+class ViewLoadPathsTest extends TestCase {
   declare paths: PathSet;
 
   static {
@@ -55,7 +56,7 @@ class ViewLoadPathsTest extends ActionController.TestCase {
 
     this.controller = new TestController();
     Object.assign(this, {
-      request: ActionController.TestRequest.create(this.controller.constructor),
+      request: ControllerTestRequest.create(this.controller.constructor),
       response: new ActionDispatch.TestResponse(),
     });
     this.paths = TestController.viewPaths();

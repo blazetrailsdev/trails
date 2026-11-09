@@ -3,6 +3,7 @@ import { HTML5 } from "@blazetrails/nokogiri";
 import { include, isModuleIncluded, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
+import "../../../lib/testing.js";
 import { TemplateAssertions } from "../../../lib/action-controller/template-assertions.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import { Assertions, htmlDocument } from "../../../lib/action-dispatch/testing/assertions.js";

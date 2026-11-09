@@ -11,6 +11,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { ActionController, ActionDispatch, RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import {
   ArgumentError,
   extend,
@@ -120,7 +121,7 @@ interface PolymorphicRoutesTest {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
-class PolymorphicRoutesTest extends ActionController.TestCase {
+class PolymorphicRoutesTest extends TestCase {
   static Routes: RouteSet = new RouteSet();
   declare static defaultUrlOptions: Record<string, unknown>;
 
@@ -1005,7 +1006,7 @@ interface DirectRoutesTest {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
-class DirectRoutesTest extends ActionController.TestCase {
+class DirectRoutesTest extends TestCase {
   static Routes: RouteSet = new RouteSet();
 
   declare category: Category;

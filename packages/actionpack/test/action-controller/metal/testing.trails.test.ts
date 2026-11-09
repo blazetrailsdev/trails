@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { publicInstanceMethods, rbModName } from "@blazetrails/ruby-compat";
 import { ActionController } from "../../../lib/namespaces.js";
 import { Metal } from "../../../lib/action-controller/metal.js";
-import "../../../lib/action-controller/test-case.js";
+import "../../../lib/testing.js";
 import { Functional, recycleBang, Testing } from "../../../lib/action-controller/metal/testing.js";
 
 describe("ActionController::Testing", () => {

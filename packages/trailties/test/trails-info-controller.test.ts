@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { ActionController, Mapper, type RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { include } from "@blazetrails/activesupport";
 import { assert, assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { block } from "@blazetrails/ruby-compat";
@@ -8,7 +9,6 @@ import { InfoController } from "../lib/info-controller.js";
 import { Info, PropertyList } from "../lib/info.js";
 import { Trails } from "../lib/trails.js";
 
-const { TestCase } = ActionController;
 const SOURCE_FILE = import.meta.filename;
 
 function exactResults(tc: InstanceType<typeof TestCase>): string[] {

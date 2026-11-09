@@ -1,26 +1,8 @@
 {
-  "server-path-actionpack-testing": [
-    "packages/actionpack/dist/action-dispatch/testing/assertion-response.js",
-    "packages/actionpack/dist/action-dispatch/testing/assertions.js",
-    "packages/actionpack/dist/action-dispatch/testing/assertions/response.js",
-    "packages/actionpack/dist/action-dispatch/testing/assertions/routing.js",
-    "packages/actionpack/dist/action-dispatch/testing/integration.js",
-    "packages/actionpack/dist/action-dispatch/testing/request-encoder.js",
-    "packages/actionpack/dist/action-dispatch/testing/test-helpers/page-dump-helper.js",
-    "packages/actionpack/dist/action-dispatch/testing/test-process.js",
-    "packages/actionpack/dist/action-dispatch/testing/test-request.js",
-    "packages/actionpack/dist/action-dispatch/testing/test-response.js",
-    "packages/activesupport/dist/testing/constant-lookup.js"
-  ],
-  "server-path-actionview-test-case": [
-    "packages/actionview/dist/rails-dom-testing/assertions.js",
-    "packages/actionview/dist/test-case.js"
-  ],
   "server-path-activejob-test-adapter": ["packages/activejob/dist/queue-adapters/test-adapter.js"],
   "server-path-activemodel-lint": ["packages/activesupport/dist/testing/assertions.js"],
   "server-path-activesupport-test-case-and-behaviors": [
     "packages/activesupport/dist/executor/test-helper.js",
-    "packages/activesupport/dist/test-case.js",
     "packages/activesupport/dist/testing/file-fixtures.js"
   ],
   "server-path-mail-test-mailer": ["packages/mail/dist/network/delivery-methods/test-mailer.js"],
@@ -29,6 +11,7 @@
     "packages/actionmailer/dist/test-helper.js",
     "packages/activejob/dist/test-helper.js"
   ],
+  "server-path-trailties-console-integration-session": ["packages/actionpack/dist/testing.js"],
   "server-path-trailties-test-unit-trailtie-vitest": [
     "packages/trailties/dist/test-unit/trailtie.js"
   ]

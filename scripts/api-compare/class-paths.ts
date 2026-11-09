@@ -46,9 +46,9 @@ const EXCLUDED_GENERATED = "constants.excluded.generated.ts";
 const SKIPPED = new Set(["activerecord-test-support"]);
 
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
-const SUBPATH_ENTRIES: Record<string, string> = {
+const SUBPATH_ENTRIES: Record<string, string | string[]> = {
   actionmailer: "test-case.ts",
-  actionpack: "system-testing.ts",
+  actionpack: ["system-testing.ts", "testing.ts"],
   activejob: "test-case.ts",
   activerecord: "fixtures.ts",
   activestorage: "transformers/image-processing-transformer.ts",
@@ -77,7 +77,7 @@ const LAZY_DIRS: Record<string, string[]> = {
   ],
   actionmailbox: ["inbound-email.ts", "inbound-email/"],
   actionmailer: ["test-case.ts", "test-helper.ts"],
-  actionview: ["testing/resolvers.ts"],
+  actionview: ["test-case.ts", "testing/resolvers.ts"],
   activejob: ["test-case.ts", "test-helper.ts"],
   activestorage: ["blob.ts", "blob/", "variant-record.ts"],
   trailties: ["commands/", "command.ts", "generators/"],
@@ -246,7 +246,10 @@ async function placement(dir: string) {
   const testOnly = await testProjectFiles(dir);
   const reachable = await entryGraph(dir);
   const subpath = SUBPATH_ENTRIES[dir];
-  const subpathGraph = subpath ? await entryGraph(dir, subpath) : new Set<string>();
+  const subpathGraph = new Set<string>();
+  for (const entry of Array.isArray(subpath) ? subpath : subpath ? [subpath] : []) {
+    for (const file of await entryGraph(dir, entry)) subpathGraph.add(file);
+  }
   const separate = SEPARATE_SUBPATH_ENTRIES[dir];
   const separateGraph = separate ? await entryGraph(dir, separate) : new Set<string>();
   const sources = new Map<string, string>();

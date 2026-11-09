@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import "../../support/abstract-unit.js";
 import { Logger } from "@blazetrails/activesupport";
 import { ActionController } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { FixtureResolver } from "../../../lib/testing/resolvers.js";
 
 class CaptureController extends ActionController.Base {
@@ -53,7 +54,7 @@ CaptureController.viewPaths([
   }),
 ]);
 
-class CaptureTest extends ActionController.TestCase {
+class CaptureTest extends TestCase {
   static {
     this.tests(CaptureController);
 

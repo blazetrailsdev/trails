@@ -1,5 +1,6 @@
 import "../constants.test-case.generated.js";
-import { Headers, TestRequest as ActionDispatchTestRequest } from "@blazetrails/actionpack";
+import { Headers } from "@blazetrails/actionpack";
+import { TestRequest as ActionDispatchTestRequest } from "@blazetrails/actionpack/testing";
 import {
   camelize,
   classAttribute,

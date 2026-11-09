@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { IntegrationTest, type RouteSet } from "@blazetrails/actionpack";
+import { type RouteSet } from "@blazetrails/actionpack";
+import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { TopLevel } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { OpenSSL } from "@blazetrails/ruby-compat";

@@ -2,6 +2,7 @@ import "../support/abstract-unit.js";
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController, ActionDispatch, Request, RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { Conversion, Naming } from "@blazetrails/activemodel";
 import { extend, isHtmlSafe, isPresent } from "@blazetrails/activesupport";
 import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
@@ -1311,7 +1312,7 @@ class UrlHelperController extends ActionController.Base {
   }
 }
 
-class UrlHelperControllerTest extends ActionController.TestCase {
+class UrlHelperControllerTest extends TestCase {
   static {
     this.tests(UrlHelperController);
   }
@@ -1417,7 +1418,7 @@ class TasksController extends ActionController.Base {
   }
 }
 
-class LinkToUnlessCurrentWithControllerTest extends ActionController.TestCase {
+class LinkToUnlessCurrentWithControllerTest extends TestCase {
   static {
     this.tests(TasksController);
   }
@@ -1525,7 +1526,7 @@ class SessionsController extends ActionController.Base {
   }
 }
 
-class PolymorphicControllerTest extends ActionController.TestCase {
+class PolymorphicControllerTest extends TestCase {
   override setup(): void {
     super.setup();
     this.routes = WorkshopsController.ROUTES;
@@ -1570,7 +1571,7 @@ describe("PolymorphicControllerTest", () => {
   });
 });
 
-class PolymorphicSessionsControllerTest extends ActionController.TestCase {
+class PolymorphicSessionsControllerTest extends TestCase {
   override setup(): void {
     super.setup();
     this.routes = SessionsController.ROUTES;

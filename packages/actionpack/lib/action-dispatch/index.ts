@@ -127,7 +127,5 @@ export {
   type Proxy,
   type CustomProxies,
 } from "./middleware/remote-ip.js";
-export { IntegrationTest } from "./testing/integration.js";
 export { Request as CacheRequest } from "./http/cache.js";
 export { Headers } from "./http/headers.js";
-export { TestRequest } from "./testing/test-request.js";
