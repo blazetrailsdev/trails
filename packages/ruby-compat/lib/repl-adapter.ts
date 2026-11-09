@@ -1,4 +1,3 @@
-import { STDIN } from "./io.js";
 import { format } from "./kernel-format.js";
 import { TopLevel } from "./object.js";
 import { rbAutoloadLoad } from "./variable.js";
@@ -6,10 +5,14 @@ import { env, exit } from "./process-adapter.js";
 import { extend } from "./include.js";
 import { StandardError } from "./standard-error.js";
 import { LoadError } from "./load-error.js";
+import { kernelCatch, throwDataP } from "./kernel-catch.js";
+import { File } from "./file.js";
+import { STDIN, STDOUT } from "./io.js";
 
 export interface ReplServerLike {
   context: Record<string, unknown>;
   on(event: "exit", listener: () => void): unknown;
+  close(): void;
   eval: (
     cmd: string,
     context: object,
@@ -150,24 +153,26 @@ export class Tsrepl {
     const prevContext = conf.MAIN_CONTEXT;
     conf.MAIN_CONTEXT = this.context;
 
-    let forcedExit = false;
+    let forcedExit: unknown = null;
     try {
-      forcedExit = await this.evalInput();
+      forcedExit = await kernelCatch("IRB_EXIT", () => this.evalInput());
     } finally {
       if (prevContext != null) TSREPL.conf.MAIN_CONTEXT = prevContext;
       for (const hook of conf.AT_EXIT as Array<() => void>) hook();
-      if (forcedExit) exit();
+      if (forcedExit != null && forcedExit !== false) exit();
     }
   }
 
   /**
-   * `IRB::Irb#eval_input` (`vendor/ruby/v3.3.11/lib/irb.rb:1038`), run by the
-   * REPL. It answers what `catch(:IRB_EXIT)` caught: the REPL's `.exit` and
-   * EOF both close it, and both are `irb_exit` (`irb.rb:908-910`).
+   * `IRB::Irb#eval_input` (`vendor/ruby/v3.3.11/lib/irb.rb:1038-1080`), over
+   * the REPL. `each_top_level_statement` is the loop below: the REPL queues
+   * each statement and this body evaluates it, so a `throw :IRB_EXIT` from
+   * the statement unwinds through here to `run`'s `catch`, and EOF (the REPL
+   * closing) ends the loop and returns normally.
    *
    * @noRailsEquivalent PERMANENT
    */
-  async evalInput(): Promise<boolean> {
+  async evalInput(): Promise<void> {
     const pconf = (TSREPL.conf.PROMPT as Record<string, PromptConf>)[
       TSREPL.conf.PROMPT_MODE as string
     ];
@@ -182,17 +187,39 @@ export class Tsrepl {
           err ? reject(err) : resolve(result),
         ),
       );
-    let previous: Promise<void> = Promise.resolve();
-    server.eval = (statements, _context, file, callback) => {
-      previous = previous.then(() =>
-        this.evaluate(statements, file).then(
-          (result) => callback(null, result),
-          (error: unknown) => callback(error as Error),
-        ),
-      );
+    const statements: Array<[string, string, (err: Error | null, result?: unknown) => void]> = [];
+    let closed = false;
+    let wake: (() => void) | null = null;
+    server.eval = (statement, _context, file, callback) => {
+      statements.push([statement, file, callback]);
+      wake?.();
     };
-    await new Promise<void>((resolve) => server.on("exit", () => resolve()));
-    return true;
+    server.on("exit", () => {
+      closed = true;
+      wake?.();
+    });
+    for (;;) {
+      const next = statements.shift();
+      if (next == null) {
+        if (closed) return;
+        await new Promise<void>((resolve) => (wake = resolve));
+        wake = null;
+        continue;
+      }
+      const [statement, file, callback] = next;
+      let result: unknown;
+      try {
+        result = await this.evaluate(statement, file);
+      } catch (error) {
+        if (throwDataP(error)) {
+          server.close();
+          throw error;
+        }
+        callback(error as Error);
+        continue;
+      }
+      callback(null, result);
+    }
   }
 
   /**
@@ -299,22 +326,44 @@ export const TSREPL = {
     TSREPL.INITIALIZED = true;
   },
 
+  /** `IRB::VERSION` (`vendor/ruby/v3.3.11/lib/irb/version.rb:8-10`). */
+  VERSION: "1.13.1",
+  RELEASE_VERSION: "1.13.1",
+  LAST_UPDATE_DATE: "2024-05-05",
+
   /**
-   * `IRB.init_config` (`vendor/ruby/v3.3.11/lib/irb/init.rb:64-189`).
-   * `VERSION`, `AP_NAME`, `IRB_LIB_PATH`, `MEASURE_PROC`, `LC_MESSAGES` and
-   * `COMMAND_ALIASES` name irb's own files and commands, which the REPL
-   * adapter has none of.
+   * `IRB.version` (`vendor/ruby/v3.3.11/lib/irb/init.rb:41-43`).
    *
    * @noRailsEquivalent PERMANENT
    */
-  initConfig(_apPath: string | null): void {
+  version(): string {
+    return format("tsrepl %s (%s)", TSREPL.RELEASE_VERSION, TSREPL.LAST_UPDATE_DATE);
+  },
+
+  /**
+   * `IRB.init_config` (`vendor/ruby/v3.3.11/lib/irb/init.rb:64-189`).
+   * `IRB_LIB_PATH`, `MEASURE_PROC[:STACKPROF]` and `LC_MESSAGES` name irb's
+   * own files, the stackprof gem and irb's message catalogue, which the REPL
+   * adapter has none of; `USE_SINGLELINE` is `false` because no
+   * `ReadlineInputMethod` is defined.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  initConfig(apPath: string | null): void {
     const conf = TSREPL.conf;
+    if (!(apPath != null && conf.AP_NAME != null)) {
+      apPath = "tsrepl.ts";
+    }
+    conf.VERSION = TSREPL.version();
+    conf.AP_NAME = File.basename(apPath, ".ts");
+
     conf.TSREPL_NAME = "tsrepl";
 
     conf.RC = true;
     conf.LOAD_MODULES = [];
     conf.TSREPL_RC = null;
 
+    conf.USE_SINGLELINE = false;
     const nc = env.NO_COLOR;
     conf.USE_COLORIZE = nc == null || nc === "";
     conf.USE_AUTOCOMPLETE =
@@ -368,6 +417,19 @@ export const TSREPL = {
     conf.SINGLE_IRB = false;
 
     conf.MEASURE = false;
+    conf.MEASURE_PROC = {};
+    (conf.MEASURE_PROC as Record<string, unknown>).TIME = (
+      _context: unknown,
+      _code: unknown,
+      _lineNo: unknown,
+      block: () => unknown,
+    ) => {
+      const time = Date.now();
+      const result = block();
+      const now = Date.now();
+      if (TSREPL.conf.MEASURE) STDOUT.puts(format("processing time: %fs", (now - time) / 1000));
+      return result;
+    };
     conf.MEASURE_CALLBACKS = [];
 
     conf.AT_EXIT = [];
