@@ -26,9 +26,8 @@ export interface SearchableHost {
   xpathImpl: typeof xpathImpl;
 }
 
-export const LOOKS_LIKE_XPATH = /^(\.\/|\/|\.\.|\.$)/;
-
 export function search(this: SearchableHost, ...args: unknown[]): NodeSet {
+  const LOOKS_LIKE_XPATH = /^(\.\/|\/|\.\.|\.$)/;
   const [paths, handler, ns, binds] = this.extractParams(args);
 
   const xpaths = [
