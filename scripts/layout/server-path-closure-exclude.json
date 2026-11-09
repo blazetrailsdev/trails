@@ -5,14 +5,10 @@
     "packages/activesupport/dist/executor/test-helper.js",
     "packages/activesupport/dist/testing/file-fixtures.js"
   ],
-  "server-path-mail-test-mailer": ["packages/mail/dist/network/delivery-methods/test-mailer.js"],
   "server-path-railtie-integration-test-hooks": [
     "packages/actionmailer/dist/test-case.js",
     "packages/actionmailer/dist/test-helper.js",
     "packages/activejob/dist/test-helper.js"
   ],
-  "server-path-trailties-console-integration-session": ["packages/actionpack/dist/testing.js"],
-  "server-path-trailties-test-unit-trailtie-vitest": [
-    "packages/trailties/dist/test-unit/trailtie.js"
-  ]
+  "server-path-trailties-console-integration-session": ["packages/actionpack/dist/testing.js"]
 }

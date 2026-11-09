@@ -75,6 +75,8 @@ export interface PlanInput {
   comparison: readonly ComparedPackage[];
   /** Each non-`.ts` file under `libDir` to the files there naming it by a relative path. */
   assetRefs?: ReadonlyMap<string, readonly string[]>;
+  /** The directories directly under the gem's own `test/` (`jobs`, `adapters`). */
+  railsTestDirs?: ReadonlySet<string>;
 }
 
 export interface Plan {
@@ -86,12 +88,15 @@ export interface Plan {
   collisions: string[];
 }
 
-function supportHome(file: string): string | null {
+function supportHome(file: string, railsTestDirs: ReadonlySet<string> = new Set()): string | null {
   const parts = file.split("/");
   const at = parts.findIndex((p, i) => i < parts.length - 1 && SUPPORT_DIRS.has(p));
   if (at < 0) return null;
   const rest = parts.slice(at + 1);
-  if (rest.length > 1 && RAILS_SUPPORT_DIRS.has(rest[0])) return `test/${rest.join("/")}`;
+  if (rest.length > 1 && (RAILS_SUPPORT_DIRS.has(rest[0]) || railsTestDirs.has(rest[0]))) {
+    return `test/${rest.join("/")}`;
+  }
+  if (rest.length === 1 && rest[0] === "helper.ts") return "test/helper.ts";
   if (parts[at] === "__fixtures__") return `test/fixtures/${rest.join("/")}`;
   return `test/support/${rest.join("/")}`;
 }
@@ -106,16 +111,21 @@ export function planTestMoves(input: PlanInput): Plan {
   const { pkg, libDir, files } = input;
   const present = new Set(files);
   const placed = new Map<string, string>();
-  for (const cp of input.comparison) {
-    const prefix = PKG_SRC_DIRS[cp.package] ?? `packages/${cp.package}/src/`;
-    const pkgPrefix = `packages/${pkg}/src/`;
-    if (!prefix.startsWith(pkgPrefix)) continue;
+  const prefixOf = (cp: ComparedPackage): string =>
+    PKG_SRC_DIRS[cp.package] ?? `packages/${cp.package}/src/`;
+  // An aliased compare package (`rails-dom-testing`) sits under its host's
+  // prefix; the longer prefix claims its files first.
+  const ordered = [...input.comparison].sort((a, b) => prefixOf(b).length - prefixOf(a).length);
+  for (const cp of ordered) {
+    const prefix = prefixOf(cp);
+    const pkgPrefix = prefix.match(new RegExp(`^packages/${pkg}/(?:src|lib)/`))?.[0];
+    if (pkgPrefix === undefined) continue;
     const within = prefix.slice(pkgPrefix.length);
     for (const f of cp.files) {
       if (!f.tsFileExists || f.conventionTsPackage || f.rubyFile.startsWith("../")) continue;
       const old = within + f.conventionTsFile;
       if (!present.has(old) || placed.has(old)) continue;
-      placed.set(old, `test/${RUBY_FILE_ROOT[cp.package] ?? ""}${f.conventionTsFile}`);
+      placed.set(old, `test/${within}${RUBY_FILE_ROOT[cp.package] ?? ""}${f.conventionTsFile}`);
     }
   }
   for (const [old, to] of [...placed]) {
@@ -127,7 +137,7 @@ export function planTestMoves(input: PlanInput): Plan {
   const flagged: string[] = [];
   for (const file of files) {
     if (placed.has(file)) continue;
-    const home = supportHome(file);
+    const home = supportHome(file, input.railsTestDirs);
     if (home !== null && !isTestFile(file)) {
       if (input.libImported.has(file)) flagged.push(`${libDir}/${file}`);
       else placed.set(file, home);
@@ -235,6 +245,14 @@ async function libImportedFiles(libPath: string, files: readonly string[]): Prom
   return imported;
 }
 
+/** The directories under `vendor/rails/v8.0.2/<gem>/test/`, empty for a non-Rails gem. */
+async function railsTestDirs(pkg: string, cwd: string): Promise<Set<string>> {
+  const entries = await fs
+    .readdir(path.join(cwd, "vendor/rails/v8.0.2", pkg, "test"), { withFileTypes: true })
+    .catch(() => []);
+  return new Set(entries.filter((e) => e.isDirectory()).map((e) => e.name));
+}
+
 export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<string> {
   const pkg = args.find((a) => !a.startsWith("--"));
   if (!pkg) throw new Error("usage: plan-test-moves <pkg> [--apply]");
@@ -262,6 +280,7 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
     libImported: await libImportedFiles(libPath, files),
     comparison: comparison.results,
     assetRefs: await assetReferences(libPath, files),
+    railsTestDirs: await railsTestDirs(pkg, cwd),
   });
   if (plan.collisions.length > 0) {
     throw new Error(`plan-test-moves: two files land on:\n  ${plan.collisions.join("\n  ")}`);

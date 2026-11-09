@@ -1,6 +1,6 @@
 import { aryJoin, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Logger } from "@blazetrails/activesupport";
-import { Base } from "../../../lib/base.js";
+import { Base } from "../../lib/base.js";
 
 export class LoggingJob extends Base {
   static toString(): string {

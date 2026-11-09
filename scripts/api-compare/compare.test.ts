@@ -1308,6 +1308,7 @@ describe("jsEnumerableAliases", () => {
 describe("nameMatches", () => {
   it("matches identical names", () => {
     expect(nameMatches("Binary", "Binary")).toBe(true);
+    expect(nameMatches("ERB", "TSE")).toBe(true);
   });
 
   it("matches Ruby error builtins against JS Error", () => {

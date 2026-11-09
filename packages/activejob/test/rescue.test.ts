@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { assertIncludes, assertNotIncludes } from "@blazetrails/activesupport/testing/assertions";
-import "./support/helper.js";
-import { RescueJob } from "./support/jobs/rescue-job.js";
+import "./helper.js";
+import { RescueJob } from "./jobs/rescue-job.js";
 import { Person } from "./models/person.js";
 import { JobBuffer } from "./support/job-buffer.js";
 

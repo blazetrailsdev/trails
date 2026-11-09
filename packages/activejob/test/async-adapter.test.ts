@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { noon, tomorrow } from "@blazetrails/activesupport/core-ext/date/calculations";
-import { isAdapterIs } from "./support/helper.js";
+import { isAdapterIs } from "./helper.js";
 import { Base } from "../lib/base.js";
-import { HelloJob } from "./support/jobs/hello-job.js";
+import { HelloJob } from "./jobs/hello-job.js";
 import { JobBuffer } from "./support/job-buffer.js";
 import type { AsyncAdapter } from "../lib/queue-adapters/async-adapter.js";
 

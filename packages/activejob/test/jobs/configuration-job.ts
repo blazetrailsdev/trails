@@ -1,6 +1,6 @@
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
-import { JobBuffer } from "../job-buffer.js";
+import { Base } from "../../lib/base.js";
+import { JobBuffer } from "../support/job-buffer.js";
 export class ConfigurationJob extends Base {
   static toString(): string {
     return "ConfigurationJob";

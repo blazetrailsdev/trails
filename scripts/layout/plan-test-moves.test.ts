@@ -107,6 +107,67 @@ describe("planTestMoves", () => {
       ],
     ]);
   });
+
+  it("resolves an aliased compare package against its own prefix", () => {
+    const plan = planTestMoves(
+      fixture({
+        pkg: "actionview",
+        files: ["rails-dom-testing/assertions/selector-assertions.test.ts"],
+        libImported: new Set(),
+        comparison: [
+          {
+            package: "actionview",
+            files: [
+              {
+                rubyFile: "selector_assertions_test.rb",
+                conventionTsFile: "rails-dom-testing/assertions/selector-assertions.test.ts",
+                tsFileExists: true,
+              },
+            ],
+          },
+          {
+            package: "rails-dom-testing",
+            files: [
+              {
+                rubyFile: "selector_assertions_test.rb",
+                conventionTsFile: "selector-assertions.test.ts",
+                tsFileExists: true,
+              },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(plan.moves).toEqual([
+      [
+        "src/rails-dom-testing/assertions/selector-assertions.test.ts",
+        "test/rails-dom-testing/assertions/selector-assertions.test.ts",
+      ],
+    ]);
+  });
+
+  it("keeps the gem's own test directories and helper.ts", () => {
+    const plan = planTestMoves(
+      fixture({
+        pkg: "activejob",
+        files: [
+          "test-helpers/jobs/hello-job.ts",
+          "test-helpers/adapters/inline.ts",
+          "test-helpers/helper.ts",
+          "test-helpers/other.ts",
+        ],
+        libImported: new Set(),
+        comparison: [],
+        railsTestDirs: new Set(["jobs", "adapters", "cases"]),
+      }),
+    );
+    expect(plan.moves).toEqual([
+      ["src/test-helpers/adapters/inline.ts", "test/adapters/inline.ts"],
+      ["src/test-helpers/helper.ts", "test/helper.ts"],
+      ["src/test-helpers/jobs/hello-job.ts", "test/jobs/hello-job.ts"],
+      ["src/test-helpers/other.ts", "test/support/other.ts"],
+    ]);
+  });
 });
 
 describe("planTestMoves assets", () => {

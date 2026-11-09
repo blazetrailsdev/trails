@@ -5,8 +5,8 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { block, constSet, constGet } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";
 import { EnqueueError } from "../lib/enqueuing.js";
-import "./support/helper.js";
-import { EnqueueErrorJob } from "./support/jobs/enqueue-error-job.js";
+import "./helper.js";
+import { EnqueueErrorJob } from "./jobs/enqueue-error-job.js";
 
 class FakeActiveRecord {
   calls: number;

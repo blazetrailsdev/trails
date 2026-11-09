@@ -8,9 +8,9 @@ import {
   StandardError,
   TopLevel,
 } from "@blazetrails/ruby-compat";
-import { DeserializationError } from "../../../lib/arguments.js";
-import { Base } from "../../../lib/base.js";
-import { JobBuffer } from "../job-buffer.js";
+import { DeserializationError } from "../../lib/arguments.js";
+import { Base } from "../../lib/base.js";
+import { JobBuffer } from "../support/job-buffer.js";
 
 class OtherError extends StandardError {}
 

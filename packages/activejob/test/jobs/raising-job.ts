@@ -1,6 +1,6 @@
 import { constantize } from "@blazetrails/activesupport";
 import { constSet, StandardError, TopLevel } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
+import { Base } from "../../lib/base.js";
 
 class MyError extends StandardError {}
 

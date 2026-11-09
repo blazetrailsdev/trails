@@ -1,7 +1,7 @@
 import { locale } from "@blazetrails/i18n";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
-import { JobBuffer } from "../job-buffer.js";
+import { Base } from "../../lib/base.js";
+import { JobBuffer } from "../support/job-buffer.js";
 
 export class TranslatedHelloJob extends Base {
   static toString(): string {

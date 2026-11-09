@@ -1,9 +1,9 @@
 import { getEnv } from "@blazetrails/activesupport";
 import { GlobalID } from "@blazetrails/globalid";
 import { include, LoadError, puts, setEnv, stdout } from "@blazetrails/ruby-compat";
-import { Base } from "../../lib/base.js";
-import { EnqueueAfterTransactionCommit } from "../../lib/enqueue-after-transaction-commit.js";
-import "./job-buffer.js";
+import { Base } from "../lib/base.js";
+import { EnqueueAfterTransactionCommit } from "../lib/enqueue-after-transaction-commit.js";
+import "./support/job-buffer.js";
 
 GlobalID.setApp("aj");
 

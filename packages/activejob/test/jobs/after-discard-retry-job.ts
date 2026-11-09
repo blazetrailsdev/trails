@@ -1,7 +1,7 @@
 import { constantize, ordinalize } from "@blazetrails/activesupport";
 import { block, constSet, StandardError, TopLevel } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
-import { JobBuffer } from "../job-buffer.js";
+import { Base } from "../../lib/base.js";
+import { JobBuffer } from "../support/job-buffer.js";
 
 class UnhandledError extends StandardError {}
 class DefaultsError extends StandardError {}

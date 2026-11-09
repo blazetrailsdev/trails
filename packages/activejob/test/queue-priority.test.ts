@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import "./support/helper.js";
-import { ConfigurationJob } from "./support/jobs/configuration-job.js";
-import { HelloJob } from "./support/jobs/hello-job.js";
+import "./helper.js";
+import { ConfigurationJob } from "./jobs/configuration-job.js";
+import { HelloJob } from "./jobs/hello-job.js";
 import { JobBuffer } from "./support/job-buffer.js";
 
 type ConfiguredJob = { performNow(): Promise<unknown>; performLater(): Promise<unknown> };

@@ -1,6 +1,6 @@
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { Base } from "../../../lib/base.js";
-import { EnqueueError } from "../../../lib/enqueuing.js";
+import { Base } from "../../lib/base.js";
+import { EnqueueError } from "../../lib/enqueuing.js";
 
 class EnqueueErrorAdapter {
   static shouldRaiseSequence: boolean[] = [];
