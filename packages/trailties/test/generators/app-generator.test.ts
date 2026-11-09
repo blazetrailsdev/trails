@@ -384,6 +384,28 @@ describe("AppGeneratorTest", () => {
     expect(content).toMatch(/The template \[.*\] could not be loaded/);
     expect(content).toMatch(/non\/existent\/path/);
   });
+
+  it("apply trails template class method runs bundle and after bundle callbacks", async () => {
+    await t.runGenerator();
+
+    const template = File.join(t.destinationRoot, "lib/template.mjs");
+    await File.writeAsync(
+      template,
+      'export default (g) => g.afterBundle(() => g.createFile("after_bundle_callback_ran"));\n',
+    );
+
+    const runInstall = vi
+      .spyOn(AppGenerator.prototype as unknown as { runInstall(): Promise<void> }, "runInstall")
+      .mockResolvedValue(undefined);
+    try {
+      await capture("stdout", () => AppGenerator.applyTrailsTemplate(template, t.destinationRoot));
+      expect(runInstall).toHaveBeenCalledOnce();
+    } finally {
+      runInstall.mockRestore();
+    }
+
+    await t.assertFile("after_bundle_callback_ran");
+  });
 });
 
 describe("AppGenerator", () => {
