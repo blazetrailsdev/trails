@@ -1388,6 +1388,35 @@ describe("Hash#fetch dispatch", () => {
     expect(() => fetch({}, "__proto__")).toThrow(KeyError);
   });
 
+  it("answers a plain object's stored value, default and block arms", () => {
+    expect(fetch({ a: 1 }, "a")).toBe(1);
+    expect(fetch({ a: null }, "a", 0)).toBe(null);
+    expect(fetch({}, "a", 0)).toBe(0);
+    expect(
+      fetch(
+        {},
+        "a",
+        block((k: string) => `${k}!`),
+      ),
+    ).toBe("a!");
+    expect(fetch({ a: undefined }, "a", 0)).toBe(0);
+    expect(() => fetch({ a: undefined }, "a")).toThrow(KeyError);
+  });
+
+  it("answers a Map's stored value, default and block arms", () => {
+    const map = new Map<unknown, unknown>([[1, "one"]]);
+    expect(fetch(map, 1, "x")).toBe("one");
+    expect(fetch(map, 2, "x")).toBe("x");
+    expect(
+      fetch(
+        map,
+        2,
+        block((k: unknown) => k),
+      ),
+    ).toBe(2);
+    expect(() => fetch(map, 2)).toThrow(KeyError);
+  });
+
   it("lets a block supersede a default, as rb_hash_fetch_m does", () => {
     const anyFetch = fetch as (...args: unknown[]) => unknown;
     expect(

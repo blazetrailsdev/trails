@@ -141,6 +141,7 @@ export function fetch<V>(
  * raising arm, and an explicitly-passed `undefined` is a default, exactly as
  * Ruby's `nil` is.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
+ * @perf 2x — PERMANENT
  */
 export function fetch(
   receiver:
@@ -151,50 +152,27 @@ export function fetch(
   arg?: unknown,
   ...more: unknown[]
 ): unknown {
-  if (more.length === 0) {
-    return arguments.length === 2 ? _fetchFast(receiver, key) : _fetchFast(receiver, key, arg);
-  }
-  const rest = [arg, ...more];
+  const given = arguments.length;
   const plain = Object.getPrototypeOf(receiver) === Object.prototype;
+  if (plain && more.length === 0) {
+    const value = (receiver as Record<string, unknown>)[key as string];
+    if (value !== undefined && Object.hasOwn(receiver, key as string)) return value;
+  }
   if (!plain) {
     const own = ownMethod(receiver, "fetch");
-    if (own) return own.call(receiver, key, ...rest);
+    if (own) {
+      if (given === 2) return own.call(receiver, key);
+      if (more.length === 0) return own.call(receiver, key, arg);
+      return own.call(receiver, key, arg, ...more);
+    }
   }
-  return _hashFetch(receiver as Record<string, unknown> | Map<unknown, unknown>, plain, key, rest);
-}
-
-/** @perf 2x — PERMANENT */
-function _fetchFast(receiver: object, key: unknown, arg?: unknown): unknown {
-  const argc = arguments.length;
-  if (Object.getPrototypeOf(receiver) === Object.prototype) {
-    const hash = receiver as Record<string, unknown>;
-    const value = hash[key as string];
-    if (value !== undefined && Object.hasOwn(hash, key as string)) return value;
-    if (argc === 2) return _hashFetch(hash, true, key, []);
-    return rbBlockGivenP(arg) ? arg(key as string) : arg;
-  }
-  const own = ownMethod(receiver, "fetch");
-  if (own) return argc === 2 ? own.call(receiver, key) : own.call(receiver, key, arg);
-  return _hashFetch(
-    receiver as Record<string, unknown> | Map<unknown, unknown>,
-    false,
-    key,
-    argc === 2 ? [] : [arg],
-  );
-}
-
-/** @perf 2x — PERMANENT */
-function _hashFetch(
-  hash: Record<string, unknown> | Map<unknown, unknown>,
-  plain: boolean,
-  key: unknown,
-  rest: unknown[],
-): unknown {
+  const rest = given === 2 ? [] : [arg, ...more];
   const blockGiven = rbBlockGivenP(rest[rest.length - 1]);
   const argc = 1 + rest.length - (blockGiven ? 1 : 0);
   if (argc > 2) {
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
   }
+  const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
   const isMap = !plain && hash instanceof Map;
   if (!(isMap ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
