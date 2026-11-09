@@ -1,4 +1,5 @@
 import * as Nokogiri from "@blazetrails/nokogiri";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HTML, HTML4, HTML5, type VendorMethods } from "./namespaces.js";
 import { safeListSanitize, stripAllTags, unwrapTagsAndStripAttributes } from "./engine.js";
 import { DEFAULT_ALLOWED_ATTRIBUTES, DEFAULT_ALLOWED_TAGS } from "./config.js";
@@ -70,22 +71,23 @@ export class HTML4SafeListSanitizer extends Sanitizer {
   ): string | null | undefined {
     if (isTrivialInput(html)) return html;
 
-    const tags = resolveAllowlist(
-      options.tags,
-      (this.constructor as typeof HTML4SafeListSanitizer).allowedTags,
-      "tags",
-    );
-    const attributes = resolveAllowlist(
-      options.attributes,
-      (this.constructor as typeof HTML4SafeListSanitizer).allowedAttributes,
-      "attributes",
-    );
-
     return safeListSanitize(html as string, {
-      allowedTags: tags,
-      allowedAttributes: attributes,
+      allowedTags: [...validateBang(this.allowedTags(options), "tags")],
+      allowedAttributes: [...validateBang(this.allowedAttributes(options), "attributes")],
       prune: this.prune,
     });
+  }
+
+  /** @internal */
+  private allowedTags(options: SanitizeOptions): Iterable<string> {
+    return options.tags ?? (this.constructor as typeof HTML4SafeListSanitizer).allowedTags;
+  }
+
+  /** @internal */
+  private allowedAttributes(options: SanitizeOptions): Iterable<string> {
+    return (
+      options.attributes ?? (this.constructor as typeof HTML4SafeListSanitizer).allowedAttributes
+    );
   }
 }
 
@@ -121,35 +123,30 @@ export class HTML5SafeListSanitizer extends Sanitizer {
   ): string | null | undefined {
     if (isTrivialInput(html)) return html;
 
-    const tags = resolveAllowlist(
-      options.tags,
-      (this.constructor as typeof HTML5SafeListSanitizer).allowedTags,
-      "tags",
-    );
-    const attributes = resolveAllowlist(
-      options.attributes,
-      (this.constructor as typeof HTML5SafeListSanitizer).allowedAttributes,
-      "attributes",
-    );
-
     return safeListSanitize(html as string, {
-      allowedTags: tags,
-      allowedAttributes: attributes,
+      allowedTags: [...validateBang(this.allowedTags(options), "tags")],
+      allowedAttributes: [...validateBang(this.allowedAttributes(options), "attributes")],
       prune: this.prune,
     });
   }
-}
 
-function resolveAllowlist(
-  override: Iterable<string> | undefined,
-  fallback: Set<string>,
-  label: "tags" | "attributes",
-): string[] {
-  if (override === undefined) return [...fallback];
-  if (typeof override === "string") {
-    throw new TypeError(
-      `SafeListSanitizer: \`${label}\` must be an iterable of strings, not a string`,
+  /** @internal */
+  private allowedTags(options: SanitizeOptions): Iterable<string> {
+    return options.tags ?? (this.constructor as typeof HTML5SafeListSanitizer).allowedTags;
+  }
+
+  /** @internal */
+  private allowedAttributes(options: SanitizeOptions): Iterable<string> {
+    return (
+      options.attributes ?? (this.constructor as typeof HTML5SafeListSanitizer).allowedAttributes
     );
   }
-  return [...override];
+}
+
+/** @noRailsEquivalent CONVERGEABLE html-sanitizer-port-scrubbers */
+function validateBang(variable: Iterable<string>, name: string): Iterable<string> {
+  if (typeof variable === "string" || typeof variable[Symbol.iterator] !== "function") {
+    throw new ArgumentError(`You should pass :${name} as an Enumerable`);
+  }
+  return variable;
 }

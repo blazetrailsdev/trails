@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HTML4SafeListSanitizer as SafeListSanitizer } from "../lib/sanitizer.js";
 import { DEFAULT_ALLOWED_ATTRIBUTES, DEFAULT_ALLOWED_TAGS } from "../lib/config.js";
 
@@ -125,11 +126,11 @@ describe("SafeListSanitizer", () => {
   });
 
   test("should_raise_argument_error_if_tags_is_not_enumerable", () => {
-    expect(() => sanitize("<a>some html</a>", { tags: "foo" })).toThrow(TypeError);
+    expect(() => sanitize("<a>some html</a>", { tags: "foo" })).toThrow(ArgumentError);
   });
 
   test("should_raise_argument_error_if_attributes_is_not_enumerable", () => {
-    expect(() => sanitize("<a>some html</a>", { attributes: "foo" })).toThrow(TypeError);
+    expect(() => sanitize("<a>some html</a>", { attributes: "foo" })).toThrow(ArgumentError);
   });
 
   test("should_strip_src_attribute_in_img_with_bad_protocols", () => {
