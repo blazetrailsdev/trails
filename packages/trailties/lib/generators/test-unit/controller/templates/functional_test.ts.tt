@@ -1,12 +1,15 @@
 import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { <%= this.isMountableEngine() ? "constGet, include, " : "" %>constSet, TopLevel } from "@blazetrails/ruby-compat";
 import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper.js";
 
 <% this.moduleNamespacing(() => { -%>
 export class <%= this.className().split("::").pop() %>ControllerTest extends IntegrationTest {
   static {
     constSet(TopLevel, "<%= this.className().split("::").pop() %>ControllerTest", this);
+<% if (this.isMountableEngine()) { -%>
+    include(this, (constGet(Object, "<%= this.namespace().name %>::Engine") as { routes(): { urlHelpers(): object } }).routes().urlHelpers());
+<% } -%>
   }
 }
 <% }) -%>

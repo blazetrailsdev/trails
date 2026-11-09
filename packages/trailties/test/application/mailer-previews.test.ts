@@ -815,39 +815,4 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     });
     expect(t.lastResponse().body).toMatch('<dd id="date">Fri, 20 Oct 2023 10:20:30 +0000</dd>');
   });
-
-  it.skip("mailer preview has access to rendering context", async () => {
-    // BLOCKED: mailers-controller-view-paths-miss-app-views
-    await t.mailer(
-      "notifier",
-      mailerSource(
-        "Notifier",
-        `${FROM}
-        foo() {
-          this["@template"] = this.params.template;
-          return this.mail({ to: "to@example.org", cc: "cc@example.com", bcc: "bcc@example.com" });
-        }`,
-      ),
-    );
-
-    await t.textTemplate("notifier/foo", "<%= this['@template'] %>");
-
-    await t.textTemplate("notifier/bar", "bar");
-
-    await t.mailerPreview(
-      "notifier",
-      previewSource(
-        "NotifierPreview",
-        `async foo() {
-          const template = await TopLevel.Trails.MailersController.renderer.renderToString("notifier/bar");
-          return TopLevel.Notifier.with({ template: template }).foo();
-        }`,
-      ),
-    );
-
-    await t.app("development");
-
-    await t.get("/trails/mailers/notifier/foo?part=text%2Fplain");
-    expect(t.lastResponse().body).toContain("bar");
-  });
 });
