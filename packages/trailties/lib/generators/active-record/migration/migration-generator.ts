@@ -14,24 +14,6 @@ export interface MigrationGeneratorOptions extends GeneratorOptions {
 }
 
 export class MigrationGenerator extends Base {
-  static {
-    this.argument("attributes", {
-      type: "array",
-      default: [],
-      banner: "field[:type][:index] field[:type][:index]",
-    });
-
-    this.classOption("timestamps", { type: "boolean" });
-    this.classOption("primaryKeyType", { type: "string", desc: "The type for primary key" });
-    this.classOption("database", {
-      type: "string",
-      aliases: ["--db"],
-      desc: "The database for your migration. By default, the current environment's primary database is used.",
-    });
-
-    this.methodAdded("createMigrationFile");
-  }
-
   declare ["constructor"]: typeof MigrationGenerator;
   declare options: MigrationGeneratorOptions;
   private _migrationTemplate = "migration.ts";
@@ -99,3 +81,22 @@ export class MigrationGenerator extends Base {
 Object.defineProperty(MigrationGenerator, "name", {
   value: "ActiveRecord::Generators::MigrationGenerator",
 });
+
+MigrationGenerator.argument("attributes", {
+  type: "array",
+  default: [],
+  banner: "field[:type][:index] field[:type][:index]",
+});
+
+MigrationGenerator.classOption("timestamps", { type: "boolean" });
+MigrationGenerator.classOption("primaryKeyType", {
+  type: "string",
+  desc: "The type for primary key",
+});
+MigrationGenerator.classOption("database", {
+  type: "string",
+  aliases: ["--db"],
+  desc: "The database for your migration. By default, the current environment's primary database is used.",
+});
+
+MigrationGenerator.methodAdded("createMigrationFile");
