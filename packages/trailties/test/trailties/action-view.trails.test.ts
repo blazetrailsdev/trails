@@ -1,0 +1,267 @@
+import { describe, it, expect, afterAll, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import {
+  Deprecators,
+  include,
+  FileUpdateChecker,
+  Logger,
+  Reloader,
+  runLoadHooks,
+  resetLoadHooks,
+} from "@blazetrails/activesupport";
+import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import {
+  Base,
+  DetailsKey,
+  PathRegistry,
+  Resolver,
+  ViewReloader,
+  RoutingUrlFor,
+  type RoutingUrlForHost,
+  type UrlHelperHost,
+} from "@blazetrails/actionview";
+import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
+import { Trails } from "../../lib/trails.js";
+import {
+  applyStylesheetMediaDefault,
+  computeAssetPath,
+  imageLoading,
+  imageTag,
+  publicComputeAssetPath,
+  setApplyStylesheetMediaDefault,
+  setImageLoading,
+  stylesheetLinkTag,
+  type AssetTagHelperHost,
+} from "@blazetrails/actionview";
+import { Trailtie, type ActionViewConfig } from "../../lib/trailties/action-view.js";
+
+const host = {
+  computeAssetPath,
+  publicComputeAssetPath,
+  request: { baseUrl: "http://www.example.com", protocol: "http://" },
+} as unknown as AssetTagHelperHost;
+
+describe("ActionView::Railtie view reloader (trails)", () => {
+  afterEach(() => {
+    PathRegistry.reset();
+    Trailtie.config.set("actionView", {
+      applyStylesheetMediaDefault: true,
+      annotateRenderedViewWithFilenames: false,
+    } as ActionViewConfig);
+  });
+
+  function bootApp(
+    reloadingEnabled: boolean,
+    cacheTemplateLoading?: boolean,
+    fileWatcher: unknown = class {},
+  ) {
+    if (cacheTemplateLoading !== undefined) {
+      (Trailtie.config.get("actionView") as ActionViewConfig).cacheTemplateLoading =
+        cacheTemplateLoading;
+    }
+    const app = {
+      config: Object.assign(Object.create(Trailtie.config), {
+        isReloadingEnabled: () => reloadingEnabled,
+        fileWatcher,
+      }),
+      reloaders: [] as unknown[],
+      reloader: class extends Reloader {},
+    };
+    runLoadHooks("after_initialize", app);
+    return app;
+  }
+
+  it("registers a ViewReloader when reloading is enabled", () => {
+    const app = bootApp(true);
+    expect(app.reloaders).toHaveLength(1);
+    expect(app.reloaders[0]).toBeInstanceOf(ViewReloader);
+    expect(PathRegistry.fileSystemResolverHooks).toHaveLength(1);
+  });
+
+  it("registers nothing for a production-shaped config", () => {
+    const app = bootApp(false);
+    expect(app.reloaders).toEqual([]);
+    expect(PathRegistry.fileSystemResolverHooks).toHaveLength(0);
+  });
+
+  it("cache_template_loading overrides reloading_enabled?", () => {
+    expect(bootApp(true, true).reloaders).toEqual([]);
+    expect(bootApp(false, false).reloaders).toHaveLength(1);
+  });
+
+  it("an awaited reloader run clears the digest caches after a watched view is touched", async () => {
+    const viewsDir = fs.mkdtempSync(path.join(os.tmpdir(), "view_reloader-"));
+    try {
+      const view = path.join(viewsDir, "index.html.tse");
+      const touch = (secondsAgo: number) => {
+        fs.writeFileSync(view, "x");
+        const when = new Date(Date.now() - secondsAgo * 1000);
+        fs.utimesSync(view, when, when);
+      };
+      touch(10);
+      PathRegistry.castFileSystemResolvers([viewsDir]);
+      const app = bootApp(true, undefined, FileUpdateChecker);
+      const viewReloader = app.reloaders[0] as ViewReloader;
+      app.reloader.check = () => viewReloader.isUpdated();
+      expect(viewReloader.isUpdated()).toBe(false);
+
+      touch(1);
+      DetailsKey.digestCache({ formats: ["html"] }).set("template", "digest");
+      const instance = await app.reloader.runBang();
+      expect(DetailsKey.digestCaches()).toEqual([]);
+      await instance.completeBang();
+    } finally {
+      DetailsKey.clear();
+      fs.rmSync(viewsDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("ActionView::Railtie asset tag wiring (trails)", () => {
+  afterAll(() => {
+    resetLoadHooks();
+  });
+
+  afterEach(() => {
+    setApplyStylesheetMediaDefault(null);
+    setImageLoading(null);
+    Trailtie.config.set("actionView", {
+      applyStylesheetMediaDefault: true,
+      annotateRenderedViewWithFilenames: false,
+    } as ActionViewConfig);
+  });
+
+  it("after_initialize applies apply_stylesheet_media_default so stylesheet_link_tag emits media=screen", () => {
+    const app = {
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      reloaders: [],
+    };
+    runLoadHooks("after_initialize", app);
+
+    expect(applyStylesheetMediaDefault).toBe(true);
+    expect(String(stylesheetLinkTag.call(host, "style"))).toContain('media="screen"');
+  });
+
+  it("after_initialize applies config.action_view.image_loading so image_tag emits it", () => {
+    Trailtie.config.set("actionView", {
+      ...(Trailtie.config.get("actionView") as ActionViewConfig),
+      imageLoading: "lazy",
+    });
+    const app = { config: Trailtie.config };
+    runLoadHooks("after_initialize", app);
+
+    expect(imageLoading).toBe("lazy");
+    expect("imageLoading" in (Trailtie.config.get("actionView") as ActionViewConfig)).toBe(false);
+    expect(String(imageTag.call(host, "icon.png"))).toBe(
+      '<img src="/images/icon.png" loading="lazy" />',
+    );
+  });
+});
+
+describe("action_view.setup_action_pack", () => {
+  afterEach(() => {
+    resetLoadHooks();
+  });
+
+  it("includes ActionDispatch::Routing::UrlFor into ActionView::RoutingUrlFor", async () => {
+    await runTrailtieInitializers(Trailtie, {
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      deprecators: new Deprecators(),
+    });
+    runLoadHooks("action_controller", ActionController.Base);
+
+    class View {}
+    include(View, RoutingUrlFor);
+    const proto = View.prototype as unknown as Record<string, unknown>;
+    for (const name of ["routeFor", "fullUrlFor", "polymorphicUrl", "polymorphicPath"]) {
+      expect(typeof proto[name], name).toBe("function");
+    }
+  });
+
+  it("action_view.logger seeds Base.logger from Trails.logger only when unset", async () => {
+    const previous = Base.logger;
+    const logger = new Logger(null);
+    const prevTrailsLogger = Trails.logger;
+    Trails.logger = logger;
+    try {
+      Base.logger = null;
+      await runTrailtieInitializers(Trailtie, {
+        config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+        deprecators: new Deprecators(),
+      });
+      runLoadHooks("action_view", Base);
+      expect(Base.logger).toBe(logger);
+
+      const own = new Logger(null);
+      Base.logger = own;
+      runLoadHooks("action_view", Base);
+      expect(Base.logger).toBe(own);
+    } finally {
+      Base.logger = previous;
+      Trails.logger = prevTrailsLogger;
+    }
+  });
+
+  it("leaves RoutingUrlFor's own overrides on top of the included module", async () => {
+    await runTrailtieInitializers(Trailtie, {
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      deprecators: new Deprecators(),
+    });
+    runLoadHooks("action_controller", ActionController.Base);
+
+    class View {}
+    include(View, RoutingUrlFor);
+    const view = Object.create(View.prototype) as RoutingUrlFor;
+    expect(view.urlFor("http://www.example.com")).toBe("http://www.example.com");
+  });
+
+  it("url_for with a Hash from a view generates a path, not a full URL, by default", async () => {
+    await runTrailtieInitializers(Trailtie, {
+      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      deprecators: new Deprecators(),
+    });
+    runLoadHooks("action_controller", ActionController.Base);
+
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/:controller/:action");
+    });
+    class View {}
+    include(View, RoutingUrlFor);
+    const view = Object.assign(Object.create(View.prototype) as RoutingUrlFor, {
+      _routes: routes,
+      controller: { urlOptions: () => ({ host: "example.com" }) },
+    }) as unknown as RoutingUrlFor & RoutingUrlForHost & UrlHelperHost;
+
+    expect(view.urlFor({ controller: "foo", action: "other" })).toBe("/foo/other");
+    expect(view.urlFor({ controller: "foo", action: "other", onlyPath: false })).toBe(
+      "http://example.com/foo/other",
+    );
+  });
+});
+
+describe("action_view.caching", () => {
+  afterEach(() => {
+    resetLoadHooks();
+    Resolver.caching = true;
+    Trailtie.config.set("actionView", {
+      applyStylesheetMediaDefault: true,
+      annotateRenderedViewWithFilenames: false,
+    } as ActionViewConfig);
+  });
+
+  it("leaves Resolver.caching alone when cache_template_loading is set", async () => {
+    const actionView = Trailtie.config.get("actionView") as ActionViewConfig;
+    actionView.cacheTemplateLoading = false;
+    const config = Object.assign(Object.create(Trailtie.config), {
+      isReloadingEnabled: () => false,
+    });
+    Resolver.caching = false;
+    await runTrailtieInitializers(Trailtie, { config, deprecators: new Deprecators() });
+    runLoadHooks("action_view", Base);
+
+    expect(Resolver.isCaching()).toBe(false);
+  });
+});

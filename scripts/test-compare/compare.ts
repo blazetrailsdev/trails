@@ -138,7 +138,7 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  * source root, as a convention path is.
  *
  * A gem's `railtie_test.rb` boots a `Rails::Application`, and trails ports each
- * gem's railtie in trailties (`packages/trailties/src/trailties/<gem>.ts`,
+ * gem's railtie in trailties (`packages/trailties/lib/trailties/<gem>.ts`,
  * with its test beside it) because the gem's own package cannot depend on
  * trailties. Without a row the file can only score against a convention path
  * in a package that cannot host it.
@@ -1761,7 +1761,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   actionmailer: "packages/actionmailer/test/",
   actionmailbox: "packages/actionmailbox/src/",
   activestorage: "packages/activestorage/test/",
-  trailties: "packages/trailties/src/",
+  trailties: "packages/trailties/test/",
   globalid: "packages/globalid/test/",
   "did-you-mean": "packages/did-you-mean/test/",
   i18n: "packages/i18n/test/",

@@ -354,7 +354,7 @@ export default defineConfig(
   // Per-package exemptions noted inline.
   {
     files: [
-      "packages/trailties/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
@@ -367,7 +367,7 @@ export default defineConfig(
       // trailties: app-generator.ts contains template strings emitting
       // user-app code (which legitimately uses process.* at runtime in
       // the user's app).
-      "packages/trailties/src/generators/trails/app/app-generator.ts",
+      "packages/trailties/lib/generators/trails/app/app-generator.ts",
     ],
     rules: {
       "blazetrails/no-process-bypass": "error",
@@ -384,7 +384,7 @@ export default defineConfig(
       "packages/rack/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
-      "packages/trailties/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
       "packages/website/src/**/*.ts",
     ],
@@ -451,7 +451,7 @@ export default defineConfig(
       "packages/i18n/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
-      "packages/trailties/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -468,7 +468,7 @@ export default defineConfig(
   //    in eslint/rails-private-jsdoc.config.mjs.
   {
     files: [
-      "packages/trailties/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
@@ -532,7 +532,7 @@ export default defineConfig(
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
       "packages/rack/lib/**/*.ts",
-      "packages/trailties/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
       "packages/activejob/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
@@ -861,7 +861,7 @@ export default defineConfig(
   },
 
   {
-    files: ["packages/trailties/src/**/*.ts"],
+    files: ["packages/trailties/lib/**/*.ts"],
     rules: {
       "blazetrails/thor-command-registration": [
         "error",
@@ -1155,7 +1155,7 @@ export default defineConfig(
   {
     files: [
       "packages/actionpack/{lib,test}/**/*.ts",
-      "packages/trailties/src/**/*.ts",
+      "packages/trailties/{lib,test}/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
     ],
     rules: {

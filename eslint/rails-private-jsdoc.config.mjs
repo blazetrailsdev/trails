@@ -54,7 +54,7 @@ export default [
       "packages/i18n/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
-      "packages/trailties/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
@@ -75,7 +75,7 @@ export default [
   // block in eslint.config.mjs.
   {
     files: [
-      "packages/trailties/src/**/*.ts",
+      "packages/trailties/lib/**/*.ts",
       "packages/thor/{lib,test}/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
       "packages/activesupport/lib/**/*.ts",

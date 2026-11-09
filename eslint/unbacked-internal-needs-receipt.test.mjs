@@ -119,7 +119,7 @@ tester.run("unbacked-internal-needs-receipt", rule, {
     },
     // Same, in a file the manifest does not cover at all.
     {
-      filename: path.join(REPO_ROOT, "packages/trailties/src/engine.ts"),
+      filename: path.join(REPO_ROOT, "packages/trailties/lib/engine.ts"),
       code: `/** @internal */\nexport function seam() {}\n`,
       errors: [{ messageId: "unbackedInternal" }],
     },
