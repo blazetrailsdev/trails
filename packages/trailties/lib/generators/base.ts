@@ -113,7 +113,10 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   /** @internal */
   _indentation: number;
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   _gemGroups: string[];
 
   /**

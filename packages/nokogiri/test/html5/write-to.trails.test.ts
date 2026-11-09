@@ -29,4 +29,15 @@ describe("Nokogiri::HTML5::Node#write_to", () => {
     (doc.css("p").first() as Node).writeTo(io, { saveWith: SaveOptions.AS_XML });
     expect(io.string()).toBe('<p title="a &quot;b&quot; &amp; &lt;c>">x</p>');
   });
+
+  it("writes the XML declaration for a document unless NO_DECLARATION is set", () => {
+    const doc = new Node(Document.parse("<p>x</p>")._node as never);
+    const io = new StringIO();
+    doc.writeTo(io, { saveWith: SaveOptions.AS_XML, encoding: "UTF-8" });
+    expect(io.string()).toMatch(/^<\?xml version="1.0" encoding="UTF-8"\?>\n/);
+
+    const bare = new StringIO();
+    doc.writeTo(bare, { saveWith: SaveOptions.AS_XML | SaveOptions.NO_DECLARATION });
+    expect(bare.string()).not.toMatch(/<\?xml/);
+  });
 });

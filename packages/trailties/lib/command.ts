@@ -170,7 +170,8 @@ async function invokeRake(
 
 Trails.Command = { invoke };
 
-const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
+/** @internal */
+export const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
 
 let _commandType: string | undefined;
 let _lookupPaths: string[] | undefined;

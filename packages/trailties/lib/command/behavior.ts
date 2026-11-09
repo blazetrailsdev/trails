@@ -9,9 +9,8 @@ import {
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { Basic } from "@blazetrails/thor/shell/basic";
 import type { Base } from "./base.js";
-import { commandType, fileLookupPaths, lookupPaths } from "../command.js";
+import { EXTENSION, commandType, fileLookupPaths, lookupPaths } from "../command.js";
 
-const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
 const FRAMEWORK_LIB = File.expandPath(decodeURIComponent(new URL("..", import.meta.url).pathname));
 if (!LOAD_PATH.includes(FRAMEWORK_LIB)) LOAD_PATH.push(FRAMEWORK_LIB);
 
