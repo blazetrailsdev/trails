@@ -38,10 +38,10 @@ export interface Model extends API, Access, Naming {
   initializeDup(other: unknown): void;
 }
 
-/** @perf 10x — PERMANENT */
+/** @perf 100ns — PERMANENT */
 const _includesAttributesCache = new WeakMap<object, { serial: number; value: boolean }>();
 
-/** @perf 10x — PERMANENT */
+/** @perf 100ns — PERMANENT */
 function _includesAttributes(klass: { prototype: object }): boolean {
   const hit = _includesAttributesCache.get(klass);
   if (hit && hit.serial === methodCacheSerial) return hit.value;

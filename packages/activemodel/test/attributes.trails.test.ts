@@ -357,3 +357,17 @@ describe("Attributes included after a class was first instantiated", () => {
     expect(late._readAttribute("name")).toBe("x");
   });
 });
+
+describe("Attributes included by an ancestor after a subclass was first instantiated", () => {
+  it("builds an attribute set once the parent includes Attributes", () => {
+    class LateParent extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+    }
+    class LateChild extends LateParent {}
+    expect((new LateChild() as unknown as { _attributes?: unknown })._attributes).toBeUndefined();
+    include(LateParent, Attributes);
+    LateParent.attribute("name", "string");
+    const late = new LateChild({ name: "x" }) as unknown as Attributes;
+    expect(late._readAttribute("name")).toBe("x");
+  });
+});
