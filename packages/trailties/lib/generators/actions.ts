@@ -39,6 +39,7 @@ export interface GemOptions {
 /**
  * @missingRailsCall quote — PERMANENT
  * @inventedArm writeAsync — PERMANENT
+ * @inventedArm every — PERMANENT
  */
 export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): Promise<void> {
   const options = (extractOptionsBang(args) ?? {}) as GemOptions;

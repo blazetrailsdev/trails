@@ -28,7 +28,6 @@ import { Trails } from "../../lib/trails.js";
 import "../../lib/trailties/active-record.js";
 import "../../lib/test-unit/trailtie.js";
 import { Base } from "../../lib/generators/base.js";
-import { quote } from "../../lib/generators/actions.js";
 import * as Assertions from "../../lib/generators/testing/assertions.js";
 
 class TestGenerator extends Base {}
@@ -383,11 +382,6 @@ describe("ActionsTest", () => {
     });
     const pkg = () =>
       JSON.parse(read("package.json")) as Record<string, Record<string, string> | undefined>;
-
-    it("gem with non string options", async () => {
-      expect(quote([">= 1", "< 2"])).toBe('[">= 1", "< 2"]');
-      expect(quote({ require: false })).toBe("require: false");
-    });
 
     it("add source adds source to gemfile", async () => {
       await capture("stdout", () => makeGen().addSource("http://gems.github.com"));

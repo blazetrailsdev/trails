@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { indentation, withIndentation } from "../../lib/generators/actions.js";
+import { indentation, quote, withIndentation } from "../../lib/generators/actions.js";
 
 describe("Actions indentation", () => {
   it("withIndentation nests indentation and restores it after the block", async () => {
@@ -33,5 +33,12 @@ describe("Actions indentation", () => {
       yielded = g;
     });
     expect(yielded).toBe(host);
+  });
+});
+
+describe("Rails::Generators::Actions#quote", () => {
+  it("inspects an Array and renders a Hash as key: value pairs", () => {
+    expect(quote([">= 1", "< 2"])).toBe('[">= 1", "< 2"]');
+    expect(quote({ require: false })).toBe("require: false");
   });
 });

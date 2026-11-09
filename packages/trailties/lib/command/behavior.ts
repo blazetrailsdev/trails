@@ -63,7 +63,10 @@ export async function lookup(namespaces: string[]): Promise<void> {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 export async function lookupBang(): Promise<void> {
   for (const base of LOAD_PATH) {
     for (const path of await Dir.globAsync(File.join(base, ...fileLookupPaths()))) {
