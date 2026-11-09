@@ -4,6 +4,7 @@ import { TopLevel } from "../object.js";
 import { Timeout } from "../timeout.js";
 import type { HTTP } from "./http.js";
 import type { HTTPResponse } from "./http/response.js";
+import type * as Responses from "./http/responses.js";
 import type { Post } from "./http/requests.js";
 
 /**
@@ -52,11 +53,5 @@ export const Net = { name: "Net", OpenTimeout, ReadTimeout } as {
   HTTP: typeof HTTP & { Post: typeof Post };
   /** @noRailsEquivalent PERMANENT */
   HTTPResponse: typeof HTTPResponse;
-  /** @noRailsEquivalent PERMANENT */
-  HTTPUnknownResponse: typeof HTTPResponse;
-  /** @noRailsEquivalent PERMANENT */
-  HTTPSuccess: typeof HTTPResponse;
-  /** @noRailsEquivalent PERMANENT */
-  HTTPUnauthorized: typeof HTTPResponse;
-};
+} & typeof Responses;
 constSet(TopLevel, "Net", Net);

@@ -378,6 +378,54 @@ class ECONNREFUSED extends SystemCallError {
 }
 
 /**
+ * `Errno::ECONNABORTED`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
+ * as {@link ENOTTY} is: the host's own error carrying `code: "ECONNABORTED"` is this
+ * class to `rescue Errno::ECONNABORTED`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ECONNABORTED`.
+ */
+class ECONNABORTED extends SystemCallError {
+  static readonly Errno = 103;
+  readonly code = "ECONNABORTED";
+
+  constructor(mesg?: string) {
+    super(
+      mesg == null
+        ? "Software caused connection abort"
+        : `Software caused connection abort - ${mesg}`,
+    );
+    this.name = "Errno::ECONNABORTED";
+    this.errno = ECONNABORTED.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ECONNABORTED";
+  }
+}
+
+/**
+ * `Errno::ETIMEDOUT`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
+ * as {@link ENOTTY} is: the host's own error carrying `code: "ETIMEDOUT"` is this
+ * class to `rescue Errno::ETIMEDOUT`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ETIMEDOUT`.
+ */
+class ETIMEDOUT extends SystemCallError {
+  static readonly Errno = 110;
+  readonly code = "ETIMEDOUT";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Connection timed out" : `Connection timed out - ${mesg}`);
+    this.name = "Errno::ETIMEDOUT";
+    this.errno = ETIMEDOUT.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ETIMEDOUT";
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
@@ -387,6 +435,7 @@ class ECONNREFUSED extends SystemCallError {
 export const Errno = {
   EACCES,
   EAGAIN,
+  ECONNABORTED,
   ECONNREFUSED,
   ECONNRESET,
   EEXIST,
@@ -401,4 +450,5 @@ export const Errno = {
   EPIPE,
   ESPIPE,
   ESRCH,
+  ETIMEDOUT,
 };
