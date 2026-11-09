@@ -11,4 +11,10 @@ defineConstants([
   [() => m3.Tokenizer, "Crass::Tokenizer"],
   [() => m2.TokenScanner, "Crass::TokenScanner"],
   [() => m4.Sanitizer, "Trails::HTML::Sanitizer"],
+  [() => m4.HTML4FullSanitizer, "Trails::HTML4::FullSanitizer"],
+  [() => m4.HTML4LinkSanitizer, "Trails::HTML4::LinkSanitizer"],
+  [() => m4.HTML4SafeListSanitizer, "Trails::HTML4::SafeListSanitizer"],
+  [() => m4.HTML5FullSanitizer, "Trails::HTML5::FullSanitizer"],
+  [() => m4.HTML5LinkSanitizer, "Trails::HTML5::LinkSanitizer"],
+  [() => m4.HTML5SafeListSanitizer, "Trails::HTML5::SafeListSanitizer"],
 ]);
