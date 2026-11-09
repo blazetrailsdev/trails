@@ -22,7 +22,6 @@ import {
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
 import * as Actions from "./actions.js";
-import * as TrailsActions from "./trails-actions.js";
 import * as ThorActions from "@blazetrails/thor/actions";
 import type { BaseConfig } from "@blazetrails/thor/base";
 import { Error as ThorError } from "@blazetrails/thor/error";
@@ -114,6 +113,11 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   /** @internal */
   _indentation: number;
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  _gemGroups: string[];
 
   /**
    * @inlinedFrom Rails::Generators::Actions#initialize rails/v8.0.2/railties/lib/rails/generators/actions.rb:10-13
@@ -122,6 +126,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
   constructor(args: unknown[] = [], options: unknown = {}, config: GeneratorConfig = {}) {
     super(args, options, config);
     this._indentation = 0;
+    this._gemGroups = [];
   }
 
   static {
@@ -250,6 +255,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
   declare apply: OmitThisParameter<typeof ThorActions.apply>;
   declare inRoot: <T>(block: () => T | Promise<T>) => Promise<T>;
   declare injectIntoFile: (destination: string, ...args: unknown[]) => unknown;
+  declare prependFile: (path: string, ...args: unknown[]) => unknown;
   declare directory: OmitThisParameter<typeof ThorActions.Actions.directory>;
   declare emptyDirectory: OmitThisParameter<typeof ThorActions.Actions.emptyDirectory>;
   declare gsubFile: OmitThisParameter<typeof ThorActions.Actions.gsubFile>;
@@ -260,6 +266,9 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   environment = Actions.environment;
   application = Actions.application;
+  gem = Actions.gem;
+  gemGroup = Actions.gemGroup;
+  addSource = Actions.addSource;
   git = Actions.git;
   vendor = Actions.vendor;
   lib = Actions.lib;
@@ -272,8 +281,6 @@ export abstract class Base extends (Group as unknown as (abstract new (
   readme = Actions.readme;
   log = Actions.log;
   executeCommand = Actions.executeCommand;
-
-  pkg = TrailsActions.pkg;
 
   static hookFor(...names: Array<string | HookForOptions | HookBlock>): void {
     const block = typeof names.at(-1) === "function" ? (names.pop() as HookBlock) : undefined;

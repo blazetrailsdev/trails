@@ -114,6 +114,10 @@
       "types": "./dist/cache/*.d.ts",
       "default": "./dist/cache/*.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

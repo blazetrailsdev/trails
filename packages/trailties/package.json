@@ -36,6 +36,10 @@
       "types": "./dist/app-path.d.ts",
       "default": "./dist/app-path.js"
     },
+    "./code-statistics": {
+      "types": "./dist/code-statistics.d.ts",
+      "default": "./dist/code-statistics.js"
+    },
     "./commands": {
       "types": "./dist/commands.d.ts",
       "default": "./dist/commands.js"

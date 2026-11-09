@@ -53,6 +53,10 @@
     "./support/*": null,
     "./cases/*": null,
     "./constants.query-assertions.generated": null,
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

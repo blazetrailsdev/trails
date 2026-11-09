@@ -5,6 +5,7 @@ import {
   Gem,
   rbFRequire,
   regexpEscape,
+  rbInspect,
   Shellwords,
 } from "@blazetrails/ruby-compat";
 import { chomp, extractOptionsBang, indent, stripHeredoc } from "@blazetrails/activesupport";
@@ -24,6 +25,105 @@ export interface ActionsHost {
   gsubFile: OmitThisParameter<typeof gsubFile>;
   findInSourcePaths(file: string): Promise<string>;
   _indentation: number;
+  _gemGroups: string[];
+  prependFile(path: string, ...args: unknown[]): unknown;
+}
+
+export interface GemOptions {
+  version?: string | string[];
+  comment?: string;
+  group?: string | string[];
+  [key: string]: unknown;
+}
+
+/**
+ * @missingRailsCall quote — PERMANENT
+ * @inventedArm writeAsync — PERMANENT
+ * @inventedArm every — PERMANENT
+ */
+export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): Promise<void> {
+  const options = (extractOptionsBang(args) ?? {}) as GemOptions;
+  const [name, ...versions] = args as string[];
+
+  let message = name;
+
+  delete options.comment;
+
+  let _versions: string[] = [];
+  const given = versions.length > 0 ? versions : options.version;
+  delete options.version;
+  if (given != null) {
+    _versions = [given].flat();
+    message += ` (${_versions.join(", ")})`;
+  }
+  if (options.git) message = String(options.git);
+
+  log.call(this, "gemfile", message);
+
+  const groups = [...this._gemGroups, ...[options.group ?? []].flat()];
+
+  await this.inRoot(async () => {
+    const json = JSON.parse(await File.readAsync("package.json")) as Record<
+      string,
+      Record<string, string> | undefined
+    >;
+    const key =
+      groups.length > 0 && groups.every((g) => g === "development" || g === "test")
+        ? "devDependencies"
+        : "dependencies";
+    json[key] = {
+      ...json[key],
+      [name]: options.git ? String(options.git) : _versions.join(" ") || "*",
+    };
+    await File.writeAsync("package.json", `${JSON.stringify(json, null, 2)}\n`);
+  });
+}
+
+export async function gemGroup(
+  this: ActionsHost,
+  ...names: (string | Record<string, unknown> | ((this: ActionsHost) => unknown))[]
+): Promise<void> {
+  const block = names.pop() as (this: ActionsHost) => unknown;
+  const options = (extractOptionsBang(names) ?? {}) as Record<string, unknown>;
+  const str = (names as string[]).map((n) => `:${n}`);
+  if (Object.keys(options).length > 0) str.push(quote(options));
+  log.call(this, "gemfile", `group ${str.join(", ")}`);
+
+  await this.inRoot(async () => {
+    this._gemGroups.push(...(names as string[]));
+    try {
+      await withIndentation.call(
+        this,
+        block as (this: Pick<ActionsHost, "_indentation">) => unknown,
+      );
+    } finally {
+      this._gemGroups.length -= names.length;
+    }
+  });
+}
+
+/**
+ * @missingRailsCall quote — PERMANENT
+ * @inventedArm prependFile — PERMANENT
+ */
+export async function addSource(
+  this: ActionsHost,
+  source: string,
+  options: Record<string, unknown> = {},
+  block?: (this: ActionsHost) => unknown,
+): Promise<void> {
+  log.call(this, "source", source);
+
+  await this.inRoot(async () => {
+    if (block) {
+      await withIndentation.call(
+        this,
+        block as (this: Pick<ActionsHost, "_indentation">) => unknown,
+      );
+    } else {
+      await this.prependFile(".npmrc", `registry=${source}\n`, { verbose: false });
+    }
+  });
 }
 
 export interface EnvironmentOptions {
@@ -308,6 +408,17 @@ export function optimizeIndentation(value: unknown, amount: number = 0): string 
 }
 
 export const rebaseIndentation = optimizeIndentation;
+
+export function quote(value: unknown): string {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+    return Object.entries(value)
+      .map(([k, v]) => `${k}: ${quote(v)}`)
+      .join(", ");
+  }
+  if (typeof value !== "string") return rbInspect(value);
+
+  return `"${value.replaceAll("'", '"')}"`;
+}
 
 export function indentation(this: Pick<ActionsHost, "_indentation">): string {
   return "  ".repeat(this._indentation);

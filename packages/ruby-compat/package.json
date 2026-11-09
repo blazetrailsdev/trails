@@ -38,6 +38,10 @@
       "types": "./dist/yaml.d.ts",
       "default": "./dist/yaml.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

@@ -14,6 +14,10 @@
       "types": "./types/tse-modules.d.ts",
       "default": "./types/tse-modules.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

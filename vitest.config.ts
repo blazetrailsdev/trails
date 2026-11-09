@@ -361,6 +361,10 @@ const alias = {
   "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/lib") + "/",
   "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/lib/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/lib/index.ts"),
+  "@blazetrails/trailties/code-statistics": path.resolve(
+    __dirname,
+    "packages/trailties/lib/code-statistics.ts",
+  ),
   "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/lib/all.ts"),
   "@blazetrails/trailties/trailties/":
     path.resolve(__dirname, "packages/trailties/lib/trailties") + "/",

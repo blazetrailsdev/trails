@@ -510,7 +510,7 @@ ${requireStatements.join("\n")}`;
 
   /**
    * @internal
-   * @missingRailsCall rails_version_specifier — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json
+   * @missingRailsCall rails_version_specifier — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json
    */
   trailsGemfileEntry(name: string, packageManager: string): string {
     const subdirectory =

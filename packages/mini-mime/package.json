@@ -10,6 +10,10 @@
       "types": "./dist/mini-mime.d.ts",
       "default": "./dist/mini-mime.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

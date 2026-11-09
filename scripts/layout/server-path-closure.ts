@@ -53,7 +53,7 @@ const SERVER_EXPORTS = new Set(["./network/delivery-methods/test-mailer", "./tes
 
 /** True for an export key naming a testing entry. */
 export function isTestingExport(key: string): boolean {
-  if (SERVER_EXPORTS.has(key)) return false;
+  if (SERVER_EXPORTS.has(key.replace(/\.js$/, ""))) return false;
   return key.split(/[/.*-]/).some((token) => ["test", "testing", "tests"].includes(token));
 }
 

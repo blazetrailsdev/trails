@@ -13,6 +13,10 @@
       "types": "./dist/rake.d.ts",
       "default": "./dist/rake.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

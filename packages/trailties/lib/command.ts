@@ -169,3 +169,25 @@ async function invokeRake(
 }
 
 Trails.Command = { invoke };
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
+
+let _commandType: string | undefined;
+let _lookupPaths: string[] | undefined;
+let _fileLookupPaths: string[] | undefined;
+
+export function commandType(): string {
+  return (_commandType ??= "command");
+}
+
+export function lookupPaths(): string[] {
+  return (_lookupPaths ??= ["trails/commands", "commands"]);
+}
+
+export function fileLookupPaths(): string[] {
+  return (_fileLookupPaths ??= [`{${lookupPaths().join(",")}}`, "**", `*${EXTENSION}`]);
+}
