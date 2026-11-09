@@ -55,6 +55,13 @@ describe("ActionCable::Server::Configuration", () => {
     expect(config.pubsubAdapter()).toBe(Inline);
   });
 
+  it("resolves the test adapter by its require path alone", async () => {
+    const config = new Configuration();
+    config.cable = { adapter: "test" };
+    await config.loadPubsubAdapter();
+    expect((config.pubsubAdapter() as { name: string }).name).toBe("Test");
+  });
+
   it("fixes up PostgreSQL", async () => {
     const config = new Configuration();
     config.cable = { adapter: "postgresql" };

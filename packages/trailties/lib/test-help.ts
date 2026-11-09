@@ -1,7 +1,6 @@
 import { include, onLoad, type Extended } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import "@blazetrails/activesupport/testing/autorun";
-import "@blazetrails/actioncable/subscription-adapter/test";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { TestFixtures, type ClassMethods } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";

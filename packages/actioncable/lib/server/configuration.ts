@@ -14,12 +14,15 @@ import {
 import { Base } from "../connection/base.js";
 import { SubscriptionAdapter } from "../namespaces.js";
 
+const TEST_ADAPTER: string = "@blazetrails/actioncable/subscription-adapter/test";
+
 const BUILT_IN_ADAPTERS: Record<string, () => Promise<Record<string, unknown>>> = {
   "action_cable/subscription_adapter/inline": () => import("../subscription-adapter/inline.js"),
   "action_cable/subscription_adapter/async": () => import("../subscription-adapter/async.js"),
   "action_cable/subscription_adapter/postgresql": () =>
     import("../subscription-adapter/postgresql.js"),
   "action_cable/subscription_adapter/redis": () => import("../subscription-adapter/redis.js"),
+  "action_cable/subscription_adapter/test": () => import(TEST_ADAPTER),
 };
 
 type RackResponse = [number, Record<string, string>, unknown[]];
