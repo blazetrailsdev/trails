@@ -28,8 +28,8 @@ export class CreateActionTextTables extends Migration.get(6.0) {
   private primaryAndForeignKeyTypes(): [string, string] {
     const config = TopLevel.Trails!.configuration!.generators();
     const setting = config.options.get(config.orm!())!.primaryKeyType as string | null | undefined;
-    const primaryKeyType = setting || "primary_key";
-    const foreignKeyType = setting || "bigint";
+    const primaryKeyType = setting ?? "primary_key";
+    const foreignKeyType = setting ?? "bigint";
     return [primaryKeyType, foreignKeyType];
   }
 }

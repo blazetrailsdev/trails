@@ -19,12 +19,11 @@ function databaseName(): string {
 const primary = {
   ...arunit.configurationHash,
   database: databaseName(),
-  migrationsPaths: `${import.meta.dirname}/../../../lib/db/migrate`,
+  migrationsPaths: `${import.meta.dirname}/../db/migrate`,
 };
 
 export default {
   [String(ActiveRecord.ConnectionHandling.DEFAULT_ENV())]: {
     primary,
-    replica: { ...primary, replica: true },
   },
 };

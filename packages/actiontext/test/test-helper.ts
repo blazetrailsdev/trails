@@ -1,7 +1,7 @@
 import { afterAll } from "vitest";
 import { EnvironmentInquirer, I18n, TopLevel, setTrailsRoot } from "@blazetrails/activesupport";
 import { Configuration } from "@blazetrails/trailties/trailtie/configuration";
-import { ActiveRecord, Base, DatabaseTasks, Migrator } from "@blazetrails/activerecord";
+import { ActiveRecord, Base, DatabaseTasks, Migration, Migrator } from "@blazetrails/activerecord";
 import { Application } from "@blazetrails/trailties";
 import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
 import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailties/active-record";
@@ -43,11 +43,11 @@ for (const railtie of [ActiveSupportRailtie, ActiveRecordRailtie]) {
 }
 
 DatabaseTasks.root = TopLevel.Trails!.root()!;
-await DatabaseTasks.purge(Base.configurations().configsFor({ envName, name: "primary" })!);
+DatabaseTasks.dbDir = File.expandPath("dummy/db", import.meta.dirname);
 
 Migrator.migrationsPaths = [File.expandPath("dummy/db/migrate", import.meta.dirname)];
-await Base.connectsTo({ database: { writing: ":primary", reading: ":replica" } });
-await import("./dummy/db/schema.js");
+await Base.establishConnection();
+await Migration.maintainTestSchemaBang();
 
 I18n.config().enforceAvailableLocales = false;
 

@@ -15,11 +15,7 @@ describe("ActionText dummy database", () => {
     messages: [Message, messagesData],
     reviews: [Review, reviewsData],
     people: [Person, peopleData],
-  }) as never as {
-    messages: (name: string) => Promise<Message>;
-    reviews: (name: string) => Promise<Review>;
-    people: (name: string) => Promise<Person>;
-  };
+  });
 
   it("loads the dummy fixtures", async () => {
     expect((await messages("hello_alice")).subject).toBe("A message to Alice");
