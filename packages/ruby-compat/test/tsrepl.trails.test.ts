@@ -164,6 +164,19 @@ describe("TSREPL", () => {
     expect(exit).not.toHaveBeenCalled();
   });
 
+  it("run abandons the statements queued behind an IRB_EXIT throw", async () => {
+    const started = fakeRepl([
+      ["exit!", () => {}],
+      ["1", () => {}],
+    ]);
+    TSREPL.setup(null);
+
+    await new TSREPL.Tsrepl().run(TSREPL.conf);
+
+    expect(started[0].server.evaluated).toEqual(["exit!"]);
+    expect(exit).toHaveBeenCalledTimes(1);
+  });
+
   it("init_config seats VERSION, AP_NAME and the measure, history and completor keys", () => {
     TSREPL.setup(null);
     expect(TSREPL.conf.VERSION).toBe("tsrepl 1.13.1 (2024-05-05)");
