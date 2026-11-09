@@ -2,6 +2,10 @@ import { include } from "@blazetrails/ruby-compat/include";
 import { SecurityUtils } from "./security-utils.js";
 
 export class InvalidMatch extends Error {
+  static toString(): string {
+    return "ActiveSupport::SecureCompareRotator::InvalidMatch";
+  }
+
   constructor(message?: string) {
     super(message);
     this.name = "InvalidMatch";

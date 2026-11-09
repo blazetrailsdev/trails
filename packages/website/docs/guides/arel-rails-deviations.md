@@ -46,7 +46,7 @@ clause, a `static` field initializer, a top-level call, a top-level `new` or
 `const`. Those do throw
 `Cannot access 'Binary' before initialization`, depending on which module you
 enter the graph through. For one of those, the constant is read off a namespace
-object in `packages/arel/src/namespaces.ts` — `Arel`, `Arel::Attributes`,
+object in `packages/arel/lib/namespaces.ts` — `Arel`, `Arel::Attributes`,
 `Arel::Nodes`, `Arel::Visitors` — each extended with trails' port of
 `ActiveSupport::Autoload`
 (`activesupport/lib/active_support/dependencies/autoload.rb`). That module
@@ -95,7 +95,7 @@ Arel. TypeScript can't express a `Table#[]` method the way Ruby does, so
 // Trails: users.get("id")   // or: users.attr("id")
 ```
 
-Both are defined in `packages/arel/src/table.ts`. We considered a
+Both are defined in `packages/arel/lib/table.ts`. We considered a
 `Proxy`-backed `Table` that would make `users.id` work, but chose the
 explicit accessor because the Proxy would defeat TypeScript's property
 checking on the surrounding class. Typing wins over syntax.

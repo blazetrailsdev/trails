@@ -4825,7 +4825,7 @@ describe("Ruby extractor gem entry file", { timeout: RUBY_SUBPROCESS_TIMEOUT_MS 
   // `libPath` names a DIRECTORY (`activerecord/lib/arel`), so the gem's own
   // entry file (`activerecord/lib/arel.rb`) is outside the package glob.
   // Declared as `libEntryFile`, it is walked relative to its own directory so
-  // it records as `arel.rb` — the path `packages/arel/src/arel.ts` maps onto —
+  // it records as `arel.rb` — the path `packages/arel/lib/arel.ts` maps onto —
   // rather than the umbrella scan's `../arel.rb`, which matches no TS file.
   it("records a package entry file's methods against its own basename", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "entry-rb-"));

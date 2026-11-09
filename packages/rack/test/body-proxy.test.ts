@@ -1,0 +1,143 @@
+import { it, expect } from "vitest";
+import { NoMethodError, StringIO, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { BodyProxy } from "../lib/body-proxy.js";
+
+it("call each on the wrapped body", () => {
+  let called = false;
+  const proxy = new BodyProxy(["foo"], () => {});
+  proxy.each((str) => {
+    called = true;
+    expect(str).toBe("foo");
+  });
+  expect(called).toBe(true);
+});
+
+it("call close on the wrapped body", () => {
+  const body = new StringIO();
+  const proxy = new BodyProxy(body, () => {});
+  proxy.close();
+  expect(body.isClosed()).toBeTruthy();
+});
+
+it("only call close on the wrapped body if it responds to close", () => {
+  const body: any[] = [];
+  const proxy = new BodyProxy(body, () => {});
+  expect(proxy.close()).toBeUndefined();
+});
+
+it("call the passed block on close", () => {
+  let called = false;
+  const proxy = new BodyProxy([], () => {
+    called = true;
+  });
+  expect(called).toBe(false);
+  proxy.close();
+  expect(called).toBe(true);
+});
+
+it("call the passed block on close even if there is an exception", () => {
+  const body = {
+    close() {
+      throw new Error("No!");
+    },
+  };
+  let called = false;
+  const proxy = new BodyProxy(body, () => {
+    called = true;
+  });
+  const e = (() => {
+    try {
+      expect(called).toBe(false);
+      proxy.close();
+    } catch (error: any) {
+      return error;
+    }
+  })();
+
+  void (
+    e ??
+    (() => {
+      throw new Error("Expected exception to have been raised");
+    })()
+  );
+  expect(called).toBe(true);
+});
+
+it("allow multiple arguments in respond_to?", () => {
+  const proxy = new BodyProxy([], () => {});
+  expect(rbObjRespondTo(proxy, "foo")).toBe(false);
+});
+
+it("allows #method to work with delegated methods", () => {
+  const body = {
+    banana() {
+      return "pear";
+    },
+  };
+  const proxy = new BodyProxy(body, () => {});
+  expect(proxy.methodMissing("banana")).toBe("pear");
+});
+
+it("allows calling delegated methods with keywords", () => {
+  const body = {
+    banana(opts: { foo?: number } = {}) {
+      return opts.foo;
+    },
+  };
+  const proxy = new BodyProxy(body, () => {});
+  expect(proxy.methodMissing("banana", { foo: 1 })).toBe(1);
+});
+
+it("respond to :to_ary if body does responds to it, and have to_ary call close", () => {
+  let proxyClosed = false;
+  const proxy = new BodyProxy([], () => {
+    proxyClosed = true;
+  });
+  expect(rbObjRespondTo(proxy, "toAry")).toBe(true);
+  expect(proxyClosed).toBe(false);
+  expect((proxy as any).toAry()).toEqual([]);
+  expect(proxyClosed).toBe(true);
+});
+
+it("not respond to :to_ary if body does not respond to it", () => {
+  const body = {
+    [Symbol.iterator]: function* () {
+      yield 1;
+    },
+  };
+  const proxy = new BodyProxy(body, () => {});
+  expect(rbObjRespondTo(proxy, "toAry")).toBe(false);
+  expect(() => proxy.methodMissing("toAry")).toThrow(NoMethodError);
+});
+
+it("not respond to :to_str", () => {
+  const proxy = new BodyProxy("string body", () => {});
+  expect(rbObjRespondTo(proxy, "toStr")).toBe(false);
+  expect(() => proxy.methodMissing("toStr")).toThrow(NoMethodError);
+});
+
+it("not respond to :to_path if body does not respond to it", () => {
+  const proxy = new BodyProxy("string body", () => {});
+  expect(rbObjRespondTo(proxy, "toPath")).toBe(false);
+  expect(() => proxy.methodMissing("toPath")).toThrow(NoMethodError);
+});
+
+it("not close more than one time", () => {
+  let count = 0;
+  const proxy = new BodyProxy([], () => {
+    count += 1;
+    if (count > 1) throw new Error("Block invoked more than 1 time!");
+  });
+  proxy.close();
+  proxy.close();
+  expect(count).toBe(1);
+});
+
+it("be closed when the callback is triggered", () => {
+  let closedDuringCallback = false;
+  const proxy = new BodyProxy([], () => {
+    closedDuringCallback = proxy.closed;
+  });
+  proxy.close();
+  expect(closedDuringCallback).toBe(true);
+});

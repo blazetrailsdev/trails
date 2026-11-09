@@ -4516,7 +4516,7 @@ describe("ownerRecordsNothing", () => {
 });
 
 describe("declarationOnlyInFile", () => {
-  // arel/crud.rb:6-47 is four module bodies; packages/arel/src/crud.ts:10-24 is
+  // arel/crud.rb:6-47 is four module bodies; packages/arel/lib/crud.ts:10-24 is
   // a bare `interface Crud` with the four signatures, and the bodies were
   // inlined onto SelectManager (select-manager.ts:295-338).
   const bodyless = new Map([["crud.ts", new Map([["compileInsert", new Set(["Crud"])]])]]);

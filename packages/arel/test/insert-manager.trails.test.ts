@@ -1,0 +1,64 @@
+import { describe, it, expect } from "vitest";
+import { Table, InsertManager, Nodes, type ArelNode } from "../lib/index.js";
+
+describe("InsertManagerTest (trails)", () => {
+  const users = new Table("users");
+  const posts = new Table("posts");
+
+  it("returns empty array before insert", () => {
+    const manager = new InsertManager();
+    expect(manager.columns).toEqual([]);
+  });
+
+  describe("insert (Rails parity)", () => {
+    it("is a no-op for an empty fields array", () => {
+      const mgr = new InsertManager();
+      mgr.insert([]);
+      expect(mgr.ast.values).toBeNull();
+      expect(mgr.ast.relation).toBeNull();
+      expect(mgr.ast.columns).toEqual([]);
+    });
+
+    it("stores a string `fields` value as a SqlLiteral on ast.values", () => {
+      const mgr = new InsertManager(users);
+      mgr.insert("foo");
+      expect(mgr.ast.values).toBeInstanceOf(Nodes.SqlLiteral);
+      expect((mgr.ast.values as Nodes.SqlLiteral).toString()).toBe("foo");
+    });
+
+    it("infers ast.relation from the first column when not yet set", () => {
+      const mgr = new InsertManager();
+      mgr.insert([[users.get("name"), "alice"]]);
+      expect(mgr.ast.relation).toBe(users);
+    });
+
+    it("preserves an explicit ast.relation rather than inferring", () => {
+      const mgr = new InsertManager(posts);
+      mgr.insert([[users.get("name"), "alice"]]);
+      expect(mgr.ast.relation).toBe(posts);
+    });
+  });
+
+  describe("select (Rails parity)", () => {
+    it("stores the SelectManager itself on ast.select", () => {
+      const mgr = new InsertManager(users);
+      mgr.ast.columns = [users.get("name")];
+      const selectMgr = posts.project(posts.get("title"));
+      mgr.select(selectMgr);
+      expect(mgr.ast.select).toBe(selectMgr);
+      expect(mgr.toSql()).toContain("SELECT");
+    });
+  });
+  it("takes the Hash ActiveRecord passes and reads its first key's relation", () => {
+    const mgr = new InsertManager();
+    mgr.insert(
+      new Map<ArelNode, unknown>([
+        [users.get("id"), 1],
+        [users.get("name"), "aaron"],
+      ]),
+    );
+    expect(mgr.ast.relation).toBe(users);
+    expect(mgr.toSql()).toBe(`INSERT INTO "users" ("id", "name") VALUES (1, 'aaron')`);
+    expect(new InsertManager().insert(new Map())).toBeUndefined();
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
+import { testConnection } from "@blazetrails/arel/test/support/connection.js";
 import { Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";

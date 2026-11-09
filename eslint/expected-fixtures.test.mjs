@@ -90,7 +90,7 @@ describe("trailsToRailsRel", () => {
     ).toBe("associations/has_many_associations_test.rb");
   });
   it("returns null for non-activerecord paths", () => {
-    expect(trailsToRailsRel("/x/packages/arel/src/foo.test.ts")).toBeNull();
+    expect(trailsToRailsRel("/x/packages/arel/lib/foo.test.ts")).toBeNull();
     expect(trailsToRailsRel("/x/random/file.ts")).toBeNull();
   });
 });
@@ -230,7 +230,7 @@ function runCases(tester) {
       },
       {
         name: "non-activerecord paths ignored",
-        filename: path.join(ROOT, "packages/arel/src/foo.test.ts"),
+        filename: path.join(ROOT, "packages/arel/lib/foo.test.ts"),
         code: `// nothing\n`,
       },
       {

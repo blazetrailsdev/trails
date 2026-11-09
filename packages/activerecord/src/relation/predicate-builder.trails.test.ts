@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
+import { testConnection } from "@blazetrails/arel/test/support/connection.js";
 import { IntegerType, ValueType } from "@blazetrails/activemodel";
 import { Nodes, Table, Visitors, Collectors, type ArelNode } from "@blazetrails/arel";
 import { fixtures } from "../test-helpers/use-fixtures.js";

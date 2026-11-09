@@ -1,0 +1,46 @@
+import { it, expect } from "vitest";
+import { Runtime } from "../lib/runtime.js";
+import { MockRequest } from "../lib/mock-request.js";
+
+const request = () => MockRequest.envFor("/");
+
+it("sets x-runtime is none is set", async () => {
+  const app = async () => [200, { "content-type": "text/plain" }, "Hello, World!"] as any;
+  const runtime = new Runtime(app);
+  const [, headers] = await runtime.call(request());
+  expect(headers["x-runtime"]).toMatch(/[\d.]+/);
+});
+
+it("doesn't set the x-runtime if it is already set", async () => {
+  const app = async () =>
+    [200, { "content-type": "text/plain", "x-runtime": "foobar" }, "Hello, World!"] as any;
+  const runtime = new Runtime(app);
+  const [, headers] = await runtime.call(request());
+  expect(headers["x-runtime"]).toBe("foobar");
+});
+
+it("allow a suffix to be set", async () => {
+  const app = async () => [200, { "content-type": "text/plain" }, "Hello, World!"] as any;
+  const runtime = new Runtime(app, "Test");
+  const [, headers] = await runtime.call(request());
+  expect(headers["x-runtime-test"]).toMatch(/[\d.]+/);
+});
+
+it("allow multiple timers to be set", async () => {
+  const inner = async () => {
+    await new Promise((r) => setTimeout(r, 10));
+    return [200, { "content-type": "text/plain" }, "Hello, World!"] as any;
+  };
+  let app = new Runtime(inner, "App");
+  for (let i = 0; i < 5; i++) {
+    const prev = app;
+    app = new Runtime(prev, String(i));
+  }
+  const outer = new Runtime(app, "All");
+  const [, headers] = await outer.call(request());
+  expect(headers["x-runtime-app"]).toMatch(/[\d.]+/);
+  expect(headers["x-runtime-all"]).toMatch(/[\d.]+/);
+  expect(parseFloat(String(headers["x-runtime-all"]))).toBeGreaterThan(
+    parseFloat(String(headers["x-runtime-app"])),
+  );
+});
