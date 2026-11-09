@@ -1264,12 +1264,13 @@ export function extractFromProgram(
         const original = list.find((m) => m.name === right.name.text && !m.bodyless);
         const at = list.findIndex((m) => m.name === left.name.text);
         if (!original) continue;
-        const { internal: _internal, ...body } = original;
+        const { internal: _internal, inventedArms: _inventedArms, ...body } = original;
         const own = at >= 0 ? list[at].internal : undefined;
         const aliased = {
           ...body,
           name: left.name.text,
           aliasOf: right.name.text,
+          line: sourceFile.getLineAndCharacterOfPosition(statement.getStart()).line + 1,
           ...(own !== undefined ? { internal: own } : {}),
         };
         if (at >= 0) list[at] = aliased;
