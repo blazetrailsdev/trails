@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { stub, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { IntegrationTest } from "@blazetrails/actionpack";
 import { StandardError } from "@blazetrails/ruby-compat";

@@ -1,12 +1,8 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
-import {
-  assertChanges,
-  assertDifference,
-  minutes,
-  travelBack,
-  travelTo,
-} from "@blazetrails/activesupport";
+import { minutes } from "@blazetrails/activesupport";
+import { assertChanges, assertDifference } from "@blazetrails/activesupport/testing/assertions";
+import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import type { Time } from "@blazetrails/date";
 import { Socket } from "@blazetrails/ruby-compat";
 import {

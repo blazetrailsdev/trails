@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertRespondTo } from "@blazetrails/activesupport";
+import { assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { ProtectedParams } from "../../support/stubs/strong-parameters.js";

@@ -1,4 +1,6 @@
-import { assertCalled, assertEqual, Inflections, inflections } from "@blazetrails/activesupport";
+import { Inflections, inflections } from "@blazetrails/activesupport";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import {
   except,
   rbObjDup,

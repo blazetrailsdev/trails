@@ -1,5 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
-import { assert, assertEqual, assertNotEqual, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNotEqual } from "@blazetrails/activesupport/testing/assertions";
 import { type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";

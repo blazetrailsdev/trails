@@ -6,7 +6,7 @@ import {
   assertNotPredicate,
   assertPredicate,
   assertRaise,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { EachValidator, Validator } from "../../lib/validator.js";
 import { ArgumentError } from "../../lib/attribute-assignment.js";
 import { Topic } from "../models/topic.js";

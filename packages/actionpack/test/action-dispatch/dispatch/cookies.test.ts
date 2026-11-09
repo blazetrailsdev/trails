@@ -22,7 +22,7 @@ import {
   assertNot,
   assertEmpty,
   assertNothingRaised,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   JSON,
@@ -38,7 +38,7 @@ import { TestRequest } from "../../../lib/action-dispatch/testing/test-request.j
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
 import { Duration, include, isPresent } from "@blazetrails/activesupport";
-import { travel, travelBack, travelTo } from "@blazetrails/activesupport";
+import { travel, travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Time } from "@blazetrails/date";
 
 function cookieJarCookies(jar: CookieJar): Map<string, string> {

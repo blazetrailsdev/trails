@@ -2,7 +2,12 @@ import { beforeEach, describe, it } from "vitest";
 import { File, StringIO, type Tempfile } from "@blazetrails/ruby-compat";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
-import { BigDecimal, assertEqual, assertPredicate, assertRaises } from "@blazetrails/activesupport";
+import { BigDecimal } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertPredicate,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { UploadedFile } from "../../../../lib/action-dispatch/http/upload.js";
 import {
   ExpectedParameterMissing,

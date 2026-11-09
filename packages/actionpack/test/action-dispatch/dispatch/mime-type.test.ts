@@ -5,6 +5,7 @@ import {
   Mime,
   MimeType,
 } from "../../../lib/action-dispatch/http/mime-type.js";
+import { camelize } from "@blazetrails/activesupport";
 import {
   assert,
   assertNot,
@@ -13,8 +14,7 @@ import {
   assertNotEqual,
   assertOperator,
   assertRespondTo,
-  camelize,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbInspect, symbolToS } from "@blazetrails/ruby-compat";
 
 describe("MimeTypeTest", () => {

@@ -51,7 +51,7 @@ import {
   assertRespondTo,
   assertNotEmpty,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Dog } from "./test-helpers/models/dog.js";
 
 function assertNotCalledFlag(called: boolean): void {

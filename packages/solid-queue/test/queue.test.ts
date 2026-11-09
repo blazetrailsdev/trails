@@ -1,17 +1,14 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
+import { minutes, seconds } from "@blazetrails/activesupport";
 import {
   assertChanges,
   assertDifference,
   assertInDelta,
   assertNoDifference,
-  freezeTime,
-  minutes,
-  seconds,
-  travelBack,
-  travelTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { freezeTime, travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import type { Time } from "@blazetrails/date";
 import { Job, Pause, Queue, ReadyExecution, SolidQueueAdapter } from "../lib/index.js";
 import { ApplicationJob } from "./support/application-job.js";

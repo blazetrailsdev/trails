@@ -1,5 +1,6 @@
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
-import { assertNoMatch, capture } from "@blazetrails/activesupport";
+import { assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PluginGenerator } from "../../lib/generators/trails/plugin/plugin-generator.js";

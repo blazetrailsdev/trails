@@ -2,6 +2,7 @@ import { describe, it } from "vitest";
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
+import { Duration } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertMatch,
@@ -10,9 +11,8 @@ import {
   assertNotEqual,
   assertNotNil,
   assertRaise,
-  Duration,
-  stub,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Time } from "@blazetrails/date";
 import { Utils } from "@blazetrails/rack";
 import {

@@ -1,8 +1,7 @@
 import { beforeEach, describe, it, type TestContext } from "vitest";
+import { TimeWithZone, TimeZone, minutes } from "@blazetrails/activesupport";
 import {
   Assertion,
-  TimeWithZone,
-  TimeZone,
   assertEqual,
   assertInDelta,
   assertInstanceOf,
@@ -11,8 +10,7 @@ import {
   assertNothingRaised,
   assertRaise,
   assertRaises,
-  minutes,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { noon, tomorrow } from "@blazetrails/activesupport/core-ext/date/calculations";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import {

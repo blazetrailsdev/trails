@@ -1,4 +1,5 @@
-import { ActiveSupportJSON, assertCalled } from "@blazetrails/activesupport";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MockRequest } from "@blazetrails/rack";
 import { Exception, hashAref, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";

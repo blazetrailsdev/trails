@@ -2,7 +2,12 @@ import { b, rbObjEncoding, StringIO, Tempfile } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
 import { UploadedFile } from "../../../lib/action-dispatch/http/upload.js";
-import { assertEqual, assertNil, assertNot, assertPredicate } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertNil,
+  assertNot,
+  assertPredicate,
+} from "@blazetrails/activesupport/testing/assertions";
 
 describe("UploadedFileTest", () => {
   it("constructor with argument error", () => {

@@ -1,4 +1,4 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, vi } from "vitest";
 import { Dir, File, FileUtils, SecureRandom } from "@blazetrails/ruby-compat";
 import { Base, type GeneratorConfig } from "../../lib/generators/base.js";

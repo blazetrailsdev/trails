@@ -1,12 +1,11 @@
 import { GlobalID } from "../lib/global-id.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
+import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import {
-  travelBack,
-  travelTo,
   assertNil,
   assertNotNil,
   assertEqual,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { SignedGlobalID, _resetSignedGlobalIDClassConfig } from "../lib/signed-global-id.js";

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { SilenceRequest } from "../lib/rack/silence-request.js";
 import { Trails } from "../lib/trails.js";
-import { Mock } from "@blazetrails/activesupport";
+import { Mock } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MockRequest } from "@blazetrails/rack";
 import type { RackBody, RackResponse } from "@blazetrails/rack";
 

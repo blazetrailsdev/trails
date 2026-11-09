@@ -12,7 +12,8 @@ import type {
   MiddlewareStack,
 } from "../../../lib/action-dispatch/middleware/stack.js";
 import { CookieStore } from "../../../lib/action-dispatch/middleware/session/cookie-store.js";
-import { assertEqual, HashWithIndifferentAccess, include } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, include } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { SharedTestRoutes } from "../../support/abstract-unit.js";
 
 const Generator = new KeyGenerator("a".repeat(64), { iterations: 2 });

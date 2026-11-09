@@ -7,7 +7,11 @@ import {
 } from "@blazetrails/activerecord/active-record";
 import { Base, EnqueueError } from "@blazetrails/activejob";
 import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapter";
-import { assertDifference, assertNoDifference, isPresent } from "@blazetrails/activesupport";
+import { isPresent } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNoDifference,
+} from "@blazetrails/activesupport/testing/assertions";
 import { Time } from "@blazetrails/date";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import {

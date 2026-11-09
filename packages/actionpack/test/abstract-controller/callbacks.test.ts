@@ -15,7 +15,12 @@ import {
   type skipBeforeAction,
   type skipAfterAction,
 } from "../../lib/abstract-controller/callbacks.js";
-import { assertIncludes, assertNot, assertRaises, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import {
+  assertIncludes,
+  assertNot,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 
 class ControllerWithCallbacks extends Base {
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];

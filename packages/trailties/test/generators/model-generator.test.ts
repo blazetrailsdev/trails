@@ -1,5 +1,6 @@
 import { File, Dir, FileUtils } from "@blazetrails/ruby-compat";
-import { assertMatch, assertNoMatch, capture } from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";

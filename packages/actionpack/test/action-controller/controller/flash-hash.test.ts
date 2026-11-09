@@ -7,7 +7,7 @@ import {
   assertNil,
   assertNot,
   assertNotEmpty,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbObjDup, rbObjIvarSet } from "@blazetrails/ruby-compat";
 
 describe("FlashHashTest", () => {

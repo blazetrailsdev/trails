@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertRaises, assertRespondTo } from "@blazetrails/activesupport";
+import { assertRaises, assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { NotImplementedError, Thread } from "@blazetrails/ruby-compat";
 import { Executor } from "@blazetrails/activesupport";
 import { BodyProxy } from "@blazetrails/rack";

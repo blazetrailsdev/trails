@@ -11,13 +11,12 @@ function isTemporalDatetime(v: unknown): boolean {
   return v instanceof RubyTime;
 }
 import { describe, it, expect, beforeAll } from "vitest";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import {
-  travel,
-  travelBack,
   assertDifference,
   assertEmpty,
   assertNothingRaised,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {

@@ -2,7 +2,8 @@ import type { TimeZone } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import * as Types from "../../lib/index.js";
-import { TimeWithZone, useZone, zone, assertNil } from "@blazetrails/activesupport";
+import { TimeWithZone, useZone, zone } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 function timeUtc(year: number, mon: number, mday: number, hour = 0, min = 0, sec = 0): RubyTime {
   return RubyTime.utc(year, mon, mday, hour, min, sec);

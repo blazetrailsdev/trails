@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { currentTime, travelTo } from "@blazetrails/activesupport";
+import { currentTime } from "@blazetrails/activesupport";
+import { travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 
 describe("TimeHelpers after_teardown", () => {
   it("travels without unwinding", () => {

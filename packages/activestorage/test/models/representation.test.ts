@@ -1,7 +1,7 @@
 import "../support/database/setup.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ActiveStorage } from "../../lib/active-storage.js";
 import { Current } from "../../lib/current.js";
 import { UnrepresentableError } from "../../lib/errors.js";

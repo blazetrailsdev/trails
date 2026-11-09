@@ -8,7 +8,7 @@ import {
   setLazilyLoadSchemaCache,
 } from "../active-record.js";
 import { StatementInvalid } from "../errors.js";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { File, FileUtils, Marshal, Tempfile } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";

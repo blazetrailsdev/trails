@@ -6,7 +6,7 @@ import {
   assertKindOf,
   assertNil,
   assertNotEqual,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   Buffer as LiveBuffer,
   Response as LiveResponse,

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./base.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
-import { assertEmpty } from "@blazetrails/activesupport";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 
 describe("ShardsKeysTest", () => {

@@ -1,6 +1,7 @@
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertCalled, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Message, SMTP, TestMailer } from "@blazetrails/mail";
 import { Dir, RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
 import { Base as ActionMailerBase } from "../lib/base.js";

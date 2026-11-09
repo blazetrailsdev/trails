@@ -3,7 +3,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { Author, AuthorFavorite } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";

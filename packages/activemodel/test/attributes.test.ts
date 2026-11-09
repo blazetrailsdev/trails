@@ -4,13 +4,12 @@
    how `include()` surfaces those members on the type side, and a generated attribute member is an
    accessor pair (CLAUDE.md § "Generated attribute readers are properties"). */
 import { describe, it, expect } from "vitest";
+import { BigDecimal, include } from "@blazetrails/activesupport";
 import {
-  BigDecimal,
   assertNothingRaised,
   assertRaise,
-  include,
   assertNil,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Date as RubyDate, Temporal } from "@blazetrails/date";
 import {
   ArgumentError,

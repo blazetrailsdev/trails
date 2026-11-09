@@ -1,10 +1,7 @@
 import { beforeEach, describe, it, expect, vi } from "vitest";
+import { ActionableError, BacktraceCleaner, Logger, TopLevel } from "@blazetrails/activesupport";
 import {
-  ActionableError,
   assert,
-  BacktraceCleaner,
-  Logger,
-  TopLevel,
   assertEmpty,
   assertEqual,
   assertIncludes,
@@ -15,7 +12,7 @@ import {
   assertOperator,
   assertRaise,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Base, TemplateError } from "@blazetrails/actionview";
 import {
   block,

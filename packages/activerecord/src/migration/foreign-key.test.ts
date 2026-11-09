@@ -7,7 +7,7 @@ import {
   assertNoChanges,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { StatementInvalid } from "../errors.js";
 import type { ReferentialAction } from "../connection-adapters/abstract/schema-definitions.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";

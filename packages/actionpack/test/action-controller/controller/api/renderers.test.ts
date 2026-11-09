@@ -1,5 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual, toXml } from "@blazetrails/activesupport";
+import { toXml } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import "../../../support/abstract-unit.js";
 import { API } from "../../../../lib/action-controller/api.js";
 import { TestCase } from "../../../../lib/action-controller/test-case.js";

@@ -1,14 +1,10 @@
 import { describe, expect, it, type TestContext } from "vitest";
+import { hours, Logger, Notifications, seconds, TaggedLogging } from "@blazetrails/activesupport";
 import {
   assertMatch,
   assertNothingRaised,
   assertRaises,
-  hours,
-  Logger,
-  Notifications,
-  seconds,
-  TaggedLogging,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import {
   setup as logSubscriberTestHelperSetup,

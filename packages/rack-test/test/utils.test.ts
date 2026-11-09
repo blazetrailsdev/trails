@@ -4,7 +4,7 @@ import { MockRequest, Multipart } from "@blazetrails/rack";
 import { Utils } from "../lib/utils.js";
 import { MULTIPART_BOUNDARY } from "../lib/test.js";
 import { UploadedFile } from "../lib/uploaded-file.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 function multipartFile(name: string): string {
   return File.join(File.dirname(new URL(import.meta.url).pathname), "fixtures", name);

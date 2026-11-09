@@ -5,7 +5,7 @@ import {
   assertMatch,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { include, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../lib/namespaces.js";
 import { TestCase } from "./support/test-helper.js";

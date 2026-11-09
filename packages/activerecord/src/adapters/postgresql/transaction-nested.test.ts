@@ -1,7 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfPg, leasePgAdapter } from "./test-helper.js";
 import type { PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";

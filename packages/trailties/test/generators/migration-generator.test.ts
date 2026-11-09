@@ -1,5 +1,5 @@
 import { File, Dir } from "@blazetrails/ruby-compat";
-import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Base } from "@blazetrails/activerecord";
 import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";

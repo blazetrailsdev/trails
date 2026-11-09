@@ -5,7 +5,12 @@ import {
   type HostPermission,
 } from "../../../lib/action-dispatch/middleware/host-authorization.js";
 import { IPAddr, StringIO } from "@blazetrails/ruby-compat";
-import { Logger, assertEmpty, assertEqual, assertMatch } from "@blazetrails/activesupport";
+import { Logger } from "@blazetrails/activesupport";
+import {
+  assertEmpty,
+  assertEqual,
+  assertMatch,
+} from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "@blazetrails/actionview";
 import { Lint } from "@blazetrails/rack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";

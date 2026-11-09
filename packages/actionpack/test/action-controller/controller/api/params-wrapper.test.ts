@@ -1,4 +1,5 @@
-import { type HashWithIndifferentAccess, assertEqual } from "@blazetrails/activesupport";
+import { type HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { constSet, constGet, TopLevel } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { API } from "../../../../lib/action-controller/api.js";

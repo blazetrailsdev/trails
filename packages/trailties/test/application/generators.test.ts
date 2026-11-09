@@ -8,7 +8,8 @@ import {
   registerChildProcessAdapter,
   stdout,
 } from "@blazetrails/ruby-compat";
-import { assertNoMatch, assertNothingRaised, capture } from "@blazetrails/activesupport";
+import { assertNoMatch, assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { Configuration } from "../../lib/application/configuration.js";
 import type { Generators } from "../../lib/configuration.js";
 import { Generators as TrailsGenerators } from "../../lib/generators.js";

@@ -1,13 +1,13 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Lint, MockRequest } from "@blazetrails/rack";
 import type { RackApp } from "@blazetrails/rack";
+import { Reloader as ActiveSupportReloader } from "@blazetrails/activesupport";
 import {
-  Reloader as ActiveSupportReloader,
   assert,
   assertNil,
   assertNot,
   assertRespondTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Reloader } from "../../../lib/action-dispatch/middleware/reloader.js";
 
 describe("ReloaderTest", () => {

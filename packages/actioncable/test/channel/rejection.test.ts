@@ -1,4 +1,4 @@
-import { Mock, stub } from "@blazetrails/activesupport";
+import { Mock, stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import "../support/test-helper.js";

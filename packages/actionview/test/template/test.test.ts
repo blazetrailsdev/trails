@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { Naming } from "@blazetrails/activemodel";
-import { assertEqual, extend } from "@blazetrails/activesupport";
+import { extend } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import "../support/abstract-unit.js";
 import { TestCase } from "../../lib/test-case.js";

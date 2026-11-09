@@ -16,7 +16,7 @@ import {
   assertDifference,
   assertNothingRaised,
   assertRespondTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Project, SpecialProject } from "../test-helpers/models/project.js";
 import {

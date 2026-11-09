@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import {
-  assertDifference,
-  assertEqual,
-  assertMatch,
   LogSubscriber as ActiveSupportLogSubscriber,
   MemoryStore,
   setTrailsRoot,
   trailsRoot,
 } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertEqual,
+  assertMatch,
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   setup as testHelperSetup,
   teardown as testHelperTeardown,

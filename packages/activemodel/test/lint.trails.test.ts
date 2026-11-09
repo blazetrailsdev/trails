@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Assertion } from "@blazetrails/activesupport";
+import { Assertion } from "@blazetrails/activesupport/testing/assertions";
 import {
   testErrorsAref,
   testModelNaming,

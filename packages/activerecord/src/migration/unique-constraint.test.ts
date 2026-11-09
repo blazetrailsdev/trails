@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertEmpty, assertNoChanges, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertEmpty,
+  assertNoChanges,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Rollback, StatementInvalid } from "../errors.js";

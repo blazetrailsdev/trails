@@ -1,11 +1,10 @@
 import "./constants.test-helper.generated.js";
+import { ActiveSupportJSON, delegate } from "@blazetrails/activesupport";
 import {
-  ActiveSupportJSON,
   assert,
   assertEqual,
   _assertNothingRaisedOrWarn,
-  delegate,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { classModule, rbCallSuper, rbEqual, rbObjIvarSet, toS } from "@blazetrails/ruby-compat";
 import { ActionCable } from "./namespaces.js";
 import type { AsyncServer } from "./subscription-adapter/async.js";

@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { assertEqual, assertNil } from "@blazetrails/activesupport";
+import { assertEqual, assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { NullResolver } from "../../../lib/testing/resolvers.js";
 
 describe("NullResolverTest", () => {

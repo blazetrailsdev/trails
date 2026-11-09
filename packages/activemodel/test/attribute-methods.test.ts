@@ -3,12 +3,12 @@
    Rails test model it mirrors does (attribute_methods_test.rb:5-104); the class/interface merge
    beside it is how `include()` surfaces those members and the generated methods on the type side. */
 import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/activesupport";
 import {
   assertNotRespondTo,
   assertRaises,
   assertRespondTo,
-  include,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../lib/attribute-assignment.js";
 import {

@@ -1,7 +1,8 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "@blazetrails/i18n";
-import { I18n, include, isHtmlSafe, stub, type Included } from "@blazetrails/activesupport";
+import { I18n, include, isHtmlSafe, type Included } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { constSet } from "@blazetrails/ruby-compat";
 import { AbstractController } from "../../lib/namespaces.js";
 import "../support/abstract-unit.js";

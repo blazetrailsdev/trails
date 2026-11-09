@@ -1,6 +1,6 @@
 import { block as rbBlock, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach } from "vitest";
-import { assertEmpty } from "@blazetrails/activesupport";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "./base.js";
 import { Migration, IrreversibleMigration, type MigrationClass } from "./migration.js";
 import { CommandRecorder } from "./migration/command-recorder.js";

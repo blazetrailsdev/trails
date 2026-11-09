@@ -2,7 +2,8 @@ import { constSetPath } from "../../support/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Lint, type RackEnv, type RackResponse } from "@blazetrails/rack";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
+import { include, type Included, sole, TopLevel, underscore } from "@blazetrails/activesupport";
 import {
   assert,
   assertIncludes,
@@ -10,12 +11,7 @@ import {
   assertKindOf,
   assertNot,
   assertNotIncludes,
-  include,
-  type Included,
-  sole,
-  TopLevel,
-  underscore,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   Dir,

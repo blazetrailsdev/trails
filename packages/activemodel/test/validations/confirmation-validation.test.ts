@@ -5,7 +5,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Model, I18n } from "../../lib/index.js";
 import { resetI18n } from "../support/i18n.js";
-import { assertPredicate } from "@blazetrails/activesupport";
+import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Topic } from "../models/topic.js";
 import { Person } from "../models/person.js";
 

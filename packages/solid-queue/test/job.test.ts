@@ -1,14 +1,13 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
+import { minutes } from "@blazetrails/activesupport";
 import {
   assertChanges,
   assertDifference,
   assertNoChanges,
   assertNoDifference,
-  minutes,
-  travelBack,
-  travelTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Deadlocked, Rollback } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { performAllLater } from "@blazetrails/activejob";

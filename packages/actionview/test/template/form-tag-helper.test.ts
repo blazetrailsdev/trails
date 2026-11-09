@@ -1,5 +1,10 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual, assertMatch, assertPredicate, isHtmlSafe } from "@blazetrails/activesupport";
+import { isHtmlSafe } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertMatch,
+  assertPredicate,
+} from "@blazetrails/activesupport/testing/assertions";
 import { ActionController } from "@blazetrails/actionpack";
 import { CGI, include, Range, rbInspect, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 

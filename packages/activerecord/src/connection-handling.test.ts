@@ -2,7 +2,10 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "./base.js";
 import { ActiveRecordError } from "./errors.js";
 import { deprecator } from "./deprecator.js";
-import { assertDeprecated, assertNotDeprecated } from "@blazetrails/activesupport";
+import {
+  assertDeprecated,
+  assertNotDeprecated,
+} from "@blazetrails/activesupport/testing/deprecation";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 import { connectedToStack } from "./core.js";

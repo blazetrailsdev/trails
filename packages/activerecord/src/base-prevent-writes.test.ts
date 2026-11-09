@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 
 import { Base } from "./index.js";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ReadOnlyError } from "./errors.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";

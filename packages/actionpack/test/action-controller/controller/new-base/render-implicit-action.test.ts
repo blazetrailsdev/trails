@@ -4,7 +4,7 @@ import { rbFSend } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { FileSystemResolver } from "@blazetrails/actionview";
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
-import { assert, assertEqual, assertRaises } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { MockRequest } from "@blazetrails/rack";
 import { File, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { ActionNotFound } from "../../../../lib/abstract-controller/base.js";

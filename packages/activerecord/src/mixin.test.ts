@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { freezeTime, travel, travelBack } from "@blazetrails/activesupport";
+import { freezeTime, travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { Duration } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Base } from "./index.js";

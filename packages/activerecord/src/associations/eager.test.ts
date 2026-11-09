@@ -1,8 +1,8 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, AssociationNotFoundError, EagerLoadPolymorphicError } from "../index.js";
+import { Notifications } from "@blazetrails/activesupport";
 import {
-  Notifications,
   assertIncludes,
   assertNothingRaised,
   assertNot,
@@ -10,10 +10,10 @@ import {
   assertPredicate,
   assertRaise,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
-import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
+import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import {

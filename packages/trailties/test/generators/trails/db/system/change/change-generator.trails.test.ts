@@ -1,4 +1,4 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";

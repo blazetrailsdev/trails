@@ -6,7 +6,8 @@ import { CachingKeyGenerator, KeyGenerator } from "@blazetrails/activesupport/ke
 import { ActionDispatch } from "@blazetrails/actionpack";
 import { MockRequest } from "@blazetrails/rack";
 import { ArgumentError, IPAddr, include } from "@blazetrails/ruby-compat";
-import { assertNotDeprecated, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Application } from "../../../lib/application.js";
 import { Trails } from "../../../lib/trails.js";
 import type { Generation } from "../../support/isolation/abstract-unit.js";

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { AdapterSpecificRegistry, TypeConflictError } from "./adapter-specific-registry.js";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 
 class TestType extends ValueType<unknown> {

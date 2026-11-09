@@ -1,5 +1,5 @@
 import { it, expect } from "vitest";
-import { assertNotEmpty } from "@blazetrails/activesupport";
+import { assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
 import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { SQLite3Constants } from "../../sqlite-adapter.js";

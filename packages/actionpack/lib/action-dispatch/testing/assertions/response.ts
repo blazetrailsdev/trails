@@ -1,10 +1,9 @@
+import { isPlainObject, isPresent } from "@blazetrails/activesupport";
 import {
   assert,
   assertEqual,
-  isPlainObject,
-  isPresent,
   UnexpectedError,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbEqq } from "@blazetrails/ruby-compat";
 import { AssertionResponse } from "../assertion-response.js";
 import { Redirecting, type RedirectingHost } from "../../../action-controller/metal/redirecting.js";

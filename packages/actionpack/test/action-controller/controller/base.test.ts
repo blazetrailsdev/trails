@@ -7,10 +7,10 @@ import {
   assertEqual,
   assertIncludes,
   assertNot,
-  assertNotDeprecated,
   assertNotIncludes,
   assertRaise,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { ActionNotFound } from "../../../lib/abstract-controller/base.js";
 import { ModelName } from "@blazetrails/activemodel";
 import { domClass, domId } from "@blazetrails/actionview";

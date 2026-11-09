@@ -7,14 +7,8 @@ import {
 } from "@blazetrails/activerecord/active-record";
 import { EnqueueError } from "@blazetrails/activejob";
 import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapter";
-import {
-  days,
-  isPresent,
-  Notifications,
-  seconds,
-  travelBack,
-  travelTo,
-} from "@blazetrails/activesupport";
+import { days, isPresent, Notifications, seconds } from "@blazetrails/activesupport";
+import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import type { Time } from "@blazetrails/date";
 import { groupBy, rbEqual, slice } from "@blazetrails/ruby-compat";
 import {

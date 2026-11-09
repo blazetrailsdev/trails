@@ -5,17 +5,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base, RecordInvalid, RecordNotFound, RecordNotSaved } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
+import { assertDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import {
-  assertDeprecated,
   assertDifference,
   assertEmpty,
   assertIncludes,
   assertNotEmpty,
   assertNoDifference,
-  assertNotCalled,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertNotCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import { HasManyThroughCantAssociateThroughHasOneOrManyReflection } from "./errors.js";
 import { AssociationTypeMismatch } from "../errors.js";

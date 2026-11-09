@@ -6,7 +6,8 @@ import { Base, transaction, Rollback } from "./index.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
-import { ArgumentError, assertEmpty, assertRaise } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activesupport";
+import { assertEmpty, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 
 import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";

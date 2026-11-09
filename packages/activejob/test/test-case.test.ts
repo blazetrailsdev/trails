@@ -1,5 +1,9 @@
 import { describe, it, type TestContext } from "vitest";
-import { assertIncludes, assertKindOf, assertNil } from "@blazetrails/activesupport";
+import {
+  assertIncludes,
+  assertKindOf,
+  assertNil,
+} from "@blazetrails/activesupport/testing/assertions";
 import { NotImplementedError, rbModAncestors, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";
 import { ActiveJob, QueueAdapters } from "../lib/namespaces.js";

@@ -13,14 +13,12 @@ import {
   Thread,
   ThreadError,
 } from "@blazetrails/ruby-compat";
+import { IsolatedExecutionState, Notifications, NullLock } from "@blazetrails/activesupport";
 import {
-  IsolatedExecutionState,
-  Notifications,
-  NullLock,
   assertRaise,
   assertRaises,
   assertRespondTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   ConnectionNotEstablished,
   ConnectionTimeoutError,

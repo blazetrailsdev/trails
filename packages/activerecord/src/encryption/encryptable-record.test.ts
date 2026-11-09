@@ -24,7 +24,7 @@ import {
   Errors,
   Base,
 } from "./test-helpers.js";
-import { assertNoChanges } from "@blazetrails/activesupport";
+import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
 import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 

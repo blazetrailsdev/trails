@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdapterNotSpecified, HashConfig } from "@blazetrails/activerecord";
-import { assertCalledWith, assertRaises, capture } from "@blazetrails/activesupport";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { SystemExit, env, stderr } from "@blazetrails/ruby-compat";
 import { DBConsole, DbconsoleCommand } from "../../lib/commands/dbconsole.js";
 import { invoke } from "../../lib/command.js";

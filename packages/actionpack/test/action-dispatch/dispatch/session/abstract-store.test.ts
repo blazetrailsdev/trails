@@ -1,5 +1,10 @@
 import { describe, it } from "vitest";
-import { assert, assertEqual, assertNotEqual, assertRaise } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEqual,
+  assertNotEqual,
+  assertRaise,
+} from "@blazetrails/activesupport/testing/assertions";
 import type { RackEnv } from "@blazetrails/rack";
 import { AbstractStore } from "../../../../lib/action-dispatch/middleware/session/abstract-store.js";
 import { Request } from "../../../../lib/action-dispatch/http/request.js";

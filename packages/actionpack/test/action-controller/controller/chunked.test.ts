@@ -1,5 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual, HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { ApplicationController, type RoutedRackApp } from "../../support/abstract-unit.js";
 import { IntegrationTest } from "../../../lib/action-dispatch/testing/integration.js";

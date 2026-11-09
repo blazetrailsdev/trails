@@ -1,6 +1,7 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { Notifications, assertMatch, assertNoMatch } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { Lint, MockRequest } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertCalledWith } from "@blazetrails/activesupport";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Base } from "../../../lib/action-controller/base.js";
 import { assertResponse } from "../../../lib/action-dispatch/testing/assertions/response.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";

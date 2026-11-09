@@ -4,7 +4,7 @@ import {
   assertNothingRaised,
   assertPredicate,
   assertRaise,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "../../lib/attribute-assignment.js";
 import { Topic } from "../models/topic.js";
 import { Person } from "../models/person.js";

@@ -18,6 +18,9 @@ import {
   Notifications,
   Logger,
   Executor,
+  type NotificationEvent,
+} from "@blazetrails/activesupport";
+import {
   assert,
   assertNot,
   assertPredicate,
@@ -25,8 +28,7 @@ import {
   assertNothingRaised,
   assertChanges,
   assertNoChanges,
-  type NotificationEvent,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";

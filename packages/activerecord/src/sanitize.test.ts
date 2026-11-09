@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
-import { assertNothingRaised, assertRaises, isPlainObject } from "@blazetrails/activesupport";
+import { isPlainObject } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Base, Range, PreparedStatementInvalid, UnknownAttributeReference } from "./index.js";
 import type { Relation } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport";
+import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
 import { UrlConfig } from "../../database-configurations/url-config.js";

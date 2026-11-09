@@ -2,11 +2,8 @@ import { afterEach, beforeEach, describe, it } from "vitest";
 import "../support/active-record-unit.js";
 import { ControllerRuntime, RuntimeRegistry } from "@blazetrails/activerecord";
 import { Project } from "../fixtures/project.js";
-import {
-  assertEqual,
-  assertMatch,
-  LogSubscriber as ActiveSupportLogSubscriber,
-} from "@blazetrails/activesupport";
+import { LogSubscriber as ActiveSupportLogSubscriber } from "@blazetrails/activesupport";
+import { assertEqual, assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import {
   setup as testHelperSetup,
   teardown as testHelperTeardown,

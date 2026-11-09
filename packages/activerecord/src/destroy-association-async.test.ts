@@ -12,7 +12,7 @@ import {
   assertNot,
   assertPredicate,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { include, rbEqual, regexpEscape, TopLevel, constSet } from "@blazetrails/ruby-compat";

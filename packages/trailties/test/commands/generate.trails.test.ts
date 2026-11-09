@@ -1,4 +1,4 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { afterEach, describe, it, expect, vi } from "vitest";
 import { invoke as commandInvoke } from "../../lib/command.js";
 import { Application } from "../../lib/application.js";

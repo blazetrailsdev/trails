@@ -1,6 +1,6 @@
 import { GlobalID } from "../lib/global-id.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {

@@ -19,13 +19,13 @@ import { CpkBook } from "../test-helpers/models/cpk.js";
 import { UuidItem, UuidValidatingItem } from "../test-helpers/models/uuid-item.js";
 import "../support/canonical-model-index.js";
 import { Range } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
 import {
   assertChanges,
   assertEmpty,
   assertNothingRaised,
   assertRaises,
-  DescendantsTracker,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import "../test-helpers/models/cpk.js";
 
 const INT_MAX_VALUE = 2147483647;

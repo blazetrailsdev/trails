@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
+import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Parser } from "../../../../lib/action-dispatch/journey/parser.js";
 import { Ast } from "../../../../lib/action-dispatch/journey/nodes/node.js";
 import {

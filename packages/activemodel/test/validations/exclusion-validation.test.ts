@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assert, assertPredicate, Duration } from "@blazetrails/activesupport";
+import { Duration } from "@blazetrails/activesupport";
+import { assert, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Range } from "@blazetrails/ruby-compat";
 import { Topic } from "../models/topic.js";
 import { Person } from "../models/person.js";

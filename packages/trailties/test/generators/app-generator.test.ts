@@ -1,5 +1,6 @@
 import { Dir, File, FileUtils, Gem, Process, rbFBackquote } from "@blazetrails/ruby-compat";
-import { assertNoChanges, assertNoMatch, capture } from "@blazetrails/activesupport";
+import { assertNoChanges, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppGenerator } from "../../lib/generators/trails/app/app-generator.js";

@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertEqual, assertRaises } from "@blazetrails/activesupport";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import type { Mapper } from "../../../../lib/action-dispatch/routing/mapper.js";
 import { RouteSet } from "../../../../lib/action-dispatch/routing/route-set.js";
 import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";

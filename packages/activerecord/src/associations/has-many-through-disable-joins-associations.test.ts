@@ -3,7 +3,7 @@ import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { assertDifference } from "@blazetrails/activesupport";
+import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 

@@ -1,4 +1,4 @@
-import { assertRaise, assertRaises } from "@blazetrails/activesupport";
+import { assertRaise, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

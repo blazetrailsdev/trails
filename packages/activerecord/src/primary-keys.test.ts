@@ -4,10 +4,10 @@ import { Base } from "./index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import {
   assertChanges,
-  assertNotDeprecated,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { deprecator } from "./deprecator.js";
 import { adapterType } from "./test-adapter.js";

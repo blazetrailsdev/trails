@@ -1,10 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
-import {
-  assertEqual,
-  assertRaise,
-  Logger,
-  ToJsonWithActiveSupportEncoder,
-} from "@blazetrails/activesupport";
+import { Logger, ToJsonWithActiveSupportEncoder } from "@blazetrails/activesupport";
+import { assertEqual, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 import { MissingTemplate } from "@blazetrails/actionview";
 import "../../support/abstract-unit.js";
 import { Mime } from "../../../lib/action-dispatch/http/mime-type.js";

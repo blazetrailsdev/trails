@@ -360,11 +360,6 @@ export {
   DeprecatedInstanceVariableProxy,
   DeprecatedConstantProxy,
 } from "./deprecation/proxy-wrappers.js";
-export {
-  assertDeprecated,
-  assertNotDeprecated,
-  collectDeprecations,
-} from "./testing/deprecation.js";
 
 export * from "./time-ext.js";
 import "./core-ext/date/calculations.js";
@@ -567,75 +562,6 @@ export type { MethodSource } from "./code-generator.js";
 export { prepend } from "@blazetrails/ruby-compat";
 export { ClassAttribute } from "./class-attribute.js";
 
-export {
-  travelTo,
-  travelBack,
-  travel,
-  freezeTime,
-  unfreezeTime,
-  afterTeardown,
-  SimpleStubs,
-} from "./testing/time-helpers.js";
-export {
-  Mock,
-  MockExpectationError,
-  MethodCallAssertions,
-  assertMock,
-  assertCalled,
-  assertCalledWith,
-  assertNotCalled,
-  expectCalledWith,
-  assertCalledOnInstanceOf,
-  assertNotCalledOnInstanceOf,
-  stub,
-  stubAnyInstance,
-} from "./testing/method-call-assertions.js";
-export {
-  assert,
-  assertNot,
-  assertPredicate,
-  assertNotPredicate,
-  assertRespondTo,
-  assertNotRespondTo,
-  assertIncludes,
-  assertNotIncludes,
-  assertInDelta,
-  assertEmpty,
-  assertNotEmpty,
-  assertNil,
-  assertNotNil,
-  assertEqual,
-  assertNotEqual,
-  message,
-  assertInstanceOf,
-  assertKindOf,
-  assertNotKindOf,
-  assertMatch,
-  assertNoMatch,
-  assertSame,
-  assertNotSame,
-  assertOperator,
-  diff,
-  assertRaises,
-  assertRaise,
-  assertNothingRaised,
-  _assertNothingRaisedOrWarn,
-  assertDifference,
-  assertNoDifference,
-  assertChanges,
-  assertNoChanges,
-  Assertion,
-  UnexpectedError,
-  UNTRACKED,
-  BacktraceFilter,
-  Minitest,
-} from "./testing/assertions.js";
-export { assertErrorReported, assertNoErrorReported } from "./testing/error-reporter-assertions.js";
-export { ConstantLookup } from "./testing/constant-lookup.js";
-export { beforeSetup, setTaggedLogger } from "./testing/tagged-logging.js";
-export { Stream, silenceStream, quietly, capture } from "./testing/stream.js";
-export * as SetupAndTeardown from "./testing/setup-and-teardown.js";
-export { Isolation } from "./testing/isolation.js";
 export { TestHelper as ExecutorTestHelper } from "./executor/test-helper.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";

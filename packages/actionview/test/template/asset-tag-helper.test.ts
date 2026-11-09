@@ -1,15 +1,14 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { assertMatch } from "@blazetrails/activesupport";
+import { assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "@blazetrails/ruby-compat";
+import { SafeBuffer, isHtmlSafe } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertNil,
   assertNothingRaised,
   assertPredicate,
   assertRaise,
-  SafeBuffer,
-  isHtmlSafe,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   assetPath,
   assetUrl,

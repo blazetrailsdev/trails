@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import {
+  htmlSafe,
+  isHtmlSafe,
+  MemoryStore,
+  extend,
+  Notifications,
+} from "@blazetrails/activesupport";
+import {
   assert,
   assertEmpty,
   assertEqual,
@@ -8,13 +15,8 @@ import {
   assertNothingRaised,
   assertNot,
   assertPredicate,
-  htmlSafe,
-  isHtmlSafe,
-  MemoryStore,
-  extend,
-  Notifications,
-  stub,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { rbFSend, setEnv } from "@blazetrails/ruby-compat";
 import { CacheHelper, Digestor, OutputBuffer, PartialRenderer } from "@blazetrails/actionview";
 import { Time } from "@blazetrails/date";

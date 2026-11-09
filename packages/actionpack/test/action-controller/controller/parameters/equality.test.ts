@@ -1,5 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
-import { assert, assertNot, assertNotEqual } from "@blazetrails/activesupport";
+import { assert, assertNot, assertNotEqual } from "@blazetrails/activesupport/testing/assertions";
 import { Parameters } from "../../../../lib/action-controller/metal/strong-parameters.js";
 
 describe("ParametersAccessorsTest", () => {

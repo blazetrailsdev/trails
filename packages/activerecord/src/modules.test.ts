@@ -5,7 +5,7 @@ import {
   assertNot,
   assertNotNil,
   assertNothingRaised,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { constDefined, rbModRemoveConst, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { minutes, hours, assertNil } from "@blazetrails/activesupport";
+import { minutes, hours } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 import * as Types from "../../lib/index.js";
 import { IntegerType as Integer } from "../../lib/type/integer.js";
 import { RangeError } from "../../lib/errors.js";

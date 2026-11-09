@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { getEnv, stub } from "@blazetrails/activesupport";
+import { getEnv } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { TestDatabases } from "./test-databases.js";
 import { Base } from "./index.js";

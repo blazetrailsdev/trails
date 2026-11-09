@@ -62,9 +62,8 @@ import {
 } from "../test-helpers/models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { travelTo, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import {
-  travelTo,
-  travelBack,
   assert,
   assertNot,
   assertPredicate,
@@ -75,7 +74,7 @@ import {
   assertDifference,
   assertNoDifference,
   assertEmpty,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import {

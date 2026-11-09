@@ -2,13 +2,13 @@ import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
+import { type CallbackChain } from "@blazetrails/activesupport";
 import {
   assert,
   assertNot,
   assertNothingRaised,
   assertRaises,
-  type CallbackChain,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { type Base as AbstractControllerBase } from "../../../lib/abstract-controller/base.js";
 import { Base } from "../../../lib/action-controller/base.js";

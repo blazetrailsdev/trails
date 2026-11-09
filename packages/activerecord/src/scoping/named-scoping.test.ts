@@ -1,13 +1,13 @@
 import { Enumerable, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { assertNotCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import {
-  assertNotCalled,
   assertNotEmpty,
   assertNothingRaised,
   assertRaises,
   assertRespondTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import "../index.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";

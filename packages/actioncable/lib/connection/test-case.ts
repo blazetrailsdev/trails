@@ -1,12 +1,10 @@
 import "../constants.test-case.generated.js";
 import { Headers, TestRequest as ActionDispatchTestRequest } from "@blazetrails/actionpack";
 import {
-  assertRaises,
   camelize,
   classAttribute,
   Concern,
   constantize,
-  ConstantLookup,
   extend,
   HashWithIndifferentAccess,
   include,
@@ -19,6 +17,8 @@ import {
   toQuery,
   withIndifferentAccess,
 } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
+import { ConstantLookup } from "@blazetrails/activesupport/testing/constant-lookup";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   defineModule,

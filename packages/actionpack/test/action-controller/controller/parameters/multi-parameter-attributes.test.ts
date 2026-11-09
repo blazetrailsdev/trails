@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assert } from "@blazetrails/activesupport";
+import { assert } from "@blazetrails/activesupport/testing/assertions";
 import { Parameters } from "../../../../lib/action-controller/metal/strong-parameters.js";
 
 describe("MultiParameterAttributesTest", () => {

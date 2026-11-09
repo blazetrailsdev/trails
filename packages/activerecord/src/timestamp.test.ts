@@ -1,7 +1,8 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
-import { assertInDelta, assertNothingRaised, travel, travelBack } from "@blazetrails/activesupport";
+import { assertInDelta, assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import {

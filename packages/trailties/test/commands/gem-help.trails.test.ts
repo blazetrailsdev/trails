@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Dir, File, getFs } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { invoke } from "../../lib/command.js";
 import { GemHelpCommand } from "../../lib/commands/gem-help.js";
 

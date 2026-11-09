@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import type { ReapablePool } from "./connection-adapters/abstract/connection-pool/reaper.js";
 import { Thread } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";

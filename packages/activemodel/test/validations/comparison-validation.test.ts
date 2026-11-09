@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assertPredicate } from "@blazetrails/activesupport";
+import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import {
   instant,
   plainDate,

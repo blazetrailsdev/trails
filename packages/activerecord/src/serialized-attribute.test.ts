@@ -17,7 +17,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { MessageEncryptor } from "@blazetrails/activesupport/message-encryptor";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { MissingAttributeError, Mutable, StringType, ValueType } from "@blazetrails/activemodel";

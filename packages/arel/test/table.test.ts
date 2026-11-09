@@ -3,7 +3,7 @@ import { Table, sql, TreeManager, Nodes, EmptyJoinError } from "../lib/index.js"
 
 import { mustBeLike } from "./support/must-be-like.js";
 import { uniq } from "./support/uniq.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 describe("TableTest", () => {
   const users = new Table("users");

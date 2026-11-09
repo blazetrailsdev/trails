@@ -4,7 +4,7 @@ import {
   assertEmpty,
   assertNotEmpty,
   assertRespondTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Table } from "@blazetrails/arel";

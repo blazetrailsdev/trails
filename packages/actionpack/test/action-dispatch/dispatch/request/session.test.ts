@@ -4,7 +4,8 @@ import {
   Session,
   type SessionStore,
 } from "../../../../lib/action-dispatch/request/session.js";
-import { assertEmpty, assertEqual, assertNil, MemoryStore } from "@blazetrails/activesupport";
+import { MemoryStore } from "@blazetrails/activesupport";
+import { assertEmpty, assertEqual, assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { Lint, Request as RackRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { RouteSet } from "../../../../lib/action-dispatch/routing/route-set.js";
 import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";

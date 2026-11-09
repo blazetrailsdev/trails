@@ -1,4 +1,4 @@
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { beforeEach, describe, it } from "vitest";
 import { SharedTestRoutes } from "../../../support/abstract-unit.js";
 import { API } from "../../../../lib/action-controller/api.js";

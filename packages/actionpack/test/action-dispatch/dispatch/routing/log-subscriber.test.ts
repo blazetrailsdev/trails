@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveSupport::LogSubscriber::TestHelper`; the class/interface merge is how the mixin surfaces on the type side. */
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { assertEqual, assertMatch } from "@blazetrails/activesupport";
+import { assertEqual, assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import {
   setup as testHelperSetup,
   TestHelper,

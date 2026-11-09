@@ -10,7 +10,7 @@ import {
   stderr,
   Tempfile,
 } from "@blazetrails/ruby-compat";
-import { assertIncludes, assertRaises } from "@blazetrails/activesupport";
+import { assertIncludes, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Error as MiniMagickError } from "@blazetrails/mini-magick";
 import { Error as ImageProcessingError } from "../lib/image-processing.js";

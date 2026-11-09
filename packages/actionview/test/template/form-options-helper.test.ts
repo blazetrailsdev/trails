@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "../support/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TimeZone, assertMatch, assertRaises, isHtmlSafe } from "@blazetrails/activesupport";
+import { TimeZone, isHtmlSafe } from "@blazetrails/activesupport";
+import { assertMatch, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, Enumerable, Hash, Range, Struct, include } from "@blazetrails/ruby-compat";
 import { Date as RubyDate } from "@blazetrails/date";
 import { Errors } from "@blazetrails/activemodel";

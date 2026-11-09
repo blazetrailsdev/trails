@@ -7,7 +7,7 @@ import { fixtures } from "../test-helpers/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
+import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Developer } from "../test-helpers/models/developer.js";

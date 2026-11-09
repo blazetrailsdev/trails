@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 
-import { assertEmpty } from "@blazetrails/activesupport";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";

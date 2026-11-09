@@ -1,6 +1,6 @@
 import { File, Dir } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { assertMatch, assertNoMatch } from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { beforeAll, beforeEach, describe, it } from "vitest";
 import { Application } from "../../lib/application.js";
 import "../../lib/trailties/active-record.js";

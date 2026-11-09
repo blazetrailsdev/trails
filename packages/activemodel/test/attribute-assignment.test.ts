@@ -3,7 +3,8 @@
    the Rails test model it mirrors does (attribute_assignment_test.rb:5-23); the class/interface
    merge beside it is how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { include, assertRaises } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, StandardError, isEmpty } from "@blazetrails/ruby-compat";
 import {
   type AttributeAssignment,

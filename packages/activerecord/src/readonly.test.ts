@@ -1,6 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import { assertNotEmpty } from "@blazetrails/activesupport";
+import { assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { ActiveRecordError, ReadOnlyRecord } from "./errors.js";

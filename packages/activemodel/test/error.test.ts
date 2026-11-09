@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertNotRespondTo, assertNothingRaised, extend } from "@blazetrails/activesupport";
+import { extend } from "@blazetrails/activesupport";
+import {
+  assertNotRespondTo,
+  assertNothingRaised,
+} from "@blazetrails/activesupport/testing/assertions";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Errors } from "../lib/errors.js";
 import { I18n } from "../lib/i18n.js";

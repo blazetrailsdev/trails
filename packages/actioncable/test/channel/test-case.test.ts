@@ -1,5 +1,5 @@
 import { describe, expect, it, type TestContext } from "vitest";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { hashAref, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import "../support/test-helper.js";
 import { User } from "../support/stubs/user.js";

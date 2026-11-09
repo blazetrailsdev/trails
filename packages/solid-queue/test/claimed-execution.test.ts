@@ -8,9 +8,9 @@ import { Callbacks } from "@blazetrails/activejob/callbacks";
 import {
   ActiveSupport,
   Reloader,
-  assertDifference,
   type ClassMethods as CallbacksClassMethods,
 } from "@blazetrails/activesupport";
+import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { RuntimeError, block, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import {
   ClaimedExecution,

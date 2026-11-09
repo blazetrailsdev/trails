@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertDeprecated, assertPredicate } from "@blazetrails/activesupport";
+import { assertDeprecated } from "@blazetrails/activesupport/testing/deprecation";
+import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { RangeError as ActiveRecordRangeError } from "../../errors.js";

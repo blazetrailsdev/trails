@@ -1,15 +1,14 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { include, TopLevel } from "@blazetrails/activesupport";
 import {
   Assertion,
   assertEqual,
   assertMatch,
   assertPredicate,
   assertRaise,
-  include,
-  TopLevel,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { File } from "@blazetrails/ruby-compat";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";

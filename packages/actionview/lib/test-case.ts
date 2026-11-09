@@ -2,7 +2,6 @@ import {
   camelize,
   classAttribute,
   Concern,
-  ConstantLookup,
   extend,
   HashWithIndifferentAccess,
   isBlank,
@@ -10,6 +9,7 @@ import {
   safeConstantize,
   underscore,
 } from "@blazetrails/activesupport";
+import { ConstantLookup } from "@blazetrails/activesupport/testing/constant-lookup";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { AbstractController, ActionController, ActionDispatch } from "@blazetrails/actionpack";
 import {

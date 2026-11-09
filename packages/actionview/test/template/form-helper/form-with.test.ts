@@ -5,20 +5,24 @@ import { Conversion, Naming } from "@blazetrails/activemodel";
 import {
   HashWithIndifferentAccess,
   I18n,
-  Mock,
-  assertEqual,
-  assertMock,
-  assertMatch,
-  assertNotIncludes,
-  expectCalledWith,
   extend,
   htmlSafe,
   humanize,
   isBlank,
   isPlainObject,
   isPresent,
-  stub,
 } from "@blazetrails/activesupport";
+import {
+  Mock,
+  assertMock,
+  expectCalledWith,
+  stub,
+} from "@blazetrails/activesupport/testing/method-call-assertions";
+import {
+  assertEqual,
+  assertMatch,
+  assertNotIncludes,
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   Hash,

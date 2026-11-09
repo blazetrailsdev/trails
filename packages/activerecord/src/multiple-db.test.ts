@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import "./index.js";
 import { Base } from "./base.js";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { withSecondPool } from "./support/setup-second-pool.js";

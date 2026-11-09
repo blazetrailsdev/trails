@@ -1,5 +1,5 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect, afterEach, beforeAll } from "vitest";
 import { Notifications, NotificationEvent as Event, Logger } from "@blazetrails/activesupport";
 import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";

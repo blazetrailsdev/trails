@@ -4,7 +4,7 @@ import {
   assertNoDifference,
   assertPredicate,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Thread, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";

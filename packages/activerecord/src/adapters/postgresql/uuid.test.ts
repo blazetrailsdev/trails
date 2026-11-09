@@ -9,14 +9,14 @@ import { Base, Migration, Migrator } from "../../index.js";
 import type { MigrationProxy } from "../../migration.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
+import { isPresent } from "@blazetrails/activesupport";
 import {
   assert,
   assertEmpty,
   assertNotPredicate,
   assertPredicate,
   assertRaises,
-  isPresent,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 
 class UUIDType extends Base {
   declare guid: string | null;

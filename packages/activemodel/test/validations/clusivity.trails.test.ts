@@ -1,5 +1,5 @@
 import { describe, it, afterEach, expect } from "vitest";
-import { assertNothingRaised, assertRaise } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 import { BigDecimal, Complex, Range, Rational } from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime as RubyDateTime, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "../../lib/attribute-assignment.js";

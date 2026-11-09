@@ -2,13 +2,9 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import type {} from "@blazetrails/vitest-matchers";
 import { Base as ActiveJobBase, DeserializationError } from "@blazetrails/activejob";
 import { TestHelper } from "@blazetrails/activejob/test-helper";
-import {
-  assertNothingRaised,
-  minutes,
-  hours,
-  constantize,
-  travelTo,
-} from "@blazetrails/activesupport";
+import { minutes, hours, constantize } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
+import { travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Time } from "@blazetrails/date";
 import { GlobalID, Identification } from "@blazetrails/globalid";

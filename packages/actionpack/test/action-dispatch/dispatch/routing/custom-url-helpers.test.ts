@@ -1,6 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
 import { Conversion, ModelName, Naming } from "@blazetrails/activemodel";
-import { assertEqual, assertRaises, Concern, extend, underscore } from "@blazetrails/activesupport";
+import { Concern, extend, underscore } from "@blazetrails/activesupport";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { include, merge, NameError, rbFSend, RuntimeError } from "@blazetrails/ruby-compat";
 import {
   Parameters,
