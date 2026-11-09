@@ -10,6 +10,7 @@ import {
   type Logger,
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
+import type { TestCase } from "@blazetrails/actionpack/testing";
 import {
   Dir,
   except,
@@ -145,7 +146,7 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("action_controller.test_case", (app) => {
-      onLoad("action_controller_test_case", (testCase: { executorAroundEachRequest: unknown }) => {
+      onLoad("action_controller_test_case", (testCase: typeof TestCase) => {
         testCase.executorAroundEachRequest = app.config.activeSupport.executorAroundTestCase;
       });
     });

@@ -247,7 +247,7 @@ async function placement(dir: string) {
   const reachable = await entryGraph(dir);
   const subpath = SUBPATH_ENTRIES[dir];
   const subpathGraph = new Set<string>();
-  for (const entry of [subpath ?? []].flat()) {
+  for (const entry of Array.isArray(subpath) ? subpath : subpath ? [subpath] : []) {
     for (const file of await entryGraph(dir, entry)) subpathGraph.add(file);
   }
   const separate = SEPARATE_SUBPATH_ENTRIES[dir];
