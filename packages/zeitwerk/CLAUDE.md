@@ -72,4 +72,8 @@ export, and cannot await a load. Such a body is a module-eval read, so by
 § "Call-time constant resolution" it is a plain ES import of the child file:
 `import { ReptileHouse } from "./zoo/reptile-house.js"`. The loader adds
 nothing for it: the eager load's later `require` of the child gets the same
-module instance from the module cache and seats it at `Zoo::ReptileHouse`.
+module instance from the module cache and seats it at `Zoo::ReptileHouse`. That
+holds past generation 1 and under a host `importer`: `zoo.ts` was itself loaded
+through `importer`, so its static import resolves in the same graph, and after
+a reload the resolve hook in `core-ext/kernel.ts` stamps `?zeitwerk=N` on every
+file under a root, the static import's target included, so both reach one URL.
