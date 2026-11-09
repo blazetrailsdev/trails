@@ -414,6 +414,21 @@ export class Trailtie extends BaseTrailtie {
         }
       });
     });
+
+    this.initializer("active_record.unregister_current_scopes_on_unload", (app) => {
+      this.config.afterInitialize(() => {
+        if (app.config.isReloadingEnabled()) {
+          Trails.autoloaders.main.onUnload((_cpath: string, value: unknown, _abspath: string) => {
+            if (
+              typeof value === "function" &&
+              Object.prototype.isPrototypeOf.call(ActiveRecord.Base, value)
+            ) {
+              (value as typeof ActiveRecord.Base).setCurrentScope(null);
+            }
+          });
+        }
+      });
+    });
   }
 }
 
