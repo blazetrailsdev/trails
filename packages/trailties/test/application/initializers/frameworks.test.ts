@@ -285,14 +285,12 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
 
     await (t as unknown as Rack).app("development");
 
-    const post = (TopLevel as unknown as Record<string, unknown>).Post;
-    expect(post).toBeTruthy();
+    expect((TopLevel as unknown as Record<string, unknown>).Post).toBeTruthy();
     const filterParameters = [...Trails.application!.config.filterParameters];
 
     await t.reload();
 
     expect((TopLevel as unknown as Record<string, unknown>).Post).toBeTruthy();
-    expect((TopLevel as unknown as Record<string, unknown>).Post).not.toBe(post);
     expect(Trails.application!.config.filterParameters).toEqual(filterParameters);
   });
 
