@@ -141,6 +141,7 @@ export function fetch<V>(
  * raising arm, and an explicitly-passed `undefined` is a default, exactly as
  * Ruby's `nil` is.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
+ * @perf 2x — PERMANENT
  */
 export function fetch(
   receiver:
@@ -148,13 +149,24 @@ export function fetch(
     | Map<unknown, unknown>
     | { fetch(key: string, ...rest: never): unknown },
   key: unknown,
-  ...rest: unknown[]
+  arg?: unknown,
+  ...more: unknown[]
 ): unknown {
+  const given = arguments.length;
   const plain = Object.getPrototypeOf(receiver) === Object.prototype;
+  if (plain && more.length === 0) {
+    const value = (receiver as Record<string, unknown>)[key as string];
+    if (value !== undefined && Object.hasOwn(receiver, key as string)) return value;
+  }
   if (!plain) {
     const own = ownMethod(receiver, "fetch");
-    if (own) return own.call(receiver, key, ...rest);
+    if (own) {
+      if (given === 2) return own.call(receiver, key);
+      if (more.length === 0) return own.call(receiver, key, arg);
+      return own.call(receiver, key, arg, ...more);
+    }
   }
+  const rest = given === 2 ? [] : [arg, ...more];
   const blockGiven = rbBlockGivenP(rest[rest.length - 1]);
   const argc = 1 + rest.length - (blockGiven ? 1 : 0);
   if (argc > 2) {

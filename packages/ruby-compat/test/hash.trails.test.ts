@@ -1367,3 +1367,65 @@ describe("Hash.new", () => {
     expect(() => new Hash("1", () => "2")).toThrow(ArgumentError);
   });
 });
+
+describe("Hash#fetch dispatch", () => {
+  it("sends a receiver's own fetch exactly the arguments it was given", () => {
+    const seen: number[] = [];
+    const row = new (class {
+      fetch(...args: unknown[]): unknown {
+        seen.push(args.length);
+        return args[1] ?? "own";
+      }
+    })();
+    expect(fetch(row, "a")).toBe("own");
+    expect(fetch(row, "a", undefined)).toBe("own");
+    expect(fetch(row, "a", 7)).toBe(7);
+    expect(seen).toEqual([1, 2, 2]);
+  });
+
+  it("does not read Object.prototype as a stored __proto__ key", () => {
+    expect(fetch({}, "__proto__", 0)).toBe(0);
+    expect(() => fetch({}, "__proto__")).toThrow(KeyError);
+  });
+
+  it("answers a plain object's stored value, default and block arms", () => {
+    expect(fetch({ a: 1 }, "a")).toBe(1);
+    expect(fetch({ a: null }, "a", 0)).toBe(null);
+    expect(fetch({}, "a", 0)).toBe(0);
+    expect(
+      fetch(
+        {},
+        "a",
+        block((k: string) => `${k}!`),
+      ),
+    ).toBe("a!");
+    expect(fetch({ a: undefined }, "a", 0)).toBe(0);
+    expect(() => fetch({ a: undefined }, "a")).toThrow(KeyError);
+  });
+
+  it("answers a Map's stored value, default and block arms", () => {
+    const map = new Map<unknown, unknown>([[1, "one"]]);
+    expect(fetch(map, 1, "x")).toBe("one");
+    expect(fetch(map, 2, "x")).toBe("x");
+    expect(
+      fetch(
+        map,
+        2,
+        block((k: unknown) => k),
+      ),
+    ).toBe(2);
+    expect(() => fetch(map, 2)).toThrow(KeyError);
+  });
+
+  it("lets a block supersede a default, as rb_hash_fetch_m does", () => {
+    const anyFetch = fetch as (...args: unknown[]) => unknown;
+    expect(
+      anyFetch(
+        {},
+        "a",
+        0,
+        block(() => 1),
+      ),
+    ).toBe(1);
+  });
+});
