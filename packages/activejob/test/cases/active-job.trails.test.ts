@@ -31,8 +31,6 @@ describe("ActiveJob", () => {
       "EnqueueAfterTransactionCommit",
       "Serializers",
       "ConfiguredJob",
-      "TestCase",
-      "TestHelper",
     ]);
   });
 

@@ -73,9 +73,6 @@ ActionMailer.autoload("MessageDelivery");
 ActionMailer.autoload("Parameterized");
 ActionMailer.autoload("QueuedDelivery");
 ActionMailer.autoload("FormBuilder");
-ActionMailer.autoload("NonInferrableMailerError", "action_mailer/test_case");
-ActionMailer.autoload("TestCase");
-ActionMailer.autoload("TestHelper");
 ActionMailer.autoload("Preview", "action_mailer/preview");
 ActionMailer.autoload("Previews", "action_mailer/preview");
 

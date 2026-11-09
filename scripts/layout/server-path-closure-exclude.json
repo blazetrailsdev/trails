@@ -1,8 +1,4 @@
 {
-  "server-path-actionmailer-testing": [
-    "packages/actionmailer/dist/test-case.js",
-    "packages/actionmailer/dist/test-helper.js"
-  ],
   "server-path-actionpack-testing": [
     "packages/actionpack/dist/action-dispatch/testing/assertion-response.js",
     "packages/actionpack/dist/action-dispatch/testing/assertions.js",
@@ -19,15 +15,7 @@
     "packages/actionview/dist/rails-dom-testing/assertions.js",
     "packages/actionview/dist/test-case.js"
   ],
-  "server-path-activejob-testing": [
-    "packages/activejob/dist/queue-adapters/test-adapter.js",
-    "packages/activejob/dist/test-case.js",
-    "packages/activejob/dist/test-helper.js"
-  ],
-  "server-path-activerecord-testing": [
-    "packages/activerecord/dist/support/async-helper.js",
-    "packages/activerecord/dist/support/describe-if-pg.js"
-  ],
+  "server-path-activejob-test-adapter": ["packages/activejob/dist/queue-adapters/test-adapter.js"],
   "server-path-activesupport-index-testing": [
     "packages/activesupport/dist/testing/assertions.js",
     "packages/activesupport/dist/testing/constant-lookup.js",
@@ -46,6 +34,11 @@
     "packages/activesupport/dist/testing/file-fixtures.js"
   ],
   "server-path-mail-test-mailer": ["packages/mail/dist/network/delivery-methods/test-mailer.js"],
+  "server-path-railtie-integration-test-hooks": [
+    "packages/actionmailer/dist/test-case.js",
+    "packages/actionmailer/dist/test-helper.js",
+    "packages/activejob/dist/test-helper.js"
+  ],
   "server-path-trailties-test-unit-trailtie-vitest": [
     "packages/trailties/dist/test-unit/trailtie.js"
   ]

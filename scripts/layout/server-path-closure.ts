@@ -85,10 +85,12 @@ export async function readPackages(root = ROOT_DIR): Promise<Map<string, Package
         : (declared as Record<string, ExportTarget>);
     const exports: Record<string, string> = {};
     const patterns: [string, string | null][] = [];
+    const blocked = new Set<string>();
     for (const [key, target] of Object.entries(raw)) {
       const file = runtimeTarget(target);
       if (key.includes("*")) patterns.push([key, file]);
       else if (file !== null) exports[key] = path.join(dir, file);
+      else blocked.add(key);
     }
     if (patterns.length > 0) {
       const built = (await fs.readdir(path.join(dir, "dist"), { recursive: true }).catch(() => []))
@@ -101,7 +103,11 @@ export async function readPackages(root = ROOT_DIR): Promise<Map<string, Package
           const stem = wildcardMatch(file, rel);
           if (stem === null) continue;
           const expanded = key.replace("*", stem);
-          if (expanded in exports || excluded.some((k) => wildcardMatch(k, expanded) !== null)) {
+          if (
+            expanded in exports ||
+            blocked.has(expanded) ||
+            excluded.some((k) => wildcardMatch(k, expanded) !== null)
+          ) {
             continue;
           }
           exports[expanded] = path.join(dir, rel);
