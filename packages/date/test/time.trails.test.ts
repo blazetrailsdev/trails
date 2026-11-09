@@ -2,7 +2,16 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, Date as RbDate, DateTime } from "../lib/date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "../lib/time.js";
-import { Rational, env, rbFSend, rbObjRespondTo, setEnv, toF } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  env,
+  rbFSend,
+  rbObjInstanceVariables,
+  rbObjIvarSet,
+  rbObjRespondTo,
+  setEnv,
+  toF,
+} from "@blazetrails/ruby-compat";
 
 describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
   afterEach(() => {
@@ -996,5 +1005,37 @@ describe("Time#strftime through rb_strftime", () => {
   it("raises ArgumentError for a format that ends inside a conversion", () => {
     expect(() => Time.utc(2008, 3, 1).strftime("%")).toThrow(ArgumentError);
     expect(Time.utc(2008, 3, 1).strftime("%-5d|%Eq|%::::z|%3:z")).toBe("1|%Eq|%::::z|+00:00");
+  });
+});
+
+describe("Time#strftime subsecond and epoch directives", () => {
+  it("formats a whole-nanosecond time before the epoch", () => {
+    const time = Time.at(-1, 123456789, "nsec", { in: "UTC" });
+    expect(time.strftime("%s %L %N %3N %6N %12N %-N")).toBe(
+      "-1 123 123456789 123 123456 123456789000 123456789",
+    );
+  });
+
+  it("formats a time whose seconds are not a whole number of nanoseconds", () => {
+    const time = Time.at(new Rational(1, 3), { in: "UTC" });
+    expect(time.strftime("%s %L %N %12N")).toBe("0 333 333333333 333333333333");
+    expect(Time.at(new Rational(-1, 3), { in: "UTC" }).strftime("%s %N")).toBe("-1 666666666");
+  });
+});
+
+describe("Time#getutc (time_dup)", () => {
+  it("keeps the receiver's class but copies no instance variables", () => {
+    class Stamp extends Time {}
+    const time = Object.setPrototypeOf(
+      Time.at(1000000000, { in: "+09:00" }),
+      Stamp.prototype,
+    ) as Stamp;
+    rbObjIvarSet(time, "@note", "kept?");
+    const utc = time.getutc();
+    expect(utc).toBeInstanceOf(Stamp);
+    expect(utc.isUtc()).toBe(true);
+    expect(time.isUtc()).toBe(false);
+    expect(utc.toI()).toBe(time.toI());
+    expect(rbObjInstanceVariables(utc)).toEqual([]);
   });
 });

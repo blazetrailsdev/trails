@@ -2,7 +2,7 @@ import { Temporal } from "@js-temporal/polyfill";
 import { tzdataAbbreviation } from "./tzdata-abbreviations.js";
 import { tzdataIsdst, tzdataOffsetInstant } from "./tzdata-isdst.js";
 import { rbWarning } from "./rb-warning.js";
-import { rbStrftime, type StrftimeVtm } from "./strftime.js";
+import { rbStrftime, rbStrftimeTimespec, type StrftimeVtm, type Timespec } from "./strftime.js";
 import {
   ArgumentError,
   Date,
@@ -29,7 +29,7 @@ import {
   rbDefineAllocFunc,
   rbHash,
   rbBigNorm,
-  rbObjDup,
+  rbObjClass,
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -470,19 +470,70 @@ function zoneOffsetAt(timeZoneId: string, ns: bigint, localZone = true): number 
 }
 
 /**
- * `rb_strftime_alloc` (`vendor/ruby/v3.3.11/time.c:5194-5210`).
+ * The `struct vtm` `time_strftime` hands `rb_strftime_alloc` (`vendor/ruby/v3.3.11/time.c:5234-5264`).
  *
- * @missingRailsCall rb_strftime_timespec — PERMANENT
+ * @noRailsEquivalent PERMANENT
  */
+class TimeVtm implements StrftimeVtm {
+  readonly year: number;
+  readonly mon: number;
+  readonly mday: number;
+  readonly hour: number;
+  readonly min: number;
+  readonly sec: number;
+  readonly wday: number;
+  readonly yday: number;
+  readonly utcOffset: number;
+  readonly #time: Time;
+
+  constructor(time: Time) {
+    this.#time = time;
+    this.year = time.year;
+    this.mon = time.mon;
+    this.mday = time.day;
+    this.hour = time.hour;
+    this.min = time.min;
+    this.sec = time.sec;
+    this.wday = time.wday;
+    this.yday = time.yday;
+    this.utcOffset = time.utcOffset;
+  }
+
+  get zone(): unknown {
+    return this.#time.zone;
+  }
+}
+
+/** `rb_strftime_alloc` (`vendor/ruby/v3.3.11/time.c:5194-5210`). */
 function rbStrftimeAlloc(
   format: string,
   time: Time,
   vtm: StrftimeVtm,
+  ts: Timespec | null,
   timev: () => Rational,
   gmt: boolean,
 ): string | null {
+  if (ts) return rbStrftimeTimespec(format, time, vtm, ts, gmt);
   return rbStrftime(format, time, vtm, timev, gmt);
 }
+
+/** `timew2timespec_exact` (`vendor/ruby/v3.3.11/time.c:1973-1989`). */
+function timew2timespecExact(epochNs: bigint, subnano: Rational): Timespec | null {
+  if (!subnano.isZero()) return null;
+  let tvSec = epochNs / 1_000_000_000n;
+  let tvNsec = epochNs % 1_000_000_000n;
+  if (tvNsec < 0n) {
+    tvSec -= 1n;
+    tvNsec += 1_000_000_000n;
+  }
+  if (tvSec < TIMET_MIN || tvSec > TIMET_MAX) return null;
+  return { tvSec, tvNsec: Number(tvNsec) };
+}
+
+/** `TIMET_MIN` (`vendor/ruby/v3.3.11/internal/time.h:15-20`). */
+const TIMET_MIN = -(2n ** 63n);
+/** `TIMET_MAX` (`vendor/ruby/v3.3.11/internal/time.h:15-20`). */
+const TIMET_MAX = 2n ** 63n - 1n;
 
 /**
  * `rb_time_zone_abbreviation` (`vendor/ruby/v3.3.11/time.c:5746-5775`).
@@ -1646,26 +1697,12 @@ export class Time extends rbCTime {
       rbWarning("strftime called with empty format string");
       return "";
     }
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
-    const self = this;
     let timev: Rational | undefined;
     const str = rbStrftimeAlloc(
       format,
       this,
-      {
-        year: this.year,
-        mon: this.mon,
-        mday: this.day,
-        hour: this.hour,
-        min: this.min,
-        sec: this.sec,
-        wday: this.wday,
-        yday: this.yday,
-        utcOffset: this.utcOffset,
-        get zone(): unknown {
-          return self.zone;
-        },
-      },
+      new TimeVtm(this),
+      timew2timespecExact(this.#epochNs, this.#subnano),
       () => (timev ??= this.toR()),
       this.#tzmodeUtc,
     );
@@ -1696,6 +1733,17 @@ export class Time extends rbCTime {
   /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`), whose `MEMCPY` copies the whole `time_object`. */
   initializeCopy(time: Time): this {
     if ((this as Time) === time) return this;
+    return this.#initCopy(time);
+  }
+
+  /** `time_dup` (`vendor/ruby/v3.3.11/time.c:4058-4064`). */
+  #dup(): Time {
+    const klass = rbObjClass(this) as typeof Time;
+    return timeSAlloc(klass).#initCopy(this);
+  }
+
+  /** `time_init_copy` (`vendor/ruby/v3.3.11/time.c:4046`). */
+  #initCopy(time: Time): this {
     this.#vtmMemo = time.#vtmMemo;
     this.#instantMemo = time.#instantMemo;
     this.#epochNsMemo = time.#epochNsMemo;
@@ -1806,7 +1854,7 @@ export class Time extends rbCTime {
 
   /** `time_getgmtime` (`vendor/ruby/v3.3.11/time.c:4291`). */
   getutc(): Time {
-    return rbObjDup(this).utc();
+    return this.#dup().utc();
   }
 
   getlocal(utcOffset: number | string | object | null = null): Time {
@@ -2061,7 +2109,8 @@ Time.rfc822 = Time.rfc2822;
 Time.iso8601 = Time.xmlschema;
 Time.prototype.iso8601 = Time.prototype.xmlschema;
 
-rbDefineAllocFunc(Time, (klass) => {
+/** `time_s_alloc` (`vendor/ruby/v3.3.11/time.c:1904-1917`). */
+function timeSAlloc(klass: typeof Time): Time {
   seatedTime = {
     vtm: null,
     utcOffset: null,
@@ -2073,7 +2122,9 @@ rbDefineAllocFunc(Time, (klass) => {
     subnano: new Rational(0, 1),
   };
   return new klass(0);
-});
+}
+
+rbDefineAllocFunc(Time, timeSAlloc);
 
 for (const seat of ["Temporal.Instant", "Date"]) {
   Object.assign((TEMPORAL_METHOD_TABLE[seat] ??= {}), {
