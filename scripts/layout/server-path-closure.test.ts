@@ -23,6 +23,7 @@ describe("server-path-closure", () => {
     expect(isTestingExport("./log-subscriber/test-helper")).toBe(true);
     expect(isTestingExport("./latest")).toBe(false);
     expect(isTestingExport("./network/delivery-methods/test-mailer")).toBe(false);
+    expect(isTestingExport("./queue-adapters/test-adapter")).toBe(false);
     expect(isTestingPath("testing/time-helpers.js")).toBe(true);
     expect(isTestingPath("attesting.js")).toBe(false);
   });
