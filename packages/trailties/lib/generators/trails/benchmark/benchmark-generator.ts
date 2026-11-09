@@ -13,7 +13,6 @@ export class BenchmarkGenerator extends NamedBase {
 
   declare reports: string[];
 
-  /** @missingRailsArgs template — PERMANENT */
   async generateLayout(): Promise<void> {
     if (!(await this.isIpsInstalled())) await this.addIpsToGemfile();
     await this.template("benchmark.ts", `script/benchmarks/${this.fileName}${this.ext()}`);
