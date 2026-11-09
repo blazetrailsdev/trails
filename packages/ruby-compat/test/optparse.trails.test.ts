@@ -12,4 +12,11 @@ describe("TestOptionParserSummaryTest", () => {
     o.programName = "foobar";
     expect(o.toString()).toBe("Usage: foobar [options]\n");
   });
+
+  it("default banner lists a nonswitch description", () => {
+    const o = new OptionParser();
+    o.programName = "foobar";
+    o.on("FILE", () => {});
+    expect(o.banner).toBe("Usage: foobar [options] [FILE]...");
+  });
 });
