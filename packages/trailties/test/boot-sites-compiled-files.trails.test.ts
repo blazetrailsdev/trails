@@ -4,6 +4,7 @@ import { Application } from "../lib/application.js";
 import { Engine } from "../lib/engine.js";
 import { Trails } from "../lib/trails.js";
 import { RoutesReloader } from "../lib/application/routes-reloader.js";
+import { loadDatabaseConfigModule } from "../lib/database.js";
 
 const loads: string[] = [];
 let tmp: string;
@@ -90,5 +91,47 @@ describe("boot sites load through a registered compiled file", () => {
     await CompiledEnvironmentApp.instance().requireEnvironmentBang();
 
     expect(loads).toEqual(["config/environment.ts"]);
+  });
+  it("loadDatabaseConfigModule reads config/database.ts through the thunk", async () => {
+    tmp = Dir.mktmpdir("compiled_database");
+    FileUtils.mkdirP(`${tmp}/config`);
+    File.write(`${tmp}/config/database.ts`, 'throw new Error("read from disk");\n');
+    registerCompiledFiles(tmp, {
+      "config/database.ts": async () => (
+        loads.push("config/database.ts"),
+        { default: { test: { adapter: "sqlite3" } } }
+      ),
+    });
+
+    const loaded = await loadDatabaseConfigModule(tmp);
+
+    expect(loads).toEqual(["config/database.ts"]);
+    expect(loaded?.module).toEqual({ test: { adapter: "sqlite3" } });
+  });
+
+  it("Application#configFor reads config/<name>.ts through the thunk", async () => {
+    const previousEnv = env.TRAILS_ENV;
+    setEnv("TRAILS_ENV", "test");
+    onTestFinished(() => setEnv("TRAILS_ENV", previousEnv));
+    tmp = Dir.mktmpdir("compiled_config_for");
+    FileUtils.mkdirP(`${tmp}/config`);
+    File.write(`${tmp}/config/compiled-cable.ts`, 'throw new Error("read from disk");\n');
+    File.write(`${tmp}/config.ts`, "");
+    registerCompiledFiles(tmp, {
+      "config/compiled-cable.ts": async () => (
+        loads.push("config/compiled-cable.ts"),
+        { default: { test: { adapter: "async" } } }
+      ),
+    });
+    class CompiledConfigApp extends Application {}
+    Application.register(CompiledConfigApp, tmp);
+    onTestFinished(() => {
+      Trails.application = null;
+    });
+
+    const config = await CompiledConfigApp.instance().configFor("compiled-cable");
+
+    expect(loads).toEqual(["config/compiled-cable.ts"]);
+    expect((config as { toH(): unknown }).toH()).toEqual({ adapter: "async" });
   });
 });

@@ -10,12 +10,12 @@ import {
 } from "@blazetrails/activesupport";
 import {
   File,
-  getPath,
   env,
   include,
   prepend,
   rbObjSingletonClass,
   RuntimeError,
+  loadIseqEval,
 } from "@blazetrails/ruby-compat";
 import { Reflection, type Base } from "@blazetrails/activerecord";
 import { setMultipleFileFieldIncludeHidden } from "@blazetrails/actionview/helpers/form-helper";
@@ -224,7 +224,7 @@ export class Engine extends TrailsEngine {
       const mod: { default?: Record<string, Record<string, unknown>> } | null =
         configFileExist &&
         TopLevel.Trails!.configuration!.activeStorage.serviceConfigurations == null
-          ? await import(getPath().pathToFileURL!(configFile).href)
+          ? await loadIseqEval(configFile)
           : null;
 
       onLoad("active_storage_blob", () => {
