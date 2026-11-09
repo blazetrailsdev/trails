@@ -2,9 +2,10 @@ import {
   Callbacks as ASCallbacks,
   Concern,
   extend,
+  include,
+  included,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { include } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "./action-mailbox.js";
 
 interface CallbacksClass {
@@ -46,14 +47,17 @@ export function aroundProcessing(
 
 export const ClassMethods = { beforeProcessing, afterProcessing, aroundProcessing };
 
-export const Callbacks = { TERMINATOR, ClassMethods };
+export const Callbacks = {
+  TERMINATOR,
+  ClassMethods,
+  [included](base: CallbacksClass): void {
+    base.defineCallbacks("process", {
+      terminator: TERMINATOR,
+      skipAfterCallbacksIfTerminated: true,
+    });
+  },
+};
 extend(Callbacks, Concern);
-Concern.included.call(Callbacks as never, null, function (this: CallbacksClass) {
-  include(this, ASCallbacks);
-  this.defineCallbacks("process", {
-    terminator: TERMINATOR,
-    skipAfterCallbacksIfTerminated: true,
-  });
-});
+include(Callbacks, ASCallbacks);
 
 ActionMailbox.Callbacks = Callbacks;

@@ -110,8 +110,8 @@ export class Base {
 }
 
 include(Base, Rescuable);
-include(Base, Callbacks);
 include(Base, Routing);
+include(Base, Callbacks);
 
 delegate.call(Base.prototype, "mail", "deliveredBang", "bouncedBang", { to: "inboundEmail" });
 

@@ -1,5 +1,5 @@
 import { ActionController } from "@blazetrails/actionpack";
-import { TopLevel, isPresent, underscore } from "@blazetrails/activesupport";
+import { TopLevel, isPresent, remove, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, env, rbModName } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "./action-mailbox.js";
 
@@ -20,14 +20,16 @@ export class BaseController extends ActionController.Base {
   /** @internal */
   private ingressName(): string {
     return underscore(
-      rbModName(this.constructor)!
-        .replace(/^ActionMailbox::Ingresses::/, "")
-        .replace(/::InboundEmailsController$/, ""),
+      remove(
+        rbModName(this.constructor)!,
+        /^ActionMailbox::Ingresses::/,
+        /::InboundEmailsController$/,
+      ),
     );
   }
 
   /** @internal */
-  protected async authenticateByPassword(): Promise<unknown> {
+  private async authenticateByPassword(): Promise<unknown> {
     const password = await this.password();
     if (isPresent(password)) {
       return this.httpBasicAuthenticateOrRequestWith({

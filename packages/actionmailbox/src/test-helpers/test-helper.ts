@@ -4,13 +4,11 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
 import { ActionController } from "@blazetrails/actionpack";
 import { File, constSet, env, setEnv } from "@blazetrails/ruby-compat";
-import { app } from "@blazetrails/activestorage/test-helpers/database/setup";
 import "./database/setup.js";
 import { InboundEmail } from "../inbound-email.js";
 
 setEnv("RAILS_INBOUND_EMAIL_PASSWORD", "tbsy84uSV1Kt3ZJZELY2TmShPRs91E3yL4tzf96297vBCkDWgL");
 
-TopLevel.Trails!.application!.credentials = () => app.credentials();
 await import("../config/routes.js");
 
 afterEach(async () => {
