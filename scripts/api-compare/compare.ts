@@ -3542,6 +3542,17 @@ export function buildModuleIncluderFqns(
       includers.add(fqn);
       moduleIncluderFqns.set(modFqn, includers);
     }
+    // `def self.included(base); base.send :include, Invocation; end`
+    // (thor/base.rb:116-120): whatever includes `fqn` includes these too, so
+    // `fqn` stands in as their includer and the transitive walk reaches its own.
+    for (const hook of info.includedHookMixins ?? []) {
+      for (const name of hook.names) {
+        const modFqn = resolveModuleName(name, fqn, moduleFqnByShort);
+        const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
+        includers.add(fqn);
+        moduleIncluderFqns.set(modFqn, includers);
+      }
+    }
   }
   return moduleIncluderFqns;
 }

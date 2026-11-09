@@ -76,10 +76,7 @@ export function applicationRoot(): Pathname | undefined {
   return undefined;
 }
 
-/**
- * @inventedArm replaceAll — PERMANENT
- * @inventedArm if — CONVERGEABLE port-help-and-version-commands-for-split-namespace
- */
+/** @inventedArm replaceAll — PERMANENT */
 export async function invoke(
   fullNamespace: string,
   args: string[] = [],
@@ -91,30 +88,6 @@ export async function invoke(
 
   try {
     await withArgv(args, async () => {
-      if (
-        fullNamespace === "" ||
-        fullNamespace === "help" ||
-        HELP_MAPPINGS.has(fullNamespace) ||
-        VERSION_MAPPINGS.has(fullNamespace)
-      ) {
-        const rake = (await findByNamespace("rake")) as typeof Base;
-        await lookupBang();
-        const program = createProgram();
-        if (fullNamespace !== "" && !VERSION_MAPPINGS.has(fullNamespace)) {
-          const tasks = await rake.printingCommands();
-          const width = Math.max(0, ...tasks.map(([name]) => name.length));
-          program.addHelpText(
-            "after",
-            ["", "In addition to those commands, there are:", ""]
-              .concat(tasks.map(([name, comment]) => `${name.padEnd(width)}  ${comment}`))
-              .join("\n"),
-          );
-        }
-        await program.parseAsync(fullNamespace === "" ? args : [fullNamespace, ...args], {
-          from: "user",
-        });
-        return;
-      }
       if (command && "perform" in command) {
         if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
           await command.perform(name, args, config);

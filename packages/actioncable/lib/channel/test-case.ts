@@ -1,3 +1,4 @@
+import "../constants.test-case.generated.js";
 import {
   assert,
   camelize,

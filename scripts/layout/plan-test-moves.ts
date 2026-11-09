@@ -10,7 +10,8 @@
  *
  * Test-only support files (under `test-helpers/`, `support/`, `test-setup/`,
  * `__fixtures__/`) go to the gem's matching Rails directory, else
- * `test/support/`. One a library file imports stays put and is flagged.
+ * `test/support/`. One a library file imports stays put and is flagged. A test
+ * file inside such a directory is still placed by rules 1-3.
  *
  * Reads `scripts/test-compare/output/convention-comparison.json`, which a full
  * `pnpm parity:test -- --json` writes.
@@ -129,7 +130,7 @@ export function planTestMoves(input: PlanInput): Plan {
       if (input.libImported.has(file)) flagged.push(`${libDir}/${file}`);
       else placed.set(file, home);
     } else if (isTestFile(file)) {
-      placed.set(file, home ?? `test/${MAIN_TEST_DIR[pkg] ?? ""}${file}`);
+      placed.set(file, `test/${MAIN_TEST_DIR[pkg] ?? ""}${file}`);
     }
   }
   const moves = [...placed]
