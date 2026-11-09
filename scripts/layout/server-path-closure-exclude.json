@@ -9,6 +9,5 @@
     "packages/actionmailer/dist/test-case.js",
     "packages/actionmailer/dist/test-helper.js",
     "packages/activejob/dist/test-helper.js"
-  ],
-  "server-path-trailties-console-integration-session": ["packages/actionpack/dist/testing.js"]
+  ]
 }
