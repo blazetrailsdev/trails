@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { rbModName } from "@blazetrails/ruby-compat";
 import { ActionDispatch } from "../lib/namespaces.js";
+import "../lib/testing.js";
 
 describe("ActionDispatch autoload_under testing", () => {
   it("seats IntegrationTest, TestRequest and AssertionResponse at their Ruby paths", async () => {
