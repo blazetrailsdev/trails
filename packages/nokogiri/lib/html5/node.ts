@@ -249,27 +249,108 @@ export class Node {
     return this.toFormat(SaveOptions.DEFAULT_HTML, options);
   }
 
+  toXml(options: { saveWith?: number; encoding?: string | null } = {}): string {
+    options.saveWith ||= SaveOptions.DEFAULT_XML;
+    return this.serialize(options);
+  }
+
   writeTo(io: StringIO, ...options: unknown[]): void {
     const block =
       typeof options.at(-1) === "function"
         ? (options.pop() as (config: SaveOptions) => void)
         : undefined;
     const opts = (options[0] !== null && typeof options[0] === "object" ? options.shift() : {}) as {
+      encoding?: string | null;
       saveWith?: number;
+      indent?: number;
+      indentText?: string;
       preserveNewline?: boolean;
     };
-    const saveOptions = opts.saveWith || SaveOptions.FORMAT;
+    const encoding = opts.encoding || (options[0] as string | null | undefined);
+    const saveOptions = opts.saveWith || (options[1] as number | undefined) || SaveOptions.FORMAT;
+    const indentTimes = opts.indent || 2;
+    const indentString = (opts.indentText || " ").repeat(indentTimes);
 
     const config = new SaveOptions(Number(saveOptions));
     if (block) block(config);
 
     const configOptions = config.options;
     if ((configOptions & (SaveOptions.AS_XML | SaveOptions.AS_XHTML)) !== 0) {
-      io.write(this.toString());
+      this.nativeWriteTo(io, encoding ?? null, indentString, configOptions);
     } else {
       const html = this.htmlStandardSerialize(opts.preserveNewline || false);
       io.write(html);
     }
+  }
+
+  /** @internal */
+  private nativeWriteTo(
+    io: StringIO,
+    encoding: string | null,
+    indentString: string,
+    options: number,
+  ): StringIO {
+    const format = (options & SaveOptions.FORMAT) !== 0;
+    const xhtml = (options & SaveOptions.AS_XHTML) !== 0;
+    const noEmpty = (options & SaveOptions.NO_EMPTY_TAGS) !== 0;
+    const escape = (text: string, attr: boolean): string =>
+      text.replace(attr ? /[&<"\n\r\t]/g : /[&<>\r]/g, (c) =>
+        c === "&"
+          ? "&amp;"
+          : c === "<"
+            ? "&lt;"
+            : c === ">"
+              ? "&gt;"
+              : c === '"'
+                ? "&quot;"
+                : `&#${c.charCodeAt(0)};`,
+      );
+    const dump = (node: Parse5Node | Parse5Parent, level: number): string => {
+      const n = node as {
+        nodeName: string;
+        tagName?: string;
+        attrs?: Parse5Attr[];
+        childNodes?: Parse5Node[];
+        value?: string;
+        data?: string;
+        name?: string;
+        content?: DefaultTreeAdapterMap["documentFragment"];
+      };
+      if (n.nodeName === "#text") return escape(n.value!, false);
+      if (n.nodeName === "#comment") return `<!--${n.data}-->`;
+      if (n.nodeName === "#documentType") return `<!DOCTYPE ${n.name}>`;
+      if (n.nodeName === "#document" || n.nodeName === "#document-fragment") {
+        let out = "";
+        if (n.nodeName === "#document" && (options & SaveOptions.NO_DECLARATION) === 0) {
+          out += `<?xml version="1.0"${encoding ? ` encoding="${encoding}"` : ""}?>\n`;
+        }
+        for (const child of n.childNodes!) out += `${dump(child, 0)}\n`;
+        return out;
+      }
+      const attrs = n.attrs!.map(
+        (a) => ` ${a.prefix ? `${a.prefix}:` : ""}${a.name}="${escape(a.value, true)}"`,
+      );
+      const children = n.content?.childNodes ?? n.childNodes!;
+      let out = `<${n.tagName}${attrs.join("")}`;
+      if (children.length === 0) {
+        if (xhtml && _VOID_ELEMENTS.has(n.tagName!)) {
+          return `${out} />`;
+        }
+        return noEmpty || xhtml ? `${out}></${n.tagName}>` : `${out}/>`;
+      }
+      out += ">";
+      const indent = format && children.every((c) => c.nodeName !== "#text");
+      if (indent) out += "\n";
+      for (const child of children) {
+        if (indent) out += indentString.repeat(level + 1);
+        out += dump(child, level + 1);
+        if (indent) out += "\n";
+      }
+      if (indent) out += indentString.repeat(level);
+      return `${out}</${n.tagName}>`;
+    };
+    io.write(dump(this._node, 0));
+    return io;
   }
 
   /** @internal */
@@ -416,6 +497,22 @@ export class Node {
 }
 
 include(Node, Searchable);
+
+const _VOID_ELEMENTS = new Set([
+  "area",
+  "base",
+  "br",
+  "col",
+  "embed",
+  "hr",
+  "img",
+  "input",
+  "link",
+  "meta",
+  "source",
+  "track",
+  "wbr",
+]);
 
 function _cloneNode<T extends object>(node: T, level: number): T {
   const copy: Record<string, unknown> = { ...node, parentNode: null };

@@ -10,6 +10,10 @@
       "types": "./dist/chronic.d.ts",
       "default": "./dist/chronic.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

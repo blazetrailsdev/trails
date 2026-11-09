@@ -374,4 +374,49 @@ describe("ActionsTest", () => {
   it("log with status with quiet", async () => {
     expect(await action(true, "yes", "YES")).toBe("");
   });
+
+  describe("the Gemfile family edits package.json", () => {
+    beforeEach(() => {
+      File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+      File.write(File.join(root, ".npmrc"), "");
+    });
+    const pkg = () =>
+      JSON.parse(read("package.json")) as Record<string, Record<string, string> | undefined>;
+
+    it("add source adds source to gemfile", async () => {
+      await capture("stdout", () => makeGen().addSource("http://gems.github.com"));
+      assertFile(".npmrc", /registry=http:\/\/gems\.github\.com\n/);
+    });
+
+    it("gem should put gem dependency in gemfile", async () => {
+      await capture("stdout", () => makeGen().gem("will-paginate"));
+      expect(pkg().dependencies).toEqual({ "will-paginate": "*" });
+    });
+
+    it("gem with version should include version in gemfile", async () => {
+      await capture("stdout", async () => {
+        const gen = makeGen();
+        await gen.gem("rspec", ">= 2.0.0");
+        await gen.gem("RedCloth", ">= 4.1.0", "< 4.2.0");
+        await gen.gem("nokogiri", { version: ">= 1.4.2" });
+        await gen.gem("faker", { version: [">= 0.1.0", "< 0.3.0"] });
+      });
+      expect(pkg().dependencies).toEqual({
+        rspec: ">= 2.0.0",
+        RedCloth: ">= 4.1.0 < 4.2.0",
+        nokogiri: ">= 1.4.2",
+        faker: ">= 0.1.0 < 0.3.0",
+      });
+    });
+
+    it("gem group should wrap gems in a group", async () => {
+      await capture("stdout", async () => {
+        const gen = makeGen();
+        await gen.gemGroup("development", "test", () => gen.gem("rspec-rails"));
+        await gen.gemGroup("production", () => gen.gem("fakeweb"));
+      });
+      expect(pkg().devDependencies).toEqual({ "rspec-rails": "*" });
+      expect(pkg().dependencies).toEqual({ fakeweb: "*" });
+    });
+  });
 });

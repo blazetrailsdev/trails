@@ -10,6 +10,10 @@
       "types": "./dist/et-orbi.d.ts",
       "default": "./dist/et-orbi.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

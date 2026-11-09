@@ -32,7 +32,7 @@ describe("Trails::Command.find_by_namespace", () => {
   it("hides unused_routes from the program, as printing_commands subtracts hidden_commands", async () => {
     await lookupBang();
     const hidden = hiddenCommands().map((klass) => klass.commandName());
-    expect(hidden).toEqual(["unused-routes", "application", "plugin", "help", "gem-help"]);
+    expect(hidden).toEqual(["application", "gem-help", "help", "plugin", "unused-routes"]);
   }, 30_000);
 
   it("finds a command ported onto Base by its namespace", async () => {
@@ -128,4 +128,34 @@ describe("Trails::Command.root", () => {
     setEngineRoot("/engine");
     expect(root()?.toString()).toBe("/engine");
   });
+});
+
+describe("Trails::Command.lookup", () => {
+  it("finds a command an application defines under lib/commands on the load path", async () => {
+    const { Dir, File, FileUtils, LOAD_PATH } = await import("@blazetrails/ruby-compat");
+    const lib = File.join(Dir.mktmpdir("lookup"), "lib");
+    await FileUtils.mkdirPAsync(File.join(lib, "commands"));
+    const base = File.expandPath(
+      "../lib/command/base.ts",
+      decodeURIComponent(new URL(".", import.meta.url).pathname),
+    );
+    await File.writeAsync(
+      File.join(lib, "commands", "foo.ts"),
+      `import { Base } from ${JSON.stringify(base)};
+export class FooCommand extends Base {
+  static {
+    this.desc("foo", "Foo");
+    this.methodAdded("perform");
+  }
+  perform() {}
+}
+`,
+    );
+    LOAD_PATH.unshift(lib);
+    onTestFinished(() => void LOAD_PATH.splice(LOAD_PATH.indexOf(lib), 1));
+
+    const foo = (await findByNamespace("foo")) as typeof Base;
+    expect(foo.name).toBe("FooCommand");
+    expect(foo.namespace()).toBe("foo");
+  }, 30_000);
 });
