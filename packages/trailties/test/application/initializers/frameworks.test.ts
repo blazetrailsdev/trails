@@ -390,7 +390,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
       await (t as unknown as Rack).app("development");
 
       expect(
-        await Base.connectionPool().schemaReflection.dataSources(null as never, "posts"),
+        await Base.connectionPool().schemaReflection.dataSources("__unused__" as never, "posts"),
       ).toBeTruthy();
     });
   });
@@ -409,7 +409,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
         await (t as unknown as Rack).app("development");
 
         expect(
-          await Base.connectionPool().schemaReflection.dataSources(null as never, "posts"),
+          await Base.connectionPool().schemaReflection.dataSources("__unused__" as never, "posts"),
         ).toBeTruthy();
         await expect(
           (async () => (await Base.leaseConnection()).execute("SELECT 1"))(),
@@ -418,8 +418,8 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     );
   });
 
-  // BLOCKED: port-active-record-define-attribute-methods-initializer
   it.skip("define attribute methods when schema cache is present and check_schema_cache_dump_version is false", async () => {
+    // BLOCKED: port-active-record-define-attribute-methods-initializer
     await t.trails("generate", "model", "post", "title:string");
     await t.trails("db:migrate", "db:schema:cache:dump");
 
@@ -504,8 +504,8 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     // BLOCKED: reload-autoloads-constant-on-first-reference
   });
 
-  // BLOCKED: activerecord-port-message-pack-module
   it.skip("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", async () => {
+    // BLOCKED: activerecord-port-message-pack-module
     await t.trails("generate", "model", "post", "title:string");
     await t.trails("db:migrate");
 
