@@ -3,16 +3,6 @@ import type { ThorClass } from "@blazetrails/thor";
 import { Base } from "../command/base.js";
 import { printingCommands } from "../command.js";
 
-const COMMANDS_IN_USAGE = [
-  "generate",
-  "console",
-  "server",
-  "test",
-  "test:system",
-  "dbconsole",
-  "new",
-];
-
 export class HelpCommand extends Base {
   static {
     const klass = this as unknown as ThorClass;
