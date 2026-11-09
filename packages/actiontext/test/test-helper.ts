@@ -30,6 +30,13 @@ for (const railtie of [ActiveSupportRailtie, ActiveRecordRailtie]) {
 
 DatabaseTasks.root = TopLevel.Trails!.root()!;
 
+await DatabaseTasks.purge(
+  Base.configurations().configsFor({
+    envName: String(ActiveRecord.ConnectionHandling.DEFAULT_ENV()),
+    name: "primary",
+  })!,
+);
+
 Migrator.migrationsPaths = [File.expandPath("dummy/db/migrate", import.meta.dirname)];
 await Base.establishConnection();
 await Migration.maintainTestSchemaBang();
