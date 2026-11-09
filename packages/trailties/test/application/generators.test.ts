@@ -163,6 +163,48 @@ describe("GeneratorsTest", () => {
     );
   }
 
+  it("api only generators allow overriding generator options", () => {
+    const hidden = [...TrailsGenerators.hiddenNamespaces()];
+    const options = { ...TrailsGenerators.options().trails };
+    try {
+      withBareConfig((c) => {
+        const g = c.generators() as ConfiguredGenerators;
+        g.helper = true;
+        c.apiOnly = true;
+        g.templateEngine = "my_template";
+        TrailsGenerators.configureBang(c.generators());
+      });
+
+      expect(TrailsGenerators.options().trails.api).toBeTruthy();
+      expect(TrailsGenerators.options().trails.helper).toBeTruthy();
+      expect(TrailsGenerators.options().trails.templateEngine).toBe("my_template");
+    } finally {
+      TrailsGenerators.hiddenNamespaces().splice(0, Infinity, ...hidden);
+      TrailsGenerators.options().trails = options;
+    }
+  });
+
+  it("api only generator generate mailer views", async () => {
+    const hidden = [...TrailsGenerators.hiddenNamespaces()];
+    const options = { ...TrailsGenerators.options().trails };
+    const mailer = TrailsGenerators.options().mailer;
+    try {
+      withBareConfig((c) => {
+        c.apiOnly = true;
+        TrailsGenerators.configureBang(c.generators());
+      });
+
+      await trails("generate", "mailer", "notifier", "foo");
+      expect(File.isExist(File.join(appRoot, "app/views/notifier-mailer/foo.text.tse"))).toBe(true);
+      expect(File.isExist(File.join(appRoot, "app/views/notifier-mailer/foo.html.tse"))).toBe(true);
+    } finally {
+      TrailsGenerators.hiddenNamespaces().splice(0, Infinity, ...hidden);
+      TrailsGenerators.options().trails = options;
+      if (mailer === undefined) delete TrailsGenerators.options().mailer;
+      else TrailsGenerators.options().mailer = mailer;
+    }
+  });
+
   it("generators with apply_eslint_autocorrect_after_generate!", async () => {
     withBareConfig((c) => {
       c.generators().applyEslintAutocorrectAfterGenerateBang();

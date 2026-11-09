@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/activesupport";
+import { TopLevel, onLoad } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   ActionDispatch,
@@ -10,9 +10,13 @@ import {
   CacheRequest,
   Response,
   ExceptionWrapper,
+  ParamBuilder,
+  CookieJar,
+  Mapper,
   type CustomProxies,
 } from "@blazetrails/actionpack";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
+import { Trails } from "../trails.js";
 
 export interface ActionDispatchConfig {
   xSendfileHeader: string | null;
@@ -99,17 +103,33 @@ export class Trailtie extends BaseTrailtie {
     });
 
     this.initializer("action_dispatch.configure", (app) => {
-      const cfg = this.config.actionDispatch;
-
       HttpURL.secureProtocol = app.config.forceSsl;
-      HttpURL.tldLength = cfg.tldLength;
-      QueryParser.strictQueryStringSeparator = cfg.strictQueryStringSeparator;
-      Request.Utils.performDeepMunge = cfg.performDeepMunge;
-      CacheRequest.strictFreshness = cfg.strictFreshness;
-      Response.defaultCharset = cfg.defaultCharset ?? app.config.encoding;
+      HttpURL.tldLength = app.config.actionDispatch.tldLength;
 
-      Object.assign(ExceptionWrapper.rescueResponses, cfg.rescueResponses);
-      Object.assign(ExceptionWrapper.rescueTemplates, cfg.rescueTemplates);
+      ParamBuilder.ignoreLeadingBrackets = app.config.actionDispatch.ignoreLeadingBrackets;
+      QueryParser.strictQueryStringSeparator = app.config.actionDispatch.strictQueryStringSeparator;
+
+      onLoad("action_dispatch_request", function (this: typeof Request) {
+        this.ignoreAcceptHeader = app.config.actionDispatch.ignoreAcceptHeader;
+        Request.Utils.performDeepMunge = app.config.actionDispatch.performDeepMunge;
+      });
+
+      onLoad("action_dispatch_response", function (this: typeof Response) {
+        this.defaultCharset = app.config.actionDispatch.defaultCharset || app.config.encoding;
+        this.defaultHeaders = app.config.actionDispatch.defaultHeaders;
+      });
+
+      Object.assign(ExceptionWrapper.rescueResponses, this.config.actionDispatch.rescueResponses);
+      Object.assign(ExceptionWrapper.rescueTemplates, this.config.actionDispatch.rescueTemplates);
+
+      if (this.config.actionDispatch.alwaysWriteCookie == null) {
+        this.config.actionDispatch.alwaysWriteCookie = Trails.env["development?"]();
+      }
+      CookieJar.alwaysWriteCookie = this.config.actionDispatch.alwaysWriteCookie;
+
+      Mapper.routeSourceLocations = Trails.env["development?"]();
+
+      CacheRequest.strictFreshness = app.config.actionDispatch.strictFreshness;
       ActionDispatch.testApp = app;
     });
 

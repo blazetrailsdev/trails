@@ -1,8 +1,8 @@
 import "../../../constants.active-record-model-model-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
-import { NamedBase } from "../../named-base.js";
-import { MigrationGenerator } from "../migration/migration-generator.js";
+import { Base } from "../../active-record.js";
+import { Generators } from "../../../generators.js";
 import { camelize, classify, underscore } from "@blazetrails/activesupport";
 
 export interface ModelGeneratorOptions extends GeneratorOptions {
@@ -14,7 +14,7 @@ export interface ModelGeneratorOptions extends GeneratorOptions {
   database?: string;
 }
 
-export class ModelGenerator extends NamedBase {
+export class ModelGenerator extends Base {
   declare options: ModelGeneratorOptions;
 
   static {
@@ -31,18 +31,6 @@ export class ModelGenerator extends NamedBase {
     this.methodAdded("createModuleFile");
   }
 
-  protected createMigrationGenerator(): MigrationGenerator {
-    return new MigrationGenerator(
-      [`create_${this.tableName()}`],
-      Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
-      {
-        destinationRoot: this.destinationRoot,
-        shell: this.shell,
-        behavior: this.behavior,
-      },
-    );
-  }
-
   async createMigrationFile(): Promise<void> {
     if (this.isSkipMigrationCreation()) return;
     const attributes = this.attributes;
@@ -53,9 +41,10 @@ export class ModelGenerator extends NamedBase {
       }
     }
 
-    const migGen = this.createMigrationGenerator();
-    migGen.attributes = attributes;
-    await migGen.createMigrationFile();
+    await this.migrationTemplate(
+      "create_table_migration.ts",
+      File.join(this.dbMigratePath(), `create_${this.tableName()}${this.ext()}`),
+    );
   }
 
   async createModelFile(): Promise<void> {
@@ -188,4 +177,16 @@ ModelGenerator.classOption("database", {
   aliases: ["--db"],
   desc: "The database for your model's migration. By default, the current environment's primary database is used.",
 });
+
+const baseName = (ModelGenerator as unknown as { baseName(): string }).baseName();
+for (const path of Generators.templatesPath()) {
+  ModelGenerator.sourcePaths().push(File.join(path, baseName, "migration"));
+}
+ModelGenerator.sourcePaths().push(
+  File.expandPath(
+    File.join(dasherize(baseName), "migration", "templates"),
+    ModelGenerator.baseRoot(),
+  ),
+);
+
 ModelGenerator.hookFor("testFramework");

@@ -10,7 +10,7 @@ import { QueryParser } from "@blazetrails/actionpack";
 import { Request } from "@blazetrails/actionpack";
 import { CacheRequest } from "@blazetrails/actionpack";
 import { Response } from "@blazetrails/actionpack";
-import { X_REQUEST_ID } from "@blazetrails/actionpack";
+import { X_REQUEST_ID, ParamBuilder, CookieJar } from "@blazetrails/actionpack";
 
 function cfg(): ActionDispatchConfig {
   return Trailtie.config.get("actionDispatch") as ActionDispatchConfig;
@@ -23,6 +23,10 @@ describe("ActionDispatch::Trailtie", () => {
   let savedPerformDeepMunge: boolean;
   let savedStrictFreshness: boolean;
   let savedDefaultCharset: string | null;
+  let savedDefaultHeaders: Record<string, string> | undefined;
+  let savedIgnoreLeadingBrackets: boolean | null | undefined;
+  let savedIgnoreAcceptHeader: boolean;
+  let savedAlwaysWriteCookie: boolean;
   let app: { deprecators: Deprecators; config: Configuration };
 
   beforeEach(() => {
@@ -32,6 +36,10 @@ describe("ActionDispatch::Trailtie", () => {
     savedPerformDeepMunge = Request.Utils.performDeepMunge;
     savedStrictFreshness = CacheRequest.strictFreshness;
     savedDefaultCharset = Response.defaultCharset;
+    savedDefaultHeaders = Response.defaultHeaders;
+    savedIgnoreLeadingBrackets = ParamBuilder.ignoreLeadingBrackets;
+    savedIgnoreAcceptHeader = Request.ignoreAcceptHeader;
+    savedAlwaysWriteCookie = CookieJar.alwaysWriteCookie;
     app = { deprecators: new Deprecators(), config: new Configuration("/app") };
   });
 
@@ -42,6 +50,10 @@ describe("ActionDispatch::Trailtie", () => {
     Request.Utils.performDeepMunge = savedPerformDeepMunge;
     CacheRequest.strictFreshness = savedStrictFreshness;
     Response.defaultCharset = savedDefaultCharset;
+    Response.defaultHeaders = savedDefaultHeaders;
+    ParamBuilder.ignoreLeadingBrackets = savedIgnoreLeadingBrackets;
+    Request.ignoreAcceptHeader = savedIgnoreAcceptHeader;
+    CookieJar.alwaysWriteCookie = savedAlwaysWriteCookie;
   });
 
   it("registers itself with the Railtie registry", () => {
@@ -88,5 +100,19 @@ describe("ActionDispatch::Trailtie", () => {
     cfg().defaultCharset = null;
     await runTrailtieInitializers(Trailtie, app);
     expect(Response.defaultCharset).toBe("utf-8");
+  });
+
+  it("runInitializers copies ignoreLeadingBrackets onto ParamBuilder", async () => {
+    cfg().ignoreLeadingBrackets = true;
+    await runTrailtieInitializers(Trailtie, app);
+    expect(ParamBuilder.ignoreLeadingBrackets).toBe(true);
+  });
+
+  it("runInitializers copies defaultHeaders onto Response and ignoreAcceptHeader onto Request", async () => {
+    cfg().defaultHeaders = { "X-Test": "1" };
+    cfg().ignoreAcceptHeader = true;
+    await runTrailtieInitializers(Trailtie, app);
+    expect(Response.defaultHeaders).toEqual({ "X-Test": "1" });
+    expect(Request.ignoreAcceptHeader).toBe(true);
   });
 });

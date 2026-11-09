@@ -41,3 +41,15 @@ export function configuredMigratePath(this: MigrationHost): string | undefined {
 
   return [config?.migrationsPaths ?? []].flat()[0];
 }
+
+/** @internal */
+export function primaryKeyType(this: { options: { primaryKeyType?: string } }): string | undefined {
+  const keyType = this.options.primaryKeyType;
+  if (keyType) return `, id: "${keyType}"`;
+}
+
+/** @internal */
+export function foreignKeyType(this: { options: { primaryKeyType?: string } }): string | undefined {
+  const keyType = this.options.primaryKeyType;
+  if (keyType) return `, type: "${keyType}"`;
+}

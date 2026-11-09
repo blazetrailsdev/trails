@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import {
   MigrationContext,
   Migrator,
@@ -41,6 +42,7 @@ interface RailtiesEngineTest extends Generation {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class RailtiesEngineTest extends TestCase {}
 include(RailtiesEngineTest, Isolation);
+registerSpecType(/^RailtiesTest::EngineTest$/, RailtiesEngineTest);
 
 const engineSource = (name: string, mod: string, railtieName?: string): string => `
 import { Engine } from "@blazetrails/trailties";
