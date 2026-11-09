@@ -309,12 +309,10 @@ export function optimizeIndentation(value: unknown, amount: number = 0): string 
 
 export const rebaseIndentation = optimizeIndentation;
 
-/** @internal */
 export function indentation(this: Pick<ActionsHost, "_indentation">): string {
   return "  ".repeat(this._indentation);
 }
 
-/** @internal */
 export async function withIndentation<H extends Pick<ActionsHost, "_indentation">>(
   this: H,
   block: (this: H, host: H) => unknown,
