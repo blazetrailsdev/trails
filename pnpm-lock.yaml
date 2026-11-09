@@ -335,6 +335,36 @@ importers:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
 
+  packages/actiontext:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+      '@blazetrails/activestorage':
+        specifier: workspace:*
+        version: link:../activestorage
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../globalid
+      '@blazetrails/html-sanitizer':
+        specifier: workspace:*
+        version: link:../html-sanitizer
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/actionview:
     dependencies:
       '@blazetrails/activesupport':
@@ -1274,6 +1304,9 @@ importers:
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../../packages/actionpack
+      '@blazetrails/actiontext':
+        specifier: workspace:*
+        version: link:../../packages/actiontext
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../../packages/actionview

@@ -49,6 +49,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "activejob",
     "actionmailer",
     "actionmailbox",
+    "actiontext",
     "activestorage",
     "trailties",
     "globalid",

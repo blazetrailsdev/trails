@@ -1760,6 +1760,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   activejob: "packages/activejob/test/",
   actionmailer: "packages/actionmailer/test/",
   actionmailbox: "packages/actionmailbox/src/",
+  actiontext: "packages/actiontext/test/",
   activestorage: "packages/activestorage/test/",
   trailties: "packages/trailties/test/",
   globalid: "packages/globalid/test/",
