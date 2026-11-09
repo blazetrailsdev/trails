@@ -9,13 +9,15 @@
     "packages/actionpack/dist/action-dispatch/testing/test-helpers/page-dump-helper.js",
     "packages/actionpack/dist/action-dispatch/testing/test-process.js",
     "packages/actionpack/dist/action-dispatch/testing/test-request.js",
-    "packages/actionpack/dist/action-dispatch/testing/test-response.js"
+    "packages/actionpack/dist/action-dispatch/testing/test-response.js",
+    "packages/activesupport/dist/testing/constant-lookup.js"
   ],
   "server-path-actionview-test-case": [
     "packages/actionview/dist/rails-dom-testing/assertions.js",
     "packages/actionview/dist/test-case.js"
   ],
   "server-path-activejob-test-adapter": ["packages/activejob/dist/queue-adapters/test-adapter.js"],
+  "server-path-activemodel-lint": ["packages/activesupport/dist/testing/assertions.js"],
   "server-path-activesupport-test-case-and-behaviors": [
     "packages/activesupport/dist/executor/test-helper.js",
     "packages/activesupport/dist/test-case.js",
