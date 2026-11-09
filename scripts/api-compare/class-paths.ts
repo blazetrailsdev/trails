@@ -71,7 +71,7 @@ const LAZY_DIRS: Record<string, string[]> = {
   ],
   actionmailbox: ["inbound-email.ts", "inbound-email/"],
   actionmailer: ["test-case.ts", "test-helper.ts"],
-  actionview: ["testing/resolvers.ts"],
+  actionview: ["test-case.ts", "testing/resolvers.ts"],
   activejob: ["test-case.ts", "test-helper.ts"],
   activestorage: ["blob.ts", "blob/", "variant-record.ts"],
   trailties: ["commands/", "command.ts", "generators/"],

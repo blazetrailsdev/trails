@@ -8,7 +8,7 @@
       "@blazetrails/actionpack": ["../actionpack/lib/index.ts"]
     }
   },
-  "include": ["lib/test-case.ts", "lib/constants.excluded.generated.ts"],
+  "include": ["lib/test-case.ts", "lib/constants.test-case.generated.ts"],
   "references": [
     {
       "path": "./tsconfig.json"

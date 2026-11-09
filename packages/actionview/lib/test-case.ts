@@ -43,7 +43,7 @@ import { OutputFlow } from "./flows.js";
 import { Helpers } from "./helpers.js";
 import { RecordIdentifier } from "./record-identifier.js";
 import { RoutingUrlFor } from "./routing-url-for.js";
-import "./constants.excluded.generated.js";
+import "./constants.test-case.generated.js";
 import { Testing } from "./rails-dom-testing/testing.js";
 import { Assertions as DomTestingAssertions } from "./rails-dom-testing/assertions.js";
 

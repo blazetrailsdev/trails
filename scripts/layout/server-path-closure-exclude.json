@@ -21,10 +21,7 @@
     "packages/actionpack/dist/action-dispatch/testing/test-request.js",
     "packages/actionpack/dist/action-dispatch/testing/test-response.js"
   ],
-  "server-path-actionview-test-case": [
-    "packages/actionview/dist/rails-dom-testing/assertions.js",
-    "packages/actionview/dist/test-case.js"
-  ],
+  "server-path-actionview-test-case": ["packages/actionview/dist/rails-dom-testing/assertions.js"],
   "server-path-activejob-testing": [
     "packages/activejob/dist/queue-adapters/test-adapter.js",
     "packages/activejob/dist/test-case.js",

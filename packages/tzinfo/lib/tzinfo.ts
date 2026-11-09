@@ -1,0 +1,33 @@
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { InvalidCountryCode } from "./country.js";
+import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
+import { AmbiguousTime, InvalidTimezoneIdentifier, PeriodNotFound, Timezone } from "./timezone.js";
+import { TimezoneOffset } from "./timezone-offset.js";
+import { TimezonePeriod } from "./timezone-period.js";
+import { TimezoneTransition } from "./timezone-transition.js";
+
+export {
+  AmbiguousTime,
+  ConstantOffsetDataTimezoneInfo,
+  InvalidCountryCode,
+  InvalidTimezoneIdentifier,
+  PeriodNotFound,
+  Timezone,
+  TimezoneOffset,
+  TimezonePeriod,
+  TimezoneTransition,
+};
+
+/** @noRailsEquivalent PERMANENT */
+export const TZInfo = {
+  Timezone,
+  DataTimezone: Timezone,
+  TimezonePeriod,
+  TimezoneOffset,
+  AmbiguousTime,
+  PeriodNotFound,
+  InvalidTimezoneIdentifier,
+  DataSources: { ConstantOffsetDataTimezoneInfo },
+  Data: { name: "TZInfo::Data" },
+};
+constSet(TopLevel, "TZInfo", TZInfo);
