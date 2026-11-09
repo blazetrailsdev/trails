@@ -156,6 +156,8 @@ class List {
   private update(sw: Switch, sopts: string[], lopts: string[]): void {
     for (const o of sopts) this.short.set(o, sw);
     for (const o of lopts) this.long.set(o, sw);
+    const used = new Set([...this.short.values(), ...this.long.values()]);
+    this.list = this.list.filter((o) => !(o instanceof Switch) || used.has(o));
   }
 
   /** `List#prepend`, `vendor/ruby/v3.3.11/lib/optparse.rb:886-889`. */

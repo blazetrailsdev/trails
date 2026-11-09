@@ -113,8 +113,6 @@ export function planTestMoves(input: PlanInput): Plan {
   const placed = new Map<string, string>();
   const prefixOf = (cp: ComparedPackage): string =>
     PKG_SRC_DIRS[cp.package] ?? `packages/${cp.package}/src/`;
-  // An aliased compare package (`rails-dom-testing`) sits under its host's
-  // prefix; the longer prefix claims its files first.
   const ordered = [...input.comparison].sort((a, b) => prefixOf(b).length - prefixOf(a).length);
   for (const cp of ordered) {
     const prefix = prefixOf(cp);
