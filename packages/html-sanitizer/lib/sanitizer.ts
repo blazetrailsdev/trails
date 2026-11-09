@@ -60,6 +60,7 @@ export class HTML4SafeListSanitizer extends Sanitizer {
 
   private readonly prune: boolean;
 
+  /** @missingRailsCall new — CONVERGEABLE html-sanitizer-port-scrubbers */
   constructor(options: { prune?: boolean } = {}) {
     super();
     this.prune = options.prune ?? false;
@@ -114,6 +115,7 @@ export class HTML5SafeListSanitizer extends Sanitizer {
 
   private readonly prune: boolean;
 
+  /** @missingRailsCall new — CONVERGEABLE html-sanitizer-port-scrubbers */
   constructor(options: { prune?: boolean } = {}) {
     super();
     this.prune = options.prune ?? false;
