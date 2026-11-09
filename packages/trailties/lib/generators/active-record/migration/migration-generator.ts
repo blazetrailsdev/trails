@@ -2,7 +2,7 @@ import "../../../constants.active-record-migration-migration-generator.generated
 import { File } from "@blazetrails/ruby-compat";
 import { IllegalMigrationNameError } from "@blazetrails/activerecord/migration";
 import type { GeneratorOptions } from "../../base.js";
-import { Base, indexNameLiteral, kwargs } from "../../active-record.js";
+import { Base } from "../../active-record.js";
 import { GeneratedAttribute } from "../../generated-attribute.js";
 import { foreignKey, pluralize, singularize, underscore } from "@blazetrails/activesupport";
 
@@ -46,72 +46,6 @@ export class MigrationGenerator extends Base {
       this._migrationTemplate,
       File.join(this.dbMigratePath(), `${underscore(name)}${this.ext()}`),
     );
-  }
-
-  protected migration(): string {
-    const table = this.tableName();
-    const lines: string[] = [];
-    if (this.migrationAction === "add") {
-      for (const attribute of this.attributes) {
-        if (attribute.reference()) {
-          lines.push(
-            `    await this.addReference("${table}", "${attribute.name}"${kwargs(attribute.injectOptions(), this.foreignKeyType())});`,
-          );
-        } else if (attribute.token()) {
-          lines.push(
-            `    await this.addColumn("${table}", "${attribute.name}", "string"${kwargs(attribute.injectOptions())});`,
-          );
-          lines.push(
-            `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions() || ", unique: true")});`,
-          );
-        } else if (!attribute.virtual()) {
-          lines.push(
-            `    await this.addColumn("${table}", "${attribute.name}", "${attribute.type}"${kwargs(attribute.injectOptions())});`,
-          );
-          if (attribute.hasIndex()) {
-            lines.push(
-              `    await this.addIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions())});`,
-            );
-          }
-        }
-      }
-    } else if (this.migrationAction === "join") {
-      lines.push(
-        `    await this.createJoinTable("${this.joinTables[0]}", "${this.joinTables[1]}", (t) => {`,
-      );
-      for (const attribute of this.attributes) {
-        if (attribute.reference()) {
-          lines.push(
-            `      t.references("${attribute.name}"${kwargs(attribute.injectOptions(), this.foreignKeyType())});`,
-          );
-        } else if (!attribute.virtual()) {
-          lines.push(
-            `      ${attribute.hasIndex() ? "" : "// "}t.index(${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions())});`,
-          );
-        }
-      }
-      lines.push("    });");
-    } else if (this.migrationAction) {
-      for (const attribute of this.attributes) {
-        if (attribute.reference()) {
-          lines.push(
-            `    await this.removeReference("${table}", "${attribute.name}"${kwargs(attribute.injectOptions(), this.foreignKeyType())});`,
-          );
-        } else {
-          if (attribute.hasIndex()) {
-            lines.push(
-              `    await this.removeIndex("${table}", ${indexNameLiteral(attribute)}${kwargs(attribute.injectIndexOptions())});`,
-            );
-          }
-          if (!attribute.virtual()) {
-            lines.push(
-              `    await this.removeColumn("${table}", "${attribute.name}", "${attribute.type}"${kwargs(attribute.injectOptions())});`,
-            );
-          }
-        }
-      }
-    }
-    return lines.join("\n");
   }
 
   /** @internal */

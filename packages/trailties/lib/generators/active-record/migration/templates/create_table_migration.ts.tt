@@ -1,7 +1,30 @@
 import { Migration } from "@blazetrails/activerecord";
+<% const kwargs = (...options) => { const pairs = options.join(""); return pairs === "" ? "" : `, { ${pairs.slice(2)} }`; }; -%>
+<% const indexName = (attribute) => { const name = attribute.indexName(); return Array.isArray(name) ? `[${name.map((n) => `"${n}"`).join(", ")}]` : `"${name}"`; }; -%>
 
 export class <%= this.migrationClassName %> extends Migration.get(<%= new Number(ActiveRecord.Migration.currentVersion()) %>) {
   async change()<%= this.isTypeScript() ? ": Promise<void>" : "" %> {
-<%= this.createTableMigration() %>
+    await this.createTable("<%= this.tableName() %>"<%= kwargs(this.primaryKeyType()) %>, (t) => {
+<% for (const attribute of this.attributes) { -%>
+<% if (attribute.passwordDigest()) { -%>
+      t.string("password_digest"<%= kwargs(attribute.injectOptions()) %>);
+<% } else if (attribute.token()) { -%>
+      t.string("<%= attribute.name %>"<%= kwargs(attribute.injectOptions()) %>);
+<% } else if (attribute.reference()) { -%>
+      t.<%= ActiveSupport.Inflector.camelize(attribute.type, false) %>("<%= attribute.name %>"<%= kwargs(attribute.injectOptions(), this.foreignKeyType()) %>);
+<% } else if (!attribute.virtual()) { -%>
+      t.<%= attribute.type %>("<%= attribute.name %>"<%= kwargs(attribute.injectOptions()) %>);
+<% } -%>
+<% } -%>
+<% if (this.options.timestamps ?? true) { -%>
+      t.timestamps();
+<% } -%>
+    });
+<% for (const attribute of this.attributes.filter((a) => a.token())) { -%>
+    await this.addIndex("<%= this.tableName() %>", <%= indexName(attribute) %><%= kwargs(attribute.injectIndexOptions() || ", unique: true") %>);
+<% } -%>
+<% for (const attribute of this.attributesWithIndex()) { -%>
+    await this.addIndex("<%= this.tableName() %>", <%= indexName(attribute) %><%= kwargs(attribute.injectIndexOptions()) %>);
+<% } -%>
   }
 }
