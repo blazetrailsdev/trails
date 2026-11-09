@@ -1389,8 +1389,9 @@ describe("Hash#fetch dispatch", () => {
   });
 
   it("lets a block supersede a default, as rb_hash_fetch_m does", () => {
+    const anyFetch = fetch as (...args: unknown[]) => unknown;
     expect(
-      fetch(
+      anyFetch(
         {},
         "a",
         0,
