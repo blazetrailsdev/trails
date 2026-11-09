@@ -29,7 +29,7 @@ import {
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel";
-import * as Lint from "@blazetrails/activemodel/lint";
+import * as Lint from "@blazetrails/activemodel/testing/lint";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { Company, Client, AbstractCompany } from "./test-helpers/models/company.js";
 import { Post, PostRecord } from "./test-helpers/models/post.js";
