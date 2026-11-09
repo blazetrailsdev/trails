@@ -45,8 +45,10 @@ export class BaseController extends ActionController.Base {
     const credential = (await TopLevel.Trails!.application!.credentials()).dig(
       "action_mailbox",
       "ingress_password",
-    ) as string | null | undefined;
-    return credential != null ? credential : env.RAILS_INBOUND_EMAIL_PASSWORD;
+    ) as string | false | null | undefined;
+    return credential != null && credential !== false
+      ? credential
+      : env.RAILS_INBOUND_EMAIL_PASSWORD;
   }
 }
 

@@ -103,17 +103,17 @@ describe("ActionMailbox::Base::CallbacksTest", () => {
 
   it("bouncing in a callback terminates processing", async () => {
     await BouncingCallbackMailbox.receive(inboundEmail);
-    expect(inboundEmail.isBounced()).toBe(true);
+    expect(inboundEmail.isBounced()).toBeTruthy();
     expect($beforeProcessing).toEqual(["Pre-bounce", "Bounce"]);
-    expect($processed).toBe(false);
-    expect($afterProcessing).toBe(false);
+    expect($processed).toBeFalsy();
+    expect($afterProcessing).toBeFalsy();
   });
 
   it("marking the inbound email as delivered in a callback terminates processing", async () => {
     await DiscardingCallbackMailbox.receive(inboundEmail);
-    expect(inboundEmail.isDelivered()).toBe(true);
+    expect(inboundEmail.isDelivered()).toBeTruthy();
     expect($beforeProcessing).toEqual(["Pre-discard", "Discard"]);
-    expect($processed).toBe(false);
-    expect($afterProcessing).toBe(false);
+    expect($processed).toBeFalsy();
+    expect($afterProcessing).toBeFalsy();
   });
 });

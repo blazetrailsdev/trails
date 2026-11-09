@@ -51,19 +51,19 @@ describe("ActionMailbox::Base::StateTest", () => {
 
   it("successful mailbox processing leaves inbound email in delivered state", async () => {
     await SuccessfulMailbox.receive(inboundEmail);
-    expect(inboundEmail.isDelivered()).toBe(true);
+    expect(inboundEmail.isDelivered()).toBeTruthy();
     expect($processed).toBe("I was processed");
   });
 
   it("unsuccessful mailbox processing leaves inbound email in failed state", async () => {
     await UnsuccessfulMailbox.receive(inboundEmail);
-    expect(inboundEmail.isFailed()).toBe(true);
+    expect(inboundEmail.isFailed()).toBeTruthy();
     expect($processed).toBe("failure");
   });
 
   it("bounced inbound emails are not delivered", async () => {
     await BouncingMailbox.receive(inboundEmail);
-    expect(inboundEmail.isBounced()).toBe(true);
+    expect(inboundEmail.isBounced()).toBeTruthy();
     expect($processed).toBe("bounced");
   });
 });
