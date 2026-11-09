@@ -21,6 +21,11 @@ export class CaptureEndEngine extends Engine {
   declare protected bufval: string;
   declare protected bufstack: string;
 
+  /**
+   * @inventedArm try — PERMANENT
+   * @inventedArm assign — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   constructor(input: string, properties: CaptureEndEngineProperties = {}) {
     properties = { ...properties };
     const escape = Object.hasOwn(properties, "escape")
@@ -35,18 +40,24 @@ export class CaptureEndEngine extends Engine {
       yieldReturnsBuffer: Object.hasOwn(properties, "yieldReturnsBuffer")
         ? properties.yieldReturnsBuffer!
         : false,
-      bufval: (properties.bufval ||= "::String.new"),
+      bufval: (properties.bufval ??= "::String.new"),
       bufstack: "__erubi_stack",
     };
-    properties.regexp ||= /<%(\|?={1,2}|-|#|%|\|)?(.*?)([-=])?%>([ \t]*\r?\n)?/s;
+    properties.regexp ??= /<%(\|?={1,2}|-|#|%|\|)?(.*?)([-=])?%>([ \t]*\r?\n)?/s;
     _pending = state;
-    super(input, properties);
-    _pending = null;
+    try {
+      super(input, properties);
+    } finally {
+      _pending = null;
+    }
     Object.assign(this, state);
     if (new.target === CaptureEndEngine) Object.freeze(this);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   protected override handle(
     indicator: string | null,
     code: string | null,
