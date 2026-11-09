@@ -1021,14 +1021,18 @@
     }
   },
   "html-sanitizer": {
-    "rows": 5,
-    "excluded": [
-      "full-sanitizer.ts::FullSanitizer",
-      "link-sanitizer.ts::LinkSanitizer",
-      "safe-list-sanitizer.ts::SafeListSanitizer"
-    ],
+    "rows": 11,
+    "excluded": [],
     "unwalked": [],
-    "residue": { "sanitizer.ts::Sanitizer": "Trails::HTML::Sanitizer" }
+    "residue": {
+      "sanitizer.ts::HTML4FullSanitizer": "Trails::HTML4::FullSanitizer",
+      "sanitizer.ts::HTML4LinkSanitizer": "Trails::HTML4::LinkSanitizer",
+      "sanitizer.ts::HTML4SafeListSanitizer": "Trails::HTML4::SafeListSanitizer",
+      "sanitizer.ts::HTML5FullSanitizer": "Trails::HTML5::FullSanitizer",
+      "sanitizer.ts::HTML5LinkSanitizer": "Trails::HTML5::LinkSanitizer",
+      "sanitizer.ts::HTML5SafeListSanitizer": "Trails::HTML5::SafeListSanitizer",
+      "sanitizer.ts::Sanitizer": "Trails::HTML::Sanitizer"
+    }
   },
   "i18n": {
     "rows": 27,

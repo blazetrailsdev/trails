@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { SafeListSanitizer } from "../lib/safe-list-sanitizer.js";
+import { HTML4SafeListSanitizer as SafeListSanitizer } from "../lib/sanitizer.js";
 import { DEFAULT_ALLOWED_ATTRIBUTES, DEFAULT_ALLOWED_TAGS } from "../lib/config.js";
 
 const sanitize = (

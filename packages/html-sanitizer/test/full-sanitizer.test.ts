@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { FullSanitizer } from "../lib/full-sanitizer.js";
+import { HTML4FullSanitizer as FullSanitizer } from "../lib/sanitizer.js";
 
 const fullSanitize = (input: string | null | undefined) => new FullSanitizer().sanitize(input);
 
