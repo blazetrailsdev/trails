@@ -59,7 +59,7 @@ function json(content: string) {
 function assertOption(generator: { options: unknown }, option: string): void {
   expect(
     (generator.options as Record<string, unknown>)[option],
-    `Expected generator option ${option} to be truthy.`,
+    `Expected generator option :${option} to be truthy.`,
   ).toBeTruthy();
 }
 
