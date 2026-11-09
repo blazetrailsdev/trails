@@ -50,10 +50,6 @@
       "types": "./dist/encryption/*.d.ts",
       "default": "./dist/encryption/*.js"
     },
-    "./test/support/*": {
-      "types": "./dist/support/*.d.ts",
-      "default": "./dist/support/*.js"
-    },
     "./support/*": null,
     "./cases/*": null,
     "./constants.query-assertions.generated": null,

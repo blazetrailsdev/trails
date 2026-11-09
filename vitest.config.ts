@@ -272,10 +272,6 @@ const alias = {
     __dirname,
     "packages/activerecord/src/adapters/mysql2-adapter.ts",
   ),
-  "@blazetrails/activerecord/support/config": path.resolve(
-    __dirname,
-    "packages/activerecord/src/support/config.ts",
-  ),
   "@blazetrails/activerecord/fixtures": path.resolve(
     __dirname,
     "packages/activerecord/src/fixtures.ts",
