@@ -66,6 +66,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "rake",
     "solid-queue",
     "solid-cable",
+    "tzinfo",
   ];
   const packageAliases: Record<string, [dir: string, pattern: string, ignore?: string]> = {
     erubi: ["tse-compiler", "**/*.test.ts"],
