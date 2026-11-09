@@ -18,7 +18,6 @@ export {
   TimezoneTransition,
 };
 
-/** @noRailsEquivalent PERMANENT */
 export const TZInfo = {
   Timezone,
   DataTimezone: Timezone,

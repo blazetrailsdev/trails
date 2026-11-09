@@ -1,7 +1,6 @@
 import { TimezoneOffset } from "./timezone-offset.js";
 import type { TimezoneTransition } from "./timezone-transition.js";
 
-/** @noRailsEquivalent PERMANENT */
 export class TimezonePeriod {
   readonly abbreviation: string;
   readonly observedUtcOffset: number;

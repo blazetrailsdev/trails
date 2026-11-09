@@ -24,17 +24,14 @@ import { TimezonePeriod } from "./timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
 import type { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
 
-/** @noRailsEquivalent PERMANENT */
 export class AmbiguousTime extends Error {
   override name = "AmbiguousTime";
 }
 
-/** @noRailsEquivalent PERMANENT */
 export class PeriodNotFound extends Error {
   override name = "PeriodNotFound";
 }
 
-/** @noRailsEquivalent PERMANENT */
 export class InvalidTimezoneIdentifier extends Error {
   override name = "InvalidTimezoneIdentifier";
 }
@@ -358,7 +355,6 @@ const TZDB_NAMES: readonly string[] = [
 
 const loadedTimezoneIdentifiers = new Set<string>();
 
-/** @noRailsEquivalent PERMANENT */
 export class Timezone {
   static all(): Timezone[] {
     return [...new Set([...Intl.supportedValuesOf("timeZone"), ...TZDB_NAMES])]

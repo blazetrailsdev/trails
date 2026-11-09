@@ -1,6 +1,5 @@
 import { TimezoneOffset } from "./timezone-offset.js";
 
-/** @noRailsEquivalent PERMANENT */
 export class TimezoneTransition {
   readonly offset: TimezoneOffset;
   readonly previousOffset: TimezoneOffset;

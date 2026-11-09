@@ -6,7 +6,7 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
-  "exclude": ["lib/test-case.ts", "lib/constants.test-case.generated.ts"],
+  "exclude": ["lib/test-case.ts", "lib/constants.excluded.generated.ts"],
   "references": [
     {
       "path": "../builder"

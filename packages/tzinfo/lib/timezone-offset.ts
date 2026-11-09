@@ -1,4 +1,3 @@
-/** @noRailsEquivalent PERMANENT */
 export class TimezoneOffset {
   readonly baseUtcOffset: number;
   readonly stdOffset: number;
