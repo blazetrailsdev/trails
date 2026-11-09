@@ -16,6 +16,9 @@ export class <%= this.migrationClassName %> extends Migration.get(<%= new Number
       t.<%= attribute.type %>("<%= attribute.name %>"<%= kwargs(attribute.injectOptions()) %>);
 <% } -%>
 <% } -%>
+<% if (this.attributes.length > 0) { -%>
+
+<% } -%>
 <% if (this.options.timestamps ?? true) { -%>
       t.timestamps();
 <% } -%>
