@@ -195,8 +195,12 @@ describe("GeneratorsTest", () => {
       });
 
       await trails("generate", "mailer", "notifier", "foo");
-      expect(File.isExist(File.join(appRoot, "app/views/notifier-mailer/foo.text.tse"))).toBe(true);
-      expect(File.isExist(File.join(appRoot, "app/views/notifier-mailer/foo.html.tse"))).toBe(true);
+      expect(
+        File.isExist(File.join(appRoot, "app/views/notifier-mailer/foo.text.tse")),
+      ).toBeTruthy();
+      expect(
+        File.isExist(File.join(appRoot, "app/views/notifier-mailer/foo.html.tse")),
+      ).toBeTruthy();
     } finally {
       TrailsGenerators.hiddenNamespaces().splice(0, Infinity, ...hidden);
       TrailsGenerators.options().trails = options;
