@@ -109,8 +109,6 @@ export abstract class Base extends (Group as unknown as (abstract new (
   declare static _sourcePaths?: string[];
   declare static _sourceRoot?: string | null;
   declare static _namespace?: string;
-  declare static _baseName?: string;
-  declare static _generatorName?: string;
   /** @internal */
   declare static _hooks?: Record<string, [string | undefined, string | undefined]>;
 
@@ -389,22 +387,18 @@ export abstract class Base extends (Group as unknown as (abstract new (
 
   /** @internal */
   protected static baseName(): string | undefined {
-    if (Object.hasOwn(this, "_baseName") && this._baseName != null) return this._baseName;
     const segments = (rbModName(this) ?? "").split("::");
     while (segments.at(-1) === "") segments.pop();
     const base = segments[0];
-    return (this._baseName = base != null ? _underscore(base) : undefined);
+    return base != null ? _underscore(base) : undefined;
   }
 
   /** @internal */
   protected static generatorName(): string | undefined {
-    if (Object.hasOwn(this, "_generatorName") && this._generatorName != null)
-      return this._generatorName;
     const segments = (rbModName(this) ?? "").split("::");
     while (segments.at(-1) === "") segments.pop();
     const generator = segments.at(-1);
-    return (this._generatorName =
-      generator != null ? _underscore(generator.replace(/Generator$/, "")) : undefined);
+    return generator != null ? _underscore(generator.replace(/Generator$/, "")) : undefined;
   }
 
   /** @internal */

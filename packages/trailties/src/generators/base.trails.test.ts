@@ -565,18 +565,6 @@ describe("Base names read the Ruby class path (base.rb:334-347)", () => {
     expect(klass.namespace()).toBe("trails:task");
   });
 
-  it("memoizes base and generator names per class, as @base_name ||= does", async () => {
-    const { TaskGenerator } = await import("./trails/task/task-generator.js");
-    const klass = TaskGenerator as unknown as { baseName(): string; generatorName(): string };
-    klass.baseName();
-    klass.generatorName();
-    expect(Object.hasOwn(TaskGenerator, "_baseName")).toBe(true);
-    expect(Object.hasOwn(TaskGenerator, "_generatorName")).toBe(true);
-    class Child extends TaskGenerator {}
-    expect(Object.hasOwn(Child, "_baseName")).toBe(false);
-    expect((Child as unknown as { _baseName?: string })._baseName).toBe("trails");
-  });
-
   it("finds trails/task/templates and trails/app/templates as the default source root", async () => {
     const { TaskGenerator } = await import("./trails/task/task-generator.js");
     const { AppGenerator } = await import("./trails/app/app-generator.js");
