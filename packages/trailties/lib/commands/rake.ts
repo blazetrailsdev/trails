@@ -3,7 +3,7 @@ import { Rake, TaskManager, type Application as RakeApplication } from "@blazetr
 import { extend, regexpEscape } from "@blazetrails/ruby-compat";
 import { Actions } from "../command/actions.js";
 import { Base } from "../command/base.js";
-import { UnrecognizedCommandError, printingCommands, root } from "../command.js";
+import { UnrecognizedCommandError, root } from "../command.js";
 
 export class RakeCommand extends Base {
   static {
@@ -22,18 +22,11 @@ export class RakeCommand extends Base {
       .map((task) => [task.nameWithArgs(), task.comment]);
   }
 
-  /** @inventedArm if — CONVERGEABLE rake-command-drops-invented-rakefile-guards */
   static override async perform(
     task: string,
     args: string[],
     _config: Record<string, unknown>,
   ): Promise<void> {
-    if ((await Rake.application!.findRakefileLocation()) == null) {
-      throw new UnrecognizedCommandError(
-        task,
-        (await printingCommands()).map(([name]) => name),
-      );
-    }
     await this.withRake([task, ...args], async (rake) => {
       const unrecognizedTask = rake.topLevelTasks
         .filter((t) => t !== "default")
@@ -78,12 +71,8 @@ export class RakeCommand extends Base {
     return result!;
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE rake-command-drops-invented-rakefile-guards
-   */
+  /** @internal */
   private static async rakeTasks(): Promise<RakeApplication["tasks"]> {
-    if ((await Rake.application!.findRakefileLocation()) == null) return [];
     return (this._rakeTasks ??= await this.withRake([], (rake) => rake.tasks));
   }
 }
