@@ -1,7 +1,4 @@
 export { Sanitizer, type SanitizeOptions } from "./sanitizer.js";
-export { FullSanitizer } from "./full-sanitizer.js";
-export { LinkSanitizer } from "./link-sanitizer.js";
-export { SafeListSanitizer } from "./safe-list-sanitizer.js";
 export { HTML, HTML as Html, HTML4 } from "./html4.js";
 export { HTML5 } from "./html5.js";
 export { type VendorMethods } from "./namespaces.js";

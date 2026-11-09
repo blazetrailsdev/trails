@@ -1,40 +1,36 @@
 import { extend } from "@blazetrails/ruby-compat";
-import { FullSanitizer as Html4FullSanitizer } from "./full-sanitizer.js";
-import { LinkSanitizer as Html4LinkSanitizer } from "./link-sanitizer.js";
-import { SafeListSanitizer as Html4SafeListSanitizer } from "./safe-list-sanitizer.js";
+import {
+  HTML5FullSanitizer,
+  HTML5LinkSanitizer,
+  HTML5SafeListSanitizer,
+  Sanitizer,
+} from "./sanitizer.js";
 import { HTML5, type VendorMethods } from "./namespaces.js";
 
-/** @noRailsEquivalent CONVERGEABLE html-sanitizer-parser-concerns */
-class FullSanitizer extends Html4FullSanitizer {}
+if (Sanitizer.isHtml5Support()) {
+  const VendorMethods: VendorMethods = {
+    get fullSanitizer() {
+      return HTML5.FullSanitizer;
+    },
 
-/** @noRailsEquivalent CONVERGEABLE html-sanitizer-parser-concerns */
-class LinkSanitizer extends Html4LinkSanitizer {}
+    get linkSanitizer() {
+      return HTML5.LinkSanitizer;
+    },
 
-/** @noRailsEquivalent CONVERGEABLE html-sanitizer-parser-concerns */
-class SafeListSanitizer extends Html4SafeListSanitizer {}
+    get safeListSanitizer() {
+      return HTML5.SafeListSanitizer;
+    },
 
-const VendorMethods: VendorMethods = {
-  get fullSanitizer() {
-    return HTML5.FullSanitizer;
-  },
+    get whiteListSanitizer() {
+      return this.safeListSanitizer;
+    },
+  };
 
-  get linkSanitizer() {
-    return HTML5.LinkSanitizer;
-  },
-
-  get safeListSanitizer() {
-    return HTML5.SafeListSanitizer;
-  },
-
-  get whiteListSanitizer() {
-    return this.safeListSanitizer;
-  },
-};
-
-HTML5.Sanitizer = {} as typeof HTML5.Sanitizer;
-extend(HTML5.Sanitizer, VendorMethods);
-HTML5.FullSanitizer = FullSanitizer;
-HTML5.LinkSanitizer = LinkSanitizer;
-HTML5.SafeListSanitizer = SafeListSanitizer;
+  HTML5.Sanitizer = {} as typeof HTML5.Sanitizer;
+  extend(HTML5.Sanitizer, VendorMethods);
+  HTML5.FullSanitizer = HTML5FullSanitizer;
+  HTML5.LinkSanitizer = HTML5LinkSanitizer;
+  HTML5.SafeListSanitizer = HTML5SafeListSanitizer;
+}
 
 export { HTML5 };
