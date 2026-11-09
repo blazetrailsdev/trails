@@ -2,13 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ts from "typescript-5";
 import {
   Base,
-  FixtureResolver,
   LookupContext,
   OutputBuffer,
   Template,
   TopLevel,
   TseHandler,
 } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { hashAref, keys } from "@blazetrails/ruby-compat";
 import { tseLookupTransformer, virtualizeTse } from "../../lib/plugins/tse.js";
 

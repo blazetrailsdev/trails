@@ -103,9 +103,8 @@ import * as m100 from "./template/sources.js";
 import * as m101 from "./template/sources/file.js";
 import * as m102 from "./template/text.js";
 import * as m103 from "./template/types.js";
-import * as m104 from "./testing/resolvers.js";
-import * as m105 from "./unbound-template.js";
-import * as m106 from "./view-paths.js";
+import * as m104 from "./unbound-template.js";
+import * as m105 from "./view-paths.js";
 
 defineConstants([
   [() => m78.AbstractRenderer, "ActionView::AbstractRenderer"],
@@ -136,7 +135,6 @@ defineConstants([
   [() => m7.Partial, "ActionView::Digestor::Partial"],
   [() => m90.EncodingError, "ActionView::EncodingError"],
   [() => m99.FileSystemResolver, "ActionView::FileSystemResolver"],
-  [() => m104.FixtureResolver, "ActionView::FixtureResolver"],
   [() => m10.Helpers, "ActionView::Helpers"],
   [() => m11.ActiveModelHelper, "ActionView::Helpers::ActiveModelHelper"],
   [() => m11.ActiveModelInstanceTag, "ActionView::Helpers::ActiveModelInstanceTag"],
@@ -233,7 +231,6 @@ defineConstants([
   [() => m90.Results, "ActionView::MissingTemplate::Results"],
   [() => m90.Result, "ActionView::MissingTemplate::Results::Result"],
   [() => m74.ModelNaming, "ActionView::ModelNaming"],
-  [() => m104.NullResolver, "ActionView::NullResolver"],
   [() => m80.ObjectRenderer, "ActionView::ObjectRenderer"],
   [() => m1.OutputBuffer, "ActionView::OutputBuffer"],
   [() => m8.OutputFlow, "ActionView::OutputFlow"],
@@ -276,9 +273,9 @@ defineConstants([
   [() => m87.Requested, "ActionView::TemplateDetails::Requested"],
   [() => m88.TemplatePath, "ActionView::TemplatePath"],
   [() => m84.TemplateRenderer, "ActionView::TemplateRenderer"],
-  [() => m105.UnboundTemplate, "ActionView::UnboundTemplate"],
+  [() => m104.UnboundTemplate, "ActionView::UnboundTemplate"],
   [() => m9.VERSION, "ActionView::VERSION"],
-  [() => m106.ViewPaths, "ActionView::ViewPaths"],
-  [() => m106.ClassMethods, "ActionView::ViewPaths::ClassMethods"],
+  [() => m105.ViewPaths, "ActionView::ViewPaths"],
+  [() => m105.ClassMethods, "ActionView::ViewPaths::ClassMethods"],
   [() => m90.WrongEncodingError, "ActionView::WrongEncodingError"],
 ]);

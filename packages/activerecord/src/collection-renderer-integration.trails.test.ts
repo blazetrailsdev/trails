@@ -1,12 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import {
-  Base,
-  FixtureResolver,
-  LookupContext,
-  Renderer,
-  Template,
-  TseHandler,
-} from "@blazetrails/actionview";
+import { Base, LookupContext, Renderer, Template, TseHandler } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 

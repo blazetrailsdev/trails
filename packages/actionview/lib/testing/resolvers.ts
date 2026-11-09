@@ -1,3 +1,4 @@
+import "../constants.testing-resolvers.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import type { LookupDetails } from "../path-set.js";
 import { Template } from "../template.js";

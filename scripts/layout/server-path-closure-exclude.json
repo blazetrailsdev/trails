@@ -25,7 +25,6 @@
     "packages/actionview/dist/rails-dom-testing/assertions.js",
     "packages/actionview/dist/test-case.js"
   ],
-  "server-path-actionview-testing-resolvers": ["packages/actionview/dist/testing/resolvers.js"],
   "server-path-activejob-testing": [
     "packages/activejob/dist/queue-adapters/test-adapter.js",
     "packages/activejob/dist/test-case.js",
@@ -44,8 +43,7 @@
     "packages/activerecord/dist/test-adapter.js",
     "packages/activerecord/dist/test-helpers/models/arunit2-model.js",
     "packages/activerecord/dist/test-helpers/models/index.js",
-    "packages/activerecord/dist/test-helpers/test-schema.js",
-    "packages/activerecord/dist/testing/query-assertions.js"
+    "packages/activerecord/dist/test-helpers/test-schema.js"
   ],
   "server-path-activesupport-index-testing": [
     "packages/activesupport/dist/testing/assertions.js",

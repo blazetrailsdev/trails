@@ -1,6 +1,6 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
-import { FixtureResolver } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { include } from "@blazetrails/activesupport";
 import { Rendering as AbstractControllerRendering } from "../../../../lib/abstract-controller/rendering.js";
 import { Base } from "../../../../lib/action-controller/base.js";

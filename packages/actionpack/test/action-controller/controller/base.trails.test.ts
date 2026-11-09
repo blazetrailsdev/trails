@@ -1,7 +1,7 @@
 import { rbModName } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { htmlSafe } from "@blazetrails/activesupport";
-import { FixtureResolver } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { Base, DoubleRenderError, PROTECTED_IVARS } from "../../../lib/action-controller/base.js";
 import { HttpAuthentication } from "../../../lib/action-controller/metal/http-authentication.js";
 import { API } from "../../../lib/action-controller/api.js";

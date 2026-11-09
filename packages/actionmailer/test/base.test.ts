@@ -1,3 +1,4 @@
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
@@ -1015,9 +1016,7 @@ describe("BaseTest", () => {
     class BeforeActionMailer extends Base {
       static {
         (this as unknown as ActionCallbacks).beforeAction(":addSpecialHeaderBang");
-        this.prependViewPath(
-          new ActionView.FixtureResolver({ "before-action-mailer/welcome.html.tse": "" }),
-        );
+        this.prependViewPath(new FixtureResolver({ "before-action-mailer/welcome.html.tse": "" }));
       }
 
       welcome() {
@@ -1040,9 +1039,7 @@ describe("BaseTest", () => {
     class AfterActionMailer extends Base {
       static {
         (this as unknown as ActionCallbacks).afterAction(":addSpecialHeaderBang");
-        this.prependViewPath(
-          new ActionView.FixtureResolver({ "after-action-mailer/welcome.html.tse": "" }),
-        );
+        this.prependViewPath(new FixtureResolver({ "after-action-mailer/welcome.html.tse": "" }));
       }
 
       welcome() {
@@ -1064,7 +1061,7 @@ describe("BaseTest", () => {
       static {
         (this as unknown as ActionCallbacks).beforeAction(":addInlineAttachmentBang");
         this.prependViewPath(
-          new ActionView.FixtureResolver({
+          new FixtureResolver({
             "default-inline-attachment-mailer/welcome.html.tse": "",
           }),
         );
@@ -1112,7 +1109,7 @@ describe("BaseTest", () => {
       class extends Base {
         static {
           this.prependViewPath(
-            new ActionView.FixtureResolver({ "anonymous/welcome.tse": "Anonymous mailer body\n" }),
+            new FixtureResolver({ "anonymous/welcome.tse": "Anonymous mailer body\n" }),
           );
         }
 
