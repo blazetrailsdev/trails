@@ -209,7 +209,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     await (t as unknown as Rack).app("development");
     const origDatabaseUrl = ENV["DATABASE_URL"];
     setEnv("DATABASE_URL", undefined);
-    const origTrailsEnv = String(Trails.env);
+    const origTrailsEnv = Trails.env;
     Trails.env = "development";
     try {
       await Base.establishConnection();
