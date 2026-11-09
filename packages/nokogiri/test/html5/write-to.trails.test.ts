@@ -17,5 +17,16 @@ describe("Nokogiri::HTML5::Node#write_to", () => {
     const noEmpty = new StringIO();
     div.writeTo(noEmpty, { saveWith: SaveOptions.AS_XML | SaveOptions.NO_EMPTY_TAGS });
     expect(noEmpty.string()).toBe("<div><p>a</p><br></br></div>");
+
+    const xhtml = new StringIO();
+    div.writeTo(xhtml, { saveWith: SaveOptions.AS_XHTML });
+    expect(xhtml.string()).toBe("<div><p>a</p><br /></div>");
+  });
+
+  it("escapes attribute values on the AS_XML arm", () => {
+    const doc = Document.parse(`<p title='a "b" & <c>'>x</p>`);
+    const io = new StringIO();
+    (doc.css("p").first() as Node).writeTo(io, { saveWith: SaveOptions.AS_XML });
+    expect(io.string()).toBe('<p title="a &quot;b&quot; &amp; &lt;c>">x</p>');
   });
 });

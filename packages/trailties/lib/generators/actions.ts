@@ -36,7 +36,10 @@ export interface GemOptions {
   [key: string]: unknown;
 }
 
-/** @missingRailsCall quote — PERMANENT */
+/**
+ * @missingRailsCall quote — PERMANENT
+ * @inventedArm writeAsync — PERMANENT
+ */
 export async function gem(this: ActionsHost, ...args: (string | GemOptions)[]): Promise<void> {
   const options = (extractOptionsBang(args) ?? {}) as GemOptions;
   const [name, ...versions] = args as string[];
@@ -98,7 +101,10 @@ export async function gemGroup(
   });
 }
 
-/** @missingRailsCall quote — PERMANENT */
+/**
+ * @missingRailsCall quote — PERMANENT
+ * @inventedArm prependFile — PERMANENT
+ */
 export async function addSource(
   this: ActionsHost,
   source: string,
@@ -403,7 +409,7 @@ export function optimizeIndentation(value: unknown, amount: number = 0): string 
 export const rebaseIndentation = optimizeIndentation;
 
 export function quote(value: unknown): string {
-  if (value !== null && typeof value === "object") {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     return Object.entries(value)
       .map(([k, v]) => `${k}: ${quote(v)}`)
       .join(", ");
