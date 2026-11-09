@@ -63,7 +63,7 @@ function tally(
 
 /** Source files whose working-tree content differs from `ref`, deletions excluded. */
 export async function changedFiles(ref: string, cwd = ROOT_DIR): Promise<string[]> {
-  const spec = ["--", "packages/*/src/*.ts"];
+  const spec = ["--", "packages/*/src/*.ts", "packages/*/lib/*.ts", "packages/*/test/*.ts"];
   const diffed = await git(["diff", "--name-only", "--diff-filter=d", ref, ...spec], cwd);
   const untracked = await git(["ls-files", "--others", "--exclude-standard", ...spec], cwd);
   return [...new Set(`${diffed}${untracked}`.split("\n").filter((f) => f !== ""))].sort();
