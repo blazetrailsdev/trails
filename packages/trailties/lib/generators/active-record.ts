@@ -3,6 +3,7 @@ import { camelize } from "@blazetrails/activesupport";
 import { NamedBase } from "./named-base.js";
 import * as Generators from "./migration.js";
 import type { GeneratedAttribute } from "./generated-attribute.js";
+import type { CreateMigrationConfig, MigrationRenderer } from "./actions/create-migration.js";
 import { ClassMethods, Migration } from "./active-record/migration.js";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
@@ -22,7 +23,17 @@ export function kwargs(...options: Array<string | undefined>): string {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Included<typeof Generators.Migration>, Included<typeof Migration> {}
+export interface Base
+  extends
+    Omit<Included<typeof Generators.Migration>, "createMigration">,
+    Included<typeof Migration> {
+  createMigration(
+    destination: string,
+    data: unknown,
+    config?: CreateMigrationConfig,
+    block?: Exclude<MigrationRenderer, string> | null,
+  ): Promise<string | undefined>;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends NamedBase {
