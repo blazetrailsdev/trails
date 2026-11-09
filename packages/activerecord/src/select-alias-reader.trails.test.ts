@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Comment } from "./test-helpers/models/comment.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { _virtualAttributePrototypeCache } from "./persistence.js";
 
 describe("select alias dynamic reader (trails)", () => {
@@ -92,6 +93,27 @@ describe("select alias dynamic reader (trails)", () => {
     const [first] = await Comment.select("comments.*, (id + 64) AS alias_64").order("id");
     const [second] = await Comment.select("comments.*, (id + 64) AS alias_64").order("id");
     expect(Object.getPrototypeOf(first) === Object.getPrototypeOf(second)).toBe(false);
+  });
+
+  it("stops treating an alias as virtual once the class defines a method by that name", async () => {
+    const sql = "comments.*, (id + 1000) AS bumped_id";
+    const [before] = await Comment.select(sql).order("id");
+    expect(Object.getPrototypeOf(before) === Comment.prototype).toBe(false);
+    Object.defineProperty(Comment.prototype, "bumped_id", {
+      configurable: true,
+      get: () => "defined",
+    });
+    rbClearMethodCache();
+    try {
+      const [after] = (await Comment.select(sql).order("id")) as (Comment & {
+        bumped_id: unknown;
+      })[];
+      expect(Object.getPrototypeOf(after) === Comment.prototype).toBe(true);
+      expect(after.bumped_id).toBe("defined");
+    } finally {
+      delete (Comment.prototype as unknown as Record<string, unknown>).bumped_id;
+      rbClearMethodCache();
+    }
   });
 
   it("loads a record without materializing its attribute set", async () => {

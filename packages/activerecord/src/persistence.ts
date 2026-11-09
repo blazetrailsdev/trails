@@ -3,6 +3,7 @@ import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import {
   basicObjRespondTo,
   keys,
+  methodCacheSerial,
   rbEqual,
   rbFSend,
   rbObjAsString,
@@ -969,9 +970,32 @@ export function instantiateInstanceOf(
   const names = keys(attributes as Record<string, unknown>);
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
   const record = klass.allocate();
-  const virtual = names.filter((name) => !basicObjRespondTo(record, name));
+  const virtual = _virtualAttributeNames(record, names);
   if (virtual.length > 0) Object.setPrototypeOf(record, _virtualAttributePrototype(klass, virtual));
   return record.initWithAttributes(attributes, false, block);
+}
+
+/** @perf 10x — PERMANENT */
+const _virtualAttributeNamesCache = new WeakMap<
+  object,
+  Map<string, { serial: number; virtual: string[] }>
+>();
+
+/**
+ * @perf 10x — PERMANENT
+ * @inventedArm basicObjRespondTo — PERMANENT
+ */
+function _virtualAttributeNames(record: object, names: string[]): string[] {
+  const proto = Object.getPrototypeOf(record) as object;
+  let byKey = _virtualAttributeNamesCache.get(proto);
+  if (!byKey) _virtualAttributeNamesCache.set(proto, (byKey = new Map()));
+  const key = names.join("\0");
+  const hit = byKey.get(key);
+  if (hit && hit.serial === methodCacheSerial) return hit.virtual;
+  const serial = methodCacheSerial;
+  const virtual = names.filter((name) => !basicObjRespondTo(record, name));
+  if (byKey.size < 64) byKey.set(key, { serial, virtual });
+  return virtual;
 }
 
 /** @perf 90x — PERMANENT */
