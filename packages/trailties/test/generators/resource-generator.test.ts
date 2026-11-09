@@ -70,7 +70,7 @@ describe("ResourceGeneratorTest", () => {
     );
     await t.assertFile(
       "test/controllers/accounts-controller.test.ts",
-      /describe\("AccountsController"/,
+      /class AccountsControllerTest extends IntegrationTest/,
     );
 
     await t.assertFile("app/helpers/accounts-helper.ts", /AccountsHelper/);

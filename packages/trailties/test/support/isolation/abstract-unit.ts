@@ -33,8 +33,19 @@ interface RackHost {
   call(env: Record<string, unknown>): Promise<RackResponse>;
 }
 
-async function puts(file: string, string: string, mode: "w" | "a" = "w"): Promise<void> {
+async function puts(
+  file: string,
+  string: string | Uint8Array,
+  mode: "w" | "a" | "wb" = "w",
+): Promise<void> {
   const fs = getFs();
+  if (string instanceof Uint8Array) {
+    if (string.at(-1) === 0x0a) return await fs.writeFile!(file, string);
+    const bytes = new Uint8Array(string.length + 1);
+    bytes.set(string);
+    bytes[string.length] = 0x0a;
+    return await fs.writeFile!(file, bytes);
+  }
   const prior = mode === "a" && (await fs.exists(file)) ? await fs.readFile(file, "utf-8") : "";
   await fs.writeFile!(file, prior + (string.endsWith("\n") ? string : `${string}\n`));
 }
@@ -407,7 +418,11 @@ export default { development: env("development"), test: env("test"), production:
     await getFs().writeFile!(file, contents.replace(new RegExp(str, "g"), ""));
   }
 
-  async appFile(path: string, contents: string, mode: "w" | "a" = "w"): Promise<string> {
+  async appFile(
+    path: string,
+    contents: string | Uint8Array,
+    mode: "w" | "a" | "wb" = "w",
+  ): Promise<string> {
     const fileName = `${await this.appPath()}/${path}`;
     await FileUtils.mkdirPAsync(File.dirname(fileName));
     await puts(fileName, contents, mode);

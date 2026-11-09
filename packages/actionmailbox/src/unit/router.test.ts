@@ -3,6 +3,7 @@ import { ArgumentError, TopLevel, constSet, rbModName } from "@blazetrails/ruby-
 import type { Message } from "@blazetrails/mail";
 import "../test-helpers/database/setup.js";
 import type { InboundEmail } from "../inbound-email.js";
+import { Base } from "../base.js";
 import "../inbound-email.js";
 import { ActionMailbox } from "../action-mailbox.js";
 import "../router.js";
@@ -12,16 +13,10 @@ import { TestCase } from "../test-case.js";
 let $processedBy: string | null;
 let $processedMail: Message | null;
 
-class RootMailbox {
-  constructor(readonly inboundEmail: InboundEmail) {}
-
-  static async receive(inboundEmail: InboundEmail): Promise<void> {
-    await new this(inboundEmail).process();
-  }
-
+class RootMailbox extends Base {
   async process(): Promise<void> {
     $processedBy = rbModName(this.constructor);
-    $processedMail = await this.inboundEmail.mail();
+    $processedMail = await this.mail();
   }
 }
 

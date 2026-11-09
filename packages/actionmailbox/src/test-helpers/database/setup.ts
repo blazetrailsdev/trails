@@ -9,3 +9,5 @@ import { CreateActionMailboxTables } from "../../db/migrate/20180917164000_creat
 Base.logger ??= new NullLogger();
 await CreateActionMailboxTables.migrate("up");
 await InboundEmail.loadSchema();
+import "../mailboxes/application-mailbox.js";
+import "../mailboxes/messages-mailbox.js";

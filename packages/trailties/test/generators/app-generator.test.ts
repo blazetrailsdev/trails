@@ -56,6 +56,13 @@ function json(content: string) {
   return JSON.parse(content);
 }
 
+function assertOption(generator: { options: unknown }, option: string): void {
+  expect(
+    (generator.options as Record<string, unknown>)[option],
+    `Expected generator option :${option} to be truthy.`,
+  ).toBeTruthy();
+}
+
 describe("AppGeneratorTest", () => {
   it("version control initializes git repo", async () => {
     await t.runGenerator([t.destinationRoot]);
@@ -688,6 +695,31 @@ describe("AppGenerator", () => {
       expect(dbConfig).toContain('adapter: "node-sqlite"');
       expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/node-sqlite");
     });
+  });
+
+  it("minimal trails app", () => {
+    const generator = t.generator([t.destinationRoot], ["--minimal"]);
+
+    assertOption(generator, "minimal");
+    assertOption(generator, "skipActionCable");
+    assertOption(generator, "skipActionMailbox");
+    assertOption(generator, "skipActionMailer");
+    assertOption(generator, "skipActionText");
+    assertOption(generator, "skipActiveJob");
+    assertOption(generator, "skipActiveStorage");
+    assertOption(generator, "skipBootsnap");
+    assertOption(generator, "skipBrakeman");
+    assertOption(generator, "skipCi");
+    assertOption(generator, "skipDevGems");
+    assertOption(generator, "skipDocker");
+    assertOption(generator, "skipHotwire");
+    assertOption(generator, "skipJavascript");
+    assertOption(generator, "skipJbuilder");
+    assertOption(generator, "skipKamal");
+    assertOption(generator, "skipEslint");
+    assertOption(generator, "skipSolid");
+    assertOption(generator, "skipSystemTest");
+    assertOption(generator, "skipThruster");
   });
 
   it("rejects an unknown sqlite driver", () => {

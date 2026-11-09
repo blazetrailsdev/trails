@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { STDOUT, StringIO } from "@blazetrails/ruby-compat";
 import { CodeStatistics } from "../lib/code-statistics.js";
 import { CodeStatisticsCalculator } from "../lib/code-statistics-calculator.js";
 
@@ -266,7 +266,10 @@ describe("CodeStatisticsTest", () => {
       ["Models", tmpPath],
       ["Model tests", path.join(tmpPath, "t")],
     );
-    const s = stats.toString();
+    const write = vi.spyOn(STDOUT, "write").mockReturnValue(0 as never);
+    stats.toString();
+    const s = write.mock.calls.map((call) => String(call[0])).join("");
+    write.mockRestore();
     const lines = s.split("\n");
     expect(lines[0]).toMatch(/^\+-+(\+-+)+\+$/);
     expect(lines[1]).toContain("| Name");
