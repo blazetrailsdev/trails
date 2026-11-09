@@ -100,8 +100,10 @@ const BOOT_PATHS = [
   "app/helpers",
 ];
 
+/** @noRailsEquivalent PERMANENT */
 const HELPER_FILE = /[-_]helper\.[cm]?[tj]s$/;
 
+/** @noRailsEquivalent PERMANENT */
 async function helperFiles(dir: string, out: Set<string>): Promise<void> {
   for (const entry of Dir.children(dir).slice().sort()) {
     const full = File.join(dir, entry);

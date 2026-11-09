@@ -208,7 +208,7 @@ describe("buildAutoload", () => {
     }
   });
 
-  it("writes a boot file that registers the routes, environments, initializers, seeds and helpers", async () => {
+  it("writes a boot file that registers the routes, environments, initializers and seeds", async () => {
     const tmp = Dir.mktmpdir("build-autoload");
     Dir.chdir(tmp);
     try {
