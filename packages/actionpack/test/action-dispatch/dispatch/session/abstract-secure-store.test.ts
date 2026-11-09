@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { assert, assertEqual, assertNotEqual } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNotEqual } from "@blazetrails/activesupport/testing/assertions";
 import type { RackEnv } from "@blazetrails/rack";
 import { SessionId as RackSessionId } from "@blazetrails/rack-session";
 import { AbstractSecureStore } from "../../../../lib/action-dispatch/middleware/session/abstract-store.js";

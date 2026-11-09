@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { Logger } from "@blazetrails/activesupport";
 import {
   assertDifference,
   assertEmpty,
   assertNoDifference,
   assertRaises,
   assertInDelta,
-  Logger,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { adapterType } from "./test-adapter.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-helpers/use-fixtures.js";

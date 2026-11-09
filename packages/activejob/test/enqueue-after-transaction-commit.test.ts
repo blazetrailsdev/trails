@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assertDifference, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
+import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { block, constSet, constGet } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";

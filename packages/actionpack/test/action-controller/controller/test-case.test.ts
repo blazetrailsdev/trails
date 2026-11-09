@@ -1,6 +1,13 @@
 import { forceEncoding, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { htmlSafe } from "@blazetrails/activesupport";
 import {
+  ActiveSupportJSON,
+  isBlank,
+  isPlainObject,
+  toParam,
+  toQuery,
+} from "@blazetrails/activesupport";
+import {
   assert,
   Assertion,
   assertEmpty,
@@ -15,12 +22,7 @@ import {
   assertRaise,
   assertRaises,
   assertRespondTo,
-  ActiveSupportJSON,
-  isBlank,
-  isPlainObject,
-  toParam,
-  toQuery,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
 import {
   Encoding,

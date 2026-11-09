@@ -1,4 +1,4 @@
-import { diff } from "@blazetrails/activesupport";
+import { diff } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, Range, strip } from "@blazetrails/ruby-compat";
 import { XML, type Html5Node, type NodeSet } from "@blazetrails/nokogiri";
 import { SubstitutionContext } from "./substitution-context.js";

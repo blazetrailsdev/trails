@@ -7,13 +7,9 @@ import { Base } from "../../lib/base.js";
 import { Template } from "../../lib/template.js";
 import { Handlers } from "../../lib/template/handlers.js";
 import { FixtureResolver } from "../../lib/testing/resolvers.js";
+import { MemoryStore, I18n, Logger, symbolizeKeys, SafeBuffer } from "@blazetrails/activesupport";
 import {
-  MemoryStore,
-  I18n,
-  Logger,
   assert,
-  symbolizeKeys,
-  SafeBuffer,
   assertEqual,
   assertIncludes,
   assertInstanceOf,
@@ -24,7 +20,7 @@ import {
   assertNotEqual,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   File,

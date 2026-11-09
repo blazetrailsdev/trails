@@ -1,10 +1,10 @@
 import { beforeEach, describe, it } from "vitest";
 import {
   ActiveSupportJSON,
-  assertEqual,
   Logger,
   ToJsonWithActiveSupportEncoder,
 } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

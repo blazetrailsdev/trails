@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assertPredicate } from "@blazetrails/activesupport";
+import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Topic } from "../models/topic.js";
 import { Person } from "../models/person.js";
 import { CustomReader } from "../models/custom-reader.js";

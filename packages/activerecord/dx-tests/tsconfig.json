@@ -43,6 +43,7 @@
       ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/lib/gzip.ts"],
       "@blazetrails/activesupport/test-case": ["../../activesupport/lib/test-case.ts"],
+      "@blazetrails/activesupport/testing/*": ["../../activesupport/lib/testing/*.ts"],
       "@blazetrails/tse-compiler": ["../../tse-compiler/lib/index.ts"],
       "@blazetrails/activesupport/testing/temporal-helpers": [
         "../../activesupport/lib/testing/temporal-helpers.ts"

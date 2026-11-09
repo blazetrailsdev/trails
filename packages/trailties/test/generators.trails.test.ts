@@ -1,4 +1,4 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
@@ -126,7 +126,7 @@ describe("GeneratorsTest", () => {
 
   it("an enum class option rejects an undeclared value with Thor's message", async () => {
     const devcontainer = (await Generators.findByNamespace("devcontainer"))!;
-    const { capture: freshCapture } = await import("@blazetrails/activesupport");
+    const { capture: freshCapture } = await import("@blazetrails/activesupport/testing/stream");
     expect(
       await freshCapture("stderr", () =>
         devcontainer.start(["--database", "oracle"], { destinationRoot: "/tmp" }),

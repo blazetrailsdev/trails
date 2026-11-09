@@ -34,8 +34,12 @@ import { Invoice } from "../test-helpers/models/invoice.js";
 import { Project } from "../test-helpers/models/project.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
-import { assertCalled, assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
+import {
+  assertCalled,
+  assertNotCalledOnInstanceOf,
+} from "@blazetrails/activesupport/testing/method-call-assertions";
 import { AssociationReflection } from "../reflection.js";
+import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import {
   assertDifference,
   assertEmpty,
@@ -45,12 +49,9 @@ import {
   assertRaise,
   assertRaises,
   assertNoDifference,
-  assertNotCalled,
-  Notifications,
-  type NotificationEvent,
-  travel,
-  travelBack,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertNotCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 
 import { fixtures } from "../test-helpers/use-fixtures.js";
 

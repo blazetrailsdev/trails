@@ -12,6 +12,7 @@ import { IntegrationTest } from "../../../lib/action-dispatch/testing/integratio
 import "../../support/abstract-unit.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
+import { include } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertNil,
@@ -19,8 +20,7 @@ import {
   assertNotEqual,
   assertNothingRaised,
   assertRespondTo,
-  include,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbObjAsString, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Metal } from "../../../lib/action-controller/metal.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

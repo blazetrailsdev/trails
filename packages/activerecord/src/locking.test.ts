@@ -29,14 +29,13 @@ import { Reader } from "./test-helpers/models/reader.js";
 import {
   assertDifference,
   assertEmpty,
-  assertNotDeprecated,
   assertNotEmpty,
   assertNothingRaised,
   assertRaise,
   assertRaises,
-  travel,
-  travelBack,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { Time as RubyTime } from "@blazetrails/date";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { adapterType } from "./test-adapter.js";

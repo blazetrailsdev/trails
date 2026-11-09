@@ -2,7 +2,11 @@ import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertNot, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertNot,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { ActiveRecordError } from "../errors.js";

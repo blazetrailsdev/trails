@@ -1,5 +1,6 @@
 import { RuntimeError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
+import { isPresent } from "@blazetrails/activesupport";
 import {
   assert,
   assertEmpty,
@@ -12,8 +13,7 @@ import {
   assertNothingRaised,
   assertPredicate,
   assertRaise,
-  isPresent,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";

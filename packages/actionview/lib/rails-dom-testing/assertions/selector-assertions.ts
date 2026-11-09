@@ -1,4 +1,4 @@
-import { assert, assertEqual, assertOperator } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertOperator } from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   aryJoin,

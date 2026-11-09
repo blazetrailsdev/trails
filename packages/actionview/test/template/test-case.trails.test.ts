@@ -1,5 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { NoMethodError } from "@blazetrails/ruby-compat";
 import "../support/abstract-unit.js";
 import { TestCase } from "../../lib/test-case.js";

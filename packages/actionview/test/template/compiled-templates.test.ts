@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { rbInspect } from "@blazetrails/ruby-compat";
 import { DetailsKey } from "../../lib/lookup-context.js";
 import type { PathSet } from "../../lib/path-set.js";

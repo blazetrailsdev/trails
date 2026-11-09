@@ -1,6 +1,7 @@
 import { Hash, hashAref, rbEqual } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeEach } from "vitest";
+import { include, ToJsonWithActiveSupportEncoder, type Included } from "@blazetrails/activesupport";
 import {
   assert,
   assertNil,
@@ -8,10 +9,7 @@ import {
   assertNotNil,
   assertPredicate,
   assertNotPredicate,
-  include,
-  ToJsonWithActiveSupportEncoder,
-  type Included,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import * as AttributeMethods from "../lib/attribute-methods.js";
 import { Dirty } from "../lib/dirty.js";
 import { API } from "../lib/api.js";

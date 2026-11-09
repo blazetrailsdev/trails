@@ -1,5 +1,6 @@
 import "../constants.testing-query-assertions.generated.js";
-import { Notifications, _assertNothingRaisedOrWarn, assert } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
+import { _assertNothingRaisedOrWarn, assert } from "@blazetrails/activesupport/testing/assertions";
 import { rbEqq } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 

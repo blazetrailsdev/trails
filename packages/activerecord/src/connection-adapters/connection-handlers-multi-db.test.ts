@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Concurrent, Tempfile, Thread, setEnv } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertNotNil, assertRaises, getEnv } from "@blazetrails/activesupport";
+import { getEnv } from "@blazetrails/activesupport";
+import { assertNotNil, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ConnectionNotDefined } from "../errors.js";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { Base } from "../base.js";

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { Base } from "../../lib/base.js";
 import { FormBuilder } from "../../lib/helpers/form-helper.js";
 import { LookupContext } from "../../lib/lookup-context.js";
-import { assert, assertNil, assertNot } from "@blazetrails/activesupport";
+import { assert, assertNil, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 describe("ControllerHelperTest", () => {

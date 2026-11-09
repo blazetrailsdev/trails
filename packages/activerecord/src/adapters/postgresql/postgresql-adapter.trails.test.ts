@@ -1,4 +1,4 @@
-import { stub } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { StringIO, Thread } from "@blazetrails/ruby-compat";
 import pg from "pg";

@@ -5,7 +5,6 @@ import {
   classAttribute,
   Concern,
   constantize,
-  ConstantLookup,
   extend,
   include,
   isAnonymous,
@@ -21,6 +20,7 @@ import {
   type Included,
   withIndifferentAccess,
 } from "@blazetrails/activesupport";
+import { ConstantLookup } from "@blazetrails/activesupport/testing/constant-lookup";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   ArgumentError,

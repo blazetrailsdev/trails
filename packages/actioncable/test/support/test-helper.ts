@@ -1,4 +1,5 @@
-import { Logger, MethodCallAssertions, include, type Included } from "@blazetrails/activesupport";
+import { Logger, include, type Included } from "@blazetrails/activesupport";
+import { MethodCallAssertions } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { RuntimeError, globalIoExecutor } from "@blazetrails/ruby-compat";
 import { ActionCable } from "../../lib/namespaces.js";
 import "../../lib/index.js";

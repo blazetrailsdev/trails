@@ -1,6 +1,6 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { afterAll, beforeEach, describe, it, expect } from "vitest";
-import { assertEqual, assertRaises } from "@blazetrails/activesupport";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   constDefined,

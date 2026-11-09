@@ -17,7 +17,8 @@ import {
   publicInstanceMethods,
   rbObjMethod,
 } from "@blazetrails/ruby-compat";
-import { assertRespondTo, htmlSafe, SafeBuffer, withOptions } from "@blazetrails/activesupport";
+import { htmlSafe, SafeBuffer, withOptions } from "@blazetrails/activesupport";
+import { assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { FixtureResolver } from "../../lib/testing/resolvers.js";
 import { raw } from "../../lib/helpers/output-safety-helper.js";
 import { Base } from "../../lib/base.js";

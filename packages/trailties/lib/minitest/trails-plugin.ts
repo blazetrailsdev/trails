@@ -1,4 +1,4 @@
-import { Minitest } from "@blazetrails/activesupport";
+import { Minitest } from "@blazetrails/activesupport/testing/assertions";
 import { env } from "@blazetrails/ruby-compat";
 import { Trails } from "../trails.js";
 

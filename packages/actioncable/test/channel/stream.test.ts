@@ -1,4 +1,5 @@
-import { ActiveSupportJSON, Mock, stub } from "@blazetrails/activesupport";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { Mock, stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MockRequest } from "@blazetrails/rack";
 import { Thread, hashAref, constSet, rbModName, rbObjClass } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";

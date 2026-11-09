@@ -1,18 +1,19 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
+import { EnvironmentInquirer, getEnv } from "@blazetrails/activesupport";
 import {
   assertCalled,
   assertCalledWith as assertCalledWithArgs,
-  assertEmpty,
   assertMock,
   assertNotCalled,
-  assertNothingRaised,
-  assertRaises,
-  capture,
-  EnvironmentInquirer,
-  getEnv,
   Mock,
   stub,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/method-call-assertions";
+import {
+  assertEmpty,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import {
   Dir,
   File,
@@ -39,7 +40,7 @@ import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { ConnectionAdapters } from "../namespaces.js";
 import { DEFAULT_ENV } from "../connection-handling.js";
-import { assertCalledOnInstanceOf } from "@blazetrails/activesupport";
+import { assertCalledOnInstanceOf } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { adapterType } from "../test-adapter.js";
 import { Backup } from "../sqlite/backup.js";
 import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";

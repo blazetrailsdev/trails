@@ -1,4 +1,5 @@
-import { Minitest, presence, TopLevel } from "@blazetrails/activesupport";
+import { presence, TopLevel } from "@blazetrails/activesupport";
+import { Minitest } from "@blazetrails/activesupport/testing/assertions";
 import {
   defineModule,
   Encoding,

@@ -1,10 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
-import {
-  assertNotRespondTo,
-  assertRespondTo,
-  publicInstanceMethods,
-} from "@blazetrails/activesupport";
+import { publicInstanceMethods } from "@blazetrails/activesupport";
+import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { Base, Relation } from "../index.js";
 import * as Querying from "../querying.js";
 import { CollectionProxy } from "../associations/collection-proxy.js";

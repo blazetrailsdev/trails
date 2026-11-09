@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { beforeEach, describe, it, onTestFinished } from "vitest";
 import { ActionController, ActionDispatch, RouteSet } from "@blazetrails/actionpack";
+import { HashWithIndifferentAccess, TopLevel } from "@blazetrails/activesupport";
 import {
   assert,
-  assertCalledWith,
   assertEqual,
   assertIncludes,
   assertKindOf,
@@ -14,9 +14,8 @@ import {
   assertNotRespondTo,
   assertRaise,
   assertSame,
-  HashWithIndifferentAccess,
-  TopLevel,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { HTML5 } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";

@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { HashWithIndifferentAccess, toQuery } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertMatch,
   assertRaise,
   assertRespondTo,
-  HashWithIndifferentAccess,
-  toQuery,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, include } from "@blazetrails/ruby-compat";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";
 import { URL } from "../../../lib/action-dispatch/http/url.js";

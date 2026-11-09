@@ -5,15 +5,8 @@ import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import { Conversion, ModelName, Naming, Translation } from "@blazetrails/activemodel";
 import {
   BigDecimal,
-  Mock,
   HashWithIndifferentAccess,
   I18n,
-  assertEqual,
-  assertPredicate,
-  assertMock,
-  assertNotIncludes,
-  assertRaises,
-  expectCalledWith,
   extend,
   isBlank,
   htmlSafe,
@@ -22,9 +15,20 @@ import {
   isPlainObject,
   isPresent,
   setZone,
-  stub,
   zone,
 } from "@blazetrails/activesupport";
+import {
+  Mock,
+  assertMock,
+  expectCalledWith,
+  stub,
+} from "@blazetrails/activesupport/testing/method-call-assertions";
+import {
+  assertEqual,
+  assertPredicate,
+  assertNotIncludes,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { Date as RubyDate, DateTime } from "@blazetrails/date";
 import {
   ArgumentError,

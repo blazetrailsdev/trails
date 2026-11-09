@@ -3,7 +3,7 @@ import { CommandRecorder } from "./command-recorder.js";
 import { IrreversibleMigration } from "../migration.js";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import { adapterSupports, itIfSupports } from "../support/supports.js";
-import { assertRaises, assertRespondTo } from "@blazetrails/activesupport";
+import { assertRaises, assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 
 const abstractDelegate = {
   updateTableDefinition: (tableName: string, base: unknown) => new Table(tableName, base as never),

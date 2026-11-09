@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertSame } from "@blazetrails/activesupport";
+import { assertSame } from "@blazetrails/activesupport/testing/assertions";
 import { ImmutableStringType } from "../../lib/type/immutable-string.js";
 
 describe("ImmutableStringTest", () => {

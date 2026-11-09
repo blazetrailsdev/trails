@@ -1,4 +1,4 @@
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";
 import { TypeError } from "@blazetrails/ruby-compat";
 import { DatabaseConfigurations, InvalidConfigurationError } from "../database-configurations.js";

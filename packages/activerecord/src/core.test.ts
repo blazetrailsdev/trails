@@ -6,7 +6,10 @@ import { PP } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { LoosePerson } from "./test-helpers/models/person.js";
-import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNoDifference,
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 

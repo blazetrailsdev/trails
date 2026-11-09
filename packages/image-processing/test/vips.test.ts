@@ -1,5 +1,9 @@
 import { File, Pathname, Tempfile } from "@blazetrails/ruby-compat";
-import { assertIncludes, assertMatch, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertIncludes,
+  assertMatch,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Error as ImageProcessingError } from "../lib/image-processing.js";
 import {

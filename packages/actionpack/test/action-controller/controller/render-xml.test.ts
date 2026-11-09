@@ -1,5 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual, Logger } from "@blazetrails/activesupport";
+import { Logger } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import "../../support/abstract-unit.js";
 import { Customer } from "../../support/lib/controller/fake-models.js";
 import { deprecator as actionDispatchDeprecator } from "../../../lib/action-dispatch/deprecator.js";

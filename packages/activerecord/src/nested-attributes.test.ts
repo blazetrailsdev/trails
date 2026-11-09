@@ -28,7 +28,7 @@ import {
   assertRaise,
   assertNothingRaised,
   assertRespondTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { repairValidations } from "./cases/validations-repair-helper.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNoDifference,
+} from "@blazetrails/activesupport/testing/assertions";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Notification } from "./test-helpers/models/notification.js";
 import { User, UserWithNotification } from "./test-helpers/models/user.js";

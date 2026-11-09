@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  currentTimeInstant,
-  Duration,
-  stub,
-  TopLevel,
-  travel,
-  travelBack,
-} from "@blazetrails/activesupport";
+import { currentTimeInstant, Duration, TopLevel } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { ActionController, IntegrationTest } from "@blazetrails/actionpack";
 import { SecureRandom, StandardError } from "@blazetrails/ruby-compat";

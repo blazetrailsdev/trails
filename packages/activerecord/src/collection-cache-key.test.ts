@@ -1,6 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { assertNotPredicate } from "@blazetrails/activesupport";
+import { assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";
 import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";

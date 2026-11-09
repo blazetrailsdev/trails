@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { assert, assertEqual, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEqual,
+  assertNoDifference,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "../lib/namespaces.js";
 import { ObjectSerializer } from "../lib/serializers/object-serializer.js";

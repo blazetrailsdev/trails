@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,

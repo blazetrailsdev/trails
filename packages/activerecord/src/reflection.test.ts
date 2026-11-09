@@ -46,7 +46,7 @@ import {
   assertNothingRaised,
   assertRaise,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
 import { Address, Money } from "./test-helpers/models/customer.js";
 import { Pirate } from "./test-helpers/models/pirate.js";

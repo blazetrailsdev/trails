@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { OrderedOptions } from "@blazetrails/activesupport";
 import {
   assertRaises,
   assertRespondTo,
-  OrderedOptions,
   assertNil,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, Method, rbObjMethod } from "@blazetrails/ruby-compat";
 import { Configuration } from "../../../lib/application/configuration.js";
 

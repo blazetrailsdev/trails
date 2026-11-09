@@ -1,5 +1,6 @@
 import { afterAll, describe, it, expect, inject } from "vitest";
-import { assertEqual, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { Dir, getFs } from "@blazetrails/ruby-compat";
 import { SystemTestCase } from "../../lib/action-dispatch/system-test-case.js";
 import { vite } from "../../lib/action-dispatch/system-testing/server.js";

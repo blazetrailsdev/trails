@@ -3,7 +3,12 @@ import { readFile, stat, unlink, writeFile } from "fs/promises";
 import { Lint, MockRequest, Mime, CONTENT_TYPE } from "@blazetrails/rack";
 import type { MockResponse, RackApp, RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import { Gzip } from "@blazetrails/activesupport/gzip";
-import { assert, assertEqual, assertNil, assertNotEqual } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEqual,
+  assertNil,
+  assertNotEqual,
+} from "@blazetrails/activesupport/testing/assertions";
 import { Static } from "../../../lib/action-dispatch/middleware/static.js";
 import { FIXTURE_LOAD_PATH } from "../../support/abstract-unit.js";
 

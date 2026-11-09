@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Nodes } from "@blazetrails/arel";
+import { Notifications } from "@blazetrails/activesupport";
 import {
-  Notifications,
   assertEmpty,
   assertNotEmpty,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Process, StandardError, Thread } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";

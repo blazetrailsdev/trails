@@ -6,7 +6,8 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { StringIO, regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { currentAdapter } from "./support/adapter-helper.js";
-import { Logger, assertEqual, isPresent } from "@blazetrails/activesupport";
+import { Logger, isPresent } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { Time as RubyTime } from "@blazetrails/date";
 import {
   Post,

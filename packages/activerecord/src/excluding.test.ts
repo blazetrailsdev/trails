@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import "./index.js";
-import { assertEmpty, assertNotEmpty, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertEmpty,
+  assertNotEmpty,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

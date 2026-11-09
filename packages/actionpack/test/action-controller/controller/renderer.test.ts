@@ -1,5 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
-import { assert, assertEqual } from "@blazetrails/activesupport";
+import { assert, assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { URL } from "../../../lib/action-dispatch/http/url.js";
 import {
   AccountsController,

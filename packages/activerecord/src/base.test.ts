@@ -12,9 +12,8 @@ import {
 import { adapterType } from "./test-adapter.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { connectedToStack } from "./core.js";
+import { Logger, TimeWithZone } from "@blazetrails/activesupport";
 import {
-  Logger,
-  TimeWithZone,
   assert,
   assertEqual,
   assertNot,
@@ -26,10 +25,11 @@ import {
   assertRespondTo,
   assertNotRespondTo,
   assertDifference,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-helpers/use-fixtures.js";
-import { IntegerType, ValueType, ArgumentError, Lint } from "@blazetrails/activemodel";
+import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel";
+import * as Lint from "@blazetrails/activemodel/lint";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { Company, Client, AbstractCompany } from "./test-helpers/models/company.js";
 import { Post, PostRecord } from "./test-helpers/models/post.js";

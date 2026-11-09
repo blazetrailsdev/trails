@@ -1,5 +1,9 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assertEqual, assertRaises, assertInDelta } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertRaises,
+  assertInDelta,
+} from "@blazetrails/activesupport/testing/assertions";
 import { DateTime, Time as RubyTime } from "@blazetrails/date";
 import { inTimeZone } from "./cases/helper.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

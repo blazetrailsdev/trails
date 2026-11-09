@@ -1,7 +1,7 @@
 import type { RackResponse } from "@blazetrails/rack";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, it } from "vitest";
-import { assertMatch, assertNot } from "@blazetrails/activesupport";
+import { assertMatch, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { Headers } from "@blazetrails/rack";
 import { Metal } from "../../../lib/action-controller/metal.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";

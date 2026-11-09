@@ -5,6 +5,7 @@ import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
    model it mirrors does; the empty class/interface merge beside it is how `include()` surfaces
    those members on the type side. */
 import { describe, it, expect, beforeEach } from "vitest";
+import { include } from "@blazetrails/activesupport";
 import {
   assert,
   assertNil,
@@ -12,8 +13,7 @@ import {
   assertNotNil,
   assertPredicate,
   assertNotPredicate,
-  include,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Dirty } from "../lib/dirty.js";
 import { Model } from "../lib/index.js";
 import { Attributes, type AttributesClassHalf } from "../lib/attributes.js";

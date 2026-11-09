@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  currentTimeInstant,
-  Duration,
-  TopLevel,
-  travel,
-  travelBack,
-} from "@blazetrails/activesupport";
+import { currentTimeInstant, Duration, TopLevel } from "@blazetrails/activesupport";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { IntegrationTest } from "@blazetrails/actionpack";
 import "../../support/database/setup.js";

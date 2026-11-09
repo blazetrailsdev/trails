@@ -1,11 +1,8 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { ActiveRecordTestCase } from "../support/active-record-unit.js";
 import { Topic } from "../fixtures/topic.js";
-import {
-  Notifications,
-  assertEqual,
-  type NotificationSubscriber,
-} from "@blazetrails/activesupport";
+import { Notifications, type NotificationSubscriber } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { File } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/base.js";
 import { FileSystemResolver } from "../../lib/template/resolver.js";

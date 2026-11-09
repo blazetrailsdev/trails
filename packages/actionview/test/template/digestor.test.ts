@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Logger, StringIO, assertNotNil } from "@blazetrails/activesupport";
+import { Logger, StringIO } from "@blazetrails/activesupport";
+import { assertNotNil } from "@blazetrails/activesupport/testing/assertions";
 
 import { Base } from "../../lib/base.js";
 import { Digestor, type Node } from "../../lib/digestor.js";

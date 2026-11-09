@@ -4,7 +4,7 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { assertDifference } from "@blazetrails/activesupport";
+import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import {
   FailedExecution,

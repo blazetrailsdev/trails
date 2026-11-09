@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { base58, freezeTime, minutes, travelBack } from "@blazetrails/activesupport";
+import { base58, minutes } from "@blazetrails/activesupport";
+import { freezeTime, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { Dir, OpenSSL, StringIO } from "@blazetrails/ruby-compat";

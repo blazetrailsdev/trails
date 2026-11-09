@@ -3,7 +3,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, afterAll } from "vitest";
 import { Base } from "../index.js";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("EagerSingularizationTest", () => {

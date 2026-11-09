@@ -1,6 +1,6 @@
 import { NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
-import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport";
+import { assertNotRespondTo, assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { Mime, MimeType } from "../../lib/action-dispatch/http/mime-type.js";
 import { Collector } from "../../lib/abstract-controller/collector.js";
 

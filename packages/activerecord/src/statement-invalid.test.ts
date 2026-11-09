@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { assertNot, assertRaises } from "@blazetrails/activesupport";
+import { assertNot, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "./index.js";
 import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

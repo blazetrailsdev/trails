@@ -6,7 +6,8 @@ import {
   assertQueriesMatch,
   assertNoQueriesMatch,
 } from "../testing/query-assertions.js";
-import { Assertion, Notifications, assertRaises } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
+import { Assertion, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 
 function instrumentSql(sql: string, name?: string, cached = false): void {
   Notifications.instrument("sql.active_record", { sql, name: name ?? "SQL", cached });

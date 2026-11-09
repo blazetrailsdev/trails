@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
+import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "./index.js";
 import { disconnectAllBang } from "./active-record.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

@@ -1,14 +1,11 @@
 import { beforeEach, describe, it } from "vitest";
 import { Conversion, Naming } from "@blazetrails/activemodel";
+import { extend, include, isPresent, Notifications } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertRaise,
   assertRaises,
-  extend,
-  include,
-  isPresent,
-  Notifications,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   constSet,

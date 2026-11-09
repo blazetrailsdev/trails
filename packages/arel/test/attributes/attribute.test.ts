@@ -4,7 +4,7 @@ import { fakeRecordConnection } from "../support/connection.js";
 import { Table, star, Nodes, Visitors } from "../../lib/index.js";
 import { Attribute } from "../../lib/attributes/attribute.js";
 import { mustBeLike } from "../support/must-be-like.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 describe("AttributeTest", () => {
   const users = new Table("users");

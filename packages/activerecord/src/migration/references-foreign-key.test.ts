@@ -1,4 +1,7 @@
-import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNothingRaised,
+} from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";

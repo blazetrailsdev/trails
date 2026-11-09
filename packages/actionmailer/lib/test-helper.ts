@@ -1,7 +1,8 @@
 import "./constants.test-helper.generated.js";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
-import { assertEqual, extractOptionsBang, kernelArray } from "@blazetrails/activesupport";
+import { extractOptionsBang, kernelArray } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import type { Message } from "@blazetrails/mail";
 import {
   fetch,

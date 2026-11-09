@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Hash } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { YAMLColumn } from "./yaml-column.js";
 import { Time } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/ruby-compat";

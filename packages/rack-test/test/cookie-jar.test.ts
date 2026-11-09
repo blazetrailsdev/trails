@@ -1,4 +1,4 @@
-import { assertEmpty } from "@blazetrails/activesupport";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { URI, rbObjClone, rbObjDup } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Cookie, CookieJar } from "../lib/cookie-jar.js";

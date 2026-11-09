@@ -1,5 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual, toXml } from "@blazetrails/activesupport";
+import { toXml } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { include } from "@blazetrails/ruby-compat/include";
 import "../../../support/abstract-unit.js";
 import { Rendering as AbstractControllerRendering } from "../../../../lib/abstract-controller/rendering.js";

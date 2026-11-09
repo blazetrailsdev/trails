@@ -1,5 +1,5 @@
 import { describe, it, expect, expect as vitestExpect } from "vitest";
-import { assertNot } from "@blazetrails/activesupport";
+import { assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import {

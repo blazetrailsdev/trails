@@ -3,12 +3,12 @@ import { Base } from "../../../lib/action-controller/base.js";
 import { assertResponse } from "../../../lib/action-dispatch/testing/assertions/response.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
+import { Notifications } from "@blazetrails/activesupport";
 import {
   assertEmpty,
   assertEqual,
   assertNotEmpty,
-  Notifications,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import type { BrowserVersions } from "../../../lib/action-controller/metal/allow-browser.js";
 
 afterEach(() => {

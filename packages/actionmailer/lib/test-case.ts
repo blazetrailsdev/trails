@@ -1,6 +1,5 @@
 import {
   Concern,
-  ConstantLookup,
   camelize,
   classAttribute,
   constantize,
@@ -8,6 +7,7 @@ import {
   runLoadHooks,
   underscore,
 } from "@blazetrails/activesupport";
+import { ConstantLookup } from "@blazetrails/activesupport/testing/constant-lookup";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import * as DomAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
 import * as SelectorAssertions from "@blazetrails/actionview/rails-dom-testing/assertions/selector-assertions";

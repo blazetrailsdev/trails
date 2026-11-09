@@ -3,7 +3,8 @@ import "../support/abstract-unit.js";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController, ActionDispatch, Request, RouteSet } from "@blazetrails/actionpack";
 import { Conversion, Naming } from "@blazetrails/activemodel";
-import { assertPredicate, extend, isHtmlSafe, isPresent } from "@blazetrails/activesupport";
+import { extend, isHtmlSafe, isPresent } from "@blazetrails/activesupport";
+import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { MockRequest } from "@blazetrails/rack";
 import {
   ArgumentError,

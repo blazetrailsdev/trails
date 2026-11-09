@@ -54,6 +54,7 @@ import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { resetI18n } from "../test-helpers/i18n.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
+import { isPresent } from "@blazetrails/activesupport";
 import {
   assert,
   assertNot,
@@ -63,8 +64,7 @@ import {
   assertNothingRaised,
   assertNoDifference,
   assertNotEmpty,
-  isPresent,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 
 async function readHasOne(owner: any, name: string): Promise<any> {
   return await owner.association(name).loadTarget();

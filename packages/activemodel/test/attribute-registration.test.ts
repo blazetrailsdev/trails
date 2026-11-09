@@ -4,7 +4,8 @@ import { ValueType } from "../lib/index.js";
 import type { AttributeSet } from "../lib/attribute-set.js";
 import { AttributeRegistration } from "../lib/attribute-registration.js";
 import { registry } from "../lib/type.js";
-import { include, assertNil } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 const typeRegistry = registry();
 

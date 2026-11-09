@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
+import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { ReadOnlyError, StatementInvalid } from "./errors.js";

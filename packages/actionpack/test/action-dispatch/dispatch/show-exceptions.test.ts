@@ -1,13 +1,13 @@
 import { beforeEach, describe, it, vi } from "vitest";
 import { Lint } from "@blazetrails/rack";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import { I18n } from "@blazetrails/activesupport";
 import {
-  I18n,
   assertEqual,
   assertKindOf,
   assertMatch,
   assertRaise,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { RuntimeError, StandardError, stderr } from "@blazetrails/ruby-compat";
 import { TemplateError } from "@blazetrails/actionview";
 import { ActionNotFound } from "../../../lib/abstract-controller/base.js";

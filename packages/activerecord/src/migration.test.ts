@@ -1,17 +1,14 @@
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { BigDecimal, Logger, camelize } from "@blazetrails/activesupport";
 import {
-  BigDecimal,
-  Logger,
   assertEmpty,
   assertNoChanges,
-  camelize,
   assertNothingRaised,
   assertRaises,
   assertInDelta,
-  travelBack,
-  travelTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Base, Migrator, Rollback, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";

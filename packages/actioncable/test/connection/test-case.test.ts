@@ -1,5 +1,10 @@
 import { describe, expect, it, type TestContext } from "vitest";
-import { Assertion, assertMatch, assertRaises, presence } from "@blazetrails/activesupport";
+import { presence } from "@blazetrails/activesupport";
+import {
+  Assertion,
+  assertMatch,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { hashAref, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import "../support/test-helper.js";
 import { Base } from "../../lib/connection/base.js";

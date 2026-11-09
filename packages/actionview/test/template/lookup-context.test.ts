@@ -1,11 +1,10 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { MimeType } from "@blazetrails/actionpack";
+import { I18n } from "@blazetrails/activesupport";
 import {
-  I18n,
   assert,
   assertEqual,
   assertKindOf,
-  assertCalled,
   assertMatch,
   assertNil,
   assertNot,
@@ -13,7 +12,8 @@ import {
   assertPredicate,
   assertRaises,
   assertSame,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/base.js";
 import { I18nProxy } from "../../lib/rendering.js";

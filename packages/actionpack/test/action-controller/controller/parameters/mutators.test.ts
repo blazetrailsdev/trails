@@ -1,6 +1,6 @@
 import { beforeEach, describe, it } from "vitest";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import {
-  HashWithIndifferentAccess,
   assertEqual,
   assertInstanceOf,
   assertNil,
@@ -8,7 +8,7 @@ import {
   assertNotPredicate,
   assertPredicate,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   Parameters,
   UnfilteredParameters,

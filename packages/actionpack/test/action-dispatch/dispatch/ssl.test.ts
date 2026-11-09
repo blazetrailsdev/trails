@@ -1,7 +1,8 @@
 import { beforeEach, describe, it } from "vitest";
 import { Lint, SET_COOKIE } from "@blazetrails/rack";
 import type { RackEnv } from "@blazetrails/rack";
-import { assertEqual, assertNil, years } from "@blazetrails/activesupport";
+import { years } from "@blazetrails/activesupport";
+import { assertEqual, assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { SSL, type SSLOptions } from "../../../lib/action-dispatch/middleware/ssl.js";
 import type { Request } from "../../../lib/action-dispatch/http/request.js";
 import { STRICT_TRANSPORT_SECURITY } from "../../../lib/action-dispatch/constants.js";

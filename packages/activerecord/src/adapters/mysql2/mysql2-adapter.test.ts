@@ -17,6 +17,7 @@ import {
 import { AbstractMysqlAdapter } from "../../connection-adapters/abstract-mysql-adapter.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { Base } from "../../base.js";
+import { Logger } from "@blazetrails/activesupport";
 import {
   assert,
   assertChanges,
@@ -24,8 +25,7 @@ import {
   assertNot,
   assertNothingRaised,
   assertRaises,
-  Logger,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import * as Arel from "@blazetrails/arel";
 
 describeIfMysqlAdapter("Mysql2AdapterTest", () => {

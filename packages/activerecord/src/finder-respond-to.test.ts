@@ -1,5 +1,5 @@
 import { describe, it, beforeEach } from "vitest";
-import { assertRespondTo, assertNotRespondTo } from "@blazetrails/activesupport";
+import { assertRespondTo, assertNotRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 

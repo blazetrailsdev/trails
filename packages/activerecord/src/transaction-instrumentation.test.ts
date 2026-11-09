@@ -6,7 +6,7 @@ import "./test-helpers/models/reply.js";
 import { Rollback } from "./errors.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
-import { assertEmpty, assertNot, assertSame } from "@blazetrails/activesupport";
+import { assertEmpty, assertNot, assertSame } from "@blazetrails/activesupport/testing/assertions";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";

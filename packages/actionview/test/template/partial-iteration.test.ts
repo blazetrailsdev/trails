@@ -1,5 +1,9 @@
 import { describe, it } from "vitest";
-import { assertEqual, assertNot, assertPredicate } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertNot,
+  assertPredicate,
+} from "@blazetrails/activesupport/testing/assertions";
 import { PartialIteration } from "../../lib/renderer/collection-renderer.js";
 
 describe("PartialIterationTest", () => {

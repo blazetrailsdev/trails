@@ -12,7 +12,8 @@ import {
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { assertFile } from "../../lib/generators/testing/assertions.js";
 import { Base } from "@blazetrails/activerecord";
-import { OrderedOptions, silenceStream } from "@blazetrails/activesupport";
+import { OrderedOptions } from "@blazetrails/activesupport";
+import { silenceStream } from "@blazetrails/activesupport/testing/stream";
 import type { TestCase } from "../../lib/generators/test-case.js";
 
 export async function copyRoutes(this: TestCase): Promise<void> {

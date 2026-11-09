@@ -1,4 +1,4 @@
-import { assertEqual, assertKindOf } from "@blazetrails/activesupport";
+import { assertEqual, assertKindOf } from "@blazetrails/activesupport/testing/assertions";
 import { File } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import "../../../support/abstract-unit.js";

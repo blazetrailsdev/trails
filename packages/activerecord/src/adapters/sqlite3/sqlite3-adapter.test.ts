@@ -18,13 +18,13 @@ import { QueryAttribute } from "../../relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
 import { assertLogged } from "./test-helper.js";
 import type { Column as SQLite3Column } from "../../connection-adapters/sqlite3/column.js";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import {
-  assertCalled,
   assertNothingRaised,
   assertRaises,
-  capture,
   assertRespondTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import * as DdlHelper from "../../support/ddl-helper.js";
 import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";

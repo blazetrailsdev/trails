@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, type TestContext } from "vitest";
 import type {} from "@blazetrails/activesupport/testing/autorun";
-import { Assertion, assertNothingRaised, assertRaise, hours } from "@blazetrails/activesupport";
+import { hours } from "@blazetrails/activesupport";
+import {
+  Assertion,
+  assertNothingRaised,
+  assertRaise,
+} from "@blazetrails/activesupport/testing/assertions";
 import { Encodings, Message } from "@blazetrails/mail";
 import { InlineAdapter } from "@blazetrails/activejob";
 import { File, TopLevel, constSet } from "@blazetrails/ruby-compat";

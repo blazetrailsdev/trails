@@ -1,5 +1,6 @@
 import { describe, it } from "vitest";
-import { Concern, assertEqual } from "@blazetrails/activesupport";
+import { Concern } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { extend, include, rbCallSuper } from "@blazetrails/ruby-compat";
 import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

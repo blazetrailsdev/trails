@@ -110,6 +110,7 @@ const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
 const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);
 
 const alias = {
+  "@blazetrails/activemodel/lint": path.resolve(__dirname, "packages/activemodel/lib/lint.ts"),
   "@blazetrails/activemodel/locale/en": path.resolve(
     __dirname,
     "packages/activemodel/lib/locale/en.ts",
@@ -117,14 +118,6 @@ const alias = {
   "@blazetrails/activesupport/core-ext/numeric/bytes": path.resolve(
     __dirname,
     "packages/activesupport/lib/core-ext/numeric/bytes.ts",
-  ),
-  "@blazetrails/activesupport/testing/isolation": path.resolve(
-    __dirname,
-    "packages/activesupport/lib/testing/isolation.ts",
-  ),
-  "@blazetrails/activesupport/testing/file-fixtures": path.resolve(
-    __dirname,
-    "packages/activesupport/lib/testing/file-fixtures.ts",
   ),
   "@blazetrails/activesupport/message-verifier": path.resolve(
     __dirname,
@@ -477,6 +470,10 @@ const COVERAGE_EXCLUDE = [
 ];
 
 const aliasEntries = [
+  {
+    find: /^@blazetrails\/activesupport\/testing\/(.+)$/,
+    replacement: path.resolve(__dirname, "packages/activesupport/lib/testing") + "/$1.ts",
+  },
   {
     find: /^@blazetrails\/image-processing$/,
     replacement: path.resolve(__dirname, "packages/image-processing/lib/image-processing.ts"),

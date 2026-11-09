@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
 import { ActiveModel, Conversion, Naming } from "@blazetrails/activemodel";
+import { isPresent, Logger } from "@blazetrails/activesupport";
 import {
   assert,
   assertNothingRaised,
   assertRaises,
-  isPresent,
-  Logger,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Date } from "@blazetrails/date";
 import {
   ArgumentError,

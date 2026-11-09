@@ -3,18 +3,17 @@ import "./encryption.js";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { Hash, TypeError } from "@blazetrails/ruby-compat";
-import { assertCalled } from "@blazetrails/activesupport";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Result } from "./result.js";
+import { TimeWithZone, BigDecimal } from "@blazetrails/activesupport";
 import {
   assert,
   assertPredicate,
   assertNotPredicate,
   assertRaises,
   assertNothingRaised,
-  assertNotDeprecated,
-  TimeWithZone,
-  BigDecimal,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { ArgumentError, ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { currentAdapter } from "./support/adapter-helper.js";

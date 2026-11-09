@@ -12,16 +12,15 @@ import { Response } from "../../../lib/action-dispatch/http/response.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Utils } from "../../../lib/action-dispatch/journey/router/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { pluralize, underscore } from "@blazetrails/activesupport";
+import { assertDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import {
-  pluralize,
-  assertDeprecated,
   assertEqual,
   assertNothingRaised,
   assertPredicate,
   assertRaises,
-  stub,
-  underscore,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import {
   Encoding,
   include,

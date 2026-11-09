@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { rbClassInheritedP, rbModAncestors } from "@blazetrails/ruby-compat";
 import { ApplicationController, SharedTestRoutes } from "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";

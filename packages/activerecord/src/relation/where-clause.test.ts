@@ -1,4 +1,5 @@
-import { assertEmpty, assertNotEmpty, rbEqual } from "@blazetrails/activesupport";
+import { rbEqual } from "@blazetrails/activesupport";
+import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { Hash } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, sql } from "@blazetrails/arel";

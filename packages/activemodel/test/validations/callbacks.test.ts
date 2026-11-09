@@ -1,6 +1,7 @@
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { assertEmpty, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { Model } from "../../lib/index.js";
 import { Callbacks as ValidationsCallbacks } from "../../lib/validations/callbacks.js";
 

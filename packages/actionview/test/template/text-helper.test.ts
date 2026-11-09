@@ -19,7 +19,8 @@ import {
 import { include } from "@blazetrails/ruby-compat";
 import { raw } from "../../lib/helpers/output-safety-helper.js";
 import { Base } from "../../lib/base.js";
-import { I18n, assertNil, inflections } from "@blazetrails/activesupport";
+import { I18n, inflections } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const simpleFormat = _simpleFormat.bind(view);

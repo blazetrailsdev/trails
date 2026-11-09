@@ -1,4 +1,4 @@
-import { stub } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MockRequest } from "@blazetrails/rack";
 import { EOFError, Errno, type TCPSocket } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";

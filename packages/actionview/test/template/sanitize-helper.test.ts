@@ -1,7 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { include } from "@blazetrails/ruby-compat";
-import { assertEqual, assertKindOf, assertRespondTo, isHtmlSafe } from "@blazetrails/activesupport";
+import { isHtmlSafe } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertKindOf,
+  assertRespondTo,
+} from "@blazetrails/activesupport/testing/assertions";
 
 declare const Loofah: unknown;
 declare const Trails: unknown;

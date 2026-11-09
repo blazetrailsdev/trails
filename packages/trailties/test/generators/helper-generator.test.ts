@@ -1,6 +1,6 @@
 import { Dir, File, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { HelperGenerator } from "../../lib/generators/trails/helper/helper-generator.js";

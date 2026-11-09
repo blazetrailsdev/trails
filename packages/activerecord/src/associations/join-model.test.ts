@@ -9,12 +9,12 @@ import {
   HasManyThroughAssociationPolymorphicThroughError,
   EagerLoadPolymorphicError,
 } from "./errors.js";
+import { isPresent } from "@blazetrails/activesupport";
 import {
   assertDifference,
   assertNothingRaised,
   assertRaises,
-  isPresent,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Author, AuthorAddress, AuthorFavorite } from "../test-helpers/models/author.js";

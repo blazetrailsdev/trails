@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Assertion } from "@blazetrails/activesupport";
+import { Assertion } from "@blazetrails/activesupport/testing/assertions";
 import { Assertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import { block, include } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";

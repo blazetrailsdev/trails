@@ -15,7 +15,8 @@ import {
   rbInspect,
   setEnv,
 } from "@blazetrails/ruby-compat";
-import { Dependencies, Stream } from "@blazetrails/activesupport";
+import { Dependencies } from "@blazetrails/activesupport";
+import { Stream } from "@blazetrails/activesupport/testing/stream";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { MockRequest } from "@blazetrails/rack";
 import { ConnectionAdapters } from "@blazetrails/activerecord";

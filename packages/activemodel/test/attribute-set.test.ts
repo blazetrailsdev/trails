@@ -6,7 +6,7 @@ import { ValueType } from "../lib/type/value.js";
 import { FloatType } from "../lib/type/float.js";
 import { IntegerType } from "../lib/type/integer.js";
 import { StringType } from "../lib/type/string.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { rbObjDup } from "@blazetrails/ruby-compat";
 
 describe("AttributeSetTest", () => {

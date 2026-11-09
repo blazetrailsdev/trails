@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { SecurePassword } from "@blazetrails/activemodel";
-import { Assertion, assertCalledWith, assertInDelta } from "@blazetrails/activesupport";
+import { Assertion, assertInDelta } from "@blazetrails/activesupport/testing/assertions";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 

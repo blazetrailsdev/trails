@@ -8,13 +8,13 @@ import {
   Duration,
   TimeZone,
   type TimeWithZone,
-  assertPredicate,
   isHtmlSafe,
   ordinalize,
   setZone,
-  travelTo,
   zone,
 } from "@blazetrails/activesupport";
+import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
+import { travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import {
   distanceOfTimeInWords,
   selectDay,

@@ -1,5 +1,9 @@
 import { describe, it } from "vitest";
-import { assertEqual, assertRaises, assertSame } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertRaises,
+  assertSame,
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   Extensions as ActiveSupportExtensions,
   MissingClassError,

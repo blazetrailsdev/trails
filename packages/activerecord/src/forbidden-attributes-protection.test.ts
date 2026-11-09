@@ -1,6 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { assertEmpty } from "@blazetrails/activesupport";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import "./index.js";
 import { Person } from "./test-helpers/models/person.js";

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Dir, File, SystemExit, getFs, getProcessAdapter } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { invoke } from "../../lib/command.js";
 import { HelpCommand } from "../../lib/commands/help.js";
 import { RakeCommand } from "../../lib/commands/rake.js";

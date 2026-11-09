@@ -1,10 +1,7 @@
-import {
-  assertNothingRaised,
-  seconds,
-  stub,
-  travelBack,
-  travelTo,
-} from "@blazetrails/activesupport";
+import { seconds } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Time } from "@blazetrails/date";
 import { Kernel, constGet, rbObjClass, StandardError, toF } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

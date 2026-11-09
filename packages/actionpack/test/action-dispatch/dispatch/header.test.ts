@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Headers } from "../../../lib/action-dispatch/http/headers.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
-import { assert, assertIncludes } from "@blazetrails/activesupport";
+import { assert, assertIncludes } from "@blazetrails/activesupport/testing/assertions";
 
 function makeHeaders(hash: Record<string, unknown>): Headers {
   return new Headers(new Request(hash));

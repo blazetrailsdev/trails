@@ -12,9 +12,8 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
+import { BigDecimal, HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import {
-  BigDecimal,
-  HashWithIndifferentAccess,
   assert,
   assertEmpty,
   assertEqual,
@@ -28,7 +27,7 @@ import {
   assertPredicate,
   assertRaises,
   assertSame,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { UploadedFile } from "../../../../lib/action-dispatch/http/upload.js";
 import {
   InvalidParameterKey,

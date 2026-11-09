@@ -72,6 +72,7 @@ import { fixtures } from "./test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { DrinkDesigner } from "./test-helpers/models/drink-designer.js";
 import { Chef, ChefWithPolymorphicInverseOf } from "./test-helpers/models/chef.js";
+import { deepDup, humanize, isPresent, type CallbackChain } from "@blazetrails/activesupport";
 import {
   assert,
   assertEmpty,
@@ -86,11 +87,7 @@ import {
   assertPredicate,
   assertRespondTo,
   assertNotRespondTo,
-  deepDup,
-  humanize,
-  isPresent,
-  type CallbackChain,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { resetI18n } from "./test-helpers/i18n.js";
 
 function setAssociationTarget(record: Base, name: string, value: unknown) {

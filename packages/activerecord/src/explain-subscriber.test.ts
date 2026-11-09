@@ -2,7 +2,7 @@ import { describe, expect, beforeEach, afterEach } from "vitest";
 
 import { ExplainSubscriber } from "./explain-subscriber.js";
 import { ExplainRegistry } from "./explain-registry.js";
-import { assertEmpty } from "@blazetrails/activesupport";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { itIfSupports } from "./support/supports.js";
 
 const SUBSCRIBER = new ExplainSubscriber();

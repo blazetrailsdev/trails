@@ -5,14 +5,12 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
+import { days, ordinalize } from "@blazetrails/activesupport";
 import {
   assertDifference,
   assertNoDifference,
-  days,
-  ordinalize,
-  travelBack,
-  travelTo,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import type { Time } from "@blazetrails/date";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import {

@@ -4,15 +4,15 @@ import { Range } from "../index.js";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { ProtectedParams } from "../support/stubs/strong-parameters.js";
 import { adapterType } from "../test-adapter.js";
+import { seconds } from "@blazetrails/activesupport";
 import {
   assertEmpty,
   assertNothingRaised,
   assertRaises,
-  seconds,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 import { assertQueriesCount } from "../testing/query-assertions.js";
-import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
+import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { rational, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Post } from "../test-helpers/models/post.js";

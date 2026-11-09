@@ -1,11 +1,11 @@
 import { beforeEach, describe, it } from "vitest";
+import { useZone } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertKindOf,
   assertNil,
-  freezeTime,
-  useZone,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { freezeTime } from "@blazetrails/activesupport/testing/time-helpers";
 import { Time } from "@blazetrails/date";
 import "./support/helper.js";
 import { GidJob } from "./support/jobs/gid-job.js";

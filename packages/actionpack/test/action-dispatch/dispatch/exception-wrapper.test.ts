@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { ParameterTypeError } from "@blazetrails/rack";
 import { ActionNotFound } from "../../../lib/abstract-controller/base.js";
 import { RoutingError } from "../../../lib/action-controller/metal/exceptions.js";
-import { BacktraceCleaner, assertCalledWith, assertEmpty } from "@blazetrails/activesupport";
+import { BacktraceCleaner } from "@blazetrails/activesupport";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { excBacktrace, excBacktraceLocations, type Location } from "@blazetrails/ruby-compat";
 import { ExceptionWrapper } from "../../../lib/action-dispatch/middleware/exception-wrapper.js";
 

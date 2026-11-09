@@ -1,5 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertChanges } from "@blazetrails/activesupport";
+import { assertChanges } from "@blazetrails/activesupport/testing/assertions";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";

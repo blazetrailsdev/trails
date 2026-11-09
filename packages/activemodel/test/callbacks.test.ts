@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { extend } from "@blazetrails/activesupport";
 import {
   assertEmpty,
   assertRespondTo,
   assertNotRespondTo,
-  extend,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import { Callbacks } from "../lib/callbacks.js";
 

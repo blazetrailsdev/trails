@@ -1,12 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import {
-  currentTimeInstant,
-  Duration,
-  stub,
-  travel,
-  travelBack,
-  assertNothingRaised,
-} from "@blazetrails/activesupport";
+import { currentTimeInstant, Duration } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "@blazetrails/activerecord";
 import { OpenSSL, StringIO } from "@blazetrails/ruby-compat";
 import { TestCase } from "@blazetrails/activejob/test-case";

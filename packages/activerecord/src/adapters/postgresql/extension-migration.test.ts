@@ -1,5 +1,5 @@
 import { StandardError } from "@blazetrails/ruby-compat";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../index.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";

@@ -13,7 +13,7 @@ import {
 } from "../../lib/helpers/capture-helper.js";
 import { contentTag } from "../../lib/helpers/tag-helper.js";
 import { raw } from "../../lib/helpers/output-safety-helper.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 interface Host extends CaptureHelperHost {
   capture: typeof capture;

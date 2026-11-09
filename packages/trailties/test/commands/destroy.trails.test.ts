@@ -1,4 +1,4 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, onTestFinished, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";

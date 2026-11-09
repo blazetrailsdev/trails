@@ -1,5 +1,5 @@
 import { Dir } from "@blazetrails/ruby-compat";
-import { assertNoMatch } from "@blazetrails/activesupport";
+import { assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Base as ThorBase } from "@blazetrails/thor/shell";
 import { afterEach, beforeEach, describe, it } from "vitest";

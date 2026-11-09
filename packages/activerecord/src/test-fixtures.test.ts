@@ -7,7 +7,8 @@ import {
   constSet,
   TopLevel,
 } from "@blazetrails/ruby-compat";
-import { Minitest, Notifications, onLoad } from "@blazetrails/activesupport";
+import { Notifications, onLoad } from "@blazetrails/activesupport";
+import { Minitest } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "./base.js";
 import "./relation.js";
 import { TestFixtures } from "./test-fixtures.js";

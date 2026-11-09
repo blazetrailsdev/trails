@@ -1,7 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import "../support/abstract-unit.js";
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { I18n, assertCalledWith } from "@blazetrails/activesupport";
+import { I18n } from "@blazetrails/activesupport";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 
 import { Base } from "../../lib/base.js";
 import { LookupContext } from "../../lib/lookup-context.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assertEmpty, assertPredicate } from "@blazetrails/activesupport";
+import { assertEmpty, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Topic } from "../models/topic.js";
 
 describe("ConditionalValidationTest", () => {
