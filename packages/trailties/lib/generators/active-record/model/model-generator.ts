@@ -2,6 +2,7 @@ import "../../../constants.active-record-model-model-generator.generated.js";
 import { File } from "@blazetrails/ruby-compat";
 import { dasherize, type GeneratorOptions } from "../../base.js";
 import { Base } from "../../active-record.js";
+import type { GeneratedAttribute } from "../../generated-attribute.js";
 import { Generators } from "../../../generators.js";
 import { camelize, classify, underscore } from "@blazetrails/activesupport";
 
@@ -109,6 +110,11 @@ ${staticBlock}}
         File.join("app/models", `${this.classPath().join("/")}${this.ext()}`),
       );
     }
+  }
+
+  /** @internal */
+  protected attributesWithIndex(): GeneratedAttribute[] {
+    return this.attributes.filter((a) => !a.reference() && a.hasIndex());
   }
 
   private isSkipMigrationCreation(): boolean {

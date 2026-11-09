@@ -152,6 +152,11 @@ export class MigrationGenerator extends Base {
     return attribute.foreignKey() ? attribute.name : foreignKey(singularize(attribute.name));
   }
 
+  /** @internal */
+  protected attributesWithIndex(): GeneratedAttribute[] {
+    return this.attributes.filter((a) => !a.reference() && a.hasIndex());
+  }
+
   private normalizeTableName(tableName: string): string {
     return this.isPluralizeTableNames() ? pluralize(tableName) : singularize(tableName);
   }

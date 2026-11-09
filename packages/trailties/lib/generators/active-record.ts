@@ -14,7 +14,6 @@ import {
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
 
-/** @noRailsEquivalent PERMANENT */
 export function indexNameLiteral(attribute: GeneratedAttribute): string {
   const indexName = attribute.indexName();
   return Array.isArray(indexName)
@@ -22,7 +21,6 @@ export function indexNameLiteral(attribute: GeneratedAttribute): string {
     : `"${indexName}"`;
 }
 
-/** @noRailsEquivalent PERMANENT */
 export function kwargs(...options: Array<string | undefined>): string {
   const pairs = options.join("");
   return pairs === "" ? "" : `, { ${pairs.slice(2)} }`;
@@ -32,7 +30,7 @@ export function kwargs(...options: Array<string | undefined>): string {
 export interface Base extends Included<typeof Migration> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class Base extends NamedBase {
+export abstract class Base extends NamedBase {
   declare options: NamedBase["options"] & { primaryKeyType?: string; timestamps?: boolean };
   migrationNumber = "";
   migrationFileName = "";
@@ -58,12 +56,9 @@ export class Base extends NamedBase {
     return __dir__;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  protected attributesWithIndex(): GeneratedAttribute[] {
-    return this.attributes.filter((a) => !a.reference() && a.hasIndex());
-  }
+  /** @internal */
+  protected abstract attributesWithIndex(): GeneratedAttribute[];
 
-  /** @noRailsEquivalent PERMANENT */
   protected createTableMigration(): string {
     const table = this.tableName();
     const colLines: string[] = [];
