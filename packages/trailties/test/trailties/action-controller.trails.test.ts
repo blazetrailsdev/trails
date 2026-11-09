@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
+import { TestSession } from "@blazetrails/actionpack/testing";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Configuration } from "../../lib/application/configuration.js";
 import { Trailtie, type ActionControllerConfig } from "../../lib/trailties/action-controller.js";
@@ -80,7 +81,7 @@ describe("ActionController::Railtie action_controller.request_forgery_protection
       REQUEST_METHOD: "POST",
       PATH_INFO: "/posts",
       HTTP_HOST: "localhost",
-      "rack.session": new ActionController.TestSession(),
+      "rack.session": new TestSession(),
     });
     await controller.dispatch("create", request, new Response());
     return controller;

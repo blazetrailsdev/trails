@@ -11,6 +11,7 @@ import {
   type MockLogger,
 } from "@blazetrails/activesupport/log-subscriber/test-helper";
 import { ActionController } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { include, type Included } from "@blazetrails/ruby-compat";
 
 include(ActionController.Base, ControllerRuntime);
@@ -50,7 +51,7 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
   > {}
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
-  class ControllerRuntimeLogSubscriberTest extends ActionController.TestCase {
+  class ControllerRuntimeLogSubscriberTest extends TestCase {
     declare logger: MockLogger;
     declare oldLogger: typeof ActionController.Base.logger;
 

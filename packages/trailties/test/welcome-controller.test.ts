@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { WelcomeController } from "../lib/welcome-controller.js";
 
 describe("WelcomeController", () => {
@@ -12,7 +13,7 @@ describe("WelcomeController", () => {
   });
 
   it("index renders the shipped welcome page", async ({ task }) => {
-    class WelcomeControllerTest extends ActionController.TestCase {}
+    class WelcomeControllerTest extends TestCase {}
     WelcomeControllerTest.tests(WelcomeController);
     const t = new WelcomeControllerTest(task.name);
     await t.beforeSetup();

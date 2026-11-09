@@ -5,10 +5,11 @@
     "outDir": "dist",
     "rootDir": "lib",
     "paths": {
-      "@blazetrails/actionpack": ["../actionpack/lib/index.ts"]
+      "@blazetrails/actionpack": ["../actionpack/lib/index.ts"],
+      "@blazetrails/actionpack/testing": ["../actionpack/lib/testing.ts"]
     }
   },
-  "include": ["lib/test-case.ts", "lib/constants.excluded.generated.ts"],
+  "include": ["lib/test-case.ts", "lib/constants.test-case.generated.ts"],
   "references": [
     {
       "path": "./tsconfig.json"

@@ -5,7 +5,7 @@ import {
   TestFixtures,
 } from "@blazetrails/activerecord/test-fixtures";
 import { Notifications, cattrAccessor, isBlank } from "@blazetrails/activesupport";
-import { ActionController } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import {
   Dir,
   Module,
@@ -85,10 +85,10 @@ export class ActiveRecordTestConnector {
   }
 }
 
-type ControllerClass = Parameters<typeof ActionController.TestCase.tests>[0];
+type ControllerClass = Parameters<typeof TestCase.tests>[0];
 
 /** @missingRailsCall after_fork_hook — PERMANENT */
-export class ActiveRecordTestCase extends ActionController.TestCase {
+export class ActiveRecordTestCase extends TestCase {
   declare static fixturePaths: string[];
   declare static useTransactionalTests: boolean;
 

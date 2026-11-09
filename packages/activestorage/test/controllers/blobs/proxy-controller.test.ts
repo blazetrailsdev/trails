@@ -3,7 +3,8 @@ import { currentTimeInstant, Duration, TopLevel } from "@blazetrails/activesuppo
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { ActionController, IntegrationTest } from "@blazetrails/actionpack";
+import { ActionController } from "@blazetrails/actionpack";
+import { ControllerTestRequest, IntegrationTest } from "@blazetrails/actionpack/testing";
 import { SecureRandom, StandardError } from "@blazetrails/ruby-compat";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
@@ -198,7 +199,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
   });
 
   it("uses a Live::Response", () => {
-    const request = ActionController.TestRequest.create({} as never);
+    const request = ControllerTestRequest.create({} as never);
     expect(
       (ProxyController as unknown as { makeResponseBang(r: unknown): unknown }).makeResponseBang(
         request,

@@ -11,11 +11,6 @@ export { Base, type RenderOptions } from "./base.js";
 export { DoubleRenderError } from "../abstract-controller/rendering.js";
 export { API } from "./api.js";
 
-export { TestCase, type RequestOptions } from "./test-case.js";
-export {
-  IntegrationTest,
-  type IntegrationRequestOptions,
-} from "../action-dispatch/testing/integration.js";
 export {
   Parameters,
   ParameterMissing,
@@ -62,7 +57,6 @@ export { HttpAuthentication } from "./metal/http-authentication.js";
 export { Renderer } from "./renderer.js";
 export { Deprecator, deprecator } from "./deprecator.js";
 export { addRenderer, removeRenderer } from "./metal/renderers.js";
-export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 export { fragmentCacheKey } from "./caching.js";
 export { FormBuilder, defaultFormBuilder } from "./form-builder.js";
 export { assertTemplate, TemplateAssertions } from "./template-assertions.js";

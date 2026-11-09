@@ -27,6 +27,7 @@ export class NewSession extends RailsHelperBase {
   async execute(..._args: unknown[]): Promise<unknown> {
     const app = Trails.application!;
     await app.reloadRoutesUnlessLoaded();
+    await import("@blazetrails/actionpack/testing");
     const session = new ActionDispatch.Integration.Session(app);
 
     extend(session, app.routes().urlHelpers());

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { IntegrationTest } from "@blazetrails/actionpack";
+import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
 import type { Attachment } from "../../../lib/attachment.js";

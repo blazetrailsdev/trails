@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest";
 import { dasherize, extractOptionsBang, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { FixtureResolver } from "../../../lib/testing/resolvers.js";
 import { MissingTemplate } from "../../../lib/template/error.js";
 import { type TemplateHandler } from "../../../lib/template/handlers.js";
@@ -71,7 +72,7 @@ const SharedTestRoutes = new RouteSet();
 SharedTestRoutes.draw(function () {
   this.get(":controller(/:action)");
 });
-let testCase: InstanceType<typeof ActionController.TestCase>;
+let testCase: InstanceType<typeof TestCase>;
 const assertResponse = (type: number | string): void => testCase.assertResponse(type);
 
 async function get(controller: LayoutTest, action: string): Promise<string> {
@@ -91,7 +92,7 @@ describe("LayoutAutoDiscoveryTest", () => {
 
   test("third party template library auto discovers layout", async ({ task }) => {
     await withTemplateHandler("mab", mab, async () => {
-      testCase = new ActionController.TestCase(task.name);
+      testCase = new TestCase(task.name);
       testCase.controller = new ThirdPartyTemplateLibraryController();
       await testCase.beforeSetup();
       testCase.routes = SharedTestRoutes;
@@ -260,7 +261,7 @@ class LayoutStatusIsRendered extends LayoutTest {
 
 describe("LayoutStatusIsRenderedTest", () => {
   test("layout status is rendered", async ({ task }) => {
-    testCase = new ActionController.TestCase(task.name);
+    testCase = new TestCase(task.name);
     testCase.controller = new LayoutStatusIsRendered();
     await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;
@@ -277,7 +278,7 @@ class LayoutSymlinkedTest extends LayoutTest {
 
 describe("LayoutSymlinkedIsRenderedTest", () => {
   test("symlinked layout is rendered", async ({ task }) => {
-    testCase = new ActionController.TestCase(task.name);
+    testCase = new TestCase(task.name);
     testCase.controller = new LayoutSymlinkedTest();
     await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;
