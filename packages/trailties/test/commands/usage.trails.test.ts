@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Dir, File, getFs } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import { capture } from "@blazetrails/activesupport";
@@ -26,6 +26,21 @@ async function helpOutput(klass: typeof Base, namespace: string): Promise<string
 }
 
 describe("command USAGE files", () => {
+  let appPath: string;
+  let originalCwd: string;
+
+  beforeEach(async () => {
+    appPath = Dir.mktmpdir();
+    originalCwd = Dir.pwd();
+    await getFs().writeFile!(File.join(appPath, "Rakefile.ts"), "");
+    Dir.chdir(appPath);
+  });
+
+  afterEach(async () => {
+    Dir.chdir(originalCwd);
+    await getFs().rm!(appPath, { recursive: true, force: true });
+  });
+
   it("prints an unrecognized command and exits 1", async () => {
     const out = await capture(":stdout", () =>
       expect(invoke("db:nope")).rejects.toThrow('called with "1"'),
