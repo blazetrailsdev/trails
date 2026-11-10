@@ -107,6 +107,15 @@ export function cmp(a: unknown, b: unknown): number | null {
     const y = (b as { epochNanoseconds?: bigint }).epochNanoseconds;
     if (x !== undefined && y !== undefined) return x < y ? -1 : x > y ? 1 : 0;
   }
+  // `time_cmp`'s `rb_invcmp` arm (vendor/ruby/v3.3.11/time.c:3951) for a non-Time `other`.
+  if (
+    rbObjClass(a) === reopened(rbCTime) &&
+    rbObjClass(b) !== reopened(rbCTime) &&
+    (isComparable(b) || isCmpSpelling(b))
+  ) {
+    const c = isComparable(b) ? b.compareTo(a) : b.cmp(a);
+    return c == null ? null : -c;
+  }
   if (kTemporalDateP(a) && (typeof b === "number" || typeof b === "bigint")) {
     const ajd = mAjd(a);
     const n = Number(b);
@@ -282,9 +291,7 @@ export function rbCmpint(val: number | null | undefined, a: unknown, b: unknown)
  * @noRailsEquivalent PERMANENT — Ruby core `Comparable` `cmpint` (`vendor/ruby/v3.3.11/compar.c:91`).
  */
 export function cmpint(this: Comparable, other: unknown): number {
-  const c = this.compareTo(other);
-  if (c === null || c === undefined) rbCmperr(this, other);
-  return c;
+  return rbCmpint(cmp(this, other), this, other);
 }
 
 /**

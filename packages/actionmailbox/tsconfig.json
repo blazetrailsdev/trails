@@ -24,6 +24,9 @@
       "path": "../activesupport"
     },
     {
+      "path": "../date"
+    },
+    {
       "path": "../mail"
     },
     {

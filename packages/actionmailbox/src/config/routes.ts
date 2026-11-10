@@ -10,6 +10,11 @@ import { TopLevel } from "@blazetrails/activesupport";
         to: "relay/inbound_emails#create",
         as: "trails_relay_inbound_emails",
       });
+
+      this.post("/mailgun/inbound_emails/mime", {
+        to: "mailgun/inbound_emails#create",
+        as: "trails_mailgun_inbound_emails",
+      });
     },
   );
 

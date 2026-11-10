@@ -37,12 +37,14 @@
     }
   },
   "actionmailbox": {
-    "rows": 14,
+    "rows": 19,
     "excluded": ["base-controller.ts::BaseController"],
     "unwalked": [
       "callbacks.ts::Callbacks",
       "gem-version.ts::VERSION",
+      "inbound-email/incineratable.ts::Incineratable",
       "inbound-email/routable.ts::Routable",
+      "ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
       "relayer.ts::Relayer.Result",
       "router.ts::Router.RoutingError",
       "routing.ts::Routing"
