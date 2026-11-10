@@ -16,25 +16,15 @@ describe("PackageTask#define archive tasks", () => {
   async function packageWith(withoutParentDir: boolean) {
     await FileUtilsExt.touch("a.c");
     const calls: { cwd: string; cmd: unknown[] }[] = [];
-    vi.spyOn(
-      PackageTask.prototype as unknown as Record<
-        "sh" | "mv",
-        (...args: unknown[]) => Promise<unknown>
-      >,
-      "sh",
-    ).mockImplementation(async (...cmd: unknown[]) => {
+    const host = PackageTask.prototype as unknown as Record<
+      "sh" | "mv",
+      (...args: unknown[]) => Promise<unknown>
+    >;
+    vi.spyOn(host, "sh").mockImplementation(async (...cmd: unknown[]) => {
       calls.push({ cwd: Dir.pwd(), cmd });
       return true;
     });
-    const mv = vi
-      .spyOn(
-        PackageTask.prototype as unknown as Record<
-          "sh" | "mv",
-          (...args: unknown[]) => Promise<unknown>
-        >,
-        "mv",
-      )
-      .mockImplementation(async () => null);
+    const mv = vi.spyOn(host, "mv").mockImplementation(async () => null);
     const packageFiles = new FileList();
     packageFiles.include("a.c");
     await packageFiles.resolve();
