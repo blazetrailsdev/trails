@@ -5,7 +5,7 @@ import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import type { Configuration } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { Mail, type Message } from "@blazetrails/mail";
-import { include } from "@blazetrails/ruby-compat";
+import { chomp, include } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Base } from "../lib/base.js";
 import type { MessageDelivery } from "../lib/message-delivery.js";
@@ -105,12 +105,10 @@ describe("ActionMailerUrlTest", () => {
 
   async function assertUrlFor(expected: string, options: unknown, relative = false) {
     if (expected.startsWith("/") && !relative) expected = `http://www.basecamphq.com${expected}`;
-    const urls = (await (UrlTestMailer as Mailer).exerciseUrlFor(options).message())
+    const body = (await (UrlTestMailer as Mailer).exerciseUrlFor(options).message())
       .body()
-      .toString()
-      .replace(/\r?\n$/, "")
-      .trim()
-      .split(/\s+/);
+      .toString();
+    const urls = chomp(body).split(" ");
 
     expect(urls[0]).toBe(expected);
     expect(urls[1]).toBe(expected);

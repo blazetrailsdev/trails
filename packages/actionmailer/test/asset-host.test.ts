@@ -7,7 +7,6 @@ import type { MessageDelivery } from "../lib/message-delivery.js";
 
 class AssetHostMailer extends Base {
   static {
-    this.setMailerName("asset_host_mailer");
     this.prependViewPath(
       new FixtureResolver({
         "asset-host-mailer/email-with-asset.html.tse": '<%= imageTag("somelogo.png") %>',
@@ -27,10 +26,10 @@ class AssetHostMailer extends Base {
 type Mailer = typeof AssetHostMailer & Record<string, (...args: unknown[]) => MessageDelivery>;
 
 describe("AssetHostTest", () => {
-  let previousAssetHost: unknown;
+  let previousDeliveryMethod: typeof Base.deliveryMethod;
 
   beforeEach(() => {
-    previousAssetHost = AssetHostMailer.config().get("assetHost");
+    previousDeliveryMethod = Base.deliveryMethod;
     (AssetHostMailer as unknown as { configure(b: (c: Configuration) => void): void }).configure(
       (c) => {
         c.set("assetHost", "http://www.example.com");
@@ -39,7 +38,8 @@ describe("AssetHostTest", () => {
   });
 
   afterEach(() => {
-    AssetHostMailer.config().set("assetHost", previousAssetHost);
+    Base.deliveries.length = 0;
+    Base.deliveryMethod = previousDeliveryMethod;
   });
 
   it("asset host as string", async () => {

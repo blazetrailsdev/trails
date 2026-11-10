@@ -5,79 +5,10 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { stub, stubAnyInstance } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { silenceStream } from "@blazetrails/activesupport/testing/stream";
 import { TestMailer, type Message } from "@blazetrails/mail";
-import {
-  StandardError,
-  TopLevel,
-  block,
-  constSet,
-  include,
-  kernelThrow,
-  stdout,
-} from "@blazetrails/ruby-compat";
+import { TopLevel, constSet, include, stdout } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";
+import { CallbackMailer } from "./support/mailers/callback-mailer.js";
 import type { MessageDelivery } from "../lib/message-delivery.js";
-
-class CallbackMailerError extends StandardError {}
-constSet(TopLevel, "CallbackMailerError", CallbackMailerError);
-
-type Callable = (...args: unknown[]) => unknown;
-type CallbackHost = Record<
-  "beforeDeliver" | "afterDeliver" | "aroundDeliver",
-  (f: Callable) => void
-> & {
-  rescueFrom(...args: unknown[]): void;
-};
-
-class CallbackMailer extends Base {
-  static rescueFromError: unknown = null;
-  static afterDeliverInstance: unknown = null;
-  static aroundDeliverInstance: unknown = null;
-  static abortBeforeDeliver: unknown = null;
-  static aroundHandlesError: unknown = null;
-
-  static {
-    const host = this as unknown as CallbackHost;
-
-    host.rescueFrom(
-      CallbackMailerError,
-      block(function (error: unknown) {
-        CallbackMailer.rescueFromError = error;
-      }),
-    );
-
-    host.beforeDeliver(() => {
-      if (CallbackMailer.abortBeforeDeliver) kernelThrow(":abort");
-    });
-
-    host.afterDeliver(function (this: unknown) {
-      CallbackMailer.afterDeliverInstance = this;
-    });
-
-    host.aroundDeliver(async function (this: unknown, _mailer: unknown, block: unknown) {
-      CallbackMailer.aroundDeliverInstance = this;
-      try {
-        await (block as () => unknown)();
-      } catch (e) {
-        if (!(e instanceof StandardError)) throw e;
-        if (!CallbackMailer.aroundHandlesError) throw e;
-      }
-    });
-  }
-
-  testMessage(..._args: unknown[]) {
-    return this.mail({
-      from: "test-sender@test.com",
-      to: "test-receiver@test.com",
-      subject: "Test Subject",
-      body: "Test Body",
-    });
-  }
-
-  testRaiseAction(): never {
-    throw new CallbackMailerError("boom action processing");
-  }
-}
-constSet(TopLevel, "CallbackMailer", CallbackMailer);
 
 type Mailer = typeof CallbackMailer & Record<string, (...args: unknown[]) => MessageDelivery>;
 const Mailer = CallbackMailer as Mailer;
