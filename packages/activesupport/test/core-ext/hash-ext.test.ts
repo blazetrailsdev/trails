@@ -15,12 +15,16 @@ import {
 } from "../../lib/testing/assertions.js";
 import { Date as RubyDate, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal } from "../../lib/core-ext/big-decimal/conversions.js";
-import { DisallowedType, XMLConverter } from "../../lib/core-ext/hash/conversions.js";
+import {
+  DisallowedType,
+  XMLConverter,
+  fromXml,
+  fromTrustedXml,
+} from "../../lib/core-ext/hash/conversions.js";
 
 import * as HashExt from "../../lib/hash-utils.js";
 import { ArgumentError, FrozenError, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import {
-  fromXml,
   deepMerge,
   deepMergeBang,
   exceptBang,
@@ -45,7 +49,6 @@ import {
   assertValidKeys,
   toParam,
   toXml,
-  fromTrustedXml,
 } from "../../lib/hash-utils.js";
 import { Hash } from "@blazetrails/ruby-compat";
 

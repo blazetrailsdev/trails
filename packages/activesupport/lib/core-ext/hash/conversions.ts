@@ -7,6 +7,17 @@ import { wrap } from "../../array-utils.js";
 import { isPlainObject } from "../../hash-utils.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 
+export function fromXml(
+  xml: string | Uint8Array | StringIO | null | undefined,
+  disallowedTypes: string[] | null = null,
+): unknown {
+  return new XMLConverter(xml, disallowedTypes).toH();
+}
+
+export function fromTrustedXml(xml: string | Uint8Array | StringIO | null | undefined): unknown {
+  return fromXml(xml, []);
+}
+
 export class DisallowedType extends Error {
   static toString(): string {
     return "ActiveSupport::XMLConverter::DisallowedType";
