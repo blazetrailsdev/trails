@@ -1,3 +1,4 @@
+import { Mail } from "../../mail.js";
 import type { Message } from "../../message.js";
 
 export interface RetrieverOptions {
@@ -57,3 +58,5 @@ export class Retriever {
     return this.find(options, block);
   }
 }
+
+Mail.Retriever = Retriever;

@@ -33,6 +33,7 @@ export interface MailConstants {
   SMTPConnection: typeof import("./network/delivery-methods/smtp-connection.js").SMTPConnection;
   TestMailer: typeof import("./network/delivery-methods/test-mailer.js").TestMailer;
   LoggerDelivery: typeof import("./network/delivery-methods/logger-delivery.js").LoggerDelivery;
+  Retriever: typeof import("./network/retriever-methods/base.js").Retriever;
   TestRetriever: typeof import("./network/retriever-methods/test-retriever.js").TestRetriever;
   POP3?: new (settings: Record<string, unknown>) => Retriever;
   IMAP?: new (settings: Record<string, unknown>) => Retriever;
