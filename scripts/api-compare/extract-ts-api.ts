@@ -4631,13 +4631,6 @@ export function harvestObjectLiteralMethods(
         checker.getNonNullableType(checker.getTypeAtLocation(prop.name)).getCallSignatures()
           .length === 0
       ) {
-        // `extend({ _transKeys: [...], start: 1, parse() {} }, ParserTools)` — a
-        // module's `class << self; attr_accessor :_trans_keys, :start; end`
-        // (mail/parsers/content_type_parser.rb) seated as data properties of its
-        // singleton. A data property is writable, so it is both accessor halves,
-        // as a class field is; so is `loaders: [] as Loader[]`, `class << self;
-        // attr_reader :loaders` (zeitwerk/registry.rb). A literal of data alone
-        // is state, not a module.
         mname = prop.name.text;
         slots.add(mname);
       } else {

@@ -555,7 +555,7 @@ export class Base extends AbstractController.Base {
   }
 
   /** @internal */
-  instrumentPayload(key: unknown): { mailer: string; key: unknown } {
+  protected instrumentPayload(key: unknown): { mailer: string; key: unknown } {
     return {
       mailer: this.mailerName(),
       key: key,
@@ -563,12 +563,12 @@ export class Base extends AbstractController.Base {
   }
 
   /** @internal */
-  instrumentName(): string {
+  protected instrumentName(): string {
     return "action_mailer";
   }
 
   /** @internal */
-  _protectedIvars(): readonly string[] {
+  protected _protectedIvars(): readonly string[] {
     return Base.PROTECTED_IVARS;
   }
 }
