@@ -90,6 +90,7 @@ describe("the node adapter", () => {
     readAsync: true,
     writeSync: true,
     writeAsync: true,
+    accessAsync: true,
     closeSync: true,
     copyFileSync: true,
     cwd: true,

@@ -1016,10 +1016,13 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "dispatches to a named method for `+duration` — the unary `+` coerces " +
       "through `valueOf()` to a number — so a ported `identity()` method would " +
       "be inert dead code no caller can reach (unlike `-@` → `negate`, which is " +
-      "called from `minus()` via `other.negate()`). Scoped to duration.rb so it " +
-      "can't silence a genuine `+@` gap elsewhere.",
+      "called from `minus()` via `other.negate()`). Date::Infinity#+@ " +
+      "(`def +@() self.class.new(+d) end`, date's lib/date.rb:33) is the same " +
+      "operator in the same situation, and nothing in date.rb calls it by name. " +
+      "Scoped to duration.rb and date.rb so it can't silence a genuine `+@` gap " +
+      "elsewhere.",
     names: ["+@"],
-    rubyFiles: ["duration.rb"],
+    rubyFiles: ["duration.rb", "date.rb"],
   },
   {
     reason:

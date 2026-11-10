@@ -1043,7 +1043,7 @@
     }
   },
   "mail": {
-    "rows": 118,
+    "rows": 123,
     "excluded": ["multibyte/encoding-error.ts::EncodingError"],
     "unwalked": [
       "check-delivery-params.ts::CheckDeliveryParams",
@@ -1086,6 +1086,11 @@
       "encodings/7bit.ts::SevenBit": "Mail::Encodings::SevenBit",
       "encodings/8bit.ts::EightBit": "Mail::Encodings::EightBit",
       "fields/common-address-field.ts::AddressContainer": "Mail::AddressContainer",
+      "matchers/attachment-matchers.ts::AnyAttachmentMatcher": "Mail::Matchers::AnyAttachmentMatcher",
+      "matchers/attachment-matchers.ts::AttachmentFilenameMatcher": "Mail::Matchers::AttachmentFilenameMatcher",
+      "matchers/attachment-matchers.ts::AttachmentMimeTypeMatcher": "Mail::Matchers::AttachmentMimeTypeMatcher",
+      "matchers/attachment-matchers.ts::Matchers": "Mail::Matchers",
+      "matchers/has-sent-mail.ts::HasSentEmailMatcher": "Mail::Matchers::HasSentEmailMatcher",
       "network/delivery-methods/exim.ts::Exim": "Mail::Exim",
       "network/delivery-methods/file-delivery.ts::FileDelivery": "Mail::FileDelivery",
       "network/delivery-methods/logger-delivery.ts::LoggerDelivery": "Mail::LoggerDelivery",

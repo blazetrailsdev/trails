@@ -125,6 +125,11 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "MiniMagick::Tool": { "<<": ["append"] },
   "Mail::AddressContainer": { "<<": ["append"] },
   "Mail::CommonAddressField": { "<<": ["append"] },
+  // mail/matchers/attachment_matchers.rb:17,29,40 `def ===(other)` →
+  // matchers/attachment-matchers.ts `caseEquals`.
+  "Mail::Matchers::AnyAttachmentMatcher": { "===": ["caseEquals"] },
+  "Mail::Matchers::AttachmentFilenameMatcher": { "===": ["caseEquals"] },
+  "Mail::Matchers::AttachmentMimeTypeMatcher": { "===": ["caseEquals"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.
   "Arel::Table": { "[]": ["get"] },
   // arel/nodes/table_alias.rb:10 `def [](name)` → nodes/table-alias.ts `get`.

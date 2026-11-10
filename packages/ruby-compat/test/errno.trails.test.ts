@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Errno, SystemCallError } from "../lib/errno.js";
+import { ArgumentError } from "../lib/argument-error.js";
+import { StandardError } from "../lib/standard-error.js";
 
 describe("SystemCallError", () => {
   it("is the class of an fs error carrying a code", () => {
@@ -63,5 +65,27 @@ describe("Errno::EINTR", () => {
     expect(error.errno).toBe(4);
     expect(error.message).toBe("Interrupted system call - x");
     expect(new Errno.EINTR().message).toBe("Interrupted system call");
+  });
+});
+
+describe("StandardError", () => {
+  it("is the class of an error carrying an errno code, as Errno::* is", () => {
+    const fs = Object.assign(new Error("EACCES"), { code: "EACCES" });
+    const socket = Object.assign(new Error("ECONNRESET"), { code: "ECONNRESET" });
+    expect(fs instanceof StandardError).toBe(true);
+    expect(socket instanceof StandardError).toBe(true);
+  });
+
+  it("is not the class of an error whose code is not an errno name", () => {
+    const node = Object.assign(new Error("bad arg"), { code: "ERR_INVALID_ARG_TYPE" });
+    const dns = Object.assign(new Error("again"), { code: "EAI_AGAIN" });
+    expect(node instanceof StandardError).toBe(false);
+    expect(dns instanceof StandardError).toBe(false);
+    expect(new Error("boom") instanceof StandardError).toBe(false);
+  });
+
+  it("keeps a subclass check exact", () => {
+    const fs = Object.assign(new Error("EACCES"), { code: "EACCES" });
+    expect(fs instanceof ArgumentError).toBe(false);
   });
 });

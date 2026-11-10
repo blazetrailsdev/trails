@@ -96,3 +96,10 @@ export { Chars } from "./multibyte/chars.js";
 export { Unicode } from "./multibyte/unicode.js";
 import "./parsers.js";
 export { YAML } from "./yaml.js";
+export {
+  Matchers,
+  AnyAttachmentMatcher,
+  AttachmentFilenameMatcher,
+  AttachmentMimeTypeMatcher,
+} from "./matchers/attachment-matchers.js";
+export { HasSentEmailMatcher, haveSentEmail } from "./matchers/has-sent-mail.js";

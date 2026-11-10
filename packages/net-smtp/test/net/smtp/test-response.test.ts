@@ -6,7 +6,7 @@ import {
   SMTPServerBusy,
   SMTPSyntaxError,
   SMTPUnknownError,
-} from "../lib/smtp.js";
+} from "../../../lib/smtp.js";
 
 describe("TestResponse", () => {
   const multi = "250-ubuntu-desktop\n250-SIZE 1 2 3\n250 DSN\n";
@@ -17,7 +17,7 @@ describe("TestResponse", () => {
     );
     const capabilities = res.capabilities;
     for (const str of ["PIPELINING", "SIZE", "VRFY", "STARTTLS", "ENHANCEDSTATUSCODES", "DSN"]) {
-      expect(capabilities).toHaveProperty(str);
+      expect(Object.hasOwn(capabilities, str), str).toBeTruthy();
     }
   });
 
@@ -41,14 +41,14 @@ describe("TestResponse", () => {
 
   it("success?", () => {
     const res = Response.parse(multi);
-    expect(res.isSuccess()).toBe(true);
-    expect(res.isContinue()).toBe(false);
+    expect(res.isSuccess()).toBeTruthy();
+    expect(!res.isContinue()).toBeTruthy();
   });
 
   it("continue?", () => {
     const res = Response.parse("3yz-ubuntu-desktop\n250-SIZE 1 2 3\n250 DSN\n");
-    expect(res.isSuccess()).toBe(false);
-    expect(res.isContinue()).toBe(true);
+    expect(!res.isSuccess()).toBeTruthy();
+    expect(res.isContinue()).toBeTruthy();
   });
 
   it("status type char", () => {
