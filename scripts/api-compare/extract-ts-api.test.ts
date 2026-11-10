@@ -8797,6 +8797,25 @@ describe("object-literal modules and Struct.new constants", () => {
     ]);
   });
 
+  it("leaves a cast namespace literal with no bodies alone", () => {
+    // activerecord/src/namespaces.ts: `export const ActiveRecord = { name, loadPath } as AutoloadModule & …`
+    const info = extractFromFiles("/p", {
+      "namespaces.ts": `
+        const loadPath = { a: 1 };
+        export const ActiveRecord = { name: "ActiveRecord", loadPath } as { name: string };
+      `,
+    });
+    expect(info.modules["namespaces.ts:ActiveRecord"]).toBeUndefined();
+  });
+
+  it("leaves an `as const` section literal alone", () => {
+    // activerecord/src/relation/calculations.ts: CalculationsPublicInstanceMethods
+    const info = extractFromFiles("/p", {
+      "calculations.ts": `export const Section = { pick(): void {} } as const;`,
+    });
+    expect(info.modules["calculations.ts:Section"]).toBeUndefined();
+  });
+
   it("credits the literal of extend({ ... }, Mod) and its data properties", () => {
     // mail/parsers/content-type-parser.ts over content_type_parser.rb:9-10
     const info = extractFromFiles("/p", {
@@ -8818,6 +8837,16 @@ describe("object-literal modules and Struct.new constants", () => {
     expect(mod.instanceMethods.map((m) => m.name)).toEqual(["_transKeys", "start", "parse"]);
   });
 
+  it("does not credit a plain literal's data properties", () => {
+    // ruby-compat/lib/repl-adapter.ts: `HelperMethod = { helperMethods: {}, register() {} }`
+    const info = extractFromFiles("/p", {
+      "repl-adapter.ts": `export const HelperMethod = { helperMethods: {}, register(): void {} };`,
+    });
+    expect(info.modules["repl-adapter.ts:HelperMethod"].instanceMethods.map((m) => m.name)).toEqual(
+      ["register"],
+    );
+  });
+
   it("does not make a literal of data alone a module", () => {
     const info = extractFromFiles("/p", {
       "state.ts": `export const State = { loaders: [] as string[], count: 0 };`,
@@ -8828,7 +8857,10 @@ describe("object-literal modules and Struct.new constants", () => {
   it("does not credit a string-valued data property as an accessor slot", () => {
     // activerecord/src/sqlite/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
     const info = extractFromFiles("/p", {
-      "driver.ts": `export const Driver = { name: "x", open(): void {} };`,
+      "driver.ts": `
+        declare function extend<T>(obj: T, ...mods: object[]): T;
+        export const Driver = extend({ name: "x", open(): void {} }, {});
+      `,
     });
     expect(info.modules["driver.ts:Driver"].instanceMethods.map((m) => m.name)).toEqual(["open"]);
   });

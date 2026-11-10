@@ -1029,15 +1029,17 @@ export function extractFromProgram(
           attributeReceivers ??= new Set(
             collectClassAttributeCalls(sourceFile).map((call) => call.receiver),
           );
-          const literal =
+          const moduleLiteral =
             extendModuleLiteral(decl.initializer) ??
-            sameFileLiteralAlias(decl.initializer, checker) ??
+            sameFileLiteralAlias(decl.initializer, checker);
+          const literal =
+            moduleLiteral ??
             (attributeReceivers.has(decl.name.text) || moduleLiteralCast(decl.initializer)
               ? unwrapAssertions(decl.initializer)
               : decl.initializer);
           const objectLiteral = ts.isObjectLiteralExpression(literal);
           const methods = ts.isObjectLiteralExpression(literal)
-            ? harvestObjectLiteralMethods(literal, checker, relPath, true)
+            ? harvestObjectLiteralMethods(literal, checker, relPath, moduleLiteral !== undefined)
             : isDefineModuleCall(unwrapAssertions(decl.initializer))
               ? (unwrapAssertions(decl.initializer) as ts.CallExpression).arguments
                   .map(unwrapAssertions)
@@ -4323,7 +4325,19 @@ function sameFileLiteralAlias(
  * not off the interface the cast names.
  */
 function moduleLiteralCast(init: ts.Expression): boolean {
-  return ts.isAsExpression(init) && ts.isObjectLiteralExpression(unwrapAssertions(init));
+  const literal = unwrapAssertions(init);
+  return (
+    ts.isAsExpression(init) &&
+    !ts.isConstTypeReference(init.type) &&
+    ts.isObjectLiteralExpression(literal) &&
+    literal.properties.some(
+      (p) =>
+        ts.isMethodDeclaration(p) ||
+        ts.isAccessor(p) ||
+        (ts.isPropertyAssignment(p) &&
+          (ts.isFunctionExpression(p.initializer) || ts.isArrowFunction(p.initializer))),
+    )
+  );
 }
 
 function unwrapAssertions(expr: ts.Expression): ts.Expression {
