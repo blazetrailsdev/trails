@@ -236,6 +236,10 @@ const alias = {
     __dirname,
     "packages/activerecord/src/destroy-association-async-job.ts",
   ),
+  "@blazetrails/activerecord/message-pack": path.resolve(
+    __dirname,
+    "packages/activerecord/src/message-pack.ts",
+  ),
   "@blazetrails/activerecord/fixtures.js": path.resolve(
     __dirname,
     "packages/activerecord/src/fixtures.ts",

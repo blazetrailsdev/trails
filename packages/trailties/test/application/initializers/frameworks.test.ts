@@ -543,8 +543,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(Trails.application!.config.filterParameters).toEqual(filterParameters);
   });
 
-  it.skip("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", async () => {
-    // BLOCKED: port-active-record-message-pack-initializer
+  it("ActiveRecord::MessagePack extensions are installed when using ActiveSupport::MessagePack::CacheSerializer", async () => {
     await t.trails("generate", "model", "post", "title:string");
     await t.trails("db:migrate");
 
