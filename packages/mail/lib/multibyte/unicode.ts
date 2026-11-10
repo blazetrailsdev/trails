@@ -145,6 +145,8 @@ export class UnicodeDatabase {
 
   load(): void {
     try {
+      /** @missingRailsCall open — CONVERGEABLE mail-unicode-database-full-codepoint-table */
+      /** @missingRailsCall load — CONVERGEABLE mail-unicode-database-full-codepoint-table */
       const codepoints = new Hash<number, Codepoint>(new Codepoint());
       for (const cp of new Set([
         ...COMBINING_CLASS.keys(),
