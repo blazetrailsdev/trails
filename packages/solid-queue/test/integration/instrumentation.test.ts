@@ -460,6 +460,7 @@ describe("InstrumentationTest", () => {
   });
 
   it.skip("enqueuing recurring task emits enqueue_recurring_task event", async () => {
+    // BLOCKED: solid-queue-recurring-enqueue-event-flake
     const recurringTask = {
       example_task: { class: "AddToBufferJob", schedule: "every second", args: 42 },
     };
