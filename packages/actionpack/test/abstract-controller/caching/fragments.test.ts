@@ -204,9 +204,9 @@ describe("read/write/expire fragment", () => {
   it("returns content / undefined when caching is not configured", async () => {
     HostConfig.performCaching = false;
     expect(await writeFragment.call(host, "n", "body")).toBe("body");
-    expect(await readFragment.call(host, "n")).toBeUndefined();
-    expect(await fragmentExist.call(host, "n")).toBeUndefined();
-    expect(await expireFragment.call(host, "n")).toBeUndefined();
+    expect(await readFragment.call(host, "n")).toBeNull();
+    expect(await fragmentExist.call(host, "n")).toBeNull();
+    expect(await expireFragment.call(host, "n")).toBeNull();
   });
 });
 

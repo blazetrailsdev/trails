@@ -1105,9 +1105,13 @@
     "residue": {}
   },
   "mini-mime": {
-    "rows": 5,
+    "rows": 6,
     "excluded": [],
-    "unwalked": ["mini-mime.ts::Db.Cache", "mini-mime.ts::Db.RandomAccessDb"],
+    "unwalked": [
+      "mini-mime.ts::Db.Cache",
+      "mini-mime.ts::Db.PReadFile",
+      "mini-mime.ts::Db.RandomAccessDb"
+    ],
     "residue": {}
   },
   "msgpack": {
