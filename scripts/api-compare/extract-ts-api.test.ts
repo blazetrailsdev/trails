@@ -8825,6 +8825,14 @@ describe("object-literal modules and Struct.new constants", () => {
     expect(info.modules["state.ts:State"]).toBeUndefined();
   });
 
+  it("does not credit a string-valued data property as an accessor slot", () => {
+    // activerecord/src/sqlite/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
+    const info = extractFromFiles("/p", {
+      "driver.ts": `export const Driver = { name: "x", open(): void {} };`,
+    });
+    expect(info.modules["driver.ts:Driver"].instanceMethods.map((m) => m.name)).toEqual(["open"]);
+  });
+
   it("credits an exported alias of a same-file literal", () => {
     // rake/file-utils-ext.ts: `export const FileUtilsExt = fileUtilsExt as …`
     const info = extractFromFiles("/p", {

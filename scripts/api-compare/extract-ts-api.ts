@@ -4628,6 +4628,7 @@ export function harvestObjectLiteralMethods(
       } else if (
         dataSlots &&
         !/^[A-Z]/.test(prop.name.text) &&
+        !ts.isStringLiteralLike(unwrapAssertions(init)) &&
         checker.getNonNullableType(checker.getTypeAtLocation(prop.name)).getCallSignatures()
           .length === 0
       ) {
