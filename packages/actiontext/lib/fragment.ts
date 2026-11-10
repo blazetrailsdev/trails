@@ -1,5 +1,6 @@
 import { delegate } from "@blazetrails/activesupport";
 import { XML, type Html5DocumentFragment, type Html5Node } from "@blazetrails/nokogiri";
+import { toS } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
 import { HtmlConversion } from "./html-conversion.js";
 import { PlainTextConversion } from "./plain-text-conversion.js";
@@ -18,7 +19,7 @@ export class Fragment {
   }
 
   static fromHtml(html: unknown): Fragment {
-    return new this(HtmlConversion.fragmentForHtml(String(html ?? "").trim()));
+    return new this(HtmlConversion.fragmentForHtml(toS(html).trim()));
   }
 
   readonly source: Html5DocumentFragment;

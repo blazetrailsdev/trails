@@ -68,10 +68,10 @@ export const PlainTextConversion = {
     let text = this.plainTextForBlock(node);
     if (isBlank(text)) return "“”";
 
-    const last = text.search(/\S\s*$/) + 1;
-    text = `${text.slice(0, last)}”${text.slice(last)}`;
-    const first = text.search(/\S/);
-    text = `${text.slice(0, first)}“${text.slice(first)}`;
+    const rindex = [...text.matchAll(/\S/g)].at(-1)!.index + 1;
+    text = `${text.slice(0, rindex)}”${text.slice(rindex)}`;
+    const index = text.search(/\S/);
+    text = `${text.slice(0, index)}“${text.slice(index)}`;
     return text;
   },
 

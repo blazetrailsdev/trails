@@ -44,8 +44,6 @@ export const ActionText = {
   _htmlDocumentClass?: typeof HTML5.Document;
   /** @internal */
   _htmlDocumentFragmentClass?: typeof HTML5.DocumentFragment;
-  Attachables: AutoloadModule;
-  Attachments: AutoloadModule;
   Fragment?: typeof Fragment;
   HtmlConversion?: typeof HtmlConversion;
   PlainTextConversion?: typeof PlainTextConversion;
@@ -53,38 +51,6 @@ export const ActionText = {
 extend(ActionText, Autoload);
 constSet(TopLevel, "ActionText", ActionText);
 
-ActionText.autoload("Attachable");
-ActionText.autoload("AttachmentGallery");
-ActionText.autoload("Attachment");
-ActionText.autoload("Attribute");
-ActionText.autoload("Content");
-ActionText.autoload("Encryption");
 ActionText.autoload("Fragment");
-ActionText.autoload("FixtureSet");
 ActionText.autoload("HtmlConversion");
 ActionText.autoload("PlainTextConversion");
-ActionText.autoload("Rendering");
-ActionText.autoload("Serialization");
-ActionText.autoload("TrixAttachment");
-
-export const Attachables = {
-  name: "ActionText::Attachables",
-  loadPath,
-} as AutoloadModule;
-ActionText.Attachables = Attachables;
-extend(Attachables, Autoload);
-
-Attachables.autoload("ContentAttachment");
-Attachables.autoload("MissingAttachable");
-Attachables.autoload("RemoteImage");
-
-export const Attachments = {
-  name: "ActionText::Attachments",
-  loadPath,
-} as AutoloadModule;
-ActionText.Attachments = Attachments;
-extend(Attachments, Autoload);
-
-Attachments.autoload("Caching");
-Attachments.autoload("Minification");
-Attachments.autoload("TrixConversion");
