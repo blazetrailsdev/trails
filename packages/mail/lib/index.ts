@@ -9,6 +9,7 @@ export { Base64 } from "./encodings/base64.js";
 export { QuotedPrintable } from "./encodings/quoted-printable.js";
 export { UnixToUnix } from "./encodings/unix-to-unix.js";
 export { Utilities } from "./utilities.js";
+export { CheckDeliveryParams } from "./check-delivery-params.js";
 export { Field } from "./field.js";
 export { FieldList } from "./field-list.js";
 export { Header } from "./header.js";

@@ -2,6 +2,7 @@ export { VERSION, gemVersion } from "./gem-version.js";
 export { version } from "./version.js";
 export { deprecator } from "./deprecator.js";
 export { ActionMailer } from "./namespaces.js";
+export { eagerLoadBang } from "./action-mailer.js";
 export { Base } from "./base.js";
 export { Callbacks } from "./callbacks.js";
 export { Collector } from "./collector.js";

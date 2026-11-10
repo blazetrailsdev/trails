@@ -1029,12 +1029,15 @@ export function extractFromProgram(
           attributeReceivers ??= new Set(
             collectClassAttributeCalls(sourceFile).map((call) => call.receiver),
           );
-          const literal = attributeReceivers.has(decl.name.text)
-            ? unwrapAssertions(decl.initializer)
-            : decl.initializer;
+          const literal =
+            extendModuleLiteral(decl.initializer) ??
+            sameFileLiteralAlias(decl.initializer, checker) ??
+            (attributeReceivers.has(decl.name.text) || moduleLiteralCast(decl.initializer)
+              ? unwrapAssertions(decl.initializer)
+              : decl.initializer);
           const objectLiteral = ts.isObjectLiteralExpression(literal);
           const methods = ts.isObjectLiteralExpression(literal)
-            ? harvestObjectLiteralMethods(literal, checker, relPath)
+            ? harvestObjectLiteralMethods(literal, checker, relPath, true)
             : isDefineModuleCall(unwrapAssertions(decl.initializer))
               ? (unwrapAssertions(decl.initializer) as ts.CallExpression).arguments
                   .map(unwrapAssertions)
@@ -1096,6 +1099,13 @@ export function extractFromProgram(
         }
       }
     });
+
+    for (const struct of structConstants(sourceFile, relPath)) {
+      const key = `${relPath}:${struct.name}`;
+      if (info.classes[key]) continue;
+      info.classes[key] = struct;
+      fileHasClassOrModule = true;
+    }
 
     // Extract members from mixin functions that return a class (constructor type).
     // e.g., `export function Attributes<T>(Base: T) { class M { constructor(); get attributes() {} } return M; }`
@@ -4221,6 +4231,101 @@ function isUnsetSlot(expr: ts.Expression): boolean {
   return (ts.isIdentifier(e) && e.text === "undefined") || e.kind === ts.SyntaxKind.NullKeyword;
 }
 
+/**
+ * `const ContentTypeStruct = Struct.new("mainType", "subType")`, ruby-compat's
+ * `Struct.new` (MRI `rb_struct_s_def`), as the class it answers: one accessor
+ * per member, both halves (`Struct.new` defines `main_type` and `main_type=`),
+ * and an `initialize` taking each member optionally
+ * (mail/parsers/content_type_parser.rb:13). A `class X extends Struct.new(...)`
+ * is a class declaration and is read by `extractClass`.
+ */
+export function structConstants(sourceFile: ts.SourceFile, file: string): ClassInfo[] {
+  const out: ClassInfo[] = [];
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isVariableStatement(stmt)) continue;
+    for (const decl of stmt.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || !decl.initializer) continue;
+      const call = unwrapAssertions(decl.initializer);
+      if (
+        !ts.isCallExpression(call) ||
+        !ts.isPropertyAccessExpression(call.expression) ||
+        !ts.isIdentifier(call.expression.expression) ||
+        call.expression.expression.text !== "Struct" ||
+        call.expression.name.text !== "new" ||
+        call.arguments.length === 0 ||
+        !call.arguments.every(ts.isStringLiteralLike)
+      ) {
+        continue;
+      }
+      const line = sourceFile.getLineAndCharacterOfPosition(decl.getStart()).line + 1;
+      const names = call.arguments.map((a) => (a as ts.StringLiteralLike).text);
+      out.push({
+        name: decl.name.text,
+        file,
+        includes: [],
+        extends: [],
+        instanceMethods: [
+          ...names.map((name) => ({ name, visibility: "public" as const, params: [], line, file })),
+          {
+            name: "constructor",
+            visibility: "public" as const,
+            params: names.map((name) => ({ name, kind: "optional" as const })),
+            line,
+            file,
+          },
+        ],
+        classMethods: [],
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * The object literal of `extend({ ... }, Mod)`, a Ruby module's singleton
+ * methods built inline and extended with another module (ruby-compat's
+ * `extend`, which answers its first argument): `ContentTypeParser =
+ * extend({ parse() {} }, ParserTools)` is `module ContentTypeParser; extend
+ * Mail::ParserTools` (mail/parsers/content_type_parser.rb:9-10).
+ */
+export function extendModuleLiteral(init: ts.Expression): ts.ObjectLiteralExpression | undefined {
+  const call = unwrapAssertions(init);
+  if (!ts.isCallExpression(call) || !ts.isIdentifier(call.expression)) return undefined;
+  if (call.expression.text !== "extend" || call.arguments.length < 2) return undefined;
+  const literal = unwrapAssertions(call.arguments[0]);
+  return ts.isObjectLiteralExpression(literal) ? literal : undefined;
+}
+
+/**
+ * The object literal an exported const re-seats under the module's name,
+ * `export const FileUtilsExt = fileUtilsExt as typeof fileUtilsExt & Commands`
+ * (rake/file-utils-ext.ts), where `fileUtilsExt` is a same-file `const` bound
+ * to the literal holding `module FileUtilsExt`'s bodies (rake/file_utils_ext.rb).
+ */
+function sameFileLiteralAlias(
+  init: ts.Expression,
+  checker: ts.TypeChecker,
+): ts.ObjectLiteralExpression | undefined {
+  const ref = unwrapAssertions(init);
+  if (!ts.isIdentifier(ref)) return undefined;
+  const decl = checker.getSymbolAtLocation(ref)?.valueDeclaration;
+  if (!decl || !ts.isVariableDeclaration(decl) || !decl.initializer) return undefined;
+  if (decl.getSourceFile() !== init.getSourceFile()) return undefined;
+  const literal = unwrapAssertions(decl.initializer);
+  return ts.isObjectLiteralExpression(literal) ? literal : undefined;
+}
+
+/**
+ * Whether an exported const is an object literal cast to the interface that
+ * types it, `export const Mail: MailConstants = { new() {} } as unknown as
+ * MailConstants` (mail/mail.ts): the literal holds the bodies of the module's
+ * singleton methods (mail/mail.rb), so they are credited off the literal and
+ * not off the interface the cast names.
+ */
+function moduleLiteralCast(init: ts.Expression): boolean {
+  return ts.isAsExpression(init) && ts.isObjectLiteralExpression(unwrapAssertions(init));
+}
+
 function unwrapAssertions(expr: ts.Expression): ts.Expression {
   let cur = expr;
   while (ts.isAsExpression(cur) || ts.isSatisfiesExpression(cur)) cur = cur.expression;
@@ -4431,6 +4536,7 @@ export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,
   file: string,
+  dataSlots = false,
 ): MethodInfo[] {
   const out: MethodInfo[] = [];
   const slots = new Set<string>();
@@ -4517,6 +4623,21 @@ export function harvestObjectLiteralMethods(
         // `controller: undefined as T | undefined` — a module's `attr_accessor`
         // slot, credited as a class field is (see the PropertyDeclaration arm).
         // A holder with no methods (`{ klass: null }`) is state, not a module.
+        mname = prop.name.text;
+        slots.add(mname);
+      } else if (
+        dataSlots &&
+        !/^[A-Z]/.test(prop.name.text) &&
+        checker.getNonNullableType(checker.getTypeAtLocation(prop.name)).getCallSignatures()
+          .length === 0
+      ) {
+        // `extend({ _transKeys: [...], start: 1, parse() {} }, ParserTools)` — a
+        // module's `class << self; attr_accessor :_trans_keys, :start; end`
+        // (mail/parsers/content_type_parser.rb) seated as data properties of its
+        // singleton. A data property is writable, so it is both accessor halves,
+        // as a class field is; so is `loaders: [] as Loader[]`, `class << self;
+        // attr_reader :loaders` (zeitwerk/registry.rb). A literal of data alone
+        // is state, not a module.
         mname = prop.name.text;
         slots.add(mname);
       } else {

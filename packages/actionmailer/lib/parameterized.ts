@@ -117,18 +117,19 @@ export class MessageDelivery extends BaseMessageDelivery {
   }
 }
 
-export const Parameterized = { ClassMethods, Mailer, MessageDelivery };
+export const Parameterized = {
+  ClassMethods,
+  Mailer,
+  MessageDelivery,
+
+  set params(value: Record<string, unknown>) {
+    (this as ParameterizedHost)._params = value;
+  },
+
+  get params(): Record<string, unknown> {
+    return ((this as ParameterizedHost)._params ||= {});
+  },
+};
 extend(Parameterized, Concern);
-Concern.included.call(Parameterized as never, null, function (this: { prototype: object }) {
-  Object.defineProperty(this.prototype, "params", {
-    get(this: ParameterizedHost) {
-      return (this._params ||= {});
-    },
-    set(this: ParameterizedHost, value: Record<string, unknown>) {
-      this._params = value;
-    },
-    configurable: true,
-  });
-});
 
 ActionMailer.Parameterized = Parameterized;

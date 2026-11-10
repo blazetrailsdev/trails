@@ -421,6 +421,7 @@ class TestExtractor
     ActionController::API
     ActionController::Metal
     ApplicationController
+    ActionMailer::Base
   ].freeze
 
   def process_class(node)
@@ -429,10 +430,11 @@ class TestExtractor
 
     @describe_stack.push(name)
     @class_stack.push(name)
-    # A class whose superclass is a controller base, or a class this file
-    # already defined as one, is not a test case: Minitest never runs its
-    # `def test_*`, which are controller actions (`LiveTestController#test_action`,
-    # actionpack/test/controller/render_test.rb:980). Decided by the superclass
+    # A class whose superclass is a controller or mailer base, or a class this
+    # file already defined as one, is not a test case: Minitest never runs its
+    # `def test_*`, which are actions (`LiveTestController#test_action`,
+    # actionpack/test/controller/render_test.rb:980; `TestHelperMailer#test_parameter_args`,
+    # actionmailer/test/test_helper_test.rb:27). Decided by the superclass
     # the file shows, never by the class name: `TestErrorsInController <
     # ActionDispatch::IntegrationTest` (dispatch/routing_test.rb) is a test case.
     superclass = const_name(node[2])

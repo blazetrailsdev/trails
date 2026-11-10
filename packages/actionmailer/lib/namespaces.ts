@@ -1,10 +1,4 @@
-import {
-  Autoload,
-  descendants,
-  extend,
-  type Extended,
-  type Logger,
-} from "@blazetrails/activesupport";
+import { Autoload, extend, type Extended, type Logger } from "@blazetrails/activesupport";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { Callbacks } from "./callbacks.js";
@@ -75,16 +69,3 @@ ActionMailer.autoload("QueuedDelivery");
 ActionMailer.autoload("FormBuilder");
 ActionMailer.autoload("Preview", "action_mailer/preview");
 ActionMailer.autoload("Previews", "action_mailer/preview");
-
-/** @missingRailsCall eagerAutoloadBang — PERMANENT */
-Object.defineProperty(ActionMailer, "eagerLoadBang", {
-  value: async function eagerLoadBang(this: typeof ActionMailer): Promise<void> {
-    await Autoload.eagerLoadBang.call(this);
-
-    for (const mailer of descendants(this.Base) as (typeof Base)[]) {
-      if (!mailer.isAbstract()) mailer.eagerLoadBang();
-    }
-  },
-  writable: true,
-  configurable: true,
-});
