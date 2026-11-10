@@ -1,36 +1,45 @@
-# Perry native ladder — recommended work after Wall 30
+# Perry native ladder — recommended work after the first 200
 
-As of 2026-11-07. Companion to [FINDINGS.md](FINDINGS.md), which records the
+As of 2026-11-10. Companion to [FINDINGS.md](FINDINGS.md), which records the
 walls. This file says what to do next and why.
 
 ## Recommendation in one paragraph
 
-Give trails a **boot manifest**: `trails build` emits one statically
-importable map from each path-loaded application file to a literal
-`() => import("./file")` thunk, the AOT entry imports it, and every site that
-loads an application file by path consults it before falling back to
-`import(url)`. That is Wall 30, and it is a trails change, not a perry one.
-Then make a reached deferred import fail loudly, so the next miss is an error
-and not an empty route table.
+Rung 08 serves: the compiled binary boots production through
+`.trails/entry.generated.js` and answers `/up` with `status=200 len=73` (r79).
+The ladder's remaining value is keeping that true. Land trails#9944, rebase
+the ladder onto main, and turn r79's command into a repeatable check. Then aim
+the same binary at a real application (trailmap) rather than adding rungs:
+its walls are the ones users will hit.
 
 ## Where the ladder stands
 
-| Run | Result                                     | Note                               |
-| --- | ------------------------------------------ | ---------------------------------- |
-| r61 | serves, dies in `ExceptionWrapper`         | wall 29                            |
-| r62 | `COMPILE_RC=0` 2103s, `status=404 len=795` | wall 29 fixed; wall 30 = no routes |
+| Run | Result                                  | Note                                 |
+| --- | --------------------------------------- | ------------------------------------ |
+| r62 | `status=404 len=795`                    | wall 30: application files not built |
+| r64 | wall 31 (Proxy in prototype chain)      | wall 30 fixed by the boot file map   |
+| r74 | `establishConnection is not a function` | walls 31–35 fixed                    |
+| r79 | `[08] env=production status=200 len=73` | walls 36–39 fixed; 2225 modules      |
 
-The compiled binary boots, listens, accepts, routes through the full Rack
-stack and renders a response. The only thing between it and `status=200` is
-that the application's own files were never compiled in.
+Every wall from 31 on is in FINDINGS' "Walls 32–39" table. Trails fixes:
+#9901 and #9911 (merged), #9944 (draft: Psych's yaml backend). Perry fixes are
+local commits on `wall29-const-alias-rest` in `/home/dean/github/perry-wall29`
+(fork policy: never pushed): `c336c1aeb` `cef27a740` `aa69722b2` `4a70c0d4e`
+`e701a76a1` `b45837a6b` `fbedce6ae` `8bfb521d4`, each with a gap test under
+`test-files/`. `perrysrc/target/release` holds that build; the runtime
+archives must be rebuilt together (`libperry_stdlib.a` embeds a runtime copy)
+and their GC-effects sidecars regenerated.
 
-Wall 29 is fixed on perry `c336c1aeb` (branch `wall29-const-alias-rest`, off
-`ladder/perry-native`, worktree `/home/dean/github/perry-wall29`, not pushed).
-`perrysrc/target/release/perry` is that build; the previous binary is
-`perry.pre-wall29`. Note `r61-serve.sh` prints the perrysrc HEAD as "compiler",
-which is NOT what the binary was built from.
+## Next, in order
 
-## Wall 30 — the work
+1. Merge trails#9944; drop the ladder's cherry-picks that main now carries.
+2. Make the r79 run a script with a pass/fail exit, so a regression is a red
+   line, not a log read.
+3. Compile trailmap with the same perry build and record its walls here.
+4. Open perry issues for the two defects left off the ladder's path
+   (wpfacts non-convergence; name-keyed parent walks), with the probes.
+
+## Wall 30 — the work (done; kept for the record)
 
 Nine sites load application files by path (table in FINDINGS). Trails already
 has both halves of the remedy and connects neither:

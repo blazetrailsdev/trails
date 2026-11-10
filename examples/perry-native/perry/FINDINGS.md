@@ -2524,17 +2524,17 @@ runtime-only rebuild left r65 crashing exactly as before.
 
 ## Walls 32–39, to the first 200 (r66–r79)
 
-| wall | symptom | cause | fix |
-| ---- | ------- | ----- | --- |
-| 32 | static method through a Proxy parent answers the wrong receiver | `class_prototype_get` had no Proxy branch | perry `aa69722b2` |
-| 33 | `new` with spread of an imported class builds the wrong object | `callee_is_generic_construct_shape` ignored imported classes | perry `4a70c0d4e` |
-| 34 | `/up` 404 again: `app/helpers` never compiled | `BOOT_PATHS` lacked helpers | trails#9901 |
-| 35 | database config / `configFor` / storage config read by path | config reads bypassed the compiled-file map | trails#9911 (`loadIseqEval`) |
-| 36 | `establishConnection is not a function` | a cyclic barrel's eager namespace mints `ConnectionHandler`'s prototype before its declaration registers; methods never installed | perry `e701a76a1` |
-| 36b | `super.has`, `instanceof Map` false on such a class | the same early prototype was born linked to `Object.prototype` | perry `b45837a6b` |
-| 37 | `Cannot read private member #identhash` | an imported `Hash extends Map` resolved its parent to ruby-compat's own `class Map` (Concurrent.Map): wrong layout, `new.target` unbound | perry `fbedce6ae` |
-| 38 | `LoadError: cannot load such file -- yaml` | Psych resolves yaml through `createRequire`, absent natively | trails#9944 (`ruby-compat/psych-yaml`, imported by the build) |
-| 39 | `isEos is not a function` | `static Scanner = class Scanner {}` deduped onto the outer `Scanner` | perry `8bfb521d4` |
+| wall | symptom                                                         | cause                                                                                                                                    | fix                                                           |
+| ---- | --------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| 32   | static method through a Proxy parent answers the wrong receiver | `class_prototype_get` had no Proxy branch                                                                                                | perry `aa69722b2`                                             |
+| 33   | `new` with spread of an imported class builds the wrong object  | `callee_is_generic_construct_shape` ignored imported classes                                                                             | perry `4a70c0d4e`                                             |
+| 34   | `/up` 404 again: `app/helpers` never compiled                   | `BOOT_PATHS` lacked helpers                                                                                                              | trails#9901                                                   |
+| 35   | database config / `configFor` / storage config read by path     | config reads bypassed the compiled-file map                                                                                              | trails#9911 (`loadIseqEval`)                                  |
+| 36   | `establishConnection is not a function`                         | a cyclic barrel's eager namespace mints `ConnectionHandler`'s prototype before its declaration registers; methods never installed        | perry `e701a76a1`                                             |
+| 36b  | `super.has`, `instanceof Map` false on such a class             | the same early prototype was born linked to `Object.prototype`                                                                           | perry `b45837a6b`                                             |
+| 37   | `Cannot read private member #identhash`                         | an imported `Hash extends Map` resolved its parent to ruby-compat's own `class Map` (Concurrent.Map): wrong layout, `new.target` unbound | perry `fbedce6ae`                                             |
+| 38   | `LoadError: cannot load such file -- yaml`                      | Psych resolves yaml through `createRequire`, absent natively                                                                             | trails#9944 (`ruby-compat/psych-yaml`, imported by the build) |
+| 39   | `isEos is not a function`                                       | `static Scanner = class Scanner {}` deduped onto the outer `Scanner`                                                                     | perry `8bfb521d4`                                             |
 
 r79: `[08] env=production port=3178 status=200 len=73`, 2225 modules, 2245 s
 compile. The `yaml` import adds 73 modules; `r61-serve.sh`'s cap is now 2300.
