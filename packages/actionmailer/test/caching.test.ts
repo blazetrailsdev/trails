@@ -57,7 +57,7 @@ describe("FragmentCachingTest", () => {
 
   it("read fragment with caching enabled", async () => {
     await store.write("views/name", "value");
-    expect(String(await mailer.readFragment("name"))).toBe("value");
+    expect(await mailer.readFragment("name")).toEqualRuby("value");
   });
 
   it("read fragment with caching disabled", async () => {
@@ -130,14 +130,14 @@ describe("FragmentCachingTest", () => {
   it("html safety", async () => {
     expect(await store.read("views/name")).toBeNull();
     const content = htmlSafe("value");
-    expect(String(await mailer.writeFragment("name", content))).toBe(content.toString());
+    expect(await mailer.writeFragment("name", content)).toEqualRuby(content);
 
     const cached = await store.read("views/name");
-    expect(cached).toBe(content.toString());
+    expect(cached).toEqualRuby(content);
     expect(typeof cached).toBe("string");
 
     const htmlSafeValue = await mailer.readFragment("name");
-    expect(String(htmlSafeValue)).toBe(content.toString());
+    expect(htmlSafeValue).toEqualRuby(content);
     expect(isHtmlSafe(htmlSafeValue)).toBeTruthy();
   });
 });

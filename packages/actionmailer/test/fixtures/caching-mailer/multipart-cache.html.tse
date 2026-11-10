@@ -1,0 +1,1 @@
+<% await cache("html_caching", { skipDigest: true }, () => { %>\n    "Welcome html"\n<% }) %>\n
