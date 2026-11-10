@@ -5,7 +5,7 @@ import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import type { Configuration } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { Mail, type Message } from "@blazetrails/mail";
-import { chomp, include } from "@blazetrails/ruby-compat";
+import { chomp, include, stringSplit } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Base } from "../lib/base.js";
 import type { MessageDelivery } from "../lib/message-delivery.js";
@@ -108,7 +108,7 @@ describe("ActionMailerUrlTest", () => {
     const body = (await (UrlTestMailer as Mailer).exerciseUrlFor(options).message())
       .body()
       .toString();
-    const urls = chomp(body).split(" ");
+    const urls = stringSplit(chomp(body));
 
     expect(urls[0]).toBe(expected);
     expect(urls[1]).toBe(expected);
