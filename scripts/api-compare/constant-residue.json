@@ -1045,7 +1045,7 @@
     }
   },
   "mail": {
-    "rows": 129,
+    "rows": 130,
     "excluded": ["multibyte/encoding-error.ts::EncodingError"],
     "unwalked": [
       "check-delivery-params.ts::CheckDeliveryParams",
@@ -1103,6 +1103,7 @@
       "network/delivery-methods/test-mailer.ts::TestMailer": "Mail::TestMailer",
       "network/retriever-methods/base.ts::Retriever": "Mail::Retriever",
       "network/retriever-methods/imap.ts::IMAP": "Mail::IMAP",
+      "network/retriever-methods/pop3.ts::POP3": "Mail::POP3",
       "network/retriever-methods/test-retriever.ts::TestRetriever": "Mail::TestRetriever",
       "version.ts::VERSION": "Mail::VERSION",
       "yaml.ts::YAML": "Mail::YAML"
