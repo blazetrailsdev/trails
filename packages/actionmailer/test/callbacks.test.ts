@@ -121,7 +121,7 @@ describe("ActionMailerCallbacksTest", () => {
 
     expect(CallbackMailer.afterDeliverInstance).toBeInstanceOf(CallbackMailer);
     const instance = CallbackMailer.afterDeliverInstance as Instance;
-    expect(instance.message.messageId()).not.toHaveLength(0);
+    expect(instance.message.messageId()).not.toBeEmpty();
     expect(instance.message.messageId()).toBe((await mailDelivery.message()).messageId());
     expect((instance.message.to() as string[])[0]).toBe("test-receiver@test.com");
   });
@@ -153,7 +153,7 @@ describe("ActionMailerCallbacksTest", () => {
     });
     expect(CallbackMailer.afterDeliverInstance).toBeInstanceOf(CallbackMailer);
     const instance = CallbackMailer.afterDeliverInstance as Instance;
-    expect(instance.message.messageId()).not.toHaveLength(0);
+    expect(instance.message.messageId()).not.toBeEmpty();
   });
 
   it("around_deliver is called after rescue_from on action processing exceptions", async () => {

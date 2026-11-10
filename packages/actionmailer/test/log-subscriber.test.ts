@@ -86,7 +86,7 @@ describe("AMLogSubscriberTest", () => {
       t.wait();
 
       expect(t.logger.logged(":info").length).toBe(1);
-      expect(t.logger.logged(":info")[0]).toContain(
+      expect(t.logger.logged(":info")[0]).toMatch(
         "Skipped delivery of mail 123@abc as `perform_deliveries` is false",
       );
 
@@ -94,7 +94,7 @@ describe("AMLogSubscriberTest", () => {
       expect(t.logger.logged(":debug")[0]).toMatch(
         /BaseMailer#welcomeWithoutDeliveries: processed outbound mail in [\d.]+ms/,
       );
-      expect(t.logger.logged(":debug")[1]).toContain("Welcome");
+      expect(t.logger.logged(":debug")[1]).toMatch("Welcome");
     } finally {
       BaseMailer.deliveries.length = 0;
     }
