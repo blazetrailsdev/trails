@@ -72,7 +72,6 @@ export class Timestamp {
     return Timestamp.newBang(this.value, this.subSecond, "utc");
   }
 
-  /** @missingRailsCall localtime — CONVERGEABLE date-time-localtime-and-datetime-jd */
   toTime(): Time {
     const time = this.newTime();
 
@@ -133,13 +132,15 @@ export class Timestamp {
 
   /** @internal */
   protected newTime(klass: typeof Time = Time): Time {
-    return klass.at(this.value, this.subSecond === 0 ? 0 : this.subSecond.mul(1_000_000));
+    return klass.at(
+      this.value,
+      this.subSecond instanceof Rational
+        ? this.subSecond.mul(1_000_000)
+        : this.subSecond * 1_000_000,
+    );
   }
 
-  /**
-   * @missingRailsCall jd — CONVERGEABLE date-time-localtime-and-datetime-jd
-   * @internal
-   */
+  /** @internal */
   protected newDatetime(klass: typeof DateTime = DateTime): DateTime {
     const datetime = new klass(-4712, 1, 1)
       .plus(new Rational(this.value, 1).add(this.subSecond).quo(86400).add(JD_EPOCH))
