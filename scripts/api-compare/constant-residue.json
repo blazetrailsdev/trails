@@ -1043,7 +1043,7 @@
     }
   },
   "mail": {
-    "rows": 123,
+    "rows": 124,
     "excluded": ["multibyte/encoding-error.ts::EncodingError"],
     "unwalked": [
       "check-delivery-params.ts::CheckDeliveryParams",
@@ -1099,6 +1099,7 @@
       "network/delivery-methods/smtp-connection.ts::SMTPConnection": "Mail::SMTPConnection",
       "network/delivery-methods/smtp.ts::SMTP": "Mail::SMTP",
       "network/delivery-methods/test-mailer.ts::TestMailer": "Mail::TestMailer",
+      "version.ts::VERSION": "Mail::VERSION",
       "yaml.ts::YAML": "Mail::YAML"
     }
   },
@@ -1494,7 +1495,7 @@
     }
   },
   "zeitwerk": {
-    "rows": 17,
+    "rows": 18,
     "excluded": [],
     "unwalked": [
       "internal.ts::Internal",
@@ -1504,7 +1505,8 @@
       "loader/helpers.ts::Helpers",
       "real-mod-name.ts::RealModName",
       "registry.ts::Registry",
-      "registry/explicit-namespaces.ts::ExplicitNamespaces"
+      "registry/explicit-namespaces.ts::ExplicitNamespaces",
+      "registry/inceptions.ts::Inceptions"
     ],
     "residue": {}
   }

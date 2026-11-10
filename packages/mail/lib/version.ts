@@ -1,3 +1,5 @@
+import { Mail } from "./mail.js";
+
 const MAJOR = 2;
 const MINOR = 8;
 const PATCH = 1;
@@ -16,3 +18,4 @@ export const VERSION = {
     return STRING;
   },
 };
+Mail.VERSION = VERSION;

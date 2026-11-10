@@ -13,6 +13,7 @@ import * as m10 from "./null-inflector.js";
 import * as m11 from "./real-mod-name.js";
 import * as m12 from "./registry.js";
 import * as m13 from "./registry/explicit-namespaces.js";
+import * as m14 from "./registry/inceptions.js";
 
 defineConstants([
   [() => m0.Cref, "Zeitwerk::Cref"],
@@ -30,6 +31,7 @@ defineConstants([
   [() => m11.RealModName, "Zeitwerk::RealModName"],
   [() => m12.Registry, "Zeitwerk::Registry"],
   [() => m13.ExplicitNamespaces, "Zeitwerk::Registry::ExplicitNamespaces"],
+  [() => m14.Inceptions, "Zeitwerk::Registry::Inceptions"],
   [() => m2.ReloadingDisabledError, "Zeitwerk::ReloadingDisabledError"],
   [() => m2.SetupRequired, "Zeitwerk::SetupRequired"],
 ]);
