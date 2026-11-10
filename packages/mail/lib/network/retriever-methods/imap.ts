@@ -93,8 +93,7 @@ export class IMAP extends Retriever {
           }
           if (opts.uid != null) break;
         }
-        if (opts.deleteAfterFind) imap.expunge();
-        return undefined;
+        return opts.deleteAfterFind ? imap.expunge() : null;
       } else {
         const emails: Message[] = [];
         for (let uid of uids) {
@@ -133,15 +132,15 @@ export class IMAP extends Retriever {
   /** @internal */
   private validateOptions(options: RetrieverOptions | null): RetrieverOptions {
     options = options ? { ...options } : {};
-    options.mailbox ||= "INBOX";
-    options.count ||= 10;
-    options.order ||= "asc";
-    options.what ||= "first";
-    options.keys ||= "ALL";
-    options.uid ||= null;
-    options.deleteAfterFind ||= false;
+    options.mailbox ??= "INBOX";
+    options.count ??= 10;
+    options.order ??= "asc";
+    options.what ??= "first";
+    options.keys ??= "ALL";
+    options.uid ??= null;
+    options.deleteAfterFind ??= false;
     options.mailbox = (TopLevel.Net as NetWithIMAP).IMAP!.encodeUtf7(options.mailbox as string);
-    options.readOnly ||= false;
+    options.readOnly ??= false;
 
     return options;
   }
