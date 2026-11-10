@@ -292,17 +292,14 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(rt.lastResponse().body).toBe('{"omg":"omg"}');
   });
 
-  it.skip("if there's no config.active_support.bare, all of ActiveSupport is required", () => {
-    // BLOCKED: frameworks-test-use-frameworks-and-active-support-bare
-  });
+  // PERMANENT-SKIP: trails installs no core_ext on `Array.prototype` / `String.prototype` (owner ruling, 2026-11-09), so `active_support.bare` has no observable arm.
+  it.skip("if there's no config.active_support.bare, all of ActiveSupport is required", () => {});
 
-  it.skip("config.active_support.bare does not require all of ActiveSupport", () => {
-    // BLOCKED: frameworks-test-use-frameworks-and-active-support-bare
-  });
+  // PERMANENT-SKIP: trails installs no core_ext on `Array.prototype` / `String.prototype` (owner ruling, 2026-11-09), so `active_support.bare` has no observable arm.
+  it.skip("config.active_support.bare does not require all of ActiveSupport", () => {});
 
-  it.skip("database middleware doesn't initialize when activerecord is not in frameworks", () => {
-    // BLOCKED: frameworks-test-use-frameworks-and-active-support-bare
-  });
+  // PERMANENT-SKIP: an ES import is eager and this file imports `@blazetrails/activerecord`, so `ActiveRecord.Base` is defined in-process and has no `autoload?` arm.
+  it.skip("database middleware doesn't initialize when activerecord is not in frameworks", () => {});
 
   it("use schema cache dump", async () => {
     try {
