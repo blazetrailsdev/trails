@@ -2720,7 +2720,7 @@ class TestExtractor
         if @interpolated_names && parts.any? { |p| p.is_a?(Array) && p[0] == :string_embexpr }
           @interpolated_names[blanked] = parts.map { |p|
             next "" unless p.is_a?(Array)
-            p[0] == :@tstring_content ? p[1] : (p[0] == :string_embexpr ? INTERPOLATION_PLACEHOLDER : "")
+            p[0] == :@tstring_content ? p[1].gsub("\\'", "'") : (p[0] == :string_embexpr ? INTERPOLATION_PLACEHOLDER : "")
           }.join
         end
         return blanked

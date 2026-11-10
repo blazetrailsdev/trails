@@ -66,8 +66,8 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
     return this.isKey(key);
   }
 
-  fetch(key: string, ...extras: unknown[]): unknown {
-    return fetch(this as Map<string, V>, this.convertKey(key), ...extras);
+  fetch<T = V>(key: string, ...extras: unknown[]): V | T {
+    return fetch(this as Map<string, V>, this.convertKey(key), ...extras) as V | T;
   }
 
   valuesAt(...indices: string[]): (V | null)[] {
