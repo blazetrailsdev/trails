@@ -8665,6 +8665,24 @@ describe("staticClassExpressions", () => {
     expect(nested.name).toBe("ENCODER");
     expect(nested.cls.members.map((member) => member.name?.getText())).toEqual(["shouldMultipart"]);
   });
+
+  it("hosts the class expression branch of a conditional static initializer", () => {
+    const [cls] = ts
+      .createSourceFile(
+        "virtual.ts",
+        "class Db { static PReadFile = cond ? File : class PReadFile { readline() {} pread() {} }; }",
+        ts.ScriptTarget.Latest,
+        true,
+      )
+      .statements.filter(ts.isClassDeclaration);
+    const [nested, ...rest] = staticClassExpressions(cls, "Db");
+    expect(rest).toEqual([]);
+    expect(nested.seat).toBe("Db.PReadFile");
+    expect(nested.cls.members.map((member) => member.name?.getText())).toEqual([
+      "readline",
+      "pread",
+    ]);
+  });
 });
 
 describe("extractClass — @inlinedFrom on a constructor", () => {

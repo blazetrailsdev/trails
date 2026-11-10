@@ -137,7 +137,7 @@ export async function readFragment(
   key: unknown,
   options?: CacheOptions,
 ): Promise<unknown> {
-  if (!this.isCacheConfigured()) return undefined;
+  if (!this.isCacheConfigured()) return null;
   key = combinedFragmentCacheKey.call(this, key);
   return await instrumentFragmentCache.call(this, "read_fragment", key, async () => {
     const result = await this.cacheStore!.read(key, options);

@@ -5071,10 +5071,24 @@ export function staticClassExpressions(
       found.push({ seat: nestedSeat, cls: instantiated, name: member.name.text });
       continue;
     }
-    if (!init || !ts.isClassExpression(init) || !init.name) continue;
-    found.push({ seat: nestedSeat, cls: init }, ...staticClassExpressions(init, nestedSeat));
+    const cls = init && conditionalClassExpression(init);
+    if (!cls || !cls.name) continue;
+    found.push({ seat: nestedSeat, cls }, ...staticClassExpressions(cls, nestedSeat));
   }
   return found;
+}
+
+/**
+ * The class expression of an initializer, or of a branch of a conditional
+ * one: Ruby's `Name = cond ? Other : Class.new { ... }` (mini_mime's
+ * `PReadFile`), where Ruby defines whichever arm the guard picks.
+ */
+function conditionalClassExpression(init: ts.Expression): ts.ClassExpression | undefined {
+  let expr = init;
+  while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+  if (ts.isClassExpression(expr)) return expr;
+  if (!ts.isConditionalExpression(expr)) return undefined;
+  return conditionalClassExpression(expr.whenTrue) ?? conditionalClassExpression(expr.whenFalse);
 }
 
 /**
