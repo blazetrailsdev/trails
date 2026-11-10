@@ -8678,6 +8678,7 @@ describe("staticClassExpressions", () => {
     const [nested, ...rest] = staticClassExpressions(cls, "Db");
     expect(rest).toEqual([]);
     expect(nested.seat).toBe("Db.PReadFile");
+    expect(nested.conditional).toBe(true);
     expect(nested.cls.members.map((member) => member.name?.getText())).toEqual([
       "readline",
       "pread",

@@ -462,6 +462,12 @@ export interface ClassInfo {
    * proximity then.
    */
   superclassFile?: string;
+  /**
+   * TS-side only: the class is one arm of a conditional static initializer
+   * (`static PReadFile = cond ? File : class PReadFile {…}`), so the seat may
+   * hold another class and no constant table names it. Absent otherwise.
+   */
+  conditionalSeat?: true;
   file?: string;
   reExportedFrom?: string;
   includes: string[];

@@ -347,6 +347,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       const tsByLowerFileName = new Map<string, ClassInfo>();
       const tsKinds = kind === "modules" ? (["modules", "classes"] as const) : ([kind] as const);
       for (const cls of tsKinds.flatMap((k) => Object.values(tsPkg[k] ?? {}))) {
+        if (cls.conditionalSeat) continue;
         if (cls.file) tsByFileName.set(`${cls.file}::${cls.name}`, cls);
         if (cls.file) tsByLowerFileName.set(`${cls.file}::${cls.name}`.toLowerCase(), cls);
       }
