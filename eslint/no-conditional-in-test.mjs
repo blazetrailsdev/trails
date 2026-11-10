@@ -19,8 +19,6 @@ function isStringLiteral(node) {
   return node.type === "Literal" && typeof node.value === "string";
 }
 
-// Rake's `if File::ALT_SEPARATOR` platform guard
-// (vendor/rake/v13.2.1/test/test_rake_path_map_explode.rb:25-32).
 function isPlatformCondition(node) {
   return (
     node.type === "MemberExpression" &&

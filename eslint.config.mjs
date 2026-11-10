@@ -1103,8 +1103,6 @@ export default defineConfig(
     },
   },
 
-  // ── rake: Rails' `if File::ALT_SEPARATOR` guard wraps plain asserts, so the
-  // blazetrails rule (which admits that one condition) stands in for vitest's.
   {
     files: [
       "packages/rake/test/test-rake-path-map-explode.test.ts",
