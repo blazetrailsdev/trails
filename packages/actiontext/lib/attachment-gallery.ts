@@ -75,7 +75,6 @@ export class AttachmentGallery extends Model {
     return (await this.attachments()).length;
   }
 
-  /** @inventedArm await — PERMANENT */
   async inspect(): Promise<string> {
     return `#<${rbModName(this.constructor)} size=${rbInspect(await this.size())}>`;
   }
