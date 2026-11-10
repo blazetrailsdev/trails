@@ -1,4 +1,4 @@
-import { rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
+import { arySlice, rbInspect, RuntimeError } from "@blazetrails/ruby-compat";
 import { Mail } from "../../mail.js";
 import type { Message } from "../../message.js";
 import { Retriever, type RetrieverOptions } from "./base.js";
@@ -24,11 +24,11 @@ export class TestRetriever extends Retriever {
     options.count ??= "all";
     options.order ??= "asc";
     options.what ??= "first";
-    let emailsIndex = Array.from({ length: _emails.length }, (_, i) => i);
+    let emailsIndex: number[] = Array.from({ length: _emails.length }, (_, i) => i);
     if (options.what === "last") emailsIndex.reverse();
     const count = options.count;
     if (Number.isInteger(count)) {
-      emailsIndex = emailsIndex.slice(0, count as number);
+      emailsIndex = arySlice(emailsIndex, 0, count) as number[];
     } else if (count !== "all") {
       throw new RuntimeError("Invalid count option value: " + rbInspect(count));
     }

@@ -186,7 +186,7 @@ export class UnicodeDatabase {
   }
 
   static dirname(): string {
-    return File.dirname(import.meta.url.replace(/^file:\/\//, "")) + "/../values/";
+    return File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)) + "/../values/";
   }
 
   static filename(): string {

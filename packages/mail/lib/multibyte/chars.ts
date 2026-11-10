@@ -206,8 +206,7 @@ export class Chars {
   }
 
   lstripBang(): this {
-    this.wrappedString = (this.methodMissing("lstrip") as Chars).toS();
-    return this;
+    return this.methodMissing("lstripBang") as this;
   }
 
   reverseBang(): this {
@@ -216,8 +215,7 @@ export class Chars {
   }
 
   rstripBang(): this {
-    this.wrappedString = (this.methodMissing("rstrip") as Chars).toS();
-    return this;
+    return this.methodMissing("rstripBang") as this;
   }
 
   sliceBang(...args: unknown[]): this {
@@ -226,8 +224,7 @@ export class Chars {
   }
 
   stripBang(): this {
-    this.wrappedString = (this.methodMissing("strip") as Chars).toS();
-    return this;
+    return this.methodMissing("stripBang") as this;
   }
 
   tidyBytesBang(force: boolean = false): this {

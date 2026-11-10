@@ -1,37 +1,52 @@
 import type { Message } from "../../message.js";
 
-export type RetrieverOptions = {
+export interface RetrieverOptions {
   what?: "first" | "last";
   count?: number | "all";
   order?: "asc" | "desc";
   deleteAfterFind?: boolean;
   [key: string]: unknown;
+}
+
+type Finder = Retriever & {
+  find(options: RetrieverOptions, block?: (email: Message) => unknown): unknown;
 };
 
-export abstract class Retriever {
-  abstract find(options?: RetrieverOptions | null, block?: (email: Message) => unknown): unknown;
-
-  first(options: RetrieverOptions | null = null, block?: (email: Message) => unknown): unknown {
+export class Retriever {
+  first(
+    this: Finder,
+    options: RetrieverOptions | null = null,
+    block?: (email: Message) => unknown,
+  ): unknown {
     options = options ? { ...options } : {};
     options.what = "first";
     options.count ??= 1;
     return this.find(options, block);
   }
 
-  last(options: RetrieverOptions | null = null, block?: (email: Message) => unknown): unknown {
+  last(
+    this: Finder,
+    options: RetrieverOptions | null = null,
+    block?: (email: Message) => unknown,
+  ): unknown {
     options = options ? { ...options } : {};
     options.what = "last";
     options.count ??= 1;
     return this.find(options, block);
   }
 
-  all(options: RetrieverOptions | null = null, block?: (email: Message) => unknown): unknown {
+  all(
+    this: Finder,
+    options: RetrieverOptions | null = null,
+    block?: (email: Message) => unknown,
+  ): unknown {
     options = options ? { ...options } : {};
     options.count = "all";
     return this.find(options, block);
   }
 
   findAndDelete(
+    this: Finder,
     options: RetrieverOptions | null = null,
     block?: (email: Message) => unknown,
   ): unknown {

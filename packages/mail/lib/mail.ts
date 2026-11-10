@@ -17,10 +17,11 @@ import type { Retriever, RetrieverOptions } from "./network/retriever-methods/ba
 
 type RetrieverArgs = [options?: RetrieverOptions | null, block?: (email: Message) => unknown];
 
-interface RetrieverConnection {
+type RetrieverMethod = Retriever & {
+  find(...args: RetrieverArgs): unknown;
   deleteAll(...args: unknown[]): unknown;
   connection(block?: (...args: unknown[]) => unknown): unknown;
-}
+};
 
 export interface MailConstants {
   Message: typeof Message;
@@ -76,7 +77,7 @@ export interface MailConstants {
   readFromString(mailAsString: string): Message;
   defaults(block: (this: Configuration) => unknown): unknown;
   deliveryMethod(): unknown;
-  retrieverMethod(): Retriever;
+  retrieverMethod(): RetrieverMethod;
   find(...args: RetrieverArgs): unknown;
   findAndDelete(...args: RetrieverArgs): unknown;
   first(...args: RetrieverArgs): unknown;
@@ -124,7 +125,7 @@ export const Mail: MailConstants = {
   },
 
   retrieverMethod() {
-    return Configuration.instance().retrieverMethod() as Retriever;
+    return Configuration.instance().retrieverMethod() as RetrieverMethod;
   },
 
   find(...args: RetrieverArgs) {
@@ -148,11 +149,11 @@ export const Mail: MailConstants = {
   },
 
   deleteAll(...args: unknown[]) {
-    return (Mail.retrieverMethod() as Retriever & RetrieverConnection).deleteAll(...args);
+    return Mail.retrieverMethod().deleteAll(...args);
   },
 
   connection(block?: (...args: unknown[]) => unknown) {
-    return (Mail.retrieverMethod() as Retriever & RetrieverConnection).connection(block);
+    return Mail.retrieverMethod().connection(block);
   },
 
   registerObserver(observer: DeliveryObserver) {
