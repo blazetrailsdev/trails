@@ -10,7 +10,7 @@ import {
 import { beforeEach, describe, expect, it } from "vitest";
 import "../lib/index.js";
 import { Mail } from "../lib/mail.js";
-import type { Message } from "../lib/message.js";
+import { Message } from "../lib/message.js";
 
 const fixturePath = (...path: string[]) =>
   new URL(`./fixtures/${path.join("/")}`, import.meta.url).pathname;
@@ -147,13 +147,14 @@ describe("Test emails", () => {
       expect(mail.date()).toEqual(DateTime.parse("21 Nov 97 09:55:06 GMT"));
     });
 
-    // PERMANENT-SKIP: pending upstream (example_emails_spec.rb:248), and its body references an undefined `email`.
-    it.skip("should handle the rfc obsolete whitespace email", async () => {
+    it.fails("should handle the rfc obsolete whitespace email", async () => {
       const mail = await readFixture("emails", "rfc2822", "example13.eml");
       expect(mail.from()).toEqualRuby("John Doe <jdoe@machine(comment).example>");
       expect(mail.to()).toEqualRuby("Mary Smith <mary@example.net>");
       expect(mail.date()).toEqual(DateTime.parse("Fri, 21 Nov 1997 09:55:06 -0600"));
       expect(mail.messageId()).toEqual("1234@local(blah).machine.example");
+      // @ts-expect-error -- example_emails_spec.rb:245 names an undefined `email`
+      expect(() => new Message(email)).not.toThrow();
     });
 
     it("should handle folding subject", async () => {
@@ -282,8 +283,7 @@ describe("Test emails", () => {
       message = await readFixture("emails", "rfc6532", "utf8_headers.eml");
     });
 
-    // BLOCKED: mail-unstructured-field-utf8-arm-misreads-decoded-string
-    it.skip("subject", () => {
+    it("subject", () => {
       expect(message.subject()).toEqual("Säying Hello");
     });
 

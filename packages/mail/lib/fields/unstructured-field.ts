@@ -23,7 +23,7 @@ export class UnstructuredField extends CommonField {
       value = value.join(", ");
     } else if (value instanceof Uint8Array && rbObjEncoding(value) === Encoding.ASCII_8BIT) {
       const utf8 = forceEncoding(rbObjDup(value), Encoding.UTF_8);
-      if (isValidEncoding(utf8, Encoding.UTF_8)) value = utf8;
+      if (isValidEncoding(value, Encoding.UTF_8)) value = utf8;
     }
 
     if (charset == null && (typeof value === "string" || value instanceof Uint8Array)) {

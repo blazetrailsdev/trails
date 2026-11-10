@@ -7853,10 +7853,16 @@ describe("extractFromProgram — attribute() generated readers", () => {
       width(...args: unknown[]): Promise<number>;
       humanSize(...args: unknown[]): Promise<string>;
     }
+    export interface Image {
+      type(...args: unknown[]): Promise<string>;
+    }
     export class Image {
       static attribute(name: string, key?: string): void {}
+      signature(): string { return ""; }
     }
     {
+      Image.attribute("type", "format");
+      Image.attribute("signature");
       Image.attribute("width");
       Image.attribute("human_size");
     }
@@ -7867,6 +7873,29 @@ describe("extractFromProgram — attribute() generated readers", () => {
     const klass = info.classes["image.ts:Image"];
     expect(klass.instanceMethods.find((m) => m.name === "width")!.bodyless).toBeUndefined();
     expect(klass.instanceMethods.find((m) => m.name === "humanSize")!.bodyless).toBeUndefined();
+  });
+
+  it("credits the name, not the key, of a two-argument call", () => {
+    const info = extractFromFiles("/p", { "image.ts": SRC });
+    const names = info.classes["image.ts:Image"].instanceMethods.map((m) => m.name);
+    expect(names).toContain("type");
+    expect(names).not.toContain("format");
+  });
+
+  it("keeps a bodied member the class already defines", () => {
+    const info = extractFromFiles("/p", { "image.ts": SRC });
+    const klass = info.classes["image.ts:Image"];
+    const signatures = klass.instanceMethods.filter((m) => m.name === "signature");
+    expect(signatures).toHaveLength(1);
+    expect(signatures[0].params).toEqual([]);
+    expect(signatures[0].line).toBe(11);
+  });
+
+  it("skips a receiver that is not a class in the file", () => {
+    const info = extractFromFiles("/p", {
+      "image.ts": `${SRC}\n{ Other.attribute("width"); }`,
+    });
+    expect(info.classes["image.ts:Other"]).toBeUndefined();
   });
 
   it("leaves an unlisted class's readers declaration-only", () => {
