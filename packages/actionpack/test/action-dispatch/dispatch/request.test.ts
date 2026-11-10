@@ -1295,22 +1295,22 @@ describe("RequestVariant", () => {
   });
 
   it("setting variant to a symbol", async () => {
-    request.variant = "phone";
+    request.variant = ":phone";
 
     assertPredicate(request.variant, (v) => v["phone?"]());
     assertNotPredicate(request.variant, (v) => v["tablet?"]());
-    assert(request.variant.any("phone", "tablet"));
-    assertNot(request.variant.any("tablet", "desktop"));
+    assert(request.variant.any(":phone", ":tablet"));
+    assertNot(request.variant.any(":tablet", ":desktop"));
   });
 
   it("setting variant to an array of symbols", async () => {
-    request.variant = ["phone", "tablet"];
+    request.variant = [":phone", ":tablet"];
 
     assertPredicate(request.variant, (v) => v["phone?"]());
     assertPredicate(request.variant, (v) => v["tablet?"]());
     assertNotPredicate(request.variant, (v) => v["desktop?"]());
-    assert(request.variant.any("tablet", "desktop"));
-    assertNot(request.variant.any("desktop", "watch"));
+    assert(request.variant.any(":tablet", ":desktop"));
+    assertNot(request.variant.any(":desktop", ":watch"));
   });
 
   it("clearing variant", async () => {
@@ -1318,7 +1318,7 @@ describe("RequestVariant", () => {
 
     assertEmpty(request.variant);
     assertNotPredicate(request.variant, (v) => v["phone?"]());
-    assertNot(request.variant.any("phone", "tablet"));
+    assertNot(request.variant.any(":phone", ":tablet"));
   });
 
   it("setting variant to a non-symbol value", async () => {

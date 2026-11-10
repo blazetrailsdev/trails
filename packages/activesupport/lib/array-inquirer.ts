@@ -15,9 +15,11 @@ export class ArrayInquirer<T extends string | symbol> extends Array<T> {
       const elements = this as unknown as T[];
       return block !== undefined ? elements.some(block) : elements.length > 0;
     }
-    return (candidates as string[]).some((candidate) =>
-      (this as unknown as T[]).includes(candidate as T),
-    );
+    const elements = this as unknown as T[];
+    return (candidates as string[]).some((candidate) => {
+      const name = candidate.startsWith(":") ? candidate.slice(1) : candidate;
+      return elements.includes(`:${name}` as T) || elements.includes(name as T);
+    });
   }
 }
 
