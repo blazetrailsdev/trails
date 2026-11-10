@@ -68,7 +68,7 @@ export class InboundEmailsController extends BaseController {
 
   static Authenticator = class Authenticator {
     readonly key: string;
-    readonly timestamp: number;
+    readonly timestamp: number | bigint;
     readonly token: string;
     readonly signature: string;
 
@@ -85,7 +85,7 @@ export class InboundEmailsController extends BaseController {
     }) {
       [this.key, this.timestamp, this.token, this.signature] = [
         key,
-        Number(kernelInteger(timestamp)),
+        kernelInteger(timestamp),
         token,
         signature,
       ];
