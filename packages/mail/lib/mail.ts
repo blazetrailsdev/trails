@@ -13,6 +13,15 @@ import {
 import { Configuration } from "./configuration.js";
 import type { Message } from "./message.js";
 import type { Part } from "./part.js";
+import type { Retriever, RetrieverOptions } from "./network/retriever-methods/base.js";
+
+type RetrieverArgs = [options?: RetrieverOptions | null, block?: (email: Message) => unknown];
+
+type RetrieverMethod = Retriever & {
+  find(...args: RetrieverArgs): unknown;
+  deleteAll(...args: unknown[]): unknown;
+  connection(block?: (...args: unknown[]) => unknown): unknown;
+};
 
 export interface MailConstants {
   Message: typeof Message;
@@ -24,6 +33,10 @@ export interface MailConstants {
   SMTPConnection: typeof import("./network/delivery-methods/smtp-connection.js").SMTPConnection;
   TestMailer: typeof import("./network/delivery-methods/test-mailer.js").TestMailer;
   LoggerDelivery: typeof import("./network/delivery-methods/logger-delivery.js").LoggerDelivery;
+  Retriever: typeof import("./network/retriever-methods/base.js").Retriever;
+  TestRetriever: typeof import("./network/retriever-methods/test-retriever.js").TestRetriever;
+  POP3?: new (settings: Record<string, unknown>) => Retriever;
+  IMAP?: new (settings: Record<string, unknown>) => Retriever;
   Parsers?: typeof import("./parsers.js");
   YAML: typeof import("./yaml.js").YAML;
   VERSION: typeof import("./version.js").VERSION;
@@ -65,6 +78,14 @@ export interface MailConstants {
   readFromString(mailAsString: string): Message;
   defaults(block: (this: Configuration) => unknown): unknown;
   deliveryMethod(): unknown;
+  retrieverMethod(): RetrieverMethod;
+  find(...args: RetrieverArgs): unknown;
+  findAndDelete(...args: RetrieverArgs): unknown;
+  first(...args: RetrieverArgs): unknown;
+  last(...args: RetrieverArgs): unknown;
+  all(...args: RetrieverArgs): unknown;
+  deleteAll(...args: unknown[]): unknown;
+  connection(block?: (...args: unknown[]) => unknown): unknown;
   RANDOM_TAG: string;
   randomTag(): string;
   somethingRandom(): number | bigint;
@@ -104,6 +125,46 @@ export const Mail: MailConstants = {
     return Configuration.instance().deliveryMethod();
   },
 
+  retrieverMethod() {
+    return Configuration.instance().retrieverMethod() as RetrieverMethod;
+  },
+
+  find(...args: RetrieverArgs) {
+    return Mail.retrieverMethod().find(...args);
+  },
+
+  findAndDelete(...args: RetrieverArgs) {
+    return Mail.retrieverMethod().findAndDelete(...args);
+  },
+
+  first(...args: RetrieverArgs) {
+    return Mail.retrieverMethod().first(...args);
+  },
+
+  last(...args: RetrieverArgs) {
+    return Mail.retrieverMethod().last(...args);
+  },
+
+  all(...args: RetrieverArgs) {
+    return Mail.retrieverMethod().all(...args);
+  },
+
+  async read(filename: string): Promise<Message> {
+    return Mail.new(await File.openAsync(filename, "rb", (f) => f.readAsync()));
+  },
+
+  deleteAll(...args: unknown[]) {
+    return Mail.retrieverMethod().deleteAll(...args);
+  },
+
+  readFromString(mailAsString: string): Message {
+    return Mail.new(mailAsString);
+  },
+
+  connection(block?: (...args: unknown[]) => unknown) {
+    return Mail.retrieverMethod().connection(block);
+  },
+
   registerObserver(observer: DeliveryObserver) {
     if (!deliveryNotificationObservers.includes(observer)) {
       deliveryNotificationObservers.push(observer);
@@ -136,14 +197,6 @@ export const Mail: MailConstants = {
 
   informInterceptors(mail: Message) {
     for (const interceptor of deliveryInterceptors) interceptor.deliveringEmail(mail);
-  },
-
-  async read(filename: string): Promise<Message> {
-    return Mail.new(await File.openAsync(filename, "rb", (f) => f.readAsync()));
-  },
-
-  readFromString(mailAsString: string): Message {
-    return Mail.new(mailAsString);
   },
 
   randomTag(): string {

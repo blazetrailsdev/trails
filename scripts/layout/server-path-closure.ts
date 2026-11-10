@@ -50,7 +50,8 @@ export interface PackageExports {
  * Export keys whose `test` token names production code the gem loads at boot,
  * not a testing entry: `Mail::TestMailer` is a delivery method autoloaded by
  * `mail/network.rb` (vendor/mail/2.8.1/lib/mail/network.rb:11) and named by
- * `Configuration#lookup_delivery_method` (mail/configuration.rb:44), and
+ * `Configuration#lookup_delivery_method` (mail/configuration.rb:44),
+ * `Mail::TestRetriever` likewise (mail/network.rb:15, configuration.rb:64), and
  * `Rails::TestUnitRailtie` is required by `rails/all.rb`
  * (vendor/rails/v8.0.2/railties/lib/rails/all.rb), loading no test framework.
  * `ActiveJob::QueueAdapters::TestAdapter` is autoloaded from lib
@@ -59,6 +60,7 @@ export interface PackageExports {
  */
 const SERVER_EXPORTS = new Set([
   "./network/delivery-methods/test-mailer",
+  "./network/retriever-methods/test-retriever",
   "./test-unit/trailtie",
   "./queue-adapters/test-adapter",
 ]);
