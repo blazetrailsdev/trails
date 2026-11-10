@@ -49,13 +49,14 @@ export class Configuration {
   declare static validate: typeof Model.validate;
 
   static {
-    include(this, Model);
     constSet(SolidQueue, "Configuration", this);
-    constSet(this, "Process", Process);
+    include(this, Model);
 
     this.validate(":ensureConfiguredProcesses");
     this.validate(":ensureValidRecurringTasks");
     this.validate(":ensureCorrectlySizedThreadPool");
+
+    constSet(this, "Process", Process);
   }
 
   static readonly WORKER_DEFAULTS = {
