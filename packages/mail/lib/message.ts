@@ -1176,7 +1176,7 @@ export class Message {
         this.setContentTransferEncoding(this._transportEncoding);
       } else {
         this.setContentTransferEncoding(
-          String(
+          rbObjAsString(
             this.body().negotiateBestEncoding(
               this._transportEncoding as typeof TransferEncoding | null,
               this.allowedEncodings(),

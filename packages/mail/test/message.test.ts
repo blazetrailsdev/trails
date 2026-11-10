@@ -1,7 +1,7 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { DateTime } from "@blazetrails/date";
 import { rbObjDup, Socket, sort } from "@blazetrails/ruby-compat";
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hashAref, hashAset, Hash } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { Body } from "../lib/body.js";
@@ -888,6 +888,326 @@ describe("Mail::Message", () => {
         });
       });
     });
+
+    describe("mime emails", () => {
+      function testEmail() {
+        return Mail.new(function (this: Message) {
+          this.from("mikel@test.lindsaar.net");
+          this.to("you@test.lindsaar.net");
+          this.subject("This is a test email");
+          this.body("This is a body of the email");
+        });
+      }
+      const nonAscii = "This is NOT plain text ASCII　− かきくけこ";
+      const defaultingWarning =
+        /Non US-ASCII detected and no charset defined.\nDefaulting to UTF-8, set your own if this is incorrect./;
+
+      describe("mime-version", () => {
+        it("should say if it has a mime-version", () => {
+          const mail = testEmail();
+          expect(mail.hasMimeVersion()).toBe(false);
+        });
+
+        it("should preserve any mime version that you pass it if add_mime_version is called explicitly", () => {
+          const mail = testEmail();
+          mail.addMimeVersion("3.0 (This is an unreal version number)");
+          expect(mail.toString()).toMatch(/Mime-Version: 3.0\r\n/);
+        });
+
+        it("should generate a mime version if nothing is passed to add_date", () => {
+          const mail = testEmail();
+          mail.addMimeVersion();
+          expect(mail.toString()).toMatch(/Mime-Version: 1.0\r\n/);
+        });
+
+        it("should make an email and inject a mime_version if none was set if told to_s", () => {
+          const mail = testEmail();
+          expect(mail.toString()).toMatch(/Mime-Version: 1.0\r\n/);
+        });
+
+        it("should add the mime version to the message permanently once sent to_s", () => {
+          const mail = testEmail();
+          mail.toString();
+          expect(mail.hasMimeVersion()).toBe(true);
+        });
+      });
+
+      describe("content type", () => {
+        it("should say if it has a content type", () => {
+          const mail = Mail.new("Content-Type: text/plain");
+          expect(mail.hasContentType()).toBe(true);
+        });
+
+        it("should say if it does not have a content type", () => {
+          const mail = Mail.new();
+          expect(mail.hasContentType()).toBe(false);
+        });
+
+        it("should say if it has a charset", () => {
+          const mail = Mail.new("Content-Type: text/plain; charset=US-ASCII");
+          expect(mail.hasCharset()).toBe(true);
+        });
+
+        it("should say if it has a charset", () => {
+          const mail = Mail.new("Content-Type: text/plain");
+          expect(mail.hasCharset()).toBe(false);
+        });
+
+        it("should not raise a warning if there is no charset defined and only US-ASCII chars", async () => {
+          const body = "This is plain text US-ASCII";
+          const mail = Mail.new();
+          mail.setBody(body);
+          await expect(() => mail.toString()).not.toOutput(undefined, "stderr");
+        });
+
+        it("should set the content type to text/plain; charset=us-ascii", () => {
+          const body = "This is plain text US-ASCII";
+          const mail = Mail.new();
+          mail.setBody(body);
+          expect(mail.toString()).toMatch(/|Content-Type: text\/plain; charset=US-ASCII|/);
+        });
+
+        it("should not set the charset if the file is an attachment", () => {
+          const body = "This is plain text US-ASCII";
+          const mail = Mail.new();
+          mail.setBody(body);
+          mail.setContentDisposition('attachment; filename="foo.jpg"');
+          expect(mail.toString()).toMatch("Content-Type: text/plain;\r\n");
+        });
+
+        it("should not set the charset if the content_type is not text", () => {
+          const mail = Mail.new();
+          mail.setBody(nonAscii);
+          mail.setContentType("image/png");
+          expect(mail.toString()).not.toMatch(/Content-Type: image\/png;\s+charset=UTF-8/);
+        });
+
+        it("should raise a warning if there is no content type and there is non ascii chars and default to text/plain, UTF-8", async () => {
+          const mail = Mail.new();
+          mail.setBody(nonAscii);
+          mail.setContentTransferEncoding("8bit");
+
+          let result: string | null = null;
+          await expect(() => {
+            result = mail.toString();
+          }).toOutput(defaultingWarning, "stderr");
+          expect(result).toMatch(/|Content-Type: text\/plain; charset=UTF-8|/);
+        });
+
+        it("should raise a warning if there is no charset parameter and there is non ascii chars and default to text/plain, UTF-8", async () => {
+          const mail = Mail.new();
+          mail.setBody(nonAscii);
+          mail.setContentType("text/plain");
+          mail.setContentTransferEncoding("8bit");
+
+          let result: string | null = null;
+          await expect(() => {
+            result = mail.toString();
+          }).toOutput(defaultingWarning, "stderr");
+          expect(result).toMatch(/|Content-Type: text\/plain; charset=UTF-8|/);
+        });
+
+        it("should not raise a warning if there is no charset parameter and the content-type is not text", async () => {
+          const mail = Mail.new();
+          mail.setBody(nonAscii);
+          mail.setContentType("image/png");
+          mail.setContentTransferEncoding("8bit");
+          await expect(() => mail.toString()).not.toOutput(undefined, "stderr");
+        });
+
+        it("should not raise a warning if there is a charset defined and there is non ascii chars", async () => {
+          const mail = Mail.new();
+          mail.setBody(nonAscii);
+          mail.setContentTransferEncoding("8bit");
+          mail.setContentType("text/plain; charset=UTF-8");
+          await expect(() => mail.toString()).not.toOutput(undefined, "stderr");
+        });
+
+        it("should be able to set a content type with an array and hash", () => {
+          const mail = Mail.new();
+          mail.setContentType(["text", "plain", { charset: "US-ASCII" }]);
+          expect((mail.get("content_type") as Field).encoded()).toBe(
+            "Content-Type: text/plain;\r\n charset=US-ASCII\r\n",
+          );
+          expect(Object.fromEntries(mail.contentTypeParameters()!.entries())).toEqual({
+            charset: "US-ASCII",
+          });
+        });
+
+        it("should be able to set a content type with an array and hash with a non-usascii field", () => {
+          const mail = Mail.new();
+          mail.setContentType(["text", "plain", { charset: "UTF-8" }]);
+          expect((mail.get("content_type") as Field).encoded()).toBe(
+            "Content-Type: text/plain;\r\n charset=UTF-8\r\n",
+          );
+          expect(Object.fromEntries(mail.contentTypeParameters()!.entries())).toEqual({
+            charset: "UTF-8",
+          });
+        });
+
+        it("should allow us to specify a content type in a block", () => {
+          const mail = Mail.new(function (this: Message) {
+            this.contentType(["text", "plain", { charset: "UTF-8" }]);
+          });
+          expect(Object.fromEntries(mail.contentTypeParameters()!.entries())).toEqual({
+            charset: "UTF-8",
+          });
+        });
+      });
+
+      it("rfc2046 can be decoded", () => {
+        const mail = Mail.new();
+        const part = new Part();
+        part.setContentDisposition('attachment; filename="test.eml"');
+        part.setContentType("message/rfc822");
+        part.setBody(nonAscii.repeat(30));
+        mail.body().push(part);
+
+        const roundtripped = Mail.new(mail.encoded());
+        expect(roundtripped.contentTransferEncoding()).toBe("7bit");
+        expect((roundtripped.parts.at(-1) as Part).contentTransferEncoding()).toBe("");
+
+        expect(roundtripped.encoded()).toContain("NOT plain");
+        expect(roundtripped.contentTransferEncoding()).toBe("7bit");
+        expect((roundtripped.parts.at(-1) as Part).contentTransferEncoding()).toBe("");
+      });
+
+      it("rfc2046", () => {
+        const mail = Mail.new();
+        const part = new Part();
+        part.setContentDisposition('attachment; filename="test.eml"');
+        part.setContentType("message/rfc822");
+        part.setBody("a".repeat(999));
+        mail.body().push(part);
+        mail.encoded();
+
+        expect(mail.parts.length).toBe(1);
+        expect((mail.parts.at(-1) as Part).contentTransferEncoding()).toMatch(/7bit|8bit|binary/);
+      });
+
+      describe("charset", () => {
+        it("should return a default value for multipart mails", () => {
+          const mail = Mail.new();
+          mail.addPart(new Part({ body: "PLAIN TEXT", contentType: "text/plain" }));
+          expect(mail.charset).toBe("UTF-8");
+        });
+      });
+
+      describe("charset=", () => {
+        let mail: Message;
+        beforeEach(() => {
+          mail = Mail.new(function (this: Message) {
+            this.to("mikel@test.lindsaar.net");
+            this.from("bob@test.lindsaar.net");
+            this.subject("Multipart email");
+            this.textPart(function (this: Message) {
+              this.body("This is plain text");
+            });
+            this.htmlPart(function (this: Message) {
+              this.contentType("text/html; charset=UTF-8");
+              this.body("<h1>This is HTML</h1>");
+            });
+          });
+        });
+
+        it("should not add an empty charset header", () => {
+          mail.charset = null;
+
+          expect(mail.isMultipart()).toBe(true);
+          expect(mail.parts.length).toBe(2);
+          expect((mail.encoded() as string).match(/charset=UTF-8/g)?.length ?? 0).toBe(2);
+        });
+
+        it("should remove the charset header", () => {
+          mail.charset = "iso-8859-1";
+          mail.charset = null;
+
+          expect((mail.encoded() as string).match(/charset=UTF-8/g)?.length ?? 0).toBe(2);
+          expect((mail.encoded() as string).match(/charset=iso-8859-1/g)?.length ?? 0).toBe(0);
+        });
+      });
+
+      describe("convert_to_multipart", () => {
+        let subject: Message;
+        beforeEach(async () => {
+          subject = await readFixture("emails", "attachment_emails", "attachment_only_email.eml");
+          subject.convertToMultipart();
+        });
+
+        it("original content headers move to the new part", () => {
+          expect(subject.header().get("content_type")).toBeNull();
+          expect(subject.header().get("content_disposition")).toBeNull();
+          expect(subject.header().get("content_description")).toBeNull();
+          expect(subject.header().get("content_transfer_encoding")).toBeNull();
+
+          const header = subject.parts[0].header();
+          expect((header.get("content_type") as Field).value).toBe(
+            "application/x-gzip; NAME=blah.gz",
+          );
+          expect((header.get("content_disposition") as Field).value).toBe(
+            "attachment; filename=blah.gz",
+          );
+          expect((header.get("content_description") as Field).value).toBe(
+            "Attachment has identical content to above foo.gz",
+          );
+          expect((header.get("content_transfer_encoding") as Field).value).toBe("base64");
+        });
+      });
+
+      describe("content-transfer-encoding", () => {
+        it("should use 7bit for only US-ASCII chars", () => {
+          const body = "This is plain text US-ASCII";
+          const mail = Mail.new();
+          mail.setBody(body);
+          expect(mail.toString()).toMatch(/Content-Transfer-Encoding: 7bit/);
+        });
+
+        it("should use QP transfer encoding for 7bit text with lines longer than 998 octets", () => {
+          const body = "a".repeat(999);
+          const mail = Mail.new();
+          mail.charset = "UTF-8";
+          mail.setBody(body);
+          expect(mail.toString()).toMatch(/Content-Transfer-Encoding: quoted-printable/);
+        });
+
+        it("should use QP transfer encoding for 8bit text with only a few 8bit characters", () => {
+          const body = "Maxfeldstraße 5, 90409 Nürnberg";
+          const mail = Mail.new();
+          mail.charset = "UTF-8";
+          mail.setBody(body);
+          expect(mail.toString()).toMatch(/Content-Transfer-Encoding: quoted-printable/);
+        });
+
+        it("should use QP transfer encoding for 8bit text attachment with only a few 8bit characters", async () => {
+          const mail = Mail.new();
+          const fileContent = new Uint8Array([0x50, 0x6f, 0x6b, 0xe9, 0x6d, 0x6f, 0x6e]);
+          await mail.attachments().set("iso_text.txt", fileContent);
+          mail.setBody("This is plain text US-ASCII");
+          expect(mail.toString()).toMatch(
+            /Content-Transfer-Encoding: 7bit.*This is plain text US-ASCII.*Content-Transfer-Encoding: quoted-printable.*Pok=E9mon/s,
+          );
+        });
+
+        it("should use base64 transfer encoding for 8-bit text with lots of 8bit characters", () => {
+          const mail = Mail.new();
+          mail.charset = "UTF-8";
+          mail.setBody(nonAscii);
+          mail.setContentType("text/plain; charset=utf-8");
+          expect(mail.hasContentType()).toBe(true);
+          expect(mail.hasCharset()).toBe(true);
+          expect(mail.toString()).toMatch(/Content-Transfer-Encoding: base64/);
+        });
+
+        it("should use 8bit transfer encoding when 8bit is forced", () => {
+          const mail = Mail.new();
+          mail.charset = "UTF-8";
+          mail.setBody(nonAscii);
+          mail.setContentType("text/plain; charset=utf-8");
+          mail.setTransportEncoding("8bit");
+          expect(mail.toString()).toMatch(/Content-Transfer-Encoding: 8bit/);
+        });
+      });
+    });
   });
   describe("helper methods", () => {
     it("should implement the spaceship operator on the date field", () => {
@@ -1001,6 +1321,143 @@ describe("Mail::Message", () => {
       expect(mail.parts.length).toBe(2);
       expect(mail.textPart()).not.toBeNull();
       expect((mail.textPart() as Message).decoded()).toBe("this: body is not a header");
+    });
+
+    it("should provide a way to instantiate a new part as you go down", () => {
+      const mail = Mail.new(function (this: Message) {
+        this.to("mikel@test.lindsaar.net");
+        this.subject("nested multipart");
+        this.from("test@example.com");
+        this.contentType("multipart/mixed");
+
+        this.part(
+          {
+            contentType: "multipart/alternative",
+            contentDisposition: "inline",
+            headers: { foo: "bar" },
+          },
+          (p: Part) => {
+            p.part({ contentType: "text/plain", body: "test text\nline #2" });
+            p.part({ contentType: "text/html", body: "<b>test</b> HTML<br/>\nline #2" });
+          },
+        );
+      });
+
+      const first = mail.parts[0];
+      expect(first.isMultipart()).toBe(true);
+      expect(first.parts.length).toBe(2);
+      expect((first.parts[0].get("content_type") as Field & { string(): string }).string()).toBe(
+        "text/plain",
+      );
+      expect(first.parts[0].body().decoded()).toBe("test text\nline #2");
+      expect((first.parts[1].get("content_type") as Field & { string(): string }).string()).toBe(
+        "text/html",
+      );
+      expect(first.parts[1].body().decoded()).toBe("<b>test</b> HTML<br/>\nline #2");
+    });
+  });
+
+  describe("deliver", () => {
+    class DeliveryAgent {
+      static deliverMail(_mail: Message, _block?: () => unknown): void {}
+    }
+
+    class ObserverAgent {
+      static deliveredEmail(_mail: Message): void {}
+    }
+
+    class InterceptorAgent {
+      static intercept = false;
+      static setIntercept(val: boolean): void {
+        InterceptorAgent.intercept = val;
+      }
+      static deliveringEmail(mail: Message): void {
+        if (InterceptorAgent.intercept) {
+          mail.setTo("bob@example.com");
+        }
+      }
+    }
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      Mail.unregisterObserver(ObserverAgent);
+      Mail.unregisterInterceptor(InterceptorAgent);
+    });
+
+    it("should return self after delivery", async () => {
+      const mail = Mail.new();
+      mail.performDeliveries = false;
+      expect(await mail.deliver()).toBe(mail);
+    });
+
+    it("should pass self to a delivery agent", async () => {
+      const mail = Mail.new();
+      mail.deliveryHandler = DeliveryAgent;
+      const spy = vi.spyOn(DeliveryAgent, "deliverMail");
+      await mail.deliver();
+      expect(spy).toHaveBeenCalledWith(mail, expect.any(Function));
+    });
+
+    it("should inform observers that the mail was sent", async () => {
+      const mail = Mail.new({ from: "bob@example.com", to: "bobette@example.com" });
+      mail.deliveryMethod("test");
+      Mail.registerObserver(ObserverAgent);
+      const spy = vi.spyOn(ObserverAgent, "deliveredEmail");
+      await mail.deliver();
+      expect(spy).toHaveBeenCalledWith(mail);
+    });
+
+    it("should allow observers to be unregistered", async () => {
+      const mail = Mail.new({ from: "bob@example.com", to: "bobette@example.com" });
+      mail.deliveryMethod("test");
+      Mail.registerObserver(ObserverAgent);
+      Mail.unregisterObserver(ObserverAgent);
+      const spy = vi.spyOn(ObserverAgent, "deliveredEmail");
+      await mail.deliver();
+      expect(spy).not.toHaveBeenCalledWith(mail);
+    });
+
+    it("should inform observers that the mail was sent, even if a delivery agent is used", async () => {
+      const mail = Mail.new();
+      mail.deliveryHandler = DeliveryAgent;
+      Mail.registerObserver(ObserverAgent);
+      const spy = vi.spyOn(ObserverAgent, "deliveredEmail");
+      await mail.deliver();
+      expect(spy).toHaveBeenCalledWith(mail);
+    });
+
+    it("should pass to the interceptor the email just before it gets sent", async () => {
+      const mail = Mail.new({ from: "bob@example.com", to: "bobette@example.com" });
+      mail.deliveryMethod("test");
+      Mail.registerInterceptor(InterceptorAgent);
+      const spy = vi.spyOn(InterceptorAgent, "deliveringEmail");
+      InterceptorAgent.setIntercept(true);
+      await mail.deliver();
+      InterceptorAgent.setIntercept(false);
+      expect(spy).toHaveBeenCalledWith(mail);
+    });
+
+    it("should let the interceptor that the mail was sent", async () => {
+      const mail = Mail.new({ from: "bob@example.com", to: "bobette@example.com" });
+      mail.setTo("fred@example.com");
+      mail.deliveryMethod("test");
+      Mail.registerInterceptor(InterceptorAgent);
+      InterceptorAgent.setIntercept(true);
+      await mail.deliver();
+      InterceptorAgent.setIntercept(false);
+      expect([...(mail.to() as string[])]).toEqual(["bob@example.com"]);
+    });
+
+    it("should allow interceptors to be unregistered", async () => {
+      const mail = Mail.new({ from: "bob@example.com", to: "bobette@example.com" });
+      mail.setTo("fred@example.com");
+      mail.deliveryMethod("test");
+      Mail.registerInterceptor(InterceptorAgent);
+      InterceptorAgent.setIntercept(true);
+      Mail.unregisterInterceptor(InterceptorAgent);
+      await mail.deliver();
+      InterceptorAgent.setIntercept(false);
+      expect([...(mail.to() as string[])]).toEqual(["fred@example.com"]);
     });
   });
 
@@ -1171,6 +1628,108 @@ describe("Mail::Message", () => {
   });
 
   describe("replying", () => {
+    describe("to a basic message", () => {
+      let mail: Message;
+      beforeEach(async () => {
+        mail = await readFixture("emails", "plain_emails", "basic_email.eml");
+      });
+
+      it("should create a new message", () => {
+        expect(mail.reply()).toBeInstanceOf(Message);
+      });
+
+      it("should be in-reply-to the original message", () => {
+        expect(mail.reply().inReplyTo()).toBe(
+          "6B7EC235-5B17-4CA8-B2B8-39290DEB43A3@test.lindsaar.net",
+        );
+      });
+
+      it("should reference the original message", () => {
+        expect(mail.reply().references()).toBe(
+          "6B7EC235-5B17-4CA8-B2B8-39290DEB43A3@test.lindsaar.net",
+        );
+      });
+
+      it("should Re: the original subject", () => {
+        expect(mail.reply().subject()).toBe("Re: Testing 123");
+      });
+
+      it("should be sent to the original sender", () => {
+        expect([...(mail.reply().to() as string[])]).toEqual(["test@lindsaar.net"]);
+        expect(String(mail.reply().get("to"))).toBe("Mikel Lindsaar <test@lindsaar.net>");
+      });
+
+      it("should be sent from the original recipient", () => {
+        expect([...(mail.reply().from() as string[])]).toEqual(["raasdnil@gmail.com"]);
+        expect(String(mail.reply().get("from"))).toBe("Mikel Lindsaar <raasdnil@gmail.com>");
+      });
+
+      it("should accept args", () => {
+        expect([
+          ...(mail.reply({ from: "Donald Ball <donald.ball@gmail.com>" }).from() as string[]),
+        ]).toEqual(["donald.ball@gmail.com"]);
+      });
+
+      it("should accept a block", () => {
+        expect([
+          ...(mail
+            .reply(function (this: Message) {
+              this.from("Donald Ball <donald.ball@gmail.com>");
+            })
+            .from() as string[]),
+        ]).toEqual(["donald.ball@gmail.com"]);
+      });
+    });
+
+    describe("to a message with an explicit reply-to address", () => {
+      let mail: Message;
+      beforeEach(async () => {
+        mail = await readFixture("emails", "rfc2822", "example06.eml");
+      });
+
+      it("should be sent to the reply-to address", () => {
+        expect(String(mail.reply().get("to"))).toBe(
+          '"Mary Smith: Personal Account" <smith@home.example>',
+        );
+      });
+    });
+
+    describe("to a message with more than one recipient", () => {
+      let mail: Message;
+      beforeEach(async () => {
+        mail = await readFixture("emails", "rfc2822", "example03.eml");
+      });
+
+      it("should be sent from the first to address", () => {
+        expect(String(mail.reply().get("from"))).toBe("Mary Smith <mary@x.test>");
+      });
+    });
+
+    describe("to a reply", () => {
+      let mail: Message;
+      beforeEach(async () => {
+        mail = await readFixture("emails", "plain_emails", "raw_email_reply.eml");
+      });
+
+      it("should be in-reply-to the original message", () => {
+        expect(mail.reply().inReplyTo()).toBe("473FFE27.20003@xxx.org");
+      });
+
+      it("should append to the original's references list", () => {
+        expect(
+          (mail.reply().get("references") as Field & { messageIds(): string[] }).messageIds(),
+        ).toEqual([
+          "473FF3B8.9020707@xxx.org",
+          "348F04F142D69C21-291E56D292BC@xxxx.net",
+          "473FFE27.20003@xxx.org",
+        ]);
+      });
+
+      it("should not append another Re:", () => {
+        expect(mail.reply().subject()).toBe("Re: Test reply email");
+      });
+    });
+
     describe("to a reply with an in-reply-to with a single message id but no references header", () => {
       let mail: Message;
       beforeEach(() => {
