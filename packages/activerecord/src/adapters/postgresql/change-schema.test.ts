@@ -1,6 +1,6 @@
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertPredicate } from "@blazetrails/activesupport";
+import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("Migration", () => {

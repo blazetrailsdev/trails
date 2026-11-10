@@ -10,6 +10,10 @@
       "types": "./dist/types/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./*.js": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/types/*.d.ts",
       "default": "./dist/*.js"
@@ -19,7 +23,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "node -e \"require('fs').cpSync('src/trails/generators', 'dist/trails/generators', { recursive: true, filter: (source) => !/\\\\.ts$/.test(source) })\" && trails-tsc-views build-templates dist/trails/generators"
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
@@ -34,5 +39,9 @@
   },
   "engines": {
     "node": ">=26"
+  },
+  "devDependencies": {
+    "@blazetrails/actionmailer": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*"
   }
 }

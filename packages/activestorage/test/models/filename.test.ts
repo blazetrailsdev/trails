@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { ActiveSupportJSON, assertOperator } from "@blazetrails/activesupport";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { assertOperator } from "@blazetrails/activesupport/testing/assertions";
 import { Filename } from "../../lib/filename.js";
 
 describe("ActiveStorage::FilenameTest", () => {

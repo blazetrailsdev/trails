@@ -110,6 +110,10 @@ const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
 const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);
 
 const alias = {
+  "@blazetrails/activemodel/testing/lint": path.resolve(
+    __dirname,
+    "packages/activemodel/lib/lint.ts",
+  ),
   "@blazetrails/activemodel/locale/en": path.resolve(
     __dirname,
     "packages/activemodel/lib/locale/en.ts",
@@ -117,14 +121,6 @@ const alias = {
   "@blazetrails/activesupport/core-ext/numeric/bytes": path.resolve(
     __dirname,
     "packages/activesupport/lib/core-ext/numeric/bytes.ts",
-  ),
-  "@blazetrails/activesupport/testing/isolation": path.resolve(
-    __dirname,
-    "packages/activesupport/lib/testing/isolation.ts",
-  ),
-  "@blazetrails/activesupport/testing/file-fixtures": path.resolve(
-    __dirname,
-    "packages/activesupport/lib/testing/file-fixtures.ts",
   ),
   "@blazetrails/activesupport/message-verifier": path.resolve(
     __dirname,
@@ -240,6 +236,10 @@ const alias = {
     __dirname,
     "packages/activerecord/src/destroy-association-async-job.ts",
   ),
+  "@blazetrails/activerecord/message-pack": path.resolve(
+    __dirname,
+    "packages/activerecord/src/message-pack.ts",
+  ),
   "@blazetrails/activerecord/fixtures.js": path.resolve(
     __dirname,
     "packages/activerecord/src/fixtures.ts",
@@ -271,10 +271,6 @@ const alias = {
   "@blazetrails/activerecord/adapters/mysql2-adapter.js": path.resolve(
     __dirname,
     "packages/activerecord/src/adapters/mysql2-adapter.ts",
-  ),
-  "@blazetrails/activerecord/support/config": path.resolve(
-    __dirname,
-    "packages/activerecord/src/support/config.ts",
   ),
   "@blazetrails/activerecord/fixtures": path.resolve(
     __dirname,
@@ -343,6 +339,7 @@ const alias = {
     __dirname,
     "packages/actionpack/lib/system-testing.ts",
   ),
+  "@blazetrails/actionpack/testing": path.resolve(__dirname, "packages/actionpack/lib/testing.ts"),
   "@blazetrails/actionpack": path.resolve(__dirname, "packages/actionpack/lib/index.ts"),
   "@blazetrails/globalid/wire": path.resolve(__dirname, "packages/globalid/lib/wire.ts"),
   "@blazetrails/globalid/signed-global-id": path.resolve(
@@ -354,7 +351,7 @@ const alias = {
   "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/lib/index.ts"),
   "@blazetrails/actionmailer/": path.resolve(__dirname, "packages/actionmailer/lib") + "/",
   "@blazetrails/actionmailer": path.resolve(__dirname, "packages/actionmailer/lib/index.ts"),
-  "@blazetrails/actioncable/test-helpers/":
+  "@blazetrails/actioncable/test/support/":
     path.resolve(__dirname, "packages/actioncable/test/support") + "/",
   "@blazetrails/actioncable/": path.resolve(__dirname, "packages/actioncable/lib") + "/",
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/lib/index.ts"),
@@ -366,13 +363,31 @@ const alias = {
   "@blazetrails/activestorage": path.resolve(__dirname, "packages/activestorage/lib/index.ts"),
   "@blazetrails/actionmailbox/": path.resolve(__dirname, "packages/actionmailbox/src") + "/",
   "@blazetrails/actionmailbox": path.resolve(__dirname, "packages/actionmailbox/src/index.ts"),
+  "@blazetrails/actiontext/": path.resolve(__dirname, "packages/actiontext/lib") + "/",
+  "@blazetrails/actiontext": path.resolve(__dirname, "packages/actiontext/lib/index.ts"),
   "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/lib") + "/",
   "@blazetrails/solid-queue": path.resolve(__dirname, "packages/solid-queue/lib/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/lib/index.ts"),
+  "@blazetrails/trailties/code-statistics": path.resolve(
+    __dirname,
+    "packages/trailties/lib/code-statistics.ts",
+  ),
   "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/lib/all.ts"),
   "@blazetrails/trailties/trailties/":
     path.resolve(__dirname, "packages/trailties/lib/trailties") + "/",
   "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/lib/engine.ts"),
+  "@blazetrails/trailties/generators/test-case": path.resolve(
+    __dirname,
+    "packages/trailties/lib/generators/test-case.ts",
+  ),
+  "@blazetrails/trailties/generators": path.resolve(
+    __dirname,
+    "packages/trailties/lib/generators/index.ts",
+  ),
+  "@blazetrails/trailties/test-unit/trailtie": path.resolve(
+    __dirname,
+    "packages/trailties/lib/test-unit/trailtie.ts",
+  ),
   "@blazetrails/trailties/trailtie/configuration": path.resolve(
     __dirname,
     "packages/trailties/lib/trailtie/configuration.ts",
@@ -480,6 +495,10 @@ const COVERAGE_EXCLUDE = [
 
 const aliasEntries = [
   {
+    find: /^@blazetrails\/activesupport\/testing\/(.+)$/,
+    replacement: path.resolve(__dirname, "packages/activesupport/lib/testing") + "/$1.ts",
+  },
+  {
     find: /^@blazetrails\/image-processing$/,
     replacement: path.resolve(__dirname, "packages/image-processing/lib/image-processing.ts"),
   },
@@ -584,6 +603,7 @@ export default defineConfig({
             "packages/solid-cable/test/**/*.test.ts",
             "packages/activestorage/test/**/*.test.ts",
             "packages/actionmailbox/src/**/*.test.ts",
+            "packages/actiontext/test/**/*.test.ts",
           ],
           exclude: [
             ...SHARED_EXCLUDE,
@@ -591,6 +611,7 @@ export default defineConfig({
             ...SQLITE_DRIVER_TESTS,
             "packages/solid-cable/test/generators/**",
             "packages/solid-queue/test/generators/**",
+            "packages/actionmailbox/src/generators/**",
           ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
@@ -678,6 +699,7 @@ export default defineConfig({
             "packages/solid-cable/**",
             "packages/activestorage/**",
             "packages/actionmailbox/**",
+            "packages/actiontext/**",
             "packages/trailties/**",
             "packages/thor/**",
             "packages/et-orbi/**",
@@ -721,6 +743,7 @@ export default defineConfig({
             "packages/trailties/test/**/*.test.ts",
             "packages/solid-cable/test/generators/**/*.test.ts",
             "packages/solid-queue/test/generators/**/*.test.ts",
+            "packages/actionmailbox/src/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
@@ -728,6 +751,7 @@ export default defineConfig({
             "./packages/trailties/test/support/isolation/global-setup.ts",
             "./packages/solid-cable/test/support/build-templates.ts",
             "./packages/solid-queue/test/support/build-templates.ts",
+            "./packages/actionmailbox/src/test-helpers/support/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
         },

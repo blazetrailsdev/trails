@@ -61,6 +61,15 @@ abstract class Switch {
   desc: string[] = [];
   block: SwitchBlock | null = null;
 
+  /** `Switch#add_banner`, `vendor/ruby/v3.3.11/lib/optparse.rb:640-646`. */
+  addBanner(to: string): string {
+    if (!(this.short.length > 0 || this.long.length > 0)) {
+      const s = this.desc.join("");
+      if (s !== "") to += " [" + s + "]...";
+    }
+    return to;
+  }
+
   abstract parse(
     arg: string | null,
     argv: string[],
@@ -106,6 +115,103 @@ class PlacedArgument extends Switch {
   }
 }
 
+/** `OptionParser::Completion`, `vendor/ruby/v3.3.11/lib/optparse.rb:440`. */
+const Completion = {
+  /** `Completion.regexp`, `vendor/ruby/v3.3.11/lib/optparse.rb:441-443`. */
+  regexp(key: string, icase: boolean): RegExp {
+    const quoted = key.replace(/[.*+?^${}()|[\]\\-]/g, "\\$&");
+    return new RegExp("^" + quoted.replace(/\w+\b/g, "$&\\w*"), icase ? "i" : "");
+  },
+};
+
+/**
+ * `OptionParser::OptionMap` (`vendor/ruby/v3.3.11/lib/optparse.rb:503`), a Hash
+ * with `Completion#complete` (`:467-490`). An ambiguous key throws
+ * `AmbiguousOption` where Ruby throws `:ambiguous` to `OptionParser#complete`.
+ */
+class OptionMap extends Map<string, Switch> {
+  complete(key: string, icase = false): [string, Switch] | undefined {
+    const pat = Completion.regexp(key, icase);
+    const candidates = [...this]
+      .filter(([k]) => pat.test(k))
+      .sort((a, b) => a[0].length - b[0].length);
+    if (candidates.length === 0) return undefined;
+    let [cn, sw] = candidates.shift()!;
+    for (const [kn, v] of candidates) {
+      if (sw === v) continue;
+      if (cn.startsWith(kn)) {
+        [sw, cn] = [v, kn];
+        continue;
+      } else if (kn.startsWith(cn)) {
+        continue;
+      }
+      throw new AmbiguousOption(key);
+    }
+    return [key, sw];
+  }
+}
+
+/** `OptionParser::List`, `vendor/ruby/v3.3.11/lib/optparse.rb:800`. */
+class List {
+  short = new OptionMap();
+  long = new OptionMap();
+  list: (Switch | string)[] = [];
+
+  /** `List#update`, `vendor/ruby/v3.3.11/lib/optparse.rb:870-876`. */
+  private update(sw: Switch, sopts: string[], lopts: string[]): void {
+    for (const o of sopts) this.short.set(o, sw);
+    for (const o of lopts) this.long.set(o, sw);
+    const used = new Set([...this.short.values(), ...this.long.values()]);
+    this.list = this.list.filter((o) => !(o instanceof Switch) || used.has(o));
+  }
+
+  /** `List#prepend`, `vendor/ruby/v3.3.11/lib/optparse.rb:886-889`. */
+  prepend(sw: Switch, sopts: string[], lopts: string[]): void {
+    this.update(sw, sopts, lopts);
+    this.list.unshift(sw);
+  }
+
+  /** `List#append`, `vendor/ruby/v3.3.11/lib/optparse.rb:901-904`. */
+  append(sw: Switch, sopts: string[], lopts: string[]): void {
+    this.update(sw, sopts, lopts);
+    this.list.push(sw);
+  }
+
+  /** `List#search`, `vendor/ruby/v3.3.11/lib/optparse.rb:910-915`. */
+  search(id: "short" | "long", key: string): Switch | undefined {
+    return this[id].get(key);
+  }
+
+  /** `List#complete`, `vendor/ruby/v3.3.11/lib/optparse.rb:923-925`. */
+  complete(id: "short" | "long", opt: string, icase = false): [string, Switch] | undefined {
+    return this[id].complete(opt, icase);
+  }
+
+  /** `List#add_banner`, `vendor/ruby/v3.3.11/lib/optparse.rb:961-967`. */
+  addBanner(to: string): string {
+    for (const opt of this.list) {
+      if (opt instanceof Switch) {
+        to = opt.addBanner(to);
+      }
+    }
+    return to;
+  }
+}
+
+const terminate = Symbol("terminate");
+
+/** `OptionParser::DefaultList`, `vendor/ruby/v3.3.11/lib/optparse.rb:1019-1021`. */
+const DefaultList = new List();
+DefaultList.short.set("-", Object.assign(new NoArgument(), { block: () => {} }));
+DefaultList.long.set(
+  "",
+  Object.assign(new NoArgument(), {
+    block: () => {
+      throw terminate;
+    },
+  }),
+);
+
 const stopOrder = Symbol("stopOrder");
 
 /** @noRailsEquivalent PERMANENT — `OptionParser`, `vendor/ruby/v3.3.11/lib/optparse.rb:427`. */
@@ -127,8 +233,7 @@ export class OptionParser {
   summaryWidth: number;
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1148 */
   summaryIndent: string;
-  private _lines: (Switch | string)[] = [];
-  private _tail: Switch[] = [];
+  private _stack: List[] = [DefaultList, new List(), new List()];
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/lib/optparse.rb:1143 */
   constructor(banner: string | null = null, width = 32, indent = " ".repeat(4)) {
@@ -137,19 +242,27 @@ export class OptionParser {
     this.summaryIndent = indent;
   }
 
-  /**
-   * @missingRailsCall visit — CONVERGEABLE ruby-compat-optparse-visit-add-banner
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   get banner(): string {
     if (this._banner == null) {
       this._banner = `Usage: ${this.programName} [options]`;
+      this._banner = this.visit("addBanner", this._banner);
     }
     return this._banner;
   }
 
   set banner(banner: string) {
     this._banner = banner;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `OptionParser#top`, `vendor/ruby/v3.3.11/lib/optparse.rb:1297-1299`. */
+  get top(): List {
+    return this._stack.at(-1)!;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `OptionParser#base`, `vendor/ruby/v3.3.11/lib/optparse.rb:1304-1306`. */
+  get base(): List {
+    return this._stack[1];
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -163,17 +276,19 @@ export class OptionParser {
 
   /** @noRailsEquivalent PERMANENT */
   separator(string: string): void {
-    this._lines.push(string);
+    this.top.list.push(string);
   }
 
   /** @noRailsEquivalent PERMANENT */
   on(...opts: (string | SwitchBlock)[]): void {
-    this._lines.push(this._makeSwitch(opts));
+    const sw = this._makeSwitch(opts);
+    this.top.append(sw, sw.short, sw.long);
   }
 
   /** @noRailsEquivalent PERMANENT — `on_tail`, `vendor/ruby/v3.3.11/lib/optparse.rb:1597`. */
   onTail(...opts: (string | SwitchBlock)[]): void {
-    this._tail.push(this._makeSwitch(opts));
+    const sw = this._makeSwitch(opts);
+    this.base.append(sw, sw.short, sw.long);
   }
 
   private _makeSwitch(opts: (string | SwitchBlock)[]): Switch {
@@ -199,29 +314,29 @@ export class OptionParser {
       } else if ((m = o.match(/^-(.)(.+)?/))) {
         short.push(m[1]);
         guess(m[2]);
-      } else desc.push(o);
+      } else if (o !== "") desc.push(o);
     }
     return Object.assign(new klass(), { short, long, desc, block, arg });
   }
 
-  private get _switches(): Switch[] {
-    return [...this._lines, ...this._tail].filter((l): l is Switch => l instanceof Switch);
-  }
-
-  private _complete(opt: string): Switch {
-    const key = opt.toLowerCase();
-    const found = new Set<Switch>();
-    for (const sw of this._switches) {
-      if (sw.long.some((l) => l.toLowerCase() === key)) return sw;
-      if (sw.long.some((l) => l.toLowerCase().startsWith(key))) found.add(sw);
+  /** `OptionParser#search`, `vendor/ruby/v3.3.11/lib/optparse.rb:1841-1847`. */
+  private _search(id: "short" | "long", key: string): Switch | undefined {
+    for (const el of [...this._stack].reverse()) {
+      const sw = el.search(id, key);
+      if (sw !== undefined) return sw;
     }
-    if (found.size > 1) throw new AmbiguousOption(opt);
-    if (found.size === 0) throw new InvalidOption(opt);
-    return [...found][0];
+    return undefined;
   }
 
-  private _search(opt: string): Switch | undefined {
-    return this._switches.find((sw) => sw.short.includes(opt));
+  /** `OptionParser#complete`, `vendor/ruby/v3.3.11/lib/optparse.rb:1858-1868`. */
+  private _complete(typ: "short" | "long", opt: string, icase = false): Switch {
+    const exact = this._search(typ, opt);
+    if (exact !== undefined) return exact;
+    for (const el of [...this._stack].reverse()) {
+      const found = el.complete(typ, opt, icase);
+      if (found !== undefined) return found[1];
+    }
+    throw new InvalidOption(opt);
   }
 
   private async _parseInOrder(argv: string[], nonopt: (arg: string) => void): Promise<string[]> {
@@ -231,10 +346,9 @@ export class OptionParser {
       if ((m = arg.match(/^--([^=]*)(?:=(.*))?/s))) {
         const opt = m[1].replace(/_/g, "-");
         const rest = m[2] ?? null;
-        if (opt === "") break;
         let sw: Switch;
         try {
-          sw = this._complete(opt);
+          sw = this._complete("long", opt, true);
         } catch (e) {
           if (e instanceof ParseError) throw e.setOption(arg, true);
           throw e;
@@ -245,33 +359,46 @@ export class OptionParser {
           });
           await sw.block?.(val);
         } catch (e) {
+          if (e === terminate) break;
           if (e instanceof ParseError) throw e.setOption(arg, rest);
           throw e;
         }
       } else if ((m = arg.match(/^-(.)((=).*|.+)?/s))) {
-        const eq = m[3];
+        let eq: unknown = m[3];
         const rest = m[2] ?? null;
         const opt = m[1];
-        let sw = this._search(opt);
+        let hasArg: unknown = eq;
+        let val: unknown = rest;
+        let sw: Switch | undefined;
         try {
-          sw ??= this._complete(opt);
+          sw = this._search("short", opt);
+          if (!sw) {
+            try {
+              sw = this._complete("short", opt);
+              val = arg.replace(/^-/, "");
+              hasArg = true;
+            } catch (e) {
+              if (!(e instanceof InvalidOption)) throw e;
+              sw = this._complete("long", opt);
+              eq ||= rest == null;
+            }
+          }
         } catch (e) {
           if (e instanceof ParseError) throw e.setOption(arg, true);
           throw e;
         }
         let next: string | null;
-        let val: unknown;
         try {
-          [next, val] = sw.parse(rest, argv, (a) => {
+          [next, val] = sw.parse(val as string | null, argv, (a) => {
             if (eq) throw new NeedlessArgument(a);
           });
         } catch (e) {
           if (e instanceof ParseError) throw e.setOption(arg, arg.length > 2);
           throw e;
         }
-        if (next != null) {
-          const short = next.replace(/^-*/, "-");
-          if (short !== "-") argv.unshift(short);
+        if (hasArg && !eq && arg === `-${next}`) throw new InvalidOption(arg);
+        if (next != null && (rest == null || (next = next.replace(/^-*/, "-")) !== "-")) {
+          argv.unshift(next);
         }
         await sw.block?.(val);
       } else nonopt(arg);
@@ -304,10 +431,26 @@ export class OptionParser {
     await this.parse(Shellwords.shellwords(value));
   }
 
+  /**
+   * `OptionParser#visit`, `vendor/ruby/v3.3.11/lib/optparse.rb:1830-1835`. A JS
+   * string cannot be appended to in place (CLAUDE.md, "Ruby Strings are JS
+   * string primitives"), so each `add_banner` result is threaded into the next
+   * call and returned where Ruby mutates its argument and returns `nil`.
+   *
+   * @inventedArm return — PERMANENT
+   * @noRailsEquivalent PERMANENT
+   */
+  visit(id: "addBanner", to: string): string {
+    for (const el of [...this._stack].reverse()) {
+      to = el[id](to);
+    }
+    return to;
+  }
+
   /** @noRailsEquivalent PERMANENT */
   toString(): string {
     const out = [this.banner];
-    for (const line of [...this._lines, ...this._tail]) {
+    for (const line of [...this._stack].reverse().flatMap((el) => el.list)) {
       if (!(line instanceof Switch)) {
         out.push(line);
         continue;

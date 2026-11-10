@@ -13,7 +13,7 @@ import {
   assertNothingRaised,
   assertDifference,
   assertNoDifference,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   HasOneThroughCantAssociateThroughCollection,
   HasOneAssociationPolymorphicThroughError,

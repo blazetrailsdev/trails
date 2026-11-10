@@ -309,6 +309,13 @@ importers:
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties
+    devDependencies:
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../actionmailer
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
 
   packages/actionmailer:
     dependencies:
@@ -401,6 +408,40 @@ importers:
       vite:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
+
+  packages/actiontext:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+      '@blazetrails/activestorage':
+        specifier: workspace:*
+        version: link:../activestorage
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/globalid':
+        specifier: workspace:*
+        version: link:../globalid
+      '@blazetrails/html-sanitizer':
+        specifier: workspace:*
+        version: link:../html-sanitizer
+      '@blazetrails/nokogiri':
+        specifier: workspace:*
+        version: link:../nokogiri
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
 
   packages/actionview:
     dependencies:
@@ -792,6 +833,9 @@ importers:
         specifier: ^2.13.0
         version: 2.17.4
     devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
       '@types/sanitize-html':
         specifier: ^2.13.0
         version: 2.16.1
@@ -1198,9 +1242,6 @@ importers:
       '@blazetrails/zeitwerk':
         specifier: workspace:*
         version: link:../zeitwerk
-      commander:
-        specifier: ^14.0.0
-        version: 14.0.3
       vite:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
@@ -1230,7 +1271,11 @@ importers:
         specifier: 7.1.0-dev.20260920.1
         version: 7.1.0-dev.20260920.1
 
-  packages/tse-compiler: {}
+  packages/tse-compiler:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/tzinfo:
     dependencies:
@@ -1334,6 +1379,9 @@ importers:
       '@blazetrails/actionpack':
         specifier: workspace:*
         version: link:../../packages/actionpack
+      '@blazetrails/actiontext':
+        specifier: workspace:*
+        version: link:../../packages/actiontext
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../../packages/actionview

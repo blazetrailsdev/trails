@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { invoke } from "../../lib/command.js";
 

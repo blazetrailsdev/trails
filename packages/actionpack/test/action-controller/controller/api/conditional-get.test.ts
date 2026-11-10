@@ -1,4 +1,5 @@
-import { assertEqual, assertPredicate, Duration, isBlank } from "@blazetrails/activesupport";
+import { Duration, isBlank } from "@blazetrails/activesupport";
+import { assertEqual, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Time } from "@blazetrails/date";
 
 import { beforeEach, describe, it } from "vitest";

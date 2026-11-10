@@ -91,6 +91,17 @@ export const mail: Record<string, AssertionReceipt[]> = {
           "encodings_spec.rb:591 spells the expected text as octal UTF-8 bytes; a JS string has no encoding tag, so the port spells the decoded characters (CLAUDE.md, A String has no encoding tag either).",
       },
     ],
+  "mail:mail/example_emails_spec.rb › Test emails › invalid charsets in headers › falls back to ASCII-8BIT for unrecognized charsets":
+    [
+      {
+        kind: "expect_to_include",
+        value:
+          "s:Subject: =?UTF-8?Q?Forma=E7=E3o_FrenetikPolis:_Mega_Campanha_Final?=\r\n =?UTF-8?Q?_Ver=E3o_|_Cursos_de_Setembro?=",
+        as: null,
+        reason:
+          "example_emails_spec.rb:389 branches on `respond_to?(:encoding)`; the else arm is for Ruby 1.8 and never runs under any supported Ruby, so the port has nothing to assert there.",
+      },
+    ],
   "mail:mail/field_spec.rb › helper methods › should say it is not == to nil": [
     {
       kind: "expect_not_to_eq",

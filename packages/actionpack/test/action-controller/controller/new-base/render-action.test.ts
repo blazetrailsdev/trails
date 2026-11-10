@@ -1,7 +1,8 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
-import { FixtureResolver, MissingTemplate } from "@blazetrails/actionview";
-import { assertRaises } from "@blazetrails/activesupport";
+import { MissingTemplate } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { ApplicationController, Rack } from "../../../support/abstract-unit.js";

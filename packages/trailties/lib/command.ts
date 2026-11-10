@@ -16,10 +16,8 @@ import {
   stdout,
 } from "@blazetrails/ruby-compat";
 import { APP_PATH, ENGINE_ROOT } from "./app-path.js";
-import type { Command as Program } from "commander";
 import type { ThorClass } from "@blazetrails/thor";
 import type { Base } from "./command/base.js";
-import { createProgram } from "./cli.js";
 import { lookup, lookupBang, subclasses } from "./command/behavior.js";
 
 export const HELP_MAPPINGS: ReadonlySet<string> = new Set(["-h", "-?", "--help"]);
@@ -76,67 +74,29 @@ export function applicationRoot(): Pathname | undefined {
   return undefined;
 }
 
-/**
- * @inventedArm replaceAll — PERMANENT
- * @inventedArm if — CONVERGEABLE port-help-and-version-commands-for-split-namespace
- */
+/** @inventedArm replaceAll — PERMANENT */
 export async function invoke(
   fullNamespace: string,
   args: string[] = [],
   config: Record<string, unknown> = {},
 ): Promise<void> {
+  if (isTrailsNewWithNoPath(args)) args = ["--help"];
+
   const [namespace, commandName] = splitNamespace(fullNamespace);
   const command = await findByNamespace(namespace, commandName);
   const name = commandName.replaceAll("_", "-");
 
   try {
     await withArgv(args, async () => {
-      if (
-        fullNamespace === "" ||
-        fullNamespace === "help" ||
-        HELP_MAPPINGS.has(fullNamespace) ||
-        VERSION_MAPPINGS.has(fullNamespace)
-      ) {
-        const rake = (await findByNamespace("rake")) as typeof Base;
-        await lookupBang();
-        const program = createProgram();
-        if (fullNamespace !== "" && !VERSION_MAPPINGS.has(fullNamespace)) {
-          const tasks = await rake.printingCommands();
-          const width = Math.max(0, ...tasks.map(([name]) => name.length));
-          program.addHelpText(
-            "after",
-            ["", "In addition to those commands, there are:", ""]
-              .concat(tasks.map(([name, comment]) => `${name.padEnd(width)}  ${comment}`))
-              .join("\n"),
-          );
-        }
-        await program.parseAsync(fullNamespace === "" ? args : [fullNamespace, ...args], {
-          from: "user",
-        });
-        return;
-      }
-      if (command && "perform" in command) {
-        if (Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
-          await command.perform(name, args, config);
-        } else {
-          await invokeRake(fullNamespace, args, config);
-        }
-      } else if (command && command.name() === name) {
-        await command.parent!.parseAsync([name, ...args], { from: "user" });
-      } else if (command && command.commands.some((c) => c.name() === name)) {
-        await command.parent!.parseAsync([command.name(), name, ...args], { from: "user" });
+      if (command && Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
+        await command.perform(name, args, config);
       } else {
         await invokeRake(fullNamespace, args, config);
       }
     });
   } catch (error) {
     if (!(error instanceof UnrecognizedCommandError)) throw error;
-    if (
-      error.name === fullNamespace &&
-      command &&
-      "perform" in command &&
-      commandName === fullNamespace
-    ) {
+    if (error.name === fullNamespace && command && commandName === fullNamespace) {
       await command.perform("help", [], config);
     } else {
       stdout.write(`${error.detailedMessage()}\n`);
@@ -149,7 +109,7 @@ export async function invoke(
 export async function findByNamespace(
   namespace: string,
   commandName?: string,
-): Promise<Program | typeof Base | undefined> {
+): Promise<typeof Base | undefined> {
   namespace = namespace.replaceAll("_", "-");
   const lookups = [namespace];
   if (commandName) lookups.push(`${namespace}:${commandName.replaceAll("_", "-")}`);
@@ -157,13 +117,9 @@ export async function findByNamespace(
 
   await lookup(lookups);
 
-  const klasses = new Map(subclasses().map((klass) => [klass.namespace(), klass]));
-  const first = lookups.find((lookup) => klasses.has(lookup));
-  if (first !== undefined) return klasses.get(first);
-
-  const namespaces = new Map(createProgram().commands.map((c) => [c.name(), c]));
-  const found = lookups.find((lookup) => namespaces.has(lookup));
-  return found === undefined ? undefined : namespaces.get(found);
+  const namespaces = new Map(subclasses().map((klass) => [klass.namespace(), klass]));
+  const first = lookups.find((lookup) => namespaces.has(lookup));
+  return first === undefined ? undefined : namespaces.get(first);
 }
 
 export async function printingCommands(): Promise<[string, string | null][]> {
@@ -174,6 +130,11 @@ export async function printingCommands(): Promise<[string, string | null][]> {
       .map((klass) => klass.printingCommands()),
   );
   return commands.flat();
+}
+
+/** @internal */
+function isTrailsNewWithNoPath(args: string[]): boolean {
+  return args.length === 1 && args[0] === "new";
 }
 
 /** @internal */
@@ -204,7 +165,29 @@ async function invokeRake(
   config: Record<string, unknown>,
 ): Promise<void> {
   if (HELP_MAPPINGS.has(args[0])) args = ["--describe", task];
-  await ((await findByNamespace("rake")) as typeof Base).perform(task, args, config);
+  await (await findByNamespace("rake"))!.perform(task, args, config);
 }
 
 Trails.Command = { invoke };
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export const EXTENSION = /\.[cm]?[tj]s$/.exec(import.meta.url)![0];
+
+let _commandType: string | undefined;
+let _lookupPaths: string[] | undefined;
+let _fileLookupPaths: string[] | undefined;
+
+export function commandType(): string {
+  return (_commandType ??= "command");
+}
+
+export function lookupPaths(): string[] {
+  return (_lookupPaths ??= ["trails/commands", "commands"]);
+}
+
+export function fileLookupPaths(): string[] {
+  return (_fileLookupPaths ??= [`{${lookupPaths().join(",")}}`, "**", `*${EXTENSION}`]);
+}

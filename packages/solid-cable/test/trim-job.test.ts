@@ -1,4 +1,5 @@
-import { assertDifference, days } from "@blazetrails/activesupport";
+import { days } from "@blazetrails/activesupport";
+import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { afterEach, beforeAll, describe, it, vi } from "vitest";
 import { Message, SolidCable, TrimJob } from "../lib/index.js";
 import { loadCableSchema } from "./support/cable-schema.js";

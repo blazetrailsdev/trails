@@ -1,5 +1,6 @@
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import {
+  STDOUT,
   fsAdapterConfig,
   registerFsAdapter,
   type FsAdapter,
@@ -10,6 +11,18 @@ import {
   SourceAnnotationExtractor,
   resetAnnotationRegistry,
 } from "../lib/source-annotation-extractor.js";
+
+async function enumerate(
+  ...args: Parameters<typeof SourceAnnotationExtractor.enumerate>
+): Promise<string> {
+  const write = vi.spyOn(STDOUT, "write").mockReturnValue(0 as never);
+  try {
+    await SourceAnnotationExtractor.enumerate(...args);
+    return write.mock.calls.map((call) => String(call[0])).join("");
+  } finally {
+    write.mockRestore();
+  }
+}
 
 const posix: PathAdapter = {
   join: (...p) => p.filter(Boolean).join("/").replace(/\/+/g, "/"),
@@ -88,7 +101,7 @@ describe("SourceAnnotationExtractor", () => {
     w("lib/nested/y.ts", "// FIXME: b");
     w("test/z.ts", "\n".repeat(99) + "// OPTIMIZE: c");
     w("ignored_dir/q.ts", "// TODO: not in default dirs");
-    const out = await SourceAnnotationExtractor.enumerate(null, { tag: true });
+    const out = await enumerate(null, { tag: true });
     expect(out).toBe(
       `app/x.ts:\n  * [  1] [TODO] a\n\n` +
         `lib/nested/y.ts:\n  * [  1] [FIXME] b\n\n` +
@@ -97,40 +110,32 @@ describe("SourceAnnotationExtractor", () => {
   });
 
   test("returns empty string when no annotations match", async () => {
-    expect(await SourceAnnotationExtractor.enumerate()).toBe("");
+    expect(await enumerate()).toBe("");
   });
 
   test("single-tag filter omits the [TAG] prefix", async () => {
     w("db/s.ts", "// FIXME: fix");
     w("app/c.ts", "// TODO: skip");
-    expect(await SourceAnnotationExtractor.enumerate("FIXME", { tag: false })).toBe(
-      `db/s.ts:\n  * [1] fix\n\n`,
-    );
+    expect(await enumerate("FIXME", { tag: false })).toBe(`db/s.ts:\n  * [1] fix\n\n`);
   });
 
   test("registerDirectories adds search roots", async () => {
     w("spec/m.ts", "// TODO: x");
     Annotation.registerDirectories("spec");
-    expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
-      `spec/m.ts:\n  * [1] [TODO] x\n\n`,
-    );
+    expect(await enumerate(null, { tag: true })).toBe(`spec/m.ts:\n  * [1] [TODO] x\n\n`);
   });
 
   test("registerExtensions adds new file types", async () => {
     Annotation.registerExtensions("scss", (tag) => new RegExp(`//\\s*(${tag}):?\\s*(.*)$`));
     w("app/a.scss", "// TODO: styled");
-    expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
-      `app/a.scss:\n  * [1] [TODO] styled\n\n`,
-    );
+    expect(await enumerate(null, { tag: true })).toBe(`app/a.scss:\n  * [1] [TODO] styled\n\n`);
   });
 
   test("registerTags adds new tags; unregistered tags are ignored", async () => {
     w("app/a.ts", "// TESTME: yes");
     w("app/b.ts", "// BAD: no");
     Annotation.registerTags("TESTME");
-    expect(await SourceAnnotationExtractor.enumerate(null, { tag: true })).toBe(
-      `app/a.ts:\n  * [1] [TESTME] yes\n\n`,
-    );
+    expect(await enumerate(null, { tag: true })).toBe(`app/a.ts:\n  * [1] [TESTME] yes\n\n`);
   });
 });
 

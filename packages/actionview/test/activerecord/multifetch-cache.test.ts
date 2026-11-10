@@ -2,13 +2,12 @@ import { afterEach, beforeEach, describe, it } from "vitest";
 import "../support/abstract-unit.js";
 import { ActiveRecordTestCase } from "../support/active-record-unit.js";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { MemoryStore, type CacheStore } from "@blazetrails/activesupport";
 import {
-  MemoryStore,
   assertEqual,
   assertIncludes,
   assertNotPredicate,
-  type CacheStore,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { include } from "@blazetrails/ruby-compat";
 import { FixtureResolver } from "../../lib/testing/resolvers.js";
 import { PartialRenderer } from "../../lib/renderer/partial-renderer.js";

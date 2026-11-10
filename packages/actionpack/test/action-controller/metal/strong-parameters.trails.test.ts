@@ -1,11 +1,8 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { ArgumentError, Hash, NoMethodError, rbObjDup } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
-import {
-  HashWithIndifferentAccess,
-  assertEqual,
-  withIndifferentAccess,
-} from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import {
   Parameters,
   UnpermittedParameters,

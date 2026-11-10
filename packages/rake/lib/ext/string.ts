@@ -10,7 +10,8 @@ export function ext(self: string, newext = ""): string {
   return chomp(self, File.extname(self)) + newext;
 }
 
-function pathmapExplode(self: string): string[] {
+/** @internal */
+export function pathmapExplode(self: string): string[] {
   const [head, tail] = File.split(self);
   if (head === self) return [self];
   if (head === "." || tail === "/") return [tail];
@@ -18,8 +19,11 @@ function pathmapExplode(self: string): string[] {
   return [...pathmapExplode(head), tail];
 }
 
-/** @missingRailsArgs pathmap_explode — PERMANENT */
-function pathmapPartial(self: string, n: number): string {
+/**
+ * @missingRailsArgs pathmap_explode — PERMANENT
+ * @internal
+ */
+export function pathmapPartial(self: string, n: number): string {
   const dirs = pathmapExplode(File.dirname(self));
   let partialDirs: string | string[];
   if (n > 0) {

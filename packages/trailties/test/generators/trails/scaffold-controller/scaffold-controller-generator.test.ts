@@ -1,4 +1,5 @@
-import { assertMatch, assertNoMatch, capture } from "@blazetrails/activesupport";
+import { assertMatch, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import {
   Dir,

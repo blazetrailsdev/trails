@@ -1,7 +1,7 @@
 import * as path from "path";
 
 import { apiComparePackages } from "../../vendor/sources.js";
-import { libRoot } from "../layout/package-roots.js";
+import { libRoot } from "../layout/package-roots.mjs";
 
 export const SCRIPT_DIR = __dirname;
 export const ROOT_DIR = path.resolve(SCRIPT_DIR, "../..");
@@ -206,6 +206,7 @@ export const MANIFEST_PACKAGES = [
   "activejob",
   "actionmailer",
   "actionmailbox",
+  "actiontext",
   "activestorage",
   "trailties",
   "rack",
@@ -262,3 +263,12 @@ export const PACKAGE_DIRS: Record<string, string> = Object.fromEntries(
     path.relative(ROOT_DIR, packageSrcDir(pkg)).split(path.sep).join("/"),
   ]),
 );
+
+/**
+ * Classes whose readers a class-body `Klass.attribute("name")` call generates,
+ * keyed `<file relative to the package source dir>:<class>`. The extractor
+ * credits each literal name as a bodied member, the TS twin of the gem's
+ * `attribute` macro (`vendor/mini_magick/v5.2.0/lib/mini_magick/image.rb:118`).
+ * An explicit list, so no other class's `attribute` call can move a credit.
+ */
+export const ATTRIBUTE_MACRO_CLASSES: ReadonlySet<string> = new Set(["image.ts:Image"]);

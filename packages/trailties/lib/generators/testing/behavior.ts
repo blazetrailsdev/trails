@@ -9,7 +9,8 @@ import {
   included,
   type FileUtils,
 } from "@blazetrails/ruby-compat";
-import { Stream, capture, classAttribute } from "@blazetrails/activesupport";
+import { classAttribute } from "@blazetrails/activesupport";
+import { Stream, capture } from "@blazetrails/activesupport/testing/stream";
 import type { Base, GeneratorConfig } from "../base.js";
 import { GeneratedAttribute } from "../generated-attribute.js";
 

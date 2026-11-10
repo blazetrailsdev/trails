@@ -24,7 +24,14 @@ export class CancelledOperationError extends StandardError {}
  * `TimerSet#ns_post_task` / `#process_tasks`
  * (`concurrent/executor/timer_set.rb:95-107,146-180`), whose timer thread waits
  * through `rb_mutex_sleep` (`vendor/ruby/v3.3.11/thread_sync.c:626`). The wait
- * here is an unref'd `setTimeout`, re-armed past its 2^31-1 ms ceiling.
+ * here is an unref'd `setTimeout`, re-armed past its 2^31-1 ms ceiling. The
+ * deadline is read from `performance.now()`, as concurrent-ruby reads
+ * `Concurrent.monotonic_time`. Callers compute the delay from `Time.current`,
+ * which reads the same clock (`performance.timeOrigin + performance.now()`), so
+ * the task never wakes before `Time.current` reaches the deadline. `Date.now()`
+ * is millisecond-truncated and jitters up to 1ms against that clock, enough to
+ * wake a recurring task in the second before its run time, where it
+ * re-enqueues the same second.
  *
  * @noRailsEquivalent PERMANENT
  */

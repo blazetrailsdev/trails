@@ -73,10 +73,10 @@ export class Execution extends Record {
     );
   }
 
-  static async discardAllFromJobs(jobs: Relation<Job>): Promise<void> {
+  static async discardAllFromJobs(jobs: Relation<Job> | Job[]): Promise<void> {
     await SolidQueue.instrument(
       "discard_all",
-      { jobs_size: await jobs.size(), status: this.type() },
+      { jobs_size: Array.isArray(jobs) ? jobs.length : await jobs.size(), status: this.type() },
       async (payload) => {
         await this.transaction(async () => {
           const jobIds = await this.lockAllFromJobs(jobs);
@@ -89,8 +89,10 @@ export class Execution extends Record {
   }
 
   /** @internal */
-  protected static async lockAllFromJobs(jobs: Relation<Job>): Promise<unknown[]> {
-    return await this.where({ job_id: (await jobs.toArray()).map((job) => job.id) })
+  protected static async lockAllFromJobs(jobs: Relation<Job> | Job[]): Promise<unknown[]> {
+    return await this.where({
+      job_id: (Array.isArray(jobs) ? jobs : await jobs.toArray()).map((job) => job.id),
+    })
       .order("job_id")
       .lock()
       .pluck("job_id");

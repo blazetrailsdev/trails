@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertNot, assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
+import {
+  assertNot,
+  assertNotPredicate,
+  assertPredicate,
+} from "@blazetrails/activesupport/testing/assertions";
 import { Person } from "../models/person.js";
 import { Topic } from "../models/topic.js";
 import { PersonWithValidator } from "../models/person-with-validator.js";

@@ -1,14 +1,10 @@
 import { describe, expect, it, type TestContext } from "vitest";
+import { hours, Logger, Notifications, seconds, TaggedLogging } from "@blazetrails/activesupport";
 import {
   assertMatch,
   assertNothingRaised,
   assertRaises,
-  hours,
-  Logger,
-  Notifications,
-  seconds,
-  TaggedLogging,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import {
   setup as logSubscriberTestHelperSetup,
@@ -29,16 +25,16 @@ import { LogSubscriber } from "../lib/log-subscriber.js";
 import { ActiveJob, QueueAdapters } from "../lib/namespaces.js";
 import "../lib/queue-adapters/inline-adapter.js";
 import { TestHelper } from "../lib/test-helper.js";
-import { isAdapterIs } from "./support/helper.js";
-import { AbortBeforeEnqueueJob } from "./support/jobs/abort-before-enqueue-job.js";
-import { DisableLogJob } from "./support/jobs/disable-log-job.js";
-import { EnqueueErrorJob } from "./support/jobs/enqueue-error-job.js";
-import { HelloJob } from "./support/jobs/hello-job.js";
-import { LoggingJob } from "./support/jobs/logging-job.js";
-import { NestedJob } from "./support/jobs/nested-job.js";
-import { OverriddenLoggingJob } from "./support/jobs/overridden-logging-job.js";
-import { RescueJob } from "./support/jobs/rescue-job.js";
-import { DefaultsError, RetryJob } from "./support/jobs/retry-job.js";
+import { isAdapterIs } from "./helper.js";
+import { AbortBeforeEnqueueJob } from "./jobs/abort-before-enqueue-job.js";
+import { DisableLogJob } from "./jobs/disable-log-job.js";
+import { EnqueueErrorJob } from "./jobs/enqueue-error-job.js";
+import { HelloJob } from "./jobs/hello-job.js";
+import { LoggingJob } from "./jobs/logging-job.js";
+import { NestedJob } from "./jobs/nested-job.js";
+import { OverriddenLoggingJob } from "./jobs/overridden-logging-job.js";
+import { RescueJob } from "./jobs/rescue-job.js";
+import { DefaultsError, RetryJob } from "./jobs/retry-job.js";
 import { Person } from "./models/person.js";
 import { JobBuffer } from "./support/job-buffer.js";
 

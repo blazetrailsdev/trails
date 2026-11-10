@@ -211,7 +211,7 @@ describe("buildAutoload", () => {
     }
   });
 
-  it("writes a boot file that registers the routes, environments, initializers, seeds, helpers and config reads", async () => {
+  it("writes a boot file that registers the routes, environments, initializers and seeds", async () => {
     const tmp = Dir.mktmpdir("build-autoload");
     Dir.chdir(tmp);
     try {
@@ -222,6 +222,7 @@ describe("buildAutoload", () => {
         "db",
         "app/helpers/admin",
         "config/storage",
+        "lib/helpers",
       ]) {
         FileUtils.mkdirP(dir);
       }
@@ -243,9 +244,11 @@ describe("buildAutoload", () => {
       File.write("config/storage.ts", "export default {};\n");
       File.write("config/storage/production.ts", "export default {};\n");
       File.write("config/types.d.ts", "export {};\n");
+      File.write("config/my.settings.ts", "export default {};\n");
       File.write("app/helpers/admin/users_helper.ts", "export {};\n");
       File.write("app/helpers/format.ts", "export {};\n");
       File.write("app/helpers/posts-helper.test.ts", "export {};\n");
+      File.write("lib/helpers/extra-helper.ts", "export {};\n");
       const root = Dir.pwd();
       const globs: Record<string, string> = {
         "config/routes": "**/*.{ts,js}",
@@ -271,7 +274,7 @@ describe("buildAutoload", () => {
       File.write(`${engineRoot}/config/initializers/blog.ts`, "export {};\n");
       seats.Trails = {
         application: {
-          config: { root },
+          config: { root, helpersPaths: [File.expandPath("lib/helpers")] },
           paths: paths(root),
           railties: () => [{ config: { root: engineRoot }, paths: paths(engineRoot) }, {}],
           initializers: { tsort: () => [] },
@@ -294,6 +297,8 @@ describe("buildAutoload", () => {
         "config/cable.ts",
         "config/storage.ts",
         "config/storage/production.ts",
+        "config/my.settings.ts",
+        "lib/helpers/extra-helper.ts",
         "vendor/blog/config/routes.ts",
         "vendor/blog/config/initializers/blog.ts",
       ]) {

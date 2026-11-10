@@ -5,5 +5,12 @@
     "rootDir": "."
   },
   "include": ["test"],
-  "references": [{ "path": "./tsconfig.json" }]
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    },
+    {
+      "path": "../vitest-matchers"
+    }
+  ]
 }

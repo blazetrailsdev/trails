@@ -3,7 +3,8 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { resetConnection } from "../../support/connection-helper.js";
-import { assertNothingRaised, assertRaises, Notifications } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import {
   defaultRowFormat,
   isRowFormatDynamicByDefault,

@@ -20,14 +20,17 @@ import {
 import {
   I18n,
   Logger,
+  inflections,
+  isBlank,
+  underscore,
+  ParameterFilter,
+} from "@blazetrails/activesupport";
+import {
   assert,
   assertEqual,
   assertMatch,
   assertPredicate,
   assertRaises,
-  inflections,
-  isBlank,
-  underscore,
   assertNil,
   assertNotPredicate,
   assertInstanceOf,
@@ -35,12 +38,11 @@ import {
   assertNot,
   assertKindOf,
   assertSame,
-  ParameterFilter,
   assertRaise,
   assertNotNil,
   assertNothingRaised,
-  stub,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MockRequest, release } from "@blazetrails/rack";
 import {
   IpSpoofAttackError,

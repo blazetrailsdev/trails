@@ -1,5 +1,6 @@
 import { describe, it } from "vitest";
-import { ArgumentError, assertNil, assertSame } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activesupport";
+import { assertNil, assertSame } from "@blazetrails/activesupport/testing/assertions";
 import { StatementPool } from "./statement-pool.js";
 
 describe("StatementPoolTest", () => {

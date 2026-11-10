@@ -2,6 +2,7 @@ import * as fs from "fs/promises";
 import * as os from "os";
 import * as path from "path";
 import { describe, expect, it } from "vitest";
+import { isTestFileUnported } from "@blazetrails/parity/unported-files";
 import {
   aliasKey,
   arClosureResult,
@@ -205,6 +206,24 @@ describe("rubyToConventionTs", () => {
       "repeater-day-name.test.ts",
     );
     expect(rubyToConventionTs("test_chronic.rb", "chronic")).toBe("chronic.test.ts");
+  });
+
+  it("strips tzinfo's tc_ prefix and kebabs its subdirectory", () => {
+    expect(rubyToConventionTs("tc_timezone_proxy.rb", "tzinfo")).toBe("timezone-proxy.test.ts");
+    expect(rubyToConventionTs("data_sources/tc_zoneinfo_reader.rb", "tzinfo")).toBe(
+      "data-sources/zoneinfo-reader.test.ts",
+    );
+  });
+
+  it("counts tzinfo's tc_ files in the denominator instead of dropping them as unported", () => {
+    for (const file of [
+      "tc_timezone.rb",
+      "data_sources/tc_zoneinfo_reader.rb",
+      "format1/tc_country_definer.rb",
+      "format2/tc_timezone_definer.rb",
+    ]) {
+      expect(isTestFileUnported(file, "tzinfo")).toBe(false);
+    }
   });
 
   it("strips fugit's _spec suffix", () => {

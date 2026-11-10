@@ -1,6 +1,7 @@
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionView } from "@blazetrails/actionpack";
-import { assertCalled, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Message, SMTP, TestMailer } from "@blazetrails/mail";
 import { Dir, RuntimeError, TopLevel } from "@blazetrails/ruby-compat";
 import { Base as ActionMailerBase } from "../lib/base.js";
@@ -102,9 +103,7 @@ class DeliveryMailer extends ActionMailerBase {
   };
 
   static {
-    this.prependViewPath(
-      new ActionView.FixtureResolver({ "delivery-mailer/welcome.html.tse": "" }),
-    );
+    this.prependViewPath(new FixtureResolver({ "delivery-mailer/welcome.html.tse": "" }));
   }
 
   welcome(hash: Record<string, unknown> = {}) {

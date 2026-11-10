@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { BigDecimal, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base, RecordInvalid } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

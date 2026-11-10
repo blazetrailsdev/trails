@@ -10,6 +10,7 @@ import {
 } from "./index.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { isBlank, isPresent, toXmlArray } from "@blazetrails/activesupport";
 import {
   assertDifference,
   assertEmpty,
@@ -19,10 +20,7 @@ import {
   assertPredicate,
   assertRaises,
   assertRespondTo,
-  isBlank,
-  isPresent,
-  toXmlArray,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { PP, SimpleDelegator, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";

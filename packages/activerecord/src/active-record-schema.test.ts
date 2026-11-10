@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
-import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNothingRaised,
+} from "@blazetrails/activesupport/testing/assertions";
 import { isModuleIncluded } from "@blazetrails/ruby-compat";
 import { Base, Migration, Schema, TableDefinition } from "./index.js";
 import { Definition } from "./schema.js";

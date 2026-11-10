@@ -1,8 +1,7 @@
 import { beforeEach, describe, it, type TestContext } from "vitest";
+import { TimeWithZone, TimeZone, minutes } from "@blazetrails/activesupport";
 import {
   Assertion,
-  TimeWithZone,
-  TimeZone,
   assertEqual,
   assertInDelta,
   assertInstanceOf,
@@ -11,8 +10,7 @@ import {
   assertNothingRaised,
   assertRaise,
   assertRaises,
-  minutes,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { noon, tomorrow } from "@blazetrails/activesupport/core-ext/date/calculations";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import {
@@ -37,15 +35,15 @@ import "../lib/queue-adapters/test-adapter.js";
 import type { TestAdapter } from "../lib/queue-adapters/test-adapter.js";
 import { TestCase } from "../lib/test-case.js";
 import type { TestHelper } from "../lib/test-helper.js";
-import { isAdapterIs } from "./support/helper.js";
-import { HelloJob } from "./support/jobs/hello-job.js";
-import { InheritedJob } from "./support/jobs/inherited-job.js";
-import { LoggingJob } from "./support/jobs/logging-job.js";
-import { MultipleKwargsJob } from "./support/jobs/multiple-kwargs-job.js";
-import { NestedJob } from "./support/jobs/nested-job.js";
-import { RaisingJob } from "./support/jobs/raising-job.js";
-import { RescueJob } from "./support/jobs/rescue-job.js";
-import { RetryJob } from "./support/jobs/retry-job.js";
+import { isAdapterIs } from "./helper.js";
+import { HelloJob } from "./jobs/hello-job.js";
+import { InheritedJob } from "./jobs/inherited-job.js";
+import { LoggingJob } from "./jobs/logging-job.js";
+import { MultipleKwargsJob } from "./jobs/multiple-kwargs-job.js";
+import { NestedJob } from "./jobs/nested-job.js";
+import { RaisingJob } from "./jobs/raising-job.js";
+import { RescueJob } from "./jobs/rescue-job.js";
+import { RetryJob } from "./jobs/retry-job.js";
 import { Person } from "./models/person.js";
 import { JobBuffer } from "./support/job-buffer.js";
 

@@ -6,7 +6,7 @@ import {
   assertMatch,
   assertNot,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { block, ArgumentError, Range } from "@blazetrails/ruby-compat";
 import { CSS, XML, type Html5Document, type NodeSet } from "@blazetrails/nokogiri";
 import { Testing } from "../../../lib/rails-dom-testing/testing.js";

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { assertEqual, assertKindOf, HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { assertEqual, assertKindOf } from "@blazetrails/activesupport/testing/assertions";
 import { Range } from "@blazetrails/ruby-compat";
 import type { Html5Document } from "@blazetrails/nokogiri";
 import { TestResponse } from "../../../lib/action-dispatch/testing/test-response.js";

@@ -1,7 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    `ValidatableVisitor` merges with an empty interface so the `Validations` members its `Visitor`
    parent includes surface on the type side. */
-import { assertRespondTo, assertNotRespondTo, assertNil } from "@blazetrails/activesupport";
+import {
+  assertRespondTo,
+  assertNotRespondTo,
+  assertNil,
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Engine, Password } from "@blazetrails/bcrypt";

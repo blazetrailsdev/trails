@@ -3,7 +3,8 @@
    the class/interface merge is how `include()` surfaces those members on the type side. */
 import { beforeEach, describe, it, expect } from "vitest";
 import { ModelName, Naming } from "@blazetrails/activemodel";
-import { assertRespondTo, extend, TopLevel } from "@blazetrails/activesupport";
+import { extend, TopLevel } from "@blazetrails/activesupport";
+import { assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { File, include, constSet } from "@blazetrails/ruby-compat";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { Engine } from "@blazetrails/trailties/engine";

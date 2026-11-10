@@ -15,7 +15,8 @@ import {
   rbInspect,
   setEnv,
 } from "@blazetrails/ruby-compat";
-import { Dependencies, Stream } from "@blazetrails/activesupport";
+import { Dependencies } from "@blazetrails/activesupport";
+import { Stream } from "@blazetrails/activesupport/testing/stream";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { MockRequest } from "@blazetrails/rack";
 import { ConnectionAdapters } from "@blazetrails/activerecord";
@@ -32,8 +33,19 @@ interface RackHost {
   call(env: Record<string, unknown>): Promise<RackResponse>;
 }
 
-async function puts(file: string, string: string, mode: "w" | "a" = "w"): Promise<void> {
+async function puts(
+  file: string,
+  string: string | Uint8Array,
+  mode: "w" | "a" | "wb" = "w",
+): Promise<void> {
   const fs = getFs();
+  if (string instanceof Uint8Array) {
+    if (string.at(-1) === 0x0a) return await fs.writeFile!(file, string);
+    const bytes = new Uint8Array(string.length + 1);
+    bytes.set(string);
+    bytes[string.length] = 0x0a;
+    return await fs.writeFile!(file, bytes);
+  }
   const prior = mode === "a" && (await fs.exists(file)) ? await fs.readFile(file, "utf-8") : "";
   await fs.writeFile!(file, prior + (string.endsWith("\n") ? string : `${string}\n`));
 }
@@ -363,6 +375,15 @@ export default { development: env("development"), test: env("test"), production:
       File.join(appPath, "config/application.ts"),
       "utf-8",
     );
+    if (/^\s*(?:const .*=\s*)?await\b/m.test(str)) {
+      const classEnd = /(\n(?:\/\/.*\n)*await [\s\S]*)$/.exec(environment);
+      if (!classEnd) throw new Error("addToConfig: no top-level await in config/application.ts");
+      await puts(
+        File.join(appPath, "config/application.ts"),
+        environment.slice(0, classEnd.index) + `\n${str}\n` + classEnd[1],
+      );
+      return;
+    }
     const match = /(\n\s*\}\n(?:\s*\/\/.*\n)*}\n\n(?:\/\/.*\n)*await [\s\S]*)$/.exec(environment);
     if (match) {
       await puts(
@@ -397,7 +418,11 @@ export default { development: env("development"), test: env("test"), production:
     await getFs().writeFile!(file, contents.replace(new RegExp(str, "g"), ""));
   }
 
-  async appFile(path: string, contents: string, mode: "w" | "a" = "w"): Promise<string> {
+  async appFile(
+    path: string,
+    contents: string | Uint8Array,
+    mode: "w" | "a" | "wb" = "w",
+  ): Promise<string> {
     const fileName = `${await this.appPath()}/${path}`;
     await FileUtils.mkdirPAsync(File.dirname(fileName));
     await puts(fileName, contents, mode);

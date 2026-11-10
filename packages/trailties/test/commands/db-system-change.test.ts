@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { Dir, File, FileUtils, stdin } from "@blazetrails/ruby-compat";
 import { ChangeGenerator } from "../../lib/generators/trails/db/system/change/change-generator.js";
 import { DATABASES } from "../../lib/generators/database.js";

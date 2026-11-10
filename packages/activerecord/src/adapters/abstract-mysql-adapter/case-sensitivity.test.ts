@@ -1,5 +1,5 @@
 import { describe, it, beforeEach, expect } from "vitest";
-import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport";
+import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";

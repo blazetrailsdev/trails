@@ -1,19 +1,16 @@
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ActionView } from "@blazetrails/actionpack";
 import { DateTime, Time, strftime } from "@blazetrails/date";
+import { ExecutionContext, I18n, Notifications, days } from "@blazetrails/activesupport";
 import {
-  ExecutionContext,
-  I18n,
-  Notifications,
   assertCalled,
   assertCalledWith,
   assertNotCalled,
-  assertNothingRaised,
-  assertRaises,
-  days,
   stub,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/method-call-assertions";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { assertDomEqual } from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
 import { Mail, type AddressContainer, type Field, type Message } from "@blazetrails/mail";
 import {
@@ -1015,9 +1012,7 @@ describe("BaseTest", () => {
     class BeforeActionMailer extends Base {
       static {
         (this as unknown as ActionCallbacks).beforeAction(":addSpecialHeaderBang");
-        this.prependViewPath(
-          new ActionView.FixtureResolver({ "before-action-mailer/welcome.html.tse": "" }),
-        );
+        this.prependViewPath(new FixtureResolver({ "before-action-mailer/welcome.html.tse": "" }));
       }
 
       welcome() {
@@ -1040,9 +1035,7 @@ describe("BaseTest", () => {
     class AfterActionMailer extends Base {
       static {
         (this as unknown as ActionCallbacks).afterAction(":addSpecialHeaderBang");
-        this.prependViewPath(
-          new ActionView.FixtureResolver({ "after-action-mailer/welcome.html.tse": "" }),
-        );
+        this.prependViewPath(new FixtureResolver({ "after-action-mailer/welcome.html.tse": "" }));
       }
 
       welcome() {
@@ -1064,7 +1057,7 @@ describe("BaseTest", () => {
       static {
         (this as unknown as ActionCallbacks).beforeAction(":addInlineAttachmentBang");
         this.prependViewPath(
-          new ActionView.FixtureResolver({
+          new FixtureResolver({
             "default-inline-attachment-mailer/welcome.html.tse": "",
           }),
         );
@@ -1112,7 +1105,7 @@ describe("BaseTest", () => {
       class extends Base {
         static {
           this.prependViewPath(
-            new ActionView.FixtureResolver({ "anonymous/welcome.tse": "Anonymous mailer body\n" }),
+            new FixtureResolver({ "anonymous/welcome.tse": "Anonymous mailer body\n" }),
           );
         }
 

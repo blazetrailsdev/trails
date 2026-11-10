@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assert, assertNot } from "@blazetrails/activesupport";
+import { assert, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { Result, type ColumnTypes } from "./result.js";
 
 function assertKindOf(klass: NumberConstructor, actual: unknown): void {

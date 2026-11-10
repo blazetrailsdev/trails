@@ -14,6 +14,7 @@ import type { Node } from "../html5/node.js";
 import type { XmlDocument } from "./document.js";
 import type { DocumentFragment } from "./document-fragment.js";
 import { NodeSet } from "./node-set.js";
+import { SaveOptions } from "./node/save-options.js";
 import * as Searchable from "./searchable.js";
 import "./xpath-context.js";
 
@@ -29,6 +30,7 @@ export class XmlNode {
   declare atXpath: (...args: unknown[]) => XmlNode | undefined;
 
   static readonly IMPLIED_XPATH_CONTEXTS = [".//"] as const;
+  static readonly SaveOptions = SaveOptions;
 
   constructor(
     /**

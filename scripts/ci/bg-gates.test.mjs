@@ -86,6 +86,14 @@ describe("start / wait / summary", () => {
     expect(run(["wait", "nope"]).stderr).toContain("no task nope");
   });
 
+  it("fails a wait cleanly when the start step never ran", () => {
+    const { run } = runner();
+    const result = run(["wait", "a"]);
+    expect(result.status).toBe(1);
+    expect(result.stdout).toContain("a was never started");
+    expect(result.stderr).not.toContain("ENOENT");
+  });
+
   it("prints a task log larger than a pipe buffer in full to a slow reader", () => {
     const { dir } = runner();
     const env = { ...process.env, CI_BG_DIR: dir };

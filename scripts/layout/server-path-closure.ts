@@ -13,6 +13,11 @@
  * - or one that imports `vitest` or `@blazetrails/vitest-matchers` (a package
  *   that is test-only as a whole, so its own exports are not entries).
  *
+ * A package's dynamic `import()` of its own testing export by its bare
+ * specifier is a load by name, as Rails' `require` of a feature path
+ * (`pubsub_adapter`'s `require path_to_adapter`): the server path reaches it
+ * only when configuration names it, so it is not followed.
+ *
  * Today's violations are `server-path-closure-exclude.json`, only-shrink: a new
  * violation reds, and so does a listed one that no longer occurs.
  *
@@ -41,8 +46,26 @@ export interface PackageExports {
   exports: Record<string, string>;
 }
 
+/**
+ * Export keys whose `test` token names production code the gem loads at boot,
+ * not a testing entry: `Mail::TestMailer` is a delivery method autoloaded by
+ * `mail/network.rb` (vendor/mail/2.8.1/lib/mail/network.rb:11) and named by
+ * `Configuration#lookup_delivery_method` (mail/configuration.rb:44), and
+ * `Rails::TestUnitRailtie` is required by `rails/all.rb`
+ * (vendor/rails/v8.0.2/railties/lib/rails/all.rb), loading no test framework.
+ * `ActiveJob::QueueAdapters::TestAdapter` is autoloaded from lib
+ * (vendor/rails/v8.0.2/activejob/lib/active_job/queue_adapters.rb:125) and
+ * resolved by `lookup(:test)` (:135) in any environment.
+ */
+const SERVER_EXPORTS = new Set([
+  "./network/delivery-methods/test-mailer",
+  "./test-unit/trailtie",
+  "./queue-adapters/test-adapter",
+]);
+
 /** True for an export key naming a testing entry. */
 export function isTestingExport(key: string): boolean {
+  if (SERVER_EXPORTS.has(key.replace(/\.js$/, ""))) return false;
   return key.split(/[/.*-]/).some((token) => ["test", "testing", "tests"].includes(token));
 }
 
@@ -85,10 +108,12 @@ export async function readPackages(root = ROOT_DIR): Promise<Map<string, Package
         : (declared as Record<string, ExportTarget>);
     const exports: Record<string, string> = {};
     const patterns: [string, string | null][] = [];
+    const blocked = new Set<string>();
     for (const [key, target] of Object.entries(raw)) {
       const file = runtimeTarget(target);
       if (key.includes("*")) patterns.push([key, file]);
       else if (file !== null) exports[key] = path.join(dir, file);
+      else blocked.add(key);
     }
     if (patterns.length > 0) {
       const built = (await fs.readdir(path.join(dir, "dist"), { recursive: true }).catch(() => []))
@@ -101,7 +126,11 @@ export async function readPackages(root = ROOT_DIR): Promise<Map<string, Package
           const stem = wildcardMatch(file, rel);
           if (stem === null) continue;
           const expanded = key.replace("*", stem);
-          if (expanded in exports || excluded.some((k) => wildcardMatch(k, expanded) !== null)) {
+          if (
+            expanded in exports ||
+            blocked.has(expanded) ||
+            excluded.some((k) => wildcardMatch(k, expanded) !== null)
+          ) {
             continue;
           }
           exports[expanded] = path.join(dir, rel);
@@ -150,7 +179,8 @@ export async function findViolations(root = ROOT_DIR): Promise<Violation[]> {
         const rel = path.relative(root, file);
         const source = await fs.readFile(file, "utf-8").catch(() => null);
         if (source === null) continue;
-        const specifiers = moduleSpecifiers(source).map((s) => s.specifier);
+        const imports = moduleSpecifiers(source);
+        const specifiers = imports.map((s) => s.specifier);
         const testing =
           testingEntries.has(file) ||
           isTestingPath(path.relative(path.join(file.split("/dist/")[0], "dist"), file)) ||
@@ -159,11 +189,19 @@ export async function findViolations(root = ROOT_DIR): Promise<Violation[]> {
           if (!found.has(rel)) found.set(rel, { module: rel, chain: [...chain, rel] });
           continue;
         }
-        for (const specifier of specifiers) {
+        for (const { specifier, kind } of imports) {
           const next = specifier.startsWith(".")
             ? path.resolve(path.dirname(file), specifier)
             : resolveBare(specifier, packages);
-          if (next !== null) queue.push([next, [...chain, rel]]);
+          if (next === null) continue;
+          if (
+            kind === "dynamic" &&
+            file.startsWith(`${packages.get(specifier.split("/").slice(0, 2).join("/"))?.dir}/`) &&
+            testingEntries.has(next)
+          ) {
+            continue;
+          }
+          queue.push([next, [...chain, rel]]);
         }
       }
     }

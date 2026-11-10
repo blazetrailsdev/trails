@@ -1,7 +1,8 @@
 import "../support/abstract-unit.js";
 import { describe, it, expect } from "vitest";
 import { Rational } from "@blazetrails/ruby-compat";
-import { htmlSafe, isHtmlSafe, assertNil, assertRaises, I18n } from "@blazetrails/activesupport";
+import { htmlSafe, isHtmlSafe, I18n } from "@blazetrails/activesupport";
+import { assertNil, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import {
   numberToPhone,
   numberToCurrency,

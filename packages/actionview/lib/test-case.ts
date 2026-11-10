@@ -1,8 +1,8 @@
+import "./constants.test-case.generated.js";
 import {
   camelize,
   classAttribute,
   Concern,
-  ConstantLookup,
   extend,
   HashWithIndifferentAccess,
   isBlank,
@@ -10,8 +10,10 @@ import {
   safeConstantize,
   underscore,
 } from "@blazetrails/activesupport";
+import { ConstantLookup } from "@blazetrails/activesupport/testing/constant-lookup";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import { AbstractController, ActionController, ActionDispatch } from "@blazetrails/actionpack";
+import { ControllerTestRequest } from "@blazetrails/actionpack/testing";
 import {
   include,
   isPlainHash,
@@ -43,7 +45,6 @@ import { OutputFlow } from "./flows.js";
 import { Helpers } from "./helpers.js";
 import { RecordIdentifier } from "./record-identifier.js";
 import { RoutingUrlFor } from "./routing-url-for.js";
-import "./constants.excluded.generated.js";
 import { Testing } from "./rails-dom-testing/testing.js";
 import { Assertions as DomTestingAssertions } from "./rails-dom-testing/assertions.js";
 
@@ -95,7 +96,7 @@ export class TestController extends ActionController.Base {
   constructor() {
     super();
     (this.constructor as typeof TestController).setControllerPath("");
-    this.request = ActionController.TestRequest.create(this.constructor);
+    this.request = ControllerTestRequest.create(this.constructor);
     this.response = new ActionDispatch.TestResponse();
 
     delete this.request.env["PATH_INFO"];

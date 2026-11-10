@@ -3,7 +3,7 @@ import {
   Parameters,
   UnpermittedParameters,
 } from "../../../../lib/action-controller/metal/strong-parameters.js";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 
 describe("RaiseOnUnpermittedParamsTest", () => {
   afterEach(() => {

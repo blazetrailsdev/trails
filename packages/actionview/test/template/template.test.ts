@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import "@blazetrails/actionpack";
-import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, Marshal } from "@blazetrails/ruby-compat";
 import { SafeBuffer } from "@blazetrails/activesupport";
 import { Base } from "../../lib/base.js";

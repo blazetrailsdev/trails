@@ -1,6 +1,11 @@
 import { describe, it, expect, beforeAll, type TestContext } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
-import { assert, assertNot, assertNotRespondTo, assertRaises } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertNot,
+  assertNotRespondTo,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { sql as arelSql } from "@blazetrails/arel";
 import { Relation } from "./index.js";

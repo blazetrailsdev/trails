@@ -1,6 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertNot } from "@blazetrails/activesupport";
+import { assertNot } from "@blazetrails/activesupport/testing/assertions";
 import "../../index.js";
 import { describeIfPg } from "./test-helper.js";
 import { Base } from "../../base.js";

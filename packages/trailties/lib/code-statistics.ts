@@ -1,5 +1,5 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { File, getFs, sprintf } from "@blazetrails/ruby-compat";
+import { File, STDOUT, getFs, sprintf } from "@blazetrails/ruby-compat";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
 export type DirectoryPair = readonly [label: string, path: string];
@@ -83,17 +83,17 @@ export class CodeStatistics {
   }
 
   toString(): string {
-    const out = [this.printHeader()];
-    for (const pair of this.pairs) out.push(this.printLine(pair[0], this.statistics.get(pair[0])!));
-    out.push(this.printSplitter());
+    this.printHeader();
+    for (const pair of this.pairs) this.printLine(pair[0], this.statistics.get(pair[0])!);
+    this.printSplitter();
 
     if (this.total) {
-      out.push(this.printLine("Total", this.total));
-      out.push(this.printSplitter());
+      this.printLine("Total", this.total);
+      this.printSplitter();
     }
 
-    out.push(this.printCodeTestStats());
-    return out.join("\n");
+    this.printCodeTestStats();
+    return "";
   }
 
   /** @internal */
@@ -158,40 +158,41 @@ export class CodeStatistics {
   }
 
   /** @internal */
-  private printHeader(): string {
-    const header =
-      "| Name                " +
-      HEADER_KEYS.map((k) => ` | ${HEADERS[k].padStart(this.widthFor(k))}`).join("") +
-      " | M/C | LOC/M |";
-    return [this.printSplitter(), header, this.printSplitter()].join("\n");
+  private printHeader(): void {
+    this.printSplitter();
+    STDOUT.print("| Name                ");
+    for (const k of HEADER_KEYS) STDOUT.print(` | ${HEADERS[k].padStart(this.widthFor(k))}`);
+    STDOUT.puts(" | M/C | LOC/M |");
+    this.printSplitter();
   }
 
   /** @internal */
-  private printSplitter(): string {
-    return (
-      "+----------------------" +
-      HEADER_KEYS.map((k) => `+${"-".repeat(this.widthFor(k) + 2)}`).join("") +
-      "+-----+-------+"
-    );
+  private printSplitter(): void {
+    STDOUT.print("+----------------------");
+    for (const k of HEADER_KEYS) STDOUT.print(`+${"-".repeat(this.widthFor(k) + 2)}`);
+    STDOUT.puts("+-----+-------+");
   }
 
   /** @internal */
-  private printLine(name: string, statistics: CodeStatisticsCalculator): string {
+  private printLine(name: string, statistics: CodeStatisticsCalculator): void {
     const mOverC = statistics.classes > 0 ? Math.floor(statistics.methods / statistics.classes) : 0;
     const locOverM =
       statistics.methods > 0 ? Math.floor(statistics.codeLines / statistics.methods) - 2 : 0;
 
-    const cells = HEADER_KEYS.map(
-      (k) => `| ${String(statistics[k]).padStart(this.widthFor(k))} `,
-    ).join("");
-    return `| ${name.padEnd(20)} ${cells}| ${String(mOverC).padStart(3)} | ${String(locOverM).padStart(5)} |`;
+    STDOUT.print(`| ${name.padEnd(20)} `);
+    for (const k of HEADER_KEYS)
+      STDOUT.print(`| ${String(statistics[k]).padStart(this.widthFor(k))} `);
+    STDOUT.puts(`| ${String(mOverC).padStart(3)} | ${String(locOverM).padStart(5)} |`);
   }
 
   /** @internal */
-  private printCodeTestStats(): string {
+  private printCodeTestStats(): void {
     const code = this.calculateCode();
     const tests = this.calculateTests();
 
-    return `  Code LOC: ${code}     Test LOC: ${tests}     Code to Test Ratio: 1:${sprintf("%.1f", tests / code)}`;
+    STDOUT.puts(
+      `  Code LOC: ${code}     Test LOC: ${tests}     Code to Test Ratio: 1:${sprintf("%.1f", tests / code)}`,
+    );
+    STDOUT.puts("");
   }
 }

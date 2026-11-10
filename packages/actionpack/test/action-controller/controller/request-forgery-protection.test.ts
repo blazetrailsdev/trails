@@ -2,17 +2,19 @@ import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Cookies } from "../../../lib/action-dispatch/middleware/cookies.js";
 import {
   ActiveSupportJSON,
+  Duration,
+  include,
+  type Included,
+  isBlank,
+} from "@blazetrails/activesupport";
+import {
   assert,
   assertNil,
   assertNot,
   assertNothingRaised,
   assertRaises,
-  Duration,
-  include,
-  type Included,
-  isBlank,
-  stub,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   embedAuthenticityTokenInRemoteForms,

@@ -105,6 +105,7 @@ declare module "@blazetrails/ruby-compat" {
           urlHelpers(): Record<`${string}Url`, (...args: unknown[]) => string>;
         };
         envConfig(): Record<string, unknown>;
+        credentials(): Promise<{ dig(key: string, ...identifiers: string[]): unknown }>;
         executor: { wrap<T>(block: () => T): T; runBang(): unknown; perform<T>(block: () => T): T };
         configFor(name: string): Promise<unknown>;
         loadSeed(): Promise<void>;

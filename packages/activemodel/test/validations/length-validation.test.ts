@@ -1,5 +1,8 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { assertPredicate, assertNothingRaised } from "@blazetrails/activesupport";
+import {
+  assertPredicate,
+  assertNothingRaised,
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "../../lib/attribute-assignment.js";
 import { Range } from "@blazetrails/ruby-compat";
 import { Topic } from "../models/topic.js";

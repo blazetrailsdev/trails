@@ -1,4 +1,4 @@
-import { assertEmpty } from "@blazetrails/activesupport";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { b } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import {

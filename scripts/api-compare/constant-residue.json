@@ -37,13 +37,15 @@
     }
   },
   "actionmailbox": {
-    "rows": 10,
-    "excluded": [],
+    "rows": 14,
+    "excluded": ["base-controller.ts::BaseController"],
     "unwalked": [
+      "callbacks.ts::Callbacks",
       "gem-version.ts::VERSION",
       "inbound-email/routable.ts::Routable",
       "relayer.ts::Relayer.Result",
-      "router.ts::Router.RoutingError"
+      "router.ts::Router.RoutingError",
+      "routing.ts::Routing"
     ],
     "residue": {}
   },
@@ -284,6 +286,12 @@
       "action-dispatch/testing/integration.ts::IntegrationTest": "ActionDispatch::IntegrationTest"
     }
   },
+  "actiontext": {
+    "rows": 1,
+    "excluded": [],
+    "unwalked": [],
+    "residue": { "gem-version.ts::VERSION": "ActionText::VERSION" }
+  },
   "actionview": {
     "rows": 168,
     "excluded": ["helpers/form-helper.ts::FormBuilder", "template/handlers/builder.ts::Builder"],
@@ -388,7 +396,7 @@
     }
   },
   "activemodel": {
-    "rows": 98,
+    "rows": 96,
     "excluded": [],
     "unwalked": [
       "attribute-methods.ts::AttributeMethods",
@@ -396,7 +404,6 @@
       "conversion.ts::Conversion",
       "forbidden-attributes-protection.ts::ForbiddenAttributesProtection",
       "gem-version.ts::VERSION",
-      "lint.ts::Lint",
       "naming.ts::Naming",
       "type.ts::Type",
       "type/helpers/mutable.ts::Mutable",
@@ -423,7 +430,6 @@
       "attribute.ts::WithCastValue": "ActiveModel::Attribute::WithCastValue",
       "attributes.ts::ClassMethods": "ActiveModel::Attributes::ClassMethods",
       "conversion.ts::ClassMethods": "ActiveModel::Conversion::ClassMethods",
-      "lint.ts::Tests": "ActiveModel::Lint::Tests",
       "secure-password.ts::InstanceMethodsOnActivation": "ActiveModel::SecurePassword::InstanceMethodsOnActivation",
       "type/big-integer.ts::BigIntegerType": "ActiveModel::Type::BigInteger",
       "type/binary.ts::BinaryType": "ActiveModel::Type::Binary",
@@ -793,7 +799,7 @@
     }
   },
   "activesupport": {
-    "rows": 186,
+    "rows": 171,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -835,13 +841,6 @@
       "rexml/document.ts::Element",
       "rexml/document.ts::ParseException",
       "rexml/document.ts::Text",
-      "testing/assertions.ts::Assertion",
-      "testing/assertions.ts::BacktraceFilter",
-      "testing/assertions.ts::Skip",
-      "testing/assertions.ts::Test",
-      "testing/assertions.ts::UnexpectedError",
-      "testing/method-call-assertions.ts::Mock",
-      "testing/method-call-assertions.ts::MockExpectationError",
       "thread-local-var.ts::ThreadLocalVar",
       "xml-mini.ts::IndentedXmlStringBuilder",
       "xml-mini.ts::XmlStringBuilder"
@@ -880,18 +879,6 @@
       "tagged-logging.ts::Formatter",
       "tagged-logging.ts::LocalTagStorage",
       "tagged-logging.ts::TaggedLogging",
-      "testing/constant-lookup.ts::ClassMethods",
-      "testing/constant-lookup.ts::ConstantLookup",
-      "testing/error-reporter-assertions.ts::ErrorCollector",
-      "testing/error-reporter-assertions.ts::ErrorReporterAssertions",
-      "testing/isolation.ts::Isolation",
-      "testing/isolation.ts::Subprocess",
-      "testing/method-call-assertions.ts::MethodCallAssertions",
-      "testing/setup-and-teardown.ts::ClassMethods",
-      "testing/setup-and-teardown.ts::SetupAndTeardown",
-      "testing/stream.ts::Stream",
-      "testing/tagged-logging.ts::TaggedLogging",
-      "testing/time-helpers.ts::TimeHelpers",
       "xml-mini.ts::FileLike",
       "xml-mini.ts::XmlMini"
     ],
@@ -939,9 +926,7 @@
       "notifications/fanout.ts::Timed": "ActiveSupport::Notifications::Fanout::Subscribers::Timed",
       "notifications/instrumenter.ts::Event": "ActiveSupport::Notifications::Event",
       "notifications/instrumenter.ts::Wrapper": "ActiveSupport::Notifications::Instrumenter::LegacyHandle::Wrapper",
-      "ordered-options.ts::InheritableOptions": "ActiveSupport::InheritableOptions",
-      "testing/error-reporter-assertions.ts::Report": "ActiveSupport::Testing::ErrorReporterAssertions::ErrorCollector::Report",
-      "testing/time-helpers.ts::SimpleStubs": "ActiveSupport::Testing::SimpleStubs"
+      "ordered-options.ts::InheritableOptions": "ActiveSupport::InheritableOptions"
     }
   },
   "arel": {
@@ -1153,7 +1138,7 @@
     }
   },
   "nokogiri": {
-    "rows": 26,
+    "rows": 27,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1176,6 +1161,7 @@
       "xml/namespace.ts::Namespace": "Nokogiri::XML::Namespace",
       "xml/node-set.ts::NodeSet": "Nokogiri::XML::NodeSet",
       "xml/node.ts::XmlNode": "Nokogiri::XML::Node",
+      "xml/node/save-options.ts::SaveOptions": "Nokogiri::XML::Node::SaveOptions",
       "xml/parse-options.ts::ParseOptions": "Nokogiri::XML::ParseOptions",
       "xml/sax/document.ts::SaxDocument": "Nokogiri::XML::SAX::Document",
       "xml/sax/parser.ts::SaxParser": "Nokogiri::XML::SAX::Parser",
@@ -1301,7 +1287,7 @@
     }
   },
   "trailties": {
-    "rows": 151,
+    "rows": 156,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
@@ -1351,6 +1337,7 @@
       "commands/encrypted.ts::EncryptedCommand": "Trails::Command::EncryptedCommand",
       "commands/gem-help.ts::GemHelpCommand": "Trails::Command::GemHelpCommand",
       "commands/generate.ts::GenerateCommand": "Trails::Command::GenerateCommand",
+      "commands/help.ts::HelpCommand": "Trails::Command::HelpCommand",
       "commands/notes.ts::NotesCommand": "Trails::Command::NotesCommand",
       "commands/plugin.ts::PluginCommand": "Trails::Command::PluginCommand",
       "commands/rake.ts::RakeCommand": "Trails::Command::RakeCommand",
@@ -1363,6 +1350,7 @@
       "commands/test.ts::TestCommand": "Trails::Command::TestCommand",
       "commands/unused-routes.ts::RouteInfo": "Trails::Command::UnusedRoutesCommand::RouteInfo",
       "commands/unused-routes.ts::UnusedRoutesCommand": "Trails::Command::UnusedRoutesCommand",
+      "commands/version.ts::VersionCommand": "Trails::Command::VersionCommand",
       "configuration.ts::Generators": "Trails::Configuration::Generators",
       "configuration.ts::MiddlewareStackProxy": "Trails::Configuration::MiddlewareStackProxy",
       "engine.ts::Engine": "Trails::Engine",
@@ -1372,7 +1360,10 @@
       "gem-version.ts::VERSION": "Trails::VERSION",
       "generators/actions/create-migration.ts::CreateMigration": "Trails::Generators::Actions::CreateMigration",
       "generators/active-model.ts::ActiveModel": "Trails::Generators::ActiveModel",
+      "generators/active-record.ts::Base": "ActiveRecord::Generators::Base",
       "generators/active-record/application-record/application-record-generator.ts::ApplicationRecordGenerator": "ActiveRecord::Generators::ApplicationRecordGenerator",
+      "generators/active-record/migration.ts::ClassMethods": "ActiveRecord::Generators::Migration::ClassMethods",
+      "generators/active-record/migration.ts::Migration": "ActiveRecord::Generators::Migration",
       "generators/active-record/migration/migration-generator.ts::MigrationGenerator": "ActiveRecord::Generators::MigrationGenerator",
       "generators/active-record/model/model-generator.ts::ModelGenerator": "ActiveRecord::Generators::ModelGenerator",
       "generators/active-record/multi-db/multi-db-generator.ts::MultiDbGenerator": "ActiveRecord::Generators::MultiDbGenerator",
@@ -1466,6 +1457,22 @@
       "trailtie/configuration.ts::Configuration": "Trails::Trailtie::Configuration",
       "welcome-controller.ts::WelcomeController": "Trails::WelcomeController",
       "zeitwerk-checker.ts::ZeitwerkChecker": "Trails::ZeitwerkChecker"
+    }
+  },
+  "tzinfo": {
+    "rows": 9,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "country.ts::InvalidCountryCode": "TZInfo::InvalidCountryCode",
+      "data-sources/constant-offset-data-timezone-info.ts::ConstantOffsetDataTimezoneInfo": "TZInfo::DataSources::ConstantOffsetDataTimezoneInfo",
+      "timezone-offset.ts::TimezoneOffset": "TZInfo::TimezoneOffset",
+      "timezone-period.ts::TimezonePeriod": "TZInfo::TimezonePeriod",
+      "timezone-transition.ts::TimezoneTransition": "TZInfo::TimezoneTransition",
+      "timezone.ts::AmbiguousTime": "TZInfo::AmbiguousTime",
+      "timezone.ts::InvalidTimezoneIdentifier": "TZInfo::InvalidTimezoneIdentifier",
+      "timezone.ts::PeriodNotFound": "TZInfo::PeriodNotFound",
+      "timezone.ts::Timezone": "TZInfo::Timezone"
     }
   },
   "zeitwerk": {

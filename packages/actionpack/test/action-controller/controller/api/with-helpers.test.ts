@@ -1,4 +1,5 @@
-import { assertEqual, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import type { Base as ActionViewBase } from "@blazetrails/actionview";
 import { beforeEach, describe, it } from "vitest";
 import type { HelpersClass } from "../../../../lib/abstract-controller/helpers.js";

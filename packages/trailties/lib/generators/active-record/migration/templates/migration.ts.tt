@@ -1,7 +1,52 @@
 import { Migration } from "@blazetrails/activerecord";
+<% const kwargs = (...options) => { const pairs = options.join(""); return pairs === "" ? "" : `, { ${pairs.slice(2)} }`; }; -%>
+<% const indexName = (attribute) => { const name = attribute.indexName(); return Array.isArray(name) ? `[${name.map((n) => `"${n}"`).join(", ")}]` : `"${name}"`; }; -%>
 
 export class <%= this.migrationClassName %> extends Migration.get(<%= new Number(ActiveRecord.Migration.currentVersion()) %>) {
+<% if (this.migrationAction === "add") { -%>
   async change()<%= this.isTypeScript() ? ": Promise<void>" : "" %> {
-<%= this.migration() %>
+<% for (const attribute of this.attributes) { -%>
+<% if (attribute.reference()) { -%>
+    await this.addReference("<%= this.tableName() %>", "<%= attribute.name %>"<%= kwargs(attribute.injectOptions(), this.foreignKeyType()) %>);
+<% } else if (attribute.token()) { -%>
+    await this.addColumn("<%= this.tableName() %>", "<%= attribute.name %>", "string"<%= kwargs(attribute.injectOptions()) %>);
+    await this.addIndex("<%= this.tableName() %>", <%= indexName(attribute) %><%= kwargs(attribute.injectIndexOptions() || ", unique: true") %>);
+<% } else if (!attribute.virtual()) { -%>
+    await this.addColumn("<%= this.tableName() %>", "<%= attribute.name %>", "<%= attribute.type %>"<%= kwargs(attribute.injectOptions()) %>);
+<% if (attribute.hasIndex()) { -%>
+    await this.addIndex("<%= this.tableName() %>", <%= indexName(attribute) %><%= kwargs(attribute.injectIndexOptions()) %>);
+<% } -%>
+<% } -%>
+<% } -%>
   }
+<% } else if (this.migrationAction === "join") { -%>
+  async change()<%= this.isTypeScript() ? ": Promise<void>" : "" %> {
+    await this.createJoinTable("<%= this.joinTables[0] %>", "<%= this.joinTables[1] %>", (t) => {
+<% for (const attribute of this.attributes) { -%>
+<% if (attribute.reference()) { -%>
+      t.references("<%= attribute.name %>"<%= kwargs(attribute.injectOptions(), this.foreignKeyType()) %>);
+<% } else if (!attribute.virtual()) { -%>
+      <%= attribute.hasIndex() ? "" : "// " %>t.index(<%= indexName(attribute) %><%= kwargs(attribute.injectIndexOptions()) %>);
+<% } -%>
+<% } -%>
+    });
+  }
+<% } else { -%>
+  async change()<%= this.isTypeScript() ? ": Promise<void>" : "" %> {
+<% for (const attribute of this.attributes) { -%>
+<% if (this.migrationAction) { -%>
+<% if (attribute.reference()) { -%>
+    await this.removeReference("<%= this.tableName() %>", "<%= attribute.name %>"<%= kwargs(attribute.injectOptions(), this.foreignKeyType()) %>);
+<% } else { -%>
+<% if (attribute.hasIndex()) { -%>
+    await this.removeIndex("<%= this.tableName() %>", <%= indexName(attribute) %><%= kwargs(attribute.injectIndexOptions()) %>);
+<% } -%>
+<% if (!attribute.virtual()) { -%>
+    await this.removeColumn("<%= this.tableName() %>", "<%= attribute.name %>", "<%= attribute.type %>"<%= kwargs(attribute.injectOptions()) %>);
+<% } -%>
+<% } -%>
+<% } -%>
+<% } -%>
+  }
+<% } -%>
 }

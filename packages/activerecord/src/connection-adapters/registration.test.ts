@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 
 type ConnectionAdaptersModule = typeof import("../connection-adapters.js");
 type ErrorsModule = typeof import("../errors.js");

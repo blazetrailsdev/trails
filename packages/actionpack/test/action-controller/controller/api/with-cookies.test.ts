@@ -1,5 +1,6 @@
 import { hashAset } from "@blazetrails/ruby-compat";
-import { assertEqual, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { beforeEach, describe, it } from "vitest";
 import "../../../support/abstract-unit.js";
 import { API } from "../../../../lib/action-controller/api.js";

@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-test",
+    "declarationDir": "dist-test/types",
+    "rootDir": "."
+  },
+  "exclude": [],
+  "include": ["test"],
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    },
+    {
+      "path": "../activerecord/tsconfig.test.json"
+    },
+    {
+      "path": "../trailties"
+    }
+  ]
+}

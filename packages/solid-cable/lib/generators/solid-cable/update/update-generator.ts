@@ -23,7 +23,7 @@ export class UpdateGenerator extends Base {
   migrationClassName = "";
 
   declare static migrationLookupAt: Extended<typeof ClassMethods>["migrationLookupAt"];
-  declare static migrationExists: Extended<typeof ClassMethods>["migrationExists"];
+  declare static isMigrationExists: Extended<typeof ClassMethods>["isMigrationExists"];
   declare static currentMigrationNumber: Extended<typeof ClassMethods>["currentMigrationNumber"];
   static nextMigrationNumber = ActiveRecordMigration.nextMigrationNumber;
 

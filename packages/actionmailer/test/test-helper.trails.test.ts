@@ -1,6 +1,6 @@
 import { describe, it, type TestContext } from "vitest";
 import type {} from "@blazetrails/activesupport/testing/autorun";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";
 import { TestCase } from "../lib/test-case.js";

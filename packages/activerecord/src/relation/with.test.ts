@@ -7,7 +7,7 @@ import { Comment } from "../test-helpers/models/comment.js";
 import { Company } from "../test-helpers/models/company.js";
 import { adapterSupports, describeIfSupports } from "../support/supports.js";
 import { StatementInvalid } from "../errors.js";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 
 const SPECIAL_POSTS = [2];
 const POSTS_WITH_TAGS = [1, 2, 7, 8, 9, 10, 11];

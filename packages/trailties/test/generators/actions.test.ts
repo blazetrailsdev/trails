@@ -15,12 +15,14 @@ import {
 import {
   assertEqual,
   assertMatch,
-  assertMock,
   assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
+import {
+  assertMock,
   assertNotCalled,
-  capture,
   Mock,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/method-call-assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 import "../../lib/trailties/active-record.js";
@@ -371,5 +373,49 @@ describe("ActionsTest", () => {
 
   it("log with status with quiet", async () => {
     expect(await action(true, "yes", "YES")).toBe("");
+  });
+
+  it("add source adds source to gemfile", async () => {
+    File.write(File.join(root, ".npmrc"), "");
+    await capture("stdout", () => makeGen().addSource("http://gems.github.com"));
+    assertFile(".npmrc", /registry=http:\/\/gems\.github\.com\n/);
+  });
+
+  it("gem should put gem dependency in gemfile", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", () => makeGen().gem("will-paginate"));
+    assertFile("package.json", /"will-paginate": "\*"\n/);
+  });
+
+  it("gem with version should include version in gemfile", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gem("rspec", ">= 2.0.0.a5");
+      await gen.gem("RedCloth", ">= 4.1.0", "< 4.2.0");
+      await gen.gem("nokogiri", { version: ">= 1.4.2" });
+      await gen.gem("faker", { version: [">= 0.1.0", "< 0.3.0"] });
+    });
+
+    assertFile("package.json", (content: string) => {
+      assertMatch(/"rspec": ">= 2\.0\.0\.a5"/, content);
+      assertMatch(/"RedCloth": ">= 4\.1\.0 < 4\.2\.0"/, content);
+      assertMatch(/"nokogiri": ">= 1\.4\.2"/, content);
+      assertMatch(/"faker": ">= 0\.1\.0 < 0\.3\.0"/, content);
+    });
+  });
+
+  it("gem group should wrap gems in a group", async () => {
+    File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
+    await capture("stdout", async () => {
+      const gen = makeGen();
+      await gen.gemGroup("development", "test", () => gen.gem("rspec-rails"));
+      await gen.gemGroup("test", () => gen.gem("fakeweb"));
+    });
+
+    assertFile(
+      "package.json",
+      /"devDependencies": \{\n {4}"rspec-rails": "\*",\n {4}"fakeweb": "\*"\n {2}\}\n/,
+    );
   });
 });

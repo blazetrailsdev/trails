@@ -1,9 +1,6 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
-  _assertNothingRaisedOrWarn,
-  Assertion,
-  assertRaises,
   camelize,
   constantize,
   extractOptionsBang,
@@ -12,6 +9,11 @@ import {
   singularize,
   withOptions,
 } from "@blazetrails/activesupport";
+import {
+  _assertNothingRaisedOrWarn,
+  Assertion,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   hashDelete,
   rbFSend,

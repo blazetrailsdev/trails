@@ -4,14 +4,14 @@ import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { isBlank } from "@blazetrails/activesupport";
 import {
   assert,
   assertNotPredicate,
   assertNothingRaised,
   assertPredicate,
   assertRaises,
-  isBlank,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { StatementInvalid } from "../../errors.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { assertNot } from "@blazetrails/activesupport";
+import { assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Parameters } from "../../../../lib/action-controller/metal/strong-parameters.js";
 

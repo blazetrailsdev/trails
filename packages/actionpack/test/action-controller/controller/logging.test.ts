@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { assertNoChanges, Logger } from "@blazetrails/activesupport";
+import { Logger } from "@blazetrails/activesupport";
+import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
 import "../../support/abstract-unit.js";

@@ -1,5 +1,8 @@
 import { BinaryData } from "@blazetrails/activemodel";
-import { Extensions as ActiveSupportExtensions } from "@blazetrails/activesupport/message-pack";
+import {
+  Extensions as ActiveSupportExtensions,
+  type Serializer,
+} from "@blazetrails/activesupport/message-pack";
 import type { Factory, Packer, Unpacker } from "@blazetrails/msgpack";
 import { RuntimeError, rbInspect } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
@@ -21,7 +24,7 @@ export function load(dumped: unknown): unknown {
 }
 
 export const Extensions = {
-  install(registry: Factory): void {
+  install(registry: Factory | Serializer): void {
     registry.registerType(119, BinaryData, {
       packer: "toString",
       unpacker: "new",

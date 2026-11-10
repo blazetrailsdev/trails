@@ -6,7 +6,7 @@ import { Route } from "../../../lib/action-dispatch/journey/route.js";
 import { Routes, type Mapping } from "../../../lib/action-dispatch/journey/routes.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
+import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 
 function makePattern(
   path: string,

@@ -980,6 +980,7 @@ function trackIncludedModule(
       enumerable: false,
     });
   }
+  if (!set!.has(mod)) rbClearMethodCache();
   set!.add(mod);
 }
 

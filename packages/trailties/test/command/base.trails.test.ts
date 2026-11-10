@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { Dir, File, getFs } from "@blazetrails/ruby-compat";
 import { buildTemplates } from "@blazetrails/trails-tsc";
 import type { ThorClass } from "@blazetrails/thor";
@@ -72,9 +72,26 @@ describe("Trails::Command::Base class surface", () => {
     expect(NotesCommand.baseName()).toBe("trails");
   });
 
-  it("Trails::Command.printing_commands skips hidden_commands", async () => {
-    const names = (await printingCommands()).map(([name]) => name);
-    expect(names).toContain("notes");
-    expect(names).not.toContain("unused-routes");
+  describe("in an app", () => {
+    let appPath: string;
+    let originalCwd: string;
+
+    beforeEach(async () => {
+      appPath = Dir.mktmpdir();
+      originalCwd = Dir.pwd();
+      await getFs().writeFile!(File.join(appPath, "Rakefile.ts"), "");
+      Dir.chdir(appPath);
+    });
+
+    afterEach(async () => {
+      Dir.chdir(originalCwd);
+      await getFs().rm!(appPath, { recursive: true, force: true });
+    });
+
+    it("Trails::Command.printing_commands skips hidden_commands", async () => {
+      const names = (await printingCommands()).map(([name]) => name);
+      expect(names).toContain("notes");
+      expect(names).not.toContain("unused-routes");
+    });
   });
 });

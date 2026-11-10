@@ -31,6 +31,9 @@ export class InboundEmail extends Record {
   declare isFailed: () => boolean;
   declare isBounced: () => boolean;
   declare bouncedBang: () => Promise<unknown>;
+  declare deliveredBang: () => Promise<unknown>;
+  declare processingBang: () => Promise<unknown>;
+  declare failedBang: () => Promise<unknown>;
 
   private _mail?: Message;
   private _source?: Uint8Array;
@@ -49,6 +52,9 @@ export class InboundEmail extends Record {
   async source(): Promise<Uint8Array> {
     if (this._source == null) {
       await this.rawEmail.load();
+      await (
+        await this.rawEmail.attachment
+      )?.blob;
       this._source = await this.rawEmail.download();
     }
     return this._source;

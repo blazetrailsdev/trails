@@ -12,7 +12,7 @@ import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import * as Journey from "./action-dispatch/journey/index.js";
 import * as Cache from "./action-dispatch/http/cache.js";
-import * as PageDumpHelper from "./action-dispatch/testing/test-helpers/page-dump-helper.js";
+import type * as PageDumpHelper from "./action-dispatch/testing/test-helpers/page-dump-helper.js";
 import * as ActionPackGemVersion from "./action-pack/gem-version.js";
 import type { Base as ControllerBase } from "./action-controller/base.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
@@ -81,14 +81,7 @@ type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 const loadPath: Record<string, () => Promise<unknown>> = {
   "action_controller/base": () => import("./action-controller/base.js"),
   "action_controller/metal/testing": () => import("./action-controller/metal/testing.js"),
-  "action_controller/test_case": () => import("./action-controller/test-case.js"),
   "action_dispatch/http/request": () => import("./action-dispatch/http/request.js"),
-  "action_dispatch/testing/assertions": () => import("./action-dispatch/testing/assertions.js"),
-  "action_dispatch/testing/test_process": () => import("./action-dispatch/testing/test-process.js"),
-  "action_dispatch/testing/integration": () => import("./action-dispatch/testing/integration.js"),
-  "action_dispatch/testing/test_request": () => import("./action-dispatch/testing/test-request.js"),
-  "action_dispatch/testing/assertion_response": () =>
-    import("./action-dispatch/testing/assertion-response.js"),
   "action_dispatch/routing/polymorphic_routes": () =>
     import("./action-dispatch/routing/polymorphic-routes.js"),
   "action_dispatch/routing/routes_proxy": () => import("./action-dispatch/routing/routes-proxy.js"),
@@ -165,7 +158,6 @@ export const Http = { name: "ActionDispatch::Http" } as {
 Http.Cache = Cache;
 ActionDispatch.Http = Http;
 ActionDispatch.Journey = Journey;
-ActionDispatch.TestHelpers = { name: "ActionDispatch::TestHelpers", PageDumpHelper };
 
 export const ActionPack = { name: "ActionPack", VERSION: ActionPackGemVersion.VERSION };
 

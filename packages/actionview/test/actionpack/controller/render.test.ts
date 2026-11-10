@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { ActiveModel, Conversion, Naming } from "@blazetrails/activemodel";
+import { isPresent, Logger } from "@blazetrails/activesupport";
 import {
   assert,
   assertNothingRaised,
   assertRaises,
-  isPresent,
-  Logger,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Date } from "@blazetrails/date";
 import {
   ArgumentError,
@@ -716,11 +716,11 @@ SharedTestRoutes.draw(function () {
 });
 
 describe("RenderTest", () => {
-  let testCase: InstanceType<typeof ActionController.TestCase>;
+  let testCase: InstanceType<typeof TestCase>;
   let oldViewPaths: PathSet;
 
   beforeEach(async ({ task }) => {
-    testCase = new ActionController.TestCase(task.name);
+    testCase = new TestCase(task.name);
     testCase.controller = new TestController();
     await testCase.beforeSetup();
     testCase.routes = SharedTestRoutes;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { assertNotDeprecated } from "@blazetrails/activesupport";
+import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { deprecator } from "../../../lib/action-controller/deprecator.js";
 import { Base } from "../../../lib/action-controller/base.js";

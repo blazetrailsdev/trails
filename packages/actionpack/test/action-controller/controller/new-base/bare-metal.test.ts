@@ -6,7 +6,7 @@ import {
   assertKindOf,
   assertNil,
   assertPredicate,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { MockRequest, Response as RackResponseObject } from "@blazetrails/rack";
 import type { RackResponse as RackTriplet } from "@blazetrails/rack";
 import { include, type Included, constGet, constSet } from "@blazetrails/ruby-compat";

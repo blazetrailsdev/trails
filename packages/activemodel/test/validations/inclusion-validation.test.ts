@@ -1,10 +1,10 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { Duration } from "@blazetrails/activesupport";
 import {
-  Duration,
   assertNothingRaised,
   assertPredicate,
   assertRaise,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { current as dateTimeCurrent } from "@blazetrails/activesupport/core-ext/date-time/calculations";
 import { Date, Time } from "@blazetrails/date";
 import { Range } from "@blazetrails/ruby-compat";

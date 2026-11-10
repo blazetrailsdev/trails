@@ -18,6 +18,7 @@ import {
   rbObjRespondTo,
   STDERR,
   STDOUT,
+  rbModGt,
 } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Callbacks, type ActionController } from "@blazetrails/actionpack";
@@ -413,6 +414,31 @@ export class Trailtie extends BaseTrailtie {
           }
         }
       });
+    });
+
+    this.initializer("active_record.unregister_current_scopes_on_unload", (app) => {
+      this.config.afterInitialize(() => {
+        if (app.config.isReloadingEnabled()) {
+          Trails.autoloaders.main.onUnload((_cpath: string, value: unknown, _abspath: string) => {
+            if (typeof value === "function" && rbModGt(ActiveRecord.Base, value)) {
+              (value as typeof ActiveRecord.Base).setCurrentScope(null);
+            }
+          });
+        }
+      });
+    });
+
+    this.initializer("active_record.message_pack", async () => {
+      let messagePack: Promise<void> | undefined;
+      onLoad("message_pack", () => {
+        onLoad("active_record", () => {
+          messagePack = (async () => {
+            const { Extensions } = await import("@blazetrails/activerecord/message-pack");
+            Extensions.install(TopLevel.ActiveSupport!.MessagePack!.CacheSerializer);
+          })();
+        });
+      });
+      await messagePack;
     });
   }
 }

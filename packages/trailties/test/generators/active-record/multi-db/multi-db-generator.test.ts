@@ -1,5 +1,5 @@
 import { Dir, File } from "@blazetrails/ruby-compat";
-import { assertMatch } from "@blazetrails/activesupport";
+import { assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { beforeEach, describe, it } from "vitest";
 import { MultiDbGenerator } from "../../../../lib/generators/active-record/multi-db/multi-db-generator.js";

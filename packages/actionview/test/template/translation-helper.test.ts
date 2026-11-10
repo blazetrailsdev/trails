@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { I18n, assertCalledWith, isHtmlSafe } from "@blazetrails/activesupport";
+import { I18n, isHtmlSafe } from "@blazetrails/activesupport";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Hash } from "@blazetrails/ruby-compat";
 import { Time } from "@blazetrails/date";
 import { Base } from "../../lib/base.js";

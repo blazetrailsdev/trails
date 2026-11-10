@@ -10,6 +10,10 @@
       "types": "./dist/thor.d.ts",
       "default": "./dist/thor.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

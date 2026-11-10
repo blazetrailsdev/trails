@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertDifference, assertNothingRaised } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNothingRaised,
+} from "@blazetrails/activesupport/testing/assertions";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";

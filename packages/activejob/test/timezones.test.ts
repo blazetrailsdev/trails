@@ -1,7 +1,8 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual, setZone, useZone } from "@blazetrails/activesupport";
-import "./support/helper.js";
-import { TimezoneDependentJob } from "./support/jobs/timezone-dependent-job.js";
+import { setZone, useZone } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
+import "./helper.js";
+import { TimezoneDependentJob } from "./jobs/timezone-dependent-job.js";
 import { JobBuffer } from "./support/job-buffer.js";
 
 describe("TimezonesTest", () => {

@@ -1,5 +1,9 @@
 import "../support/database/setup.js";
-import { assertChanges, assertRaises, assertNothingRaised } from "@blazetrails/activesupport";
+import {
+  assertChanges,
+  assertRaises,
+  assertNothingRaised,
+} from "@blazetrails/activesupport/testing/assertions";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, type TestContext } from "vitest";

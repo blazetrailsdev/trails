@@ -28,12 +28,14 @@ import { StatementInvalid, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertCalled,
-  assertNoDifference,
-  assertNotDeprecated,
   assertNotCalled,
+} from "@blazetrails/activesupport/testing/method-call-assertions";
+import {
+  assertNoDifference,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import "./test-helpers/models/reply.js";
 import "./test-helpers/models/topic.js";

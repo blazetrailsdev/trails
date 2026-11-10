@@ -1,4 +1,4 @@
-import { assertNoChanges } from "@blazetrails/activesupport";
+import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";

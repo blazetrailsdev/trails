@@ -54,6 +54,7 @@ import {
   packageSrcDir,
   overlappingSubDirs,
   apiComparePackageRoots,
+  ATTRIBUTE_MACRO_CLASSES,
 } from "./config.js";
 import { scopeOf } from "./scope.js";
 import {
@@ -1245,6 +1246,56 @@ export function extractFromProgram(
       const aliased = mod?.instanceMethods.find((m) => m.name === original.text);
       if (!mod || !aliased || mod.instanceMethods.some((m) => m.name === alias.text)) continue;
       mod.instanceMethods.push({ ...aliased, name: alias.text, aliasOf: original.text });
+    }
+
+    // `ClassMethods.tasks = ClassMethods.commands;` — Ruby's
+    // `alias_method :tasks, :commands` on a plain-object module whose literal
+    // types the alias with a placeholder slot.
+    for (const statement of sourceFile.statements) {
+      const expr = ts.isExpressionStatement(statement) ? statement.expression : undefined;
+      if (!expr || !ts.isBinaryExpression(expr)) continue;
+      if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
+      const { left, right } = expr;
+      if (!ts.isPropertyAccessExpression(left) || !ts.isPropertyAccessExpression(right)) continue;
+      if (!ts.isIdentifier(left.expression) || !ts.isIdentifier(right.expression)) continue;
+      if (left.expression.text !== right.expression.text) continue;
+      const mod = info.modules[`${relPath}:${left.expression.text}`];
+      if (!mod) continue;
+      for (const list of [mod.instanceMethods, mod.classMethods]) {
+        const original = list.find((m) => m.name === right.name.text && !m.bodyless);
+        const at = list.findIndex((m) => m.name === left.name.text);
+        if (!original) continue;
+        const { internal: _internal, inventedArms: _inventedArms, ...body } = original;
+        const own = at >= 0 ? list[at].internal : undefined;
+        const aliased = {
+          ...body,
+          name: left.name.text,
+          aliasOf: right.name.text,
+          line: sourceFile.getLineAndCharacterOfPosition(statement.getStart()).line + 1,
+          ...(own !== undefined ? { internal: own } : {}),
+        };
+        if (at >= 0) list[at] = aliased;
+        else list.push(aliased);
+      }
+    }
+
+    for (const generated of collectAttributeMacroMembers(sourceFile.statements)) {
+      if (!ATTRIBUTE_MACRO_CLASSES.has(`${relPath}:${generated.receiver}`)) continue;
+      const entity = info.classes[`${relPath}:${generated.receiver}`];
+      if (entity === undefined) continue;
+      const at = entity.instanceMethods.findIndex((m) => m.name === generated.name);
+      if (at !== -1 && entity.instanceMethods[at].bodyless !== true) continue;
+      const method: MethodInfo = {
+        name: generated.name,
+        visibility: "public",
+        params: [],
+        isStatic: false,
+        line:
+          sourceFile.getLineAndCharacterOfPosition(generated.node.getStart(sourceFile)).line + 1,
+        file: relPath,
+      };
+      if (at === -1) entity.instanceMethods.push(method);
+      else entity.instanceMethods[at] = method;
     }
 
     for (const generated of collectDefineColumnMethodsMembers(sourceFile)) {
@@ -3475,6 +3526,39 @@ export function isConstantCaseName(name: string): boolean {
 }
 
 /**
+ * Readers a top-level `Klass.attribute("name", …)` call generates, the TS twin
+ * of MiniMagick::Image's `attribute` macro
+ * (`vendor/mini_magick/v5.2.0/lib/mini_magick/image.rb:118-128`). The class
+ * types them through a merged interface, which alone reads as
+ * declaration-only; the macro call is the body. Calls inside a top-level
+ * block are read too. Only classes in `ATTRIBUTE_MACRO_CLASSES` are credited.
+ */
+function collectAttributeMacroMembers(
+  statements: Iterable<ts.Statement>,
+): { receiver: string; name: string; node: ts.Node }[] {
+  const out: { receiver: string; name: string; node: ts.Node }[] = [];
+  for (const statement of statements) {
+    if (ts.isBlock(statement)) {
+      out.push(...collectAttributeMacroMembers(statement.statements));
+      continue;
+    }
+    if (!ts.isExpressionStatement(statement)) continue;
+    const expr = statement.expression;
+    if (!ts.isCallExpression(expr) || !ts.isPropertyAccessExpression(expr.expression)) continue;
+    if (expr.expression.name.text !== "attribute") continue;
+    if (!ts.isIdentifier(expr.expression.expression)) continue;
+    const [name] = expr.arguments;
+    if (!name || !ts.isStringLiteralLike(name)) continue;
+    out.push({
+      receiver: expr.expression.expression.text,
+      name: snakeToCamel(name.text),
+      node: name,
+    });
+  }
+  return out;
+}
+
+/**
  * Members a top-level `Klass.defineColumnMethods("a", "b_c", …)` call installs on
  * `Klass.prototype`, the TS twin of extract-ruby-api.rb#process_define_column_methods
  * (`abstract/schema_definitions.rb:332-341`). The class types them through a
@@ -3735,8 +3819,10 @@ function readClassAttributeCall(
       .map((arg) => arg.text);
     if (names.length === 0 || names.length !== node.arguments.length - 1) return null;
     const enclosing = enclosingEntity(node);
+    const receiver = rbModAttrReceiver(node.arguments[0], sourceFile);
     return {
       ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+      ...(enclosing === undefined && receiver !== undefined ? { receiver } : {}),
       names,
       reader: false,
       writer: false,
@@ -3812,6 +3898,31 @@ function readClassAttributeCall(
 }
 
 /** `Klass.prototype`, a top-level macro's receiver for a class module's instance side. */
+/**
+ * The module a top-level `rbModAttrReader(X, …)` installs on: `X`, or `X` for
+ * the `{ prototype: X }` shape a plain-object module passes, whose own members
+ * are its instance methods.
+ */
+function rbModAttrReceiver(
+  expr: ts.Expression | undefined,
+  sourceFile: ts.SourceFile,
+): string | undefined {
+  if (expr === undefined) return undefined;
+  if (ts.isIdentifier(expr)) return importedName(expr, sourceFile);
+  if (!ts.isObjectLiteralExpression(expr)) return undefined;
+  for (const prop of expr.properties) {
+    if (
+      ts.isPropertyAssignment(prop) &&
+      ts.isIdentifier(prop.name) &&
+      prop.name.text === "prototype" &&
+      ts.isIdentifier(prop.initializer)
+    ) {
+      return importedName(prop.initializer, sourceFile);
+    }
+  }
+  return undefined;
+}
+
 function prototypeReceiver(expr: ts.Expression): string | undefined {
   return ts.isPropertyAccessExpression(expr) &&
     expr.name.text === "prototype" &&

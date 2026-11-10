@@ -1,13 +1,8 @@
 import type { TimeZone } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import {
-  TimeWithZone,
-  assertNotRespondTo,
-  assertRaise,
-  toFs,
-  zone as timeZone,
-} from "@blazetrails/activesupport";
+import { TimeWithZone, toFs, zone as timeZone } from "@blazetrails/activesupport";
+import { assertNotRespondTo, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./index.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";

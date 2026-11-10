@@ -4,6 +4,7 @@ import { TopLevel } from "../lib/object.js";
 import { Kernel } from "../lib/include.js";
 import { autoloadDelete, rbAutoloadLoad, rbAutoloadStr } from "../lib/variable.js";
 import { LoadError } from "../lib/load-error.js";
+import { kernelThrow } from "../lib/kernel-catch.js";
 import {
   TSREPL,
   registerReplAdapter,
@@ -11,7 +12,9 @@ import {
   type ReplServerLike,
 } from "../lib/repl-adapter.js";
 
-function fakeRepl() {
+type Input = [string, (e: Error | null, r?: unknown) => void];
+
+function fakeRepl(inputs: Input[] = []) {
   const started: Array<{
     prompt: string;
     server: ReplServerLike & { close(): void; evaluated: string[] };
@@ -28,11 +31,15 @@ function fakeRepl() {
         evaluated: [] as string[],
         eval(cmd: string, _ctx: object, _file: string, cb: (e: Error | null, r?: unknown) => void) {
           server.evaluated.push(cmd);
+          if (cmd === "exit!") kernelThrow("IRB_EXIT", true);
           cb(null, (TopLevel as Record<string, unknown>).IrbLazy);
         },
       };
       started.push({ prompt, server });
-      queueMicrotask(() => server.close());
+      queueMicrotask(() => {
+        for (const [cmd, cb] of inputs) server.eval(cmd, server.context, "repl", cb);
+        server.close();
+      });
       return server;
     },
   });
@@ -77,7 +84,7 @@ describe("TSREPL", () => {
   });
 
   it("run puts helpers and TopLevel constants on main, runs AT_EXIT, then exits", async () => {
-    const started = fakeRepl();
+    const started = fakeRepl([["exit!", () => {}]]);
     class Greet extends TSREPL.HelperMethod.Base {
       execute(): string {
         return "hello";
@@ -113,7 +120,11 @@ describe("TSREPL", () => {
   });
 
   it("evaluate loads a pending top-level autoload before the REPL evaluates", async () => {
-    const started = fakeRepl();
+    let result: unknown;
+    const started = fakeRepl([
+      ["IrbLazy + 1", (_e, r) => (result = r)],
+      ["x.IrbOther", () => {}],
+    ]);
     TSREPL.setup(null);
     const required: string[] = [];
     const prevRequire = Kernel.require;
@@ -128,10 +139,6 @@ describe("TSREPL", () => {
     try {
       await new TSREPL.Tsrepl().run(TSREPL.conf);
       const { server } = started[0];
-      const result = await new Promise((resolve, reject) =>
-        server.eval("IrbLazy + 1", server.context, "repl", (e, r) => (e ? reject(e) : resolve(r))),
-      );
-      await new Promise((resolve) => server.eval("x.IrbOther", server.context, "repl", resolve));
       expect(required).toEqual(["/app/models/irb_lazy.ts"]);
       expect(server.evaluated).toEqual(["IrbLazy + 1", "x.IrbOther"]);
       expect(result).toBe(7);
@@ -141,6 +148,50 @@ describe("TSREPL", () => {
       autoloadDelete(Object, "IrbOther");
       delete (TopLevel as Record<string, unknown>).IrbLazy;
     }
+  });
+
+  it("run returns on EOF without exiting", async () => {
+    const results: unknown[] = [];
+    fakeRepl([["1", (_e, r) => results.push(r)]]);
+    TSREPL.setup(null);
+    const order: string[] = [];
+    (TSREPL.conf.AT_EXIT as Array<() => void>).push(() => order.push("at_exit"));
+
+    await new TSREPL.Tsrepl().run(TSREPL.conf);
+
+    expect(results).toHaveLength(1);
+    expect(order).toEqual(["at_exit"]);
+    expect(exit).not.toHaveBeenCalled();
+  });
+
+  it("run abandons the statements queued behind an IRB_EXIT throw", async () => {
+    const started = fakeRepl([
+      ["exit!", () => {}],
+      ["1", () => {}],
+    ]);
+    TSREPL.setup(null);
+
+    await new TSREPL.Tsrepl().run(TSREPL.conf);
+
+    expect(started[0].server.evaluated).toEqual(["exit!"]);
+    expect(exit).toHaveBeenCalledTimes(1);
+  });
+
+  it("init_config seats VERSION, AP_NAME and the measure, history and completor keys", () => {
+    TSREPL.setup(null);
+    expect(TSREPL.conf.VERSION).toBe("tsrepl 1.13.1 (2024-05-05)");
+    expect(TSREPL.conf.AP_NAME).toBe("tsrepl");
+    expect(TSREPL.conf.USE_SINGLELINE).toBe(false);
+    expect(TSREPL.conf.SAVE_HISTORY).toBe(1000);
+    expect(TSREPL.conf.EVAL_HISTORY).toBeNull();
+    expect(TSREPL.conf.COMPLETOR).toBe("regexp");
+    const time = (
+      TSREPL.conf.MEASURE_PROC as Record<
+        string,
+        (c: unknown, s: string, n: number, b: () => unknown) => unknown
+      >
+    ).TIME;
+    expect(time(null, "1", 1, () => 42)).toBe(42);
   });
 
   it("a pending autoload with no gem's require raises LoadError", async () => {

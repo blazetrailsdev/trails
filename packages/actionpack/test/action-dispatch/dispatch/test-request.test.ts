@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Lint } from "@blazetrails/rack";
 import { StringIO } from "@blazetrails/ruby-compat";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import type { CookieJar } from "../../../lib/action-dispatch/middleware/cookies.js";
 import { TestRequest } from "../../../lib/action-dispatch/testing/test-request.js";
 

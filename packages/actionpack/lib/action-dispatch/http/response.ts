@@ -1,5 +1,5 @@
 import type { Time } from "@blazetrails/date";
-import { cattrAccessor, include, presence } from "@blazetrails/activesupport";
+import { cattrAccessor, include, presence, runLoadHooks } from "@blazetrails/activesupport";
 import {
   hashAset,
   File,
@@ -797,3 +797,5 @@ function rackCookieValue(value: string | Partial<CookieOptions>): Record<string,
     sameSite: opts.sameSite,
   };
 }
+
+runLoadHooks("action_dispatch_response", Response);

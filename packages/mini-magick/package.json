@@ -10,6 +10,10 @@
       "types": "./dist/mini-magick.d.ts",
       "default": "./dist/mini-magick.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

@@ -1,4 +1,5 @@
-import { Duration, Mock } from "@blazetrails/activesupport";
+import { Duration } from "@blazetrails/activesupport";
+import { Mock } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { ArgumentError, block, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "../support/test-helper.js";

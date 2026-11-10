@@ -1,5 +1,6 @@
 import { Concern, cattrAccessor, extend } from "@blazetrails/activesupport";
 import type { InboundEmail } from "./inbound-email.js";
+import { ActionMailbox } from "./action-mailbox.js";
 import { Router } from "./router.js";
 
 interface RoutingHost {
@@ -25,3 +26,5 @@ extend(Routing, Concern);
 Concern.included.call(Routing as never, null, function (this: object) {
   cattrAccessor.call(this, "router", { default: new Router() });
 });
+
+ActionMailbox.Routing = Routing;

@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { HealthController } from "../lib/health-controller.js";
 
 describe("HealthControllerTest", () => {
   it("health controller renders green success page", async ({ task }) => {
-    class HealthControllerTest extends ActionController.TestCase {}
+    class HealthControllerTest extends TestCase {}
     HealthControllerTest.tests(HealthController);
     const t = new HealthControllerTest(task.name);
     await t.beforeSetup();
@@ -23,7 +24,7 @@ describe("HealthControllerTest", () => {
         throw new Error("some exception");
       }
     }
-    class HealthControllerTest extends ActionController.TestCase {}
+    class HealthControllerTest extends TestCase {}
     HealthControllerTest.tests(FailingController);
     const t = new HealthControllerTest(task.name);
     await t.beforeSetup();

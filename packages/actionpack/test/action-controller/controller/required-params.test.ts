@@ -1,4 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
+import { toParam, toQuery } from "@blazetrails/activesupport";
 import {
   assert,
   assertEqual,
@@ -6,9 +7,7 @@ import {
   assertMatch,
   assertRaise,
   assertRaises,
-  toParam,
-  toQuery,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

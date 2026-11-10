@@ -3,9 +3,6 @@ import {
   Concern,
   DescendantsTracker,
   actsLike,
-  assert,
-  assertEqual,
-  _assertNothingRaisedOrWarn,
   classAttribute,
   delegate,
   extend,
@@ -13,6 +10,11 @@ import {
   onLoad,
   symbolizeKeys,
 } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEqual,
+  _assertNothingRaisedOrWarn,
+} from "@blazetrails/activesupport/testing/assertions";
 import { Time } from "@blazetrails/date";
 import {
   ArgumentError,

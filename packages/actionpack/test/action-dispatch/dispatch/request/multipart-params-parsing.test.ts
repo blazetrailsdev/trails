@@ -8,7 +8,7 @@ import {
   TopLevel,
   constSet,
 } from "@blazetrails/ruby-compat";
-import { assert, assertEqual, assertNil } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { deprecator } from "../../../../lib/action-dispatch/deprecator.js";
 import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";

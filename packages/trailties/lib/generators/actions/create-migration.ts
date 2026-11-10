@@ -2,12 +2,12 @@ import "../../constants.actions-create-migration.generated.js";
 import { CreateFile } from "@blazetrails/thor/actions/create-file";
 import type { EmptyDirectoryBase } from "@blazetrails/thor/actions/empty-directory";
 import { File, FileUtils, getFs, merge, rbEqual, rtest } from "@blazetrails/ruby-compat";
-import { Error as GeneratorError } from "../base.js";
+import { Error } from "../base.js";
 
 export interface CreateMigrationHost extends EmptyDirectoryBase {
   behavior?: "invoke" | "revoke";
   migrationFileName: string;
-  constructor: { migrationExists(dirname: string, fileName: string): string | undefined };
+  constructor: { isMigrationExists(dirname: string, fileName: string): string | undefined };
 }
 
 export type CreateMigrationConfig = {
@@ -63,7 +63,7 @@ export class CreateMigration extends CreateFile {
 
   existingMigration(): string | false {
     return (this._existingMigration ||=
-      this.base.constructor.migrationExists(this.migrationDir, this.migrationFileName) ||
+      this.base.constructor.isMigrationExists(this.migrationDir, this.migrationFileName) ||
       (File.isExist(this.destination) && this.destination));
   }
 
@@ -88,7 +88,7 @@ export class CreateMigration extends CreateFile {
       this.sayStatus("skip", ":yellow");
     } else {
       this.sayStatus("conflict", ":red");
-      throw new GeneratorError(
+      throw new Error(
         `Another migration is already named ${this.migrationFileName}: ` +
           `${this.existingMigration()}. Use --force to replace this migration ` +
           "or --skip to ignore conflicted file.",

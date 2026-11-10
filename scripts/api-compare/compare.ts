@@ -106,6 +106,7 @@ import { DATA_LAYER_PACKAGES, filterFilesToClosure, writeArClosure } from "./ar-
 import {
   COPY_HOOKS,
   OPERATORS,
+  TOKEN_RENAMES,
   TS_CLASS_RENAMES,
   applyTokenRenames,
   isArityOverridden,
@@ -3253,6 +3254,7 @@ export const TS_PARENT_ALIASES: { transform: (ruby: string) => string }[] = [
 export function nameMatches(rubyName: string, tsName: string): boolean {
   if (rubyName === tsName) return true;
   if (RUBY_ERROR_BUILTINS.has(rubyName) && tsName === "Error") return true;
+  if (Object.hasOwn(TOKEN_RENAMES, rubyName) && tsName === TOKEN_RENAMES[rubyName]) return true;
   for (const { transform } of TS_PARENT_ALIASES) {
     if (tsName === transform(rubyName)) return true;
   }
@@ -3541,6 +3543,17 @@ export function buildModuleIncluderFqns(
       const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
       includers.add(fqn);
       moduleIncluderFqns.set(modFqn, includers);
+    }
+    // `def self.included(base); base.send :include, Invocation; end`
+    // (thor/base.rb:116-120): whatever includes `fqn` includes these too, so
+    // `fqn` stands in as their includer and the transitive walk reaches its own.
+    for (const hook of info.includedHookMixins ?? []) {
+      for (const name of hook.names) {
+        const modFqn = resolveModuleName(name, fqn, moduleFqnByShort);
+        const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
+        includers.add(fqn);
+        moduleIncluderFqns.set(modFqn, includers);
+      }
     }
   }
   return moduleIncluderFqns;

@@ -1,18 +1,15 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { TimeWithZone, TimeZone, toFs, zone } from "@blazetrails/activesupport";
 import {
   assertEmpty,
-  assertNotDeprecated,
   assertNothingRaised,
   assertRaises,
   assertRespondTo,
   assertNotRespondTo,
   assertIncludes,
-  TimeWithZone,
-  TimeZone,
-  toFs,
-  zone,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import {
   BooleanType,
   DateTimeType,

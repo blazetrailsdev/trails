@@ -3,7 +3,7 @@ import { include, underscore } from "@blazetrails/activesupport";
 import { AbstractController } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../../lib/testing/resolvers.js";
 import { Rendering } from "../../../lib/rendering.js";
-import { Layouts } from "../../../lib/layouts.js";
+import { Layouts, type Layouts as LayoutsHost } from "../../../lib/layouts.js";
 import {
   ClassMethods as ViewPathsClassMethods,
   type ViewPathsClass,
@@ -235,6 +235,12 @@ describe("OverridingLocalPrefixesTest", () => {
 });
 
 class WithLayouts extends PrefixedViews {
+  /** @inlinedFrom ActionView::Layouts#initialize rails/v8.0.2/actionview/lib/action_view/layouts.rb:361-364 */
+  constructor(...args: ConstructorParameters<typeof PrefixedViews>) {
+    super(...args);
+    (this as unknown as LayoutsHost)._actionHasLayout = true;
+  }
+
   /** @internal */
   static layout(formats: unknown): unknown {
     const findTemplate = (this as unknown as { findTemplate(...args: unknown[]): unknown })
@@ -274,8 +280,7 @@ const Me4 = named(
 );
 
 describe("TestLayouts", () => {
-  test.skip("layouts are included", async () => {
-    // BLOCKED: layouts-inherited-writes-layout-method-at-first-construction
+  test("layouts are included", async () => {
     const controller = new Me4();
     await controller.process("index");
     expect(String(controller.responseBody)).toBe("Me4 Enter : Hello from me4/index.erb : Exit");

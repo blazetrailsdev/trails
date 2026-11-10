@@ -1,6 +1,10 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertDifference, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertEmpty,
+  assertNotEmpty,
+} from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Time as RubyTime } from "@blazetrails/date";

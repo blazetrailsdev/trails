@@ -1,5 +1,5 @@
 import { File, Dir, TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../../lib/application.js";

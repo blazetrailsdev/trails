@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertNot } from "@blazetrails/activesupport";
+import { assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { ambientPoolConfiguration } from "../test-adapter.js";

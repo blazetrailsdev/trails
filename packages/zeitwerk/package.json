@@ -10,6 +10,10 @@
       "types": "./dist/zeitwerk.d.ts",
       "default": "./dist/zeitwerk.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

@@ -1,12 +1,12 @@
 import { block, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { describe, it, beforeEach, afterEach } from "vitest";
+import { LogSubscriber as ActiveSupportLogSubscriber } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertMatch,
   assertNil,
   assertNoMatch,
-  LogSubscriber as ActiveSupportLogSubscriber,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   setup as testHelperSetup,
   teardown as testHelperTeardown,

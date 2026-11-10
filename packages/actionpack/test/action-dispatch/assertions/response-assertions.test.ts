@@ -1,5 +1,9 @@
 import { beforeEach, describe, it } from "vitest";
-import { Assertion, assertMatch, assertRaises } from "@blazetrails/activesupport";
+import {
+  Assertion,
+  assertMatch,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import {
   assertResponse,

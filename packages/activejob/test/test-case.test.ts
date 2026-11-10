@@ -1,5 +1,9 @@
 import { describe, it, type TestContext } from "vitest";
-import { assertIncludes, assertKindOf, assertNil } from "@blazetrails/activesupport";
+import {
+  assertIncludes,
+  assertKindOf,
+  assertNil,
+} from "@blazetrails/activesupport/testing/assertions";
 import { NotImplementedError, rbModAncestors, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";
 import { ActiveJob, QueueAdapters } from "../lib/namespaces.js";
@@ -7,8 +11,8 @@ import "../lib/queue-adapters/async-adapter.js";
 import "../lib/queue-adapters/inline-adapter.js";
 import "../lib/queue-adapters/test-adapter.js";
 import { TestCase } from "../lib/test-case.js";
-import "./support/helper.js";
-import "./support/jobs/hello-job.js";
+import "./helper.js";
+import "./jobs/hello-job.js";
 
 class ActiveJobTestCaseTest extends TestCase {
   static override toString(): string {

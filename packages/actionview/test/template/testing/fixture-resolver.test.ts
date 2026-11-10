@@ -1,5 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual, assertNil } from "@blazetrails/activesupport";
+import { assertEqual, assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { FixtureResolver } from "../../../lib/testing/resolvers.js";
 import { Template } from "../../../lib/template.js";
 import { TSE } from "../../../lib/template/handlers/tse.js";

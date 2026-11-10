@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { assertNil, assertEqual, tryCall } from "@blazetrails/activesupport";
+import { tryCall } from "@blazetrails/activesupport";
+import { assertNil, assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import {
   Enumerable,
   include,

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { Application } from "../../lib/application.js";
 import "../../lib/generators.js";
 import { Trails } from "../../lib/trails.js";

@@ -1,0 +1,44 @@
+import { describe, expect, it } from "vitest";
+import { indentation, quote, withIndentation } from "../../lib/generators/actions.js";
+
+describe("Actions indentation", () => {
+  it("withIndentation nests indentation and restores it after the block", async () => {
+    const host = { _indentation: 0 };
+    const seen: string[] = [];
+    await withIndentation.call(host, async function () {
+      seen.push(indentation.call(this));
+      await withIndentation.call(this, function () {
+        seen.push(indentation.call(this));
+      });
+      seen.push(indentation.call(this));
+    });
+    expect(seen).toEqual(["  ", "    ", "  "]);
+    expect(indentation.call(host)).toBe("");
+  });
+
+  it("withIndentation restores indentation when the block raises", async () => {
+    const host = { _indentation: 0 };
+    await expect(
+      withIndentation.call(host, () => {
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    expect(host._indentation).toBe(0);
+  });
+
+  it("withIndentation yields the receiver to the block", async () => {
+    const host = { _indentation: 0 };
+    let yielded: unknown;
+    await withIndentation.call(host, (g) => {
+      yielded = g;
+    });
+    expect(yielded).toBe(host);
+  });
+});
+
+describe("Rails::Generators::Actions#quote", () => {
+  it("inspects an Array and renders a Hash as key: value pairs", () => {
+    expect(quote([">= 1", "< 2"])).toBe('[">= 1", "< 2"]');
+    expect(quote({ require: false })).toBe("require: false");
+  });
+});

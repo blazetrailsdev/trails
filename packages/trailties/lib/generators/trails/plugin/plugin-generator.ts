@@ -13,7 +13,7 @@ import {
 import { AppGenerator } from "../app/app-generator.js";
 import { AppBase, type AppBaseOptions } from "../../app-base.js";
 import { AppName } from "../../app-name.js";
-import { Error as GeneratorError } from "../../base.js";
+import { Error } from "../../base.js";
 import { Trails } from "../../../trails.js";
 import { APP_PATH } from "../../../app-path.js";
 
@@ -89,7 +89,7 @@ export class PluginBuilder {
     await this.template("README.md");
   }
 
-  /** @missingRailsArgs template — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json */
+  /** @missingRailsArgs template — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemfile(this: PluginBuilderHost): Promise<void> {
     await this.template("pnpm-workspace.yaml");
   }
@@ -102,7 +102,7 @@ export class PluginBuilder {
     }
   }
 
-  /** @missingRailsArgs template — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json */
+  /** @missingRailsArgs template — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemspec(this: PluginBuilderHost): Promise<void> {
     /** @inventedArm author — PERMANENT */
     await this.author();
@@ -266,7 +266,7 @@ this.config.actionController.includeAllHelpers = false;
     await this.chmod("bin", 0o755, { verbose: false });
   }
 
-  /** @missingRailsArgs join — CONVERGEABLE converge-generators-actions-gemfile-family-onto-package-json */
+  /** @missingRailsArgs join — CONVERGEABLE generators-gemfile-templates-converge-onto-package-json */
   async gemfileEntry(this: PluginBuilderHost): Promise<void> {
     if (!this.isInsideApplication()) return;
 
@@ -583,25 +583,25 @@ export class PluginGenerator extends AppBase {
   /** @internal */
   override isValidConst = function (this: PluginGenerator): void {
     if (/-\d/.test(this.originalName())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}. Please give a name which does not contain a namespace starting with numeric characters.`,
       );
     } else if (/[^\w-]+/.test(this.originalName())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}. Please give a name which uses only alphabetic, numeric, "_" or "-" characters.`,
       );
     } else if (/^\d/.test(this.camelized())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}. Please give a name which does not start with numbers.`,
       );
     } else if (AppName.RESERVED_NAMES.includes(this.name())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}. Please give a ` +
           `name which does not match one of the reserved trails ` +
           `words: ${AppName.RESERVED_NAMES.join(", ")}`,
       );
     } else if (constDefined(TopLevel, this.camelized())) {
-      throw new GeneratorError(
+      throw new Error(
         `Invalid plugin name ${this.originalName()}, constant ${this.camelized()} is already in use. Please choose another plugin name.`,
       );
     }

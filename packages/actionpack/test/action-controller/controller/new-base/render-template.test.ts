@@ -1,7 +1,7 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
-import { FixtureResolver } from "@blazetrails/actionview";
-import { assertMatch } from "@blazetrails/activesupport";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
+import { assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { deprecator } from "../../../../lib/action-dispatch/deprecator.js";

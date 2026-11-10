@@ -4,7 +4,8 @@ import type { REPLServer } from "node:repl";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { capture, isPlainObject } from "@blazetrails/activesupport";
+import { isPlainObject } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import {
   Kernel,
   TopLevel,

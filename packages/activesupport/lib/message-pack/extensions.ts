@@ -1,6 +1,7 @@
 import { MessagePack, type Factory, type Packer, type Unpacker } from "@blazetrails/msgpack";
 import { extend, constSet } from "@blazetrails/ruby-compat/include";
 import { ActiveSupport } from "../namespaces.js";
+import type { Serializer } from "./serializer.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
 import {
@@ -102,7 +103,7 @@ export const Extensions = {
    * MRI spelling is asked for by name: `rbRegToS(regexp, "onig")`, read back
    * by `rbRegInitStr` (`rb_reg_init_str`, `re.c:3360`).
    */
-  install(registry: Factory): void {
+  install(registry: Factory | Serializer): void {
     registry.registerType(0, rbCSymbol, {
       packer: "toMsgpackExt",
       unpacker: "fromMsgpackExt",

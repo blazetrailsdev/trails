@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ActionController } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { TopLevel, include } from "@blazetrails/ruby-compat";
@@ -7,12 +8,9 @@ import { Trails } from "../../lib/trails.js";
 import type { Generation } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-interface ActionControllerTestCaseIntegrationTest extends Omit<
-  Generation,
-  keyof ActionController.TestCase
-> {}
+interface ActionControllerTestCaseIntegrationTest extends Omit<Generation, keyof TestCase> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-class ActionControllerTestCaseIntegrationTest extends ActionController.TestCase {
+class ActionControllerTestCaseIntegrationTest extends TestCase {
   static executorAroundEachRequest: boolean | null | undefined;
 
   async setup(): Promise<void> {
@@ -148,7 +146,7 @@ describe("WithExecutorIntegrationTest", () => {
 
   it("current customer is cleared after each request", { timeout: 120_000 }, async () => {
     expect(Trails.application!.config.activeSupport.executorAroundTestCase).toBeTruthy();
-    expect(ActionController.TestCase.executorAroundEachRequest).toBeTruthy();
+    expect(TestCase.executorAroundEachRequest).toBeTruthy();
 
     await t.get("getCurrentCustomer");
     t.assertResponse("ok");
@@ -175,7 +173,7 @@ describe("WithoutExecutorIntegrationTest", () => {
 
   it("current customer is not cleared after each request", { timeout: 120_000 }, async () => {
     expect(Trails.application!.config.activeSupport.executorAroundTestCase).toBeFalsy();
-    expect(ActionController.TestCase.executorAroundEachRequest).toBeFalsy();
+    expect(TestCase.executorAroundEachRequest).toBeFalsy();
 
     await t.get("getCurrentCustomer");
     t.assertResponse("ok");

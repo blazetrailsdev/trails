@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { assert, assertDifference, assertPredicate } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertDifference,
+  assertPredicate,
+} from "@blazetrails/activesupport/testing/assertions";
 import { includedModules, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Model } from "../../lib/index.js";
 import { Topic } from "../models/topic.js";

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Assertion, assertRaises } from "@blazetrails/activesupport";
+import { Assertion, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Testing } from "../../../lib/rails-dom-testing/testing.js";
 import {

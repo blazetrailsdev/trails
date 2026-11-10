@@ -10,6 +10,10 @@
       "types": "./dist/image-processing.d.ts",
       "default": "./dist/image-processing.js"
     },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

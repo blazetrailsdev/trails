@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { HashConfig } from "./hash-config.js";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { AdapterNotFound } from "../errors.js";
 import "../connection-handling.js";
 

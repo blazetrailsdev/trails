@@ -1,20 +1,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  FixtureResolver,
   LookupContext,
   MissingTemplate,
   Rendering as ActionViewRendering,
 } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
+import { Duration, include, isBlank, isPresent } from "@blazetrails/activesupport";
 import {
   assert,
   assertNil,
   assertNothingRaised,
   assertNotIncludes,
-  Duration,
-  include,
-  isBlank,
-  isPresent,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { FormBuilder } from "@blazetrails/actionview";
 import { Utils } from "@blazetrails/rack";
 import { Time } from "@blazetrails/date";

@@ -1,11 +1,6 @@
 import { describe, it } from "vitest";
-import {
-  assertEqual,
-  assertPredicate,
-  htmlEscape,
-  htmlSafe,
-  isBlank,
-} from "@blazetrails/activesupport";
+import { htmlEscape, htmlSafe, isBlank } from "@blazetrails/activesupport";
+import { assertEqual, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import "../../support/abstract-unit.js";
 
 describe("OutputEscapingTest", () => {

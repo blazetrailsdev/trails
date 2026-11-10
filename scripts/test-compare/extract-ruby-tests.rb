@@ -2846,6 +2846,11 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
   end
 
   test_files.concat(Dir.glob(File.join(pkg_dir, "test.rb"))) if pkg_name == "erubi"
+
+  if pkg_name == "tzinfo"
+    test_files.reject! { |f| File.basename(f) == "test_utils.rb" }
+    test_files.concat(Dir.glob(File.join(pkg_dir, "**", "tc_*.rb")))
+  end
   test_files
 end
 

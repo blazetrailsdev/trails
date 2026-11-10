@@ -5,7 +5,7 @@ import {
   assertMatch,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { rbInspect, StandardError } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Base, Migration, Migrator, NotNullViolation } from "../index.js";

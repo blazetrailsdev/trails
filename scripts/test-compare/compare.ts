@@ -85,6 +85,7 @@ import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/lib/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
+import { testRoots } from "../layout/package-roots.mjs";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -225,6 +226,13 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "chronic" || pkg === "builder" || pkg === "zeitwerk") {
     const base = path.basename(rubyFile, ".rb").replace(/^test_/, "");
     return base.replace(/_/g, "-") + ".test.ts";
+  }
+
+  if (pkg === "tzinfo") {
+    const dir = path.dirname(rubyFile).replace(/_/g, "-");
+    const tsFile =
+      path.basename(rubyFile, ".rb").replace(/^tc_/, "").replace(/_/g, "-") + ".test.ts";
+    return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
   if (pkg === "rack" || pkg === "rack-session" || pkg === "rackup") {
@@ -1732,7 +1740,7 @@ function formatGate(g?: TestGate): string {
 export const PKG_SRC_DIRS: Record<string, string> = {
   arel: "packages/arel/test/",
   activemodel: "packages/activemodel/test/",
-  activerecord: "packages/activerecord/src/",
+  activerecord: `packages/activerecord/${testRoots("activerecord")[0]}/`,
   activesupport: "packages/activesupport/test/",
   rack: "packages/rack/test/",
   "rack-session": "packages/rack-session/test/",
@@ -1745,6 +1753,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "net-smtp": "packages/net-smtp/test/",
   rake: "packages/rake/test/",
   chronic: "packages/chronic/test/",
+  tzinfo: "packages/tzinfo/test/",
   builder: "packages/builder/test/",
   "et-orbi": "packages/et-orbi/test/",
   raabro: "packages/raabro/test/",
@@ -1759,7 +1768,8 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   actioncable: "packages/actioncable/test/",
   activejob: "packages/activejob/test/",
   actionmailer: "packages/actionmailer/test/",
-  actionmailbox: "packages/actionmailbox/src/",
+  actionmailbox: `packages/actionmailbox/${testRoots("actionmailbox")[0]}/`,
+  actiontext: "packages/actiontext/test/",
   activestorage: "packages/activestorage/test/",
   trailties: "packages/trailties/test/",
   globalid: "packages/globalid/test/",

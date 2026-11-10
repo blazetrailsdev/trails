@@ -22,6 +22,8 @@ describe("server-path-closure", () => {
     expect(isTestingExport("./testing/assertions")).toBe(true);
     expect(isTestingExport("./log-subscriber/test-helper")).toBe(true);
     expect(isTestingExport("./latest")).toBe(false);
+    expect(isTestingExport("./network/delivery-methods/test-mailer")).toBe(false);
+    expect(isTestingExport("./queue-adapters/test-adapter")).toBe(false);
     expect(isTestingPath("testing/time-helpers.js")).toBe(true);
     expect(isTestingPath("attesting.js")).toBe(false);
   });
@@ -52,12 +54,13 @@ describe("server-path-closure", () => {
       "packages/c/package.json",
       JSON.stringify({
         name: "@blazetrails/c",
-        exports: { "./*": { default: "./dist/*.js" }, "./hidden/*": null },
+        exports: { "./*": { default: "./dist/*.js" }, "./hidden/*": null, "./shut": null },
       }),
     );
     await write(root, "packages/c/dist/open.js", 'import "./helpers/t.js";\n');
     await write(root, "packages/c/dist/helpers/t.js", 'import "vitest";\n');
     await write(root, "packages/c/dist/hidden/h.js", 'import "vitest";\n');
+    await write(root, "packages/c/dist/shut.js", 'import "vitest";\n');
     const violations = await findViolations(root);
     expect(violations.map((v) => v.module)).toEqual([
       "packages/b/dist/testing/x.js",
@@ -69,6 +72,28 @@ describe("server-path-closure", () => {
       "packages/a/dist/clean.js",
       "packages/b/dist/index.js",
       "packages/b/dist/testing/x.js",
+    ]);
+  });
+
+  it("does not follow a dynamic import of a testing export by bare specifier", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "server-path-closure-"));
+    await write(
+      root,
+      "packages/a/package.json",
+      JSON.stringify({
+        name: "@blazetrails/a",
+        exports: { ".": "./dist/index.js", "./adapter/test": "./dist/adapter/test.js" },
+      }),
+    );
+    await write(
+      root,
+      "packages/a/dist/index.js",
+      'const load = () => import("@blazetrails/a/adapter/test");\nimport("./adapter/test.js");\n',
+    );
+    await write(root, "packages/a/dist/adapter/test.js", 'import "vitest";\n');
+    const violations = await findViolations(root);
+    expect(violations.map((v) => v.chain)).toEqual([
+      ["@blazetrails/a", "packages/a/dist/index.js", "packages/a/dist/adapter/test.js"],
     ]);
   });
 

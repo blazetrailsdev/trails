@@ -38,8 +38,6 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
   "action_mailer/preview": () => import("./preview.js"),
   "action_mailer/queued_delivery": () => import("./queued-delivery.js"),
   "action_mailer/form_builder": () => import("./form-builder.js"),
-  "action_mailer/test_case": () => import("./test-case.js"),
-  "action_mailer/test_helper": () => import("./test-helper.js"),
 };
 
 export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule & {
@@ -75,9 +73,6 @@ ActionMailer.autoload("MessageDelivery");
 ActionMailer.autoload("Parameterized");
 ActionMailer.autoload("QueuedDelivery");
 ActionMailer.autoload("FormBuilder");
-ActionMailer.autoload("NonInferrableMailerError", "action_mailer/test_case");
-ActionMailer.autoload("TestCase");
-ActionMailer.autoload("TestHelper");
 ActionMailer.autoload("Preview", "action_mailer/preview");
 ActionMailer.autoload("Previews", "action_mailer/preview");
 

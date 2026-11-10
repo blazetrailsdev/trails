@@ -14,7 +14,8 @@ import {
   URI,
   type Method,
 } from "@blazetrails/ruby-compat";
-import { Assertion, assertEqual, Concern, message } from "@blazetrails/activesupport";
+import { Concern } from "@blazetrails/activesupport";
+import { Assertion, assertEqual, message } from "@blazetrails/activesupport/testing/assertions";
 import { RouteSet, type Config } from "../../routing/route-set.js";
 import { RoutingError } from "../../../action-controller/metal/exceptions.js";
 import type { TestRequest } from "../../../action-controller/test-case.js";

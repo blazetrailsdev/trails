@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { MimeType } from "@blazetrails/actionpack";
 
 import { HTML } from "../../lib/template/html.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 describe("HTMLTest", () => {
   it("formats returns symbol for recognized MIME type", () => {

@@ -5,11 +5,12 @@ import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Assertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import { Methods } from "@blazetrails/rack-test";
 import { HTML5 } from "@blazetrails/nokogiri";
-import { h, travelTo } from "@blazetrails/activesupport";
+import { I18n, camelize, h } from "@blazetrails/activesupport";
+import { travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Mail } from "@blazetrails/mail";
 import type {} from "@blazetrails/vitest-matchers";
 import { Time } from "@blazetrails/date";
-import { Base64, File, getFs, include } from "@blazetrails/ruby-compat";
+import { Base64, File, binaryBytes, getFs, include } from "@blazetrails/ruby-compat";
 import { Generation } from "../support/isolation/abstract-unit.js";
 import type { Rack } from "../support/isolation/abstract-unit.js";
 
@@ -53,10 +54,12 @@ class MailerPreviewsTest extends TestCase {
     return this.appFile(`app/views/${name}.text.tse`, contents);
   }
 
-  async imageFile(name: string, contents: string): Promise<void> {
-    const fileName = `${await this.appPath()}/public/images/${name}`;
-    await this.appDir("public/images");
-    await getFs().writeFile!(fileName, Base64.strictDecode64(contents));
+  imageFile(name: string, contents: string): Promise<string> {
+    return this.appFile(
+      `public/images/${name}`,
+      binaryBytes(Base64.strictDecode64(contents)),
+      "wb",
+    );
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -80,6 +83,7 @@ include(MailerPreviewsTest, Assertions);
 registerSpecType(/^MailerPreviewsTest$/, MailerPreviewsTest);
 
 const mailerSource = (name: string, body: string): string => `
+  import { File } from "@blazetrails/ruby-compat";
   import { ActionMailer } from "@blazetrails/actionmailer";
   export class ${name} extends ActionMailer.Base {
     ${body}
@@ -93,6 +97,12 @@ const previewSource = (name: string, body: string): string => `
     ${body}
   }
 `;
+
+const PIXEL =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEWzIioca/JlAAAACklEQVQI12NgAAAAAgAB4iG8MwAAAABJRU5ErkJgggo=";
+
+const sleep = (seconds: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, seconds * 1000));
 
 const FROM = 'static { this.default({ from: "from@example.com" }); }';
 const FOO = 'foo() { return this.mail({ to: "to@example.org" }); }';
@@ -110,6 +120,19 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
   it("/trails/mailers is accessible in development", async () => {
     await t.app("development");
     await t.get("/trails/mailers");
+    expect(t.lastResponse().status).toBe(200);
+  });
+
+  it("/trails/mailers is not accessible in production", async () => {
+    await t.app("production");
+    await t.get("/trails/mailers", {}, { HTTPS: "on" });
+    expect(t.lastResponse().status).toBe(404);
+  });
+
+  it("/trails/mailers is accessible with correct configuration", async () => {
+    await t.addToConfig("this.config.actionMailer.showPreviews = true;");
+    await t.app("production");
+    await t.get("/trails/mailers", {}, { REMOTE_ADDR: "4.2.42.42", HTTPS: "on" });
     expect(t.lastResponse().status).toBe(200);
   });
 
@@ -173,6 +196,185 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     );
     expect(t.lastResponse().body).toMatch(
       '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+  });
+
+  // BLOCKED: plain-required-class-reaches-descendants-tracker
+  it.skip("mailer previews are loaded from custom preview_paths", async () => {
+    await t.appDir("lib/mailer_previews");
+    const appPath = await t.appPath();
+    await t.addToConfig(
+      `this.config.actionMailer.previewPaths = ["${appPath}/lib/notifier_previews", "${appPath}/lib/confirm_previews"];`,
+    );
+
+    for (const keyword of ["notifier", "confirm"]) {
+      const klass = camelize(keyword);
+      await t.mailer(keyword, mailerSource(klass, `${FROM} ${FOO}`));
+
+      await t.textTemplate(`${keyword}/foo`, "Hello, World!");
+
+      await t.appFile(
+        `lib/${keyword}_previews/notifier-preview.ts`,
+        previewSource(`${klass}Preview`, `foo() { return TopLevel.${klass}.foo(); }`),
+      );
+    }
+
+    await t.app("development");
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+    expect(t.lastResponse().body).toMatch('<h3><a href="/trails/mailers/confirm">Confirm</a></h3>');
+    expect(t.lastResponse().body).toMatch('<li><a href="/trails/mailers/confirm/foo">foo</a></li>');
+  });
+
+  it("mailer previews are reloaded across requests", async () => {
+    await t.app("development");
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).not.toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+
+    await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+
+    await t.removeFile("test/mailers/previews/notifier-preview.ts");
+    await sleep(1);
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).not.toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+  });
+
+  it("mailer preview actions are added and removed", async () => {
+    await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+    expect(t.lastResponse().body).not.toMatch(
+      '<li><a href="/trails/mailers/notifier/bar">bar</a></li>',
+    );
+
+    await t.mailer(
+      "notifier",
+      mailerSource(
+        "Notifier",
+        `${FROM} ${FOO} bar() { return this.mail({ to: "to@example.net" }); }`,
+      ),
+    );
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.textTemplate("notifier/bar", "Goodbye, World!");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource(
+        "NotifierPreview",
+        "foo() { return TopLevel.Notifier.foo(); } bar() { return TopLevel.Notifier.bar(); }",
+      ),
+    );
+
+    await sleep(1);
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/bar">bar</a></li>',
+    );
+
+    await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
+
+    await t.removeFile("app/views/notifier/bar.text.tse");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await sleep(1);
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+    expect(t.lastResponse().body).not.toMatch(
+      '<li><a href="/trails/mailers/notifier/bar">bar</a></li>',
+    );
+  });
+
+  it("mailer previews are reloaded from custom preview_paths", async () => {
+    await t.appDir("lib/mailer_previews");
+    await t.addToConfig(
+      `this.config.actionMailer.previewPaths = ["${await t.appPath()}/lib/mailer_previews"];`,
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).not.toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+
+    await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.appFile(
+      "lib/mailer_previews/notifier-preview.ts",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+
+    await t.removeFile("lib/mailer_previews/notifier-preview.ts");
+    await sleep(1);
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).not.toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
     );
   });
 
@@ -395,6 +597,13 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     );
   });
 
+  it("preview does not leak I18n global setting changes", async () => {
+    await I18n.withLocale("en", async () => {
+      await t.get("/trails/mailers/notifier/foo.txt?locale=ja");
+      expect(I18n.locale()).toBe("en");
+    });
+  });
+
   it("mailer previews create correct links when loaded on a subdirectory", async () => {
     await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
 
@@ -435,6 +644,268 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
 
     await t.get("/trails/mailers/notifier/foo?part=text/html");
     expect(t.lastResponse().status).toBe(200);
+  });
+
+  it("mailer preview receives query params", async () => {
+    await t.mailer(
+      "notifier",
+      mailerSource(
+        "Notifier",
+        `${FROM}
+        foo(name: string) {
+          this["@name"] = name;
+          return this.mail({ to: "to@example.org" });
+        }`,
+      ),
+    );
+
+    await t.htmlTemplate("notifier/foo", "<p>Hello, <%= this['@name'] %>!</p>");
+
+    await t.textTemplate("notifier/foo", "Hello, <%= this['@name'] %>!");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource(
+        "NotifierPreview",
+        'foo() { return TopLevel.Notifier.foo(this.params.get("name") ?? "World"); }',
+      ),
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers/notifier/foo.txt");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch('<iframe name="messageBody" src="?part=text%2Fplain">');
+    expect(t.lastResponse().body).toMatch('<option selected value="part=text%2Fplain">');
+    expect(t.lastResponse().body).toMatch('<option  value="part=text%2Fhtml">');
+
+    await t.get("/trails/mailers/notifier/foo?part=text%2Fplain");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/Hello, World!/);
+
+    await t.get("/trails/mailers/notifier/foo.html?name=Ruby");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(
+      '<iframe name="messageBody" src="?name=Ruby&amp;part=text%2Fhtml">',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<option selected value="name=Ruby&amp;part=text%2Fhtml">',
+    );
+    expect(t.lastResponse().body).toMatch('<option  value="name=Ruby&amp;part=text%2Fplain">');
+
+    await t.get("/trails/mailers/notifier/foo?name=Ruby&part=text%2Fhtml");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/<p>Hello, Ruby!<\/p>/);
+  });
+
+  it("plain text mailer preview with attachment", async () => {
+    await t.imageFile("pixel.png", PIXEL);
+
+    await t.mailer(
+      "notifier",
+      mailerSource(
+        "Notifier",
+        `${FROM}
+        async foo() {
+          await this.attachments().set(
+            "pixel.png",
+            await File.binreadAsync("${await t.appPath()}/public/images/pixel.png"),
+          );
+          return this.mail({ to: "to@example.org" });
+        }`,
+      ),
+    );
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers/notifier/foo");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch('<iframe name="messageBody"');
+    expect(t.lastResponse().body).toMatch("<dt>Attachments:</dt>");
+    expect(t.lastResponse().body).not.toMatch("Inline:");
+    expect(t.lastResponse().body).toMatch(
+      '<a download="pixel.png" href="data:application/octet-stream;charset=utf-8;base64,iVBORw0K',
+    );
+
+    await t.get("/trails/mailers/notifier/foo?part=text/plain");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/Hello, World!/);
+
+    await t.get("/trails/mailers/download/notifier/foo");
+    expect(t.lastResponse().status).toBe(200);
+    const email = Mail.readFromString(t.lastResponse().body);
+    expect(email.parts.length).toBe(2);
+    expect(email.parts[0].contentType()).toBe("text/plain; charset=UTF-8");
+    expect(email.parts[1].contentType()).toBe("image/png; filename=pixel.png");
+  });
+
+  it("multipart mailer preview with attachment", async () => {
+    await t.imageFile("pixel.png", PIXEL);
+
+    await t.mailer(
+      "notifier",
+      mailerSource(
+        "Notifier",
+        `${FROM}
+        async foo() {
+          await this.attachments().set(
+            "pixel.png",
+            await File.binreadAsync("${await t.appPath()}/public/images/pixel.png"),
+          );
+          return this.mail({ to: "to@example.org" });
+        }`,
+      ),
+    );
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.htmlTemplate("notifier/foo", "<p>Hello, World!</p>");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers/notifier/foo");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch('<iframe name="messageBody"');
+    expect(t.lastResponse().body).toMatch("<dt>Attachments:</dt>");
+    expect(t.lastResponse().body).not.toMatch("Inline:");
+    expect(t.lastResponse().body).toMatch(
+      '<a download="pixel.png" href="data:application/octet-stream;charset=utf-8;base64,iVBORw0K',
+    );
+
+    await t.get("/trails/mailers/notifier/foo?part=text/plain");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/Hello, World!/);
+
+    await t.get("/trails/mailers/notifier/foo?part=text/html");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/<p>Hello, World!<\/p>/);
+  });
+
+  it("multipart mailer preview with inline attachment", async () => {
+    await t.imageFile("pixel.png", PIXEL);
+
+    await t.mailer(
+      "notifier",
+      mailerSource(
+        "Notifier",
+        `${FROM}
+        async foo() {
+          await this.attachments().inline().set(
+            "pixel.png",
+            await File.binreadAsync("${await t.appPath()}/public/images/pixel.png"),
+          );
+          return this.mail({ to: "to@example.org" });
+        }`,
+      ),
+    );
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.htmlTemplate(
+      "notifier/foo",
+      "<p>Hello, World!</p>\n<%= imageTag(attachments().get('pixel.png').url()) %>",
+    );
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers/notifier/foo");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch('<iframe name="messageBody"');
+    expect(t.lastResponse().body).toMatch("<dt>Attachments:</dt>");
+    expect(t.lastResponse().body).toMatch(
+      /\(Inline:\s+<a download="pixel.png" href="data:application\/octet-stream;charset=utf-8;base64,iVBORw0K/,
+    );
+
+    await t.get("/trails/mailers/notifier/foo?part=text/plain");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/Hello, World!/);
+
+    await t.get("/trails/mailers/notifier/foo?part=text/html");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/<p>Hello, World!<\/p>/);
+    expect(t.lastResponse().body).toMatch(`src="data:image/png;base64,${PIXEL}"`);
+
+    await t.get("/trails/mailers/download/notifier/foo");
+    const email = Mail.readFromString(t.lastResponse().body);
+    expect(email.attachments().inline().get("pixel.png")!.contentDisposition()).toBe(
+      "inline; filename=pixel.png",
+    );
+  });
+
+  it("multipart mailer preview with attached email", async () => {
+    await t.mailer(
+      "notifier",
+      mailerSource(
+        "Notifier",
+        `${FROM}
+        async foo() {
+          const message = Mail.new(function () {
+            this.from("foo@example.com");
+            this.to("bar@example.com");
+            this.subject("Important Message");
+
+            this.textPart(function () {
+              this.body("Goodbye, World!");
+            });
+
+            this.htmlPart(function () {
+              this.body("<p>Goodbye, World!</p>");
+            });
+          });
+
+          await this.attachments().set("message.eml", message.toString());
+          return this.mail({ to: "to@example.org" });
+        }`,
+      ).replace(
+        "import { ActionMailer }",
+        'import { Mail } from "@blazetrails/mail";\n  import { ActionMailer }',
+      ),
+    );
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.htmlTemplate("notifier/foo", "<p>Hello, World!</p>");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers/notifier/foo");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch('<iframe name="messageBody"');
+    expect(t.lastResponse().body).toMatch("<dt>Attachments:</dt>");
+    expect(t.lastResponse().body).not.toMatch("Inline:");
+    expect(t.lastResponse().body).toMatch(
+      '<a download="message.eml" href="data:application/octet-stream;charset=utf-8;base64,RGF0ZTog',
+    );
+
+    await t.get("/trails/mailers/notifier/foo?part=text/plain");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/Hello, World!/);
+
+    await t.get("/trails/mailers/notifier/foo?part=text/html");
+    expect(t.lastResponse().status).toBe(200);
+    expect(t.lastResponse().body).toMatch(/<p>Hello, World!<\/p>/);
   });
 
   it("mailer preview title tag", async () => {
@@ -525,5 +996,39 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
       await t.get("/trails/mailers/notifier/foo");
     });
     expect(t.lastResponse().body).toMatch('<dd id="date">Fri, 20 Oct 2023 10:20:30 +0000</dd>');
+  });
+
+  it.skip("mailer preview has access to rendering context", async () => {
+    await t.mailer(
+      "notifier",
+      mailerSource(
+        "Notifier",
+        `${FROM}
+        foo() {
+          this["@template"] = this.params.template;
+          return this.mail({ to: "to@example.org", cc: "cc@example.com", bcc: "bcc@example.com" });
+        }`,
+      ),
+    );
+
+    await t.textTemplate("notifier/foo", "<%= this['@template'] %>");
+
+    await t.textTemplate("notifier/bar", "bar");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource(
+        "NotifierPreview",
+        `async foo() {
+          const template = await TopLevel.Trails.MailersController.renderer.renderToString("notifier/bar");
+          return TopLevel.Notifier.with({ template: template }).foo();
+        }`,
+      ),
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers/notifier/foo?part=text%2Fplain");
+    expect(t.lastResponse().body).toContain("bar");
   });
 });

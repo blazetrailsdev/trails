@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "../lib/base.js";
-import "./support/helper.js";
-import { AbortBeforeEnqueueJob } from "./support/jobs/abort-before-enqueue-job.js";
+import "./helper.js";
+import { AbortBeforeEnqueueJob } from "./jobs/abort-before-enqueue-job.js";
 
 describe("ActiveJob::Instrumentation", () => {
   it("a perform.active_job event's duration covers an awaited perform body", async () => {

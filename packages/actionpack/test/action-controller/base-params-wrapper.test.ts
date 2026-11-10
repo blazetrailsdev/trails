@@ -1,4 +1,5 @@
-import { type HashWithIndifferentAccess, assertEqual } from "@blazetrails/activesupport";
+import { type HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect } from "vitest";
 import { Base } from "../../lib/action-controller/base.js";
 import {

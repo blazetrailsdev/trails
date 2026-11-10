@@ -3,7 +3,7 @@ import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./t
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value } from "../../type.js";
 import { assertQueriesCount } from "../../testing/query-assertions.js";
-import { assertNothingRaised, assertEmpty } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 
 describeIfPg("PostgresqlConnectionTest", () => {
   let adapter: PostgreSQLAdapter;

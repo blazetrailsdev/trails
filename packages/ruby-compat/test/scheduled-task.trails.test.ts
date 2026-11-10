@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "../lib/argument-error.js";
 import { ImmediateExecutor } from "../lib/immediate-executor.js";
 import { CancelledOperationError, ScheduledTask } from "../lib/scheduled-task.js";
@@ -92,6 +92,23 @@ describe("ScheduledTask", () => {
     cancelled.execute().cancel();
     expect(reasons[0]).toBeInstanceOf(ArgumentError);
     expect(reasons[1]).toBeInstanceOf(CancelledOperationError);
+  });
+
+  it("does not run before the monotonic clock reaches its deadline", async () => {
+    const start = performance.now();
+    let ranAt: number | null = null;
+    ScheduledTask.execute(0.1, { executor: new ImmediateExecutor() }, () => {
+      ranAt = performance.now();
+    });
+    const realNow = Date.now.bind(Date);
+    const ahead = vi.spyOn(Date, "now").mockImplementation(() => realNow() + 60);
+    try {
+      await sleep(250);
+    } finally {
+      ahead.mockRestore();
+    }
+    expect(ranAt).not.toBeNull();
+    expect(ranAt! - start).toBeGreaterThanOrEqual(100);
   });
 
   it("raises on a negative delay", () => {

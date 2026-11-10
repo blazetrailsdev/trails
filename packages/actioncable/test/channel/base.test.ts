@@ -1,4 +1,5 @@
-import { Logger, Notifications, type NotificationEvent, stub } from "@blazetrails/activesupport";
+import { Logger, Notifications, type NotificationEvent } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import {
   StandardError,
   StringIO,

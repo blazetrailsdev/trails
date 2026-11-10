@@ -12,6 +12,7 @@ import "./xpath-context.js";
 export class NodeSet implements Iterable<Node> {
   declare atCss: (...args: unknown[]) => Node | undefined;
   declare findAll: (block?: (node: Node) => unknown) => Node[];
+  declare isInclude: (obj: unknown) => boolean;
 
   static readonly IMPLIED_XPATH_CONTEXTS = [".//", "self::"] as const;
 
@@ -26,6 +27,10 @@ export class NodeSet implements Iterable<Node> {
 
   first(): Node | undefined {
     return this._list[0];
+  }
+
+  last(): Node | undefined {
+    return this._list.at(-1);
   }
 
   isEmpty(): boolean {
@@ -103,6 +108,11 @@ export class NodeSet implements Iterable<Node> {
 
   get text(): string {
     return this.map((node) => node.text).join("");
+  }
+
+  /** @missingRailsArgs join — PERMANENT */
+  toHtml(options: { saveWith?: number } = {}): string {
+    return this.map((node) => node.toHtml(options)).join("");
   }
 
   /** @missingRailsArgs join — PERMANENT */

@@ -62,6 +62,10 @@
       "types": "./dist/testing/temporal-helpers.d.ts",
       "default": "./dist/testing/temporal-helpers.js"
     },
+    "./testing/*": {
+      "types": "./dist/testing/*.d.ts",
+      "default": "./dist/testing/*.js"
+    },
     "./core-ext/date/calculations": {
       "types": "./dist/core-ext/date/calculations.d.ts",
       "default": "./dist/core-ext/date/calculations.js"
@@ -109,6 +113,10 @@
     "./cache/*": {
       "types": "./dist/cache/*.d.ts",
       "default": "./dist/cache/*.js"
+    },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
     },
     "./*": {
       "types": "./dist/*.d.ts",

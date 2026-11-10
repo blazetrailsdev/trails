@@ -41,7 +41,7 @@ describe("ExceptionWrapper template spots", () => {
   it("remaps a compiled-template frame onto the template's own source", async () => {
     Template.registerTemplateHandler("tse", new TseHandler());
     const root = decodeURIComponent(
-      new URL("../../../test-fixtures/precompiled", import.meta.url).pathname,
+      new URL("../../fixtures/precompiled", import.meta.url).pathname,
     );
     const template = new LookupContext([`${root}/app/views`]).findTemplate(
       "show",

@@ -1,15 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Dir, File, getFs } from "@blazetrails/ruby-compat";
-import { createProgram } from "../../lib/cli.js";
-import { lookupBang } from "../../lib/command/behavior.js";
-
-await lookupBang();
+import { invoke } from "../../lib/command.js";
 
 async function trailsNew(...args: string[]) {
-  await createProgram().parseAsync(
-    ["new", "my-app", "--skip-git", "--skip-install", "--skip-docker", ...args],
-    { from: "user" },
-  );
+  await invoke("application", [
+    "new",
+    "my-app",
+    "--skip-git",
+    "--skip-install",
+    "--skip-docker",
+    ...args,
+  ]);
 }
 
 describe("NewCommand", () => {
@@ -29,16 +30,7 @@ describe("NewCommand", () => {
 
   const app = (path: string) => File.isExist(File.join(tmpDir, "my-app", path));
 
-  it("is registered on the program", () => {
-    expect(createProgram().commands.some((c) => c.name() === "new")).toBe(true);
-  });
-
-  it("declares no commander options", () => {
-    const cmd = createProgram().commands.find((c) => c.name() === "new");
-    expect(cmd?.options).toEqual([]);
-  });
-
-  it("parses a class option commander never listed", async () => {
+  it("parses a class option", async () => {
     await trailsNew("--skip-ci");
     expect(app("package.json")).toBe(true);
     expect(app(".github")).toBe(false);

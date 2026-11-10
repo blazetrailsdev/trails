@@ -1,5 +1,5 @@
 import { beforeEach, describe, it } from "vitest";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import "../../support/abstract-unit.js";
 import type { Buffer as ResponseBuffer } from "../../../lib/action-dispatch/http/response.js";
 import { Base } from "../../../lib/action-controller/base.js";

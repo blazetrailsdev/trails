@@ -7,7 +7,7 @@ import {
   assertNotEmpty,
   assert,
   assertNot,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Post, CategoryPost } from "../test-helpers/models/post.js";

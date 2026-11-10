@@ -3,7 +3,8 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Dir, File, FileUtils, Pathname } from "@blazetrails/ruby-compat";
-import { assert, assertEqual, assertNot, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import {
   takeScreenshot,
   takeFailedScreenshot,

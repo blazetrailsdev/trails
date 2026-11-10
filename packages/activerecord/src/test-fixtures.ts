@@ -26,7 +26,6 @@ import {
 import { FixtureSet } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { Base } from "./base.js";
-import type { TestCase as ActiveRecordTestCase } from "./cases/test-case.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { PoolConfig } from "./connection-adapters/pool-config.js";
 import { writingRole } from "./active-record.js";
@@ -522,5 +521,11 @@ async function settlePendingPins(this: TestFixtures): Promise<PromiseRejectedRes
   return pinResults.find((r): r is PromiseRejectedResult => r.status === "rejected");
 }
 
-type TestCaseClass = typeof ActiveRecordTestCase;
-type TestCase = InstanceType<TestCaseClass>;
+type TestCaseClass = (abstract new (...args: never) => unknown) &
+  Omit<TestFixturesClassHost, "fixtureClassNames"> &
+  typeof ClassMethods & {
+    prototype: object;
+    useTransactionalTests: boolean;
+    fixtureClassNames: TestFixtures["fixtureClassNames"];
+  };
+type TestCase = TestFixtures & { name: string };

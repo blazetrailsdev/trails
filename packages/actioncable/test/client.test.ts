@@ -1,4 +1,5 @@
-import { Logger, assertCalled } from "@blazetrails/activesupport";
+import { Logger } from "@blazetrails/activesupport";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Handler } from "@blazetrails/rackup";
 import {
   AtomicFixnum,

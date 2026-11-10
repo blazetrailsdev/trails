@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { RouteSet } from "@blazetrails/actionpack";
+import { TestCase as ControllerTestCase, IntegrationTest } from "@blazetrails/actionpack/testing";
 import { ActiveJob } from "@blazetrails/activejob";
 import { ActionCable } from "@blazetrails/actioncable";
 import { Base as Connection } from "@blazetrails/actioncable/connection/base";
 import { Subscriptions } from "@blazetrails/actioncable/connection/subscriptions";
 import type { Base as Server } from "@blazetrails/actioncable/server/base";
-import { TestServer } from "@blazetrails/actioncable/test-helpers/stubs/test-server";
+import { TestServer } from "@blazetrails/actioncable/test/support/stubs/test-server";
 import { ActiveSupportJSON, constantize, safeConstantize } from "@blazetrails/activesupport";
 import { MockRequest } from "@blazetrails/rack";
 import { TestCase } from "@blazetrails/activesupport/test-case";
@@ -25,7 +26,7 @@ import {
 import { Application } from "../lib/application.js";
 import { Trails } from "../lib/trails.js";
 
-class BootAppIntegrationTest extends ActionController.IntegrationTest {
+class BootAppIntegrationTest extends IntegrationTest {
   declare "@post": { title: string };
   declare posts: FixtureSetAccessor<{ title: string }>;
 
@@ -72,12 +73,12 @@ describe("test_help wires a booted app into the test case classes", () => {
   });
 
   it("shares ActiveSupport::TestCase's fixture paths with IntegrationTest", () => {
-    const integrationTest = ActionController.IntegrationTest as unknown as FixtureHost;
+    const integrationTest = IntegrationTest as unknown as FixtureHost;
     expect(integrationTest.fixturePaths).toContain(`${root}/test/fixtures/`);
   });
 
   it("makes IntegrationTest an ActiveSupport::TestCase (integration.rb:651)", () => {
-    expect(ActionController.IntegrationTest.prototype instanceof TestCase).toBe(true);
+    expect(IntegrationTest.prototype instanceof TestCase).toBe(true);
   });
 
   describe("BootAppIntegrationTest", () => {
@@ -88,7 +89,7 @@ describe("test_help wires a booted app into the test case classes", () => {
       const session = testCase as BootAppIntegrationTest;
       expect(session.routes).toBe(Trails.application!.routes());
 
-      const controllerTest = new ActionController.TestCase(task.name) as unknown as {
+      const controllerTest = new ControllerTestCase(task.name) as unknown as {
         routes?: unknown;
         beforeSetup(): void;
       };
@@ -131,7 +132,7 @@ describe("test_help wires a booted app into the test case classes", () => {
   it("loads the application's routes in IntegrationTest's before_setup", async () => {
     const reload = vi.spyOn(Trails.application!, "reloadRoutesUnlessLoaded");
     try {
-      const session = new ActionController.IntegrationTest("test") as unknown as {
+      const session = new IntegrationTest("test") as unknown as {
         beforeSetup(): unknown;
       };
       const setup = session.beforeSetup();
@@ -153,8 +154,8 @@ describe("test_help wires a booted app into the test case classes", () => {
         return rbCallSuper(this, Included.beforeSetup);
       },
     };
-    include(ActionController.TestCase, Included);
-    const controllerTest = new ActionController.TestCase(task.name);
+    include(ControllerTestCase, Included);
+    const controllerTest = new ControllerTestCase(task.name);
     await controllerTest.beforeSetup();
     expect(ran).toEqual(["included"]);
     expect(controllerTest.routes).toBe(Trails.application!.routes());
@@ -163,7 +164,7 @@ describe("test_help wires a booted app into the test case classes", () => {
   it("renders a view through ActionController::TestCase", async ({ task }) => {
     const { PostsController } =
       await import("./fixtures/boot-app/app/controllers/posts-controller.js");
-    const controllerTest = new ActionController.TestCase(task.name);
+    const controllerTest = new ControllerTestCase(task.name);
     controllerTest.controller = new PostsController();
     await controllerTest.beforeSetup();
     await controllerTest.get("show");

@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { stub, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
+import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { IntegrationTest } from "@blazetrails/actionpack";
+import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { StandardError } from "@blazetrails/ruby-compat";
 import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";

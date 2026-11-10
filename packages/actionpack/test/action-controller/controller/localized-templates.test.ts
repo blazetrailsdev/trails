@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { assertEqual, I18n } from "@blazetrails/activesupport";
+import { I18n } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";

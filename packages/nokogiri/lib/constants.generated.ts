@@ -15,12 +15,13 @@ import * as m12 from "./xml/document.js";
 import * as m13 from "./xml/namespace.js";
 import * as m14 from "./xml/node-set.js";
 import * as m15 from "./xml/node.js";
-import * as m16 from "./xml/parse-options.js";
-import * as m17 from "./xml/sax/document.js";
-import * as m18 from "./xml/sax/parser.js";
-import * as m19 from "./xml/syntax-error.js";
-import * as m20 from "./xml/xpath-context.js";
-import * as m21 from "./xml/xpath/syntax-error.js";
+import * as m16 from "./xml/node/save-options.js";
+import * as m17 from "./xml/parse-options.js";
+import * as m18 from "./xml/sax/document.js";
+import * as m19 from "./xml/sax/parser.js";
+import * as m20 from "./xml/syntax-error.js";
+import * as m21 from "./xml/xpath-context.js";
+import * as m22 from "./xml/xpath/syntax-error.js";
 
 defineConstants([
   [() => m0.Node, "Nokogiri::CSS::Node"],
@@ -40,13 +41,14 @@ defineConstants([
   [() => m11.DocumentFragment, "Nokogiri::XML::DocumentFragment"],
   [() => m13.Namespace, "Nokogiri::XML::Namespace"],
   [() => m15.XmlNode, "Nokogiri::XML::Node"],
+  [() => m16.SaveOptions, "Nokogiri::XML::Node::SaveOptions"],
   [() => m14.NodeSet, "Nokogiri::XML::NodeSet"],
-  [() => m16.ParseOptions, "Nokogiri::XML::ParseOptions"],
-  [() => m17.SaxDocument, "Nokogiri::XML::SAX::Document"],
-  [() => m18.SaxParser, "Nokogiri::XML::SAX::Parser"],
-  [() => m19.SyntaxError, "Nokogiri::XML::SyntaxError"],
-  [() => m21.SyntaxError, "Nokogiri::XML::XPath::SyntaxError"],
-  [() => m20.XPathContext, "Nokogiri::XML::XPathContext"],
+  [() => m17.ParseOptions, "Nokogiri::XML::ParseOptions"],
+  [() => m18.SaxDocument, "Nokogiri::XML::SAX::Document"],
+  [() => m19.SaxParser, "Nokogiri::XML::SAX::Parser"],
+  [() => m20.SyntaxError, "Nokogiri::XML::SyntaxError"],
+  [() => m22.SyntaxError, "Nokogiri::XML::XPath::SyntaxError"],
+  [() => m21.XPathContext, "Nokogiri::XML::XPathContext"],
   [() => m9.ParseError, "Racc::ParseError"],
   [() => m9.Parser, "Racc::Parser"],
 ]);

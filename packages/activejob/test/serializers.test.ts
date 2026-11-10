@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { assert, assertEqual, assertNoDifference, assertRaises } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEqual,
+  assertNoDifference,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "../lib/namespaces.js";
 import { ObjectSerializer } from "../lib/serializers/object-serializer.js";
 import type { SerializerLike } from "../lib/namespaces.js";
-import "./support/helper.js";
+import "./helper.js";
 
 class SerializersTest {
   static toString(): string {

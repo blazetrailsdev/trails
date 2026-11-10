@@ -7,7 +7,8 @@ import { logProcessAction } from "../../../lib/action-controller/metal/instrumen
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
 import { ParseError } from "../../../lib/action-dispatch/http/parameters.js";
-import { FixtureResolver, Template } from "@blazetrails/actionview";
+import { Template } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 
 function subscribeOnce(name: string, sink: Record<string, unknown>[]): () => void {
   const subscriber = Notifications.subscribe(

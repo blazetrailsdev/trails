@@ -1,3 +1,4 @@
+import "../constants.test.generated.js";
 import { Async } from "./async.js";
 
 export class Test extends Async {

@@ -1,4 +1,7 @@
-import { assertDifference, assertNoDifference } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertNoDifference,
+} from "@blazetrails/activesupport/testing/assertions";
 import { MockRequest } from "@blazetrails/rack";
 import { kernelThrow, constSet } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";

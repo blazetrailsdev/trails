@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base, StatementInvalid } from "../../index.js";
-import { assert, assertNotPredicate } from "@blazetrails/activesupport";
+import { assert, assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 

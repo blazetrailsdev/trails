@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Contact } from "./models/contact.js";
 import { Apache, Comanche, Helicopter } from "./models/helicopter.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 describe("ConversionTest", () => {
   it("to_model default implementation returns self", () => {

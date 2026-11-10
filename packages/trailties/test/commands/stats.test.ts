@@ -1,45 +1,45 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Dir, FileUtils, stdout } from "@blazetrails/ruby-compat";
-import { CodeStatistics, DIRECTORIES, TEST_TYPES } from "../../lib/code-statistics.js";
-import { invoke } from "../../lib/command.js";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Isolation } from "@blazetrails/activesupport/testing/isolation";
+import { include } from "@blazetrails/ruby-compat";
+import type { Generation } from "../support/isolation/abstract-unit.js";
+import "../support/isolation/abstract-unit.js";
 
-let appPath: string;
-let originalCwd: string;
+class StatsTest extends TestCase {}
+include(StatsTest, Isolation);
 
-beforeEach(() => {
-  appPath = Dir.mktmpdir("trails-stats-");
-  originalCwd = Dir.pwd();
-  Dir.chdir(appPath);
-  CodeStatistics.directories = [...DIRECTORIES];
-  CodeStatistics.testTypes = [...TEST_TYPES];
+let t: Generation;
+
+beforeEach(async () => {
+  t = new StatsTest("test") as unknown as Generation;
+  await t.buildApp();
 });
 
-afterEach(() => {
-  Dir.chdir(originalCwd);
-  FileUtils.rmRf(appPath);
-  CodeStatistics.directories = [...DIRECTORIES];
-  CodeStatistics.testTypes = [...TEST_TYPES];
+afterEach(async () => {
+  await t.teardownApp();
 });
 
-async function trails(): Promise<string> {
-  const write = vi.spyOn(stdout, "write").mockReturnValue(true as never);
-  await invoke("stats");
-  const output = write.mock.calls.map((args) => String(args[0])).join("");
-  write.mockRestore();
-  return output;
-}
-
-describe("Trails::Command::StatsTest", { timeout: 30_000 }, () => {
+describe("Trails::Command::StatsTest", { timeout: 60_000 }, () => {
   it("`bin/trails stats` handles directories added by third parties", async () => {
-    FileUtils.mkdirP("custom/dir");
-    CodeStatistics.registerDirectory("Custom dir", "custom/dir");
+    await t.appDir("custom/dir");
+    await t.appFile(
+      "config/initializers/custom.ts",
+      `import { CodeStatistics } from "@blazetrails/trailties/code-statistics";
+CodeStatistics.registerDirectory("Custom dir", "custom/dir");
+`,
+    );
 
-    expect(await trails()).toMatch("Custom dir");
+    expect(await t.trails("stats")).toMatch("Custom dir");
   });
 
   it("`bin/trails stats` handles non-existing directories added by third parties", async () => {
-    CodeStatistics.registerDirectory("Non Existing", "app/non_existing");
+    await t.appFile(
+      "config/initializers/custom.ts",
+      `import { CodeStatistics } from "@blazetrails/trailties/code-statistics";
+CodeStatistics.registerDirectory("Non Existing", "app/non_existing");
+`,
+    );
 
-    expect(await trails()).not.toMatch("Non Existing");
+    expect(await t.trails("stats")).not.toMatch("Non Existing");
   });
 });

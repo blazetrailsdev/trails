@@ -1,4 +1,5 @@
-import { Duration, MemoryStore, travelTo } from "@blazetrails/activesupport";
+import { Duration, MemoryStore } from "@blazetrails/activesupport";
+import { travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Time } from "@blazetrails/date";
 import { beforeEach, describe, it } from "vitest";
 import "../../../support/abstract-unit.js";

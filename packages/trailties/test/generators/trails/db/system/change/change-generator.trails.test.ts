@@ -1,8 +1,8 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
-import { Error as GeneratorError } from "../../../../../../lib/generators/base.js";
+import { Error } from "../../../../../../lib/generators/base.js";
 import { TestCase } from "../../../../../../lib/generators/test-case.js";
 import { ChangeGenerator } from "../../../../../../lib/generators/trails/db/system/change/change-generator.js";
 
@@ -27,7 +27,7 @@ beforeEach((context) => {
 
 describe("ChangeGenerator", () => {
   it("raises GeneratorError for an invalid --to option", () => {
-    expect(() => new ChangeGenerator([], { to: "invalid-db" })).toThrow(GeneratorError);
+    expect(() => new ChangeGenerator([], { to: "invalid-db" })).toThrow(Error);
   });
 
   it("removes the previous database package from package.json", async () => {

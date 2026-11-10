@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { FixtureResolver } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { Base } from "../../../lib/action-controller/base.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";

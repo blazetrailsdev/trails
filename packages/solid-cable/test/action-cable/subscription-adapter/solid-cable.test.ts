@@ -1,7 +1,7 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { Base as ActiveRecordBase } from "@blazetrails/activerecord";
 import { Base as Server } from "@blazetrails/actioncable/server/base";
-import type { SubscriptionAdapter } from "@blazetrails/actioncable/test-helpers/subscription-adapter/common";
+import type { SubscriptionAdapter } from "@blazetrails/actioncable/test/support/subscription-adapter/common";
 import { Logger } from "@blazetrails/activesupport";
 import { Queue, StringIO } from "@blazetrails/ruby-compat";
 import { Event } from "@blazetrails/ruby-compat/concurrent/event";

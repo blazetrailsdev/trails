@@ -1,12 +1,8 @@
 import { describe, expect, it } from "vitest";
-import "./support/helper.js";
+import "./helper.js";
 import { JobBuffer } from "./support/job-buffer.js";
-import {
-  FirstRetryableErrorOfTwo,
-  RetryJob,
-  SecondRetryableErrorOfTwo,
-} from "./support/jobs/retry-job.js";
-import { RescueJob } from "./support/jobs/rescue-job.js";
+import { FirstRetryableErrorOfTwo, RetryJob, SecondRetryableErrorOfTwo } from "./jobs/retry-job.js";
+import { RescueJob } from "./jobs/rescue-job.js";
 
 describe("Exceptions", () => {
   it("keys exception_executions by Array#to_s of the exception classes", async () => {

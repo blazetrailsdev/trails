@@ -15,7 +15,7 @@ import {
   assertRaises,
   assertRespondTo,
   assertNothingRaised,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";

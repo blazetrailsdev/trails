@@ -47,6 +47,25 @@ export class DocumentFragment {
     return new DocumentFragment(document, input, context, rest);
   }
 
+  dup(): DocumentFragment {
+    const newDocument = this.document.dup();
+    const newFragment = new (this.constructor as typeof DocumentFragment)(newDocument);
+    for (const child of this.children) {
+      child.dup(1, newDocument).parent = newFragment;
+    }
+    return newFragment;
+  }
+
+  addChild(nodeOrTags: Node): Node {
+    defaultTreeAdapter.detachNode(nodeOrTags._node);
+    defaultTreeAdapter.appendChild(this._node, nodeOrTags._node);
+    return nodeOrTags;
+  }
+
+  toHtml(options: { saveWith?: number } = {}): string {
+    return new NodeSet(this.document, this.children).toHtml(options);
+  }
+
   get children(): Node[] {
     return childNodes(this._node, this.document);
   }

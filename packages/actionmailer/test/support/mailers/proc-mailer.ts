@@ -1,10 +1,10 @@
-import { ActionView } from "@blazetrails/actionpack";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { Time } from "@blazetrails/date";
 import { Base } from "../../../lib/base.js";
 
 export class ProcMailer extends Base {
   static {
-    this.prependViewPath(new ActionView.FixtureResolver({ "proc-mailer/welcome.html.tse": "" }));
+    this.prependViewPath(new FixtureResolver({ "proc-mailer/welcome.html.tse": "" }));
 
     this.default({
       to: "system@test.lindsaar.net",

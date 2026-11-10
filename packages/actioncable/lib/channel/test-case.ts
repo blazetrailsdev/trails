@@ -1,10 +1,9 @@
+import "../constants.test-case.generated.js";
 import {
-  assert,
   camelize,
   classAttribute,
   Concern,
   constantize,
-  ConstantLookup,
   extend,
   include,
   Logger,
@@ -14,6 +13,8 @@ import {
   TaggedLogging,
   withIndifferentAccess,
 } from "@blazetrails/activesupport";
+import { assert } from "@blazetrails/activesupport/testing/assertions";
+import { ConstantLookup } from "@blazetrails/activesupport/testing/constant-lookup";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
 import {
   defineModule,

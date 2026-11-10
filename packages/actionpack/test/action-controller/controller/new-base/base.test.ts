@@ -1,6 +1,6 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import { TopLevel, constGet, constSet } from "@blazetrails/ruby-compat";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { beforeEach, describe, it } from "vitest";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { Rack } from "../../../support/abstract-unit.js";

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
-import { assertCalledWith } from "@blazetrails/activesupport";
+import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Range } from "@blazetrails/ruby-compat";
 import { Error as ModelError } from "../../lib/error.js";
 import { I18n } from "../../lib/i18n.js";

@@ -3,8 +3,8 @@ import { block, kernelThrow, TopLevel, constSet } from "@blazetrails/ruby-compat
 import { Base } from "../../lib/base.js";
 import { ConfiguredJob } from "../../lib/configured-job.js";
 import { ActiveJob } from "../../lib/namespaces.js";
-import "../support/helper.js";
-import { HelloJob } from "../support/jobs/hello-job.js";
+import "../helper.js";
+import { HelloJob } from "../jobs/hello-job.js";
 import { JobBuffer } from "../support/job-buffer.js";
 
 class AbortJob extends HelloJob {

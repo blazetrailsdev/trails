@@ -321,6 +321,10 @@ describe("Rackup::Server", () => {
     return withOutput(() => newServer());
   }
 
+  it("options server", async () => {
+    await testOptionsServer();
+  });
+
   it("support -h option to get help", async () => {
     expect(await testOptionsServer("-scgi", "-h")).toMatch(
       /^Usage: rackup.*Ruby options:.*Rack options.*Profiling options.*Common options.*exited$/s,

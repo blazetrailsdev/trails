@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { BigDecimal, assertNil } from "@blazetrails/activesupport";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 import * as Types from "../../lib/index.js";
 
 describe("FloatTest", () => {

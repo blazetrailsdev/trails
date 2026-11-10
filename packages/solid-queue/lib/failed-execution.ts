@@ -34,10 +34,10 @@ export class FailedExecution extends Execution {
     this._exception = value;
   }
 
-  static async retryAll(jobs: Relation<Job>): Promise<unknown> {
+  static async retryAll(jobs: Relation<Job> | Job[]): Promise<unknown> {
     return await SolidQueue.instrument(
       "retry_all",
-      { jobs_size: await jobs.size() },
+      { jobs_size: Array.isArray(jobs) ? jobs.length : await jobs.size() },
       async (payload) => {
         return await this.transaction(async () => {
           return (payload["size"] = await this.dispatchJobs(await this.lockAllFromJobs(jobs)));

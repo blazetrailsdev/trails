@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import * as Types from "../../lib/index.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 describe("BinaryTest", () => {
   it("type cast binary", () => {

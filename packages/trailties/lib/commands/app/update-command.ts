@@ -149,7 +149,10 @@ export class UpdateCommand extends Base {
     if (constDefined(TopLevel, "Propshaft::Railtie")) return "propshaft";
   }
 
-  /** @inventedArm readAsync — PERMANENT */
+  /**
+   * @inventedArm readAsync — PERMANENT
+   * @missingRailsCall gem — PERMANENT
+   */
   private async isSkipGem(gemName: string): Promise<boolean> {
     const pkg = JSON.parse(await File.readAsync(File.join(Trails.root()!, "package.json"))) as {
       dependencies?: Record<string, string>;

@@ -1,12 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { TopLevel, type Extended } from "@blazetrails/activesupport";
 import {
   assertChanges,
   assertNoChanges,
   assertNothingRaised,
   assertRaises,
-  TopLevel,
-  type Extended,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { TestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper } from "@blazetrails/activejob/test-helper";

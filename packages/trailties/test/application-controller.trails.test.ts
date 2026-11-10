@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { LookupContext, type Template } from "@blazetrails/actionview";
 import { File } from "@blazetrails/ruby-compat";
 import { ApplicationController } from "../lib/application-controller.js";
@@ -22,7 +23,7 @@ describe("Trails::ApplicationController", () => {
   it("disables the nonce generator and allows inline script and style sources", async ({
     task,
   }) => {
-    const tc = new ActionController.TestCase(task.name);
+    const tc = new TestCase(task.name);
     tc.controller = new InfoController();
     await tc.beforeSetup();
     tc.routes = new RouteSet();

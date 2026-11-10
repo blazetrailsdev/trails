@@ -1,6 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { ActiveSupportJSON, assertNotRespondTo } from "@blazetrails/activesupport";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
+import { assertNotRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "./index.js";
 
 import { Contact, ContactSti } from "./test-helpers/models/contact.js";

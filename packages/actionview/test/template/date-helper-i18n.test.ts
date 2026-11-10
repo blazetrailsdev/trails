@@ -1,15 +1,14 @@
 import "../support/abstract-unit.js";
 import { beforeEach, describe, expect, it } from "vitest";
+import { I18n, isPresent } from "@blazetrails/activesupport";
 import {
-  I18n,
   Mock,
   assertCalledWith,
   assertMock,
   assertNotCalled,
   expectCalledWith,
-  isPresent,
   stub,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Date as RubyDate, Time } from "@blazetrails/date";
 import { StandardError } from "@blazetrails/ruby-compat";
 import {

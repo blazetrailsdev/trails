@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError, StringType } from "@blazetrails/activemodel";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { rbObjDup } from "@blazetrails/ruby-compat";
 import { AdapterSpecificRegistry } from "./adapter-specific-registry.js";
 

@@ -16,17 +16,15 @@ import { File as FixtureFile } from "./fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./config.js";
 import { PrimaryKeyError } from "./fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
+import { Notifications, Duration, Logger } from "@blazetrails/activesupport";
 import {
   assertDifference,
   assertNoDifference,
   assertNotEmpty,
   assertRaises,
-  Notifications,
-  Duration,
-  Logger,
   Minitest,
   assertInDelta,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";

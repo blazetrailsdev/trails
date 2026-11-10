@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { assertDeprecated, assertNil } from "@blazetrails/activesupport";
+import { assertDeprecated } from "@blazetrails/activesupport/testing/deprecation";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { Enumerable, include, resetConstants, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { GlobalID } from "../lib/global-id.js";
 import { SignedGlobalID } from "../lib/signed-global-id.js";

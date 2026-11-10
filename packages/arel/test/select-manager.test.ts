@@ -13,7 +13,7 @@ import {
 } from "../lib/index.js";
 import { fakeRecordConnection } from "./support/connection.js";
 import { mustBeLike } from "./support/must-be-like.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertNil } from "@blazetrails/activesupport/testing/assertions";
 
 describe("SelectManagerTest", () => {
   const users = new Table("users");

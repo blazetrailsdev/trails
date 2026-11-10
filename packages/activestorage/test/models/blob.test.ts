@@ -1,17 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type {} from "@blazetrails/vitest-matchers";
+import { base36, Duration } from "@blazetrails/activesupport";
+import { assertCalledWith, stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import {
-  assertCalledWith,
   assertChanges,
   assertNoDifference,
   assertNothingRaised,
   assertRaises,
-  base36,
-  Duration,
-  freezeTime,
-  stub,
-  travelBack,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { freezeTime, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { Numeric } from "@blazetrails/activesupport/core-ext/numeric/bytes";
 import { ContentDisposition } from "@blazetrails/actionpack";

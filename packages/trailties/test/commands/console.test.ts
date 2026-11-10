@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { env, setEnv } from "@blazetrails/ruby-compat";
 import { Trails } from "../../lib/trails.js";
 import { Console, ConsoleCommand } from "../../lib/commands/console.js";

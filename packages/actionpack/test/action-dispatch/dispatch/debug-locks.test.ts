@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
-import { assertMatch, Dependencies } from "@blazetrails/activesupport";
+import { Dependencies } from "@blazetrails/activesupport";
+import { assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import { Concurrent, Thread } from "@blazetrails/ruby-compat";
 import { DebugLocks } from "../../../lib/action-dispatch/middleware/debug-locks.js";
 

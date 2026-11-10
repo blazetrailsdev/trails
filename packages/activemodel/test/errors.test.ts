@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { isBlank, extend } from "@blazetrails/activesupport";
 import {
   assertEmpty,
   assertNotEmpty,
@@ -12,10 +13,8 @@ import {
   assertNotPredicate,
   assertRaises,
   assertSame,
-  isBlank,
   assertNil,
-  extend,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { FrozenError, Marshal, constSet, rbObjIvarGet, TopLevel } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { Errors } from "../lib/errors.js";

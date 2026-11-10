@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import { isIn } from "@blazetrails/activesupport";
 import { block } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";
-import "./support/helper.js";
-import { AbortBeforeEnqueueJob } from "./support/jobs/abort-before-enqueue-job.js";
-import { CallbackJob } from "./support/jobs/callback-job.js";
+import "./helper.js";
+import { AbortBeforeEnqueueJob } from "./jobs/abort-before-enqueue-job.js";
+import { CallbackJob } from "./jobs/callback-job.js";
 
 describe("CallbacksTest", () => {
   it("perform callbacks", async () => {

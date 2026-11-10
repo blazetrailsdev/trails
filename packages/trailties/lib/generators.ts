@@ -1,6 +1,6 @@
 import { dasherize, deepMergeBang, underscore } from "@blazetrails/activesupport";
 import "@blazetrails/activesupport/core-ext/string/inflections";
-import { Dir, File, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
+import { Dir, File, LOAD_PATH, LoadError, getPath, regexpEscape } from "@blazetrails/ruby-compat";
 import type { Base, GeneratorConfig } from "./generators/base.js";
 import { noColorBang } from "./command/behavior.js";
 import { Trails } from "./trails.js";
@@ -27,7 +27,7 @@ const HIDDEN_FROM_LISTING = [
 let _subclasses: GeneratorClass[] | undefined;
 let _hiddenNamespaces: string[] | undefined;
 let _commandType: string | undefined;
-let _lookupPaths: URL[] | undefined;
+let _lookupPaths: string[] | undefined;
 let _aliases: Record<string, Record<string, unknown>> | undefined;
 let _options: Record<string, Record<string, unknown>> | undefined;
 let _fallbacks: Record<string, unknown> | undefined;
@@ -130,10 +130,18 @@ export class Generators {
 
     for (const rawPath of paths) {
       for (const base of Generators.lookupPaths()) {
-        const path = `${urlToPath(base)}${dasherize(rawPath)}-${Generators.commandType()}${EXTENSION}`;
+        const path = `${base}/${dasherize(rawPath)}-${Generators.commandType()}`;
 
         try {
-          await requireGenerator(base, path);
+          let found: string | undefined;
+          for (const dir of LOAD_PATH) {
+            if (await File.isExistAsync(File.join(dir, `${path}${EXTENSION}`))) {
+              found = dir;
+              break;
+            }
+          }
+          if (found === undefined) throw new LoadError(`cannot load such file -- ${path}`);
+          await requireGenerator(found, base, File.join(found, `${path}${EXTENSION}`));
           return;
         } catch (e) {
           if (e instanceof LoadError) {
@@ -150,18 +158,22 @@ export class Generators {
 
   /** @internal */
   static async lookupBang(): Promise<void> {
-    const walk = async (base: URL, dir: string): Promise<void> => {
-      for (const entry of Dir.children(dir).slice().sort()) {
-        const full = getPath().join(dir, entry);
+    const walk = async (dir: string, base: string, sub: string): Promise<void> => {
+      for (const entry of Dir.children(sub).slice().sort()) {
+        const full = getPath().join(sub, entry);
         if (File.isDirectory(full)) {
-          await walk(base, full);
+          await walk(dir, base, full);
         } else if (/-generator\.[cm]?[tj]s$/.test(entry) && !/\.(test|d)\./.test(entry)) {
-          await requireGenerator(base, full).catch(() => undefined);
+          await requireGenerator(dir, base, full).catch(() => undefined);
         }
       }
     };
-    for (const base of Generators.lookupPaths())
-      await walk(base, getPath().join(urlToPath(base), "trails"));
+    for (const dir of LOAD_PATH) {
+      for (const base of Generators.lookupPaths()) {
+        const root = File.join(dir, base, "trails");
+        if (File.isDirectory(root)) await walk(dir, base, root);
+      }
+    }
   }
 
   /** @internal */
@@ -253,7 +265,12 @@ export class Generators {
   }
 
   static hiddenNamespaces(): string[] {
-    return (_hiddenNamespaces ??= ["trails", "resource-route", "devcontainer"]);
+    return (_hiddenNamespaces ??= [
+      "trails",
+      "resource-route",
+      "action-mailbox:install",
+      "devcontainer",
+    ]);
   }
 
   static hideNamespaces(...namespaces: string[]): void {
@@ -344,8 +361,8 @@ export class Generators {
     return (_commandType ??= "generator");
   }
 
-  private static lookupPaths(): URL[] {
-    return (_lookupPaths ??= [new URL("./generators/", import.meta.url)]);
+  private static lookupPaths(): string[] {
+    return (_lookupPaths ??= ["trails/generators", "generators"]);
   }
 
   private static printList(
@@ -361,12 +378,12 @@ export class Generators {
   }
 }
 
-async function requireGenerator(base: URL, path: string): Promise<void> {
+async function requireGenerator(dir: string, base: string, path: string): Promise<void> {
   if (!File.isExist(path)) throw new LoadError(`cannot load such file -- ${path}`);
   const { Base } = await import("./generators/base.js");
   const mod = (await import(getPath().pathToFileURL!(path).href)) as Record<string, unknown>;
   const namespace = getPath()
-    .dirname(path.slice(urlToPath(base).length))
+    .dirname(path.slice(File.join(dir, base).length + 1))
     .split(/[\\/]/);
   for (const value of Object.values(mod)) {
     if (typeof value === "function" && value.prototype instanceof Base) {

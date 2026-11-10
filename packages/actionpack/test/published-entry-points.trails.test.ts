@@ -51,6 +51,7 @@ describe("published entry points", () => {
     expect(entries.map((entry) => getPath().basename(entry))).toEqual([
       "index.ts",
       "system-testing.ts",
+      "testing.ts",
     ]);
 
     const bare = await bareSpecifiersFrom(entries);

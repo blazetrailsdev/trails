@@ -1,4 +1,4 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import { env, getFs, getOsAsync, getPath, setEnv, rbFLoad } from "@blazetrails/ruby-compat";

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { assertMatch, capture } from "@blazetrails/activesupport";
+import { assertMatch } from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import {
   Dir,
   File,

@@ -1,16 +1,12 @@
 import "@blazetrails/activesupport/testing/autorun";
+import { I18n, include, kernelArray, transformKeys, underscore } from "@blazetrails/activesupport";
 import {
   assert,
   assertEqual,
   assertNil,
   assertNotEqual,
   assertNotIncludes,
-  I18n,
-  include,
-  kernelArray,
-  transformKeys,
-  underscore,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   DelegateClass,
   Dir,

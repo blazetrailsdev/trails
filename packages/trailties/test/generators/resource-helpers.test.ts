@@ -1,4 +1,4 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, beforeEach } from "vitest";
 import { ModelHelpers } from "../../lib/generators/model-helpers.js";
 import { ResourceGenerator } from "../../lib/generators/trails/resource/resource-generator.js";

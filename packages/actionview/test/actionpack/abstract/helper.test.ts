@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { assertRaises, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { NameError } from "@blazetrails/ruby-compat";
 import { AbstractController } from "@blazetrails/actionpack";
 import { Rendering } from "../../../lib/rendering.js";

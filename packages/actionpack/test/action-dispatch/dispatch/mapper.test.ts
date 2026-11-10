@@ -5,7 +5,7 @@ import { Dispatcher, RouteSet } from "../../../lib/action-dispatch/routing/route
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import type { Pattern } from "../../../lib/action-dispatch/journey/path/pattern.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertEqual, assertRaises } from "@blazetrails/activesupport";
+import { assertEqual, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 
 class FakeSet extends RouteSet {
   override resourcesPathNames: Record<string, string> = {};

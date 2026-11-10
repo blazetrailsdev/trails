@@ -11,7 +11,7 @@ import {
   type HelperMap,
 } from "./extract-ts-core.js";
 import { scopeOf } from "../api-compare/scope.js";
-import { testRoots } from "../layout/package-roots.js";
+import { testRoots } from "../layout/package-roots.mjs";
 
 function globInTestRoots(pkg: string, pattern: string): string[] {
   return testRoots(pkg).flatMap((root) =>
@@ -49,6 +49,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "activejob",
     "actionmailer",
     "actionmailbox",
+    "actiontext",
     "activestorage",
     "trailties",
     "globalid",
@@ -65,6 +66,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "rake",
     "solid-queue",
     "solid-cable",
+    "tzinfo",
   ];
   const packageAliases: Record<string, [dir: string, pattern: string, ignore?: string]> = {
     erubi: ["tse-compiler", "**/*.test.ts"],

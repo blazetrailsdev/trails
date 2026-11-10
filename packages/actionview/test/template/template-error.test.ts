@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { excSetBacktrace, rbInspect } from "@blazetrails/ruby-compat";
 import { Template } from "../../lib/template.js";
 import type { TemplateError } from "../../lib/template/error.js";

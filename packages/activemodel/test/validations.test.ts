@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { ActiveSupportJSON } from "@blazetrails/activesupport";
 import {
   assert,
   assertEmpty,
@@ -8,8 +9,7 @@ import {
   assertNotPredicate,
   assertPredicate,
   assertRaises,
-  ActiveSupportJSON,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   LengthValidator,

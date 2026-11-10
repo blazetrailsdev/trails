@@ -11,6 +11,7 @@
 import { actioncontroller } from "./assertion-receipts/actioncontroller.js";
 import { actiondispatch } from "./assertion-receipts/actiondispatch.js";
 import { actionview } from "./assertion-receipts/actionview.js";
+import { erubi } from "./assertion-receipts/erubi.js";
 import { activejob } from "./assertion-receipts/activejob.js";
 import { activemodel } from "./assertion-receipts/activemodel.js";
 import { activerecord } from "./assertion-receipts/activerecord.js";
@@ -58,6 +59,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   activerecord,
   activestorage,
   activesupport,
+  erubi,
   "image-processing": imageProcessing,
   mail,
   msgpack,

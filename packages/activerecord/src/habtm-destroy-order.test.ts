@@ -5,7 +5,7 @@ import {
   assertNotEmpty,
   assertRaises,
   assertNothingRaised,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Rollback } from "./index.js";
 import "./support/canonical-model-index.js";
 import { Lesson, LessonError } from "./test-helpers/models/lesson.js";

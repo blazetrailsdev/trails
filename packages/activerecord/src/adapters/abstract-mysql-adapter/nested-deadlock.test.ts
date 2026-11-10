@@ -1,6 +1,6 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";

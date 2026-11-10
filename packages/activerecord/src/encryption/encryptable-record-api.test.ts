@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import {
   freshAdapter,
   configureEncryption,

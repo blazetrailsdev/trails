@@ -2,7 +2,7 @@ import { SchemaDumper as BaseSchemaDumper } from "../schema-dumper.js";
 import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { Base } from "../base.js";
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 
 export const FULL_DUMP_TIMEOUT_MS = 30_000;
 

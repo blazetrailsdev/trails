@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, it } from "vitest";
-import { assertEqual } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { setAvailableLocales } from "@blazetrails/i18n";
-import "./support/helper.js";
-import { TranslatedHelloJob } from "./support/jobs/translated-hello-job.js";
+import "./helper.js";
+import { TranslatedHelloJob } from "./jobs/translated-hello-job.js";
 import { JobBuffer } from "./support/job-buffer.js";
 
 describe("TranslationTest", () => {

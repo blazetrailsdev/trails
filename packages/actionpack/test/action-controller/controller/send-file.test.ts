@@ -1,4 +1,5 @@
 import { describe, it, beforeEach } from "vitest";
+import { include, Notifications } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertKindOf,
@@ -7,9 +8,7 @@ import {
   assertNothingRaised,
   assertRaise,
   assertRespondTo,
-  include,
-  Notifications,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, File, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";

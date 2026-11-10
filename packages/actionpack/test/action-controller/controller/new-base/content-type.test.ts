@@ -1,6 +1,6 @@
 import { constSetPath } from "../../../support/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
-import { FixtureResolver } from "@blazetrails/actionview";
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../../../lib/action-controller/base.js";
 import { Mime } from "../../../../lib/action-dispatch/http/mime-type.js";

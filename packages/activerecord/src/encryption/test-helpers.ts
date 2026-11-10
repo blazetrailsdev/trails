@@ -12,7 +12,7 @@ import { Encryptor as EncryptorImpl } from "./encryptor.js";
 import type { KeyProviderLike } from "./encryptor.js";
 import { type Scheme } from "./scheme.js";
 import * as Errors from "./errors.js";
-import { assertEqual, assertNotEqual } from "@blazetrails/activesupport";
+import { assertEqual, assertNotEqual } from "@blazetrails/activesupport/testing/assertions";
 import { Encryption } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 

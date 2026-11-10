@@ -5,6 +5,7 @@ import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vite
 import { SingularAssociation } from "./associations/singular-association.js";
 import { Base, ConfigurationError, reflectOnAssociation, NameError, Relation } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { squish } from "@blazetrails/activesupport";
 import {
   assertEmpty,
   assertNot,
@@ -14,8 +15,7 @@ import {
   assertPredicate,
   assertRaises,
   assertSame,
-  squish,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";

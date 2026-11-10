@@ -1,5 +1,5 @@
 import { describe, expect, beforeEach, afterEach } from "vitest";
-import { assertDifference } from "@blazetrails/activesupport";
+import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";

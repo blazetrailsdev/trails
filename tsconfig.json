@@ -73,6 +73,8 @@
     { "path": "packages/activestorage" },
     { "path": "packages/activestorage/tsconfig.test.json" },
     { "path": "packages/actionmailbox/tsconfig.test.json" },
+    { "path": "packages/actiontext" },
+    { "path": "packages/actiontext/tsconfig.test.json" },
     { "path": "packages/did-you-mean" },
     { "path": "packages/did-you-mean/tsconfig.test.json" },
     { "path": "packages/thor" },

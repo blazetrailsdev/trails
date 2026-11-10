@@ -10,6 +10,17 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing/lint": {
+      "types": "./dist/lint.d.ts",
+      "default": "./dist/lint.js"
+    },
+    "./testing/lint.js": null,
+    "./lint": null,
+    "./lint.js": null,
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"

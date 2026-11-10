@@ -2,6 +2,13 @@ import { constSetPath } from "../../support/const-set-path.js";
 import { beforeEach, describe, it } from "vitest";
 import { MissingTemplate } from "@blazetrails/actionview";
 import {
+  CurrentAttributes,
+  include,
+  IsolatedExecutionState,
+  Logger,
+  Notifications,
+} from "@blazetrails/activesupport";
+import {
   assert,
   assertEqual,
   assertMatch,
@@ -9,12 +16,7 @@ import {
   assertNot,
   assertPredicate,
   assertRaises,
-  CurrentAttributes,
-  include,
-  IsolatedExecutionState,
-  Logger,
-  Notifications,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Digest } from "@blazetrails/activesupport/digest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import {

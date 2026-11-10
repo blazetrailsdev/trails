@@ -3,7 +3,12 @@ import { hashAref, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, Range } from "./index.js";
 import { ArgumentError, RuntimeError } from "@blazetrails/activemodel";
-import { assertRespondTo, assertRaises, assertEmpty, Logger } from "@blazetrails/activesupport";
+import { Logger } from "@blazetrails/activesupport";
+import {
+  assertRespondTo,
+  assertRaises,
+  assertEmpty,
+} from "@blazetrails/activesupport/testing/assertions";
 import { Book, PublishedBook } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";

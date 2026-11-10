@@ -4,7 +4,7 @@ import { Base } from "../base.js";
 import { Migration } from "../migration.js";
 import { NotNullViolation, StatementInvalid } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ambientConnection } from "../support/rocket-tables.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { adapterType } from "../test-adapter.js";

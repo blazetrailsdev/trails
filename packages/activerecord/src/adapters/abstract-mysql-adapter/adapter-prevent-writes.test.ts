@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfMysqlAdapter, Mysql2Adapter, ARUNIT_DATABASE } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { ReadOnlyError, QueryCanceled } from "../../errors.js";

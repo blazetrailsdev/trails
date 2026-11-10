@@ -143,7 +143,7 @@ function exportedNames(source) {
   return names;
 }
 
-const SKIPPED_DIRS = new Set(["node_modules", "dist", "vendor", ".git", "coverage"]);
+const SKIPPED_DIRS = new Set(["node_modules", "dist", "dist-test", "vendor", ".git", "coverage"]);
 
 /**
  * Every JS/TS spelling a module could use, not just `.ts`: a loader moved into

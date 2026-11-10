@@ -10,7 +10,7 @@ import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.j
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
-import { assertNothingRaised } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { RecordInvalid } from "../validations.js";
 
 fixtures([]);

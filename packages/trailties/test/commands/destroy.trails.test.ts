@@ -1,10 +1,9 @@
-import { capture } from "@blazetrails/activesupport";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, onTestFinished, vi } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
 import { DestroyCommand } from "../../lib/commands/destroy.js";
-import { createProgram } from "../../lib/cli.js";
 import { invoke as commandInvoke } from "../../lib/command.js";
 import { Generators } from "../../lib/generators.js";
 import { Application } from "../../lib/application.js";
@@ -91,10 +90,6 @@ describe("DestroyCommand", () => {
     expect(output).toMatch(/^ +remove +app\/models\/post\.ts$/m);
     expect(listFiles(tmpDir)).toEqual(generated);
     expect(fs.readFileSync(path.join(tmpDir, "config", "routes.ts"), "utf-8")).toBe(routes);
-  });
-
-  it("is not registered on the program", () => {
-    expect(createProgram().commands.some((c) => c.name() === "destroy")).toBe(false);
   });
 
   it("resolves both spellings of a generator name", async () => {

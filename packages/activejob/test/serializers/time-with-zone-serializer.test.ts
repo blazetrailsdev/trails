@@ -1,13 +1,8 @@
 import { describe, it } from "vitest";
-import {
-  assertEqual,
-  setZone,
-  type TimeWithZone,
-  type TimeZone,
-  zone,
-} from "@blazetrails/activesupport";
+import { setZone, type TimeWithZone, type TimeZone, zone } from "@blazetrails/activesupport";
+import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { Time } from "@blazetrails/date";
-import "../support/helper.js";
+import "../helper.js";
 import { ActiveJob } from "../../lib/namespaces.js";
 import "../../lib/serializers.js";
 

@@ -1,0 +1,5 @@
+import { ApplicationMailbox } from "<%= "../".repeat(this.classPathParts.length) || "./" %>application-mailbox<%= this.ext() %>";
+
+export class <%= this.className().split("::").pop() %>Mailbox extends ApplicationMailbox {
+  process(): void {}
+}

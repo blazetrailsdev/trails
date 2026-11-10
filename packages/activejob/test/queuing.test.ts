@@ -4,10 +4,10 @@ import { Notifications } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { block, NotImplementedError } from "@blazetrails/ruby-compat";
 import { EnqueueError, performAllLater } from "../lib/enqueuing.js";
-import "./support/helper.js";
-import { EnqueueErrorJob } from "./support/jobs/enqueue-error-job.js";
-import { HelloJob } from "./support/jobs/hello-job.js";
-import { MultipleKwargsJob } from "./support/jobs/multiple-kwargs-job.js";
+import "./helper.js";
+import { EnqueueErrorJob } from "./jobs/enqueue-error-job.js";
+import { HelloJob } from "./jobs/hello-job.js";
+import { MultipleKwargsJob } from "./jobs/multiple-kwargs-job.js";
 import { JobBuffer } from "./support/job-buffer.js";
 
 describe("QueuingTest", () => {

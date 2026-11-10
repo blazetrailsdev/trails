@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
 import {
   assert,
   assertEmpty,
   assertNotPredicate,
   assertPredicate,
   assertRaises,
-  Notifications,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { ARUnit2Model } from "../../test-helpers/models/arunit2-model.js";
 import type { NotificationEvent } from "@blazetrails/activesupport";
 import {

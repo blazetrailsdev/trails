@@ -1,4 +1,5 @@
-import { assert, assertNot, isBlank } from "@blazetrails/activesupport";
+import { isBlank } from "@blazetrails/activesupport";
+import { assert, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { type Html5DocumentFragment, type Html5Node } from "@blazetrails/nokogiri";
 import { rbEqual, stringSplit } from "@blazetrails/ruby-compat";
 import { Testing } from "../testing.js";

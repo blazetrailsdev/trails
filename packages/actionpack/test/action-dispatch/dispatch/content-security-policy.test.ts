@@ -28,7 +28,7 @@ import {
   assertNoMatch,
   assertNothingRaised,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import {
   ArgumentError,
   RuntimeError,

@@ -1,12 +1,12 @@
 import { describe, it } from "vitest";
+import { MemoryStore } from "@blazetrails/activesupport";
 import {
   assert,
   assertEqual,
   assertNil,
   assertNotEqual,
   assertNotNil,
-  MemoryStore,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { SessionId } from "@blazetrails/rack-session";
 import { constSet, rbInspect, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../../../lib/action-controller/base.js";

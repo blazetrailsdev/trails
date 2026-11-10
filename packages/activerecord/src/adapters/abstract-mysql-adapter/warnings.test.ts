@@ -1,6 +1,6 @@
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { assertRaises } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SQLWarning } from "../../errors.js";
 import { Base } from "../../base.js";

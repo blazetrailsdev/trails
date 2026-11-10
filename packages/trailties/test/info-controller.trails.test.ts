@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { RouteSet } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { ApplicationController } from "../lib/application-controller.js";
 import { Application } from "../lib/application.js";
 import { InfoController } from "../lib/info-controller.js";
@@ -44,7 +45,7 @@ describe("Trails::InfoController#notes", () => {
 
   it("renders a row per annotation, with the file name spanning its rows", async ({ task }) => {
     await writeFile(join(dir, "widget.ts"), "// TODO: first\nconst a = 1;\n// FIXME: second\n");
-    const tc = new ActionController.TestCase(task.name);
+    const tc = new TestCase(task.name);
     tc.controller = new InfoController();
     await tc.beforeSetup();
     tc.routes = new RouteSet();

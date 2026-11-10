@@ -3,13 +3,8 @@
    merge is how `include()` surfaces those members on the type side. */
 import { describe, it, expect, beforeEach } from "vitest";
 
-import {
-  ActiveSupportJSON,
-  assertNot,
-  include,
-  type Included,
-  isPresent,
-} from "@blazetrails/activesupport";
+import { ActiveSupportJSON, include, type Included, isPresent } from "@blazetrails/activesupport";
+import { assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { Utils } from "@blazetrails/rack";
 import {
   RFC2396_PARSER,

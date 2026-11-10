@@ -1,5 +1,6 @@
 import { describe, it } from "vitest";
-import { assertRespondTo, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
+import { assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { Runner, type Session } from "../../../lib/action-dispatch/testing/integration.js";
 
 describe("RunnerTest", () => {

@@ -26,6 +26,7 @@ interface BootEngine {
 }
 
 interface BootApplication extends BootEngine {
+  config: BootEngine["config"] & { helpersPaths?: readonly string[] };
   railties?(): Iterable<object>;
   initializers: { tsort(): BootInitializer[] };
   autoloaders?: Partial<Record<"main" | "once", BootLoader>>;
@@ -102,14 +103,14 @@ const BOOT_PATHS = [
 ];
 
 /** @noRailsEquivalent PERMANENT */
-const CONFIG_FILE = /^[^.]+\.[cm]?[tj]s$/;
+const CONFIG_FILE = /^(?!.*\.d\.[cm]?ts$)(?!.*\.test\.)[^/]+\.[cm]?[tj]s$/;
 
 /** @noRailsEquivalent PERMANENT */
-async function configFiles(dir: string, out: Set<string>): Promise<void> {
+async function configFiles(dir: string, out: Set<string>, top = true): Promise<void> {
   for (const entry of Dir.children(dir).slice().sort()) {
     const full = File.join(dir, entry);
-    if (entry === "storage" && (await File.isDirectoryAsync(full))) {
-      await configFiles(full, out);
+    if (top && entry === "storage" && (await File.isDirectoryAsync(full))) {
+      await configFiles(full, out, false);
     } else if (CONFIG_FILE.test(entry) && !(await File.isDirectoryAsync(full))) {
       out.add(full);
     }
@@ -172,6 +173,9 @@ async function writeBoot(
         }
       }
     }
+  }
+  for (const dir of application.config.helpersPaths ?? []) {
+    if (await File.isDirectoryAsync(dir)) await helperFiles(dir, files);
   }
   const entries = [...files].map((file) => {
     const specifier = path.relative!(trailsDir, file);

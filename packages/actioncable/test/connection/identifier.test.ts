@@ -1,4 +1,7 @@
-import { assertCalled, assertNotCalled } from "@blazetrails/activesupport";
+import {
+  assertCalled,
+  assertNotCalled,
+} from "@blazetrails/activesupport/testing/method-call-assertions";
 import { MockRequest } from "@blazetrails/rack";
 import { describe, expect, it } from "vitest";
 import { TestCase } from "../support/test-helper.js";

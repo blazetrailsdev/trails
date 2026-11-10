@@ -6,7 +6,8 @@ import { ArgumentError, setEnv } from "@blazetrails/ruby-compat";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { Person } from "../test-helpers/models/person.js";
-import { assertNothingRaised, getEnv } from "@blazetrails/activesupport";
+import { getEnv } from "@blazetrails/activesupport";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 
 describe("ConnectionHandlersShardingDbTest", () => {
   let prevConfigs: ReturnType<typeof Base.configurations>;

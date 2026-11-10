@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertNotPredicate, BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/use-fixtures.js";
 import { Base } from "../../index.js";

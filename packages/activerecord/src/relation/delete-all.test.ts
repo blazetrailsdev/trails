@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertDifference, assertRaise } from "@blazetrails/activesupport";
+import { assertDifference, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";

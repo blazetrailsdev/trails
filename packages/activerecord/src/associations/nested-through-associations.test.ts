@@ -30,7 +30,12 @@ import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 import { Reader } from "../test-helpers/models/reader.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { assert, assertNot, assertEmpty, assertNotEmpty } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertNot,
+  assertEmpty,
+  assertNotEmpty,
+} from "@blazetrails/activesupport/testing/assertions";
 
 async function assertIncludesAndJoinsEqual(
   query: any,

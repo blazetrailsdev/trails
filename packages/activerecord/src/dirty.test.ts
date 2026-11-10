@@ -4,12 +4,8 @@ import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
 import { ValueType } from "@blazetrails/activemodel";
-import {
-  TimeWithZone,
-  zone as timeZone,
-  assertEmpty,
-  assertInDelta,
-} from "@blazetrails/activesupport";
+import { TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
+import { assertEmpty, assertInDelta } from "@blazetrails/activesupport/testing/assertions";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { itIfSupports } from "./support/supports.js";

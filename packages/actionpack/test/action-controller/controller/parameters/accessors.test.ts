@@ -11,7 +11,7 @@ import {
   assertNotPredicate,
   assertPredicate,
   assertSame,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { Enumerator, rbInspect } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../../../lib/action-controller/metal/strong-parameters.js";
 

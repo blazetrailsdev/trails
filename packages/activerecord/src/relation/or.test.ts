@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";

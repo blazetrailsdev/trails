@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertRaises, isBlank } from "@blazetrails/activesupport";
+import { isBlank } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base, Range, RecordNotFound } from "../index.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";

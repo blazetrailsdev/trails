@@ -1,0 +1,45 @@
+{
+  "name": "@blazetrails/actiontext",
+  "version": "0.1.0",
+  "description": "Rich text content and editing for Trails, mirroring the actiontext gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*.js": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./*": {
+      "types": "./dist/types/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
+    "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activestorage": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/html-sanitizer": "workspace:*",
+    "@blazetrails/nokogiri": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "devDependencies": {
+    "@blazetrails/trailties": "workspace:*"
+  }
+}

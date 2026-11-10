@@ -71,7 +71,8 @@ export class Application extends Engine {
   private _orderedRailties?: Array<Trailtie | Trailtie[] | string>;
   private _keyGenerators = new Map<string, CachingKeyGenerator>();
   private _appEnvConfig?: Record<string, unknown>;
-  private _credentials?: EncryptedConfiguration;
+  /** @internal */
+  _credentials?: EncryptedConfiguration;
   private _deprecators?: Deprecators;
   private _messageVerifiers?: MessageVerifiers;
   private _ranLoadHooks = false;
@@ -302,11 +303,13 @@ export class Application extends Engine {
     }
   }
 
+  /** @inventedArm credentials — PERMANENT */
   async initializeBang(group: InitializerGroup = "default"): Promise<this> {
     if (this._initialized) throw new Error("Application has been already initialized.");
     setSourceMapsSupport(true);
     setTrailsRoot(() => this.config.root);
     this._resetAutoloadState();
+    await this.credentials();
     await this.runInitializers(group, this);
     this._initialized = true;
     return this;

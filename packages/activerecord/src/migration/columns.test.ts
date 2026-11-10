@@ -12,7 +12,7 @@ import { adapterType } from "../test-adapter.js";
 import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
 import { supportsDefaultExpression } from "../support/adapter-helper.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { assertDifference, assertRaises } from "@blazetrails/activesupport";
+import { assertDifference, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 import { adapterSupports } from "../support/supports.js";
 import { rbInspect } from "@blazetrails/ruby-compat";

@@ -9,7 +9,7 @@ import {
   assertNotPredicate,
   assertRaise,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { include, constSet, regexpEscape, TopLevel } from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
 import { classify, underscore } from "@blazetrails/activesupport";

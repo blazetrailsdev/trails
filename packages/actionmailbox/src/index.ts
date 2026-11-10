@@ -9,3 +9,7 @@ export { Record } from "./record.js";
 export type { InboundEmail } from "./inbound-email.js";
 export { RoutingJob } from "./routing-job.js";
 export { Router } from "./router.js";
+export { Base } from "./base.js";
+export { Callbacks } from "./callbacks.js";
+export { BaseController } from "./base-controller.js";
+import "./ingresses/relay/inbound-emails-controller.js";

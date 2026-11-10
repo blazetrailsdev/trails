@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport";
+import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Author } from "../test-helpers/models/author.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 

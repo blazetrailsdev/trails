@@ -33,7 +33,7 @@ import { isSourceUnported } from "@blazetrails/parity/unported-files";
 import { resolveTsClassForRuby } from "./compare.js";
 import { BRAND_RENAMES, derivedConstantPath, walkConstants } from "./constant-table.js";
 import { PACKAGE_DIR_OVERRIDES, ROOT_DIR, packageSrcDir } from "./config.js";
-import { libRoot } from "../layout/package-roots.js";
+import { libRoot } from "../layout/package-roots.mjs";
 import type { ClassInfo } from "@blazetrails/parity/types";
 
 const run = promisify(execFile);
@@ -46,9 +46,9 @@ const EXCLUDED_GENERATED = "constants.excluded.generated.ts";
 const SKIPPED = new Set(["activerecord-test-support"]);
 
 /** A subpath entry that must stay out of the package entry's graph, so its table is its own. */
-const SUBPATH_ENTRIES: Record<string, string> = {
+const SUBPATH_ENTRIES: Record<string, string | string[]> = {
   actionmailer: "test-case.ts",
-  actionpack: "system-testing.ts",
+  actionpack: ["system-testing.ts", "testing.ts"],
   activejob: "test-case.ts",
   activerecord: "fixtures.ts",
   activestorage: "transformers/image-processing-transformer.ts",
@@ -69,8 +69,15 @@ const LAZY_DIRS: Record<string, string[]> = {
     "test-databases.ts",
     "testing/query-assertions.ts",
   ],
+  actioncable: [
+    "channel/test-case.ts",
+    "connection/test-case.ts",
+    "subscription-adapter/test.ts",
+    "test-helper.ts",
+  ],
   actionmailbox: ["inbound-email.ts", "inbound-email/"],
   actionmailer: ["test-case.ts", "test-helper.ts"],
+  actionview: ["test-case.ts", "testing/resolvers.ts"],
   activejob: ["test-case.ts", "test-helper.ts"],
   activestorage: ["blob.ts", "blob/", "variant-record.ts"],
   trailties: ["commands/", "command.ts", "generators/"],
@@ -87,10 +94,17 @@ function seatedFqn(source: string, tsName: string, fqns: string[]): string | und
   return hits.length === 1 ? hits[0] : undefined;
 }
 
-/** A lazy file's table, named from its path under the prefix so same-named files do not collide. */
+/**
+ * A lazy file's table, named from its path under the prefix so same-named files do not collide.
+ * A file under `testing/` keeps that segment, so its table is a testing export (RFC 0223).
+ */
 function lazyTable(dir: string, file: string): string {
   const prefix = (LAZY_DIRS[dir] ?? []).find((p) => p.endsWith("/") && file.startsWith(p));
-  const rel = prefix ? file.slice(prefix.length) : path.basename(file);
+  const rel = prefix
+    ? file.slice(prefix.length)
+    : file.startsWith("testing/")
+      ? file
+      : path.basename(file);
   return `constants.${rel.replace(/\.ts$/, "").replaceAll("/", "-")}.generated.ts`;
 }
 
@@ -129,6 +143,16 @@ async function readJson<T>(name: string): Promise<T> {
 async function tsconfigExcludes(dir: string): Promise<string[]> {
   const raw = await fs.readFile(path.join(ROOT_DIR, "packages", dir, "tsconfig.json"), "utf8");
   return (JSON.parse(raw) as { exclude?: string[] }).exclude ?? [];
+}
+
+/** Files and directories the package's test project lists by name: test-only, so in no table. */
+async function testProjectFiles(dir: string): Promise<string[]> {
+  const raw = await fs
+    .readFile(path.join(ROOT_DIR, "packages", dir, "tsconfig.test.json"), "utf8")
+    .catch(() => "{}");
+  return ((JSON.parse(raw) as { include?: string[] }).include ?? []).filter(
+    (f) => !f.includes("*"),
+  );
 }
 
 /**
@@ -219,9 +243,13 @@ const unexportedModules: string[] = [];
 async function placement(dir: string) {
   const srcRoot = path.join(ROOT_DIR, "packages", dir, libRoot(dir));
   const excluded = await tsconfigExcludes(dir);
+  const testOnly = await testProjectFiles(dir);
   const reachable = await entryGraph(dir);
   const subpath = SUBPATH_ENTRIES[dir];
-  const subpathGraph = subpath ? await entryGraph(dir, subpath) : new Set<string>();
+  const subpathGraph = new Set<string>();
+  for (const entry of Array.isArray(subpath) ? subpath : subpath ? [subpath] : []) {
+    for (const file of await entryGraph(dir, entry)) subpathGraph.add(file);
+  }
   const separate = SEPARATE_SUBPATH_ENTRIES[dir];
   const separateGraph = separate ? await entryGraph(dir, separate) : new Set<string>();
   const sources = new Map<string, string>();
@@ -230,6 +258,7 @@ async function placement(dir: string) {
     sources.set(file, await fs.readFile(path.join(srcRoot, file), "utf8")).get(file)!;
   const at = (file: string, lazyOk = true): Pick<ClassPathEntry, "excluded" | "table"> | null => {
     const rel = path.join(libRoot(dir), file);
+    if (testOnly.some((f) => rel === f || rel.startsWith(`${f}/`))) return null;
     const separated = !reachable.has(file) && separateGraph.has(file);
     const lazy =
       lazyOk &&

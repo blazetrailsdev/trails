@@ -2,11 +2,8 @@ import { afterEach, beforeEach, describe, it } from "vitest";
 import "../support/active-record-unit.js";
 import { ControllerRuntime, RuntimeRegistry } from "@blazetrails/activerecord";
 import { Project } from "../fixtures/project.js";
-import {
-  assertEqual,
-  assertMatch,
-  LogSubscriber as ActiveSupportLogSubscriber,
-} from "@blazetrails/activesupport";
+import { LogSubscriber as ActiveSupportLogSubscriber } from "@blazetrails/activesupport";
+import { assertEqual, assertMatch } from "@blazetrails/activesupport/testing/assertions";
 import {
   setup as testHelperSetup,
   teardown as testHelperTeardown,
@@ -14,6 +11,7 @@ import {
   type MockLogger,
 } from "@blazetrails/activesupport/log-subscriber/test-helper";
 import { ActionController } from "@blazetrails/actionpack";
+import { TestCase } from "@blazetrails/actionpack/testing";
 import { include, type Included } from "@blazetrails/ruby-compat";
 
 include(ActionController.Base, ControllerRuntime);
@@ -53,7 +51,7 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
   > {}
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
-  class ControllerRuntimeLogSubscriberTest extends ActionController.TestCase {
+  class ControllerRuntimeLogSubscriberTest extends TestCase {
     declare logger: MockLogger;
     declare oldLogger: typeof ActionController.Base.logger;
 

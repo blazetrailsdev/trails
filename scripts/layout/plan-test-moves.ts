@@ -10,7 +10,8 @@
  *
  * Test-only support files (under `test-helpers/`, `support/`, `test-setup/`,
  * `__fixtures__/`) go to the gem's matching Rails directory, else
- * `test/support/`. One a library file imports stays put and is flagged.
+ * `test/support/`. One a library file imports stays put and is flagged. A test
+ * file inside such a directory is still placed by rules 1-3.
  *
  * Reads `scripts/test-compare/output/convention-comparison.json`, which a full
  * `pnpm parity:test -- --json` writes.
@@ -25,7 +26,8 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { PKG_SRC_DIRS } from "../test-compare/compare.js";
 import { moduleSpecifiers } from "../ruby-compat-leaf.js";
-import { LIB_TEST_PACKAGES } from "./package-roots.js";
+import { LIB_TEST_PACKAGES } from "./package-roots.mjs";
+import { resolveSourcePath } from "../../vendor/sources.js";
 import { COMMITTED_TS_FILES, walkTsFiles } from "../api-compare/ts-file-walk.js";
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -72,6 +74,10 @@ export interface PlanInput {
   /** Files (relative to `libDir`) a non-test library file imports. */
   libImported: ReadonlySet<string>;
   comparison: readonly ComparedPackage[];
+  /** Each non-`.ts` file under `libDir` to the files there naming it by a relative path. */
+  assetRefs?: ReadonlyMap<string, readonly string[]>;
+  /** The entries directly under the gem's own `test/` (`jobs`, `adapters`, `helper.rb`). */
+  railsTestDirs?: ReadonlySet<string>;
 }
 
 export interface Plan {
@@ -83,12 +89,17 @@ export interface Plan {
   collisions: string[];
 }
 
-function supportHome(file: string): string | null {
+function supportHome(file: string, railsTestDirs: ReadonlySet<string> = new Set()): string | null {
   const parts = file.split("/");
   const at = parts.findIndex((p, i) => i < parts.length - 1 && SUPPORT_DIRS.has(p));
   if (at < 0) return null;
   const rest = parts.slice(at + 1);
-  if (rest.length > 1 && RAILS_SUPPORT_DIRS.has(rest[0])) return `test/${rest.join("/")}`;
+  if (rest.length > 1 && (RAILS_SUPPORT_DIRS.has(rest[0]) || railsTestDirs.has(rest[0]))) {
+    return `test/${rest.join("/")}`;
+  }
+  if (rest.length === 1 && rest[0] === "helper.ts" && railsTestDirs.has("helper.rb")) {
+    return "test/helper.ts";
+  }
   if (parts[at] === "__fixtures__") return `test/fixtures/${rest.join("/")}`;
   return `test/support/${rest.join("/")}`;
 }
@@ -103,16 +114,19 @@ export function planTestMoves(input: PlanInput): Plan {
   const { pkg, libDir, files } = input;
   const present = new Set(files);
   const placed = new Map<string, string>();
-  for (const cp of input.comparison) {
-    const prefix = PKG_SRC_DIRS[cp.package] ?? `packages/${cp.package}/src/`;
-    const pkgPrefix = `packages/${pkg}/src/`;
-    if (!prefix.startsWith(pkgPrefix)) continue;
+  const prefixOf = (cp: ComparedPackage): string =>
+    PKG_SRC_DIRS[cp.package] ?? `packages/${cp.package}/src/`;
+  const ordered = [...input.comparison].sort((a, b) => prefixOf(b).length - prefixOf(a).length);
+  for (const cp of ordered) {
+    const prefix = prefixOf(cp);
+    const pkgPrefix = prefix.match(new RegExp(`^packages/${pkg}/(?:src|lib)/`))?.[0];
+    if (pkgPrefix === undefined) continue;
     const within = prefix.slice(pkgPrefix.length);
     for (const f of cp.files) {
       if (!f.tsFileExists || f.conventionTsPackage || f.rubyFile.startsWith("../")) continue;
       const old = within + f.conventionTsFile;
       if (!present.has(old) || placed.has(old)) continue;
-      placed.set(old, `test/${RUBY_FILE_ROOT[cp.package] ?? ""}${f.conventionTsFile}`);
+      placed.set(old, `test/${within}${RUBY_FILE_ROOT[cp.package] ?? ""}${f.conventionTsFile}`);
     }
   }
   for (const [old, to] of [...placed]) {
@@ -124,13 +138,26 @@ export function planTestMoves(input: PlanInput): Plan {
   const flagged: string[] = [];
   for (const file of files) {
     if (placed.has(file)) continue;
-    const home = supportHome(file);
+    const home = supportHome(file, input.railsTestDirs);
     if (home !== null && !isTestFile(file)) {
       if (input.libImported.has(file)) flagged.push(`${libDir}/${file}`);
       else placed.set(file, home);
     } else if (isTestFile(file)) {
-      placed.set(file, home ?? `test/${MAIN_TEST_DIR[pkg] ?? ""}${file}`);
+      placed.set(file, `test/${MAIN_TEST_DIR[pkg] ?? ""}${file}`);
     }
+  }
+  for (const [asset, refs] of input.assetRefs ?? []) {
+    if (refs.length === 0) continue;
+    const dirs = new Set(
+      refs.map((ref) => (placed.has(ref) ? path.posix.dirname(placed.get(ref)!) : null)),
+    );
+    const [dir] = dirs;
+    if (dirs.size !== 1 || dir == null) {
+      flagged.push(`${libDir}/${asset}`);
+      continue;
+    }
+    const from = path.posix.relative(path.posix.dirname(refs[0]), asset);
+    placed.set(asset, path.posix.normalize(path.posix.join(dir, from)));
   }
   const moves = [...placed]
     .map(([old, to]): [string, string] => [`${libDir}/${old}`, to])
@@ -139,6 +166,66 @@ export function planTestMoves(input: PlanInput): Plan {
   for (const [, to] of moves) seen.set(to, (seen.get(to) ?? 0) + 1);
   const collisions = [...seen].filter(([, n]) => n > 1).map(([to]) => to);
   return { moves, flagged: flagged.sort(), collisions: collisions.sort() };
+}
+
+const SPECIFIER_RE =
+  /(\bfrom\s*|\bimport\s*\(?\s*|\bdeclare\s+module\s+|\bvi\.(?:mock|doMock|doUnmock|importActual)\s*(?:<[^>]*>)?\(\s*)(["'])(\.{1,2}\/[^"'\n]*)\2/g;
+
+/**
+ * Rewrites each relative module specifier in `source`, a file moving from
+ * `from` to `to` (package-root-relative), so it names the same target after
+ * the move, `moved` (old path to new path) included.
+ */
+export function rewriteSpecifiers(
+  source: string,
+  from: string,
+  to: string,
+  moved: ReadonlyMap<string, string>,
+): string {
+  return source.replace(SPECIFIER_RE, (whole, lead: string, quote: string, spec: string) => {
+    const target = path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
+    const ts = target.replace(/\.js$/, ".ts");
+    const dest = moved.has(ts)
+      ? moved.get(ts)!.replace(/\.ts$/, path.posix.extname(target))
+      : target;
+    let rel = path.posix.relative(path.posix.dirname(to), dest);
+    if (!rel.startsWith(".")) rel = `./${rel}`;
+    if (spec.endsWith("/") && !rel.endsWith("/")) rel += "/";
+    return rel === spec ? whole : `${lead}${quote}${rel}${quote}`;
+  });
+}
+
+/** Adds `pkg` to the `LIB_TEST_PACKAGES` set literal in `source`, sorted. */
+export function registerLibTestPackage(source: string, pkg: string): string {
+  return source.replace(
+    /(LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>\(\[)([^\]]*)(\]\))/,
+    (_, open: string, body: string, close: string) => {
+      const names = new Set([...body.matchAll(/"([^"]+)"/g)].map((m) => m[1]));
+      names.add(pkg);
+      return `${open}\n${[...names]
+        .sort()
+        .map((n) => `  "${n}",\n`)
+        .join("")}${close}`;
+    },
+  );
+}
+
+/** Each non-`.ts` committed file under `libPath` to the `.ts` files naming it by a relative path. */
+async function assetReferences(
+  libPath: string,
+  files: readonly string[],
+): Promise<Map<string, string[]>> {
+  const { stdout } = await promisify(execFile)("git", ["ls-files"], { cwd: libPath });
+  const assets = stdout.split("\n").filter((f) => f !== "" && !f.endsWith(".ts"));
+  const refs = new Map(assets.map((a): [string, string[]] => [a, []]));
+  for (const file of files) {
+    const source = await fs.readFile(path.join(libPath, file), "utf-8");
+    for (const [, spec] of source.matchAll(/["'`](\.{1,2}\/[^"'`\n$]+)["'`]/g)) {
+      const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), spec));
+      if (refs.has(target)) refs.get(target)!.push(file);
+    }
+  }
+  return refs;
 }
 
 /** Files under `libDir` that a non-test file there imports by relative specifier. */
@@ -157,6 +244,12 @@ async function libImportedFiles(libPath: string, files: readonly string[]): Prom
     }
   }
   return imported;
+}
+
+/** The entries under the vendored Rails gem's `test/`, empty for a non-Rails gem. */
+async function railsTestDirs(pkg: string): Promise<Set<string>> {
+  const entries = await fs.readdir(resolveSourcePath("rails", `${pkg}/test`)).catch(() => []);
+  return new Set(entries);
 }
 
 export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<string> {
@@ -185,6 +278,8 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
     files,
     libImported: await libImportedFiles(libPath, files),
     comparison: comparison.results,
+    assetRefs: await assetReferences(libPath, files),
+    railsTestDirs: await railsTestDirs(pkg),
   });
   if (plan.collisions.length > 0) {
     throw new Error(`plan-test-moves: two files land on:\n  ${plan.collisions.join("\n  ")}`);
@@ -195,6 +290,16 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
       await fs.mkdir(path.dirname(path.join(pkgDir, to)), { recursive: true });
       await git("git", ["mv", from, to], { cwd: pkgDir });
     }
+    const moved = new Map(plan.moves);
+    for (const [from, to] of plan.moves) {
+      if (!to.endsWith(".ts")) continue;
+      const file = path.join(pkgDir, to);
+      const source = await fs.readFile(file, "utf-8");
+      const rewritten = rewriteSpecifiers(source, from, to, moved);
+      if (rewritten !== source) await fs.writeFile(file, rewritten);
+    }
+    const roots = path.join(cwd, "scripts/layout/package-roots.mts");
+    await fs.writeFile(roots, registerLibTestPackage(await fs.readFile(roots, "utf-8"), pkg));
   }
   return [
     ...plan.moves.map(([from, to]) => `${from} → ${to}`),

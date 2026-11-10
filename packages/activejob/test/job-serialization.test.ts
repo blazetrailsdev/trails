@@ -1,15 +1,15 @@
 import { beforeEach, describe, it } from "vitest";
+import { useZone } from "@blazetrails/activesupport";
 import {
   assertEqual,
   assertKindOf,
   assertNil,
-  freezeTime,
-  useZone,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
+import { freezeTime } from "@blazetrails/activesupport/testing/time-helpers";
 import { Time } from "@blazetrails/date";
-import "./support/helper.js";
-import { GidJob } from "./support/jobs/gid-job.js";
-import { HelloJob } from "./support/jobs/hello-job.js";
+import "./helper.js";
+import { GidJob } from "./jobs/gid-job.js";
+import { HelloJob } from "./jobs/hello-job.js";
 import { Person } from "./models/person.js";
 import { JobBuffer } from "./support/job-buffer.js";
 

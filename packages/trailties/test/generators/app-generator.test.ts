@@ -1,5 +1,6 @@
 import { Dir, File, FileUtils, Gem, Process, rbFBackquote } from "@blazetrails/ruby-compat";
-import { assertNoChanges, assertNoMatch, capture } from "@blazetrails/activesupport";
+import { assertNoChanges, assertNoMatch } from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppGenerator } from "../../lib/generators/trails/app/app-generator.js";
@@ -53,6 +54,13 @@ function assertNoGem(name: string): Promise<void> {
 
 function json(content: string) {
   return JSON.parse(content);
+}
+
+function assertOption(generator: { options: unknown }, option: string): void {
+  expect(
+    (generator.options as Record<string, unknown>)[option],
+    `Expected generator option :${option} to be truthy.`,
+  ).toBeTruthy();
 }
 
 describe("AppGeneratorTest", () => {
@@ -384,6 +392,28 @@ describe("AppGeneratorTest", () => {
     expect(content).toMatch(/The template \[.*\] could not be loaded/);
     expect(content).toMatch(/non\/existent\/path/);
   });
+
+  it("apply trails template class method runs bundle and after bundle callbacks", async () => {
+    await t.runGenerator();
+
+    const template = File.join(t.destinationRoot, "lib/template.mjs");
+    await File.writeAsync(
+      template,
+      'export default (g) => g.afterBundle(() => g.createFile("after_bundle_callback_ran"));\n',
+    );
+
+    const runInstall = vi
+      .spyOn(AppGenerator.prototype as unknown as { runInstall(): Promise<void> }, "runInstall")
+      .mockResolvedValue(undefined);
+    try {
+      await capture("stdout", () => AppGenerator.applyTrailsTemplate(template, t.destinationRoot));
+      expect(runInstall).toHaveBeenCalledOnce();
+    } finally {
+      runInstall.mockRestore();
+    }
+
+    await t.assertFile("after_bundle_callback_ran");
+  });
 });
 
 describe("AppGenerator", () => {
@@ -665,6 +695,31 @@ describe("AppGenerator", () => {
       expect(dbConfig).toContain('adapter: "node-sqlite"');
       expect(dbConfig).not.toContain("@blazetrails/activerecord/sqlite/node-sqlite");
     });
+  });
+
+  it("minimal trails app", () => {
+    const generator = t.generator([t.destinationRoot], ["--minimal"]);
+
+    assertOption(generator, "minimal");
+    assertOption(generator, "skipActionCable");
+    assertOption(generator, "skipActionMailbox");
+    assertOption(generator, "skipActionMailer");
+    assertOption(generator, "skipActionText");
+    assertOption(generator, "skipActiveJob");
+    assertOption(generator, "skipActiveStorage");
+    assertOption(generator, "skipBootsnap");
+    assertOption(generator, "skipBrakeman");
+    assertOption(generator, "skipCi");
+    assertOption(generator, "skipDevGems");
+    assertOption(generator, "skipDocker");
+    assertOption(generator, "skipHotwire");
+    assertOption(generator, "skipJavascript");
+    assertOption(generator, "skipJbuilder");
+    assertOption(generator, "skipKamal");
+    assertOption(generator, "skipEslint");
+    assertOption(generator, "skipSolid");
+    assertOption(generator, "skipSystemTest");
+    assertOption(generator, "skipThruster");
   });
 
   it("rejects an unknown sqlite driver", () => {

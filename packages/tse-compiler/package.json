@@ -20,5 +20,8 @@
   "license": "MIT",
   "engines": {
     "node": ">=26"
+  },
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*"
   }
 }

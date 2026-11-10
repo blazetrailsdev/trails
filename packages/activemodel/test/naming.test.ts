@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Model } from "../lib/index.js";
 import { ModelName, Naming } from "../lib/naming.js";
-import { assert, assertNot, inflections } from "@blazetrails/activesupport";
+import { inflections } from "@blazetrails/activesupport";
+import { assert, assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 
 class Post {

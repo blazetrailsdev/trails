@@ -19,7 +19,7 @@
 import * as fs from "fs";
 import * as fsPromises from "fs/promises";
 import * as path from "path";
-import { sourceRoots } from "../layout/package-roots.js";
+import { sourceRoots } from "../layout/package-roots.mjs";
 
 export interface TsFilePopulation {
   /** Directory *names* pruned during traversal, at any depth. */

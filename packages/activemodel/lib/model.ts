@@ -9,7 +9,7 @@ import {
   type Included,
   type Extended,
 } from "@blazetrails/activesupport";
-import { isModuleIncluded, rbObjDup, type Hash } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, methodCacheSerial, rbObjDup, type Hash } from "@blazetrails/ruby-compat";
 import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
@@ -36,6 +36,19 @@ export interface Model extends API, Access, Naming {
 
   /** @internal */
   initializeDup(other: unknown): void;
+}
+
+/** @perf 100ns — PERMANENT */
+const _includesAttributesCache = new WeakMap<object, { serial: number; value: boolean }>();
+
+/** @perf 100ns — PERMANENT */
+function _includesAttributes(klass: { prototype: object }): boolean {
+  const hit = _includesAttributesCache.get(klass);
+  if (hit && hit.serial === methodCacheSerial) return hit.value;
+  const serial = methodCacheSerial;
+  const value = isModuleIncluded(klass, Attributes);
+  _includesAttributesCache.set(klass, { serial, value });
+  return value;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -122,7 +135,7 @@ export class Model {
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
   constructor(attributes: Record<string, unknown> | Map<string, unknown> | null = {}) {
-    if (isModuleIncluded(new.target, Attributes)) {
+    if (_includesAttributes(new.target)) {
       (this as unknown as { _attributes: AttributeSet })._attributes = (
         new.target as unknown as { _defaultAttributes(): AttributeSet }
       )

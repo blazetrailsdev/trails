@@ -10,7 +10,7 @@ import {
   assertEmpty,
   assertNotRespondTo,
   assertRaises,
-} from "@blazetrails/activesupport";
+} from "@blazetrails/activesupport/testing/assertions";
 import { flatten } from "@blazetrails/ruby-compat";
 import {
   ContentLength,
