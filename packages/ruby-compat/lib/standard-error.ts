@@ -13,7 +13,7 @@ import { Exception } from "./exception.js";
  * inherits rather than defines.
  */
 export class StandardError extends Exception {
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE system-call-error-instanceof-reads-an-errno-table-and-all-takes-a-pattern */
   static [Symbol.hasInstance](error: unknown): boolean {
     return (
       Function.prototype[Symbol.hasInstance].call(this, error) ||
