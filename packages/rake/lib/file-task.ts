@@ -1,6 +1,6 @@
 import { AsyncEnumerable, cmp, Errno, File, rbCmpint, rbObjClass } from "@blazetrails/ruby-compat";
 import { LATE } from "./late-time.js";
-import { fromPathname } from "./rake-module.js";
+import { fromPathname } from "./file-list.js";
 import type { Scope } from "./scope.js";
 import { Task, type Timestamp } from "./task.js";
 

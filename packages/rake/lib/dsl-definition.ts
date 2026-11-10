@@ -9,13 +9,13 @@ import {
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { FileCreationTask } from "./file-creation-task.js";
-import { FileList } from "./file-list.js";
+import { eachDirParent, FileList, fromPathname } from "./file-list.js";
 import { FileTask } from "./file-task.js";
 import { FileUtilsExt } from "./file-utils-ext.js";
 import { MultiTask } from "./multi-task.js";
 import type { NameSpace } from "./name-space.js";
 import type { InNamespaceResult } from "./task-manager.js";
-import { eachDirParent, fromPathname, Rake } from "./rake-module.js";
+import { Rake } from "./rake-module.js";
 import { Task } from "./task.js";
 
 export const DSL = {

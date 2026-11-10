@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import { File } from "@blazetrails/ruby-compat";
 import { Application } from "../lib/application.js";
-import { Rake, eachDirParent } from "../lib/rake-module.js";
+import { eachDirParent } from "../lib/file-list.js";
+import { Rake } from "../lib/rake-module.js";
 import { useApplicationTestCase } from "./support/application.js";
 
 function alldirs(fn: string): string[] {

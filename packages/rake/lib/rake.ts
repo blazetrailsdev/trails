@@ -4,6 +4,7 @@ export { FileUtils } from "./file-utils.js";
 export { PseudoStatus } from "./pseudo-status.js";
 
 import "./constants.generated.js";
+export { rakeExtension } from "./ext/core.js";
 export { pathmap } from "./ext/string.js";
 export { Backtrace } from "./backtrace.js";
 export { Cloneable } from "./cloneable.js";
