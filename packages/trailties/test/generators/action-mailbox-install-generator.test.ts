@@ -68,8 +68,8 @@ describe("ActionMailbox::Generators::InstallGeneratorTest", () => {
     });
 
     await t.assertFile("config/environments/production.ts", (content) => {
-      expect(content).toContain("Prepare the ingress controller used to receive mail");
-      expect(content).toContain('this.config.actionMailbox.ingress = "relay"');
+      expect(content).toMatch("Prepare the ingress controller used to receive mail");
+      expect(content).toMatch('this.config.actionMailbox.ingress = "relay"');
     });
   });
 
