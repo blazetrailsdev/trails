@@ -51,6 +51,7 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "Chronic::Repeater": { "<=>": ["compareTo"] },
   "Rake::EarlyTime": { "<=>": ["compareTo"] },
   "Rake::LateTime": { "<=>": ["compareTo"] },
+  "TZInfo::Timestamp": { "<=>": ["compareTo"] },
   "Chronic::RepeaterTime::Tick": { "*": ["multiply"] },
   "EtOrbi::EoTime": {
     "==": ["equals"],

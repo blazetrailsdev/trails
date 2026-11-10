@@ -6,6 +6,7 @@ import { AmbiguousTime, InvalidTimezoneIdentifier, PeriodNotFound, Timezone } fr
 import { TimezoneOffset } from "./timezone-offset.js";
 import { TimezonePeriod } from "./timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
+import { Timestamp } from "./timestamp.js";
 
 export {
   AmbiguousTime,
@@ -13,6 +14,7 @@ export {
   InvalidCountryCode,
   InvalidTimezoneIdentifier,
   PeriodNotFound,
+  Timestamp,
   Timezone,
   TimezoneOffset,
   TimezonePeriod,
@@ -20,6 +22,7 @@ export {
 };
 
 export const TZInfo = {
+  Timestamp,
   Timezone,
   DataTimezone: Timezone,
   TimezonePeriod,
