@@ -13,7 +13,7 @@ describe("ArrayInquirerTest", () => {
   let arrayInquirer: ArrayInquirer<string>;
 
   beforeEach(() => {
-    arrayInquirer = new ArrayInquirer("mobile", "tablet", "api");
+    arrayInquirer = new ArrayInquirer(":mobile", ":tablet", "api");
   });
 
   it("individual", () => {
@@ -23,18 +23,18 @@ describe("ArrayInquirerTest", () => {
   });
 
   it("any", () => {
-    assert(arrayInquirer.any("mobile", "desktop"));
-    assert(arrayInquirer.any("watch", "tablet"));
-    assertNot(arrayInquirer.any("desktop", "watch"));
+    assert(arrayInquirer.any(":mobile", ":desktop"));
+    assert(arrayInquirer.any(":watch", ":tablet"));
+    assertNot(arrayInquirer.any(":desktop", ":watch"));
   });
 
   it("any string symbol mismatch", () => {
     assert(arrayInquirer.any("mobile"));
-    assert(arrayInquirer.any("api"));
+    assert(arrayInquirer.any(":api"));
   });
 
   it("any with block", () => {
-    assert(arrayInquirer.any((v) => v === "mobile"));
+    assert(arrayInquirer.any((v) => v === ":mobile"));
     assertNot(arrayInquirer.any((v) => v === "desktop"));
   });
 
@@ -43,7 +43,7 @@ describe("ArrayInquirerTest", () => {
   });
 
   it("inquiry", () => {
-    const result = inquiry.call(["mobile", "tablet", "api"]);
+    const result = inquiry.call([":mobile", ":tablet", "api"]);
 
     expect(result).toBeInstanceOf(ArrayInquirer);
     expect(result).toEqual(arrayInquirer);
