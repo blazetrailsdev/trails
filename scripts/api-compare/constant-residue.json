@@ -1043,7 +1043,7 @@
     }
   },
   "mail": {
-    "rows": 107,
+    "rows": 118,
     "excluded": ["multibyte/encoding-error.ts::EncodingError"],
     "unwalked": [
       "check-delivery-params.ts::CheckDeliveryParams",
@@ -1057,17 +1057,28 @@
       "multibyte.ts::Multibyte",
       "multibyte/unicode.ts::Unicode",
       "parser-tools.ts::ParserTools",
+      "parsers/address-lists-parser.ts::AddressListStruct",
       "parsers/address-lists-parser.ts::AddressListsParser",
+      "parsers/address-lists-parser.ts::AddressStruct",
       "parsers/content-disposition-parser.ts::ContentDispositionParser",
+      "parsers/content-disposition-parser.ts::ContentDispositionStruct",
       "parsers/content-location-parser.ts::ContentLocationParser",
+      "parsers/content-location-parser.ts::ContentLocationStruct",
       "parsers/content-transfer-encoding-parser.ts::ContentTransferEncodingParser",
+      "parsers/content-transfer-encoding-parser.ts::ContentTransferEncodingStruct",
       "parsers/content-type-parser.ts::ContentTypeParser",
+      "parsers/content-type-parser.ts::ContentTypeStruct",
       "parsers/date-time-parser.ts::DateTimeParser",
+      "parsers/date-time-parser.ts::DateTimeStruct",
       "parsers/envelope-from-parser.ts::EnvelopeFromParser",
+      "parsers/envelope-from-parser.ts::EnvelopeFromStruct",
       "parsers/message-ids-parser.ts::MessageIdsParser",
+      "parsers/message-ids-parser.ts::MessageIdsStruct",
       "parsers/mime-version-parser.ts::MimeVersionParser",
-      "parsers/phrase-lists-parser.ts::PhraseListsParser.PhraseListsStruct",
+      "parsers/mime-version-parser.ts::MimeVersionStruct",
+      "parsers/phrase-lists-parser.ts::PhraseListsStruct",
       "parsers/received-parser.ts::ReceivedParser",
+      "parsers/received-parser.ts::ReceivedStruct",
       "utilities.ts::Utilities"
     ],
     "residue": {

@@ -4,7 +4,7 @@ import { Field } from "../field.js";
 import { ReceivedElement } from "../elements/received-element.js";
 import { ParserTools } from "../parser-tools.js";
 
-const ReceivedStruct = Struct.new("date", "time", "info", "error");
+export const ReceivedStruct = Struct.new("date", "time", "info", "error");
 
 export const ReceivedParser = extend(
   {

@@ -5,7 +5,7 @@ import { ContentDispositionElement } from "../elements/content-disposition-eleme
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-const ContentDispositionStruct = Struct.new("dispositionType", "parameters", "error");
+export const ContentDispositionStruct = Struct.new("dispositionType", "parameters", "error");
 
 export const ContentDispositionParser = extend(
   {

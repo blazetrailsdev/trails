@@ -4,7 +4,7 @@ import { Field } from "../field.js";
 import { DateTimeElement } from "../elements/date-time-element.js";
 import { ParserTools } from "../parser-tools.js";
 
-const DateTimeStruct = Struct.new("dateString", "timeString", "error");
+export const DateTimeStruct = Struct.new("dateString", "timeString", "error");
 
 export const DateTimeParser = extend(
   {

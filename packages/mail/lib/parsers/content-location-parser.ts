@@ -5,7 +5,7 @@ import { ContentLocationElement } from "../elements/content-location-element.js"
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-const ContentLocationStruct = Struct.new("location", "error");
+export const ContentLocationStruct = Struct.new("location", "error");
 
 export const ContentLocationParser = extend(
   {

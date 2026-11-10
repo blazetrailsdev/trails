@@ -4,7 +4,7 @@ import { Field } from "../field.js";
 import { MessageIdsElement } from "../elements/message-ids-element.js";
 import { ParserTools } from "../parser-tools.js";
 
-const MessageIdsStruct = Struct.new("messageIds", "error");
+export const MessageIdsStruct = Struct.new("messageIds", "error");
 
 export const MessageIdsParser = extend(
   {

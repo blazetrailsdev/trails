@@ -5,7 +5,7 @@ import { MimeVersionElement } from "../elements/mime-version-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-const MimeVersionStruct = Struct.new("major", "minor", "error");
+export const MimeVersionStruct = Struct.new("major", "minor", "error");
 
 export const MimeVersionParser = extend(
   {
