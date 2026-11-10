@@ -20,6 +20,8 @@ const BUILT_IN_ADAPTERS: Record<string, () => Promise<Record<string, unknown>>> 
   "action_cable/subscription_adapter/postgresql": () =>
     import("../subscription-adapter/postgresql.js"),
   "action_cable/subscription_adapter/redis": () => import("../subscription-adapter/redis.js"),
+  "action_cable/subscription_adapter/test": () =>
+    import("@blazetrails/actioncable/subscription-adapter/test"),
 };
 
 type RackResponse = [number, Record<string, string>, unknown[]];

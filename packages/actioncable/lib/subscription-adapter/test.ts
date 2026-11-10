@@ -1,6 +1,5 @@
 import "../constants.test.generated.js";
 import { Async } from "./async.js";
-import { SubscriptionAdapter } from "../namespaces.js";
 
 export class Test extends Async {
   private _channelsData: Record<string, unknown[]> | null = null;
@@ -27,5 +26,3 @@ export class Test extends Async {
     return (this._channelsData ??= {});
   }
 }
-
-SubscriptionAdapter.loadPath["action_cable/subscription_adapter/test"] = () => import("./test.js");
