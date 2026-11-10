@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HTML5, SaveOptions } from "../../lib/index.js";
+import { HTML5, SaveOptions, XML } from "../../lib/index.js";
 
 const { Document, DocumentFragment } = HTML5;
 
@@ -132,5 +132,15 @@ describe("HTML5 node mutation", () => {
     const fragment = DocumentFragment.parse("<p>a</p><p>b</p>");
     fragment.css("p").each((node) => node.replace(`<b>${node.text}</b>`));
     expect(fragment.toHtml()).toBe("<b>a</b><b>b</b>");
+  });
+});
+
+describe("HTML5::DocumentFragment elements and is_a?", () => {
+  it("answers element children, deconstructs a NodeSet, and is an XML::DocumentFragment", () => {
+    const fragment = HTML5.DocumentFragment.parse("a<p>b</p><div>c</div>");
+    expect(fragment.elements.map((node) => node.name)).toEqual(["p", "div"]);
+    expect(fragment.elements.deconstruct()).toEqual(fragment.elements.toA());
+    expect(fragment).toBeInstanceOf(XML.DocumentFragment);
+    expect(fragment.children[0]).not.toBeInstanceOf(XML.DocumentFragment);
   });
 });

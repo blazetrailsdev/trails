@@ -289,10 +289,15 @@
     }
   },
   "actiontext": {
-    "rows": 1,
+    "rows": 4,
     "excluded": [],
     "unwalked": [],
-    "residue": { "gem-version.ts::VERSION": "ActionText::VERSION" }
+    "residue": {
+      "fragment.ts::Fragment": "ActionText::Fragment",
+      "gem-version.ts::VERSION": "ActionText::VERSION",
+      "html-conversion.ts::HtmlConversion": "ActionText::HtmlConversion",
+      "plain-text-conversion.ts::PlainTextConversion": "ActionText::PlainTextConversion"
+    }
   },
   "actionview": {
     "rows": 168,

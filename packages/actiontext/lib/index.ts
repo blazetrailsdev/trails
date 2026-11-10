@@ -3,3 +3,6 @@ export { VERSION, gemVersion } from "./gem-version.js";
 export { version } from "./version.js";
 export { deprecator } from "./deprecator.js";
 import "./constants.generated.js";
+export { Fragment } from "./fragment.js";
+export { HtmlConversion } from "./html-conversion.js";
+export { PlainTextConversion } from "./plain-text-conversion.js";

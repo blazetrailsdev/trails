@@ -70,6 +70,13 @@ export class DocumentFragment {
     return childNodes(this._node, this.document);
   }
 
+  get elements(): NodeSet {
+    return new NodeSet(
+      this.document,
+      this.children.filter((child) => child.isElement()),
+    );
+  }
+
   css(...args: unknown[]): NodeSet {
     if (this.children.length > 0) {
       return new NodeSet(this.document, this.children).css(...args);
