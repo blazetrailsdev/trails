@@ -21,9 +21,7 @@ Concern.included.call(Incineratable as never, null, function (this: typeof Inbou
     if: (inboundEmail: InboundEmail) =>
       ActionMailbox.incinerate != null &&
       ActionMailbox.incinerate !== false &&
-      (
-        inboundEmail as unknown as { statusPreviouslyChanged(): boolean }
-      ).statusPreviouslyChanged() &&
+      inboundEmail.statusPreviouslyChanged() &&
       inboundEmail.isProcessed(),
   });
 });

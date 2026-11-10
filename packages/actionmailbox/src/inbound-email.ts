@@ -1,5 +1,11 @@
 import "./constants.inbound-email.generated.js";
-import { include, runLoadHooks, type Extended, type Included } from "@blazetrails/activesupport";
+import {
+  include,
+  runLoadHooks,
+  type Extended,
+  type Included,
+  type TimeWithZone,
+} from "@blazetrails/activesupport";
 import type { ClassMethods as AttachedClassMethods } from "@blazetrails/activestorage/attached/model";
 import type { One } from "@blazetrails/activestorage/attached/one";
 import type { Blob } from "@blazetrails/activestorage/blob";
@@ -26,6 +32,8 @@ export class InboundEmail extends Record {
 
   declare rawEmail: One & Pick<Blob, "download">;
   declare status: string;
+  declare updated_at: TimeWithZone;
+  declare statusPreviouslyChanged: () => boolean;
   declare message_id: string;
   declare message_checksum: string;
   declare isPending: () => boolean;
@@ -79,8 +87,8 @@ export class InboundEmail extends Record {
 InboundEmail.MessageId = MessageId;
 InboundEmail.Incineratable = Incineratable;
 InboundEmail.Routable = Routable;
-include(InboundEmail, MessageId);
 include(InboundEmail, Routable);
+include(InboundEmail, MessageId);
 include(InboundEmail, Incineratable);
 ActionMailbox.InboundEmail = InboundEmail;
 

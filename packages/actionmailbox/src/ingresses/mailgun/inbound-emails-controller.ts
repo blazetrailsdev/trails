@@ -5,9 +5,9 @@ import {
   Encoding,
   OpenSSL,
   env,
-  cmp,
+  greaterThanOrEqual,
   kernelInteger,
-  rbCmpint,
+  type Comparable,
 } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../action-mailbox.js";
 import { BaseController } from "../../base-controller.js";
@@ -102,9 +102,10 @@ export class InboundEmailsController extends BaseController {
 
     /** @internal */
     isRecent(): boolean {
-      const time = Time.at(this.timestamp);
-      const ago = minutes(2).ago();
-      return rbCmpint(cmp(time, ago), time, ago) >= 0;
+      return greaterThanOrEqual.call(
+        Time.at(this.timestamp) as unknown as Comparable,
+        minutes(2).ago(),
+      );
     }
 
     /** @internal */

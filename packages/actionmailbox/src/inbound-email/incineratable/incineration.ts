@@ -17,7 +17,7 @@ export class Incineration {
 
   /** @internal */
   private isDue(): boolean {
-    return (this.inboundEmail as unknown as { updated_at: TimeWithZone }).updated_at.lessThan(
+    return this.inboundEmail.updated_at.lessThan(
       (ActionMailbox.incinerateAfter.ago() as TimeWithZone).endOfDay(),
     );
   }

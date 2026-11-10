@@ -136,6 +136,8 @@ describe("Array#max", () => {
     const now = instant(5n);
     expect(cmp(now, { compareTo: () => 1 })).toBe(-1);
     expect(cmp(now, { compareTo: () => null })).toBeNull();
+    expect(cmp(now, { cmp: () => -1 })).toBe(1);
+    expect(cmp(now, {})).toBeNull();
   });
 
   it("raises rb_cmperr's ArgumentError when a nil reaches the comparison", () => {
