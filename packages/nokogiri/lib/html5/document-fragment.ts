@@ -70,15 +70,11 @@ export class DocumentFragment {
     return childNodes(this._node, this.document);
   }
 
-  get elementChildren(): NodeSet {
+  get elements(): NodeSet {
     return new NodeSet(
       this.document,
       this.children.filter((child) => child.isElement()),
     );
-  }
-
-  get elements(): NodeSet {
-    return this.elementChildren;
   }
 
   css(...args: unknown[]): NodeSet {
