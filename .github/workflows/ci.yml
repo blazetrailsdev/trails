@@ -1183,10 +1183,6 @@ jobs:
       needs.changes.outputs.actioncable_only == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
-    # 2-way file-level shard: unsharded, this job was the last to finish in 20
-    # of 50 sampled runs (vitest step ~13 min median, 19.6 min max against the
-    # 20-minute timeout). The scoped thor_only / actioncable_only arms are a
-    # handful of files, so they run once, on shard 1.
     strategy:
       fail-fast: false
       matrix:
