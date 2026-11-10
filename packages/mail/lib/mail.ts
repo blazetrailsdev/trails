@@ -35,7 +35,7 @@ export interface MailConstants {
   LoggerDelivery: typeof import("./network/delivery-methods/logger-delivery.js").LoggerDelivery;
   Retriever: typeof import("./network/retriever-methods/base.js").Retriever;
   TestRetriever: typeof import("./network/retriever-methods/test-retriever.js").TestRetriever;
-  POP3?: new (settings: Record<string, unknown>) => Retriever;
+  POP3: typeof import("./network/retriever-methods/pop3.js").POP3;
   IMAP: typeof import("./network/retriever-methods/imap.js").IMAP;
   Parsers?: typeof import("./parsers.js");
   YAML: typeof import("./yaml.js").YAML;

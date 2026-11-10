@@ -90,6 +90,7 @@ export { LoggerDelivery } from "./network/delivery-methods/logger-delivery.js";
 export { Retriever } from "./network/retriever-methods/base.js";
 export { TestRetriever } from "./network/retriever-methods/test-retriever.js";
 export { IMAP } from "./network/retriever-methods/imap.js";
+export { POP3 } from "./network/retriever-methods/pop3.js";
 export { Envelope } from "./envelope.js";
 export { Body } from "./body.js";
 export { PartsList } from "./parts-list.js";
