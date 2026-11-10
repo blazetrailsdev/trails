@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { stdout as $stdout } from "@blazetrails/ruby-compat";
+import { stderr as $stderr, stdout as $stdout } from "@blazetrails/ruby-compat";
 import { Benchmark } from "../lib/ips.js";
 
 function sleep(seconds: number): void {
@@ -8,16 +8,19 @@ function sleep(seconds: number): void {
 
 describe("TestBenchmarkIPS", () => {
   let out: string;
-  let write: typeof $stdout.write;
+  let err: string;
+  let writes: [typeof $stdout.write, typeof $stderr.write];
 
   beforeEach(() => {
     out = "";
-    write = $stdout.write;
+    err = "";
+    writes = [$stdout.write, $stderr.write];
     $stdout.write = (chunk: string) => ((out += chunk), true);
+    $stderr.write = (chunk: string) => ((err += chunk), true);
   });
 
   afterEach(() => {
-    $stdout.write = write;
+    [$stdout.write, $stderr.write] = writes;
   });
 
   it("kwargs", () => {
@@ -25,7 +28,7 @@ describe("TestBenchmarkIPS", () => {
       x.report("sleep 0.25", () => sleep(0.25));
     });
 
-    expect(out.length).toBeGreaterThan(0);
+    expect(out.length > 0).toBeTruthy();
   });
 
   it("warmup0", () => {
@@ -34,6 +37,7 @@ describe("TestBenchmarkIPS", () => {
     });
 
     expect(out).not.toMatch(/Warming up -+/);
+    expect(err).toBeEmpty();
   });
 
   it("output", () => {
@@ -43,7 +47,7 @@ describe("TestBenchmarkIPS", () => {
       x.report("operation", () => 100 * 100);
     });
 
-    expect(out.length).toBeGreaterThan(0);
+    expect(out.length > 0).toBeTruthy();
   });
 
   it("quiet", () => {
@@ -52,14 +56,14 @@ describe("TestBenchmarkIPS", () => {
       x.report("operation", () => 100 * 100);
     });
 
-    expect(out.length).toBe(0);
+    expect(out.length === 0).toBeTruthy();
 
     Benchmark.ips({ quiet: true }, (x) => {
       x.config({ warmup: 0.001, time: 0.001 });
       x.report("operation", () => 100 * 100);
     });
 
-    expect(out.length).toBe(0);
+    expect(out.length === 0).toBeTruthy();
 
     Benchmark.ips((x) => {
       x.config({ warmup: 0.001, time: 0.001 });
@@ -67,7 +71,7 @@ describe("TestBenchmarkIPS", () => {
       x.report("operation", () => 100 * 100);
     });
 
-    expect(out.length).toBe(0);
+    expect(out.length === 0).toBeTruthy();
   });
 
   it("quiet option override", () => {
@@ -77,7 +81,7 @@ describe("TestBenchmarkIPS", () => {
       x.report("operation", () => 100 * 100);
     });
 
-    expect(out.length).toBeGreaterThan(0);
+    expect(out.length > 0).toBeTruthy();
     out = "";
 
     Benchmark.ips({ quiet: true }, (x) => {
@@ -85,7 +89,7 @@ describe("TestBenchmarkIPS", () => {
       x.report("operation", () => 100 * 100);
     });
 
-    expect(out.length).toBeGreaterThan(0);
+    expect(out.length > 0).toBeTruthy();
     out = "";
 
     Benchmark.ips({ quiet: true, warmup: 0.001, time: 0.001 }, (x) => {
@@ -93,7 +97,7 @@ describe("TestBenchmarkIPS", () => {
       x.report("operation", () => 100 * 100);
     });
 
-    expect(out.length).toBe(0);
+    expect(out.length === 0).toBeTruthy();
   });
 
   it("ips old config", () => {
@@ -114,7 +118,7 @@ describe("TestBenchmarkIPS", () => {
     expect(allData).toBeTruthy();
     expect(allData[0]["name"]).toBe("sleep 0.25");
     expect(allData[0]["ips"]).toBeTruthy();
-    expect(allData[0]["stddev"]).not.toBeNull();
+    expect(allData[0]["stddev"] != null).toBeTruthy();
   });
 
   it("ips empty", () => {
@@ -177,6 +181,6 @@ describe("TestBenchmarkIPS", () => {
       time: 0.001,
     });
 
-    expect(out.length).toBeGreaterThan(0);
+    expect(out.length > 0).toBeTruthy();
   });
 });
