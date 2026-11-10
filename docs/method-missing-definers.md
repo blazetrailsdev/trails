@@ -53,3 +53,4 @@ Class-specific rules live in the owning package's `CLAUDE.md`, under
 | `active_storage/attached/one.rb`                      | Proxy (proto chain)   |
 | `active_storage/attached/many.rb`                     | Proxy (proto chain)   |
 | `mail/field.rb`                                       | Proxy (proto chain)   |
+| `action_text/attachment.rb`                           | Proxy (proto chain)   |

@@ -10,6 +10,7 @@
   "references": [
     { "path": "../actionpack" },
     { "path": "../actionview" },
+    { "path": "../activemodel" },
     { "path": "../activerecord" },
     { "path": "../activestorage" },
     { "path": "../activesupport" },

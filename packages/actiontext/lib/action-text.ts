@@ -1,16 +1,28 @@
 import { Autoload, extend, type Deprecation, type Extended } from "@blazetrails/activesupport";
 import { HTML5 } from "@blazetrails/nokogiri";
 import { TopLevel, constSet, type Gem } from "@blazetrails/ruby-compat";
+import type { Attachment } from "./attachment.js";
+import type { AttachmentGallery } from "./attachment-gallery.js";
+import type { Caching } from "./attachments/caching.js";
+import type { Minification } from "./attachments/minification.js";
+import type { TrixConversion } from "./attachments/trix-conversion.js";
 import type { Fragment } from "./fragment.js";
 import type { HtmlConversion } from "./html-conversion.js";
 import type { PlainTextConversion } from "./plain-text-conversion.js";
+import type { TrixAttachment } from "./trix-attachment.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
+  "action_text/attachment": () => import("./attachment.js"),
+  "action_text/attachment_gallery": () => import("./attachment-gallery.js"),
+  "action_text/attachments/caching": () => import("./attachments/caching.js"),
+  "action_text/attachments/minification": () => import("./attachments/minification.js"),
+  "action_text/attachments/trix_conversion": () => import("./attachments/trix-conversion.js"),
   "action_text/fragment": () => import("./fragment.js"),
   "action_text/html_conversion": () => import("./html-conversion.js"),
   "action_text/plain_text_conversion": () => import("./plain-text-conversion.js"),
+  "action_text/trix_attachment": () => import("./trix-attachment.js"),
 };
 
 type NokogiriConstants = { Nokogiri: { HTML5?: unknown; HTML4: typeof HTML5 } };
@@ -44,13 +56,34 @@ export const ActionText = {
   _htmlDocumentClass?: typeof HTML5.Document;
   /** @internal */
   _htmlDocumentFragmentClass?: typeof HTML5.DocumentFragment;
+  Attachable?: { fromNode(node: unknown): Promise<unknown> };
+  Attachment?: typeof Attachment;
+  AttachmentGallery?: typeof AttachmentGallery;
+  Attachments: typeof Attachments;
+  Content?: { render(...args: unknown[]): unknown };
   Fragment?: typeof Fragment;
   HtmlConversion?: typeof HtmlConversion;
   PlainTextConversion?: typeof PlainTextConversion;
+  TrixAttachment?: typeof TrixAttachment;
 };
 extend(ActionText, Autoload);
 constSet(TopLevel, "ActionText", ActionText);
 
+ActionText.autoload("Attachment");
+ActionText.autoload("AttachmentGallery");
 ActionText.autoload("Fragment");
 ActionText.autoload("HtmlConversion");
 ActionText.autoload("PlainTextConversion");
+ActionText.autoload("TrixAttachment");
+
+const Attachments = { name: "ActionText::Attachments", loadPath } as AutoloadModule & {
+  Caching?: typeof Caching;
+  Minification?: typeof Minification;
+  TrixConversion?: typeof TrixConversion;
+};
+extend(Attachments, Autoload);
+ActionText.Attachments = Attachments;
+
+Attachments.autoload("Caching");
+Attachments.autoload("Minification");
+Attachments.autoload("TrixConversion");
