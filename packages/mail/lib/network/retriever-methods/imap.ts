@@ -1,4 +1,4 @@
-import { ArgumentError, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError, toI, TopLevel } from "@blazetrails/ruby-compat";
 import { Configuration } from "../../configuration.js";
 import { Mail } from "../../mail.js";
 import type { Message } from "../../message.js";
@@ -75,7 +75,7 @@ export class IMAP extends Retriever {
 
       if (block) {
         for (let uid of uids) {
-          if (opts.uid != null) uid = Number.parseInt(String(opts.uid), 10);
+          if (opts.uid != null) uid = toI(opts.uid) as number;
           const fetchdata = imap.uidFetch(uid, ["RFC822", "FLAGS"])[0];
           const newMessage = Mail.new(fetchdata.attr["RFC822"]);
           if (opts.deleteAfterFind) newMessage.setMarkForDelete(true);
@@ -97,7 +97,7 @@ export class IMAP extends Retriever {
       } else {
         const emails: Message[] = [];
         for (let uid of uids) {
-          if (opts.uid != null) uid = Number.parseInt(String(opts.uid), 10);
+          if (opts.uid != null) uid = toI(opts.uid) as number;
           const fetchdata = imap.uidFetch(uid, ["RFC822"])[0];
           emails.push(Mail.new(fetchdata.attr["RFC822"]));
           if (opts.deleteAfterFind)
@@ -132,12 +132,12 @@ export class IMAP extends Retriever {
   /** @internal */
   private validateOptions(options: RetrieverOptions | null): RetrieverOptions {
     options = options ? { ...options } : {};
-    options.mailbox ??= "INBOX";
+    if (options.mailbox == null || options.mailbox === false) options.mailbox = "INBOX";
     options.count ??= 10;
     options.order ??= "asc";
     options.what ??= "first";
-    options.keys ??= "ALL";
-    options.uid ??= null;
+    if (options.keys == null || options.keys === false) options.keys = "ALL";
+    if (options.uid == null || options.uid === false) options.uid = null;
     options.deleteAfterFind ??= false;
     options.mailbox = (TopLevel.Net as NetWithIMAP).IMAP!.encodeUtf7(options.mailbox as string);
     options.readOnly ??= false;
