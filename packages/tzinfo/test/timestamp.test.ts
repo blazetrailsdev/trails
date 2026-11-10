@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DateTime, Time } from "@blazetrails/date";
-import { ArgumentError, RangeError, Rational, rbHash } from "@blazetrails/ruby-compat";
+import { ArgumentError, RangeError, Rational, rbCInteger, rbHash } from "@blazetrails/ruby-compat";
 import { Timestamp } from "../lib/index.js";
 
 const R = (n: number, d: number) => new Rational(n, d);
@@ -15,27 +15,26 @@ function assertEqualWithOffset(expected: Time | DateTime, actual: Time | DateTim
   }
 }
 
-function raises(
+function assertRaises(
   klass: abstract new (...args: never[]) => Error,
-  message: string,
-  fn: () => unknown,
-) {
+  block: () => unknown,
+): Error {
   let error: unknown;
   try {
-    fn();
+    block();
   } catch (e) {
     error = e;
   }
   expect(error).toBeInstanceOf(klass);
-  expect((error as Error).message).toBe(message);
+  return error as Error;
 }
 
 describe("TCTimestamp", () => {
   it("initialize timestamp only", () => {
     const t = new Timestamp(1476316800);
-    expect(t.value).toBe(1476316800);
-    expect(Number.isInteger(t.subSecond)).toBe(true);
-    expect(t.subSecond).toBe(0);
+    expect(t.value).toEqual(1476316800);
+    expect(t.subSecond).toBeInstanceOf(rbCInteger);
+    expect(t.subSecond).toEqual(0);
     expect(t.utcOffset).toBeNull();
     expect(t.isUtc()).toBeNull();
   });
@@ -47,153 +46,214 @@ describe("TCTimestamp", () => {
 
   it("initialize sub second zero", () => {
     const t = new Timestamp(1476316800, 0);
-    expect(Number.isInteger(t.subSecond)).toBe(true);
-    expect(t.subSecond).toBe(0);
+    expect(t.subSecond).toBeInstanceOf(rbCInteger);
+    expect(t.subSecond).toEqual(0);
   });
 
   it("initialize zero utc offset", () => {
     const t = new Timestamp(1476316800, 0, 0);
-    expect(t.value).toBe(1476316800);
-    expect(t.utcOffset).toBe(0);
-    expect(t.isUtc()).toBe(false);
+    expect(t.value).toEqual(1476316800);
+    expect(t.utcOffset).toEqual(0);
+    expect(t.isUtc()).toEqual(false);
   });
 
   it("initialize non zero utc offset", () => {
     const t = new Timestamp(1476316800, 0, 3600);
-    expect(t.value).toBe(1476316800);
-    expect(t.utcOffset).toBe(3600);
-    expect(t.isUtc()).toBe(false);
+    expect(t.value).toEqual(1476316800);
+    expect(t.utcOffset).toEqual(3600);
+    expect(t.isUtc()).toEqual(false);
   });
 
   it("initialize utc", () => {
     const t = new Timestamp(1476316800, 0, "utc");
-    expect(t.value).toBe(1476316800);
-    expect(t.utcOffset).toBe(0);
-    expect(t.isUtc()).toBe(true);
+    expect(t.value).toEqual(1476316800);
+    expect(t.utcOffset).toEqual(0);
+    expect(t.isUtc()).toEqual(true);
   });
 
   it("initialize value nil", () => {
-    raises(ArgumentError, "value must be an Integer", () => new Timestamp(null as never));
+    const error = assertRaises(ArgumentError, () => new Timestamp(null as never));
+    expect(error.message).toEqual("value must be an Integer");
   });
 
   it("initialize valuenot integer", () => {
-    raises(ArgumentError, "value must be an Integer", () => new Timestamp(1476316800.5));
+    const error = assertRaises(ArgumentError, () => new Timestamp(1476316800.5));
+    expect(error.message).toEqual("value must be an Integer");
   });
 
   it("initialize sub second nil", () => {
-    raises(
-      ArgumentError,
-      "sub_second must be a Rational or the Integer 0",
-      () => new Timestamp(1476316800, null as never),
-    );
+    const error = assertRaises(ArgumentError, () => new Timestamp(1476316800, null as never));
+    expect(error.message).toEqual("sub_second must be a Rational or the Integer 0");
   });
 
   it("initialize sub second not integer or rational", () => {
-    raises(
-      ArgumentError,
-      "sub_second must be a Rational or the Integer 0",
-      () => new Timestamp(1476316800, 0.1),
-    );
+    const error = assertRaises(ArgumentError, () => new Timestamp(1476316800, 0.1));
+    expect(error.message).toEqual("sub_second must be a Rational or the Integer 0");
   });
 
   it("initialize sub second integer not zero", () => {
-    raises(
-      ArgumentError,
-      "sub_second must be a Rational or the Integer 0",
-      () => new Timestamp(1476316800, 1),
-    );
+    const error = assertRaises(ArgumentError, () => new Timestamp(1476316800, 1));
+    expect(error.message).toEqual("sub_second must be a Rational or the Integer 0");
   });
 
   it("initialize sub second less than zero", () => {
-    raises(
-      RangeError,
-      "sub_second must be >= 0 and < 1",
-      () => new Timestamp(1476316800, R(-1, 10)),
-    );
+    const error = assertRaises(RangeError, () => new Timestamp(1476316800, R(-1, 10)));
+    expect(error.message).toEqual("sub_second must be >= 0 and < 1");
   });
 
   it("initialize sub second greater than or equal to one", () => {
-    raises(RangeError, "sub_second must be >= 0 and < 1", () => new Timestamp(1476316800, R(1, 1)));
+    const error = assertRaises(RangeError, () => new Timestamp(1476316800, R(1, 1)));
+    expect(error.message).toEqual("sub_second must be >= 0 and < 1");
   });
 
   it("initialize utc offset not integer or utc", () => {
     for (const utcOffset of [1.5, "zero"]) {
-      raises(
+      const error = assertRaises(
         ArgumentError,
-        "utc_offset must be an Integer, :utc or nil",
         () => new Timestamp(1476316800, 0, utcOffset as never),
       );
+      expect(error.message).toEqual("utc_offset must be an Integer, :utc or nil");
     }
   });
 
-  const addAndSet = (offset: number | "utc" | null) => {
+  it("add and set utc offset utc", () => {
     const t1 = new Timestamp(1476316800, R(1, 10));
     const t2 = new Timestamp(1476316800, R(1, 10), 0);
     const t3 = new Timestamp(1476316800, R(1, 10), "utc");
-    const rs = [
-      t1.addAndSetUtcOffset(-1, offset),
-      t2.addAndSetUtcOffset(1, offset),
-      t3.addAndSetUtcOffset(2, offset),
-    ];
-    expect(rs.map((r) => r.value)).toEqual([1476316799, 1476316801, 1476316802]);
-    for (const r of rs) expect(r.subSecond).toEqual(R(1, 10));
-    return rs;
-  };
 
-  it("add and set utc offset utc", () => {
-    for (const r of addAndSet("utc")) {
-      expect(r.utcOffset).toBe(0);
-      expect(r.isUtc()).toBe(true);
-    }
+    const r1 = t1.addAndSetUtcOffset(-1, "utc");
+    const r2 = t2.addAndSetUtcOffset(1, "utc");
+    const r3 = t3.addAndSetUtcOffset(2, "utc");
+
+    expect(r1.value).toEqual(1476316799);
+    expect(r2.value).toEqual(1476316801);
+    expect(r3.value).toEqual(1476316802);
+
+    expect(r1.subSecond).toEqual(R(1, 10));
+    expect(r2.subSecond).toEqual(R(1, 10));
+    expect(r3.subSecond).toEqual(R(1, 10));
+
+    expect(r1.utcOffset).toEqual(0);
+    expect(r2.utcOffset).toEqual(0);
+    expect(r3.utcOffset).toEqual(0);
+
+    expect(r1.isUtc()).toEqual(true);
+    expect(r2.isUtc()).toEqual(true);
+    expect(r3.isUtc()).toEqual(true);
   });
 
   it("add and set utc offset zero", () => {
-    for (const r of addAndSet(0)) {
-      expect(r.utcOffset).toBe(0);
-      expect(r.isUtc()).toBe(false);
-    }
+    const t1 = new Timestamp(1476316800, R(1, 10));
+    const t2 = new Timestamp(1476316800, R(1, 10), 0);
+    const t3 = new Timestamp(1476316800, R(1, 10), "utc");
+
+    const r1 = t1.addAndSetUtcOffset(-1, 0);
+    const r2 = t2.addAndSetUtcOffset(1, 0);
+    const r3 = t3.addAndSetUtcOffset(2, 0);
+
+    expect(r1.value).toEqual(1476316799);
+    expect(r2.value).toEqual(1476316801);
+    expect(r3.value).toEqual(1476316802);
+
+    expect(r1.subSecond).toEqual(R(1, 10));
+    expect(r2.subSecond).toEqual(R(1, 10));
+    expect(r3.subSecond).toEqual(R(1, 10));
+
+    expect(r1.utcOffset).toEqual(0);
+    expect(r2.utcOffset).toEqual(0);
+    expect(r3.utcOffset).toEqual(0);
+
+    expect(r1.isUtc()).toEqual(false);
+    expect(r2.isUtc()).toEqual(false);
+    expect(r3.isUtc()).toEqual(false);
   });
 
   it("add and set utc offset non zero", () => {
-    for (const r of addAndSet(3600)) {
-      expect(r.utcOffset).toBe(3600);
-      expect(r.isUtc()).toBe(false);
-    }
+    const t1 = new Timestamp(1476316800, R(1, 10));
+    const t2 = new Timestamp(1476316800, R(1, 10), 0);
+    const t3 = new Timestamp(1476316800, R(1, 10), "utc");
+
+    const r1 = t1.addAndSetUtcOffset(-1, 3600);
+    const r2 = t2.addAndSetUtcOffset(1, 3600);
+    const r3 = t3.addAndSetUtcOffset(2, 3600);
+
+    expect(r1.value).toEqual(1476316799);
+    expect(r2.value).toEqual(1476316801);
+    expect(r3.value).toEqual(1476316802);
+
+    expect(r1.subSecond).toEqual(R(1, 10));
+    expect(r2.subSecond).toEqual(R(1, 10));
+    expect(r3.subSecond).toEqual(R(1, 10));
+
+    expect(r1.utcOffset).toEqual(3600);
+    expect(r2.utcOffset).toEqual(3600);
+    expect(r3.utcOffset).toEqual(3600);
+
+    expect(r1.isUtc()).toEqual(false);
+    expect(r2.isUtc()).toEqual(false);
+    expect(r3.isUtc()).toEqual(false);
   });
 
   it("add and set utc offset unspecified", () => {
-    for (const r of addAndSet(null)) {
-      expect(r.utcOffset).toBeNull();
-      expect(r.isUtc()).toBeNull();
-    }
+    const t1 = new Timestamp(1476316800, R(1, 10));
+    const t2 = new Timestamp(1476316800, R(1, 10), 0);
+    const t3 = new Timestamp(1476316800, R(1, 10), "utc");
+
+    const r1 = t1.addAndSetUtcOffset(-1, null);
+    const r2 = t2.addAndSetUtcOffset(1, null);
+    const r3 = t3.addAndSetUtcOffset(2, null);
+
+    expect(r1.value).toEqual(1476316799);
+    expect(r2.value).toEqual(1476316801);
+    expect(r3.value).toEqual(1476316802);
+
+    expect(r1.subSecond).toEqual(R(1, 10));
+    expect(r2.subSecond).toEqual(R(1, 10));
+    expect(r3.subSecond).toEqual(R(1, 10));
+
+    expect(r1.utcOffset).toBeNull();
+    expect(r2.utcOffset).toBeNull();
+    expect(r3.utcOffset).toBeNull();
+
+    expect(r1.isUtc()).toBeNull();
+    expect(r2.isUtc()).toBeNull();
+    expect(r3.isUtc()).toBeNull();
   });
 
   it("add and set utc offset add zero same offset", () => {
     const t1 = new Timestamp(1476316800, R(1, 10));
     const t2 = new Timestamp(1476316800, R(1, 10), 0);
     const t3 = new Timestamp(1476316800, R(1, 10), "utc");
-    expect(t1.addAndSetUtcOffset(0, null)).toBe(t1);
-    expect(t2.addAndSetUtcOffset(0, 0)).toBe(t2);
-    expect(t3.addAndSetUtcOffset(0, "utc")).toBe(t3);
+
+    const r1 = t1.addAndSetUtcOffset(0, null);
+    const r2 = t2.addAndSetUtcOffset(0, 0);
+    const r3 = t3.addAndSetUtcOffset(0, "utc");
+
+    expect(r1).toBe(t1);
+    expect(r2).toBe(t2);
+    expect(r3).toBe(t3);
   });
 
   it("add and set utc offset seconds nil", () => {
-    raises(ArgumentError, "seconds must be an Integer", () =>
+    const error = assertRaises(ArgumentError, () =>
       new Timestamp(1476316800).addAndSetUtcOffset(null as never, 0),
     );
+    expect(error.message).toEqual("seconds must be an Integer");
   });
 
   it("add and set utc offset seconds non integer", () => {
-    raises(ArgumentError, "seconds must be an Integer", () =>
+    const error = assertRaises(ArgumentError, () =>
       new Timestamp(1476316800).addAndSetUtcOffset(1.5, 0),
     );
+    expect(error.message).toEqual("seconds must be an Integer");
   });
 
   it("add and set utc offset utc offset not integer or utc", () => {
     for (const utcOffset of [1.5, "zero"]) {
-      raises(ArgumentError, "utc_offset must be an Integer, :utc or nil", () =>
+      const error = assertRaises(ArgumentError, () =>
         new Timestamp(1476316800).addAndSetUtcOffset(1, utcOffset as never),
       );
+      expect(error.message).toEqual("utc_offset must be an Integer, :utc or nil");
     }
   });
 
@@ -202,26 +262,36 @@ describe("TCTimestamp", () => {
     expect(t.utc()).toBe(t);
   });
 
-  const utcFrom = (offset: number | null) => {
-    const t = new Timestamp(1476316800, 0, offset).utc();
-    expect(t.value).toBe(1476316800);
-    expect(t.subSecond).toBe(0);
-    expect(t.utcOffset).toBe(0);
-    expect(t.isUtc()).toBe(true);
-  };
+  it("utc from zero offset", () => {
+    const t = new Timestamp(1476316800, 0, 0).utc();
+    expect(t.value).toEqual(1476316800);
+    expect(t.subSecond).toEqual(0);
+    expect(t.utcOffset).toEqual(0);
+    expect(t.isUtc()).toEqual(true);
+  });
 
-  it("utc from zero offset", () => utcFrom(0));
+  it("utc from non zero offset", () => {
+    const t = new Timestamp(1476316800, 0, 3600).utc();
+    expect(t.value).toEqual(1476316800);
+    expect(t.subSecond).toEqual(0);
+    expect(t.utcOffset).toEqual(0);
+    expect(t.isUtc()).toEqual(true);
+  });
 
-  it("utc from non zero offset", () => utcFrom(3600));
-
-  it("utc from unspecified offset", () => utcFrom(null));
+  it("utc from unspecified offset", () => {
+    const t = new Timestamp(1476316800, 0).utc();
+    expect(t.value).toEqual(1476316800);
+    expect(t.subSecond).toEqual(0);
+    expect(t.utcOffset).toEqual(0);
+    expect(t.isUtc()).toEqual(true);
+  });
 
   it("utc sub second", () => {
     const t = new Timestamp(1476316800, R(1, 10), 0).utc();
-    expect(t.value).toBe(1476316800);
+    expect(t.value).toEqual(1476316800);
     expect(t.subSecond).toEqual(R(1, 10));
-    expect(t.utcOffset).toBe(0);
-    expect(t.isUtc()).toBe(true);
+    expect(t.utcOffset).toEqual(0);
+    expect(t.isUtc()).toEqual(true);
   });
 
   it("to time", () => {
@@ -292,10 +362,14 @@ describe("TCTimestamp", () => {
   });
 
   it("to i", () => {
-    for (const offset of [null, 0, "utc", 3600] as const) {
-      expect(new Timestamp(1476316801, 0, offset).toI()).toBe(1476316801);
-      expect(new Timestamp(1476316801, R(1, 10), offset).toI()).toBe(1476316801);
-    }
+    expect(new Timestamp(1476316801).toI()).toEqual(1476316801);
+    expect(new Timestamp(1476316801, R(1, 10)).toI()).toEqual(1476316801);
+    expect(new Timestamp(1476316801, 0, 0).toI()).toEqual(1476316801);
+    expect(new Timestamp(1476316801, R(1, 10), 0).toI()).toEqual(1476316801);
+    expect(new Timestamp(1476316801, 0, "utc").toI()).toEqual(1476316801);
+    expect(new Timestamp(1476316801, R(1, 10), "utc").toI()).toEqual(1476316801);
+    expect(new Timestamp(1476316801, 0, 3600).toI()).toEqual(1476316801);
+    expect(new Timestamp(1476316801, R(1, 10), 3600).toI()).toEqual(1476316801);
   });
 
   it("to datetime returns gregorian", () => {
@@ -304,187 +378,159 @@ describe("TCTimestamp", () => {
     expect(dt.year).toBe(1582);
     expect(dt.month).toBe(10);
     expect(dt.day).toBe(14);
-    expect(dt.isGregorian).toBe(true);
+    expect(dt.isGregorian).toBeTruthy();
   });
 
   it("strftime", () => {
-    const f = "%Y-%m-%d %H:%M:%S.%L %z %%";
-    expect(new Timestamp(1476316800, R(1, 10)).strftime(f)).toBe("2016-10-13 00:00:00.100 +0000 %");
-    expect(new Timestamp(1476316800, R(1, 10), "utc").strftime(f)).toBe(
+    expect(new Timestamp(1476316800, R(1, 10)).strftime("%Y-%m-%d %H:%M:%S.%L %z %%")).toEqual(
       "2016-10-13 00:00:00.100 +0000 %",
     );
-    expect(new Timestamp(1476316800, R(1, 10), 0).strftime(f)).toBe(
+    expect(
+      new Timestamp(1476316800, R(1, 10), "utc").strftime("%Y-%m-%d %H:%M:%S.%L %z %%"),
+    ).toEqual("2016-10-13 00:00:00.100 +0000 %");
+    expect(new Timestamp(1476316800, R(1, 10), 0).strftime("%Y-%m-%d %H:%M:%S.%L %z %%")).toEqual(
       "2016-10-13 00:00:00.100 +0000 %",
     );
-    expect(new Timestamp(1476316800, R(1, 10), 3600).strftime(f)).toBe(
-      "2016-10-13 01:00:00.100 +0100 %",
-    );
-    expect(new Timestamp(1476316800, R(1, 10), -3600).strftime(f)).toBe(
-      "2016-10-12 23:00:00.100 -0100 %",
-    );
+    expect(
+      new Timestamp(1476316800, R(1, 10), 3600).strftime("%Y-%m-%d %H:%M:%S.%L %z %%"),
+    ).toEqual("2016-10-13 01:00:00.100 +0100 %");
+    expect(
+      new Timestamp(1476316800, R(1, 10), -3600).strftime("%Y-%m-%d %H:%M:%S.%L %z %%"),
+    ).toEqual("2016-10-12 23:00:00.100 -0100 %");
   });
 
   it("strftime nil format", () => {
     const t = new Timestamp(1476316800, R(1, 10));
-    raises(ArgumentError, "format must be specified", () => t.strftime(null));
+    const error = assertRaises(ArgumentError, () => t.strftime(null as never));
+    expect(error.message).toEqual("format must be specified");
   });
 
   it("to s without offset", () => {
-    expect(new Timestamp(1476316800).toString()).toBe("1476316800");
+    expect(new Timestamp(1476316800).toString()).toEqual("1476316800");
   });
 
   it("to s utc", () => {
-    expect(new Timestamp(1476316800, 0, "utc").toString()).toBe("1476316800 UTC");
+    expect(new Timestamp(1476316800, 0, "utc").toString()).toEqual("1476316800 UTC");
   });
 
   it("to s offset", () => {
-    expect(new Timestamp(1476316800, 0, 0).toString()).toBe("1476316800 +00:00");
-    expect(new Timestamp(1476316800, 0, 3600).toString()).toBe(
+    expect(new Timestamp(1476316800, 0, 0).toString()).toEqual("1476316800 +00:00");
+    expect(new Timestamp(1476316800, 0, 3600).toString()).toEqual(
       "1476320400 +01:00 (1476316800 UTC)",
     );
-    expect(new Timestamp(1476316800, 0, -3600).toString()).toBe(
+    expect(new Timestamp(1476316800, 0, -3600).toString()).toEqual(
       "1476313200 -01:00 (1476316800 UTC)",
     );
-    expect(new Timestamp(1476316800, 0, 1500).toString()).toBe(
+    expect(new Timestamp(1476316800, 0, 1500).toString()).toEqual(
       "1476318300 +00:25 (1476316800 UTC)",
     );
-    expect(new Timestamp(1476316800, 0, -1500).toString()).toBe(
+    expect(new Timestamp(1476316800, 0, -1500).toString()).toEqual(
       "1476315300 -00:25 (1476316800 UTC)",
     );
-    expect(new Timestamp(1476316800, 0, 1503).toString()).toBe(
+    expect(new Timestamp(1476316800, 0, 1503).toString()).toEqual(
       "1476318303 +00:25:03 (1476316800 UTC)",
     );
-    expect(new Timestamp(1476316800, 0, -1503).toString()).toBe(
+    expect(new Timestamp(1476316800, 0, -1503).toString()).toEqual(
       "1476315297 -00:25:03 (1476316800 UTC)",
     );
-    expect(new Timestamp(1476316800, 0, 90000).toString()).toBe(
+    expect(new Timestamp(1476316800, 0, 90000).toString()).toEqual(
       "1476406800 +25:00 (1476316800 UTC)",
     );
-    expect(new Timestamp(1476316800, 0, -90000).toString()).toBe(
+    expect(new Timestamp(1476316800, 0, -90000).toString()).toEqual(
       "1476226800 -25:00 (1476316800 UTC)",
     );
   });
 
   it("to s sub second", () => {
-    expect(new Timestamp(1476316800, R(2, 10)).toString()).toBe("1476316800 1/5");
+    expect(new Timestamp(1476316800, R(2, 10)).toString()).toEqual("1476316800 1/5");
   });
 
   it("to s utc sub second", () => {
-    expect(new Timestamp(1476316800, R(2, 10), "utc").toString()).toBe("1476316800 1/5 UTC");
+    expect(new Timestamp(1476316800, R(2, 10), "utc").toString()).toEqual("1476316800 1/5 UTC");
   });
 
   it("to s offset sub second", () => {
-    expect(new Timestamp(1476316800, R(2, 10), 0).toString()).toBe("1476316800 1/5 +00:00");
-    expect(new Timestamp(1476316800, R(2, 10), 3600).toString()).toBe(
+    expect(new Timestamp(1476316800, R(2, 10), 0).toString()).toEqual("1476316800 1/5 +00:00");
+    expect(new Timestamp(1476316800, R(2, 10), 3600).toString()).toEqual(
       "1476320400 1/5 +01:00 (1476316800 1/5 UTC)",
     );
   });
 
-  const a = R(100_000_000, 1_000_000_000);
-  const b = R(100_000_001, 1_000_000_000);
-  const pairs = (): [Timestamp, Timestamp, number | null][] => [
-    [new Timestamp(1476313200), new Timestamp(1476316800), -1],
-    [new Timestamp(1476316800), new Timestamp(1476316800), 0],
-    [new Timestamp(1476316800), new Timestamp(1476313200), 1],
-    [new Timestamp(1476316800, a), new Timestamp(1476316800, b), -1],
-    [new Timestamp(1476316800, b), new Timestamp(1476316800, b), 0],
-    [new Timestamp(1476316800, b), new Timestamp(1476316800, a), 1],
-    [new Timestamp(1476313200, 0, 3600), new Timestamp(1476316800, 0, 0), -1],
-    [new Timestamp(1476316800, 0, 3600), new Timestamp(1476316800, 0, 0), 0],
-    [new Timestamp(1476316800, 0, 0), new Timestamp(1476313200, 0, 3600), 1],
-    [new Timestamp(1476313200, 0, 3600), new Timestamp(1476316800, 0, "utc"), -1],
-    [new Timestamp(1476316800, 0, 3600), new Timestamp(1476316800, 0, "utc"), 0],
-    [new Timestamp(1476316800, 0, "utc"), new Timestamp(1476313200, 0, 3600), 1],
-    [new Timestamp(1476316800, a, 3600), new Timestamp(1476316800, b, 0), -1],
-    [new Timestamp(1476316800, b, 3600), new Timestamp(1476316800, b, 0), 0],
-    [new Timestamp(1476316800, b, 0), new Timestamp(1476316800, a, 3600), 1],
-    [new Timestamp(1476316800, a, 3600), new Timestamp(1476316800, b, "utc"), -1],
-    [new Timestamp(1476316800, b, 3600), new Timestamp(1476316800, b, "utc"), 0],
-    [new Timestamp(1476316800, b, "utc"), new Timestamp(1476316800, a, 3600), 1],
-    [new Timestamp(1476316800), new Timestamp(1476316800, 0, 0), null],
-    [new Timestamp(1476316800, 0, 0), new Timestamp(1476316800), null],
-    [new Timestamp(1476316800), new Timestamp(1476316800, 0, "utc"), null],
-    [new Timestamp(1476316800, 0, "utc"), new Timestamp(1476316800), null],
-  ];
-
-  it("compare", () => {
-    for (const [x, y, expected] of pairs()) expect(x.compareTo(y)).toBe(expected);
-    expect(new Timestamp(1476316800).compareTo({})).toBeNull();
-    expect(new Timestamp(1476316800).compareTo(1476316800)).toBeNull();
-  });
-
-  it("eql", () => {
-    for (const [x, y, expected] of pairs()) expect(x.eql(y)).toBe(expected === 0);
-    expect(new Timestamp(1476316800).eql({})).toBe(false);
-    expect(new Timestamp(1476316800).eql(1476316800)).toBe(false);
-  });
-
   it("hash", () => {
-    expect(new Timestamp(1476316800).hash()).toBe(rbHash([1476316800, 0, false]));
-    expect(new Timestamp(1476316800, 0, 0).hash()).toBe(rbHash([1476316800, 0, true]));
-    expect(new Timestamp(1476316800, 0, "utc").hash()).toBe(rbHash([1476316800, 0, true]));
-    expect(new Timestamp(1476316800, R(0, 1), 0).hash()).toBe(rbHash([1476316800, 0, true]));
-    expect(new Timestamp(1476316800, R(1, 10), 3600).hash()).toBe(
+    expect(new Timestamp(1476316800).hash()).toEqual(rbHash([1476316800, 0, false]));
+    expect(new Timestamp(1476316800, 0, 0).hash()).toEqual(rbHash([1476316800, 0, true]));
+    expect(new Timestamp(1476316800, 0, "utc").hash()).toEqual(rbHash([1476316800, 0, true]));
+    expect(new Timestamp(1476316800, R(0, 1), 0).hash()).toEqual(rbHash([1476316800, 0, true]));
+    expect(new Timestamp(1476316800, R(1, 10), 3600).hash()).toEqual(
       rbHash([1476316800, R(1, 10), true]),
     );
   });
 
   it("inspect", () => {
-    expect(new Timestamp(1476316800, 0, 0).inspect()).toBe(
+    expect(new Timestamp(1476316800, 0, 0).inspect()).toEqual(
       "#<TZInfo::Timestamp: @value=1476316800, @sub_second=0, @utc_offset=0, @utc=false>",
     );
-    expect(new Timestamp(1476316800, R(0, 1), "utc").inspect()).toBe(
+    expect(new Timestamp(1476316800, R(0, 1), "utc").inspect()).toEqual(
       "#<TZInfo::Timestamp: @value=1476316800, @sub_second=0, @utc_offset=0, @utc=true>",
     );
-    expect(new Timestamp(1476316800, R(1, 10), 3600).inspect()).toBe(
+    expect(new Timestamp(1476316800, R(1, 10), 3600).inspect()).toEqual(
       "#<TZInfo::Timestamp: @value=1476316800, @sub_second=1/10, @utc_offset=3600, @utc=false>",
     );
-    expect(new Timestamp(1476316800, R(1, 10), null).inspect()).toBe(
+    expect(new Timestamp(1476316800, R(1, 10), null).inspect()).toEqual(
       "#<TZInfo::Timestamp: @value=1476316800, @sub_second=1/10, @utc_offset=nil, @utc=nil>",
     );
   });
 
-  const classUtc = (subSecond: number | Rational) => {
-    const t = Timestamp.utc(1476316800, subSecond);
+  it("class utc", () => {
+    const t = Timestamp.utc(1476316800);
     expect(t).toBeInstanceOf(Timestamp);
-    expect(t.value).toBe(1476316800);
-    expect(t.subSecond).toEqual(subSecond);
-    expect(t.utcOffset).toBe(0);
-    expect(t.isUtc()).toBe(true);
-  };
+    expect(t.value).toEqual(1476316800);
+    expect(t.subSecond).toEqual(0);
+    expect(t.utcOffset).toEqual(0);
+    expect(t.isUtc()).toEqual(true);
+  });
 
-  it("class utc", () => classUtc(0));
+  it("class utc sub second", () => {
+    const t = Timestamp.utc(1476316800, R(1, 10));
+    expect(t).toBeInstanceOf(Timestamp);
+    expect(t.value).toEqual(1476316800);
+    expect(t.subSecond).toEqual(R(1, 10));
+    expect(t.utcOffset).toEqual(0);
+    expect(t.isUtc()).toEqual(true);
+  });
 
-  it("class utc sub second", () => classUtc(R(1, 10)));
+  it("class utc value nil", () => {
+    const error = assertRaises(ArgumentError, () => Timestamp.utc(null as never));
+    expect(error.message).toEqual("value must be an Integer");
+  });
 
-  it("class utc value nil", () =>
-    raises(ArgumentError, "value must be an Integer", () => Timestamp.utc(null as never)));
+  it("class utc value not integer", () => {
+    const error = assertRaises(ArgumentError, () => Timestamp.utc(1476316800.1));
+    expect(error.message).toEqual("value must be an Integer");
+  });
 
-  it("class utc value not integer", () =>
-    raises(ArgumentError, "value must be an Integer", () => Timestamp.utc(1476316800.1)));
+  it("class utc sub second nil", () => {
+    const error = assertRaises(ArgumentError, () => Timestamp.utc(1476316800, null as never));
+    expect(error.message).toEqual("sub_second must be a Rational or the Integer 0");
+  });
 
-  it("class utc sub second nil", () =>
-    raises(ArgumentError, "sub_second must be a Rational or the Integer 0", () =>
-      Timestamp.utc(1476316800, null as never),
-    ));
+  it("class utc sub second not integer or rational", () => {
+    const error = assertRaises(ArgumentError, () => Timestamp.utc(1476316800, 0.1));
+    expect(error.message).toEqual("sub_second must be a Rational or the Integer 0");
+  });
 
-  it("class utc sub second not integer or rational", () =>
-    raises(ArgumentError, "sub_second must be a Rational or the Integer 0", () =>
-      Timestamp.utc(1476316800, 0.1),
-    ));
+  it("class utc sub second integer not zero", () => {
+    const error = assertRaises(ArgumentError, () => Timestamp.utc(1476316800, 1));
+    expect(error.message).toEqual("sub_second must be a Rational or the Integer 0");
+  });
 
-  it("class utc sub second integer not zero", () =>
-    raises(ArgumentError, "sub_second must be a Rational or the Integer 0", () =>
-      Timestamp.utc(1476316800, 1),
-    ));
+  it("class utc sub second less than zero", () => {
+    const error = assertRaises(RangeError, () => Timestamp.utc(1476316800, R(-1, 10)));
+    expect(error.message).toEqual("sub_second must be >= 0 and < 1");
+  });
 
-  it("class utc sub second less than zero", () =>
-    raises(RangeError, "sub_second must be >= 0 and < 1", () =>
-      Timestamp.utc(1476316800, R(-1, 10)),
-    ));
-
-  it("class utc sub second greater than or equal to one", () =>
-    raises(RangeError, "sub_second must be >= 0 and < 1", () =>
-      Timestamp.utc(1476316800, R(1, 1)),
-    ));
+  it("class utc sub second greater than or equal to one", () => {
+    const error = assertRaises(RangeError, () => Timestamp.utc(1476316800, R(1, 1)));
+    expect(error.message).toEqual("sub_second must be >= 0 and < 1");
+  });
 });
