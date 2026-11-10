@@ -1,5 +1,12 @@
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { env, setEnv } from "@blazetrails/ruby-compat";
+<% if (!this.options.skipActionMailer) { -%>
+import "@blazetrails/actionmailer/test-case";
+import "@blazetrails/actionmailer/test-helper";
+<% } -%>
+<% if (!this.options.skipActiveJob) { -%>
+import "@blazetrails/activejob/test-helper";
+<% } -%>
 
 if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
 await import("../config/environment.ts");

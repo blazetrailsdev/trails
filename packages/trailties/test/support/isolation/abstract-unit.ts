@@ -25,6 +25,9 @@ import { Application } from "../../../lib/application.js";
 import type { EnvHelpers } from "../env-helpers.js";
 import { Trails } from "../../../lib/trails.js";
 import { Paths, TRAILS_FRAMEWORK_ROOT } from "./paths.js";
+import "@blazetrails/actionmailer/test-case";
+import "@blazetrails/actionmailer/test-helper";
+import "@blazetrails/activejob/test-helper";
 
 export { Paths, TRAILS_FRAMEWORK_ROOT };
 
