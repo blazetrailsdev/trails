@@ -3,7 +3,7 @@ import { include, underscore } from "@blazetrails/activesupport";
 import { AbstractController } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../../lib/testing/resolvers.js";
 import { Rendering } from "../../../lib/rendering.js";
-import { Layouts } from "../../../lib/layouts.js";
+import { Layouts, type Layouts as LayoutsHost } from "../../../lib/layouts.js";
 import {
   ClassMethods as ViewPathsClassMethods,
   type ViewPathsClass,
@@ -236,9 +236,9 @@ describe("OverridingLocalPrefixesTest", () => {
 
 class WithLayouts extends PrefixedViews {
   /** @inlinedFrom ActionView::Layouts#initialize rails/v8.0.2/actionview/lib/action_view/layouts.rb:361-364 */
-  constructor() {
-    super();
-    (this as unknown as { _actionHasLayout: boolean })._actionHasLayout = true;
+  constructor(...args: ConstructorParameters<typeof PrefixedViews>) {
+    super(...args);
+    (this as unknown as LayoutsHost)._actionHasLayout = true;
   }
 
   /** @internal */

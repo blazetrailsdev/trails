@@ -1,4 +1,4 @@
-import { File, RuntimeError, block } from "@blazetrails/ruby-compat";
+import { File, RuntimeError, StandardError, block } from "@blazetrails/ruby-compat";
 import type { main } from "./dsl-definition.js";
 import { FileList } from "./file-list.js";
 import type { FileUtils } from "./file-utils.js";
@@ -63,7 +63,8 @@ export class PackageTask extends TaskLib {
       block(async () => {
         try {
           await self.rmR(this.packageDir);
-        } catch {
+        } catch (e) {
+          if (!(e instanceof StandardError)) throw e;
           return null;
         }
       }),
@@ -116,7 +117,7 @@ export class PackageTask extends TaskLib {
     void self.directory(
       { [this.packageDirPath()]: this.packageFiles.toAry() },
       block(async () => {
-        for (const fn of this.packageFiles.toAry() as string[]) {
+        for (const fn of (await this.packageFiles.toA()) as string[]) {
           const f = File.join(this.packageDirPath(), fn);
           const fdir = File.dirname(f);
           if (!(await File.isExistAsync(fdir))) await self.mkdirP(fdir);
