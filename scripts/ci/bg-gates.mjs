@@ -150,6 +150,10 @@ function schedulerAlive() {
 }
 
 async function wait(id) {
+  if (!existsSync(path.join(DIR, "spec.json"))) {
+    console.log(`::error title=bg-gates::${id} was never started: the start step did not run`);
+    return 1;
+  }
   const tasks = JSON.parse(readFileSync(path.join(DIR, "spec.json"), "utf8"));
   if (!tasks.some((task) => task.id === id)) throw new Error(`bg-gates: no task ${id} in the spec`);
   const waited = Date.now();
