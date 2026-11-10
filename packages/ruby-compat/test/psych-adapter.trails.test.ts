@@ -34,6 +34,14 @@ describe("psych-adapter backend resolution", () => {
     expect(() => adapter.stringify(1)).toThrow("cannot load such file -- libyaml");
   });
 
+  it("parses through psych-yaml's adapter without createRequire", async () => {
+    vi.spyOn(nodeProcess, "getBuiltinModule").mockImplementation(() => {
+      throw new Error("no module");
+    });
+    await import("../lib/psych-yaml.js");
+    expect(adapter.parse("a: 1")).toEqual({ a: 1 });
+  });
+
   it("dispatches to a registered adapter", () => {
     adapter.registerPsychAdapter("fake", {
       parse: (src) => ({ parsed: src }),
