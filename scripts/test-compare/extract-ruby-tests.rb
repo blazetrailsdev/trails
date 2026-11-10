@@ -2677,12 +2677,19 @@ class TestExtractor
 
   def extract_first_string(args)
     return nil unless args.is_a?(Array)
-    traverse_for_string(args)&.gsub("\\'", "'")
+    unescape_name_quotes(traverse_for_string(args))
   end
 
   def extract_string_from_arg_paren(args)
     return nil unless args.is_a?(Array)
-    traverse_for_string(args)&.gsub("\\'", "'")
+    unescape_name_quotes(traverse_for_string(args))
+  end
+
+  def unescape_name_quotes(name)
+    return name unless name&.include?("\\'")
+    unescaped = name.gsub("\\'", "'")
+    @interpolated_names[unescaped] = @interpolated_names.delete(name).gsub("\\'", "'") if @interpolated_names&.key?(name)
+    unescaped
   end
 
   def traverse_for_string(node)
