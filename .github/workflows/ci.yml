@@ -1183,20 +1183,29 @@ jobs:
       needs.changes.outputs.actioncable_only == 'true')
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
+    # 2-way file-level shard: unsharded, this job was the last to finish in 20
+    # of 50 sampled runs (vitest step ~13 min median, 19.6 min max against the
+    # 20-minute timeout). The scoped thor_only / actioncable_only arms are a
+    # handful of files, so they run once, on shard 1.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       - if: needs.changes.outputs.thor_only != 'true' && needs.changes.outputs.actioncable_only != 'true'
-        run: pnpm vitest run packages/trailties packages/thor
-      - if: needs.changes.outputs.actioncable_only == 'true'
+        run: pnpm vitest run packages/trailties packages/thor --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+      - if: needs.changes.outputs.actioncable_only == 'true' && matrix.shard == 1
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
           $(git ls-files 'packages/actioncable/lib/*.ts')
-      - if: needs.changes.outputs.thor_only == 'true'
+      - if: needs.changes.outputs.thor_only == 'true' && matrix.shard == 1
         run: pnpm vitest run packages/thor
-      - if: needs.changes.outputs.thor_only == 'true'
+      - if: needs.changes.outputs.thor_only == 'true' && matrix.shard == 1
         run: >
           pnpm vitest related --run --passWithNoTests --project trailties
           $(git ls-files 'packages/thor/lib/*.ts')
@@ -1214,6 +1223,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
       - run: pnpm build
       - run: scripts/generated-app-smoke.sh "$RUNNER_TEMP/generated-app"
 
