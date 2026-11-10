@@ -283,10 +283,10 @@ describe("PROTOCOL_DEFINITION_NAMES", () => {
 
 describe("rubyCallToTs", () => {
   it("maps a call to a protocol name in an enrolled package only", () => {
-    expect(PROTOCOL_CALL_ENROLLED_PACKAGES.has("activerecord")).toBe(false);
+    expect(PROTOCOL_CALL_ENROLLED_PACKAGES.has("actioncable")).toBe(false);
     for (const name of PROTOCOL_DEFINITION_NAMES) {
       expect(rubyCallToTs(name, undefined)).toBeNull();
-      expect(rubyCallToTs(name, "activerecord")).toBeNull();
+      expect(rubyCallToTs(name, "actioncable")).toBeNull();
       expect(rubyCallToTs(name, "arel")).toEqual(rubyMethodToTsIgnoringSkip(name));
     }
     expect(rubyCallToTs("clone", "arel")).toBeNull();
