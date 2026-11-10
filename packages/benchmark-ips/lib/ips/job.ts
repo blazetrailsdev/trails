@@ -232,6 +232,7 @@ export class Job {
     }
   }
 
+  /** @missingRailsCall new — CONVERGEABLE benchmark-ips-held-results-json-and-share */
   createStats(samples: number[]): SD {
     switch (this.stats) {
       case ":sd":
