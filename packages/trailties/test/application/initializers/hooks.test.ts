@@ -90,8 +90,7 @@ describe("HooksTest", { timeout: 120_000 }, () => {
     expect($.$order).toEqual(["to_prepare", "after_initialize"]);
   });
 
-  // BLOCKED: secret-key-base-credentials-arm
-  it.skip("after_initialize happens after to_prepare in production", async () => {
+  it("after_initialize happens after to_prepare in production", async () => {
     $.$order = [];
     await t.addToConfig(`
         this.config.enableReloading = false;
