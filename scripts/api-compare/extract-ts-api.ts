@@ -54,6 +54,7 @@ import {
   packageSrcDir,
   overlappingSubDirs,
   apiComparePackageRoots,
+  ATTRIBUTE_MACRO_CLASSES,
 } from "./config.js";
 import { scopeOf } from "./scope.js";
 import {
@@ -1276,6 +1277,25 @@ export function extractFromProgram(
         if (at >= 0) list[at] = aliased;
         else list.push(aliased);
       }
+    }
+
+    for (const generated of collectAttributeMacroMembers(sourceFile.statements)) {
+      if (!ATTRIBUTE_MACRO_CLASSES.has(`${relPath}:${generated.receiver}`)) continue;
+      const entity = info.classes[`${relPath}:${generated.receiver}`];
+      if (entity === undefined) continue;
+      const at = entity.instanceMethods.findIndex((m) => m.name === generated.name);
+      if (at !== -1 && entity.instanceMethods[at].bodyless !== true) continue;
+      const method: MethodInfo = {
+        name: generated.name,
+        visibility: "public",
+        params: [],
+        isStatic: false,
+        line:
+          sourceFile.getLineAndCharacterOfPosition(generated.node.getStart(sourceFile)).line + 1,
+        file: relPath,
+      };
+      if (at === -1) entity.instanceMethods.push(method);
+      else entity.instanceMethods[at] = method;
     }
 
     for (const generated of collectDefineColumnMethodsMembers(sourceFile)) {
@@ -3503,6 +3523,39 @@ export function factoryClassMembers(
  */
 export function isConstantCaseName(name: string): boolean {
   return /^[A-Z][A-Z0-9]*(_[A-Z0-9]+)+$/.test(name);
+}
+
+/**
+ * Readers a top-level `Klass.attribute("name", …)` call generates, the TS twin
+ * of MiniMagick::Image's `attribute` macro
+ * (`vendor/mini_magick/v5.2.0/lib/mini_magick/image.rb:118-128`). The class
+ * types them through a merged interface, which alone reads as
+ * declaration-only; the macro call is the body. Calls inside a top-level
+ * block are read too. Only classes in `ATTRIBUTE_MACRO_CLASSES` are credited.
+ */
+function collectAttributeMacroMembers(
+  statements: Iterable<ts.Statement>,
+): { receiver: string; name: string; node: ts.Node }[] {
+  const out: { receiver: string; name: string; node: ts.Node }[] = [];
+  for (const statement of statements) {
+    if (ts.isBlock(statement)) {
+      out.push(...collectAttributeMacroMembers(statement.statements));
+      continue;
+    }
+    if (!ts.isExpressionStatement(statement)) continue;
+    const expr = statement.expression;
+    if (!ts.isCallExpression(expr) || !ts.isPropertyAccessExpression(expr.expression)) continue;
+    if (expr.expression.name.text !== "attribute") continue;
+    if (!ts.isIdentifier(expr.expression.expression)) continue;
+    const [name] = expr.arguments;
+    if (!name || !ts.isStringLiteralLike(name)) continue;
+    out.push({
+      receiver: expr.expression.expression.text,
+      name: snakeToCamel(name.text),
+      node: name,
+    });
+  }
+  return out;
 }
 
 /**
