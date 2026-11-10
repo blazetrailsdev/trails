@@ -49,6 +49,8 @@ export interface Loader
     Included<typeof Config>,
     Included<typeof EagerLoad> {
   tag: string;
+  __onFileAutoloaded: Loader["onFileAutoloaded"];
+  __onDirAutoloaded: Loader["onDirAutoloaded"];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -342,6 +344,9 @@ export class Loader {
   /** @internal */
   isShadowedFile(file: string): boolean {
     return this.shadowedFiles.has(file);
+  }
+  static {
+    this.internal("isShadowedFile");
   }
 
   static async eagerLoadAll(): Promise<void> {
@@ -662,5 +667,4 @@ include(Loader, Callbacks);
 include(Loader, Helpers);
 include(Loader, Config);
 include(Loader, EagerLoad);
-Loader.internal("isShadowedFile");
 Registry.Loader = Loader;

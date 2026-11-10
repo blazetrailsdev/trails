@@ -25,8 +25,8 @@ describe("TestCallbacks", () => {
   });
 
   it("autoloading a file triggers on_file_autoloaded (Object)", async () => {
-    const onFileAutoloaded = loader.onFileAutoloaded;
-    loader.onFileAutoloaded = function (this: Loader, file, exports) {
+    const onFileAutoloaded = loader.__onFileAutoloaded;
+    loader.__onFileAutoloaded = function (this: Loader, file, exports) {
       if (file === File.expandPath("x.ts")) called = true;
       return onFileAutoloaded.call(this, file, exports);
     };
@@ -37,8 +37,8 @@ describe("TestCallbacks", () => {
   });
 
   it("autoloading a file triggers on_file_autoloaded (Namespace)", async () => {
-    const onFileAutoloaded = loader.onFileAutoloaded;
-    loader.onFileAutoloaded = function (this: Loader, file, exports) {
+    const onFileAutoloaded = loader.__onFileAutoloaded;
+    loader.__onFileAutoloaded = function (this: Loader, file, exports) {
       if (file === File.expandPath("x.ts")) called = true;
       return onFileAutoloaded.call(this, file, exports);
     };
@@ -50,8 +50,8 @@ describe("TestCallbacks", () => {
   });
 
   it("requiring an autoloadable file triggers on_file_autoloaded (Object)", async () => {
-    const onFileAutoloaded = loader.onFileAutoloaded;
-    loader.onFileAutoloaded = function (this: Loader, file, exports) {
+    const onFileAutoloaded = loader.__onFileAutoloaded;
+    loader.__onFileAutoloaded = function (this: Loader, file, exports) {
       if (file === File.expandPath("y.ts")) called = true;
       return onFileAutoloaded.call(this, file, exports);
     };
@@ -67,8 +67,8 @@ describe("TestCallbacks", () => {
   });
 
   it("requiring an autoloadable file triggers on_file_autoloaded (Namespace)", async () => {
-    const onFileAutoloaded = loader.onFileAutoloaded;
-    loader.onFileAutoloaded = function (this: Loader, file, exports) {
+    const onFileAutoloaded = loader.__onFileAutoloaded;
+    loader.__onFileAutoloaded = function (this: Loader, file, exports) {
       if (file === File.expandPath("y.ts")) called = true;
       return onFileAutoloaded.call(this, file, exports);
     };
@@ -84,8 +84,8 @@ describe("TestCallbacks", () => {
   });
 
   it("autoloading a directory triggers on_dir_autoloaded (Object)", async () => {
-    const onDirAutoloaded = loader.onDirAutoloaded;
-    loader.onDirAutoloaded = function (this: Loader, dir) {
+    const onDirAutoloaded = loader.__onDirAutoloaded;
+    loader.__onDirAutoloaded = function (this: Loader, dir) {
       if (dir === File.expandPath("m")) called = true;
       return onDirAutoloaded.call(this, dir);
     };
@@ -96,8 +96,8 @@ describe("TestCallbacks", () => {
   });
 
   it("autoloading a directory triggers on_dir_autoloaded (Namespace)", async () => {
-    const onDirAutoloaded = loader.onDirAutoloaded;
-    loader.onDirAutoloaded = function (this: Loader, dir) {
+    const onDirAutoloaded = loader.__onDirAutoloaded;
+    loader.__onDirAutoloaded = function (this: Loader, dir) {
       if (dir === File.expandPath("m")) called = true;
       return onDirAutoloaded.call(this, dir);
     };

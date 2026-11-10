@@ -80,6 +80,7 @@ export const Callbacks = {
 };
 
 extend(Callbacks, Internal);
-(Callbacks as typeof Callbacks & Extended<typeof Internal>).internal("onFileAutoloaded");
-(Callbacks as typeof Callbacks & Extended<typeof Internal>).internal("onDirAutoloaded");
-(Callbacks as typeof Callbacks & Extended<typeof Internal>).internal("onNamespaceLoaded");
+const self = Callbacks as typeof Callbacks & Extended<typeof Internal>;
+self.internal("onFileAutoloaded");
+self.internal("onDirAutoloaded");
+self.internal("onNamespaceLoaded");

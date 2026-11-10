@@ -215,5 +215,6 @@ export const Config = {
 };
 
 extend(Config, Internal);
-(Config as typeof Config & Extended<typeof Internal>).internal("roots");
-(Config as typeof Config & Extended<typeof Internal>).internal("isIgnores");
+const self = Config as typeof Config & Extended<typeof Internal>;
+self.internal("roots");
+self.internal("isIgnores");

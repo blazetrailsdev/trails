@@ -35,12 +35,9 @@ export const ExplicitNamespaces = {
 };
 
 extend(ExplicitNamespaces, Internal);
-(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal("register");
-(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal("loaderFor");
-(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal(
-  "unregisterLoader",
-);
-(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal(
-  "isRegistered",
-);
-(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal("clear");
+const self = ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>;
+self.internal("register");
+self.internal("loaderFor");
+self.internal("unregisterLoader");
+self.internal("isRegistered");
+self.internal("clear");
