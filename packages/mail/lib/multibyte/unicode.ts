@@ -13,6 +13,9 @@ import {
 import { EncodingError } from "./encoding-error.js";
 import {
   COMBINING_CLASS,
+  COMPOSITION_EXCLUSION,
+  COMPOSITION_MAP,
+  DECOMPOSITION,
   LOWERCASE_MAPPING,
   UPPERCASE_MAPPING,
 } from "./simple-case-mappings.generated.js";
@@ -147,12 +150,14 @@ export class UnicodeDatabase {
         ...COMBINING_CLASS.keys(),
         ...UPPERCASE_MAPPING.keys(),
         ...LOWERCASE_MAPPING.keys(),
+        ...DECOMPOSITION.keys(),
       ])) {
         const codepoint = new Codepoint();
         codepoint.code = cp;
         codepoint.combiningClass = COMBINING_CLASS.get(cp) ?? 0;
         codepoint.uppercaseMapping = UPPERCASE_MAPPING.get(cp) ?? 0;
         codepoint.lowercaseMapping = LOWERCASE_MAPPING.get(cp) ?? 0;
+        [codepoint.decompType, codepoint.decompMapping] = DECOMPOSITION.get(cp) ?? [null, null];
         codepoints.set(cp, codepoint);
       }
       [
@@ -161,7 +166,7 @@ export class UnicodeDatabase {
         this._compositionMap,
         this._boundary,
         this._cp1252,
-      ] = [codepoints, [], {}, BOUNDARY, CP1252];
+      ] = [codepoints, COMPOSITION_EXCLUSION, COMPOSITION_MAP, BOUNDARY, CP1252];
     } catch (e) {
       throw new IOError(
         `Couldn't load the Unicode tables for UTF8Handler (${(e as Error).message}), Mail::Multibyte is unusable`,

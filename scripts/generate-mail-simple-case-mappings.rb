@@ -1,6 +1,6 @@
 # Writes packages/mail/lib/multibyte/simple-case-mappings.generated.ts from the
 # gem's Mail::Multibyte UnicodeDatabase (`values/unicode_tables.dat`), UnicodeData
-# fields 3, 12 and 13. Run: ruby scripts/generate-mail-simple-case-mappings.rb
+# fields 3, 5, 12 and 13, and its composition tables. Run: ruby scripts/generate-mail-simple-case-mappings.rb
 module Mail; module Multibyte; module Unicode
   class Codepoint
     attr_accessor :code, :combining_class, :decomp_type, :decomp_mapping,
@@ -9,7 +9,7 @@ module Mail; module Multibyte; module Unicode
 end; end; end
 
 root = File.expand_path("..", __dir__)
-codepoints, = Marshal.load(File.binread("#{root}/vendor/mail/2.8.1/lib/mail/values/unicode_tables.dat"))
+codepoints, composition_exclusion, composition_map, = Marshal.load(File.binread("#{root}/vendor/mail/2.8.1/lib/mail/values/unicode_tables.dat"))
 table = lambda do |field|
   codepoints.sort.filter_map { |cp, c| (m = c.send(field)) && m > 0 ? "#{cp.to_s(36)}:#{(m - cp).to_s(36)}" : nil }.join(",")
 end
@@ -36,5 +36,33 @@ File.write("#{root}/packages/mail/lib/multibyte/simple-case-mappings.generated.t
     "#{codepoints.sort.filter_map { |cp, c| c.combining_class > 0 ? "#{cp.to_s(36)}:#{c.combining_class.to_s(36)}" : nil }.join(",")}"
       .split(",")
       .map((entry) => entry.split(":").map((n) => parseInt(n, 36)) as [number, number]),
+  );
+
+  export const DECOMPOSITION = new Map(
+    "#{codepoints.sort.filter_map { |cp, c| c.decomp_mapping ? "#{cp.to_s(36)}:#{c.decomp_type}:#{c.decomp_mapping.map { |m| m.to_s(36) }.join(" ")}" : nil }.join(",")}"
+      .split(",")
+      .map((entry) => {
+        const [cp, type, mapping] = entry.split(":");
+        return [
+          parseInt(cp, 36),
+          [type || null, mapping.split(" ").map((n) => parseInt(n, 36))],
+        ] as [number, [string | null, number[]]];
+      }),
+  );
+
+  export const COMPOSITION_EXCLUSION = "#{composition_exclusion.map { |c| c.to_s(36) }.join(",")}"
+    .split(",")
+    .map((n) => parseInt(n, 36));
+
+  export const COMPOSITION_MAP: Record<number, Record<number, number>> = Object.fromEntries(
+    "#{composition_map.sort.map { |k, v| "#{k.to_s(36)}=#{v.sort.map { |a, b| "#{a.to_s(36)}:#{b.to_s(36)}" }.join(" ")}" }.join(",")}"
+      .split(",")
+      .map((entry) => {
+        const [k, v] = entry.split("=");
+        return [
+          parseInt(k, 36),
+          Object.fromEntries(v.split(" ").map((pair) => pair.split(":").map((n) => parseInt(n, 36)))),
+        ];
+      }),
   );
 TS
