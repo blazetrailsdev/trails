@@ -1,4 +1,5 @@
 import { rbEqual } from "@blazetrails/ruby-compat";
+import { Mail } from "../mail.js";
 import type { Message } from "../message.js";
 import { HasSentEmailMatcher, haveSentEmail } from "./has-sent-mail.js";
 
@@ -52,3 +53,5 @@ export const Matchers = {
   AttachmentFilenameMatcher,
   AttachmentMimeTypeMatcher,
 };
+
+Mail.Matchers = Matchers;
