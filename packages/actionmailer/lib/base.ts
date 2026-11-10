@@ -43,6 +43,7 @@ import {
   type DeliveryMethodsClass,
 } from "./delivery-methods.js";
 import { Callbacks } from "./callbacks.js";
+import { FormBuilder, type ClassMethods as FormBuilderClassMethods } from "./form-builder.js";
 import { ActionMailer } from "./namespaces.js";
 import {
   Parameterized,
@@ -109,6 +110,8 @@ export class Base extends AbstractController.Base {
   declare static unregisterPreviewInterceptors: typeof PreviewsClassMethods.unregisterPreviewInterceptors;
   declare static registerPreviewInterceptor: typeof PreviewsClassMethods.registerPreviewInterceptor;
   declare static unregisterPreviewInterceptor: typeof PreviewsClassMethods.unregisterPreviewInterceptor;
+  declare static defaultFormBuilder: typeof FormBuilderClassMethods.defaultFormBuilder;
+  declare static _defaultFormBuilder: unknown;
 
   /** @internal */
   protected static _mailerName?: string;
@@ -618,6 +621,7 @@ include(Base, QueuedDelivery);
 include(Base, Rescuable);
 include(Base, Parameterized);
 include(Base, Previews);
+include(Base, FormBuilder);
 Base.abstractBang();
 
 include(Base, AbstractController.Rendering);
