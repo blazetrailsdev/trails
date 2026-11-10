@@ -67,7 +67,7 @@ export class TrixAttachment {
   ): Record<string, unknown> {
     return Object.fromEntries(
       Object.entries(attributes).map(([key, value]) => [
-        camelize(underscore(toS(key)), false),
+        camelize(underscore(toS(key)), "lower"),
         value,
       ]),
     );
