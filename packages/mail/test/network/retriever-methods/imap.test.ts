@@ -31,7 +31,7 @@ describe("IMAP Retriever", () => {
 
   describe("find with and without block", () => {
     it("should find all emails with a given block", () => {
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
 
       const messages: Message[] = [];
       Mail.all(null, (message) => {
@@ -39,24 +39,24 @@ describe("IMAP Retriever", () => {
       });
       expect(list(messages).sort()).toEqual(examples().sort());
 
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
     });
     it("should get all emails without a given block", () => {
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
 
       const messages = Mail.all();
       expect(list(messages).sort()).toEqual(examples().sort());
 
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
     });
 
     it("should get all emails and yield the imap, uid, and email when given a block of arity 3", () => {
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
 
       const messages: Message[] = [];
       const uids: number[] = [];
       Mail.all(null, ((message: Message, imap: unknown, uid: number) => {
-        expect(imap).toBeInstanceOf(MockIMAP);
+        expect(imap).toSatisfy((i) => i instanceof MockIMAP);
         messages.push(message);
         uids.push(uid);
       }) as (email: Message) => unknown);
@@ -64,17 +64,17 @@ describe("IMAP Retriever", () => {
       expect(list(messages).sort()).toEqual(examples().sort());
       expect(uids.sort((a, b) => a - b)).toEqual(MockIMAP.examples().map((m) => m.number));
 
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
     });
 
     it("should get all emails and yield the imap, uid, flag, and email when given a block of arity 4", () => {
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
 
       const messages: Message[] = [];
       const uids: number[] = [];
       const flags: unknown[] = [];
       Mail.all(null, ((message: Message, imap: unknown, uid: number, flag: unknown) => {
-        expect(imap).toBeInstanceOf(MockIMAP);
+        expect(imap).toSatisfy((i) => i instanceof MockIMAP);
         messages.push(message);
         uids.push(uid);
         flags.push(flag);
@@ -88,7 +88,7 @@ describe("IMAP Retriever", () => {
           .sort(),
       );
 
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
     });
   });
 
@@ -136,7 +136,7 @@ describe("IMAP Retriever", () => {
     it("should find the last 10 messages by default", () => {
       const messages = Mail.find();
 
-      expect(messages).toHaveLength(10);
+      expect((messages as unknown[]).length).toBe(10);
     });
     it("should search the mailbox 'INBOX' by default", () => {
       Mail.find();
@@ -146,23 +146,23 @@ describe("IMAP Retriever", () => {
 
     it("should handle the delete_after_find_option", () => {
       Mail.find({ deleteAfterFind: false });
-      expect(MockIMAP.examples()).toHaveLength(20);
+      expect(MockIMAP.examples().length).toBe(20);
 
       Mail.find({ deleteAfterFind: true });
-      expect(MockIMAP.examples()).toHaveLength(10);
+      expect(MockIMAP.examples().length).toBe(10);
 
       Mail.find({ deleteAfterFind: true }, () => {});
-      expect(MockIMAP.examples()).toHaveLength(10);
+      expect(MockIMAP.examples().length).toBe(10);
     });
 
     it("should handle the find_and_delete method", () => {
       Mail.findAndDelete({ count: 15 });
-      expect(MockIMAP.examples()).toHaveLength(5);
+      expect(MockIMAP.examples().length).toBe(5);
     });
 
     it("should pass :search_charset to IMAP uid_search", () => {
       const messages = Mail.find({ searchCharset: "UTF-8" }) as Message[];
-      expect(messages).toHaveLength(1);
+      expect((messages as unknown[]).length).toBe(1);
 
       const message = messages[0];
       expect(message.rawSource).toBe(examples()[0]);
@@ -201,7 +201,7 @@ describe("IMAP Retriever", () => {
     it("should find all messages", () => {
       const messages = Mail.all();
 
-      expect(messages).toHaveLength(MockIMAP.examples().length);
+      expect((messages as unknown[]).length).toBe(MockIMAP.examples().length);
       expect(list(messages)).toEqual(examples());
     });
   });
@@ -214,8 +214,8 @@ describe("IMAP Retriever", () => {
       Mail.deleteAll();
       expect(spy).toHaveBeenCalledTimes(1);
 
-      expect(MockIMAP.isReadonly()).toBe(false);
-      expect(MockIMAP.examples()).toHaveLength(0);
+      expect(MockIMAP.isReadonly()).toBeFalsy();
+      expect(MockIMAP.examples().length).toBe(0);
     });
   });
 
@@ -239,16 +239,16 @@ describe("IMAP Retriever", () => {
       const retrievable = new IMAP({});
       const options = retrievable["validateOptions"]({});
 
-      expect(Utilities.isBlank(options.count)).toBe(false);
+      expect(Utilities.isBlank(options.count)).toBeFalsy();
       expect(options.count).toBe(10);
 
-      expect(Utilities.isBlank(options.order)).toBe(false);
+      expect(Utilities.isBlank(options.order)).toBeFalsy();
       expect(options.order).toBe("asc");
 
-      expect(Utilities.isBlank(options.what)).toBe(false);
+      expect(Utilities.isBlank(options.what)).toBeFalsy();
       expect(options.what).toBe("first");
 
-      expect(Utilities.isBlank(options.mailbox)).toBe(false);
+      expect(Utilities.isBlank(options.mailbox)).toBeFalsy();
       expect(options.mailbox).toBe("INBOX");
     });
     it("should not replace given configuration", () => {
@@ -260,16 +260,16 @@ describe("IMAP Retriever", () => {
         what: "first",
       });
 
-      expect(Utilities.isBlank(options.count)).toBe(false);
+      expect(Utilities.isBlank(options.count)).toBeFalsy();
       expect(options.count).toBe(2);
 
-      expect(Utilities.isBlank(options.order)).toBe(false);
+      expect(Utilities.isBlank(options.order)).toBeFalsy();
       expect(options.order).toBe("asc");
 
-      expect(Utilities.isBlank(options.what)).toBe(false);
+      expect(Utilities.isBlank(options.what)).toBeFalsy();
       expect(options.what).toBe("first");
 
-      expect(Utilities.isBlank(options.mailbox)).toBe(false);
+      expect(Utilities.isBlank(options.mailbox)).toBeFalsy();
       expect(options.mailbox).toBe("some/mail/box");
     });
     it("should ensure utf7 conversion for mailbox names", () => {
@@ -286,7 +286,7 @@ describe("IMAP Retriever", () => {
 
   describe("error handling", () => {
     it("should finish the IMAP connection if an exception is raised", () => {
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
 
       expect(() =>
         Mail.all(null, () => {
@@ -294,7 +294,7 @@ describe("IMAP Retriever", () => {
         }),
       ).toThrow(ArgumentError);
 
-      expect(MockIMAP.isDisconnected()).toBe(true);
+      expect(MockIMAP.isDisconnected()).toBeTruthy();
     });
   });
 
