@@ -1749,6 +1749,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   bcrypt: "packages/bcrypt/test/",
   msgpack: "packages/msgpack/test/",
   marcel: "packages/marcel/test/",
+  "benchmark-ips": "packages/benchmark-ips/test/",
   "mini-mime": "packages/mini-mime/test/",
   "net-smtp": "packages/net-smtp/test/",
   rake: "packages/rake/test/",

@@ -106,6 +106,7 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "I18n::Backend::KeyValue::SubtreeProxy": { "[]": ["get"] },
   "DidYouMean::DeprecatedMapping": { "[]=": ["set"] },
   "Rack::Multipart::ParamList": { "<<": ["push"] },
+  "Benchmark::IPS::Job::MultiReport": { "<<": ["append"] },
   "Rack::NullLogger": { "<<": ["append"] },
   "Rackup::Stream": { "<<": ["append"] },
   // action_dispatch/middleware/cookies.rb:345 `def [](name)` → middleware/cookies.ts

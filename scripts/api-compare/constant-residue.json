@@ -961,6 +961,25 @@
       "error.ts::InvalidSecret": "BCrypt::Errors::InvalidSecret"
     }
   },
+  "benchmark-ips": {
+    "rows": 12,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "compare.ts::Compare": "Benchmark::Compare",
+      "ips.ts::Helpers": "Benchmark::IPS::Helpers",
+      "ips.ts::IPS": "Benchmark::IPS",
+      "ips/job.ts::Job": "Benchmark::IPS::Job",
+      "ips/job/entry.ts::Entry": "Benchmark::IPS::Job::Entry",
+      "ips/job/multi-report.ts::MultiReport": "Benchmark::IPS::Job::MultiReport",
+      "ips/job/stream-report.ts::StreamReport": "Benchmark::IPS::Job::StreamReport",
+      "ips/report.ts::Entry": "Benchmark::IPS::Report::Entry",
+      "ips/report.ts::Report": "Benchmark::IPS::Report",
+      "ips/stats/sd.ts::SD": "Benchmark::IPS::Stats::SD",
+      "ips/stats/stats-metric.ts::StatsMetric": "Benchmark::IPS::Stats::StatsMetric",
+      "timing.ts::Timing": "Benchmark::Timing"
+    }
+  },
   "builder": { "rows": 5, "excluded": [], "unwalked": ["xchar.ts::XChar"], "residue": {} },
   "chronic": {
     "rows": 61,

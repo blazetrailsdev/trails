@@ -61,6 +61,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "mini-magick",
     "image-processing",
     "mail",
+    "benchmark-ips",
     "mini-mime",
     "net-smtp",
     "rake",

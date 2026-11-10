@@ -17,6 +17,7 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "ruby-compat",
   "tzinfo",
   "mini-mime",
+  "benchmark-ips",
   "net-smtp",
   "et-orbi",
   "vitest-matchers",

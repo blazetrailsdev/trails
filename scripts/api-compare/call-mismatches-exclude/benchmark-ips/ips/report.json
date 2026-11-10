@@ -1,0 +1,16 @@
+[
+  {
+    "package": "benchmark-ips",
+    "tsFile": "ips/report.ts",
+    "rubyName": "body",
+    "call": "rjust",
+    "reason": "String#rjust is the native padStart; the gate pairs it with the homonym StreamReport#rjust."
+  },
+  {
+    "package": "benchmark-ips",
+    "tsFile": "ips/report.ts",
+    "rubyName": "header",
+    "call": "rjust",
+    "reason": "String#rjust is the native padStart; the gate pairs it with the homonym StreamReport#rjust."
+  }
+]

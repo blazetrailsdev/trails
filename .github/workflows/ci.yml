@@ -1034,6 +1034,7 @@ jobs:
           packages/activejob
           packages/activemodel
           packages/activesupport
+          packages/benchmark-ips
           packages/bcrypt
           packages/builder
           packages/chronic
@@ -1253,6 +1254,7 @@ jobs:
           packages/activejob
           packages/activemodel
           packages/activesupport
+          packages/benchmark-ips
           packages/bcrypt
           packages/builder
           packages/chronic

@@ -50,3 +50,14 @@ export function RUBY_ENGINE(): string {
  * @noRailsEquivalent PERMANENT
  */
 export const RUBY_VERSION = "3.3.11";
+
+/**
+ * `RUBY_DESCRIPTION` (`vendor/ruby/v3.3.11/version.c:68`): `ruby_description`,
+ * the version, release date and revision of the vendored MRI, then
+ * {@link RUBY_PLATFORM} in brackets. A function, as that constant is.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function RUBY_DESCRIPTION(): string {
+  return `ruby ${RUBY_VERSION} (2026-03-26 revision 1f2d15125a) [${RUBY_PLATFORM()}]`;
+}

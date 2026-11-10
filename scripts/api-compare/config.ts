@@ -223,6 +223,7 @@ export const MANIFEST_PACKAGES = [
   "sqlite3",
   "thor",
   "mail",
+  "benchmark-ips",
   "mini-mime",
   "net-smtp",
   "rake",

@@ -651,6 +651,16 @@ importers:
         specifier: ^6.0.0
         version: 6.0.0
 
+  packages/benchmark-ips:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+
   packages/builder:
     dependencies:
       '@blazetrails/activesupport':

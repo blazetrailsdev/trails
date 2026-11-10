@@ -1057,6 +1057,23 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "benchmark-ips",
+    origin: {
+      type: "git",
+      url: "https://github.com/evanphx/benchmark-ips.git",
+      ref: "v2.14.0",
+    },
+    packages: [
+      {
+        name: "benchmark-ips",
+        libPath: "lib/benchmark",
+        testPath: "test",
+        compareApi: true,
+        compareTests: true,
+      },
+    ],
+  },
+  {
     name: "net-smtp",
     origin: {
       type: "git",

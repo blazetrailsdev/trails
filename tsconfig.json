@@ -101,6 +101,8 @@
     { "path": "packages/image-processing/tsconfig.test.json" },
     { "path": "packages/mini-magick" },
     { "path": "packages/mini-magick/tsconfig.test.json" },
+    { "path": "packages/benchmark-ips" },
+    { "path": "packages/benchmark-ips/tsconfig.test.json" },
     { "path": "packages/mini-mime" },
     { "path": "packages/mini-mime/tsconfig.test.json" },
     { "path": "packages/net-smtp" },
