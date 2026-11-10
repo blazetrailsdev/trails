@@ -1,6 +1,6 @@
 # Writes packages/mail/lib/multibyte/simple-case-mappings.generated.ts from the
 # gem's Mail::Multibyte UnicodeDatabase (`values/unicode_tables.dat`), UnicodeData
-# fields 12 and 13. Run: ruby scripts/generate-mail-simple-case-mappings.rb
+# fields 3, 12 and 13. Run: ruby scripts/generate-mail-simple-case-mappings.rb
 module Mail; module Multibyte; module Unicode
   class Codepoint
     attr_accessor :code, :combining_class, :decomp_type, :decomp_mapping,
@@ -30,5 +30,11 @@ File.write("#{root}/packages/mail/lib/multibyte/simple-case-mappings.generated.t
 
   export const LOWERCASE_MAPPING = decode(
     "#{table.call(:lowercase_mapping)}",
+  );
+
+  export const COMBINING_CLASS = new Map(
+    "#{codepoints.sort.filter_map { |cp, c| c.combining_class > 0 ? "#{cp.to_s(36)}:#{c.combining_class.to_s(36)}" : nil }.join(",")}"
+      .split(",")
+      .map((entry) => entry.split(":").map((n) => parseInt(n, 36)) as [number, number]),
   );
 TS

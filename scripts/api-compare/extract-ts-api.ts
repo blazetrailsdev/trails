@@ -8271,6 +8271,9 @@ function checkerProvenKind(expr: ts.Expression): "sized" | "object" | undefined 
     parts.map((t): "sized" | "object" | undefined => {
       if (t.flags & ts.TypeFlags.StringLike) return "sized";
       if (checker.isArrayType(t) || checker.isTupleType(t)) return "sized";
+      if ((t.getSymbol()?.flags ?? 0) & ts.SymbolFlags.Class && checker.isArrayLikeType(t)) {
+        return "sized";
+      }
       if (!(t.flags & ts.TypeFlags.Object) || t.getCallSignatures().length > 0) return undefined;
       const sym = t.getSymbol();
       if (sym === undefined) return "object";

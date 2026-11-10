@@ -4,7 +4,13 @@ export class Configuration {
   private static _instance: Configuration | null = null;
 
   private _encodeLanguage: string | null = null;
-  private _deliveryMethod: unknown = null;
+  private _deliveryMethod: unknown;
+  private _retrieverMethod: unknown;
+
+  constructor() {
+    this._deliveryMethod = null;
+    this._retrieverMethod = null;
+  }
 
   static instance(): Configuration {
     return (Configuration._instance ||= new Configuration());
@@ -37,6 +43,30 @@ export class Configuration {
         return Mail.TestMailer;
       case "logger":
         return Mail.LoggerDelivery;
+      default:
+        return method;
+    }
+  }
+
+  retrieverMethod(method: unknown = null, settings: Record<string, unknown> = {}): unknown {
+    if (this._retrieverMethod != null && method == null) return this._retrieverMethod;
+    const klass = this.lookupRetrieverMethod(method) as new (
+      settings: Record<string, unknown>,
+    ) => unknown;
+    return (this._retrieverMethod = new klass(settings));
+  }
+
+  lookupRetrieverMethod(method: unknown): unknown {
+    switch (method) {
+      case null:
+      case undefined:
+        return Mail.POP3;
+      case "pop3":
+        return Mail.POP3;
+      case "imap":
+        return Mail.IMAP;
+      case "test":
+        return Mail.TestRetriever;
       default:
         return method;
     }

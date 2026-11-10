@@ -2,12 +2,39 @@ import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   bytes as rbBytes,
+  File,
+  Hash,
+  hashAref,
+  IOError,
   NoMethodError,
   pack,
   unpack,
 } from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
-import { LOWERCASE_MAPPING, UPPERCASE_MAPPING } from "./simple-case-mappings.generated.js";
+import {
+  COMBINING_CLASS,
+  LOWERCASE_MAPPING,
+  UPPERCASE_MAPPING,
+} from "./simple-case-mappings.generated.js";
+
+export class Codepoint {
+  code: number | null = null;
+  combiningClass: number;
+  decompType: string | null = null;
+  decompMapping: number[] | null = null;
+  uppercaseMapping: number;
+  lowercaseMapping: number;
+
+  constructor() {
+    this.combiningClass = 0;
+    this.uppercaseMapping = 0;
+    this.lowercaseMapping = 0;
+  }
+
+  swapcaseMapping(): number {
+    return this.uppercaseMapping > 0 ? this.uppercaseMapping : this.lowercaseMapping;
+  }
+}
 
 const WHITESPACE: readonly number[] = Object.freeze(
   [
@@ -44,25 +71,6 @@ function isHangulSyllable(cp: number, lv: boolean): boolean {
   return 0xac00 <= cp && cp <= 0xd7a3 && ((cp - 0xac00) % 28 === 0) === lv;
 }
 
-const _database = {
-  boundary: {
-    cr: 0x0d,
-    lf: 0x0a,
-    l: inRanges([0x1100, 0x115f], [0xa960, 0xa97c]),
-    v: inRanges([0x1160, 0x11a7], [0xd7b0, 0xd7c6]),
-    t: inRanges([0x11a8, 0x11ff], [0xd7cb, 0xd7fb]),
-    lv: (cp: number) => isHangulSyllable(cp, true),
-    lvt: (cp: number) => isHangulSyllable(cp, false),
-    extend: (cp: number) => /\p{Grapheme_Extend}/u.test(String.fromCodePoint(cp)),
-  } as Record<BoundaryClass, number | ((cp: number) => boolean)>,
-  cp1252: Object.fromEntries(
-    Array.from({ length: 32 }, (_, i) => [
-      0x80 + i,
-      new TextDecoder("windows-1252").decode(Uint8Array.of(0x80 + i)).codePointAt(0)!,
-    ]),
-  ) as Record<number, number>,
-};
-
 function caseEq(
   matcher: number | ((cp: number) => boolean),
   codepoint: number | undefined,
@@ -71,16 +79,158 @@ function caseEq(
   return typeof matcher === "number" ? matcher === codepoint : matcher(codepoint);
 }
 
-function database(): typeof _database {
-  return _database;
+type Boundary = Record<BoundaryClass, number | ((cp: number) => boolean)>;
+
+export class UnicodeDatabase {
+  static ATTRIBUTES = [
+    "codepoints",
+    "compositionExclusion",
+    "compositionMap",
+    "boundary",
+    "cp1252",
+  ];
+
+  private _codepoints: Hash<number, Codepoint>;
+  private _compositionExclusion: number[];
+  private _compositionMap: Record<number, Record<number, number>>;
+  private _boundary: Boundary;
+  private _cp1252: Record<number, number>;
+
+  constructor() {
+    this._codepoints = new Hash<number, Codepoint>(new Codepoint());
+    this._compositionExclusion = [];
+    this._compositionMap = {};
+    this._boundary = {} as Boundary;
+    this._cp1252 = {};
+  }
+
+  get codepoints(): Hash<number, Codepoint> {
+    this.load();
+    return this._codepoints;
+  }
+  set codepoints(value: Hash<number, Codepoint>) {
+    this._codepoints = value;
+  }
+  get compositionExclusion(): number[] {
+    this.load();
+    return this._compositionExclusion;
+  }
+  set compositionExclusion(value: number[]) {
+    this._compositionExclusion = value;
+  }
+  get compositionMap(): Record<number, Record<number, number>> {
+    this.load();
+    return this._compositionMap;
+  }
+  set compositionMap(value: Record<number, Record<number, number>>) {
+    this._compositionMap = value;
+  }
+  get boundary(): Boundary {
+    this.load();
+    return this._boundary;
+  }
+  set boundary(value: Boundary) {
+    this._boundary = value;
+  }
+  get cp1252(): Record<number, number> {
+    this.load();
+    return this._cp1252;
+  }
+  set cp1252(value: Record<number, number>) {
+    this._cp1252 = value;
+  }
+
+  load(): void {
+    try {
+      const codepoints = new Hash<number, Codepoint>(new Codepoint());
+      for (const cp of new Set([
+        ...COMBINING_CLASS.keys(),
+        ...UPPERCASE_MAPPING.keys(),
+        ...LOWERCASE_MAPPING.keys(),
+      ])) {
+        const codepoint = new Codepoint();
+        codepoint.code = cp;
+        codepoint.combiningClass = COMBINING_CLASS.get(cp) ?? 0;
+        codepoint.uppercaseMapping = UPPERCASE_MAPPING.get(cp) ?? 0;
+        codepoint.lowercaseMapping = LOWERCASE_MAPPING.get(cp) ?? 0;
+        codepoints.set(cp, codepoint);
+      }
+      [
+        this._codepoints,
+        this._compositionExclusion,
+        this._compositionMap,
+        this._boundary,
+        this._cp1252,
+      ] = [codepoints, [], {}, BOUNDARY, CP1252];
+    } catch (e) {
+      throw new IOError(
+        `Couldn't load the Unicode tables for UTF8Handler (${(e as Error).message}), Mail::Multibyte is unusable`,
+      );
+    }
+
+    for (const attrName of UnicodeDatabase.ATTRIBUTES) {
+      const ivar = `_${attrName}` as const;
+      Object.defineProperty(this, attrName, {
+        configurable: true,
+        get: () => this[ivar as keyof this],
+        set: (value) => {
+          (this as Record<string, unknown>)[ivar] = value;
+        },
+      });
+    }
+  }
+
+  static dirname(): string {
+    return File.dirname(import.meta.url.replace(/^file:\/\//, "")) + "/../values/";
+  }
+
+  static filename(): string {
+    return File.expandPath(File.join(UnicodeDatabase.dirname(), "unicode_tables.dat"));
+  }
+}
+
+const BOUNDARY: Boundary = {
+  cr: 0x0d,
+  lf: 0x0a,
+  l: inRanges([0x1100, 0x115f], [0xa960, 0xa97c]),
+  v: inRanges([0x1160, 0x11a7], [0xd7b0, 0xd7c6]),
+  t: inRanges([0x11a8, 0x11ff], [0xd7cb, 0xd7fb]),
+  lv: (cp: number) => isHangulSyllable(cp, true),
+  lvt: (cp: number) => isHangulSyllable(cp, false),
+  extend: (cp: number) => /\p{Grapheme_Extend}/u.test(String.fromCodePoint(cp)),
+};
+
+const CP1252: Record<number, number> = Object.fromEntries(
+  Array.from({ length: 32 }, (_, i) => [
+    0x80 + i,
+    new TextDecoder("windows-1252").decode(Uint8Array.of(0x80 + i)).codePointAt(0)!,
+  ]),
+) as Record<number, number>;
+
+let _defaultNormalizationForm = ":kc";
+
+let _database: UnicodeDatabase | null = null;
+
+function database(): UnicodeDatabase {
+  return (_database ||= new UnicodeDatabase());
 }
 
 export const Unicode = {
+  Codepoint,
+
+  UnicodeDatabase,
+
   UNICODE_VERSION: "7.0.0",
 
   NORMALIZATION_FORMS: [":c", ":kc", ":d", ":kd"],
 
-  defaultNormalizationForm: ":kc",
+  get defaultNormalizationForm(): string {
+    return _defaultNormalizationForm;
+  },
+
+  set defaultNormalizationForm(value: string) {
+    _defaultNormalizationForm = value;
+  },
 
   HANGUL_SBASE: 0xac00,
   HANGUL_LBASE: 0x1100,
@@ -145,6 +295,24 @@ export const Unicode = {
 
   gPack(unpacked: number[][]): string {
     return pack(unpacked.flat(), "U*");
+  },
+
+  reorderCharacters(codepoints: number[]): number[] {
+    const length = codepoints.length - 1;
+    let pos = 0;
+    while (pos < length) {
+      const [cp1, cp2] = [
+        hashAref(database().codepoints, codepoints[pos]) as Codepoint,
+        hashAref(database().codepoints, codepoints[pos + 1]) as Codepoint,
+      ];
+      if (cp1.combiningClass > cp2.combiningClass && cp2.combiningClass > 0) {
+        codepoints.splice(pos, 2, cp2.code!, cp1.code!);
+        pos += pos > 0 ? -1 : 1;
+      } else {
+        pos += 1;
+      }
+    }
+    return codepoints;
   },
 
   decomposeCodepoints(type: string, codepoints: number[]): number[] {
@@ -226,17 +394,21 @@ export const Unicode = {
     let result: number[];
     switch (form) {
       case ":d":
-        result = Unicode.decomposeCodepoints(":canonical", codepoints);
+        result = Unicode.reorderCharacters(Unicode.decomposeCodepoints(":canonical", codepoints));
         break;
       case ":c":
-        result = Unicode.composeCodepoints(Unicode.decomposeCodepoints(":canonical", codepoints));
+        result = Unicode.composeCodepoints(
+          Unicode.reorderCharacters(Unicode.decomposeCodepoints(":canonical", codepoints)),
+        );
         break;
       case ":kd":
-        result = Unicode.decomposeCodepoints(":compatability", codepoints);
+        result = Unicode.reorderCharacters(
+          Unicode.decomposeCodepoints(":compatability", codepoints),
+        );
         break;
       case ":kc":
         result = Unicode.composeCodepoints(
-          Unicode.decomposeCodepoints(":compatability", codepoints),
+          Unicode.reorderCharacters(Unicode.decomposeCodepoints(":compatability", codepoints)),
         );
         break;
       default:

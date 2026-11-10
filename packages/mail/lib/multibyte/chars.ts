@@ -205,13 +205,28 @@ export class Chars {
     return this;
   }
 
+  lstripBang(): this {
+    this.wrappedString = (this.methodMissing("lstrip") as Chars).toS();
+    return this;
+  }
+
   reverseBang(): this {
     this.wrappedString = this.reverse().toString();
     return this;
   }
 
+  rstripBang(): this {
+    this.wrappedString = (this.methodMissing("rstrip") as Chars).toS();
+    return this;
+  }
+
   sliceBang(...args: unknown[]): this {
     this.wrappedString = this.slice(...args)?.toString() ?? "";
+    return this;
+  }
+
+  stripBang(): this {
+    this.wrappedString = (this.methodMissing("strip") as Chars).toS();
     return this;
   }
 

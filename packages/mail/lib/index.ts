@@ -87,6 +87,8 @@ export { FileDelivery } from "./network/delivery-methods/file-delivery.js";
 export { SMTPConnection } from "./network/delivery-methods/smtp-connection.js";
 export { TestMailer } from "./network/delivery-methods/test-mailer.js";
 export { LoggerDelivery } from "./network/delivery-methods/logger-delivery.js";
+export { Retriever } from "./network/retriever-methods/base.js";
+export { TestRetriever } from "./network/retriever-methods/test-retriever.js";
 export { Envelope } from "./envelope.js";
 export { Body } from "./body.js";
 export { PartsList } from "./parts-list.js";
