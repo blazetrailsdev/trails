@@ -98,3 +98,18 @@ it("handles body.to_path returning nil", async () => {
   const [status] = await app.call(env({}));
   expect(status).toBe(200);
 });
+
+it("rack.input#read accepts a binary (Uint8Array) buffer", async () => {
+  const response = await new Lint(async (env) => {
+    env["rack.input"].read(1, new Uint8Array(0));
+    return [201, { "content-type": "text/plain", "content-length": "0" }, []];
+  }).call(env({ ":input": "hello world" }));
+  expect(response[0]).toBe(201);
+
+  const p = new Lint(async (env) => {
+    env["rack.input"].read(1, 42);
+    return [201, { "content-type": "text/plain", "content-length": "0" }, []];
+  }).call(env({ ":input": "hello world" }));
+  await expect(p).rejects.toThrow(LintError);
+  await expect(p).rejects.toThrow(/read called with non-String buffer/);
+});

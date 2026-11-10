@@ -82,7 +82,7 @@ export class InputWrapper {
       }
     }
     if (args.length >= 2) {
-      if (typeof args[1] !== "string") {
+      if (!(typeof args[1] === "string" || args[1] instanceof Uint8Array)) {
         throw new LintError("rack.input#read called with non-String buffer");
       }
     }
