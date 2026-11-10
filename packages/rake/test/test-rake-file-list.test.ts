@@ -479,8 +479,8 @@ describe("TestRakeFileList", () => {
     a.taint();
     const c = rbObjClone(a);
     const d = rbObjDup(a);
-    expect(c.isTainted(), "Clone should be tainted").toBe(true);
-    expect(d.isTainted(), "Dup should be tainted").toBe(true);
+    expect(c.isTainted(), "Clone should be tainted").toBeTruthy();
+    expect(d.isTainted(), "Dup should be tainted").toBeTruthy();
   });
 
   it("duped items will thaw", async () => {
