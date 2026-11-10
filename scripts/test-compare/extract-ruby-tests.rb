@@ -2716,7 +2716,6 @@ class TestExtractor
       content = node[1]
       if content.is_a?(Array) && content[0] == :string_content
         parts = content[1..]
-        # `\'` is `'` in either quote style, so the name reads as Ruby sees it.
         blanked = parts.map { |p| p.is_a?(Array) && p[0] == :@tstring_content ? p[1].gsub("\\'", "'") : "" }.join
         if @interpolated_names && parts.any? { |p| p.is_a?(Array) && p[0] == :string_embexpr }
           @interpolated_names[blanked] = parts.map { |p|
