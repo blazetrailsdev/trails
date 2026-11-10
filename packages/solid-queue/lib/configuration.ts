@@ -2,6 +2,7 @@ import { Model } from "@blazetrails/activemodel";
 import {
   TopLevel,
   camelize,
+  include,
   isPlainObject,
   isPresent,
   presence,
@@ -39,10 +40,16 @@ export class Process extends Struct.new("kind", "attributes") {
   }
 }
 
-export class Configuration extends Model {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveModel::Model` (configuration.rb:5); the class/interface merge is how `include()` surfaces on the type side.
+export interface Configuration extends Model {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Configuration {
   declare static Process: typeof Process;
+  declare static validate: typeof Model.validate;
 
   static {
+    include(this, Model);
     constSet(SolidQueue, "Configuration", this);
     constSet(this, "Process", Process);
 
@@ -76,7 +83,6 @@ export class Configuration extends Model {
   private _recurringTasksConfig?: Options;
 
   constructor(options: Options = {}) {
-    super(null);
     this.options = reverseMerge(options, this.defaultOptions());
   }
 
