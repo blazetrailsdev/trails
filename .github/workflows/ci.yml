@@ -372,7 +372,7 @@ jobs:
           unit_runs_on=$hosted
           unit_shards='[1, 2]'
           postgres_shards='[1, 2, 3]'
-          maria_shards='[1, 2]'
+          maria_shards='[1, 2, 3]'
           if [ -n "$AR_SCOPE" ]; then
             sqlite_shards='[1]'
             postgres_shards='[1]'
@@ -1884,10 +1884,10 @@ jobs:
       contains(github.event.pull_request.labels.*.name, 'run-db-adapters'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
-    # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
+    # 3-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job above for the rationale. Each matrix leg gets its own
     # fresh MariaDB service container; the `needs` graph keys on the job id, so
-    # the `ci` aggregator sees one merged result for both legs.
+    # the `ci` aggregator sees one merged result for every leg.
     strategy:
       fail-fast: false
       matrix:
