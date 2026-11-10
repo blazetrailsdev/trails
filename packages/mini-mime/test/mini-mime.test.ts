@@ -67,11 +67,11 @@ describe("MiniMimeTest", () => {
         type ??= types[0];
 
         const expected = type.contentType;
-        const actual = MiniMime.lookupByFilename(`a.${ext}`)?.contentType;
+        const actual = MiniMime.lookupByFilename(`a.${ext}`)!.contentType;
 
         if (expected !== actual) {
           differences.push(
-            `Expected ".${ext}" to return ${JSON.stringify(expected)}, got: ${JSON.stringify(actual ?? null)}`,
+            `Expected ".${ext}" to return ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)}`,
           );
         }
       }

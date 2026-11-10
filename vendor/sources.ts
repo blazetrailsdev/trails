@@ -1057,6 +1057,25 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "mime-types",
+    origin: {
+      type: "git",
+      url: "https://github.com/mime-types/ruby-mime-types.git",
+      ref: "v3.5.1",
+    },
+    packages: [
+      {
+        name: "mime-types",
+        libPath: "lib/mime",
+        compareApi: false,
+        apiExcludedReason:
+          "read-anchor only: packages/mini-mime/test/support/mime-types.ts ports the MIME::Types calls test_full_parity_with_mime_types makes; the gem is not ported.",
+        compareTests: false,
+        testsExcludedReason: "read-anchor only: the gem is not ported.",
+      },
+    ],
+  },
+  {
     name: "mime-types-data",
     origin: {
       type: "git",
