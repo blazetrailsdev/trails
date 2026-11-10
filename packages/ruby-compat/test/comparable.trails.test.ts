@@ -132,6 +132,12 @@ describe("Array#max", () => {
     expect(max([late, early])).toBe(late);
   });
 
+  it("hands a non-Time operand's <=> the inverted comparison, as time_cmp's rb_invcmp does", () => {
+    const now = instant(5n);
+    expect(cmp(now, { compareTo: () => 1 })).toBe(-1);
+    expect(cmp(now, { compareTo: () => null })).toBeNull();
+  });
+
   it("raises rb_cmperr's ArgumentError when a nil reaches the comparison", () => {
     const now = instant(1n);
     expect(() => max([now, null])).toThrow("comparison of Time with nil failed");

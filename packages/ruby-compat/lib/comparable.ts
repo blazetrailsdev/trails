@@ -107,6 +107,15 @@ export function cmp(a: unknown, b: unknown): number | null {
     const y = (b as { epochNanoseconds?: bigint }).epochNanoseconds;
     if (x !== undefined && y !== undefined) return x < y ? -1 : x > y ? 1 : 0;
   }
+  // `time_cmp`'s `rb_invcmp` arm (vendor/ruby/v3.3.11/time.c:3951) for a non-Time `other`.
+  if (
+    rbObjClass(a) === reopened(rbCTime) &&
+    rbObjClass(b) !== reopened(rbCTime) &&
+    isComparable(b)
+  ) {
+    const c = b.compareTo(a);
+    return c == null ? null : -c;
+  }
   if (kTemporalDateP(a) && (typeof b === "number" || typeof b === "bigint")) {
     const ajd = mAjd(a);
     const n = Number(b);
