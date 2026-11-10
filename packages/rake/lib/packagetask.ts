@@ -61,7 +61,11 @@ export class PackageTask extends TaskLib {
     self.task(
       "clobber_package",
       block(async () => {
-        await Promise.resolve(self.rmR(this.packageDir)).catch(() => null);
+        try {
+          await self.rmR(this.packageDir);
+        } catch {
+          return null;
+        }
       }),
     );
 
