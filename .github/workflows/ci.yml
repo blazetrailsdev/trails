@@ -1016,6 +1016,10 @@ jobs:
           command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
           { magick -version 2>/dev/null || convert -version; } | head -1
       - run: pnpm build
+      # mini-mime's test_full_parity_with_mime_types reads the vendored
+      # mime-types-data registry (packages/mini-mime/test/support/mime-types.ts).
+      - if: needs.changes.outputs.unit_packages == '' || contains(needs.changes.outputs.unit_packages, 'packages/mini-mime')
+        run: pnpm vendor:fetch --source mime-types-data
       - if: (needs.changes.outputs.unit_packages == '' || contains(needs.changes.outputs.unit_packages, 'packages/activejob')) && matrix.shard == 1
         env:
           AJ_ADAPTER: test

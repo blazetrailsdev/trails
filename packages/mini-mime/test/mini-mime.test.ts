@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { MiniMime } from "../lib/mini-mime.js";
+import { MIME } from "./support/mime-types.js";
 
 describe("MiniMimeTest", () => {
   it("that it has a version number", () => {
@@ -43,5 +44,39 @@ describe("MiniMimeTest", () => {
     expect(MiniMime.lookupByContentType("application/x-compressed")!.isBinary()).toBeTruthy();
     expect(MiniMime.lookupByContentType("something-fake")).toBeNull();
     expect(MiniMime.lookupByContentType("text/plain")!.isBinary()).toBeFalsy();
+  });
+
+  describe("with MIME::Types", () => {
+    beforeAll(async () => {
+      await MIME.Types.loadDefaultMimeTypes();
+    });
+
+    it("full parity with mime types", () => {
+      const exts = new Set<string>();
+      MIME.Types.each((type) => {
+        type.extensions.forEach((ext) => exts.add(ext));
+      });
+
+      const differences: string[] = [];
+
+      for (const ext of exts) {
+        const types = MIME.Types.typeFor(`a.${ext}`);
+
+        let type = types.find((t) => !t.isObsolete());
+        type ??= types.find((t) => t.registered);
+        type ??= types[0];
+
+        const expected = type.contentType;
+        const actual = MiniMime.lookupByFilename(`a.${ext}`)?.contentType;
+
+        if (expected !== actual) {
+          differences.push(
+            `Expected ".${ext}" to return ${JSON.stringify(expected)}, got: ${JSON.stringify(actual ?? null)}`,
+          );
+        }
+      }
+
+      expect(differences.length === 0, differences.join("\n")).toBe(true);
+    });
   });
 });
