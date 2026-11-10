@@ -11,11 +11,10 @@ export class ArrayInquirer<T extends string | symbol> extends Array<T> {
     const block = typeof candidates[0] === "function" ? candidates[0] : undefined;
     if (block !== undefined) candidates = [];
 
+    const elements = this as unknown as T[];
     if (candidates.length === 0) {
-      const elements = this as unknown as T[];
       return block !== undefined ? elements.some(block) : elements.length > 0;
     }
-    const elements = this as unknown as T[];
     return (candidates as string[]).some((candidate) => {
       const name = candidate.startsWith(":") ? candidate.slice(1) : candidate;
       return elements.includes(`:${name}` as T) || elements.includes(name as T);
