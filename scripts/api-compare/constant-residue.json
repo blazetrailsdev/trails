@@ -289,14 +289,20 @@
     }
   },
   "actiontext": {
-    "rows": 4,
+    "rows": 10,
     "excluded": [],
     "unwalked": [],
     "residue": {
+      "attachment-gallery.ts::AttachmentGallery": "ActionText::AttachmentGallery",
+      "attachment.ts::Attachment": "ActionText::Attachment",
+      "attachments/caching.ts::Caching": "ActionText::Attachments::Caching",
+      "attachments/minification.ts::Minification": "ActionText::Attachments::Minification",
+      "attachments/trix-conversion.ts::TrixConversion": "ActionText::Attachments::TrixConversion",
       "fragment.ts::Fragment": "ActionText::Fragment",
       "gem-version.ts::VERSION": "ActionText::VERSION",
       "html-conversion.ts::HtmlConversion": "ActionText::HtmlConversion",
-      "plain-text-conversion.ts::PlainTextConversion": "ActionText::PlainTextConversion"
+      "plain-text-conversion.ts::PlainTextConversion": "ActionText::PlainTextConversion",
+      "trix-attachment.ts::TrixAttachment": "ActionText::TrixAttachment"
     }
   },
   "actionview": {

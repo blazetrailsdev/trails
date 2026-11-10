@@ -32,12 +32,31 @@ const DIGITS = "0123456789abcdefghijklmnopqrstuvwxyz";
  * is no Ruby file in any gem for the port to mirror.
  */
 export function kernelInteger(val: number, base?: unknown): number;
+/** `Kernel#Integer` with `exception: false` (`vendor/ruby/v3.3.11/object.c:3355`).
+ * @noRailsEquivalent PERMANENT */
+export function kernelInteger(
+  val: unknown,
+  base: unknown,
+  options: { exception: false },
+): number | bigint | null;
 /** `Kernel#Integer` (`vendor/ruby/v3.3.11/object.c:3355`).
  * @noRailsEquivalent PERMANENT */
 export function kernelInteger(val: unknown, base?: unknown): number | bigint;
 /** `Kernel#Integer` (`vendor/ruby/v3.3.11/object.c:3355`).
  * @noRailsEquivalent PERMANENT */
-export function kernelInteger(val: unknown, base: unknown = 0): number | bigint {
+export function kernelInteger(
+  val: unknown,
+  base: unknown = 0,
+  { exception = true }: { exception?: boolean } = {},
+): number | bigint | null {
+  if (!exception) {
+    try {
+      return kernelInteger(val, base);
+    } catch (e) {
+      if (e instanceof ArgumentError || e instanceof TypeError) return null;
+      throw e;
+    }
+  }
   const radix = rbNum2Int(base);
   if (radix !== 0) {
     const tmp = rbCheckStringType(val);

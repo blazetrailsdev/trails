@@ -6,3 +6,6 @@ import "./constants.generated.js";
 export { Fragment } from "./fragment.js";
 export { HtmlConversion } from "./html-conversion.js";
 export { PlainTextConversion } from "./plain-text-conversion.js";
+export { Attachment } from "./attachment.js";
+export { AttachmentGallery } from "./attachment-gallery.js";
+export { TrixAttachment } from "./trix-attachment.js";

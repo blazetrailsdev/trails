@@ -28,6 +28,7 @@
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
