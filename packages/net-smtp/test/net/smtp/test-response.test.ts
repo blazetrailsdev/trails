@@ -6,7 +6,7 @@ import {
   SMTPServerBusy,
   SMTPSyntaxError,
   SMTPUnknownError,
-} from "../lib/smtp.js";
+} from "../../../lib/smtp.js";
 
 describe("TestResponse", () => {
   const multi = "250-ubuntu-desktop\n250-SIZE 1 2 3\n250 DSN\n";

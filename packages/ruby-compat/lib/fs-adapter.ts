@@ -412,8 +412,7 @@ function tryAutoRegisterNode(): boolean {
         fsPromises.access(p).then(
           () => true,
           (error: unknown) => {
-            const code = (error as { code?: string }).code;
-            if (code === "ENOENT" || code === "ENOTDIR") return false;
+            if (typeof (error as { code?: unknown }).code === "string") return false;
             throw error;
           },
         ),

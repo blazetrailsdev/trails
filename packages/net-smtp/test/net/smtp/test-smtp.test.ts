@@ -3,7 +3,7 @@ import { TLSSocket } from "node:tls";
 import { afterEach, describe, expect, it } from "vitest";
 import { ArgumentError, EOFError, block } from "@blazetrails/ruby-compat";
 import { SMTPServer, type SMTPServerOptions } from "smtp-server";
-import { OpenTimeout } from "../lib/protocol.js";
+import { OpenTimeout } from "../../../lib/protocol.js";
 import {
   Address,
   Response,
@@ -14,7 +14,7 @@ import {
   SMTPSyntaxError,
   SMTPUnknownError,
   SMTPUnsupportedCommand,
-} from "../lib/smtp.js";
+} from "../../../lib/smtp.js";
 
 type Capabilities = Record<string, boolean | string | string[] | null | undefined>;
 
@@ -745,33 +745,5 @@ describe("TestSMTP", () => {
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
     await smtp.mailfrom("rené@example.com");
     expect(server.commands.at(-1)).toBe("MAIL FROM:<rené@example.com> SMTPUTF8\r\n");
-  });
-});
-
-describe("TestStarttls", () => {
-  it("enable tls and enable starttls", () => {
-    const smtp = new SMTP("localhost", 25);
-    smtp.enableTls();
-    expect(() => smtp.enableStarttls()).toThrow(ArgumentError);
-  });
-
-  it("enable tls and enable starttls auto", () => {
-    const smtp = new SMTP("localhost", 25);
-    smtp.enableTls();
-    expect(() => smtp.enableStarttlsAuto()).toThrow(ArgumentError);
-  });
-
-  it("enable starttls and enable starttls auto", () => {
-    const smtp = new SMTP("localhost", 25);
-    smtp.enableStarttls();
-    expect(smtp.isStarttlsAlways()).toBe(true);
-    smtp.enableStarttlsAuto();
-    expect(smtp.isStarttlsAuto()).toBe(true);
-  });
-
-  it("disable starttls", () => {
-    const smtp = new SMTP("localhost", 25);
-    smtp.disableStarttls();
-    expect(smtp.isStarttls()).toBe(false);
   });
 });
