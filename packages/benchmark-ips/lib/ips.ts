@@ -56,8 +56,12 @@ export class IPS {
   static readonly VERSION = "2.14.0";
   static readonly CODENAME = "Akagi";
   static Helpers = Helpers;
-  static Job = Job;
-  static Report = Report;
+  static get Job(): typeof Job {
+    return Job;
+  }
+  static get Report(): typeof Report {
+    return Report;
+  }
   static Stats = { SD, StatsMetric };
 
   ips(

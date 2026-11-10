@@ -22,8 +22,12 @@ interface ConfigOptions {
 
 export class Job {
   static Entry = Entry;
-  static MultiReport = MultiReport;
-  static StreamReport = StreamReport;
+  static get MultiReport(): typeof MultiReport {
+    return MultiReport;
+  }
+  static get StreamReport(): typeof StreamReport {
+    return StreamReport;
+  }
 
   static readonly MICROSECONDS_PER_100MS = 100_000;
   static readonly MICROSECONDS_PER_SECOND = Timing.MICROSECONDS_PER_SECOND;
