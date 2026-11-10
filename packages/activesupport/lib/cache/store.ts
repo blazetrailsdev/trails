@@ -3,6 +3,7 @@ import { Entry } from "./entry.js";
 import type { Duration } from "../duration.js";
 import {
   ArgumentError,
+  Hash,
   NotImplementedError,
   TypeError,
   kernelFloat,
@@ -15,7 +16,7 @@ import { SerializerWithFallback, type Serializer } from "./serializer-with-fallb
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
-import { isPlainObject, toParam } from "../hash-utils.js";
+import { extractOptionsBang, isPlainObject, toParam } from "../hash-utils.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import { cattrAccessor } from "../module-ext.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
@@ -55,14 +56,6 @@ export interface CacheCoder {
   dump(entry: Entry): unknown;
   load(payload: unknown): unknown;
   dumpCompressed?(entry: Entry, threshold: number): unknown;
-}
-
-function extractOptions(args: unknown[]): StoreOptions | undefined {
-  const last = args[args.length - 1];
-  if (isPlainObject(last)) {
-    return args.pop() as StoreOptions;
-  }
-  return undefined;
 }
 
 /** @internal */
@@ -279,7 +272,7 @@ export abstract class Store {
 
   async readMulti(...names: unknown[]): Promise<Map<unknown, unknown>> {
     if (names.length === 0) return new Map();
-    let options = extractOptions(names);
+    let options = extractOptionsBang(names);
     options = this.mergedOptions(options);
     const keys: string[] = [];
     for (const name of names) keys.push(await this.normalizeKey(name, options));
@@ -324,7 +317,7 @@ export abstract class Store {
     if (typeof block !== "function")
       throw new ArgumentError("Missing block: `Cache#fetch_multi` requires a block.");
     if (names.length === 0) return new Map();
-    let options = extractOptions(names as unknown[]);
+    let options = extractOptionsBang(names as unknown[]);
     options = this.mergedOptions(options);
     const keys: string[] = [];
     for (const name of names as unknown[]) keys.push(await this.normalizeKey(name, options));
@@ -676,8 +669,8 @@ export abstract class Store {
       } else {
         expanded = await this.expandedKey(key[0]);
       }
-    } else if (isPlainObject(key)) {
-      expanded = Object.entries(key)
+    } else if (isPlainObject(key) || key instanceof Hash) {
+      expanded = (key instanceof Hash ? key.toA() : Object.entries(key))
         .map(([k, v]) => `${k}=${v}`)
         .sort();
     } else {

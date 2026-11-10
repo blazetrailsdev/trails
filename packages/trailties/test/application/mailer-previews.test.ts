@@ -199,6 +199,7 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     );
   });
 
+  // BLOCKED: plain-required-class-reaches-descendants-tracker
   it.skip("mailer previews are loaded from custom preview_paths", async () => {
     await t.appDir("lib/mailer_previews");
     const appPath = await t.appPath();
