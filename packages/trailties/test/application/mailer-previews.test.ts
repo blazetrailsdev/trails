@@ -5,7 +5,7 @@ import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { Assertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import { Methods } from "@blazetrails/rack-test";
 import { HTML5 } from "@blazetrails/nokogiri";
-import { I18n, h } from "@blazetrails/activesupport";
+import { I18n, camelize, h } from "@blazetrails/activesupport";
 import { travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Mail } from "@blazetrails/mail";
 import type {} from "@blazetrails/vitest-matchers";
@@ -101,6 +101,9 @@ const previewSource = (name: string, body: string): string => `
 const PIXEL =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQMAAAAl21bKAAAAA1BMVEWzIioca/JlAAAACklEQVQI12NgAAAAAgAB4iG8MwAAAABJRU5ErkJgggo=";
 
+const sleep = (seconds: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+
 const FROM = 'static { this.default({ from: "from@example.com" }); }';
 const FOO = 'foo() { return this.mail({ to: "to@example.org" }); }';
 
@@ -193,6 +196,185 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
     );
     expect(t.lastResponse().body).toMatch(
       '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+  });
+
+  // BLOCKED: plain-required-class-reaches-descendants-tracker
+  it.skip("mailer previews are loaded from custom preview_paths", async () => {
+    await t.appDir("lib/mailer_previews");
+    const appPath = await t.appPath();
+    await t.addToConfig(
+      `this.config.actionMailer.previewPaths = ["${appPath}/lib/notifier_previews", "${appPath}/lib/confirm_previews"];`,
+    );
+
+    for (const keyword of ["notifier", "confirm"]) {
+      const klass = camelize(keyword);
+      await t.mailer(keyword, mailerSource(klass, `${FROM} ${FOO}`));
+
+      await t.textTemplate(`${keyword}/foo`, "Hello, World!");
+
+      await t.appFile(
+        `lib/${keyword}_previews/notifier-preview.ts`,
+        previewSource(`${klass}Preview`, `foo() { return TopLevel.${klass}.foo(); }`),
+      );
+    }
+
+    await t.app("development");
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+    expect(t.lastResponse().body).toMatch('<h3><a href="/trails/mailers/confirm">Confirm</a></h3>');
+    expect(t.lastResponse().body).toMatch('<li><a href="/trails/mailers/confirm/foo">foo</a></li>');
+  });
+
+  it("mailer previews are reloaded across requests", async () => {
+    await t.app("development");
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).not.toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+
+    await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+
+    await t.removeFile("test/mailers/previews/notifier-preview.ts");
+    await sleep(1);
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).not.toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+  });
+
+  it("mailer preview actions are added and removed", async () => {
+    await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+    expect(t.lastResponse().body).not.toMatch(
+      '<li><a href="/trails/mailers/notifier/bar">bar</a></li>',
+    );
+
+    await t.mailer(
+      "notifier",
+      mailerSource(
+        "Notifier",
+        `${FROM} ${FOO} bar() { return this.mail({ to: "to@example.net" }); }`,
+      ),
+    );
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.textTemplate("notifier/bar", "Goodbye, World!");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource(
+        "NotifierPreview",
+        "foo() { return TopLevel.Notifier.foo(); } bar() { return TopLevel.Notifier.bar(); }",
+      ),
+    );
+
+    await sleep(1);
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/bar">bar</a></li>',
+    );
+
+    await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
+
+    await t.removeFile("app/views/notifier/bar.text.tse");
+
+    await t.mailerPreview(
+      "notifier",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await sleep(1);
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+    expect(t.lastResponse().body).toMatch(
+      '<li><a href="/trails/mailers/notifier/foo">foo</a></li>',
+    );
+    expect(t.lastResponse().body).not.toMatch(
+      '<li><a href="/trails/mailers/notifier/bar">bar</a></li>',
+    );
+  });
+
+  it("mailer previews are reloaded from custom preview_paths", async () => {
+    await t.appDir("lib/mailer_previews");
+    await t.addToConfig(
+      `this.config.actionMailer.previewPaths = ["${await t.appPath()}/lib/mailer_previews"];`,
+    );
+
+    await t.app("development");
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).not.toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+
+    await t.mailer("notifier", mailerSource("Notifier", `${FROM} ${FOO}`));
+
+    await t.textTemplate("notifier/foo", "Hello, World!");
+
+    await t.appFile(
+      "lib/mailer_previews/notifier-preview.ts",
+      previewSource("NotifierPreview", "foo() { return TopLevel.Notifier.foo(); }"),
+    );
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
+    );
+
+    await t.removeFile("lib/mailer_previews/notifier-preview.ts");
+    await sleep(1);
+
+    await t.get("/trails/mailers");
+    expect(t.lastResponse().body).not.toMatch(
+      '<h3><a href="/trails/mailers/notifier">Notifier</a></h3>',
     );
   });
 
