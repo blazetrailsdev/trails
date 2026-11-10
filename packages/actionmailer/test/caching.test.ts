@@ -124,7 +124,7 @@ describe("FragmentCachingTest", () => {
     );
 
     expect(fragmentComputed).toBeFalsy();
-    expect(buffer.toString()).toBe("generated till now -> fragment content");
+    expect(buffer).toEqualRuby("generated till now -> fragment content");
   });
 
   it("html safety", async () => {
@@ -163,10 +163,8 @@ describe("FunctionalFragmentCachingTest", () => {
 
     expect(email.body().encoded()).toMatch(expectedBody);
     expect(
-      String(
-        await store.read(
-          `views/caching-mailer/fragment-cache:${templateDigest("caching-mailer/fragment-cache", "html")}/caching`,
-        ),
+      await store.read(
+        `views/caching-mailer/fragment-cache:${templateDigest("caching-mailer/fragment-cache", "html")}/caching`,
       ),
     ).toMatch(expectedBody);
   });
@@ -177,10 +175,8 @@ describe("FunctionalFragmentCachingTest", () => {
     expect(email.body().encoded()).toMatch(expectedBody);
 
     expect(
-      String(
-        await store.read(
-          `views/caching-mailer/_partial:${templateDigest("caching-mailer/_partial", "html")}/caching`,
-        ),
+      await store.read(
+        `views/caching-mailer/_partial:${templateDigest("caching-mailer/_partial", "html")}/caching`,
       ),
     ).toMatch(expectedBody);
   });
@@ -190,7 +186,7 @@ describe("FunctionalFragmentCachingTest", () => {
     const expectedBody = "No Digest";
 
     expect(email.body().encoded()).toMatch(expectedBody);
-    expect(String(await store.read("views/no_digest"))).toMatch(expectedBody);
+    expect(await store.read("views/no_digest")).toMatch(expectedBody);
   });
 
   it("fragment caching options", async () => {
@@ -212,8 +208,8 @@ describe("FunctionalFragmentCachingTest", () => {
     const encodedBody = email.body().encoded();
     expect(encodedBody).toMatch(expectedTextBody);
     expect(encodedBody).toMatch(expectedHtmlBody);
-    expect(String(await store.read("views/text_caching"))).toMatch(expectedTextBody);
-    expect(String(await store.read("views/html_caching"))).toMatch(expectedHtmlBody);
+    expect(await store.read("views/text_caching")).toMatch(expectedTextBody);
+    expect(await store.read("views/html_caching")).toMatch(expectedHtmlBody);
   });
 
   it("fragment cache instrumentation", async () => {

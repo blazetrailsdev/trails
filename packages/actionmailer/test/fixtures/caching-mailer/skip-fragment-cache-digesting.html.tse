@@ -1,1 +1,3 @@
-<%= cache("no_digest", { skipDigest: true }, () => { %>\n  No Digest\n<% }) %>\n
+<%= cache("no_digest", { skipDigest: true }, () => { %>
+  No Digest
+<% }) %>

@@ -1,1 +1,3 @@
-<% await cache("caching", {}, () => { %>\n"Welcome"\n<% }) %>\n
+<% await cache("caching", {}, () => { %>
+"Welcome"
+<% }) %>

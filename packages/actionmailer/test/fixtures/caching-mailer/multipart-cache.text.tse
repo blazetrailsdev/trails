@@ -1,1 +1,3 @@
-<% await cache("text_caching", { skipDigest: true }, () => { %>\n    "Welcome text"\n<% }) %>\n
+<% await cache("text_caching", { skipDigest: true }, () => { %>
+    "Welcome text"
+<% }) %>
