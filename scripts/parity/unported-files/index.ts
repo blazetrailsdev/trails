@@ -32,7 +32,6 @@ import { RAILS_DOM_TESTING_UNPORTED_FILES } from "./rails-dom-testing.js";
 import { SOLID_QUEUE_UNPORTED_FILES } from "./solid-queue.js";
 import { THOR_UNPORTED_FILES } from "./thor.js";
 import { TRAILTIES_UNPORTED_FILES } from "./trailties.js";
-import { TZINFO_UNPORTED_FILES } from "./tzinfo.js";
 import { UNSCOPED_UNPORTED_FILES } from "./unscoped.js";
 import { VERSION_UNPORTED_FILES } from "./version.js";
 import { ZEITWERK_UNPORTED_FILES } from "./zeitwerk.js";
@@ -64,7 +63,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
   ...SOLID_QUEUE_UNPORTED_FILES,
   ...THOR_UNPORTED_FILES,
   ...TRAILTIES_UNPORTED_FILES,
-  ...TZINFO_UNPORTED_FILES,
   ...UNSCOPED_UNPORTED_FILES,
   ...VERSION_UNPORTED_FILES,
   ...ZEITWERK_UNPORTED_FILES,
