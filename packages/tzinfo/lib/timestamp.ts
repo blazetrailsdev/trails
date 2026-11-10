@@ -3,6 +3,7 @@ import {
   ArgumentError,
   RangeError,
   Rational,
+  cmp,
   equals,
   rbHash,
   rbInspect,
@@ -71,11 +72,11 @@ export class Timestamp {
     return Timestamp.newBang(this.value, this.subSecond, "utc");
   }
 
+  /** @missingRailsCall localtime — CONVERGEABLE date-time-localtime-and-datetime-jd */
   toTime(): Time {
     const time = this.newTime();
 
     if (this.utcOffset != null && !this._utc) {
-      // @missingRailsCall localtime
       return time.getlocal(this.utcOffset);
     } else {
       return time.utc();
@@ -104,9 +105,8 @@ export class Timestamp {
     const sec = Math.abs(this.utcOffset) % 60;
     const hour = Math.floor(min / 60);
     min = min % 60;
-    const pad = (n: number) => String(n).padStart(2, "0");
 
-    return `${this.valueAndSubSecondToS(this.utcOffset)} ${sign}${pad(hour)}:${pad(min)}${sec > 0 ? `:${pad(sec)}` : ""}${this.utcOffset !== 0 ? ` (${this.valueAndSubSecondToS()} UTC)` : ""}`;
+    return `${this.valueAndSubSecondToS(this.utcOffset)} ${sign}${String(hour).padStart(2, "0")}:${String(min).padStart(2, "0")}${sec > 0 ? `:${String(sec).padStart(2, "0")}` : ""}${this.utcOffset !== 0 ? ` (${this.valueAndSubSecondToS()} UTC)` : ""}`;
   }
 
   compareTo(t: unknown): number | null {
@@ -114,8 +114,8 @@ export class Timestamp {
     if (this.utcOffset != null && t.utcOffset == null) return null;
     if (this.utcOffset == null && t.utcOffset != null) return null;
 
-    let result = Math.sign(this.value - t.value);
-    if (result === 0) result = new Rational(0, 1).add(this.subSecond).cmp(t.subSecond);
+    let result = cmp(this.value, t.value)!;
+    if (result === 0) result = cmp(this.subSecond, t.subSecond)!;
     return result;
   }
 
@@ -133,14 +133,14 @@ export class Timestamp {
 
   /** @internal */
   protected newTime(klass: typeof Time = Time): Time {
-    return klass.at(this.value, new Rational(0, 1).add(this.subSecond).mul(1_000_000));
+    return klass.at(this.value, this.subSecond === 0 ? 0 : this.subSecond.mul(1_000_000));
   }
 
-  /** @internal */
+  /**
+   * @missingRailsCall jd — CONVERGEABLE date-time-localtime-and-datetime-jd
+   * @internal
+   */
   protected newDatetime(klass: typeof DateTime = DateTime): DateTime {
-    // Can't specify the start parameter unless the jd parameter is an exact number of days.
-    // Use #gregorian instead.
-    // @missingRailsCall jd
     const datetime = new klass(-4712, 1, 1)
       .plus(new Rational(this.value, 1).add(this.subSecond).quo(86400).add(JD_EPOCH))
       .gregorian();
