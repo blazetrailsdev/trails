@@ -49,6 +49,7 @@ export class DocumentFragment extends XmlNode {
     children.each((child) => this.addChildNodeAndReparentAttrs(child as unknown as XmlNode));
   }
 
+  /** @noRailsEquivalent CONVERGEABLE nokogiri-html5-document-fragment-inherits-xml */
   static [Symbol.hasInstance](instance: unknown): boolean {
     return (
       Function.prototype[Symbol.hasInstance].call(this, instance) ||
