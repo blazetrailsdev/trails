@@ -312,6 +312,20 @@ describe("Array#to_h", () => {
   it("raises ArgumentError for a pair of the wrong length", () => {
     expect(() => toH([["a", 1, 2]])).toThrow("wrong array length at 0 (expected 2, was 3)");
   });
+
+  it("builds the Hash from the pairs the block answers", () => {
+    const hash = toH(["a", "bb"], (s) => [s, s.length]);
+    expect([...hash]).toEqual([
+      ["a", 1],
+      ["bb", 2],
+    ]);
+    expect(() => toH(["a"], () => "x")).toThrow("wrong element type String at 0 (expected array)");
+  });
+
+  it("toA answers a Map's pairs and a Set's elements", () => {
+    expect(toA(new Map([["a", 1]]))).toEqual([["a", 1]]);
+    expect(toA(new Set(["asc", "desc"]))).toEqual(["asc", "desc"]);
+  });
 });
 
 describe("Array#reject", () => {

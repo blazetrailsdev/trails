@@ -9,7 +9,7 @@ import {
 } from "../active-record.js";
 import { StatementInvalid } from "../errors.js";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import { File, FileUtils, Marshal, Tempfile } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Marshal, Tempfile, sort, toH } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
@@ -379,7 +379,8 @@ describe("SchemaCacheTest", () => {
       ["y", null],
       ["x", null],
     ];
-    const expected = new Map([...values].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- encodeWith answers Hashes, which a plain object does not equal
+    const expected = toH(sort(values));
 
     const coder: Record<string, unknown> = {
       columns: values,

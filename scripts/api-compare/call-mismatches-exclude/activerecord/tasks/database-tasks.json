@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/database-tasks.ts",
+    "rubyName": "migrations_paths",
+    "call": "to_a",
+    "reason": "Rails::Paths::Path#to_a is expanded (railties/lib/rails/paths.rb:235), an async glob in trailties, so the sync reader cannot call it; CONVERGEABLE database-tasks-migrations-paths-reads-app-paths-to-a."
+  }
+]

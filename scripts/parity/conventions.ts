@@ -565,6 +565,7 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
   "actionview",
   "activemodel",
   "activerecord",
+  "activerecord",
   "activerecord-test-support",
   "activesupport",
   "arel",
@@ -594,8 +595,10 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
 export const PROTOCOL_CALL_ENROLLED_PACKAGES: ReadonlySet<string> = new Set<string>([
   "abstractcontroller",
   "actioncontroller",
+  "actiondispatch",
   "actionview",
   "activemodel",
+  "activerecord",
   "activerecord-test-support",
   "activesupport",
   "arel",
