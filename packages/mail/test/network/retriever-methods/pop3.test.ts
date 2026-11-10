@@ -23,7 +23,7 @@ describe("POP3 Retriever", () => {
 
   describe("find with and without block", () => {
     it("should find all emails with a given block", () => {
-      expect(MockPOP3.isStarted()).toBe(false);
+      expect(MockPOP3.isStarted()).toBeFalsy();
 
       const messages: Message[] = [];
       Mail.all(null, (message) => {
@@ -31,16 +31,16 @@ describe("POP3 Retriever", () => {
       });
 
       expect(list(messages).sort()).toEqual(pops().sort());
-      expect(MockPOP3.isStarted()).toBe(false);
+      expect(MockPOP3.isStarted()).toBeFalsy();
     });
 
     it("should get all emails without a given block", () => {
-      expect(MockPOP3.isStarted()).toBe(false);
+      expect(MockPOP3.isStarted()).toBeFalsy();
 
       const messages = Mail.all();
 
       expect(list(messages).sort()).toEqual(pops().sort());
-      expect(MockPOP3.isStarted()).toBe(false);
+      expect(MockPOP3.isStarted()).toBeFalsy();
     });
   });
 
@@ -87,33 +87,33 @@ describe("POP3 Retriever", () => {
 
     it("should handle the delete_after_find option", () => {
       Mail.find({ deleteAfterFind: false });
-      MockPOP3.popmails().forEach((message) => expect(message.isDeleted()).toBe(false));
+      MockPOP3.popmails().forEach((message) => expect(message.isDeleted()).toBeFalsy());
 
       Mail.find({ deleteAfterFind: true });
       MockPOP3.popmails()
         .slice(0, 10)
-        .forEach((message) => expect(message.isDeleted()).toBe(true));
+        .forEach((message) => expect(message.isDeleted()).toBeTruthy());
       MockPOP3.popmails()
         .slice(-10)
-        .forEach((message) => expect(message.isDeleted()).toBe(false));
+        .forEach((message) => expect(message.isDeleted()).toBeFalsy());
 
       Mail.find({ deleteAfterFind: true }, () => {});
       MockPOP3.popmails()
         .slice(0, 10)
-        .forEach((message) => expect(message.isDeleted()).toBe(true));
+        .forEach((message) => expect(message.isDeleted()).toBeTruthy());
       MockPOP3.popmails()
         .slice(-10)
-        .forEach((message) => expect(message.isDeleted()).toBe(false));
+        .forEach((message) => expect(message.isDeleted()).toBeFalsy());
     });
 
     it("should handle the find_and_delete method", () => {
       Mail.findAndDelete({ count: 15 });
       MockPOP3.popmails()
         .slice(0, 15)
-        .forEach((message) => expect(message.isDeleted()).toBe(true));
+        .forEach((message) => expect(message.isDeleted()).toBeTruthy());
       MockPOP3.popmails()
         .slice(-5)
-        .forEach((message) => expect(message.isDeleted()).toBe(false));
+        .forEach((message) => expect(message.isDeleted()).toBeFalsy());
     });
   });
 
@@ -128,7 +128,7 @@ describe("POP3 Retriever", () => {
     it("should find the last received message", () => {
       const message = Mail.last();
 
-      expect((message as object).constructor).toBe(Message);
+      expect(message).toBeInstanceOf(Message);
       expect(raw(message)).toBe(MockPOP3.popmails().at(-1)!.pop());
     });
   });
@@ -144,7 +144,7 @@ describe("POP3 Retriever", () => {
     it("should find the first received message", () => {
       const message = Mail.first();
 
-      expect((message as object).constructor).toBe(Message);
+      expect(message).toBeInstanceOf(Message);
       expect(raw(message)).toBe(MockPOP3.popmails()[0].pop());
     });
   });
@@ -177,7 +177,7 @@ describe("POP3 Retriever", () => {
     });
     it("should yield the connection object to the given block", () => {
       Mail.connection((connection) => {
-        expect((connection as object).constructor).toBe(MockPOP3);
+        expect(connection).toBeInstanceOf(MockPOP3);
       });
     });
   });
@@ -218,7 +218,7 @@ describe("POP3 Retriever", () => {
 
   describe("error handling", () => {
     it("should finish the POP3 connection is an exception is raised", () => {
-      expect(MockPOP3.isStarted()).toBe(false);
+      expect(MockPOP3.isStarted()).toBeFalsy();
 
       expect(() =>
         Mail.all(null, () => {
@@ -226,7 +226,7 @@ describe("POP3 Retriever", () => {
         }),
       ).toThrow(ArgumentError);
 
-      expect(MockPOP3.isStarted()).toBe(false);
+      expect(MockPOP3.isStarted()).toBeFalsy();
     });
   });
 
