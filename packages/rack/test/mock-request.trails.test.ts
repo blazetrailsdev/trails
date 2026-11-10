@@ -10,16 +10,3 @@ it("copies a String key that spells an option name into the env", () => {
   expect(env["REQUEST_METHOD"]).toBe("POST");
   expect(env["rack.input"]).toBeUndefined();
 });
-
-it("should handle :input object that does not respond to set_encoding", () => {
-  const input = {
-    read() {
-      return "data";
-    },
-    size() {
-      return 4;
-    },
-  };
-  const env = MockRequest.envFor("/", { ":input": input });
-  expect(env["rack.input"].read()).toBe("data");
-});

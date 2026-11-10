@@ -55,7 +55,7 @@ export class Processor {
     if (
       /^resize[A-Z]/.test(String(operations[0]?.[0] ?? "")) &&
       Object.keys(loader).length === 0 &&
-      this.supportsResizeOnLoad()
+      this.isSupportsResizeOnLoad()
     ) {
       accumulator = source;
     } else {
@@ -90,7 +90,7 @@ export class Processor {
     return new this(accumulator).applyOperation(name, ...args, ...(block ? [block] : []));
   }
 
-  static supportsResizeOnLoad(): boolean {
+  static isSupportsResizeOnLoad(): boolean {
     return false;
   }
 

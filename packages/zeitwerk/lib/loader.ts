@@ -1,4 +1,5 @@
 import { _generations, _installResolveHook, autoloadGet } from "./core-ext/kernel.js";
+import { Internal } from "./internal.js";
 import {
   File,
   LOADED_FEATURES,
@@ -7,6 +8,8 @@ import {
   NameError as RubyNameError,
   SecureRandom,
   constGet,
+  extend,
+  type Extended,
   getFs,
   include,
   rbInspect,
@@ -46,6 +49,11 @@ export interface Loader
     Included<typeof Config>,
     Included<typeof EagerLoad> {
   tag: string;
+  __onFileAutoloaded: Loader["onFileAutoloaded"];
+  __onDirAutoloaded: Loader["onDirAutoloaded"];
+  __onNamespaceLoaded: Loader["onNamespaceLoaded"];
+  __isIgnores: Loader["isIgnores"];
+  __roots: Loader["roots"];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -83,6 +91,15 @@ export class Loader {
   /** @internal */ toUnload: Record<string, Cref>;
   /** @internal */ namespaceDirs: Map<string[]>;
   /** @internal */ shadowedFiles: Set<string>;
+  declare static internal: Extended<typeof Internal>["internal"];
+  static {
+    extend(this, Internal);
+    this.internal("autoloads");
+    this.internal("autoloadedDirs");
+    this.internal("toUnload");
+    this.internal("namespaceDirs");
+    this.internal("shadowedFiles");
+  }
   /** @internal */ _setup: boolean;
   /** @internal */ _eagerLoaded: boolean;
   /** @internal */ mutex: Mutex;
@@ -330,6 +347,9 @@ export class Loader {
   /** @internal */
   isShadowedFile(file: string): boolean {
     return this.shadowedFiles.has(file);
+  }
+  static {
+    this.internal("isShadowedFile");
   }
 
   static async eagerLoadAll(): Promise<void> {
@@ -588,12 +608,12 @@ export class Loader {
 
   /** @internal */
   private registerExplicitNamespace(cref: Cref): void {
-    Registry.ExplicitNamespaces.register(cref, this);
+    Registry.ExplicitNamespaces.__register(cref, this);
   }
 
   /** @internal */
   private unregisterExplicitNamespaces(): void {
-    Registry.ExplicitNamespaces.unregisterLoader(this);
+    Registry.ExplicitNamespaces.__unregisterLoader(this);
   }
 
   /** @internal */
@@ -603,9 +623,9 @@ export class Loader {
 
       for (const loader of Registry.loaders) {
         if (loader === this) continue;
-        if (loader.isIgnores(dir)) continue;
+        if (loader.__isIgnores(dir)) continue;
 
-        for (const rootDir of Object.keys(loader.roots)) {
+        for (const rootDir of Object.keys(loader.__roots)) {
           if (this.isIgnores(rootDir)) continue;
 
           const rootDirSlash = `${rootDir}/`;

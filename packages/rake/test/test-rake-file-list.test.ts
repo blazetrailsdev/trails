@@ -11,6 +11,7 @@ import {
   rbObjClone,
   rbObjDup,
   rbObjIsKindOf,
+  RUBY_VERSION,
 } from "@blazetrails/ruby-compat";
 import { ext, pathmap } from "../lib/ext/string.js";
 import { FileList } from "../lib/file-list.js";
@@ -470,6 +471,16 @@ describe("TestRakeFileList", () => {
     expect(await a.toA()).toEqual(["a", "b", "c", "d"]);
     expect(await c.toA()).toEqual(["a", "b", "c"]);
     expect(await d.toA()).toEqual(["a", "b", "c"]);
+  });
+
+  it.skipIf(!(RUBY_VERSION < "2.7"))("dup and clone replicate taint", async () => {
+    type Taintable = FileList & { taint(): void; isTainted(): boolean };
+    const a = FileList.get("a", "b", "c") as Taintable;
+    a.taint();
+    const c = rbObjClone(a);
+    const d = rbObjDup(a);
+    expect(c.isTainted(), "Clone should be tainted").toBeTruthy();
+    expect(d.isTainted(), "Dup should be tainted").toBeTruthy();
   });
 
   it("duped items will thaw", async () => {

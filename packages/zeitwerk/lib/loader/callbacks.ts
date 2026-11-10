@@ -1,3 +1,5 @@
+import { extend, type Extended } from "@blazetrails/ruby-compat";
+import { Internal } from "../internal.js";
 import { constAdded } from "../core-ext/module.js";
 import type { Cref } from "../cref.js";
 import { NameError } from "../error.js";
@@ -76,3 +78,9 @@ export const Callbacks = {
     for (const c of callbacks ?? []) await c(cpath, value, abspath);
   },
 };
+
+extend(Callbacks, Internal);
+const self = Callbacks as typeof Callbacks & Extended<typeof Internal>;
+self.internal("onFileAutoloaded");
+self.internal("onDirAutoloaded");
+self.internal("onNamespaceLoaded");

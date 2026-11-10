@@ -1,3 +1,5 @@
+import { extend, type Extended } from "@blazetrails/ruby-compat";
+import { Internal } from "../internal.js";
 import type { Cref } from "../cref.js";
 import { Map } from "../cref/map.js";
 import type { Loader } from "../loader.js";
@@ -31,3 +33,18 @@ export const ExplicitNamespaces = {
     this.loaders.clear();
   },
 };
+
+extend(ExplicitNamespaces, Internal);
+/** @noRailsEquivalent PERMANENT */
+export type ExplicitNamespacesInternals = {
+  __register: (typeof ExplicitNamespaces)["register"];
+  __loaderFor: (typeof ExplicitNamespaces)["loaderFor"];
+  __unregisterLoader: (typeof ExplicitNamespaces)["unregisterLoader"];
+};
+
+const self = ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>;
+self.internal("register");
+self.internal("loaderFor");
+self.internal("unregisterLoader");
+self.internal("isRegistered");
+self.internal("clear");

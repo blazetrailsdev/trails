@@ -1,3 +1,5 @@
+import { extend, type Extended } from "@blazetrails/ruby-compat";
+import { Internal } from "../internal.js";
 import { _generations } from "../core-ext/kernel.js";
 import { Dir, File, Pathname, TypeError, getFs, rbInspect, stdout } from "@blazetrails/ruby-compat";
 import { _isModule } from "../core-ext/module.js";
@@ -211,3 +213,8 @@ export const Config = {
     for (const dir of dirs) this.collapseDirs.add(dir);
   },
 };
+
+extend(Config, Internal);
+const self = Config as typeof Config & Extended<typeof Internal>;
+self.internal("roots");
+self.internal("isIgnores");

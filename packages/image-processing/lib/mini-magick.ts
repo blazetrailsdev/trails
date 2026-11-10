@@ -23,7 +23,7 @@ import { Processor as BaseProcessor } from "./processor.js";
 
 type Options = Record<string, unknown>;
 
-class Processor extends BaseProcessor {
+export class Processor extends BaseProcessor {
   declare readonly magick: CliTool;
 
   static {
@@ -41,7 +41,7 @@ class Processor extends BaseProcessor {
       magick = pathOrMagick;
     } else {
       const sourcePath = pathOrMagick;
-      magick = ImageProcessingMiniMagick.convertShim() as CliTool;
+      magick = MiniMagick.convertShim() as CliTool;
 
       Processor.Utils.applyOptions(magick, options);
 
@@ -280,7 +280,7 @@ class Processor extends BaseProcessor {
   };
 }
 
-const ImageProcessingMiniMagick = {
+export const MiniMagick = {
   ...Chainable,
   Processor,
 
@@ -294,7 +294,7 @@ const ImageProcessingMiniMagick = {
 
   async isValidImage(file: { path(): string }): Promise<boolean> {
     try {
-      await ImageProcessingMiniMagick.convertShim((convert) => {
+      await MiniMagick.convertShim((convert) => {
         convert.append(file.path());
         convert.append("null:");
       });
@@ -306,6 +306,5 @@ const ImageProcessingMiniMagick = {
   },
 };
 
-chainableProxy(ImageProcessingMiniMagick);
-export const MiniMagick = ImageProcessingMiniMagick;
+chainableProxy(MiniMagick);
 ImageProcessing.MiniMagick = MiniMagick;

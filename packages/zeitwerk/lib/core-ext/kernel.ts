@@ -77,7 +77,7 @@ export async function require(path: string): Promise<boolean> {
   if (_requiring.has(path)) return !ruby;
   if (!Object.hasOwn(loader.autoloads, path)) {
     if (ruby) return false;
-    await loader.onDirAutoloaded(path);
+    await loader.__onDirAutoloaded(path);
     return true;
   }
 
@@ -95,9 +95,9 @@ export async function require(path: string): Promise<boolean> {
         exports = (await loader.importer(url.href)) as Record<string, unknown>;
       else exports = (await import(url.href)) as Record<string, unknown>;
       LOADED_FEATURES.push(path);
-      await loader.onFileAutoloaded(path, exports);
+      await loader.__onFileAutoloaded(path, exports);
     } else {
-      await loader.onDirAutoloaded(path);
+      await loader.__onDirAutoloaded(path);
     }
   });
   _requiring.set(path, { cpath, load });
@@ -125,7 +125,14 @@ export async function autoloadGet(cref: Cref): Promise<unknown> {
   return cref.get();
 }
 
-const zeitwerkOriginalRequire = Kernel.require;
+declare module "@blazetrails/ruby-compat" {
+  interface KernelModule {
+    zeitwerkOriginalRequire?: KernelModule["require"];
+  }
+}
+
+export const zeitwerkOriginalRequire = Kernel.require;
+Kernel.zeitwerkOriginalRequire = zeitwerkOriginalRequire;
 
 /** @missingRailsCall __on_file_autoloaded — CONVERGEABLE zeitwerk-kernel-require-load-path-feature-arm */
 Kernel.require = async function (path: string): Promise<boolean> {

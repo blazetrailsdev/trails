@@ -1,5 +1,13 @@
 import type { RackHeaders } from "./index.js";
-import { ArgumentError, hashDelete, rbFSend, toI, toS } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Hash,
+  hashDelete,
+  isPlainHash,
+  rbFSend,
+  toI,
+  toS,
+} from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -251,7 +259,7 @@ export class Response {
   constructor(body: any = null, status: number | string = 200, headers: RackHeaders = {}) {
     this.status = Number(toI(status));
 
-    if (headers === null || typeof headers !== "object" || Array.isArray(headers)) {
+    if (!(isPlainHash(headers) || (headers as unknown) instanceof Hash)) {
       throw new ArgumentError("Headers must be a Hash!");
     }
 

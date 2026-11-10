@@ -1,12 +1,15 @@
 import { File, Mutex, aryDelete, deleteIf, getFs } from "@blazetrails/ruby-compat";
 import type { Loader } from "./loader.js";
-import { ExplicitNamespaces } from "./registry/explicit-namespaces.js";
+import {
+  ExplicitNamespaces,
+  type ExplicitNamespacesInternals,
+} from "./registry/explicit-namespaces.js";
 
 /** @noRailsEquivalent PERMANENT */
 const PACKAGE_MUTEX = new Mutex();
 
 export const Registry = {
-  ExplicitNamespaces,
+  ExplicitNamespaces: ExplicitNamespaces as typeof ExplicitNamespaces & ExplicitNamespacesInternals,
   Loader: undefined as typeof Loader | undefined,
 
   loaders: [] as Loader[],

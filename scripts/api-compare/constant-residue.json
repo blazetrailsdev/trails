@@ -1494,9 +1494,10 @@
     }
   },
   "zeitwerk": {
-    "rows": 16,
+    "rows": 17,
     "excluded": [],
     "unwalked": [
+      "internal.ts::Internal",
       "loader/callbacks.ts::Callbacks",
       "loader/config.ts::Config",
       "loader/eager-load.ts::EagerLoad",

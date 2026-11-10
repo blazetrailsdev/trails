@@ -11,6 +11,12 @@ it("has standard constructor", () => {
   expect(response.body).toEqual(body);
 });
 
+it("raises ArgumentError unless headers is a hash", () => {
+  expect(() => {
+    new Response(null, 200, new (class {})() as never);
+  }).toThrow(ArgumentError);
+});
+
 it("has cache-control methods", () => {
   const response = new Response();
   response.cacheControl = "foo";

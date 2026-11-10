@@ -213,7 +213,7 @@ function imageSetType(image: Image, gtype: number, name: string, value: unknown)
   }
 }
 
-class Processor extends BaseProcessor {
+export class Processor extends BaseProcessor {
   declare readonly image: Image | string;
 
   static {
@@ -256,7 +256,7 @@ class Processor extends BaseProcessor {
     return image;
   }
 
-  static supportsResizeOnLoad(): boolean {
+  static isSupportsResizeOnLoad(): boolean {
     return true;
   }
 
@@ -515,7 +515,7 @@ class Processor extends BaseProcessor {
   };
 }
 
-const ImageProcessingVips = {
+export const Vips = {
   ...Chainable,
   Processor,
 
@@ -530,6 +530,5 @@ const ImageProcessingVips = {
   },
 };
 
-chainableProxy(ImageProcessingVips);
-export const Vips = ImageProcessingVips;
+chainableProxy(Vips);
 ImageProcessing.Vips = Vips;

@@ -148,7 +148,20 @@ describe("TestOnLoad", () => {
       expect(x).toEqual([1, 2]);
     });
   });
-  it.skip("on_load survives reloads", () => {});
+  it("on_load survives reloads", async () => {
+    await withSetup(loader, [["a.ts", "export class A {}"]], {}, async () => {
+      let x = 0;
+      loader.onLoad("A", () => (x += 1));
+
+      expect(await autoloadGet(new Cref(Object, "A"))).toBeTruthy();
+      expect(x).toBe(1);
+
+      await loader.reload();
+
+      expect(await autoloadGet(new Cref(Object, "A"))).toBeTruthy();
+      expect(x).toBe(2);
+    });
+  });
 
   const childImplicit: [string, string][] = [["x/a.ts", "export const A = 1"]];
   const childExplicit: [string, string][] = [

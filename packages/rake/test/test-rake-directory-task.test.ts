@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { File, Pathname, block } from "@blazetrails/ruby-compat";
 import { FileCreationTask } from "../lib/file-creation-task.js";
+import { FileTask } from "../lib/file-task.js";
+import { Win32 } from "../lib/win32.js";
 import { FileList } from "../lib/file-list.js";
 import type { Task } from "../lib/task.js";
 import { dsl, useRakeTestCase } from "./support/file-creation.js";
@@ -31,6 +33,18 @@ describe("TestRakeDirectoryTask", () => {
     dsl.directory("a:b");
 
     expect((await rake.tm.get("a:b")).constructor).toEqual(FileCreationTask);
+  });
+
+  it.skipIf(!Win32.isWindows())("directory win32", async () => {
+    dsl.desc("WIN32 DESC");
+    dsl.directory("c:/a/b/c");
+    expect((await rake.tm.get("c:")).constructor).toEqual(FileTask);
+    expect((await rake.tm.get("c:/a")).constructor).toEqual(FileCreationTask);
+    expect((await rake.tm.get("c:/a/b")).constructor).toEqual(FileCreationTask);
+    expect((await rake.tm.get("c:/a/b/c")).constructor).toEqual(FileCreationTask);
+    expect((await rake.tm.get("c:/")).comment).toBeNull();
+    expect((await rake.tm.get("c:/a/b/c")).comment).toEqual("WIN32 DESC");
+    expect((await rake.tm.get("c:/a/b")).comment).toBeNull();
   });
 
   it("can use blocks", async () => {
