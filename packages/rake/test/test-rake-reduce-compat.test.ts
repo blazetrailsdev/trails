@@ -14,12 +14,13 @@ describe("TestRakeReduceCompat", () => {
 
   it("no deprecated dsl", async () => {
     await rakefile(`
+      import { rbObjRespondTo } from "@blazetrails/ruby-compat";
       task("check_task", block(() => {
-        console.log("task" in {} ? "method" : "nil");
+        console.log(rbObjRespondTo(new Object(), "task") ? "method" : "nil");
       }));
 
       task("check_file", block(() => {
-        console.log("file" in {} ? "method" : "nil");
+        console.log(rbObjRespondTo(new Object(), "file") ? "method" : "nil");
       }));
     `);
 
