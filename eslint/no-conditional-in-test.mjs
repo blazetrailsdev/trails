@@ -19,6 +19,16 @@ function isStringLiteral(node) {
   return node.type === "Literal" && typeof node.value === "string";
 }
 
+function isPlatformCondition(node) {
+  return (
+    node.type === "MemberExpression" &&
+    !node.computed &&
+    node.object.type === "Identifier" &&
+    node.object.name === "File" &&
+    node.property.name === "ALT_SEPARATOR"
+  );
+}
+
 function isAdapterCondition(node) {
   switch (node.type) {
     // Rails' `mariadb?` is the same adapter-flavour branch as `current_adapter?`
@@ -50,7 +60,7 @@ export default {
     type: "problem",
     docs: {
       description:
-        "disallow conditionals in tests, except a current_adapter?/mariadb?/in_memory_db? branch",
+        "disallow conditionals in tests, except a current_adapter?/mariadb?/in_memory_db? or File::ALT_SEPARATOR branch",
     },
     messages: { noConditionalInTest: "Remove conditional tests" },
     schema: [],
@@ -60,7 +70,7 @@ export default {
       IfStatement(node) {
         const call = node.parent?.parent?.parent;
         if (call?.type !== "CallExpression" || !TEST_FNS.has(calleeRoot(call.callee))) return;
-        if (isAdapterCondition(node.test)) return;
+        if (isAdapterCondition(node.test) || isPlatformCondition(node.test)) return;
         context.report({ messageId: "noConditionalInTest", node });
       },
     };

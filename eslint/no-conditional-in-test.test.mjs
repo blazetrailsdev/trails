@@ -17,6 +17,7 @@ tester.run("no-conditional-in-test", rule, {
     'it("x", () => { if (isMariaDb) { expect(1).toBe(1); } else { expect(2).toBe(2); } });',
     'it("x", () => { if (adapterType === "mysql" || !currentAdapter("postgres")) {} });',
     'it("x", () => { if (!inMemoryDb()) {} });',
+    'it("x", () => { if (File.ALT_SEPARATOR) { expect(1).toBe(1); } });',
     "function helper(x) { if (x) {} }",
     'describe("x", () => { beforeEach(() => { if (y) {} }); });',
   ],
@@ -31,6 +32,10 @@ tester.run("no-conditional-in-test", rule, {
     },
     {
       code: 'it("x", () => { if (isMariaDbLike) {} });',
+      errors: [{ messageId: "noConditionalInTest" }],
+    },
+    {
+      code: 'it("x", () => { if (Dir.ALT_SEPARATOR) {} });',
       errors: [{ messageId: "noConditionalInTest" }],
     },
     {
