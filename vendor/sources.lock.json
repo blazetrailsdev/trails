@@ -64,6 +64,14 @@
       "ref": "v1.0.4",
       "sha": "cdf0e659c87f81e5d2b393cff3569f870bd71c47"
     },
+    "mime-types": {
+      "ref": "v3.5.1",
+      "sha": "a545cd245b7d1983ea2d834697aa8436c0546fcb"
+    },
+    "mime-types-data": {
+      "ref": "v3.2023.0808",
+      "sha": "76e2377d981e833717809cc311d034b4c11c6b29"
+    },
     "mini_magick": {
       "ref": "v5.2.0",
       "sha": "34433dc21cd4df544b33e67c111ff0ea36312d34"

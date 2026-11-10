@@ -1057,6 +1057,46 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "mime-types",
+    origin: {
+      type: "git",
+      url: "https://github.com/mime-types/ruby-mime-types.git",
+      ref: "v3.5.1",
+    },
+    packages: [
+      {
+        name: "mime-types",
+        libPath: "lib/mime",
+        compareApi: false,
+        apiExcludedReason:
+          "read-anchor only: packages/mini-mime/test/support/mime-types.ts ports the MIME::Types calls test_full_parity_with_mime_types makes; the gem is not ported.",
+        compareTests: false,
+        testsExcludedReason: "read-anchor only: the gem is not ported.",
+      },
+    ],
+  },
+  {
+    name: "mime-types-data",
+    origin: {
+      type: "git",
+      url: "https://github.com/mime-types/mime-types-data.git",
+      // The release mini_mime v1.1.5's lib/db was rebuilt from (CHANGELOG,
+      // 08-08-2023), so test_full_parity_with_mime_types compares like with like.
+      ref: "v3.2023.0808",
+    },
+    packages: [
+      {
+        name: "mime-types-data",
+        libPath: "data",
+        compareApi: false,
+        apiExcludedReason:
+          "data only: read by packages/mini-mime/test/support/mime-types.ts for test_full_parity_with_mime_types; the gem has no Ruby surface to port.",
+        compareTests: false,
+        testsExcludedReason: "data only: the gem ships no tests trails ports.",
+      },
+    ],
+  },
+  {
     name: "net-smtp",
     origin: {
       type: "git",

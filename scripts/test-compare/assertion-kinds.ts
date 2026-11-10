@@ -220,6 +220,7 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   "expect_to_be_<": "operator",
   "expect_to_be_<=": "operator",
   expect_to_be_a: "kindOf",
+  expect_to_be_a_kind_of: "kindOf",
   expect_to_be_an_instance_of: "instanceOf",
   expect_to_be_instance_of: "instanceOf",
   expect_to_be_kind_of: "kindOf",
