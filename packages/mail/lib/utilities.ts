@@ -26,6 +26,8 @@ import {
   rbObjEncoding,
   rbObjRespondTo,
   unpack,
+  constDefined,
+  constGet,
 } from "@blazetrails/ruby-compat";
 import { Configuration } from "./configuration.js";
 import * as Constants from "./constants.js";
@@ -270,6 +272,14 @@ export const Utilities = {
 
   encodeBase64(str: string | Uint8Array): string {
     return pack([str], "m");
+  },
+
+  isHasConstant(klass: object, string: string): boolean {
+    return constDefined(klass as { readonly name: string }, string, false);
+  },
+
+  getConstant(klass: object, string: string): unknown {
+    return constGet(klass, string);
   },
 
   /** @missingRailsArgs encode — PERMANENT */

@@ -103,3 +103,4 @@ export {
   AttachmentMimeTypeMatcher,
 } from "./matchers/attachment-matchers.js";
 export { HasSentEmailMatcher, haveSentEmail } from "./matchers/has-sent-mail.js";
+export { VERSION } from "./version.js";

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { Multibyte } from "../lib/multibyte.js";
 import { Utilities } from "../lib/utilities.js";
+
+const mbChars = (str: string): string => Multibyte.mbChars(str) as string;
 
 const {
   isTokenSafe,
@@ -29,6 +32,11 @@ describe("Utilities Module", () => {
       it("should return false if a string is token safe", () => {
         expect(isTokenSafe("?=abc")).toBeFalsy();
       });
+
+      it("should work with mb_chars", () => {
+        expect(isTokenSafe(mbChars(".abc"))).toBeTruthy();
+        expect(isTokenSafe(mbChars("?=abc"))).toBeFalsy();
+      });
     });
 
     describe("quoting", () => {
@@ -38,6 +46,11 @@ describe("Utilities Module", () => {
 
       it("should return false if a string is token safe", () => {
         expect(quoteToken("?=abc")).toBe('"?=abc"');
+      });
+
+      it.skip("should work with mb_chars", () => {
+        expect(String(quoteToken(mbChars(".abc")))).toBe(".abc");
+        expect(quoteToken(mbChars("?=abc"))).toBe('"?=abc"');
       });
     });
   });
@@ -51,6 +64,11 @@ describe("Utilities Module", () => {
       it("should return false if a string is token safe", () => {
         expect(isAtomSafe(".abc")).toBeFalsy();
       });
+
+      it("should work with mb_chars", () => {
+        expect(isAtomSafe(mbChars("?=abc"))).toBeTruthy();
+        expect(isAtomSafe(mbChars(".abc"))).toBeFalsy();
+      });
     });
 
     describe("quoting", () => {
@@ -60,6 +78,16 @@ describe("Utilities Module", () => {
 
       it("should return false if a string is token safe", () => {
         expect(quoteAtom(".abc")).toBe('".abc"');
+      });
+
+      it.skip("should work with mb_chars", () => {
+        expect(String(quoteAtom(mbChars("?=abc")))).toBe("?=abc");
+        expect(quoteAtom(mbChars(".abc"))).toBe('".abc"');
+      });
+
+      it.skip("should quote mb_chars white space", () => {
+        expect(quoteAtom(mbChars("ab abc"))).toBe('"ab abc"');
+        expect(quoteAtom(mbChars("a b\ta\r\nbc"))).toBe('"a b\ta\r\nbc"');
       });
     });
   });
@@ -113,6 +141,18 @@ describe("Utilities Module", () => {
     it("should work without parens", () => {
       expect(unparen("This is a string")).toBe("This is a string");
     });
+
+    it.skip("should work using Multibyte.mb_chars", () => {
+      const test = mbChars("(This is a string)");
+      const result = "This is a string";
+      expect(String(unparen(test))).toBe(result);
+    });
+
+    it.skip("should work without parens using Multibyte.mb_chars", () => {
+      const test = mbChars("This is a string");
+      const result = "This is a string";
+      expect(String(unparen(test))).toBe(result);
+    });
   });
 
   describe("unescaping brackets", () => {
@@ -122,6 +162,18 @@ describe("Utilities Module", () => {
 
     it("should work without brackets", () => {
       expect(unbracket("This is a string")).toBe("This is a string");
+    });
+
+    it.skip("should work using Multibyte.mb_chars", () => {
+      const test = mbChars("<This is a string>");
+      const result = "This is a string";
+      expect(String(unbracket(test))).toBe(result);
+    });
+
+    it.skip("should work without parens using Multibyte.mb_chars", () => {
+      const test = mbChars("This is a string");
+      const result = "This is a string";
+      expect(String(unbracket(test))).toBe(result);
     });
   });
 
@@ -383,6 +435,14 @@ describe("Utilities Module", () => {
         expect(Utilities.toLf(null as unknown as string)).toBe("");
       });
     });
+
+    describe("on String subclasses", () => {
+      it("returns Strings", () => {
+        const klass = class extends String {};
+        const string = new klass("") as unknown as string;
+        expect(Utilities.toLf(string).constructor).toBe(String);
+      });
+    });
   });
 
   describe("to_crlf", () => {
@@ -418,6 +478,14 @@ describe("Utilities Module", () => {
     describe("on NilClass", () => {
       it("returns an empty string", () => {
         expect(Utilities.toCrlf(null as unknown as string)).toBe("");
+      });
+    });
+
+    describe("on String subclasses", () => {
+      it("returns Strings", () => {
+        const klass = class extends String {};
+        const string = new klass("") as unknown as string;
+        expect(Utilities.toCrlf(string).constructor).toBe(String);
       });
     });
   });

@@ -1,4 +1,4 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, fetch } from "@blazetrails/ruby-compat";
 
 function isHash(value: unknown): boolean {
   return (
@@ -56,6 +56,18 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
 
   isKey(key: string): boolean {
     return super.has(this.convertKey(key));
+  }
+
+  isHasKey(key: string): boolean {
+    return this.isKey(key);
+  }
+
+  isMember(key: string): boolean {
+    return this.isKey(key);
+  }
+
+  fetch(key: string, ...extras: unknown[]): unknown {
+    return fetch(this as Map<string, V>, this.convertKey(key), ...extras);
   }
 
   valuesAt(...indices: string[]): (V | null)[] {

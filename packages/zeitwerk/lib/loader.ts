@@ -87,6 +87,7 @@ export class Loader {
   /** @internal */ onUnloadCallbacks: Record<string, ((...args: never[]) => unknown)[]>;
 
   /** @internal */ autoloads: Record<string, Cref>;
+  /** @internal */ inceptions: Map<string>;
   /** @internal */ autoloadedDirs: string[];
   /** @internal */ toUnload: Record<string, Cref>;
   /** @internal */ namespaceDirs: Map<string[]>;
@@ -132,6 +133,7 @@ export class Loader {
     this.onUnloadCallbacks = {};
 
     this.autoloads = {};
+    this.inceptions = new Map();
     this.autoloadedDirs = [];
     this.toUnload = {};
     this.namespaceDirs = new Map();
@@ -214,6 +216,7 @@ export class Loader {
       this.namespaceDirs.clear();
       this.shadowedFiles.clear();
 
+      this.unregisterInceptions();
       this.unregisterExplicitNamespaces();
 
       Registry.onUnload(this);
@@ -340,6 +343,7 @@ export class Loader {
   }
 
   unregister(): void {
+    this.unregisterInceptions();
     this.unregisterExplicitNamespaces();
     Registry.unregisterLoader(this);
   }
@@ -540,7 +544,7 @@ export class Loader {
 
   /** @internal */
   private async autoloadFile(cref: Cref, file: string): Promise<void> {
-    const autoloadPath = cref.isAutoload();
+    const autoloadPath = cref.isAutoload() ?? Registry.Inceptions.isRegistered(cref);
     if (autoloadPath != null) {
       if (await this.isRuby(autoloadPath)) {
         this.shadowedFiles.add(file);
@@ -597,13 +601,19 @@ export class Loader {
 
     this.autoloads[abspath] = cref;
     Registry.registerAutoload(this, abspath);
+
+    if (cref.isAutoload() == null) this.registerInception(cref, abspath);
   }
 
   /** @internal */
   private isAutoloadPathSetByMeFor(cref: Cref): string | null {
     const autoloadPath = cref.isAutoload();
-    if (autoloadPath != null && Object.hasOwn(this.autoloads, autoloadPath)) return autoloadPath;
-    return null;
+    if (autoloadPath != null) {
+      if (Object.hasOwn(this.autoloads, autoloadPath)) return autoloadPath;
+      return null;
+    } else {
+      return this.inceptions.get(cref);
+    }
   }
 
   /** @internal */
@@ -614,6 +624,20 @@ export class Loader {
   /** @internal */
   private unregisterExplicitNamespaces(): void {
     Registry.ExplicitNamespaces.__unregisterLoader(this);
+  }
+
+  /** @internal */
+  private registerInception(cref: Cref, abspath: string): void {
+    this.inceptions.set(cref, abspath);
+    Registry.Inceptions.register(cref, abspath);
+  }
+
+  /** @internal */
+  private unregisterInceptions(): void {
+    this.inceptions.eachKey((cref) => {
+      Registry.Inceptions.unregister(cref);
+    });
+    this.inceptions.clear();
   }
 
   /** @internal */

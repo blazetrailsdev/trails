@@ -2,8 +2,13 @@ import { Mutex } from "@blazetrails/ruby-compat";
 import { Cref } from "../cref.js";
 
 export class Map<V = unknown> {
-  private _map = new globalThis.Map<object, globalThis.Map<string, V>>();
-  private _mutex = new Mutex();
+  private _map: globalThis.Map<object, globalThis.Map<string, V>>;
+  private _mutex: Mutex;
+
+  constructor() {
+    this._map = new globalThis.Map();
+    this._mutex = new Mutex();
+  }
 
   /** @noRailsEquivalent PERMANENT */
   set(cref: Cref, value: V): V {
