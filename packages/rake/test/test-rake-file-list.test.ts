@@ -237,8 +237,8 @@ describe("TestRakeFileList", () => {
   it("to string", async () => {
     const fl = new FileList();
     await (await fl.append("a.java")).append("b.java");
-    expect(await fl.toS()).toEqual("a.java b.java");
-    expect(`${await fl.toS()}`).toEqual("a.java b.java");
+    expect(await fl.toString()).toEqual("a.java b.java");
+    expect(`${await fl.toString()}`).toEqual("a.java b.java");
   });
 
   it("to array", async () => {
@@ -250,7 +250,7 @@ describe("TestRakeFileList", () => {
   });
 
   it("to s pending", async () => {
-    const result = await FileList.get("abc.*").toS();
+    const result = await FileList.get("abc.*").toString();
     expect(result).toMatch(/abc\.c/);
     expect(result).toMatch(/abc\.h/);
     expect(result).toMatch(/abc\.x/);

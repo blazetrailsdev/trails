@@ -9,6 +9,7 @@ import {
   FrozenError,
   IndexError,
   Range,
+  rbObjRespondTo,
   StandardError,
   arySlice,
   aryJoin,
@@ -52,7 +53,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Cloneable } from "./cloneable.js";
 import { ext as stringExt, pathmap as stringPathmap } from "./ext/string.js";
-import { fromPathname } from "./rake-module.js";
 
 type Items = unknown[];
 type ElementBlock = (fn: string) => unknown;
@@ -863,7 +863,7 @@ export class FileList {
     ];
   }
 
-  async toS(): Promise<string> {
+  async toString(): Promise<string> {
     await this.resolve();
     return this.join(" ");
   }
@@ -1052,4 +1052,20 @@ for (const sym of FileList.DELEGATING_METHODS) {
       return result === items ? this : result;
     },
   });
+}
+
+export function eachDirParent(dir: string, block: (dir: string) => unknown): void {
+  let oldLength: number | null = null;
+  while (dir !== "." && dir.length !== oldLength) {
+    block(dir);
+    oldLength = dir.length;
+    dir = File.dirname(dir);
+  }
+}
+
+export function fromPathname(path: unknown): unknown {
+  if (rbObjRespondTo(path, "toPath")) path = (path as { toPath(): unknown }).toPath();
+  if (typeof path !== "string" && rbObjRespondTo(path, "toStr"))
+    path = (path as { toStr(): unknown }).toStr();
+  return path;
 }
