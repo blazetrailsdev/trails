@@ -459,6 +459,37 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.isReadable} over the backend's async `access`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.readable?`
+   * (`vendor/ruby/v3.3.11/file.c:1826`).
+   */
+  static async isReadableAsync(fileName: string): Promise<boolean> {
+    const fs = getFs();
+    if (!fs.accessAsync) return fs.exists(fileName);
+    try {
+      await fs.accessAsync(fileName, 4);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * {@link File.isExecutable} over the backend's async `stat`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.executable?`
+   * (`vendor/ruby/v3.3.11/file.c:1966`).
+   */
+  static async isExecutableAsync(fileName: string): Promise<boolean> {
+    try {
+      return (await getFs().stat!(fileName)).isExecutable();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:1826` `rb_file_readable_p`, which is
    * `rb_eaccess(fname, R_OK) >= 0` and so is `false` both for a file that is
    * not there and for one the effective user cannot read. `R_OK` is POSIX's

@@ -202,7 +202,7 @@ export class HasSentEmailMatcher {
       return (
         sentAttachments != null &&
         sentAttachments !== false &&
-        attachment.caseEquals(delivery.attachments()[index])
+        attachment.caseEquals(delivery.attachments()[index] ?? null)
       );
     }, true);
   }

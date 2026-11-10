@@ -108,6 +108,7 @@ export interface FsAdapter {
   copyFileSync(src: string, dest: string): void;
   cwd(): string;
   exists(path: string): Promise<boolean>;
+  accessAsync?(path: string, mode: number): Promise<void>;
   stat?(path: string): Promise<FsStatResult>;
   lstat?(path: string): Promise<FsStatResult>;
   mkdtempSync?(prefix: string): string;
@@ -315,7 +316,7 @@ function tryAutoRegisterNode(): boolean {
       NODE_SYNC_VERBS.map((verb) => [verb, nodeFs[verb]]),
     ) as NodeSyncFs;
     const fsPromises = req("node:fs/promises") as {
-      access(p: string): Promise<void>;
+      access(p: string, mode?: number): Promise<void>;
       open(p: string, flags: string): Promise<FsFileHandle>;
       stat(p: string): Promise<FsStatResult>;
       lstat(p: string): Promise<FsStatResult>;
@@ -416,6 +417,7 @@ function tryAutoRegisterNode(): boolean {
             throw error;
           },
         ),
+      accessAsync: (p: string, mode: number) => fsPromises.access(p, mode),
       openHandle: (p: string, flags: string) => fsPromises.open(p, flags),
       stat: (p: string) => fsPromises.stat(p).then(withExecutable),
       lstat: (p: string) => fsPromises.lstat(p).then(withExecutable),

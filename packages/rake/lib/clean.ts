@@ -54,7 +54,7 @@ export const Cleaner = {
   async isCantBeDeleted(pathName: string): Promise<boolean> {
     return (
       (await File.isExistAsync(pathName)) &&
-      (!File.isReadable(pathName) || !File.isExecutable(pathName))
+      (!(await File.isReadableAsync(pathName)) || !(await File.isExecutableAsync(pathName)))
     );
   },
 };
