@@ -210,11 +210,15 @@ export {
   compactBlankBang,
   valuesAt,
   toXml,
-  fromXml,
-  fromTrustedXml,
 } from "./hash-utils.js";
 
-export { XMLConverter, DisallowedType, DISALLOWED_TYPES } from "./core-ext/hash/conversions.js";
+export {
+  fromXml,
+  fromTrustedXml,
+  XMLConverter,
+  DisallowedType,
+  DISALLOWED_TYPES,
+} from "./core-ext/hash/conversions.js";
 
 export {
   asJson,

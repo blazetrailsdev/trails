@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { toXml, fromXml, fromTrustedXml } from "../lib/hash-utils.js";
+import { toXml } from "../lib/hash-utils.js";
+import { fromXml, fromTrustedXml } from "../lib/core-ext/hash/conversions.js";
 import { except } from "@blazetrails/ruby-compat";
 import type { ToXmlOptions } from "../lib/xml-mini.js";
 import { DisallowedType } from "../lib/core-ext/hash/conversions.js";

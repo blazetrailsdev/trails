@@ -18,8 +18,6 @@ import { Module, rbObjIsKindOf } from "@blazetrails/ruby-compat/include";
 import { isBlank } from "./core-ext/object/blank.js";
 import { isDuplicable } from "./core-ext/object/duplicable.js";
 import * as XmlMini from "./xml-mini.js";
-import { XMLConverter } from "./core-ext/hash/conversions.js";
-import type { StringIO } from "@blazetrails/ruby-compat";
 
 type AnyObject = Record<string, unknown>;
 
@@ -569,14 +567,3 @@ rbModDefineMethod(
     return toXml(this, options, block);
   },
 );
-
-export function fromXml(
-  xml: string | Uint8Array | StringIO | null | undefined,
-  disallowedTypes?: string[] | null,
-): unknown {
-  return new XMLConverter(xml, disallowedTypes).toH();
-}
-
-export function fromTrustedXml(xml: string | StringIO | null | undefined): unknown {
-  return fromXml(xml, []);
-}

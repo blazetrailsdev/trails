@@ -5,7 +5,7 @@ import * as XmlMini_REXML from "../../lib/xml-mini/rexml.js";
 import * as XmlMini_Nokogiri from "../../lib/xml-mini/nokogiri.js";
 import * as XmlMini_NokogiriSAX from "../../lib/xml-mini/nokogirisax.js";
 import { assertRaises } from "../../lib/testing/assertions.js";
-import { fromXml } from "../../lib/hash-utils.js";
+import { fromXml } from "../../lib/core-ext/hash/conversions.js";
 import { FileLike } from "../../lib/xml-mini.js";
 
 function isLoadError(e: unknown, gemName: string): boolean {
@@ -77,7 +77,7 @@ function engineTests({ engine, backendModule, expansionAttackError }: EngineTest
 
     it("exception thrown on expansion attack", async () => {
       await assertRaises([expansionAttackError], {}, () =>
-        XmlMini.parse(`<?xml version="1.0" encoding="UTF-8"?>
+        fromXml(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE member [
   <!ENTITY a "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
   <!ENTITY b "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
