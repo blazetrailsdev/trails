@@ -97,7 +97,8 @@ import * as m94 from "./part.js";
 import * as m95 from "./parts-list.js";
 import * as m96 from "./smtp-envelope.js";
 import * as m97 from "./utilities.js";
-import * as m98 from "./yaml.js";
+import * as m98 from "./version.js";
+import * as m99 from "./yaml.js";
 
 defineConstants([
   [() => m5.Address, "Mail::Address"],
@@ -228,5 +229,6 @@ defineConstants([
   [() => m16.UnknownEncodingType, "Mail::UnknownEncodingType"],
   [() => m66.UnstructuredField, "Mail::UnstructuredField"],
   [() => m97.Utilities, "Mail::Utilities"],
-  [() => m98.YAML, "Mail::YAML"],
+  [() => m98.VERSION, "Mail::VERSION"],
+  [() => m99.YAML, "Mail::YAML"],
 ]);

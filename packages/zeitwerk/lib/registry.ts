@@ -4,12 +4,14 @@ import {
   ExplicitNamespaces,
   type ExplicitNamespacesInternals,
 } from "./registry/explicit-namespaces.js";
+import { Inceptions } from "./registry/inceptions.js";
 
 /** @noRailsEquivalent PERMANENT */
 const PACKAGE_MUTEX = new Mutex();
 
 export const Registry = {
   ExplicitNamespaces: ExplicitNamespaces as typeof ExplicitNamespaces & ExplicitNamespacesInternals,
+  Inceptions,
   Loader: undefined as typeof Loader | undefined,
 
   loaders: [] as Loader[],

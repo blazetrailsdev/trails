@@ -24,6 +24,7 @@ import {
   warn,
   binaryBytes,
   binaryString,
+  fetch,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
 import type { CommonField } from "./fields/common-field.js";
@@ -282,8 +283,11 @@ export class Field implements Comparable {
   }
 
   fieldOrderId(): number {
-    return (this._fieldOrderId ??=
-      FIELD_ORDER_LOOKUP[rbObjAsString(this.name).toLowerCase()] ?? 100);
+    return (this._fieldOrderId ??= fetch(
+      FIELD_ORDER_LOOKUP,
+      rbObjAsString(this.name).toLowerCase(),
+      100,
+    ));
   }
 
   methodMissing(name: string, ...args: unknown[]): unknown {

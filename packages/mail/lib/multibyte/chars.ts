@@ -29,11 +29,7 @@ export class Chars {
     this.wrappedString = string;
   }
 
-  toS(): string {
-    return this.wrappedString;
-  }
-
-  toStr(): string {
+  toString(): string {
     return this.wrappedString;
   }
 
@@ -158,15 +154,15 @@ export class Chars {
 
   capitalize(): Chars {
     return this.chars(
-      (this.slice(0) ?? this.chars("")).upcase().toS() +
-        (this.slice(new Range(1, -1)) ?? this.chars("")).downcase().toS(),
+      (this.slice(0) ?? this.chars("")).upcase().toString() +
+        (this.slice(new Range(1, -1)) ?? this.chars("")).downcase().toString(),
     );
   }
 
   titleize(): Chars {
     return this.chars(
       this.downcase()
-        .toS()
+        .toString()
         .replace(WORD_BOUNDARY_TITLEIZE, (_m, c: string) =>
           Unicode.applyMapping(c, ":uppercase_mapping"),
         ),
@@ -200,32 +196,32 @@ export class Chars {
   }
 
   capitalizeBang(): this {
-    this.wrappedString = this.capitalize().toS();
+    this.wrappedString = this.capitalize().toString();
     return this;
   }
 
   downcaseBang(): this {
-    this.wrappedString = this.downcase().toS();
+    this.wrappedString = this.downcase().toString();
     return this;
   }
 
   reverseBang(): this {
-    this.wrappedString = this.reverse().toS();
+    this.wrappedString = this.reverse().toString();
     return this;
   }
 
   sliceBang(...args: unknown[]): this {
-    this.wrappedString = this.slice(...args)?.toS() ?? "";
+    this.wrappedString = this.slice(...args)?.toString() ?? "";
     return this;
   }
 
   tidyBytesBang(force: boolean = false): this {
-    this.wrappedString = this.tidyBytes(force).toS();
+    this.wrappedString = this.tidyBytes(force).toString();
     return this;
   }
 
   upcaseBang(): this {
-    this.wrappedString = this.upcase().toS();
+    this.wrappedString = this.upcase().toString();
     return this;
   }
 
@@ -277,7 +273,7 @@ export class Chars {
       return (
         this.chars(padstr.repeat(Math.floor(padsize / Unicode.uUnpack(padstr).length) + 1))
           .slice(0, padsize)
-          ?.toS() ?? ""
+          ?.toString() ?? ""
       );
     } else {
       return "";

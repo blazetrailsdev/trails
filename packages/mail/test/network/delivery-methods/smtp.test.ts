@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SMTP as NetSMTP } from "@blazetrails/net-smtp";
 import { buildMail, closeMockSmtp, deliveries, mockSmtp } from "../../support/mock-smtp.js";
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, OpenSSL, rbInspect } from "@blazetrails/ruby-compat";
 import { Message } from "../../../lib/message.js";
 import { SMTP } from "../../../lib/network/delivery-methods/smtp.js";
 import { NULL_SENDER } from "../../../lib/constants.js";
@@ -41,7 +41,67 @@ describe("SMTP Delivery Method", () => {
     });
   });
 
+  describe("enabling tls", () => {
+    const VERIFY_NONE = OpenSSL.SSL.VERIFY_NONE;
+    const redefineVerifyNone = (newValue: unknown) => {
+      (OpenSSL.SSL as { VERIFY_NONE: unknown }).VERIFY_NONE = newValue;
+    };
+    const deliver = async () => {
+      const start = vi.spyOn(NetSMTP.prototype, "start").mockResolvedValue(null);
+      try {
+        const mail = new SMTP({
+          address: "smtp.mockup.com",
+          port: 587,
+        });
+        await mail.deliverBang(buildMail());
+      } finally {
+        start.mockRestore();
+      }
+    };
+
+    afterEach(() => redefineVerifyNone(VERIFY_NONE));
+
+    it("should use OpenSSL::SSL::VERIFY_NONE if a context", async () => {
+      redefineVerifyNone(NetSMTP.defaultSslContext());
+      await expect(deliver()).resolves.not.toThrow();
+    });
+
+    it("should ignore OpenSSL::SSL::VERIFY_NONE if it is 0", async () => {
+      redefineVerifyNone(0);
+      await expect(deliver()).resolves.not.toThrow();
+    });
+  });
+
   describe("enabling ssl", () => {
+    const VERIFY_NONE = OpenSSL.SSL.VERIFY_NONE;
+    const redefineVerifyNone = (newValue: unknown) => {
+      (OpenSSL.SSL as { VERIFY_NONE: unknown }).VERIFY_NONE = newValue;
+    };
+    const deliver = async () => {
+      const start = vi.spyOn(NetSMTP.prototype, "start").mockResolvedValue(null);
+      try {
+        const mail = new SMTP({
+          address: "smtp.mockup.com",
+          port: 587,
+          tls: true,
+        });
+        await mail.deliverBang(buildMail());
+      } finally {
+        start.mockRestore();
+      }
+    };
+
+    afterEach(() => redefineVerifyNone(VERIFY_NONE));
+
+    it("should use OpenSSL::SSL::VERIFY_NONE if a context", async () => {
+      redefineVerifyNone(NetSMTP.defaultSslContext());
+      await expect(deliver()).resolves.not.toThrow();
+    });
+
+    it("should ignore OpenSSL::SSL::VERIFY_NONE if it is 0", async () => {
+      redefineVerifyNone(0);
+      await expect(deliver()).resolves.not.toThrow();
+    });
     const verifyModeDelivery = (settings: Record<string, unknown>) => {
       const verifyMode = vi.fn();
       const context = {};
