@@ -1,4 +1,8 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import * as m0 from "./gem-version.js";
+import * as m0 from "./fragment.js";
+import * as m1 from "./gem-version.js";
 
-defineConstants([[() => m0.VERSION, "ActionText::VERSION"]]);
+defineConstants([
+  [() => m1.VERSION, "ActionText::VERSION"],
+  [() => m0.Fragment, "Fragment"],
+]);
