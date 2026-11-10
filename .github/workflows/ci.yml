@@ -2850,9 +2850,9 @@ jobs:
                   fi
                   ;;
                 postgres-tests|maria-tests)
-                  # Both are `--shard` matrices (3-way and 2-way); GitHub collapses the
+                  # Both are `--shard` matrices (both 3-way); GitHub collapses the
                   # legs into a single result under the job id here, so these
-                  # two names cover all five legs — do NOT add per-leg names
+                  # two names cover all six legs — do NOT add per-leg names
                   # (they don't exist in the `needs` context).
                   if [ "$AR_AFFECTED" = "false" ] || \
                      [ "$SQLITE_ONLY" = "true" ] || \
