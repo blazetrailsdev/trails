@@ -16,6 +16,7 @@ import {
   Tempfile,
   rbModRemoveConst,
   StandardError,
+  Struct,
 } from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError, Fixture } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
@@ -23,6 +24,7 @@ import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./config.js";
 import { PrimaryKeyError } from "./fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
 import { Notifications, Duration, Logger } from "@blazetrails/activesupport";
+import * as Arel from "@blazetrails/arel";
 import {
   assertDifference,
   assertNoDifference,
@@ -277,6 +279,17 @@ describe("FixturesTest", () => {
     "tasks",
   ];
   const MATCH_ATTRIBUTE_NAME = /[a-zA-Z][-\w]*/;
+
+  let engine: typeof Arel.Table.engine;
+
+  beforeEach(() => {
+    engine = Arel.Table.engine;
+    Arel.Table.engine = null;
+  });
+
+  afterEach(() => {
+    Arel.Table.engine = engine;
+  });
 
   it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
     "bulk insert",
@@ -963,11 +976,12 @@ describe("FixturesWithoutInstantiationTest", () => {
 
   it("reloading fixtures through accessor methods", async () => {
     expect(topics("first").title).toBe("The First Topic");
+    const topic = Struct.new("title");
     await assertCalled(
       self()._loadedFixtures["topics"].get("first")!,
       "find",
       null,
-      { returns: Promise.resolve({ title: "Fresh Topic!" }) },
+      { returns: Promise.resolve(new topic("Fresh Topic!")) },
       async () => {
         expect((await topics("first", true)).title).toBe("Fresh Topic!");
       },
@@ -1823,6 +1837,8 @@ describe("FileFixtureConflictTest", () => {
 
   it("ignores file fixtures", () => {
     const klass = self().constructor as typeof TestCase;
+    const oldFileFixturePath = klass.fileFixturePath;
+    const oldFixturePaths = klass.fixturePaths;
     klass.fileFixturePath = TS_FIXTURES_ROOT + "/all/admin";
     try {
       klass.fixturePaths = [TS_FIXTURES_ROOT + "/all"];
@@ -1835,6 +1851,8 @@ describe("FileFixtureConflictTest", () => {
         "tasks",
       ]);
     } finally {
+      klass.fileFixturePath = oldFileFixturePath;
+      klass.fixturePaths = oldFixturePaths;
       FixtureSet.resetCache();
     }
   });
