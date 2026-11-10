@@ -110,7 +110,10 @@ const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
 const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);
 
 const alias = {
-  "@blazetrails/activemodel/lint": path.resolve(__dirname, "packages/activemodel/lib/lint.ts"),
+  "@blazetrails/activemodel/testing/lint": path.resolve(
+    __dirname,
+    "packages/activemodel/lib/lint.ts",
+  ),
   "@blazetrails/activemodel/locale/en": path.resolve(
     __dirname,
     "packages/activemodel/lib/locale/en.ts",
