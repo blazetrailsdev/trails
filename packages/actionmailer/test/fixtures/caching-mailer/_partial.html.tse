@@ -1,0 +1,3 @@
+<% await cache("caching", {}, () => { %>
+  Old fragment caching in a partial
+<% }) %>

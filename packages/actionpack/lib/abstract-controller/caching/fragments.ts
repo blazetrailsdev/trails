@@ -137,7 +137,7 @@ export async function readFragment(
   key: unknown,
   options?: CacheOptions,
 ): Promise<unknown> {
-  if (!this.isCacheConfigured()) return undefined;
+  if (!this.isCacheConfigured()) return null;
   key = combinedFragmentCacheKey.call(this, key);
   return await instrumentFragmentCache.call(this, "read_fragment", key, async () => {
     const result = await this.cacheStore!.read(key, options);
@@ -149,8 +149,8 @@ export async function fragmentExist(
   this: FragmentsHost,
   key: unknown,
   options?: CacheOptions,
-): Promise<boolean | undefined> {
-  if (!this.isCacheConfigured()) return undefined;
+): Promise<boolean | null | undefined> {
+  if (!this.isCacheConfigured()) return null;
   key = combinedFragmentCacheKey.call(this, key);
   return (await instrumentFragmentCache.call(this, "exist_fragment?", key, () =>
     this.cacheStore!.exist(key, options),
@@ -162,7 +162,7 @@ export async function expireFragment(
   key: unknown,
   options?: CacheOptions,
 ): Promise<unknown> {
-  if (!this.isCacheConfigured()) return undefined;
+  if (!this.isCacheConfigured()) return null;
   if (!(key instanceof RegExp)) key = combinedFragmentCacheKey.call(this, key);
 
   return await instrumentFragmentCache.call(this, "expire_fragment", key, () => {

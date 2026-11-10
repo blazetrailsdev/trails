@@ -760,6 +760,7 @@ export function extractFromProgram(
           fileHasClassOrModule = true;
           for (const nested of staticClassExpressions(node, classInfo.name)) {
             const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir, nested.name);
+            if (nestedInfo && nested.conditional) nestedInfo.conditionalSeat = true;
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
           for (const nested of staticModuleInstances(node, classInfo.name)) {
@@ -1016,6 +1017,7 @@ export function extractFromProgram(
           fileHasClassOrModule = true;
           for (const nested of staticClassExpressions(cls, seat)) {
             const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir, nested.name);
+            if (nestedInfo && nested.conditional) nestedInfo.conditionalSeat = true;
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
         }
@@ -5059,8 +5061,8 @@ export function staticModuleInstances(
 export function staticClassExpressions(
   node: ts.ClassDeclaration | ts.ClassExpression,
   seat: string,
-): { seat: string; cls: ts.ClassExpression; name?: string }[] {
-  const found: { seat: string; cls: ts.ClassExpression; name?: string }[] = [];
+): { seat: string; cls: ts.ClassExpression; name?: string; conditional?: true }[] {
+  const found: { seat: string; cls: ts.ClassExpression; name?: string; conditional?: true }[] = [];
   for (const member of node.members) {
     if (!ts.isPropertyDeclaration(member) || !ts.isIdentifier(member.name)) continue;
     if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
@@ -5071,10 +5073,33 @@ export function staticClassExpressions(
       found.push({ seat: nestedSeat, cls: instantiated, name: member.name.text });
       continue;
     }
-    if (!init || !ts.isClassExpression(init) || !init.name) continue;
-    found.push({ seat: nestedSeat, cls: init }, ...staticClassExpressions(init, nestedSeat));
+    const cls = init && conditionalClassExpression(init);
+    if (!cls || !cls.name) continue;
+    const conditional = cls !== unwrapParens(init) ? { conditional: true as const } : {};
+    found.push(
+      { seat: nestedSeat, cls, ...conditional },
+      ...staticClassExpressions(cls, nestedSeat),
+    );
   }
   return found;
+}
+
+/**
+ * The class expression of an initializer, or of a branch of a conditional
+ * one: Ruby's `Name = cond ? Other : Class.new { ... }` (mini_mime's
+ * `PReadFile`), where Ruby defines whichever arm the guard picks.
+ */
+function unwrapParens(init: ts.Expression): ts.Expression {
+  let expr = init;
+  while (ts.isParenthesizedExpression(expr)) expr = expr.expression;
+  return expr;
+}
+
+function conditionalClassExpression(init: ts.Expression): ts.ClassExpression | undefined {
+  const expr = unwrapParens(init);
+  if (ts.isClassExpression(expr)) return expr;
+  if (!ts.isConditionalExpression(expr)) return undefined;
+  return conditionalClassExpression(expr.whenTrue) ?? conditionalClassExpression(expr.whenFalse);
 }
 
 /**

@@ -1,4 +1,4 @@
-import { ArgumentError, Exception } from "@blazetrails/ruby-compat";
+import { ArgumentError, Exception, encode } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, expect, it } from "vitest";
 import { IllegalBlockError, XmlBase } from "../lib/xmlbase.js";
 import { XmlEvents } from "../lib/xmlevents.js";
@@ -469,6 +469,21 @@ describe("TestIndentedXmlMarkup", () => {
   });
 
   describe("TestUtfMarkup", () => {
+    const encodeDefined = typeof encode === "function";
+
+    it.skipIf(encodeDefined)("use entities if no encoding is given and kcode is none", () => {
+      const xml = new XmlMarkup();
+      xml.p("\u2019");
+      expect(xml.targetBang()).toMatch(/<p>&#8217;<\/p>/);
+    });
+
+    it.skipIf(encodeDefined)("use entities if encoding is utf but kcode is not", () => {
+      const xml = new XmlMarkup();
+      xml.instructBang(":xml", { encoding: "UTF-8" });
+      xml.p("\u2019");
+      expect(xml.targetBang()).toMatch(/<p>&#8217;<\/p>/);
+    });
+
     it("use entities if no encoding is given and kcode is none", () => {
       const xml = new XmlMarkup();
       xml.p("\u2019");

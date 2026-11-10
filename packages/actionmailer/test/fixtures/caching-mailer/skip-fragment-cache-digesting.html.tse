@@ -1,0 +1,3 @@
+<%= await cache("no_digest", { skipDigest: true }, () => { %>
+  No Digest
+<% }) %>
