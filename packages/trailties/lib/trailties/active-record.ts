@@ -428,13 +428,17 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
-    this.initializer("active_record.message_pack", () => {
+    this.initializer("active_record.message_pack", async () => {
+      let messagePack: Promise<void> | undefined;
       onLoad("message_pack", () => {
-        onLoad("active_record", async () => {
-          const { Extensions } = await import("@blazetrails/activerecord/message-pack");
-          Extensions.install(TopLevel.ActiveSupport!.MessagePack!.CacheSerializer);
+        onLoad("active_record", () => {
+          messagePack = (async () => {
+            const { Extensions } = await import("@blazetrails/activerecord/message-pack");
+            Extensions.install(TopLevel.ActiveSupport!.MessagePack!.CacheSerializer);
+          })();
         });
       });
+      await messagePack;
     });
   }
 }
