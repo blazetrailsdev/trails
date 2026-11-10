@@ -28,12 +28,14 @@ export class TestRetriever extends Retriever {
     let emailsIndex: number[] = Array.from({ length: _emails.length }, (_, i) => i);
     if (options.what === "last") emailsIndex.reverse();
     const count = options.count;
-    if (count === "all") {
-      emailsIndex = [...emailsIndex];
-    } else if (Number.isInteger(count)) {
-      emailsIndex = arySlice(emailsIndex, 0, count) as number[];
-    } else {
-      throw new RuntimeError("Invalid count option value: " + rbInspect(count));
+    switch (true) {
+      case count === "all":
+        break;
+      case Number.isInteger(count):
+        emailsIndex = arySlice(emailsIndex, 0, count) as number[];
+        break;
+      default:
+        throw new RuntimeError("Invalid count option value: " + rbInspect(count));
     }
     if (
       (options.what === "last" && options.order === "asc") ||
