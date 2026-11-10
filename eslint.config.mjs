@@ -1103,6 +1103,20 @@ export default defineConfig(
     },
   },
 
+  // ── rake: Rails' `if File::ALT_SEPARATOR` guard wraps plain asserts, so the
+  // blazetrails rule (which admits that one condition) stands in for vitest's.
+  {
+    files: [
+      "packages/rake/test/test-rake-path-map-explode.test.ts",
+      "packages/rake/test/test-rake-path-map.test.ts",
+    ],
+    rules: {
+      "vitest/no-conditional-in-test": "off",
+      "vitest/no-conditional-expect": "off",
+      "blazetrails/no-conditional-in-test": "error",
+    },
+  },
+
   // ── activerecord: no-conditional-tests and no-conditional-in-test are
   // clean. no-conditional-expect still has outstanding violations; enable
   // it in a follow-up PR as the sites are driven to zero.

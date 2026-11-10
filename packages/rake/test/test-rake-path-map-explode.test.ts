@@ -11,29 +11,13 @@ describe("TestRakePathMapExplode", () => {
     expect(pathmapExplode("/a/b")).toEqual(["/", "a", "b"]);
     expect(pathmapExplode("/a/b/c")).toEqual(["/", "a", "b", "c"]);
 
-    expect(File.ALT_SEPARATOR ? pathmapExplode("c:a") : ["c:.", "a"]).toEqual(["c:.", "a"]);
-    expect(File.ALT_SEPARATOR ? pathmapExplode("c:a/b") : ["c:.", "a", "b"]).toEqual([
-      "c:.",
-      "a",
-      "b",
-    ]);
-    expect(File.ALT_SEPARATOR ? pathmapExplode("c:a/b/c") : ["c:.", "a", "b", "c"]).toEqual([
-      "c:.",
-      "a",
-      "b",
-      "c",
-    ]);
-    expect(File.ALT_SEPARATOR ? pathmapExplode("c:/a") : ["c:/", "a"]).toEqual(["c:/", "a"]);
-    expect(File.ALT_SEPARATOR ? pathmapExplode("c:/a/b") : ["c:/", "a", "b"]).toEqual([
-      "c:/",
-      "a",
-      "b",
-    ]);
-    expect(File.ALT_SEPARATOR ? pathmapExplode("c:/a/b/c") : ["c:/", "a", "b", "c"]).toEqual([
-      "c:/",
-      "a",
-      "b",
-      "c",
-    ]);
+    if (File.ALT_SEPARATOR) {
+      expect(pathmapExplode("c:a")).toEqual(["c:.", "a"]);
+      expect(pathmapExplode("c:a/b")).toEqual(["c:.", "a", "b"]);
+      expect(pathmapExplode("c:a/b/c")).toEqual(["c:.", "a", "b", "c"]);
+      expect(pathmapExplode("c:/a")).toEqual(["c:/", "a"]);
+      expect(pathmapExplode("c:/a/b")).toEqual(["c:/", "a", "b"]);
+      expect(pathmapExplode("c:/a/b/c")).toEqual(["c:/", "a", "b", "c"]);
+    }
   });
 });
