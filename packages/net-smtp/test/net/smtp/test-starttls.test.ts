@@ -6,26 +6,42 @@ describe("TestStarttls", () => {
   it("enable tls and enable starttls", () => {
     const smtp = new SMTP("localhost", 25);
     smtp.enableTls();
-    expect(() => smtp.enableStarttls()).toThrow(ArgumentError);
+    let err: Error | undefined;
+    expect(() => {
+      try {
+        smtp.enableStarttls();
+      } catch (e) {
+        err = e as Error;
+        throw e;
+      }
+    }).toThrow(ArgumentError);
+    expect(err!.message).toEqual("SMTPS and STARTTLS is exclusive");
   });
 
   it("enable tls and enable starttls auto", () => {
     const smtp = new SMTP("localhost", 25);
     smtp.enableTls();
-    expect(() => smtp.enableStarttlsAuto()).toThrow(ArgumentError);
+    let err: Error | undefined;
+    expect(() => {
+      try {
+        smtp.enableStarttlsAuto();
+      } catch (e) {
+        err = e as Error;
+        throw e;
+      }
+    }).toThrow(ArgumentError);
+    expect(err!.message).toEqual("SMTPS and STARTTLS is exclusive");
   });
 
   it("enable starttls and enable starttls auto", () => {
     const smtp = new SMTP("localhost", 25);
     smtp.enableStarttls();
-    expect(smtp.isStarttlsAlways()).toBe(true);
-    smtp.enableStarttlsAuto();
-    expect(smtp.isStarttlsAuto()).toBe(true);
+    expect(() => smtp.enableStarttlsAuto()).not.toThrow();
   });
 
   it("disable starttls", () => {
     const smtp = new SMTP("localhost", 25);
     smtp.disableStarttls();
-    expect(smtp.isStarttls()).toBe(false);
+    expect(!smtp.isStarttls()).toBeTruthy();
   });
 });

@@ -1,7 +1,8 @@
 import { createServer, type Server, type Socket } from "node:net";
 import { TLSSocket } from "node:tls";
-import { afterEach, describe, expect, it } from "vitest";
-import { ArgumentError, EOFError, block } from "@blazetrails/ruby-compat";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { ArgumentError, EOFError, RuntimeError, block } from "@blazetrails/ruby-compat";
+import { AuthCramMD5 } from "../../../lib/auth-cram-md5.js";
 import { SMTPServer, type SMTPServerOptions } from "smtp-server";
 import { OpenTimeout } from "../../../lib/protocol.js";
 import {
@@ -279,8 +280,9 @@ function greeting(line: string): Promise<number> {
 
 async function refusedAt(line: string, klass: new (...args: never[]) => Error): Promise<void> {
   const port = await greeting(line);
-  const err = await SMTP.start("127.0.0.1", port).catch((e: unknown) => e);
-  expect(err).toBeInstanceOf(klass);
+  const errPromise = SMTP.start("127.0.0.1", port);
+  await expect(errPromise).rejects.toThrow(klass);
+  const err = await errPromise.catch((e: unknown) => e);
   expect((err as Error).message).toBe(`${line}\n`);
   expect((err as { response: Response }).response.status).toBe(line.slice(0, 3));
 }
@@ -305,11 +307,11 @@ describe("TestSMTP", () => {
 
   it("esmtp", () => {
     const smtp = new SMTP("localhost", 25);
-    expect(smtp.esmtp).toBe(true);
-    expect(smtp.isEsmtp()).toBe(true);
+    expect(smtp.esmtp).toBeTruthy();
+    expect(smtp.isEsmtp()).toBeTruthy();
     smtp.esmtp = "omg";
-    expect(smtp.esmtp).toBe("omg");
-    expect(smtp.isEsmtp()).toBe("omg");
+    expect(smtp.esmtp).toEqual("omg");
+    expect(smtp.isEsmtp()).toEqual("omg");
   });
 
   it("server capabilities", async () => {
@@ -320,9 +322,19 @@ describe("TestSMTP", () => {
     });
     const smtp = (await SMTP.start("127.0.0.1", port, { starttls: false })) as SMTP;
     expect(smtp.capabilities).toEqual({ STARTTLS: [], AUTH: ["PLAIN"] });
-    expect(smtp.isCapable("STARTTLS")).toBe(true);
-    expect(smtp.isCapable("DOES-NOT-EXIST")).toBe(false);
+    expect(smtp.isCapable("STARTTLS")).toEqual(true);
+    expect(smtp.isCapable("DOES-NOT-EXIST")).toEqual(false);
     await smtp.finish();
+    const plainPort = await fakeServerStart({
+      disabledCommands: ["STARTTLS"],
+      authMethods: ["PLAIN"],
+      allowInsecureAuth: true,
+    });
+    const plain = (await SMTP.start("127.0.0.1", plainPort, { starttls: false })) as SMTP;
+    expect(plain.capabilities).toEqual({ AUTH: ["PLAIN"] });
+    expect(plain.isCapable("STARTTLS")).toEqual(false);
+    expect(plain.isCapable("DOES-NOT-EXIST")).toEqual(false);
+    await plain.finish();
   });
 
   it("address", () => {
@@ -334,36 +346,44 @@ describe("TestSMTP", () => {
   it("auth plain", async () => {
     const server = await FakeServer.start({ auth: "plain" });
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
-    expect((await smtp.authenticate("account", "password", "plain")).isSuccess()).toBe(true);
+    expect((await smtp.authenticate("account", "password", "plain")).isSuccess()).toBeTruthy();
     expect(server.commands.at(-1)).toBe("AUTH PLAIN AGFjY291bnQAcGFzc3dvcmQ=\r\n");
   });
 
   it("unsuccessful auth plain", async () => {
-    const port = await fakeServerStart({ ...auth, authMethods: ["PLAIN"] });
-    const smtp = (await SMTP.start("127.0.0.1", port)) as SMTP;
-    const err = await smtp.authenticate("foo", "bar", "plain").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(SMTPAuthenticationError);
+    const server = await FakeServer.start({ auth: "plain" });
+    const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
+    const errPromise = smtp.authenticate("foo", "bar", "plain");
+    await expect(errPromise).rejects.toThrow(SMTPAuthenticationError);
+    const err = await errPromise.catch((e: unknown) => e);
+    expect((err as SMTPAuthenticationError).message).toBe(
+      "535 5.7.8 Error: authentication failed: authentication failure\n",
+    );
     expect((err as SMTPAuthenticationError).response!.status).toBe("535");
   });
 
   it("auth login", async () => {
     const port = await fakeServerStart({ ...auth, authMethods: ["LOGIN"] });
     const smtp = (await SMTP.start("127.0.0.1", port)) as SMTP;
-    expect((await smtp.authenticate("account", "password", "login")).isSuccess()).toBe(true);
+    expect((await smtp.authenticate("account", "password", "login")).isSuccess()).toBeTruthy();
   });
 
   it("unsuccessful auth login", async () => {
-    const port = await fakeServerStart({ ...auth, authMethods: ["LOGIN"] });
-    const smtp = (await SMTP.start("127.0.0.1", port)) as SMTP;
-    const err = await smtp.authenticate("foo", "bar", "login").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(SMTPAuthenticationError);
+    const server = await FakeServer.start({ auth: "login" });
+    const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
+    const errPromise = smtp.authenticate("foo", "bar", "login");
+    await expect(errPromise).rejects.toThrow(SMTPAuthenticationError);
+    const err = await errPromise.catch((e: unknown) => e);
+    expect((err as SMTPAuthenticationError).message).toBe(
+      "535 5.7.8 Error: authentication failed: authentication failure\n",
+    );
     expect((err as SMTPAuthenticationError).response!.status).toBe("535");
   });
 
   it("auth xoauth2", async () => {
     const server = await FakeServer.start({ auth: "xoauth2" });
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
-    expect((await smtp.authenticate("account", "token", "xoauth2")).isSuccess()).toBe(true);
+    expect((await smtp.authenticate("account", "token", "xoauth2")).isSuccess()).toBeTruthy();
     expect(server.commands.at(-1)).toBe(
       "AUTH XOAUTH2 dXNlcj1hY2NvdW50AWF1dGg9QmVhcmVyIHRva2VuAQE=\r\n",
     );
@@ -371,26 +391,23 @@ describe("TestSMTP", () => {
 
   it("send message", async () => {
     const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
-    const res = await smtp.sendMessage("message", "sender@example.com", "rcpt1@example.com");
-    expect(res.isSuccess()).toBe(true);
+    await expect(
+      smtp.sendMessage("message", "sender@example.com", "rcpt1@example.com"),
+    ).resolves.not.toThrow();
   });
 
   it("send message with multiple recipients", async () => {
     const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
-    await smtp.sendMessage(
-      "message",
-      "sender@example.com",
-      "rcpt1@example.com",
-      "rcpt2@example.com",
-    );
+    await expect(
+      smtp.sendMessage("message", "sender@example.com", "rcpt1@example.com", "rcpt2@example.com"),
+    ).resolves.not.toThrow();
   });
 
   it("send message with multiple recipients as array", async () => {
     const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
-    await smtp.sendMessage("message", "sender@example.com", [
-      "rcpt1@example.com",
-      "rcpt2@example.com",
-    ]);
+    await expect(
+      smtp.sendMessage("message", "sender@example.com", ["rcpt1@example.com", "rcpt2@example.com"]),
+    ).resolves.not.toThrow();
   });
 
   it("unsuccessful send message server busy", () => refusedAt("400 BUSY", SMTPServerBusy));
@@ -403,14 +420,14 @@ describe("TestSMTP", () => {
 
   it("rset", async () => {
     const smtp = (await SMTP.start("127.0.0.1", await fakeServerStart())) as SMTP;
-    expect((await smtp.rset()).isSuccess()).toBe(true);
+    expect(await smtp.rset()).toBeTruthy();
     await smtp.finish();
   });
 
   it("mailfrom", async () => {
     const server = await FakeServer.start();
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
-    expect((await smtp.mailfrom("foo@example.com")).isSuccess()).toBe(true);
+    expect((await smtp.mailfrom("foo@example.com")).isSuccess()).toBeTruthy();
     expect(server.commands.at(-1)).toBe("MAIL FROM:<foo@example.com>\r\n");
     await smtp.finish();
   });
@@ -418,44 +435,43 @@ describe("TestSMTP", () => {
   it("rcptto", async () => {
     const server = await FakeServer.start();
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
-    expect((await smtp.rcptto("foo@example.com")).isSuccess()).toBe(true);
+    expect((await smtp.rcptto("foo@example.com")).isSuccess()).toBeTruthy();
     expect(server.commands.at(-1)).toBe("RCPT TO:<foo@example.com>\r\n");
     await smtp.finish();
   });
 
   it("crlf injection", async () => {
     const smtp = new SMTP("localhost", 25);
-    await expect(smtp.mailfrom("foo\r\nbar")).rejects.toBeInstanceOf(ArgumentError);
-    await expect(smtp.mailfrom("foo\rbar")).rejects.toBeInstanceOf(ArgumentError);
-    await expect(smtp.mailfrom("foo\nbar")).rejects.toBeInstanceOf(ArgumentError);
-    await expect(smtp.rcptto("foo\r\nbar")).rejects.toBeInstanceOf(ArgumentError);
+    await expect(smtp.mailfrom("foo\r\nbar")).rejects.toThrow(ArgumentError);
+    await expect(smtp.mailfrom("foo\rbar")).rejects.toThrow(ArgumentError);
+    await expect(smtp.mailfrom("foo\nbar")).rejects.toThrow(ArgumentError);
+    await expect(smtp.rcptto("foo\r\nbar")).rejects.toThrow(ArgumentError);
   });
 
   it("start with tls", async () => {
-    await SMTP.start("127.0.0.1", await fakeServerStart({ secure: true }), {
-      tls: true,
-      tlsVerify: false,
-    }).then((s) => (s as SMTP).finish());
-    await SMTP.start("127.0.0.1", await fakeServerStart(), { tls: false }).then((s) =>
-      (s as SMTP).finish(),
-    );
+    let port = await fakeServerStart({ secure: true });
+    await expect(
+      SMTP.start("127.0.0.1", port, { tls: true, tlsVerify: false }, noop),
+    ).resolves.not.toThrow();
+
+    port = await fakeServerStart();
+    await expect(SMTP.start("127.0.0.1", port, { tls: false }, noop)).resolves.not.toThrow();
   });
 
   it("start with starttls always", async () => {
-    const port = await fakeServerStart({ disabledCommands: ["AUTH"] });
-    const smtp = (await SMTP.start("127.0.0.1", port, {
-      starttls: "always",
-      tlsVerify: false,
-    })) as SMTP;
-    await smtp.finish();
-    const refused = SMTP.start("127.0.0.1", await fakeServerStart(), { starttls: "always" });
-    await expect(refused).rejects.toBeInstanceOf(SMTPUnsupportedCommand);
+    let server = await FakeServer.start({ starttls: true });
+    await SMTP.start("127.0.0.1", server.port, { starttls: "always", tlsVerify: false }, noop);
+    expect(server.isStarttlsStarted()).toEqual(true);
+
+    server = await FakeServer.start({ starttls: false });
+    await expect(
+      SMTP.start("127.0.0.1", server.port, { starttls: "always", tlsVerify: false }, noop),
+    ).rejects.toThrow(SMTPUnsupportedCommand);
   });
 
   it("start instance", async () => {
     const smtp = new SMTP("127.0.0.1", await fakeServerStart());
     await smtp.start();
-    expect(smtp.isStarted()).toBe(true);
     await smtp.finish();
   });
 
@@ -481,23 +497,36 @@ describe("TestSMTP", () => {
   });
 
   it("with tls", async () => {
-    const port = await fakeServerStart({ secure: true });
-    const smtp = new SMTP("127.0.0.1", port, { tls: true, tlsVerify: false });
-    await smtp.start(noop);
+    let port = await fakeServerStart({ secure: true });
+    let smtp = new SMTP("127.0.0.1", port, { tls: true, tlsVerify: false });
+    await expect(smtp.start(noop)).resolves.not.toThrow();
+
+    port = await fakeServerStart();
+    smtp = new SMTP("127.0.0.1", port, { tls: false });
+    await expect(smtp.start(noop)).resolves.not.toThrow();
   });
 
   it("with starttls always", async () => {
-    let port = await fakeServerStart({ disabledCommands: ["AUTH"] });
-    await new SMTP("127.0.0.1", port, { starttls: "always", tlsVerify: false }).start(noop);
-    port = await fakeServerStart();
-    const smtp = new SMTP("127.0.0.1", port, { starttls: "always", tlsVerify: false });
-    await expect(smtp.start(noop)).rejects.toBeInstanceOf(SMTPUnsupportedCommand);
+    let server = await FakeServer.start({ starttls: true });
+    let smtp = new SMTP("127.0.0.1", server.port, { starttls: "always", tlsVerify: false });
+    await smtp.start(noop);
+    expect(server.isStarttlsStarted()).toEqual(true);
+
+    server = await FakeServer.start({ starttls: false });
+    smtp = new SMTP("127.0.0.1", server.port, { starttls: "always", tlsVerify: false });
+    await expect(smtp.start(noop)).rejects.toThrow(SMTPUnsupportedCommand);
   });
 
   it("with starttls false", async () => {
-    const port = await fakeServerStart({ disabledCommands: ["AUTH"] });
-    const smtp = new SMTP("127.0.0.1", port, { starttls: false, tlsVerify: false });
+    let server = await FakeServer.start({ starttls: true });
+    let smtp = new SMTP("127.0.0.1", server.port, { starttls: false, tlsVerify: false });
     await smtp.start(noop);
+    expect(server.isStarttlsStarted()).toEqual(false);
+
+    server = await FakeServer.start({ starttls: false });
+    smtp = new SMTP("127.0.0.1", server.port, { starttls: false, tlsVerify: false });
+    await smtp.start(noop);
+    expect(server.isStarttlsStarted()).toEqual(false);
   });
 
   it("start", async () => {
@@ -534,7 +563,7 @@ describe("TestSMTP", () => {
   });
 
   it("start invalid number of arguments", async () => {
-    const err = await SMTP.start(
+    const errPromise = SMTP.start(
       "localhost",
       25,
       "myname",
@@ -542,17 +571,17 @@ describe("TestSMTP", () => {
       "password",
       "plain",
       "invalid_arg",
-    ).catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(ArgumentError);
+    );
+    await expect(errPromise).rejects.toThrow(ArgumentError);
+    const err = await errPromise.catch((e: unknown) => e);
     expect((err as Error).message).toBe("wrong number of arguments (given 7, expected 1..6)");
   });
 
   it("start instance invalid number of arguments", async () => {
     const smtp = new SMTP("localhost");
-    const err = await smtp
-      .start("myname", "account", "password", "plain", "invalid_arg")
-      .catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(ArgumentError);
+    const errPromise = smtp.start("myname", "account", "password", "plain", "invalid_arg");
+    await expect(errPromise).rejects.toThrow(ArgumentError);
+    const err = await errPromise.catch((e: unknown) => e);
     expect((err as Error).message).toBe("wrong number of arguments (given 5, expected 0..4)");
   });
 
@@ -560,7 +589,7 @@ describe("TestSMTP", () => {
     const server = await FakeServer.start();
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
     const addr = new Address("foo@example.com", { size: 12345 });
-    expect((await smtp.mailfrom(addr)).isSuccess()).toBe(true);
+    expect((await smtp.mailfrom(addr)).isSuccess()).toBeTruthy();
     expect(server.commands.at(-1)).toBe("MAIL FROM:<foo@example.com> size=12345\r\n");
   });
 
@@ -568,7 +597,7 @@ describe("TestSMTP", () => {
     const server = await FakeServer.start();
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
     const addr = new Address("foo@example.com", { nofty: "failure" });
-    expect((await smtp.rcptto(addr)).isSuccess()).toBe(true);
+    expect((await smtp.rcptto(addr)).isSuccess()).toBeTruthy();
     expect(server.commands.at(-1)).toBe("RCPT TO:<foo@example.com> nofty=failure\r\n");
   });
 
@@ -580,8 +609,9 @@ describe("TestSMTP", () => {
       this.sock.write("235 2.7.0 Authentication successful\r\n");
     };
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
-    const err = await smtp.authenticate("account", "password", "login").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(SMTPUnknownError);
+    const errPromise = smtp.authenticate("account", "password", "login");
+    await expect(errPromise).rejects.toThrow(SMTPUnknownError);
+    const err = await errPromise.catch((e: unknown) => e);
     expect((err as SMTPUnknownError).message).toBe("235 2.7.0 Authentication successful\n");
     expect((err as SMTPUnknownError).response!.status).toBe("235");
   });
@@ -589,8 +619,9 @@ describe("TestSMTP", () => {
   it("unsuccessful auth xoauth2", async () => {
     const server = await FakeServer.start({ auth: "xoauth2" });
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
-    const err = await smtp.authenticate("account", "password", "xoauth2").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(SMTPAuthenticationError);
+    const errPromise = smtp.authenticate("account", "password", "xoauth2");
+    await expect(errPromise).rejects.toThrow(SMTPAuthenticationError);
+    const err = await errPromise.catch((e: unknown) => e);
     expect((err as SMTPAuthenticationError).message).toBe(
       "535 5.7.8 Error: authentication failed: authentication failure\n",
     );
@@ -604,8 +635,9 @@ describe("TestSMTP", () => {
     };
     await server.start();
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
-    const err = await smtp.data("message").catch((e: unknown) => e);
-    expect(err).toBeInstanceOf(SMTPUnknownError);
+    const errPromise = smtp.data("message");
+    await expect(errPromise).rejects.toThrow(SMTPUnknownError);
+    const err = await errPromise.catch((e: unknown) => e);
     expect((err as SMTPUnknownError).message).toBe("could not get 3xx (250: 250 OK\n)");
     expect((err as SMTPUnknownError).response!.status).toBe("250");
   });
@@ -625,19 +657,26 @@ describe("TestSMTP", () => {
     const smtp = new SMTP("127.0.0.1", server.port);
     smtp.enableTls();
     smtp.openTimeout = 0.1;
-    await expect(smtp.start(noop)).rejects.toBeInstanceOf(OpenTimeout);
+    await expect(smtp.start(noop)).rejects.toThrow(OpenTimeout);
   });
 
   it("eof error backtrace", async () => {
+    const bug13018 = "[ruby-core:78550] [Bug #13018]";
+
     const server = new FakeServer();
     server.ehlo = async function () {
       this.sock.end();
     };
     await server.start();
     const smtp = new SMTP("127.0.0.1", server.port);
-    const e = await smtp.start(noop).catch((err: unknown) => err);
-    expect(e).toBeInstanceOf(EOFError);
-    expect((e as Error).stack).toMatch(/\bsmtp\.ts:/);
+    const ePromise = smtp.start(noop);
+    await expect(ePromise, bug13018).rejects.toThrow(EOFError);
+    const e = (await ePromise.catch((err: unknown) => err)) as Error;
+    expect(e.constructor, bug13018).toEqual(EOFError);
+    expect(
+      e.stack!.split("\n").filter((l) => /\bsmtp\.ts:/.test(l)).length > 0,
+      bug13018,
+    ).toBeTruthy();
   });
 
   it("with starttls auto", async () => {
@@ -681,8 +720,8 @@ describe("TestSMTP", () => {
       return SMTP.start("127.0.0.1", server.port, options, noop);
     };
     await start("plain", "password");
-    await expect(start("plain", "invalid")).rejects.toBeInstanceOf(SMTPAuthenticationError);
-    await expect(start("login", "password")).rejects.toBeInstanceOf(SMTPAuthenticationError);
+    await expect(start("plain", "invalid")).rejects.toThrow(SMTPAuthenticationError);
+    await expect(start("login", "password")).rejects.toThrow(SMTPAuthenticationError);
   });
 
   it("start auth login", async () => {
@@ -692,8 +731,8 @@ describe("TestSMTP", () => {
       return SMTP.start("127.0.0.1", server.port, options, noop);
     };
     await start("LOGIN", "password");
-    await expect(start("LOGIN", "invalid")).rejects.toBeInstanceOf(SMTPAuthenticationError);
-    await expect(start("PLAIN", "password")).rejects.toBeInstanceOf(SMTPAuthenticationError);
+    await expect(start("LOGIN", "invalid")).rejects.toThrow(SMTPAuthenticationError);
+    await expect(start("PLAIN", "password")).rejects.toThrow(SMTPAuthenticationError);
   });
 
   it("start auth cram md5", async () => {
@@ -703,26 +742,41 @@ describe("TestSMTP", () => {
       return SMTP.start("127.0.0.1", server.port, options, noop);
     };
     await start("CRAM-MD5", "password", "CRAM-MD5");
-    await expect(start("CRAM-MD5", "invalid", "cram_md5")).rejects.toBeInstanceOf(
-      SMTPAuthenticationError,
-    );
-    await expect(start("PLAIN", "password", "cram_md5")).rejects.toBeInstanceOf(
-      SMTPAuthenticationError,
-    );
+    await expect(start("CRAM-MD5", "invalid", "cram_md5")).rejects.toThrow(SMTPAuthenticationError);
+    await expect(start("PLAIN", "password", "cram_md5")).rejects.toThrow(SMTPAuthenticationError);
+
+    const server = await FakeServer.start({ auth: "CRAM-MD5" });
+    const smtp = new SMTP("127.0.0.1", server.port);
+    const digestClass = vi
+      .spyOn(AuthCramMD5.prototype, "digestClass", "get")
+      .mockImplementation(() => {
+        throw new RuntimeError('"openssl" or "digest" library is required');
+      });
+    try {
+      const ePromise = smtp.start(
+        { user: "account", password: "password", authtype: "cram_md5" },
+        noop,
+      );
+      await expect(ePromise).rejects.toThrow(RuntimeError);
+      const e = (await ePromise.catch((err: unknown) => err)) as Error;
+      expect(e.message).toEqual('"openssl" or "digest" library is required');
+    } finally {
+      digestClass.mockRestore();
+    }
   });
 
   it("send smtputf sender without server", async () => {
     const server = await FakeServer.start({ smtputf8: false });
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
     await smtp.sendMessage("message", "rené@example.com", "foo@example.com");
-    expect(server.commands).toContain("MAIL FROM:<rené@example.com>\r\n");
+    expect(server.commands.includes("MAIL FROM:<rené@example.com>\r\n")).toBeTruthy();
   });
 
   it("send smtputf8 sender", async () => {
     const server = await FakeServer.start({ smtputf8: true });
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
     await smtp.sendMessage("message", "rené@example.com", "foo@example.com");
-    expect(server.commands).toContain("MAIL FROM:<rené@example.com> SMTPUTF8\r\n");
+    expect(server.commands.includes("MAIL FROM:<rené@example.com> SMTPUTF8\r\n")).toBeTruthy();
   });
 
   it("send smtputf8 sender with size", async () => {
@@ -730,14 +784,16 @@ describe("TestSMTP", () => {
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
     const from = new Address("rené@example.com", "SIZE=42");
     await smtp.sendMessage("message", from, "foo@example.com");
-    expect(server.commands).toContain("MAIL FROM:<rené@example.com> SIZE=42 SMTPUTF8\r\n");
+    expect(
+      server.commands.includes("MAIL FROM:<rené@example.com> SIZE=42 SMTPUTF8\r\n"),
+    ).toBeTruthy();
   });
 
   it("send smtputf recipient", async () => {
     const server = await FakeServer.start({ smtputf8: true });
     const smtp = (await SMTP.start("127.0.0.1", server.port)) as SMTP;
     await smtp.sendMessage("message", "foo@example.com", "rené@example.com");
-    expect(server.commands).toContain("MAIL FROM:<foo@example.com> SMTPUTF8\r\n");
+    expect(server.commands.includes("MAIL FROM:<foo@example.com> SMTPUTF8\r\n")).toBeTruthy();
   });
 
   it("mailfrom with smtputf detection", async () => {

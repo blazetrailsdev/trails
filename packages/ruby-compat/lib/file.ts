@@ -459,16 +459,14 @@ export class File extends IO {
   }
 
   /**
-   * {@link File.isReadable} over the backend's async `access`.
+   * {@link File.isReadable} over the backend's async `access`, `rb_eaccess(fname, R_OK)`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.readable?`
    * (`vendor/ruby/v3.3.11/file.c:1826`).
    */
   static async isReadableAsync(fileName: string): Promise<boolean> {
-    const fs = getFs();
-    if (!fs.accessAsync) return fs.exists(fileName);
     try {
-      await fs.accessAsync(fileName, 4);
+      await getFs().accessAsync!(fileName, 4);
       return true;
     } catch {
       return false;
@@ -476,14 +474,15 @@ export class File extends IO {
   }
 
   /**
-   * {@link File.isExecutable} over the backend's async `stat`.
+   * {@link File.isExecutable} over the backend's async `access`, `rb_eaccess(fname, X_OK)`.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `File.executable?`
    * (`vendor/ruby/v3.3.11/file.c:1966`).
    */
   static async isExecutableAsync(fileName: string): Promise<boolean> {
     try {
-      return (await getFs().stat!(fileName)).isExecutable();
+      await getFs().accessAsync!(fileName, 1);
+      return true;
     } catch {
       return false;
     }

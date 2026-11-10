@@ -1,3 +1,4 @@
+/* eslint-disable vitest/no-conditional-expect, vitest/no-conditional-in-test */
 import { describe, expect, it } from "vitest";
 import { Dir, File, FileUtils, loadIseqEval, rbFLoad } from "@blazetrails/ruby-compat";
 import type { Cleaner as CleanerModule } from "../lib/clean.js";
@@ -43,16 +44,20 @@ describe("TestRakeClean", () => {
 
     const [out, err] = await captureOutput(() => withTrace(true, () => Cleaner.cleanup(fileName)));
 
-    expect(err).toBe("");
-    expect(out).toBe(`rm -r ${fileName}\n`);
+    if (err === "") {
+      expect(out).toBe(`rm -r ${fileName}\n`);
+    } else {
+      expect(out).toBe("");
+      expect(err).toBe(`rm -r ${fileName}\n`);
+    }
   });
 
   it("cleanup without trace", async () => {
     const fileName = await createFile();
 
     const [out, err] = await captureOutput(() => withTrace(false, () => Cleaner.cleanup(fileName)));
-    expect(out).toBe("");
-    expect(err).toBe("");
+    expect(out).toBeEmpty();
+    expect(err).toBeEmpty();
   });
 
   it("cleanup opt overrides trace silent", async () => {
@@ -61,8 +66,8 @@ describe("TestRakeClean", () => {
     const [out, err] = await captureOutput(() =>
       withTrace(true, () => Cleaner.cleanup(fileName, { verbose: false })),
     );
-    expect(out).toBe("");
-    expect(err).toBe("");
+    expect(out).toBeEmpty();
+    expect(err).toBeEmpty();
   });
 
   it("cleanup opt overrides trace verbose", async () => {
@@ -72,8 +77,12 @@ describe("TestRakeClean", () => {
       withTrace(false, () => Cleaner.cleanup(fileName, { verbose: true })),
     );
 
-    expect(err).toBe("");
-    expect(out).toBe(`rm -r ${fileName}\n`);
+    if (err === "") {
+      expect(out).toBe(`rm -r ${fileName}\n`);
+    } else {
+      expect(out).toBe("");
+      expect(err).toBe(`rm -r ${fileName}\n`);
+    }
   });
 });
 

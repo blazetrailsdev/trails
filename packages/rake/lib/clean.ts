@@ -2,7 +2,6 @@ import {
   File,
   FileUtils,
   StandardError,
-  SystemCallError,
   block,
   extend,
   puts,
@@ -28,7 +27,7 @@ export const Cleaner = {
       opts = { verbose: Rake.application!.options.trace, ...opts };
       await FileUtils.rmRAsync(fileName, opts);
     } catch (ex) {
-      if (!(ex instanceof StandardError || ex instanceof SystemCallError)) throw ex;
+      if (!(ex instanceof StandardError)) throw ex;
       if (!(await Cleaner.isFileAlreadyGone(fileName))) {
         puts.call($stdout, `Failed to remove ${fileName}: ${rbObjAsString(ex)}`);
       }
