@@ -1481,12 +1481,13 @@
     }
   },
   "tzinfo": {
-    "rows": 9,
-    "excluded": ["timestamp.ts::Timestamp"],
+    "rows": 10,
+    "excluded": [],
     "unwalked": [],
     "residue": {
       "country.ts::InvalidCountryCode": "TZInfo::InvalidCountryCode",
       "data-sources/constant-offset-data-timezone-info.ts::ConstantOffsetDataTimezoneInfo": "TZInfo::DataSources::ConstantOffsetDataTimezoneInfo",
+      "timestamp.ts::Timestamp": "TZInfo::Timestamp",
       "timezone-offset.ts::TimezoneOffset": "TZInfo::TimezoneOffset",
       "timezone-period.ts::TimezonePeriod": "TZInfo::TimezonePeriod",
       "timezone-transition.ts::TimezoneTransition": "TZInfo::TimezoneTransition",
