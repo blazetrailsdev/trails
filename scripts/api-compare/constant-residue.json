@@ -1043,9 +1043,10 @@
     }
   },
   "mail": {
-    "rows": 105,
+    "rows": 107,
     "excluded": ["multibyte/encoding-error.ts::EncodingError"],
     "unwalked": [
+      "check-delivery-params.ts::CheckDeliveryParams",
       "encodings.ts::Encodings",
       "field.ts::Field.FieldError",
       "field.ts::Field.IncompleteParseError",
@@ -1065,6 +1066,7 @@
       "parsers/envelope-from-parser.ts::EnvelopeFromParser",
       "parsers/message-ids-parser.ts::MessageIdsParser",
       "parsers/mime-version-parser.ts::MimeVersionParser",
+      "parsers/phrase-lists-parser.ts::PhraseListsParser.PhraseListsStruct",
       "parsers/received-parser.ts::ReceivedParser",
       "utilities.ts::Utilities"
     ],

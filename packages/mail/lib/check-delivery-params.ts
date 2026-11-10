@@ -51,3 +51,5 @@ export const CheckDeliveryParams = {
     return message;
   },
 };
+
+Mail.CheckDeliveryParams = CheckDeliveryParams;
