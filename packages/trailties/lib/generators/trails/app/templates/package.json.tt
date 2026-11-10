@@ -46,6 +46,7 @@
         "@blazetrails/actionview",
         "@blazetrails/trailties",
         ...(this.options.skipActiveJob ? [] : ["@blazetrails/activejob"]),
+        ...(this.options.skipActionMailer ? [] : ["@blazetrails/actionmailer"]),
         ...(this.skipSolid() ? [] : ["@blazetrails/solid-queue"]),
         ...(this.skipActionCable() ? [] : ["@blazetrails/actioncable"]),
       ]),
