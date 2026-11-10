@@ -8835,3 +8835,125 @@ describe("@perf and the privates lane (RFC 0218)", () => {
     expect(intrnl).toBe(population.length - underscored + aliasRows);
   });
 });
+
+describe("object-literal modules and Struct.new constants", () => {
+  it("credits an exported literal cast to the interface that types it", () => {
+    // mail/mail.ts: `export const Mail: MailConstants = { … } as unknown as MailConstants`
+    const info = extractFromFiles("/p", {
+      "mail.ts": `
+        export interface MailConstants { defaults(): unknown; randomTag(): string }
+        export const Mail: MailConstants = {
+          defaults() { return null; },
+          randomTag(): string { return ""; },
+        } as unknown as MailConstants;
+      `,
+    });
+    const mod = info.modules["mail.ts:Mail"];
+    expect(mod.objectLiteral).toBe(true);
+    expect(mod.instanceMethods.map((m) => [m.name, m.bodyless])).toEqual([
+      ["defaults", undefined],
+      ["randomTag", undefined],
+    ]);
+  });
+
+  it("leaves a cast namespace literal with no bodies alone", () => {
+    // activerecord/src/namespaces.ts: `export const ActiveRecord = { name, loadPath } as AutoloadModule & …`
+    const info = extractFromFiles("/p", {
+      "namespaces.ts": `
+        const loadPath = { a: 1 };
+        export const ActiveRecord = { name: "ActiveRecord", loadPath } as { name: string };
+      `,
+    });
+    expect(info.modules["namespaces.ts:ActiveRecord"]).toBeUndefined();
+  });
+
+  it("leaves an `as const` section literal alone", () => {
+    // activerecord/src/relation/calculations.ts: CalculationsPublicInstanceMethods
+    const info = extractFromFiles("/p", {
+      "calculations.ts": `export const Section = { pick(): void {} } as const;`,
+    });
+    expect(info.modules["calculations.ts:Section"]).toBeUndefined();
+  });
+
+  it("credits the literal of extend({ ... }, Mod) and its data properties", () => {
+    // mail/parsers/content-type-parser.ts over content_type_parser.rb:9-10
+    const info = extractFromFiles("/p", {
+      "content-type-parser.ts": `
+        declare function extend<T>(obj: T, ...mods: object[]): T;
+        const ParserTools = {};
+        export const ContentTypeParser = extend(
+          {
+            _transKeys: [0, 1],
+            start: 1,
+            ContentTypeStruct: [0],
+            parse(data: string): unknown { return data; },
+          },
+          ParserTools,
+        );
+      `,
+    });
+    const mod = info.modules["content-type-parser.ts:ContentTypeParser"];
+    expect(mod.instanceMethods.map((m) => m.name)).toEqual(["_transKeys", "start", "parse"]);
+  });
+
+  it("does not credit a plain literal's data properties", () => {
+    // ruby-compat/lib/repl-adapter.ts: `HelperMethod = { helperMethods: {}, register() {} }`
+    const info = extractFromFiles("/p", {
+      "repl-adapter.ts": `export const HelperMethod = { helperMethods: {}, register(): void {} };`,
+    });
+    expect(info.modules["repl-adapter.ts:HelperMethod"].instanceMethods.map((m) => m.name)).toEqual(
+      ["register"],
+    );
+  });
+
+  it("does not make a literal of data alone a module", () => {
+    const info = extractFromFiles("/p", {
+      "state.ts": `export const State = { loaders: [] as string[], count: 0 };`,
+    });
+    expect(info.modules["state.ts:State"]).toBeUndefined();
+  });
+
+  it("does not credit a string-valued data property as an accessor slot", () => {
+    // activerecord/src/sqlite/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
+    const info = extractFromFiles("/p", {
+      "driver.ts": `
+        declare function extend<T>(obj: T, ...mods: object[]): T;
+        export const Driver = extend({ name: "x", open(): void {} }, {});
+      `,
+    });
+    expect(info.modules["driver.ts:Driver"].instanceMethods.map((m) => m.name)).toEqual(["open"]);
+  });
+
+  it("credits an exported alias of a same-file literal", () => {
+    // rake/file-utils-ext.ts: `export const FileUtilsExt = fileUtilsExt as …`
+    const info = extractFromFiles("/p", {
+      "file-utils-ext.ts": `
+        interface Commands { rm(): void }
+        const fileUtilsExt = {
+          verboseFlag: false,
+          rakeOutputMessage(message: string): void {},
+        };
+        export const FileUtilsExt = fileUtilsExt as typeof fileUtilsExt & Commands;
+      `,
+    });
+    const mod = info.modules["file-utils-ext.ts:FileUtilsExt"];
+    expect(mod.instanceMethods.map((m) => m.name)).toEqual(["verboseFlag", "rakeOutputMessage"]);
+  });
+
+  it("credits a Struct.new constant's members and initialize", () => {
+    // mail/parsers/content_type_parser.rb:13
+    const info = extractFromFiles("/p", {
+      "content-type-parser.ts": `
+        declare const Struct: { new: (...names: string[]) => unknown };
+        const ContentTypeStruct = Struct.new("mainType", "subType");
+        export const X = { parse(): unknown { return ContentTypeStruct; } };
+      `,
+    });
+    const cls = info.classes["content-type-parser.ts:ContentTypeStruct"];
+    expect(cls.instanceMethods.map((m) => [m.name, m.params.map((p) => p.kind)])).toEqual([
+      ["mainType", []],
+      ["subType", []],
+      ["constructor", ["optional", "optional"]],
+    ]);
+  });
+});

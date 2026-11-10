@@ -5,7 +5,7 @@ import { ContentTypeElement } from "../elements/content-type-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-const ContentTypeStruct = Struct.new("mainType", "subType", "parameters", "error");
+export const ContentTypeStruct = Struct.new("mainType", "subType", "parameters", "error");
 
 export const ContentTypeParser = extend(
   {

@@ -5,7 +5,7 @@ import { ContentTransferEncodingElement } from "../elements/content-transfer-enc
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-const ContentTransferEncodingStruct = Struct.new("encoding", "error");
+export const ContentTransferEncodingStruct = Struct.new("encoding", "error");
 
 export const ContentTransferEncodingParser = extend(
   {

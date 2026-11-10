@@ -5,8 +5,8 @@ import { AddressList } from "../elements/address-list.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-const AddressListStruct = Struct.new("addresses", "groupNames", "error");
-const AddressStruct = Struct.new("raw", "domain", "comments", "local", "obsDomainList", "displayName", "group", "error");
+export const AddressListStruct = Struct.new("addresses", "groupNames", "error");
+export const AddressStruct = Struct.new("raw", "domain", "comments", "local", "obsDomainList", "displayName", "group", "error");
 
 export const AddressListsParser = extend(
   {

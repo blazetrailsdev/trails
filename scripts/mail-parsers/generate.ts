@@ -260,7 +260,7 @@ function generate(p: Parser): string {
     "",
     ...p.structs.map(
       ([n, members]) =>
-        `const ${n} = Struct.new(${members.map((x) => JSON.stringify(x)).join(", ")});`,
+        `export const ${n} = Struct.new(${members.map((x) => JSON.stringify(x)).join(", ")});`,
     ),
     "",
     ...(p.kind === "class"

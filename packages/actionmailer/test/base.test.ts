@@ -434,6 +434,46 @@ describe("BaseTest", () => {
     );
   });
 
+  it("adding inline attachments while rendering mail works", async () => {
+    class LateInlineAttachmentMailer extends Base {
+      static {
+        this.prependViewPath(
+          new FixtureResolver({
+            "late-inline-attachment-mailer/on-render.tse": [
+              "<h1>Adding an inline image while rendering</h1>",
+              "",
+              `<% await this.controller.attachments().inline().set("controller_attachments.jpg", "via controller.attachments.inline") %>`,
+              `<%= this.imageTag(this.attachments().get("controller_attachments.jpg").url()) %>`,
+              "",
+              `<% await this.attachments().inline().set("attachments.jpg", "via attachments.inline") %>`,
+              `<%= this.imageTag(this.attachments().get("attachments.jpg").url()) %>`,
+              "",
+            ].join("\n"),
+          }),
+        );
+      }
+
+      onRender() {
+        return this.mail({ from: "welcome@example.com", to: "to@example.com" });
+      }
+    }
+
+    const mail = (
+      LateInlineAttachmentMailer as Mailer<typeof LateInlineAttachmentMailer>
+    ).onRender();
+    await assertNothingRaised(() => mail.message());
+
+    expect(
+      (await mail.message())
+        .attachments()
+        .inline()
+        .map((a) => String(a.get("Content-Type"))),
+    ).toEqual([
+      "image/jpeg; filename=controller_attachments.jpg",
+      "image/jpeg; filename=attachments.jpg",
+    ]);
+  });
+
   it("accessing attachments works after mail was called", async () => {
     class LateAttachmentAccessorMailer extends Base {
       async welcome() {

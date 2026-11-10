@@ -5,7 +5,7 @@ import { EnvelopeFromElement } from "../elements/envelope-from-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-const EnvelopeFromStruct = Struct.new("address", "ctimeDate", "error");
+export const EnvelopeFromStruct = Struct.new("address", "ctimeDate", "error");
 
 export const EnvelopeFromParser = extend(
   {

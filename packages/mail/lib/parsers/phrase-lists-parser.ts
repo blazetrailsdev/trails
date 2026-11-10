@@ -4,7 +4,7 @@ import { Field } from "../field.js";
 import { PhraseList } from "../elements/phrase-list.js";
 import { ParserTools } from "../parser-tools.js";
 
-const PhraseListsStruct = Struct.new("phrases", "error");
+export const PhraseListsStruct = Struct.new("phrases", "error");
 
 export class PhraseListsParser {
     static PhraseListsStruct = PhraseListsStruct;

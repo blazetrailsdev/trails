@@ -85,4 +85,22 @@ describe("Ruby extractor controller actions named test_*", () => {
       `),
     ).toEqual(["TestErrorsInController > legit routes are not swallowed"]);
   });
+
+  it("skips def test_* in a class whose superclass is ActionMailer::Base", () => {
+    // actionmailer/test/test_helper_test.rb:7-32
+    expect(
+      extract(`
+        class TestHelperMailer < ActionMailer::Base
+          def test_parameter_args
+            mail body: "x"
+          end
+        end
+
+        class TestHelperMailerTest < ActionMailer::TestCase
+          def test_setup_sets_right_action_mailer_options
+          end
+        end
+      `),
+    ).toEqual(["TestHelperMailerTest > setup sets right action mailer options"]);
+  });
 });

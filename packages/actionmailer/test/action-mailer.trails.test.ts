@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { registerSubclass } from "@blazetrails/activesupport";
 import { ActionMailer } from "../lib/namespaces.js";
+import "../lib/action-mailer.js";
 import { Base } from "../lib/base.js";
 
 describe("ActionMailer.eagerLoadBang", () => {
