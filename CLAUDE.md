@@ -1240,6 +1240,25 @@ Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#fixtu
 
 Moved to [packages/actionpack/CLAUDE.md](packages/actionpack/CLAUDE.md#dom-testing-is-html5-only-railsdomtestingdefault_html_version); unchanged, heading kept for citations.
 
+## Core extensions are not installed on native prototypes (`config.active_support.bare`)
+
+Rails' `active_support/railtie.rb` requires `active_support/all` unless
+`config.active_support.bare`, which reopens `Array`, `String` and the other core
+classes (`[1, 2, 3].sample`, `"hello".exclude?`). trails installs nothing on
+`Array.prototype`, `String.prototype` or any other native prototype: a core
+extension is a free function the caller imports. So `active_support.bare` has
+no observable arm, and a Rails test that asserts a core-ext method is present
+or absent on a native value
+(`vendor/rails/v8.0.2/railties/test/application/initializers/frameworks_test.rb:186-201`)
+is parked as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
+
+For the same reason a framework is loaded by an ES import, not by a load path:
+`use_frameworks`' `$:.reject!`
+(`vendor/rails/v8.0.2/railties/test/isolation/abstract_unit.rb:494`) has no
+port, and a test asserting a framework constant is undefined in a process that
+imports it (`frameworks_test.rb:212-216`) is parked the same way. Ruled by the
+repo owner on 2026-11-09.
+
 ## Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)
 
 Ruby's `case`/`in` and rightward `=>` pattern matching

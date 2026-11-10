@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Isolation } from "@blazetrails/activesupport/testing/isolation";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { include, TopLevel } from "@blazetrails/ruby-compat";
+import { constGet, include, TopLevel } from "@blazetrails/ruby-compat";
 import type { Generation, Rack, Reload } from "../support/isolation/abstract-unit.js";
 import "../support/isolation/abstract-unit.js";
 
@@ -21,7 +21,10 @@ describe("ReloadReseatsConstantTest", { timeout: 120_000 }, () => {
     await t.buildApp();
   });
 
-  afterEach(() => t.teardownApp());
+  afterEach(async () => {
+    Reflect.deleteProperty(TopLevel, "Post");
+    await t.teardownApp();
+  });
 
   it("Dependencies.clear seats a new app constant after a reload", async () => {
     await t.trails("generate", "model", "post", "title:string");
@@ -29,13 +32,12 @@ describe("ReloadReseatsConstantTest", { timeout: 120_000 }, () => {
 
     await (t as unknown as Rack).app("development");
 
-    const topLevel = TopLevel as unknown as Record<string, unknown>;
-    const before = topLevel.Post;
+    const before = constGet(TopLevel, "Post");
     expect(before).toBeDefined();
 
     await t.reload();
 
-    expect(topLevel.Post).toBeDefined();
-    expect(topLevel.Post).not.toBe(before);
+    expect(constGet(TopLevel, "Post")).toBeDefined();
+    expect(constGet(TopLevel, "Post")).not.toBe(before);
   });
 });

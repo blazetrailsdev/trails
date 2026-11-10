@@ -292,14 +292,33 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     expect(rt.lastResponse().body).toBe('{"omg":"omg"}');
   });
 
-  // PERMANENT-SKIP: trails installs no core_ext on `Array.prototype` / `String.prototype` (owner ruling, 2026-11-09), so `active_support.bare` has no observable arm.
-  it.skip("if there's no config.active_support.bare, all of ActiveSupport is required", () => {});
+  // PERMANENT-SKIP: CLAUDE.md, "Core extensions are not installed on native prototypes (`config.active_support.bare`)" — `Array.prototype.sample` is never installed.
+  it.skip("if there's no config.active_support.bare, all of ActiveSupport is required", async () => {
+    await t.useFrameworks([]);
+    await (t as unknown as Rack).app("development");
+    expect(() => ([1, 2, 3] as unknown as { sample(): unknown }).sample()).not.toThrow();
+  });
 
-  // PERMANENT-SKIP: trails installs no core_ext on `Array.prototype` / `String.prototype` (owner ruling, 2026-11-09), so `active_support.bare` has no observable arm.
-  it.skip("config.active_support.bare does not require all of ActiveSupport", () => {});
+  // PERMANENT-SKIP: CLAUDE.md, "Core extensions are not installed on native prototypes (`config.active_support.bare`)" — `String.prototype.isExclude` is never installed.
+  it.skip("config.active_support.bare does not require all of ActiveSupport", async () => {
+    await t.addToConfig("this.config.activeSupport.bare = true;");
 
-  // PERMANENT-SKIP: an ES import is eager and this file imports `@blazetrails/activerecord`, so `ActiveRecord.Base` is defined in-process and has no `autoload?` arm.
-  it.skip("database middleware doesn't initialize when activerecord is not in frameworks", () => {});
+    await t.useFrameworks([]);
+
+    await Dir.chdir(`${await t.appPath()}/app`, async () => {
+      await (t as unknown as Rack).app("development");
+      expect(() =>
+        ("hello" as unknown as { isExclude(s: string): boolean }).isExclude("lo"),
+      ).toThrow(TypeError);
+    });
+  });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Core extensions are not installed on native prototypes (`config.active_support.bare`)" — this file imports `@blazetrails/activerecord`, so `ActiveRecord.Base` is always defined.
+  it.skip("database middleware doesn't initialize when activerecord is not in frameworks", async () => {
+    await t.useFrameworks([]);
+    await (t as unknown as Rack).app("development");
+    expect(Base).toBeUndefined();
+  });
 
   it("use schema cache dump", async () => {
     try {
