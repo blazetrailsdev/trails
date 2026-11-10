@@ -976,7 +976,7 @@ export function each<R extends object>(
  */
 export function toH<K = unknown, V = unknown, T = unknown>(
   ary: readonly T[],
-  block?: (e: T) => readonly [K, V] | unknown,
+  block?: (e: T) => readonly [K, V],
 ): Hash<K, V>;
 /**
  * The `to_h` send for any other receiver: its own `toH`, and a plain object,

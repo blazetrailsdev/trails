@@ -319,7 +319,9 @@ describe("Array#to_h", () => {
       ["a", 1],
       ["bb", 2],
     ]);
-    expect(() => toH(["a"], () => "x")).toThrow("wrong element type String at 0 (expected array)");
+    expect(() => toH(["a"], () => "x" as unknown as [string, string])).toThrow(
+      "wrong element type String at 0 (expected array)",
+    );
   });
 
   it("toA answers a Map's pairs and a Set's elements", () => {
