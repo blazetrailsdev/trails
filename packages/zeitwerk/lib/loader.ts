@@ -96,6 +96,7 @@ export class Loader {
   static {
     extend(this, Internal);
     this.internal("autoloads");
+    this.internal("inceptions");
     this.internal("autoloadedDirs");
     this.internal("toUnload");
     this.internal("namespaceDirs");
