@@ -1,6 +1,7 @@
 import { Dir } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { FileList } from "../lib/file-list.js";
+import type { FileUtils } from "../lib/file-utils.js";
 import { FileUtilsExt } from "../lib/file-utils-ext.js";
 import { PackageTask } from "../lib/packagetask.js";
 import { Task } from "../lib/task.js";
@@ -16,11 +17,15 @@ describe("PackageTask#define archive tasks", () => {
   async function packageWith(withoutParentDir: boolean) {
     await FileUtilsExt.touch("a.c");
     const calls: { cwd: string; cmd: unknown[] }[] = [];
-    vi.spyOn(PackageTask.prototype, "sh").mockImplementation(async (...cmd: unknown[]) => {
-      calls.push({ cwd: Dir.pwd(), cmd });
-      return true;
-    });
-    const mv = vi.spyOn(PackageTask.prototype, "mv").mockImplementation(async () => null);
+    vi.spyOn(PackageTask.prototype as unknown as typeof FileUtils, "sh").mockImplementation(
+      async (...cmd: unknown[]) => {
+        calls.push({ cwd: Dir.pwd(), cmd });
+        return true;
+      },
+    );
+    const mv = vi
+      .spyOn(PackageTask.prototype as unknown as typeof FileUtils, "mv")
+      .mockImplementation(async () => null);
     const packageFiles = new FileList();
     packageFiles.include("a.c");
     await packageFiles.resolve();
