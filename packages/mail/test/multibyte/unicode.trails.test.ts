@@ -69,8 +69,8 @@ describe("Mail::Multibyte::Chars strip bangs", () => {
   it("strips the wrapped string in place and returns self", () => {
     const chars = new Chars("  héllo  ");
     expect(chars.stripBang()).toBe(chars);
-    expect(chars.toS()).toBe("héllo");
-    expect(new Chars(" a ").lstripBang().toS()).toBe("a ");
-    expect(new Chars(" a ").rstripBang().toS()).toBe(" a");
+    expect(chars.toString()).toBe("héllo");
+    expect(new Chars(" a ").lstripBang().toString()).toBe("a ");
+    expect(new Chars(" a ").rstripBang().toString()).toBe(" a");
   });
 });

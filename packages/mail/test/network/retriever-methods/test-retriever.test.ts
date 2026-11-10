@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { beforeEach, describe, expect, it } from "vitest";
 import { Mail } from "../../../lib/index.js";
 import type { Message } from "../../../lib/message.js";
@@ -11,7 +12,7 @@ describe("Test Retriever", () => {
   });
 
   it("should have no emails initially", () => {
-    expect(Mail.all()).toEqual([]);
+    expect(Mail.all()).toBeEmpty();
   });
 
   describe("all", () => {
@@ -72,16 +73,16 @@ describe("Test Retriever", () => {
       expect(Mail.find({ deleteAfterFind: false })).toEqual(emails);
       expect(Mail.find({ deleteAfterFind: false })).toEqual(emails);
       expect(Mail.find({ deleteAfterFind: true })).toEqual(emails);
-      expect(Mail.find({ deleteAfterFind: false })).toEqual([]);
+      expect(Mail.find({ deleteAfterFind: false })).toBeEmpty();
     });
 
-    it("should handle the both of :delete_after_find and :count option", () => {
-      let before = (Mail.all() as Message[]).length;
-      expect((Mail.find({ count: 5, deleteAfterFind: true }) as Message[]).length).toBe(5);
-      expect((Mail.all() as Message[]).length - before).toBe(-5);
-      before = (Mail.all() as Message[]).length;
-      expect((Mail.find({ count: 5, deleteAfterFind: true }) as Message[]).length).toBe(5);
-      expect((Mail.all() as Message[]).length - before).toBe(-5);
+    it("should handle the both of :delete_after_find and :count option", async () => {
+      await expect(() => {
+        expect((Mail.find({ count: 5, deleteAfterFind: true }) as Message[]).length).toEqual(5);
+      }).toChange(() => (Mail.all() as Message[]).length, { by: -5 });
+      await expect(() => {
+        expect((Mail.find({ count: 5, deleteAfterFind: true }) as Message[]).length).toEqual(5);
+      }).toChange(() => (Mail.all() as Message[]).length, { by: -5 });
     });
 
     it("should handle the :delete_after_find option with messages marked not for delete", () => {
