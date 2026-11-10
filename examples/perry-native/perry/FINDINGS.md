@@ -2511,3 +2511,42 @@ the same under both runtimes. The probe does not yet show how the miss becomes
 recursion in the real `Generators`. That is the next step, and the fix belongs
 in perry: a `Proxy` in the prototype chain gets `[[Get]]` / `[[Set]]` like any
 other prototype.
+
+### Wall 31 is fixed in perry (r65)
+
+The trap is now consulted with the outermost receiver: when
+`class_instance_property_value` finds a Proxy holder in the chain it calls
+`proxy_get_with_receiver(proxy, key, outer)`, `outer` taken from the
+accessor-receiver override. Perry commit `cef27a740` (local, fork policy),
+probe `test-files/test_gap_proxy_proto_method_call_receiver.ts`. A coherent
+rebuild matters here: `libperry_stdlib.a` embeds its own runtime copy, so a
+runtime-only rebuild left r65 crashing exactly as before.
+
+## Walls 32–39, to the first 200 (r66–r79)
+
+| wall | symptom | cause | fix |
+| ---- | ------- | ----- | --- |
+| 32 | static method through a Proxy parent answers the wrong receiver | `class_prototype_get` had no Proxy branch | perry `aa69722b2` |
+| 33 | `new` with spread of an imported class builds the wrong object | `callee_is_generic_construct_shape` ignored imported classes | perry `4a70c0d4e` |
+| 34 | `/up` 404 again: `app/helpers` never compiled | `BOOT_PATHS` lacked helpers | trails#9901 |
+| 35 | database config / `configFor` / storage config read by path | config reads bypassed the compiled-file map | trails#9911 (`loadIseqEval`) |
+| 36 | `establishConnection is not a function` | a cyclic barrel's eager namespace mints `ConnectionHandler`'s prototype before its declaration registers; methods never installed | perry `e701a76a1` |
+| 36b | `super.has`, `instanceof Map` false on such a class | the same early prototype was born linked to `Object.prototype` | perry `b45837a6b` |
+| 37 | `Cannot read private member #identhash` | an imported `Hash extends Map` resolved its parent to ruby-compat's own `class Map` (Concurrent.Map): wrong layout, `new.target` unbound | perry `fbedce6ae` |
+| 38 | `LoadError: cannot load such file -- yaml` | Psych resolves yaml through `createRequire`, absent natively | trails#9944 (`ruby-compat/psych-yaml`, imported by the build) |
+| 39 | `isEos is not a function` | `static Scanner = class Scanner {}` deduped onto the outer `Scanner` | perry `8bfb521d4` |
+
+r79: `[08] env=production port=3178 status=200 len=73`, 2225 modules, 2245 s
+compile. The `yaml` import adds 73 modules; `r61-serve.sh`'s cap is now 2300.
+
+### Left open, off the ladder's path
+
+- **wpfacts does not converge** on `ruby-compat/lib/string/encode.ts` in
+  sub-programs (two units oscillate past 32768 rounds; the full program
+  converges). Probes that pull ruby-compat need `PERRY_PROGRAM_FACTS=0`.
+- **Name-keyed parent walks.** About a dozen codegen sites walk
+  `extends_name` through `ctx.classes` by name (`dynamic_dispatch.rs`,
+  `static_dispatch.rs`, `number_string.rs`, `new_alloc.rs`,
+  `new_error_init.rs`, `type_analysis/predicates.rs`, ...). Wall 37 fixed the
+  two the crash went through; the rest can still confuse a builtin parent with
+  a same-named class.
