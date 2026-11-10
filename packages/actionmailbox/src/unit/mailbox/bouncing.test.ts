@@ -56,7 +56,7 @@ describe("ActionMailbox::Base::BouncingTest", () => {
       await BouncingWithReplyMailbox.receive(inboundEmail);
     });
 
-    expect(inboundEmail.isBounced()).toBe(true);
+    expect(inboundEmail.isBounced()).toBeTruthy();
     await t.assertEmails(1);
 
     const mail = ActionMailerBase.deliveries.at(-1)!;
@@ -70,7 +70,7 @@ describe("ActionMailbox::Base::BouncingTest", () => {
       await BouncingWithImmediateReplyMailbox.receive(inboundEmail);
     });
 
-    expect(inboundEmail.isBounced()).toBe(true);
+    expect(inboundEmail.isBounced()).toBeTruthy();
     await t.assertEmails(1);
 
     const mail = ActionMailerBase.deliveries.at(-1)!;
