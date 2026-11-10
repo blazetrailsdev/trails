@@ -71,6 +71,11 @@ export class BaseMailer extends Base {
     return this.mail(Object.assign({ subject: "The first email on new API!" }, hash));
   }
 
+  async welcomeWithoutDeliveries(hash: Hash = {}) {
+    await this.mail(Object.assign({ templateName: "welcome" }, hash));
+    (await this.mail()).performDeliveries = false;
+  }
+
   welcomeFromAnotherPath(path: string | string[]) {
     return this.mail({ templateName: "welcome", templatePath: path });
   }

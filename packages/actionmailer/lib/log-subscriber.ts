@@ -11,14 +11,14 @@ export class LogSubscriber extends BaseLogSubscriber {
     this.info(null, () => {
       let exception: Error | null | undefined;
       if ((exception = event.payload.exception_object as Error | null | undefined) != null) {
-        return `Failed delivery of mail ${rbObjAsString(event.payload.message_id)} error_class=${rbModName(rbObjClass(exception))} error_message=${rbInspect(exception.message)}`;
+        return `Failed delivery of mail ${rbObjAsString(event.payload.messageId)} error_class=${rbModName(rbObjClass(exception))} error_message=${rbInspect(exception.message)}`;
       } else if (
-        event.payload.perform_deliveries != null &&
-        event.payload.perform_deliveries !== false
+        event.payload.performDeliveries != null &&
+        event.payload.performDeliveries !== false
       ) {
-        return `Delivered mail ${rbObjAsString(event.payload.message_id)} (${round(event.duration, 1)}ms)`;
+        return `Delivered mail ${rbObjAsString(event.payload.messageId)} (${round(event.duration, 1)}ms)`;
       } else {
-        return `Skipped delivery of mail ${rbObjAsString(event.payload.message_id)} as \`perform_deliveries\` is false`;
+        return `Skipped delivery of mail ${rbObjAsString(event.payload.messageId)} as \`perform_deliveries\` is false`;
       }
     });
 
