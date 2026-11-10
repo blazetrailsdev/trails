@@ -15,7 +15,7 @@ import { SerializerWithFallback, type Serializer } from "./serializer-with-fallb
 import { deflate, inflate } from "../gzip.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
-import { toParam } from "../hash-utils.js";
+import { isPlainObject, toParam } from "../hash-utils.js";
 import { currentErrorReporter } from "../error-reporter.js";
 import { cattrAccessor } from "../module-ext.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
@@ -59,7 +59,7 @@ export interface CacheCoder {
 
 function extractOptions(args: unknown[]): StoreOptions | undefined {
   const last = args[args.length - 1];
-  if (last != null && typeof last === "object" && !Array.isArray(last)) {
+  if (isPlainObject(last)) {
     return args.pop() as StoreOptions;
   }
   return undefined;
@@ -676,8 +676,8 @@ export abstract class Store {
       } else {
         expanded = await this.expandedKey(key[0]);
       }
-    } else if (key != null && typeof key === "object") {
-      expanded = Object.entries(key as Record<string, unknown>)
+    } else if (isPlainObject(key)) {
+      expanded = Object.entries(key)
         .map(([k, v]) => `${k}=${v}`)
         .sort();
     } else {

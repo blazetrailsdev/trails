@@ -6,6 +6,11 @@ import {
   type StoreOptions,
 } from "../../../lib/cache/store.js";
 import { assertErrorReported } from "../../../lib/testing/error-reporter-assertions.js";
+import { assertCalled } from "../../../lib/testing/method-call-assertions.js";
+import { travel, travelTo } from "../../../lib/testing/time-helpers.js";
+import { plusWithDuration } from "../../../lib/core-ext/time/calculations.js";
+import { Duration } from "../../../lib/duration.js";
+import { Time } from "@blazetrails/date";
 import {
   assert,
   assertIncludes,
@@ -13,6 +18,7 @@ import {
   assertRaises,
   assertSame,
   assertNil,
+  assertNothingRaised,
 } from "../../../lib/testing/assertions.js";
 
 /** @internal */
@@ -61,6 +67,27 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     } finally {
       write.mockRestore();
     }
+  });
+
+  it("fetch with cache miss passes key to block", async () => {
+    let cacheMiss = false;
+    const key = crypto.randomUUID().replaceAll("-", "").slice(0, 10);
+    expect(
+      await cache.fetch(key, (key) => {
+        cacheMiss = true;
+        return key.length;
+      }),
+    ).toBe(10);
+    assert(cacheMiss);
+
+    cacheMiss = false;
+    expect(
+      await cache.fetch(key, (fetchKey) => {
+        cacheMiss = true;
+        return fetchKey.length;
+      }),
+    ).toBe(10);
+    assertNot(cacheMiss);
   });
 
   it("fetch with forced cache miss", async () => {
@@ -155,11 +182,38 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     expect(Object.fromEntries(await cache.readMulti())).toEqual({});
   });
 
+  it("read multi with expires", async () => {
+    const time = Time.now();
+    const key = crypto.randomUUID();
+    const otherKey = crypto.randomUUID();
+    await cache.write(key, "bar", { expiresIn: 10 });
+    await cache.write(otherKey, "baz");
+    await cache.write(crypto.randomUUID(), "biz");
+    await travelTo(plusWithDuration.call(time, 11), {}, async () => {
+      expect(Object.fromEntries(await cache.readMulti(otherKey, crypto.randomUUID()))).toEqual({
+        [otherKey]: "baz",
+      });
+    });
+  });
+
   it("write multi", async () => {
     const key = crypto.randomUUID();
     await cache.writeMulti({ [`${key}1`]: 1, [`${key}2`]: 2 });
     expect(await cache.read(`${key}1`)).toBe(1);
     expect(await cache.read(`${key}2`)).toBe(2);
+  });
+
+  it("write multi empty hash", async () => {
+    assert(await cache.writeMulti({}));
+  });
+
+  it("write multi expires in", async () => {
+    const key = crypto.randomUUID();
+    await cache.writeMulti({ [key]: 1 }, { expiresIn: 10 });
+
+    await travel(Duration.seconds(11), {}, async () => {
+      assertNil(await cache.read(key));
+    });
   });
 
   it("fetch multi", async () => {
@@ -179,6 +233,69 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     expect(await cache.read(thirdKey)).toBe(thirdKey + thirdKey);
   });
 
+  it("fetch multi empty hash", async () => {
+    expect(
+      Object.fromEntries(
+        await cache.fetchMulti(() => {
+          throw new Error("Not called");
+        }),
+      ),
+    ).toEqual({});
+  });
+
+  it("fetch multi without expires in", async () => {
+    const key = crypto.randomUUID();
+    const otherKey = crypto.randomUUID();
+    const thirdKey = crypto.randomUUID();
+    await cache.write(key, "bar");
+    await cache.write(otherKey, "biz");
+
+    const values = await cache.fetchMulti(
+      key,
+      thirdKey,
+      otherKey,
+      { expiresIn: null },
+      (value) => `${value}${value}`,
+    );
+
+    expect(Object.fromEntries(values)).toEqual({
+      [key]: "bar",
+      [thirdKey]: thirdKey + thirdKey,
+      [otherKey]: "biz",
+    });
+    expect(await cache.read(thirdKey)).toBe(thirdKey + thirdKey);
+  });
+
+  it("fetch multi with objects", async () => {
+    const key = crypto.randomUUID();
+    const otherKey = crypto.randomUUID();
+    class CacheStruct {
+      constructor(
+        private _cacheKey: string,
+        private _title: string | null = null,
+      ) {}
+      cacheKey() {
+        return this._cacheKey;
+      }
+      title() {
+        return this._title;
+      }
+    }
+    const foo = new CacheStruct(key, "FOO!");
+    const bar = new CacheStruct(otherKey);
+
+    await cache.write(otherKey, "BAM!");
+
+    const values = await cache.fetchMulti(foo, bar, (object) => (object as CacheStruct).title());
+
+    expect(values).toEqual(
+      new Map<unknown, unknown>([
+        [foo, "FOO!"],
+        [bar, "BAM!"],
+      ]),
+    );
+  });
+
   it("fetch multi returns ordered names", async () => {
     const key = crypto.randomUUID().toLowerCase();
     const otherKey = crypto.randomUUID().toLowerCase();
@@ -191,6 +308,12 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
 
     expect([...values.keys()]).toEqual([otherKey, thirdKey, key]);
     expect([...values.values()]).toEqual([otherKey.toUpperCase(), thirdKey.toUpperCase(), "BAM"]);
+  });
+
+  it("fetch multi without block", async () => {
+    await assertRaises([ArgumentError], {}, async () => {
+      await (cache.fetchMulti as (...args: unknown[]) => Promise<unknown>)(crypto.randomUUID());
+    });
   });
 
   it("fetch multi with forced cache miss", async () => {
@@ -208,6 +331,150 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     });
     expect(await cache.read(key)).toEqual(key + key);
     expect(await cache.read(otherKey)).toEqual(otherKey + otherKey);
+  });
+
+  it("fetch multi with skip nil", async () => {
+    const key = crypto.randomUUID();
+    const otherKey = crypto.randomUUID();
+
+    const values = await cache.fetchMulti(key, otherKey, { skipNil: true }, (k) =>
+      k === key ? k : null,
+    );
+
+    expect(Object.fromEntries(values)).toEqual({ [key]: key, [otherKey]: null });
+    expect(await cache.exist(otherKey)).toBe(false);
+  });
+
+  it("fetch multi uses write multi entries store provider interface", async () => {
+    await assertCalled(
+      cache as unknown as { writeMultiEntries: unknown },
+      "writeMultiEntries",
+      null,
+      {},
+      async () => {
+        await cache.fetchMulti("a", "b", "c", (key) => `${key}${key}`);
+      },
+    );
+  });
+
+  it("cache key", async () => {
+    const key = crypto.randomUUID();
+    const klass = class {
+      constructor(private key: string) {}
+      cacheKey() {
+        return this.key;
+      }
+    };
+    await cache.write(new klass(key), "bar");
+    expect(await cache.read(key)).toBe("bar");
+  });
+
+  it("param as cache key", async () => {
+    const key = crypto.randomUUID();
+    const klass = class {
+      constructor(private key: string) {}
+      toParam() {
+        return this.key;
+      }
+    };
+    await cache.write(new klass(key), "bar");
+    expect(await cache.read(key)).toBe("bar");
+  });
+
+  it("unversioned cache key", async () => {
+    const key = crypto.randomUUID();
+    const klass = class {
+      constructor(private key: string) {}
+      cacheKey() {
+        return this.key;
+      }
+      cacheKeyWithVersion() {
+        return `${this.key}-v1`;
+      }
+    };
+    await cache.write(new klass(key), "bar");
+    expect(await cache.read(key)).toBe("bar");
+  });
+
+  it("array as cache key", async () => {
+    const key = crypto.randomUUID();
+    await cache.write([key, "foo"], "bar");
+    expect(await cache.read(`${key}/foo`)).toBe("bar");
+  });
+
+  it("array with single instance as cache key uses cache key method", async () => {
+    const key = crypto.randomUUID();
+    const otherKey = crypto.randomUUID();
+    const testInstanceOne = new InstanceTest(key, 1);
+    const testInstanceTwo = new InstanceTest(otherKey, 2);
+
+    await cache.write([testInstanceOne], "one");
+    await cache.write([testInstanceTwo], "two");
+
+    expect(await cache.read([testInstanceOne])).toBe("one");
+    expect(await cache.read([testInstanceTwo])).toBe("two");
+  });
+
+  it("array with multiple instances as cache key uses cache key method", async () => {
+    const key = crypto.randomUUID();
+    const otherKey = crypto.randomUUID();
+    const thirdKey = crypto.randomUUID();
+    const testInstanceOne = new InstanceTest(key, 1);
+    const testInstanceTwo = new InstanceTest(otherKey, 2);
+    const testInstanceThree = new InstanceTest(thirdKey, 3);
+
+    await cache.write([testInstanceOne, testInstanceThree], "one");
+    await cache.write([testInstanceTwo, testInstanceThree], "two");
+
+    expect(await cache.read([testInstanceOne, testInstanceThree])).toBe("one");
+    expect(await cache.read([testInstanceTwo, testInstanceThree])).toBe("two");
+  });
+
+  it("format of expanded key for single instance", async () => {
+    const key = crypto.randomUUID();
+    const testInstanceOne = new InstanceTest(key, 1);
+
+    const expandedKey = await cache["expandedKey"](testInstanceOne);
+
+    expect(expandedKey).toEqual(testInstanceOne.cacheKey());
+  });
+
+  it("format of expanded key for single instance in array", async () => {
+    const key = crypto.randomUUID();
+    const testInstanceOne = new InstanceTest(key, 1);
+
+    const expandedKey = await cache["expandedKey"]([testInstanceOne]);
+
+    expect(expandedKey).toEqual(testInstanceOne.cacheKey());
+  });
+
+  it("hash as cache key", async () => {
+    const key = crypto.randomUUID();
+    const otherKey = crypto.randomUUID();
+    await cache.write({ [key]: 1, [otherKey]: 2 }, "bar");
+    expect(await cache.read({ [key]: 1, [otherKey]: 2 })).toBe("bar");
+  });
+
+  it("keys are case sensitive", async () => {
+    const key = "case_sensitive_key";
+    await cache.write(key, "bar");
+    assertNil(await cache.read(key.toUpperCase()));
+  });
+
+  it("blank key", async () => {
+    const invalidKeys = [null, "", [], {}];
+    for (const key of invalidKeys) {
+      await assertRaises([ArgumentError], {}, () => cache.write(key, "bar"));
+      await assertRaises([ArgumentError], {}, () => cache.read(key));
+      await assertRaises([ArgumentError], {}, () => cache.delete(key));
+    }
+
+    const validKeys = ["foo", ["bar"], { foo: "bar" }, 0, 1, new InstanceTest("foo", 2)];
+    for (const key of validKeys) {
+      await assertNothingRaised(() => cache.write(key, "bar"));
+      await assertNothingRaised(() => cache.read(key));
+      await assertNothingRaised(() => cache.delete(key));
+    }
   });
 
   it("exist", async () => {
@@ -301,5 +568,20 @@ async function captureLogs(block: () => unknown): Promise<string> {
     return log.join("\n");
   } finally {
     CacheStore.logger = oldLogger;
+  }
+}
+
+class InstanceTest {
+  constructor(
+    public name: string,
+    public id: number,
+  ) {}
+
+  cacheKey(): string {
+    return `${this.name}/${this.id}`;
+  }
+
+  toParam(): string {
+    return "hello";
   }
 }
