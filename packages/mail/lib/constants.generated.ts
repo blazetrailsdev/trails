@@ -82,25 +82,26 @@ import * as m79 from "./network/delivery-methods/smtp-connection.js";
 import * as m80 from "./network/delivery-methods/smtp.js";
 import * as m81 from "./network/delivery-methods/test-mailer.js";
 import * as m82 from "./network/retriever-methods/base.js";
-import * as m83 from "./network/retriever-methods/test-retriever.js";
-import * as m84 from "./parser-tools.js";
-import * as m85 from "./parsers/address-lists-parser.js";
-import * as m86 from "./parsers/content-disposition-parser.js";
-import * as m87 from "./parsers/content-location-parser.js";
-import * as m88 from "./parsers/content-transfer-encoding-parser.js";
-import * as m89 from "./parsers/content-type-parser.js";
-import * as m90 from "./parsers/date-time-parser.js";
-import * as m91 from "./parsers/envelope-from-parser.js";
-import * as m92 from "./parsers/message-ids-parser.js";
-import * as m93 from "./parsers/mime-version-parser.js";
-import * as m94 from "./parsers/phrase-lists-parser.js";
-import * as m95 from "./parsers/received-parser.js";
-import * as m96 from "./part.js";
-import * as m97 from "./parts-list.js";
-import * as m98 from "./smtp-envelope.js";
-import * as m99 from "./utilities.js";
-import * as m100 from "./version.js";
-import * as m101 from "./yaml.js";
+import * as m83 from "./network/retriever-methods/imap.js";
+import * as m84 from "./network/retriever-methods/test-retriever.js";
+import * as m85 from "./parser-tools.js";
+import * as m86 from "./parsers/address-lists-parser.js";
+import * as m87 from "./parsers/content-disposition-parser.js";
+import * as m88 from "./parsers/content-location-parser.js";
+import * as m89 from "./parsers/content-transfer-encoding-parser.js";
+import * as m90 from "./parsers/content-type-parser.js";
+import * as m91 from "./parsers/date-time-parser.js";
+import * as m92 from "./parsers/envelope-from-parser.js";
+import * as m93 from "./parsers/message-ids-parser.js";
+import * as m94 from "./parsers/mime-version-parser.js";
+import * as m95 from "./parsers/phrase-lists-parser.js";
+import * as m96 from "./parsers/received-parser.js";
+import * as m97 from "./part.js";
+import * as m98 from "./parts-list.js";
+import * as m99 from "./smtp-envelope.js";
+import * as m100 from "./utilities.js";
+import * as m101 from "./version.js";
+import * as m102 from "./yaml.js";
 
 defineConstants([
   [() => m5.Address, "Mail::Address"],
@@ -151,6 +152,7 @@ defineConstants([
   [() => m76.FileDelivery, "Mail::FileDelivery"],
   [() => m42.FromField, "Mail::FromField"],
   [() => m67.Header, "Mail::Header"],
+  [() => m83.IMAP, "Mail::IMAP"],
   [() => m68.IndifferentHash, "Mail::IndifferentHash"],
   [() => m43.InReplyToField, "Mail::InReplyToField"],
   [() => m44.KeywordsField, "Mail::KeywordsField"],
@@ -175,38 +177,38 @@ defineConstants([
   [() => m48.NamedUnstructuredField, "Mail::NamedUnstructuredField"],
   [() => m49.OptionalField, "Mail::OptionalField"],
   [() => m50.ParameterHash, "Mail::ParameterHash"],
-  [() => m85.AddressListsParser, "Mail::Parsers::AddressListsParser"],
-  [() => m85.AddressListStruct, "Mail::Parsers::AddressListsParser::AddressListStruct"],
-  [() => m85.AddressStruct, "Mail::Parsers::AddressListsParser::AddressStruct"],
-  [() => m86.ContentDispositionParser, "Mail::Parsers::ContentDispositionParser"],
+  [() => m86.AddressListsParser, "Mail::Parsers::AddressListsParser"],
+  [() => m86.AddressListStruct, "Mail::Parsers::AddressListsParser::AddressListStruct"],
+  [() => m86.AddressStruct, "Mail::Parsers::AddressListsParser::AddressStruct"],
+  [() => m87.ContentDispositionParser, "Mail::Parsers::ContentDispositionParser"],
   [
-    () => m86.ContentDispositionStruct,
+    () => m87.ContentDispositionStruct,
     "Mail::Parsers::ContentDispositionParser::ContentDispositionStruct",
   ],
-  [() => m87.ContentLocationParser, "Mail::Parsers::ContentLocationParser"],
-  [() => m87.ContentLocationStruct, "Mail::Parsers::ContentLocationParser::ContentLocationStruct"],
-  [() => m88.ContentTransferEncodingParser, "Mail::Parsers::ContentTransferEncodingParser"],
+  [() => m88.ContentLocationParser, "Mail::Parsers::ContentLocationParser"],
+  [() => m88.ContentLocationStruct, "Mail::Parsers::ContentLocationParser::ContentLocationStruct"],
+  [() => m89.ContentTransferEncodingParser, "Mail::Parsers::ContentTransferEncodingParser"],
   [
-    () => m88.ContentTransferEncodingStruct,
+    () => m89.ContentTransferEncodingStruct,
     "Mail::Parsers::ContentTransferEncodingParser::ContentTransferEncodingStruct",
   ],
-  [() => m89.ContentTypeParser, "Mail::Parsers::ContentTypeParser"],
-  [() => m89.ContentTypeStruct, "Mail::Parsers::ContentTypeParser::ContentTypeStruct"],
-  [() => m90.DateTimeParser, "Mail::Parsers::DateTimeParser"],
-  [() => m90.DateTimeStruct, "Mail::Parsers::DateTimeParser::DateTimeStruct"],
-  [() => m91.EnvelopeFromParser, "Mail::Parsers::EnvelopeFromParser"],
-  [() => m91.EnvelopeFromStruct, "Mail::Parsers::EnvelopeFromParser::EnvelopeFromStruct"],
-  [() => m92.MessageIdsParser, "Mail::Parsers::MessageIdsParser"],
-  [() => m92.MessageIdsStruct, "Mail::Parsers::MessageIdsParser::MessageIdsStruct"],
-  [() => m93.MimeVersionParser, "Mail::Parsers::MimeVersionParser"],
-  [() => m93.MimeVersionStruct, "Mail::Parsers::MimeVersionParser::MimeVersionStruct"],
-  [() => m94.PhraseListsParser, "Mail::Parsers::PhraseListsParser"],
-  [() => m94.PhraseListsStruct, "Mail::Parsers::PhraseListsParser::PhraseListsStruct"],
-  [() => m95.ReceivedParser, "Mail::Parsers::ReceivedParser"],
-  [() => m95.ReceivedStruct, "Mail::Parsers::ReceivedParser::ReceivedStruct"],
-  [() => m84.ParserTools, "Mail::ParserTools"],
-  [() => m96.Part, "Mail::Part"],
-  [() => m97.PartsList, "Mail::PartsList"],
+  [() => m90.ContentTypeParser, "Mail::Parsers::ContentTypeParser"],
+  [() => m90.ContentTypeStruct, "Mail::Parsers::ContentTypeParser::ContentTypeStruct"],
+  [() => m91.DateTimeParser, "Mail::Parsers::DateTimeParser"],
+  [() => m91.DateTimeStruct, "Mail::Parsers::DateTimeParser::DateTimeStruct"],
+  [() => m92.EnvelopeFromParser, "Mail::Parsers::EnvelopeFromParser"],
+  [() => m92.EnvelopeFromStruct, "Mail::Parsers::EnvelopeFromParser::EnvelopeFromStruct"],
+  [() => m93.MessageIdsParser, "Mail::Parsers::MessageIdsParser"],
+  [() => m93.MessageIdsStruct, "Mail::Parsers::MessageIdsParser::MessageIdsStruct"],
+  [() => m94.MimeVersionParser, "Mail::Parsers::MimeVersionParser"],
+  [() => m94.MimeVersionStruct, "Mail::Parsers::MimeVersionParser::MimeVersionStruct"],
+  [() => m95.PhraseListsParser, "Mail::Parsers::PhraseListsParser"],
+  [() => m95.PhraseListsStruct, "Mail::Parsers::PhraseListsParser::PhraseListsStruct"],
+  [() => m96.ReceivedParser, "Mail::Parsers::ReceivedParser"],
+  [() => m96.ReceivedStruct, "Mail::Parsers::ReceivedParser::ReceivedStruct"],
+  [() => m85.ParserTools, "Mail::ParserTools"],
+  [() => m97.Part, "Mail::Part"],
+  [() => m98.PartsList, "Mail::PartsList"],
   [() => m14.PhraseList, "Mail::PhraseList"],
   [() => m15.ReceivedElement, "Mail::ReceivedElement"],
   [() => m51.ReceivedField, "Mail::ReceivedField"],
@@ -226,15 +228,15 @@ defineConstants([
   [() => m78.DeliveryError, "Mail::Sendmail::DeliveryError"],
   [() => m80.SMTP, "Mail::SMTP"],
   [() => m79.SMTPConnection, "Mail::SMTPConnection"],
-  [() => m98.SmtpEnvelope, "Mail::SmtpEnvelope"],
+  [() => m99.SmtpEnvelope, "Mail::SmtpEnvelope"],
   [() => m63.StructuredField, "Mail::StructuredField"],
   [() => m64.SubjectField, "Mail::SubjectField"],
   [() => m81.TestMailer, "Mail::TestMailer"],
-  [() => m83.TestRetriever, "Mail::TestRetriever"],
+  [() => m84.TestRetriever, "Mail::TestRetriever"],
   [() => m65.ToField, "Mail::ToField"],
   [() => m16.UnknownEncodingType, "Mail::UnknownEncodingType"],
   [() => m66.UnstructuredField, "Mail::UnstructuredField"],
-  [() => m99.Utilities, "Mail::Utilities"],
-  [() => m100.VERSION, "Mail::VERSION"],
-  [() => m101.YAML, "Mail::YAML"],
+  [() => m100.Utilities, "Mail::Utilities"],
+  [() => m101.VERSION, "Mail::VERSION"],
+  [() => m102.YAML, "Mail::YAML"],
 ]);
