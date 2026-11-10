@@ -51,6 +51,9 @@ export interface Loader
   tag: string;
   __onFileAutoloaded: Loader["onFileAutoloaded"];
   __onDirAutoloaded: Loader["onDirAutoloaded"];
+  __onNamespaceLoaded: Loader["onNamespaceLoaded"];
+  __isIgnores: Loader["isIgnores"];
+  __roots: Loader["roots"];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -605,12 +608,12 @@ export class Loader {
 
   /** @internal */
   private registerExplicitNamespace(cref: Cref): void {
-    Registry.ExplicitNamespaces.register(cref, this);
+    Registry.ExplicitNamespaces.__register(cref, this);
   }
 
   /** @internal */
   private unregisterExplicitNamespaces(): void {
-    Registry.ExplicitNamespaces.unregisterLoader(this);
+    Registry.ExplicitNamespaces.__unregisterLoader(this);
   }
 
   /** @internal */
@@ -620,9 +623,9 @@ export class Loader {
 
       for (const loader of Registry.loaders) {
         if (loader === this) continue;
-        if (loader.isIgnores(dir)) continue;
+        if (loader.__isIgnores(dir)) continue;
 
-        for (const rootDir of Object.keys(loader.roots)) {
+        for (const rootDir of Object.keys(loader.__roots)) {
           if (this.isIgnores(rootDir)) continue;
 
           const rootDirSlash = `${rootDir}/`;

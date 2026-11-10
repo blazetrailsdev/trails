@@ -35,6 +35,13 @@ export const ExplicitNamespaces = {
 };
 
 extend(ExplicitNamespaces, Internal);
+/** @noRailsEquivalent PERMANENT */
+export type ExplicitNamespacesInternals = {
+  __register: (typeof ExplicitNamespaces)["register"];
+  __loaderFor: (typeof ExplicitNamespaces)["loaderFor"];
+  __unregisterLoader: (typeof ExplicitNamespaces)["unregisterLoader"];
+};
+
 const self = ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>;
 self.internal("register");
 self.internal("loaderFor");

@@ -11,7 +11,7 @@ export function _isModule(x: unknown): x is object {
 }
 
 export async function constAdded(mod: object, cname: string): Promise<void> {
-  const loader = Registry.ExplicitNamespaces.loaderFor(mod, cname);
+  const loader = Registry.ExplicitNamespaces.__loaderFor(mod, cname);
   if (loader != null) {
     const namespace = new Cref(mod, cname).get();
 
@@ -22,6 +22,6 @@ export async function constAdded(mod: object, cname: string): Promise<void> {
       );
     }
 
-    await loader.onNamespaceLoaded(new Cref(mod, cname), namespace);
+    await loader.__onNamespaceLoaded(new Cref(mod, cname), namespace);
   }
 }
