@@ -14,7 +14,8 @@ export class TestRetriever extends Retriever {
     _emails = val;
   }
 
-  constructor(_values: Record<string, unknown>) {
+  // eslint-disable-next-line unused-imports/no-unused-vars
+  constructor(values: Record<string, unknown>) {
     super();
     _emails = [];
   }
@@ -27,9 +28,11 @@ export class TestRetriever extends Retriever {
     let emailsIndex: number[] = Array.from({ length: _emails.length }, (_, i) => i);
     if (options.what === "last") emailsIndex.reverse();
     const count = options.count;
-    if (Number.isInteger(count)) {
+    if (count === "all") {
+      emailsIndex = [...emailsIndex];
+    } else if (Number.isInteger(count)) {
       emailsIndex = arySlice(emailsIndex, 0, count) as number[];
-    } else if (count !== "all") {
+    } else {
       throw new RuntimeError("Invalid count option value: " + rbInspect(count));
     }
     if (

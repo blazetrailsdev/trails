@@ -149,8 +149,16 @@ export const Mail: MailConstants = {
     return Mail.retrieverMethod().all(...args);
   },
 
+  async read(filename: string): Promise<Message> {
+    return Mail.new(await File.openAsync(filename, "rb", (f) => f.readAsync()));
+  },
+
   deleteAll(...args: unknown[]) {
     return Mail.retrieverMethod().deleteAll(...args);
+  },
+
+  readFromString(mailAsString: string): Message {
+    return Mail.new(mailAsString);
   },
 
   connection(block?: (...args: unknown[]) => unknown) {
@@ -189,14 +197,6 @@ export const Mail: MailConstants = {
 
   informInterceptors(mail: Message) {
     for (const interceptor of deliveryInterceptors) interceptor.deliveringEmail(mail);
-  },
-
-  async read(filename: string): Promise<Message> {
-    return Mail.new(await File.openAsync(filename, "rb", (f) => f.readAsync()));
-  },
-
-  readFromString(mailAsString: string): Message {
-    return Mail.new(mailAsString);
   },
 
   randomTag(): string {

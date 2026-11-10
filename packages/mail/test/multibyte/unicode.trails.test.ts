@@ -1,4 +1,5 @@
 import { NoMethodError } from "@blazetrails/ruby-compat";
+import { Chars } from "../../lib/multibyte/chars.js";
 import { describe, expect, it } from "vitest";
 import { Unicode } from "../../lib/multibyte/unicode.js";
 
@@ -55,5 +56,21 @@ describe("Mail::Multibyte::Unicode.tidy_bytes", () => {
 
   it("raises NoMethodError where the backward clean reaches an already tidied byte", () => {
     expect(() => Unicode.tidyBytes("\udce0\udcf1a")).toThrow(NoMethodError);
+  });
+});
+
+describe("Mail::Multibyte::Unicode reorder_characters", () => {
+  it("reorders combining marks by combining class", () => {
+    expect(Unicode.reorderCharacters([0x61, 0x301, 0x323])).toEqual([0x61, 0x323, 0x301]);
+  });
+});
+
+describe("Mail::Multibyte::Chars strip bangs", () => {
+  it("strips the wrapped string in place and returns self", () => {
+    const chars = new Chars("  héllo  ");
+    expect(chars.stripBang()).toBe(chars);
+    expect(chars.toS()).toBe("héllo");
+    expect(new Chars(" a ").lstripBang().toS()).toBe("a ");
+    expect(new Chars(" a ").rstripBang().toS()).toBe(" a");
   });
 });
