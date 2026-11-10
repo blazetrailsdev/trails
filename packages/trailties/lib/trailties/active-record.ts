@@ -427,6 +427,15 @@ export class Trailtie extends BaseTrailtie {
         }
       });
     });
+
+    this.initializer("active_record.message_pack", () => {
+      onLoad("message_pack", () => {
+        onLoad("active_record", async () => {
+          const { Extensions } = await import("@blazetrails/activerecord/message-pack");
+          Extensions.install(TopLevel.ActiveSupport!.MessagePack!.CacheSerializer);
+        });
+      });
+    });
   }
 }
 
