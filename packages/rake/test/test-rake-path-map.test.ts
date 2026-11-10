@@ -139,15 +139,10 @@ describe("TestRakePathMap", () => {
   });
 
   it("works with windows separators", () => {
-    const altSeparatorCases: [string, string, string][] = File.ALT_SEPARATOR
-      ? [
-          ["dir\\abc.rb", "%n", "abc"],
-          ["this\\is\\a\\dir\\abc.rb", "%d", "this\\is\\a\\dir"],
-        ]
-      : [];
-    for (const [path, spec, expected] of altSeparatorCases) {
-      expect(pathmap(path, spec)).toBe(expected);
-    }
+    expect(File.ALT_SEPARATOR ? pathmap("dir\\abc.rb", "%n") : "abc").toBe("abc");
+    expect(
+      File.ALT_SEPARATOR ? pathmap("this\\is\\a\\dir\\abc.rb", "%d") : "this\\is\\a\\dir",
+    ).toBe("this\\is\\a\\dir");
   });
 
   it("complex patterns", () => {
