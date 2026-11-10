@@ -1,4 +1,4 @@
-import { OpenSSL } from "@blazetrails/ruby-compat";
+import { OpenSSL, b } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import {
@@ -456,13 +456,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("forced encoding for deterministic attributes will replace invalid characters", async () => {
-    Encryption.config.forcedEncodingForDeterministicEncryption = "ASCII";
     await freshAdapter();
     const Book = makeEncryptedBook();
     new Book();
-    const book = await Book.create({ name: "Hello üñ" });
-    const reloaded = await Book.find(book.id);
-    expect(reloaded.name).toBe("Hello ??");
+    const book = await Book.createBang({ name: b("Hello \udc93\udcfa") });
+    expect((await book.reload()).name).toBe("Hello \ufffd\ufffd");
   });
 
   it("forced encoding for deterministic attributes can be disabled", async () => {

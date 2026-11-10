@@ -34,6 +34,7 @@ import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { TestFixtures } from "./test-fixtures.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Organization } from "./test-helpers/models/organization.js";
 import { ClassNameThatDoesNotFollowCONVENTIONS } from "./test-helpers/models/randomly-named-c1.js";
 import {
@@ -767,9 +768,15 @@ describe("FixturesWithoutInstantiationTest", () => {
 
   it("reloading fixtures through accessor methods", async () => {
     expect(topics("first").title).toBe("The First Topic");
-    await Topic.where({ id: topics("first").id }).updateAll({ title: "Fresh Topic!" });
-    expect((await topics("first", true)).title).toBe("Fresh Topic!");
-    expect(topics("first").title).toBe("Fresh Topic!");
+    await assertCalled(
+      self()._loadedFixtures["topics"].get("first")!,
+      "find",
+      null,
+      { returns: Promise.resolve({ title: "Fresh Topic!" }) },
+      async () => {
+        expect((await topics("first", true)).title).toBe("Fresh Topic!");
+      },
+    );
   });
 });
 
