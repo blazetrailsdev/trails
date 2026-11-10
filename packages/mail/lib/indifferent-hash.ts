@@ -58,6 +58,10 @@ export class IndifferentHash<V = unknown> extends Hash<string, V> {
     return super.has(this.convertKey(key));
   }
 
+  override isInclude(key: string): boolean {
+    return this.isKey(key);
+  }
+
   isHasKey(key: string): boolean {
     return this.isKey(key);
   }
