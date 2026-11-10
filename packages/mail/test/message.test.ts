@@ -905,7 +905,7 @@ describe("Mail::Message", () => {
       describe("mime-version", () => {
         it("should say if it has a mime-version", () => {
           const mail = testEmail();
-          expect(mail.hasMimeVersion()).toBe(false);
+          expect(mail.hasMimeVersion()).toBeFalsy();
         });
 
         it("should preserve any mime version that you pass it if add_mime_version is called explicitly", () => {
@@ -928,29 +928,29 @@ describe("Mail::Message", () => {
         it("should add the mime version to the message permanently once sent to_s", () => {
           const mail = testEmail();
           mail.toString();
-          expect(mail.hasMimeVersion()).toBe(true);
+          expect(mail.hasMimeVersion()).toBeTruthy();
         });
       });
 
       describe("content type", () => {
         it("should say if it has a content type", () => {
           const mail = Mail.new("Content-Type: text/plain");
-          expect(mail.hasContentType()).toBe(true);
+          expect(mail.hasContentType()).toBeTruthy();
         });
 
         it("should say if it does not have a content type", () => {
           const mail = Mail.new();
-          expect(mail.hasContentType()).toBe(false);
+          expect(mail.hasContentType()).toBeFalsy();
         });
 
         it("should say if it has a charset", () => {
           const mail = Mail.new("Content-Type: text/plain; charset=US-ASCII");
-          expect(mail.hasCharset()).toBe(true);
+          expect(mail.hasCharset()).toBeTruthy();
         });
 
         it("should say if it has a charset", () => {
           const mail = Mail.new("Content-Type: text/plain");
-          expect(mail.hasCharset()).toBe(false);
+          expect(mail.hasCharset()).toBeFalsy();
         });
 
         it("should not raise a warning if there is no charset defined and only US-ASCII chars", async () => {
@@ -1193,8 +1193,8 @@ describe("Mail::Message", () => {
           mail.charset = "UTF-8";
           mail.setBody(nonAscii);
           mail.setContentType("text/plain; charset=utf-8");
-          expect(mail.hasContentType()).toBe(true);
-          expect(mail.hasCharset()).toBe(true);
+          expect(mail.hasContentType()).toBeTruthy();
+          expect(mail.hasCharset()).toBeTruthy();
           expect(mail.toString()).toMatch(/Content-Transfer-Encoding: base64/);
         });
 
@@ -1344,7 +1344,7 @@ describe("Mail::Message", () => {
       });
 
       const first = mail.parts[0];
-      expect(first.isMultipart()).toBe(true);
+      expect(first.isMultipart()).toBeTruthy();
       expect(first.parts.length).toBe(2);
       expect((first.parts[0].get("content_type") as Field & { string(): string }).string()).toBe(
         "text/plain",

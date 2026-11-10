@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { MiniMime } from "../lib/mini-mime.js";
 import { MIME } from "./support/mime-types.js";
 
@@ -46,37 +46,32 @@ describe("MiniMimeTest", () => {
     expect(MiniMime.lookupByContentType("text/plain")!.isBinary()).toBeFalsy();
   });
 
-  describe("with MIME::Types", () => {
-    beforeAll(async () => {
-      await MIME.Types.loadDefaultMimeTypes();
+  it("full parity with mime types", async () => {
+    await MIME.Types.loadDefaultMimeTypes();
+    const exts = new Set<string>();
+    MIME.Types.each((type) => {
+      type.extensions.forEach((ext) => exts.add(ext));
     });
 
-    it("full parity with mime types", () => {
-      const exts = new Set<string>();
-      MIME.Types.each((type) => {
-        type.extensions.forEach((ext) => exts.add(ext));
-      });
+    const differences: string[] = [];
 
-      const differences: string[] = [];
+    for (const ext of exts) {
+      const types = MIME.Types.typeFor(`a.${ext}`);
 
-      for (const ext of exts) {
-        const types = MIME.Types.typeFor(`a.${ext}`);
+      let type = types.find((t) => !t.isObsolete());
+      type ??= types.find((t) => t.registered);
+      type ??= types[0];
 
-        let type = types.find((t) => !t.isObsolete());
-        type ??= types.find((t) => t.registered);
-        type ??= types[0];
+      const expected = type.contentType;
+      const actual = MiniMime.lookupByFilename(`a.${ext}`)!.contentType;
 
-        const expected = type.contentType;
-        const actual = MiniMime.lookupByFilename(`a.${ext}`)!.contentType;
-
-        if (expected !== actual) {
-          differences.push(
-            `Expected ".${ext}" to return ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)}`,
-          );
-        }
+      if (expected !== actual) {
+        differences.push(
+          `Expected ".${ext}" to return ${JSON.stringify(expected)}, got: ${JSON.stringify(actual)}`,
+        );
       }
+    }
 
-      expect(differences.length === 0, differences.join("\n")).toBe(true);
-    });
+    expect(differences.length === 0, differences.join("\n")).toBeTruthy();
   });
 });
