@@ -13,6 +13,9 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
+import "@blazetrails/actionmailer/test-case";
+import "@blazetrails/actionmailer/test-helper";
+import "@blazetrails/activejob/test-helper";
 import {
   env,
   include,
