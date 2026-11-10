@@ -116,6 +116,7 @@ describe("buildAutoload", () => {
       );
       const install = File.read(".trails/autoload/install.generated.js");
       expect(install).toContain('import "../../config/application.ts";');
+      expect(install).toContain('import "@blazetrails/ruby-compat/psych-yaml";');
       expect(install).toContain(
         'import { imports as imports0 } from "./trails.main/imports.generated.js";',
       );
@@ -123,6 +124,7 @@ describe("buildAutoload", () => {
       expect(install).toContain("loader.imports = byTag[loader.tag]");
 
       let sawApplication: unknown;
+      vi.doMock("@blazetrails/ruby-compat/psych-yaml", () => ({}));
       vi.doMock("@blazetrails/trailties", () => ({
         Trails: {
           autoloaders: {
@@ -142,6 +144,7 @@ describe("buildAutoload", () => {
         expect(Object.keys(main.imports!)).toEqual(["Widget"]);
       } finally {
         vi.doUnmock("@blazetrails/trailties");
+        vi.doUnmock("@blazetrails/ruby-compat/psych-yaml");
         delete globals.__applicationLoaded;
       }
     } finally {

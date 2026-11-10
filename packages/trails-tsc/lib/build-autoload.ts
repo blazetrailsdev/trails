@@ -207,6 +207,7 @@ async function writeEntry(
   const byTag = tagged.map(([tag], i) => `  ${JSON.stringify(tag)}: imports${i},`);
   const install = [
     'import "../boot.generated.js";',
+    'import "@blazetrails/ruby-compat/psych-yaml";',
     'import { Trails } from "@blazetrails/trailties";',
     `import ${JSON.stringify(specifier(autoloadDir, applicationFile))};`,
     ...imports,
