@@ -369,6 +369,18 @@ const alias = {
   "@blazetrails/trailties/trailties/":
     path.resolve(__dirname, "packages/trailties/lib/trailties") + "/",
   "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/lib/engine.ts"),
+  "@blazetrails/trailties/generators/test-case": path.resolve(
+    __dirname,
+    "packages/trailties/lib/generators/test-case.ts",
+  ),
+  "@blazetrails/trailties/generators": path.resolve(
+    __dirname,
+    "packages/trailties/lib/generators/index.ts",
+  ),
+  "@blazetrails/trailties/test-unit/trailtie": path.resolve(
+    __dirname,
+    "packages/trailties/lib/test-unit/trailtie.ts",
+  ),
   "@blazetrails/trailties/trailtie/configuration": path.resolve(
     __dirname,
     "packages/trailties/lib/trailtie/configuration.ts",
@@ -592,6 +604,7 @@ export default defineConfig({
             ...SQLITE_DRIVER_TESTS,
             "packages/solid-cable/test/generators/**",
             "packages/solid-queue/test/generators/**",
+            "packages/actionmailbox/src/generators/**",
           ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
@@ -723,6 +736,7 @@ export default defineConfig({
             "packages/trailties/test/**/*.test.ts",
             "packages/solid-cable/test/generators/**/*.test.ts",
             "packages/solid-queue/test/generators/**/*.test.ts",
+            "packages/actionmailbox/src/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
@@ -730,6 +744,7 @@ export default defineConfig({
             "./packages/trailties/test/support/isolation/global-setup.ts",
             "./packages/solid-cable/test/support/build-templates.ts",
             "./packages/solid-queue/test/support/build-templates.ts",
+            "./packages/actionmailbox/src/test-helpers/support/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
         },

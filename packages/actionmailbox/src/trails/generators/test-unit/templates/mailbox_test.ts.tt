@@ -1,0 +1,13 @@
+import "<%= "../".repeat(this.classPathParts.length + 1) %>test-helper<%= this.ext() %>";
+import { ActionMailbox } from "@blazetrails/actionmailbox";
+
+export class <%= this.className().split("::").pop() %>MailboxTest extends ActionMailbox.TestCase {
+  // test("receive mail", async () => {
+  //   await this.receiveInboundEmailFromMail({
+  //     to: '"someone" <someone@example.com>',
+  //     from: '"else" <else@example.com>',
+  //     subject: "Hello world!",
+  //     body: "Hello?",
+  //   });
+  // });
+}

@@ -18,6 +18,9 @@
     },
     {
       "path": "../activestorage/tsconfig.test.json"
+    },
+    {
+      "path": "../trails-tsc"
     }
   ]
 }
