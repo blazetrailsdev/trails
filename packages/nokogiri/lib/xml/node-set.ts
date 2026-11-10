@@ -104,6 +104,14 @@ export class NodeSet implements Iterable<Node> {
     return this._list[Symbol.iterator]();
   }
 
+  toA(): Node[] {
+    return [...this._list];
+  }
+
+  deconstruct(): Node[] {
+    return this.toA();
+  }
+
   get text(): string {
     return this.map((node) => node.text).join("");
   }

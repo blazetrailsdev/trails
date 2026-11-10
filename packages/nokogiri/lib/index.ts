@@ -1,12 +1,18 @@
 import { XmlDocument } from "./xml/document.js";
 import { XmlNode } from "./xml/node.js";
-import "./xml/document-fragment.js";
+import { DocumentFragment as XmlDocumentFragment } from "./xml/document-fragment.js";
 import { parseXml } from "./xml/parse.js";
 import { SyntaxError } from "./xml/syntax-error.js";
 import { SaxDocument } from "./xml/sax/document.js";
 import { SaxParser } from "./xml/sax/parser.js";
 
-export const XML = { Document: XmlDocument, Node: XmlNode, NodeSet, SyntaxError };
+export const XML = {
+  Document: XmlDocument,
+  DocumentFragment: XmlDocumentFragment,
+  Node: XmlNode,
+  NodeSet,
+  SyntaxError,
+};
 export const SAX = { Document: SaxDocument, Parser: SaxParser };
 export { parseXml, SaxDocument, SaxParser };
 export type { XmlNode, XmlDocument };
