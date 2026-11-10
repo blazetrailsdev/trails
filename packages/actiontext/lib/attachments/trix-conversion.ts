@@ -16,6 +16,7 @@ interface TrixConversionClass {
 }
 
 export const TrixConversion = {
+  /** @inventedArm await — PERMANENT */
   async toTrixAttachment(
     this: TrixConversionHost,
     content: unknown = this.trixAttachmentContent(),

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Attachment } from "../lib/attachment.js";
+import { AttachmentGallery } from "../lib/attachment-gallery.js";
 
 class Racecar {
   toRichTextAttributes(attributes: Record<string, unknown> = {}) {
@@ -48,5 +49,11 @@ describe("ActionText::Attachment", () => {
       Object.assign(new Racecar(), { cacheKey: () => "racecars/7" }),
     )!;
     expect(attachment.cacheKey()).toMatch(/^ActionText::Attachment\/[0-9a-f]{64}\/racecars\/7$/);
+  });
+});
+
+describe("ActionText::AttachmentGallery", () => {
+  it("includes ActiveModel::Model", () => {
+    expect(AttachmentGallery.modelName.element).toBe("attachment_gallery");
   });
 });

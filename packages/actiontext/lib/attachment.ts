@@ -44,6 +44,14 @@ export class Attachment {
   declare static fragmentByConvertingTrixAttachments: (content: unknown) => Promise<Fragment>;
   declare static fromTrixAttachment: (trixAttachment: unknown) => Promise<Attachment | null>;
 
+  static {
+    include(this, TrixConversion);
+    include(this, Minification);
+    include(this, Caching);
+
+    mattrAccessor.call(this, "tagName", { default: "action-text-attachment" });
+  }
+
   static readonly ATTRIBUTES = [
     "sgid",
     "content-type",
@@ -66,7 +74,12 @@ export class Attachment {
   }
 
   static async fromNode(node: Html5Node, attachable: unknown = null): Promise<Attachment> {
-    return new this(node, attachable ?? (await ActionText.Attachable!.fromNode(node)));
+    return new this(
+      node,
+      attachable != null && attachable !== false
+        ? attachable
+        : await ActionText.Attachable!.fromNode(node),
+    );
   }
 
   static fromAttachables(attachables: unknown): Attachment[] {
@@ -189,12 +202,6 @@ export class Attachment {
       presence(slice(this.nodeAttributes(), "sgid")) ?? slice(this.attachableAttributes(), "sgid"));
   }
 }
-
-include(Attachment, TrixConversion);
-include(Attachment, Minification);
-include(Attachment, Caching);
-
-mattrAccessor.call(Attachment, "tagName", { default: "action-text-attachment" });
 
 delegate.call(Attachment.prototype, "toParam", { to: "attachable" });
 delegateMissingTo.call(Attachment, "attachable");

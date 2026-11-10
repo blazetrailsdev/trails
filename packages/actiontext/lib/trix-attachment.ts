@@ -120,7 +120,8 @@ export class TrixAttachment {
 
   /** @internal */
   private readJsonObjectAttribute(name: string): Record<string, unknown> {
-    return (this.readJsonAttribute(name) as Record<string, unknown> | null) ?? {};
+    const value = this.readJsonAttribute(name) as Record<string, unknown> | null | false;
+    return value != null && value !== false ? value : {};
   }
 
   /** @internal */

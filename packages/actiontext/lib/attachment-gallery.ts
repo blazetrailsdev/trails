@@ -1,14 +1,13 @@
-import { include } from "@blazetrails/activesupport";
 import { Model } from "@blazetrails/activemodel";
 import type { Html5Node } from "@blazetrails/nokogiri";
-import { rbInspect, rbModName } from "@blazetrails/ruby-compat";
+import { rbInspect, rbModName, toS } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
 import type { Attachment } from "./attachment.js";
 import { Fragment } from "./fragment.js";
 
 const TAG_NAME = "div";
 
-export class AttachmentGallery {
+export class AttachmentGallery extends Model {
   static fragmentByCanonicalizingAttachmentGalleries(content: unknown): Fragment {
     return this.fragmentByReplacingAttachmentGalleryNodes(
       content,
@@ -22,7 +21,7 @@ export class AttachmentGallery {
   ): Fragment {
     return Fragment.wrap(content).update((source) => {
       for (const node of this.findAttachmentGalleryNodes(source)) {
-        node.replace(String(block(node)));
+        node.replace(toS(block(node)));
       }
     });
   }
@@ -56,21 +55,19 @@ export class AttachmentGallery {
 
   readonly node: Html5Node;
   /** @internal */
-  private _attachments?: Promise<Attachment[]>;
+  private _attachments?: Array<Attachment | null>;
 
   constructor(node: Html5Node) {
+    super();
     this.node = node;
   }
 
-  attachments(): Promise<Attachment[]> {
-    return (this._attachments ??= Promise.all(
+  async attachments(): Promise<Array<Attachment | null>> {
+    return (this._attachments ??= await Promise.all(
       this.node
         .css(AttachmentGallery.attachmentSelector())
         .toA()
-        .map(
-          async (node) =>
-            (await (await ActionText.Attachment!.fromNode(node)).withFullAttributes())!,
-        ),
+        .map(async (node) => (await ActionText.Attachment!.fromNode(node)).withFullAttributes()),
     ));
   }
 
@@ -82,7 +79,5 @@ export class AttachmentGallery {
     return `#<${rbModName(this.constructor)} size=${rbInspect(await this.size())}>`;
   }
 }
-
-include(AttachmentGallery, Model);
 
 ActionText.AttachmentGallery = AttachmentGallery;
