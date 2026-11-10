@@ -1,5 +1,5 @@
 import { camelize, isBlank } from "@blazetrails/activesupport";
-import { chomp } from "@blazetrails/ruby-compat";
+import { chomp, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Html5DocumentFragment, Html5Node } from "@blazetrails/nokogiri";
 import { ActionText } from "./action-text.js";
 
@@ -12,8 +12,10 @@ export const PlainTextConversion = {
 
   /** @internal */
   plainTextForNode(node: PlainTextNode, index = 0): string {
-    if (Object.hasOwn(plainTextMethods, this.plainTextMethodForNode(node))) {
-      return plainTextMethods[this.plainTextMethodForNode(node)].call(this, node as never, index);
+    if (rbObjRespondTo(this, this.plainTextMethodForNode(node))) {
+      return (this as unknown as Record<string, PlainTextMethod>)[
+        this.plainTextMethodForNode(node)
+      ](node as never, index);
     } else {
       return this.plainTextForNodeChildren(node);
     }
@@ -133,23 +135,16 @@ export const PlainTextConversion = {
   },
 };
 
-type PlainTextMethod = (this: typeof PlainTextConversion, node: never, index: number) => string;
-
-const plainTextMethods: Record<string, PlainTextMethod> = {
-  plainTextForBrNode: PlainTextConversion.plainTextForBrNode,
-  plainTextForTextNode: PlainTextConversion.plainTextForTextNode,
-  plainTextForDivNode: PlainTextConversion.plainTextForDivNode,
-  plainTextForFigcaptionNode: PlainTextConversion.plainTextForFigcaptionNode,
-  plainTextForBlockquoteNode: PlainTextConversion.plainTextForBlockquoteNode,
-  plainTextForLiNode: PlainTextConversion.plainTextForLiNode,
-};
+type PlainTextMethod = (node: never, index: number) => string;
 
 for (const element of ["h1", "p"]) {
-  plainTextMethods[`plainTextFor${camelize(element)}Node`] = PlainTextConversion.plainTextForBlock;
+  (PlainTextConversion as Record<string, unknown>)[`plainTextFor${camelize(element)}Node`] =
+    PlainTextConversion.plainTextForBlock;
 }
 
 for (const element of ["ul", "ol"]) {
-  plainTextMethods[`plainTextFor${camelize(element)}Node`] = PlainTextConversion.plainTextForList;
+  (PlainTextConversion as Record<string, unknown>)[`plainTextFor${camelize(element)}Node`] =
+    PlainTextConversion.plainTextForList;
 }
 
 ActionText.PlainTextConversion = PlainTextConversion;

@@ -13,7 +13,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_text/plain_text_conversion": () => import("./plain-text-conversion.js"),
 };
 
-type Nokogiri4 = { Nokogiri: { HTML4: typeof HTML5 } };
+type NokogiriConstants = { Nokogiri: { HTML5?: unknown; HTML4: typeof HTML5 } };
 
 export const ActionText = {
   name: "ActionText",
@@ -22,17 +22,17 @@ export const ActionText = {
   htmlDocumentClass(): typeof HTML5.Document {
     if (Object.hasOwn(this, "_htmlDocumentClass")) return this._htmlDocumentClass!;
     return (this._htmlDocumentClass =
-      HTML5 !== undefined
+      (TopLevel as unknown as NokogiriConstants).Nokogiri.HTML5 !== undefined
         ? HTML5.Document
-        : (TopLevel as unknown as Nokogiri4).Nokogiri.HTML4.Document);
+        : (TopLevel as unknown as NokogiriConstants).Nokogiri.HTML4.Document);
   },
 
   htmlDocumentFragmentClass(): typeof HTML5.DocumentFragment {
     if (Object.hasOwn(this, "_htmlDocumentFragmentClass")) return this._htmlDocumentFragmentClass!;
     return (this._htmlDocumentFragmentClass =
-      HTML5 !== undefined
+      (TopLevel as unknown as NokogiriConstants).Nokogiri.HTML5 !== undefined
         ? HTML5.DocumentFragment
-        : (TopLevel as unknown as Nokogiri4).Nokogiri.HTML4.DocumentFragment);
+        : (TopLevel as unknown as NokogiriConstants).Nokogiri.HTML4.DocumentFragment);
   },
 } as AutoloadModule & {
   deprecator(): Deprecation;
