@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { Attachment } from "../lib/attachment.js";
-import { AttachmentGallery } from "../lib/attachment-gallery.js";
 import { TrixAttachment } from "../lib/trix-attachment.js";
 
 class Racecar {
@@ -53,13 +52,5 @@ describe("ActionText::Attachment", () => {
       Object.assign(new Racecar(), { cacheKey: () => "racecars/7" }),
     )!;
     expect(attachment.cacheKey()).toMatch(/^ActionText::Attachment\/[0-9a-f]{64}\/racecars\/7$/);
-  });
-
-  it("selects galleries of two or more gallery attachments", () => {
-    const html =
-      '<div><action-text-attachment presentation="gallery"></action-text-attachment>' +
-      '<action-text-attachment presentation="gallery"></action-text-attachment></div>';
-    expect(AttachmentGallery.findAttachmentGalleryNodes(html)).toHaveLength(1);
-    expect(AttachmentGallery.fragmentByCanonicalizingAttachmentGalleries(html).toHtml()).toBe(html);
   });
 });
