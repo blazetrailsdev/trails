@@ -2,10 +2,5 @@
   "server-path-activesupport-test-case-and-behaviors": [
     "packages/activesupport/dist/executor/test-helper.js",
     "packages/activesupport/dist/testing/file-fixtures.js"
-  ],
-  "server-path-railtie-integration-test-hooks": [
-    "packages/actionmailer/dist/test-case.js",
-    "packages/actionmailer/dist/test-helper.js",
-    "packages/activejob/dist/test-helper.js"
   ]
 }

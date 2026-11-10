@@ -20,7 +20,6 @@ import { ActiveJob, Base, deprecator, Serializers } from "@blazetrails/activejob
 import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-after-transaction-commit";
 import { LogSubscriber } from "@blazetrails/activejob/log-subscriber";
 import { Callbacks } from "@blazetrails/activejob/callbacks";
-import { TestHelper } from "@blazetrails/activejob/test-helper";
 import { QueryLogs } from "@blazetrails/activerecord";
 import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
@@ -136,7 +135,7 @@ export class Trailtie extends BaseTrailtie {
       });
 
       onLoad("action_dispatch_integration_test", function (this: new () => object) {
-        include(this, TestHelper);
+        include(this, ActiveJob.TestHelper);
       });
     });
 
