@@ -17,6 +17,10 @@ defineConstants([
   [() => m1.Callbacks, "ActionMailbox::Callbacks"],
   [() => m3.IncinerationJob, "ActionMailbox::IncinerationJob"],
   [() => m4.InboundEmailsController, "ActionMailbox::Ingresses::Mailgun::InboundEmailsController"],
+  [
+    () => m4.InboundEmailsController.Authenticator,
+    "ActionMailbox::Ingresses::Mailgun::InboundEmailsController::Authenticator",
+  ],
   [() => m5.InboundEmailsController, "ActionMailbox::Ingresses::Relay::InboundEmailsController"],
   [() => m6.Record, "ActionMailbox::Record"],
   [() => m7.Relayer, "ActionMailbox::Relayer"],

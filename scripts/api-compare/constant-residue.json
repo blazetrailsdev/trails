@@ -37,12 +37,14 @@
     }
   },
   "actionmailbox": {
-    "rows": 14,
+    "rows": 19,
     "excluded": ["base-controller.ts::BaseController"],
     "unwalked": [
       "callbacks.ts::Callbacks",
       "gem-version.ts::VERSION",
+      "inbound-email/incineratable.ts::Incineratable",
       "inbound-email/routable.ts::Routable",
+      "ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
       "relayer.ts::Relayer.Result",
       "router.ts::Router.RoutingError",
       "routing.ts::Routing"
@@ -1479,13 +1481,12 @@
     }
   },
   "tzinfo": {
-    "rows": 10,
-    "excluded": [],
+    "rows": 9,
+    "excluded": ["timestamp.ts::Timestamp"],
     "unwalked": [],
     "residue": {
       "country.ts::InvalidCountryCode": "TZInfo::InvalidCountryCode",
       "data-sources/constant-offset-data-timezone-info.ts::ConstantOffsetDataTimezoneInfo": "TZInfo::DataSources::ConstantOffsetDataTimezoneInfo",
-      "timestamp.ts::Timestamp": "TZInfo::Timestamp",
       "timezone-offset.ts::TimezoneOffset": "TZInfo::TimezoneOffset",
       "timezone-period.ts::TimezonePeriod": "TZInfo::TimezonePeriod",
       "timezone-transition.ts::TimezoneTransition": "TZInfo::TimezoneTransition",

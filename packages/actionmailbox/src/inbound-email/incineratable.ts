@@ -1,3 +1,4 @@
+import "../constants.incineratable.generated.js";
 import { Concern, extend } from "@blazetrails/activesupport";
 import { ActionMailbox } from "../action-mailbox.js";
 import type { InboundEmail } from "../inbound-email.js";
