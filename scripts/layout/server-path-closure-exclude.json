@@ -1,5 +1,4 @@
 {
-  "server-path-activejob-test-adapter": ["packages/activejob/dist/queue-adapters/test-adapter.js"],
   "server-path-activemodel-lint": ["packages/activesupport/dist/testing/assertions.js"],
   "server-path-activesupport-test-case-and-behaviors": [
     "packages/activesupport/dist/executor/test-helper.js",
