@@ -282,6 +282,7 @@ describe("Test emails", () => {
       message = await readFixture("emails", "rfc6532", "utf8_headers.eml");
     });
 
+    // BLOCKED: mail-unstructured-field-utf8-arm-misreads-decoded-string
     it.skip("subject", () => {
       expect(message.subject()).toEqual("Säying Hello");
     });
