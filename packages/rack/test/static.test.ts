@@ -1,4 +1,4 @@
-import { it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import { Dir, File, FileUtils, getZlib } from "@blazetrails/ruby-compat";
 import { Static, type StaticOptions } from "../lib/static.js";
 import { Lint } from "../lib/lint.js";
@@ -317,4 +317,67 @@ it("supports urls ending in /", async () => {
   const res = await request.get("/cgi/test");
   expect(res.isOk).toBeTruthy();
   expect(res.body).toMatch(/ruby/);
+});
+
+describe("applies path-specific header rules after path normalization", () => {
+  const SECRET_BODY = "<protected>top secret</protected>";
+
+  async function withNormalizedApp(block: (request: MockRequest) => Promise<void>): Promise<void> {
+    const dir = Dir.mktmpdir();
+    try {
+      FileUtils.mkdirP(File.join(dir, "css"));
+      FileUtils.mkdirP(File.join(dir, "admin"));
+      File.write(File.join(dir, "admin", "secret.html"), SECRET_BODY);
+
+      const opts: StaticOptions = {
+        urls: ["/css", "/admin"],
+        root: dir,
+        headerRules: [
+          ["all", { "cache-control": "public, max-age=100" }],
+          [
+            "/admin/",
+            {
+              "cache-control": "private, no-store",
+              "x-frame-options": "DENY",
+            },
+          ],
+        ],
+      };
+
+      await block(new MockRequest(_static(new DummyApp(), opts)));
+    } finally {
+      FileUtils.rmRf(dir);
+    }
+  }
+
+  function assertAdminHeadersApplied(res: Awaited<ReturnType<MockRequest["get"]>>): void {
+    expect(res.isOk).toBe(true);
+    expect(res.body).toBe(SECRET_BODY);
+    expect(res.headers["cache-control"]).toBe("private, no-store");
+    expect(res.headers["x-frame-options"]).toBe("DENY");
+  }
+
+  it("applies admin header rules for a dot-segment path", async () => {
+    await withNormalizedApp(async (request) => {
+      assertAdminHeadersApplied(await request.get("/css/../admin/secret.html"));
+    });
+  });
+
+  it("applies admin header rules for a fully encoded dot-segment path", async () => {
+    await withNormalizedApp(async (request) => {
+      assertAdminHeadersApplied(await request.get("/css%2F..%2Fadmin%2Fsecret.html"));
+    });
+  });
+
+  it("applies admin header rules for a mixed encoded dot-segment path", async () => {
+    await withNormalizedApp(async (request) => {
+      assertAdminHeadersApplied(await request.get("/foo/..%2Fadmin/secret.html"));
+    });
+  });
+
+  it("applies admin header rules when dot segments are percent-encoded", async () => {
+    await withNormalizedApp(async (request) => {
+      assertAdminHeadersApplied(await request.get("/css/%2E%2E/admin/secret.html"));
+    });
+  });
 });
