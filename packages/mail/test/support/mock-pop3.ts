@@ -55,9 +55,10 @@ export class MockPOP3 {
     return [...popmails];
   }
 
-  start(..._args: unknown[]): this {
+  start(...args: unknown[]): unknown {
     start = true;
-    return this;
+    const block = args.at(-1);
+    return typeof block === "function" ? block(this) : this;
   }
 
   enableSsl(..._args: unknown[]): boolean {

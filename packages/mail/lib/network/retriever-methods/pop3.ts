@@ -67,16 +67,22 @@ export class POP3 extends Retriever {
       if (block) {
         for (const mail of mails) {
           const newMessage = Mail.new(mail.pop());
-          if (opts.deleteAfterFind) newMessage.setMarkForDelete(true);
+          if (opts.deleteAfterFind != null && opts.deleteAfterFind !== false)
+            newMessage.setMarkForDelete(true);
           block(newMessage);
-          if (opts.deleteAfterFind && newMessage.isMarkedForDelete()) mail.delete();
+          if (
+            opts.deleteAfterFind != null &&
+            opts.deleteAfterFind !== false &&
+            newMessage.isMarkedForDelete()
+          )
+            mail.delete();
         }
         return mails;
       } else {
         const emails: Message[] = [];
         for (const mail of mails) {
           emails.push(Mail.new(mail.pop()));
-          if (opts.deleteAfterFind) mail.delete();
+          if (opts.deleteAfterFind != null && opts.deleteAfterFind !== false) mail.delete();
         }
         return emails.length === 1 && opts.count === 1 ? emails[0] : emails;
       }
@@ -105,7 +111,7 @@ export class POP3 extends Retriever {
     options.count ??= 10;
     options.order ??= "asc";
     options.what ??= "first";
-    options.deleteAfterFind ??= false;
+    if (options.deleteAfterFind == null) options.deleteAfterFind = false;
     return options;
   }
 
@@ -124,8 +130,10 @@ export class POP3 extends Retriever {
         this.settings.port,
         false,
       );
-      if (this.settings.enableSsl) pop3.enableSsl(OpenSSL.SSL.VERIFY_NONE);
-      if (this.settings.readTimeout) pop3.readTimeout = this.settings.readTimeout;
+      if (this.settings.enableSsl != null && this.settings.enableSsl !== false)
+        pop3.enableSsl(OpenSSL.SSL.VERIFY_NONE);
+      if (this.settings.readTimeout != null && this.settings.readTimeout !== false)
+        pop3.readTimeout = this.settings.readTimeout;
       pop3.start(this.settings.userName, this.settings.password);
 
       return block(pop3);
