@@ -5,9 +5,11 @@ import {
   Rational,
   cmp,
   equals,
+  isBetween,
   rbHash,
   rbInspect,
   rbModName,
+  type Comparable,
 } from "@blazetrails/ruby-compat";
 
 type UtcOffset = number | "utc" | null;
@@ -15,13 +17,13 @@ type SubSecond = number | Rational;
 
 const JD_EPOCH = 2440588;
 
-export class Timestamp {
+export class Timestamp implements Comparable {
   static utc(value: number, subSecond: SubSecond = 0): Timestamp {
     return new this(value, subSecond, "utc");
   }
 
   /** @internal */
-  protected static newBang(
+  private static newBang(
     value: number,
     subSecond: SubSecond = 0,
     utcOffset: UtcOffset = null,
@@ -118,6 +120,7 @@ export class Timestamp {
     return result;
   }
 
+  isBetween = isBetween;
   equals = equals;
 
   eql = equals;
