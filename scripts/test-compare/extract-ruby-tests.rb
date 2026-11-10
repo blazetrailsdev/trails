@@ -2677,12 +2677,12 @@ class TestExtractor
 
   def extract_first_string(args)
     return nil unless args.is_a?(Array)
-    traverse_for_string(args)
+    traverse_for_string(args)&.gsub("\\'", "'")
   end
 
   def extract_string_from_arg_paren(args)
     return nil unless args.is_a?(Array)
-    traverse_for_string(args)
+    traverse_for_string(args)&.gsub("\\'", "'")
   end
 
   def traverse_for_string(node)
@@ -2716,11 +2716,11 @@ class TestExtractor
       content = node[1]
       if content.is_a?(Array) && content[0] == :string_content
         parts = content[1..]
-        blanked = parts.map { |p| p.is_a?(Array) && p[0] == :@tstring_content ? p[1].gsub("\\'", "'") : "" }.join
+        blanked = parts.map { |p| p.is_a?(Array) && p[0] == :@tstring_content ? p[1] : "" }.join
         if @interpolated_names && parts.any? { |p| p.is_a?(Array) && p[0] == :string_embexpr }
           @interpolated_names[blanked] = parts.map { |p|
             next "" unless p.is_a?(Array)
-            p[0] == :@tstring_content ? p[1].gsub("\\'", "'") : (p[0] == :string_embexpr ? INTERPOLATION_PLACEHOLDER : "")
+            p[0] == :@tstring_content ? p[1] : (p[0] == :string_embexpr ? INTERPOLATION_PLACEHOLDER : "")
           }.join
         end
         return blanked

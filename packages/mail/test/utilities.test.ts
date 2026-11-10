@@ -1,3 +1,4 @@
+import "@blazetrails/vitest-matchers";
 import { describe, expect, it } from "vitest";
 import { Multibyte } from "../lib/multibyte.js";
 import { Utilities } from "../lib/utilities.js";
@@ -440,7 +441,7 @@ describe("Utilities Module", () => {
       it("returns Strings", () => {
         const klass = class extends String {};
         const string = new klass("") as unknown as string;
-        expect(Utilities.toLf(string).constructor).toBe(String);
+        expect(Utilities.toLf(string)).toBeExactInstanceOf(String);
       });
     });
   });
@@ -485,7 +486,7 @@ describe("Utilities Module", () => {
       it("returns Strings", () => {
         const klass = class extends String {};
         const string = new klass("") as unknown as string;
-        expect(Utilities.toCrlf(string).constructor).toBe(String);
+        expect(Utilities.toCrlf(string)).toBeExactInstanceOf(String);
       });
     });
   });
