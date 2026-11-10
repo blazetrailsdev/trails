@@ -246,6 +246,9 @@ importers:
       '@blazetrails/actionmailer':
         specifier: workspace:*
         version: link:../actionmailer
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
 
   packages/actionmailer:
     dependencies:

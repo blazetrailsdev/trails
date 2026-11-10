@@ -1,0 +1,10 @@
+Description:
+    Generates a new mailbox class in app/mailboxes and invokes your template
+    engine and test framework generators.
+
+Example:
+    `bin/trails generate mailbox inbox`
+
+    creates an InboxMailbox class and test:
+        Mailbox:  app/mailboxes/inbox-mailbox.ts
+        Test:     test/mailboxes/inbox-mailbox.test.ts

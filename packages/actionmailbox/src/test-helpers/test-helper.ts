@@ -37,6 +37,8 @@ export async function switchPasswordTo(
   }
 }
 
+ActionMailerBase.deliveryMethod = "test";
+
 export class BounceMailer extends ActionMailerBase {
   bounce({ to }: { to: unknown }) {
     return this.mail(

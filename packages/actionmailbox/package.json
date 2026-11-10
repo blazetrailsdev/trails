@@ -23,7 +23,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "node -e \"require('fs').cpSync('src/trails/generators', 'dist/trails/generators', { recursive: true, filter: (source) => !/\\\\.ts$/.test(source) })\" && trails-tsc-views build-templates dist/trails/generators"
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
@@ -40,6 +41,7 @@
     "node": ">=26"
   },
   "devDependencies": {
-    "@blazetrails/actionmailer": "workspace:*"
+    "@blazetrails/actionmailer": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*"
   }
 }

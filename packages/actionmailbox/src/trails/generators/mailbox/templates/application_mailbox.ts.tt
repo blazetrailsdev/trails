@@ -1,0 +1,5 @@
+import { ActionMailbox } from "@blazetrails/actionmailbox";
+
+export class ApplicationMailbox extends ActionMailbox.Base {
+  // routing /something/i => :somewhere
+}
