@@ -268,3 +268,16 @@ it("defaults encoding to ASCII 8BIT", () => {
     expect(typeof req[k]).toBe("string");
   }
 });
+
+it("should handle :input object that does not respond to set_encoding", () => {
+  const input = {
+    read() {
+      return "data";
+    },
+    size() {
+      return 4;
+    },
+  };
+  const env = MockRequest.envFor("/", { ":input": input });
+  expect(env["rack.input"].read()).toBe("data");
+});

@@ -92,6 +92,7 @@ describe("TestEagerLoad", () => {
       expect(isRequired(...files)).toBeTruthy();
     });
   });
+  // PERMANENT-SKIP: `class MyGem; Foo::Baz; end` pauses on an autoload inside a class body, and `require` inside a class body has no synchronous `import()` (CLAUDE.md, "`Module#autoload` is a build step").
   it.skip("eager loads gems", () => {});
 
   for (const enableReloading of [false, true]) {

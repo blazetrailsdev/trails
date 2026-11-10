@@ -1,4 +1,5 @@
 import { _generations, _installResolveHook, autoloadGet } from "./core-ext/kernel.js";
+import { Internal } from "./internal.js";
 import {
   File,
   LOADED_FEATURES,
@@ -7,6 +8,8 @@ import {
   NameError as RubyNameError,
   SecureRandom,
   constGet,
+  extend,
+  type Extended,
   getFs,
   include,
   rbInspect,
@@ -83,6 +86,15 @@ export class Loader {
   /** @internal */ toUnload: Record<string, Cref>;
   /** @internal */ namespaceDirs: Map<string[]>;
   /** @internal */ shadowedFiles: Set<string>;
+  declare static internal: Extended<typeof Internal>["internal"];
+  static {
+    extend(this, Internal);
+    this.internal("autoloads");
+    this.internal("autoloadedDirs");
+    this.internal("toUnload");
+    this.internal("namespaceDirs");
+    this.internal("shadowedFiles");
+  }
   /** @internal */ _setup: boolean;
   /** @internal */ _eagerLoaded: boolean;
   /** @internal */ mutex: Mutex;
@@ -650,4 +662,5 @@ include(Loader, Callbacks);
 include(Loader, Helpers);
 include(Loader, Config);
 include(Loader, EagerLoad);
+Loader.internal("isShadowedFile");
 Registry.Loader = Loader;

@@ -1,3 +1,5 @@
+import { extend, type Extended } from "@blazetrails/ruby-compat";
+import { Internal } from "../internal.js";
 import type { Cref } from "../cref.js";
 import { Map } from "../cref/map.js";
 import type { Loader } from "../loader.js";
@@ -31,3 +33,14 @@ export const ExplicitNamespaces = {
     this.loaders.clear();
   },
 };
+
+extend(ExplicitNamespaces, Internal);
+(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal("register");
+(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal("loaderFor");
+(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal(
+  "unregisterLoader",
+);
+(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal(
+  "isRegistered",
+);
+(ExplicitNamespaces as typeof ExplicitNamespaces & Extended<typeof Internal>).internal("clear");

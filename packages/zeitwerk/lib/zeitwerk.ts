@@ -9,6 +9,7 @@ export { Error, NameError, ReloadingDisabledError, SetupRequired } from "./error
 export { Cref } from "./cref.js";
 export { Loader } from "./loader.js";
 export { Registry } from "./registry.js";
+export { Internal } from "./internal.js";
 export {
   buildManifest,
   configurationDigest,
