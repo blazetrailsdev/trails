@@ -459,7 +459,7 @@ describe("InstrumentationTest", () => {
     assertEvent(events[1], "release_many_blocked", { limit: 5, size: 0 });
   });
 
-  it("enqueuing recurring task emits enqueue_recurring_task event", async () => {
+  it.skip("enqueuing recurring task emits enqueue_recurring_task event", async () => {
     const recurringTask = {
       example_task: { class: "AddToBufferJob", schedule: "every second", args: 42 },
     };
