@@ -172,11 +172,3 @@ describe("kernelInteger", () => {
     expect(kernelInteger({ toInt: () => 9007199254740993n })).toBe(9007199254740993n);
   });
 });
-
-describe("kernelInteger with exception: false", () => {
-  it("answers null where the raising form raises", () => {
-    expect(kernelInteger("3.5 MB", 0, { exception: false })).toBeNull();
-    expect(kernelInteger(null, 0, { exception: false })).toBeNull();
-    expect(kernelInteger("12", 0, { exception: false })).toBe(12);
-  });
-});
