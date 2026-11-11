@@ -25,6 +25,8 @@ import {
   rbObjClone,
   rbObjRespondTo,
   rbModMethodDefined,
+  rbModDefineMethod,
+  rbModUndefMethod,
   included,
   update,
   RFC2396_PARSER,
@@ -611,8 +613,8 @@ export class NamedRouteCollection {
     const urlName = camelize(`${name}_url`, "lower");
 
     if (this._routes.has(name)) {
-      delete this.pathHelpersModule.prototype[pathName];
-      delete this.urlHelpersModule.prototype[urlName];
+      rbModUndefMethod(this.pathHelpersModule, pathName);
+      rbModUndefMethod(this.urlHelpersModule, urlName);
     }
     this._routes.set(name, route);
 
@@ -699,7 +701,7 @@ export class NamedRouteCollection {
       }
       return helper.call(this, name, args, options, urlStrategy);
     };
-    mod.prototype[name] = method;
+    rbModDefineMethod(mod, name, method);
     this._appendToIncluders(name, method, mod === this.pathHelpersModule);
   }
 
@@ -926,7 +928,8 @@ export class RouteSet {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const routes = this;
 
-    const urlHelpersModule = (): UrlHelpersModule => {
+    let _proxy: UrlHelpersModule["_proxy"] | undefined;
+    const build = (): UrlHelpersModule => {
       const self = class {
         static readonly [classModule] = true;
 
@@ -989,23 +992,27 @@ export class RouteSet {
       extend(self, Concern);
       include(self, UrlFor);
 
-      const proxyClass = class {
-        readonly _routes: RouteSet;
+      if (_proxy) {
+        self._proxy = _proxy;
+      } else {
+        const proxyClass = class {
+          readonly _routes: RouteSet;
 
-        constructor(routes: RouteSet) {
-          this._routes = routes;
-        }
+          constructor(routes: RouteSet) {
+            this._routes = routes;
+          }
 
-        optimizeRoutesGeneration(): boolean {
-          return this._routes.isOptimizeRoutesGeneration();
-        }
-      };
-      include(proxyClass, UrlFor);
-      include(proxyClass, routes.namedRoutes.pathHelpersModule);
-      include(proxyClass, routes.namedRoutes.urlHelpersModule);
-      routes.namedRoutes._appendIncluder(proxyClass.prototype, true);
+          optimizeRoutesGeneration(): boolean {
+            return this._routes.isOptimizeRoutesGeneration();
+          }
+        };
+        include(proxyClass, UrlFor);
+        include(proxyClass, routes.namedRoutes.pathHelpersModule);
+        include(proxyClass, routes.namedRoutes.urlHelpersModule);
+        routes.namedRoutes._appendIncluder(proxyClass.prototype, true);
 
-      self._proxy = new proxyClass(routes) as unknown as UrlHelpersModule["_proxy"];
+        self._proxy = _proxy = new proxyClass(routes) as unknown as UrlHelpersModule["_proxy"];
+      }
 
       const urlHelpers = routes.namedRoutes.urlHelpersModule;
 
@@ -1038,13 +1045,13 @@ export class RouteSet {
           rbObjRespondTo(base, "_routes") &&
           (base as { _routes: unknown })._routes !== this._proxy._routes
         ) {
-          this.dupForReinclude ??= urlHelpersModule();
+          this.dupForReinclude ??= build();
           include(base as new () => unknown, this.dupForReinclude);
         }
       };
       return self;
     };
-    return urlHelpersModule();
+    return build();
   }
 
   mountedHelpers(): typeof MountedHelpers {

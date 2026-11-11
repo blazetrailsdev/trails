@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/ruby-compat";
 import {
   NamedRouteCollection,
   RouteSet,
@@ -100,6 +101,47 @@ describe("NamedRouteCollection", () => {
     expect(routeSet.urlHelpers()).toBe(helpers);
     expect(helpers["postsPath"]()).toBe("/posts");
     expect(helpers["postsUrl"]).toBeTypeOf("function");
+  });
+
+  it("an includer keeps a helper it defined itself when the route is added later", () => {
+    const routeSet = new RouteSet();
+    class Host {
+      fooPath(): string {
+        return "mine";
+      }
+    }
+    include(Host, routeSet.urlHelpers());
+    routeSet.draw(function () {
+      this.get("/foo", { to: "foo#index", as: "foo" });
+    });
+    expect(new Host().fooPath()).toBe("mine");
+  });
+
+  it("a url helpers module without paths answers no path helper drawn later", () => {
+    const routeSet = new RouteSet();
+    const helpers = routeSet.urlHelpers(false) as unknown as Record<string, unknown>;
+    class Host {}
+    include(Host, helpers);
+    routeSet.draw(function () {
+      this.get("/foo", { to: "foo#index", as: "foo" });
+    });
+    expect(helpers["fooUrl"]).toBeTypeOf("function");
+    expect(helpers["fooPath"]).toBeUndefined();
+    expect((Host.prototype as Record<string, unknown>)["fooUrl"]).toBeTypeOf("function");
+    expect((Host.prototype as Record<string, unknown>)["fooPath"]).toBeUndefined();
+  });
+
+  it("the copy included for another route set shares the original's proxy", () => {
+    const routeSet = new RouteSet();
+    const helpers = routeSet.urlHelpers();
+    class Parent {}
+    include(Parent, helpers);
+    class Child extends Parent {}
+    const other = new RouteSet();
+    Object.defineProperty(Child, "_routes", { get: () => other, configurable: true });
+    include(Child, helpers);
+    expect(helpers.dupForReinclude).toBeDefined();
+    expect(helpers.dupForReinclude!._proxy).toBe(helpers._proxy);
   });
 
   it("each yields every name with its route and returns the collection", () => {
