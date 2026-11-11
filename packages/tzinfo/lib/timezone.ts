@@ -360,6 +360,9 @@ const TZDB_NAMES: readonly string[] = [
 
 const loadedTimezoneIdentifiers = new Set<string>();
 
+/** @perf 190x — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
+const _periodsCache = new Map<string, TimezonePeriod[]>();
+
 export class Timezone {
   static all(): Timezone[] {
     return [...new Set([...Intl.supportedValuesOf("timeZone"), ...TZDB_NAMES])]
@@ -470,6 +473,13 @@ export class Timezone {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
       return new OffsetTimezonePeriod(this.info.constantOffset);
     const at = Math.floor(toDate(time).getTime() / 1000);
+    let cached = _periodsCache.get(this.identifier);
+    if (!cached) _periodsCache.set(this.identifier, (cached = []));
+    for (const period of cached) {
+      const start = period.startTransition?.timestampValue ?? -Infinity;
+      const end = period.endTransition?.timestampValue ?? Infinity;
+      if (start <= at && at < end) return period;
+    }
     const [initialBase, baseInstants, bases] = tzdataBaseOffsets(this.identifier) ?? [null, [], []];
     const offsetAt = (seconds: number): TimezoneOffset => {
       const d = new Date(seconds * 1000);
@@ -499,10 +509,12 @@ export class Timezone {
     const end = Math.min(...ends.filter((e): e is number => e != null));
     const offset = offsetAt(at);
     if (!Number.isFinite(start) && !Number.isFinite(end)) return new OffsetTimezonePeriod(offset);
-    return new TransitionsTimezonePeriod(
+    const period = new TransitionsTimezonePeriod(
       Number.isFinite(start) ? new TimezoneTransition(offset, offsetAt(start - 1), start) : null,
       Number.isFinite(end) ? new TimezoneTransition(offsetAt(end), offset, end) : null,
     );
+    cached.push(period);
+    return period;
   }
 
   /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
