@@ -67,14 +67,18 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
       break;
     }
   }
-  const initializersDir = path.join(cwd, "config/initializers");
-  const existent = (await exists(initializersDir))
-    ? (await fs.readdir(initializersDir, { recursive: true, encoding: "utf8" }))
-        .filter((file) => /\.(?:ts|js)$/u.test(file))
-        .map((file) => path.join(initializersDir, file))
-    : [];
-  for (const initializer of existent.sort()) await loadConfigInitializer(initializer);
   const application = TopLevel.Trails?.application;
+  if (application) {
+    if (!application.initialized()) await application.initializeBang();
+  } else {
+    const initializersDir = path.join(cwd, "config/initializers");
+    const existent = (await exists(initializersDir))
+      ? (await fs.readdir(initializersDir, { recursive: true, encoding: "utf8" }))
+          .filter((file) => /\.(?:ts|js)$/u.test(file))
+          .map((file) => path.join(initializersDir, file))
+      : [];
+    for (const initializer of existent.sort()) await loadConfigInitializer(initializer);
+  }
   if (application && (await application.reloadRoutesUnlessLoaded()) === false) {
     for (const ext of ["ts", "js"]) {
       const routes = path.join(cwd, `config/routes.${ext}`);

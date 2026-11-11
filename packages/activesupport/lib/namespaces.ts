@@ -103,6 +103,8 @@ declare module "@blazetrails/ruby-compat" {
               | undefined;
           };
         };
+        initialized(): boolean;
+        initializeBang(): Promise<unknown>;
         reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
         routes(): {
           namedRoutes: { helperNames(): string[] };
