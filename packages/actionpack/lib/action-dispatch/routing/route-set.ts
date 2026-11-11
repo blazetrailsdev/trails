@@ -328,7 +328,7 @@ export class Config {
   }
 }
 
-export class MountedHelpers {
+export const MountedHelpers = class {
   static readonly [classModule] = true;
 
   /** @internal */
@@ -337,7 +337,7 @@ export class MountedHelpers {
       mountedHelpersIncluders.add(new WeakRef((base as { prototype: object }).prototype));
     }
   };
-}
+};
 extend(MountedHelpers, Concern);
 include(MountedHelpers, UrlFor);
 
@@ -714,28 +714,29 @@ export class NamedRouteCollection {
   _appendIncluder(
     proto: object,
     supportsPath: boolean,
-    installed: Map<string, PropertyDescriptor> = this._includedHelpers(proto, supportsPath),
-    includes: Map<string, PropertyDescriptor>[] = [installed],
+    installed?: Map<string, PropertyDescriptor>,
+    includes?: Map<string, PropertyDescriptor>[],
   ): void {
-    this._includers.add({ proto: new WeakRef(proto), supportsPath, installed, includes });
-  }
-
-  /** @internal */
-  private _includedHelpers(proto: object, supportsPath: boolean): Map<string, PropertyDescriptor> {
-    const installed = new Map<string, PropertyDescriptor>();
-    const modules = supportsPath
-      ? [this.urlHelpersModule, this.pathHelpersModule]
-      : [this.urlHelpersModule];
-    for (const mod of modules) {
-      for (const [name, method] of Object.entries(
-        Object.getOwnPropertyDescriptors(mod.prototype),
-      )) {
-        if (name === "constructor") continue;
-        const own = Object.getOwnPropertyDescriptor(proto, name);
-        if (own && own.value === method.value) installed.set(name, own);
+    if (!installed) {
+      installed = new Map();
+      const modules = supportsPath
+        ? [this.urlHelpersModule, this.pathHelpersModule]
+        : [this.urlHelpersModule];
+      for (const mod of modules) {
+        for (const [name, method] of Object.entries(
+          Object.getOwnPropertyDescriptors(mod.prototype),
+        )) {
+          const own = Object.getOwnPropertyDescriptor(proto, name);
+          if (name !== "constructor" && own && own.value === method.value) installed.set(name, own);
+        }
       }
     }
-    return installed;
+    this._includers.add({
+      proto: new WeakRef(proto),
+      supportsPath,
+      installed,
+      includes: includes ?? [installed],
+    });
   }
 
   /** @internal */
