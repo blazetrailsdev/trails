@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryStore } from "../../../lib/cache/memory-store.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
+import { cacheLoggingBehavior } from "../behaviors/cache-logging-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-behavior.js";
 import { cacheIncrementDecrementBehavior } from "../behaviors/cache-increment-decrement-behavior.js";
@@ -128,6 +129,10 @@ describe("MemoryStoreTest", () => {
   cacheInstrumentationBehavior({
     lookupStore: (options?: StoreOptions) => new MemoryStore(options),
     storeName: "MemoryStore",
+  });
+
+  cacheLoggingBehavior({
+    lookupStore: (options?: StoreOptions) => new MemoryStore(options),
   });
 });
 

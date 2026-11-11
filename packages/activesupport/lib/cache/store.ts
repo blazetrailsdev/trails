@@ -46,7 +46,7 @@ export interface CacheLogger {
   warn(message: string): void;
   error?(message: string): void;
   debug?(message: string): void;
-  isDebug?(): boolean;
+  readonly "debug?"?: boolean;
 }
 
 export type StoreOptions = Record<string, unknown>;
@@ -449,7 +449,7 @@ export abstract class Store {
     payload: EventPayload,
     block?: (payload: EventPayload) => T,
   ): T {
-    if (this.logger?.isDebug?.() && !this.silence) {
+    if (this.logger && this.logger["debug?"] && !this.silence) {
       const key = payload.key;
       const multiSize = Array.isArray(key)
         ? key.length
