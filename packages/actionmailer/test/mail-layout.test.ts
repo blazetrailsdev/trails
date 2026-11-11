@@ -1,0 +1,128 @@
+import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
+import { describe, expect, it } from "vitest";
+import type { Message } from "@blazetrails/mail";
+import { Base } from "../lib/base.js";
+import type { Collector } from "../lib/collector.js";
+
+type Format = Collector & Record<string, (...args: unknown[]) => unknown>;
+
+const FIXTURES = new FixtureResolver({
+  "layouts/auto-layout-mailer.html.tse": "Hello from layout <%= yield %>",
+  "layouts/auto-layout-mailer.text.tse": "text/plain layout - <%= yield %>",
+  "layouts/spam.html.tse": "Spammer layout <%= yield %>",
+  "auto-layout-mailer/hello.html.tse": "Inside",
+  "auto-layout-mailer/multipart.html.tse": "text/html multipart",
+  "auto-layout-mailer/multipart.text.tse": "text/plain multipart",
+  "explicit-layout-mailer/logout.html.tse": "You logged out",
+  "explicit-layout-mailer/signup.html.tse": "We do not spam",
+});
+
+class AutoLayoutMailer extends Base {
+  declare world: string;
+
+  static {
+    this.setMailerName("auto_layout_mailer");
+    this.prependViewPath(FIXTURES);
+    this.default({ to: "test@localhost", subject: "You have a mail", from: "tester@example.com" });
+  }
+
+  hello() {
+    return this.mail();
+  }
+
+  async spam() {
+    this.world = "Earth";
+    return this.mail({
+      body: await this.render({ inline: "Hello, <%= this.world %>", layout: "spam" }),
+    });
+  }
+
+  async nolayout() {
+    this.world = "Earth";
+    return this.mail({
+      body: await this.render({ inline: "Hello, <%= this.world %>", layout: false }),
+    });
+  }
+
+  multipart(type: string | null = null) {
+    return this.mail({ contentType: type }, async (format) => {
+      const f = format as Format;
+      await f.text(() => this.render());
+      await f.html(() => this.render());
+    });
+  }
+}
+
+class ExplicitLayoutMailer extends Base {
+  static {
+    this.setMailerName("explicit_layout_mailer");
+    this.prependViewPath(FIXTURES);
+    (this as unknown as { layout(name: string, conditions: object): void }).layout("spam", {
+      except: ["logout"],
+    });
+    this.default({ to: "test@localhost", subject: "You have a mail", from: "tester@example.com" });
+  }
+
+  signup() {
+    return this.mail();
+  }
+
+  logout() {
+    return this.mail();
+  }
+}
+
+type Mailer = Record<string, (...args: unknown[]) => { message(): Promise<Message> }>;
+const auto = AutoLayoutMailer as unknown as Mailer;
+const explicit = ExplicitLayoutMailer as unknown as Mailer;
+
+describe("LayoutMailerTest", () => {
+  it("should pickup default layout", async () => {
+    const mail = await auto.hello().message();
+    expect(mail.body().toString().trim()).toBe("Hello from layout Inside");
+  });
+
+  it("should pickup multipart layout", async () => {
+    const mail = await auto.multipart().message();
+    expect(mail.mimeType()).toBe("multipart/alternative");
+    expect(mail.parts.length).toBe(2);
+
+    expect(mail.parts[0].mimeType()).toBe("text/plain");
+    expect(mail.parts[0].body().toString()).toBe("text/plain layout - text/plain multipart");
+
+    expect(mail.parts.at(-1)!.mimeType()).toBe("text/html");
+    expect(mail.parts.at(-1)!.body().toString()).toBe("Hello from layout text/html multipart");
+  });
+
+  it("should pickup multipartmixed layout", async () => {
+    const mail = await auto.multipart("multipart/mixed").message();
+    expect(mail.mimeType()).toBe("multipart/mixed");
+    expect(mail.parts.length).toBe(2);
+
+    expect(mail.parts[0].mimeType()).toBe("text/plain");
+    expect(mail.parts[0].body().toString()).toBe("text/plain layout - text/plain multipart");
+
+    expect(mail.parts.at(-1)!.mimeType()).toBe("text/html");
+    expect(mail.parts.at(-1)!.body().toString()).toBe("Hello from layout text/html multipart");
+  });
+
+  it("should pickup layout given to render", async () => {
+    const mail = await auto.spam().message();
+    expect(mail.body().toString().trim()).toBe("Spammer layout Hello, Earth");
+  });
+
+  it("should respect layout false", async () => {
+    const mail = await auto.nolayout().message();
+    expect(mail.body().toString().trim()).toBe("Hello, Earth");
+  });
+
+  it("explicit class layout", async () => {
+    const mail = await explicit.signup().message();
+    expect(mail.body().toString().trim()).toBe("Spammer layout We do not spam");
+  });
+
+  it("explicit layout exceptions", async () => {
+    const mail = await explicit.logout().message();
+    expect(mail.body().toString().trim()).toBe("You logged out");
+  });
+});
