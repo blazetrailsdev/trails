@@ -104,8 +104,8 @@ export abstract class Store {
       Store.logger = prev;
       throw error;
     }
-    if (result instanceof Promise) {
-      return result.finally(() => {
+    if (typeof (result as { then?: unknown } | null)?.then === "function") {
+      return Promise.resolve(result).finally(() => {
         Store.logger = prev;
       }) as T;
     }
