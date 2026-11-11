@@ -279,10 +279,10 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // composite.rb:20 and substitute_binds.rb:13 → `append` on each collector
   // class (`SQLString` inherits PlainString's).
   "Arel::Collectors::PlainString": { "<<": ["append"] },
-  "Erubi::CaptureBlockEngine::Buffer": { "<<": ["append"], "|": ["bitwiseOr"] },
   "Arel::Collectors::Bind": { "<<": ["append"] },
   "Arel::Collectors::Composite": { "<<": ["append"] },
   "Arel::Collectors::SubstituteBinds": { "<<": ["append"] },
+  "Erubi::CaptureBlockEngine::Buffer": { "<<": ["append"], "|": ["bitwiseOr"] },
   // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
   // → connection-adapters/statement-pool.ts `get` / `set`.
   "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },

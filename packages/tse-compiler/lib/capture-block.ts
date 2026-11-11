@@ -1,4 +1,4 @@
-import { rbObjDup, toS } from "@blazetrails/ruby-compat";
+import { LocalJumpError, rbBlockGivenP, rbObjDup, toS } from "@blazetrails/ruby-compat";
 import { Engine, h, type EngineProperties } from "./erubi.js";
 
 export class Buffer {
@@ -15,13 +15,14 @@ export class Buffer {
     return this;
   }
 
-  capture<A extends unknown[]>(...args: [...A, (...args: A) => void]): Buffer {
-    const block = args.pop() as (...args: A) => void;
+  capture(...args: unknown[]): Buffer {
+    const block = rbBlockGivenP(args.at(-1)) ? (args.pop() as (...args: unknown[]) => void) : null;
     let prev: Buffer | undefined;
     try {
       prev = rbObjDup(this);
       this.value = "";
-      block(...(args as unknown as A));
+      if (block === null) throw new LocalJumpError("no block given (yield)");
+      block(...args);
       return rbObjDup(this);
     } finally {
       this.value = prev!.value;
