@@ -740,7 +740,7 @@ describe("Base's inherited chain is deferred to own-property memo guards", () =>
 
     const leaf = await read(Leaf);
     expect(ownMemos(Leaf)).toEqual(memos);
-    expect(ownMemos(Middle)).toEqual([]);
+    expect(ownMemos(Middle)).toEqual(["_findByStatementCache"]);
 
     const middle = await read(Middle);
     const root = await read(Topic);

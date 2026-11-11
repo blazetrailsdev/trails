@@ -270,10 +270,15 @@ clobbers what the class body already wrote.
   `Compatibility::V*` descends from it. A migration extends `Migration.Current`
   or `Migration.get(x.y)`.
 
-One thing Rails does at definition time has no counterpart: `Core`'s loop that
-re-initializes every ancestor's find-by cache up to the base class
-(`core.rb:417-423`) never runs, so a parent keeps its cached statements when a
-subclass is defined.
+One thing Rails does at definition time reaches other classes: `Core`'s loop
+that re-initializes every ancestor's find-by cache up to the base class
+(`core.rb:409-421`). A guard on the child cannot drop a parent's memo, so it
+runs where trails first learns of the child: `DescendantsTracker.registerSubclass`,
+on a new edge, calls the parent's ruby-compat `inherited` hook, and `Base`'s
+is `_inherited` (`core.ts`). A parent's cached statements bake its type
+condition over `descendants`, which only that registration changes, so the
+reset is exactly as fresh as what the parent can see. Ruled by the repo owner
+on 2026-11-11.
 
 The guard is the port of `inherited`, not a deviation to retire. Where the arms
 report flags a guarded read or a first-read seed in one of these readers, it

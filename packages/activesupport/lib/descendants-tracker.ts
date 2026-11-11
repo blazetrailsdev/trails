@@ -1,4 +1,4 @@
-import { classModule } from "@blazetrails/ruby-compat";
+import { classModule, inherited } from "@blazetrails/ruby-compat";
 
 export type AnyClass = abstract new (...args: never) => unknown;
 
@@ -68,7 +68,11 @@ export class WeakSet<T extends object> {
 
 export function registerSubclass(parent: AnyClass, child: AnyClass): void {
   if (!_subclassMap.has(parent)) _subclassMap.set(parent, new WeakSet<AnyClass>());
-  _subclassMap.get(parent)!.add(child);
+  const subs = _subclassMap.get(parent)!;
+  if (subs.isInclude(child)) return;
+  subs.add(child);
+  const hook = (parent as unknown as Record<symbol, unknown>)[inherited];
+  if (typeof hook === "function") hook.call(parent, child);
 }
 
 export function subclasses(klass: AnyClass): AnyClass[] {

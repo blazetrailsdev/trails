@@ -23,6 +23,7 @@ import {
   rbCallSuper,
   filterMap,
   rbObjRespondTo,
+  inherited,
 } from "@blazetrails/ruby-compat";
 import {
   NameError,
@@ -78,6 +79,7 @@ export interface Core {
 export const Core = {
   [included](base: object): void {
     include(base as new () => object, SuperMethods);
+    Object.defineProperty(base, inherited, { configurable: true, value: _inherited });
     classAttribute.call(base, "logger", { instanceWriter: false });
     classAttribute.call(base, "_destroyAssociationAsyncJob", {
       instanceAccessor: false,
@@ -672,6 +674,18 @@ export function initializeFindByCache(this: typeof Base): FindByStatementCache {
     [true, new Concurrent.Map()],
     [false, new Concurrent.Map()],
   ]));
+}
+
+/** @internal */
+export function _inherited(this: typeof Base, subclass: typeof Base): void {
+  subclass.initializeFindByCache();
+  if (!subclass.isBaseClass()) {
+    let klass = this;
+    while (!klass.isBaseClass()) {
+      klass.initializeFindByCache();
+      klass = Object.getPrototypeOf(klass) as typeof Base;
+    }
+  }
 }
 
 export function initializeGeneratedModules(this: typeof Base): void {
