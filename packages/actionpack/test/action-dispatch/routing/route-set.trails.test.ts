@@ -1,6 +1,6 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
-import { include } from "@blazetrails/ruby-compat";
+import { include, rbModMethodDefined } from "@blazetrails/ruby-compat";
 import {
   RouteSet,
   StaticDispatcher,
@@ -271,9 +271,9 @@ describe("ActionDispatch::Routing::RouteSet#define_mounted_helper", () => {
     });
     routes.defineMountedHelper("trails_test_app");
     const mod = routes.mountedHelpers();
-    expect(mod.isMethodDefined("trailsTestApp")).toBe(true);
-    expect(mod.isMethodDefined("_trailsTestApp")).toBe(true);
-    expect(mod.isMethodDefined("trails_test_app")).toBe(false);
+    expect(rbModMethodDefined(mod, "trailsTestApp")).toBe(true);
+    expect(rbModMethodDefined(mod, "_trailsTestApp")).toBe(true);
+    expect(rbModMethodDefined(mod, "trails_test_app")).toBe(false);
 
     const other = new RouteSet();
     other.defineMountedHelper("trailsTestApp");

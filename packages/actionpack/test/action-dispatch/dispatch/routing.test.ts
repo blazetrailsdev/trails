@@ -5,7 +5,6 @@ import {
   Config,
   RouteSet,
   type DrawCallback,
-  type NamedRouteHelper,
 } from "../../../lib/action-dispatch/routing/route-set.js";
 import { MockRequest, type RackBody, Utils as RackUtils } from "@blazetrails/rack";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
@@ -5037,7 +5036,7 @@ describe("TestOptimizedNamedRoutes", () => {
   const urlHelpers = () =>
     Routes.urlHelpers() as unknown as Record<string, (...args: unknown[]) => string>;
   const included = (name: string, ...args: unknown[]): string =>
-    (Routes.namedRoutes.pathHelpersModule.instanceMethod(name)!.value as NamedRouteHelper).call(
+    Routes.namedRoutes.pathHelpersModule.prototype[name].call(
       {
         _routes: Routes,
         urlOptions: () => ({}),

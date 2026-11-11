@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/ruby-compat";
 import {
   NamedRouteCollection,
   RouteSet,
-  type NamedRouteHelper,
   type UrlHelperContext,
 } from "../../../lib/action-dispatch/routing/route-set.js";
 
@@ -18,8 +18,16 @@ function drawn(): RouteSet {
 describe("NamedRouteCollection", () => {
   it("defines a name_path and a name_url helper per named route", () => {
     const named = drawn().namedRoutes;
-    expect(named.pathHelpersModule.instanceMethods()).toEqual(["postsPath", "postPath"]);
-    expect(named.urlHelpersModule.instanceMethods()).toEqual(["postsUrl", "postUrl"]);
+    expect(
+      Object.getOwnPropertyNames(named.pathHelpersModule.prototype).filter(
+        (n) => n !== "constructor",
+      ),
+    ).toEqual(["postsPath", "postPath"]);
+    expect(
+      Object.getOwnPropertyNames(named.urlHelpersModule.prototype).filter(
+        (n) => n !== "constructor",
+      ),
+    ).toEqual(["postsUrl", "postUrl"]);
     expect(named.helperNames()).toEqual(["postsPath", "postPath", "postsUrl", "postUrl"]);
     expect(named.names()).toEqual(["posts", "post"]);
     expect(named.length()).toBe(2);
@@ -56,7 +64,11 @@ describe("NamedRouteCollection", () => {
   it("clear! removes the generated helpers", () => {
     const routeSet = drawn();
     routeSet.namedRoutes.clearBang();
-    expect(routeSet.namedRoutes.pathHelpersModule.instanceMethods()).toEqual([]);
+    expect(
+      Object.getOwnPropertyNames(routeSet.namedRoutes.pathHelpersModule.prototype).filter(
+        (n) => n !== "constructor",
+      ),
+    ).toEqual([]);
     expect(routeSet.namedRoutes.helperNames()).toEqual([]);
   });
 
@@ -74,16 +86,8 @@ describe("NamedRouteCollection", () => {
       _routes: routeSet,
       fullUrlFor: (options: string) => routeSet.fullUrlFor(options),
     } as unknown as UrlHelperContext;
-    expect(
-      (named.pathHelpersModule.instanceMethod("profilePath")!.value as NamedRouteHelper).call(
-        context,
-      ),
-    ).toBe("/profile");
-    expect(
-      (named.urlHelpersModule.instanceMethod("profileUrl")!.value as NamedRouteHelper).call(
-        context,
-      ),
-    ).toBe("/profile");
+    expect(named.pathHelpersModule.prototype["profilePath"].call(context)).toBe("/profile");
+    expect(named.urlHelpersModule.prototype["profileUrl"].call(context)).toBe("/profile");
   });
 
   it("a url helpers module built before a route is added answers its helpers", () => {
@@ -97,6 +101,47 @@ describe("NamedRouteCollection", () => {
     expect(routeSet.urlHelpers()).toBe(helpers);
     expect(helpers["postsPath"]()).toBe("/posts");
     expect(helpers["postsUrl"]).toBeTypeOf("function");
+  });
+
+  it("an includer keeps a helper it defined itself when the route is added later", () => {
+    const routeSet = new RouteSet();
+    class Host {
+      fooPath(): string {
+        return "mine";
+      }
+    }
+    include(Host, routeSet.urlHelpers());
+    routeSet.draw(function () {
+      this.get("/foo", { to: "foo#index", as: "foo" });
+    });
+    expect(new Host().fooPath()).toBe("mine");
+  });
+
+  it("a url helpers module without paths answers no path helper drawn later", () => {
+    const routeSet = new RouteSet();
+    const helpers = routeSet.urlHelpers(false) as unknown as Record<string, unknown>;
+    class Host {}
+    include(Host, helpers);
+    routeSet.draw(function () {
+      this.get("/foo", { to: "foo#index", as: "foo" });
+    });
+    expect(helpers["fooUrl"]).toBeTypeOf("function");
+    expect(helpers["fooPath"]).toBeUndefined();
+    expect((Host.prototype as Record<string, unknown>)["fooUrl"]).toBeTypeOf("function");
+    expect((Host.prototype as Record<string, unknown>)["fooPath"]).toBeUndefined();
+  });
+
+  it("the copy included for another route set shares the original's proxy", () => {
+    const routeSet = new RouteSet();
+    const helpers = routeSet.urlHelpers();
+    class Parent {}
+    include(Parent, helpers);
+    class Child extends Parent {}
+    const other = new RouteSet();
+    Object.defineProperty(Child, "_routes", { get: () => other, configurable: true });
+    include(Child, helpers);
+    expect(helpers.dupForReinclude).toBeDefined();
+    expect(helpers.dupForReinclude!._proxy).toBe(helpers._proxy);
   });
 
   it("each yields every name with its route and returns the collection", () => {

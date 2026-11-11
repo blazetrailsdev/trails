@@ -1,6 +1,11 @@
 import { constSetPath } from "../../support/const-set-path.js";
 import { camelize } from "@blazetrails/activesupport";
-import { constDefined, constGet, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import {
+  constDefined,
+  constGet,
+  rbModMethodDefined,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Engine } from "@blazetrails/trailties/engine";
@@ -371,7 +376,7 @@ describe("Mapper#mount", () => {
       });
 
       expect(set.namedRoutes.isKey("shorthand_app")).toBe(true);
-      expect(ShorthandApp.routes().mountedHelpers().isMethodDefined("shorthandApp")).toBe(true);
+      expect(rbModMethodDefined(ShorthandApp.routes().mountedHelpers(), "shorthandApp")).toBe(true);
     } finally {
       TopLevel.Trails = trails;
     }

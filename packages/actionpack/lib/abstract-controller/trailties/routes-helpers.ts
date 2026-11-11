@@ -5,7 +5,6 @@ import {
   include,
   includedModules,
   isModuleIncluded,
-  Module,
   constSet,
 } from "@blazetrails/ruby-compat";
 
@@ -15,9 +14,10 @@ import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import type { HelpersClassMethods } from "../helpers.js";
 
 type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
+type ClassModule = { prototype: object };
 
 export interface UrlHelpersRouteSet {
-  urlHelpers(includePathHelpers?: boolean): HelperMethodsModule | Module;
+  urlHelpers(includePathHelpers?: boolean): HelperMethodsModule | ClassModule;
 }
 
 export interface RoutesHelpersClassMethods extends HelpersClassMethods {
@@ -40,7 +40,7 @@ Object.defineProperty(RoutesHelpers, "with", {
   ): (cls: RoutesHelpersControllerClass) => void {
     return (cls) => {
       const namespaceBuilder = findTrailtieUrlHelpers(cls);
-      const urlHelpersModule = (): HelperMethodsModule | Module =>
+      const urlHelpersModule = (): HelperMethodsModule | ClassModule =>
         namespaceBuilder
           ? namespaceBuilder(includePathHelpers)
           : routes.urlHelpers(includePathHelpers);
@@ -96,10 +96,10 @@ export function isIncludedMember(
 
 function includedDescriptors(
   cls: RoutesHelpersControllerClass,
-  mod: HelperMethodsModule | Module,
+  mod: HelperMethodsModule | ClassModule,
 ): Map<string, PropertyDescriptor> {
   const descriptors = new Map<string, PropertyDescriptor>();
-  if (mod instanceof Module) {
+  if (typeof mod === "function") {
     const scan = class {};
     include(scan, mod);
     const ancestry = class {};
