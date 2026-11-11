@@ -110,8 +110,6 @@ async function main(): Promise<void> {
   assertPackagesBuilt("parity dump (trails)");
 
   const frozenTs = frozenAt ?? DEFAULT_FROZEN_AT;
-  // The Rails side freezes through travel_to, which drops sub-second precision
-  // (`now.change(usec: 0) unless with_usec`, activesupport/lib/active_support/testing/time_helpers.rb:171).
   const frozenMs = Math.floor(new Date(frozenTs).getTime() / 1000) * 1000;
   const fixtureDirAbs = resolve(fixtureDirRaw);
   const outPathAbs = resolve(outPathRaw);
