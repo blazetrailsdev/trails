@@ -62,7 +62,7 @@ export async function resetConstants(): Promise<void> {
 function resetRegistry(): void {
   Registry.loaders.length = 0;
   Registry.loadersByPackageFile = {};
-  Registry.autoloads = {};
+  for (const k of Object.keys(Registry.autoloads)) delete Registry.autoloads[k];
 }
 
 function resetExplicitNamespace(): void {

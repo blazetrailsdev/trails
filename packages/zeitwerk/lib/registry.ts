@@ -9,15 +9,24 @@ import { Inceptions } from "./registry/inceptions.js";
 /** @noRailsEquivalent PERMANENT */
 const PACKAGE_MUTEX = new Mutex();
 
+const loaders: Loader[] = [];
+const autoloads: Record<string, Loader> = {};
+
 export const Registry = {
   ExplicitNamespaces: ExplicitNamespaces as typeof ExplicitNamespaces & ExplicitNamespacesInternals,
   Inceptions,
   Loader: undefined as typeof Loader | undefined,
 
-  loaders: [] as Loader[],
+  get loaders(): Loader[] {
+    return loaders;
+  },
+
   /** @noRailsEquivalent PERMANENT */
   loadersByPackageFile: {} as Record<string, Loader>,
-  autoloads: {} as Record<string, Loader>,
+
+  get autoloads(): Record<string, Loader> {
+    return autoloads;
+  },
 
   registerLoader(loader: Loader): void {
     this.loaders.push(loader);
