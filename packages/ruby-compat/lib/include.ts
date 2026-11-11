@@ -930,6 +930,18 @@ export const included = Symbol.for("@blazetrails/ruby-compat:included");
 export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
 
 /**
+ * Symbol key for Ruby's Class#inherited callback, which `rb_class_inherited`
+ * calls on the superclass with the new subclass
+ * (vendor/ruby/v3.3.11/class.c:963). JS runs nothing when a class is defined,
+ * so the call is made where trails first learns of the subclass:
+ * `DescendantsTracker.registerSubclass` adding a new edge (CLAUDE.md
+ * § "`inherited` is deferred to own-property memo guards").
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const inherited = Symbol.for("@blazetrails/ruby-compat:inherited");
+
+/**
  * Symbol key for Ruby's Module#prepended callback, which `rb_mod_prepend`
  * fires on the module once `prepend_features` has spliced it into the
  * ancestry, on every call (vendor/ruby/v3.3.11/eval.c:1215).

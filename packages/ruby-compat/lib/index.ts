@@ -286,6 +286,7 @@ export {
   prepend,
   rbCallSuper,
   included,
+  inherited,
   prepended,
   includedModules,
   isModuleIncluded,

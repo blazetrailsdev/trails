@@ -144,16 +144,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "autoload path during a synchronous `Company.new`. A JS read cannot run the awaited " +
       'load (CLAUDE.md § "`Module#autoload` is a build step").',
   },
-  {
-    testFile: "inheritance_test.rb",
-    className: "InheritanceComputeTypeTest",
-    tests: ["instantiation doesnt try to require corresponding file"],
-    reason:
-      "Not loader residue: the SubclassNotFound arm needs a Firm subclass that compute_type " +
-      "cannot reach from Firm's lexical scope, and trails' instantiate finds any tracked " +
-      "descendant by sti_name before it tries the constant. Portable once story " +
-      "discriminate-class-for-record-should-call-find-sti-class lands.",
-  },
   // --- Permanently not-portable: per-test GVL / serialization in mixed files ---
   {
     testFile: "connection_handlers_sharding_db_test.rb",

@@ -10,7 +10,14 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
-import { include, constSet, regexpEscape, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  include,
+  constSet,
+  regexpEscape,
+  TopLevel,
+  rbObjClone,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
@@ -550,8 +557,45 @@ describe("InheritanceTest", () => {
 describe("InheritanceComputeTypeTest", () => {
   fixtures(["companies"]);
 
-  it.skip("instantiation doesnt try to require corresponding file", () => {
-    // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  it("instantiation doesnt try to require corresponding file", async () => {
+    const InheritanceComputeTypeTest = {};
+    const prev = Base.storeFullStiClass;
+    try {
+      Base.storeFullStiClass = false;
+      const foo = rbObjClone((await Firm.first()) as Firm);
+      (foo as Firm & { type: string }).type = "FirmOnTheFly";
+      await foo.saveBang();
+
+      await expect(Firm.find(foo.id)).rejects.toThrow(RecordNotFound);
+      await expect(Firm.findByBang({ id: foo.id })).rejects.toThrow(RecordNotFound);
+
+      const testFirmOnTheFly = constSet(
+        InheritanceComputeTypeTest,
+        "FirmOnTheFly",
+        class FirmOnTheFly extends Firm {},
+      );
+      DescendantsTracker.registerSubclass(Firm, testFirmOnTheFly);
+      await expect(Firm.find(foo.id)).rejects.toThrow(SubclassNotFound);
+      await expect(Firm.findByBang({ id: foo.id })).rejects.toThrow(SubclassNotFound);
+
+      const firmOnTheFly = constSet(Firm, "FirmOnTheFly", class FirmOnTheFly extends Firm {});
+      DescendantsTracker.registerSubclass(Firm, firmOnTheFly);
+
+      await assertNothingRaised(async () => {
+        expect(await Firm.find(foo.id)).toBeInstanceOf(firmOnTheFly);
+      });
+      await assertNothingRaised(async () => {
+        expect(await Firm.findByBang({ id: foo.id })).toBeInstanceOf(firmOnTheFly);
+      });
+    } finally {
+      Base.storeFullStiClass = prev;
+      try {
+        rbModRemoveConst(InheritanceComputeTypeTest, "FirmOnTheFly");
+      } catch {}
+      try {
+        rbModRemoveConst(Firm, "FirmOnTheFly");
+      } catch {}
+    }
   });
 
   it("sti type from attributes disabled in non sti class", async () => {
