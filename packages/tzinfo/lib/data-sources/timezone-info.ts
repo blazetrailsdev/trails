@@ -1,4 +1,4 @@
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
 import type { Timezone } from "../timezone.js";
 
 export class TimezoneInfo {
@@ -6,6 +6,10 @@ export class TimezoneInfo {
 
   constructor(identifier: string) {
     this.identifier = identifier;
+  }
+
+  inspect(): string {
+    return `#<${rbModName(this.constructor)}: ${this.identifier}>`;
   }
 
   createTimezone(): Timezone {

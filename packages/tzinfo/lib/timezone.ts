@@ -19,7 +19,7 @@ import {
   tzdataIsdstFlips,
   tzdataOffsetInstant,
 } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rbModName } from "@blazetrails/ruby-compat";
 import { TimezonePeriod } from "./timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
 import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
@@ -386,6 +386,10 @@ export class Timezone {
   constructor(name: string, info: TimezoneInfo | null = null) {
     this.identifier = name;
     this.info = info;
+  }
+
+  inspect(): string {
+    return `#<${rbModName(this.constructor)}: ${this.identifier}>`;
   }
 
   equals(tz: unknown): boolean {
