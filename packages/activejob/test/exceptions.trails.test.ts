@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import type { Logger } from "@blazetrails/activesupport";
+import { Base } from "../lib/base.js";
 import "./helper.js";
 import { JobBuffer } from "./support/job-buffer.js";
 import { FirstRetryableErrorOfTwo, RetryJob, SecondRetryableErrorOfTwo } from "./jobs/retry-job.js";
@@ -25,5 +27,19 @@ describe("Exceptions", () => {
     await RescueJob.performLater("david");
     expect(JobBuffer.values()).toContain("rescued from ArgumentError");
     expect(JobBuffer.values()).toContain("Retried job DIFFERENT!");
+  });
+
+  it("types after_discard's block with the subclass instance, and the job's logger", () => {
+    class MailingJob extends Base {
+      mailFailure(exception: Error): string {
+        return exception.message;
+      }
+    }
+    MailingJob.afterDiscard((job, exception) => {
+      expectTypeOf(job).toEqualTypeOf<MailingJob>();
+      return job.mailFailure(exception);
+    });
+    expect(MailingJob.afterDiscardProcs.length).toBe(Base.afterDiscardProcs.length + 1);
+    expectTypeOf(new MailingJob().logger).toEqualTypeOf<Logger | null>();
   });
 });

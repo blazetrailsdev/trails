@@ -17,7 +17,7 @@ describe("SolidQueue::Dispatcher (trails)", () => {
 
   beforeAll(async () => {
     await loadAppSchema();
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
   });

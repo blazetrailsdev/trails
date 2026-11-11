@@ -28,8 +28,12 @@ constSet(TopLevel, "QueueAdapterTest", QueueAdapterTest);
 
 describe("QueueAdapterTest", () => {
   it("should forbid nonsense arguments", () => {
-    expect(() => Base.setQueueAdapter(Mutex)).toThrow(ArgumentError);
-    expect(() => Base.setQueueAdapter(new Mutex())).toThrow(ArgumentError);
+    expect(() => {
+      Base.queueAdapter = Mutex;
+    }).toThrow(ArgumentError);
+    expect(() => {
+      Base.queueAdapter = new Mutex();
+    }).toThrow(ArgumentError);
   });
 
   it("should allow overriding the queue_adapter at the child class level without affecting the parent or its sibling", () => {
@@ -38,7 +42,7 @@ describe("QueueAdapterTest", () => {
     const childJobOne = class extends Base {};
     expect(childJobOne.queueAdapterName).toBe(Base.queueAdapterName);
 
-    childJobOne.setQueueAdapter("stub_one");
+    childJobOne.queueAdapter = "stub_one";
 
     expect(childJobOne.queueAdapter).not.toBe(Base.queueAdapter);
     expect(childJobOne.queueAdapterName).toBe("stub_one");
@@ -46,7 +50,7 @@ describe("QueueAdapterTest", () => {
     expect(new childJobOne().queueAdapter).toBeInstanceOf(StubOneAdapter);
 
     const childJobTwo = class extends Base {};
-    childJobTwo.setQueueAdapter("stub_two");
+    childJobTwo.queueAdapter = "stub_two";
 
     expect(childJobTwo.queueAdapterName).toBe("stub_two");
 
@@ -76,7 +80,7 @@ describe("QueueAdapterTest", () => {
 
   it("should extract a reasonable name from a class instance", () => {
     const childJob = class extends Base {};
-    childJob.setQueueAdapter(new StubOneAdapter());
+    childJob.queueAdapter = new StubOneAdapter();
     expect(childJob.queueAdapterName).toBe("stub_one");
   });
 
@@ -89,7 +93,7 @@ describe("QueueAdapterTest", () => {
 
   it("should extract a reasonable name from a class or module", () => {
     const childJob = class extends Base {};
-    childJob.setQueueAdapter(StubThreeAdapter);
+    childJob.queueAdapter = StubThreeAdapter;
     expect(childJob.queueAdapterName).toBe("stub_three");
   });
 
@@ -103,7 +107,7 @@ describe("QueueAdapterTest", () => {
 
   it("should use the name provided by the adapter", () => {
     const childJob = class extends Base {};
-    childJob.setQueueAdapter(new StubFourAdapter());
+    childJob.queueAdapter = new StubFourAdapter();
     expect(childJob.queueAdapterName).toBe("fancy_name");
   });
 });

@@ -22,7 +22,7 @@ import { waitForRegisteredProcesses } from "./support/processes-test-helper.js";
 describe("SolidQueue::ProcessTest", () => {
   beforeAll(async () => {
     await loadAppSchema();
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
   });
 
   afterEach(async () => {

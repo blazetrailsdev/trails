@@ -33,5 +33,5 @@ export class EnqueueErrorJob extends Base {
     throw new Error("This should never be called");
   }
 }
-EnqueueErrorJob.setQueueAdapter(new EnqueueErrorAdapter());
+EnqueueErrorJob.queueAdapter = new EnqueueErrorAdapter();
 constSet(TopLevel, "EnqueueErrorJob", EnqueueErrorJob);

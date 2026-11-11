@@ -22,7 +22,7 @@ class ActiveJobTestCaseTest extends TestCase {
 constSet(TopLevel, "ActiveJobTestCaseTest", ActiveJobTestCaseTest);
 
 class TestClassAttributeInheritanceJob extends Base {
-  static override setQueueAdapter(): void {
+  static override set queueAdapter(_: unknown) {
     throw new Error("Attempting to break `class_attribute` inheritance, bad!");
   }
 }

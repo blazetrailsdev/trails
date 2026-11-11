@@ -6,4 +6,4 @@ export class QueueAdapterJob extends Base {
   }
 }
 constSet(TopLevel, "QueueAdapterJob", QueueAdapterJob);
-QueueAdapterJob.setQueueAdapter("inline");
+QueueAdapterJob.queueAdapter = "inline";

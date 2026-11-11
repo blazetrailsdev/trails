@@ -24,7 +24,7 @@ describe("EnqueueAfterTransactionCommit with a real transaction", () => {
 
   it("enqueues a job only after the transaction commits", async () => {
     const adapter = new TestAdapter();
-    AfterCommitTopicJob.setQueueAdapter(adapter);
+    AfterCommitTopicJob.queueAdapter = adapter;
 
     await Topic.transaction(async () => {
       await Topic.create({ title: "enqueued after commit" });
@@ -41,7 +41,7 @@ describe("EnqueueAfterTransactionCommit with a real transaction", () => {
     adapter.enqueue = () => {
       throw new EnqueueError("There was an error enqueuing the job");
     };
-    AfterCommitTopicJob.setQueueAdapter(adapter);
+    AfterCommitTopicJob.queueAdapter = adapter;
 
     let job: AfterCommitTopicJob | undefined;
     await Topic.transaction(async () => {

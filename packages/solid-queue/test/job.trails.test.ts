@@ -6,7 +6,7 @@ import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 
 describe("SolidQueue::Job#execution (trails)", () => {
   beforeAll(async () => {
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
   });
 
   afterEach(async () => {

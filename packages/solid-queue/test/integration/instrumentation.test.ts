@@ -73,7 +73,7 @@ describe("InstrumentationTest", () => {
     await loadAppSchema();
     const pool = RecurringTask.connectionPool();
     await pool.schemaReflection.loadAllBang(pool);
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
   });
@@ -539,7 +539,7 @@ describe("InstrumentationTest", () => {
   });
 
   it("an error enqueuing a recurring task with another adapter is reflected in the enqueue_recurring_task event", async () => {
-    AddToBufferJob.setQueueAdapter("async");
+    AddToBufferJob.queueAdapter = "async";
     try {
       vi.spyOn(AsyncAdapter.prototype, "enqueue").mockImplementation(() => {
         throw new EnqueueError("All is broken");
@@ -567,7 +567,7 @@ describe("InstrumentationTest", () => {
       expect(isPresent(event[4].at)).toBeTruthy();
       expect(event[4].other_adapter).toBeTruthy();
     } finally {
-      AddToBufferJob.setQueueAdapter("solid_queue");
+      AddToBufferJob.queueAdapter = "solid_queue";
     }
   });
 

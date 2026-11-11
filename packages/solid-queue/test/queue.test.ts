@@ -19,7 +19,7 @@ describe("QueueTest", () => {
   let defaultQueue: Queue;
 
   beforeAll(async () => {
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
   });
 
   beforeEach(async () => {
