@@ -111,9 +111,9 @@ export const Struct = {
    *
    * @noRailsEquivalent PERMANENT
    */
-  new<M extends string>(
+  new<M extends string, T extends Record<M, unknown> = Record<M, unknown>>(
     ...memberNames: M[]
-  ): new (...values: unknown[]) => StructInstance & Record<M, unknown> {
+  ): new (...values: unknown[]) => StructInstance & T {
     const klass = class {
       [RSTRUCT]!: unknown[];
 
@@ -240,6 +240,6 @@ export const Struct = {
     });
     structClasses.add(klass.prototype);
     Object.defineProperty(klass, "name", { value: "" });
-    return klass as unknown as new (...values: unknown[]) => StructInstance & Record<M, unknown>;
+    return klass as unknown as new (...values: unknown[]) => StructInstance & T;
   },
 };

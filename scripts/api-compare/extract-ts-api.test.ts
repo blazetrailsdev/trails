@@ -6669,6 +6669,23 @@ describe("typed merge! credit", () => {
   });
 });
 
+describe("typed first credit", () => {
+  const forms = (body: string): Set<string> =>
+    nativeForms(
+      extractFromFiles("/p", {
+        "foo.ts": `class Container extends Array<string> {}
+        export class Foo {
+          m(c: Container, h: { 0: string }) { ${body} }
+        }`,
+      }).classes["foo.ts:Foo"].instanceMethods.find((m) => m.name === "m")!,
+    );
+
+  it("credits first@typed on a class extending Array", () => {
+    expect(forms(`return c[0] ?? null;`).has("first@typed")).toBe(true);
+    expect(forms(`return h[0] ?? null;`).has("first@typed")).toBe(false);
+  });
+});
+
 describe("typed fetch credit", () => {
   const forms = (body: string): Set<string> =>
     nativeForms(
