@@ -97,11 +97,20 @@ export abstract class Store {
   static with<T>(options: { logger: CacheLogger }, fn: () => T): T {
     const prev = Store.logger;
     Store.logger = options.logger;
+    let result: T;
     try {
-      return fn();
-    } finally {
+      result = fn();
+    } catch (error) {
       Store.logger = prev;
+      throw error;
     }
+    if (result instanceof Promise) {
+      return result.finally(() => {
+        Store.logger = prev;
+      }) as T;
+    }
+    Store.logger = prev;
+    return result;
   }
 
   static retrievePoolOptions(options: StoreOptions): StoreOptions | false | undefined {

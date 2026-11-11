@@ -104,13 +104,7 @@ export function cacheLoggingBehavior(host: CacheLoggingBehaviorHost): void {
 
   async function assertLogs(pattern: RegExp | string, block: () => unknown): Promise<void> {
     const io = new StringIO();
-    const oldLogger = Store.logger;
-    try {
-      Store.logger = new Logger(io, { level: "debug" });
-      await block();
-    } finally {
-      Store.logger = oldLogger;
-    }
+    await Store.with({ logger: new Logger(io, { level: "debug" }) }, async () => await block());
     if (typeof pattern === "string") expect(io.string()).toContain(pattern);
     else expect(io.string()).toMatch(pattern);
   }
