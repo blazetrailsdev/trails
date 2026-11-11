@@ -1211,7 +1211,7 @@ describe("NullPool member parity", () => {
     expect(pool.dirtiesQueryCache).toBe(true);
     expect(pool.schemaCache).toBeNull();
     for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType"]) {
-      expect(() => pool[probe]).toThrow(NoMethodError);
+      expect(pool[probe]).toBeUndefined();
     }
     expect(pool.inspect).toBeUndefined();
     expect(rbObjInspect(pool)).toMatch(
@@ -1219,6 +1219,12 @@ describe("NullPool member parity", () => {
     );
     expect(pool.toString).toBe(Object.prototype.toString);
     expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();
+  });
+
+  it("awaits and serializes a pool-less adapter's NullPool", async () => {
+    const pool = new NullPool();
+    expect(await pool).toBe(pool);
+    expect(() => JSON.stringify({ pool })).not.toThrow();
   });
 
   it("lets a failing assertion whose subject holds a NullPool report its own failure", () => {

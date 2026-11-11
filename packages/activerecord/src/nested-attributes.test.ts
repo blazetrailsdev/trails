@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { hashAref, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { hashAref, isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, RecordNotFound, REJECT_ALL_BLANK_PROC, TooManyRecords } from "./index.js";
 import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";
@@ -66,7 +66,7 @@ describe("TestNestedAttributesInGeneral", () => {
   function resetShipConfig(): void {
     Pirate.acceptsNestedAttributesFor("ship", {
       allowDestroy: true,
-      rejectIf: (a) => Object.keys(a).length === 0,
+      rejectIf: isEmpty,
     });
   }
 
@@ -493,14 +493,14 @@ describe("TestNestedAttributesOnAHasOneAssociation", () => {
     const { pirate, ship } = await setup();
     Pirate.acceptsNestedAttributesFor("ship", {
       allowDestroy: false,
-      rejectIf: (a) => Object.keys(a).length === 0,
+      rejectIf: isEmpty,
     });
     await pirate.update({ ship_attributes: { id: ship.id, _destroy: "1" } });
     const reloaded = await shipOf(await Pirate.find(pirate.id));
     expect(String(reloaded!.id)).toBe(String(ship.id));
     Pirate.acceptsNestedAttributesFor("ship", {
       allowDestroy: true,
-      rejectIf: (a) => Object.keys(a).length === 0,
+      rejectIf: isEmpty,
     });
   });
 
@@ -736,13 +736,13 @@ describe("TestNestedAttributesOnABelongsToAssociation", () => {
     const { ship, pirate } = await setup();
     Ship.acceptsNestedAttributesFor("pirate", {
       allowDestroy: false,
-      rejectIf: (a) => Object.keys(a).length === 0,
+      rejectIf: isEmpty,
     });
     await ship.update({ pirate_attributes: { id: pirate.id, _destroy: "1" } });
     await assertNothingRaised(async () => (await pirateOf(ship))!.reload());
     Ship.acceptsNestedAttributesFor("pirate", {
       allowDestroy: true,
-      rejectIf: (a) => Object.keys(a).length === 0,
+      rejectIf: isEmpty,
     });
   });
 
