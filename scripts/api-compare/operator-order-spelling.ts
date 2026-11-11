@@ -282,6 +282,7 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "Arel::Collectors::Bind": { "<<": ["append"] },
   "Arel::Collectors::Composite": { "<<": ["append"] },
   "Arel::Collectors::SubstituteBinds": { "<<": ["append"] },
+  "Erubi::CaptureBlockEngine::Buffer": { "<<": ["append"], "|": ["bitwiseOr"] },
   // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
   // → connection-adapters/statement-pool.ts `get` / `set`.
   "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },

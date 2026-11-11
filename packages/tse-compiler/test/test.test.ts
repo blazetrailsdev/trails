@@ -550,6 +550,10 @@ _buf.to_s
     expect(new Engine("", { outvar: "foo" }).bufvar).toBe("foo");
   });
 
+  // PERMANENT-SKIP: generated Ruby src cannot be evaluated in process (CLAUDE.md, "Runtime facts Node does not expose").
+  it.skip("should work with BasicObject methods", () => {
+    new Engine("2");
+  });
   it("should return frozen object", () => {
     expect(Object.isFrozen(new Engine(""))).toBe(true);
   });
@@ -1093,6 +1097,51 @@ _buf.to_s
         { bufvar: "@a", escape: true },
         true,
         engine,
+      );
+    });
+  });
+
+  describe("CaptureBlockEngine", () => {
+    // PERMANENT-SKIP: generated Ruby src cannot be evaluated in process (CLAUDE.md, "Runtime facts Node does not expose").
+    it.skip("should allow <%= and <% for capturing when with :escape => true", () => {
+      new CaptureBlockEngine(
+        "<table>\n <tbody>\n  <%= bar do %>\n   <b><%= '&' %></b>\n <% end %>\n </tbody>\n</table>\n",
+        { bufvar: "@a", escape: true },
+      );
+    });
+    // PERMANENT-SKIP: generated Ruby src cannot be evaluated in process (CLAUDE.md, "Runtime facts Node does not expose").
+    it.skip("should handle loops in <%= and <% for capturing when with :escape => true", () => {
+      new CaptureBlockEngine(
+        '<table>\n <tbody>\n  <%= quux do |i| %>\n   <b><%= "#{i}&" %></b>\n <% end %>\n </tbody>\n</table>\n',
+        { bufvar: "@a", escape: true },
+      );
+    });
+    // PERMANENT-SKIP: generated Ruby src cannot be evaluated in process (CLAUDE.md, "Runtime facts Node does not expose").
+    it.skip("should allow <%= and <% for nested capturing when with :escape => true", () => {
+      new CaptureBlockEngine(
+        "<table>\n <tbody>\n  <%= bar do %>\n   <b><%= '&' %></b>\n   <%= baz do %>e<% end %>\n <% end %>\n </tbody>\n</table>\n",
+        { bufvar: "@a", escape: true },
+      );
+    });
+    // PERMANENT-SKIP: generated Ruby src cannot be evaluated in process (CLAUDE.md, "Runtime facts Node does not expose").
+    it.skip("should allow <%== and <% for capturing when with :escape => false", () => {
+      new CaptureBlockEngine(
+        "<table>\n <tbody>\n  <%== bar do %>\n   <b><%== '&' %></b>\n <% end %>\n </tbody>\n</table>\n",
+        { bufvar: "@a", escape: false },
+      );
+    });
+    // PERMANENT-SKIP: generated Ruby src cannot be evaluated in process (CLAUDE.md, "Runtime facts Node does not expose").
+    it.skip("should handle loops in <%== and <% for capturing when with :escape => false", () => {
+      new CaptureBlockEngine(
+        '<table>\n <tbody>\n  <%== quux do |i| %>\n   <b><%== "#{i}&" %></b>\n <% end %>\n </tbody>\n</table>\n',
+        { bufvar: "@a", escape: false },
+      );
+    });
+    // PERMANENT-SKIP: generated Ruby src cannot be evaluated in process (CLAUDE.md, "Runtime facts Node does not expose").
+    it.skip("should allow <%== and <% for nested capturing when with :escape => false", () => {
+      new CaptureBlockEngine(
+        "<table>\n <tbody>\n  <%== bar do %>\n   <b><%== '&' %></b>\n   <%== baz do %>e<% end %>\n <% end %>\n </tbody>\n</table>\n",
+        { bufvar: "@a", escape: false },
       );
     });
   });
