@@ -28,6 +28,7 @@
     "db:down": "docker compose down",
     "parity:api": "bash scripts/api-compare/run.sh",
     "parity:api:drift": "pnpm tsx scripts/api-compare/drift.ts",
+    "parity:bump:dry-run": "pnpm tsx scripts/parity/bump-dry-run/dry-run.ts",
     "parity:api:extra": "pnpm tsx scripts/api-compare/extra-surface.ts",
     "parity:api:privates": "pnpm tsx scripts/api-compare/privates-surface.ts",
     "parity:api:build": "pnpm tsx scripts/api-compare/build.ts",
