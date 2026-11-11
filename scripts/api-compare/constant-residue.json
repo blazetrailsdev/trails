@@ -289,10 +289,14 @@
     }
   },
   "actiontext": {
-    "rows": 10,
+    "rows": 14,
     "excluded": [],
     "unwalked": [],
     "residue": {
+      "attachable.ts::Attachable": "ActionText::Attachable",
+      "attachables/content-attachment.ts::ContentAttachment": "ActionText::Attachables::ContentAttachment",
+      "attachables/missing-attachable.ts::MissingAttachable": "ActionText::Attachables::MissingAttachable",
+      "attachables/remote-image.ts::RemoteImage": "ActionText::Attachables::RemoteImage",
       "attachment-gallery.ts::AttachmentGallery": "ActionText::AttachmentGallery",
       "attachment.ts::Attachment": "ActionText::Attachment",
       "attachments/caching.ts::Caching": "ActionText::Attachments::Caching",
