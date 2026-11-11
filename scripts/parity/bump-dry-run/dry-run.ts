@@ -10,11 +10,19 @@
  * 3. Extract the candidate's Ruby API (`parity:api:drift`'s extraction) and
  *    tests, merge the source's packages over the active manifests, and run
  *    every step again; the outputs are kept as `candidate/`. Each gating lint
- *    runs with `--no-regen`, so nothing rewrites the merged manifest.
- * 4. Restore the active outputs, and refuse a run that left any tracked file
- *    changed (restoring the ones it changed).
+ *    runs with `--no-regen`, so nothing rewrites the merged manifest. First
+ *    `parity:api:inlined:fix` re-cites every `@inlinedFrom` tag at the
+ *    candidate's spans, as the flip PR will, and the build and TS API are
+ *    refreshed, so `compare.ts` reads the candidate bodies.
+ * 4. Restore the active outputs and every tracked file from HEAD, rebuild, and
+ *    refuse a run that left any tracked file changed. The run needs a clean
+ *    tracked tree to start.
  * 5. Write the ledger seed, the attribution of every new gate row and RFC
  *    § 2's tables to scripts/parity/output/bump-dry-run/<source>@<ref>/.
+ *
+ * `vendor/` and `scripts/api-compare` resolve as CommonJS while
+ * `scripts/parity` is ESM, so their modules are loaded by dynamic import, as
+ * `scripts/parity/pipeline/schema/ruby/build-gemfile.ts` does.
  *
  * Hard rules: no node:* imports; process.* only in the entry guard.
  */
@@ -41,13 +49,11 @@ import {
   type RubyTestManifest,
 } from "./ledger.js";
 
-// vendor/ and scripts/api-compare resolve as CommonJS while scripts/parity is
-// ESM; a dynamic import does that interop under tsx and Vitest alike (see
-// scripts/parity/pipeline/schema/ruby/build-gemfile.ts).
 const { fetchCandidate } = await import("../../../vendor/fetch.js");
 const { SOURCES, testPathsManifest, vendoredRoot } = await import("../../../vendor/sources.js");
 const { extractTargetApi } = await import("../../api-compare/drift.js");
 const { compareArms } = await import("../../api-compare/report-arms.js");
+const { buildReport, loadConcernHooks } = await import("../../api-compare/extra-surface.js");
 
 type Env = Record<string, string | undefined>;
 const run = promisify(execFile);
@@ -147,6 +153,22 @@ async function runSteps(env: Env, label: string): Promise<StepResult[]> {
   }
   await sh("pnpm", MISSING_REPORT, env);
   return results;
+}
+
+/** Every extra-surface name `lint-extra-surface-ratchet.ts` measures, as a gate row. */
+async function extraRows(dir: string): Promise<GateRow[]> {
+  const ruby = await readJson<Parameters<typeof buildReport>[0]>(path.join(dir, "rails-api.json"));
+  const ts = await readJson<Parameters<typeof buildReport>[1]>(path.join(dir, "ts-api.json"));
+  const report = buildReport(ruby, ts, {
+    filterPkg: null,
+    excludeGlobs: [],
+    novelOnly: false,
+    topN: Infinity,
+    concernHooks: await loadConcernHooks(ruby, null),
+  });
+  return report.topN.flatMap((f) =>
+    f.extras.map((e) => ({ package: f.package, tsFile: f.tsFile, tsName: e.name, kind: e.kind })),
+  );
 }
 
 async function readJson<T>(file: string): Promise<T> {
@@ -307,8 +329,6 @@ async function main(argv: string[], env: Env): Promise<number> {
       path.join(TEST_OUT, "rails-tests.json"),
       JSON.stringify(mergeManifest(activeTests, candidateTests, Object.keys(candidateTestPaths))),
     );
-    // The flip PR re-cites every @inlinedFrom tag at the candidate's spans; do
-    // the same, so compare.ts reads the candidate bodies, and undo it below.
     await sh("pnpm", [...TSX, "scripts/api-compare/lint-inlined-from.ts", "--fix"], childEnv);
     citationRewrites = [...(await trackedDiff(env)).keys()];
     await sh("pnpm", ["build"], env);
@@ -367,8 +387,6 @@ async function main(argv: string[], env: Env): Promise<number> {
       c<unknown>(`api/${f}`).catch(() => null),
     ]);
     if (cand === null) continue;
-    // call-skeletons.json holds every compared pair; the arm gate counts the
-    // pairs compareArms flags with a missing `throw` (lint-arm-throws.ts).
     const gated = (rows: GateRow[]) =>
       f === "call-skeletons.json"
         ? rows.filter((r) => {
@@ -381,6 +399,15 @@ async function main(argv: string[], env: Env): Promise<number> {
     );
     attribution[f] = attribute(fresh, seed, activeHashes, candidateHashes);
   }
+  attribution["extra surface"] = attribute(
+    newRows(
+      await extraRows(path.join(outDir, "active/api")),
+      await extraRows(path.join(outDir, "candidate/api")),
+    ).filter((r) => packages.includes(r.package)),
+    seed,
+    activeHashes,
+    candidateHashes,
+  );
   const residue = Object.entries(attribution).flatMap(([f, rows]) =>
     rows.filter((r) => r.attribution === null).map((r) => ({ artifact: f, ...r.row })),
   );
