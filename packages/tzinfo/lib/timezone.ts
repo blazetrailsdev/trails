@@ -22,7 +22,9 @@ import {
 import { Rational } from "@blazetrails/ruby-compat";
 import { TimezonePeriod } from "./timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
-import type { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
+import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
+import { DataTimezoneInfo } from "./data-sources/data-timezone-info.js";
+import type { TimezoneInfo } from "./data-sources/timezone-info.js";
 
 export class AmbiguousTime extends Error {
   override name = "AmbiguousTime";
@@ -375,13 +377,13 @@ export class Timezone {
       }
       loadedTimezoneIdentifiers.add(identifier);
     }
-    return new Timezone(identifier);
+    return new DataTimezoneInfo(identifier).createTimezone();
   }
 
   readonly identifier: string;
-  readonly info: ConstantOffsetDataTimezoneInfo | null;
+  readonly info: TimezoneInfo | null;
 
-  constructor(name: string, info: ConstantOffsetDataTimezoneInfo | null = null) {
+  constructor(name: string, info: TimezoneInfo | null = null) {
     this.identifier = name;
     this.info = info;
   }
@@ -422,7 +424,8 @@ export class Timezone {
   }
 
   abbr(time: Date | Temporal.Instant): string {
-    if (this.info) return this.info.constantOffset.abbreviation;
+    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
+      return this.info.constantOffset.abbreviation;
     const fixed = fixedZoneAbbreviations.get(this.identifier);
     if (fixed !== undefined) return fixed;
     const interval = zoneInterval(this.identifier, toDate(time));
@@ -438,12 +441,14 @@ export class Timezone {
   }
 
   observedUtcOffset(time: Date | Temporal.Instant): number {
-    if (this.info) return this.info.constantOffset.observedUtcOffset;
+    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
+      return this.info.constantOffset.observedUtcOffset;
     return getZoneInfo(this.identifier, toDate(time)).utcOffsetSeconds;
   }
 
   isDst(time: Date | Temporal.Instant | Time): boolean {
-    if (this.info) return this.info.constantOffset.stdOffset !== 0;
+    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
+      return this.info.constantOffset.stdOffset !== 0;
     return tzdataIsdst(this.identifier, Math.floor(toDate(time).getTime() / 1000));
   }
 
@@ -455,7 +460,7 @@ export class Timezone {
     const d = toDate(time);
     const observed = this.observedUtcOffset(d);
     const dst = this.isDst(d);
-    if (this.info) {
+    if (this.info instanceof ConstantOffsetDataTimezoneInfo) {
       const offset = this.info.constantOffset;
       return new TimezonePeriod(offset.abbreviation, observed, dst, offset.baseUtcOffset);
     }
@@ -504,7 +509,7 @@ export class Timezone {
   }
 
   periodsForLocal(time: Time): TimezonePeriod[] {
-    if (this.info) return [this.periodForUtc(time)];
+    if (this.info instanceof ConstantOffsetDataTimezoneInfo) return [this.periodForUtc(time)];
     const localMs = ignoringOffset(time).getTime();
     const DAY = 86_400_000;
     const around = [
@@ -549,7 +554,8 @@ export class Timezone {
   }
 
   utcToLocal(time: Time): Time {
-    if (this.info) return time.getlocal(this.info.constantOffset.observedUtcOffset);
+    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
+      return time.getlocal(this.info.constantOffset.observedUtcOffset);
     return time.getlocal(this.identifier);
   }
 

@@ -1500,12 +1500,16 @@
     }
   },
   "tzinfo": {
-    "rows": 10,
+    "rows": 14,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "country.ts::InvalidCountryCode": "TZInfo::InvalidCountryCode",
       "data-sources/constant-offset-data-timezone-info.ts::ConstantOffsetDataTimezoneInfo": "TZInfo::DataSources::ConstantOffsetDataTimezoneInfo",
+      "data-sources/data-timezone-info.ts::DataTimezoneInfo": "TZInfo::DataSources::DataTimezoneInfo",
+      "data-sources/timezone-info.ts::TimezoneInfo": "TZInfo::DataSources::TimezoneInfo",
+      "data-timezone.ts::DataTimezone": "TZInfo::DataTimezone",
+      "info-timezone.ts::InfoTimezone": "TZInfo::InfoTimezone",
       "timestamp.ts::Timestamp": "TZInfo::Timestamp",
       "timezone-offset.ts::TimezoneOffset": "TZInfo::TimezoneOffset",
       "timezone-period.ts::TimezonePeriod": "TZInfo::TimezonePeriod",

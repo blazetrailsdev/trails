@@ -28,10 +28,12 @@ export class TimezonePeriod {
     return this.#transitions;
   }
 
+  /** @missingRailsCall raise_not_implemented — CONVERGEABLE tzinfo-offset-transition-and-periods */
   get startTransition(): TimezoneTransition | null {
     return this.#boundaries()[0];
   }
 
+  /** @missingRailsCall raise_not_implemented — CONVERGEABLE tzinfo-offset-transition-and-periods */
   get endTransition(): TimezoneTransition | null {
     return this.#boundaries()[1];
   }
