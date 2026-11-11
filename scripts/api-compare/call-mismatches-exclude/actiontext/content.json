@@ -1,9 +1,0 @@
-[
-  {
-    "package": "actiontext",
-    "tsFile": "content.ts",
-    "rubyName": "render_attachment_galleries",
-    "call": "order:attachmentGalleryForNode,fragmentByReplacingAttachmentGalleryNodes",
-    "reason": "The block reaches an awaited render, and fragment_by_replacing_attachment_gallery_nodes takes a sync block, so each gallery is rendered before the replace; converges with story actiontext-fragment-replace-awaits-its-block."
-  }
-]

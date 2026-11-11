@@ -34,7 +34,8 @@ extend(Rendering, Concern);
 
 Rendering.classMethods((mod) => {
   mod.actionControllerRenderer = function (this: RenderingClass): RendererLike {
-    return (this._actionControllerRenderer ??= class extends ActionController.Base {}.renderer);
+    if (Object.hasOwn(this, "_actionControllerRenderer")) return this._actionControllerRenderer!;
+    return (this._actionControllerRenderer = class extends ActionController.Base {}.renderer);
   };
 
   /** @inventedArm fork — PERMANENT */

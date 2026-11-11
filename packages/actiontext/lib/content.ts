@@ -42,7 +42,7 @@ export class Content {
 
   static async fragmentByCanonicalizingContent(content: unknown): Promise<Fragment> {
     let fragment = await Attachment.fragmentByCanonicalizingAttachments(content);
-    fragment = AttachmentGallery.fragmentByCanonicalizingAttachmentGalleries(fragment);
+    fragment = await AttachmentGallery.fragmentByCanonicalizingAttachmentGalleries(fragment);
     return fragment;
   }
 
@@ -125,7 +125,7 @@ export class Content {
   }
 
   async renderAttachments(
-    options: { withFullAttributes?: boolean },
+    options: { withFullAttributes?: boolean } = {},
     block: (attachment: Attachment | null) => unknown,
   ): Promise<Content> {
     const nodes: Html5Node[] = [];
@@ -149,14 +149,9 @@ export class Content {
   async renderAttachmentGalleries(
     block: (attachmentGallery: AttachmentGallery) => unknown,
   ): Promise<Content> {
-    const replacements: unknown[] = [];
-    for (const node of AttachmentGallery.findAttachmentGalleryNodes(this.fragment)) {
-      replacements.push(await block(this.attachmentGalleryForNode(node)));
-    }
-    let index = 0;
-    const content = AttachmentGallery.fragmentByReplacingAttachmentGalleryNodes(
+    const content = await AttachmentGallery.fragmentByReplacingAttachmentGalleryNodes(
       this.fragment,
-      () => replacements[index++],
+      (node) => block(this.attachmentGalleryForNode(node)),
     );
     return new (this.constructor as typeof Content)(content, { canonicalize: false });
   }
@@ -171,7 +166,7 @@ export class Content {
 
   async toTrixHtml(): Promise<string> {
     return (
-      await this.renderAttachments({}, (attachment) => attachment!.toTrixAttachment())
+      await this.renderAttachments(undefined, (attachment) => attachment!.toTrixAttachment())
     ).toHtml();
   }
 
@@ -220,7 +215,7 @@ export class Content {
   }
 
   isEmpty(): boolean {
-    return this.toHtml().length === 0;
+    return this.toHtml() === "";
   }
 
   htmlSafe(): ReturnType<typeof htmlSafe> {
