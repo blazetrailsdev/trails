@@ -52,6 +52,7 @@ runs:
           && sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends --no-download "$DEBS"/*.deb; then
           exit 0
         fi
+        [ "$CACHE_HIT" = true ] && echo "offline install from cached .debs failed; falling back to apt-get update"
         for attempt in 1 2 3; do
           sudo timeout -k 10 60 apt-get "${APT_OPTS[@]}" update -q \
             && sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends $PACKAGES \
