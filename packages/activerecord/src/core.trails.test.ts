@@ -11,7 +11,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { compactBlank, isBlank } from "@blazetrails/activesupport";
+import { compactBlank, DescendantsTracker, isBlank } from "@blazetrails/activesupport";
 import { rbCheckArrayType, rbHash, rbModToS, rbObjRespondTo, uniq } from "@blazetrails/ruby-compat";
 import { _allocation, equals as coreEquals, hash as coreHash } from "./core.js";
 import { hasQueryConstraints, queryConstraints } from "./persistence.js";
@@ -750,6 +750,19 @@ describe("Base's inherited chain is deferred to own-property memo guards", () =>
       expect(middle[memo]).not.toBe(root[memo]);
     }
     expect(await read(Leaf)).toEqual(leaf);
+  });
+
+  it("drops an ancestor's cached find-by statements when a subclass is registered", async () => {
+    class Middle extends Topic {}
+    await read(Middle);
+    const cached = (Middle as unknown as { _findByStatementCache: object })._findByStatementCache;
+
+    class Leaf extends Middle {}
+    DescendantsTracker.registerSubclass(Middle, Leaf);
+
+    expect((Middle as unknown as { _findByStatementCache: object })._findByStatementCache).not.toBe(
+      cached,
+    );
   });
 
   it("resets locking_column and has_query_constraints? for a subclass", () => {
