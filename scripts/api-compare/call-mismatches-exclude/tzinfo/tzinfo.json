@@ -1,0 +1,9 @@
+[
+  {
+    "package": "tzinfo",
+    "tsFile": "tzinfo.ts",
+    "rubyName": "periods_for_local",
+    "call": "raise_not_implemented",
+    "reason": "The gate pairs DataSources::DataTimezoneInfo#periods_for_local, which is unported, with Timezone#periodsForLocal; Rails' Timezone#periods_for_local raises raise_unknown_timezone, not raise_not_implemented."
+  }
+]
