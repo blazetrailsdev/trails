@@ -192,7 +192,7 @@ describe("RailtieTest", () => {
     Encryption.config.addToFilterParameters = true;
 
     await runTrailtieInitializers(Trailtie, app);
-    Encryption.encryptedAttributeWasDeclared(class Person {}, "name");
+    Encryption.encryptedAttributeWasDeclared(class Person extends Base {}, "name");
 
     expect(app.config.filterParameters).toContain("person.name");
   });
@@ -206,7 +206,7 @@ describe("RailtieTest", () => {
     Encryption.config.addToFilterParameters = false;
 
     await runTrailtieInitializers(Trailtie, app);
-    Encryption.encryptedAttributeWasDeclared(class Person {}, "name");
+    Encryption.encryptedAttributeWasDeclared(class Person extends Base {}, "name");
 
     expect(app.config.filterParameters).toEqual([]);
   });

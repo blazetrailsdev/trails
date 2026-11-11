@@ -1,5 +1,5 @@
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { fetch } from "@blazetrails/ruby-compat";
+import { fetch, rbEqual } from "@blazetrails/ruby-compat";
 import { asJson, classAttribute, getEnv, included, onLoad } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
@@ -78,9 +78,7 @@ export class TokenDefinition {
       | null;
     let model: Base | null = null;
     if (payload != null) model = await block(payload[0]);
-    return model && JSON.stringify(this.payloadFor(model)) === JSON.stringify(payload)
-      ? model
-      : null;
+    return model && rbEqual(this.payloadFor(model), payload) ? model : null;
   }
 }
 

@@ -458,6 +458,17 @@ describe.skipIf(!hasCredentials)("libsqlRemoteDriver — network round-trip (TUR
   });
 });
 
+describe("LibSQLRemoteAdapter#databaseExists", () => {
+  it("answers from a connection, not from File.exist? on the database URL", async () => {
+    const adapter = new LibSQLRemoteAdapter({ database: "file::memory:", driver: libsqlDriver });
+    try {
+      expect(await adapter.databaseExists()).toBe(true);
+    } finally {
+      await adapter.disconnectBang();
+    }
+  });
+});
+
 describe.skipIf(!hasCredentials)("LibSQLRemoteAdapter — network adapter smoke (TURSO_*)", () => {
   let adapter: LibSQLRemoteAdapter;
 

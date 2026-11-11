@@ -77,7 +77,8 @@ export class WhereChain<R = any> {
 
   not(opts: Record<string, unknown>): R;
   not(opts: unknown[]): R;
-  not(opts: Record<string, unknown> | unknown[], ...rest: unknown[]): R {
+  not(opts: string, ...rest: unknown[]): R;
+  not(opts: Record<string, unknown> | unknown[] | string, ...rest: unknown[]): R {
     const scope = this._scope as unknown as QueryMethodsHost;
     const whereClause = buildWhereClause.call(scope, opts, rest);
     scope.whereClause = scope.whereClause.plus(whereClause.invert());

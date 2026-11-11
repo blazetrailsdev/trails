@@ -62,4 +62,8 @@ describe("FinderTrailsTest", () => {
     expect(notInRel.toSql()).toMatch(/NOT IN \(NULL\)/);
     expect(await notInRel.isExists()).toBe(false);
   });
+
+  it("offset with a string produces the same SQL as a number", () => {
+    expect(Topic.offset("3").toSql()).toBe(Topic.offset(3).toSql());
+  });
 });

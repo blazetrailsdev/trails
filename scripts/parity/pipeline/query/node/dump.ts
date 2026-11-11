@@ -110,7 +110,7 @@ async function main(): Promise<void> {
   assertPackagesBuilt("parity dump (trails)");
 
   const frozenTs = frozenAt ?? DEFAULT_FROZEN_AT;
-  const frozenMs = new Date(frozenTs).getTime();
+  const frozenMs = Math.floor(new Date(frozenTs).getTime() / 1000) * 1000;
   const fixtureDirAbs = resolve(fixtureDirRaw);
   const outPathAbs = resolve(outPathRaw);
   const fixtureName = basename(fixtureDirAbs);

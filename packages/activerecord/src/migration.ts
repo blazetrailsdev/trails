@@ -1437,7 +1437,13 @@ export class MigrationProxy {
 
   /** @internal */
   migration(): Promise<Migration> {
-    this._migration ??= this.loadMigration();
+    if (this._migration == null) {
+      const loading = this.loadMigration();
+      this._migration = loading;
+      loading.catch(() => {
+        if (this._migration === loading) this._migration = null;
+      });
+    }
     return this._migration;
   }
 
