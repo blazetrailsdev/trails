@@ -64,7 +64,6 @@ export class Content {
   /** @internal */
   private _attachmentGalleryNodes?: Html5Node[];
 
-  /** @inventedArm await — PERMANENT */
   constructor(content: unknown = null, options: ContentOptions = {}) {
     withDefaultsBang(options, { canonicalize: true });
 
@@ -125,29 +124,28 @@ export class Content {
     ).canonicalized;
   }
 
-  /** @inventedArm await — CONVERGEABLE actiontext-fragment-replace-awaits-its-block */
   async renderAttachments(
     options: { withFullAttributes?: boolean },
     block: (attachment: Attachment | null) => unknown,
   ): Promise<Content> {
-    let nodes: Html5Node[] = [];
-    const content = this.fragment.update((source) => {
-      nodes = source.css(Attachment.tagName).toA();
-    });
-    for (const node of nodes) {
+    const nodes: Html5Node[] = [];
+    const content = this.fragment.replace(Attachment.tagName, (node) => {
       if (node.isKey("content")) {
         const sanitizedContent = this.sanitizeContentAttachment(
           String(node.removeAttribute("content")),
         );
         if (isPresent(sanitizedContent)) node.set("content", sanitizedContent);
       }
+      nodes.push(node);
+      return node;
+    });
+    for (const node of nodes) {
       const replacementNode = await block(await this.attachmentForNode(node, options));
       if (!node.equals(replacementNode)) node.replace(String(replacementNode));
     }
     return new (this.constructor as typeof Content)(content, { canonicalize: false });
   }
 
-  /** @inventedArm await — CONVERGEABLE actiontext-fragment-replace-awaits-its-block */
   async renderAttachmentGalleries(
     block: (attachmentGallery: AttachmentGallery) => unknown,
   ): Promise<Content> {
