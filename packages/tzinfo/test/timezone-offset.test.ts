@@ -53,35 +53,27 @@ describe("TCTimezoneOffset", () => {
     expect(o2.isDst()).toBe(true);
   });
 
-  it("equality", () => {
-    const o1 = new TimezoneOffset(18000, 0, "TEST");
-    const o2 = new TimezoneOffset(18000, 0, "TEST");
-    const o3 = new TimezoneOffset(18001, 0, "TEST");
-    const o4 = new TimezoneOffset(18000, 1, "TEST");
-    const o5 = new TimezoneOffset(18000, 0, "TEST2");
+  for (const [name, method] of [
+    ["equality", "equals"],
+    ["eql", "eql"],
+  ] as const) {
+    it(name, () => {
+      const o1 = new TimezoneOffset(18000, 0, "TEST");
+      const o2 = new TimezoneOffset(18000, 0, "TEST");
+      const o3 = new TimezoneOffset(18001, 0, "TEST");
+      const o4 = new TimezoneOffset(18000, 1, "TEST");
+      const o5 = new TimezoneOffset(18000, 0, "TEST2");
 
-    expect(o1.equals(o1)).toBe(true);
-    expect(o1.equals(o2)).toBe(true);
-    expect(o1.equals(o3)).toBe(false);
-    expect(o1.equals(o4)).toBe(false);
-    expect(o1.equals(o5)).toBe(false);
-    expect(o1.equals({})).toBe(false);
-  });
-
-  it("eql", () => {
-    const o1 = new TimezoneOffset(18000, 0, "TEST");
-    const o2 = new TimezoneOffset(18000, 0, "TEST");
-    const o3 = new TimezoneOffset(18001, 0, "TEST");
-    const o4 = new TimezoneOffset(18000, 1, "TEST");
-    const o5 = new TimezoneOffset(18000, 0, "TEST2");
-
-    expect(o1.eql(o1)).toBe(true);
-    expect(o1.eql(o2)).toBe(true);
-    expect(o1.eql(o3)).toBe(false);
-    expect(o1.eql(o4)).toBe(false);
-    expect(o1.eql(o5)).toBe(false);
-    expect(o1.eql({})).toBe(false);
-  });
+      expect([o1, o2, o3, o4, o5, {}].map((o) => o1[method](o))).toEqual([
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+      ]);
+    });
+  }
 
   it("hash", () => {
     const o1 = new TimezoneOffset(18000, 0, "TEST");

@@ -24,37 +24,28 @@ describe("TCOffsetTimezonePeriod", () => {
     expect(p.endTransition).toBeNull();
   });
 
-  it("equality", () => {
-    const o1 = new TimezoneOffset(0, 3600, "TEST");
-    const o2 = new TimezoneOffset(0, 0, "TEST");
+  for (const [name, method] of [
+    ["equality", "equals"],
+    ["eql", "eql"],
+  ] as const) {
+    it(name, () => {
+      const o1 = new TimezoneOffset(0, 3600, "TEST");
+      const o2 = new TimezoneOffset(0, 0, "TEST");
 
-    const p1 = new OffsetTimezonePeriod(o1);
-    const p2 = new OffsetTimezonePeriod(o1);
-    const p3 = new OffsetTimezonePeriod(o2);
-    const p4 = new TimezonePeriod(o1);
+      const p1 = new OffsetTimezonePeriod(o1);
+      const p2 = new OffsetTimezonePeriod(o1);
+      const p3 = new OffsetTimezonePeriod(o2);
+      const p4 = new TimezonePeriod(o1);
 
-    expect(p1.equals(p1)).toBe(true);
-    expect(p1.equals(p2)).toBe(true);
-    expect(p1.equals(p3)).toBe(false);
-    expect(p1.equals(p4)).toBe(false);
-    expect(p1.equals({})).toBe(false);
-  });
-
-  it("eql", () => {
-    const o1 = new TimezoneOffset(0, 3600, "TEST");
-    const o2 = new TimezoneOffset(0, 0, "TEST");
-
-    const p1 = new OffsetTimezonePeriod(o1);
-    const p2 = new OffsetTimezonePeriod(o1);
-    const p3 = new OffsetTimezonePeriod(o2);
-    const p4 = new TimezonePeriod(o1);
-
-    expect(p1.eql(p1)).toBe(true);
-    expect(p1.eql(p2)).toBe(true);
-    expect(p1.eql(p3)).toBe(false);
-    expect(p1.eql(p4)).toBe(false);
-    expect(p1.eql({})).toBe(false);
-  });
+      expect([p1, p2, p3, p4, {}].map((p) => p1[method](p))).toEqual([
+        true,
+        true,
+        false,
+        false,
+        false,
+      ]);
+    });
+  }
 
   it("hash", () => {
     const o = new TimezoneOffset(0, 3600, "TEST");

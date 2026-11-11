@@ -71,59 +71,41 @@ describe("TCTransitionsTimezonePeriod", () => {
     expect(() => new TransitionsTimezonePeriod(null, null)).toThrow(/\bend_transition\b/);
   });
 
-  it("equality", () => {
-    const [p1, p2, p3, p4, p5, p6, p7, p8, p9] = fixtures();
+  for (const [name, method] of [
+    ["equality", "equals"],
+    ["eql", "eql"],
+  ] as const) {
+    it(name, () => {
+      const [p1, p2, p3, p4, p5, p6, p7, p8, p9] = fixtures();
 
-    expect(p1.equals(p1)).toBe(true);
-    expect(p1.equals(p2)).toBe(true);
-    expect(p1.equals(p3)).toBe(false);
-    expect(p1.equals(p4)).toBe(false);
-    expect(p1.equals(p5)).toBe(false);
-    expect(p1.equals(p6)).toBe(false);
-    expect(p1.equals(p7)).toBe(false);
-    expect(p1.equals(p8)).toBe(false);
-    expect(p1.equals(p9)).toBe(false);
-    expect(p1.equals({})).toBe(false);
-
-    expect(p3.equals(p3)).toBe(true);
-    expect(p3.equals(p4)).toBe(true);
-    expect(p3.equals(p5)).toBe(false);
-    expect(p3.equals(p9)).toBe(false);
-    expect(p3.equals({})).toBe(false);
-
-    expect(p6.equals(p6)).toBe(true);
-    expect(p6.equals(p7)).toBe(true);
-    expect(p6.equals(p8)).toBe(false);
-    expect(p6.equals(p9)).toBe(false);
-    expect(p6.equals({})).toBe(false);
-  });
-
-  it("eql", () => {
-    const [p1, p2, p3, p4, p5, p6, p7, p8, p9] = fixtures();
-
-    expect(p1.eql(p1)).toBe(true);
-    expect(p1.eql(p2)).toBe(true);
-    expect(p1.eql(p3)).toBe(false);
-    expect(p1.eql(p4)).toBe(false);
-    expect(p1.eql(p5)).toBe(false);
-    expect(p1.eql(p6)).toBe(false);
-    expect(p1.eql(p7)).toBe(false);
-    expect(p1.eql(p8)).toBe(false);
-    expect(p1.eql(p9)).toBe(false);
-    expect(p1.eql({})).toBe(false);
-
-    expect(p3.eql(p3)).toBe(true);
-    expect(p3.eql(p4)).toBe(true);
-    expect(p3.eql(p5)).toBe(false);
-    expect(p3.eql(p9)).toBe(false);
-    expect(p3.eql({})).toBe(false);
-
-    expect(p6.eql(p6)).toBe(true);
-    expect(p6.eql(p7)).toBe(true);
-    expect(p6.eql(p8)).toBe(false);
-    expect(p6.eql(p9)).toBe(false);
-    expect(p6.eql({})).toBe(false);
-  });
+      expect([p1, p2, p3, p4, p5, p6, p7, p8, p9, {}].map((p) => p1[method](p))).toEqual([
+        true,
+        true,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+      ]);
+      expect([p3, p4, p5, p9, {}].map((p) => p3[method](p))).toEqual([
+        true,
+        true,
+        false,
+        false,
+        false,
+      ]);
+      expect([p6, p7, p8, p9, {}].map((p) => p6[method](p))).toEqual([
+        true,
+        true,
+        false,
+        false,
+        false,
+      ]);
+    });
+  }
 
   it("hash", () => {
     const o1 = new TimezoneOffset(0, 3600, "TEST");
