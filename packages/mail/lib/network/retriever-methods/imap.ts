@@ -65,7 +65,10 @@ export class IMAP extends Retriever {
       else imap.select(opts.mailbox);
       let uids = imap.uidSearch(opts.keys, opts.searchCharset);
       if (String(opts.what) === "last") uids.reverse();
-      if (Number.isInteger(opts.count)) uids = uids.slice(0, opts.count as number);
+      if (Number.isInteger(opts.count)) {
+        if ((opts.count as number) < 0) throw new ArgumentError("negative array size");
+        uids = uids.slice(0, opts.count as number);
+      }
       if (
         (String(opts.what) === "last" && String(opts.order) === "asc") ||
         (String(opts.what) !== "last" && String(opts.order) === "desc")
