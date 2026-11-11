@@ -308,7 +308,7 @@ export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T>
   const klass = this.constructor;
   await klass.ensureSchemaLoaded();
   const primaryKey = [klass.primaryKey].flat()[0];
-  if (primaryKey != null && !this._attributes.isKey(primaryKey)) {
+  if (this.isNewRecord() && primaryKey != null && !this._attributes.isKey(primaryKey)) {
     this._attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
   }
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
@@ -323,7 +323,7 @@ export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promis
   const klass = this.constructor;
   await klass.ensureSchemaLoaded();
   const primaryKey = [klass.primaryKey].flat()[0];
-  if (primaryKey != null && !this._attributes.isKey(primaryKey)) {
+  if (this.isNewRecord() && primaryKey != null && !this._attributes.isKey(primaryKey)) {
     this._attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
   }
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;

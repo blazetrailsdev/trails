@@ -62,4 +62,14 @@ describe("ModelSchema static fields", () => {
     expect(Reply.ignoredColumns).toEqual(["legacy"]);
     expect(Object.isFrozen(Topic.ignoredColumns)).toBe(true);
   });
+
+  it("a static primaryKey field is handed to its writer by the first class-level reader, with no base_class read", () => {
+    class Order extends Base {
+      static override tableName = "cpk_orders";
+      static override primaryKey: string | string[] = ["shop_id", "id"];
+    }
+    expect(Order.isCompositePrimaryKey()).toBe(true);
+    expect(Object.getOwnPropertyDescriptor(Order, "primaryKey")).toBeUndefined();
+    expect(Order.arelTable.name).toBe("cpk_orders");
+  });
 });
