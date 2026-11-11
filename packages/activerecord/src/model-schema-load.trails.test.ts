@@ -400,3 +400,18 @@ describe("set adapter auto-loads schema", () => {
     expect(Post.typeForAttribute("guid")!.type()).toBe("uuid");
   });
 });
+
+describe("ModelSchema.load_schema monitor waiter (trails)", () => {
+  fixtures(["topics"]);
+
+  it("a waiter on a schema load that raised loads the schema itself", async () => {
+    class Topic extends Base {
+      static override tableName = "topics";
+    }
+    const held = Promise.reject(new ConnectionNotEstablished("the holder's checkout raised"));
+    held.catch(() => {});
+    (Topic as unknown as { _schemaLoadPromise: Promise<void> })._schemaLoadPromise = held;
+    await Topic.loadSchema();
+    expect(Object.keys(Topic.columnsHash())).toContain("title");
+  });
+});

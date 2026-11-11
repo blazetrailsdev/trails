@@ -601,10 +601,16 @@ export class Base extends Model {
 
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
-    if (!Object.hasOwn(this, "_schemaLoadPromise") || !state._schemaLoadPromise) {
-      state._schemaLoadPromise = ModelSchema.loadSchemaFromAdapter.call(this);
+    if (Object.hasOwn(this, "_schemaLoadPromise") && state._schemaLoadPromise) {
+      const held = state._schemaLoadPromise;
+      try {
+        return await held;
+      } catch {
+        if (state._schemaLoadPromise === held) state._schemaLoadPromise = undefined;
+        return await this.loadSchema();
+      }
     }
-    const promise = state._schemaLoadPromise;
+    const promise = (state._schemaLoadPromise = ModelSchema.loadSchemaFromAdapter.call(this));
     try {
       await promise;
     } finally {
