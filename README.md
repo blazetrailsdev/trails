@@ -565,10 +565,31 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 | `@blazetrails/bcrypt`           | `bcrypt` gem                       | `BCrypt::Password` and `BCrypt::Engine`, behind ActiveModel's `has_secure_password`.                                                                                                                                                                                                                                                              |
 | `@blazetrails/msgpack`          | `msgpack` gem                      | `MessagePack` packer, unpacker, factory and extension types, used by ActiveSupport's message serializers and ActiveRecord.                                                                                                                                                                                                                        |
 | `@blazetrails/activejob`        | `activejob`                        | `ActiveJob::Base` with enqueuing, execution, callbacks, `retry_on` / `discard_on`, argument serialization, logging and instrumentation, plus the async, inline and test queue adapters. Solid Queue is a separate, partial port.                                                                                                                  |
-| `@blazetrails/solid-queue`      | `solid_queue` gem                  | A partial port: the job, execution and process records, queues, pauses and semaphores. Workers and the dispatcher are not complete.                                                                                                                                                                                                               |
+| `@blazetrails/actionmailer`     | `actionmailer`                     | `ActionMailer::Base`, mail views and layouts, delivery methods (SMTP, sendmail, file, test), previews, `deliver_later` through ActiveJob, and the mailer test case.                                                                                                                                                                               |
+| `@blazetrails/actionmailbox`    | `actionmailbox`                    | Inbound email: `InboundEmail` records, routing to mailboxes, the ingresses and their controllers, incineration, and the mailbox test helpers.                                                                                                                                                                                                     |
+| `@blazetrails/activestorage`    | `activestorage`                    | Attachments (`has_one_attached` / `has_many_attached`), blobs, the disk service, direct uploads, analyzers, previewers and variants through `image-processing`.                                                                                                                                                                                   |
+| `@blazetrails/actiontext`       | `actiontext`                       | Fragments, attachments, attachables and Trix conversion. Early: no rich-text record yet, and about a fifth of its tests are ported.                                                                                                                                                                                                               |
+| `@blazetrails/solid-queue`      | `solid_queue` gem                  | The database-backed ActiveJob backend: job, execution and process records, queues, pauses, semaphores, workers, the dispatcher, the scheduler and recurring tasks.                                                                                                                                                                                |
+| `@blazetrails/solid-cable`      | `solid_cable` gem                  | The database-backed Action Cable subscription adapter: messages table, listener and trimming.                                                                                                                                                                                                                                                     |
+| `@blazetrails/fugit`            | `fugit` gem                        | Cron, duration and natural time parsing, which Solid Queue's recurring tasks use.                                                                                                                                                                                                                                                                 |
+| `@blazetrails/et-orbi`          | `et-orbi` gem                      | Zoned times for fugit.                                                                                                                                                                                                                                                                                                                            |
+| `@blazetrails/raabro`           | `raabro` gem                       | The parser combinator library fugit parses with.                                                                                                                                                                                                                                                                                                  |
+| `@blazetrails/chronic`          | `chronic` gem                      | Natural-language date parsing, used by fugit.                                                                                                                                                                                                                                                                                                     |
 | `@blazetrails/actioncable`      | `actioncable`                      | Action Cable's server half: channels, connections, the server and worker, the async, inline, test, PostgreSQL and Redis subscription adapters, remote connections, the helper and the channel and connection test cases. The browser client is the published `@rails/actioncable`.                                                                |
 | `@blazetrails/marcel`           | `marcel` gem                       | MIME type detection by magic bytes, file name and declared type.                                                                                                                                                                                                                                                                                  |
+| `@blazetrails/mini-mime`        | `mini_mime` gem                    | MIME type lookup by extension and content type, used by `mail`.                                                                                                                                                                                                                                                                                   |
+| `@blazetrails/mail`             | `mail` gem                         | Email parsing and generation: messages, headers and fields, multipart bodies, encodings, and the delivery methods ActionMailer drives.                                                                                                                                                                                                            |
+| `@blazetrails/net-smtp`         | `net-smtp` gem                     | Ruby's SMTP client, over nodemailer's `SMTPConnection`.                                                                                                                                                                                                                                                                                           |
+| `@blazetrails/image-processing` | `image_processing` gem             | Image transformation pipelines for ActiveStorage variants, with a libvips backend (`wasm-vips`) and an ImageMagick backend.                                                                                                                                                                                                                       |
+| `@blazetrails/mini-magick`      | `mini_magick` gem                  | ImageMagick command lines, shelled out to as in Ruby.                                                                                                                                                                                                                                                                                             |
+| `@blazetrails/builder`          | `builder` gem                      | `Builder::XmlMarkup`, behind `.builder` templates and `to_xml`.                                                                                                                                                                                                                                                                                   |
+| `@blazetrails/tzinfo`           | `tzinfo` gem                       | Time zone lookups over the platform's IANA data, standing in for the parts of tzinfo ActiveSupport uses.                                                                                                                                                                                                                                          |
 | `@blazetrails/ruby-compat`      | Ruby core / stdlib                 | Ruby primitives that Rails calls and does not define (`Range`, `Rational`, `Enumerator`, `String#succ`, `Hash#fetch` semantics, `Kernel#respond_to?`, monitors, `method_missing` proxies). A leaf package; see its [README](packages/ruby-compat/README.md).                                                                                      |
+| `@blazetrails/rake`             | `rake` gem                         | Rake tasks, file tasks, rules, `FileList`, the application and DSL, behind `trails` tasks.                                                                                                                                                                                                                                                        |
+| `@blazetrails/thor`             | `thor` gem                         | The command-line toolkit trailties' commands and generators are built on: commands, options, groups, actions and shell.                                                                                                                                                                                                                           |
+| `@blazetrails/zeitwerk`         | `zeitwerk` gem                     | The application autoloader, run as a build step that writes the autoload tables.                                                                                                                                                                                                                                                                  |
+| `@blazetrails/rackup`           | `rackup` gem                       | The `rackup` server command and handler lookup.                                                                                                                                                                                                                                                                                                   |
+| `@blazetrails/vitest-matchers`  | none                               | Vitest matchers for the Minitest assertions whose meaning turns on Ruby semantics (truthiness, `nil`).                                                                                                                                                                                                                                            |
 | `@blazetrails/tse-compiler`     | `erubi` gem                        | The TSE (Trails Server Embedded) template compiler: lexer, parser and JS emitter with source maps. Used by actionview and the view build.                                                                                                                                                                                                         |
 | `@blazetrails/trails-tsc`       | none                               | A TypeScript 5.9 compiler wrapper with a plugin host. Today it builds and type-checks `.tse` views (`trails-tsc-views`) and provides the views language-service plugin. The model `trails-tsc` binary lives in `activerecord-cli`.                                                                                                                |
 | `@blazetrails/html-sanitizer`   | `rails-html-sanitizer` gem         | `FullSanitizer`, `LinkSanitizer` and `SafeListSanitizer`, over `sanitize-html`. Small, and nothing in the workspace depends on it yet.                                                                                                                                                                                                            |
@@ -577,7 +598,7 @@ The parity figures are in the [next section](#status-and-parity-snapshot).
 
 ## Status and parity snapshot
 
-**As of 2026-10-23, `main` at `4837c7ba7a`.** To regenerate from a checkout:
+**As of 2026-11-11, `main` at `784200d33b`, the day of trails' 10,000th pull request.** To regenerate from a checkout:
 
 ```sh
 pnpm parity:api --public-only   # "Public API" column: Rails public methods with a TS counterpart
@@ -591,46 +612,75 @@ under the rules in [docs/ruby-ts-conventions.md](docs/ruby-ts-conventions.md).
 `parity:test` matches each Rails test case to a ported test of the same name. A
 matched test passes in CI or is counted as skipped.
 
-| Package (parity row)                               | Public API            | All methods           | Rails tests             |
-| -------------------------------------------------- | --------------------- | --------------------- | ----------------------- |
-| activerecord                                       | 5007 / 5125 (97.7%)   | 6985 / 6989 (99.9%)   | 8898 / 8923 (99.7%)     |
-| activemodel                                        | 624 / 627 (99.5%)     | 820 / 821 (99.9%)     | 1037 / 1037 (100%)      |
-| arel                                               | 783 / 784 (99.9%)     | 1052 / 1052 (100%)    | 739 / 739 (100%)        |
-| activesupport                                      | 1675 / 1813 (92.4%)   | 2058 / 2201 (93.5%)   | 3001 / 3343 (89.8%)     |
-| actionpack: ActionDispatch                         | 1292 / 1384 (93.4%)   | 1801 / 1809 (99.6%)   | 1612 / 1670 (96.5%)     |
-| actionpack: ActionController                       | 597 / 655 (91.1%)     | 852 / 854 (99.8%)     | 1906 / 1949 (97.8%)     |
-| actionpack: AbstractController                     | 143 / 160 (89.4%)     | 178 / 178 (100%)      | 52 / 52 (100%)          |
-| actionview                                         | 2335 / 2406 (97.0%)   | 3035 / 3039 (99.9%)   | 2489 / 2562 (97.2%)     |
-| actioncable                                        | 231 / 368 (62.8%)     | 310 / 447 (69.4%)     | 39 / 200 (19.5%)        |
-| activejob                                          | 267 / 269 (99.3%)     | 369 / 369 (100%)      | 395 / 395 (100%)        |
-| trailties (railties)                               | 613 / 1229 (49.9%)    | 842 / 1704 (49.4%)    | 223 / 2419 (9.2%)       |
-| rack                                               | 512 / 517 (99.0%)     | 592 / 592 (100%)      | 866 / 872 (99.3%)       |
-| rack-session                                       | 60 / 60 (100%)        | 98 / 98 (100%)        | 123 / 124 (99.2%)       |
-| rack-test                                          | 62 / 87 (71.3%)       | 108 / 108 (100%)      | 233 / 234 (99.6%)       |
-| globalid                                           | 64 / 64 (100%)        | 93 / 93 (100%)        | 148 / 148 (100%)        |
-| i18n                                               | 235 / 236 (99.6%)     | 329 / 329 (100%)      | 307 / 307 (100%)        |
-| did-you-mean                                       | 14 / 14 (100%)        | 16 / 16 (100%)        | 7 / 7 (100%)            |
-| date                                               | n/a (C extension)     | n/a                   | 137 / 137 (100%)        |
-| bcrypt                                             | 16 / 16 (100%)        | 18 / 18 (100%)        | 39 / 39 (100%)          |
-| msgpack                                            | 32 / 34 (94.1%)       | 35 / 35 (100%)        | 165 / 374 (44.1%)       |
-| marcel                                             | 25 / 25 (100%)        | 32 / 32 (100%)        | 19 / 20 (95.0%)         |
-| solid-queue                                        | 73 / 208 (35.1%)      | 155 / 385 (40.3%)     | n/a (no tests vendored) |
-| ruby-compat                                        | n/a (not a gem)       | n/a                   | 64 / 563 (11.4%)        |
-| **Data layer** (activerecord + activemodel + arel) | 6414 / 6536 (98.1%)   | 8857 / 8862 (99.9%)   | 10674 / 10699 (99.8%)   |
-| **Overall**                                        | 15250 / 16917 (90.1%) | 20536 / 22170 (92.6%) | 22878 / 26905 (85.0%)   |
+| Package (parity row)                               | Public API            | All methods           | Rails tests           |
+| -------------------------------------------------- | --------------------- | --------------------- | --------------------- |
+| activerecord                                       | 5008 / 5126 (97.7%)   | 6987 / 6991 (99.9%)   | 8940 / 8965 (99.7%)   |
+| activemodel                                        | 624 / 627 (99.5%)     | 820 / 821 (99.9%)     | 1037 / 1037 (100%)    |
+| arel                                               | 783 / 784 (99.9%)     | 1052 / 1052 (100%)    | 739 / 739 (100%)      |
+| activesupport                                      | 1715 / 1868 (91.8%)   | 2110 / 2266 (93.1%)   | 3065 / 3379 (90.7%)   |
+| actionpack: ActionDispatch                         | 1292 / 1384 (93.4%)   | 1801 / 1809 (99.6%)   | 1627 / 1670 (97.4%)   |
+| actionpack: ActionController                       | 593 / 655 (90.5%)     | 852 / 854 (99.8%)     | 1921 / 1949 (98.6%)   |
+| actionpack: AbstractController                     | 146 / 160 (91.2%)     | 178 / 178 (100%)      | 52 / 52 (100%)        |
+| actionview                                         | 2349 / 2419 (97.1%)   | 3057 / 3057 (100%)    | 2524 / 2562 (98.5%)   |
+| actioncable                                        | 358 / 390 (91.8%)     | 496 / 496 (100%)      | 213 / 215 (99.1%)     |
+| activejob                                          | 267 / 269 (99.3%)     | 369 / 369 (100%)      | 395 / 395 (100%)      |
+| actionmailer                                       | 175 / 189 (92.6%)     | 230 / 230 (100%)      | 251 / 255 (98.4%)     |
+| activestorage                                      | 408 / 455 (89.7%)     | 631 / 631 (100%)      | 427 / 451 (94.7%)     |
+| actionmailbox                                      | 125 / 137 (91.2%)     | 148 / 167 (88.6%)     | 82 / 87 (94.3%)       |
+| actiontext                                         | 94 / 201 (46.8%)      | 133 / 253 (52.6%)     | 23 / 116 (19.8%)      |
+| trailties (railties)                               | 1100 / 1254 (87.7%)   | 1661 / 1787 (92.9%)   | 679 / 2419 (28.1%)    |
+| rack                                               | 519 / 524 (99.0%)     | 600 / 600 (100%)      | 939 / 960 (97.8%)     |
+| rack-session                                       | 60 / 60 (100%)        | 98 / 98 (100%)        | 123 / 124 (99.2%)     |
+| rack-test                                          | 62 / 87 (71.3%)       | 108 / 108 (100%)      | 233 / 234 (99.6%)     |
+| rackup                                             | 38 / 38 (100%)        | 51 / 51 (100%)        | 56 / 64 (87.5%)       |
+| rake                                               | 349 / 389 (89.7%)     | 464 / 465 (99.8%)     | 589 / 599 (98.3%)     |
+| thor                                               | 325 / 354 (91.8%)     | 504 / 504 (100%)      | 790 / 791 (99.9%)     |
+| zeitwerk                                           | 104 / 104 (100%)      | 147 / 147 (100%)      | 381 / 418 (91.1%)     |
+| globalid                                           | 64 / 64 (100%)        | 93 / 93 (100%)        | 148 / 148 (100%)      |
+| i18n                                               | 235 / 236 (99.6%)     | 329 / 329 (100%)      | 307 / 307 (100%)      |
+| mail                                               | 973 / 996 (97.7%)     | 1257 / 1278 (98.4%)   | 1377 / 1639 (84.0%)   |
+| net-smtp                                           | 91 / 91 (100%)        | 106 / 106 (100%)      | 73 / 95 (76.8%)       |
+| mini-mime                                          | 23 / 23 (100%)        | 23 / 23 (100%)        | 9 / 9 (100%)          |
+| solid-queue                                        | 375 / 378 (99.2%)     | 693 / 696 (99.6%)     | 157 / 172 (91.3%)     |
+| solid-cable                                        | 15 / 15 (100%)        | 19 / 19 (100%)        | 21 / 21 (100%)        |
+| fugit                                              | 326 / 326 (100%)      | 349 / 349 (100%)      | 419 / 420 (99.8%)     |
+| et-orbi                                            | 84 / 84 (100%)        | 110 / 110 (100%)      | 145 / 145 (100%)      |
+| raabro                                             | 101 / 101 (100%)      | 101 / 101 (100%)      | 89 / 89 (100%)        |
+| chronic                                            | 249 / 249 (100%)      | 268 / 268 (100%)      | 163 / 163 (100%)      |
+| builder                                            | 19 / 21 (90.5%)       | 34 / 34 (100%)        | 98 / 98 (100%)        |
+| mini-magick                                        | 122 / 122 (100%)      | 125 / 125 (100%)      | 145 / 145 (100%)      |
+| image-processing                                   | 92 / 92 (100%)        | 105 / 105 (100%)      | 177 / 178 (99.4%)     |
+| marcel                                             | 25 / 25 (100%)        | 32 / 32 (100%)        | 19 / 20 (95.0%)       |
+| did-you-mean                                       | 14 / 14 (100%)        | 16 / 16 (100%)        | 7 / 7 (100%)          |
+| bcrypt                                             | 16 / 16 (100%)        | 18 / 18 (100%)        | 39 / 39 (100%)        |
+| msgpack                                            | 32 / 34 (94.1%)       | 35 / 35 (100%)        | 165 / 374 (44.1%)     |
+| erubi                                              | 7 / 8 (87.5%)         | 21 / 23 (91.3%)       | 38 / 39 (97.4%)       |
+| crass                                              | 61 / 70 (87.1%)       | 61 / 70 (87.1%)       | 10 / 15 (66.7%)       |
+| rails-dom-testing                                  | 34 / 36 (94.4%)       | 66 / 69 (95.7%)       | 48 / 55 (87.3%)       |
+| nokogiri                                           | 200 / 548 (36.5%)     | 230 / 599 (38.4%)     | 96 / 351 (27.4%)      |
+| tzinfo                                             | 56 / 284 (19.7%)      | 62 / 372 (16.7%)      | 50 / 961 (5.2%)       |
+| date                                               | n/a (C extension)     | n/a                   | 137 / 137 (100%)      |
+| ruby-compat                                        | n/a (not a gem)       | n/a                   | 64 / 563 (11.4%)      |
+| **Data layer** (activerecord + activemodel + arel) | 6415 / 6537 (98.1%)   | 8859 / 8864 (99.9%)   | 10716 / 10741 (99.8%) |
+| **Overall**                                        | 20035 / 22226 (90.1%) | 26987 / 28857 (93.5%) | 29100 / 33891 (85.9%) |
 
-The Overall row also counts the ported `thor`, `pg`, `mysql2` and `sqlite3`
-gem rows, which `parity:api` reports separately. The activerecord row also counts the ported `sqlite3` gem internals the SQLite
-adapter uses (229 / 298 public). Test support has its own row
-(`activerecord-test-support`, 41 / 56 public).
+The Overall row also counts the partial `pg`, `mysql2`, `sqlite3`, `racc`,
+`loofah` and `rails-html-sanitizer` rows, the `actionpackversion` row, and
+test support (`activerecord-test-support`, 41 / 56 public), which are left out
+of the table. The activerecord row also counts the ported `sqlite3` gem
+internals the SQLite adapter uses (229 / 298 public).
 
 Read the columns this way. API coverage says a method with the Rails name
 exists. The fidelity gates in [CONTRIBUTING.md](CONTRIBUTING.md#measuring-progress)
 (call sets, call arguments, parameter names, arity) say how closely its body
 follows the Rails body. Test coverage is the better signal of what works. By
-that measure the data layer, ActionPack, ActionView, ActiveJob, Rack, i18n,
-globalid and date are close to done, and trailties, ActionCable and the
-vendored gem rows (thor, msgpack) are where most of the remaining work is.
+that measure the data layer, ActionPack, ActionView, ActionCable, ActiveJob,
+ActionMailer, Rack, Rake, Thor, i18n, globalid, date and the Solid Queue
+scheduling stack (fugit, et-orbi, raabro, chronic) are close to done.
+ActiveStorage, ActionMailbox, Zeitwerk and `mail` are most of the way there.
+trailties, ActionText and the gems that are ported only as far as Rails
+needs them (tzinfo, nokogiri, msgpack) are where most of the remaining work
+is.
 
 What the prose above means in practice:
 
