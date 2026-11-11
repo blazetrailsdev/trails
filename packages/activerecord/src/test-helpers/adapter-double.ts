@@ -28,7 +28,7 @@ export async function establishConnectionTo(
   dbConfig.adapterClass = () => connection.constructor as never;
   await klass.establishConnection(dbConfig);
   const pool = klass.connectionPool();
-  if (pool.connectionLease().connection == null && pool.connections.includes(connection)) {
+  if (pool.activeConnection == null && pool.connections.includes(connection)) {
     await pool.leaseConnection();
   }
   const schemaCache = Object.getOwnPropertyDescriptor(connection, "schemaCache")?.value;
