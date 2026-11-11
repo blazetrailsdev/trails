@@ -711,6 +711,12 @@ export class NamedRouteCollection {
    * `rb_include_module` reaches a module's existing includers
    * (vendor/ruby/v3.3.11/class.c:1179-1215).
    *
+   * Without `installed`, the members `include()` / `extend()` just copied are
+   * read back off `proto`. Every such caller registers in the same synchronous
+   * step as the copy, so no helper can be redefined in between and the match
+   * is exact; only `RoutesHelpers.with` stacks several route sets on one
+   * prototype, and it passes its own `includes` chain.
+   *
    * @internal
    */
   _appendIncluder(
