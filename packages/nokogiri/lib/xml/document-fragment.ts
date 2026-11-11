@@ -8,7 +8,6 @@ import { XmlNode } from "./node.js";
 import { NodeSet } from "./node-set.js";
 import { ParseOptions } from "./parse-options.js";
 import type { SyntaxError } from "./syntax-error.js";
-import { DocumentFragment as Html5DocumentFragment } from "../html5/document-fragment.js";
 
 export class DocumentFragment extends XmlNode {
   parseOptions: ParseOptions | undefined;
@@ -47,14 +46,6 @@ export class DocumentFragment extends XmlNode {
       children = wrapperDoc.xpath("/root/node()");
     }
     children.each((child) => this.addChildNodeAndReparentAttrs(child as unknown as XmlNode));
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE nokogiri-html5-document-fragment-inherits-xml */
-  static [Symbol.hasInstance](instance: unknown): boolean {
-    return (
-      Function.prototype[Symbol.hasInstance].call(this, instance) ||
-      (this === DocumentFragment && instance instanceof Html5DocumentFragment)
-    );
   }
 
   get name(): string {

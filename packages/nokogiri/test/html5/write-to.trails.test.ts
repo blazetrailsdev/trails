@@ -31,7 +31,7 @@ describe("Nokogiri::HTML5::Node#write_to", () => {
   });
 
   it("writes the XML declaration for a document unless NO_DECLARATION is set", () => {
-    const doc = new Node(Document.parse("<p>x</p>")._node as never);
+    const doc = Document.parse("<p>x</p>");
     const io = new StringIO();
     doc.writeTo(io, { saveWith: SaveOptions.AS_XML, encoding: "UTF-8" });
     expect(io.string()).toMatch(/^<\?xml version="1.0" encoding="UTF-8"\?>\n/);
