@@ -9,6 +9,8 @@ description: >-
   report.pdf fixtures. The .debs are cached per OS/arch and package list, so a
   warm run downloads only packages whose mirror version moved; the key rotates
   weekly and falls back to the previous week, so the cache tracks the mirror.
+  An exact-key hit installs the cached .debs without `apt-get update`, so a
+  hung Ubuntu mirror cannot fail the job.
   A failed install still saves what it downloaded under a run-scoped key that
   the next run restores, and a retry drops the Azure mirror for
   archive.ubuntu.com.
@@ -41,10 +43,17 @@ runs:
       env:
         DEBS: ${{ steps.probe.outputs.debs }}
         PACKAGES: ${{ steps.probe.outputs.packages }}
+        CACHE_HIT: ${{ steps.restore.outputs.cache-hit }}
       run: |
         mkdir -p "$DEBS/partial"
         APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120
           -o Dir::Cache::Archives="$DEBS" -o APT::Keep-Downloaded-Packages=true -o APT::Sandbox::User=root)
+        # An exact cache hit holds every .deb, so install them without the
+        # mirror: a hung `apt-get update` would otherwise fail the job.
+        if [ "$CACHE_HIT" = true ] && compgen -G "$DEBS/*.deb" >/dev/null \
+          && sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends --no-download "$DEBS"/*.deb; then
+          exit 0
+        fi
         for attempt in 1 2 3; do
           sudo timeout -k 10 60 apt-get "${APT_OPTS[@]}" update -q \
             && sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends $PACKAGES \
