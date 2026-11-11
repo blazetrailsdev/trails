@@ -17,13 +17,14 @@ export class Buffer {
 
   capture<A extends unknown[]>(...args: [...A, (...args: A) => void]): Buffer {
     const block = args.pop() as (...args: A) => void;
-    const prev = rbObjDup(this);
+    let prev: Buffer | undefined;
     try {
+      prev = rbObjDup(this);
       this.value = "";
       block(...(args as unknown as A));
       return rbObjDup(this);
     } finally {
-      this.value = prev.value;
+      this.value = prev!.value;
     }
   }
 
