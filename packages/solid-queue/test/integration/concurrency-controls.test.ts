@@ -23,6 +23,7 @@ import {
 import { ApplicationJob } from "../support/application-job.js";
 import { ExpectedTestError } from "../support/expected-test-error.js";
 import { JobResult } from "../support/job-result.js";
+import { Range } from "@blazetrails/ruby-compat";
 import { loadAppSchema } from "../support/queue-schema.js";
 import { SequentialUpdateResultJob } from "../support/sequential-update-result-job.js";
 import { ThrottledUpdateResultJob } from "../support/throttled-update-result-job.js";
@@ -38,11 +39,6 @@ import {
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
-
-const range = (from: string, to: string) =>
-  Array.from({ length: to.charCodeAt(0) - from.charCodeAt(0) + 1 }, (_, i) =>
-    String.fromCharCode(from.charCodeAt(0) + i),
-  );
 
 async function assertStoredSequence(result: JobResult, ...sequences: string[][]) {
   const expected = sequences.map(
@@ -94,18 +90,18 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("run several conflicting jobs over the same record sequentially", async () => {
-    for (const name of range("A", "F")) {
+    for (const name of new Range("A", "F").toA()) {
       await SequentialUpdateResultJob.performLater(result, { name, pause: 0.2 });
     }
 
-    for (const name of range("G", "K")) {
+    for (const name of new Range("G", "K").toA()) {
       await SequentialUpdateResultJob.performLater(result, { name });
     }
 
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
 
-    await assertStoredSequence(result, range("A", "K"));
+    await assertStoredSequence(result, new Range("A", "K").toA());
   });
 
   it("schedule several conflicting jobs over the same record sequentially", async () => {
@@ -114,14 +110,14 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       pause: 0.1,
     });
 
-    for (const [i, name] of range("A", "F").entries()) {
+    for (const [i, name] of new Range("A", "F").toA().entries()) {
       await SequentialUpdateResultJob.set({ wait: seconds(0.2 + i * 0.01) }).performLater(result, {
         name,
         pause: 0.3,
       });
     }
 
-    for (const [i, name] of range("G", "K").entries()) {
+    for (const [i, name] of new Range("G", "K").toA().entries()) {
       await SequentialUpdateResultJob.set({ wait: seconds(0.3 + i * 0.01) }).performLater(result, {
         name,
       });
@@ -130,7 +126,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
 
-    await assertStoredSequence(result, range("A", "K"));
+    await assertStoredSequence(result, new Range("A", "K").toA());
   });
 
   it("run several jobs over the same record limiting concurrency", async () => {
@@ -139,7 +135,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       async () => await BlockedExecution.count(),
       null,
       async () => {
-        for (const name of range("A", "C")) {
+        for (const name of new Range("A", "C").toA()) {
           await ThrottledUpdateResultJob.performLater(result, { name, pause: 0.5 + incr });
           incr += 0.5;
         }
@@ -152,7 +148,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       +5,
       null,
       async () => {
-        for (const name of range("D", "H")) {
+        for (const name of new Range("D", "H").toA()) {
           await ThrottledUpdateResultJob.performLater(result, { name, pause: 0.05 });
         }
       },
@@ -165,7 +161,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("run several jobs over the same record sequentially, with some of them failing", async () => {
-    for (const [i, name] of range("A", "F").entries()) {
+    for (const [i, name] of new Range("A", "F").toA().entries()) {
       await SequentialUpdateResultJob.performLater(result, {
         name,
         pause: 0.2,
@@ -173,14 +169,14 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       });
     }
 
-    for (const name of range("G", "K")) {
+    for (const name of new Range("G", "K").toA()) {
       await SequentialUpdateResultJob.performLater(result, { name });
     }
 
     await waitForJobsToFinishFor(5);
     expect(await FailedExecution.count()).toBe(3);
 
-    await assertStoredSequence(result, ["B", "D", "F", ...range("G", "K")]);
+    await assertStoredSequence(result, ["B", "D", "F", ...new Range("G", "K").toA()]);
   });
 
   it("rely on dispatcher to unblock blocked executions with an available semaphore", async () => {
@@ -204,7 +200,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       +10,
       null,
       async () => {
-        for (const name of range("B", "K")) {
+        for (const name of new Range("B", "K").toA()) {
           await SequentialUpdateResultJob.performLater(result, { name });
         }
       },
@@ -216,7 +212,12 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
 
-    await assertStoredSequence(result, range("A", "K"), ["A", "C", "B", ...range("D", "K")]);
+    await assertStoredSequence(result, new Range("A", "K").toA(), [
+      "A",
+      "C",
+      "B",
+      ...new Range("D", "K").toA(),
+    ]);
   });
 
   it("rely on dispatcher to unblock blocked executions with an expired semaphore", async () => {
@@ -239,7 +240,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       +10,
       null,
       async () => {
-        for (const name of range("B", "K")) {
+        for (const name of new Range("B", "K").toA()) {
           await SequentialUpdateResultJob.performLater(result, { name });
         }
       },
@@ -253,7 +254,12 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
 
-    await assertStoredSequence(result, range("A", "K"), ["A", "C", "B", ...range("D", "K")]);
+    await assertStoredSequence(result, new Range("A", "K").toA(), [
+      "A",
+      "C",
+      "B",
+      ...new Range("D", "K").toA(),
+    ]);
   });
 
   it("don't block claimed executions that get released", async () => {
@@ -284,7 +290,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
         expect(true, "Transaction state valid").toBeTruthy();
       } catch (e) {
         if (!(e instanceof StatementInvalid)) throw e;
-        // eslint-disable-next-line vitest/no-conditional-expect -- mirrors the rescue at concurrency_controls_test.rb:183
+        // eslint-disable-next-line vitest/no-conditional-expect
         expect(false, "Transaction state unexpectedly invalid").toBeTruthy();
       }
     });
