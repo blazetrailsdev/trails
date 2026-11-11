@@ -14,6 +14,7 @@ import {
   underscore,
   type Callbacks as ActiveSupportCallbacks,
   type Configuration,
+  type Logger,
   type EventPayload,
   type Included,
   runLoadHooks,
@@ -100,6 +101,8 @@ export class Base extends AbstractController.Base {
   declare static assetHost: string | undefined;
   declare static assetsDir: string | undefined;
   declare static config: () => Configuration;
+  declare static configure: (block: (config: Configuration) => void) => void;
+  declare static logger: Logger | null;
   declare static viewPaths: {
     (paths: ActionView.ViewPathsInput): void;
     (): ActionView.PathSet;

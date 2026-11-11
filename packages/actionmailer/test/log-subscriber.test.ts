@@ -31,7 +31,7 @@ class AMLogSubscriberTest {
   }
 
   setLogger(logger: MockLogger | null): void {
-    (Base as unknown as { logger: Logger | null }).logger = logger as unknown as Logger;
+    Base.logger = logger as unknown as Logger;
   }
 }
 
@@ -49,7 +49,7 @@ describe("AMLogSubscriberTest", () => {
   let previousDeliveryMethod: typeof Base.deliveryMethod;
 
   beforeEach(() => {
-    previousLogger = (Base as unknown as { logger: Logger | null }).logger;
+    previousLogger = Base.logger;
     previousDeliveryMethod = Base.deliveryMethod;
     Base.deliveryMethod = "test";
     t = new AMLogSubscriberTest();
@@ -58,7 +58,7 @@ describe("AMLogSubscriberTest", () => {
 
   afterEach(() => {
     testHelperTeardown.call(t as never);
-    (Base as unknown as { logger: Logger | null }).logger = previousLogger as Logger;
+    Base.logger = previousLogger as Logger;
     Base.deliveryMethod = previousDeliveryMethod;
   });
 

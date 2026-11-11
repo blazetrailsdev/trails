@@ -2,7 +2,6 @@ import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { assertDomEqual } from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { ActionController, RouteSet } from "@blazetrails/actionpack";
-import type { Configuration } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { Mail, type Message } from "@blazetrails/mail";
 import { chomp, include, stringSplit } from "@blazetrails/ruby-compat";
@@ -30,7 +29,7 @@ class UrlTestMailer extends Base {
 
     (this as unknown as { defaultUrlOptions: Hash }).defaultUrlOptions.host = "www.basecamphq.com";
 
-    (this as unknown as { configure(b: (c: Configuration) => void): void }).configure((c) => {
+    this.configure((c) => {
       c.set("assetsDir", "");
     });
 

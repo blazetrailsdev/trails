@@ -1,7 +1,7 @@
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { ActionController, MiddlewareStack, RouteSet, deprecator } from "@blazetrails/actionpack";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
-import { I18n, type Configuration } from "@blazetrails/activesupport";
+import { I18n } from "@blazetrails/activesupport";
 import {
   assertCalled,
   stubAnyInstance,
@@ -14,7 +14,7 @@ import type { MessageDelivery } from "../lib/message-delivery.js";
 
 class I18nTestMailer extends Base {
   static {
-    (this as unknown as { configure(b: (c: Configuration) => void): void }).configure((c) => {
+    this.configure((c) => {
       c.set("assetsDir", "");
     });
     this.prependViewPath(
