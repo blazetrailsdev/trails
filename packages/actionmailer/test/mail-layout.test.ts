@@ -1,4 +1,4 @@
-import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
+import type { layout } from "@blazetrails/actionview";
 import { describe, expect, it } from "vitest";
 import type { Message } from "@blazetrails/mail";
 import { Base } from "../lib/base.js";
@@ -6,16 +6,7 @@ import type { Collector } from "../lib/collector.js";
 
 type Format = Collector & Record<string, (...args: unknown[]) => unknown>;
 
-const FIXTURES = new FixtureResolver({
-  "layouts/auto-layout-mailer.html.tse": "Hello from layout <%= yield %>",
-  "layouts/auto-layout-mailer.text.tse": "text/plain layout - <%= yield %>",
-  "layouts/spam.html.tse": "Spammer layout <%= yield %>",
-  "auto-layout-mailer/hello.html.tse": "Inside",
-  "auto-layout-mailer/multipart.html.tse": "text/html multipart",
-  "auto-layout-mailer/multipart.text.tse": "text/plain multipart",
-  "explicit-layout-mailer/logout.html.tse": "You logged out",
-  "explicit-layout-mailer/signup.html.tse": "We do not spam",
-});
+const FIXTURES = new URL("./fixtures", import.meta.url).pathname;
 
 class AutoLayoutMailer extends Base {
   declare world: string;
@@ -57,7 +48,7 @@ class ExplicitLayoutMailer extends Base {
   static {
     this.setMailerName("explicit_layout_mailer");
     this.prependViewPath(FIXTURES);
-    (this as unknown as { layout(name: string, conditions: object): void }).layout("spam", {
+    (this as unknown as { layout: typeof layout }).layout("spam", {
       except: ["logout"],
     });
     this.default({ to: "test@localhost", subject: "You have a mail", from: "tester@example.com" });
