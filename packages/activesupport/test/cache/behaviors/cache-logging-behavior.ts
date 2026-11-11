@@ -11,7 +11,6 @@ export interface CacheLoggingBehaviorHost {
 
 export function cacheLoggingBehavior(host: CacheLoggingBehaviorHost): void {
   let cache: Store;
-  const namespace: string | null = null;
 
   beforeEach(async () => {
     cache = host.lookupStore({ expiresIn: 60 });
@@ -118,7 +117,9 @@ export function cacheLoggingBehavior(host: CacheLoggingBehaviorHost): void {
 
   function keyPattern(key: string, options: { namespace?: string | null } = {}): RegExp {
     if (host.keyPattern) return host.keyPattern(key, options);
-    const ns = Object.hasOwn(options, "namespace") ? options.namespace : namespace;
-    return new RegExp(`${regexpEscape(ns ?? "")}${ns != null ? ":" : ""}${regexpEscape(key)}`);
+    const { namespace = null } = options;
+    return new RegExp(
+      `${regexpEscape(namespace ?? "")}${namespace != null ? ":" : ""}${regexpEscape(key)}`,
+    );
   }
 }
