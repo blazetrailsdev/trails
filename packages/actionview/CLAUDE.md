@@ -9,7 +9,7 @@ Rails' `RubyTracker` reads a template's compiled Ruby through `RenderParser`
 (`actionview/lib/action_view/render_parser/prism_render_parser.rb:6-37,84-88`),
 and its three tests (`actionview/test/template/dependency_tracker_test.rb:274-302`)
 are run against it only. No trails handler compiles to Ruby, so there is no
-`RubyTracker`. By repo-owner ruling (2026-10-18), `TSETracker` answers those
+`RubyTracker`. By operator ruling (2026-10-18), `TSETracker` answers those
 three tests, and only those, instead: a `<%#` comment is not searched for `render`, a keyword-hash
 `render` call whose options fail `render_call_options` is skipped, and a String
 `spacerTemplate:` is a dependency ahead of the partial.
@@ -48,7 +48,7 @@ the handler's Ruby in a `def`, and `compile` (`:500-539`) hands it to
 `mod.module_eval(compiled_source, identifier, offset)`. JS can only evaluate
 source text through `eval`, `new Function` or `vm`, each of which runs code
 that was never type-checked, and a `with` scope chain is sloppy-mode only, so
-it cannot appear in an ES module. By repo-owner ruling (2026-10-19,
+it cannot appear in an ES module. By operator ruling (2026-10-19,
 2026-10-20), **file-backed `.tse` templates are precompiled in every
 environment, and shipped code has no eval pipeline.** The split is:
 
@@ -103,7 +103,7 @@ project's setup installs it through `setTemplateCompiler`.
 **`Template#spot` is line-based.** Rails' `spot`
 (`vendor/rails/v8.0.2/actionview/lib/action_view/template.rb:231-246`) parses
 `compiled_source` with Prism to find the failing node's span. trails builds no
-second compiler, by repo-owner ruling (2026-10-19), so no in-process JS parser
+second compiler, by operator ruling (2026-10-19), so no in-process JS parser
 stands in for Prism: `spot` answers the backtrace line of `compiled_source`,
 from the reported column to the end of that line, and carries
 `@missingRailsCall parse — PERMANENT` against this section.

@@ -82,7 +82,7 @@ As a consequence:
   `unported-files` row cites this section.
 - **A prewarmed in-process copy of the cache store is not the answer.** An
   invented copy, plus a store `write` started and not awaited, was rejected by
-  the repo owner on 2026-10-20: it answers a stale entry when another process
+  the operator on 2026-10-20: it answers a stale entry when another process
   wrote one, and a failed write cannot reach the `translate` caller. Do not
   re-file it.
 - A Rails test that depends on a lookup reaching a cache store is parked as
@@ -106,5 +106,5 @@ As a consequence:
   would be adapted is not decided by this section.
 
 This is a genuine language shortcoming — JS has no synchronous await — and it
-is ratified repo-wide here by the repo owner on 2026-10-21. A new instance is
+is ratified repo-wide here by the operator on 2026-10-21. A new instance is
 not a new decision to argue, and there is no story to make `translate` async.

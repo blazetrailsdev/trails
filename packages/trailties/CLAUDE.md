@@ -167,8 +167,7 @@ finisher's `_registerAutoloaded` registers a loaded model with
 `DescendantsTracker` and runs `ActionController::Railties::Helpers.inherited`
 for a controller, superclass first, since JS has no hook at `extends`. No
 own-property guard can stand in: nothing runs on an empty subclass, and
-`Helpers.inherited` is async where `_helpers` is a sync read. Ruled by the repo
-owner on 2026-11-02.
+`Helpers.inherited` is async where `_helpers` is a sync read. Ruled by the operator on 2026-11-02.
 
 **`autoload_lib` follows `Application.register`.** It is async (`Loader#ignore`
 is) and a `static {}` block cannot await, so `trails new` emits it as a top-level
@@ -194,7 +193,7 @@ the host application and takes the application's `lib/` for the engine's root.
 `caller_locations` (`engine.rb:354-366`). A per-engine `findRoot` override was
 rejected because every package-shipped engine would carry the same one.
 
-This is a genuine runtime difference, ruled by the repo owner on 2026-10-23
+This is a genuine runtime difference, ruled by the operator on 2026-10-23
 (trails#9280). `findRoot` carries `@inventedArm loop` / `if — PERMANENT`
 against this section.
 
@@ -245,7 +244,7 @@ JS has no such binding, so `evalToplevel` in `commands/runner.ts` builds a
 sloppy-mode async function with `with (TopLevel)`, where constants resolve.
 Root § "Templates are precompiled" keeps eval out of what serves production; a
 CLI command evaluating the string its own operator passed is not that. Ruled by
-the repo owner on 2026-11-02 (trails#9630).
+the operator on 2026-11-02 (trails#9630).
 
 ## A `require` in the `Application` class body runs after the class (`add_to_config`)
 

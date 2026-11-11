@@ -106,10 +106,9 @@ So:
   writing a better justification for the deviation, by broadening a baseline
   reason, or by moving it to a different register. `pnpm tasks block` is for a
   story waiting on something that can change: another story, an unported
-  package, an upstream release, an owner decision. Name that thing, and prefer
+  package, an upstream release, an operator decision. Name that thing, and prefer
   a `deps` edge when it is a story. A story that can never converge is not
-  blocked: once the limit is ratified in this file or ruled on by the repo
-  owner, `pnpm tasks close` it with a reason that starts `PERMANENT:` and
+  blocked: once the limit is ratified in this file or ruled on by the operator, `pnpm tasks close` it with a reason that starts `PERMANENT:` and
   stands alone, after its receipts in the code are `PERMANENT` too. A story
   whose premise or acceptance criteria turned out wrong closes with
   `FALSIFIED:`. Both are rare, and "it would be a bigger diff" is neither.
@@ -143,7 +142,7 @@ port a body:
   differ. "Dispatches" means the receiver may be a `Map` / `Hash`, the
   receiver answers the call itself (`isEmpty`, `fetch`, `isRespondTo`), or
   the name is computed. Where the form is identical the helper is not
-  optional but wrong (owner ruling, 2026-10-19), and
+  optional but wrong (operator ruling, 2026-10-19), and
   `ruby-compat-native-required` (`eslint/ruby-compat-native-required.mjs`)
   reports the helpers listed in its only-grow
   `ruby-compat-native-required.json` called on an Array, `string`, `number`
@@ -212,7 +211,7 @@ port a body:
   `removeForeignKey("astronauts", undefined, { column: "rocket_id" })`,
   `withExampleTable(connection, "ex", undefined, block)`. The move-across lives
   in the method whose Ruby signature does the split, never in a helper it
-  calls. Ruled by the repo owner on 2026-10-20.
+  calls. Ruled by the operator on 2026-10-20.
 - **Predicates.** A Ruby predicate returns a value, not necessarily a boolean;
   a value-returning predicate ported as a `boolean` breaks every call site that
   used the value.
@@ -591,7 +590,7 @@ When NOT to use these:
 third shape.** ruby-compat's `Module` class, and any carrier object spliced
 into an includer's prototype chain, is not one of them: it is a carrier trails
 invented, it is being deleted (RFC 0197), and a new one is never the answer to
-a porting problem. Ruled by the repo owner on 2026-10-22.
+a porting problem. Ruled by the operator on 2026-10-22.
 
 - **Plain-object module.** Its own enumerable members are its instance
   methods, which `include()` copies onto the includer's prototype. Its own
@@ -616,7 +615,7 @@ module's ancestry, so `mod`'s own methods outrank them and the class reports
 
 **A method defined on a module after it is included** has no carrier-free
 form: Ruby's includers share the module's method table (`rb_include_module`,
-`vendor/ruby/v3.3.11/class.c:1179`), and the repo owner has ruled out both a
+`vendor/ruby/v3.3.11/class.c:1179`), and the operator has ruled out both a
 carrier and a list of a module's includers. Each such site is ported so that
 its definitions exist before the include. That is the whole remedy — "leave it
 on a `Module` until its own story settles it" is not a second one, and reaching
@@ -629,8 +628,8 @@ A route set draws its routes after controllers include its `url_helpers`, so
 no ordering puts the helpers first. Its `NamedRouteCollection` keeps a weak
 list of the prototypes that copied its helpers, and `add_url_helper` /
 `clear!` write through to them (`_appendIncluder`, `isIncludedMember`). No
-carrier is spliced into the prototype chain. Ruled by the repo owner on
-2026-10-29. On 2026-11-10 the owner widened it to the route set's other
+carrier is spliced into the prototype chain. Ruled by the operator on
+2026-10-29. On 2026-11-10 the operator widened it to the route set's other
 late-defined modules: `NamedRouteCollection`'s path / url helper class
 modules record every includer the `url_helpers` module's `included` hook,
 its own singleton and its proxy class reach, and `MountedHelpers` records its
@@ -726,14 +725,14 @@ nearest constructor, wrapped in `if (isModuleIncluded(new.target, Mod))`, the
 `include?` question Ruby's ancestor chain answers. The guard carries
 `@inventedArm if — PERMANENT` where the arm gate compares the declaration, and
 the segment is tagged only where the Rails manifest records the include
-(`inlined-from-manifest-follows-included-hook-includes`). Ruled by the repo owner on 2026-10-19.
+(`inlined-from-manifest-follows-included-hook-includes`). Ruled by the operator on 2026-10-19.
 
 `parity:api` credits a tagged module hook to the constructor, both call gates
 compare the constructor against the tagged bodies in chain order, and
 `pnpm parity:api:inlined` reds on a stale or unfounded tag (see "Before you
 open the PR"). `initialize_copy` / `initialize_dup` / `initialize_clone` are
 the `rbObjDup` / `rbObjClone` protocol and stay methods. This rule was set by
-the repo owner on 2026-10-08 (RFC 0188).
+the operator on 2026-10-08 (RFC 0188).
 
 **A module method's `super` is inlined the same way** (RFC 0197). A copied
 plain-module method has no link to resume a `super` search from, so a module
@@ -748,7 +747,7 @@ target converts in the same PR as the module whose `super` reaches it, because
 a plain module's copied methods outrank every carrier link.
 
 **A module included by an open set of classes binds `super` at include time**
-(RFC 0197, ruled by the repo owner on 2026-10-20). Inlining needs the list of
+(RFC 0197, ruled by the operator on 2026-10-20). Inlining needs the list of
 includers, and a concern application code includes (`ActiveModel::Dirty`,
 `Validations`, `Attributes`, `TestFixtures`, a prepended `Correctable`) has
 none. For such a module the method stays in the module's own file under its
@@ -947,7 +946,7 @@ subclass modules at all, so their self-registration never runs.
 
 Ruby finds a class by name at run time: `constantize`, `const_get`,
 `const_defined?`, `constants`, `path2class`. trails ports that lookup. The
-2026-10-28 ruling against it was reversed by the repo owner on 2026-10-30
+2026-10-28 ruling against it was reversed by the operator on 2026-10-30
 (RFC 0213; the heading stays so citations resolve).
 
 - **A name Rails computes, or one application data supplies, is a lookup.**
@@ -1001,7 +1000,7 @@ that key's value, and `get` / `set` / `isKey` read through it. The `Thread`
 context itself is unchanged, so a block queries on its opener's leased
 connection. The one opening call carries `@inventedArm fork — PERMANENT`.
 
-This is a genuine language shortcoming, ratified repo-wide by the repo owner
+This is a genuine language shortcoming, ratified repo-wide by the operator
 on 2026-11-05; a new instance is not a new decision to argue.
 
 ## The pool monitor guards only sections that span an `await` (`ConnectionPool`'s `MonitorMixin`)
@@ -1069,7 +1068,7 @@ As a consequence:
   `fields_for_with_nested_attributes`
   (`actionview/lib/action_view/helpers/form_helper.rb:2713-2718`) would read a
   single record as a collection. Its scoped skip for `core.rb` / `base.rb` is
-  permanent, ruled by the repo owner on trails#8750.
+  permanent, ruled by the operator on trails#8750.
 - `defineModule`'s section record (`ruby-compat/lib/include.ts`), read by
   `publicInstanceMethods`, is such a mechanism and stays. It is read once at
   load, where a Rails body enumerates `public_instance_methods`
@@ -1180,7 +1179,7 @@ answers 4 for `"café".bytesize` where Ruby answers 5. A call site that reads a
 site, as Ruby keeps binary and text apart there too. A JS regex cannot match
 bytes, so where Ruby scans a binary String with one (`Multipart::Parser`,
 `Migration.copy`'s `sub!`), the bytes are read one character per byte for the
-scan and written back as bytes. Ruled by the repo owner on 2026-10-21.
+scan and written back as bytes. Ruled by the operator on 2026-10-21.
 
 ## Runtime facts Node does not expose
 
@@ -1207,7 +1206,7 @@ ratified here so no port re-derives them.
   `return object unless object` (`deprecation/proxy_wrappers.rb:6-11`) and
   `TimeZone.new`'s unknown-name `self[name]` (`values/time_zone.rb:216-218`)
   drop that arm. An unknown zone name reaches `create`, which raises
-  `TZInfo::InvalidTimezoneIdentifier`. Ruled by the repo owner on 2026-10-14.
+  `TZInfo::InvalidTimezoneIdentifier`. Ruled by the operator on 2026-10-14.
 - **`initialize` on an allocated receiver.** See § "A revived object copies a
   constructed instance".
 
@@ -1262,7 +1261,7 @@ For the same reason a framework is loaded by an ES import, not by a load path:
 (`vendor/rails/v8.0.2/railties/test/isolation/abstract_unit.rb:494`) has no
 port, and a test asserting a framework constant is undefined in a process that
 imports it (`frameworks_test.rb:212-216`) is parked the same way. Ruled by the
-repo owner on 2026-11-09.
+operator on 2026-11-09.
 
 ## Ruby pattern matching has no port (`assert_pattern`, `deconstruct_keys`)
 
@@ -1278,7 +1277,7 @@ ruby-compat's `Hash`) stay as plain methods. A Rails test
 whose assertions are patterns (`PatternMatchingTestCases`,
 `vendor/rails/v8.0.2/actionview/test/template/test_case_test.rb:490-516`) is
 parked as `it.skip` under a `PERMANENT-SKIP:` line citing this section. Ruled by
-the repo owner on 2026-10-21.
+the operator on 2026-10-21.
 
 ## A dispatch by name is spelled directly (`send`, `public_send`)
 
@@ -1290,7 +1289,7 @@ the call site knew: no TS type checks the receiver or the target, the Ruby name
 has to be guessed into a TS spelling (`camelized`, `writerSpelling` and
 `RELOPS` inside `sendInternal`, `packages/ruby-compat/lib/object.ts`), and a
 direct property read becomes a prototype walk plus a table lookup. By
-repo-owner ruling on 2026-10-20:
+operator ruling on 2026-10-20:
 
 **Write the member call directly.** Wherever the name is known where the call
 is written, spell it — `app.call(env)`, with `app` typed. The one exception
@@ -1452,13 +1451,13 @@ takes a non-local `return` or `next`, or an `await`
 method is a JS generator and the block body is the caller's `for…of` body.
 **Only a TS-`private` or `@internal` method may do this**, so a generator never
 reaches public API; `parity:api:blocks` credits a non-public generator's
-`yield` as its block and still flags a public one. Ruled by the repo owner on
+`yield` as its block and still flags a public one. Ruled by the operator on
 trails#9053.
 
 The builder gem is the one exception to `block()`: a `.builder` template's
 blocks (`xml.p(() => …)`, `tag!`, `declare!`, `XmlEvents`) are plain trailing
 functions, read off the end of the argument list by `typeof`, because a tag's
-`*args` hold no other function. Ruled by the repo owner on 2026-10-22.
+`*args` hold no other function. Ruled by the operator on 2026-10-22.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 
@@ -1537,7 +1536,7 @@ through the class's Rails constructor (`TimeZone.create`): the instance Ruby's
 `initialize` would have built, copied onto the receiver. A coder-aware
 allocator in Psych's `revive` was rejected, since Ruby's allocator never sees
 the coder. Each compared site carries `@inventedArm assign — PERMANENT`;
-`marshalLoad` has no skeleton row, so it carries none. Ruled by the repo owner
+`marshalLoad` has no skeleton row, so it carries none. Ruled by the operator
 on 2026-10-16.
 
 ## A record is built with `new Klass` only (`Inheritance::ClassMethods#new`)
@@ -1585,7 +1584,7 @@ name everywhere, and a file or locale key named for an action is kebab-case.
 ## System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)
 
 Ratified in [packages/actionpack/CLAUDE.md](packages/actionpack/CLAUDE.md#system-testing-runs-on-vitest-systemtestcase-systemtesting).
-The one-line rule: by repo-owner ruling, system testing is ported onto Vitest,
+The one-line rule: by operator ruling, system testing is ported onto Vitest,
 Vite and Playwright with no third-party browser-session library, and test code
 runs in a Node Vitest worker.
 

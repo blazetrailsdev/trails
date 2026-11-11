@@ -24,7 +24,7 @@ array` stays parked: `Array[Symbol.hasInstance]` would reroute every
 `instanceof Array` in the process (CLAUDE.md § "Ruby protocol methods with a
 different JS mechanism").
 
-Ruled by the repo owner on 2026-10-30. A new instance is not a new decision to
+Ruled by the operator on 2026-10-30. A new instance is not a new decision to
 argue.
 
 ## TestTask runs `node`, which takes no `-w` or `-I`

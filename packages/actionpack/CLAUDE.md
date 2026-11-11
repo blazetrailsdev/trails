@@ -34,7 +34,7 @@ given and looks up the method of exactly that name, and nothing on the dispatch
 path converts a spelling. So `to: "stories#nextBundle"`, `get("nextBundle")`,
 `only: "nextBundle"` and `action_name === "nextBundle"`. The underscored name
 `next_bundle` names no action unless a method is literally called that. The
-repo owner set this (reversing trails#8573, which had made `action_name` the
+operator set this (reversing trails#8573, which had made `action_name` the
 Rails spelling): an application names its own methods, and two spellings for
 one action with a conversion between them was rejected in favour of one rule.
 
@@ -53,7 +53,7 @@ both (`abstract-controller/base.trails.test.ts`).
 lazy-lookup locale key are the action's name in kebab-case: the action
 `nextBundle` renders `next-bundle.html.tse` and scopes `t(".title")` by
 `controller.next-bundle.title`, matching the kebab-case file names of a trails
-application throughout (`stories-controller.ts`). The repo owner set this too.
+application throughout (`stories-controller.ts`). The operator set this too.
 The name is converted with `dasherize(underscore(name))` only where an action
 name becomes a file name or a locale key, and each site carries
 `@inventedArm underscore — PERMANENT` and `@inventedArm dasherize — PERMANENT`:
@@ -114,7 +114,7 @@ name (a log line, a generated URL) expects the method's spelling. A template
 named explicitly (`render template: "test/hello_world"`) is looked up as
 written.
 
-This is ratified repo-wide here by the repo owner.
+This is ratified repo-wide here by the operator.
 
 ## A `null` positional keeps its url-helper slot (`UrlHelper#handle_positional_args`)
 
@@ -128,14 +128,14 @@ positional `nil` fills
 
 A Ruby Symbol is a JS string (§ "A Ruby Symbol is a JS string, never a JS
 `Symbol`" in the root CLAUDE.md), so trails has one key `id` for both. One of
-the two Ruby calls has to lose. The repo owner ruled on 2026-10-14 (trails#8906)
+the two Ruby calls has to lose. The operator ruled on 2026-10-14 (trails#8906)
 that **only a `null` positional is kept**: it claims its slot, and an option of
 the same name does not override it. A non-null positional behaves as in Rails.
 The cost is that `productPath(null, { id: "1" })` raises where Rails' Symbol-key
 `product_path(nil, id: "1")` answers `/products/1`.
 
 `handlePositionalArgs` carries `@inventedArm block — PERMANENT` against this
-section. This is ratified here by the repo owner.
+section. This is ratified here by the operator.
 
 ## System testing runs on Vitest (`SystemTestCase`, `SystemTesting::*`)
 
@@ -143,8 +143,8 @@ Rails' system-testing files (`action_dispatch/system_test_case.rb`,
 `action_dispatch/system_testing/**`) hand driver, server, session and
 screenshot state to a third-party browser-session library. **trails does not
 port that library, vendor it, or use any of its names, registries or
-environment variables.** The repo owner ruled this on 2026-10-15 (RFC 0166).
-It is an owner ruling, not a TypeScript language shortcoming.
+environment variables.** The operator ruled this on 2026-10-15 (RFC 0166).
+It is an operator ruling, not a TypeScript language shortcoming.
 
 Each call into that library is ported onto the Vitest, Vite or Playwright
 mechanism that holds the same fact:
@@ -210,7 +210,7 @@ and `Rack::Session::Pool` answer synchronously and still load lazily, so a
 request that never touches the session never decrypts its cookie. A
 rejected `findSession` re-enters `staleSessionCheckBang`'s rescue, so an async
 `ArgumentError` is retried as a synchronous one is.
-Ruled by the repo owner on 2026-10-16 (trails#8997).
+Ruled by the operator on 2026-10-16 (trails#8997).
 
 ## Request params are a null-prototype plain object (`ParamBuilder#make_params`)
 
@@ -225,7 +225,7 @@ A null prototype keeps a `__proto__` or `toString` param from reaching
 prototype is `null`, by rows in `scripts/test-compare/assertion-receipts/`
 citing this section. There is no story to make params a
 `HashWithIndifferentAccess`.
-Ruled by the repo owner on 2026-10-18, closing story
+Ruled by the operator on 2026-10-18, closing story
 `param-builder-make-params-is-hash-with-indifferent-access` as PERMANENT.
 
 ## `$!` is passed explicitly, and a response body is iterated async (`BadRequest#initialize`, `Response#each`)
@@ -271,7 +271,7 @@ backed by parse5 and has no HTML4 parser. **trails' DOM testing is HTML5 only**:
 `Testing.defaultHtmlVersion` defaults to `:html5`, no railtie copies
 `domTestingDefaultHtmlVersion`, and the `:html4` arm of `chooseHtmlParser` raises
 `NotImplementedError` where Rails' arm returns `Nokogiri::HTML4`. Ruled by
-the repo owner on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
+the operator on 2026-10-15 (trails#8947). There is no story to add an HTML4 parser.
 
 ## A colon-leading route path is a Symbol (`Mapper#map_match`'s `path_types`)
 
@@ -287,7 +287,7 @@ So a String path that starts with `:` is written with its leading slash:
 Rails' `post ":action", to: ...`
 (`actionpack/test/dispatch/request/multipart_params_parsing_test.rb:162`) is
 `this.post("/:action", { to })`. `Mapping.normalize_path` (`mapper.rb:116-117`, called at `:2058`)
-draws both spellings as the same route. Ruled by the repo owner on 2026-11-06.
+draws both spellings as the same route. Ruled by the operator on 2026-11-06.
 
 ## `method_missing` definers in this package
 
