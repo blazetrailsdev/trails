@@ -7,7 +7,14 @@ import {
   kernelArray,
   transformKeys,
 } from "@blazetrails/activesupport";
-import { extend, hashAref, hashAset, include, rbCallSuper } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  type Extended,
+  hashAref,
+  hashAset,
+  include,
+  rbCallSuper,
+} from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Relation } from "../relation.js";
 import { Base } from "../base.js";
@@ -137,13 +144,17 @@ function scopeForCreate(this: Relation<Base>): Record<string, unknown> {
 
 export const RelationQueries = { where, isExists, scopeForCreate };
 
-export const CoreQueries = {} as { ClassMethods: { findBy: typeof findBy } };
+export const CoreQueries = {} as { ClassMethods: { findBy: typeof findBy } } & Extended<
+  typeof Concern
+>;
 extend(CoreQueries, Concern);
 
 export function findBy(this: typeof Base, ...args: unknown[]): unknown {
   return rbCallSuper(this, findBy, ...EncryptedQuery.processArguments(this, args, false));
 }
-CoreQueries.ClassMethods = { findBy };
+CoreQueries.classMethods((mod) => {
+  mod.findBy = findBy;
+});
 
 export class AdditionalValue {
   readonly value: unknown;
