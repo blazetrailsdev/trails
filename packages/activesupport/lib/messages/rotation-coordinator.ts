@@ -1,4 +1,4 @@
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { rbIseqParameters, rbObjDup } from "@blazetrails/ruby-compat";
 import { extractBang } from "../core-ext/hash/slice.js";
 import { isPlainObject } from "../hash-utils.js";
 import type { OnRotation } from "./rotator.js";
@@ -6,7 +6,6 @@ import { ArgumentError, RuntimeError } from "./serializer-with-fallback.js";
 
 export interface SecretGenerator {
   (salt: string, options: Record<string, unknown>): unknown;
-  parameters?: readonly string[];
 }
 
 export interface RotateOptions extends Record<string, unknown> {
@@ -107,7 +106,9 @@ export abstract class RotationCoordinator<C extends FallsBack<C>> {
 
     options.secretGenerator ??= this.#secretGenerator;
 
-    const secretGeneratorKwargs = options.secretGenerator.parameters ?? [];
+    const secretGeneratorKwargs = rbIseqParameters(options.secretGenerator).flatMap(
+      ([type, name]) => (type === ":key" || type === ":keyreq" ? [name!.slice(1)] : []),
+    );
     options.secretGeneratorOptions = extractBang(options, ...secretGeneratorKwargs);
 
     options.onRotation = this.#onRotation;

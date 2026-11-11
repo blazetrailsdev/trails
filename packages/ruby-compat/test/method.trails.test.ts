@@ -6,6 +6,7 @@ import {
   iseqLocationSetup,
   rbCheckArity,
   rbIseqMinMaxArity,
+  rbIseqParameters,
   rbObjMethod,
   rbObjMethods,
 } from "../lib/method.js";
@@ -278,6 +279,17 @@ describe("Method#parameters", () => {
     expect(rbObjMethod(new Parsers(), "to_a").parameters()).toEqual([
       [":opt", ":opts"],
       [":rest", ":rest"],
+    ]);
+  });
+  it("answers a trailing destructured object's keys as keywords", () => {
+    const fn = (
+      salt: string,
+      { secretKeyBase = "x", other }: { secretKeyBase?: string; other?: number } = {},
+    ) => [salt, secretKeyBase, other];
+    expect(rbIseqParameters(fn)).toEqual([
+      [":req", ":salt"],
+      [":key", ":secretKeyBase"],
+      [":keyreq", ":other"],
     ]);
   });
 });

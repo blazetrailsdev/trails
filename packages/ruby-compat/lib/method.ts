@@ -84,8 +84,9 @@ export class Method {
   /**
    * `Method#parameters` (`vendor/ruby/v3.3.11/proc.c:3103` `rb_method_parameters`,
    * over `rb_iseq_parameters` at `iseq.c:3334`): a `[type, name]` pair per
-   * parameter, `:req`, `:opt` or `:rest`, each a Symbol. A destructured
-   * parameter has no name and answers its type alone.
+   * parameter, `:req`, `:opt`, `:rest`, `:key` or `:keyreq`, each a Symbol. A
+   * trailing destructured object with a default answers its keys as keywords; any other
+   * destructured parameter has no name and answers its type alone.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -206,15 +207,19 @@ export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number,
   const params = rbIseqParameters(func);
   const rest = params.some(([type]) => type === ":rest");
   const min = params.filter(([type]) => type === ":req").length;
-  const max = rest ? Infinity : params.length;
+  const keywords = params.some(([type]) => type === ":key" || type === ":keyreq");
+  const max = rest
+    ? Infinity
+    : params.filter(([type]) => type !== ":key" && type !== ":keyreq").length + (keywords ? 1 : 0);
   return [min, max];
 }
 
 /**
  * `rb_iseq_parameters` (`vendor/ruby/v3.3.11/iseq.c:3334`): a `[type, name]`
- * pair per parameter, `:req`, `:opt` or `:rest`, each a Symbol, read here from
- * the function's source. A destructured parameter has no name and answers its
- * type alone.
+ * pair per parameter, `:req`, `:opt`, `:rest`, `:key` or `:keyreq`, each a
+ * Symbol, read here from the function's source. A trailing destructured object
+ * with a default answers its keys as keywords; any other destructured parameter has no name
+ * and answers its type alone.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -261,11 +266,34 @@ export function rbIseqParameters(
     current += ch;
   }
   if (current.trim() !== "") params.push({ text: current.trim(), optional });
-  return params.map((p) => {
-    const type = p.text.startsWith("...") ? ":rest" : p.optional ? ":opt" : ":req";
-    const name = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(p.text)?.[1];
-    return name === undefined ? [type] : [type, `:${name}`];
-  });
+  const last = params.at(-1);
+  const kwargs =
+    last !== undefined && last.optional && last.text.startsWith("{") ? params.pop()! : null;
+  const keys: [string, string][] = [];
+  if (kwargs !== null) {
+    const body = kwargs.text.slice(1, kwargs.text.lastIndexOf("}"));
+    let kwDepth = 0;
+    let kwCurrent = "";
+    for (const ch of body + ",") {
+      if ("([{".includes(ch)) kwDepth++;
+      else if (")]}".includes(ch)) kwDepth--;
+      else if (kwDepth === 0 && ch === ",") {
+        const m = /^([A-Za-z_$][\w$]*)\s*(?::[^=]*)?(=)?/.exec(kwCurrent.trim());
+        if (m !== null) keys.push([m[2] === undefined ? ":keyreq" : ":key", `:${m[1]}`]);
+        kwCurrent = "";
+        continue;
+      }
+      kwCurrent += ch;
+    }
+  }
+  return [
+    ...params.map((p): [string] | [string, string] => {
+      const type = p.text.startsWith("...") ? ":rest" : p.optional ? ":opt" : ":req";
+      const name = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(p.text)?.[1];
+      return name === undefined ? [type] : [type, `:${name}`];
+    }),
+    ...keys,
+  ];
 }
 
 /**

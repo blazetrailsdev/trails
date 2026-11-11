@@ -404,7 +404,14 @@ export type {
   StdStream,
   WriteStream,
 } from "./process-adapter.js";
-export { Method, iseqLocationSetup, rbCheckArity, rbObjMethod, rbObjMethods } from "./method.js";
+export {
+  Method,
+  iseqLocationSetup,
+  rbCheckArity,
+  rbIseqParameters,
+  rbObjMethod,
+  rbObjMethods,
+} from "./method.js";
 export { rbRegInitStr, rbRegMatchP, rbRegSUnion, rbRegToS, regexpEscape } from "./regexp.js";
 export { Pathname } from "./pathname.js";
 export { Range } from "./range.js";
