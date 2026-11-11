@@ -27,7 +27,9 @@ export class ClassMethods {
   declare private static _signedIdVerifier: MessageVerifier | undefined;
 
   static get signedIdVerifier(): MessageVerifier {
-    return (this._signedIdVerifier ??= (() => {
+    if (Object.hasOwn(this, "_signedIdVerifier") && this._signedIdVerifier != null)
+      return this._signedIdVerifier;
+    return (this._signedIdVerifier = (() => {
       let secret = (this as any).signedIdVerifierSecret as
         | string
         | (() => string | null | undefined)
@@ -102,7 +104,7 @@ export async function findSigned<T extends typeof Base>(
   }
   const verifier = this.signedIdVerifier;
   const id = verifier.verified(signedId, {
-    purpose: this.combineSignedIdPurposes(options?.purpose) || undefined,
+    purpose: this.combineSignedIdPurposes(options?.purpose),
   });
   if (id === null) return null;
   if (Array.isArray(pk)) {
@@ -122,7 +124,7 @@ export async function findSignedBang<T extends typeof Base>(
 ): Promise<InstanceType<T>> {
   const verifier = this.signedIdVerifier;
   const id = verifier.verify(signedId, {
-    purpose: this.combineSignedIdPurposes(options?.purpose) || undefined,
+    purpose: this.combineSignedIdPurposes(options?.purpose),
   });
   return this.find(id);
 }

@@ -198,7 +198,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     expect(json.isChanged).toBe(false);
   });
 
-  it.skip("test_changes_in_place_ignores_key_order", async () => {
+  it("test_changes_in_place_ignores_key_order", async () => {
     const json = new (klass())() as JsonRecord;
     expect(json.isChanged).toBe(false);
 
