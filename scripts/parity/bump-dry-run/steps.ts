@@ -144,6 +144,7 @@ export const NOT_EXERCISED: {
     name: "Ratchet baseline reseed drift",
     covers: ["pnpm parity:api:calls:reseed"],
     reason: "writes the call baseline; follows the call-mismatches ratchet",
+    predictor: "calls",
   },
 ];
 

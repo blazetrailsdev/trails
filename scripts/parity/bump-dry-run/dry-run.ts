@@ -440,6 +440,7 @@ async function main(argv: string[], env: Env): Promise<number> {
   const schema =
     source.name === "rails" ? await schemaParity(activeRoot, candidateRoot, ref, env) : null;
   const predicted: Record<string, string> = {
+    calls: `${attribution["call-mismatches.json"]?.length ?? 0} new call-mismatch rows`,
     lib: `${libFiles} lib files change`,
     methodOrder: `${pairTable.filter((r) => ["arel", "activemodel"].includes(String(r[0]))).reduce((n, r) => n + Number(r[1]), 0)} arel/activemodel lib files change`,
     testNames: `${await changedUnder("actionview/test")} actionview + ${await changedUnder("activerecord/test/cases/arel")} arel test files change`,
