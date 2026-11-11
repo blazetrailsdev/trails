@@ -10,6 +10,7 @@ describe("QueueAdapter", () => {
     childJob.queueAdapter = "test";
     expect(childJob.queueAdapter).toBeInstanceOf(TestAdapter);
     expect(childJob.queueAdapterName).toBe("test");
+    expect(new childJob().queueAdapter).toBe(childJob.queueAdapter);
     expect(Base.queueAdapter).toBe(baseAdapter);
   });
 });
