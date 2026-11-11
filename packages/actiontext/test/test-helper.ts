@@ -1,5 +1,5 @@
 import { afterAll } from "vitest";
-import { I18n, TopLevel, runLoadHooks, setTrailsRoot } from "@blazetrails/activesupport";
+import { I18n, Logger, TopLevel, runLoadHooks, setTrailsRoot } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, Migration, Migrator } from "@blazetrails/activerecord";
 import { Application, Trails } from "@blazetrails/trailties";
 import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
@@ -18,6 +18,7 @@ class Dummy extends Application {}
 Application.register(Dummy, File.expandPath("dummy", import.meta.dirname));
 export const app = Dummy.instance();
 Trails.application = app;
+Trails.logger = new Logger(null);
 app.config.setRoot(File.expandPath("dummy", import.meta.dirname));
 app.config.loadDefaults("8.0");
 setTrailsRoot(TopLevel.Trails!.root()!);
