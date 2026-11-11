@@ -1445,7 +1445,7 @@ describe("FinderTest", () => {
   });
 
   it("finder with offset string", async () => {
-    await expect(CanonicalTopic.offset("3" as unknown as number)).resolves.not.toThrow();
+    await CanonicalTopic.offset("3");
   });
 
   it("find on a scope does not perform statement caching", async () => {

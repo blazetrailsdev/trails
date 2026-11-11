@@ -285,7 +285,10 @@ export function limit<T extends typeof Base>(
   return this.all().limit(value);
 }
 
-export function offset<T extends typeof Base>(this: T, value: number): Relation<InstanceType<T>> {
+export function offset<T extends typeof Base>(
+  this: T,
+  value: number | string | null,
+): Relation<InstanceType<T>> {
   return this.all().offset(value);
 }
 

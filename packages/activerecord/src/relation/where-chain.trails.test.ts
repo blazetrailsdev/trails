@@ -110,4 +110,11 @@ describe("WhereChain through association (trails)", () => {
     const authors = await relation.distinct();
     expect(ids(authors)).toContain(3);
   });
+
+  it("not with a bare SQL string and binds inverts the sanitized condition", () => {
+    expect(Post.where().not("title = ?", "x").toSql()).toBe(
+      Post.where().not(["title = ?", "x"]).toSql(),
+    );
+    expect(Post.where().not("title = ?", "x").toSql()).toContain("title = 'x'");
+  });
 });
