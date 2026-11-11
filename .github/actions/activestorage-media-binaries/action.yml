@@ -48,8 +48,6 @@ runs:
         mkdir -p "$DEBS/partial"
         APT_OPTS=(-o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o DPkg::Lock::Timeout=120
           -o Dir::Cache::Archives="$DEBS" -o APT::Keep-Downloaded-Packages=true -o APT::Sandbox::User=root)
-        # An exact cache hit holds every .deb, so install them without the
-        # mirror: a hung `apt-get update` would otherwise fail the job.
         if [ "$CACHE_HIT" = true ] && compgen -G "$DEBS/*.deb" >/dev/null \
           && sudo timeout -k 10 300 apt-get "${APT_OPTS[@]}" install -y --no-install-recommends --no-download "$DEBS"/*.deb; then
           exit 0
