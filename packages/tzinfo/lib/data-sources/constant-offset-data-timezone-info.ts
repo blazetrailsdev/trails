@@ -1,16 +1,11 @@
-import { Timezone } from "../timezone.js";
 import type { TimezoneOffset } from "../timezone-offset.js";
+import { DataTimezoneInfo } from "./data-timezone-info.js";
 
-export class ConstantOffsetDataTimezoneInfo {
-  readonly identifier: string;
+export class ConstantOffsetDataTimezoneInfo extends DataTimezoneInfo {
   readonly constantOffset: TimezoneOffset;
 
   constructor(identifier: string, constantOffset: TimezoneOffset) {
-    this.identifier = identifier;
+    super(identifier);
     this.constantOffset = constantOffset;
-  }
-
-  createTimezone(): Timezone {
-    return new Timezone(this.identifier, this);
   }
 }

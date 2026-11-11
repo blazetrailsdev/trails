@@ -88,8 +88,7 @@ export class EoTime {
           `\n${renderNozoneTime(this.seconds)}` +
           `\n${platformInfo().replace(",debian:", ",\ndebian:")}` +
           "\nTry setting `ENV['TZ'] = 'Continent/City'` in your script " +
-          "(see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)" +
-          ("Data" in TZInfo ? "" : "\nand adding gem 'tzinfo-data'"),
+          "(see https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)",
       );
     }
 
