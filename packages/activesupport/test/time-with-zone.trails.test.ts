@@ -147,8 +147,8 @@ describe("TimeWithZone Comparable", () => {
   });
 
   it("== is false for an operand <=> cannot place, and does not raise", () => {
-    expect(rbEqual(twz, "foo")).toBe(false);
-    expect(rbEqual(twz, new Date(Date.UTC(2000, 0, 1)))).toBe(true);
+    expect(twz.equals("foo")).toBe(false);
+    expect(twz.equals(new Date(Date.UTC(2000, 0, 1)))).toBe(true);
   });
 
   it("< <= > >= and between? raise ArgumentError for an operand <=> cannot place", () => {
