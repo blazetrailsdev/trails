@@ -135,7 +135,7 @@ describe("TestRoutingMount", () => {
     assertEqual("OK", t.response.body);
 
     await t.post("/getfake");
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("with fake engine does not call invalid method", async () => {

@@ -4,15 +4,15 @@ import { AssertionResponse } from "../../../lib/action-dispatch/testing/assertio
 
 describe("AssertionResponse", () => {
   it("constructs from a generic symbol", () => {
-    const r = new AssertionResponse("success");
-    expect(r.name).toBe("success");
+    const r = new AssertionResponse(":success");
+    expect(r.name).toBe(":success");
     expect(r.code).toBe("2XX");
     expect(r.codeAndName()).toBe("2XX: success");
   });
 
   it("constructs from a Rack status symbol", () => {
-    const r = new AssertionResponse("not_found");
-    expect(r.name).toBe("not_found");
+    const r = new AssertionResponse(":not_found");
+    expect(r.name).toBe(":not_found");
     expect(r.code).toBe(404);
   });
 
@@ -28,7 +28,7 @@ describe("AssertionResponse", () => {
 
   it("constructs from a generic code via GENERIC_RESPONSE_CODES.invert", () => {
     const r = new AssertionResponse("2XX");
-    expect(r.name).toBe("success");
+    expect(r.name).toBe(":success");
     expect(r.code).toBe("2XX");
   });
 
@@ -37,7 +37,7 @@ describe("AssertionResponse", () => {
   });
 
   it("throws on invalid name", () => {
-    expect(() => new AssertionResponse("bogus_status")).toThrow(
+    expect(() => new AssertionResponse(":bogus_status")).toThrow(
       /Unrecognized status code :bogus_status/,
     );
   });

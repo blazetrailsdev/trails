@@ -532,7 +532,7 @@ describe("ResponseIntegrationTest", () => {
     });
 
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual("public", testCase.response.headers.get("Cache-Control"));
     assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
@@ -548,7 +548,7 @@ describe("ResponseIntegrationTest", () => {
     });
 
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual("public", testCase.response.headers.get("Cache-Control"));
     assertEqual('W/"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
@@ -565,7 +565,7 @@ describe("ResponseIntegrationTest", () => {
     });
 
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual("utf-16", testCase.response.charset);
     assertEqual(Mime.get("xml"), testCase.response.mediaType);
@@ -577,7 +577,7 @@ describe("ResponseIntegrationTest", () => {
     testCase.app = rackishApp({ "Content-Type": "application/xml; charset=utf-16" });
 
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual("utf-16", testCase.response.charset);
     assertEqual(Mime.get("xml"), testCase.response.mediaType);
@@ -592,7 +592,7 @@ describe("ResponseIntegrationTest", () => {
     });
 
     await testCase.get("/");
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
 
     assertEqual('"202cb962ac59075b964b07152d234b70"', testCase.response.headers.get("ETag"));
     assertEqual('"202cb962ac59075b964b07152d234b70"', testCase.response.etag);
@@ -602,7 +602,7 @@ describe("ResponseIntegrationTest", () => {
     testCase.app = rackishApp({ "Content-Type": "text/csv; charset=utf-16; header=present" });
 
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual(
       "text/csv; charset=utf-16; header=present",
@@ -617,7 +617,7 @@ describe("ResponseIntegrationTest", () => {
     testCase.app = rackishApp({ "Content-Type": "text/csv; header=present; charset=utf-16" });
 
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual(
       "text/csv; header=present; charset=utf-16",
@@ -632,7 +632,7 @@ describe("ResponseIntegrationTest", () => {
     testCase.app = rackishApp({ "Content-Type": 'text/csv; header=present; charset="utf-16"' });
 
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual(
       'text/csv; header=present; charset="utf-16"',
@@ -651,7 +651,7 @@ describe("ResponseIntegrationTest", () => {
       })(),
     );
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual("text/plain", testCase.response.headers.get("Content-Type"));
     assertEqual("text/plain", testCase.response.contentType);
@@ -668,7 +668,7 @@ describe("ResponseIntegrationTest", () => {
       })(),
     );
     await testCase.get("/");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
 
     assertEqual("text/plain", testCase.response.headers.get("Content-Type"));
     assertEqual("text/plain", testCase.response.contentType);

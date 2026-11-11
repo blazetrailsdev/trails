@@ -56,7 +56,7 @@ describe("Trails::InfoController#notes", () => {
 
     await tc.get("notes");
 
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSelect("#route_table tbody tr", 2);
     tc.assertSelect("#route_table tbody th[rowspan='2']", 1);
     tc.assertSelect("td.tag", "TODO");

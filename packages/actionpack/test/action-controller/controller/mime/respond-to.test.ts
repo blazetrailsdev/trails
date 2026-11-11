@@ -755,9 +755,9 @@ describe("RespondToControllerTest", () => {
 
   it("missing templates", async () => {
     await tc.get("missingTemplates", { format: "json" });
-    tc.assertResponse("no_content");
+    tc.assertResponse(":no_content");
     await tc.get("missingTemplates", { format: "xml" });
-    tc.assertResponse("no_content");
+    tc.assertResponse(":no_content");
   });
 
   it("invalid variant", async () => {
@@ -797,7 +797,7 @@ describe("RespondToControllerTest", () => {
         xhr: true,
         params: { v: "does_not_matter" },
       });
-      tc.assertResponse("no_content");
+      tc.assertResponse(":no_content");
 
       expect(logger.logged("info").filter((s) => s === NO_CONTENT_WARNING).length).toBe(1);
     } finally {
@@ -814,7 +814,7 @@ describe("RespondToControllerTest", () => {
         format: "json",
         params: { v: "does_not_matter" },
       });
-      tc.assertResponse("no_content");
+      tc.assertResponse(":no_content");
 
       expect(logger.logged("info").filter((s) => s === NO_CONTENT_WARNING).length).toBe(1);
     } finally {
@@ -828,7 +828,7 @@ describe("RespondToControllerTest", () => {
     Base.logger = logger;
     try {
       await tc.get("variantWithoutImplicitTemplateRendering", { xhr: true });
-      tc.assertResponse("no_content");
+      tc.assertResponse(":no_content");
 
       expect(logger.logged("info").filter((s) => s === NO_CONTENT_WARNING).length).toBe(1);
     } finally {

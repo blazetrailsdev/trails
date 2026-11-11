@@ -845,7 +845,7 @@ describe("LiveStreamRouterTest", () => {
   it("streaming served through the router", async () => {
     await t.get("/test");
 
-    assertResponse("ok");
+    assertResponse(":ok");
     assertMatch(/data: {"name":"John"}/, t.response.body);
     assertMatch(/data: {"name":"Ryan"}/, t.response.body);
   });

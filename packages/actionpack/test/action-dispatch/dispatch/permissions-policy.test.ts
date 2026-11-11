@@ -194,7 +194,7 @@ describe("PermissionsPolicyIntegrationTest", () => {
   });
 
   function assertPolicy(expected: string): void {
-    t.assertResponse("success");
+    t.assertResponse(":success");
     assertEqual(expected, t.response.headers.get("Feature-Policy"));
   }
 
@@ -297,7 +297,7 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
   });
 
   function assertPolicy(expected: string): void {
-    t.assertResponse("success");
+    t.assertResponse(":success");
     assertEqual(expected, t.response.headers.get(FEATURE_POLICY));
   }
 

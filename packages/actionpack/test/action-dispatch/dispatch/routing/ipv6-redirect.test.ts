@@ -63,7 +63,7 @@ describe("IPv6IntegrationTest", () => {
     };
 
     await t.get("/foo", { env: requestEnv });
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertEqual("http://[fd07:2fa:6cff:2112:225:90ff:fec7:22aa]:3000/", t.redirectToUrl());
   });
 });

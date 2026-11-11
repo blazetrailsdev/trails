@@ -595,7 +595,7 @@ describe("WithRoutingResetTest", () => {
     middlewareConfig!.foo = "bar";
 
     await t().get("/purchase");
-    t().assertResponse("ok");
+    t().assertResponse(":ok");
     assertEqual("bar", t().response.body);
 
     await t().withRouting(async (routeSet: RouteSet) => {
@@ -604,12 +604,12 @@ describe("WithRoutingResetTest", () => {
       });
 
       await t().get("/purchase");
-      t().assertResponse("ok");
+      t().assertResponse(":ok");
       assertEqual("bar", t().response.body);
     });
 
     await t().get("/purchase");
-    t().assertResponse("ok");
+    t().assertResponse(":ok");
     assertEqual("bar", t().response.body);
   });
 });

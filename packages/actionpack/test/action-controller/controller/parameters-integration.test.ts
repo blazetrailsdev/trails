@@ -52,6 +52,6 @@ permitted: false
     await assertNotDeprecated(deprecator(), async () => {
       await tc.post("permitParams", { params });
     });
-    assertResponse("ok");
+    assertResponse(":ok");
   });
 });

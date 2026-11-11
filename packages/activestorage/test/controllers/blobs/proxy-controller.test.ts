@@ -40,14 +40,14 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
 
   it("invalid signed ID", async () => {
     await t.get(t.integrationSession.trailsServiceBlobProxyUrl("invalid", "racecar.jpg"));
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("HTTP caching", async () => {
     await t.get(
       t.integrationSession.trailsStorageProxyUrl(await createFileBlob({ filename: "racecar.jpg" })),
     );
-    t.assertResponse("success");
+    t.assertResponse(":success");
     expect(t.response.headers.get("Cache-Control")).toBe("max-age=3155695200, public, immutable");
   });
 
@@ -59,7 +59,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
     await stub(blob.service, "download", mockDownload, [], async () => {
       await t.get(t.integrationSession.trailsStorageProxyUrl(blob));
     });
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
     expect(t.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
@@ -71,7 +71,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
     await stub(blob.service, "download", mockDownload, [], async () => {
       await t.get(t.integrationSession.trailsStorageProxyUrl(blob));
     });
-    t.assertResponse("internal_server_error");
+    t.assertResponse(":internal_server_error");
     expect(t.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
@@ -109,7 +109,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
         },
       ),
     );
-    t.assertResponse("success");
+    t.assertResponse(":success");
   });
 
   it("Expired signed ID within expiration duration", async () => {
@@ -119,7 +119,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
     );
     travel(Duration.minutes(2));
     await t.get(url);
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("signed ID within expiration time", async () => {
@@ -131,7 +131,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
         },
       ),
     );
-    t.assertResponse("success");
+    t.assertResponse(":success");
   });
 
   it("Expired signed ID within expiration time", async () => {
@@ -141,7 +141,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
     );
     travel(Duration.minutes(2));
     await t.get(url);
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("single Byte Range", async () => {
@@ -149,7 +149,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
       t.integrationSession.trailsStorageProxyUrl(await createFileBlob({ filename: "racecar.jpg" })),
       { headers: { Range: "bytes=5-9" } },
     );
-    t.assertResponse("partial_content");
+    t.assertResponse(":partial_content");
     expect(t.response.headers.get("Content-Length")).toBe("5");
     expect(t.response.headers.get("Content-Range")).toBe("bytes 5-9/1124062");
     expect(t.response.headers.get("Content-Type")).toBe("image/jpeg");
@@ -161,7 +161,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
       t.integrationSession.trailsStorageProxyUrl(await createFileBlob({ filename: "racecar.jpg" })),
       { headers: { Range: "bytes=*/1234" } },
     );
-    t.assertResponse("range_not_satisfiable");
+    t.assertResponse(":range_not_satisfiable");
   });
 
   it("multiple Byte Ranges", async () => {
@@ -173,7 +173,7 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
         ),
         { headers: { Range: "bytes=5-9,13-17" } },
       );
-      t.assertResponse("partial_content");
+      t.assertResponse(":partial_content");
       expect(t.response.headers.get("Content-Length")).toBe("252");
       expect(t.response.headers.get("Content-Type")).toBe(
         `multipart/byteranges; boundary=${boundary}`,
@@ -228,7 +228,7 @@ describe("ActiveStorage::Blobs::ExpiringProxyControllerTest", () => {
     await t.get(
       t.integrationSession.trailsStorageProxyUrl(await createFileBlob({ filename: "racecar.jpg" })),
     );
-    t.assertResponse("success");
+    t.assertResponse(":success");
   });
 
   it("Expired signed ID", async () => {
@@ -237,6 +237,6 @@ describe("ActiveStorage::Blobs::ExpiringProxyControllerTest", () => {
     );
     travel(Duration.minutes(2));
     await t.get(url);
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 });

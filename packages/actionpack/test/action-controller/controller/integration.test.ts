@@ -405,8 +405,8 @@ describe("IntegrationProcessTest", () => {
       expect(t.status).toBe(200);
       expect(t.statusMessage).toBe("OK");
       assertResponse(200);
-      assertResponse("success");
-      assertResponse("ok");
+      assertResponse(":success");
+      assertResponse(":ok");
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("OK");
       expect(t.response.body).toBe("OK");
@@ -422,8 +422,8 @@ describe("IntegrationProcessTest", () => {
         expect(t.status).toBe(200);
         expect(t.statusMessage).toBe("OK");
         assertResponse(200);
-        assertResponse("success");
-        assertResponse("ok");
+        assertResponse(":success");
+        assertResponse(":ok");
         expect(t.cookies.toHash()).toEqual({});
         expect(t.body).toBe("<root></root>");
         expect(t.response.body).toBe("<root></root>");
@@ -439,8 +439,8 @@ describe("IntegrationProcessTest", () => {
       expect(t.status).toBe(201);
       expect(t.statusMessage).toBe("Created");
       assertResponse(201);
-      assertResponse("success");
-      assertResponse("created");
+      assertResponse(":success");
+      assertResponse(":created");
       expect(t.cookies.toHash()).toEqual({});
       expect(t.body).toBe("Created");
       expect(t.response.body).toBe("Created");
@@ -469,13 +469,13 @@ describe("IntegrationProcessTest", () => {
   it("cookie persist to next request", async () => {
     await t.withTestRouteSet(async () => {
       await t.get("/setCookie");
-      assertResponse("success");
+      assertResponse(":success");
 
       expect(t.headers!.get("Set-Cookie")).toBe("foo=bar; path=/");
       expect(t.cookies.toHash()).toEqual({ foo: "bar" });
 
       await t.get("/getCookie");
-      assertResponse("success");
+      assertResponse(":success");
       expect(t.body).toBe("bar");
 
       expect(t.headers!.get("Set-Cookie")).toBeUndefined();
@@ -488,13 +488,13 @@ describe("IntegrationProcessTest", () => {
       t.hostBang("37s.backpack.test");
 
       await t.get("/setCookie");
-      assertResponse("success");
+      assertResponse(":success");
 
       expect(t.headers!.get("Set-Cookie")).toBe("foo=bar; path=/");
       expect(t.cookies.toHash()).toEqual({ foo: "bar" });
 
       await t.get("/getCookie");
-      assertResponse("success");
+      assertResponse(":success");
       expect(t.body).toBe("bar");
 
       expect(t.headers!.get("Set-Cookie")).toBeUndefined();
@@ -508,19 +508,19 @@ describe("IntegrationProcessTest", () => {
       expect(t.status).toBe(302);
       expect(t.statusMessage).toBe("Found");
       assertResponse(302);
-      assertResponse("redirect");
-      assertResponse("found");
+      assertResponse(":redirect");
+      assertResponse(":found");
       expect(t.response.body).toBe("");
       assertKindOf(HTML5.Document, t.htmlDocument);
       expect(t.requestCount).toBe(1);
 
       await t.followRedirectBang();
       expect(t.request.referer).toBe("http://www.example.com/redirect");
-      assertResponse("success");
+      assertResponse(":success");
       expect(t.path).toBe("/get");
 
       await t.get("/moved");
-      assertResponse("redirect");
+      assertResponse(":redirect");
       assertRedirectedTo("/method");
     });
   });
@@ -550,7 +550,7 @@ describe("IntegrationProcessTest", () => {
 
       await t.followRedirectBang();
 
-      assertResponse("ok");
+      assertResponse(":ok");
       expect(t.htmlDocument).not.toBe(previousHtmlDocument);
     });
   });
@@ -560,7 +560,7 @@ describe("IntegrationProcessTest", () => {
       await t.get("/redirect");
       await t.followRedirectBang({ params: { foo: "bar" } });
 
-      assertResponse("ok");
+      assertResponse(":ok");
       expect(t.request.parameters["foo"]).toBe("bar");
     });
   });
@@ -571,8 +571,8 @@ describe("IntegrationProcessTest", () => {
       expect(t.status).toBe(200);
       expect(t.statusMessage).toBe("OK");
       assertResponse(200);
-      assertResponse("success");
-      assertResponse("ok");
+      assertResponse(":success");
+      assertResponse(":ok");
       expect(t.response.body).toBe("JS OK");
     });
   });
@@ -582,7 +582,7 @@ describe("IntegrationProcessTest", () => {
       await t.get("/get.php", { xhr: true });
       expect(t.status).toBe(406);
       assertResponse(406);
-      assertResponse("not_acceptable");
+      assertResponse(":not_acceptable");
     });
   });
 
@@ -805,15 +805,15 @@ describe("MetalIntegrationTest", () => {
   it("successful get", async () => {
     await t.get("/success");
     assertResponse(200);
-    assertResponse("success");
-    assertResponse("ok");
+    assertResponse(":success");
+    assertResponse(":ok");
     expect(t.response.body).toBe("Hello World!");
   });
 
   it("failed get", async () => {
     await t.get("/failure");
     assertResponse(404);
-    assertResponse("not_found");
+    assertResponse(":not_found");
     expect(t.response.body).toBe("");
   });
 
@@ -1137,13 +1137,13 @@ describe("UrlOptionsIntegrationTest", () => {
 
   it("current host overrides default URL options from routes", async () => {
     await t.get("/foo");
-    assertResponse("success");
+    assertResponse(":success");
     expect(t.foosUrl()).toBe("http://www.example.com/foo");
   });
 
   it("controller can override default URL options from request", async () => {
     await t.get("/bar");
-    assertResponse("success");
+    assertResponse(":success");
     expect(t.foosUrl()).toBe("http://bar.com/foo");
   });
 
@@ -1154,7 +1154,7 @@ describe("UrlOptionsIntegrationTest", () => {
       expect(t.foosUrl()).toBe("http://foobar.com/foo");
 
       await t.get("/bar");
-      assertResponse("success");
+      assertResponse(":success");
       expect(t.foosUrl()).toBe("http://foobar.com/foo");
     } finally {
       Session.defaultUrlOptions = t.defaultUrlOptions = originalHost;
@@ -1163,7 +1163,7 @@ describe("UrlOptionsIntegrationTest", () => {
 
   it("current request path parameters are recalled", async () => {
     await t.get("/foo/1");
-    assertResponse("success");
+    assertResponse(":success");
     expect(t.urlFor({ action: "edit", onlyPath: true })).toBe("/foo/1/edit");
   });
 });
@@ -1210,7 +1210,7 @@ describe("HeadWithStatusActionIntegrationTest", () => {
   it("get /foo/status with head result does not cause stack overflow error", async ({ task }) => {
     t = new HeadWithStatusActionIntegrationTest(task.name);
     await expect(t.get("/foo/status")).resolves.not.toThrow();
-    assertResponse("ok");
+    assertResponse(":ok");
   });
 });
 
@@ -1357,14 +1357,14 @@ describe("IntegrationRequestEncodersTest", () => {
         headers: { "Content-Type": "application/json" },
       });
 
-      assertResponse("success");
+      assertResponse(":success");
       assertEqual({ foo: "fighters" }, t.response.parsedBody);
     });
   });
 
   it("encoding as json", async () => {
     await postToFoos(":json", () => {
-      assertResponse("success");
+      assertResponse(":success");
       expect(t.request.mediaType).toBe("application/json");
       expect(t.request.accepts[0].toString()).toBe("application/json");
       expect(t.request.format().ref()).toBe(":json");
@@ -1399,7 +1399,7 @@ describe("IntegrationRequestEncodersTest", () => {
       IntegrationTest.registerEncoder(":wibble", { paramEncoder: (params) => params });
 
       await postToFoos(":wibble", () => {
-        assertResponse("success");
+        assertResponse(":success");
         expect(t.request.path).toBe("/foos_wibble");
         expect(t.request.mediaType).toBe("text/wibble");
         expect(t.request.accepts[0].toString()).toBe("text/wibble");
@@ -1420,7 +1420,7 @@ describe("IntegrationRequestEncodersTest", () => {
       IntegrationTest.registerEncoder(":json_api", { paramEncoder: (params) => params });
 
       await postToFoos(":json_api", () => {
-        assertResponse("success");
+        assertResponse(":success");
         expect(t.request.path).toBe("/foos_json_api");
         expect(t.request.mediaType).toBe("application/vnd.api+json");
         expect(t.request.accepts[0].toString()).toBe(acceptHeader);

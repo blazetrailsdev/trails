@@ -261,7 +261,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("notAuthorized", makeRequest(), makeResponse());
-    assertResponse.call(c, "forbidden");
+    assertResponse.call(c, ":forbidden");
   });
 
   it("rescue handler string", async () => {
@@ -278,7 +278,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "forbidden");
+    assertResponse.call(c, ":forbidden");
   });
 
   it("rescue handler with argument", async () => {
@@ -327,7 +327,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "forbidden");
+    assertResponse.call(c, ":forbidden");
   });
 
   it("proc rescue handler as string", async () => {
@@ -344,7 +344,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "forbidden");
+    assertResponse.call(c, ":forbidden");
   });
 
   it("proc rescue handle with argument", async () => {
@@ -485,7 +485,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "forbidden");
+    assertResponse.call(c, ":forbidden");
   });
 
   it("rescue when cause has more specific handler than wrapper", async () => {
@@ -508,7 +508,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "forbidden");
+    assertResponse.call(c, ":forbidden");
   });
 
   it("rescue when cause has handler, but wrapper doesn't", async () => {
@@ -526,7 +526,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "unprocessable_entity");
+    assertResponse.call(c, ":unprocessable_entity");
   });
 
   it("can rescue a ParseError", async () => {
@@ -547,7 +547,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "bad_request");
+    assertResponse.call(c, ":bad_request");
     expect(c.responseBody).toBe("parse error");
   });
 });
@@ -574,7 +574,7 @@ describe("ExceptionInheritanceRescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "no_content");
+    assertResponse.call(c, ":no_content");
   });
 
   it("inheritance works", async () => {
@@ -592,7 +592,7 @@ describe("ExceptionInheritanceRescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "created");
+    assertResponse.call(c, ":created");
   });
 });
 
@@ -618,7 +618,7 @@ describe("ControllerInheritanceRescueControllerTest", () => {
     });
     const c = new Child();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "gone");
+    assertResponse.call(c, ":gone");
   });
 
   it("second exception in child controller", async () => {
@@ -642,7 +642,7 @@ describe("ControllerInheritanceRescueControllerTest", () => {
     });
     const c = new Child();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "gone");
+    assertResponse.call(c, ":gone");
   });
 
   it("exception in parent controller", async () => {
@@ -660,7 +660,7 @@ describe("ControllerInheritanceRescueControllerTest", () => {
     class Child extends Parent {}
     const c = new Child();
     await c.dispatch("action", makeRequest(), makeResponse());
-    assertResponse.call(c, "created");
+    assertResponse.call(c, ":created");
   });
 });
 

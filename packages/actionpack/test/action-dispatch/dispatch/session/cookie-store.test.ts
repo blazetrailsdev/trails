@@ -205,7 +205,7 @@ describe("CookieStoreTest", () => {
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
 
-      t.assertResponse("success");
+      t.assertResponse(":success");
       t.assertSessionCookie("path=/; HttpOnly", { foo: "bar" });
     });
   });
@@ -216,7 +216,7 @@ describe("CookieStoreTest", () => {
       await t.get("/setSessionValue");
       await t.get("/getSessionValue");
 
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual('foo: "bar"', t.response.body);
     });
   });
@@ -227,12 +227,12 @@ describe("CookieStoreTest", () => {
       await t.get("/setSessionValue");
       await t.get("/persistentSessionId");
 
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual(32, t.response.body.length);
       const sessionId = t.response.body;
 
       await t.get("/getSessionId");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual(
         `id: ${sessionId}`,
         t.response.body,
@@ -253,7 +253,7 @@ describe("CookieStoreTest", () => {
 
       await t.get("/getSessionValue");
 
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual("foo: nil", t.response.body);
     });
   });
@@ -264,7 +264,7 @@ describe("CookieStoreTest", () => {
 
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNil(t.headers!.get("Set-Cookie"));
     });
   });
@@ -288,7 +288,7 @@ describe("CookieStoreTest", () => {
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue", { headers: { HTTPS: "on" } });
 
-      t.assertResponse("success");
+      t.assertResponse(":success");
       t.assertSessionCookie("path=/; secure; HttpOnly", { foo: "bar" });
     });
   });
@@ -313,7 +313,7 @@ describe("CookieStoreTest", () => {
     const t = testCase as CookieStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/noSessionAccess");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNil(t.headers!.get("Set-Cookie"));
     });
   });
@@ -326,7 +326,7 @@ describe("CookieStoreTest", () => {
         "BAh7BjoIZm9vIghiYXI%3D--" + "fef868465920f415f2c0652d6910d3af288a0367",
       );
       await t.get("/noSessionAccess");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNil(t.headers!.get("Set-Cookie"));
     });
   });
@@ -335,19 +335,19 @@ describe("CookieStoreTest", () => {
     const t = testCase as CookieStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       const sessionPayload = t.response.body;
       t.assertSessionCookie("path=/; HttpOnly", { foo: "bar" });
 
       await t.get("/callResetSession");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNotEqual([], t.headers!.get("Set-Cookie"));
       assertNotNil(t.headers!.get("Set-Cookie"));
       assertNotNil(sessionPayload);
       assertNotEqual(sessionPayload, t.cookies.get(SessionKey));
 
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual("foo: nil", t.response.body);
     });
   });
@@ -356,11 +356,11 @@ describe("CookieStoreTest", () => {
     const t = testCase as CookieStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       t.assertSessionCookie("path=/; HttpOnly", { foo: "bar" });
 
       await t.get("/getClassAfterResetSession");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNotEqual([], t.headers!.get("Set-Cookie"));
       assertEqual("class: ActionDispatch::Request::Session", t.response.body);
     });
@@ -370,7 +370,7 @@ describe("CookieStoreTest", () => {
     const t = testCase as CookieStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual("foo: nil", t.response.body);
       assertNil(t.headers!.get("Set-Cookie"), "should only create session on write, not read");
     });
@@ -380,14 +380,14 @@ describe("CookieStoreTest", () => {
     const t = testCase as CookieStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       t.assertSessionCookie("path=/; HttpOnly", { foo: "bar" });
 
       await t.get("/callSessionClear");
-      t.assertResponse("success");
+      t.assertResponse(":success");
 
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual("foo: nil", t.response.body);
     });
   });
@@ -397,7 +397,7 @@ describe("CookieStoreTest", () => {
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
       await t.get("/persistentSessionId");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual(32, t.response.body.length);
       const sessionId = t.response.body;
       await t.get("/persistentSessionId");
@@ -437,7 +437,7 @@ describe("CookieStoreTest", () => {
 
         await t.get("/setSessionValue");
 
-        t.assertResponse("success");
+        t.assertResponse(":success");
         t.assertSessionCookie(`path=/; expires=${expectedExpiry}; HttpOnly`, { foo: "bar" });
       });
 
@@ -450,7 +450,7 @@ describe("CookieStoreTest", () => {
 
         await t.get("/noSessionAccess");
 
-        t.assertResponse("success");
+        t.assertResponse(":success");
         t.assertSessionCookie(`path=/; expires=${expectedExpiry}; HttpOnly`, { foo: "bar" });
       });
     });
@@ -475,7 +475,7 @@ describe("CookieStoreTest", () => {
         await t.get("/setSessionValue");
         await t.get("/getSessionValue");
 
-        t.assertResponse("success");
+        t.assertResponse(":success");
         assertEqual('foo: "bar"', t.response.body);
         t.assertSessionCookie(`path=/; expires=${expectedExpiry}; HttpOnly`, { foo: "bar" });
       });
@@ -485,7 +485,7 @@ describe("CookieStoreTest", () => {
       await stub(Time, "now", time, [], async () => {
         await t.get("/getSessionValue");
 
-        t.assertResponse("success");
+        t.assertResponse(":success");
         assertEqual("foo: nil", t.response.body);
       });
     });

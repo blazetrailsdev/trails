@@ -63,14 +63,14 @@ describe("RenderersMetalTest", () => {
 
   it("render json", async () => {
     await tc.get("one");
-    assertResponse("success");
+    assertResponse(":success");
     assertEqual(JSON.stringify({ a: "b" }), tc.response.body);
     assertEqual("application/json", tc.response.mediaType);
   });
 
   it("render xml", async () => {
     await tc.get("two");
-    assertResponse("success");
+    assertResponse(":success");
     assertEqual(" ", tc.response.body);
     assertEqual("text/plain", tc.response.mediaType);
   });

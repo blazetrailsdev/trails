@@ -29,6 +29,6 @@ describe("NonDispatchRoutedAppTest", () => {
 
   it("does not except", async () => {
     await t.get("/foo");
-    assertResponse("success");
+    assertResponse(":success");
   });
 });

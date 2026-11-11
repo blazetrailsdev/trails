@@ -73,6 +73,6 @@ describe("RenderToStringTest", () => {
   it("response ok for render to string with xml format", async () => {
     await tc.get("renderHeadOkWithInlineTemplateAndXmlFormat");
     assertEqual("text/html", tc.response.mediaType);
-    assertResponse("ok");
+    assertResponse(":ok");
   });
 });

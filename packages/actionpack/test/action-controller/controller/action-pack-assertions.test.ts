@@ -472,7 +472,7 @@ describe("ActionPackAssertionsControllerTest", () => {
   it("assert response uses exception message", async () => {
     tc.controller = new AssertResponseWithUnexpectedErrorController();
     const e = await assertRaise([RuntimeError], {}, () => tc.get("index"));
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     assertIncludes("FAIL", e.message);
   });
 

@@ -85,7 +85,7 @@ describe("HttpTokenAuthenticationTest", () => {
       tc.request.env[header] = encodeCredentials("lifo");
       await tc.get("index");
 
-      assertResponse("success");
+      assertResponse(":success");
       expect(tc.response.body, `Authentication failed for request header ${header}`).toBe(
         "Hello Secret",
       );
@@ -96,7 +96,7 @@ describe("HttpTokenAuthenticationTest", () => {
       });
       await tc.get("show");
 
-      assertResponse("success");
+      assertResponse(":success");
       expect(
         tc.response.body,
         `Authentication failed for request header ${header} and long credentials`,
@@ -109,7 +109,7 @@ describe("HttpTokenAuthenticationTest", () => {
       tc.request.env[header] = encodeCredentials("h4x0r");
       await tc.get("index");
 
-      assertResponse("unauthorized");
+      assertResponse(":unauthorized");
       expect(tc.response.body, `Authentication didn't fail for request header ${header}`).toBe(
         "HTTP Token: Access denied.\n",
       );
@@ -118,7 +118,7 @@ describe("HttpTokenAuthenticationTest", () => {
       tc.request.env[header] = encodeCredentials("h4x0rh4x0rh4x0rh4x0rh4x0rh4x0rh4x0rh4x0r");
       await tc.get("show");
 
-      assertResponse("unauthorized");
+      assertResponse(":unauthorized");
       expect(
         tc.response.body,
         `Authentication didn't fail for request header ${header} and long credentials`,
@@ -130,7 +130,7 @@ describe("HttpTokenAuthenticationTest", () => {
     tc.request.env["HTTP_AUTHORIZATION"] = 'Token token$"lifo"';
     await tc.get("index");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body, "Authentication header was not properly parsed").toBe(
       "HTTP Token: Access denied.\n",
     );
@@ -142,7 +142,7 @@ describe("HttpTokenAuthenticationTest", () => {
       await tc.get("index");
     });
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body, "Authentication header was not properly parsed").toBe(
       "HTTP Token: Access denied.\n",
     );
@@ -152,21 +152,21 @@ describe("HttpTokenAuthenticationTest", () => {
     tc.request.env["HTTP_AUTHORIZATION"] = "Bearer lifo";
     await tc.get("index");
 
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("authentication request with tab in header", async () => {
     tc.request.env["HTTP_AUTHORIZATION"] = 'Token\ttoken="lifo"';
     await tc.get("index");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Hello Secret");
   });
 
   it("authentication request without credential", async () => {
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed\n");
     expect(tc.response.headers.get("WWW-Authenticate")).toBe('Token realm="SuperSecret"');
   });
@@ -175,7 +175,7 @@ describe("HttpTokenAuthenticationTest", () => {
     tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials('"quote" pretty');
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed\n");
     expect(tc.response.headers.get("WWW-Authenticate")).toBe('Token realm="SuperSecret"');
   });

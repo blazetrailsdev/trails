@@ -47,19 +47,19 @@ describe("RenderersApiTest", () => {
 
   it("render json", async () => {
     await tc.get("one");
-    assertResponse("success");
+    assertResponse(":success");
     assertEqual(JSON.stringify({ a: "b" }), tc.response.body);
   });
 
   it("render xml", async () => {
     await tc.get("two");
-    assertResponse("success");
+    assertResponse(":success");
     assertEqual(toXml({ a: "b" }), tc.response.body);
   });
 
   it("render plain", async () => {
     await tc.get("plain");
-    assertResponse("internal_server_error");
+    assertResponse(":internal_server_error");
     assertEqual("Hi from plain", tc.response.body);
   });
 });

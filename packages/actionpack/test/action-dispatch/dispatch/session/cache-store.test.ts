@@ -80,11 +80,11 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assert(t.cookies.get("_session_id"));
 
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual('foo: "bar"', t.response.body);
     });
   });
@@ -93,7 +93,7 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual("foo: nil", t.response.body);
     });
   });
@@ -102,18 +102,18 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assert(t.cookies.get("_session_id"));
       const sessionCookie = t.cookies.getCookie("_session_id")!;
 
       await t.get("/callResetSession");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNotEqual([], t.headers!.get("Set-Cookie"));
 
       t.cookies.push(sessionCookie);
 
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual(
         "foo: nil",
         t.response.body,
@@ -126,7 +126,7 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual("foo: nil", t.response.body);
       assertNil(t.cookies.get("_session_id"), "should only create session on write, not read");
     });
@@ -136,21 +136,21 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assert(t.cookies.get("_session_id"));
       const sessionId = t.cookies.get("_session_id");
 
       await t.get("/callResetSession");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNotEqual([], t.headers!.get("Set-Cookie"));
       assertNotNil(t.headers!.get("Set-Cookie"));
 
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual("foo: nil", t.response.body);
 
       await t.get("/getSessionId");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNotEqual(sessionId, t.response.body);
     });
   });
@@ -159,12 +159,12 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assert(t.cookies.get("_session_id"));
       const sessionId = t.cookies.get("_session_id");
 
       await t.get("/getSessionId");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual(
         sessionId,
         t.response.body,
@@ -180,11 +180,11 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assert(t.cookies.get("_session_id"));
 
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNil(
         t.headers!.get("Set-Cookie"),
         "should not resend the cookie again if session_id cookie is already exists",
@@ -201,7 +201,7 @@ describe("CacheStoreTest", () => {
       t.cookies.set("_session_id", sid.publicId);
       await t.get("/setSessionValue");
 
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNotEqual(sid.publicId, t.cookies.get("_session_id"));
       assertNil(await t._cache.read(`_session_id:${sid.privateId}`));
       assertEqual(
@@ -217,7 +217,7 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assert(t.cookies.get("_session_id"));
 
       const sid = new SessionId(t.cookies.get("_session_id")!);
@@ -226,7 +226,7 @@ describe("CacheStoreTest", () => {
       await t._cache.write(`_session_id:${sid.publicId}`, session);
 
       await t.get("/getSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertEqual('foo: "bar"', t.response.body);
     });
   });
@@ -235,7 +235,7 @@ describe("CacheStoreTest", () => {
     const t = testCase as CacheStoreTest;
     await t.withTestRouteSet(async () => {
       await t.get("/setSessionValue");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assert(t.cookies.get("_session_id"));
 
       const sid = new SessionId(t.cookies.get("_session_id")!);
@@ -244,7 +244,7 @@ describe("CacheStoreTest", () => {
       await t._cache.write(`_session_id:${sid.publicId}`, session);
 
       await t.get("/callResetSession");
-      t.assertResponse("success");
+      t.assertResponse(":success");
       assertNotEqual([], t.headers!.get("Set-Cookie"));
 
       assertNil(await t._cache.read(`_session_id:${sid.privateId}`));

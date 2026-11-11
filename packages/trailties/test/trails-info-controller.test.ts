@@ -60,7 +60,7 @@ describe("InfoControllerTest", () => {
   test("info controller does not allow remote requests", async () => {
     tc.request.env["REMOTE_ADDR"] = "example.org";
     await tc.get("properties");
-    tc.assertResponse("forbidden");
+    tc.assertResponse(":forbidden");
   });
 
   test("info controller renders an error message when request was forbidden", async () => {
@@ -74,7 +74,7 @@ describe("InfoControllerTest", () => {
     Trails.application!.config.considerAllRequestsLocal = true;
     try {
       await tc.get("properties");
-      tc.assertResponse("success");
+      tc.assertResponse(":success");
     } finally {
       Trails.application!.config.considerAllRequestsLocal = false;
     }
@@ -82,7 +82,7 @@ describe("InfoControllerTest", () => {
 
   test("info controller allows local requests", async () => {
     await tc.get("properties");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   test("info controller renders a table with properties", async () => {
@@ -92,7 +92,7 @@ describe("InfoControllerTest", () => {
 
   test("info controller renders with routes", async () => {
     await tc.get("routes");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   test("info controller routes shows source location", async () => {
@@ -248,7 +248,7 @@ describe("InfoControllerTest", () => {
 
   test("internal routes do not have a default params[:internal] value", async () => {
     await tc.get("properties");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     assertNil((tc.controller as unknown as ActionController.Base).params.get("internal"));
   });
 

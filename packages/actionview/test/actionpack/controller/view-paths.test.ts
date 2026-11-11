@@ -187,14 +187,14 @@ describe("ViewLoadPathsTest", () => {
 
   test("view paths", async () => {
     await tc.get("helloWorld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     expect(tc.response.body).toBe("Hello world!");
   });
 
   test("view paths override", async () => {
     TestController.prependViewPath(`${FIXTURE_LOAD_PATH}/override`);
     await tc.get("helloWorld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     expect(tc.response.body).toBe("Hello overridden world!");
   });
 
@@ -211,14 +211,14 @@ describe("ViewLoadPathsTest", () => {
         `${FIXTURE_LOAD_PATH}/override2`,
       ]);
       await tc.get("helloWorld");
-      tc.assertResponse("success");
+      tc.assertResponse(":success");
       expect(tc.response.body).toBe("layout: Hello overridden world!");
     });
   });
 
   test("view paths override at request time", async () => {
     await tc.get("helloWorldAtRequestTime");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     expect(tc.response.body).toBe("Hello overridden world!");
   });
 
@@ -249,7 +249,7 @@ describe("ViewLoadPathsTest", () => {
     TestController.viewPaths(new PathSet([decorator]));
 
     await tc.get("helloWorld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     expect(tc.response.body).toBe("Decorated body");
   });
 

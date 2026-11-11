@@ -39,20 +39,20 @@ describe("ApiRateLimitingTest", () => {
   it("exceeding basic limit", async () => {
     await tc.get("limitedToTwo");
     await tc.get("limitedToTwo");
-    assertResponse("ok");
+    assertResponse(":ok");
 
     await tc.get("limitedToTwo");
-    assertResponse("too_many_requests");
+    assertResponse(":too_many_requests");
   });
 
   it("limit resets after time", async () => {
     await tc.get("limitedToTwo");
     await tc.get("limitedToTwo");
-    assertResponse("ok");
+    assertResponse(":ok");
 
     await travelTo(Time.now().plus(3), {}, async () => {
       await tc.get("limitedToTwo");
-      assertResponse("ok");
+      assertResponse(":ok");
     });
   });
 });

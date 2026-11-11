@@ -74,12 +74,12 @@ describe("ActiveStorage::Representations::RedirectControllerWithVariantsTest", (
 
   it("showing variant with invalid signed blob ID", async () => {
     await getRepresentation(t, blob, "invalid", Variation.encode(resizeToLimit));
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("showing variant with invalid variation key", async () => {
     await getRepresentation(t, blob, blob.signedId(), "invalid");
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 });
 
@@ -140,12 +140,12 @@ describe("ActiveStorage::Representations::RedirectControllerWithPreviewsTest", (
 
   it("showing preview with invalid signed blob ID", async () => {
     await getRepresentation(t, blob, "invalid", Variation.encode(resizeToLimit));
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("showing preview with invalid variation key", async () => {
     await getRepresentation(t, blob, blob.signedId(), "invalid");
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 });
 

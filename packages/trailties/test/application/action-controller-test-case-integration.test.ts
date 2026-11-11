@@ -149,15 +149,15 @@ describe("WithExecutorIntegrationTest", () => {
     expect(TestCase.executorAroundEachRequest).toBeTruthy();
 
     await t.get("getCurrentCustomer");
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.body).toMatch(/noone,UTC/);
 
     await t.get("setCurrentCustomer");
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.body).toMatch(/david,Copenhagen/);
 
     await t.get("getCurrentCustomer");
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.body).toMatch(/noone,UTC/);
   });
 });
@@ -176,15 +176,15 @@ describe("WithoutExecutorIntegrationTest", () => {
     expect(TestCase.executorAroundEachRequest).toBeFalsy();
 
     await t.get("getCurrentCustomer");
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.body).toMatch(/noone,UTC/);
 
     await t.get("setCurrentCustomer");
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.body).toMatch(/david,Copenhagen/);
 
     await t.get("getCurrentCustomer");
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.body).toMatch(/david,Copenhagen/);
   });
 });

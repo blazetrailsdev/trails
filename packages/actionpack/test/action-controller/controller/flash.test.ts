@@ -381,11 +381,11 @@ describe("FlashIntegrationTest", () => {
   it("flash", async () => {
     await withTestRouteSet(async (tc) => {
       await tc.get("/set_flash");
-      tc.assertResponse("success");
+      tc.assertResponse(":success");
       assertEqual("hello", tc.request.flash!.get("that"));
 
       await tc.get("/use_flash");
-      tc.assertResponse("success");
+      tc.assertResponse(":success");
       assertEqual("flash: hello", tc.response.body);
     });
   });
@@ -393,7 +393,7 @@ describe("FlashIntegrationTest", () => {
   it("just using flash does not stream a cookie back", async () => {
     await withTestRouteSet(async (tc) => {
       await tc.get("/use_flash");
-      tc.assertResponse("success");
+      tc.assertResponse(":success");
       assertNil(tc.response.headers.get("Set-Cookie"));
       assertEqual("flash: ", tc.response.body);
     });
@@ -422,7 +422,7 @@ describe("FlashIntegrationTest", () => {
   it("added flash types method", async () => {
     await withTestRouteSet(async (tc) => {
       await tc.get("/set_bar");
-      tc.assertResponse("success");
+      tc.assertResponse(":success");
       assertEqual(
         "for great justice",
         (tc.controller as FlashIntegrationTestController & { bar: unknown }).bar,

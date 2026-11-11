@@ -212,7 +212,7 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("basic requests", () => {
     it("GET /posts returns 200", async () => {
       await app.get("/posts");
-      app.assertResponse("success");
+      app.assertResponse(":success");
       app.assertResponse(200);
     });
 
@@ -230,24 +230,24 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("POST /posts creates resource", async () => {
       await app.post("/posts", { params: { title: "Test" } });
-      app.assertResponse("created");
+      app.assertResponse(":created");
       assertEqual({ title: "Test", created: true }, app.response.parsedBody);
     });
 
     it("PUT /posts/:id updates resource", async () => {
       await app.put("/posts/5", { params: { title: "Updated" } });
-      app.assertResponse("success");
+      app.assertResponse(":success");
       expect((app.response.parsedBody as HashWithIndifferentAccess).get("updated")).toBe(true);
     });
 
     it("PATCH /posts/:id updates resource", async () => {
       await app.patch("/posts/5");
-      app.assertResponse("success");
+      app.assertResponse(":success");
     });
 
     it("DELETE /posts/:id destroys resource", async () => {
       await app.delete("/posts/1");
-      app.assertResponse("no_content");
+      app.assertResponse(":no_content");
     });
   });
 
@@ -259,25 +259,25 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("nested resources work", async () => {
       await app.get("/posts/1/comments");
-      app.assertResponse("success");
+      app.assertResponse(":success");
       expect((app.response.parsedBody as HashWithIndifferentAccess).get("postId")).toBe("1");
     });
 
     it("nested resource POST works", async () => {
       await app.post("/posts/3/comments", { params: { body: "Nice" } });
-      app.assertResponse("created");
+      app.assertResponse(":created");
       expect((app.response.parsedBody as HashWithIndifferentAccess).get("postId")).toBe("3");
     });
 
     it("namespaced resources work", async () => {
       await app.get("/admin/posts");
-      app.assertResponse("success");
+      app.assertResponse(":success");
       expect((app.response.parsedBody as HashWithIndifferentAccess).get("admin")).toBe(true);
     });
 
     it("singular resource works", async () => {
       await app.get("/session");
-      app.assertResponse("success");
+      app.assertResponse(":success");
     });
 
     it("unmatched route returns 404", async () => {
@@ -297,14 +297,14 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("redirects", () => {
     it("redirect sets location header", async () => {
       await app.get("/posts/redirect");
-      app.assertResponse("redirect");
+      app.assertResponse(":redirect");
       app.assertRedirectedTo("/posts");
     });
 
     it("followRedirect follows the redirect", async () => {
       await app.get("/posts/redirect");
       await app.followRedirectBang();
-      app.assertResponse("success");
+      app.assertResponse(":success");
       assertEqual([{ id: 1 }, { id: 2 }], app.response.parsedBody);
     });
 
@@ -354,13 +354,13 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("login flow with session", async () => {
       await app.post("/session");
-      app.assertResponse("redirect");
+      app.assertResponse(":redirect");
 
       await app.get("/session");
       expect((app.response.parsedBody as HashWithIndifferentAccess).get("userId")).toBe(42);
 
       await app.delete("/session");
-      app.assertResponse("no_content");
+      app.assertResponse(":no_content");
     });
 
     it("reset clears session", async () => {
@@ -431,7 +431,7 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("error responses", () => {
     it("500 error response", async () => {
       await app.get("/posts/error");
-      app.assertResponse("error");
+      app.assertResponse(":error");
       app.assertResponse(500);
     });
   });
@@ -456,10 +456,10 @@ describe("ActionDispatch::IntegrationTest", () => {
   describe("multi-request workflows", () => {
     it("create then show flow", async () => {
       await app.post("/posts", { params: { title: "New" } });
-      app.assertResponse("created");
+      app.assertResponse(":created");
 
       await app.get("/posts/1");
-      app.assertResponse("success");
+      app.assertResponse(":success");
     });
 
     it("requestCount increments per request and resets on resetBang", async () => {
@@ -507,19 +507,19 @@ describe("ActionDispatch::IntegrationTest", () => {
       await app.process("get", "https://other.example.com/posts");
       expect(app.host).toBe("other.example.com");
       expect(app.isHttps()).toBe(true);
-      app.assertResponse("success");
+      app.assertResponse(":success");
     });
 
     it("_processPath splits query string off PATH_INFO", async () => {
       await app.get("/posts?page=2&per=10");
       expect(app.request.env.PATH_INFO).toBe("/posts");
       expect(app.request.env.QUERY_STRING).toBe("page=2&per=10");
-      app.assertResponse("success");
+      app.assertResponse(":success");
     });
 
     it("followRedirectBang sets HTTP_REFERER to the prior request URL", async () => {
       await app.get("/posts/redirect");
-      app.assertResponse("redirect");
+      app.assertResponse(":redirect");
       const refererBefore = `http://www.example.com/posts/redirect`;
       await app.followRedirectBang();
       expect(app.request.env.HTTP_REFERER).toBe(refererBefore);
@@ -557,7 +557,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       expect(child.requestCount).toBe(0);
       expect(child.rootSession).toBe(app);
       await child.get("/posts");
-      child.assertResponse("success");
+      child.assertResponse(":success");
       expect(app.requestCount).toBe(1);
       child.assertions = 5;
       expect(app.assertions).toBe(5);
@@ -565,16 +565,16 @@ describe("ActionDispatch::IntegrationTest", () => {
 
     it("CRUD lifecycle", async () => {
       await app.post("/posts", { params: { title: "CRUD" } });
-      app.assertResponse("created");
+      app.assertResponse(":created");
 
       await app.get("/posts");
-      app.assertResponse("success");
+      app.assertResponse(":success");
 
       await app.put("/posts/1", { params: { title: "Updated" } });
-      app.assertResponse("success");
+      app.assertResponse(":success");
 
       await app.delete("/posts/1");
-      app.assertResponse("no_content");
+      app.assertResponse(":no_content");
     });
   });
 
@@ -604,7 +604,7 @@ describe("ActionDispatch::IntegrationTest", () => {
 
       await app.get("/posts/xml2");
 
-      app.assertResponse("success");
+      app.assertResponse(":success");
       expect(app.htmlDocument).not.toBe(previousHtmlDocument);
     });
   });
@@ -669,7 +669,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       constSet(TopLevel, "RedirectorController", RedirectToMissingController);
 
       await redirectApp.get("/redirect-to-missing");
-      redirectApp.assertResponse("redirect");
+      redirectApp.assertResponse(":redirect");
       await redirectApp.followRedirectBang();
 
       expect(redirectApp.status).toBe(404);
@@ -691,7 +691,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       constSet(TopLevel, "Redirector2Controller", RedirectToMissing2Controller);
 
       await redirectApp.get("/redirect-to-missing2");
-      redirectApp.assertResponse("redirect");
+      redirectApp.assertResponse(":redirect");
       await redirectApp.followRedirectBang({ headers: { "X-Custom-Header": "sentinel" } });
 
       expect(redirectApp.status).toBe(404);

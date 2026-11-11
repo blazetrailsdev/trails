@@ -39,7 +39,7 @@ describe("ActiveStorage::Blobs::RedirectControllerTest", () => {
 
   it("invalid signed ID", async () => {
     await t.get(t.integrationSession.trailsServiceBlobUrl("invalid", "racecar.jpg"));
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("HTTP caching", async () => {
@@ -61,7 +61,7 @@ describe("ActiveStorage::Blobs::RedirectControllerTest", () => {
     });
     travel(Duration.minutes(2));
     await t.get(url);
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("signed ID within expiration time", async () => {
@@ -79,7 +79,7 @@ describe("ActiveStorage::Blobs::RedirectControllerTest", () => {
     });
     travel(Duration.minutes(2));
     await t.get(url);
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 });
 
@@ -110,6 +110,6 @@ describe("ActiveStorage::Blobs::ExpiringRedirectControllerTest", () => {
     const url = t.integrationSession.trailsStorageRedirectUrl(blob);
     travel(Duration.minutes(2));
     await t.get(url);
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 });

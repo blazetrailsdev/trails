@@ -41,7 +41,7 @@ describe("ActionMailbox::Ingresses::Relay::InboundEmailsControllerTest", () => {
       },
     );
 
-    t.assertResponse("no_content");
+    t.assertResponse(":no_content");
 
     const inboundEmail = (await InboundEmail.last()) as InboundEmail;
     await inboundEmail.rawEmail.load();
@@ -67,7 +67,7 @@ describe("ActionMailbox::Ingresses::Relay::InboundEmailsControllerTest", () => {
       },
     );
 
-    t.assertResponse("no_content");
+    t.assertResponse(":no_content");
 
     const inboundEmail = (await InboundEmail.last()) as InboundEmail;
     await inboundEmail.rawEmail.load();
@@ -92,7 +92,7 @@ describe("ActionMailbox::Ingresses::Relay::InboundEmailsControllerTest", () => {
       },
     );
 
-    t.assertResponse("unprocessable_entity");
+    t.assertResponse(":unprocessable_entity");
   });
 
   it("rejecting an unauthorized inbound email", async () => {
@@ -107,7 +107,7 @@ describe("ActionMailbox::Ingresses::Relay::InboundEmailsControllerTest", () => {
       },
     );
 
-    t.assertResponse("unauthorized");
+    t.assertResponse(":unauthorized");
   });
 
   it("rejecting an inbound email of an unsupported media type", async () => {
@@ -122,7 +122,7 @@ describe("ActionMailbox::Ingresses::Relay::InboundEmailsControllerTest", () => {
       },
     );
 
-    t.assertResponse("unsupported_media_type");
+    t.assertResponse(":unsupported_media_type");
   });
 
   it("raising when the configured password is nil", async () => {

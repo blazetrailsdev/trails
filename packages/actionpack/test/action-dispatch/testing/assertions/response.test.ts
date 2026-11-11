@@ -24,7 +24,7 @@ function host(status: number, headers: Record<string, string> = {}): AssertionRe
 describe("assertResponse", () => {
   it("does not build the message for a passing assertion", () => {
     const message = vi.fn(() => "unused");
-    assertResponse.call(host(200), "success", message);
+    assertResponse.call(host(200), ":success", message);
     assertResponse.call(host(200), 200, message);
     expect(message).not.toHaveBeenCalled();
   });
