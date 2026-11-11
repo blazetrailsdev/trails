@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { constSet, rbInspect, rbModRemoveConst, rbStrStartWith } from "@blazetrails/ruby-compat";
+import { constSet, rbModRemoveConst, rbStrStartWith, uniq } from "@blazetrails/ruby-compat";
 import { Entry } from "../../../lib/cache/entry.js";
 import { formatVersion as cacheFormatVersion, setFormatVersion } from "../../../lib/cache/store.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
@@ -9,9 +9,9 @@ export interface CacheStoreFormatVersionBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-const FORMAT_VERSION_SIGNATURES = new Map<number, [Uint8Array, Uint8Array]>([
-  [7.0, [Uint8Array.of(0x00, 0x04, 0x08, 0x5b), Uint8Array.of(0x01, 0x78)]],
-  [7.1, [Uint8Array.of(0x00, 0x11, 0x01), Uint8Array.of(0x00, 0x11, 0x81)]],
+const FORMAT_VERSION_SIGNATURES = new Map<string, [Uint8Array, Uint8Array]>([
+  ["7.0", [Uint8Array.of(0x00, 0x04, 0x08, 0x5b), Uint8Array.of(0x01, 0x78)]],
+  ["7.1", [Uint8Array.of(0x00, 0x11, 0x01), Uint8Array.of(0x00, 0x11, 0x81)]],
 ]);
 
 const FORMAT_VERSIONS = [...FORMAT_VERSION_SIGNATURES.keys()];
@@ -34,11 +34,11 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
       withFormat(formatVersion, () => (lookupStore() as unknown as { coder: unknown }).coder),
     );
 
-    expect(coders).toEqual([...new Set(coders)]);
+    expect(coders).toEqual(uniq(coders));
   });
 
   it("invalid format version raises", () => {
-    withFormat(0, () => {
+    withFormat("0", () => {
       expect(() => lookupStore()).toThrow();
     });
   });
@@ -48,8 +48,8 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
     [uncompressedSignature, compressedSignature],
   ] of FORMAT_VERSION_SIGNATURES) {
     // BLOCKED: cache-marshal-serializers-dump-through-ruby-compat-marshal
-    it.skipIf(formatVersion === 7.0)(
-      `format version ${rbInspect(formatVersion)} uses correct signature for uncompressed entries`,
+    it.skipIf(formatVersion === "7.0")(
+      `format version ${formatVersion} uses correct signature for uncompressed entries`,
       () => {
         const serialized = withFormat(formatVersion, () =>
           serializeEntry(lookupStore(), new Entry(Array(100).fill("value"))),
@@ -61,7 +61,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
       },
     );
 
-    it(`format version ${rbInspect(formatVersion)} uses correct signature for compressed entries`, () => {
+    it(`format version ${formatVersion} uses correct signature for compressed entries`, () => {
       const serialized = withFormat(formatVersion, () =>
         serializeEntry(lookupStore(), new Entry(Array(100).fill("value")), {
           compressThreshold: 1,
@@ -122,7 +122,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
 
   for (const readVersion of FORMAT_VERSIONS) {
     for (const writeVersion of FORMAT_VERSIONS) {
-      it(`format version ${rbInspect(readVersion)} can read ${rbInspect(writeVersion)} entries`, async () => {
+      it(`format version ${readVersion} can read ${writeVersion} entries`, async () => {
         const key = crypto.randomUUID();
 
         const store = withFormat(writeVersion, () => lookupStore());
@@ -132,7 +132,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
         expect(await reader.read(key)).toBe(`value for ${key}`);
       });
 
-      it(`format version ${rbInspect(readVersion)} can read ${rbInspect(writeVersion)} entries with compression`, async () => {
+      it(`format version ${readVersion} can read ${writeVersion} entries with compression`, async () => {
         const key = crypto.randomUUID();
 
         const store = withFormat(writeVersion, () => lookupStore({ compressThreshold: 1 }));
@@ -145,9 +145,9 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
   }
 }
 
-function withFormat<T>(formatVersion: number, block: () => T): T {
+function withFormat<T>(formatVersion: string, block: () => T): T {
   const old = cacheFormatVersion();
-  setFormatVersion(formatVersion);
+  setFormatVersion(Number(formatVersion));
   try {
     return block();
   } finally {
