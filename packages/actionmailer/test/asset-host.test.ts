@@ -1,7 +1,6 @@
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
 import { assertDomEqual } from "@blazetrails/actionview/rails-dom-testing/assertions/dom-assertions";
 import { afterEach, beforeEach, describe, it } from "vitest";
-import type { Configuration } from "@blazetrails/activesupport";
 import { Base } from "../lib/base.js";
 import type { MessageDelivery } from "../lib/message-delivery.js";
 
@@ -30,11 +29,9 @@ describe("AssetHostTest", () => {
 
   beforeEach(() => {
     previousDeliveryMethod = Base.deliveryMethod;
-    (AssetHostMailer as unknown as { configure(b: (c: Configuration) => void): void }).configure(
-      (c) => {
-        c.set("assetHost", "http://www.example.com");
-      },
-    );
+    AssetHostMailer.configure((c) => {
+      c.set("assetHost", "http://www.example.com");
+    });
   });
 
   afterEach(() => {

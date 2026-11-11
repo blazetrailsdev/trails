@@ -6,7 +6,6 @@ import {
   TestHelper,
   type MockLogger,
 } from "@blazetrails/activesupport/log-subscriber/test-helper";
-import type { Logger } from "@blazetrails/activesupport";
 import { RuntimeError, include, type Included } from "@blazetrails/ruby-compat";
 import { Base } from "../lib/base.js";
 import { LogSubscriber } from "../lib/log-subscriber.js";
@@ -31,7 +30,7 @@ class AMLogSubscriberTest {
   }
 
   setLogger(logger: MockLogger | null): void {
-    (Base as unknown as { logger: Logger | null }).logger = logger as unknown as Logger;
+    Base.logger = logger;
   }
 }
 
@@ -45,11 +44,11 @@ class BogusDelivery {
 
 describe("AMLogSubscriberTest", () => {
   let t: AMLogSubscriberTest;
-  let previousLogger: unknown;
+  let previousLogger: typeof Base.logger;
   let previousDeliveryMethod: typeof Base.deliveryMethod;
 
   beforeEach(() => {
-    previousLogger = (Base as unknown as { logger: Logger | null }).logger;
+    previousLogger = Base.logger;
     previousDeliveryMethod = Base.deliveryMethod;
     Base.deliveryMethod = "test";
     t = new AMLogSubscriberTest();
@@ -58,7 +57,7 @@ describe("AMLogSubscriberTest", () => {
 
   afterEach(() => {
     testHelperTeardown.call(t as never);
-    (Base as unknown as { logger: Logger | null }).logger = previousLogger as Logger;
+    Base.logger = previousLogger;
     Base.deliveryMethod = previousDeliveryMethod;
   });
 
