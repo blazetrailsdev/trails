@@ -31,6 +31,11 @@ declare module "@blazetrails/activejob/base" {
     let concurrencyDuration: Duration;
     const limitsConcurrency: typeof ClassMethods.limitsConcurrency;
   }
+  interface Base {
+    concurrencyKey(): string | null;
+    concurrencyLimit: number | null;
+    concurrencyDuration: Duration;
+  }
 }
 
 export class ClassMethods {

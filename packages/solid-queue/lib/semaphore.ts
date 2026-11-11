@@ -3,6 +3,7 @@ import { RecordNotUnique, type Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { constSet, Range } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
+import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import type { Job } from "./job.js";
 
 export class Semaphore extends Record {
@@ -23,11 +24,11 @@ export class Semaphore extends Record {
     });
   }
 
-  static async wait(job: Job): Promise<boolean> {
+  static async wait(job: Job | ActiveJobBase): Promise<boolean> {
     return await new Proxy(job).wait();
   }
 
-  static async signal(job: Job): Promise<boolean> {
+  static async signal(job: Job | ActiveJobBase): Promise<boolean> {
     return await new Proxy(job).signal();
   }
 
@@ -57,9 +58,9 @@ export class Proxy {
   }
 
   /** @internal */
-  private job: Job;
+  private job: Job | ActiveJobBase;
 
-  constructor(job: Job) {
+  constructor(job: Job | ActiveJobBase) {
     this.job = job;
   }
 
@@ -115,18 +116,37 @@ export class Proxy {
     );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm concurrencyKey — PERMANENT
+   */
   private key(): string | null {
-    return this.job.concurrency_key;
+    return "concurrency_key" in this.job ? this.job.concurrency_key : this.job.concurrencyKey();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm concurrencyDuration — PERMANENT
+   */
   private expiresAt(): unknown {
-    return this.job.concurrencyDuration().fromNow();
+    const job = this.job;
+    return (
+      typeof job.concurrencyDuration === "function"
+        ? job.concurrencyDuration()
+        : job.concurrencyDuration
+    ).fromNow();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm concurrencyLimit — PERMANENT
+   */
   private limit(): number {
-    return this.job.concurrencyLimit() ?? 1;
+    const job = this.job;
+    return (
+      (typeof job.concurrencyLimit === "function"
+        ? job.concurrencyLimit()
+        : job.concurrencyLimit) ?? 1
+    );
   }
 }
