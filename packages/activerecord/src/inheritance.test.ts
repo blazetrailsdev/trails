@@ -563,7 +563,7 @@ describe("InheritanceComputeTypeTest", () => {
     try {
       Base.storeFullStiClass = false;
       const foo = rbObjClone((await Firm.first()) as Firm);
-      (foo as any).type = "FirmOnTheFly";
+      (foo as Firm & { type: string }).type = "FirmOnTheFly";
       await foo.saveBang();
 
       await expect(Firm.find(foo.id)).rejects.toThrow(RecordNotFound);
@@ -581,8 +581,12 @@ describe("InheritanceComputeTypeTest", () => {
       const firmOnTheFly = constSet(Firm, "FirmOnTheFly", class FirmOnTheFly extends Firm {});
       DescendantsTracker.registerSubclass(Firm, firmOnTheFly);
 
-      expect(await Firm.find(foo.id)).toBeInstanceOf(firmOnTheFly);
-      expect(await Firm.findByBang({ id: foo.id })).toBeInstanceOf(firmOnTheFly);
+      await assertNothingRaised(async () => {
+        expect(await Firm.find(foo.id)).toBeInstanceOf(firmOnTheFly);
+      });
+      await assertNothingRaised(async () => {
+        expect(await Firm.findByBang({ id: foo.id })).toBeInstanceOf(firmOnTheFly);
+      });
     } finally {
       Base.storeFullStiClass = prev;
       try {

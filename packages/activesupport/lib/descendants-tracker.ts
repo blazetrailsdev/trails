@@ -71,8 +71,9 @@ export function registerSubclass(parent: AnyClass, child: AnyClass): void {
   const subs = _subclassMap.get(parent)!;
   if (subs.isInclude(child)) return;
   subs.add(child);
-  const hook = (parent as unknown as Record<symbol, unknown>)[inherited];
-  if (typeof hook === "function") hook.call(parent, child);
+  if (inherited in parent) {
+    (parent as unknown as Record<symbol, (subclass: AnyClass) => void>)[inherited](child);
+  }
 }
 
 export function subclasses(klass: AnyClass): AnyClass[] {
