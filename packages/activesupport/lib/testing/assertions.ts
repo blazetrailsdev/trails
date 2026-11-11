@@ -287,10 +287,7 @@ Object.defineProperties(UnexpectedError.prototype, {
       const bt = Minitest.filterBacktrace(backtrace(this.error))
         .join("\n    ")
         .replace(baseRe(), "");
-      const message = Object.hasOwn(this.error, "message")
-        ? this.error.message
-        : classNameOf(this.error);
-      return `${classNameOf(this.error)}: ${message}\n    ${bt}`;
+      return `${classNameOf(this.error)}: ${this.error.message}\n    ${bt}`;
     },
   },
 });

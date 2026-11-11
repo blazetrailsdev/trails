@@ -682,8 +682,7 @@ describe("DebugExceptionsTest", () => {
     assertEqual(3, log.split(/(?<=\n)/).length);
   });
 
-  // BLOCKED: exception-without-message-reads-class-name
-  it.skip("doesn't log the framework backtrace when error type is a invalid mime type", async () => {
+  it("doesn't log the framework backtrace when error type is a invalid mime type", async () => {
     t.app = ProductionApp;
 
     const output = new StringIO();
