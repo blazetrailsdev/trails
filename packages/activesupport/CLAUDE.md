@@ -138,8 +138,7 @@ unlocks the mutex from a Fiber that does not hold it.
 `Fiber.current`.** A Fiber nested under the owner waits for the lock where
 MRI's would re-enter. `ThreadError`'s message stays Rails' "current thread not
 owner". ruby-compat's `Monitor#enter` is owned by the Fiber as well, as MRI's
-is (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76-85`). Ruled by the repo
-owner on 2026-11-04 (trails#9706). Do not converge it back to `Thread`.
+is (`vendor/ruby/v3.3.11/ext/monitor/monitor.c:76-85`). Ruled by the operator on 2026-11-04 (trails#9706). Do not converge it back to `Thread`.
 
 ## `Isolation::Subprocess#run_in_isolation`'s child
 
@@ -151,4 +150,4 @@ Rails' child ends with
 (`vendor/rails/v8.0.2/activesupport/lib/active_support/testing/isolation.rb:83-87`).
 A Vitest child hands its result back and lets the runner finish, so
 `isolation.ts` calls neither, and dumps the test itself. Both are `PERMANENT`
-receipts. Ruled by the repo owner on 2026-11-01 (trails#9561).
+receipts. Ruled by the operator on 2026-11-01 (trails#9561).

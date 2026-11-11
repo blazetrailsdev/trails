@@ -19,7 +19,7 @@ false against every other image, and `hash` is identity. A caller that needs
 content equality awaits `image.signature()` on both images first, which is
 the warm cache `==` then reads.
 
-Ruled by the repo owner on 2026-10-28. `Image#equals` and `#hash` carry no
+Ruled by the operator on 2026-10-28. `Image#equals` and `#hash` carry no
 receipt: their bodies make exactly Rails' calls with Rails' arms, so no gate
 flags them and no receipt tag applies, and a prose citation is stripped by
 `no-freeform-comments`. This section is the record, and `image.trails.test.ts`
@@ -37,7 +37,7 @@ constructor cannot await, so the constructor seats its promise on
 `new Image(path, null, block)` therefore sees the block's changes, as Ruby's
 does, and a failed block rejects that read rather than going unhandled.
 
-Ruled by the repo owner on 2026-10-28 (converge, not `PERMANENT-SKIP`).
+Ruled by the operator on 2026-10-28 (converge, not `PERMANENT-SKIP`).
 
 For the same reason `Tool.new` awaits its block before `call`
 (`tool.rb:30-38`), and `Image#mogrify`, `#format` and `#composite` await the
@@ -55,5 +55,5 @@ mechanism"; its cross-table rules and
 - `mini_magick/image.rb`'s `respond_to_missing?` answers `false`
   (`image.rb:471-473`) only to keep `Array#flatten` off an image, so its
   Proxy forwards every name but `PROTOCOL_PROBES` to `mogrify` without
-  consulting it — the one exception to the first rule above (owner ruling,
+  consulting it — the one exception to the first rule above (operator ruling,
   2026-10-22).

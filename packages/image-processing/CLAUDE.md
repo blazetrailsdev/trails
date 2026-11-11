@@ -18,7 +18,7 @@ so a decode would not prompt a collection. Measured on trails#9710: each
 `Processor.call` and every `ImageProcessing::Vips` operation that supersedes
 an intermediate it created deletes that intermediate, carrying
 `@inventedArm delete — PERMANENT` (`deleteAccumulator` in `processor.ts`).
-A handle the caller passed in is never deleted. Ruled by the repo owner on
+A handle the caller passed in is never deleted. Ruled by the operator on
 2026-11-04.
 
 ## `method_missing` definers in this package

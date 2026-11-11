@@ -19,7 +19,7 @@ keys of a variant's transformation hash and the methods
 unsupported method. `process` awaits `ImageProcessing.loadPath[...]` where Ruby's
 `autoload` loads inside `const_get` (`vendor/image_processing/v1.14.0/lib/image_processing.rb:10-11`),
 the shape of § "An adapter file is loaded by an awaited step", and carries
-`@inventedArm loadPath — PERMANENT`. Ruled by the repo owner on 2026-10-31.
+`@inventedArm loadPath — PERMANENT`. Ruled by the operator on 2026-10-31.
 
 ## `method_missing` definers in this package
 
@@ -31,7 +31,7 @@ mechanism"; its cross-table rules and
   sync because the association lazily loads (`one.rb:32-34,44-46,73-75`), and
   a JS read cannot. `isAttached`, `isBlank` and a delegated read are sync and
   raise `RuntimeError` on an unloaded attachment until `await one.load()`, so
-  activesupport's `isBlank(one)` never reads a promise. Ruled by the repo owner
+  activesupport's `isBlank(one)` never reads a promise. Ruled by the operator
   on 2026-10-31. `load` does not load the blob: a delegated blob read such as
   `filename` also needs `await (await one.attachment)?.blob`.
 - `active_storage/attachment.rb`'s `delegate_missing_to :blob` is

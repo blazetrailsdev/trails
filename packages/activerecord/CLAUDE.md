@@ -55,7 +55,7 @@ counterpart for:
   relation with `each` (`relation/delegation.rb:101-104`), which reads
   `records`; `for await (const record of rel)` is that loop in JS. It awaits
   `toArray()` and yields each record, the same evaluation as
-  `for (const record of await rel)`. Kept by the repo owner's ruling
+  `for (const record of await rel)`. Kept by the operator's ruling
   (2026-10-08).
 
 This is a genuine language shortcoming — JS has no synchronous await — and it is
@@ -191,8 +191,7 @@ reason `SQLite3Adapter#disconnectBang` closes the handle under `lock`, where
 Rails' `disconnect!` (`sqlite3_adapter.rb:221-226`) closes it after `super`
 releases `@lock`. `SQLite3Adapter#active` answers under `lock` too, where Rails'
 `active?` (`sqlite3_adapter.rb:210-215`) takes none, so a `verify!` cannot
-answer while a `reconnect!` is inside `reset_transaction`'s block; the repo
-owner ruled that placement on 2026-10-11, in the tasks-repo story
+answer while a `reconnect!` is inside `reset_transaction`'s block; the operator ruled that placement on 2026-10-11, in the tasks-repo story
 `pin-connection-runs-verify-and-begin-under-an-invented-adapter-lock` (RFC 0156).
 
 This is a genuine language shortcoming, ratified repo-wide here. Stories that
@@ -215,7 +214,7 @@ value.
 
 **The whole chain is ported as the own-property guard the root CLAUDE.md
 ratifies. No link is ported as a method, and nothing dispatches the chain.**
-Ruled by the repo owner (2026-10-09), over a single first-read dispatch on
+Ruled by the operator (2026-10-09), over a single first-read dispatch on
 `Base` that would run each ported link in Rails' order: that needs every ivar
 below to be an accessor that triggers it, and a reset that runs at first read
 clobbers what the class body already wrote.
@@ -258,7 +257,7 @@ clobbers what the class body already wrote.
 
 - **`Migration.inherited`** (`migration.rb:617-626`) is outside `Base`'s chain
   and resets nothing: it raises `StandardError` when a class whose superclass
-  is `Migration` is defined. The repo owner ruled on trails#8789 (2026-10-11)
+  is `Migration` is defined. The operator ruled on trails#8789 (2026-10-11)
   that a direct `extends Migration` raises as Rails does. With no
   definition-time hook the raise is deferred to `Migration`'s constructor, at
   the first `new` of such a class, with Rails' message. A direct subclass that
@@ -365,7 +364,7 @@ through `Mysql2Adapter`.
   files to "measure" them.
 
 This is an ecosystem gap rather than a TypeScript language shortcoming, and it
-is ratified repo-wide here (repo owner, trails#8579).
+is ratified repo-wide here (operator, trails#8579).
 
 ## `ActiveRecord::Promise` is the native promise (`promise.rb`, `Promise::Complete`)
 
@@ -460,8 +459,7 @@ and the synchronous body peeks at the warmed value.**
   query and passes the answer in, so the statements logged are the ones
   `exec_insert` (`database_statements.rb:157-160`) logs. Warming through
   `schemaCache.primaryKeys` was rejected: it adds a `data_source_exists?` query
-  and memoizes, which `SQLite3AdapterTest#test_insert_logged` sees. The repo
-  owner ruled that `sqlForInsert` returns synchronously under this section
+  and memoizes, which `SQLite3AdapterTest#test_insert_logged` sees. The operator ruled that `sqlForInsert` returns synchronously under this section
   (2026-10-08, story
   `converge-sql-for-insert-and-supports-insert-returning-to-sync`), and the
   warm step in `execInsert` is the permanent consequence.
@@ -637,7 +635,7 @@ runs before `resolve`.** As a consequence:
   `DatabaseConfig` by hand, and no other `require` is ported as an awaited step
   on the strength of this section.
 
-This is a genuine language shortcoming, ratified here by the repo owner
+This is a genuine language shortcoming, ratified here by the operator
 (2026-10-08). `load` carries `@noRailsEquivalent PERMANENT` and
 `resolvePoolConfig` carries `@inventedArm load — PERMANENT` against this
 section. There is no story to remove the step.
@@ -662,7 +660,7 @@ than binding it anywhere. **`Kernel#load` is `rbFLoad` in ruby-compat**
 - `loadMigration` is Rails' three lines in Rails' order and is async, as every
   caller of `MigrationProxy#migration` already is.
 
-This is a genuine language shortcoming, ratified here by the repo owner
+This is a genuine language shortcoming, ratified here by the operator
 (2026-10-09). It covers `Kernel#load` of a file Rails loads by path at run
 time. A `require` is not ported this way on the strength of this section; see
 § "An adapter file is loaded by an awaited step".
@@ -682,7 +680,7 @@ second argument. **The builder keeps one arm for that**:
 `parts.length > 0 ? ", { … }" : ""`. Always emitting the braces was rejected
 because an option-less statement would dump as `t.uniqueConstraint(["a"], {})`.
 
-This is a genuine language shortcoming, ratified here by the repo owner
+This is a genuine language shortcoming, ratified here by the operator
 (2026-10-09). The arm carries `@inventedArm if — PERMANENT` against this
 section at each builder: `exclusionConstraintsInCreate` and
 `uniqueConstraintsInCreate` in `postgresql/schema-dumper.ts`, and the base
@@ -705,7 +703,7 @@ would deadlock, and no driver reports that case apart from an ordinary
 `WITH` in an open transaction raises at once, including a `SELECT` that took no
 lock. A SAVEPOINT after the read clears the tracking, and a `-- ` comment before
 the `SELECT` hides it, so those writes wait for the deadline. This is a genuine language shortcoming, ruled
-permanent by the repo owner on 2026-11-01 (trails#9582), and
+permanent by the operator on 2026-11-01 (trails#9582), and
 `@noRailsEquivalent PERMANENT` on those functions points at it.
 
 ## Records are not Proxies (`method_missing`)
@@ -769,8 +767,7 @@ is Rails' `Klass.new(attributes, &block)`, so the body of
 (`packages/activerecord/src/base.ts`): the abstract raise, then the three
 `subclass_from_attributes` arms in Rails' order, then
 `new subclass(attributes, block)` or the rest of the constructor, which is
-`Class#new`. A static `new` beside the constructor was rejected by the repo
-owner (trails#8659): it leaves two spellings for one operation, and either the
+`Class#new`. A static `new` beside the constructor was rejected by the operator (trails#8659): it leaves two spellings for one operation, and either the
 bare `new` silently skips the abstract check and the STI dispatch, or the
 constructor has to re-enter the static method through a marker and run twice.
 
@@ -797,7 +794,7 @@ As a consequence:
   the arm in `Core`'s constructor that recognises an allocation carries
   `@inventedArm if — PERMANENT`.
 
-This is ratified repo-wide here by the repo owner.
+This is ratified repo-wide here by the operator.
 
 ## A `ClassMethods#new` that runs after `super` (`Deduplicable`)
 
@@ -814,7 +811,7 @@ only"). So each includer's or subclass's constructor ends with
 Rails `initialize` (`MySQL::Column`) is named in its parent's guard rather
 than given a constructor. Each guard carries `@inventedArm if — PERMANENT`
 where the arm gate compares the declaration.
-Ruled by the repo owner on 2026-10-27.
+Ruled by the operator on 2026-10-27.
 
 ## SQLite's double-quoted-string setting
 
