@@ -30,7 +30,7 @@ export class TrailsController extends ApplicationController {
     if (await this.trail.save()) {
       this.redirectTo(this.trail, { notice: "Trail was successfully created." });
     } else {
-      await this.render("new", { status: "unprocessable_entity" });
+      await this.render("new", { status: ":unprocessable_entity" });
     }
   }
 
@@ -38,10 +38,10 @@ export class TrailsController extends ApplicationController {
     if (await this.trail.update(this.trailParams())) {
       this.redirectTo(this.trail, {
         notice: "Trail was successfully updated.",
-        status: "see_other",
+        status: ":see_other",
       });
     } else {
-      await this.render("edit", { status: "unprocessable_entity" });
+      await this.render("edit", { status: ":unprocessable_entity" });
     }
   }
 
@@ -49,7 +49,7 @@ export class TrailsController extends ApplicationController {
     await this.trail.destroyBang();
     this.redirectTo(this.trailsPath(), {
       notice: "Trail was successfully destroyed.",
-      status: "see_other",
+      status: ":see_other",
     });
   }
 
