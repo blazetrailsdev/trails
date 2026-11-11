@@ -2,13 +2,6 @@
   {
     "package": "tzinfo",
     "tsFile": "tzinfo.ts",
-    "rubyName": "periods_for_local",
-    "call": "raise_not_implemented",
-    "reason": "data_sources/data_timezone_info.rb has no TS file, and the misplaced-file vote counts members tzinfo.ts seats on TZInfo (as tzinfo.rb does) as defined there, so it pairs DataTimezoneInfo with the barrel; Rails Timezone#periods_for_local calls raise_unknown_timezone. Retired when tzinfo-data-source-base ports data_timezone_info.rb."
-  },
-  {
-    "package": "tzinfo",
-    "tsFile": "tzinfo.ts",
     "rubyName": "create_timezone",
     "call": "new",
     "kind": "args",
@@ -16,5 +9,12 @@
       "ref:this"
     ],
     "reason": "data_sources/data_timezone_info.rb has no TS file, and the misplaced-file vote counts members tzinfo.ts seats on TZInfo (as tzinfo.rb does) as defined there, so it pairs DataTimezoneInfo with the barrel; ConstantOffsetDataTimezoneInfo#createTimezone builds new Timezone(identifier, this) until DataTimezone is ported. Retired when tzinfo-data-source-base ports data_timezone_info.rb."
+  },
+  {
+    "package": "tzinfo",
+    "tsFile": "tzinfo.ts",
+    "rubyName": "periods_for_local",
+    "call": "raise_not_implemented",
+    "reason": "data_sources/data_timezone_info.rb has no TS file, and the misplaced-file vote counts members tzinfo.ts seats on TZInfo (as tzinfo.rb does) as defined there, so it pairs DataTimezoneInfo with the barrel; Rails Timezone#periods_for_local calls raise_unknown_timezone. Retired when tzinfo-data-source-base ports data_timezone_info.rb."
   }
 ]
