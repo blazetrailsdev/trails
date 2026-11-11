@@ -1207,6 +1207,12 @@ ratified here so no port re-derives them.
   `TimeZone.new`'s unknown-name `self[name]` (`values/time_zone.rb:216-218`)
   drop that arm. An unknown zone name reaches `create`, which raises
   `TZInfo::InvalidTimezoneIdentifier`. Ruled by the operator on 2026-10-14.
+- **`eval` of generated Ruby.** An Erubi engine emits Ruby source, as the gem
+  does, and Node has no Ruby evaluator. An erubi example that asserts only on
+  `eval(engine.new(...).src)` (`vendor/erubi/1.13.1/test/test.rb:790`, and the
+  `CaptureBlockEngine` rerun at `:902-1000`, whose `check_output` skips the src
+  comparison, `:39-47`) is permanently unportable; `Buffer`'s runtime is pinned
+  by `capture-block.trails.test.ts` instead. Ruled by the operator on 2026-11-11.
 - **`initialize` on an allocated receiver.** See § "A revived object copies a
   constructed instance".
 
