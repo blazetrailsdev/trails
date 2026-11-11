@@ -374,12 +374,20 @@ export class Node {
   }
 
   get namespace(): Namespace | null {
-    const href = (this._node as { namespaceURI?: string }).namespaceURI;
-    return this.namespaceDefinitions.find((ns) => ns.prefix == null && ns.href === href) ?? null;
+    const n = this._node as { tagName?: string; namespaceURI?: string };
+    if (n.namespaceURI === undefined || n.namespaceURI === "") return null;
+    const colon = n.tagName?.indexOf(":") ?? -1;
+    const prefix = colon > 0 ? n.tagName!.slice(0, colon) : null;
+    return (
+      this.namespaceScopes.find((ns) => ns.prefix === prefix && ns.href === n.namespaceURI) ?? null
+    );
   }
 
   set namespace(ns: Namespace | null) {
-    if (ns == null) return;
+    if (ns == null) {
+      this.setNamespace(ns);
+      return;
+    }
 
     if (!(ns instanceof Namespace)) {
       throw new TypeError(`${rbObjClassname(ns)} can't be coerced into Nokogiri::XML::Namespace`);
@@ -388,19 +396,29 @@ export class Node {
       throw new ArgumentError("namespace must be declared on the same document");
     }
 
-    (this._node as { namespaceURI: string }).namespaceURI = ns.href;
+    this.setNamespace(ns);
+  }
+
+  /** @internal */
+  private setNamespace(namespace: Namespace | null): void {
+    (this._node as { namespaceURI: string }).namespaceURI = namespace?.href ?? "";
   }
 
   addNamespaceDefinition(prefix: string | null, href: string): Namespace {
-    this.set(prefix == null ? "xmlns" : `xmlns:${prefix}`, href);
-    return new Namespace({ owner: this, prefix, href }, this.document);
+    let ns = this.namespaceDefinitions.find((n) => n.prefix === prefix);
+    if (ns === undefined) {
+      this.set(prefix == null ? "xmlns" : `xmlns:${prefix}`, href);
+      ns = new Namespace({ owner: this, prefix, href }, this.document);
+    }
+    if (prefix == null) this.setNamespace(ns);
+    return ns;
   }
 
   get namespaceDefinitions(): Namespace[] {
     const attrs = (this._node as { attrs?: Parse5Attr[] }).attrs ?? [];
     return attrs.flatMap((attr) => {
       const key = attr.prefix ? `${attr.prefix}:${attr.name}` : attr.name;
-      const match = /^xmlns(?::([A-Za-z_][A-Za-z_\-.0-9]*))?$/.exec(key);
+      const match = HTML5.Document.NCNAME_RE.exec(key);
       if (match === null) return [];
       return [
         new Namespace({ owner: this, prefix: match[1] ?? null, href: attr.value }, this.document),

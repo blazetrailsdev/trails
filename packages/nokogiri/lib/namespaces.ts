@@ -1,6 +1,7 @@
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 import type { Node } from "./html5/node.js";
+import type { Document as Html5Document } from "./html5/document.js";
 import type { DocumentFragment as Html5DocumentFragment } from "./html5/document-fragment.js";
 import type { NodeSet } from "./xml/node-set.js";
 import type { Attr } from "./xml/attr.js";
@@ -27,6 +28,7 @@ export const HTML5 = { name: "Nokogiri::HTML5" } as {
   name: string;
   Node: typeof Node;
   DocumentFragment: typeof Html5DocumentFragment;
+  Document: typeof Html5Document;
 };
 
 export const XPath = { name: "Nokogiri::XML::XPath" } as { name: string; [name: string]: unknown };

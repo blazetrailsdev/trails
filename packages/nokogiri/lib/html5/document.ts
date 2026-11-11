@@ -4,6 +4,7 @@ import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { readSource, type Readable } from "../readable.js";
 import { childNodes, Node } from "./node.js";
 import { DocumentFragment } from "./document-fragment.js";
+import { HTML5 } from "../namespaces.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
@@ -130,3 +131,5 @@ export class Document extends Node {
     return XPathVisitor.DoctypeConfig.HTML5;
   }
 }
+
+HTML5.Document = Document;
