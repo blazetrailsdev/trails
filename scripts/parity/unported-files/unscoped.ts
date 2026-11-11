@@ -30,45 +30,12 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     testFile: "fixtures_test.rb",
     className: "FixturesTest",
-    tests: [
-      "broken yaml exception",
-      "clean fixtures",
-      "create fixtures",
-      "create symbol fixtures",
-      "dirty dirty yaml file",
-      "inserts with pre and suffix",
-      "multiple clean fixtures",
-      "nonexistent fixture file",
-      "omap fixtures",
-      "subsubdir file with arbitrary name",
-      "yaml file with one invalid fixture",
-      "yml file in subdirectory",
-    ],
+    tests: ["omap fixtures"],
     reason:
-      "Each loads fixtures from a .yml path on disk — FixtureSet.create_fixtures(dir, name) " +
-      "or FixtureSet.new(nil, name, Klass, FIXTURES_ROOT + ...) — and asserts on the parse " +
-      "or the layout: a Psych omap, a Tempfile of malformed YAML, a path that must not " +
-      "exist, a subdirectory, an arbitrarily named subsubdir file. trails' canonical corpus " +
-      "is TS modules under test-helpers/fixtures/, so there is no fixture file to point a " +
-      "path at and no YAML parse to fail.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "NilFixturePathTest",
-    tests: ["raises an error when all fixtures loaded"],
-    reason:
-      "Asserts `fixtures :all` with fixture_paths = nil raises 'No fixture path found.' " +
-      "(fixtures_test.rb:1607-1619). trails' fixtures() takes the set names or data up front " +
-      "and has no :all arm that globs fixture_paths, so there is no path lookup to fail.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FileFixtureConflictTest",
-    tests: ["ignores file fixtures"],
-    reason:
-      "Points fixture_paths at FIXTURES_ROOT/all and calls `fixtures :all`, asserting the " +
-      ".yml files found on disk (fixtures_test.rb:1627-1632). The canonical corpus is TS " +
-      "modules, and fixtures() has no :all arm that scans a directory.",
+      "categories_ordered.yml opens with a local `!omap` tag (fixtures_test.rb:571-580), " +
+      "which Psych's ToRuby visitor resolves. ActiveSupport::ConfigurationFile#parse " +
+      "calls the raw psych-adapter backend instead of Psych.unsafe_load " +
+      "(configuration_file.rb:21-36), so the tag is left unresolved.",
   },
   {
     testFile: "fixtures_test.rb",
@@ -85,16 +52,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "(fixtures_test.rb:1646) against test/fixtures/fixture_database.sqlite3, and drives " +
       "TestFixtures#setup_shared_connection_pool / teardown_shared_connection_pool / " +
       "clean_up_connection_handler, which trails' test-fixtures.ts does not port.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixtureWithSetModelClassPrevailsOverNamingConventionTest",
-    tests: ["model class in fixture file is respected"],
-    reason:
-      'Calls create_fixtures("other_posts") by set name and #find on the returned ' +
-      "Fixture (fixtures_test.rb:1002-1008). trails' FixtureSet.createFixtures " +
-      "(fixtures.ts:936) takes a model and a data hash, not a name resolved against " +
-      "fixture_paths, and Fixture (fixtures.ts:945) has no #find.",
   },
   {
     testFile: "fixtures_test.rb",

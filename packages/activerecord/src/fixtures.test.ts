@@ -10,16 +10,25 @@ import {
   toI,
   constSet,
   TopLevel,
+  ArgumentError,
+  Dir,
+  rbInspect,
+  Tempfile,
+  rbModRemoveConst,
+  StandardError,
+  Struct,
 } from "@blazetrails/ruby-compat";
-import { FixtureSet, FixtureError } from "./fixtures.js";
+import { FixtureSet, FixtureError, Fixture } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./config.js";
 import { PrimaryKeyError } from "./fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
 import { Notifications, Duration, Logger } from "@blazetrails/activesupport";
+import * as Arel from "@blazetrails/arel";
 import {
   assertDifference,
   assertNoDifference,
+  assertNothingRaised,
   assertNotEmpty,
   assertRaises,
   Minitest,
@@ -29,11 +38,13 @@ import { primaryKeyErrorFixtureData } from "./test-helpers/fixtures/primary-key-
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { TestCase } from "./cases/test-case.js";
+import { squish } from "@blazetrails/activesupport";
 import { fkObjectToPointToFixtureData } from "./test-helpers/fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "./support/adapter-helper.js";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { TestFixtures } from "./test-fixtures.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Organization } from "./test-helpers/models/organization.js";
 import { ClassNameThatDoesNotFollowCONVENTIONS } from "./test-helpers/models/randomly-named-c1.js";
 import {
@@ -54,6 +65,7 @@ import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Tree } from "./test-helpers/models/tree.js";
+import { otherTopicFixtureData } from "./test-helpers/fixtures/other-topics.js";
 import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
 import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
 import { allDevelopersFixtureData } from "./test-helpers/fixtures/all/developers.js";
@@ -65,6 +77,7 @@ import { categoriesSpecialCategoriesFixtureData } from "./test-helpers/fixtures/
 import { categoriesSubsubdirArbitraryFilenameFixtureData } from "./test-helpers/fixtures/categories/subsubdir/arbitrary-filename.js";
 
 FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/parrots.ts`, nakedYmlParrotsFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/other_topics.ts`, otherTopicFixtureData);
 FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/trees.ts`, nakedYmlTreesFixtureData);
 FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/developers.ts`, allDevelopersFixtureData);
 FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/people.ts`, allPeopleFixtureData);
@@ -95,6 +108,7 @@ import { Account } from "./test-helpers/models/account.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Company } from "./test-helpers/models/company.js";
+import { SpecialCategory } from "./test-helpers/models/category.js";
 import { Matey } from "./test-helpers/models/matey.js";
 import { DeadParrot, LiveParrot } from "./test-helpers/models/parrot.js";
 import {
@@ -234,7 +248,7 @@ function stubMaxAllowedPacket(conn: unknown, packetSize: number) {
 }
 
 describe("FixturesTest", () => {
-  const { self, topics, developers, binaries, trafficLights } = fixtures(
+  const { self, topics, developers, binaries, trafficLights, categories } = fixtures(
     [
       "topics",
       "developers",
@@ -250,6 +264,32 @@ describe("FixturesTest", () => {
   );
 
   const YAML_FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
+  const FIXTURES = [
+    "accounts",
+    "binaries",
+    "companies",
+    "customers",
+    "developers",
+    "developers_projects",
+    "entrants",
+    "movies",
+    "projects",
+    "subscribers",
+    "topics",
+    "tasks",
+  ];
+  const MATCH_ATTRIBUTE_NAME = /[a-zA-Z][-\w]*/;
+
+  let engine: typeof Arel.Table.engine;
+
+  beforeEach(() => {
+    engine = Arel.Table.engine;
+    Arel.Table.engine = null;
+  });
+
+  afterEach(() => {
+    Arel.Table.engine = engine;
+  });
 
   it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
     "bulk insert",
@@ -584,6 +624,71 @@ describe("FixturesTest", () => {
     expect(secondRow?.["author_email_address"]).toBeNull();
   });
 
+  it("inserts with pre and suffix", async () => {
+    FixtureSet.resetCache();
+
+    await (
+      await Base.leaseConnection()
+    ).createTable("prefix_other_topics_suffix", {}, (t) => {
+      t.column("title", "string");
+      t.column("author_name", "string");
+      t.column("author_email_address", "string");
+      t.column("written_on", "datetime");
+      t.column("bonus_time", "time");
+      t.column("last_read", "date");
+      t.column("content", "string");
+      t.column("approved", "boolean", { default: true });
+      t.column("replies_count", "integer", { default: 0 });
+      t.column("parent_id", "integer");
+      t.column("type", "string", { limit: 50 });
+    });
+
+    const oldPrefix = Base.tableNamePrefix;
+    const oldSuffix = Base.tableNameSuffix;
+
+    try {
+      Base.tableNamePrefix = "prefix_";
+      Base.tableNameSuffix = "_suffix";
+
+      const otherTopicKlass = class extends Base {
+        static override get name() {
+          return "OtherTopic";
+        }
+      };
+
+      const topics = [await self().createFixtures("other_topics")].flat()[0];
+
+      expect(
+        topics,
+        "Fixture data inserted, but fixture objects not returned from create",
+      ).not.toBeNull();
+
+      const firstRow = await (
+        await Base.leaseConnection()
+      ).selectOne("SELECT * FROM prefix_other_topics_suffix WHERE author_name = 'David'");
+      expect(
+        firstRow,
+        "The prefix_other_topics_suffix table appears to be empty despite create_fixtures: the row with author_name = 'David' was not found",
+      ).not.toBeNull();
+      expect(firstRow!["title"]).toBe("The First Topic");
+
+      const secondRow = await (
+        await Base.leaseConnection()
+      ).selectOne("SELECT * FROM prefix_other_topics_suffix WHERE author_name = 'Mary'");
+      expect(secondRow!["author_email_address"]).toBeNull();
+
+      expect(topics.tableName).toBe("prefix_other_topics_suffix");
+      expect(otherTopicKlass.tableName).toBe("prefix_other_topics_suffix");
+    } finally {
+      Base.tableNamePrefix = oldPrefix;
+      Base.tableNameSuffix = oldSuffix;
+
+      try {
+        await (await Base.leaseConnection()).dropTable("prefix_other_topics_suffix");
+      } catch {}
+    }
+  });
+
   it("insert with datetime", async () => {
     await self().createFixtures("tasks");
     const first = await Task.find(1);
@@ -658,6 +763,110 @@ describe("FixturesTest", () => {
     expect(
       new FixtureSet(null, "companies", Company, YAML_FIXTURES_ROOT + "/naked/yml/companies"),
     ).not.toBeNull();
+  });
+
+  it("clean fixtures", async () => {
+    for (const name of FIXTURES) {
+      let fixtures = null as FixtureSet | null;
+      await assertNothingRaised(async () => {
+        fixtures = (await self().createFixtures(name))[0];
+      });
+      expect(fixtures).toBeInstanceOf(FixtureSet);
+      fixtures!.each((_name, fixture) => {
+        fixture.each((key) => {
+          expect(key).toMatch(MATCH_ATTRIBUTE_NAME);
+        });
+      });
+    }
+  });
+
+  it("broken yaml exception", async () => {
+    const badyaml = Tempfile.new(["foo", ".yml"]);
+    try {
+      badyaml.write("a: : ");
+      badyaml.flush();
+
+      const dir = RubyFile.dirname(badyaml.path()!);
+      const name = RubyFile.basename(badyaml.path()!, ".yml");
+      await assertRaises([Fixture.FormatError], {}, () => FixtureSet.createFixtures(dir, name));
+    } finally {
+      badyaml.close();
+      badyaml.unlink();
+    }
+  });
+
+  it("create fixtures", async () => {
+    const fixtures = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "organizations");
+    expect(
+      await Organization.findBy({ name: "No Such Agency" }),
+      "'No Such Agency' is not in the database",
+    ).toBeTruthy();
+    expect(
+      fixtures.find((f) => f.name === "organizations"),
+      `no fixtures named 'organizations' in ${rbInspect(fixtures.map((f) => f.name))}`,
+    ).toBeTruthy();
+  });
+
+  it("multiple clean fixtures", async () => {
+    let fixturesArray = null as FixtureSet[] | null;
+    await assertNothingRaised(async () => {
+      fixturesArray = await self().createFixtures(...FIXTURES);
+    });
+    expect(fixturesArray).toBeInstanceOf(Array);
+    for (const fixtures of fixturesArray!) expect(fixtures).toBeInstanceOf(FixtureSet);
+  });
+
+  it("create symbol fixtures", async () => {
+    const fixtures = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "collections", {
+      collections: Course,
+    });
+
+    expect(
+      await Course.findBy({ name: "Collection" }),
+      "course is not in the database",
+    ).toBeTruthy();
+    expect(
+      fixtures.find((f) => f.name === "collections"),
+      `no fixtures named 'collections' in ${rbInspect(fixtures.map((f) => f.name))}`,
+    ).toBeTruthy();
+  });
+
+  it("nonexistent fixture file", async () => {
+    const nonexistentFixturePath = TS_FIXTURES_ROOT + "/imnothere";
+
+    expect(Dir.glob(nonexistentFixturePath + "*")).toBeEmpty();
+
+    await assertRaises([ArgumentError], {}, () => {
+      new FixtureSet(null, "companies", Company, nonexistentFixturePath);
+    });
+  });
+
+  it("dirty dirty yaml file", async () => {
+    const fixturePath = YAML_FIXTURES_ROOT + "/naked/yml/courses";
+    const error = await assertRaises([Fixture.FormatError], {}, () => {
+      new FixtureSet(null, "courses", Course, fixturePath);
+    });
+    expect(error.message).toBe(`fixture is not a hash: ${fixturePath}.yml`);
+  });
+
+  it("yaml file with one invalid fixture", async () => {
+    const fixturePath = YAML_FIXTURES_ROOT + "/naked/yml/courses_with_invalid_key";
+    const error = await assertRaises([Fixture.FormatError], {}, () => {
+      new FixtureSet(null, "courses", Course, fixturePath);
+    });
+    expect(error.message).toBe(`fixture key is not a hash: ${fixturePath}.yml, keys: ["two"]`);
+  });
+
+  it("yml file in subdirectory", () => {
+    expect(categories("sub_special_1" as never).name).toBe("A special category in a subdir file");
+    expect(categories("sub_special_1" as never).constructor).toBe(SpecialCategory);
+  });
+
+  it("subsubdir file with arbitrary name", () => {
+    expect(categories("sub_special_3" as never).name).toBe(
+      "A special category in an arbitrarily named subsubdir file",
+    );
+    expect(categories("sub_special_3" as never).constructor).toBe(SpecialCategory);
   });
 
   it("binary in fixtures", async () => {
@@ -767,9 +976,16 @@ describe("FixturesWithoutInstantiationTest", () => {
 
   it("reloading fixtures through accessor methods", async () => {
     expect(topics("first").title).toBe("The First Topic");
-    await Topic.where({ id: topics("first").id }).updateAll({ title: "Fresh Topic!" });
-    expect((await topics("first", true)).title).toBe("Fresh Topic!");
-    expect(topics("first").title).toBe("Fresh Topic!");
+    const topic = Struct.new("title");
+    await assertCalled(
+      self()._loadedFixtures["topics"].get("first")!,
+      "find",
+      null,
+      { returns: Promise.resolve(new topic("Fresh Topic!")) },
+      async () => {
+        expect((await topics("first", true)).title).toBe("Fresh Topic!");
+      },
+    );
   });
 });
 
@@ -894,6 +1110,20 @@ describe("FixtureWithSetModelClassTest", () => {
     const comment = otherComments("second_greetings");
     expect((await post.comments).map((c) => c.id)).toEqual([comment.id]);
     expect((await comment.post)?.id).toBe(post.id);
+  });
+});
+
+describe("FixtureWithSetModelClassPrevailsOverNamingConventionTest", () => {
+  const { self } = fixtures([]);
+
+  it("model class in fixture file is respected", async () => {
+    try {
+      constSet(TopLevel, "OtherPost", class extends Base {});
+      const otherPosts = (await self().createFixtures("other_posts"))[0];
+      expect(await otherPosts.get("second_welcome")!.find()).toBeInstanceOf(Post);
+    } finally {
+      rbModRemoveConst(TopLevel, "OtherPost");
+    }
   });
 });
 
@@ -1580,6 +1810,51 @@ describe("MultipleFixtureConnectionsTest", () => {
       expect(Object.values(idHashThree)[0]).toBe(id);
       expect(Object.values(idHashThree).slice(0, 2)).toEqual(Object.values(idHashTwo));
     });
+  });
+});
+
+describe("NilFixturePathTest", () => {
+  fixtures([]);
+
+  it("raises an error when all fixtures loaded", async () => {
+    const error = await assertRaises([StandardError], {}, () => {
+      const testCase = class extends TestCase {};
+      Object.defineProperty(testCase, "name", { value: "NilFixturePathTest::TestCase" });
+      testCase.fixturePaths = null as never;
+      testCase.fixtures(":all");
+    });
+    expect(error.message).toBe(
+      squish(`
+        No fixture path found.
+        Please set \`NilFixturePathTest::TestCase.fixture_paths\`.
+      `),
+    );
+  });
+});
+
+describe("FileFixtureConflictTest", () => {
+  const { self } = fixtures([]);
+
+  it("ignores file fixtures", () => {
+    const klass = self().constructor as typeof TestCase;
+    const oldFileFixturePath = klass.fileFixturePath;
+    const oldFixturePaths = klass.fixturePaths;
+    klass.fileFixturePath = TS_FIXTURES_ROOT + "/all/admin";
+    try {
+      klass.fixturePaths = [TS_FIXTURES_ROOT + "/all"];
+      klass.fixtures(":all");
+
+      expect([...self().fixtureTableNames].sort()).toEqual([
+        "developers",
+        "namespaced/accounts",
+        "people",
+        "tasks",
+      ]);
+    } finally {
+      klass.fileFixturePath = oldFileFixturePath;
+      klass.fixturePaths = oldFixturePaths;
+      FixtureSet.resetCache();
+    }
   });
 });
 

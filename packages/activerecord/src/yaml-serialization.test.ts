@@ -84,18 +84,18 @@ describe("YamlSerializationTest", () => {
   it("new records remain new after round trip", async () => {
     let topic = new Topic();
 
-    expect(topic.isNewRecord()).toBe(true);
-    expect(yamlLoad(YAML.dump(topic)).isNewRecord()).toBe(true);
+    expect(topic.isNewRecord()).toBeTruthy();
+    expect(yamlLoad(YAML.dump(topic)).isNewRecord()).toBeTruthy();
 
     await topic.saveBang();
 
-    expect(topic.isNewRecord()).toBe(false);
-    expect(yamlLoad(YAML.dump(topic)).isNewRecord()).toBe(false);
+    expect(topic.isNewRecord()).toBeFalsy();
+    expect(yamlLoad(YAML.dump(topic)).isNewRecord()).toBeFalsy();
 
     topic = (await Topic.select("title").last())!;
 
-    expect(topic.isNewRecord()).toBe(false);
-    expect(yamlLoad(YAML.dump(topic)).isNewRecord()).toBe(false);
+    expect(topic.isNewRecord()).toBeFalsy();
+    expect(yamlLoad(YAML.dump(topic)).isNewRecord()).toBeFalsy();
   });
 
   it("types of virtual columns are not changed on round trip", async () => {
@@ -119,7 +119,7 @@ describe("YamlSerializationTest", () => {
   it("deserializing rails v2 yaml", async () => {
     const topic = yamlLoad(await yamlFixture("rails_v2"));
 
-    expect(topic.isNewRecord()).toBe(false);
+    expect(topic.isNewRecord()).toBeFalsy();
     expect(topic.id).toBe(1);
     expect(topic.title).toBe("The First Topic");
     expect(topic.content).toBe("Have a nice day");
@@ -128,7 +128,7 @@ describe("YamlSerializationTest", () => {
   it("deserializing rails v1 mysql yaml", async () => {
     const topic = yamlLoad(await yamlFixture("rails_v1_mysql"));
 
-    expect(topic.isNewRecord()).toBe(false);
+    expect(topic.isNewRecord()).toBeFalsy();
     expect(topic.id).toBe(1);
     expect(topic.title).toBe("The First Topic");
     expect(topic.content).toBe("Have a nice day");

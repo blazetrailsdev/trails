@@ -1,4 +1,7 @@
 export const otherPostFixtureData = {
+  _fixture: {
+    model_class: "Post",
+  },
   second_welcome: {
     author_id: 1,
     title: "Welcome to the another weblog",

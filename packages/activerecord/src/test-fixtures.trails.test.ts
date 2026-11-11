@@ -79,6 +79,8 @@ describe("TestFixtures::ClassMethods", () => {
       "developers",
       "naked/yml/accounts",
       "naked/yml/companies",
+      "naked/yml/courses",
+      "naked/yml/courses_with_invalid_key",
       "other_posts",
       "parrots",
     ]);
