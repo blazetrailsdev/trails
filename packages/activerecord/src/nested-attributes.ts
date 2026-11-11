@@ -82,11 +82,8 @@ export function acceptsNestedAttributesFor(
 const UNASSIGNABLE_KEYS = ["id", "_destroy"] as const;
 
 /** @internal */
-const _booleanType = new BooleanType();
-
-/** @internal */
 export function hasDestroyFlag(hash: Record<string, unknown> | Map<string, unknown>): boolean {
-  return _booleanType.cast(hashAref(hash, "_destroy")) === true;
+  return new BooleanType().cast(hashAref(hash, "_destroy")) === true;
 }
 
 /** @internal */

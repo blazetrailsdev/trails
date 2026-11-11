@@ -15,7 +15,13 @@ import {
   isApplicationRecordClass as coreIsApplicationRecordClass,
   configurations as baseConfigurations,
 } from "./core.js";
-import { IsolatedExecutionState, TopLevel, getEnv, presence } from "@blazetrails/activesupport";
+import {
+  IsolatedExecutionState,
+  TopLevel,
+  any,
+  getEnv,
+  presence,
+} from "@blazetrails/activesupport";
 import * as ConnectionHandlingModule from "./connection-handling.js";
 import { readingRole } from "./active-record.js";
 import { permanentConnectionCheckout } from "./active-record.js";
@@ -322,7 +328,7 @@ export function shardKeys(this: typeof Base): string[] {
 }
 
 export function isSharded(this: typeof Base): boolean {
-  return shardKeys.call(this).length > 0;
+  return any(shardKeys.call(this));
 }
 
 /**

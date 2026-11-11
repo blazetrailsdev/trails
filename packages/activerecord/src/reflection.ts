@@ -1354,12 +1354,7 @@ export class ThroughReflection extends AbstractReflection {
     }
 
     if (!this.sourceReflection) {
-      throw new HasManyThroughSourceAssociationNotFoundError(
-        this.activeRecord.name,
-        this.through,
-        this.sourceReflectionNames().join(" or "),
-        this.name,
-      );
+      throw new HasManyThroughSourceAssociationNotFoundError(this);
     }
 
     if (this.options.sourceType && !this.sourceReflection.isPolymorphic()) {

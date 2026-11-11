@@ -1,4 +1,5 @@
 import {
+  AtomicFixnum,
   aryDelete,
   aryDeleteIf,
   Fiber,
@@ -267,7 +268,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   private _boundSchemaCache?: BoundSchemaReflection;
-  declare private _queryCacheVersion: { value: number };
+  declare private _queryCacheVersion: AtomicFixnum;
   declare private _threadQueryCaches: QueryCacheRegistry;
   declare private _queryCacheMaxSize: number | null;
 
@@ -288,7 +289,7 @@ export class ConnectionPool implements ReapablePool {
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
     void this.reaper.run();
 
-    this._queryCacheVersion = { value: 0 };
+    this._queryCacheVersion = new AtomicFixnum();
     this._threadQueryCaches = new QueryCacheRegistry();
     const queryCache = this.dbConfig?.queryCache;
     if (queryCache === 0 || queryCache === false) {

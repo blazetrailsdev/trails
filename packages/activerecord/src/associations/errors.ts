@@ -1,5 +1,6 @@
 import { ActiveRecord } from "../namespaces.js";
-import { singularize } from "@blazetrails/activesupport";
+import type { ThroughReflection } from "../reflection.js";
+import { singularize, toSentence } from "@blazetrails/activesupport";
 import { formatter, SpellChecker } from "@blazetrails/did-you-mean";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
 
@@ -227,10 +228,23 @@ export class HasOneAssociationPolymorphicThroughError extends ActiveRecordError 
 }
 
 export class HasManyThroughSourceAssociationNotFoundError extends ActiveRecordError {
-  constructor(owner: string, through: string, source: string, association: string) {
-    super(
-      `Could not find the source association(s) :${source} on ${owner} through '${through}'. Try 'hasMany ${association}, { through: "${through}", source: "<source_name>" }' with a valid source association defined on ${through}.`,
-    );
+  constructor(reflection: ThroughReflection | null = null) {
+    if (reflection) {
+      const throughReflection = reflection.throughReflection!;
+      const sourceReflectionNames = reflection.sourceReflectionNames();
+      const sourceAssociations = Object.keys(reflection.throughReflection!.klass._reflections);
+      super(
+        `Could not find the source association(s) ${toSentence(
+          sourceReflectionNames.map((name) => `:${name}`),
+          { twoWordsConnector: " or ", lastWordConnector: ", or " },
+        )} in model ${throughReflection.klass.name}. Try 'has_many :${reflection.name}, :through => :${throughReflection.name}, :source => <name>'. Is it one of ${toSentence(
+          sourceAssociations,
+          { twoWordsConnector: " or ", lastWordConnector: ", or " },
+        )}?`,
+      );
+    } else {
+      super("Could not find the source association(s).");
+    }
     this.name = "ActiveRecord::HasManyThroughSourceAssociationNotFoundError";
   }
 }

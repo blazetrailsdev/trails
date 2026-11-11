@@ -1,4 +1,5 @@
-import { Nodes, arelNode, sql as arelSql, type ArelNode } from "@blazetrails/arel";
+import * as Arel from "@blazetrails/arel";
+import { Nodes, arelNode, type ArelNode } from "@blazetrails/arel";
 import { actsLike, isBlank } from "@blazetrails/activesupport";
 import {
   format,
@@ -125,7 +126,7 @@ export function sanitizeSqlForOrder(
       condition = [String(condition[0] ?? null), ...condition.slice(1)];
     }
 
-    return arelSql(this.sanitizeSqlArray(condition as [string, ...unknown[]]));
+    return Arel.sql(this.sanitizeSqlArray(condition as [string, ...unknown[]]));
   } else {
     return condition;
   }
