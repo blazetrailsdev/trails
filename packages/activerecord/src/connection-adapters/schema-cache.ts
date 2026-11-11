@@ -649,13 +649,13 @@ export class SchemaCache {
   }
 
   encodeWith(coder: Record<string, unknown>): void {
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- initWith reads these members back as Maps
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
     coder["columns"] = toH(sort([...this._columns]));
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- initWith reads these members back as Maps
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
     coder["primary_keys"] = toH(sort([...this._primaryKeys]));
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- initWith reads these members back as Maps
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
     coder["data_sources"] = toH(sort([...this._dataSources]));
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- initWith reads these members back as Maps
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
     coder["indexes"] = toH(sort([...this._indexes]));
     coder["version"] = this._version;
   }

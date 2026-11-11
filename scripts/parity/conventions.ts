@@ -565,7 +565,6 @@ export const PROTOCOL_DEFINITION_ENROLLED_PACKAGES: ReadonlySet<string> = new Se
   "actionview",
   "activemodel",
   "activerecord",
-  "activerecord",
   "activerecord-test-support",
   "activesupport",
   "arel",

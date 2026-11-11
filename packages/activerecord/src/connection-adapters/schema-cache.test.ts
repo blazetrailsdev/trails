@@ -379,7 +379,7 @@ describe("SchemaCacheTest", () => {
       ["y", null],
       ["x", null],
     ];
-    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- encodeWith answers Hashes, which a plain object does not equal
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
     const expected = toH(sort(values));
 
     const coder: Record<string, unknown> = {
