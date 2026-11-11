@@ -46,7 +46,7 @@ export interface CacheLogger {
   warn(message: string): void;
   error?(message: string): void;
   debug?(message: string): void;
-  isDebug?(): boolean;
+  readonly "debug?"?: boolean;
 }
 
 export type StoreOptions = Record<string, unknown>;
@@ -97,11 +97,20 @@ export abstract class Store {
   static with<T>(options: { logger: CacheLogger }, fn: () => T): T {
     const prev = Store.logger;
     Store.logger = options.logger;
+    let result: T;
     try {
-      return fn();
-    } finally {
+      result = fn();
+    } catch (error) {
       Store.logger = prev;
+      throw error;
     }
+    if (typeof (result as { then?: unknown } | null)?.then === "function") {
+      return Promise.resolve(result).finally(() => {
+        Store.logger = prev;
+      }) as T;
+    }
+    Store.logger = prev;
+    return result;
   }
 
   static retrievePoolOptions(options: StoreOptions): StoreOptions | false | undefined {
@@ -449,7 +458,7 @@ export abstract class Store {
     payload: EventPayload,
     block?: (payload: EventPayload) => T,
   ): T {
-    if (this.logger?.isDebug?.() && !this.silence) {
+    if (this.logger && this.logger["debug?"] && !this.silence) {
       const key = payload.key;
       const multiSize = Array.isArray(key)
         ? key.length

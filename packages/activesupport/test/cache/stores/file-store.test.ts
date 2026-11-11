@@ -20,9 +20,10 @@ import {
   assertPredicate,
 } from "../../../lib/testing/assertions.js";
 import { Store } from "../../../lib/cache/store.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File, regexpEscape } from "@blazetrails/ruby-compat";
 import { isPresent } from "../../../lib/core-ext/object/blank.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
+import { cacheLoggingBehavior } from "../behaviors/cache-logging-behavior.js";
 import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-behavior.js";
 import { cacheIncrementDecrementBehavior } from "../behaviors/cache-increment-decrement-behavior.js";
@@ -258,6 +259,14 @@ describe("FileStoreTest", () => {
   cacheInstrumentationBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
     storeName: "FileStore",
+  });
+
+  cacheLoggingBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+    keyPattern: (key: string, { namespace = null }: { namespace?: string | null } = {}) =>
+      new RegExp(
+        `.+\\/${regexpEscape(namespace ?? "")}${namespace != null ? "%3[Aa]" : ""}${regexpEscape(key)}`,
+      ),
   });
 });
 
