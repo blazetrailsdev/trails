@@ -1,4 +1,5 @@
 import { ActiveRecord } from "../namespaces.js";
+import type { ThroughReflection } from "../reflection.js";
 import { singularize, toSentence } from "@blazetrails/activesupport";
 import { formatter, SpellChecker } from "@blazetrails/did-you-mean";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
@@ -227,13 +228,7 @@ export class HasOneAssociationPolymorphicThroughError extends ActiveRecordError 
 }
 
 export class HasManyThroughSourceAssociationNotFoundError extends ActiveRecordError {
-  constructor(
-    reflection: {
-      name: string;
-      throughReflection: { name: string; klass: { name: string; _reflections: object } } | null;
-      sourceReflectionNames(): string[];
-    } | null = null,
-  ) {
+  constructor(reflection: ThroughReflection | null = null) {
     if (reflection) {
       const throughReflection = reflection.throughReflection!;
       const sourceReflectionNames = reflection.sourceReflectionNames();

@@ -4,13 +4,13 @@
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_array",
     "call": "with_connection",
-    "reason": "sanitization.rb:164-181 wraps each arm in the class's `with_connection` block; trails' `withConnection` (connection-handling.ts) is async, so the synchronous sanitizers lease through `connectionPool().withConnectionSync` instead. Converges when `sanitize_sql_*` can await a lease."
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `converge-async-lease-call-rows-left-from-rfc0126` story, which converges each row against its Rails file:line."
   },
   {
     "package": "activerecord",
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_hash_for_assignment",
     "call": "with_connection",
-    "reason": "sanitization.rb:107-115 leases through the class's `with_connection`; trails' `withConnection` is async and this sanitizer is synchronous, so it calls `connectionPool().withConnectionSync`. Converges with sanitize_sql_array's row."
+    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `converge-async-lease-call-rows-left-from-rfc0126` story, which converges each row against its Rails file:line."
   }
 ]
