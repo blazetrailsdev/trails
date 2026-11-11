@@ -17,8 +17,16 @@ describe("IMAP Retriever", () => {
   });
 
   it("raises ArgumentError for a negative count as Array#first does", () => {
-    expect(() => Mail.find({ count: -1 })).toThrow(ArgumentError);
-    expect(() => Mail.find({ count: -1 })).toThrow("negative array size");
+    for (const options of [{ count: -1 }, { count: -1, what: "last" }]) {
+      let error: unknown;
+      try {
+        Mail.find(options);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(ArgumentError);
+      expect((error as Error).message).toBe("negative array size");
+    }
   });
 
   it("keeps the first count uids for a count of 0 or more", () => {
