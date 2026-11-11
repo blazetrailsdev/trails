@@ -4,13 +4,16 @@ import {
   FileUtils,
   Marshal,
   Zlib,
+  block,
+  fetch,
   forceEncoding,
+  isEmpty,
   isModuleIncluded,
   rbObjRespondTo,
   sort,
   synchronize,
 } from "@blazetrails/ruby-compat";
-import { atomicWrite } from "@blazetrails/activesupport";
+import { atomicWrite, indexBy } from "@blazetrails/activesupport";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import type { Column } from "./column.js";
 import { Deduplicable } from "./deduplicable.js";
@@ -415,23 +418,25 @@ export class SchemaCache {
   }
 
   async primaryKeys(pool: Pool, tableName: string): Promise<string | string[] | null> {
-    if (this._primaryKeys.has(tableName)) {
-      return this._primaryKeys.get(tableName)!;
-    }
-
-    return pool.withConnection(async (connection) => {
-      if (await this.dataSourceExists(pool, tableName)) {
-        const pk = deepDeduplicate(await connection.primaryKey(tableName));
-        this._primaryKeys.set(deepDeduplicate(tableName), pk);
-        return pk;
-      }
-      return null;
-    });
+    return fetch(
+      this._primaryKeys,
+      tableName,
+      block(() =>
+        pool.withConnection(async (connection) => {
+          if (await this.dataSourceExists(pool, tableName)) {
+            const pk = deepDeduplicate(await connection.primaryKey(tableName));
+            this._primaryKeys.set(deepDeduplicate(tableName), pk);
+            return pk;
+          }
+          return null;
+        }),
+      ),
+    ) as Promise<string | string[] | null> | string | string[] | null;
   }
 
   async dataSourceExists(pool: Pool, name: string): Promise<boolean | null> {
     if (this.isIgnoredTable(name)) return null;
-    if (this._dataSources.size === 0) {
+    if (isEmpty(this._dataSources)) {
       const tables = await this.tablesToCache(pool);
       for (const source of tables) {
         this._dataSources.set(source, true);
@@ -465,29 +470,31 @@ export class SchemaCache {
       throw new StatementInvalid(`Table '${tableName}' doesn't exist`);
     }
 
-    if (this._columns.has(tableName)) {
-      return this._columns.get(tableName)!;
-    }
-
-    return pool.withConnection(async (connection) => {
-      const cols: Column[] = deepDeduplicate(await connection.columns(tableName));
-      this.setColumns(deepDeduplicate(tableName), cols);
-      return cols;
-    });
+    return fetch(
+      this._columns,
+      tableName,
+      block(() =>
+        pool.withConnection(async (connection) => {
+          const cols: Column[] = deepDeduplicate(await connection.columns(tableName));
+          this.setColumns(deepDeduplicate(tableName), cols);
+          return cols;
+        }),
+      ),
+    ) as Promise<Column[]> | Column[];
   }
 
   async columnsHash(pool: Pool, tableName: string): Promise<Record<string, Column>> {
-    if (this._columnsHash.has(tableName)) {
-      return this._columnsHash.get(tableName)!;
-    }
-
-    const hash: Record<string, Column> = {};
-    for (const col of await this.columns(pool, tableName)) {
-      hash[col.name] = col;
-    }
-    Object.freeze(hash);
-    this._columnsHash.set(deepDeduplicate(tableName), hash);
-    return hash;
+    return fetch(
+      this._columnsHash,
+      tableName,
+      block(async () => {
+        const hash = Object.freeze(
+          indexBy(await this.columns(pool, tableName), (column) => column.name),
+        );
+        this._columnsHash.set(deepDeduplicate(tableName), hash);
+        return hash;
+      }),
+    ) as Promise<Record<string, Column>> | Record<string, Column>;
   }
 
   isColumnsHash(_pool: unknown, tableName: string): boolean {
@@ -495,18 +502,20 @@ export class SchemaCache {
   }
 
   async indexes(pool: Pool, tableName: string): Promise<IndexDefinition[]> {
-    if (this._indexes.has(tableName)) {
-      return this._indexes.get(tableName)!;
-    }
-
-    return pool.withConnection(async (connection) => {
-      if (await this.dataSourceExists(pool, tableName)) {
-        const idx: IndexDefinition[] = deepDeduplicate(await connection.indexes(tableName));
-        this._indexes.set(deepDeduplicate(tableName), idx);
-        return idx;
-      }
-      return [];
-    });
+    return fetch(
+      this._indexes,
+      tableName,
+      block(() =>
+        pool.withConnection(async (connection) => {
+          if (await this.dataSourceExists(pool, tableName)) {
+            const idx: IndexDefinition[] = deepDeduplicate(await connection.indexes(tableName));
+            this._indexes.set(deepDeduplicate(tableName), idx);
+            return idx;
+          }
+          return [];
+        }),
+      ),
+    ) as Promise<IndexDefinition[]> | IndexDefinition[];
   }
 
   async version(pool: Pool): Promise<string | number | null> {

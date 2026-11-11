@@ -8,7 +8,14 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import { Fiber, included, rbCallSuper, rbEnsure, Thread } from "@blazetrails/ruby-compat";
+import {
+  AtomicFixnum,
+  Fiber,
+  included,
+  rbCallSuper,
+  rbEnsure,
+  Thread,
+} from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
@@ -151,7 +158,7 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
 interface ConnectionPoolConfigurationHost {
   _threadQueryCaches: QueryCacheRegistry;
   _queryCacheMaxSize: number | null;
-  _queryCacheVersion: { value: number };
+  _queryCacheVersion: AtomicFixnum;
   _pinnedConnection: unknown;
   dbConfig: { queryCache?: unknown };
   queryCache: Store;
@@ -235,7 +242,7 @@ export const ConnectionPoolConfiguration: ThisType<ConnectionPoolConfigurationHo
 
   clearQueryCache: function clearQueryCache(this: ConnectionPoolConfigurationHost): void {
     if (this._pinnedConnection) {
-      this._queryCacheVersion.value++;
+      this._queryCacheVersion.increment();
     }
     this.queryCache.clear();
   },

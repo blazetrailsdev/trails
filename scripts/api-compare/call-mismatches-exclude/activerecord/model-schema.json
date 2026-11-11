@@ -4,6 +4,6 @@
     "tsFile": "model-schema.ts",
     "rubyName": "reset_column_information",
     "call": "clear_data_source_cache!",
-    "reason": "Newly measured by RFC 0126: this pair was outside the call population until the gate stopped letting a bodyless declaration / a dependency package's same-path body answer for the real one. The omission is pre-existing and unconverged — burndown is tracked by the `burn-down-rfc0126-repairing-surfaced-call-rows` story, which converges each row against its Rails file:line."
+    "reason": "model_schema.rb:523-530 calls `schema_cache.clear_data_source_cache!(table_name)`; trails clears through `clearAdapterDataSourceCache`, which reaches the pool's schema reflection directly, because `schema_cache` on the class is not reachable synchronously here."
   }
 ]

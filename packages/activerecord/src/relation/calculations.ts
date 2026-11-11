@@ -405,7 +405,7 @@ export async function calculate(
         const primaryKey = this.model.primaryKey;
         relation.selectValues =
           primaryKey == null
-            ? [new Nodes.SqlLiteral("*")]
+            ? [this.table.get(star())]
             : Array.isArray(primaryKey)
               ? [...primaryKey]
               : [primaryKey];
