@@ -68,6 +68,7 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
     }
   }
   const application = TopLevel.Trails?.application;
+  /** @inventedArm else — CONVERGEABLE trails-tsc-build-views-without-an-application-loads-no-initializers */
   if (application) {
     if (!application.initialized()) await application.initializeBang();
   } else {
