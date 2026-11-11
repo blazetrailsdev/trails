@@ -447,7 +447,7 @@ export class Fixture {
 }
 
 ActiveRecord.Fixture = Fixture;
-constSet(ActiveRecord, "FixtureSet", FixtureSet);
+ActiveRecord.FixtureSet = FixtureSet;
 constSet(FixtureSet, "File", File);
 
 runLoadHooks("active_record_fixture_set", FixtureSet);
