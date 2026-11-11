@@ -1,3 +1,4 @@
+import { expect } from "vitest";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { waitWhileWithTimeout } from "./processes-test-helper.js";
 import { Job } from "../../lib/job.js";
@@ -17,6 +18,12 @@ export async function waitForJobsToFinishFor(
           .isAny(),
       ),
   );
+}
+
+export async function assertNoUnfinishedJobs() {
+  await Record.uncached(async () => {
+    expect(await Job.where({ finished_at: null }).isNone()).toBeTruthy();
+  });
 }
 
 export async function waitForJobsToBeEnqueued(count: number, { timeout = 1 } = {}) {
