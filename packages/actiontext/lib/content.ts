@@ -26,7 +26,7 @@ interface ContentOptions {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rendering` (content.rb:25); the class/interface merge is how `include()` surfaces on the type side.
 export interface Content extends Included<typeof Rendering> {
   render(...args: unknown[]): unknown;
-  sanitizeContentAttachment(contentAttachment: string): string;
+  sanitizeContentAttachment?(contentAttachment: string): string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
@@ -131,7 +131,7 @@ export class Content {
     const nodes: Html5Node[] = [];
     const content = this.fragment.replace(Attachment.tagName, (node) => {
       if (node.isKey("content")) {
-        const sanitizedContent = this.sanitizeContentAttachment(
+        const sanitizedContent = this.sanitizeContentAttachment!(
           String(node.removeAttribute("content")),
         );
         if (isPresent(sanitizedContent)) node.set("content", sanitizedContent);
