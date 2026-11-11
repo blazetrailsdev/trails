@@ -15,7 +15,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { SOURCES, vendoredRoot } from "../../vendor/sources.js";
+import { SOURCES, vendoredRoot, type UpstreamSource } from "../../vendor/sources.js";
 import { diffGemList, gemNamesFromPaths } from "./gem-list.js";
 import type { ApiManifest } from "@blazetrails/parity/types";
 import { describeExtractorSkew, detectExtractorSkew } from "./extractor-skew.js";
@@ -78,34 +78,52 @@ async function fetchRef(ref: string): Promise<{ dest: string; sha: string }> {
   return { dest, sha: sha! };
 }
 
-/** Map of `rails` package → absolute lib dir inside the target clone. */
-function libPathsFor(cloneRoot: string): Record<string, string> {
+/** Map of `source` package → absolute lib dir inside the target clone. */
+function libPathsFor(cloneRoot: string, source: UpstreamSource): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const pkg of RAILS!.packages) {
+  for (const pkg of source.packages) {
     if (pkg.compareApi === false) continue;
     out[pkg.name] = join(cloneRoot, pkg.libPath);
   }
   return out;
 }
 
-/** Map of `rails` package → absolute top-level entry file inside the clone. */
-function libEntryFilesFor(cloneRoot: string): Record<string, string> {
+/** Map of `source` package → absolute top-level entry file inside the clone. */
+function libEntryFilesFor(cloneRoot: string, source: UpstreamSource): Record<string, string> {
   const out: Record<string, string> = {};
-  for (const pkg of RAILS!.packages) {
+  for (const pkg of source.packages) {
     if (pkg.compareApi === false) continue;
     if (!pkg.libEntryFile) continue;
     out[pkg.name] = join(cloneRoot, pkg.libEntryFile);
   }
   return out;
 }
-async function extractTargetApi(cloneRoot: string, ref: string): Promise<string> {
-  const outPath = join(OUTPUT_DIR, `rails-api@${ref}.json`);
-  console.log(`[drift] extracting Ruby API @ ${ref}...`);
+
+/** Map of `source` package → absolute extra lib dirs inside the clone. */
+function libExtraPathsFor(cloneRoot: string, source: UpstreamSource): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const pkg of source.packages) {
+    if (pkg.compareApi === false || !pkg.extraLibPaths) continue;
+    out[pkg.name] = pkg.extraLibPaths.map((p) => join(cloneRoot, p));
+  }
+  return out;
+}
+
+/** Extract `source`'s Ruby API at `ref` from `cloneRoot` to output/<name>-api@<ref>.json
+ *  (`rails-api@<ref>.json` for rails). `pnpm parity:bump:dry-run` reuses it. */
+export async function extractTargetApi(
+  cloneRoot: string,
+  ref: string,
+  source: UpstreamSource = RAILS!,
+): Promise<string> {
+  const outPath = join(OUTPUT_DIR, `${source.name}-api@${ref}.json`);
+  console.log(`[drift] extracting ${source.name} Ruby API @ ${ref}...`);
   const { stdout, stderr } = await execFileAsync("ruby", [join(DIR, "extract-ruby-api.rb")], {
     env: {
       ...process.env,
-      LIB_PATHS_JSON: JSON.stringify(libPathsFor(cloneRoot)),
-      LIB_ENTRY_FILES_JSON: JSON.stringify(libEntryFilesFor(cloneRoot)),
+      LIB_PATHS_JSON: JSON.stringify(libPathsFor(cloneRoot, source)),
+      LIB_ENTRY_FILES_JSON: JSON.stringify(libEntryFilesFor(cloneRoot, source)),
+      LIB_EXTRA_PATHS_JSON: JSON.stringify(libExtraPathsFor(cloneRoot, source)),
       LOCKFILE_PATH: join(ROOT, "vendor/sources.lock.json"),
       RUBY_API_OUTPUT_PATH: outPath,
     },
