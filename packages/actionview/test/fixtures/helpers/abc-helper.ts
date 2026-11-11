@@ -1,6 +1,6 @@
-import { defineModule, TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
-export const AbcHelper = defineModule({
+export const AbcHelper = {
   bareA(): void {},
-});
+};
 constSet(TopLevel, "AbcHelper", AbcHelper);

@@ -14,7 +14,6 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  defineModule,
   include,
   BigDecimal,
   eachPair,
@@ -778,11 +777,16 @@ export function tagBuilder(this: TagHelperHost): TagBuilder {
   return (this._tagBuilder ??= new TagBuilder(this));
 }
 
-export const TagHelper = defineModule(
-  { tag, contentTag, tokenList, classNames, cdataSection, escapeOnce },
-  {},
-  { buildTagValues, tagBuilder },
-);
+export const TagHelper = {
+  tag,
+  contentTag,
+  tokenList,
+  classNames,
+  cdataSection,
+  escapeOnce,
+  buildTagValues,
+  tagBuilder,
+};
 
 include(TagHelper, CaptureHelper);
 include(TagHelper, OutputSafetyHelper);

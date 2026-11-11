@@ -1,9 +1,9 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { defineModule, rbCallSuper, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { ActionView } from "../namespaces.js";
 
-export const ActiveModelHelper = defineModule({});
+export const ActiveModelHelper = {};
 
 export interface ActiveModelInstanceTag {
   object: unknown;
@@ -84,11 +84,15 @@ function isTagGenerateErrors(this: Host, options: Record<string, unknown>): bool
   return options["type"] !== "hidden";
 }
 
-export const ActiveModelInstanceTag = defineModule(
-  Object.assign(
-    Object.defineProperty({}, "object", { get: object, enumerable: true, configurable: true }),
-    { contentTag, tag, errorWrapping, errorMessage },
-  ),
-  {},
-  { isObjectHasErrors, isSelectMarkupHelper, isTagGenerateErrors },
+export const ActiveModelInstanceTag = Object.assign(
+  Object.defineProperty({}, "object", { get: object, enumerable: true, configurable: true }),
+  {
+    contentTag,
+    tag,
+    errorWrapping,
+    errorMessage,
+    isObjectHasErrors,
+    isSelectMarkupHelper,
+    isTagGenerateErrors,
+  },
 );
