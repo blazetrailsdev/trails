@@ -6,6 +6,7 @@ import {
   TimezoneTransition,
   TransitionsTimezonePeriod,
 } from "../lib/index.js";
+import { assertRaises } from "./test-utils.js";
 
 function fixtures() {
   const o1 = new TimezoneOffset(0, 3600, "TEST");
@@ -63,9 +64,9 @@ describe("TCTransitionsTimezonePeriod", () => {
   });
 
   it("initialize start and end nil", () => {
-    expect(() => new TransitionsTimezonePeriod(null, null)).toThrow(ArgumentError);
-    expect(() => new TransitionsTimezonePeriod(null, null)).toThrow(/\bstart_transition\b/);
-    expect(() => new TransitionsTimezonePeriod(null, null)).toThrow(/\bend_transition\b/);
+    const error = assertRaises(ArgumentError, () => new TransitionsTimezonePeriod(null, null));
+    expect(error.message).toMatch(/\bstart_transition\b/);
+    expect(error.message).toMatch(/\bend_transition\b/);
   });
 
   for (const [name, method] of [

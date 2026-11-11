@@ -2,32 +2,9 @@ import { describe, expect, it } from "vitest";
 import { DateTime, Time } from "@blazetrails/date";
 import { ArgumentError, RangeError, Rational, rbCInteger, rbHash } from "@blazetrails/ruby-compat";
 import { Timestamp } from "../lib/index.js";
+import { assertEqualWithOffset, assertRaises } from "./test-utils.js";
 
 const R = (n: number, d: number) => new Rational(n, d);
-
-function assertEqualWithOffset(expected: Time | DateTime, actual: Time | DateTime) {
-  expect(actual).toBeInstanceOf(expected.constructor);
-  expect(actual.equals(expected)).toBe(true);
-  if (expected instanceof Time) {
-    expect((actual as Time).utcOffset).toBe(expected.utcOffset);
-  } else {
-    expect((actual as DateTime).offset).toEqual(expected.offset);
-  }
-}
-
-function assertRaises(
-  klass: abstract new (...args: never[]) => Error,
-  block: () => unknown,
-): Error {
-  let error: unknown;
-  try {
-    block();
-  } catch (e) {
-    error = e;
-  }
-  expect(error).toBeInstanceOf(klass);
-  return error as Error;
-}
 
 describe("TCTimestamp", () => {
   it("initialize timestamp only", () => {

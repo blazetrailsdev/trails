@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { OffsetTimezonePeriod, TimezoneOffset, TimezonePeriod } from "../lib/index.js";
+import { assertRaises } from "./test-utils.js";
 
 describe("TCOffsetTimezonePeriod", () => {
   it("initialize", () => {
@@ -10,8 +11,8 @@ describe("TCOffsetTimezonePeriod", () => {
   });
 
   it("initialize nil", () => {
-    expect(() => new OffsetTimezonePeriod(null)).toThrow(ArgumentError);
-    expect(() => new OffsetTimezonePeriod(null)).toThrow(/\boffset\b/);
+    const error = assertRaises(ArgumentError, () => new OffsetTimezonePeriod(null));
+    expect(error.message).toMatch(/\boffset\b/);
   });
 
   it("start transition", () => {

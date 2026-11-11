@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
 import { Timestamp, TimezoneOffset, TimezonePeriod, TimezoneTransition } from "../lib/index.js";
+import { assertRaises } from "./test-utils.js";
 
 class TestTimezonePeriod extends TimezonePeriod {
   readonly #startTransition: TimezoneTransition | null;
@@ -43,20 +44,20 @@ describe("TCTimezonePeriod", () => {
   });
 
   it("initialize nil", () => {
-    expect(() => new TimezonePeriod(null)).toThrow(ArgumentError);
-    expect(() => new TimezonePeriod(null)).toThrow(/\boffset\b/);
+    const error = assertRaises(ArgumentError, () => new TimezonePeriod(null));
+    expect(error.message).toMatch(/\boffset\b/);
   });
 
   it("start transition", () => {
     const p = new TimezonePeriod(new TimezoneOffset(-7200, 3600, "SPECIAL"));
-    expect(() => p.startTransition).toThrow(NotImplementedError);
-    expect(() => p.startTransition).toThrow(/\bstart_transition\b/);
+    const error = assertRaises(NotImplementedError, () => p.startTransition);
+    expect(error.message).toMatch(/\bstart_transition\b/);
   });
 
   it("end transition", () => {
     const p = new TimezonePeriod(new TimezoneOffset(-7200, 3600, "SPECIAL"));
-    expect(() => p.endTransition).toThrow(NotImplementedError);
-    expect(() => p.endTransition).toThrow(/\bend_transition\b/);
+    const error = assertRaises(NotImplementedError, () => p.endTransition);
+    expect(error.message).toMatch(/\bend_transition\b/);
   });
 
   for (const [method, rubyName] of [
