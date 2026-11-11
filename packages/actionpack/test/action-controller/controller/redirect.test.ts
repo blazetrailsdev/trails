@@ -291,19 +291,19 @@ describe("RedirectTest", () => {
 
   it("simple redirect", async () => {
     await tc.get("simpleRedirect");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
   it("redirect with header break", async () => {
     await tc.get("redirectWithHeaderBreak");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertEqual("http://test.host/lolwat", tc.redirectToUrl());
   });
 
   it("redirect with null bytes", async () => {
     await tc.get("redirectWithNullBytes");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertEqual("http://test.host/lolwat", tc.redirectToUrl());
   });
 
@@ -364,49 +364,49 @@ describe("RedirectTest", () => {
 
   it("simple redirect using options", async () => {
     await tc.get("hostRedirect");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
   });
 
   it("module redirect", async () => {
     await tc.get("moduleRedirect");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo("http://test.host/module_test/module_redirect/hello_world");
   });
 
   it("module redirect using options", async () => {
     await tc.get("moduleRedirect");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo({ controller: "module_test/module_redirect", action: "hello_world" });
   });
 
   it("redirect to url", async () => {
     await tc.get("redirectToUrl");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo("http://www.rubyonrails.org/");
   });
 
   it("redirect to url with stringlike", async () => {
     await tc.get("redirectToUrlWithStringlike");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo("http://www.rubyonrails.org/");
   });
 
   it("redirect to url with unescaped query string", async () => {
     await tc.get("redirectToUrlWithUnescapedQueryString");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo("http://example.com/query?status=new");
   });
 
   it("redirect to url with complex scheme", async () => {
     await tc.get("redirectToUrlWithComplexScheme");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertEqual("x-test+scheme.complex:redirect", tc.redirectToUrl());
   });
 
   it("redirect to url with network path reference", async () => {
     await tc.get("redirectToUrlWithNetworkPathReference");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertEqual("//www.rubyonrails.org/", tc.redirectToUrl());
   });
 
@@ -554,19 +554,19 @@ describe("RedirectTest", () => {
 
   it("redirect to with block", async () => {
     await tc.get("redirectToWithBlock");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo("http://www.rubyonrails.org/");
   });
 
   it("redirect to with block and assigns", async () => {
     await tc.get("redirectToWithBlockAndAssigns");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo("http://www.rubyonrails.org/");
   });
 
   it("redirect to out of scope block", async () => {
     await tc.get("redirectToOutOfScopeBlock");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo("http://test.host/redirect/redirectToOutOfScopeBlock");
   });
 
@@ -580,7 +580,7 @@ describe("RedirectTest", () => {
 
       await tc.get("redirectToWithBlockAndOptions");
 
-      assertResponse("redirect");
+      assertResponse(":redirect");
       assertRedirectedTo("http://test.host/redirect/hello_world");
     });
   });
@@ -667,7 +667,7 @@ describe("RedirectTest", () => {
   it("only path redirect", async () => {
     await withRaiseOnOpenRedirects(async () => {
       await tc.get("onlyPathRedirect");
-      assertResponse("redirect");
+      assertResponse(":redirect");
       assertRedirectedTo("/redirect/other_host");
     });
   });
@@ -677,7 +677,7 @@ describe("RedirectTest", () => {
       await tc.get("safeRedirectWithFallback", {
         params: { redirect_url: "http://test.host/app" },
       });
-      assertResponse("redirect");
+      assertResponse(":redirect");
       assertRedirectedTo("http://test.host/app");
     });
   });
@@ -687,11 +687,11 @@ describe("RedirectTest", () => {
       await tc.get("safeRedirectWithFallback", {
         params: { redirect_url: "http://www.rubyonrails.org/" },
       });
-      assertResponse("redirect");
+      assertResponse(":redirect");
       assertRedirectedTo("http://test.host/fallback");
 
       await tc.get("safeRedirectWithFallback", { params: { redirect_url: "" } });
-      assertResponse("redirect");
+      assertResponse(":redirect");
       assertRedirectedTo("http://test.host/fallback");
     });
   });
@@ -714,7 +714,7 @@ describe("RedirectTest", () => {
 
   it("redirect to external with rescue", async () => {
     await tc.get("redirectToExternalWithRescue");
-    assertResponse("ok");
+    assertResponse(":ok");
   });
 });
 
@@ -750,25 +750,25 @@ describe("ModuleRedirectTest", () => {
 
   it("simple redirect", async () => {
     await tc.get("simpleRedirect");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertEqual("http://test.host/module_test/module_redirect/hello_world", tc.redirectToUrl());
   });
 
   it("simple redirect using options", async () => {
     await tc.get("hostRedirect");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
   });
 
   it("module redirect", async () => {
     await tc.get("moduleRedirect");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
   it("module redirect using options", async () => {
     await tc.get("moduleRedirect");
-    assertResponse("redirect");
+    assertResponse(":redirect");
     assertRedirectedTo({ controller: "/redirect", action: "hello_world" });
   });
 });

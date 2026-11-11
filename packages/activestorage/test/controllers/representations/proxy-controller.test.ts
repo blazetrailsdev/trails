@@ -75,7 +75,7 @@ describe("ActiveStorage::Representations::ProxyControllerWithVariantsTest", () =
       "attachment",
     );
 
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^attachment/);
     expect(t.response.body).toBe(await body(blob.variant(transformations)));
   });
@@ -83,7 +83,7 @@ describe("ActiveStorage::Representations::ProxyControllerWithVariantsTest", () =
   it("showing variant inline", async () => {
     await getRepresentationProxy(t, blob, blob.signedId(), Variation.encode(transformations));
 
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
     expect(t.response.body).toBe(await body(blob.variant(transformations)));
   });
@@ -98,7 +98,7 @@ describe("ActiveStorage::Representations::ProxyControllerWithVariantsTest", () =
         "attachment",
       );
 
-      t.assertResponse("ok");
+      t.assertResponse(":ok");
       expect(t.response.headers.get("Content-Disposition")).toMatch(/^attachment/);
       expect(t.response.body).toBe(await body(blob.variant(transformations)));
     });
@@ -106,12 +106,12 @@ describe("ActiveStorage::Representations::ProxyControllerWithVariantsTest", () =
 
   it("showing variant with invalid signed blob ID", async () => {
     await getRepresentationProxy(t, blob, "invalid", Variation.encode(transformations));
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("showing variant with invalid variation key", async () => {
     await getRepresentationProxy(t, blob, blob.signedId(), "invalid");
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 });
 
@@ -131,7 +131,7 @@ describe("ActiveStorage::Representations::ProxyControllerWithVariantsWithStrictL
       getRepresentationProxy(t, blob, blob.signedId(), Variation.encode(transformations)),
     );
 
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
     expect(t.response.body).toBe(await body(blob.variant(transformations)));
   });
@@ -144,7 +144,7 @@ describe("ActiveStorage::Representations::ProxyControllerWithVariantsWithStrictL
     await stub(blob.service, "download", mockDownload, [], async () => {
       await getRepresentationProxy(t, blob, blob.signedId(), Variation.encode(transformations));
     });
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
     expect(t.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
@@ -156,7 +156,7 @@ describe("ActiveStorage::Representations::ProxyControllerWithVariantsWithStrictL
     await stub(blob.service, "download", mockDownload, [], async () => {
       await getRepresentationProxy(t, blob, blob.signedId(), Variation.encode(transformations));
     });
-    t.assertResponse("internal_server_error");
+    t.assertResponse(":internal_server_error");
     expect(t.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 });
@@ -174,19 +174,19 @@ describe("ActiveStorage::Representations::ProxyControllerWithPreviewsTest", () =
   it("showing preview inline", async () => {
     await getRepresentationProxy(t, blob, blob.signedId(), Variation.encode(transformations));
 
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
     expect(t.response.body).toBe(await body(blob.preview(transformations)));
   });
 
   it("showing preview with invalid signed blob ID", async () => {
     await getRepresentationProxy(t, blob, "invalid", Variation.encode(transformations));
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("showing preview with invalid variation key", async () => {
     await getRepresentationProxy(t, blob, blob.signedId(), "invalid");
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 });
 
@@ -206,7 +206,7 @@ describe("ActiveStorage::Representations::ProxyControllerWithPreviewsWithStrictL
       getRepresentationProxy(t, blob, blob.signedId(), Variation.encode(transformations)),
     );
 
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.headers.get("Content-Disposition")).toMatch(/^inline/);
     expect(t.response.body).toBe(await body(blob.preview(transformations)));
   });

@@ -55,52 +55,52 @@ describe("RateLimitingTest", () => {
   it("exceeding basic limit", async () => {
     await tc.get("limited");
     await tc.get("limited");
-    assertResponse("ok");
+    assertResponse(":ok");
 
     await tc.get("limited");
-    assertResponse("too_many_requests");
+    assertResponse(":too_many_requests");
   });
 
   it("multiple rate limits", async () => {
     await tc.get("limited");
     await tc.get("limited");
-    assertResponse("ok");
+    assertResponse(":ok");
 
     vi.advanceTimersByTime(3000);
     await tc.get("limited");
     await tc.get("limited");
-    assertResponse("ok");
+    assertResponse(":ok");
 
     vi.advanceTimersByTime(3000);
     await tc.get("limited");
     await tc.get("limited");
-    assertResponse("too_many_requests");
+    assertResponse(":too_many_requests");
   });
 
   it("limit resets after time", async () => {
     await tc.get("limited");
     await tc.get("limited");
-    assertResponse("ok");
+    assertResponse(":ok");
 
     vi.advanceTimersByTime(3000);
     await tc.get("limited");
-    assertResponse("ok");
+    assertResponse(":ok");
   });
 
   it("limit by", async () => {
     await tc.get("limitedWith");
     await tc.get("limitedWith");
     await tc.get("limitedWith");
-    assertResponse("forbidden");
+    assertResponse(":forbidden");
 
     await tc.get("limitedWith", { params: { rate_limit_key: "other" } });
-    assertResponse("ok");
+    assertResponse(":ok");
   });
 
   it("limited with", async () => {
     await tc.get("limitedWith");
     await tc.get("limitedWith");
     await tc.get("limitedWith");
-    assertResponse("forbidden");
+    assertResponse(":forbidden");
   });
 });

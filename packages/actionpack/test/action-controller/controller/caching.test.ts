@@ -242,7 +242,7 @@ describe("FunctionalFragmentCachingTest", () => {
 
   it("fragment caching", async () => {
     await tc.get("fragmentCached");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     const expectedBody = "Hello\nThis bit's fragment cached\nCiao\n";
     assertEqual(expectedBody, tc.response.body);
 
@@ -258,7 +258,7 @@ describe("FunctionalFragmentCachingTest", () => {
 
   it("fragment caching in partials", async () => {
     await tc.get("htmlFragmentCachedWithPartial");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     assertMatch(/Old fragment caching in a partial/, tc.response.body);
 
     assertMatch(
@@ -273,7 +273,7 @@ describe("FunctionalFragmentCachingTest", () => {
 
   it("skipping fragment cache digesting", async () => {
     await tc.get("fragmentCachedWithoutDigest", { format: "html" });
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     const expectedBody = "<body>\n<p>ERB</p>\n</body>\n";
 
     assertEqual(expectedBody, tc.response.body);
@@ -283,7 +283,7 @@ describe("FunctionalFragmentCachingTest", () => {
   it("fragment caching with options", async () => {
     const time = Time.now();
     await tc.get("fragmentCachedWithOptions");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     const expectedBody = "<body>\n<p>ERB</p>\n</body>\n";
 
     assertEqual(expectedBody, tc.response.body);
@@ -294,7 +294,7 @@ describe("FunctionalFragmentCachingTest", () => {
 
   it("render inline before fragment caching", async () => {
     await tc.get("inlineFragmentCached");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     assertMatch(/Some inline content/, tc.response.body);
     assertMatch(/Some cached content/, tc.response.body);
     assertMatch(
@@ -325,7 +325,7 @@ describe("FunctionalFragmentCachingTest", () => {
   it("html formatted fragment caching", async () => {
     const format = "html";
     await tc.get("formattedFragmentCached", { format });
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     const expectedBody = "<body>\n<p>ERB</p>\n</body>\n";
 
     assertEqual(expectedBody, tc.response.body);
@@ -344,7 +344,7 @@ describe("FunctionalFragmentCachingTest", () => {
   it.skip("xml formatted fragment caching", async () => {
     const format = "xml";
     await tc.get("formattedFragmentCached", { format });
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     const expectedBody = "<body>\n  <p>Builder</p>\n</body>\n";
 
     assertEqual(expectedBody, tc.response.body);
@@ -362,7 +362,7 @@ describe("FunctionalFragmentCachingTest", () => {
   it("fragment caching with variant", async () => {
     const format = "html";
     await tc.get("formattedFragmentCachedWithVariant", { format, params: { v: "phone" } });
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     const expectedBody = "<body>\n<p>PHONE</p>\n</body>\n";
 
     assertEqual(expectedBody, tc.response.body);
@@ -380,7 +380,7 @@ describe("FunctionalFragmentCachingTest", () => {
   // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
   it.skip("fragment caching with html partials in xml", async () => {
     await tc.get("xmlFragmentCachedWithHtmlPartial", { format: "*/*" });
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 });
 

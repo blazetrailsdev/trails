@@ -895,7 +895,7 @@ function RequestForgeryProtectionTests(
       tc.session().get("something_like_user_id"),
       "session values are still present",
     ).toBeUndefined();
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   }
 
   async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
@@ -903,7 +903,7 @@ function RequestForgeryProtectionTests(
     tc.session().set("something_like_user_id", 1);
     await assertNothingRaised(block);
     expect(tc.session().get("something_like_user_id")).toBe(1);
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   }
 
   async function forgeryProtectionOriginCheck(block: () => Promise<unknown>): Promise<void> {
@@ -924,7 +924,7 @@ function RequestForgeryProtectionTests(
     tc.session().set("something_like_user_id", 1);
     await assertNothingRaised(block);
     expect(tc.session().get("something_like_user_id")).toBe(1);
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   }
 
   return { t: () => tc, initializeCsrfToken, forgeryProtectionOriginCheck };
@@ -970,17 +970,17 @@ describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
 
   it("should allow to set signed cookies", async () => {
     await tc.post("signed");
-    tc.assertResponse("ok");
+    tc.assertResponse(":ok");
   });
 
   it("should allow to set encrypted cookies", async () => {
     await tc.post("encrypted");
-    tc.assertResponse("ok");
+    tc.assertResponse(":ok");
   });
 
   it("should allow reset_session", async () => {
     await tc.post("tryToResetSession");
-    tc.assertResponse("ok");
+    tc.assertResponse(":ok");
   });
 });
 
@@ -1215,7 +1215,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("accepts token with path with query params", async () => {
@@ -1322,7 +1322,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: token } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("does not return old csrf token", async () => {
@@ -1366,7 +1366,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: nonHmacToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("chomps slashes", async () => {
@@ -1380,7 +1380,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken, baz: "foo" } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("ignores trailing slash during generation", async () => {
@@ -1392,7 +1392,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("handles empty path as request path", async () => {
@@ -1404,7 +1404,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("handles relative paths", async () => {
@@ -1416,7 +1416,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("handles relative paths with dot", async () => {
@@ -1428,7 +1428,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("handles query string", async () => {
@@ -1440,7 +1440,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("handles fragment", async () => {
@@ -1452,7 +1452,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("ignores origin during generation", async () => {
@@ -1466,7 +1466,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("ignores trailing slash during validation", async () => {
@@ -1478,7 +1478,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 
   it("method is case insensitive", async () => {
@@ -1490,7 +1490,7 @@ describe("PerFormTokensControllerTest", () => {
     await assertNothingRaised(() =>
       tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
     );
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   });
 });
 
@@ -1520,7 +1520,7 @@ describe("SkipProtectionControllerTest", () => {
 
   async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
     await assertNothingRaised(block);
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   }
 });
 
@@ -1539,7 +1539,7 @@ describe("SkipProtectionWhenUnprotectedControllerTest", () => {
 
   async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
     await assertNothingRaised(block);
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
   }
 });
 
@@ -1767,7 +1767,7 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
 
   async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
     await assertNothingRaised(block);
-    tc().assertResponse("success");
+    tc().assertResponse(":success");
   }
 });
 

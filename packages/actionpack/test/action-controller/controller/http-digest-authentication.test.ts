@@ -82,7 +82,7 @@ describe("HttpDigestAuthenticationTest", () => {
       tc.request.env[header] = await encodeCredentials({ username: "lifo", password: "world" });
       await tc.get("index");
 
-      assertResponse("success");
+      assertResponse(":success");
       expect(tc.response.body, `Authentication failed for request header ${header}`).toBe(
         "Hello Secret",
       );
@@ -94,7 +94,7 @@ describe("HttpDigestAuthenticationTest", () => {
       tc.request.env[header] = await encodeCredentials({ username: "h4x0r", password: "world" });
       await tc.get("index");
 
-      assertResponse("unauthorized");
+      assertResponse(":unauthorized");
       expect(tc.response.body, `Authentication didn't fail for request header ${header}`).toBe(
         "HTTP Digest: Access denied.\n",
       );
@@ -104,7 +104,7 @@ describe("HttpDigestAuthenticationTest", () => {
   it("authentication request without credential", async () => {
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed");
     const credentials = decodeCredentials(tc.response.headers.get("WWW-Authenticate"));
     expect(credentials.get("realm")).toBe("SuperSecret");
@@ -117,7 +117,7 @@ describe("HttpDigestAuthenticationTest", () => {
     });
     await tc.get("index");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body, "Authentication didn't fail for request").toBe(
       "HTTP Digest: Access denied.\n",
     );
@@ -131,7 +131,7 @@ describe("HttpDigestAuthenticationTest", () => {
     });
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed");
   });
 
@@ -143,7 +143,7 @@ describe("HttpDigestAuthenticationTest", () => {
     });
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed");
   });
 
@@ -155,7 +155,7 @@ describe("HttpDigestAuthenticationTest", () => {
     });
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed");
   });
 
@@ -167,7 +167,7 @@ describe("HttpDigestAuthenticationTest", () => {
     });
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed");
   });
 
@@ -178,7 +178,7 @@ describe("HttpDigestAuthenticationTest", () => {
     });
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -190,7 +190,7 @@ describe("HttpDigestAuthenticationTest", () => {
 
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -202,7 +202,7 @@ describe("HttpDigestAuthenticationTest", () => {
     tc.request.env["PATH_INFO"] = "/proxied/uri";
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -216,7 +216,7 @@ describe("HttpDigestAuthenticationTest", () => {
 
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -229,7 +229,7 @@ describe("HttpDigestAuthenticationTest", () => {
 
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -244,7 +244,7 @@ describe("HttpDigestAuthenticationTest", () => {
 
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -256,7 +256,7 @@ describe("HttpDigestAuthenticationTest", () => {
     });
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -269,7 +269,7 @@ describe("HttpDigestAuthenticationTest", () => {
     tc.request.env["rack.methodoverride.original_method"] = "POST";
     await tc.put("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -291,7 +291,7 @@ describe("HttpDigestAuthenticationTest", () => {
     tc.request.env["PATH_INFO"] = "/http_digest_authentication_test/dummy_digest";
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -305,7 +305,7 @@ describe("HttpDigestAuthenticationTest", () => {
     tc.request.env["PATH_INFO"] = "/http_digest_authentication_test/dummy_digest";
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -320,7 +320,7 @@ describe("HttpDigestAuthenticationTest", () => {
     tc.request.env["PATH_INFO"] = "/http_digest_authentication_test/dummy_digest";
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -329,7 +329,7 @@ describe("HttpDigestAuthenticationTest", () => {
 
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
   });
 
   async function encodeCredentials(options: Record<string, unknown>): Promise<string> {
@@ -347,7 +347,7 @@ describe("HttpDigestAuthenticationTest", () => {
         break;
     }
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
 
     const credentials = decodeCredentials(tc.response.headers.get("WWW-Authenticate"));
     credentials.mergeBang(options);

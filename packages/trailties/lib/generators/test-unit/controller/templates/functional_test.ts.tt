@@ -23,7 +23,7 @@ describe("<%= this.className() %>ControllerTest", () => {
 <% for (const action of this.actions) { -%>
   it("should get <%= action %>", async ({ testCase: t }) => {
     await t.get(t.<%= ActiveSupport.Inflector.camelize(`${this.urlHelperPrefix()}_${action}_url`, "lower") %>());
-    t.assertResponse("success");
+    t.assertResponse(":success");
   });
 <%= action === this.actions.at(-1) ? "" : "\n" -%>
 <% } -%>

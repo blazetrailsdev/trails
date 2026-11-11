@@ -57,9 +57,9 @@ describe("add_flash_types readers", () => {
     constSet(TopLevel, "NoticesController", NoticesController);
 
     await t.post("/notices");
-    t.assertResponse("redirect");
+    t.assertResponse(":redirect");
     await t.followRedirectBang();
-    t.assertResponse("success");
+    t.assertResponse(":success");
 
     expect((t.controller as NoticesController).notice).toBe("Post was successfully created.");
     expect((t.controller as NoticesController).alert).toBeUndefined();

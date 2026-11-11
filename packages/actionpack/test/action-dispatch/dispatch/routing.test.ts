@@ -2943,22 +2943,22 @@ describe("TestRoutingMapper", () => {
     });
 
     await t.get("/posts");
-    assertResponse("success");
+    assertResponse(":success");
     expect(t.response.body).toBe("posts#index");
     expect(t.postsPath()).toBe("/posts");
 
     await t.get("/posts.html");
-    assertResponse("not_found");
+    assertResponse(":not_found");
     expect(t.response.body).toBe("Not Found");
     expect(t.postsPath({ format: "html" })).toBe("/posts?format=html");
 
     await t.get("/user");
-    assertResponse("success");
+    assertResponse(":success");
     expect(t.response.body).toBe("users#show");
     expect(t.userPath()).toBe("/user");
 
     await t.get("/user.html");
-    assertResponse("not_found");
+    assertResponse(":not_found");
     expect(t.response.body).toBe("Not Found");
     expect(t.userPath({ format: "html" })).toBe("/user?format=html");
   });
@@ -4423,11 +4423,11 @@ describe("TestRoutingMapper", () => {
     });
 
     await t.head("/home");
-    assertResponse("ok");
+    assertResponse(":ok");
     expect(t.response.body).toBe("test#index");
 
     await t.head("/foobar");
-    assertResponse("ok");
+    assertResponse(":ok");
     expect(t.response.body).toBe("HEAD");
   });
   it("dynamic action segments are deprecated", async () => {
@@ -5138,7 +5138,7 @@ describe("TestNamedRouteUrlHelpers", () => {
   it("URL helpers do not ignore nil parameters when using non-optimized routes", async () => {
     await stub(Routes, "isOptimizeRoutesGeneration", false, undefined, async () => {
       await t.get("/categories/1");
-      assertResponse("success");
+      assertResponse(":success");
       await assertRaises([UrlGenerationError], {}, () => t.productPath(null));
     });
   });
@@ -5191,39 +5191,39 @@ describe("TestUrlConstraints", () => {
     expect(t.adminRootUrl()).toBe("http://admin.example.com/");
 
     await get("http://admin.example.com/");
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("constraints are copied to defaults when using scope constraints hash", async () => {
     expect(t.secureRootUrl()).toBe("https://www.example.com/");
 
     await get("https://www.example.com/");
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("constraints are copied to defaults when using route constraints hash", async () => {
     expect(t.alternateRootUrl()).toBe("http://www.example.com:8080/");
 
     await get("http://www.example.com:8080/");
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("false constraint expressions check for absence of values", async () => {
     await get("http://example.com/search");
-    assertResponse("success");
+    assertResponse(":success");
     expect(t.searchUrl()).toBe("http://example.com/search");
 
     await get("http://api.example.com/search");
-    assertResponse("not_found");
+    assertResponse(":not_found");
   });
 
   it("true constraint expressions check for presence of values", async () => {
     await get("http://api.example.com/logs");
-    assertResponse("success");
+    assertResponse(":success");
     expect(t.logsUrl()).toBe("http://api.example.com/logs");
 
     await get("http://example.com/logs");
-    assertResponse("not_found");
+    assertResponse(":not_found");
   });
 });
 
@@ -5267,16 +5267,16 @@ describe("TestInvalidUrls", () => {
       });
 
       await get("/%E2%EF%BF%BD%A6");
-      assertResponse("bad_request");
+      assertResponse(":bad_request");
 
       await get("/foo/%E2%EF%BF%BD%A6");
-      assertResponse("bad_request");
+      assertResponse(":bad_request");
 
       await get("/bar/%E2%EF%BF%BD%A6");
-      assertResponse("bad_request");
+      assertResponse(":bad_request");
 
       await get("/foobar/%E2%EF%BF%BD%A6");
-      assertResponse("bad_request");
+      assertResponse(":bad_request");
     });
   });
 
@@ -5288,10 +5288,10 @@ describe("TestInvalidUrls", () => {
       });
 
       await get("/foo/show/%E2%EF%BF%BD%A6");
-      assertResponse("ok");
+      assertResponse(":ok");
 
       await get("/bar/show/%E2%EF%BF%BD%A6");
-      assertResponse("ok");
+      assertResponse(":ok");
     });
   });
 
@@ -5303,10 +5303,10 @@ describe("TestInvalidUrls", () => {
       });
 
       await get("/foo/show/%E2%EF%BF%BD%A6?something_else=%E2%EF%BF%BD%A6");
-      assertResponse("bad_request");
+      assertResponse(":bad_request");
 
       await get("/foo/show/%E2%EF%BF%BD%A6?something_else=%E2%EF%BF%BD%A6");
-      assertResponse("bad_request");
+      assertResponse(":bad_request");
     });
   });
 });
@@ -5377,37 +5377,37 @@ describe("TestPortConstraints", () => {
 
   it("integer port constraints", async () => {
     await t.get("http://www.example.com/integer");
-    assertResponse("not_found");
+    assertResponse(":not_found");
 
     await t.get("http://www.example.com:8080/integer");
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("string port constraints", async () => {
     await t.get("http://www.example.com/string");
-    assertResponse("not_found");
+    assertResponse(":not_found");
 
     await t.get("http://www.example.com:8080/string");
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("array port constraints", async () => {
     await t.get("http://www.example.com/array");
-    assertResponse("not_found");
+    assertResponse(":not_found");
 
     await t.get("http://www.example.com:8080/array/middle");
-    assertResponse("not_found");
+    assertResponse(":not_found");
 
     await t.get("http://www.example.com:8080/array/first");
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("regexp port constraints", async () => {
     await t.get("http://www.example.com/regexp");
-    assertResponse("not_found");
+    assertResponse(":not_found");
 
     await t.get("http://www.example.com:8080/regexp");
-    assertResponse("success");
+    assertResponse(":success");
   });
 });
 
@@ -5439,46 +5439,46 @@ describe("TestFormatConstraints", () => {
 
   it("string format constraints", async () => {
     await t.get("http://www.example.com/string");
-    assertResponse("success");
+    assertResponse(":success");
 
     await t.get("http://www.example.com/string.json");
-    assertResponse("success");
+    assertResponse(":success");
 
     await t.get("http://www.example.com/string.html");
-    assertResponse("not_found");
+    assertResponse(":not_found");
   });
 
   it("regexp format constraints", async () => {
     await t.get("http://www.example.com/regexp");
-    assertResponse("success");
+    assertResponse(":success");
 
     await t.get("http://www.example.com/regexp.json");
-    assertResponse("success");
+    assertResponse(":success");
 
     await t.get("http://www.example.com/regexp.html");
-    assertResponse("not_found");
+    assertResponse(":not_found");
   });
 
   it("enforce with format true with constraint", async () => {
     await t.get("http://www.example.com/json_only.json");
-    assertResponse("success");
+    assertResponse(":success");
 
     await t.get("http://www.example.com/json_only.html");
-    assertResponse("not_found");
+    assertResponse(":not_found");
 
     await t.get("http://www.example.com/json_only");
-    assertResponse("not_found");
+    assertResponse(":not_found");
   });
 
   it("enforce with string", async () => {
     await t.get("http://www.example.com/xml_only.xml");
-    assertResponse("success");
+    assertResponse(":success");
 
     await t.get("http://www.example.com/xml_only");
-    assertResponse("success");
+    assertResponse(":success");
 
     await t.get("http://www.example.com/xml_only.json");
-    assertResponse("not_found");
+    assertResponse(":not_found");
   });
 });
 
@@ -5954,7 +5954,7 @@ describe("FlashRedirectTest", () => {
 
   it("block redirect commits flash", async () => {
     await t.get("/foo", { env: { "action_dispatch.key_generator": Generator } });
-    t.assertResponse("redirect");
+    t.assertResponse(":redirect");
 
     await t.followRedirectBang();
     expect(t.response.body).toBe("bar");

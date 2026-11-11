@@ -1093,7 +1093,7 @@ describe("TestCaseTest", () => {
 
   it("redirect url only cares about location header", async () => {
     await tc.get("create");
-    tc.assertResponse("created");
+    tc.assertResponse(":created");
 
     assertEqual("/resource", tc.response.redirectUrl);
     assertEqual(tc.response.redirectUrl, tc.redirectToUrl());
@@ -1255,7 +1255,7 @@ describe("ResponseDefaultHeadersTest", () => {
 
   it("response deletes a default header", async () => {
     await tc.get("removeHeader", { params: { header: "A" } });
-    tc.assertResponse("ok");
+    tc.assertResponse(":ok");
 
     assertNotIncludes(tc.response.headers, "A");
     assertIncludes(tc.response.headers, "B");

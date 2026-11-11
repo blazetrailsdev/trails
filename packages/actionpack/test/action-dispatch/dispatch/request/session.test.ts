@@ -239,7 +239,7 @@ describe("Request", () => {
     it("session follows rack api contract 1", async () => {
       const testCase = new SessionIntegrationTest(expect.getState().currentTestName!);
       await testCase.get("/mysessionapp");
-      testCase.assertResponse("ok");
+      testCase.assertResponse(":ok");
       assertEqual("Hello from MySessionApp!", testCase.response.body);
       assertEqual("Hello from MySessionApp!", testCase.session().get("hello"));
     });

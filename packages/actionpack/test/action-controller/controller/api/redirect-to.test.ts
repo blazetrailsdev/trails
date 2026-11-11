@@ -34,7 +34,7 @@ describe("RedirectToApiTest", () => {
 
   it("redirect to", async () => {
     await tc.get("one");
-    tc.assertResponse("redirect");
+    tc.assertResponse(":redirect");
     assertEqual("http://test.host/redirect_to_api/two", tc.redirectToUrl());
   });
 });

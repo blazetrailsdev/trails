@@ -565,7 +565,7 @@ describe("CookiesTest", () => {
   it("tampered cookies", async () => {
     await assertNothingRaised(async () => {
       await tc.get("tamperedCookies");
-      tc.assertResponse("success");
+      tc.assertResponse(":success");
     });
   });
 
@@ -1254,91 +1254,91 @@ describe("CookiesTest", () => {
 
   it("cookie with all domain option", async () => {
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.com; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using a non standard tld", async () => {
     tc.request.host = "two.subdomains.nextangle.local";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using australian style tld", async () => {
     tc.request.host = "nextangle.com.au";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.com.au; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using australian style tld and two subdomains", async () => {
     tc.request.host = "x.nextangle.com.au";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.com.au; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using uk style tld", async () => {
     tc.request.host = "nextangle.co.uk";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.co.uk; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using two letter one level tld", async () => {
     tc.request.host = "hawth.ca";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=hawth.ca; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using two letter one level tld and subdomain", async () => {
     tc.request.host = "x.hawth.ca";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=hawth.ca; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using uk style tld and two subdomains", async () => {
     tc.request.host = "x.nextangle.co.uk";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.co.uk; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using host with port", async () => {
     tc.request.host = "nextangle.local:3000";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using localhost", async () => {
     tc.request.host = "localhost";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using ipv4 address", async () => {
     tc.request.host = "192.168.1.1";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using ipv6 address", async () => {
     tc.request.host = "2001:0db8:85a3:0000:0000:8a2e:0370:7334";
     await tc.get("setCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
   it("deleting cookie with all domain option", async () => {
     hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithDomain");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader(
       "user_name=; domain=nextangle.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
     );
@@ -1346,42 +1346,42 @@ describe("CookiesTest", () => {
 
   it("cookie with all domain option and tld length", async () => {
     await tc.get("setCookieWithDomainAndTld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.com; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using a non standard tld and tld length", async () => {
     tc.request.host = "two.subdomains.nextangle.local";
     await tc.get("setCookieWithDomainAndTld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using a non standard 2 letter tld", async () => {
     tc.request.host = "admin.lvh.me";
     await tc.get("setCookieWithDomainAndTld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=lvh.me; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using host with port and tld length", async () => {
     tc.request.host = "nextangle.local:3000";
     await tc.get("setCookieWithDomainAndTld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=nextangle.local; path=/; SameSite=Lax");
   });
 
   it("cookie with all domain option using longer tld length", async () => {
     tc.request.host = "x.y.z.t.com";
     await tc.get("setCookieWithDomainAndLongerTld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=y.z.t.com; path=/; SameSite=Lax");
   });
 
   it("deleting cookie with all domain option and tld length", async () => {
     hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithDomainAndTld");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader(
       "user_name=; domain=nextangle.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
     );
@@ -1390,48 +1390,48 @@ describe("CookiesTest", () => {
   it("cookie with several preset domains using one of these domains", async () => {
     tc.request.host = "example1.com";
     await tc.get("setCookieWithDomains");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=example1.com; path=/; SameSite=Lax");
   });
 
   it("cookie with several preset domains using subdomain", async () => {
     tc.request.host = "subdomain.example1.com";
     await tc.get("setCookieWithDomains");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=example1.com; path=/; SameSite=Lax");
   });
 
   it("cookie with several preset domains using similar tld", async () => {
     tc.request.host = "example1.com.au";
     await tc.get("setCookieWithDomains");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
   it("cookie with several preset domains using similar domain", async () => {
     tc.request.host = "myexample1.com";
     await tc.get("setCookieWithDomains");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
   it("cookie with several preset domains using other domain", async () => {
     tc.request.host = "other-domain.com";
     await tc.get("setCookieWithDomains");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; path=/; SameSite=Lax");
   });
 
   it("cookie with several preset domains using shared domain", async () => {
     tc.request.host = "example3.com";
     await tc.get("setCookieWithDomains");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader("user_name=rizwanreza; domain=.example3.com; path=/; SameSite=Lax");
   });
 
   it("cookie with domain proc", async () => {
     await tc.get("setCookieWithDomainProc");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader(
       "user_name=braindeaf; domain=.sub.www.nextangle.com; path=/; SameSite=Lax",
     );
@@ -1439,7 +1439,7 @@ describe("CookiesTest", () => {
 
   it("cookie with domain proc with request", async () => {
     await tc.get("setCookieWithDomainProcWithRequest");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader(
       "user_name=braindeaf; domain=.sub.www.nextangle.com; path=/; SameSite=Lax",
     );
@@ -1449,7 +1449,7 @@ describe("CookiesTest", () => {
     tc.request.host = "example2.com";
     hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithDomains");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader(
       "user_name=; domain=example2.com; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
     );
@@ -1459,7 +1459,7 @@ describe("CookiesTest", () => {
     tc.request.host = "other-domain.com";
     hashAset(tc.request.cookies, "user_name", "Joe");
     await tc.get("deleteCookieWithDomains");
-    tc.assertResponse("success");
+    tc.assertResponse(":success");
     tc.assertSetCookieHeader(
       "user_name=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax",
     );

@@ -97,7 +97,7 @@ describe("LayoutAutoDiscoveryTest", () => {
       await testCase.beforeSetup();
       testCase.routes = SharedTestRoutes;
       await testCase.get("hello");
-      assertResponse("success");
+      assertResponse(":success");
       expect(testCase.response.body).toBe("layouts/third_party_template_library.mab");
     });
   });

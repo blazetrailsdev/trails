@@ -678,13 +678,13 @@ describe("DefaultContentSecurityPolicyIntegrationTest", () => {
   it("adds nonce to script src content security policy only once", async () => {
     await t.get("/");
     await t.get("/");
-    t.assertResponse("success");
+    t.assertResponse(":success");
     assertPolicy("default-src 'self'; script-src https: 'nonce-iyhD0Yc0W+c='");
   });
 
   it("redirect works with dynamic sources", async () => {
     await t.get("/redirect");
-    t.assertResponse("redirect");
+    t.assertResponse(":redirect");
     assertPolicy("default-src 'self'; script-src https: 'nonce-iyhD0Yc0W+c='");
   });
 });
@@ -820,7 +820,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
   });
 
   function assertPolicy(expected: string, { reportOnly = false } = {}): void {
-    t.assertResponse("success");
+    t.assertResponse(":success");
 
     let expectedHeader: string;
     let unexpectedHeader: string;
@@ -1005,7 +1005,7 @@ describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
     t.app = APP;
     await t.get("/");
 
-    t.assertResponse("success");
+    t.assertResponse(":success");
     assertMatch(
       "script-src https: 'nonce-iyhD0Yc0W+c='",
       t.response.headers.get("Content-Security-Policy")!,
@@ -1094,7 +1094,7 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
     testCase.app = APP;
     await testCase.get("/");
 
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
     assertMatch(
       "default-src https://example.com",
       testCase.response.headers.get(CONTENT_SECURITY_POLICY)!,

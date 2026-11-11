@@ -743,7 +743,7 @@ describe("RenderTest", () => {
   test("simple show", async () => {
     await testCase.get("helloWorld");
     testCase.assertResponse(200);
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
     expect(testCase.response.body).toBe("<html>Hello world!</html>");
   });
 
@@ -877,7 +877,7 @@ describe("RenderTest", () => {
   test("render custom code", async () => {
     await testCase.get("renderCustomCode");
     testCase.assertResponse(404);
-    testCase.assertResponse("missing");
+    testCase.assertResponse(":missing");
     expect(testCase.response.body).toBe("hello world");
   });
 
@@ -1103,7 +1103,7 @@ describe("RenderTest", () => {
 
   test("render with explicit template", async () => {
     await testCase.get("renderWithExplicitTemplate");
-    testCase.assertResponse("success");
+    testCase.assertResponse(":success");
   });
 
   test("render with explicit unescaped template", async () => {

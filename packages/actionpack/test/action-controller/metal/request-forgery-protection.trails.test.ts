@@ -177,7 +177,7 @@ describe("ActionController::Base#verify_authenticity_token", () => {
       session: { _csrf_token: token },
       params: { authenticity_token: "bogus" },
     });
-    tc.assertResponse("created");
+    tc.assertResponse(":created");
   });
 
   it("rejects a mismatched Origin when forgeryProtectionOriginCheck is on", async ({ task }) => {

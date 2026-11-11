@@ -795,7 +795,7 @@ describe("FilterTest", () => {
 
   it("before action redirects breaks actioning chain for after action", async () => {
     await testProcess(FT_BeforeActionRedirectionController);
-    tc.assertResponse("redirect");
+    tc.assertResponse(":redirect");
     expect(tc.redirectToUrl()).toBe(
       "http://test.host/filter_test/before_action_redirection/target_of_redirection",
     );
@@ -810,7 +810,7 @@ describe("FilterTest", () => {
 
   it("before action redirects breaks actioning chain for prepend after action", async () => {
     await testProcess(FT_BeforeActionRedirectionForPrependAfterActionController);
-    tc.assertResponse("redirect");
+    tc.assertResponse(":redirect");
     expect(tc.redirectToUrl()).toBe(
       "http://test.host/filter_test/before_action_redirection_for_prepend_after_action/target_of_redirection",
     );

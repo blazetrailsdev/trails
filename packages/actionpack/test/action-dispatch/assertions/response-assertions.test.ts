@@ -51,16 +51,16 @@ describe("ResponseAssertionsTest", () => {
 
   it("assert response predicate methods", async () => {
     for (const [sym, status] of [
-      ["success", 200],
-      ["missing", 404],
-      ["redirect", 302],
-      ["error", 500],
+      [":success", 200],
+      [":missing", 404],
+      [":redirect", 302],
+      [":error", 500],
     ] as const) {
       self.response = fakeResponse(status);
       self.assertResponse(sym);
 
       await assertRaises([Assertion], {}, () => {
-        self.assertResponse("unauthorized");
+        self.assertResponse(":unauthorized");
       });
     }
   });
@@ -70,7 +70,7 @@ describe("ResponseAssertionsTest", () => {
     self.assertResponse(400);
 
     await assertRaises([Assertion], {}, () => {
-      self.assertResponse("unauthorized");
+      self.assertResponse(":unauthorized");
     });
 
     await assertRaises([Assertion], {}, () => {
@@ -80,14 +80,14 @@ describe("ResponseAssertionsTest", () => {
 
   it("assert response sym status", async () => {
     self.response = fakeResponse(401);
-    self.assertResponse("unauthorized");
+    self.assertResponse(":unauthorized");
 
     await assertRaises([Assertion], {}, () => {
-      self.assertResponse("ok");
+      self.assertResponse(":ok");
     });
 
     await assertRaises([Assertion], {}, () => {
-      self.assertResponse("success");
+      self.assertResponse(":success");
     });
   });
 
@@ -95,7 +95,7 @@ describe("ResponseAssertionsTest", () => {
     self.response = fakeResponse(200);
 
     await assertRaises([ArgumentError], {}, () => {
-      self.assertResponse("succezz");
+      self.assertResponse(":succezz");
     });
   });
 
@@ -103,7 +103,7 @@ describe("ResponseAssertionsTest", () => {
     self.response = new Response();
     self.response.status = 404;
 
-    const error = await assertRaises([Assertion], {}, () => self.assertResponse("success"));
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse(":success"));
     const expected = "Expected response to be a <2XX: success>, but was a <404: Not Found>";
     assertMatch(expected, error.message);
   });
@@ -122,7 +122,7 @@ describe("ResponseAssertionsTest", () => {
     self.response.status = 302;
     self.response.location = "http://test.host/posts/redirect/1";
 
-    const error = await assertRaises([Assertion], {}, () => self.assertResponse("success"));
+    const error = await assertRaises([Assertion], {}, () => self.assertResponse(":success"));
     const expected =
       "Expected response to be a <2XX: success>, but was a <302: Found>" +
       " redirect to <http://test.host/posts/redirect/1>";

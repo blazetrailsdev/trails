@@ -63,12 +63,12 @@ describe("ActionControllerRequiredParamsTest", () => {
 
   it("required parameters that are present will not raise", async () => {
     await tc.post("create", { params: { book: { name: "Mjallo!" } } });
-    tc.assertResponse("ok");
+    tc.assertResponse(":ok");
   });
 
   it("required parameters with false value will not raise", async () => {
     await tc.post("create", { params: { book: { name: false } } });
-    tc.assertResponse("ok");
+    tc.assertResponse(":ok");
   });
 });
 

@@ -104,7 +104,7 @@ describe("ShowExceptionsFormatsTest", () => {
   it("render json exception", async () => {
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { headers: { HTTP_ACCEPT: "application/json" } });
-    assertResponse("internal_server_error");
+    assertResponse(":internal_server_error");
     expect(t.response.mediaType).toBe("application/json");
     expect(t.response.body).toBe(
       ActiveSupportJSON.encode({ status: 500, error: "Internal Server Error" }),
@@ -114,7 +114,7 @@ describe("ShowExceptionsFormatsTest", () => {
   it("render xml exception", async () => {
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { headers: { HTTP_ACCEPT: "application/xml" } });
-    assertResponse("internal_server_error");
+    assertResponse(":internal_server_error");
     expect(t.response.mediaType).toBe("application/xml");
     expect(t.response.body).toBe(toXml({ status: 500, error: "Internal Server Error" }));
   });
@@ -122,7 +122,7 @@ describe("ShowExceptionsFormatsTest", () => {
   it("render fallback exception", async () => {
     t.app = ShowExceptionsOverriddenController.action("boom");
     await t.get("/", { headers: { HTTP_ACCEPT: "text/csv" } });
-    assertResponse("internal_server_error");
+    assertResponse(":internal_server_error");
     expect(t.response.mediaType).toBe("text/html");
   });
 });
@@ -138,7 +138,7 @@ describe("ShowFailsafeExceptionsTest", () => {
       vi.spyOn(stderr, "write").mockImplementation(() => true);
 
       await t.get("/", { headers: { HTTP_ACCEPT: "text/json" } });
-      t.assertResponse("internal_server_error");
+      t.assertResponse(":internal_server_error");
       expect(t.response.mediaType).toBe("text/plain");
     } finally {
       rbObjIvarSet(middleware, "@exceptionsApp", exceptionsApp);

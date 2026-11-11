@@ -384,44 +384,44 @@ describe("TestCase over a PostsController", () => {
 
     it("accepts 'success' for 2xx", async () => {
       await tc.get("index");
-      tc.assertResponse("success");
+      tc.assertResponse(":success");
     });
 
     it("accepts 'redirect' for 3xx", async () => {
       await tc.get("redirectAction");
-      tc.assertResponse("redirect");
+      tc.assertResponse(":redirect");
     });
 
     it("rejects 'success' for non-2xx", async () => {
       await tc.get("renderWithStatus");
-      expect(() => tc.assertResponse("success")).toThrow(
+      expect(() => tc.assertResponse(":success")).toThrow(
         /Expected response to be a <2XX: success>, but was a <404: Not Found>/,
       );
     });
 
     it("accepts status symbols like 'not_found'", async () => {
       await tc.get("renderWithStatus");
-      tc.assertResponse("not_found");
+      tc.assertResponse(":not_found");
     });
 
     it("accepts status symbols like 'no_content'", async () => {
       await tc.delete("destroy", { params: { id: "1" } });
-      tc.assertResponse("no_content");
+      tc.assertResponse(":no_content");
     });
 
     it("accepts status symbols like 'forbidden'", async () => {
       await tc.get("forbidden");
-      tc.assertResponse("forbidden");
+      tc.assertResponse(":forbidden");
     });
 
     it("throws on unknown symbol", async () => {
       await tc.get("index");
-      expect(() => tc.assertResponse("banana")).toThrow(/Unrecognized status code :banana/);
+      expect(() => tc.assertResponse(":banana")).toThrow(/Unrecognized status code :banana/);
     });
 
     it("accepts 'missing' for 4xx", async () => {
       await tc.get("renderWithStatus");
-      tc.assertResponse("missing");
+      tc.assertResponse(":missing");
     });
   });
 

@@ -33,7 +33,7 @@ describe("RedirectSSLTest", () => {
   ): Promise<void> {
     testCase.app = buildApp({ sslOptions: { redirect } });
     await testCase.get(url, { headers });
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
   }
 
   async function assertRedirected({
@@ -286,7 +286,7 @@ describe("SecureCookiesTest", () => {
     await get({ headers: { [SET_COOKIE]: DEFAULT }, sslOptions: { redirect: excluding } });
 
     assertCookies("id=1; path=/", "token=abc; path=/; secure; HttpOnly");
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
   });
 
   it("no cookies", async () => {

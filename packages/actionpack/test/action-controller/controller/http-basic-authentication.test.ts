@@ -103,7 +103,7 @@ describe("HttpBasicAuthenticationTest", () => {
       tc.request.env[header] = encodeCredentials("lifo", "world");
       await tc.get("index");
 
-      assertResponse("success");
+      assertResponse(":success");
       expect(tc.response.body, `Authentication failed for request header ${header}`).toBe(
         "Hello Secret",
       );
@@ -115,7 +115,7 @@ describe("HttpBasicAuthenticationTest", () => {
       );
       await tc.get("show");
 
-      assertResponse("success");
+      assertResponse(":success");
       expect(
         tc.response.body,
         `Authentication failed for request header ${header} and long credentials`,
@@ -128,7 +128,7 @@ describe("HttpBasicAuthenticationTest", () => {
       tc.request.env[header] = encodeCredentials("h4x0r", "world");
       await tc.get("index");
 
-      assertResponse("unauthorized");
+      assertResponse(":unauthorized");
       expect(tc.response.body, `Authentication didn't fail for request header ${header}`).toBe(
         "HTTP Basic: Access denied.\n",
       );
@@ -140,7 +140,7 @@ describe("HttpBasicAuthenticationTest", () => {
       );
       await tc.get("show");
 
-      assertResponse("unauthorized");
+      assertResponse(":unauthorized");
       expect(
         tc.response.body,
         `Authentication didn't fail for request header ${header} and long credentials`,
@@ -150,7 +150,7 @@ describe("HttpBasicAuthenticationTest", () => {
     it(`unsuccessful authentication with ${header.toLowerCase()} and no credentials`, async () => {
       await tc.get("show");
 
-      assertResponse("unauthorized");
+      assertResponse(":unauthorized");
       expect(
         tc.response.body,
         `Authentication didn't fail for request header ${header} and no credentials`,
@@ -169,7 +169,7 @@ describe("HttpBasicAuthenticationTest", () => {
     tc.request.env["HTTP_AUTHORIZATION"] = `BASIC ${Base64.encode64("lifo:world")}`;
     await tc.get("index");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body, "Authentication failed when authorization scheme BASIC").toBe(
       "Hello Secret",
     );
@@ -178,7 +178,7 @@ describe("HttpBasicAuthenticationTest", () => {
   it("authentication request without credential", async () => {
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed\n");
     expect(tc.response.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
   });
@@ -187,7 +187,7 @@ describe("HttpBasicAuthenticationTest", () => {
     tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials("pretty", "foo");
     await tc.get("display");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
     expect(tc.response.body).toBe("Authentication Failed\n");
     expect(tc.response.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
   });
@@ -196,14 +196,14 @@ describe("HttpBasicAuthenticationTest", () => {
     tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${Base64.encode64("David")}`;
     await tc.get("search");
 
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
   });
 
   it("authentication request with no required password", async () => {
     tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${Base64.encode64("George")}`;
     await tc.get("noPassword");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Hello George (password: nil)");
   });
 
@@ -211,7 +211,7 @@ describe("HttpBasicAuthenticationTest", () => {
     tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials("pretty", "please");
     await tc.get("display");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Definitely Maybe");
   });
 
@@ -222,25 +222,25 @@ describe("HttpBasicAuthenticationTest", () => {
     );
     await tc.get("specialCreds");
 
-    assertResponse("success");
+    assertResponse(":success");
     expect(tc.response.body).toBe("Only for special credentials");
   });
 
   it("authenticate with class method", async () => {
     tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials("David", "Goliath");
     await tc.get("search");
-    assertResponse("success");
+    assertResponse(":success");
 
     tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials("David", "WRONG!");
     await tc.get("search");
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
   });
 
   it("authentication request with wrong scheme", async () => {
     const header = "Bearer " + encodeCredentials("David", "Goliath").split(" ", 2)[1];
     tc.request.env["HTTP_AUTHORIZATION"] = header;
     await tc.get("search");
-    assertResponse("unauthorized");
+    assertResponse(":unauthorized");
   });
 
   function encodeCredentials(username: string, password: string): string {

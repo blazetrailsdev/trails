@@ -75,19 +75,19 @@ describe("ConditionalGetApiTest", () => {
   it("request gets last modified", async () => {
     await tc.get("two");
     assertEqual(tc.lastModified, tc.response.headers.get("Last-Modified"));
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("request obeys last modified", async () => {
     tc.request.setIfModifiedSince(tc.lastModified);
     await tc.get("two");
-    assertResponse("not_modified");
+    assertResponse(":not_modified");
   });
 
   it("last modified works with less than too", async () => {
     tc.request.setIfModifiedSince((Duration.years(5).ago() as Time).httpdate());
     await tc.get("two");
-    assertResponse("success");
+    assertResponse(":success");
   });
 
   it("request not modified", async () => {
@@ -101,13 +101,13 @@ describe("ConditionalGetApiTest", () => {
   it("if none match is asterisk", async () => {
     tc.request.setIfNoneMatch("*");
     await tc.get("one");
-    assertResponse("not_modified");
+    assertResponse(":not_modified");
   });
 
   it("etag matches", async () => {
     tc.request.setIfNoneMatch(weakEtag([":foo", 123]));
     await tc.get("one");
-    assertResponse("not_modified");
+    assertResponse(":not_modified");
   });
 
   it("strict freshness with etag", async () => {
@@ -115,7 +115,7 @@ describe("ConditionalGetApiTest", () => {
       tc.request.setIfNoneMatch(weakEtag([":foo", 123]));
 
       await tc.get("one");
-      assertResponse("not_modified");
+      assertResponse(":not_modified");
     });
   });
 
@@ -124,7 +124,7 @@ describe("ConditionalGetApiTest", () => {
       tc.request.setIfModifiedSince(tc.lastModified);
 
       await tc.get("one");
-      assertResponse("not_modified");
+      assertResponse(":not_modified");
     });
   });
 
@@ -134,13 +134,13 @@ describe("ConditionalGetApiTest", () => {
       tc.request.setIfNoneMatch(weakEtag([":foo", 123]));
 
       await tc.get("one");
-      assertResponse("not_modified");
+      assertResponse(":not_modified");
 
       tc.request.setIfNoneMatch(weakEtag([":bar", 124]));
       tc.request.setIfModifiedSince(tc.lastModified);
 
       await tc.get("one");
-      assertResponse("success");
+      assertResponse(":success");
     });
   });
 
@@ -150,7 +150,7 @@ describe("ConditionalGetApiTest", () => {
       tc.request.setIfNoneMatch(weakEtag([":foo", 123]));
 
       await tc.get("one");
-      assertResponse("ok");
+      assertResponse(":ok");
     });
   });
 });

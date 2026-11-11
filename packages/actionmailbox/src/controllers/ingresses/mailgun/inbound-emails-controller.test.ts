@@ -75,7 +75,7 @@ describe("ActionMailbox::Ingresses::Mailgun::InboundEmailsControllerTest", () =>
       },
     );
 
-    t.assertResponse("no_content");
+    t.assertResponse(":no_content");
 
     const inboundEmail = (await InboundEmail.last()) as InboundEmail;
     expect(new TextDecoder().decode(await rawEmailOf(inboundEmail))).toBe(
@@ -103,7 +103,7 @@ describe("ActionMailbox::Ingresses::Mailgun::InboundEmailsControllerTest", () =>
       },
     );
 
-    t.assertResponse("no_content");
+    t.assertResponse(":no_content");
 
     const inboundEmail = (await InboundEmail.last()) as InboundEmail;
     expect(await rawEmailOf(inboundEmail)).toEqual(
@@ -131,7 +131,7 @@ describe("ActionMailbox::Ingresses::Mailgun::InboundEmailsControllerTest", () =>
       },
     );
 
-    t.assertResponse("no_content");
+    t.assertResponse(":no_content");
 
     const inboundEmail = (await InboundEmail.last()) as InboundEmail;
     const mail = Mail.fromSource(await rawEmailOf(inboundEmail));
@@ -155,7 +155,7 @@ describe("ActionMailbox::Ingresses::Mailgun::InboundEmailsControllerTest", () =>
       },
     );
 
-    t.assertResponse("unauthorized");
+    t.assertResponse(":unauthorized");
   });
 
   it("rejecting a forged inbound email from Mailgun", async () => {
@@ -175,7 +175,7 @@ describe("ActionMailbox::Ingresses::Mailgun::InboundEmailsControllerTest", () =>
       },
     );
 
-    t.assertResponse("unauthorized");
+    t.assertResponse(":unauthorized");
   });
 
   it("raising when the configured Mailgun Signing key is nil", async () => {

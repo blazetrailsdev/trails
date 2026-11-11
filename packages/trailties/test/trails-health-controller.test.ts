@@ -14,7 +14,7 @@ describe("HealthControllerTest", () => {
       this.get("/up", { to: "trails/health#show", as: "trails_health_check" });
     });
     await t.get("show");
-    t.assertResponse("success");
+    t.assertResponse(":success");
     expect(t.response.body).toMatch(/background-color: green/);
   });
 
@@ -33,7 +33,7 @@ describe("HealthControllerTest", () => {
       this.get("/up", { to: "trails/health#show", as: "trails_health_check" });
     });
     await t.get("show");
-    t.assertResponse("internal_server_error");
+    t.assertResponse(":internal_server_error");
     expect(t.response.body).toMatch(/background-color: red/);
   });
 });

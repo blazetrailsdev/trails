@@ -42,7 +42,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
     const blob = await createBlob({ filename: "hello.jpg", contentType: "image/jpeg" });
 
     await t.get(await blob.url());
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.headers.get("Content-Disposition")).toBe(
       "inline; filename=\"hello.jpg\"; filename*=UTF-8''hello.jpg",
     );
@@ -53,7 +53,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
   it("showing blob as attachment", async () => {
     const blob = await createBlob();
     await t.get(await blob.url({ disposition: "attachment" }));
-    t.assertResponse("ok");
+    t.assertResponse(":ok");
     expect(t.response.headers.get("Content-Disposition")).toBe(
       "attachment; filename=\"hello.txt\"; filename*=UTF-8''hello.txt",
     );
@@ -64,7 +64,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
   it("showing blob range", async () => {
     const blob = await createBlob();
     await t.get(await blob.url(), { headers: { Range: "bytes=5-9" } });
-    t.assertResponse("partial_content");
+    t.assertResponse(":partial_content");
     expect(t.response.headers.get("Content-Disposition")).toBe(
       "attachment; filename=\"hello.txt\"; filename*=UTF-8''hello.txt",
     );
@@ -75,7 +75,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
   it("showing blob with invalid range", async () => {
     const blob = await createBlob();
     await t.get(await blob.url(), { headers: { Range: "bytes=1000-1000" } });
-    t.assertResponse("range_not_satisfiable");
+    t.assertResponse(":range_not_satisfiable");
   });
 
   it("showing blob that does not exist", async () => {
@@ -83,7 +83,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
     await blob.delete();
 
     await t.get(await blob.url());
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("showing blob with invalid key", async () => {
@@ -94,7 +94,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
         host: "example.com",
       }),
     );
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 
   it("showing public blob", async () => {
@@ -102,7 +102,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
       const blob = await createBlob({ contentType: "image/jpeg" });
 
       await t.get(await blob.url());
-      t.assertResponse("ok");
+      t.assertResponse(":ok");
       expect(t.response.headers.get("Content-Type")).toBe("image/jpeg");
       expect(t.response.body).toBe("Hello world!");
     });
@@ -117,7 +117,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
         .processed();
 
       await t.get((await blob.url())!);
-      t.assertResponse("ok");
+      t.assertResponse(":ok");
       expect(t.response.headers.get("Content-Type")).toBe("image/jpeg");
     });
   });
@@ -133,7 +133,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
       params: data,
       headers: { "Content-Type": "text/plain" },
     });
-    t.assertResponse("no_content");
+    t.assertResponse(":no_content");
     expect(new TextDecoder().decode(await blob.download())).toBe(data);
   });
 
@@ -145,7 +145,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
     });
 
     await t.put(await blob.serviceUrlForDirectUpload(), { params: data });
-    t.assertResponse("unprocessable_entity");
+    t.assertResponse(":unprocessable_entity");
     expect(await blob.service.isExist(blob.key)).toBeFalsy();
   });
 
@@ -160,7 +160,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
       params: data,
       headers: { "Content-Type": "application/octet-stream" },
     });
-    t.assertResponse("unprocessable_entity");
+    t.assertResponse(":unprocessable_entity");
     expect(await blob.service.isExist(blob.key)).toBeFalsy();
   });
 
@@ -176,7 +176,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
       params: data,
       headers: { "Content-Type": "application/x-gzip" },
     });
-    t.assertResponse("no_content");
+    t.assertResponse(":no_content");
     expect(new TextDecoder().decode(await blob.download())).toBe(data);
   });
 
@@ -191,7 +191,7 @@ describe("ActiveStorage::DiskControllerTest", () => {
       params: data,
       headers: { "Content-Type": "text/plain" },
     });
-    t.assertResponse("unprocessable_entity");
+    t.assertResponse(":unprocessable_entity");
     expect(await blob.service.isExist(blob.key)).toBeFalsy();
   });
 
@@ -200,6 +200,6 @@ describe("ActiveStorage::DiskControllerTest", () => {
       urlHelpers().updateTrailsDiskServiceUrl({ encoded_token: "invalid", host: "example.com" }),
       { params: "Something else entirely!", headers: { "Content-Type": "text/plain" } },
     );
-    t.assertResponse("not_found");
+    t.assertResponse(":not_found");
   });
 });

@@ -26,10 +26,10 @@ export interface AssertionResponseLike {
 }
 
 const RESPONSE_PREDICATES = {
-  success: "isSuccessful",
-  missing: "isNotFound",
-  redirect: "isRedirection",
-  error: "isServerError",
+  ":success": "isSuccessful",
+  ":missing": "isNotFound",
+  ":redirect": "isRedirection",
+  ":error": "isServerError",
 } as const;
 
 export function assertResponse(
@@ -54,7 +54,7 @@ export function assertRedirectedTo(
 ): true {
   if (!isPlainObject(options)) [options, message] = [{}, options];
 
-  const status = (options as { status?: number | string }).status ?? "redirect";
+  const status = (options as { status?: number | string }).status ?? ":redirect";
   assertResponse.call(this, status, message);
   if (rbEqq(urlOptions, this.response.location)) return true;
 

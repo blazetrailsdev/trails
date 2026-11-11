@@ -60,7 +60,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/");
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertEmpty(testCase.response.body);
   });
 
@@ -69,7 +69,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/", { env: { "action_dispatch.show_detailed_exceptions": true } });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
@@ -78,7 +78,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/");
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -87,7 +87,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/");
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -96,7 +96,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/");
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -109,7 +109,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -122,7 +122,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -135,7 +135,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -149,7 +149,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: www.example.local", testCase.response.body);
   });
 
@@ -158,7 +158,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/");
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -172,7 +172,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: .example.com", testCase.response.body);
   });
 
@@ -181,7 +181,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/");
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -198,7 +198,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/", { env: { "action_dispatch.show_detailed_exceptions": true } });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
@@ -209,7 +209,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/");
 
-    testCase.assertResponse("unauthorized");
+    testCase.assertResponse(":unauthorized");
     assertEqual("Custom", testCase.body);
   });
 
@@ -223,7 +223,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -237,7 +237,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -251,7 +251,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -265,7 +265,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -279,7 +279,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -293,7 +293,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -307,7 +307,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -321,7 +321,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -335,7 +335,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -349,7 +349,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertMatch("Success", testCase.response.body);
   });
 
@@ -364,7 +364,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
@@ -379,7 +379,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: //randomhost.com", testCase.response.body);
   });
 
@@ -393,7 +393,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -408,7 +408,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: evil.com", testCase.response.body);
   });
 
@@ -422,7 +422,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -437,7 +437,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
@@ -452,7 +452,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: sub.domain.com", testCase.response.body);
   });
 
@@ -466,7 +466,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: secondary.sub.domain.com", testCase.response.body);
   });
 
@@ -480,7 +480,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -518,7 +518,7 @@ describe("HostAuthorizationTest", () => {
         },
       });
 
-      testCase.assertResponse("forbidden");
+      testCase.assertResponse(":forbidden");
       assertMatch(`Blocked hosts: ${host}`, testCase.response.body);
     }
   });
@@ -528,7 +528,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/foo");
 
-    testCase.assertResponse("ok");
+    testCase.assertResponse(":ok");
     assertEqual("Success", testCase.body);
   });
 
@@ -537,7 +537,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/foo", { env: { "action_dispatch.show_detailed_exceptions": true } });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: www.example.com", testCase.response.body);
   });
 
@@ -551,7 +551,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: attacker.com#x.example.com", testCase.response.body);
   });
 
@@ -565,7 +565,7 @@ describe("HostAuthorizationTest", () => {
       },
     });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     assertMatch("Blocked hosts: sub-example.com", testCase.response.body);
   });
 
@@ -575,7 +575,7 @@ describe("HostAuthorizationTest", () => {
 
     await testCase.get("/", { env: { "action_dispatch.logger": new Logger(output) } });
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     output.rewind();
     assertMatch("Blocked hosts: www.example.com", output.read());
   });
@@ -593,7 +593,7 @@ describe("HostAuthorizationTest", () => {
       Base.logger = _old;
     }
 
-    testCase.assertResponse("forbidden");
+    testCase.assertResponse(":forbidden");
     output.rewind();
     assertMatch("Blocked hosts: www.example.com", output.read());
   });
