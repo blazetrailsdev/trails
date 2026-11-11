@@ -9,9 +9,9 @@ export interface CacheStoreFormatVersionBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
 }
 
-const FORMAT_VERSION_SIGNATURES = new Map<string, [Uint8Array, Uint8Array]>([
-  ["7.0", [Uint8Array.of(0x00, 0x04, 0x08, 0x5b), Uint8Array.of(0x01, 0x78)]],
-  ["7.1", [Uint8Array.of(0x00, 0x11, 0x01), Uint8Array.of(0x00, 0x11, 0x81)]],
+const FORMAT_VERSION_SIGNATURES = new Map<number, [Uint8Array, Uint8Array]>([
+  [7.0, [Uint8Array.of(0x00, 0x04, 0x08, 0x5b), Uint8Array.of(0x01, 0x78)]],
+  [7.1, [Uint8Array.of(0x00, 0x11, 0x01), Uint8Array.of(0x00, 0x11, 0x81)]],
 ]);
 
 const FORMAT_VERSIONS = [...FORMAT_VERSION_SIGNATURES.keys()];
@@ -38,7 +38,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
   });
 
   it("invalid format version raises", () => {
-    withFormat("0", () => {
+    withFormat(0, () => {
       expect(() => lookupStore()).toThrow();
     });
   });
@@ -48,8 +48,8 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
     [uncompressedSignature, compressedSignature],
   ] of FORMAT_VERSION_SIGNATURES) {
     // BLOCKED: cache-marshal-serializers-dump-through-ruby-compat-marshal
-    it.skipIf(formatVersion === "7.0")(
-      `format version ${formatVersion} uses correct signature for uncompressed entries`,
+    it.skipIf(formatVersion === 7.0)(
+      `format version ${formatVersion.toFixed(1)} uses correct signature for uncompressed entries`,
       () => {
         const serialized = withFormat(formatVersion, () =>
           serializeEntry(lookupStore(), new Entry(Array(100).fill("value"))),
@@ -61,7 +61,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
       },
     );
 
-    it(`format version ${formatVersion} uses correct signature for compressed entries`, () => {
+    it(`format version ${formatVersion.toFixed(1)} uses correct signature for compressed entries`, () => {
       const serialized = withFormat(formatVersion, () =>
         serializeEntry(lookupStore(), new Entry(Array(100).fill("value")), {
           compressThreshold: 1,
@@ -74,7 +74,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
     });
 
     // BLOCKED: cache-marshal-serializers-dump-through-ruby-compat-marshal
-    it.skip(`Marshal undefined class/module deserialization error with ${formatVersion} format`, async () => {
+    it.skip(`Marshal undefined class/module deserialization error with ${formatVersion.toFixed(1)} format`, async () => {
       const key = `marshal-${Math.random()}`;
       try {
         constSet(CacheStoreFormatVersionBehaviorTest, "RemovedConstant", class RemovedConstant {});
@@ -95,7 +95,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
     });
 
     // BLOCKED: cache-marshal-serializers-dump-through-ruby-compat-marshal
-    it.skip(`Compressed Marshal undefined class/module deserialization error with ${formatVersion} format`, async () => {
+    it.skip(`Compressed Marshal undefined class/module deserialization error with ${formatVersion.toFixed(1)} format`, async () => {
       const key = `marshal-${Math.random()}`;
       try {
         constSet(CacheStoreFormatVersionBehaviorTest, "RemovedConstant", class RemovedConstant {});
@@ -122,7 +122,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
 
   for (const readVersion of FORMAT_VERSIONS) {
     for (const writeVersion of FORMAT_VERSIONS) {
-      it(`format version ${readVersion} can read ${writeVersion} entries`, async () => {
+      it(`format version ${readVersion.toFixed(1)} can read ${writeVersion.toFixed(1)} entries`, async () => {
         const key = crypto.randomUUID();
 
         const store = withFormat(writeVersion, () => lookupStore());
@@ -132,7 +132,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
         expect(await reader.read(key)).toBe(`value for ${key}`);
       });
 
-      it(`format version ${readVersion} can read ${writeVersion} entries with compression`, async () => {
+      it(`format version ${readVersion.toFixed(1)} can read ${writeVersion.toFixed(1)} entries with compression`, async () => {
         const key = crypto.randomUUID();
 
         const store = withFormat(writeVersion, () => lookupStore({ compressThreshold: 1 }));
@@ -145,9 +145,9 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
   }
 }
 
-function withFormat<T>(formatVersion: string, block: () => T): T {
+function withFormat<T>(formatVersion: number, block: () => T): T {
   const old = cacheFormatVersion();
-  setFormatVersion(Number(formatVersion));
+  setFormatVersion(formatVersion);
   try {
     return block();
   } finally {
