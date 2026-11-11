@@ -104,17 +104,17 @@ describe("MailerHelperTest", () => {
 
   it("use mailer", async () => {
     const mail = await mailer.useMailer().message();
-    expect(mail.body().encoded()).toContain("using helpers");
+    expect(mail.body().encoded()).toMatch("using helpers");
   });
 
   it("use message", async () => {
     const mail = await mailer.useMessage().message();
-    expect(mail.body().encoded()).toContain("using helpers");
+    expect(mail.body().encoded()).toMatch("using helpers");
   });
 
   it("use format paragraph", async () => {
     const mail = await mailer.useFormatParagraph().message();
-    expect(mail.body().encoded()).toContain(
+    expect(mail.body().encoded()).toMatch(
       " But soft! What\r\n light through\r\n yonder window\r\n breaks?",
     );
   });
