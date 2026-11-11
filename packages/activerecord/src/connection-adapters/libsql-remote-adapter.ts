@@ -30,7 +30,6 @@ export class LibSQLRemoteAdapter extends AbstractAdapter {
     };
   }
 
-  /** @noRailsEquivalent CONVERGEABLE sqlite-driver-adapter-subclasses-carry-file-level-covers */
   override async databaseExists(): Promise<boolean> {
     return super.databaseExists();
   }
