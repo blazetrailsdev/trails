@@ -1817,7 +1817,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 }
 
-ActiveRecord.Relation = Relation;
+constSet(ActiveRecord, "Relation", Relation);
 constSet(Relation, "WhereClause", WhereClause);
 constSet(Relation, "QueryAttribute", QueryAttribute);
 

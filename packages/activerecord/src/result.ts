@@ -292,5 +292,5 @@ export function columnType(
   );
 }
 
-ActiveRecord.Result = Result;
+constSet(ActiveRecord, "Result", Result);
 constSet(Result, "IndexedRow", IndexedRow);
