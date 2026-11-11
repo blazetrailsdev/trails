@@ -159,8 +159,8 @@ describe("withRoutesHelpers", () => {
     const lower = { helper: () => "lower" };
     const higher = { helper: () => "higher" };
     const urlHelpers = new RouteSet().urlHelpers();
-    urlHelpers.include(lower);
-    urlHelpers.include(higher);
+    include(urlHelpers, lower);
+    include(urlHelpers, higher);
 
     const parent = class {};
     include(parent, higher);

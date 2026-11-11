@@ -19,14 +19,16 @@ import {
   merge,
   block,
   mergeBang,
-  Module,
   URI,
   rbAnyToS,
   rbInspect,
   rbObjClone,
   rbObjRespondTo,
+  rbModMethodDefined,
+  included,
   update,
   RFC2396_PARSER,
+  classModule,
 } from "@blazetrails/ruby-compat";
 import { Mapper } from "./mapper.js";
 import { isIncludedMember } from "../../abstract-controller/trailties/routes-helpers.js";
@@ -326,10 +328,26 @@ export class Config {
   }
 }
 
-export const MountedHelpers = new Module((mod) => {
-  extend(mod, Concern);
-  mod.include(UrlFor);
-});
+export class MountedHelpers {
+  static readonly [classModule] = true;
+
+  /** @internal */
+  static readonly [included] = (base: unknown): void => {
+    if (typeof base === "function") {
+      mountedHelpersIncluders.add(new WeakRef((base as { prototype: object }).prototype));
+    }
+  };
+}
+extend(MountedHelpers, Concern);
+include(MountedHelpers, UrlFor);
+
+/**
+ * The prototypes that included {@link MountedHelpers}, so a helper
+ * `define_mounted_helper` adds later reaches them as Ruby's
+ * `rb_include_module` reaches a module's existing includers
+ * (vendor/ruby/v3.3.11/class.c:1179-1215).
+ */
+const mountedHelpersIncluders = new Set<WeakRef<object>>();
 
 export class UrlHelper {
   static create(route: Route, options: Record<string, unknown>, routeName: string): UrlHelper {
@@ -539,11 +557,19 @@ export interface UrlHelperContext {
 
 export type NamedRouteHelper = (this: UrlHelperContext, ...args: unknown[]) => string;
 
+type NamedRouteHelpersModule = { prototype: Record<string, NamedRouteHelper> };
+
 export class NamedRouteCollection {
   /** @internal */
   private readonly _routes: Map<string, Route> = new Map();
-  readonly pathHelpersModule: Module = new Module();
-  readonly urlHelpersModule: Module = new Module();
+  readonly pathHelpersModule: NamedRouteHelpersModule = class {
+    static readonly [classModule] = true;
+    [name: string]: NamedRouteHelper;
+  };
+  readonly urlHelpersModule: NamedRouteHelpersModule = class {
+    static readonly [classModule] = true;
+    [name: string]: NamedRouteHelper;
+  };
   /** @internal */
   private readonly pathHelpers: Set<string> = new Set();
   /** @internal */
@@ -566,12 +592,12 @@ export class NamedRouteCollection {
 
   clearBang(): void {
     for (const helper of this.pathHelpers) {
-      this.pathHelpersModule.removeMethod(helper);
+      delete this.pathHelpersModule.prototype[helper];
       this._removeFromIncluders(helper);
     }
 
     for (const helper of this.urlHelpers) {
-      this.urlHelpersModule.removeMethod(helper);
+      delete this.urlHelpersModule.prototype[helper];
       this._removeFromIncluders(helper);
     }
 
@@ -585,8 +611,8 @@ export class NamedRouteCollection {
     const urlName = camelize(`${name}_url`, "lower");
 
     if (this._routes.has(name)) {
-      this.pathHelpersModule.undefMethod(pathName);
-      this.urlHelpersModule.undefMethod(urlName);
+      delete this.pathHelpersModule.prototype[pathName];
+      delete this.urlHelpersModule.prototype[urlName];
     }
     this._routes.set(name, route);
 
@@ -633,19 +659,21 @@ export class NamedRouteCollection {
     const pathName = camelize(`${name}_path`, "lower");
     const urlName = camelize(`${name}_url`, "lower");
 
-    this.pathHelpersModule.moduleEval((mod) => {
-      mod[pathName] = function (this: UrlHelperContext, ...args: unknown[]): string {
-        return helper.call(this as unknown as PolymorphicHost, args, true);
-      };
-      this._appendToIncluders(pathName, mod[pathName], true);
-    });
+    this.pathHelpersModule.prototype[pathName] = function (
+      this: UrlHelperContext,
+      ...args: unknown[]
+    ) {
+      return helper.call(this as unknown as PolymorphicHost, args, true);
+    };
+    this._appendToIncluders(pathName, this.pathHelpersModule.prototype[pathName], true);
 
-    this.urlHelpersModule.moduleEval((mod) => {
-      mod[urlName] = function (this: UrlHelperContext, ...args: unknown[]): string {
-        return helper.call(this as unknown as PolymorphicHost, args, false);
-      };
-      this._appendToIncluders(urlName, mod[urlName], false);
-    });
+    this.urlHelpersModule.prototype[urlName] = function (
+      this: UrlHelperContext,
+      ...args: unknown[]
+    ) {
+      return helper.call(this as unknown as PolymorphicHost, args, false);
+    };
+    this._appendToIncluders(urlName, this.urlHelpersModule.prototype[urlName], false);
 
     this.pathHelpers.add(pathName);
     this.urlHelpers.add(urlName);
@@ -656,7 +684,7 @@ export class NamedRouteCollection {
   static UrlHelper = UrlHelper;
 
   private defineUrlHelper(
-    mod: Module,
+    mod: NamedRouteHelpersModule,
     name: string,
     helper: UrlHelper,
     urlStrategy: UrlStrategy,
@@ -671,13 +699,13 @@ export class NamedRouteCollection {
       }
       return helper.call(this, name, args, options, urlStrategy);
     };
-    mod.defineMethod(name, method);
+    mod.prototype[name] = method;
     this._appendToIncluders(name, method, mod === this.pathHelpersModule);
   }
 
   /**
-   * Records a class prototype that `RoutesHelpers.with` copied this
-   * collection's helpers onto, so a route drawn later reaches it as Ruby's
+   * Records a class prototype, or a module's singleton, that this
+   * collection's helpers were copied onto, so a route drawn later reaches it as Ruby's
    * `rb_include_module` reaches a module's existing includers
    * (vendor/ruby/v3.3.11/class.c:1179-1215).
    *
@@ -686,10 +714,28 @@ export class NamedRouteCollection {
   _appendIncluder(
     proto: object,
     supportsPath: boolean,
-    installed: Map<string, PropertyDescriptor>,
-    includes: Map<string, PropertyDescriptor>[],
+    installed: Map<string, PropertyDescriptor> = this._includedHelpers(proto, supportsPath),
+    includes: Map<string, PropertyDescriptor>[] = [installed],
   ): void {
     this._includers.add({ proto: new WeakRef(proto), supportsPath, installed, includes });
+  }
+
+  /** @internal */
+  private _includedHelpers(proto: object, supportsPath: boolean): Map<string, PropertyDescriptor> {
+    const installed = new Map<string, PropertyDescriptor>();
+    const modules = supportsPath
+      ? [this.urlHelpersModule, this.pathHelpersModule]
+      : [this.urlHelpersModule];
+    for (const mod of modules) {
+      for (const [name, method] of Object.entries(
+        Object.getOwnPropertyDescriptors(mod.prototype),
+      )) {
+        if (name === "constructor") continue;
+        const own = Object.getOwnPropertyDescriptor(proto, name);
+        if (own && own.value === method.value) installed.set(name, own);
+      }
+    }
+    return installed;
   }
 
   /** @internal */
@@ -736,8 +782,10 @@ interface IncludedHelpers {
   includes: Map<string, PropertyDescriptor>[];
 }
 
-export type UrlHelpersModule = Module &
-  Record<`${string}Url`, (...args: unknown[]) => string> & {
+export type UrlHelpersModule = { prototype: object } & Record<
+  `${string}Url`,
+  (...args: unknown[]) => string
+> & {
     _proxy: Included<typeof import("./url-for.js")> & { readonly _routes: RouteSet };
     dupForReinclude?: UrlHelpersModule;
     urlFor(options: UrlForOptions): string;
@@ -877,10 +925,68 @@ export class RouteSet {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const routes = this;
 
-    return new Module((mod) => {
-      const self = mod as UrlHelpersModule;
+    const urlHelpersModule = (): UrlHelpersModule => {
+      const self = class {
+        static readonly [classModule] = true;
+
+        declare static _proxy: UrlHelpersModule["_proxy"];
+        declare static dupForReinclude?: UrlHelpersModule;
+
+        static urlFor(options: UrlForOptions): string {
+          return this._proxy.urlFor(options);
+        }
+
+        static fullUrlFor(options: UrlForOptions): string {
+          return this._proxy.fullUrlFor(options);
+        }
+
+        static routeFor(name: string, ...args: unknown[]): string {
+          return this._proxy.routeFor(name, ...args);
+        }
+
+        static optimizeRoutesGeneration(): boolean {
+          return this._proxy.optimizeRoutesGeneration();
+        }
+
+        static polymorphicUrl(
+          recordOrHashOrArray: PolymorphicArg,
+          options: PolymorphicOptions = {},
+        ): string {
+          return this._proxy.polymorphicUrl(recordOrHashOrArray, options);
+        }
+
+        static polymorphicPath(
+          recordOrHashOrArray: PolymorphicArg,
+          options: PolymorphicOptions = {},
+        ): string {
+          return this._proxy.polymorphicPath(recordOrHashOrArray, options);
+        }
+
+        static get _routes(): RouteSet {
+          return this._proxy._routes;
+        }
+
+        static urlOptions(): Record<string, unknown> {
+          return {};
+        }
+
+        get _routes(): RouteSet {
+          return (
+            (this as unknown as Record<symbol, RouteSet | null | undefined>)[_routesIvar] ?? routes
+          );
+        }
+
+        set _routes(value: RouteSet | null) {
+          (this as unknown as Record<symbol, RouteSet | null | undefined>)[_routesIvar] = value;
+        }
+
+        /** @internal */
+        _generatePathsByDefault(): boolean {
+          return supportsPath;
+        }
+      } as unknown as UrlHelpersModule;
       extend(self, Concern);
-      self.include(UrlFor);
+      include(self, UrlFor);
 
       const proxyClass = class {
         readonly _routes: RouteSet;
@@ -896,96 +1002,48 @@ export class RouteSet {
       include(proxyClass, UrlFor);
       include(proxyClass, routes.namedRoutes.pathHelpersModule);
       include(proxyClass, routes.namedRoutes.urlHelpersModule);
+      routes.namedRoutes._appendIncluder(proxyClass.prototype, true);
 
       self._proxy = new proxyClass(routes) as unknown as UrlHelpersModule["_proxy"];
-
-      Object.defineProperties(
-        self,
-        Object.getOwnPropertyDescriptors({
-          urlFor(this: UrlHelpersModule, options: UrlForOptions): string {
-            return this._proxy.urlFor(options);
-          },
-
-          fullUrlFor(this: UrlHelpersModule, options: UrlForOptions): string {
-            return this._proxy.fullUrlFor(options);
-          },
-
-          routeFor(this: UrlHelpersModule, name: string, ...args: unknown[]): string {
-            return this._proxy.routeFor(name, ...args);
-          },
-
-          optimizeRoutesGeneration(this: UrlHelpersModule): boolean {
-            return this._proxy.optimizeRoutesGeneration();
-          },
-
-          polymorphicUrl(
-            this: UrlHelpersModule,
-            recordOrHashOrArray: PolymorphicArg,
-            options: PolymorphicOptions = {},
-          ): string {
-            return this._proxy.polymorphicUrl(recordOrHashOrArray, options);
-          },
-
-          polymorphicPath(
-            this: UrlHelpersModule,
-            recordOrHashOrArray: PolymorphicArg,
-            options: PolymorphicOptions = {},
-          ): string {
-            return this._proxy.polymorphicPath(recordOrHashOrArray, options);
-          },
-
-          get _routes(): RouteSet {
-            return (this as unknown as UrlHelpersModule)._proxy._routes;
-          },
-          urlOptions(): Record<string, unknown> {
-            return {};
-          },
-        }),
-      );
 
       const urlHelpers = routes.namedRoutes.urlHelpersModule;
 
       extend(self, urlHelpers);
 
-      self.include(urlHelpers);
+      include(self, urlHelpers);
 
       if (supportsPath) {
         const pathHelpers = routes.namedRoutes.pathHelpersModule;
 
-        self.include(pathHelpers);
+        include(self, pathHelpers);
         extend(self, pathHelpers);
       }
+      routes.namedRoutes._appendIncluder(self, supportsPath);
 
       self.included(null, function (this: object) {
         Object.defineProperty(this, "_routes", { get: () => routes, configurable: true });
       });
 
-      self.moduleEval((m) => {
-        Object.defineProperty(m, "_routes", {
-          get(this: Record<symbol, RouteSet | null | undefined>): RouteSet {
-            return this[_routesIvar] ?? routes;
-          },
-          set(this: Record<symbol, RouteSet | null | undefined>, value: RouteSet | null) {
-            this[_routesIvar] = value;
-          },
-          configurable: true,
-        });
-      });
-
-      self.defineMethod("_generatePathsByDefault", () => supportsPath);
-
       const concernIncluded = self.included;
       self.included = function (this: UrlHelpersModule, base: unknown): void {
         concernIncluded.call(this, base);
+        if (typeof base === "function") {
+          routes.namedRoutes._appendIncluder(
+            (base as { prototype: object }).prototype,
+            supportsPath,
+          );
+        }
         if (
           rbObjRespondTo(base, "_routes") &&
           (base as { _routes: unknown })._routes !== this._proxy._routes
         ) {
-          this.dupForReinclude ??= this.dup();
+          this.dupForReinclude ??= urlHelpersModule();
           include(base as new () => unknown, this.dupForReinclude);
         }
       };
-    }) as UrlHelpersModule;
+      return self;
+    };
+    return urlHelpersModule();
   }
 
   mountedHelpers(): typeof MountedHelpers {
@@ -994,15 +1052,14 @@ export class RouteSet {
 
   defineMountedHelper(name: string, scriptNamer: ScriptNamer | null = null): void {
     name = camelize(name, "lower");
-    if (MountedHelpers.isMethodDefined(name)) return;
+    if (rbModMethodDefined(MountedHelpers, name)) return;
 
     // eslint-disable-next-line @typescript-eslint/no-this-alias -- `routes = self` (`route_set.rb:514`).
     const routes = this;
     const helpers = routes.urlHelpers();
 
-    MountedHelpers.defineMethod(
-      `_${name}`,
-      function (this: UrlForHost & { _routesContext(): UrlForHost }): RoutesProxy {
+    Object.defineProperty(MountedHelpers.prototype, `_${name}`, {
+      value: function (this: UrlForHost & { _routesContext(): UrlForHost }): RoutesProxy {
         return new RoutesProxy(
           routes,
           this._routesContext(),
@@ -1010,18 +1067,34 @@ export class RouteSet {
           scriptNamer,
         );
       },
-    );
-
-    MountedHelpers.moduleEval((mod) => {
-      Object.defineProperty(mod, name, {
-        configurable: true,
-        get(this: Record<string, unknown>): RoutesProxy {
-          return (this[`@_${name}`] ??= (this[`_${name}`] as () => RoutesProxy).call(
-            this,
-          )) as RoutesProxy;
-        },
-      });
+      writable: true,
+      configurable: true,
     });
+
+    Object.defineProperty(MountedHelpers.prototype, name, {
+      configurable: true,
+      get(this: Record<string, unknown>): RoutesProxy {
+        return (this[`@_${name}`] ??= (this[`_${name}`] as () => RoutesProxy).call(
+          this,
+        )) as RoutesProxy;
+      },
+    });
+
+    for (const includer of mountedHelpersIncluders) {
+      const proto = includer.deref();
+      if (!proto) {
+        mountedHelpersIncluders.delete(includer);
+        continue;
+      }
+      for (const key of [`_${name}`, name]) {
+        if (Object.hasOwn(proto, key)) continue;
+        Object.defineProperty(
+          proto,
+          key,
+          Object.getOwnPropertyDescriptor(MountedHelpers.prototype, key)!,
+        );
+      }
+    }
   }
 
   /** @internal */

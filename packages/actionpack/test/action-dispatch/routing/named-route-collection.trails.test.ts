@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import {
   NamedRouteCollection,
   RouteSet,
-  type NamedRouteHelper,
   type UrlHelperContext,
 } from "../../../lib/action-dispatch/routing/route-set.js";
 
@@ -18,8 +17,16 @@ function drawn(): RouteSet {
 describe("NamedRouteCollection", () => {
   it("defines a name_path and a name_url helper per named route", () => {
     const named = drawn().namedRoutes;
-    expect(named.pathHelpersModule.instanceMethods()).toEqual(["postsPath", "postPath"]);
-    expect(named.urlHelpersModule.instanceMethods()).toEqual(["postsUrl", "postUrl"]);
+    expect(
+      Object.getOwnPropertyNames(named.pathHelpersModule.prototype).filter(
+        (n) => n !== "constructor",
+      ),
+    ).toEqual(["postsPath", "postPath"]);
+    expect(
+      Object.getOwnPropertyNames(named.urlHelpersModule.prototype).filter(
+        (n) => n !== "constructor",
+      ),
+    ).toEqual(["postsUrl", "postUrl"]);
     expect(named.helperNames()).toEqual(["postsPath", "postPath", "postsUrl", "postUrl"]);
     expect(named.names()).toEqual(["posts", "post"]);
     expect(named.length()).toBe(2);
@@ -56,7 +63,11 @@ describe("NamedRouteCollection", () => {
   it("clear! removes the generated helpers", () => {
     const routeSet = drawn();
     routeSet.namedRoutes.clearBang();
-    expect(routeSet.namedRoutes.pathHelpersModule.instanceMethods()).toEqual([]);
+    expect(
+      Object.getOwnPropertyNames(routeSet.namedRoutes.pathHelpersModule.prototype).filter(
+        (n) => n !== "constructor",
+      ),
+    ).toEqual([]);
     expect(routeSet.namedRoutes.helperNames()).toEqual([]);
   });
 
@@ -74,16 +85,8 @@ describe("NamedRouteCollection", () => {
       _routes: routeSet,
       fullUrlFor: (options: string) => routeSet.fullUrlFor(options),
     } as unknown as UrlHelperContext;
-    expect(
-      (named.pathHelpersModule.instanceMethod("profilePath")!.value as NamedRouteHelper).call(
-        context,
-      ),
-    ).toBe("/profile");
-    expect(
-      (named.urlHelpersModule.instanceMethod("profileUrl")!.value as NamedRouteHelper).call(
-        context,
-      ),
-    ).toBe("/profile");
+    expect(named.pathHelpersModule.prototype["profilePath"].call(context)).toBe("/profile");
+    expect(named.urlHelpersModule.prototype["profileUrl"].call(context)).toBe("/profile");
   });
 
   it("a url helpers module built before a route is added answers its helpers", () => {

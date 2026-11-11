@@ -11,7 +11,6 @@ import {
   URI,
   first,
   constDefined,
-  type Module,
   constSet,
   TopLevel,
 } from "@blazetrails/ruby-compat";
@@ -19,6 +18,10 @@ import { Base } from "../../../lib/action-controller/base.js";
 import { deprecator } from "../../../lib/action-dispatch/deprecator.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { RouteSet, type DrawCallback } from "../../../lib/action-dispatch/routing/route-set.js";
+import {
+  urlOptions as urlForUrlOptions,
+  type UrlForHost,
+} from "../../../lib/action-dispatch/routing/url-for.js";
 import {
   RoutingError,
   UnknownHttpMethod,
@@ -116,10 +119,10 @@ describe("UriReservedCharactersRoutingTest", () => {
 });
 
 class MockController {
-  static build(helpers: Module, additionalOptions: Record<string, unknown> = {}) {
+  static build(helpers: object, additionalOptions: Record<string, unknown> = {}) {
     const klass = class {
       urlOptions(): Record<string, unknown> {
-        const options = helpers.superMethod(this, "urlOptions")!() as Record<string, unknown>;
+        const options = urlForUrlOptions.call(this as unknown as UrlForHost);
         options.protocol ||= "http";
         options.host ||= "test.host";
         return { ...options, ...additionalOptions };

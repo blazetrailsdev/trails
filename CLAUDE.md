@@ -630,7 +630,12 @@ no ordering puts the helpers first. Its `NamedRouteCollection` keeps a weak
 list of the prototypes that copied its helpers, and `add_url_helper` /
 `clear!` write through to them (`_appendIncluder`, `isIncludedMember`). No
 carrier is spliced into the prototype chain. Ruled by the repo owner on
-2026-10-29; it does not license an includer list for any other module.
+2026-10-29. On 2026-11-10 the owner widened it to the route set's other
+late-defined modules: `NamedRouteCollection`'s path / url helper class
+modules record every includer the `url_helpers` module's `included` hook,
+its own singleton and its proxy class reach, and `MountedHelpers` records its
+includers for `define_mounted_helper`. It licenses an includer list for no
+other module.
 
 `pnpm parity:modules` (`scripts/parity/module-count.ts`) counts, per package,
 the `new Module` expressions, `superMethod(` calls and `Module` imports from
