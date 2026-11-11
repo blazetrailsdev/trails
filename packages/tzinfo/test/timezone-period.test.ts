@@ -33,6 +33,9 @@ function assertEqualWithOffsetAndClass(expected: Timestamp, actual: Timestamp | 
 }
 
 describe("TCTimezonePeriod", () => {
+  const std = new TimezoneOffset(-7200, 0, "TEST");
+  const dst = new TimezoneOffset(-7200, 3600, "TEST");
+
   it("initialize", () => {
     const offset = new TimezoneOffset(-7200, 3600, "SPECIAL");
     const p = new TimezonePeriod(offset);
@@ -102,30 +105,24 @@ describe("TCTimezonePeriod", () => {
   });
 
   it("starts at bounded", () => {
-    const std = new TimezoneOffset(-7200, 0, "TEST");
-    const dst = new TimezoneOffset(-7200, 3600, "TEST");
     const p = new TestTimezonePeriod(new TimezoneTransition(dst, std, 1136073600), null, dst);
 
     assertEqualWithOffsetAndClass(Timestamp.utc(1136073600), p.startsAt());
   });
 
   it("starts at unbounded", () => {
-    const dst = new TimezoneOffset(-7200, 3600, "TEST");
     const p = new TestTimezonePeriod(null, null, dst);
 
     expect(p.startsAt()).toBeNull();
   });
 
   it("ends at bounded", () => {
-    const std = new TimezoneOffset(-7200, 0, "TEST");
-    const dst = new TimezoneOffset(-7200, 3600, "TEST");
     const p = new TestTimezonePeriod(null, new TimezoneTransition(std, dst, 1136160000), dst);
 
     assertEqualWithOffsetAndClass(Timestamp.utc(1136160000), p.endsAt());
   });
 
   it("ends at unbounded", () => {
-    const dst = new TimezoneOffset(-7200, 3600, "TEST");
     const p = new TestTimezonePeriod(null, null, dst);
 
     expect(p.endsAt()).toBeNull();

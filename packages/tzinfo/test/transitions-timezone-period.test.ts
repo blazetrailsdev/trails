@@ -28,9 +28,10 @@ function fixtures() {
 }
 
 describe("TCTransitionsTimezonePeriod", () => {
+  const std = new TimezoneOffset(-7200, 0, "TEST");
+  const dst = new TimezoneOffset(-7200, 3600, "TEST");
+
   it("initialize start end", () => {
-    const std = new TimezoneOffset(-7200, 0, "TEST");
-    const dst = new TimezoneOffset(-7200, 3600, "TEST");
     const startT = new TimezoneTransition(dst, std, 1136073600);
     const endT = new TimezoneTransition(std, dst, 1136160000);
 
@@ -42,8 +43,6 @@ describe("TCTransitionsTimezonePeriod", () => {
   });
 
   it("initialize start", () => {
-    const std = new TimezoneOffset(-7200, 0, "TEST");
-    const dst = new TimezoneOffset(-7200, 3600, "TEST");
     const startT = new TimezoneTransition(dst, std, 1136073600);
 
     const p = new TransitionsTimezonePeriod(startT, null);
@@ -54,8 +53,6 @@ describe("TCTransitionsTimezonePeriod", () => {
   });
 
   it("initialize end", () => {
-    const std = new TimezoneOffset(-7200, 0, "TEST");
-    const dst = new TimezoneOffset(-7200, 3600, "TEST");
     const endT = new TimezoneTransition(std, dst, 1136160000);
 
     const p = new TransitionsTimezonePeriod(null, endT);
