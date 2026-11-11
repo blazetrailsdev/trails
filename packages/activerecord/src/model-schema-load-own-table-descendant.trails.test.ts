@@ -51,11 +51,14 @@ async function buildHierarchy(asked: string[]) {
   }
   constSet(TopLevel, "Ticket", Ticket);
   DescendantsTracker.registerSubclass(Circle, Ticket);
+  class VipTicket extends Ticket {}
+  constSet(TopLevel, "VipTicket", VipTicket);
+  DescendantsTracker.registerSubclass(Ticket, VipTicket);
 
-  for (const klass of [Shape, Circle, Ticket]) {
+  for (const klass of [Shape, Circle, Ticket, VipTicket]) {
     await establishConnectionTo(klass, makeAdapter(tables, asked) as never);
   }
-  return { Shape, Circle, Ticket };
+  return { Shape, Circle, Ticket, VipTicket };
 }
 
 describe("loadSchema — own-table descendant under an STI ancestor", () => {
@@ -91,6 +94,14 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
         .map((c: { name: string }) => c.name)
         .sort(),
     ).toEqual(["id", "subject"]);
+  });
+
+  it("gives a subclass of an own-table descendant its base class's table", async () => {
+    const asked: string[] = [];
+    const { VipTicket } = await buildHierarchy(asked);
+
+    expect(VipTicket.tableName).toBe("shapes");
+    expect(Object.keys(VipTicket.columnsHash()).sort()).toEqual(["id", "sides", "type"]);
   });
 
   it("gives a genuine STI subclass the base's shared table", async () => {
