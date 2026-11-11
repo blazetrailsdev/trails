@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/activerecord/active-record";
 import { minutes, seconds } from "@blazetrails/activesupport";
 import {
+  assert,
   assertDifference,
   assertNoDifference,
 } from "@blazetrails/activesupport/testing/assertions";
@@ -287,11 +288,10 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
       try {
         expect(await Job.count()).toBe(2);
-        expect(true, "Transaction state valid").toBeTruthy();
+        assert(true, "Transaction state valid");
       } catch (e) {
         if (!(e instanceof StatementInvalid)) throw e;
-        // eslint-disable-next-line vitest/no-conditional-expect
-        expect(false, "Transaction state unexpectedly invalid").toBeTruthy();
+        assert(false, "Transaction state unexpectedly invalid");
       }
     });
   });
