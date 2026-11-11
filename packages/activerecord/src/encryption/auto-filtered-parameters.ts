@@ -1,4 +1,3 @@
-import { underscore } from "@blazetrails/activesupport";
 import { Encryption } from "../encryption.js";
 
 export interface AutoFilteredParametersApp {
@@ -72,7 +71,7 @@ export class AutoFilteredParameters {
 
   private applyFilter(klass: any, attribute: string): void {
     if (!Encryption.config.addToFilterParameters) return;
-    const filter = [klass?.name ? underscore(klass.name) : null, String(attribute)]
+    const filter = [klass.name ? `${klass.modelName.element}` : null, String(attribute)]
       .filter((part) => part != null)
       .join(".");
     if (

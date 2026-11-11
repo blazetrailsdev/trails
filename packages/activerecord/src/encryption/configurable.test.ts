@@ -4,7 +4,10 @@ import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
-import { AutoFilteredParameters } from "./auto-filtered-parameters.js";
+import {
+  AutoFilteredParameters,
+  type AutoFilteredParametersApp,
+} from "./auto-filtered-parameters.js";
 import type { SchemeOptions } from "./scheme.js";
 
 describe("ActiveRecord::Encryption::ConfigurableTest", () => {
@@ -81,75 +84,61 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it("installing autofiltered parameters will add the encrypted attribute as a filter parameter using the dot notation", () => {
-    const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
-    autoFilteredParameters.enable();
+    const application = { config: { filterParameters: [] as Array<string | RegExp> } };
 
-    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
-      autoFilteredParameters.attributeWasDeclared(klass, name);
-    });
-
-    try {
+    withAutoFilteredParameters(application, () => {
       class NamedPirate extends Pirate {
         static {
           this.tableName = "pirates";
         }
       }
       NamedPirate.encrypts("catchphrase");
+    });
 
-      expect(filterParameters).toContain("named_pirate.catchphrase");
-    } finally {
-      listeners.pop();
-    }
+    expect(application.config.filterParameters).toContain("named_pirate.catchphrase");
   });
 
   it("installing autofiltered parameters will work with unnamed classes", () => {
-    const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
-    autoFilteredParameters.enable();
+    const application = { config: { filterParameters: [] as Array<string | RegExp> } };
 
-    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
-      autoFilteredParameters.attributeWasDeclared(klass, name);
-    });
-
-    try {
-      (() =>
+    withAutoFilteredParameters(application, () => {
+      void (() =>
         class extends Pirate {
           static {
             this.tableName = "pirates";
             this.encrypts("catchphrase");
           }
         })();
+    });
 
-      expect(filterParameters).toContain("catchphrase");
-    } finally {
-      listeners.pop();
-    }
+    expect(application.config.filterParameters).toContain("catchphrase");
   });
 
   it("exclude the installation of autofiltered params", () => {
     Encryption.config.excludedFromFilterParameters = ["catchphrase"];
 
-    const filterParameters: string[] = [];
-    const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
-    autoFilteredParameters.enable();
+    const application = { config: { filterParameters: [] as Array<string | RegExp> } };
 
-    const listeners = Encryption.onEncryptedAttributeDeclared((klass, name) => {
-      autoFilteredParameters.attributeWasDeclared(klass, name);
-    });
-
-    try {
+    withAutoFilteredParameters(application, () => {
       void class extends Pirate {
         static {
           this.tableName = "pirates";
           this.encrypts("catchphrase");
         }
       };
+    });
 
-      expect(filterParameters).toEqual([]);
-    } finally {
-      listeners.pop();
-      Encryption.config.excludedFromFilterParameters = [];
-    }
+    expect(application.config.filterParameters).toEqual([]);
+
+    Encryption.config.excludedFromFilterParameters = [];
   });
+
+  function withAutoFilteredParameters(
+    application: AutoFilteredParametersApp,
+    block: () => void,
+  ): void {
+    const autoFilteredParameters = new AutoFilteredParameters(application);
+    block();
+    autoFilteredParameters.enable();
+  }
 });
