@@ -93,7 +93,7 @@ The second
 }
 
 type Mailer<T> = T & Record<string, (...args: unknown[]) => MessageDelivery>;
-const mailer = HelperMailer as unknown as Mailer<typeof HelperMailer>;
+const mailer = HelperMailer as Mailer<typeof HelperMailer>;
 
 describe("MailerHelperTest", () => {
   it("use mail helper", async () => {

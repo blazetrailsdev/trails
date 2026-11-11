@@ -64,8 +64,8 @@ class ExplicitLayoutMailer extends Base {
 }
 
 type Mailer<T> = T & Record<string, (...args: unknown[]) => MessageDelivery>;
-const auto = AutoLayoutMailer as unknown as Mailer<typeof AutoLayoutMailer>;
-const explicit = ExplicitLayoutMailer as unknown as Mailer<typeof ExplicitLayoutMailer>;
+const auto = AutoLayoutMailer as Mailer<typeof AutoLayoutMailer>;
+const explicit = ExplicitLayoutMailer as Mailer<typeof ExplicitLayoutMailer>;
 
 describe("LayoutMailerTest", () => {
   it("should pickup default layout", async () => {
