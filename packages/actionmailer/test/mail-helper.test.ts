@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
-import type { Message } from "@blazetrails/mail";
 import { Base } from "../lib/base.js";
 import type { Collector } from "../lib/collector.js";
+import type { MessageDelivery } from "../lib/message-delivery.js";
 import { MailHelper } from "../lib/mail-helper.js";
 
 type Format = Collector & Record<string, (...args: unknown[]) => unknown>;
@@ -20,7 +20,7 @@ class HelperMailer extends Base {
       "it off!";
 
     return this.mailWithDefaults(async (format) => {
-      await format.html(() => this.render({ inline: "<%= blockFormat(this.text) %>" }));
+      await (format as Format).html(() => this.render({ inline: "<%= blockFormat(this.text) %>" }));
     });
   }
 
@@ -28,7 +28,9 @@ class HelperMailer extends Base {
     this.text = "But soft! What light through yonder window breaks?";
 
     return this.mailWithDefaults(async (format) => {
-      await format.html(() => this.render({ inline: "<%= formatParagraph(this.text, 15, 1) %>" }));
+      await (format as Format).html(() =>
+        this.render({ inline: "<%= formatParagraph(this.text, 15, 1) %>" }),
+      );
     });
   }
 
@@ -36,19 +38,23 @@ class HelperMailer extends Base {
     this.text = "Antidisestablishmentarianism is very long.";
 
     return this.mailWithDefaults(async (format) => {
-      await format.html(() => this.render({ inline: "<%= formatParagraph(this.text, 10, 1) %>" }));
+      await (format as Format).html(() =>
+        this.render({ inline: "<%= formatParagraph(this.text, 10, 1) %>" }),
+      );
     });
   }
 
   useMailer() {
     return this.mailWithDefaults(async (format) => {
-      await format.html(() => this.render({ inline: "<%= mailer().message.subject() %>" }));
+      await (format as Format).html(() =>
+        this.render({ inline: "<%= mailer().message.subject() %>" }),
+      );
     });
   }
 
   useMessage() {
     return this.mailWithDefaults(async (format) => {
-      await format.html(() => this.render({ inline: "<%= message().subject() %>" }));
+      await (format as Format).html(() => this.render({ inline: "<%= message().subject() %>" }));
     });
   }
 
@@ -64,13 +70,13 @@ The second
 `;
 
     return this.mailWithDefaults(async (format) => {
-      await format.html(() => this.render({ inline: "<%= blockFormat(this.text) %>" }));
+      await (format as Format).html(() => this.render({ inline: "<%= blockFormat(this.text) %>" }));
     });
   }
 
   useCache() {
     return this.mailWithDefaults(async (format) => {
-      await format.html(() =>
+      await (format as Format).html(() =>
         this.render({
           inline: "<% await cache('foo', {}, () => { %>Greetings from a cache helper block<% }) %>",
         }),
@@ -78,16 +84,16 @@ The second
     });
   }
 
-  private mailWithDefaults(block: (format: Format) => Promise<void>) {
+  private mailWithDefaults(block: (format: Collector) => Promise<void>) {
     return this.mail(
       { to: "test@localhost", from: "tester@example.com", subject: "using helpers" },
-      block as (format: Collector) => Promise<void>,
+      block,
     );
   }
 }
 
-type Mailer = Record<string, () => { message(): Promise<Message> }>;
-const mailer = HelperMailer as unknown as Mailer;
+type Mailer<T> = T & Record<string, (...args: unknown[]) => MessageDelivery>;
+const mailer = HelperMailer as unknown as Mailer<typeof HelperMailer>;
 
 describe("MailerHelperTest", () => {
   it("use mail helper", async () => {

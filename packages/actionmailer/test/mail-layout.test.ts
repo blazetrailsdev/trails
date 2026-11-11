@@ -1,8 +1,8 @@
 import type { layout } from "@blazetrails/actionview";
 import { describe, expect, it } from "vitest";
-import type { Message } from "@blazetrails/mail";
 import { Base } from "../lib/base.js";
 import type { Collector } from "../lib/collector.js";
+import type { MessageDelivery } from "../lib/message-delivery.js";
 
 type Format = Collector & Record<string, (...args: unknown[]) => unknown>;
 
@@ -63,9 +63,9 @@ class ExplicitLayoutMailer extends Base {
   }
 }
 
-type Mailer = Record<string, (...args: unknown[]) => { message(): Promise<Message> }>;
-const auto = AutoLayoutMailer as unknown as Mailer;
-const explicit = ExplicitLayoutMailer as unknown as Mailer;
+type Mailer<T> = T & Record<string, (...args: unknown[]) => MessageDelivery>;
+const auto = AutoLayoutMailer as unknown as Mailer<typeof AutoLayoutMailer>;
+const explicit = ExplicitLayoutMailer as unknown as Mailer<typeof ExplicitLayoutMailer>;
 
 describe("LayoutMailerTest", () => {
   it("should pickup default layout", async () => {
