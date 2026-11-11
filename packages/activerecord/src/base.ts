@@ -601,10 +601,16 @@ export class Base extends Model {
 
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
-    if (!Object.hasOwn(this, "_schemaLoadPromise") || !state._schemaLoadPromise) {
-      state._schemaLoadPromise = ModelSchema.loadSchemaFromAdapter.call(this);
+    if (Object.hasOwn(this, "_schemaLoadPromise") && state._schemaLoadPromise) {
+      const held = state._schemaLoadPromise;
+      try {
+        return await held;
+      } catch {
+        if (state._schemaLoadPromise === held) state._schemaLoadPromise = undefined;
+        return await this.loadSchema();
+      }
     }
-    const promise = state._schemaLoadPromise;
+    const promise = (state._schemaLoadPromise = ModelSchema.loadSchemaFromAdapter.call(this));
     try {
       await promise;
     } finally {
@@ -1329,7 +1335,6 @@ export class Base extends Model {
    * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482
    * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84
    * @inventedArm if — PERMANENT
-   * @inventedArm completeAttributesOnSchemaLoad — CONVERGEABLE save-chain-schema-warm-and-cold-built-records
    */
   constructor(
     attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes | null = {},
@@ -1374,9 +1379,6 @@ export class Base extends Model {
     if (!allocating) {
       this._newRecord = true;
       this._attributes = new.target._defaultAttributes().deepDup();
-      if (!ModelSchema.isSchemaLoaded.call(new.target as never)) {
-        _Core.completeAttributesOnSchemaLoad(this, this._attributes);
-      }
     }
 
     this.initInternals();

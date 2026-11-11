@@ -130,7 +130,8 @@ Object.setPrototypeOf(
         typeof prop === "symbol" ||
         prop in target ||
         receiver === NullPool.prototype ||
-        (KERNEL_METHODS.has(prop) && !PROTOCOL_PROBES.has(prop))
+        KERNEL_METHODS.has(prop) ||
+        PROTOCOL_PROBES.has(prop)
       ) {
         return Reflect.get(target, prop, receiver);
       }

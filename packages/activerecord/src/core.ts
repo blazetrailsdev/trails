@@ -750,36 +750,6 @@ const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE save-chain-schema-warm-and-cold-built-records
- */
-export function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet): void {
-  Object.defineProperty(record, "_attributes", {
-    get(this: object) {
-      const klass = record.constructor as unknown as {
-        _defaultAttributes(): AttributeSet;
-      };
-      if (this === record && isSchemaLoaded.call(klass as never)) {
-        attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
-        Object.defineProperty(record, "_attributes", {
-          value: attributes,
-          writable: true,
-          enumerable: true,
-          configurable: true,
-        });
-      }
-      return attributes;
-    },
-    set(this: object, value: AttributeSet) {
-      if (this === record) attributes = value;
-      else completeAttributesOnSchemaLoad(this, value);
-    },
-    enumerable: true,
-    configurable: true,
-  });
-}
-
 /** @internal */
 export function initInternals(
   this: Base & {

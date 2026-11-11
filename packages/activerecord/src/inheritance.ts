@@ -92,6 +92,34 @@ export function isBaseClass(modelClass: typeof Base): boolean {
   return modelClass.baseClass === modelClass;
 }
 
+const _SCHEMA_WRITERS = [
+  "tableName",
+  "primaryKey",
+  "sequenceName",
+  "inheritanceColumn",
+  "ignoredColumns",
+] as const;
+
+/** @noRailsEquivalent PERMANENT */
+function _assignStaticFields(modelClass: typeof Base): void {
+  const chain: object[] = [];
+  for (
+    let k: object | null = modelClass;
+    k && k !== ActiveRecord.Base;
+    k = Object.getPrototypeOf(k)
+  ) {
+    chain.unshift(k);
+  }
+  for (const k of chain) {
+    for (const name of _SCHEMA_WRITERS) {
+      const field = Object.getOwnPropertyDescriptor(k, name);
+      if (field === undefined || !("value" in field)) continue;
+      delete (k as Record<string, unknown>)[name];
+      (k as Record<string, unknown>)[name] = field.value;
+    }
+  }
+}
+
 /** @internal */
 export function setBaseClass(modelClass: typeof Base): void {
   const klass = modelClass as typeof Base & { _computedBaseClass?: typeof Base };
@@ -130,7 +158,10 @@ export function polymorphicName(modelClass: typeof Base): string {
 }
 
 export function baseClass(this: typeof Base): typeof Base {
-  if (!Object.hasOwn(this, "_computedBaseClass")) setBaseClass(this);
+  if (!Object.hasOwn(this, "_computedBaseClass")) {
+    _assignStaticFields(this);
+    setBaseClass(this);
+  }
   return (this as typeof Base & { _computedBaseClass: typeof Base })._computedBaseClass;
 }
 

@@ -528,28 +528,13 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void 
  */
 export async function loadSchemaFromAdapter(this: SchemaKlass): Promise<void> {
   if (this.isAbstractClass()) return;
-  let pool: ReturnType<typeof Base.connectionPool>;
-  try {
-    pool = this.connectionPool();
-  } catch {
-    return;
-  }
+  const pool = this.connectionPool();
   const startingAdapter: SchemaHost["connection"] | undefined = pool.activeConnection ?? undefined;
   if (!startingAdapter) {
-    let verifying = false;
-    try {
-      return await pool.withConnection(async (connection: SchemaHost["connection"]) => {
-        if (connection.typeMap === null) {
-          verifying = true;
-          await connection.verifyBang();
-          verifying = false;
-        }
-        return loadSchemaFromAdapter.call(this);
-      });
-    } catch (error) {
-      if (verifying) throw error;
-      return;
-    }
+    return await pool.withConnection(async (connection: SchemaHost["connection"]) => {
+      if (connection.typeMap === null) await connection.verifyBang();
+      return loadSchemaFromAdapter.call(this);
+    });
   }
   const adapterOwner = this;
   const cache = startingAdapter.schemaCache;

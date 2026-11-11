@@ -1,2 +1,2 @@
 import { Book } from "./models.js";
-export default Book.where({ rating: 4.0 }).order({ id: "asc" });
+export default Book.where({ rating: new Number(4) }).order({ id: "asc" });

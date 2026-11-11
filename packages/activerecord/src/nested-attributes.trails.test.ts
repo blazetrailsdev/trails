@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { constSet, hashAref, TopLevel } from "@blazetrails/ruby-compat";
 import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-helpers/use-fixtures.js";
@@ -281,7 +281,7 @@ describe("nested attributes assignment ordering (trails-only)", () => {
     };
     const original = proto.setAttributes;
     proto.setAttributes = function (this: Base, attrs: Record<string, unknown>) {
-      const name = String((attrs as { name?: unknown }).name);
+      const name = String(hashAref(attrs, "name"));
       events.push(`start:${name}`);
       const result = original.call(this, attrs);
       return Promise.resolve(result).then(() => {

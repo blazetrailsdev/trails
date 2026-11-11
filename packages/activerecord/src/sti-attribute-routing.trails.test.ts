@@ -121,6 +121,8 @@ describe("STI subclass attribute() registration", () => {
       dataSourceExists: async () => true,
       columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
       getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => true,
       isCached: () => true,
       primaryKeys: async () => null,
     };

@@ -620,6 +620,10 @@ interface ReloadRecord {
   };
 }
 
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm setPrototypeOf — PERMANENT
+ */
 export async function reload<T extends ReloadRecord>(
   this: T,
   options: { lock?: boolean | string; unscoped?: boolean } | null = null,
@@ -633,15 +637,14 @@ export async function reload<T extends ReloadRecord>(
   this._associationCache = freshObject._associationCache;
   for (const association of this._associationCache.values()) association.owner = this;
   this._attributes = freshObject._attributes;
-  if (_virtualAttributePrototypes.has(Object.getPrototypeOf(this))) {
-    Object.setPrototypeOf(this, this.constructor.prototype);
-  }
-  if (Object.getPrototypeOf(this) !== this.constructor.prototype) {
+  const freshPrototype = Object.getPrototypeOf(freshObject) as object;
+  const prototype = Object.getPrototypeOf(this) as object;
+  if (_virtualAttributePrototypes.has(prototype) || prototype === this.constructor.prototype) {
+    Object.setPrototypeOf(this, freshPrototype);
+  } else {
     AttributeMethods.ClassMethods.undefineAttributeMethods.call(rbObjSingletonClass(this) as never);
-  }
-  for (const name of this._attributes.keys()) {
-    if (!basicObjRespondTo(this, name)) {
-      (rbObjSingletonClass(this) as unknown as typeof Base).defineAttributeMethod(name);
+    if (_virtualAttributePrototypes.has(freshPrototype)) {
+      Object.defineProperties(prototype, Object.getOwnPropertyDescriptors(freshPrototype));
     }
   }
   this._newRecord = false;
