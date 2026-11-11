@@ -11,12 +11,10 @@ export class TimezonePeriod {
     this.offset = offset;
   }
 
-  /** @missingRailsCall raise_not_implemented — CONVERGEABLE tzinfo-offset-transition-and-periods */
   get startTransition(): TimezoneTransition | null {
     return this.raiseNotImplemented("start_transition");
   }
 
-  /** @missingRailsCall raise_not_implemented — CONVERGEABLE tzinfo-offset-transition-and-periods */
   get endTransition(): TimezoneTransition | null {
     return this.raiseNotImplemented("end_transition");
   }
