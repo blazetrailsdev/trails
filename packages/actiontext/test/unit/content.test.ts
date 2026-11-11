@@ -22,6 +22,7 @@ async function withAttachmentTagName(tagName: string, block: () => Promise<void>
 }
 
 describe("ActionText::ContentTest", () => {
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("equality", async () => {
     const html = "<div>test</div>";
     const content = await contentFromHtml(html);
@@ -29,22 +30,27 @@ describe("ActionText::ContentTest", () => {
     expect(content.equals(html)).not.toBe(true);
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("marshal serialization", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("roundtrips HTML without additional newlines", async () => {
     const html = "<div>a<br></div>";
     const content = await contentFromHtml(html);
     expect(content.toHtml()).toBe(html);
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("extracts links", async () => {
     const html = '<a href="http://example.com/1">1</a><br><a href="http://example.com/1">1</a>';
     const content = await contentFromHtml(html);
     expect(content.links()).toEqual(["http://example.com/1"]);
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("extracts attachables", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("extracts remote image attachables", async () => {
     const html =
       '<action-text-attachment content-type="image" url="http://example.com/cat.jpg" width="100" height="100" caption="Captioned"></action-text-attachment>';
@@ -62,8 +68,10 @@ describe("ActionText::ContentTest", () => {
     expect(attachable.height).toBe("100");
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("identifies destroyed attachables as missing", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("extracts missing attachables", async () => {
     const html = '<action-text-attachment sgid="missing"></action-text-attachment>';
     const content = await contentFromHtml(html);
@@ -74,6 +82,7 @@ describe("ActionText::ContentTest", () => {
     expect(attachable.model() ?? null).toBeNull();
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("converts Trix-formatted attachments", async () => {
     const html = `<figure data-trix-attachment='{"sgid":"123","contentType":"text/plain","width":100,"height":100}' data-trix-attributes='{"caption":"Captioned"}'></figure>`;
     const content = await contentFromHtml(html);
@@ -83,6 +92,7 @@ describe("ActionText::ContentTest", () => {
     );
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("converts Trix-formatted attachments with custom tag name", async () => {
     await withAttachmentTagName("arbitrary-tag", async () => {
       const html = `<figure data-trix-attachment='{"sgid":"123","contentType":"text/plain","width":100,"height":100}' data-trix-attributes='{"caption":"Captioned"}'></figure>`;
@@ -94,12 +104,14 @@ describe("ActionText::ContentTest", () => {
     });
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("ignores Trix-formatted attachments with malformed JSON", async () => {
     const html = `<div data-trix-attachment='{"sgid":"garbage...'></div>`;
     const content = await contentFromHtml(html);
     expect((await content.attachments()).length).toBe(0);
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("minifies attachment markup", async () => {
     const html = '<action-text-attachment sgid="123"><div>HTML</div></action-text-attachment>';
     expect((await contentFromHtml(html)).toHtml()).toBe(
@@ -107,6 +119,7 @@ describe("ActionText::ContentTest", () => {
     );
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("canonicalizes attachment gallery markup", async () => {
     const attachmentHtml =
       '<action-text-attachment sgid="1" presentation="gallery"></action-text-attachment><action-text-attachment sgid="2" presentation="gallery"></action-text-attachment>';
@@ -114,12 +127,14 @@ describe("ActionText::ContentTest", () => {
     expect((await contentFromHtml(html)).toHtml()).toBe(`<div>${attachmentHtml}</div>`);
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("canonicalizes attachment gallery markup with whitespace", async () => {
     const attachmentHtml = `\n  <action-text-attachment sgid="1" presentation="gallery"></action-text-attachment>\n  <action-text-attachment sgid="2" presentation="gallery"></action-text-attachment>\n`;
     const html = `<div class="attachment-gallery attachment-gallery--2">${attachmentHtml}</div>`;
     expect((await contentFromHtml(html)).toHtml()).toBe(`<div>${attachmentHtml}</div>`);
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("canonicalizes nested attachment gallery markup", async () => {
     const attachmentHtml =
       '<action-text-attachment sgid="1" presentation="gallery"></action-text-attachment><action-text-attachment sgid="2" presentation="gallery"></action-text-attachment>';
@@ -129,26 +144,35 @@ describe("ActionText::ContentTest", () => {
     );
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("renders with layout when ApplicationController is not defined", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("does basic sanitization", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("does custom tag sanitization", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("sanitizes attachment markup for Trix", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("removes content attribute if it's value is empty", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("removes content attribute if it's value is empty after sanitization", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("does not add missing content attribute", async () => {
     const html = '<action-text-attachment sgid="123"></action-text-attachment>';
     const trixHtml = '<figure data-trix-attachment="{&quot;sgid&quot;:&quot;123&quot;}"></figure>';
     expect((await (await contentFromHtml(html)).toTrixHtml()).trim()).toBe(trixHtml);
   });
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("renders with layout when in a new thread", () => {});
 
+  // BLOCKED: actiontext-content-test-remaining-arms
   it.skip("replace certain nodes", async () => {
     const html = `<div>
   <p>replace me</p>
