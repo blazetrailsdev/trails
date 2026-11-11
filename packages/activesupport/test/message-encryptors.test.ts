@@ -24,12 +24,10 @@ describe("MessageEncryptorsTest", () => {
     }
   };
 
-  const kwargSecretGenerator = (): SecretGenerator =>
-    Object.assign(
-      (_salt: string, { secretLength, foo, bar }: Record<string, unknown>) =>
-        (foo as string)[bar as number].repeat(secretLength as number),
-      { parameters: ["foo", "bar"] as const },
-    );
+  const kwargSecretGenerator =
+    (): SecretGenerator =>
+    (_salt: string, { secretLength, foo, bar = null }: Record<string, unknown>) =>
+      (foo as string)[bar as number].repeat(secretLength as number);
 
   let coordinator: MessageEncryptors;
 

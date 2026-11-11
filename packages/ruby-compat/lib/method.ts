@@ -84,8 +84,8 @@ export class Method {
   /**
    * `Method#parameters` (`vendor/ruby/v3.3.11/proc.c:3103` `rb_method_parameters`,
    * over `rb_iseq_parameters` at `iseq.c:3334`): a `[type, name]` pair per
-   * parameter, `:req`, `:opt` or `:rest`, each a Symbol. A destructured
-   * parameter has no name and answers its type alone.
+   * parameter, `:req`, `:opt`, `:rest`, `:key`, `:keyreq` or `:keyrest`, each a
+   * Symbol. See {@link rbIseqParameters} for how keywords are read.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -204,17 +204,25 @@ export function rbObjMethods(obj: unknown, recur = true): string[] {
  */
 export function rbIseqMinMaxArity(func: (...args: never[]) => unknown): [number, number] {
   const params = rbIseqParameters(func);
-  const rest = params.some(([type]) => type === ":rest");
-  const min = params.filter(([type]) => type === ":req").length;
-  const max = rest ? Infinity : params.length;
+  const positional = params.filter(([type]) => !type.startsWith(":key"));
+  const kw = positional.length !== params.length;
+  const rest = positional.some(([type]) => type === ":rest");
+  const keyreq = params.some(([type]) => type === ":keyreq");
+  const min = positional.filter(([type]) => type === ":req").length + (keyreq ? 1 : 0);
+  const max = rest ? Infinity : positional.length + (kw ? 1 : 0);
   return [min, max];
 }
 
 /**
  * `rb_iseq_parameters` (`vendor/ruby/v3.3.11/iseq.c:3334`): a `[type, name]`
- * pair per parameter, `:req`, `:opt` or `:rest`, each a Symbol, read here from
- * the function's source. A destructured parameter has no name and answers its
- * type alone.
+ * pair per parameter, `:req`, `:opt`, `:rest`, `:key` or `:keyreq`, each a
+ * Symbol, read here from the function's source. A trailing destructured object,
+ * trails' kwargs idiom, answers its keys as keywords: `:key` with a default,
+ * `:keyreq` without, `:keyrest` for a `...rest` member, each named by its key.
+ * One without a default whose keys all have defaults stays a `:req`
+ * positional, because JS requires the argument and no Ruby keyword shape
+ * does. Any other destructured parameter has no name and answers its type
+ * alone.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -234,13 +242,16 @@ export function rbIseqParameters(
   let depth = 0;
   let current = "";
   let optional = false;
-  const params: { text: string; optional: boolean }[] = [];
+  let key = "";
+  let keys: string[] = [];
+  const params: { text: string; optional: boolean; keys: string[] }[] = [];
   for (let i = open + 1; i < src.length; i++) {
     const ch = src[i];
     if (ch === '"' || ch === "'" || ch === "`") {
       const start = i;
       for (i++; i < src.length && src[i] !== ch; i++) if (src[i] === "\\") i++;
       current += src.slice(start, i + 1);
+      key += src.slice(start, i + 1);
       continue;
     }
     if (ch === "/" && (src[i + 1] === "/" || src[i + 1] === "*")) {
@@ -248,24 +259,45 @@ export function rbIseqParameters(
       i = close === -1 ? src.length : src[i + 1] === "/" ? close : close + 1;
       continue;
     }
+    if (depth >= 1 && current.trimStart().startsWith("{")) {
+      if (depth === 1 && (ch === "," || ch === "}")) {
+        if (key.trim() !== "") keys.push(key.trim());
+        key = "";
+      } else key += ch;
+    }
     if ("([{".includes(ch)) depth++;
     else if (")]}".includes(ch)) {
       if (depth === 0) break;
       depth--;
     } else if (depth === 0 && ch === ",") {
-      params.push({ text: current.trim(), optional });
+      params.push({ text: current.trim(), optional, keys });
       current = "";
       optional = false;
+      keys = [];
+      key = "";
       continue;
     } else if (depth === 0 && ch === "=") optional = true;
     current += ch;
   }
-  if (current.trim() !== "") params.push({ text: current.trim(), optional });
-  return params.map((p) => {
-    const type = p.text.startsWith("...") ? ":rest" : p.optional ? ":opt" : ":req";
-    const name = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(p.text)?.[1];
-    return name === undefined ? [type] : [type, `:${name}`];
-  });
+  if (current.trim() !== "") params.push({ text: current.trim(), optional, keys });
+  const last = params.at(-1);
+  const keyword = (k: string): [string, string] => {
+    if (k.startsWith("...")) return [":keyrest", `:${k.slice(3).trim()}`];
+    const m = /^([A-Za-z_$][\w$]*)\s*(?::\s*[A-Za-z_$][\w$]*\s*)?(=)?/.exec(k);
+    return [m?.[2] === undefined ? ":keyreq" : ":key", `:${m?.[1] ?? ""}`];
+  };
+  const kwargs = last !== undefined && last.text.startsWith("{") ? last.keys.map(keyword) : [];
+  if (kwargs.length > 0 && !last!.optional && kwargs.every(([type]) => type === ":key")) {
+    kwargs.length = 0;
+  } else if (kwargs.length > 0) params.pop();
+  return [
+    ...params.map((p): [string] | [string, string] => {
+      const type = p.text.startsWith("...") ? ":rest" : p.optional ? ":opt" : ":req";
+      const name = /^(?:\.\.\.)?([A-Za-z_$][\w$]*)/.exec(p.text)?.[1];
+      return name === undefined ? [type] : [type, `:${name}`];
+    }),
+    ...kwargs,
+  ];
 }
 
 /**

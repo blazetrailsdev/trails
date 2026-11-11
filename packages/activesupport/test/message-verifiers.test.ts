@@ -14,11 +14,10 @@ describe("MessageVerifiersTest", () => {
     verifier: MessageVerifier = signer,
   ): unknown => verifier.verified(signer.generate(message));
 
-  const kwargSecretGenerator = (): SecretGenerator =>
-    Object.assign(
-      (_salt: string, { foo, bar }: Record<string, unknown>) => `${foo as string}${bar as string}`,
-      { parameters: ["foo", "bar"] as const },
-    );
+  const kwargSecretGenerator =
+    (): SecretGenerator =>
+    (_salt: string, { foo, bar = null }: Record<string, unknown>) =>
+      `${foo as string}${bar as string}`;
 
   let coordinator: MessageVerifiers;
 

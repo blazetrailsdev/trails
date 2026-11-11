@@ -6,6 +6,7 @@ import {
   iseqLocationSetup,
   rbCheckArity,
   rbIseqMinMaxArity,
+  rbIseqParameters,
   rbObjMethod,
   rbObjMethods,
 } from "../lib/method.js";
@@ -278,6 +279,49 @@ describe("Method#parameters", () => {
     expect(rbObjMethod(new Parsers(), "to_a").parameters()).toEqual([
       [":opt", ":opts"],
       [":rest", ":rest"],
+    ]);
+  });
+  it("answers a trailing destructured object's keys as keywords", () => {
+    const fn = (
+      salt: string,
+      { secretKeyBase = "x", other }: { secretKeyBase?: string; other?: number } = {},
+    ) => [salt, secretKeyBase, other];
+    expect(rbIseqParameters(fn)).toEqual([
+      [":req", ":salt"],
+      [":key", ":secretKeyBase"],
+      [":keyreq", ":other"],
+    ]);
+  });
+
+  it("reads a destructured object without a default as keywords unless every key has one", () => {
+    expect(
+      rbIseqParameters((s: string, { foo, bar = null }: Record<string, unknown>) => [s, foo, bar]),
+    ).toEqual([
+      [":req", ":s"],
+      [":keyreq", ":foo"],
+      [":key", ":bar"],
+    ]);
+    expect(rbIseqParameters(({ a = 1 }: { a?: number }) => a)).toEqual([[":req"]]);
+  });
+
+  it("names a renamed key by its key, answers a rest member as keyrest, and skips strings", () => {
+    const fn = ({ a: b = 1, sep = ",}", ...rest }: Record<string, unknown> = {}) => [b, sep, rest];
+    expect(rbIseqParameters(fn)).toEqual([
+      [":key", ":a"],
+      [":key", ":sep"],
+      [":keyrest", ":rest"],
+    ]);
+  });
+
+  it("counts keywords as rb_iseq_min_max_arity does", () => {
+    expect(rbIseqMinMaxArity((s: string, { foo }: { foo?: string } = {}) => [s, foo])).toEqual([
+      2, 2,
+    ]);
+    expect(rbIseqMinMaxArity((s: string, { foo = "" }: { foo?: string } = {}) => [s, foo])).toEqual(
+      [1, 2],
+    );
+    expect(rbIseqMinMaxArity((s: string, { foo = "" }: { foo?: string }) => [s, foo])).toEqual([
+      2, 2,
     ]);
   });
 });
