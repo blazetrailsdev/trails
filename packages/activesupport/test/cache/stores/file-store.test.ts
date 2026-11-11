@@ -29,6 +29,7 @@ import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-be
 import { cacheIncrementDecrementBehavior } from "../behaviors/cache-increment-decrement-behavior.js";
 import { cacheStoreCoderBehavior } from "../behaviors/cache-store-coder-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
+import { cacheStoreFormatVersionBehavior } from "../behaviors/cache-store-format-version-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../../../lib/cache/store.js";
 function pathFor(store: FileStore, key: string): Promise<string> {
@@ -245,6 +246,10 @@ describe("FileStoreTest", () => {
   });
 
   cacheStoreSerializerBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+  });
+
+  cacheStoreFormatVersionBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
 
