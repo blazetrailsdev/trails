@@ -340,13 +340,13 @@ export function assignNestedAttributesForCollectionAssociation(
   attributesCollection:
     | (Record<string, unknown> | HashWithIndifferentAccess)[]
     | Record<string, Record<string, unknown> | HashWithIndifferentAccess>
-    | Map<string, Record<string, unknown> | HashWithIndifferentAccess>,
+    | HashWithIndifferentAccess,
 ): Promise<void> | void {
   const options = this.constructor.nestedAttributesOptions[associationName];
   if (rbObjRespondTo(attributesCollection, "isPermitted")) {
     attributesCollection = (
       attributesCollection as unknown as {
-        toH(): Map<string, Record<string, unknown> | HashWithIndifferentAccess>;
+        toH(): HashWithIndifferentAccess;
       }
     ).toH();
   }
@@ -365,7 +365,7 @@ export function assignNestedAttributesForCollectionAssociation(
   } else {
     const keys = hashKeys(attributesCollection);
     if (keys.includes("id")) {
-      attrs = [attributesCollection as Record<string, unknown>];
+      attrs = [attributesCollection as Record<string, unknown> | HashWithIndifferentAccess];
     } else {
       attrs = keys.map(
         (k) =>

@@ -301,7 +301,7 @@ export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
 
 /**
  * @inventedArm ensureSchemaLoaded — PERMANENT
- * @inventedArm if — PERMANENT
+ * @inventedArm if — CONVERGEABLE save-chain-cold-record-detector-misses-tables-without-primary-key
  * @inventedArm reverseMergeBang — PERMANENT
  */
 export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
@@ -316,7 +316,7 @@ export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T>
 
 /**
  * @inventedArm ensureSchemaLoaded — PERMANENT
- * @inventedArm if — PERMANENT
+ * @inventedArm if — CONVERGEABLE save-chain-cold-record-detector-misses-tables-without-primary-key
  * @inventedArm reverseMergeBang — PERMANENT
  */
 export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {

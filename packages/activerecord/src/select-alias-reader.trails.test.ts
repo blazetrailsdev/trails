@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { Comment } from "./test-helpers/models/comment.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { _virtualAttributePrototypeCache } from "./persistence.js";
 
 describe("select alias dynamic reader (trails)", () => {
@@ -142,5 +142,19 @@ describe("select alias dynamic reader (trails)", () => {
     loaded.marshalLoad(state);
     expect(loaded.bumped_id).toEqual(record.readAttribute("bumped_id"));
     expect(loaded.bumped_id).not.toBeUndefined();
+  });
+
+  it("reloads a record with its own singleton class onto the fresh record's readers", async () => {
+    const aliased = Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    const record = (await Comment.order("id"))[0] as Comment & { bumped_id: unknown };
+    rbObjSingletonClass(record);
+    Comment.resetColumnInformation();
+    await aliased.scoping({ allQueries: true }, async () => {
+      await record.reload();
+    });
+    expect(record.bumped_id).toEqual(record.readAttribute("bumped_id"));
+    expect(record.bumped_id).not.toBeUndefined();
+    expect(record.body).toEqual(record.readAttribute("body"));
+    expect(record.constructor).toBe(Comment);
   });
 });

@@ -72,4 +72,16 @@ describe("ModelSchema static fields", () => {
     expect(Object.getOwnPropertyDescriptor(Order, "primaryKey")).toBeUndefined();
     expect(Order.arelTable.name).toBe("cpk_orders");
   });
+
+  it("a bare tableName and primaryKey read, before any other class-level reader, answers the writer's value", () => {
+    class Application extends Base {
+      static override abstractClass = true;
+      static override tableName = "topics";
+      static override primaryKey: string | string[] = "id";
+    }
+    class Reply extends Application {}
+    expect(Reply.tableName).toBe("topics");
+    expect(Application.tableName).toBe("topics");
+    expect(Reply.primaryKey).toBe("id");
+  });
 });
