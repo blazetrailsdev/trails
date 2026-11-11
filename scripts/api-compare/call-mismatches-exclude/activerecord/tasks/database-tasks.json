@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/database-tasks.ts",
-    "rubyName": "migrations_paths",
-    "call": "to_a",
-    "reason": "CONVERGEABLE database-tasks-migrations-paths-reads-app-paths-to-a"
-  }
-]

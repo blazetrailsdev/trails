@@ -171,7 +171,7 @@ export class Trailtie extends BaseTrailtie {
               const paths = engine.paths().get("db/migrate")!;
               if (await paths.existent()) {
                 ActiveRecord.DatabaseTasks.migrationsPaths = [
-                  ...ActiveRecord.DatabaseTasks.migrationsPaths,
+                  ...(await ActiveRecord.DatabaseTasks.migrationsPaths),
                   ...(await paths.toA()),
                 ];
               }

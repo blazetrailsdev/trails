@@ -96,7 +96,11 @@ declare module "@blazetrails/ruby-compat" {
           root?: string | null;
           loadDatabaseYaml(): Promise<Record<string, unknown>>;
           paths(): {
-            get(path: string): { firstSync(): string | undefined; toAry(): string[] } | undefined;
+            get(
+              path: string,
+            ):
+              | { firstSync(): string | undefined; toAry(): string[]; toA(): Promise<string[]> }
+              | undefined;
           };
         };
         reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
