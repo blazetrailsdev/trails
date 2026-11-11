@@ -5,6 +5,7 @@ import ts from "typescript-5";
 import { Encoding, getPath, rbFLoad } from "@blazetrails/ruby-compat";
 import {
   TopLevel,
+  Notifications,
   camelize,
   chomp,
   dasherize,
@@ -67,7 +68,17 @@ export async function buildViews(opts: BuildViewsOptions = {}): Promise<BuildVie
     }
   }
   const application = TopLevel.Trails?.application;
-  if (application && !application.initialized()) await application.initializeBang();
+  if (application) {
+    if (!application.initialized()) await application.initializeBang();
+  } else {
+    const initializersDir = path.join(cwd, "config/initializers");
+    const existent = (await exists(initializersDir))
+      ? (await fs.readdir(initializersDir, { recursive: true, encoding: "utf8" }))
+          .filter((file) => /\.(?:ts|js)$/u.test(file))
+          .map((file) => path.join(initializersDir, file))
+      : [];
+    for (const initializer of existent.sort()) await loadConfigInitializer(initializer);
+  }
   if (application && (await application.reloadRoutesUnlessLoaded()) === false) {
     for (const ext of ["ts", "js"]) {
       const routes = path.join(cwd, `config/routes.${ext}`);
@@ -211,6 +222,12 @@ async function deepestExisting(p: string): Promise<string> {
     cur = parent;
   }
   return cur;
+}
+
+async function loadConfigInitializer(initializer: string): Promise<void> {
+  await Notifications.instrument("load_config_initializer.railties", { initializer }, async () => {
+    await rbFLoad(initializer);
+  });
 }
 
 async function walkTemplates(
