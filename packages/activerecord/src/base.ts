@@ -1329,7 +1329,6 @@ export class Base extends Model {
    * @inlinedFrom ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482
    * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84
    * @inventedArm if — PERMANENT
-   * @inventedArm completeAttributesOnSchemaLoad — CONVERGEABLE save-chain-schema-warm-and-cold-built-records
    */
   constructor(
     attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes | null = {},
@@ -1374,9 +1373,6 @@ export class Base extends Model {
     if (!allocating) {
       this._newRecord = true;
       this._attributes = new.target._defaultAttributes().deepDup();
-      if (!ModelSchema.isSchemaLoaded.call(new.target as never)) {
-        _Core.completeAttributesOnSchemaLoad(this, this._attributes);
-      }
     }
 
     this.initInternals();

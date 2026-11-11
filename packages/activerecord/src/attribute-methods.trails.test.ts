@@ -1,12 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import {
-  basicObjRespondTo,
-  Module,
-  rbInspect,
-  rbObjRespondTo,
-  constSet,
-  TopLevel,
-} from "@blazetrails/ruby-compat";
+import { Module, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -468,35 +461,6 @@ describe("AttributeMethodsTest (trails)", () => {
       isInstanceMethodAlreadyImplemented(n: string): boolean;
     };
     expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(true);
-  });
-});
-
-describe("AttributeMethods#respond_to_missing? (trails)", () => {
-  fixtures([]);
-
-  it("defines the attribute methods for a record built before its schema loaded", async () => {
-    class Topic extends Base {}
-    Base.connectionPool().schemaCache.clearBang();
-    const topic = new Topic();
-
-    await Topic.loadSchema();
-    expect(rbObjRespondTo(topic, "title")).toBe(true);
-    expect(basicObjRespondTo(topic, "title")).toBe(true);
-    expect(basicObjRespondTo(topic, "mumbo")).toBe(false);
-    expect(rbObjRespondTo(new Topic(), "title")).toBe(true);
-  });
-
-  it("a dup of a record built before its schema loaded takes the columns too", async () => {
-    class Topic extends Base {}
-    Base.connectionPool().schemaCache.clearBang();
-    const topic = new Topic();
-    const dup = topic.dup();
-    expect(rbObjRespondTo(topic, "title")).toBe(false);
-
-    await Topic.loadSchema();
-    expect(rbObjRespondTo(dup, "title")).toBe(true);
-    expect(rbObjRespondTo(topic, "title")).toBe(true);
-    expect((dup as unknown as { title: unknown }).title).toBeNull();
   });
 });
 

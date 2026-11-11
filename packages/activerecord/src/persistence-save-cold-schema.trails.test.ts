@@ -31,4 +31,21 @@ describe("Persistence#save on a record built against a cold schema cache (trails
 
     await expect(topic.saveBang()).rejects.toBeInstanceOf(RecordInvalid);
   });
+
+  it("save completes the column attributes of a record built before the schema loaded", async () => {
+    class Bird extends Base {}
+    Base.connectionPool().schemaCache.clearBang();
+    const bird = new Bird();
+    expect(await bird.save()).toBe(true);
+    expect(bird.id).not.toBeNull();
+  });
+
+  it("save! completes a timestamped record built before the schema loaded", async () => {
+    class Topic extends Base {}
+    Base.connectionPool().schemaCache.clearBang();
+    const topic = new Topic();
+    await topic.saveBang();
+    expect(topic.readAttribute("created_at")).not.toBeNull();
+    expect((await Topic.find(topic.id)).id).toEqual(topic.id);
+  });
 });

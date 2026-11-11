@@ -299,13 +299,33 @@ export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
+/**
+ * @inventedArm ensureSchemaLoaded — PERMANENT
+ * @inventedArm if — PERMANENT
+ * @inventedArm reverseMergeBang — PERMANENT
+ */
 export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
-  await this.constructor.ensureSchemaLoaded();
+  const klass = this.constructor;
+  await klass.ensureSchemaLoaded();
+  const primaryKey = [klass.primaryKey].flat()[0];
+  if (primaryKey != null && !this._attributes.isKey(primaryKey)) {
+    this._attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
+  }
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
+/**
+ * @inventedArm ensureSchemaLoaded — PERMANENT
+ * @inventedArm if — PERMANENT
+ * @inventedArm reverseMergeBang — PERMANENT
+ */
 export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
-  await this.constructor.ensureSchemaLoaded();
+  const klass = this.constructor;
+  await klass.ensureSchemaLoaded();
+  const primaryKey = [klass.primaryKey].flat()[0];
+  if (primaryKey != null && !this._attributes.isKey(primaryKey)) {
+    this._attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
+  }
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
