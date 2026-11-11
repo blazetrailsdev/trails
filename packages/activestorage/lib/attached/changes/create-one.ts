@@ -4,6 +4,7 @@ import {
   ArgumentError,
   fetch,
   File,
+  Hash,
   isPlainHash,
   Pathname,
   rbEqual,
@@ -56,8 +57,10 @@ export class CreateOne {
           ? (attachable as unknown as { open(): BlobIo }).open()
           : attachable) as unknown as BlobIo,
       );
-    } else if (isPlainHash(attachable)) {
-      await this.blob.uploadWithoutUnfurling(fetch<BlobIo>(attachable, "io"));
+    } else if (isPlainHash(attachable) || attachable instanceof Hash) {
+      await this.blob.uploadWithoutUnfurling(
+        fetch<BlobIo>(attachable as Record<string, unknown>, "io"),
+      );
     } else if (attachable instanceof File) {
       await this.blob.uploadWithoutUnfurling(attachable as unknown as BlobIo);
     } else if (attachable instanceof Pathname) {
@@ -142,11 +145,13 @@ export class CreateOne {
         record: this.record,
         serviceName: this.attachmentServiceName(),
       });
-    } else if (isPlainHash(attachable)) {
+    } else if (isPlainHash(attachable) || attachable instanceof Hash) {
       return ActiveStorage.Blob!.buildAfterUnfurling({
         record: this.record,
         serviceName: this.attachmentServiceName(),
-        ...(attachable as Parameters<typeof Blob.buildAfterUnfurling>[0]),
+        ...((attachable instanceof Hash
+          ? Object.fromEntries(attachable)
+          : attachable) as Parameters<typeof Blob.buildAfterUnfurling>[0]),
       });
     } else if (typeof attachable === "string") {
       return await ActiveStorage.Blob!.findSignedBang(attachable, { record: this.record });
