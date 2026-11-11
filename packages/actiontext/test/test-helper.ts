@@ -1,9 +1,10 @@
 import { afterAll } from "vitest";
-import { I18n, TopLevel, setTrailsRoot } from "@blazetrails/activesupport";
+import { I18n, TopLevel, runLoadHooks, setTrailsRoot } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, Migration, Migrator } from "@blazetrails/activerecord";
 import { Application, Trails } from "@blazetrails/trailties";
 import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
 import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailties/active-record";
+import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
 import { File } from "@blazetrails/ruby-compat";
 import { FixtureSet } from "@blazetrails/activestorage/fixture-set";
 import "./dummy/app/models/message.js";
@@ -22,11 +23,12 @@ app.config.loadDefaults("8.0");
 setTrailsRoot(TopLevel.Trails!.root()!);
 const configurations = Base.configurations();
 
-for (const railtie of [ActiveSupportRailtie, ActiveRecordRailtie]) {
+for (const railtie of [ActiveSupportRailtie, GlobalIDRailtie, ActiveRecordRailtie]) {
   for (const initializer of railtie.initializers) {
     await initializer.bind(railtie.instance()).run(app);
   }
 }
+runLoadHooks("after_initialize", app);
 
 DatabaseTasks.root = TopLevel.Trails!.root()!;
 

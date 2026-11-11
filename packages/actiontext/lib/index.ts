@@ -9,3 +9,7 @@ export { PlainTextConversion } from "./plain-text-conversion.js";
 export { Attachment } from "./attachment.js";
 export { AttachmentGallery } from "./attachment-gallery.js";
 export { TrixAttachment } from "./trix-attachment.js";
+export { Attachable } from "./attachable.js";
+export { ContentAttachment } from "./attachables/content-attachment.js";
+export { MissingAttachable } from "./attachables/missing-attachable.js";
+export { RemoteImage } from "./attachables/remote-image.js";

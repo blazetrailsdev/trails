@@ -1,6 +1,10 @@
 import { Autoload, extend, type Deprecation, type Extended } from "@blazetrails/activesupport";
 import { HTML5 } from "@blazetrails/nokogiri";
 import { TopLevel, constSet, type Gem } from "@blazetrails/ruby-compat";
+import type { Attachable } from "./attachable.js";
+import type { ContentAttachment } from "./attachables/content-attachment.js";
+import type { MissingAttachable } from "./attachables/missing-attachable.js";
+import type { RemoteImage } from "./attachables/remote-image.js";
 import type { Attachment } from "./attachment.js";
 import type { AttachmentGallery } from "./attachment-gallery.js";
 import type { Caching } from "./attachments/caching.js";
@@ -14,6 +18,10 @@ import type { TrixAttachment } from "./trix-attachment.js";
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
+  "action_text/attachable": () => import("./attachable.js"),
+  "action_text/attachables/content_attachment": () => import("./attachables/content-attachment.js"),
+  "action_text/attachables/missing_attachable": () => import("./attachables/missing-attachable.js"),
+  "action_text/attachables/remote_image": () => import("./attachables/remote-image.js"),
   "action_text/attachment": () => import("./attachment.js"),
   "action_text/attachment_gallery": () => import("./attachment-gallery.js"),
   "action_text/attachments/caching": () => import("./attachments/caching.js"),
@@ -56,7 +64,8 @@ export const ActionText = {
   _htmlDocumentClass?: typeof HTML5.Document;
   /** @internal */
   _htmlDocumentFragmentClass?: typeof HTML5.DocumentFragment;
-  Attachable?: { fromNode(node: unknown): Promise<unknown> };
+  Attachable?: typeof Attachable;
+  Attachables: typeof Attachables;
   Attachment?: typeof Attachment;
   AttachmentGallery?: typeof AttachmentGallery;
   Attachments: typeof Attachments;
@@ -69,6 +78,7 @@ export const ActionText = {
 extend(ActionText, Autoload);
 constSet(TopLevel, "ActionText", ActionText);
 
+ActionText.autoload("Attachable");
 ActionText.autoload("Attachment");
 ActionText.autoload("AttachmentGallery");
 ActionText.autoload("Fragment");
@@ -87,3 +97,15 @@ ActionText.Attachments = Attachments;
 Attachments.autoload("Caching");
 Attachments.autoload("Minification");
 Attachments.autoload("TrixConversion");
+
+const Attachables = { name: "ActionText::Attachables", loadPath } as AutoloadModule & {
+  ContentAttachment?: typeof ContentAttachment;
+  MissingAttachable?: typeof MissingAttachable;
+  RemoteImage?: typeof RemoteImage;
+};
+extend(Attachables, Autoload);
+ActionText.Attachables = Attachables;
+
+Attachables.autoload("ContentAttachment");
+Attachables.autoload("MissingAttachable");
+Attachables.autoload("RemoteImage");
