@@ -54,6 +54,7 @@ function _includesAttributes(klass: { prototype: object }): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Model {
+  /** @noRailsEquivalent CONVERGEABLE model-is-an-includable-concern */
   static [included](base: { new (...args: never[]): unknown; prototype: object }): void {
     include(base, API);
     include(base, Access);
