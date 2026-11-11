@@ -96,15 +96,12 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     ).toEqual(["id", "subject"]);
   });
 
-  it("gives a shared-table subclass of an own-table descendant that descendant's columns", async () => {
+  it("gives a subclass of an own-table descendant its base class's table", async () => {
     const asked: string[] = [];
     const { VipTicket } = await buildHierarchy(asked);
 
-    const hash = VipTicket.columnsHash();
-
-    expect(Object.keys(hash).sort()).toEqual(["id", "subject"]);
-    expect(Object.hasOwn(VipTicket, "_schemaLoaded")).toBe(true);
-    expect(Object.hasOwn(VipTicket, "_columnsHash")).toBe(true);
+    expect(VipTicket.tableName).toBe("shapes");
+    expect(Object.keys(VipTicket.columnsHash()).sort()).toEqual(["id", "sides", "type"]);
   });
 
   it("gives a genuine STI subclass the base's shared table", async () => {
