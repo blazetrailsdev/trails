@@ -4,7 +4,7 @@ import { ActionText } from "../action-text.js";
 
 interface ContentInstance {
   fragment: { source: unknown };
-  render(...args: unknown[]): unknown;
+  render(...args: unknown[]): string;
 }
 
 export class ContentAttachment extends Model {
@@ -17,17 +17,12 @@ export class ContentAttachment extends Model {
     return null;
   }
 
-  static {
-    this.validatesFormatOf("contentType", { with: /html/ });
-    this.validatesPresenceOf("content");
-  }
-
   /** @internal */
   declare private _contentType: unknown;
   /** @internal */
   declare private _content: unknown;
   /** @internal */
-  declare private _toHtml?: unknown;
+  declare private _toHtml?: string;
   /** @internal */
   declare private _contentInstance?: ContentInstance;
 
@@ -47,16 +42,21 @@ export class ContentAttachment extends Model {
     this._content = value;
   }
 
+  static {
+    this.validatesFormatOf("contentType", { with: /html/ });
+    this.validatesPresenceOf("content");
+  }
+
   attachablePlainTextRepresentation(_caption: string | null): unknown {
     return this.contentInstance().fragment.source;
   }
 
-  toHtml(): unknown {
+  toHtml(): string {
     return (this._toHtml ??= this.contentInstance().render(this.contentInstance()));
   }
 
   toString(): string {
-    return String(this.toHtml());
+    return this.toHtml();
   }
 
   toPartialPath(): string {
