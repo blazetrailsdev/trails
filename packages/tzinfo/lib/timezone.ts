@@ -388,10 +388,6 @@ export class Timezone {
     this.info = info;
   }
 
-  inspect(): string {
-    return `#<${rbModName(this.constructor)}: ${this.identifier}>`;
-  }
-
   equals(tz: unknown): boolean {
     return tz instanceof Timezone && this.identifier === tz.identifier;
   }
@@ -427,6 +423,10 @@ export class Timezone {
     return `${prefix}${rest.reverse().join(", ")}`;
   }
 
+  inspect(): string {
+    return `#<${rbModName(this.constructor)}: ${this.identifier}>`;
+  }
+
   abbr(time: Date | Temporal.Instant): string {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
       return this.info.constantOffset.abbreviation;
@@ -444,12 +444,14 @@ export class Timezone {
     return result;
   }
 
+  /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
   observedUtcOffset(time: Date | Temporal.Instant): number {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
       return this.info.constantOffset.observedUtcOffset;
     return getZoneInfo(this.identifier, toDate(time)).utcOffsetSeconds;
   }
 
+  /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
   isDst(time: Date | Temporal.Instant | Time): boolean {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
       return this.info.constantOffset.stdOffset !== 0;
@@ -460,6 +462,7 @@ export class Timezone {
     return this.identifier;
   }
 
+  /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
   periodForUtc(time: Time): TimezonePeriod {
     const d = toDate(time);
     const observed = this.observedUtcOffset(d);
@@ -512,6 +515,7 @@ export class Timezone {
     return period;
   }
 
+  /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
   periodsForLocal(time: Time): TimezonePeriod[] {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo) return [this.periodForUtc(time)];
     const localMs = ignoringOffset(time).getTime();

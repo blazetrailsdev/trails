@@ -1,10 +1,11 @@
-import { NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
+import { ArgumentError, NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
 import type { Timezone } from "../timezone.js";
 
 export class TimezoneInfo {
   readonly identifier: string;
 
   constructor(identifier: string) {
+    if (identifier == null) throw new ArgumentError("identifier must be specified");
     this.identifier = identifier;
   }
 
