@@ -36,6 +36,8 @@ export interface TestSeedRow {
   rubyFile: string;
   path: string;
   kind: "changed" | "moved";
+  /** `kind: "moved"` only: the describe path the test sits under at `to`. */
+  toPath?: string;
   from: string;
   to: string;
 }
@@ -120,7 +122,8 @@ export interface TestDelta {
   added: number;
   removed: number;
   changed: string[];
-  moved: string[];
+  /** Test keys (`<file> <path>`) at the active ref and at the candidate. */
+  moved: { from: string; to: string }[];
 }
 
 /**
@@ -148,10 +151,11 @@ export function testDelta(
     const tc = c.get(k)!;
     addedByName.set(`${tc.file} ${tc.description}`, k);
   }
-  const moved: string[] = [];
+  const moved: { from: string; to: string }[] = [];
   for (const k of removedKeys) {
     const tc = a.get(k)!;
-    if (addedByName.has(`${tc.file} ${tc.description}`)) moved.push(k);
+    const next = addedByName.get(`${tc.file} ${tc.description}`);
+    if (next !== undefined) moved.push({ from: k, to: next });
   }
   return {
     before: a.size,
@@ -159,7 +163,7 @@ export function testDelta(
     added: addedKeys.length - moved.length,
     removed: removedKeys.length - moved.length,
     changed: changed.sort(),
-    moved: moved.sort(),
+    moved: moved.sort((x, y) => cmp(x.from, y.from)),
   };
 }
 
@@ -179,16 +183,15 @@ export function testSeed(
 ): TestSeedRow[] {
   const index = testIndex(active, pkg);
   const rows: TestSeedRow[] = [];
-  const add = (keys: string[], kind: TestSeedRow["kind"]) => {
-    for (const key of keys) {
-      const tc = index.get(key)!;
-      const fileMissing = missing.get(`${pkg} ${tc.file}`);
-      if (fileMissing === undefined || fileMissing.has(tc.description)) continue;
-      rows.push({ package: pkg, rubyFile: tc.file, path: tc.path, kind, from, to });
-    }
+  const add = (key: string, kind: TestSeedRow["kind"], toKey?: string) => {
+    const tc = index.get(key)!;
+    const fileMissing = missing.get(`${pkg} ${tc.file}`);
+    if (fileMissing === undefined || fileMissing.has(tc.description)) return;
+    const toPath = toKey === undefined ? {} : { toPath: toKey.slice(tc.file.length + 1) };
+    rows.push({ package: pkg, rubyFile: tc.file, path: tc.path, kind, ...toPath, from, to });
   };
-  add(delta.changed, "changed");
-  add(delta.moved, "moved");
+  for (const key of delta.changed) add(key, "changed");
+  for (const m of delta.moved) add(m.from, "moved", m.to);
   return rows;
 }
 

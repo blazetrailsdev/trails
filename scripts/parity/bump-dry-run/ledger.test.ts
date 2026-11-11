@@ -83,7 +83,7 @@ describe("testDelta and testSeed", () => {
       added: 1,
       removed: 1,
       changed: ["a_test.rb A > one"],
-      moved: ["a_test.rb A > three"],
+      moved: [{ from: "a_test.rb A > three", to: "a_test.rb A > B > three" }],
     });
   });
 
@@ -101,6 +101,16 @@ describe("testDelta and testSeed", () => {
       },
     ]);
     expect(testSeed("arel", delta, active, new Map(), "v8.0.2", "v8.0.5.2")).toEqual([]);
+    const all = new Map([["arel a_test.rb", new Set<string>()]]);
+    expect(testSeed("arel", delta, active, all, "v8.0.2", "v8.0.5.2")[1]).toEqual({
+      package: "arel",
+      rubyFile: "a_test.rb",
+      path: "A > three",
+      kind: "moved",
+      toPath: "A > B > three",
+      from: "v8.0.2",
+      to: "v8.0.5.2",
+    });
   });
 });
 

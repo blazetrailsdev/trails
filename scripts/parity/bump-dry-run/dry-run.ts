@@ -30,7 +30,7 @@
 import { execFile } from "child_process";
 import * as fs from "fs/promises";
 import * as path from "path";
-import { fileURLToPath } from "url";
+import { fileURLToPath, pathToFileURL } from "url";
 import { promisify } from "util";
 
 import {
@@ -48,6 +48,7 @@ import {
   type Pin,
   type RubyTestManifest,
 } from "./ledger.js";
+import { NOT_EXERCISED, STEPS, TSX, parseArgs } from "./steps.js";
 
 const { fetchCandidate } = await import("../../../vendor/fetch.js");
 const { SOURCES, testPathsManifest, vendoredRoot } = await import("../../../vendor/sources.js");
@@ -61,37 +62,6 @@ const run = promisify(execFile);
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const API_OUT = path.join(ROOT, "scripts/api-compare/output");
 const TEST_OUT = path.join(ROOT, "scripts/test-compare/output");
-const TSX = ["exec", "tsx"];
-
-/** The gating steps of ci.yml's `rails-comparison` job, in its order. */
-const STEPS: { name: string; args: string[] }[] = [
-  ["API comparison", "scripts/api-compare/compare.ts"],
-  ["API comparison (privates)", "scripts/api-compare/compare.ts --privates"],
-  ["Extra-surface tag gates", "scripts/api-compare/extra-surface.ts"],
-  ["Body-pins gate", "scripts/api-compare/lint-body-pins.ts"],
-  ["API comparison (calls)", "scripts/api-compare/compare.ts --calls"],
-  ["Call-mismatches ratchet", "scripts/api-compare/lint-call-mismatches.ts --no-regen"],
-  ["Call-argument ratchet", "scripts/api-compare/lint-call-args.ts --no-regen"],
-  ...["activerecord", "activemodel"].map((pkg) => [
-    `Receipt audit (${pkg})`,
-    `scripts/api-compare/receipt-audit.ts --package ${pkg} --gate`,
-  ]),
-  ["Ruby-compat call ratchet", "scripts/api-compare/lint-ruby-compat-calls.ts --no-regen"],
-  ["Arm-parity report", "scripts/api-compare/report-arms.ts --report"],
-  ["Missing-throw arm ratchet", "scripts/api-compare/lint-arm-throws.ts"],
-  ["Extra-surface ratchet", "scripts/api-compare/lint-extra-surface-ratchet.ts"],
-  ["Parameter-name ratchet", "scripts/api-compare/lint-param-names.ts"],
-  ["Block-parameter ratchet", "scripts/api-compare/lint-block-params.ts"],
-  ["Predicate-kind ratchet", "scripts/api-compare/lint-predicate-kinds.ts"],
-  ["Inlined-from staleness gate", "scripts/api-compare/lint-inlined-from.ts"],
-  ["Class-path table gate", "scripts/api-compare/class-paths.ts --check"],
-  ["Ambiguous-parent ratchet", "scripts/api-compare/lint-ambiguous-parents.ts"],
-  ["Dependency lint", "scripts/api-compare/lint-deps.ts"],
-  ["Test comparison (TS extract)", "scripts/test-compare/extract-ts-tests.ts"],
-  ["Test comparison", "scripts/test-compare/compare.ts --gates --check"],
-  ["Assertion-mismatch ratchet", "scripts/test-compare/lint-assertion-mismatches.ts --no-regen"],
-  ["AR-closure test manifest guard", "scripts/test-compare/closure-cli.ts --check"],
-].map(([name, cmd]) => ({ name, args: [...TSX, ...cmd.split(" ")] }));
 
 /** Read only to size the test seed; not a gate. */
 const MISSING_REPORT = [...TSX, "scripts/test-compare/compare.ts", "--missing", "--json"];
@@ -126,6 +96,15 @@ async function sh(cmd: string, args: string[], env: Env, cwd = ROOT) {
       out: (err.stdout ?? "") + (err.stderr ?? ""),
     };
   }
+}
+
+/** `sh`, throwing on a non-zero exit, or on an exit outside `ok`. */
+async function must(cmd: string, args: string[], env: Env, cwd = ROOT, ok = [0]) {
+  const result = await sh(cmd, args, env, cwd);
+  if (!ok.includes(result.code) || /^\s+at /m.test(result.out)) {
+    throw new Error(`[bump] ${cmd} ${args.join(" ")} failed (${result.code}):\n${result.out}`);
+  }
+  return result;
 }
 
 function summarize(out: string): string {
@@ -198,14 +177,10 @@ async function restore(from: string): Promise<void> {
   }
 }
 
-async function trackedDiff(env: Env): Promise<Map<string, string>> {
-  const { out } = await sh("git", ["status", "--porcelain=v1", "--untracked-files=no"], env);
-  const state = new Map<string, string>();
-  for (const line of out.split("\n").filter(Boolean)) {
-    const file = line.slice(3);
-    state.set(file, (await sh("git", ["hash-object", file], env)).out.trim());
-  }
-  return state;
+/** Every tracked path that differs from HEAD, a rename read as its two halves. */
+async function trackedDiff(env: Env): Promise<string[]> {
+  const { out } = await must("git", ["diff", "--name-only", "-z", "--no-renames", "HEAD"], env);
+  return out.split("\0").filter(Boolean);
 }
 
 /** `git diff --no-index --numstat` between the two trees at `rel`. */
@@ -256,10 +231,9 @@ async function schemaParity(active: string, candidate: string, ref: string, env:
 }
 
 async function main(argv: string[], env: Env): Promise<number> {
-  const arg = (flag: string) => argv[argv.indexOf(flag) + 1];
-  const [sourceName, ref] = [arg("--source"), arg("--ref")];
+  const { source: sourceName, ref } = parseArgs(argv);
   const source = SOURCES.find((s) => s.name === sourceName);
-  if (!source || !argv.includes("--ref") || !ref) {
+  if (!source || !ref) {
     console.error("usage: pnpm parity:bump:dry-run --source <name> --ref <tag>");
     return 2;
   }
@@ -269,7 +243,7 @@ async function main(argv: string[], env: Env): Promise<number> {
   const childEnv: Env = { ...env, API_COMPARE_SKIP_REGEN: "1" };
   const activeRoot = vendoredRoot(source.name);
   const candidateRoot = await fetchCandidate(source, ref, { refresh: false });
-  if ((await trackedDiff(env)).size > 0) {
+  if ((await trackedDiff(env)).length > 0) {
     console.error(
       "[bump] the tracked tree must be clean: the run restores what it rewrites from HEAD",
     );
@@ -277,9 +251,9 @@ async function main(argv: string[], env: Env): Promise<number> {
   }
 
   console.log("[bump] active pass: parity:api --calls");
-  await sh("pnpm", ["parity:api", "--calls"], env);
+  await must("pnpm", ["parity:api", "--calls"], env);
   const testPaths = testPathsManifest();
-  await sh(
+  await must(
     "ruby",
     ["extract-ruby-tests.rb"],
     { ...env, TEST_PATHS_JSON: JSON.stringify(testPaths) },
@@ -290,6 +264,7 @@ async function main(argv: string[], env: Env): Promise<number> {
 
   let candidateSteps: StepResult[];
   let citationRewrites: string[];
+  let restoreBuild: boolean;
   try {
     for (const f of await fs.readdir(API_OUT)) {
       if (
@@ -313,7 +288,8 @@ async function main(argv: string[], env: Env): Promise<number> {
       if (pkg.testPath && pkg.compareTests !== false)
         candidateTestPaths[pkg.name] = path.join(candidateRoot, pkg.testPath);
     }
-    await sh(
+    await fs.rm(path.join(TEST_OUT, "rails-tests.json"));
+    await must(
       "ruby",
       ["extract-ruby-tests.rb"],
       { ...env, TEST_PATHS_JSON: JSON.stringify(candidateTestPaths) },
@@ -329,23 +305,24 @@ async function main(argv: string[], env: Env): Promise<number> {
       path.join(TEST_OUT, "rails-tests.json"),
       JSON.stringify(mergeManifest(activeTests, candidateTests, Object.keys(candidateTestPaths))),
     );
-    await sh("pnpm", [...TSX, "scripts/api-compare/lint-inlined-from.ts", "--fix"], childEnv);
-    citationRewrites = [...(await trackedDiff(env)).keys()];
-    await sh("pnpm", ["build"], env);
-    const tsExtract = await sh("pnpm", [...TSX, "scripts/api-compare/extract-ts-api.ts"], {
-      ...childEnv,
-      API_COMPARE_FORCE: "1",
-    });
-    if (tsExtract.code !== 0) throw new Error(`[bump] TS re-extraction failed:\n${tsExtract.out}`);
+    const fix = [...TSX, "scripts/api-compare/lint-inlined-from.ts", "--fix"];
+    await must("pnpm", fix, childEnv, ROOT, [0, 1]);
+    citationRewrites = await trackedDiff(env);
+    await must("pnpm", ["build"], env);
+    const extractTs = [...TSX, "scripts/api-compare/extract-ts-api.ts"];
+    await must("pnpm", extractTs, { ...childEnv, API_COMPARE_FORCE: "1" });
     candidateSteps = await runSteps(childEnv, "candidate");
     await snapshot(path.join(outDir, "candidate"));
   } finally {
     await restore(path.join(outDir, "active"));
-    for (const f of (await trackedDiff(env)).keys())
-      await sh("git", ["checkout", "HEAD", "--", f], env);
-    await sh("pnpm", ["build"], env);
+    for (const f of await trackedDiff(env)) {
+      const { code } = await sh("git", ["checkout", "HEAD", "--", f], env);
+      if (code !== 0) await fs.rm(path.join(ROOT, f), { force: true });
+    }
+    restoreBuild = (await sh("pnpm", ["build"], env)).code === 0;
   }
-  const touched = [...(await trackedDiff(env)).keys()];
+  const touched = await trackedDiff(env);
+  if (!restoreBuild) touched.push("packages/*/dist (the restoring `pnpm build` failed)");
 
   const a = <T>(f: string) => readJson<T>(path.join(outDir, "active", f));
   const c = <T>(f: string) => readJson<T>(path.join(outDir, "candidate", f));
@@ -462,28 +439,22 @@ async function main(argv: string[], env: Env): Promise<number> {
     .filter((t) => [...changedLib].some((f) => t.endsWith(f))).length;
   const schema =
     source.name === "rails" ? await schemaParity(activeRoot, candidateRoot, ref, env) : null;
-  const notExercised = [
-    ["Rails-private JSDoc lint and runtime artifact", `${libFiles} lib files change`],
-    [
-      "Rails file-structure method-order lint",
-      `${pairTable.filter((r) => ["arel", "activemodel"].includes(String(r[0]))).reduce((n, r) => n + Number(r[1]), 0)} arel/activemodel lib files change`,
-    ],
-    [
-      "Rails test-name parity ratchet",
-      `${await changedUnder("actionview/test")} actionview + ${await changedUnder("activerecord/test/cases/arel")} arel test files change`,
-    ],
-    [
-      "Fixtures comparison",
-      `${await changedUnder("activerecord/test/fixtures")} fixture files change`,
-    ],
-    ["Models comparison", `${await changedUnder("activerecord/test/models")} model files change`],
-    [
-      "Schema Parity / Query Parity",
-      schema
-        ? `Gemfile ${schema.gemfile ? "generatable" : "NOT generatable"} (activerecord ${schema.gemVersion}); schema delta: ${schema.delta.join(", ") || "none"}`
-        : "n/a",
-    ],
-  ];
+  const predicted: Record<string, string> = {
+    lib: `${libFiles} lib files change`,
+    methodOrder: `${pairTable.filter((r) => ["arel", "activemodel"].includes(String(r[0]))).reduce((n, r) => n + Number(r[1]), 0)} arel/activemodel lib files change`,
+    testNames: `${await changedUnder("actionview/test")} actionview + ${await changedUnder("activerecord/test/cases/arel")} arel test files change`,
+    arTests: `${await changedUnder("activerecord/test/cases")} activerecord test files change`,
+    fixtures: `${await changedUnder("activerecord/test/fixtures")} fixture files change`,
+    models: `${await changedUnder("activerecord/test/models")} model files change`,
+    schema: schema
+      ? `Gemfile ${schema.gemfile ? "generatable" : "NOT generatable"} (activerecord ${schema.gemVersion}); schema delta: ${schema.delta.join(", ") || "none"}`
+      : "n/a",
+  };
+  const notExercised = NOT_EXERCISED.map((s) => [
+    s.name,
+    s.reason,
+    s.predictor === undefined ? "independent of the ref" : predicted[s.predictor],
+  ]);
 
   const report = [
     `# Bump dry run: ${source.name} ${fromRef} → ${ref}`,
@@ -503,11 +474,10 @@ async function main(argv: string[], env: Env): Promise<number> {
       ]),
     ),
     "",
-    "Ratchet baseline reseed drift: follows the call-mismatches ratchet (not run: it writes the baseline).",
     `Inlined-from citation spans: exercised — \`parity:api:inlined:fix\` re-cited ${citationRewrites.length} file(s) (${inlinedStale} tags cite a changed file), restored afterwards.`,
     "",
     "## Not exercised",
-    table(["Step", "Upstream count that predicts it"], notExercised),
+    table(["Step", "Why", "Upstream count that predicts it"], notExercised),
     "",
     "## Ruby source and body pins",
     table(
@@ -549,7 +519,7 @@ async function main(argv: string[], env: Env): Promise<number> {
   return touched.length === 0 ? 0 : 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] !== undefined && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main(process.argv.slice(2), process.env).then(
     (code) => (process.exitCode = code),
     (err) => {
