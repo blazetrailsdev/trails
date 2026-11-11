@@ -1,6 +1,6 @@
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
-import { SystemExit } from "@blazetrails/ruby-compat";
+import { SystemExit, Timeout } from "@blazetrails/ruby-compat";
 import { Process } from "../../lib/process.js";
 import { Supervisor } from "../../lib/supervisor.js";
 
@@ -24,19 +24,31 @@ export function runSupervisor(options: { [key: string]: unknown } = {}) {
     get supervisor() {
       return supervisors[0];
     },
-    async terminate(signal: "TERM" | "QUIT" = "TERM") {
-      const supervisor = supervisors[0];
-      if (supervisor === undefined || supervisor.isStopped()) return await running;
-      (supervisor as unknown as { signalQueue(): string[] }).signalQueue().push(signal);
-      await (supervisor as unknown as { interrupt(): Promise<void> }).interrupt();
-      await running;
+    async terminate(signal: "TERM" | "QUIT" = "TERM", { timeout = 10 } = {}) {
+      await Timeout.timeout(timeout, null, null, async () => {
+        const supervisor = supervisors[0];
+        if (supervisor === undefined || supervisor.isStopped()) return await running;
+        (supervisor as unknown as { signalQueue(): string[] }).signalQueue().push(signal);
+        await (supervisor as unknown as { interrupt(): Promise<void> }).interrupt();
+        await running;
+      });
     },
   };
 }
 
 export async function waitWhileWithTimeout(timeout: number, block: () => Promise<boolean>) {
+  try {
+    await waitWhileWithTimeoutBang(timeout, block);
+  } catch (e) {
+    if (!(e instanceof Timeout.Error)) throw e;
+  }
+}
+
+export async function waitWhileWithTimeoutBang(timeout: number, block: () => Promise<boolean>) {
   const end = Date.now() + timeout * 1000;
-  while (Date.now() < end && (await block())) await sleep(0.05);
+  await Timeout.timeout(timeout, null, null, async () => {
+    while (Date.now() < end && (await block())) await sleep(0.05);
+  });
 }
 
 export async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {
