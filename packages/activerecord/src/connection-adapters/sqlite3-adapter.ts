@@ -64,7 +64,15 @@ import {
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import { File, FileUtils, eachWithObject, rbRegSUnion, sortBy } from "@blazetrails/ruby-compat";
+import {
+  File,
+  FileUtils,
+  eachWithObject,
+  rbRegSUnion,
+  sortBy,
+  toA,
+  toH,
+} from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -441,8 +449,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async virtualTables(): Promise<Array<[string, [string, string]]>> {
     const query = "SELECT name, sql FROM sqlite_master WHERE sql LIKE 'CREATE VIRTUAL %';";
 
-    return [
-      ...eachWithObject(
+    return toA(
+      eachWithObject(
         (await this.execQuery(query, "SCHEMA")).castValues() as unknown[][],
         new Map<string, [string, string]>(),
         (row, memo) => {
@@ -451,7 +459,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
           memo.set(tableName, [moduleName, args]);
         },
       ),
-    ];
+    );
   }
 
   override async createVirtualTable(
@@ -606,18 +614,17 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       `PRAGMA foreign_key_list(${this.quote(tableName)})`,
       "SCHEMA",
     );
-    const fkDefs: Record<string, "immediate" | "deferred" | false> = Object.fromEntries(
-      (await this.tableStructureSql(tableName))
-        .filter(
-          (columnString) =>
-            columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
-        )
-        .map((fkString) => {
-          const [, from, table, to] = [...(fkString.match(SQLite3Adapter.FK_REGEX) ?? [])];
-          const [, mode] = [...(fkString.match(SQLite3Adapter.DEFERRABLE_REGEX) ?? [])];
-          const deferred = (mode?.toLowerCase() as "immediate" | "deferred" | undefined) || false;
-          return [[table, from, to].join(), deferred];
-        }),
+    const fkDefs = toH<string[], "immediate" | "deferred" | false, string>(
+      (await this.tableStructureSql(tableName)).filter(
+        (columnString) =>
+          columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+      ),
+      (fkString) => {
+        const [, from, table, to] = [...(fkString.match(SQLite3Adapter.FK_REGEX) ?? [])];
+        const [, mode] = [...(fkString.match(SQLite3Adapter.DEFERRABLE_REGEX) ?? [])];
+        const deferred = (mode?.toLowerCase() as "immediate" | "deferred" | undefined) || false;
+        return [[table, from, to], deferred];
+      },
     );
 
     const groupedFk: Array<Array<Record<string, unknown>>> = [
@@ -629,7 +636,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       const options: Partial<AddForeignKeyOptions> = {
         onDelete: this.extractForeignKeyAction(row["on_delete"] as string),
         onUpdate: this.extractForeignKeyAction(row["on_update"] as string),
-        deferrable: fkDefs[[row["table"], row["from"], row["to"]].join()],
+        deferrable: fkDefs.get([row["table"], row["from"], row["to"]] as string[]),
       };
 
       if (group.length === 1) {

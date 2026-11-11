@@ -127,14 +127,6 @@ interface FinderRelation {
   _offsets?: Record<number, any>;
 }
 
-function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
-  const conditions: Record<string, unknown> = {};
-  pk.forEach((col, i) => {
-    conditions[col] = tuple[i];
-  });
-  return conditions;
-}
-
 export function find(this: FinderRelation, block: (record: any) => unknown): Promise<any>;
 export function find(this: FinderRelation, ...args: unknown[]): Promise<any>;
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
@@ -577,7 +569,7 @@ export async function findOne(this: FinderRelation, id: unknown): Promise<any> {
 
   const pk = this.primaryKey;
   const relation = Array.isArray(pk)
-    ? this.where(buildPkWhere(pk, id as unknown[]))
+    ? this.where(Object.fromEntries(pk.map((col, i) => [col, (id as unknown[])[i] ?? null])))
     : this.where({ [pk]: id });
   const record = await relation.take();
   if (!record) {

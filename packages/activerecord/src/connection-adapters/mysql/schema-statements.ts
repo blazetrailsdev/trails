@@ -148,10 +148,10 @@ export class SchemaStatements extends BaseSchemaStatements {
           const orders = hashDelete(options, "orders") as IndexOptions["orders"];
           const lengths = hashDelete(options, "lengths") as IndexOptions["lengths"];
 
-          // eslint-disable-next-line blazetrails/ruby-compat-native-required -- addOptionsForIndexColumns takes a Hash
-          const columns = toH<string, string>(
-            index[3].map((name) => [name, expressions[name] ?? this.quoteColumnName(name)]),
-          );
+          const columns = toH<string, string, string>(index[3], (name) => [
+            name,
+            expressions[name] ?? this.quoteColumnName(name),
+          ]);
 
           (index as unknown[])[3] = Array.from(
             (

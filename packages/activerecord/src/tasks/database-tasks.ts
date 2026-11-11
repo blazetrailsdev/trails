@@ -73,10 +73,14 @@ export class DatabaseTasks {
   static set dbDir(value: string) {
     this._dbDir = value;
   }
-  private static _migrationsPaths: string[] = ["db/migrate"];
+  private static _migrationsPaths: string[] | Promise<string[]> | null = null;
 
-  static get migrationsPaths(): string[] {
-    return this._migrationsPaths;
+  static get migrationsPaths(): Promise<string[]> {
+    return Promise.resolve(
+      (this._migrationsPaths ??= TopLevel.Trails!.application!.config.paths()
+        .get("db/migrate")!
+        .toA()),
+    );
   }
 
   static set migrationsPaths(value: string[]) {

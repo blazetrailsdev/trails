@@ -80,6 +80,7 @@ async function runTaskLogging(task: string, logs: string[]): Promise<void> {
 async function runTask(task: string, vars: Record<string, string> = {}): Promise<void> {
   const was = Object.fromEntries(Object.keys(vars).map((k) => [k, env[k]]));
   const seats = DatabaseTasks as unknown as Record<string, unknown>;
+  const migratorPathsWas = Migrator.migrationsPaths;
   const seatsWas = ["_root", "_dbDir", "_migrationsPaths", "_seedLoader"].map(
     (k) => [k, seats[k]] as const,
   );
@@ -118,7 +119,7 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
     for (const [k, v] of seatsWas) seats[k] = v;
     Trails.application = null;
     Application.appClass = null;
-    Migrator.migrationsPaths = DatabaseTasks.migrationsPaths;
+    Migrator.migrationsPaths = migratorPathsWas;
     await Base.connectionHandler.clearAllConnectionsBang();
   }
 }

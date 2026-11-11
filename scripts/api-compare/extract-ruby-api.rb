@@ -3476,10 +3476,14 @@ class ApiExtractor
 
   # Core Ruby methods whose return is Array UNCONDITIONALLY, regardless of
   # what receiver_kind can prove about their OWN receiver — `String#split`,
-  # `String#scan` (`vendor/ruby/v3.3.11/string.c`). Deliberately tiny and hand-picked:
-  # each name's return type is fixed by the method's contract, never by an
-  # argument or a subclass override in any file this extractor has seen.
-  CORE_ARRAY_RETURNING_CHAIN_METHODS = %w[split scan].freeze
+  # `String#scan` (`vendor/ruby/v3.3.11/string.c`), `Array#zip` / `Enumerable#zip`
+  # (`rb_ary_zip`, `vendor/ruby/v3.3.11/array.c:4422`; a block makes it answer `nil`,
+  # but a block wraps the call, so a chained `.zip(y)` node has none) and
+  # `Array#sort` / `Enumerable#sort` (`rb_ary_sort`, `array.c:3473`). Deliberately
+  # tiny and hand-picked: each name's return type is fixed by the method's
+  # contract, never by an argument or a subclass override in any file this
+  # extractor has seen (no vendored gem defines `zip` or `sort`).
+  CORE_ARRAY_RETURNING_CHAIN_METHODS = %w[split scan zip sort].freeze
 
   # Hash core methods whose return is Array WHEN the receiver is already
   # proven `hash` — `Hash#keys`, `Hash#values` (`vendor/ruby/v3.3.11/hash.c`). Unlike

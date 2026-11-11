@@ -12,6 +12,7 @@ import {
   rbObjRespondTo,
   setEnv,
   filterMap,
+  toA,
 } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import {
@@ -740,7 +741,7 @@ export class PostgreSQLAdapter
       allowRetry: true,
       materializeTransactions: false,
     });
-    return Array.from(
+    return toA(
       eachWithObject(
         result.castValues() as unknown[][],
         new Map<string, string[]>(),

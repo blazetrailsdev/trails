@@ -42,12 +42,12 @@ DSL.namespace("db", (dbNamespace) => {
 
   DSL.task(
     { load_config: "environment" },
-    block(() => {
+    block(async () => {
       if (Base.configurations().empty) {
         Base.configurations(DatabaseTasks.databaseConfiguration!);
       }
 
-      Migrator.migrationsPaths = DatabaseTasks.migrationsPaths;
+      Migrator.migrationsPaths = await DatabaseTasks.migrationsPaths;
     }),
   );
 
@@ -769,7 +769,7 @@ DSL.namespace("railties", () => {
             throw new RuntimeError(`${ENV["DATABASE"]} does not have a custom migration path`);
           }
         } else {
-          destination = DatabaseTasks.migrationsPaths[0];
+          destination = (await DatabaseTasks.migrationsPaths)[0];
         }
 
         await Migration.copy(destination as string, railties, { onSkip, onCopy });

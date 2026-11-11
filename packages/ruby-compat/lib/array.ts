@@ -968,13 +968,16 @@ export function each<R extends object>(
 }
 
 /**
- * Ruby `Array#to_h` with no block (`vendor/ruby/v3.3.11/array.c:2988` `rb_ary_to_h`):
- * a Hash of the receiver's `[key, value]` pairs. The block arm is not ported:
- * nothing calls it.
+ * Ruby `Array#to_h` (`vendor/ruby/v3.3.11/array.c:2988` `rb_ary_to_h`): a Hash of
+ * the receiver's `[key, value]` pairs, or of the pairs the block answers for
+ * each element.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function toH<K = unknown, V = unknown>(ary: readonly unknown[]): Hash<K, V>;
+export function toH<K = unknown, V = unknown, T = unknown>(
+  ary: readonly T[],
+  block?: (e: T) => readonly [K, V],
+): Hash<K, V>;
 /**
  * The `to_h` send for any other receiver: its own `toH`, and a plain object,
  * which is a Hash, answers itself (`vendor/ruby/v3.3.11/hash.c:3018` `rb_hash_to_h`).
@@ -983,7 +986,7 @@ export function toH<K = unknown, V = unknown>(ary: readonly unknown[]): Hash<K, 
  */
 export function toH<T extends object>(obj: T | { toH(): T }): T;
 /** @noRailsEquivalent PERMANENT — Ruby core `rb_ary_to_h` (`vendor/ruby/v3.3.11/array.c:2988`). */
-export function toH(ary: object): unknown {
+export function toH(ary: object, block?: (e: unknown) => unknown): unknown {
   if (!Array.isArray(ary)) {
     if (typeof (ary as { toH?: unknown }).toH === "function") {
       return (ary as { toH(): unknown }).toH();
@@ -992,7 +995,8 @@ export function toH(ary: object): unknown {
   }
   const hash = new Hash<unknown, unknown>();
   for (let i = 0; i < ary.length; i++) {
-    const keyValuePair = ary[i];
+    const e = ary[i];
+    const keyValuePair = block ? block(e) : e;
     if (!Array.isArray(keyValuePair)) {
       throw new TypeError(
         `wrong element type ${rbBuiltinClassName(keyValuePair)} at ${i} (expected array)`,
@@ -1014,7 +1018,21 @@ export function toH(ary: object): unknown {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function toA<T>(ary: T[]): T[] {
+export function toA<T>(ary: T[]): T[];
+/**
+ * `Hash#to_a` (`vendor/ruby/v3.3.11/hash.c:3428` `rb_hash_to_a`), its `[key, value]`
+ * pairs, for a `Map` or a plain object, and `Enumerable#to_a` (`enum.c:711`
+ * `enum_to_a`) for a `Set`: each element the receiver iterates, in order.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toA<T>(enumerable: Iterable<T>): T[];
+/** @noRailsEquivalent PERMANENT */
+export function toA(hash: object): unknown[];
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_ary_to_a` (`vendor/ruby/v3.3.11/array.c:2952`). */
+export function toA<T>(ary: T[] | Iterable<T> | object): unknown[] {
+  if (isPlainHash(ary)) return Object.entries(ary);
+  if (!Array.isArray(ary)) return [...(ary as Iterable<T>)];
   if (ary.constructor !== Array) {
     const dup: T[] = [];
     dup.push(...ary);

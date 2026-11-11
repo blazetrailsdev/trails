@@ -11,6 +11,7 @@ import {
   isModuleIncluded,
   rbObjRespondTo,
   sort,
+  toH,
   synchronize,
 } from "@blazetrails/ruby-compat";
 import { atomicWrite, indexBy } from "@blazetrails/activesupport";
@@ -648,10 +649,14 @@ export class SchemaCache {
   }
 
   encodeWith(coder: Record<string, unknown>): void {
-    coder["columns"] = new Map(sort([...this._columns]));
-    coder["primary_keys"] = new Map(sort([...this._primaryKeys]));
-    coder["data_sources"] = new Map(sort([...this._dataSources]));
-    coder["indexes"] = new Map(sort([...this._indexes]));
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
+    coder["columns"] = toH(sort([...this._columns]));
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
+    coder["primary_keys"] = toH(sort([...this._primaryKeys]));
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
+    coder["data_sources"] = toH(sort([...this._dataSources]));
+    // eslint-disable-next-line blazetrails/ruby-compat-native-required -- SchemaCache holds Hashes, which initWith reads back as Maps
+    coder["indexes"] = toH(sort([...this._indexes]));
     coder["version"] = this._version;
   }
 

@@ -25,6 +25,7 @@ import {
   TypeError,
   filterMap,
   rbObjIsKindOf,
+  toA,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -1221,12 +1222,6 @@ export function flattenedArgs(args: unknown[]): unknown[] {
   );
 }
 
-function toA(value: unknown[] | Map<unknown, unknown> | Record<string, unknown>): unknown[] {
-  if (Array.isArray(value)) return value;
-  if (value instanceof Map) return [...value].map(([k, v]) => [k, v]);
-  return Object.entries(value);
-}
-
 const VALID_DIRECTIONS = new Set([":asc", ":desc", ":ASC", ":DESC", "asc", "desc", "ASC", "DESC"]);
 
 /** @internal */
@@ -1239,7 +1234,7 @@ export function validateOrderArgs(this: QueryMethodsHost, args: unknown[]): void
         validateOrderArgs.call(this, [value]);
       } else if (!VALID_DIRECTIONS.has(value as string)) {
         throw new ArgumentError(
-          `Direction "${value}" is invalid. Valid directions are: ${rbInspect([...VALID_DIRECTIONS])}`,
+          `Direction "${value}" is invalid. Valid directions are: ${rbInspect(toA(VALID_DIRECTIONS))}`,
         );
       }
     });
