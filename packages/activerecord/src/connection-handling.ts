@@ -1,3 +1,4 @@
+import { Relation } from "./relation.js";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -342,7 +343,7 @@ export function withRoleAndShard<T>(
 
       appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: [this] }));
       const load = (returnValue: unknown) => {
-        if (returnValue instanceof ActiveRecord.Relation) return returnValue.load();
+        if (returnValue instanceof Relation) return returnValue.load();
         return returnValue;
       };
       const returnValue = fn();

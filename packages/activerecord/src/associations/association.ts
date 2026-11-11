@@ -1,8 +1,8 @@
+import { AssociationRelation } from "../association-relation.js";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
 import type { AssociationDefinition, AssociationOptions } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
-import { ActiveRecord } from "../namespaces.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import type { AssociationReflection, ThroughReflection } from "../reflection.js";
 import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesupport";
@@ -440,9 +440,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
 
   /** @internal */
   protected targetScope(): any {
-    return ActiveRecord.AssociationRelation.create(this.klass, this).mergeBang(
-      this.klass.scopeForAssociation(),
-    );
+    return AssociationRelation.create(this.klass, this).mergeBang(this.klass.scopeForAssociation());
   }
 
   /** @internal */

@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { Fixture, FixtureError, FixtureSet, FormatError } from "./fixtures.js";
-import { StandardError } from "@blazetrails/ruby-compat";
+import { WhereClause } from "./relation/where-clause.js";
+import { IndexedRow } from "./result.js";
+import { rbModName, StandardError } from "@blazetrails/ruby-compat";
 import {
   HashWithIndifferentAccess,
   OID_NAMESPACE,
@@ -332,5 +334,13 @@ describe("FixtureSet.compositeIdentify", () => {
       d: 893028161,
       e: 712314499,
     });
+  });
+});
+
+describe("plain ActiveRecord seats keep their nested class paths", () => {
+  it("names the nested constants under their seated owners", () => {
+    expect(rbModName(FixtureFile)).toBe("ActiveRecord::FixtureSet::File");
+    expect(rbModName(WhereClause)).toBe("ActiveRecord::Relation::WhereClause");
+    expect(rbModName(IndexedRow)).toBe("ActiveRecord::Result::IndexedRow");
   });
 });
