@@ -1,19 +1,7 @@
 {
-  "ar-01": {
-    "side": "diff",
-    "reason": "Datetime SQL serialization does not honour column precision: trails serializes Date binds with microsecond precision ('.677000'), Rails truncates to whole seconds when the DATETIME column has no precision spec (as in this fixture's bare `created_at DATETIME`). Rails: 'reviews.created_at > ''2026-04-19 00:46:48'''; trails: 'reviews.created_at > ''2026-04-19 00:46:48.677000'''. Flakes by frozen-at: PR #854 'closed' this gap because that run's frozen-at landed on a whole second. Real fix is in Date→SQL serialization to drop fractional seconds for unscaled DATETIME columns."
-  },
-  "ar-52": {
-    "side": "diff",
-    "reason": "Same datetime-precision gap as ar-01 (BETWEEN form): rails binds are 'YYYY-MM-DDTHH:MM:SS.000Z' (truncated to seconds for an unprecisioned DATETIME column), trails binds keep the millisecond component from the frozen-at value, and the inlined SQL gains '.NNN000' microseconds. Flakes whenever the parity workflow's frozen-at is not on a whole second."
-  },
-  "ar-65": {
-    "side": "diff",
-    "reason": "Same datetime-precision gap as ar-01/ar-52 (equality form): Order.where(created_at: Time.now) — rails truncates to whole seconds for the unprecisioned DATETIME column, trails keeps subsecond precision in both the bind and the inlined SQL. Flakes whenever the frozen-at is not on a whole second."
-  },
   "ar-170": {
     "side": "diff",
-    "reason": "Float values in Range lose decimal precision: where({ rating: new Range(3.5, 5.0) }) produces BETWEEN 3.5 AND 5 instead of BETWEEN 3.5 AND 5.0. JavaScript numbers don't distinguish 5 from 5.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 5.0 as '5.0'. Real fix: the SQL value serializer must emit floats with at least one decimal digit (e.g. 5 → 5.0) to match Rails' Float#to_s behavior."
+    "reason": "Float values in Range lose decimal precision: where({ rating: new Range(3.5, 5.0) }) produces BETWEEN 3.5 AND 5 instead of BETWEEN 3.5 AND 5.0. JavaScript numbers don't distinguish 5 from 5.0, so the SQL literal omits the decimal. Rails serializes Ruby Float 5.0 as '5.0'. Real fix: the SQL value serializer must emit floats with at least one decimal digit (e.g. 5 \u2192 5.0) to match Rails' Float#to_s behavior."
   },
   "ar-173": {
     "side": "diff",
@@ -29,6 +17,6 @@
   },
   "ar-179": {
     "side": "diff",
-    "reason": "Float 0.0 loses its decimal point: where({ rating: 0.0 }) produces = 0 instead of = 0.0. JavaScript 0.0 === 0 so the decimal is dropped during SQL serialization. Rails serializes Ruby Float 0.0 as '0.0'. Same root as ar-173/174/176 — Real fix: SQL value serializer must emit floats with at least one decimal digit."
+    "reason": "Float 0.0 loses its decimal point: where({ rating: 0.0 }) produces = 0 instead of = 0.0. JavaScript 0.0 === 0 so the decimal is dropped during SQL serialization. Rails serializes Ruby Float 0.0 as '0.0'. Same root as ar-173/174/176 \u2014 Real fix: SQL value serializer must emit floats with at least one decimal digit."
   }
 }
