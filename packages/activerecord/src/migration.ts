@@ -1405,7 +1405,7 @@ export class MigrationProxy {
   filename: string;
   scope: string;
 
-  private _migration: Migration | null = null;
+  private _migration: Promise<Migration> | null = null;
 
   constructor(name: string, version: number, filename: string, scope: string) {
     this.name = name;
@@ -1436,8 +1436,15 @@ export class MigrationProxy {
   }
 
   /** @internal */
-  async migration(): Promise<Migration> {
-    return (this._migration ??= await this.loadMigration());
+  migration(): Promise<Migration> {
+    if (this._migration == null) {
+      const loading = this.loadMigration();
+      this._migration = loading;
+      loading.catch(() => {
+        if (this._migration === loading) this._migration = null;
+      });
+    }
+    return this._migration;
   }
 
   /** @internal */
