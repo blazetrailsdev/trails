@@ -48,9 +48,12 @@ class ExplicitLayoutMailer extends Base {
   static {
     this.setMailerName("explicit_layout_mailer");
     this.prependViewPath(FIXTURES);
-    (this as unknown as { layout: typeof layout }).layout("spam", {
-      except: ["logout"],
-    });
+    (this as unknown as ThisParameterType<typeof layout> & { layout: typeof layout }).layout(
+      "spam",
+      {
+        except: ["logout"],
+      },
+    );
     this.default({ to: "test@localhost", subject: "You have a mail", from: "tester@example.com" });
   }
 
