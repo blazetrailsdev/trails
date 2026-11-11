@@ -52,6 +52,19 @@ describe("MigrationProxy", () => {
     await expect(proxy.disableDdlTransaction).resolves.toBe(true);
   });
 
+  it("migration() retries a load that failed, as @migration ||= memoizes only success", async () => {
+    const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
+    const sentinel = new CreateUsers("CreateUsers", 1);
+    const spy = vi
+      .spyOn(proxy, "loadMigration")
+      .mockRejectedValueOnce(new Error("boom"))
+      .mockResolvedValueOnce(sentinel);
+
+    await expect(proxy.migration()).rejects.toThrow("boom");
+    await expect(proxy.migration()).resolves.toBe(sentinel);
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
   it("migration() caches the result of loadMigration()", async () => {
     const proxy = new MigrationProxy("CreateUsers", 1, "/fake/path.ts", "");
     const sentinel = new CreateUsers("CreateUsers", 1);

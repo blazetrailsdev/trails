@@ -30,6 +30,10 @@ export class LibSQLRemoteAdapter extends AbstractAdapter {
     };
   }
 
+  override async databaseExists(): Promise<boolean> {
+    return super.databaseExists();
+  }
+
   protected static defaultSqliteDriver(): SqliteDriver {
     return libsqlRemoteDriver;
   }
@@ -38,7 +42,7 @@ export class LibSQLRemoteAdapter extends AbstractAdapter {
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface LibSQLRemoteAdapter extends Omit<
   SQLite3Adapter,
-  keyof AbstractAdapter | "_connectionParameters"
+  keyof AbstractAdapter | "_connectionParameters" | "databaseExists"
 > {}
 
 include(LibSQLRemoteAdapter, SQLite3Adapter);
