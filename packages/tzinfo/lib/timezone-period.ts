@@ -1,49 +1,28 @@
-import { TimezoneOffset } from "./timezone-offset.js";
+import { ArgumentError, NotImplementedError } from "@blazetrails/ruby-compat";
+import type { Timestamp } from "./timestamp.js";
+import type { TimezoneOffset } from "./timezone-offset.js";
 import type { TimezoneTransition } from "./timezone-transition.js";
 
 export class TimezonePeriod {
-  readonly abbreviation: string;
-  readonly observedUtcOffset: number;
-  readonly baseUtcOffset: number;
-  private readonly _dst: boolean;
+  readonly offset: TimezoneOffset;
 
-  constructor(
-    abbreviation: string,
-    observedUtcOffset: number,
-    dst: boolean,
-    baseUtcOffset = observedUtcOffset,
-    transitions: () => (TimezoneTransition | null)[] = () => [null, null],
-  ) {
-    this.abbreviation = abbreviation;
-    this.observedUtcOffset = observedUtcOffset;
-    this.baseUtcOffset = baseUtcOffset;
-    this._dst = dst;
-    this.#transitions = transitions;
-  }
-
-  #transitions: (() => (TimezoneTransition | null)[]) | (TimezoneTransition | null)[];
-
-  #boundaries(): (TimezoneTransition | null)[] {
-    if (typeof this.#transitions === "function") this.#transitions = this.#transitions();
-    return this.#transitions;
+  constructor(offset: TimezoneOffset | null) {
+    if (!offset) throw new ArgumentError("offset must be specified");
+    this.offset = offset;
   }
 
   /** @missingRailsCall raise_not_implemented — CONVERGEABLE tzinfo-offset-transition-and-periods */
   get startTransition(): TimezoneTransition | null {
-    return this.#boundaries()[0];
+    return this.raiseNotImplemented("start_transition");
   }
 
   /** @missingRailsCall raise_not_implemented — CONVERGEABLE tzinfo-offset-transition-and-periods */
   get endTransition(): TimezoneTransition | null {
-    return this.#boundaries()[1];
+    return this.raiseNotImplemented("end_transition");
   }
 
-  get offset(): TimezoneOffset {
-    return new TimezoneOffset(this.baseUtcOffset, this.stdOffset, this.abbreviation);
-  }
-
-  get abbr(): string {
-    return this.abbreviation;
+  get baseUtcOffset(): number {
+    return this.offset.baseUtcOffset;
   }
 
   get utcOffset(): number {
@@ -51,7 +30,23 @@ export class TimezonePeriod {
   }
 
   get stdOffset(): number {
-    return this.observedUtcOffset - this.baseUtcOffset;
+    return this.offset.stdOffset;
+  }
+
+  get abbreviation(): string {
+    return this.offset.abbreviation;
+  }
+
+  get abbr(): string {
+    return this.abbreviation;
+  }
+
+  get zoneIdentifier(): string {
+    return this.abbreviation;
+  }
+
+  get observedUtcOffset(): number {
+    return this.offset.observedUtcOffset;
   }
 
   get utcTotalOffset(): number {
@@ -59,21 +54,24 @@ export class TimezonePeriod {
   }
 
   isDst(): boolean {
-    return this._dst;
+    return this.offset.isDst();
   }
 
-  equals(other: unknown): boolean {
-    if (!(other instanceof TimezonePeriod)) return false;
-    if (this.startTransition === null && this.endTransition === null) {
-      return (
-        other.startTransition === null &&
-        other.endTransition === null &&
-        other.offset.equals(this.offset)
-      );
-    }
-    return (
-      (other.startTransition?.equals(this.startTransition) ?? this.startTransition === null) &&
-      (other.endTransition?.equals(this.endTransition) ?? this.endTransition === null)
-    );
+  startsAt(): Timestamp | null {
+    return this.timestamp(this.startTransition);
+  }
+
+  endsAt(): Timestamp | null {
+    return this.timestamp(this.endTransition);
+  }
+
+  /** @internal */
+  private raiseNotImplemented(methodName: string): never {
+    throw new NotImplementedError(`Subclasses must override ${methodName}`);
+  }
+
+  /** @internal */
+  private timestamp(transition: TimezoneTransition | null): Timestamp | null {
+    return transition ? transition.at() : null;
   }
 }

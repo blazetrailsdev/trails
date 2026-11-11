@@ -20,7 +20,10 @@ import {
   tzdataOffsetInstant,
 } from "@blazetrails/date";
 import { Rational, rbModName } from "@blazetrails/ruby-compat";
-import { TimezonePeriod } from "./timezone-period.js";
+import { OffsetTimezonePeriod } from "./offset-timezone-period.js";
+import { TimezoneOffset } from "./timezone-offset.js";
+import type { TimezonePeriod } from "./timezone-period.js";
+import { TransitionsTimezonePeriod } from "./transitions-timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
 import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
 import { DataTimezoneInfo } from "./data-sources/data-timezone-info.js";
@@ -464,55 +467,42 @@ export class Timezone {
 
   /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
   periodForUtc(time: Time): TimezonePeriod {
-    const d = toDate(time);
-    const observed = this.observedUtcOffset(d);
-    const dst = this.isDst(d);
-    if (this.info instanceof ConstantOffsetDataTimezoneInfo) {
-      const offset = this.info.constantOffset;
-      return new TimezonePeriod(offset.abbreviation, observed, dst, offset.baseUtcOffset);
-    }
-    const at = Math.floor(d.getTime() / 1000);
+    if (this.info instanceof ConstantOffsetDataTimezoneInfo)
+      return new OffsetTimezonePeriod(this.info.constantOffset);
+    const at = Math.floor(toDate(time).getTime() / 1000);
+    const [initialBase, baseInstants, bases] = tzdataBaseOffsets(this.identifier) ?? [null, [], []];
+    const offsetAt = (seconds: number): TimezoneOffset => {
+      const d = new Date(seconds * 1000);
+      const observed = this.observedUtcOffset(d);
+      let i = 0;
+      while (i < baseInstants.length && baseInstants[i] <= seconds) i++;
+      const base = (i === 0 ? initialBase : bases[i - 1]) ?? observed;
+      return new TimezoneOffset(base, observed - base, this.abbr(d));
+    };
     const flips = tzdataIsdstFlips(this.identifier);
     let flipIndex = 0;
     while (flipIndex < flips.length && flips[flipIndex] <= at) flipIndex++;
-    const lastFlip = flips[flipIndex - 1];
-    const [initialBase, baseInstants, bases] = tzdataBaseOffsets(this.identifier) ?? [
-      observed,
-      [],
-      [],
-    ];
     let baseIndex = 0;
     while (baseIndex < baseInstants.length && baseInstants[baseIndex] <= at) baseIndex++;
-    const base = baseIndex === 0 ? initialBase : bases[baseIndex - 1];
-    const periodAt = (seconds: number) =>
-      this.periodForUtc(Time.at(new Rational(seconds * 1000, 1000)).getutc());
-    const zoned = () =>
-      Temporal.Instant.fromEpochMilliseconds(at * 1000 + 1).toZonedDateTimeISO(this.identifier);
-    const period: TimezonePeriod = new TimezonePeriod(this.abbr(d), observed, dst, base, () => {
-      const previous = zoned().getTimeZoneTransition("previous");
-      const next = zoned().getTimeZoneTransition("next");
-      const starts = [
-        lastFlip,
-        baseInstants[baseIndex - 1],
-        previous && previous.epochMilliseconds / 1000,
-      ];
-      const ends = [
-        flips[flipIndex],
-        baseInstants[baseIndex],
-        next && next.epochMilliseconds / 1000,
-      ];
-      const start = Math.max(...starts.filter((s): s is number => s != null));
-      const end = Math.min(...ends.filter((e): e is number => e != null));
-      return [
-        Number.isFinite(start)
-          ? new TimezoneTransition(period.offset, periodAt(start - 1).offset, start)
-          : null,
-        Number.isFinite(end)
-          ? new TimezoneTransition(periodAt(end).offset, period.offset, end)
-          : null,
-      ];
-    });
-    return period;
+    const zoned = Temporal.Instant.fromEpochMilliseconds(at * 1000 + 1).toZonedDateTimeISO(
+      this.identifier,
+    );
+    const previous = zoned.getTimeZoneTransition("previous");
+    const next = zoned.getTimeZoneTransition("next");
+    const starts = [
+      flips[flipIndex - 1],
+      baseInstants[baseIndex - 1],
+      previous && previous.epochMilliseconds / 1000,
+    ];
+    const ends = [flips[flipIndex], baseInstants[baseIndex], next && next.epochMilliseconds / 1000];
+    const start = Math.max(...starts.filter((s): s is number => s != null));
+    const end = Math.min(...ends.filter((e): e is number => e != null));
+    const offset = offsetAt(at);
+    if (!Number.isFinite(start) && !Number.isFinite(end)) return new OffsetTimezonePeriod(offset);
+    return new TransitionsTimezonePeriod(
+      Number.isFinite(start) ? new TimezoneTransition(offset, offsetAt(start - 1), start) : null,
+      Number.isFinite(end) ? new TimezoneTransition(offsetAt(end), offset, end) : null,
+    );
   }
 
   /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
