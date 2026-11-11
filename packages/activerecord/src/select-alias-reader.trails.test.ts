@@ -123,6 +123,17 @@ describe("select alias dynamic reader (trails)", () => {
     expect((record as Comment & { bumped_id: unknown }).bumped_id).not.toBeUndefined();
   });
 
+  it("reloads a record without materializing its attribute set", async () => {
+    const aliased = Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
+    const record = (await aliased)[0] as Comment & { bumped_id: unknown };
+    await aliased.scoping({ allQueries: true }, async () => {
+      await record.reload();
+    });
+    const attributes = (record as unknown as { _attributes: { _attributes: object } })._attributes;
+    expect(Object.keys(attributes._attributes)).toEqual([]);
+    expect(record.bumped_id).not.toBeUndefined();
+  });
+
   it("keeps the alias reader on a record loaded through marshal_load", async () => {
     const record = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id"))[0];
     const loaded = Comment.allocate() as Comment & { bumped_id: unknown };

@@ -321,6 +321,10 @@ describe("loadSchemaFromAdapter integration details", () => {
       tableName: "posts",
       isAbstractClass: () => false,
       prototype: {},
+      connectionPool: () => ({
+        activeConnection: host.adapter,
+        withConnectionSync: (block: (connection: unknown) => unknown) => block(host.adapter),
+      }),
     };
 
     const inflight = (loadSchemaFromAdapter as any).call(host);

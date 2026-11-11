@@ -93,6 +93,8 @@ describe("TimeZoneConversionTest", () => {
       dataSourceExists: async () => true,
       columnsHash: async () => cols,
       getCachedColumnsHash: () => cols,
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => true,
       isCached: () => true,
       primaryKeys: async () => null,
     };
