@@ -4,6 +4,7 @@ import { HelperMethods } from "./validations/helper-methods.js";
 import {
   Callbacks as ASCallbacks,
   include,
+  included,
   runLoadHooks,
   ToJsonWithActiveSupportEncoder,
   type Included,
@@ -53,6 +54,12 @@ function _includesAttributes(klass: { prototype: object }): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Model {
+  /** @noRailsEquivalent CONVERGEABLE model-is-an-includable-concern */
+  static [included](base: { new (...args: never[]): unknown; prototype: object }): void {
+    include(base, API);
+    include(base, Access);
+  }
+
   declare static paramDelimiter: string;
   declare private static _modelName: ModelName | null;
   declare static _validators: Hash<string | null, Array<ValidatorLike>>;

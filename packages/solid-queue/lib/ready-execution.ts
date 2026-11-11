@@ -83,7 +83,10 @@ export class ReadyExecution extends Execution {
       processId,
       async (claimed) => {
         const byJobId = indexBy(records, (execution) => execution.job_id);
-        const idsToDelete = claimed.map((execution) => byJobId[execution.job_id].id);
+        const idsToDelete = claimed
+          .map((execution) => execution.job_id)
+          .map((jobId) => byJobId[jobId] ?? null)
+          .map((execution) => execution.id);
         await this.where({ id: idsToDelete }).deleteAll();
       },
     );
