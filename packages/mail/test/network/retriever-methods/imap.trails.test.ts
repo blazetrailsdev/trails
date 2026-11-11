@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ArgumentError, TopLevel } from "@blazetrails/ruby-compat";
 import { Mail } from "../../../lib/index.js";
+import type { RetrieverOptions } from "../../../lib/network/retriever-methods/base.js";
 import { NetIMAP } from "../../support/mock-imap.js";
 
 const Net = TopLevel.Net as { IMAP?: unknown };
@@ -17,7 +18,7 @@ describe("IMAP Retriever", () => {
   });
 
   it("raises ArgumentError for a negative count as Array#first does", () => {
-    for (const options of [{ count: -1 }, { count: -1, what: "last" }]) {
+    for (const options of [{ count: -1 }, { count: -1, what: "last" }] as RetrieverOptions[]) {
       let error: unknown;
       try {
         Mail.find(options);
