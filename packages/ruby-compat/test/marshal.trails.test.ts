@@ -180,30 +180,24 @@ const LOADED: Record<string, unknown> = {
   "string binary": Uint8Array.of(0xc3, 0xa9, 0xff),
   "string us-ascii": "abc",
   "string shift_jis": "あ",
-  array: [1, "a", null, [], new Hash()],
+  array: [1, "a", null, [], {}],
   hash: hash(
     [
       ["a", 1],
       [":b", [2]],
-      [3, new Hash()],
+      [3, {}],
     ],
     new Hash(),
   ),
-  "hash string keys": hash(
-    [
-      ["a", 1],
-      ["b", null],
-    ],
-    new Hash(),
-  ),
-  "user marshal": Array(2).fill(new Cache(1, hash([["posts", [shared]]], new Hash()))),
+  "hash string keys": { a: 1, b: null },
+  "user marshal": Array(2).fill(new Cache(1, { posts: [shared] })),
   "schema cache": [
     20240101000000,
-    hash([["posts", [new Column("id", ":integer")]]], new Hash()),
-    new Hash(),
-    hash([["posts", "id"]], new Hash()),
-    hash([["posts", true]], new Hash()),
-    new Hash(),
+    { posts: [new Column("id", ":integer")] },
+    {},
+    { posts: "id" },
+    { posts: true },
+    {},
   ],
 };
 
@@ -516,7 +510,7 @@ describe("Marshal.load", () => {
     expect(() => Marshal.load('\x04\b[\x08"\x07\xc3\xa9I@\x06\x06:\x06ET@\x07')).toThrow(
       new ArgumentError("dump format error (unlinked)"),
     );
-    expect(Marshal.load("\x04\bI{\x00\x06:\x06KT")).toEqual(new Hash());
+    expect(Marshal.load("\x04\bI{\x00\x06:\x06KT")).toEqual({});
     expect(() => Marshal.load("\x04\bI[\x00\x06:\x06KT")).toThrow(
       new ArgumentError("ruby2_keywords flag is given but [] is not a Hash"),
     );

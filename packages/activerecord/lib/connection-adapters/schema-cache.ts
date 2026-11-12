@@ -574,6 +574,7 @@ export class SchemaCache {
     ];
   }
 
+  /** @inventedArm if — CONVERGEABLE schema-cache-state-is-plain-objects */
   marshalLoad(array: unknown[]): void {
     let _columnsHash: unknown, _databaseVersion: unknown;
     [
@@ -594,6 +595,12 @@ export class SchemaCache {
       unknown,
     ];
     this._indexes ??= new Map();
+    if (!(this._columns instanceof Map)) this._columns = new Map(Object.entries(this._columns));
+    if (!(this._primaryKeys instanceof Map))
+      this._primaryKeys = new Map(Object.entries(this._primaryKeys));
+    if (!(this._dataSources instanceof Map))
+      this._dataSources = new Map(Object.entries(this._dataSources));
+    if (!(this._indexes instanceof Map)) this._indexes = new Map(Object.entries(this._indexes));
 
     this.deriveColumnsHashAndDeduplicateValues();
   }

@@ -1044,7 +1044,7 @@ function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadAr
         if (hasEncoding) hasEncoding.value = true;
         obj = str;
       } else if (sym === "K") {
-        if (!(obj instanceof Map)) {
+        if (!(obj instanceof Map || rbObjIsKindOf(obj, Hash))) {
           throw new ArgumentError(
             `ruby2_keywords flag is given but ${rbObjAsString(obj)} is not a Hash`,
           );
@@ -1174,6 +1174,7 @@ function rObjectFor(
   ivp: { value: boolean } | null,
   extmod: Module[] | null,
   type: number,
+  uclass = false,
 ): unknown {
   let v: unknown;
   let hashNewWithSize = (): Hash<unknown, unknown> => new Hash();
@@ -1243,7 +1244,7 @@ function rObjectFor(
           hashNewWithSize = () => new Hash().compareByIdentity();
           continue;
         }
-        v = rObjectFor(arg, null, extmod, type);
+        v = rObjectFor(arg, null, extmod, type, true);
         if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v as unknown)) {
           throw new ArgumentError("dump format error (user class)");
         }
@@ -1354,6 +1355,7 @@ function rObjectFor(
         let len = rLong(arg);
         const hash = hashNewWithSize();
 
+        const idx = arg.data.size;
         v = rEntry(hash, arg);
         while (len--) {
           const key = rObject(arg);
@@ -1362,6 +1364,12 @@ function rObjectFor(
         }
         if (type === TYPE_HASH_DEF) {
           hash.setDefault(rObject(arg));
+        } else if (
+          !uclass &&
+          !hash.isCompareByIdentity() &&
+          [...hash.keys()].every((key) => typeof key === "string")
+        ) {
+          v = rEntry0(Object.fromEntries(hash), idx, arg);
         }
         v = rLeave(v, arg);
         break;

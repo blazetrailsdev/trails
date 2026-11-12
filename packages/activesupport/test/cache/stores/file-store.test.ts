@@ -28,6 +28,7 @@ import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-behavior.js";
 import { cacheIncrementDecrementBehavior } from "../behaviors/cache-increment-decrement-behavior.js";
 import { cacheStoreCoderBehavior } from "../behaviors/cache-store-coder-behavior.js";
+import { cacheStoreVersionBehavior } from "../behaviors/cache-store-version-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import { cacheStoreFormatVersionBehavior } from "../behaviors/cache-store-format-version-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
@@ -237,6 +238,10 @@ describe("FileStoreTest", () => {
 
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options) });
 
+  cacheStoreVersionBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+  });
+
   cacheStoreCoderBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
@@ -288,21 +293,6 @@ describe("FileStore coder fidelity", () => {
     try {
       rmSync(cacheDir, { recursive: true, force: true });
     } catch {}
-  });
-
-  it("round-trips Date values", async () => {
-    const date = new Date("2026-06-19T14:36:26.123Z");
-    await store.write("d", date);
-    const result = await store.read("d");
-    expect(result).toBeInstanceOf(Date);
-    expect((result as Date).getTime()).toBe(date.getTime());
-  });
-
-  it("round-trips undefined distinct from null", async () => {
-    await store.write("u", undefined);
-    expect(await store.read("u")).toBeUndefined();
-    await store.write("n", null);
-    expect(await store.read("n")).toBeNull();
   });
 
   it("round-trips bigint values", async () => {

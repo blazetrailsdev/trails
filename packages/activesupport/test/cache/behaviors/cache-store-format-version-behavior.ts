@@ -1,5 +1,11 @@
 import { expect, it } from "vitest";
-import { constSet, rbModRemoveConst, rbStrStartWith, uniq } from "@blazetrails/ruby-compat";
+import {
+  constSet,
+  rbModRemoveConst,
+  rbStrStartWith,
+  TopLevel,
+  uniq,
+} from "@blazetrails/ruby-compat";
 import { Entry } from "../../../lib/cache/entry.js";
 import { formatVersion as cacheFormatVersion, setFormatVersion } from "../../../lib/cache/store.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
@@ -25,6 +31,7 @@ function serializeEntry(store: Store, entry: Entry, options?: StoreOptions): unk
 class CacheStoreFormatVersionBehaviorTest {
   static RemovedConstant?: new () => object;
 }
+constSet(TopLevel, "CacheStoreFormatVersionBehaviorTest", CacheStoreFormatVersionBehaviorTest);
 
 export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBehaviorHost): void {
   const { lookupStore } = host;
@@ -47,19 +54,15 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
     formatVersion,
     [uncompressedSignature, compressedSignature],
   ] of FORMAT_VERSION_SIGNATURES) {
-    // BLOCKED: cache-marshal-serializers-dump-through-ruby-compat-marshal
-    it.skipIf(formatVersion === 7.0)(
-      `format version ${formatVersion.toFixed(1)} uses correct signature for uncompressed entries`,
-      () => {
-        const serialized = withFormat(formatVersion, () =>
-          serializeEntry(lookupStore(), new Entry(Array(100).fill("value"))),
-        );
+    it(`format version ${formatVersion.toFixed(1)} uses correct signature for uncompressed entries`, () => {
+      const serialized = withFormat(formatVersion, () =>
+        serializeEntry(lookupStore(), new Entry(Array(100).fill("value"))),
+      );
 
-        if (serialized instanceof Uint8Array || typeof serialized === "string") {
-          expect(rbStrStartWith(serialized, uncompressedSignature)).toBeTruthy();
-        }
-      },
-    );
+      if (serialized instanceof Uint8Array || typeof serialized === "string") {
+        expect(rbStrStartWith(serialized, uncompressedSignature)).toBeTruthy();
+      }
+    });
 
     it(`format version ${formatVersion.toFixed(1)} uses correct signature for compressed entries`, () => {
       const serialized = withFormat(formatVersion, () =>
@@ -73,8 +76,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
       }
     });
 
-    // BLOCKED: cache-marshal-serializers-dump-through-ruby-compat-marshal
-    it.skip(`Marshal undefined class/module deserialization error with ${formatVersion.toFixed(1)} format`, async () => {
+    it(`Marshal undefined class/module deserialization error with ${formatVersion.toFixed(1)} format`, async () => {
       const key = `marshal-${Math.random()}`;
       try {
         constSet(CacheStoreFormatVersionBehaviorTest, "RemovedConstant", class RemovedConstant {});
@@ -94,8 +96,7 @@ export function cacheStoreFormatVersionBehavior(host: CacheStoreFormatVersionBeh
       }
     });
 
-    // BLOCKED: cache-marshal-serializers-dump-through-ruby-compat-marshal
-    it.skip(`Compressed Marshal undefined class/module deserialization error with ${formatVersion.toFixed(1)} format`, async () => {
+    it(`Compressed Marshal undefined class/module deserialization error with ${formatVersion.toFixed(1)} format`, async () => {
       const key = `marshal-${Math.random()}`;
       try {
         constSet(CacheStoreFormatVersionBehaviorTest, "RemovedConstant", class RemovedConstant {});

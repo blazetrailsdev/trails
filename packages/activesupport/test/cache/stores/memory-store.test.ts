@@ -6,6 +6,7 @@ import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-behavior.js";
 import { cacheIncrementDecrementBehavior } from "../behaviors/cache-increment-decrement-behavior.js";
 import { cacheStoreCoderBehavior } from "../behaviors/cache-store-coder-behavior.js";
+import { cacheStoreVersionBehavior } from "../behaviors/cache-store-version-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
 import type { StoreOptions } from "../../../lib/cache/store.js";
@@ -108,6 +109,8 @@ describe("MemoryStoreTest", () => {
   });
 
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
+
+  cacheStoreVersionBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
 
   cacheStoreCoderBehavior({ lookupStore: (options?: StoreOptions) => new MemoryStore(options) });
 
