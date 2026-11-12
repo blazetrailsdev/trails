@@ -33,6 +33,10 @@ interface Parser {
   body: string[];
 }
 
+const STRUCT_MEMBER_TYPES: Record<string, Record<string, string>> = {
+  AddressListStruct: { addresses: "InstanceType<typeof AddressStruct>[]" },
+};
+
 function read(rb: string): Parser {
   const lines = rb.split("\n");
   const [, kind, name] = /^\s*(module|class) (\w+Parser)$/m.exec(rb)!;
@@ -258,10 +262,14 @@ function generate(p: Parser): string {
       ? [`import { Utilities } from "../utilities.js";`]
       : []),
     "",
-    ...p.structs.map(
-      ([n, members]) =>
-        `export const ${n} = Struct.new(${members.map((x) => JSON.stringify(x)).join(", ")});`,
-    ),
+    ...p.structs.map(([n, members]) => {
+      const types = STRUCT_MEMBER_TYPES[n];
+      const generic =
+        types === undefined
+          ? ""
+          : `<${members.map((x) => JSON.stringify(x)).join(" | ")}, { ${members.map((x) => `${x}: ${types[x] ?? "unknown"}`).join("; ")} }>`;
+      return `export const ${n} = Struct.new${generic}(${members.map((x) => JSON.stringify(x)).join(", ")});`;
+    }),
     "",
     ...(p.kind === "class"
       ? [`export class ${p.name} {`]

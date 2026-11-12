@@ -5,10 +5,7 @@ import { AddressList } from "../elements/address-list.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-export const AddressListStruct = Struct.new<
-  "addresses" | "groupNames" | "error",
-  { addresses: InstanceType<typeof AddressStruct>[]; groupNames: unknown; error: unknown }
->("addresses", "groupNames", "error");
+export const AddressListStruct = Struct.new<"addresses" | "groupNames" | "error", { addresses: InstanceType<typeof AddressStruct>[]; groupNames: unknown; error: unknown }>("addresses", "groupNames", "error");
 export const AddressStruct = Struct.new("raw", "domain", "comments", "local", "obsDomainList", "displayName", "group", "error");
 
 export const AddressListsParser = extend(
