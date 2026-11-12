@@ -16,7 +16,7 @@ const trailsConductorInboundEmailsPath = () =>
     routes.urlHelpers() as unknown as Record<string, () => string>
   ).trailsConductorInboundEmailsPath();
 
-let t: IntegrationTest & { fixtureFileUpload(path: string): unknown };
+let t: IntegrationTest;
 
 async function withTrailsEnv(env: string, block: () => Promise<void>): Promise<void> {
   const oldTrailsEnv = Trails.env;
@@ -34,7 +34,7 @@ async function lastMail(): Promise<Message> {
 
 describe("Trails::Conductor::ActionMailbox::InboundEmailsControllerTest", () => {
   beforeEach(() => {
-    t = new IntegrationTest(expect.getState().currentTestName!) as typeof t;
+    t = new IntegrationTest(expect.getState().currentTestName!);
     t.app = routes;
   });
 

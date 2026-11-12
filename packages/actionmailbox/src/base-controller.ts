@@ -12,7 +12,10 @@ declare module "@blazetrails/trailties/trails" {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Trails {
     let Conductor: {
-      BaseController: typeof ActionController.Base;
+      BaseController: Omit<typeof ActionController.Base, "prototype"> &
+        (abstract new (...args: never[]) => ActionController.Base & {
+          readonly mainApp: Record<string, (...args: unknown[]) => string>;
+        });
       ActionMailbox: {
         InboundEmailsController?: typeof InboundEmailsController;
         IncineratesController?: typeof IncineratesController;
@@ -79,6 +82,8 @@ ActionMailbox.BaseController = BaseController;
 Trails.Conductor = { ActionMailbox: { InboundEmails: {} } } as typeof Trails.Conductor;
 
 Trails.Conductor.BaseController = class BaseController extends ActionController.Base {
+  declare readonly mainApp: Record<string, (...args: unknown[]) => string>;
+
   static {
     this.layout("trails/conductor");
     this.beforeAction(":ensureDevelopmentEnv");

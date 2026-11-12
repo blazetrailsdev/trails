@@ -6,12 +6,8 @@ import { ActionMailbox } from "../action-mailbox.js";
 import type { InboundEmail } from "../inbound-email.js";
 import "../base-controller.js";
 
-type MainApp = Record<string, (...args: unknown[]) => string>;
-
 export class InboundEmailsController extends Trails.Conductor.BaseController {
-  /** @internal */
   declare inboundEmails: InboundEmail[];
-  /** @internal */
   declare inboundEmail: InboundEmail;
 
   async index(): Promise<void> {
@@ -26,23 +22,17 @@ export class InboundEmailsController extends Trails.Conductor.BaseController {
 
   async create(): Promise<void> {
     const inboundEmail = await this.createInboundEmail(await this.newMail());
-    this.redirectTo(
-      (this as unknown as { mainApp: MainApp }).mainApp.trailsConductorInboundEmailUrl(
-        inboundEmail,
-      ),
-    );
+    this.redirectTo(this.mainApp.trailsConductorInboundEmailUrl(inboundEmail));
   }
 
   /** @internal */
   private async newMail(): Promise<Message> {
-    const mailParams = this.mailParams();
-    const mail = Mail.new(mailParams.except("attachments").toH());
+    const mail = Mail.new(this.mailParams().except("attachments").toH());
     const bcc = mail.get("bcc") as { includeInHeaders: boolean } | null;
     if (bcc != null) bcc.includeInHeaders = true;
-    const attachments = mailParams.get("attachments") as (UploadedFile | string)[] | null;
+    const attachments = this.mailParams().get("attachments") as UploadedFile[] | null;
     for (const attachment of attachments?.filter((a) => isPresent(a)) ?? []) {
-      const upload = attachment as UploadedFile;
-      await mail.addFile({ filename: upload.originalFilename!, content: upload.read() });
+      await mail.addFile({ filename: attachment.originalFilename!, content: attachment.read() });
     }
     return mail;
   }
@@ -65,8 +55,8 @@ export class InboundEmailsController extends Trails.Conductor.BaseController {
   }
 
   /** @internal */
-  private async createInboundEmail(mail: Message): Promise<InboundEmail> {
-    return (await ActionMailbox.InboundEmail.createAndExtractMessageIdBang(mail.toString()))!;
+  private async createInboundEmail(mail: Message): Promise<InboundEmail | null> {
+    return ActionMailbox.InboundEmail.createAndExtractMessageIdBang(mail.toString());
   }
 }
 
