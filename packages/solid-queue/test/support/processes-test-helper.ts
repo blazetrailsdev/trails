@@ -1,6 +1,6 @@
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
-import { SystemExit } from "@blazetrails/ruby-compat";
+import { Errno, SystemExit } from "@blazetrails/ruby-compat";
 import { Process } from "../../lib/process.js";
 import { Supervisor } from "../../lib/supervisor.js";
 
@@ -48,20 +48,16 @@ export function signalProcess(
 ) {
   return (async () => {
     if (wait != null) await sleep(wait);
-    const supervisor = pid.supervisor as unknown as {
-      forks: { [name: string]: { _thread: { kill(): unknown } } };
-      signalQueue(): string[];
-      interrupt(): Promise<void>;
-      signalProcess(name: string, signal: string): void;
-    };
+    const supervisor = pid.supervisor;
     if (!("name" in pid)) {
       supervisor.signalQueue().push(signal);
       await supervisor.interrupt();
-    } else if (signal === "KILL") {
-      supervisor.forks[pid.name]?._thread.kill();
-    } else {
-      supervisor.signalProcess(pid.name, signal);
+      return;
     }
+    const supervisee = supervisor.forks[pid.name];
+    if (supervisee == null) throw new Errno.ESRCH();
+    if (signal === "KILL") supervisee._thread.kill();
+    else supervisor.signalProcess(pid.name, signal);
   })();
 }
 

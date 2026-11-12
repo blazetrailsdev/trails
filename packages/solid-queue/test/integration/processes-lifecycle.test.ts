@@ -35,7 +35,7 @@ import {
 async function enqueueStoreResultJob(
   value: string,
   queueName = "background",
-  options: { pause?: number; exception?: unknown } = {},
+  options: { pause?: number; exception?: unknown; exitValue?: number } = {},
 ) {
   return (await StoreResultJob.set({ queue: queueName }).performLater(
     value,
@@ -59,11 +59,19 @@ async function assertStartedJobResult(value: string, queueName = "background", c
   });
 }
 
-async function assertJobStatus(activeJob: ActiveJobBase, status: string) {
+async function assertJobStatus(
+  activeJob: ActiveJobBase,
+  status: "finished" | "ready" | "claimed" | "failed",
+) {
   await Record.uncached(async () => {
     const job = (await Job.findBy({ active_job_id: activeJob.jobId }))!;
-    const predicate = `is${status[0].toUpperCase()}${status.slice(1)}` as "isFinished";
-    expect(await job[predicate]()).toBeTruthy();
+    const predicates = {
+      finished: () => job.isFinished(),
+      ready: () => job.isReady(),
+      claimed: () => job.isClaimed(),
+      failed: () => job.isFailed(),
+    };
+    expect(await predicates[status]()).toBeTruthy();
   });
 }
 
@@ -90,11 +98,14 @@ describe("ProcessesLifecycleTest", () => {
     expect(run.isExists).toBeFalsy();
   }
 
-  async function workerFor(queue: string) {
-    const worker = (await findProcessesRegisteredAs("Worker").toArray()).find((process) =>
-      String(process.metadata.get("queues")).includes(queue),
-    )!;
-    return { worker, pid: { supervisor: run.supervisor, name: worker.name } };
+  async function assertRegisteredSupervisorWith(pid: number) {
+    const processes = await findProcessesRegisteredAs("Supervisor").toArray();
+    expect(processes.length).toEqual(1);
+    expect(processes[0].pid).toEqual(pid);
+  }
+
+  async function assertNoRegisteredWorkers() {
+    expect(await findProcessesRegisteredAs("Worker").toArray()).toEqual([]);
   }
 
   beforeAll(async () => {
@@ -144,8 +155,28 @@ describe("ProcessesLifecycleTest", () => {
     await assertCleanTermination();
   });
 
-  // PERMANENT-SKIP: CLAUDE.md § "Runtime facts Node does not expose" (`fork`):
-  it.skip("kill supervisor while there are jobs in-flight", () => {});
+  // PERMANENT-SKIP: CLAUDE.md § "Runtime facts Node does not expose", `fork`
+  it.skip("kill supervisor while there are jobs in-flight", async () => {
+    const noPause = await enqueueStoreResultJob("no pause");
+    const pause = await enqueueStoreResultJob("pause", "background", { pause: 1 });
+
+    const signal = signalProcess(run, "KILL", { wait: 0.2 });
+    await waitForJobsToFinishFor(2);
+    await waitForRegisteredProcesses(1, { timeout: 3 });
+    await signal;
+
+    expect(run.isExists).toBeFalsy();
+
+    await assertCompletedJobResults("no pause");
+    await assertJobStatus(noPause, "finished");
+
+    await assertCompletedJobResults("pause");
+    await assertJobStatus(pause, "finished");
+
+    await assertRegisteredSupervisorWith(RbProcess.pid);
+    await assertNoRegisteredWorkers();
+    expect(await ClaimedExecution.isNone()).toBeTruthy();
+  });
 
   it("term supervisor multiple times", async () => {
     for (let i = 0; i < 5; i++) await signalProcess(run, "TERM", { wait: 0.1 });
@@ -161,7 +192,7 @@ describe("ProcessesLifecycleTest", () => {
 
     await waitWhileWithTimeout(1, async () => (await ReadyExecution.count()) > 0);
 
-    void signalProcess(run, "QUIT", { wait: 0.4 });
+    const signal = signalProcess(run, "QUIT", { wait: 0.4 });
     await waitForJobsToFinishFor(2, { except: pause });
 
     await waitWhileWithTimeout(2, async () => run.isExists);
@@ -172,6 +203,7 @@ describe("ProcessesLifecycleTest", () => {
 
     await assertStartedJobResult("pause");
     await assertJobStatus(pause, "ready");
+    await signal;
     await assertCleanTermination();
   });
 
@@ -179,7 +211,7 @@ describe("ProcessesLifecycleTest", () => {
     const noPause = await enqueueStoreResultJob("no pause");
     const pause = await enqueueStoreResultJob("pause", "background", { pause: 0.2 });
 
-    void signalProcess(run, "TERM", { wait: 0.3 });
+    const signal = signalProcess(run, "TERM", { wait: 0.3 });
     await waitForJobsToFinishFor(3);
 
     await assertCompletedJobResults("no pause");
@@ -188,6 +220,7 @@ describe("ProcessesLifecycleTest", () => {
     await assertJobStatus(noPause, "finished");
     await assertJobStatus(pause, "finished");
 
+    await signal;
     await waitForProcessTerminationWithTimeout(run);
     await assertCleanTermination();
   });
@@ -196,7 +229,7 @@ describe("ProcessesLifecycleTest", () => {
     const noPause = await enqueueStoreResultJob("no pause");
     const pause = await enqueueStoreResultJob("pause", "background", { pause: 0.2 });
 
-    void signalProcess(run, "INT", { wait: 0.3 });
+    const signal = signalProcess(run, "INT", { wait: 0.3 });
     await waitForJobsToFinishFor(2);
 
     await assertCompletedJobResults("no pause");
@@ -205,6 +238,7 @@ describe("ProcessesLifecycleTest", () => {
     await assertJobStatus(noPause, "finished");
     await assertJobStatus(pause, "finished");
 
+    await signal;
     await waitForProcessTerminationWithTimeout(run);
     await assertCleanTermination();
   });
@@ -222,7 +256,7 @@ describe("ProcessesLifecycleTest", () => {
 
       await waitWhileWithTimeout(1, async () => (await ReadyExecution.count()) > 0);
 
-      void signalProcess(run, "TERM", { wait: 0.5 });
+      const signal = signalProcess(run, "TERM", { wait: 0.5 });
 
       await sleep(shutdownTimeout + 0.5);
 
@@ -234,6 +268,7 @@ describe("ProcessesLifecycleTest", () => {
 
       await assertRegisteredWorkersFor(["background"]);
 
+      await signal;
       await waitForProcessTerminationWithTimeout(run);
       await assertCleanTermination();
     },
@@ -267,17 +302,44 @@ describe("ProcessesLifecycleTest", () => {
     await assertCleanTermination();
   });
 
-  // PERMANENT-SKIP: CLAUDE.md § "Runtime facts Node does not expose" (`fork`):
-  it.skip("process a job that exits", () => {});
+  // PERMANENT-SKIP: CLAUDE.md § "Runtime facts Node does not expose", `fork`
+  it.skip("process a job that exits", async () => {
+    for (let i = 0; i < 2; i++) {
+      await enqueueStoreResultJob("no exit", "background");
+      await enqueueStoreResultJob("no exit", "default");
+    }
+    await enqueueStoreResultJob("paused no exit", "default", { pause: 0.5 });
+    const exitJob = await enqueueStoreResultJob("exit", "background", { exitValue: 1, pause: 0.2 });
+    const pauseJob = await enqueueStoreResultJob("exit", "background", { pause: 0.3 });
+
+    for (let i = 0; i < 2; i++) await enqueueStoreResultJob("no exit", "background");
+
+    await waitForJobsToFinishFor(3, { except: [exitJob, pauseJob] });
+
+    await assertCompletedJobResults("no exit", "default", 2);
+    await assertCompletedJobResults("no exit", "background", 4);
+    await assertCompletedJobResults("paused no exit", "default", 1);
+
+    for (const job of [exitJob, pauseJob]) await assertJobStatus(job, "claimed");
+
+    expect(run.isExists).toBeTruthy();
+    await run.terminate();
+
+    for (const job of [exitJob, pauseJob]) await assertJobStatus(job, "failed");
+
+    await assertCleanTermination();
+  });
 
   it("terminate worker individually", async () => {
     await enqueueStoreResultJob("pause", "background", { pause: 0.5 });
     await enqueueStoreResultJob("pause", "default", { pause: 0.5 });
 
-    const { worker, pid } = await workerFor("background");
+    const worker = (await findProcessesRegisteredAs("Worker").first())!;
 
     await waitWhileWithTimeout(1, async () => (await ReadyExecution.count()) > 0);
-    void signalProcess(pid, "TERM", { wait: 0.1 });
+    const signal = signalProcess({ supervisor: run.supervisor, name: worker.name }, "TERM", {
+      wait: 0.1,
+    });
 
     await waitForRegisteredProcesses(2, { timeout: 3 });
     expect(await Process.findBy({ id: worker.id })).toBeNull();
@@ -296,6 +358,7 @@ describe("ProcessesLifecycleTest", () => {
     await assertCompletedJobResults("no_pause", "background");
     await assertCompletedJobResults("no_pause", "default");
 
+    await signal;
     await run.terminate();
     await assertCleanTermination();
   });
@@ -304,8 +367,12 @@ describe("ProcessesLifecycleTest", () => {
     const killedPause = await enqueueStoreResultJob("killed_pause", "background", { pause: 1 });
     await enqueueStoreResultJob("pause", "default", { pause: 0.5 });
 
-    const { worker, pid } = await workerFor("background");
-    void signalProcess(pid, "KILL", { wait: 0.5 });
+    const worker = (await findProcessesRegisteredAs("Worker").toArray()).find((process) =>
+      (process.metadata.get("queues") as string).includes("background"),
+    )!;
+    const signal = signalProcess({ supervisor: run.supervisor, name: worker.name }, "KILL", {
+      wait: 0.5,
+    });
 
     await sleep(0.5);
     expect(await Process.isExists({ id: worker.id })).toBeTruthy();
@@ -323,6 +390,7 @@ describe("ProcessesLifecycleTest", () => {
     await assertCompletedJobResults("no_pause", "background");
     await assertCompletedJobResults("no_pause", "default");
 
+    await signal;
     await run.terminate();
     await assertCleanTermination();
   });

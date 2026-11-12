@@ -311,6 +311,9 @@ export interface Supervisor {
   stopMaintenanceTask(): void;
   processSignalQueue(): Promise<void>;
   signalProcesses(pids: string[], signal: "QUIT" | "INT" | "TERM"): void;
+  signalProcess(pid: string, signal: "QUIT" | "INT" | "TERM"): void;
+  signalQueue(): string[];
+  interrupt(): Promise<void>;
 }
 
 SolidQueue.Supervisor = Supervisor;
