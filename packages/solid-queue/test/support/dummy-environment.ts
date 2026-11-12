@@ -31,12 +31,20 @@ const dummyConfigs = ["shard_one", "shard_two", "queue"].map(
       database: databaseNameFrom(name),
     }),
 );
+const primaryConfig =
+  primary.database === ":memory:"
+    ? new HashConfig(envName, "primary", {
+        ...primary.configurationHash,
+        database: databaseNameFrom("primary"),
+      })
+    : primary;
 Base.configurations([...configurations.configurations, ...dummyConfigs]);
 DatabaseTasks.root = import.meta.dirname;
 for (const dbConfig of dummyConfigs) await DatabaseTasks.purge(dbConfig);
+if (primaryConfig !== primary) await DatabaseTasks.purge(primaryConfig);
 await loadShardSchemas();
 await loadQueueSchema();
-await Base.establishConnection(primary);
+await Base.establishConnection(primaryConfig);
 
 Engine.config.solidQueue.connectsTo = { database: { writing: ":queue" } };
 
@@ -47,4 +55,5 @@ afterAll(async () => {
   for (const shard of ShardedRecord.shardKeys()) {
     await Base.connectionHandler.removeConnectionPool(ShardedRecord.name, { shard });
   }
+  if (primaryConfig !== primary) await Base.establishConnection(primary);
 });
