@@ -386,10 +386,12 @@ DEPENDENCY_PATTERNS = {
 # ---- AST walker ----
 
 class ApiExtractor
-  attr_reader :classes, :modules, :file_constants, :file_hash_keys
+  attr_reader :classes, :modules, :file_constants, :file_hash_keys, :hook_mixins, :load_hook_targets
 
   def initialize
     @in_on_load = 0
+    @hook_mixins = []
+    @load_hook_targets = {}
     @in_concern_included = 0
     @classes = {}
     @modules = {}
@@ -1409,18 +1411,13 @@ class ApiExtractor
   # calls `run_load_hooks(:action_controller, self)` (lazy_load_hooks.rb:91-93),
   # so the include is recorded per hook and resolved onto those classes.
   def on_load_hook_name(call)
-    found = nil
-    walker = lambda do |n|
-      return if found || !n.is_a?(Array)
-      found = ident_name(n[1][1]) if n[0] == :symbol_literal && n[1].is_a?(Array) && n[1][0] == :symbol
-      n.each { |c| walker.call(c) if c.is_a?(Array) }
-    end
-    walker.call(call)
-    found
+    call = call[1] if call.is_a?(Array) && call[0] == :method_add_arg && (args = call[2])
+    args ||= call.is_a?(Array) && call[0] == :command_call ? call[4] : nil
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    first = args.is_a?(Array) ? args[0] : nil
+    first.is_a?(Array) && first[0] == :symbol_literal ? ident_name(first[1]) : nil
   end
-
-  public def hook_mixins = @hook_mixins || []
-  public def load_hook_targets = @load_hook_targets || {}
 
   def record_on_load_include(names)
     hook = (@on_load_hooks || []).last
@@ -5523,7 +5520,9 @@ def run
       fqns.each do |fqn|
         info = data[:classes][fqn] || data[:modules][fqn]
         next unless info
-        hook_mixins.select { |m| m[:hook] == hook }.each { |m| (info[:bootMixins] ||= []) << m[:statement] }
+        hook_mixins.select { |m| m[:hook] == hook }.each do |m|
+          (info[:bootMixins] ||= []) << m[:statement] unless info[:bootMixins]&.include?(m[:statement])
+        end
       end
     end
   end
