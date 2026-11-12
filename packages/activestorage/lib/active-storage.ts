@@ -83,8 +83,8 @@ export const ActiveStorage = {
   videoPreviewArguments: string;
 };
 extend(ActiveStorage, Autoload);
-ActiveStorage.Blobs = {};
-ActiveStorage.Representations = {};
+constSet(ActiveStorage, "Blobs", {});
+constSet(ActiveStorage, "Representations", {});
 constSet(TopLevel, "ActiveStorage", ActiveStorage);
 
 ActiveStorage.autoload("Attached");
