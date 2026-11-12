@@ -370,7 +370,7 @@ export function inlinedFromFindings(
       }
       const chain = reached?.tagged ?? [];
       checkOrder(tags, chain);
-      if (!enrolled.includes(name)) continue;
+      if (!enrolled.includes(name) || (counterpart && modules.has(counterpart.fqn))) continue;
       for (const hook of chain) {
         if (tags.some((tag) => `${tag.module}#${tag.hook}` === hook)) continue;
         report(hook, `is inlined untagged: ${counterpart!.fqn} reaches it from another Ruby file`);

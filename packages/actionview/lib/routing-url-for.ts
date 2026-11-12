@@ -7,6 +7,9 @@ import {
 import {
   classModule,
   hasKey,
+  include,
+  included,
+  rbSeatSuper,
   hashAref,
   hashAset,
   isSymbol,
@@ -23,26 +26,67 @@ export interface RoutingUrlForHost {
 
 export type UrlForOptions = string | null | undefined | object | ReadonlyArray<unknown>;
 
-type Host = RoutingUrlFor & RoutingUrlForHost & Pick<UrlHelperHost, "_backUrl">;
+type Host = RoutingUrlFor &
+  RoutingUrlForHost &
+  Pick<UrlHelperHost, "_backUrl"> & {
+    polymorphicPath(record: unknown, options: Record<string, unknown>): string;
+    polymorphicUrl(record: unknown, options: Record<string, unknown>): string;
+  };
+
+const _includers = new Set<WeakRef<{ prototype: object }>>();
 
 type Parameters = InstanceType<NonNullable<typeof TopLevel.ActionController>["Parameters"]>;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class below.
+export interface RoutingUrlFor {
+  urlFor(options?: unknown): string;
+  urlOptions(): Record<string, unknown>;
+  /** @internal */
+  _routesContext(): unknown;
+  /** @internal */
+  optimizeRoutesGeneration(): boolean;
+  /** @internal */
+  _generatePathsByDefault(): boolean;
+  /** @internal */
+  ensureOnlyPathOption(options: Record<string, unknown> | Parameters): void;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a class module (`routing_url_for.rb`); the interface carries its instance methods.
 export class RoutingUrlFor {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
-  declare urlFor: (options?: unknown) => string;
-  declare urlOptions: () => Record<string, unknown>;
-  /** @internal */
-  declare _routesContext: () => unknown;
-  /** @internal */
-  declare optimizeRoutesGeneration: () => boolean;
-  /** @internal */
-  declare _generatePathsByDefault: () => boolean;
-  /** @internal */
-  declare ensureOnlyPathOption: (options: Record<string, unknown> | Parameters) => void;
-  declare polymorphicPath: (record: unknown, options: Record<string, unknown>) => string;
-  declare polymorphicUrl: (record: unknown, options: Record<string, unknown>) => string;
+  /** @noRailsEquivalent PERMANENT */
+  static [included](base: unknown): void {
+    if (typeof base === "function") _includers.add(new WeakRef(base));
+  }
+
+  static include(this: typeof RoutingUrlFor, ...modules: object[]): void {
+    const ownMethods = Object.entries(Object.getOwnPropertyDescriptors(this.prototype));
+    for (const mod of modules) {
+      include(this, mod);
+      for (const ref of _includers) {
+        const klass = ref.deref();
+        if (klass === undefined) {
+          _includers.delete(ref);
+          continue;
+        }
+        const proto = klass.prototype;
+        const copied = ownMethods.filter(
+          ([name, desc]) =>
+            name !== "constructor" &&
+            Object.getOwnPropertyDescriptor(proto, name)?.value === desc.value,
+        );
+        include(klass, mod);
+        const seats: PropertyDescriptorMap = {};
+        for (const [name, desc] of copied) {
+          rbSeatSuper(proto, name, desc.value, seats);
+          Object.defineProperty(proto, name, { ...desc, enumerable: false });
+        }
+        Object.defineProperties(proto, seats);
+      }
+    }
+  }
 }
 
 export function urlFor(this: Host, options: UrlForOptions = null): string {

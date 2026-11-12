@@ -131,6 +131,7 @@ export {
   writerSpelling,
   rbModDefineMethod,
   rbModMethodDefined,
+  rbSeatSuper,
   rtest,
   isNil,
   rbCBasicObject,

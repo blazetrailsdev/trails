@@ -192,8 +192,22 @@ describe("ActionView::RoutingUrlFor private helpers", () => {
 });
 
 describe("ActionView::RoutingUrlFor including ActionDispatch::Routing::UrlFor", () => {
+  it("reaches UrlFor#url_options through super in a class that included RoutingUrlFor before it", () => {
+    class Early {
+      controller = null;
+      get defaultUrlOptions(): Record<string, unknown> {
+        return { host: "example.net" };
+      }
+    }
+    include(Early, RoutingUrlFor);
+    RoutingUrlFor.include(UrlFor);
+    const early = new Early() as unknown as RoutingUrlFor;
+    expect(early.urlOptions()).toEqual({ host: "example.net" });
+    expect(typeof (early as unknown as { routeFor: unknown }).routeFor).toBe("function");
+  });
+
   it("reaches UrlFor#url_options through super in a class that includes RoutingUrlFor after it", () => {
-    include(RoutingUrlFor, UrlFor);
+    RoutingUrlFor.include(UrlFor);
     class Late {
       controller = null;
       get defaultUrlOptions(): Record<string, unknown> {

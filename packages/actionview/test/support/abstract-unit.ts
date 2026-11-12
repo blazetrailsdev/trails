@@ -31,7 +31,7 @@ export const ORIGINAL_LOCALES = I18n.availableLocales().map(String).sort();
 
 export const FIXTURE_LOAD_PATH = File.expandPath("../fixtures", __dir__);
 
-include(RoutingUrlFor, UrlFor);
+RoutingUrlFor.include(UrlFor);
 
 ActionController.Base.viewPaths(FIXTURE_LOAD_PATH);
 

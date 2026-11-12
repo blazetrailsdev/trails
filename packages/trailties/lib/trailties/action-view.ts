@@ -22,7 +22,7 @@ import {
   Template,
   ViewReloader,
 } from "@blazetrails/actionview";
-import { Dir, include } from "@blazetrails/ruby-compat";
+import { Dir } from "@blazetrails/ruby-compat";
 import type { Application } from "../application.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -196,7 +196,7 @@ export class Trailtie extends BaseTrailtie {
 
     this.initializer("action_view.setup_action_pack", () => {
       onLoad("action_controller", () => {
-        include(RoutingUrlFor, UrlFor);
+        RoutingUrlFor.include(UrlFor);
       });
     });
     this.server(watchViews);
