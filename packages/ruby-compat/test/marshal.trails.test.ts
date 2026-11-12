@@ -524,6 +524,30 @@ describe("Marshal.load", () => {
     expect(() => Marshal.load('\x04\bI"\x06a\x07:\x06ET:\x07@xi\x06')).toThrow(FrozenError);
   });
 
+  it("loads a plain object dumped with markPlainObjects back as a plain object", () => {
+    const loaded = Marshal.load(
+      Marshal.dump(
+        [{ a: 1, b: { c: 2 } }, hash([["a", 1]], new Hash()), new Map([["a", 1]])],
+        -1,
+        true,
+      ),
+    ) as unknown[];
+    expect(loaded[0]).toEqual({ a: 1, b: { c: 2 } });
+    expect(loaded[0]).not.toBeInstanceOf(Map);
+    expect((loaded[0] as { b: object }).b).not.toBeInstanceOf(Map);
+    expect(loaded[1]).toBeInstanceOf(Hash);
+    expect(loaded[2]).toBeInstanceOf(Hash);
+    expect(Marshal.load(Marshal.dump({ a: 1 }))).toBeInstanceOf(Hash);
+  });
+
+  it("loads a marked plain object reached again through a nested value as one Hash", () => {
+    const h: Record<string, unknown> = {};
+    h.a = [h];
+    const loaded = Marshal.load(Marshal.dump(h, -1, true)) as Hash<string, unknown>;
+    expect(loaded).toBeInstanceOf(Hash);
+    expect((loaded.get("a") as unknown[])[0]).toBe(loaded);
+  });
+
   it("loads what Marshal.dump dumped", () => {
     for (const [name, value] of Object.entries(VALUES)) {
       expect(Marshal.load(Marshal.dump(value))).toEqual(name in LOADED ? LOADED[name] : value);

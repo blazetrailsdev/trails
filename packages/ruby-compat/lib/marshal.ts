@@ -122,6 +122,8 @@ interface DumpArg {
   numEntries: number;
   compatTbl: Map<object, object> | null;
   userdefs: Set<object> | null;
+  /** @noRailsEquivalent PERMANENT */
+  markPlainObjects: boolean;
 }
 
 /** `struct load_arg` (`vendor/ruby/v3.3.11/marshal.c:1267`). */
@@ -131,6 +133,7 @@ interface LoadArg {
   symbols: string[];
   data: Map<number, unknown>;
   compatTbl: Map<object, object> | null;
+  links: Set<number>;
 }
 
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
@@ -453,15 +456,19 @@ function wEncoding(encname: Encname, arg: DumpArg, limit: number): number {
   return 1;
 }
 
+/** @noRailsEquivalent PERMANENT */
+const PLAIN_OBJECT_IVAR = "@__trails_object";
+
 /**
  * `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). Only a boxed `String` (the
  * ASCII-8BIT String a `_dump` answers) holds ivars, as its own non-index properties.
  *
  * @inventedArm if — PERMANENT
  */
-function hasIvars(obj: unknown, encname: Encname): number {
+function hasIvars(obj: unknown, encname: Encname, arg: DumpArg): number {
   let num = encname !== null ? 1 : 0;
   if (obj instanceof String) num += Object.keys(obj).length - obj.length;
+  else if (arg.markPlainObjects && !(obj instanceof Map) && rbObjIsKindOf(obj, Hash)) num += 1;
   return num;
 }
 
@@ -477,6 +484,11 @@ function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void 
       wSymbol(`:${id}`, arg);
       wObject((obj as unknown as Record<string, unknown>)[id], arg, limit);
     }
+    return;
+  }
+  if (arg.markPlainObjects && !(obj instanceof Map) && rbObjIsKindOf(obj, Hash)) {
+    wSymbol(`:${PLAIN_OBJECT_IVAR}`, arg);
+    wObject(true, arg, limit);
     return;
   }
   for (const id of rbObjInstanceVariables(obj)) {
@@ -606,9 +618,9 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       if (!(typeof v === "string" || v instanceof String)) {
         throw new TypeError("_dump() must return string");
       }
-      hasiv = hasIvars(obj, (encname = encodingName(obj)));
+      hasiv = hasIvars(obj, (encname = encodingName(obj)), arg);
       const encname2 = encodingName(v);
-      const hasiv2 = hasIvars(v, encname2);
+      const hasiv2 = hasIvars(v, encname2, arg);
       if (hasiv2) {
         hasiv = hasiv2;
         ivobj = v as object;
@@ -633,7 +645,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
 
     wRemember(key, arg);
 
-    hasiv = hasIvars(obj, (encname = encodingName(obj)));
+    hasiv = hasIvars(obj, (encname = encodingName(obj)), arg);
     {
       const allocator = rbGetAllocFunc(rbObjClass(obj));
       const compat = allocator === undefined ? undefined : compatAllocatorTbl.get(allocator);
@@ -742,12 +754,20 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     }
   }
   if (hasiv) {
-    wIvar(hasiv, undefined, encname, arg, limit);
+    wIvar(
+      hasiv,
+      arg.markPlainObjects && !(obj instanceof Map) && rbObjIsKindOf(obj, Hash)
+        ? (obj as object)
+        : undefined,
+      encname,
+      arg,
+      limit,
+    );
   }
 }
 
 /** `rb_marshal_dump_limited` (`vendor/ruby/v3.3.11/marshal.c:1228`). */
-function rbMarshalDumpLimited(obj: unknown, limit: number): Uint8Array {
+function rbMarshalDumpLimited(obj: unknown, limit: number, markPlainObjects: boolean): Uint8Array {
   const arg: DumpArg = {
     str: [],
     symbols: new Map(),
@@ -755,6 +775,7 @@ function rbMarshalDumpLimited(obj: unknown, limit: number): Uint8Array {
     numEntries: 0,
     compatTbl: null,
     userdefs: null,
+    markPlainObjects,
   };
 
   wByte(MARSHAL_MAJOR, arg);
@@ -1033,7 +1054,12 @@ function rEncname(obj: { value: string | Uint8Array }, arg: LoadArg): number {
  *
  * @inventedArm if — PERMANENT
  */
-function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadArg): unknown {
+function rIvar(
+  obj: unknown,
+  hasEncoding: { value: boolean } | null,
+  arg: LoadArg,
+  idx = -1,
+): unknown {
   let len = rLong(arg);
   if (len > 0) {
     do {
@@ -1048,6 +1074,10 @@ function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadAr
           throw new ArgumentError(
             `ruby2_keywords flag is given but ${rbObjAsString(obj)} is not a Hash`,
           );
+        }
+      } else if (sym === PLAIN_OBJECT_IVAR && obj instanceof Hash) {
+        if (!arg.links.has(idx) && [...obj.keys()].every((key) => typeof key === "string")) {
+          obj = Object.fromEntries(obj);
         }
       } else if (obj instanceof String) {
         (obj as unknown as Record<string, unknown>)[sym] = val;
@@ -1186,6 +1216,7 @@ function rObjectFor(
           throw new ArgumentError("dump format error (unlinked)");
         }
         v = arg.data.get(id);
+        arg.links.add(id);
         break;
       }
 
@@ -1194,7 +1225,7 @@ function rObjectFor(
         const idx = arg.data.size;
         v = rObject0(arg, ivar, extmod);
         if (ivar.value) {
-          const obj = rIvar(v, null, arg);
+          const obj = rIvar(v, null, arg, idx);
           if (obj !== v && arg.data.get(idx) === v) v = rEntry0(obj, idx, arg);
         }
         break;
@@ -1524,7 +1555,14 @@ function rbMarshalLoadWithProc(port: unknown): unknown {
   if (v === null) {
     throw new TypeError("instance of IO needed");
   }
-  const arg: LoadArg = { src: v, offset: 0, symbols: [], data: new Map(), compatTbl: null };
+  const arg: LoadArg = {
+    src: v,
+    offset: 0,
+    symbols: [],
+    data: new Map(),
+    compatTbl: null,
+    links: new Set(),
+  };
 
   const major = rByte(arg);
   const minor = rByte(arg);
@@ -1583,12 +1621,15 @@ export const Marshal = {
    * `_dump` (`TYPE_USERDEF`, `marshal.c:918`) answers a String, or a boxed `String`
    * for an ASCII-8BIT one carrying ivars, as `Time#_dump` does.
    *
+   * `markPlainObjects` gives each plain-object Hash the `@__trails_object` ivar,
+   * so `Marshal.load` answers a plain object for it; Ruby's own dumps never set it.
+   *
    * Not ported: the `anIO` argument; and the Regexp arm, which nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
-  dump(obj: unknown, limit: number = -1): Uint8Array {
-    return rbMarshalDumpLimited(obj, limit);
+  dump(obj: unknown, limit: number = -1, markPlainObjects: boolean = false): Uint8Array {
+    return rbMarshalDumpLimited(obj, limit, markPlainObjects);
   },
 
   /**

@@ -20,7 +20,7 @@ import {
   assertPredicate,
 } from "../../../lib/testing/assertions.js";
 import { Store } from "../../../lib/cache/store.js";
-import { File, regexpEscape } from "@blazetrails/ruby-compat";
+import { File, regexpEscape, TypeError } from "@blazetrails/ruby-compat";
 import { isPresent } from "../../../lib/core-ext/object/blank.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheLoggingBehavior } from "../behaviors/cache-logging-behavior.js";
@@ -28,6 +28,7 @@ import { cacheStoreBehavior } from "../behaviors/cache-store-behavior.js";
 import { cacheDeleteMatchedBehavior } from "../behaviors/cache-delete-matched-behavior.js";
 import { cacheIncrementDecrementBehavior } from "../behaviors/cache-increment-decrement-behavior.js";
 import { cacheStoreCoderBehavior } from "../behaviors/cache-store-coder-behavior.js";
+import { cacheStoreVersionBehavior } from "../behaviors/cache-store-version-behavior.js";
 import { cacheStoreCompressionBehavior } from "../behaviors/cache-store-compression-behavior.js";
 import { cacheStoreFormatVersionBehavior } from "../behaviors/cache-store-format-version-behavior.js";
 import { cacheStoreSerializerBehavior } from "../behaviors/cache-store-serializer-behavior.js";
@@ -237,6 +238,10 @@ describe("FileStoreTest", () => {
 
   cacheStoreBehavior({ lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options) });
 
+  cacheStoreVersionBehavior({
+    lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
+  });
+
   cacheStoreCoderBehavior({
     lookupStore: (options?: StoreOptions) => new FileStore(cacheDir, options),
   });
@@ -290,19 +295,23 @@ describe("FileStore coder fidelity", () => {
     } catch {}
   });
 
-  it("round-trips Date values", async () => {
-    const date = new Date("2026-06-19T14:36:26.123Z");
-    await store.write("d", date);
-    const result = await store.read("d");
-    expect(result).toBeInstanceOf(Date);
-    expect((result as Date).getTime()).toBe(date.getTime());
+  it("reads undefined back as nil", async () => {
+    await store.write("u", undefined);
+    expect(await store.read("u")).toBeNull();
   });
 
-  it("round-trips undefined distinct from null", async () => {
-    await store.write("u", undefined);
-    expect(await store.read("u")).toBeUndefined();
-    await store.write("n", null);
-    expect(await store.read("n")).toBeNull();
+  it("round-trips Time values", async () => {
+    const time = Time.at(1781879786, 123456, "usec");
+    await store.write("t", time);
+    const result = await store.read("t");
+    expect(result).toBeInstanceOf(Time);
+    expect((result as Time).equals(time)).toBe(true);
+  });
+
+  it("raises TypeError writing a JS Date, which Marshal has no dump for", async () => {
+    const error = await store.write("d", new Date()).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toBe("no _dump_data is defined for class Time");
   });
 
   it("round-trips bigint values", async () => {
