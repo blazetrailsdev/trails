@@ -4,7 +4,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../lib/base.js";
 import { Tagging } from "../../models/tagging.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 
 class NamespacedPost extends Base {

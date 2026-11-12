@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import type { Base } from "../../../lib/base.js";
 
 describe("Association#matches_foreign_key? with a derived foreign key", () => {

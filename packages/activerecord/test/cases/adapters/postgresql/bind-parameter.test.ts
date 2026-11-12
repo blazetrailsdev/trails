@@ -3,7 +3,7 @@ import { describeIfPg } from "../../../../lib/adapters/postgresql/test-helper.js
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../../../lib/test-helpers/models/post.js";
+import { Post } from "../../../models/post.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   describe("BindParameterTest", () => {

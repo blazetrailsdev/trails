@@ -97,7 +97,7 @@ FixtureFile.registerModule(
 );
 import { Aircraft } from "../models/aircraft.js";
 import { Parrot } from "../models/parrot.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Joke } from "../models/joke.js";
 import { Book } from "../models/book.js";
 import { Course } from "../models/course.js";

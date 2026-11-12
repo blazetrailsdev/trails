@@ -73,7 +73,7 @@ import {
   UserCommentsCount,
   PostCommentsCount,
 } from "../../models/comment-overlapping-counter-cache.js";
-import { Post as HmPost } from "../../../lib/test-helpers/models/post.js";
+import { Post as HmPost } from "../../models/post.js";
 import { Tag as HmTag } from "../../models/tag.js";
 import { Tyre } from "../../models/tyre.js";
 import { Car as HmCar } from "../../models/car.js";
@@ -88,7 +88,7 @@ import { Ship as HmShip, FamousShip } from "../../models/ship.js";
 import { FamousPirate } from "../../models/pirate.js";
 import { Reference as HmReference } from "../../models/reference.js";
 import { ShipPart as HmShipPart } from "../../models/ship-part.js";
-import { SubStiPost as HmSubStiPost } from "../../../lib/test-helpers/models/post.js";
+import { SubStiPost as HmSubStiPost } from "../../models/post.js";
 import { Image as HmImage } from "../../models/image.js";
 import { Comment } from "../../models/comment.js";
 import { Category } from "../../models/category.js";

@@ -4,7 +4,7 @@ import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Association } from "../../../../lib/associations/preloader/association.js";
 import type { AssociationReflection } from "../../../../lib/reflection.js";
 import type { Relation } from "../../../../lib/relation.js";
-import { Post } from "../../../../lib/test-helpers/models/post.js";
+import { Post } from "../../../models/post.js";
 import { Comment } from "../../../models/comment.js";
 
 constSet(TopLevel, "Post", Post);

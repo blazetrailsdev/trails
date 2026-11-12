@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Tagging } from "../../models/tagging.js";
 import { EagerLoadPolymorphicError } from "../../../lib/index.js";
 import "../../models/comment.js";

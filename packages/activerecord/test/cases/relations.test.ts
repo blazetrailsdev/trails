@@ -26,11 +26,7 @@ import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { adapterType } from "../../lib/test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
-import {
-  Post,
-  PostWithPreloadDefaultScope,
-  PostWithIncludesDefaultScope,
-} from "../../lib/test-helpers/models/post.js";
+import { Post, PostWithPreloadDefaultScope, PostWithIncludesDefaultScope } from "../models/post.js";
 import { Author, AuthorAddress } from "../models/author.js";
 import { Topic } from "../models/topic.js";
 import { Comment, SpecialComment, VerySpecialComment } from "../models/comment.js";

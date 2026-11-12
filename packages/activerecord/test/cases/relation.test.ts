@@ -15,7 +15,7 @@ import { Base } from "../../lib/base.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HashMerger } from "../../lib/relation/merger.js";
-import { Post as CanonPost, NullPost, FirstPost } from "../../lib/test-helpers/models/post.js";
+import { Post as CanonPost, NullPost, FirstPost } from "../models/post.js";
 import {
   Comment as CanonComment,
   SpecialComment as CanonSpecialComment,

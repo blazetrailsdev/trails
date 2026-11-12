@@ -9,7 +9,7 @@ import { ArgumentError, regexpEscape, constSet, TopLevel } from "@blazetrails/ru
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import type { Relation } from "../../lib/relation.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Comment } from "../models/comment.js";
 
 const ids = (records: { id: unknown }[]) => records.map((r) => r.id);

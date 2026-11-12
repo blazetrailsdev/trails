@@ -4,7 +4,7 @@ import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Preloader } from "../../../lib/associations/preloader.js";
 import { ThroughAssociation } from "../../../lib/associations/preloader/through-association.js";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Tag } from "../../models/tag.js";
 import { Tagging } from "../../models/tagging.js";

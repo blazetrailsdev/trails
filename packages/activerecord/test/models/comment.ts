@@ -7,10 +7,10 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Author } from "./author.js";
 import type { Company } from "./company.js";
 import type { Developer } from "./developer.js";
-import type { FirstPost } from "../../lib/test-helpers/models/post.js";
-import type { Post } from "../../lib/test-helpers/models/post.js";
+import type { FirstPost } from "./post.js";
+import type { Post } from "./post.js";
 import type { Rating } from "./rating.js";
-import type { SpecialPostWithDefaultScope } from "../../lib/test-helpers/models/post.js";
+import type { SpecialPostWithDefaultScope } from "./post.js";
 import { Base } from "../../lib/base.js";
 
 declare module "../../lib/relation.js" {

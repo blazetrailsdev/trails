@@ -5,14 +5,17 @@ import { formatter, SpellChecker } from "@blazetrails/did-you-mean";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
 
 export class AssociationNotFoundError extends ConfigurationError {
-  readonly record: any;
+  readonly record: { readonly constructor: InverseOfAssociatedClass } | null;
   readonly associationName: string | null;
   private _corrections?: string[];
 
-  constructor(record: any = null, associationName: string | null = null) {
+  constructor(
+    record: { readonly constructor: InverseOfAssociatedClass } | null = null,
+    associationName: string | null = null,
+  ) {
     if (record && associationName) {
       super(
-        `Association named '${associationName}' was not found on ${record?.constructor?.name ?? record}; perhaps you misspelled it?`,
+        `Association named '${associationName}' was not found on ${record.constructor.name}; perhaps you misspelled it?`,
       );
     } else {
       super("Association was not found.");

@@ -12,7 +12,7 @@ import { QueryMethods } from "../../../lib/relation/query-methods.js";
 import { SpawnMethods } from "../../../lib/relation/spawn-methods.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { tsName } from "../../support/array-delegate-spellings.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Project } from "../../models/project.js";
 import { Developer } from "../../models/developer.js";

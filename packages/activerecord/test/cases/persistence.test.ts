@@ -43,7 +43,7 @@ import { Account } from "../models/account.js";
 import { Reply, WrongReply } from "../models/reply.js";
 import { Developer as CanonicalDeveloper, DeveloperCalledDavid } from "../models/developer.js";
 import { Parrot, LiveParrot } from "../models/parrot.js";
-import { Post as CanonicalPost, SpecialPost } from "../../lib/test-helpers/models/post.js";
+import { Post as CanonicalPost, SpecialPost } from "../models/post.js";
 import { CpkBook, CpkOrder, CpkBestSeller } from "../models/cpk.js";
 import { Minivan } from "../models/minivan.js";
 import { Aircraft } from "../models/aircraft.js";

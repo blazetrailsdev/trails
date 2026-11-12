@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { CpkBook, CpkOrder } from "../../models/cpk.js";
-import "../../../lib/test-helpers/models/post.js";
+import "../../models/post.js";
 import "../../models/comment.js";
 import "../../models/customer.js";
 import "../../models/company.js";

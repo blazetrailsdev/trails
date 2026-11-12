@@ -4,7 +4,7 @@ import { ActiveRecordError, MultiparameterAssignmentErrors } from "../../lib/ind
 import { baseClass } from "../../lib/inheritance.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { Topic } from "../models/topic.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Customer } from "../models/customer.js";
 
 describe("raise sites Rails has and the port had dropped", () => {

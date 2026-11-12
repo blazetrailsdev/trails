@@ -2,9 +2,9 @@ import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../lib/relation.js";
 import type { ScopeOn } from "../../lib/scoping/named.js";
-import type { FirstPost } from "../../lib/test-helpers/models/post.js";
+import type { FirstPost } from "./post.js";
 import type { Person } from "./person.js";
-import type { Post } from "../../lib/test-helpers/models/post.js";
+import type { Post } from "./post.js";
 import { Base } from "../../lib/base.js";
 
 declare module "../../lib/relation.js" {

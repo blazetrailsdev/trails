@@ -243,7 +243,7 @@ describe("BasicsTest (trails)", () => {
   });
 
   it("an abstract subclass of a concrete model reflects the inherited table", async () => {
-    const { AbstractStiPost } = await import("../../lib/test-helpers/models/post.js");
+    const { AbstractStiPost } = await import("../models/post.js");
     expect(AbstractStiPost.tableName).toBe("posts");
     await AbstractStiPost.loadSchema();
     expect(Object.keys(AbstractStiPost.columnsHash())).toContain("type");

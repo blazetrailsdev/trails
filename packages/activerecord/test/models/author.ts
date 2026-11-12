@@ -11,16 +11,16 @@ import type { LazyReader } from "./reader.js";
 import type { Member } from "./member.js";
 import type { OrderedTag } from "./tag.js";
 import type { Owner } from "./owner.js";
-import type { Post } from "../../lib/test-helpers/models/post.js";
-import type { PostWithDefaultInclude } from "../../lib/test-helpers/models/post.js";
-import type { PostWithSpecialCategorization } from "../../lib/test-helpers/models/post.js";
+import type { Post } from "./post.js";
+import type { PostWithDefaultInclude } from "./post.js";
+import type { PostWithSpecialCategorization } from "./post.js";
 import type { PublishedBook } from "./book.js";
 import { Rating } from "./rating.js";
-import type { SerializedPost } from "../../lib/test-helpers/models/post.js";
+import type { SerializedPost } from "./post.js";
 import type { SpecialCategorization } from "./categorization.js";
-import type { SpecialPost } from "../../lib/test-helpers/models/post.js";
-import type { SpecialPostWithDefaultScope } from "../../lib/test-helpers/models/post.js";
-import type { StiPost } from "../../lib/test-helpers/models/post.js";
+import type { SpecialPost } from "./post.js";
+import type { SpecialPostWithDefaultScope } from "./post.js";
+import type { StiPost } from "./post.js";
 import type { Subscriber } from "./subscriber.js";
 import type { Subscription } from "./subscription.js";
 import type { Tag } from "./tag.js";
@@ -29,7 +29,7 @@ import type { Topic } from "./topic.js";
 import type { VerySpecialComment } from "./comment.js";
 import { Base } from "../../lib/base.js";
 import type { CollectionProxy } from "../../lib/associations/collection-proxy.js";
-import type { FirstPost } from "../../lib/test-helpers/models/post.js";
+import type { FirstPost } from "./post.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Author extends Base {

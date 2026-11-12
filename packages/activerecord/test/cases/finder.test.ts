@@ -22,7 +22,7 @@ import { assertQueriesCount, assertNoQueries } from "../../lib/testing/query-ass
 import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Categorization } from "../models/categorization.js";
 import { Reply as CanonicalReply } from "../models/reply.js";
-import { Post as CanonicalPost } from "../../lib/test-helpers/models/post.js";
+import { Post as CanonicalPost } from "../models/post.js";
 import { Comment as CanonicalComment, SpecialComment } from "../models/comment.js";
 import { Customer as CanonicalCustomer, Address, Money, GpsLocation } from "../models/customer.js";
 import { Author as CanonicalAuthor } from "../models/author.js";

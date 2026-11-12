@@ -4,7 +4,7 @@ import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Author } from "../../models/author.js";
 import { Comment, SpecialComment, SubSpecialComment } from "../../models/comment.js";
 import { Rating } from "../../models/rating.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 
 constSet(TopLevel, "Author", Author);
 constSet(TopLevel, "Comment", Comment);

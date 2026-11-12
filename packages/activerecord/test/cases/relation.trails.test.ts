@@ -18,7 +18,7 @@ import { AliasTracker } from "../../lib/associations/alias-tracker.js";
 
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { Company as CanonCompany, Firm as CanonFirm } from "../models/company.js";
-import { Post as CanonPost } from "../../lib/test-helpers/models/post.js";
+import { Post as CanonPost } from "../models/post.js";
 import {
   Comment as CanonComment,
   SpecialComment as CanonSpecialComment,

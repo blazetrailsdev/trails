@@ -4,7 +4,7 @@ import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Base } from "../../../lib/base.js";
 import { Author } from "../../models/author.js";
 import { Person } from "../../models/person.js";
-import { Post, SpecialPost, FirstPost } from "../../../lib/test-helpers/models/post.js";
+import { Post, SpecialPost, FirstPost } from "../../models/post.js";
 import {
   Comment,
   SpecialComment,

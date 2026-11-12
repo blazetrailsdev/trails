@@ -7,7 +7,7 @@ import type { AssociationProxy } from "../../../lib/associations/collection-prox
 import { assertNoQueries } from "../../../lib/testing/query-assertions.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Tag } from "../../models/tag.js";
 import { Tagging } from "../../models/tagging.js";
 import { Comment } from "../../models/comment.js";

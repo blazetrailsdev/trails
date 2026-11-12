@@ -8,7 +8,7 @@ import { assertQueriesCount, assertNoQueries } from "../../lib/testing/query-ass
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { Developer } from "../models/developer.js";
 import { Comment } from "../models/comment.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Topic } from "../models/topic.js";
 import { Project } from "../models/project.js";
 import { Ship } from "../models/ship.js";

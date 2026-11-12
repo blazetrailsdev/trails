@@ -28,12 +28,7 @@ import {
   AuthorAddress,
   AuthorFavoriteWithScope,
 } from "../../models/author.js";
-import {
-  Post,
-  FirstPost,
-  TaggedPost,
-  CategoryPost,
-} from "../../../lib/test-helpers/models/post.js";
+import { Post, FirstPost, TaggedPost, CategoryPost } from "../../models/post.js";
 import { Comment, VerySpecialComment } from "../../models/comment.js";
 import { Tag, OrderedTag } from "../../models/tag.js";
 import { Tagging, IndestructibleTagging } from "../../models/tagging.js";

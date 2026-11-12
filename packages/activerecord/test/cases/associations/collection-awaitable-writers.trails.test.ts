@@ -4,7 +4,7 @@ import { CollectionAssociation } from "../../../lib/associations/collection-asso
 import { RecordNotFound } from "../../../lib/index.js";
 import { CollectionIdsAssignmentError } from "../../../lib/associations/errors.js";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Category } from "../../models/category.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";

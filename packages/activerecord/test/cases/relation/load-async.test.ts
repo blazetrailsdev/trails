@@ -4,7 +4,7 @@ import { Notifications, getEnv, type NotificationEvent } from "@blazetrails/acti
 import { asyncQueryExecutor, setAsyncQueryExecutor } from "../../../lib/active-record.js";
 import { Rollback } from "../../../lib/errors.js";
 import type { Relation } from "../../../lib/relation.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";
 import { waitForAsyncQuery } from "../../../lib/cases/helper.js";

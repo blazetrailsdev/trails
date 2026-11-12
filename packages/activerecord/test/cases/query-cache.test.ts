@@ -7,7 +7,7 @@ import { Base } from "../../lib/base.js";
 import { Task } from "../models/task.js";
 import { Topic } from "../models/topic.js";
 import { Category } from "../models/category.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Rollback } from "../../lib/errors.js";
 import { assertQueriesCount, assertNoQueries } from "../../lib/testing/query-assertions.js";
 import { QueryCache } from "../../lib/query-cache.js";

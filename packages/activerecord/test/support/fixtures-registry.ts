@@ -459,17 +459,16 @@ export const fixtureRegistry = {
   otherComments: {
     model: () =>
       import("../models/comment.js").then(
-        async (m) =>
-          [m.Comment, (await import("../../lib/test-helpers/models/post.js")).Post] as const,
+        async (m) => [m.Comment, (await import("../models/post.js")).Post] as const,
       ),
     data: FixtureData.otherCommentFixtureData,
   },
   otherPosts: {
-    model: () => import("../../lib/test-helpers/models/post.js").then((m) => m.Post),
+    model: () => import("../models/post.js").then((m) => m.Post),
     data: FixtureData.otherPostFixtureData,
   },
   posts: {
-    model: () => import("../../lib/test-helpers/models/post.js").then((m) => m.Post),
+    model: () => import("../models/post.js").then((m) => m.Post),
     data: FixtureData.postFixtureData,
   },
   priceEstimates: {

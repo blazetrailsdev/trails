@@ -7,7 +7,7 @@ import { ActiveRecordError, ReadOnlyRecord } from "../../lib/errors.js";
 
 import { Developer } from "../models/developer.js";
 import { Person } from "../models/person.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Comment } from "../models/comment.js";
 import { Project } from "../models/project.js";
 import "../models/reader.js";

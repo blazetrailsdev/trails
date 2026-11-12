@@ -4,7 +4,7 @@ import { MissingAttributeError, UnknownAttributeError } from "@blazetrails/activ
 import { Book } from "../models/book.js";
 import { Company } from "../models/company.js";
 import { Lion } from "../models/cat.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Author } from "../models/author.js";
 
 describe("constructing a model whose table has not reflected", () => {

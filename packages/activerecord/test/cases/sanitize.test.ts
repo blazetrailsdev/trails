@@ -13,7 +13,7 @@ import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Author } from "../models/author.js";
 import { Binary } from "../models/binary.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { replaceBindVariables, replaceNamedBindVariables } from "../../lib/sanitization.js";
 

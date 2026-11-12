@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { ConnectionNotEstablished } from "../../../lib/errors.js";
 
 constSet(TopLevel, "Post", Post);

@@ -12,10 +12,7 @@ import { currentAdapter } from "../../support/adapter-helper.js";
 import { Author } from "../../models/author.js";
 import { Developer } from "../../models/developer.js";
 import { Comment, CommentThatAutomaticallyAltersPostBody } from "../../models/comment.js";
-import {
-  Post,
-  PostThatLoadsCommentsInAnAfterSaveHook,
-} from "../../../lib/test-helpers/models/post.js";
+import { Post, PostThatLoadsCommentsInAnAfterSaveHook } from "../../models/post.js";
 import { Rating } from "../../models/rating.js";
 import { Computer } from "../../models/computer.js";
 import { Project } from "../../models/project.js";

@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Author } from "../../models/author.js";
 import { Category } from "../../models/category.js";
 import { Categorization } from "../../models/categorization.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import type { Base } from "../../../lib/base.js";
 

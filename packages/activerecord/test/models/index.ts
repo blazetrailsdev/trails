@@ -76,7 +76,7 @@ export * from "./uuid-parent.js";
 export * from "./vertex.js";
 export * from "./warehouse-thing.js";
 export * from "./developer.js";
-export * from "../../lib/test-helpers/models/post.js";
+export * from "./post.js";
 export * from "./author-encrypted.js";
 export * from "./book-encrypted.js";
 export * from "./post-encrypted.js";

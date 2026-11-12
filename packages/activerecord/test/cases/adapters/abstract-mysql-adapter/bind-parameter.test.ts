@@ -3,7 +3,7 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
 import { describeIfMysqlAdapter } from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../../../lib/test-helpers/models/post.js";
+import { Post } from "../../../models/post.js";
 import { Topic } from "../../../models/topic.js";
 
 describeIfMysqlAdapter("AbstractMysqlAdapter", () => {

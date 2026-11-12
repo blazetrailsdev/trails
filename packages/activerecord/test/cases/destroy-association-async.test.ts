@@ -43,7 +43,7 @@ import { ShardedCommentDestroyAsync } from "../models/sharded/comment-destroy-as
 import { ShardedTag } from "../models/sharded/tag.js";
 import "../models/essay.js";
 import "../models/category.js";
-import "../../lib/test-helpers/models/post.js";
+import "../models/post.js";
 import "../models/sharded/blog-post.js";
 import "../models/sharded/blog-post-tag.js";
 import { Tag } from "../models/tag.js";

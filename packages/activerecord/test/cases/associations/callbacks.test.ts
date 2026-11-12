@@ -6,7 +6,7 @@ import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Project } from "../../models/project.js";
 import { Developer, AuditLog } from "../../models/developer.js";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Company, Firm, Client } from "../../models/company.js";
 import { Account } from "../../models/account.js";
 

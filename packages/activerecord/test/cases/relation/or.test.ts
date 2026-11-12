@@ -4,7 +4,7 @@ import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { adapterType } from "../../../lib/test-adapter.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Author } from "../../models/author.js";
-import { Post, SpecialPost } from "../../../lib/test-helpers/models/post.js";
+import { Post, SpecialPost } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Paragraph } from "../../models/paragraph.js";
 import "../../models/categorization.js";

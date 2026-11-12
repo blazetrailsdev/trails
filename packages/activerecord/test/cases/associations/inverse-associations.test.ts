@@ -27,7 +27,7 @@ import { CpkCar, CpkCarReview, CpkAuthor, CpkBook, CpkOrder } from "../../models
 import { Bulb } from "../../models/bulb.js";
 import { Comment } from "../../models/comment.js";
 import { Rating } from "../../models/rating.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Author } from "../../models/author.js";
 import { Sponsor } from "../../models/sponsor.js";
 import { Club } from "../../models/club.js";

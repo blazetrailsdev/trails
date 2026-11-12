@@ -1,7 +1,7 @@
 import { bench, describe } from "vitest";
 import { Relation } from "../relation.js";
 import { relationClassFor } from "./delegation.js";
-import { Post } from "../test-helpers/models/post.js";
+import { Post } from "../../test/models/post.js";
 
 const PerModelRelation = relationClassFor.call(Relation, Post);
 

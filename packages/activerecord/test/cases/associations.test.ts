@@ -30,7 +30,7 @@ import type { Firm as FirmT } from "../models/company.js";
 import type { Tag as TagT } from "../models/tag.js";
 import type { Tagging as TaggingT } from "../models/tagging.js";
 import { Developer, AuditLog, type Developer as DeveloperT } from "../models/developer.js";
-import { Post, FirstPost, Postesque } from "../../lib/test-helpers/models/post.js";
+import { Post, FirstPost, Postesque } from "../models/post.js";
 import { Comment } from "../models/comment.js";
 import { Computer } from "../models/computer.js";
 import { OtherDog } from "../models/other-dog.js";
@@ -380,7 +380,7 @@ describe("PreloaderTest", () => {
     Author = authorMod.Author as never;
     AuthorFavorite = authorMod.AuthorFavorite as never;
     AuthorAddress = authorMod.AuthorAddress as never;
-    const postMod = await import("../../lib/test-helpers/models/post.js");
+    const postMod = await import("../models/post.js");
     Post = postMod.Post as never;
     CategoryPost = postMod.CategoryPost as never;
     Comment = (await import("../models/comment.js")).Comment as never;
@@ -1646,7 +1646,7 @@ describe("AssociationsTest", () => {
     CpkCarReview = cpkMod.CpkCarReview as never;
     Person = (await import("../models/person.js")).Person as never;
     Reader = (await import("../models/reader.js")).Reader as never;
-    Post = (await import("../../lib/test-helpers/models/post.js")).Post as never;
+    Post = (await import("../models/post.js")).Post as never;
   });
 
   beforeEach(() => {

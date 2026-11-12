@@ -10,11 +10,7 @@ import {
   DeveloperFilteredOnJoins,
   DeveloperOrderedBySalary,
 } from "../../models/developer.js";
-import {
-  Post,
-  FirstPost,
-  SpecialPostWithDefaultScope,
-} from "../../../lib/test-helpers/models/post.js";
+import { Post, FirstPost, SpecialPostWithDefaultScope } from "../../models/post.js";
 import {
   Comment,
   SpecialComment,

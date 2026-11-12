@@ -38,7 +38,7 @@ import {
 import { Pirate, DestructivePirate } from "../../models/pirate.js";
 import { Ship } from "../../models/ship.js";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Developer, AuditLog } from "../../models/developer.js";
 import { Room } from "../../models/room.js";
 import { User } from "../../models/user.js";

@@ -15,7 +15,7 @@ import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { rational, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Author, AuthorAddress } from "../../models/author.js";
 import { Essay } from "../../models/essay.js";

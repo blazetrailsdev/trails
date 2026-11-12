@@ -4,7 +4,7 @@ import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import { Reply } from "../models/reply.js";
 import { NamespacedCompany } from "../models/company.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { ActiveRecord } from "../../lib/namespaces.js";
 import { Base } from "../../lib/index.js";
 import { DatabaseConfigurations } from "../../lib/database-configurations.js";

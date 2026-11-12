@@ -7,7 +7,7 @@ import {
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
 import { Author } from "../../../models/author.js";
-import { Post } from "../../../../lib/test-helpers/models/post.js";
+import { Post } from "../../../models/post.js";
 
 constSet(TopLevel, "Author", Author);
 constSet(TopLevel, "Post", Post);

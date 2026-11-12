@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { sql as arelSql } from "@blazetrails/arel";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Book } from "../../models/book.js";
 import { Author } from "../../models/author.js";
 

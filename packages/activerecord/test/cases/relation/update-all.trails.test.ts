@@ -3,7 +3,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Topic } from "../../models/topic.js";
 
 type Mutator = (sql: string, ...rest: unknown[]) => unknown;

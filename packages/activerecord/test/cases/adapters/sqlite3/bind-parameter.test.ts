@@ -3,7 +3,7 @@ import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
-import { Post } from "../../../../lib/test-helpers/models/post.js";
+import { Post } from "../../../models/post.js";
 
 describeIfSqlite("SQLite3Adapter", () => {
   describe("BindParameterTest", () => {

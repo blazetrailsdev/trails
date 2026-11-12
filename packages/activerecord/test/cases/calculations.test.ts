@@ -28,7 +28,7 @@ import { Account } from "../models/account.js";
 import { Company, DependentFirm, Client } from "../models/company.js";
 import { Topic } from "../models/topic.js";
 import { Reply } from "../models/reply.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Book } from "../models/book.js";
 import { NumericData } from "../models/numeric-data.js";
 import { CpkBook } from "../models/cpk.js";

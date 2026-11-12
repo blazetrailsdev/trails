@@ -4,7 +4,7 @@ import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Author } from "../../models/author.js";
 import { Tag } from "../../models/tag.js";
 import { Tagging } from "../../models/tagging.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Hotel } from "../../models/hotel.js";
 import { Department } from "../../models/department.js";
 import { Chef } from "../../models/chef.js";

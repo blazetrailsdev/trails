@@ -2,7 +2,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Person } from "../../models/person.js";
 import { Firm, Client } from "../../models/company.js";
 import { CollectionPersistedAssignmentError } from "../../../lib/associations/errors.js";

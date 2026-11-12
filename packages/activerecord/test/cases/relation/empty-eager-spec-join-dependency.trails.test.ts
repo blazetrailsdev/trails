@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/index.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Topic } from "../../models/topic.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 

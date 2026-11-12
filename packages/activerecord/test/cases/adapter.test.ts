@@ -31,7 +31,7 @@ import { itIfSupports } from "../support/supports.js";
 import { runWithoutConnection } from "../support/connection-helper.js";
 import "../support/canonical-model-index.js";
 import { Book } from "../models/book.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Author, AuthorAddress } from "../models/author.js";
 import { Movie } from "../models/movie.js";
 import { Subscriber } from "../models/subscriber.js";

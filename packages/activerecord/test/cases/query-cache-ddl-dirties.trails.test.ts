@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach } from "vitest";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { isSqliteRun } from "../support/sqlite-template.js";
 
 constSet(TopLevel, "Post", Post);

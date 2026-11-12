@@ -3,7 +3,7 @@ import { ForbiddenAttributesError, SecurePassword } from "@blazetrails/activemod
 import "../../lib/index.js";
 import { Person } from "../models/person.js";
 import { Author } from "../models/author.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Bird } from "../models/bird.js";
 import { Pirate } from "../models/pirate.js";
 import { Ship } from "../models/ship.js";

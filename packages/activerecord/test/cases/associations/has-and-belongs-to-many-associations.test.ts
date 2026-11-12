@@ -27,7 +27,7 @@ import {
 } from "../../models/developer.js";
 import { Tag } from "../../models/tag.js";
 import { Category } from "../../models/category.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Country } from "../../models/country.js";
 import { Treaty } from "../../models/treaty.js";
 import { Vertex } from "../../models/vertex.js";

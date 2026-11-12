@@ -32,7 +32,7 @@ import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel"
 import * as Lint from "@blazetrails/activemodel/testing/lint";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { Company, Client, AbstractCompany } from "../models/company.js";
-import { Post, PostRecord } from "../../lib/test-helpers/models/post.js";
+import { Post, PostRecord } from "../models/post.js";
 import { Author } from "../models/author.js";
 import { Subscriber } from "../models/subscriber.js";
 import {

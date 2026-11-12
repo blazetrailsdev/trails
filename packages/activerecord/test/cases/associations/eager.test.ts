@@ -23,7 +23,7 @@ import {
   StiPost,
   PostWithDefaultInclude,
   PostWithDefaultScope,
-} from "../../../lib/test-helpers/models/post.js";
+} from "../../models/post.js";
 import { Author, AuthorFavorite, AuthorAddress } from "../../models/author.js";
 import {
   Comment,

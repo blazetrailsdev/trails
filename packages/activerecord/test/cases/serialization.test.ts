@@ -4,7 +4,7 @@ import { Base } from "../../lib/index.js";
 import { Contact } from "../models/contact.js";
 import { Book } from "../models/book.js";
 import { Author } from "../models/author.js";
-import { SerializedPost } from "../../lib/test-helpers/models/post.js";
+import { SerializedPost } from "../models/post.js";
 import { bookFixtureData } from "../fixtures/books.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 

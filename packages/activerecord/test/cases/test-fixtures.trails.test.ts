@@ -21,7 +21,7 @@ import { College } from "../models/college.js";
 import { LiveParrot, DeadParrot } from "../models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "../models/vegetables.js";
 import { Author } from "../models/author.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import {
   defaultInsertValue,

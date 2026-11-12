@@ -4,7 +4,7 @@ import { regexpEscape } from "@blazetrails/ruby-compat";
 import { adapterType } from "../../../lib/test-adapter.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Pet } from "../../models/pet.js";
 import { CpkOrder } from "../../models/cpk.js";
 import { RecordNotFound } from "../../../lib/errors.js";

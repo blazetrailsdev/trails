@@ -5,7 +5,7 @@ import {
 } from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { Post } from "../../../../lib/test-helpers/models/post.js";
+import { Post } from "../../../models/post.js";
 
 describeIfMysqlAdapter("SchemaTestTrails", () => {
   describe("the SchemaTest @omgpost", () => {

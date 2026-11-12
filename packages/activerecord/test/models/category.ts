@@ -9,7 +9,7 @@ import type { Categorization } from "./categorization.js";
 import type { Comment } from "./comment.js";
 import type { Essay } from "./essay.js";
 import type { Human } from "./human.js";
-import type { Post } from "../../lib/test-helpers/models/post.js";
+import type { Post } from "./post.js";
 import type { SpecialCategorization } from "./categorization.js";
 import { Base } from "../../lib/base.js";
 

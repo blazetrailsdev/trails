@@ -15,7 +15,7 @@ import { Associations } from "../../lib/associations.js";
 import { AggregateReflection, ThroughReflection, create } from "../../lib/reflection.js";
 import { NameError } from "../../lib/errors.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Tagging } from "../models/tagging.js";
 import { Reply, WebReply } from "../models/reply.js";
 import { Topic } from "../models/topic.js";

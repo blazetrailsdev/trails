@@ -18,7 +18,7 @@ import {
   MyAppBillingNestedFirm,
   MyAppBusinessCompany,
 } from "../models/company-in-module.js";
-import { Post as CanonicalPost } from "../../lib/test-helpers/models/post.js";
+import { Post as CanonicalPost } from "../models/post.js";
 import { Topic as CanonicalTopic } from "../models/topic.js";
 import { Subscriber } from "../models/subscriber.js";
 import { NullColumn } from "../../lib/connection-adapters/column.js";
@@ -59,7 +59,7 @@ import { BestHardback } from "../models/hardback.js";
 import { DrinkDesigner, MocktailDesigner } from "../models/drink-designer.js";
 import { CakeDesigner } from "../models/cake-designer.js";
 import { Recipe } from "../models/recipe.js";
-import { FirstPost } from "../../lib/test-helpers/models/post.js";
+import { FirstPost } from "../models/post.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 
 const { self } = fixtures(["topics", "customers", "companies", "subscribers", "priceEstimates"]);

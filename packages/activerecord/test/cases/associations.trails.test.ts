@@ -14,7 +14,7 @@ import {
 } from "../models/cpk.js";
 import { ShardedComment } from "../models/sharded/comment.js";
 import { Author, AuthorAddress } from "../models/author.js";
-import { Post, FirstPost } from "../../lib/test-helpers/models/post.js";
+import { Post, FirstPost } from "../models/post.js";
 import { Comment } from "../models/comment.js";
 import { ShardedBlogPost } from "../models/sharded/blog-post.js";
 import { ShardedBlogPostTag } from "../models/sharded/blog-post-tag.js";

@@ -15,7 +15,7 @@ import { adapterType } from "../../../lib/test-adapter.js";
 import { Temporal } from "@blazetrails/date";
 import { Topic } from "../../models/topic.js";
 import { Reply } from "../../models/reply.js";
-import { Post, SpecialPost } from "../../../lib/test-helpers/models/post.js";
+import { Post, SpecialPost } from "../../models/post.js";
 import { Comment, SpecialComment, OopsError } from "../../models/comment.js";
 import { Author } from "../../models/author.js";
 import { Developer } from "../../models/developer.js";

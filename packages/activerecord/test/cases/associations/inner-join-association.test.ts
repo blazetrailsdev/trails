@@ -10,7 +10,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { Table, Nodes } from "@blazetrails/arel";
 import { Author, AuthorAddress } from "../../models/author.js";
-import { Post, CategoryPost } from "../../../lib/test-helpers/models/post.js";
+import { Post, CategoryPost } from "../../models/post.js";
 import {
   Comment,
   SpecialComment,

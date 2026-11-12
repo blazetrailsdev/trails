@@ -2,7 +2,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Author } from "../../models/author.js";
-import { CategoryPost, Post } from "../../../lib/test-helpers/models/post.js";
+import { CategoryPost, Post } from "../../models/post.js";
 import { Tag, OrderedTag } from "../../models/tag.js";
 import { Tagging } from "../../models/tagging.js";
 import { Member } from "../../models/member.js";

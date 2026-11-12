@@ -5,7 +5,7 @@ import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import type { HasManyAssociation } from "../../../lib/associations/has-many-association.js";
 import type { HasOneAssociation } from "../../../lib/associations/has-one-association.js";
 import { Comment, SpecialComment, VerySpecialComment } from "../../models/comment.js";
-import { Post, SpecialPost } from "../../../lib/test-helpers/models/post.js";
+import { Post, SpecialPost } from "../../models/post.js";
 import { Default } from "../../../lib/scoping/default.js";
 import { defaultExtensions } from "../../../lib/scoping/named.js";
 import {

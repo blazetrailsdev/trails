@@ -4,7 +4,7 @@ import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { JoinDependency } from "../../../lib/associations/join-dependency.js";
 import { Author } from "../../models/author.js";
 import { Comment } from "../../models/comment.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 
 constSet(TopLevel, "Author", Author);
 constSet(TopLevel, "Comment", Comment);

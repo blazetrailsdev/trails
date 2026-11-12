@@ -14,7 +14,7 @@ import {
   PostWithDefaultScope,
   SpecialPostWithDefaultScope,
   PostWithDestroyCallback,
-} from "../../lib/test-helpers/models/post.js";
+} from "../models/post.js";
 import { Subscriber } from "../models/subscriber.js";
 import { Developer } from "../models/developer.js";
 import { CpkOrder, CpkBook } from "../models/cpk.js";

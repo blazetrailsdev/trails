@@ -57,11 +57,7 @@ import { Bird as CanonicalBird } from "../models/bird.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "../models/eye.js";
 import { Comment as CanonicalComment } from "../models/comment.js";
 import { Category as CanonicalCategory } from "../models/category.js";
-import {
-  FirstPost,
-  Post as CanonicalPost,
-  PostWithAfterCreateCallback,
-} from "../../lib/test-helpers/models/post.js";
+import { FirstPost, Post as CanonicalPost, PostWithAfterCreateCallback } from "../models/post.js";
 import { Customer as CanonicalCustomer } from "../models/customer.js";
 import { Order as CanonicalOrder } from "../models/order.js";
 import { Invoice } from "../models/invoice.js";

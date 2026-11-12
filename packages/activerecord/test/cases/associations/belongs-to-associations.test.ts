@@ -31,7 +31,7 @@ import { Client, Firm, Company } from "../../models/company.js";
 import { Topic, WebTopic } from "../../models/topic.js";
 import { Reply, SillyReply, WebReply } from "../../models/reply.js";
 import { Wheel } from "../../models/wheel.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Comment, CommentWithAfterCreateUpdate } from "../../models/comment.js";
 import { Tagging } from "../../models/tagging.js";
 import { Sponsor } from "../../models/sponsor.js";

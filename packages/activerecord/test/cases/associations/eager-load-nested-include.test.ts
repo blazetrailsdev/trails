@@ -6,7 +6,7 @@ import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries } from "../../../lib/testing/query-assertions.js";
 import { Author, AuthorFavorite } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Category } from "../../models/category.js";
 import { Categorization } from "../../models/categorization.js";

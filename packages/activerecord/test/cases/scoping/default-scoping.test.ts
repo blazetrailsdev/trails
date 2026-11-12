@@ -49,7 +49,7 @@ import {
   ConditionalStiPost,
   SubConditionalStiPost,
   PostWithCommentWithDefaultScopeReferencesAssociation,
-} from "../../../lib/test-helpers/models/post.js";
+} from "../../models/post.js";
 import { Project } from "../../models/project.js";
 import { Lion } from "../../models/cat.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";

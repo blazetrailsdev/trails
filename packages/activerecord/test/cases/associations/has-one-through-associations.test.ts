@@ -38,7 +38,7 @@ import { Category, SpecialCategory } from "../../models/category.js";
 import { Author, AuthorAddress } from "../../models/author.js";
 import { Essay } from "../../models/essay.js";
 import { Owner } from "../../models/owner.js";
-import { Post, FirstPost } from "../../../lib/test-helpers/models/post.js";
+import { Post, FirstPost } from "../../models/post.js";
 import { Comment, SpecialComment } from "../../models/comment.js";
 import { Categorization } from "../../models/categorization.js";
 import { Customer } from "../../models/customer.js";

@@ -1,6 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { ShipPart } from "../../models/ship-part.js";
 import { Ship } from "../../models/ship.js";
 import { Treasure } from "../../models/treasure.js";

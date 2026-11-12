@@ -11,7 +11,7 @@ import { ClothingItem } from "../models/clothing-item.js";
 import { Minimalistic } from "../models/minimalistic.js";
 import { Minivan } from "../models/minivan.js";
 import { Aircraft } from "../models/aircraft.js";
-import { Post as CanonicalPost, SpecialPost } from "../../lib/test-helpers/models/post.js";
+import { Post as CanonicalPost, SpecialPost } from "../models/post.js";
 import { Comment } from "../models/comment.js";
 import { Company } from "../models/company.js";
 import { Notifications } from "@blazetrails/activesupport";

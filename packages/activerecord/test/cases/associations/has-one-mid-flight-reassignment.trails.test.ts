@@ -6,7 +6,7 @@ import { Client, Firm } from "../../models/company.js";
 import { Member } from "../../models/member.js";
 import { Club } from "../../models/club.js";
 import { Tagging } from "../../models/tagging.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 
 describe("has_one mid-flight reassignment", () => {
   fixtures(["companies", "accounts", "members", "memberships", "clubs"]);

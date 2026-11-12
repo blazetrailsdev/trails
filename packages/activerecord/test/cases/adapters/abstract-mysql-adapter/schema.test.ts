@@ -7,7 +7,7 @@ import {
   MYSQL_TEST_URL,
 } from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
 import { Base } from "../../../../lib/base.js";
-import { Post } from "../../../../lib/test-helpers/models/post.js";
+import { Post } from "../../../models/post.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

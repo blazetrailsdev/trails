@@ -3,7 +3,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import type { Author } from "./author.js";
 import type { Category } from "./category.js";
-import type { Post } from "../../lib/test-helpers/models/post.js";
+import type { Post } from "./post.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../lib/base.js";
 

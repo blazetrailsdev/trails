@@ -5,7 +5,7 @@ import { assertRaises, assertNotEmpty } from "@blazetrails/activesupport/testing
 import { sql as arelSql } from "@blazetrails/arel";
 import { adapterType } from "../../lib/test-adapter.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Comment } from "../models/comment.js";
 
 constSet(TopLevel, "Post", Post);

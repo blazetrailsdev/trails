@@ -12,7 +12,7 @@ import {
   CpkOrderWithSingularBookChapters,
 } from "../../models/cpk.js";
 import { Person } from "../../models/person.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { ShardedBlogPost } from "../../models/sharded/blog-post.js";
 import { Tag } from "../../models/tag.js";
 import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";

@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Car } from "../../models/car.js";
 import { Tyre } from "../../models/tyre.js";
 import { Person } from "../../models/person.js";

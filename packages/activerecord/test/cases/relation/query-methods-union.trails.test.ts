@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Nodes, sql } from "@blazetrails/arel";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 
 describe("QueryMethods Array#| dedup", () => {
   fixtures(["posts", "comments"]);

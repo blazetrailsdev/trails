@@ -18,7 +18,7 @@ import { assertNoQueries } from "../../lib/testing/query-assertions.js";
 import type { Author } from "../models/author.js";
 import { Binary } from "../models/binary.js";
 import type { Comment } from "../models/comment.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 
 constSet(TopLevel, "Binary", Binary);
 

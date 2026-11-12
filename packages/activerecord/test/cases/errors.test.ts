@@ -163,11 +163,9 @@ describe("ErrorsTest", () => {
     expect(() => {
       for (const errorKlass of errorKlasses) {
         try {
-          new (errorKlass as any)();
+          Reflect.construct(errorKlass, []);
         } catch {
-          throw new Error(
-            `Instance of ${(errorKlass as any).name} can't be initialized with no arguments`,
-          );
+          throw new Error(`Instance of ${errorKlass.name} can't be initialized with no arguments`);
         }
       }
     }).not.toThrow();

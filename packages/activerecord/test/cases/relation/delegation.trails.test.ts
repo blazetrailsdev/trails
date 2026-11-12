@@ -5,7 +5,7 @@ import {
   uncacheableMethods,
 } from "../../../lib/relation/delegation.js";
 import { NotImplementedError } from "../../../lib/errors.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Company, Firm } from "../../models/company.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";

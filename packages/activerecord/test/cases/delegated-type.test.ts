@@ -9,7 +9,7 @@ import { Entry } from "../models/entry.js";
 import { Message } from "../models/message.js";
 import { Comment } from "../models/comment.js";
 import { Account } from "../models/account.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Recipient } from "../models/recipient.js";
 
 beforeAll(() => {

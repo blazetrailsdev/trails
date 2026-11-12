@@ -9,7 +9,7 @@ import { Project } from "../models/project.js";
 import { Firm } from "../models/company.js";
 import "../models/contract.js";
 import { Author } from "../models/author.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 import { Comment } from "../models/comment.js";
 import { Member } from "../models/member.js";
 import { Membership, CurrentMembership } from "../models/membership.js";

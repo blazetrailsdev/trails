@@ -16,7 +16,7 @@ import { Comment } from "../../models/comment.js";
 import { Developer } from "../../models/developer.js";
 import { Person } from "../../models/person.js";
 import { Pet } from "../../models/pet.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { Topic } from "../../models/topic.js";
 import { WarehouseThing } from "../../models/warehouse-thing.js";
 import { CpkOrder } from "../../models/cpk.js";

@@ -59,7 +59,7 @@ import {
   SubStiPost,
   AbstractStiPost,
   SubAbstractStiPost,
-} from "../../lib/test-helpers/models/post.js";
+} from "../models/post.js";
 import { LoosePerson, LooseDescendant, TightPerson, TightDescendant } from "../models/person.js";
 import { Account } from "../models/account.js";
 import { Author } from "../models/author.js";

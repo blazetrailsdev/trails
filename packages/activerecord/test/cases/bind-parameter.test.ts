@@ -11,7 +11,7 @@ import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Topic } from "../models/topic.js";
 import { Author } from "../models/author.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 
 class LogListener {
   events: Event[] = [];

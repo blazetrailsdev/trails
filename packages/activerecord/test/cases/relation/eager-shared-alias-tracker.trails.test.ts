@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import "../../support/canonical-model-index.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 
 describe("eager build_joins shared AliasTracker", () => {
   fixtures([]);

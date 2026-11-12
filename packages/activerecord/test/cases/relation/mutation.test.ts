@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import "../../../lib/index.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { Post, FakeKlass } from "../../../lib/test-helpers/models/post.js";
+import { Post, FakeKlass } from "../../models/post.js";
 import { Relation } from "../../../lib/relation.js";
 import type { Base } from "../../../lib/base.js";
 

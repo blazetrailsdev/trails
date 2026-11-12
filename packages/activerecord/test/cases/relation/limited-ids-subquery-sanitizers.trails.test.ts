@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 
 describe("Relation limited ids subquery sanitizers", () => {

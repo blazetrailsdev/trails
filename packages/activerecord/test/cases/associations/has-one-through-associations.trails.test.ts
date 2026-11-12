@@ -6,7 +6,7 @@ import { Club } from "../../models/club.js";
 import { SpecialComment } from "../../models/comment.js";
 import { Member } from "../../models/member.js";
 import { Membership } from "../../models/membership.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import type { SingularAssociation } from "../../../lib/associations/singular-association.js";
 
 function club(member: Member): SingularAssociation {

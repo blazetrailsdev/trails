@@ -8,7 +8,7 @@ import { loadSingularTarget } from "../../support/load-singular-target.js";
 import { AssociationScope, ReflectionProxy } from "../../../lib/associations/association-scope.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { Author } from "../../models/author.js";
-import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Post } from "../../models/post.js";
 import "../../models/company.js";
 import { Comment } from "../../models/comment.js";
 import { Category } from "../../models/category.js";

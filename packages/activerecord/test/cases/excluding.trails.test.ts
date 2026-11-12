@@ -6,7 +6,7 @@ import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { Relation } from "../../lib/relation.js";
 import { DeferredIdsNotIn } from "../../lib/relation/predicate-builder/deferred-distinct-pk-in.js";
-import { Post } from "../../lib/test-helpers/models/post.js";
+import { Post } from "../models/post.js";
 
 constSet(TopLevel, "Post", Post);
 
