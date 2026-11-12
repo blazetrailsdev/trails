@@ -546,7 +546,6 @@ export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
   return Promise.resolve(this.async().ids());
 }
 
-/** @noRailsEquivalent PERMANENT */
 export type PluckColumn<T> = {
   [K in keyof T & string]: K extends `_${string}`
     ? never
@@ -555,7 +554,6 @@ export type PluckColumn<T> = {
       : K;
 }[keyof T & string];
 
-/** @noRailsEquivalent PERMANENT */
 export type PluckedRow<T, K extends readonly unknown[]> = { [I in keyof K]: T[K[I] & keyof T] };
 
 type Grouped<G extends boolean, S, M> = boolean extends G ? S | M : G extends true ? M : S;

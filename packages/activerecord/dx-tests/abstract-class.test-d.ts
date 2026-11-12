@@ -24,7 +24,7 @@ describe("abstract class DX — a TypeScript abstract class as an AR abstract cl
     expectTypeOf(Story.columnNames()).toEqualTypeOf<string[]>();
     expectTypeOf(await Story.pluck("title")).toEqualTypeOf<string[]>();
     await Story.loadSchema();
-    ApplicationRecord.establishConnection({ adapter: "sqlite3", database: ":memory:" });
+    await ApplicationRecord.establishConnection({ adapter: "sqlite3", database: ":memory:" });
     ApplicationRecord.where({});
     ApplicationRecord.from("stories");
     expectTypeOf(ApplicationRecord.columnNames()).toEqualTypeOf<string[]>();

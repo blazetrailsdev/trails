@@ -145,7 +145,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest (trails)", () => {
   });
 
   it("excludeFromFilterParameters excludes specific attributes while others are still filtered", () => {
-    Encryption.config.excludedFromFilterParameters = ["isbn"];
+    Encryption.config.excludedFromFilterParameters = ["named_book.isbn"];
 
     const filterParameters: string[] = [];
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
