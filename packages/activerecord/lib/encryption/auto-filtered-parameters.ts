@@ -17,7 +17,6 @@ export class AutoFilteredParameters {
 
   enable(): void {
     this.applyCollectedAttributes();
-    this._attributesByClass.clear();
     this._collecting = false;
   }
 
@@ -70,17 +69,14 @@ export class AutoFilteredParameters {
   }
 
   private applyFilter(klass: any, attribute: string): void {
-    if (!Encryption.config.addToFilterParameters) return;
     const filter = [klass.name ? `${klass.modelName.element}` : null, String(attribute)]
       .filter((part) => part != null)
       .join(".");
-    if (
-      !this.isExcludedFromFilterParameters(filter) &&
-      !this.isExcludedFromFilterParameters(attribute)
-    ) {
+    if (!this.isExcludedFromFilterParameters(filter)) {
       if (!this.app.config.filterParameters.includes(filter)) {
         this.app.config.filterParameters.push(filter);
       }
+      klass.filterAttributes = [...klass.filterAttributes, attribute];
     }
   }
 }

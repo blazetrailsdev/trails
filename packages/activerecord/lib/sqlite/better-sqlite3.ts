@@ -77,6 +77,10 @@ class BetterSqlite3Statement implements SqliteStatement, SyncSqliteStatement {
   }
 
   iterate(binds?: SqliteBinds): IterableIterator<unknown> {
+    if (!this.stmt.reader) {
+      this.run(binds);
+      return [][Symbol.iterator]();
+    }
     return this.bind(binds, (args) => this.stmt.iterate(...args));
   }
 
@@ -200,8 +204,14 @@ class BetterSqlite3Connection implements SqliteConnection, SyncSqliteConnection 
   }
 
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown {
-    const row = this.execute(sql, bindVars)[0];
-    if (row) return Object.values(row as object)[0];
+    const rs = this.prepare(sql);
+    try {
+      for (const row of rs.iterate(bindVars)) {
+        return (row as Record<string, unknown>)[rs.columns()[0].name];
+      }
+    } finally {
+      rs.close();
+    }
     return null;
   }
 
