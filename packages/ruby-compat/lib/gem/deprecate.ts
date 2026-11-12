@@ -1,50 +1,7 @@
-import { isModuleObject, rbClassPath } from "../classpath.js";
-import { format } from "../kernel-format.js";
-import { warn } from "../kernel-warn.js";
-import { locationOfCaller } from "./location-of-caller.js";
-import { rbModName } from "../object.js";
-
 /**
- * `vendor/ruby/v3.3.11/lib/rubygems/deprecate.rb:73` — `Gem::Deprecate`.
- * `skip` (`:74-80`) is the module's own state, which `Gem::Version` reads.
+ * `vendor/ruby/v3.3.11/lib/rubygems/deprecate.rb:73` — `Gem::Deprecate`,
+ * answering only `skip` (`:74-80`), which `Gem::Version` reads.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem::Deprecate`.
  */
-export const Deprecate = {
-  /**
-   * `Gem::Deprecate#deprecate` (`vendor/ruby/v3.3.11/lib/rubygems/deprecate.rb:101-118`):
-   * wraps the receiver's `name` so each call warns of `repl` (or of no
-   * replacement for `":none"`) and the year and month it goes
-   * away, unless `Gem::Deprecate.skip`.
-   *
-   * `is_a? Module` is a class, or a plain object marked as a module or seated
-   * as a constant: only `const_set` and the generated constant tables give an
-   * object a class path, and neither seats an instance. The block rides at the
-   * end of `args`, and `ruby2_keywords` (`:117`) has no JS analogue, since a
-   * JS call has no keyword arguments to flag.
-   *
-   * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem::Deprecate#deprecate`.
-   */
-  deprecate(this: object, name: string, repl: string, year: number, month: number): void {
-    const host = this as Record<string, (...args: unknown[]) => unknown>;
-    const old = `_deprecated_${name}`;
-    host[old] = host[name];
-    host[name] = function (this: object, ...args: unknown[]): unknown {
-      const klass =
-        typeof this === "function" || isModuleObject(this) || rbClassPath(this) !== undefined;
-      const target = klass ? `${rbModName(this)}.` : `${rbModName(this.constructor)}#`;
-      const msg = [
-        `NOTE: ${target}${name} is deprecated`,
-        repl === ":none" ? " with no replacement" : `; use ${repl} instead`,
-        format(". It will be removed on or after %4d-%02d.", year, month),
-        `\n${target}${name} called from ${locationOfCaller().join(":")}`,
-      ];
-      if (!Deprecate.skip) warn(`${msg.join("")}.`);
-      return (this as typeof host)[old](...args);
-    };
-  },
-} as {
-  deprecate(this: object, name: string, repl: string, year: number, month: number): void;
-  skip: boolean;
-};
-Object.defineProperty(Deprecate, "skip", { value: false, writable: true, enumerable: false });
+export const Deprecate = { skip: false };

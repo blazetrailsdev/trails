@@ -1,5 +1,4 @@
 import { Deprecate } from "./gem/deprecate.js";
-import { locationOfCaller } from "./gem/location-of-caller.js";
 import { Version } from "./gem/version.js";
 import { getOs } from "./os-adapter.js";
 import { RbConfig } from "./rb-config.js";
@@ -41,8 +40,6 @@ export const Gem = {
   get path(): string[] {
     return [Gem.defaultDir];
   },
-
-  locationOfCaller,
 
   /**
    * `vendor/ruby/v3.3.11/lib/rubygems.rb:807` — `Gem.ruby`.

@@ -61,18 +61,3 @@ describe("Gem::Version", () => {
     }
   });
 });
-
-describe("Gem.location_of_caller", () => {
-  it("answers the caller's file and line at depth 1 and 2", () => {
-    const line = (): number => Number(/:(\d+):\d+\)?$/.exec(new Error().stack!.split("\n")[2])![1]);
-    const a = (): [string, number] => Gem.locationOfCaller();
-    const c = (): [string, number] => Gem.locationOfCaller(2);
-    const b = (): [string, number] => c();
-    const [aLoc, aLine] = [a(), line()];
-    expect(aLoc[0]).toMatch(/version\.trails\.test\.ts$/);
-    expect(aLoc[1]).toBe(aLine);
-    const [bLoc, bLine] = [b(), line()];
-    expect(bLoc[0]).toMatch(/version\.trails\.test\.ts$/);
-    expect(bLoc[1]).toBe(bLine);
-  });
-});
