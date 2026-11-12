@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "build": "trails-tsc --schema db/schema.ts",
+    "build": "trails-tsc-views build --views app/views && trails-tsc --schema db/schema.ts",
     "test": "vitest run",
     "trails": "tsx node_modules/@blazetrails/trailties/bin/trails.js",
     "dev": "tsx node_modules/@blazetrails/trailties/bin/trails.js server",
@@ -18,8 +18,7 @@
     "db:migrate": "tsx node_modules/@blazetrails/trailties/bin/trails.js db migrate",
     "db:seed": "tsx node_modules/@blazetrails/trailties/bin/trails.js db seed",
     "db:setup": "tsx node_modules/@blazetrails/trailties/bin/trails.js db create && tsx node_modules/@blazetrails/trailties/bin/trails.js db migrate && tsx node_modules/@blazetrails/trailties/bin/trails.js db seed",
-    "db:reset": "tsx node_modules/@blazetrails/trailties/bin/trails.js db drop && tsx node_modules/@blazetrails/trailties/bin/trails.js db create && tsx node_modules/@blazetrails/trailties/bin/trails.js db migrate && tsx node_modules/@blazetrails/trailties/bin/trails.js db seed",
-    "prepare": "trails-tsc-views build --views app/views"
+    "db:reset": "tsx node_modules/@blazetrails/trailties/bin/trails.js db drop && tsx node_modules/@blazetrails/trailties/bin/trails.js db create && tsx node_modules/@blazetrails/trailties/bin/trails.js db migrate && tsx node_modules/@blazetrails/trailties/bin/trails.js db seed"
   },
   "dependencies": {
     "@blazetrails/activerecord": "workspace:*",
