@@ -312,7 +312,7 @@ jobs:
                   set_gate guides_affected       "$GUIDES_PKGS_RE" "$GUIDES_EXCL_RE"
                   set_gate website_affected      "$WEBSITE_PKGS_RE"
                   set_gate comparison_affected   "$COMPARISON_RE" '^packages/website/'
-                  bash scripts/ci/scoped-only.sh "$files" "$(grep -E "$INFRA_RE" <<<"$infra_files" || true)" "$AR_PKGS_RE" >> "$GITHUB_OUTPUT"
+                  bash scripts/ci/scoped-only.sh - "$(grep -E "$INFRA_RE" <<<"$infra_files" || true)" "$AR_PKGS_RE" <<<"$files" >> "$GITHUB_OUTPUT"
                 fi
                 ;;
             esac

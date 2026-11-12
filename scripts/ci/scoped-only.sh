@@ -3,6 +3,7 @@ set -euo pipefail
 THOR_ONLY_RE='^(packages/thor/|vendor/thor/|scripts/parity/unported-files/thor\.ts$|scripts/api-compare/call-mismatches-(exclude|unreviewed)/thor/)'
 ACTIONCABLE_ONLY_RE='^(packages/actioncable/|scripts/parity/unported-files/actioncable\.ts$)'
 files="${1:-}"
+if [ "$files" = - ]; then files=$(cat); fi
 scoped_only() {
   if [ -n "$files" ] && ! grep -qvE "$2" <<<"$files"; then
     echo "$1=true"
@@ -21,7 +22,7 @@ ar_scope=""
 sqlite_only=false
 unit_packages=""
 if [ -z "$infra" ] && ! grep -qE '^(scripts/ci/(scoped-only\.sh|unit-packages\.mjs)$|eslint/|eslint\.config\.mjs$|vendor/)' <<<"$files"; then
-  unit_packages=$(node "$(dirname "${BASH_SOURCE[0]}")/unit-packages.mjs" "$files" | { grep -E "$UNIT_RE" || true; } | tr '\n' ' ' | sed 's/ $//')
+  unit_packages=$(node "$(dirname "${BASH_SOURCE[0]}")/unit-packages.mjs" - <<<"$files" | { grep -E "$UNIT_RE" || true; } | tr '\n' ' ' | sed 's/ $//')
   [ -n "$unit_packages" ] || unit_packages=none
   if [ -n "$ar_re" ]; then
     ar_files=$(grep -E "$ar_re" <<<"$files" || true)

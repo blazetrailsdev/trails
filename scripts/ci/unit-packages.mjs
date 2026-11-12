@@ -42,6 +42,7 @@ export function affectedPackages(files, dependents = reverseEdges()) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const files = (process.argv[2] ?? "").split("\n").filter(Boolean);
+  const arg = process.argv[2] ?? "";
+  const files = (arg === "-" ? readFileSync(0, "utf8") : arg).split("\n").filter(Boolean);
   for (const dir of affectedPackages(files)) console.log(dir);
 }
