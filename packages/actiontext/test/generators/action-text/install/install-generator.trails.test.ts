@@ -6,11 +6,12 @@ import { InstallGenerator } from "../../../../lib/generators/action-text/install
 
 class Generator extends InstallGenerator {
   static {
-    void this.sourceRoot(InstallGenerator.sourceRoot());
+    void this.sourceRoot(InstallGenerator._sourceRoot);
   }
 
-  override trailsCommand = async (command: string, options?: Record<string, unknown>) => {
+  override trailsCommand: InstallGenerator["trailsCommand"] = async (command, options) => {
     commands.push(`trails ${command} ${JSON.stringify(options)}`);
+    return undefined;
   };
 }
 
@@ -32,8 +33,8 @@ describe("ActionText::Generators::InstallGenerator", () => {
     await File.writeAsync(File.join(app, "config/importmap.rb"), 'pin "application"\n');
     await File.writeAsync(File.join(app, "package.json"), '{ "dependencies": {} }\n');
     commands = [];
-    vi.spyOn(InstallGenerator.prototype, "run").mockImplementation(async (command: string) => {
-      commands.push(command);
+    vi.spyOn(InstallGenerator.prototype, "run").mockImplementation(async (command) => {
+      commands.push(String(command));
       return true;
     });
   });
