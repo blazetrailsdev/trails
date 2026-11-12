@@ -46,7 +46,7 @@ class SafeCoder {
 export class YAMLColumn extends ColumnSerializer {
   constructor(
     attrName: string,
-    objectClass: ClassLike = Object as unknown as ClassLike,
+    objectClass: ClassLike = Object,
     { permittedClasses = [], unsafeLoad = null }: YamlColumnOptions = {},
   ) {
     super(

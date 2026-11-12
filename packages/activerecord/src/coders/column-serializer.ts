@@ -25,11 +25,7 @@ export class ColumnSerializer {
     return this._coder;
   }
 
-  constructor(
-    attrName: string,
-    coder: CoderLike,
-    objectClass: ClassLike = Object as unknown as ClassLike,
-  ) {
+  constructor(attrName: string, coder: CoderLike, objectClass: ClassLike = Object) {
     this._attrName = attrName;
     this._objectClass = objectClass;
     this._coder = coder;
