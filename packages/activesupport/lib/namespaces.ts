@@ -3,6 +3,7 @@ import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { CacheStore } from "./cache/index.js";
+import type { CompletableExecution } from "./execution-wrapper.js";
 import type { Duration } from "./duration.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
 import type { ErrorReporter } from "./error-reporter.js";
@@ -112,7 +113,11 @@ declare module "@blazetrails/ruby-compat" {
         };
         envConfig(): Record<string, unknown>;
         credentials(): Promise<{ dig(key: string, ...identifiers: string[]): unknown }>;
-        executor: { wrap<T>(block: () => T): T; runBang(): unknown; perform<T>(block: () => T): T };
+        executor: {
+          wrap<T>(block: () => T): T;
+          runBang(): CompletableExecution | Promise<CompletableExecution>;
+          perform<T>(block: () => T): T;
+        };
         configFor(name: string): Promise<unknown>;
         loadSeed(): Promise<void>;
         migrationRailties(): Array<{

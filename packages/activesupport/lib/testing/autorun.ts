@@ -17,7 +17,7 @@ import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
 import { Isolation } from "./isolation.js";
 import { TestHelper as ExecutorTestHelper } from "../executor/test-helper.js";
-import type { Executor } from "../executor.js";
+import type { CompletableExecution } from "../execution-wrapper.js";
 import { Assertion, Skip, Test, UnexpectedError, _takeAssertions } from "./assertions.js";
 
 declare module "vitest" {
@@ -107,7 +107,7 @@ export function describe(suite: DescribedSuite | undefined): SpecClass {
   return cls;
 }
 
-const executions = new WeakMap<TestCase, { completeBang(): unknown }>();
+const executions = new WeakMap<TestCase, CompletableExecution>();
 
 const capturing = new WeakSet<object>();
 const captured = new WeakMap<TestCase, { from: number; at: number; count: number }>();
@@ -163,12 +163,7 @@ beforeEach(async (context: TestContext) => {
   iseqLocationSetup(test, context.task.file.filepath, context.task.location?.line ?? 0);
   Object.defineProperty(testCase, testName, { value: test, configurable: true });
   if (isModuleIncluded(klass, ExecutorTestHelper)) {
-    executions.set(
-      testCase,
-      (await (TopLevel.Trails!.application!.executor as typeof Executor).runBang()) as {
-        completeBang(): unknown;
-      },
-    );
+    executions.set(testCase, await TopLevel.Trails!.application!.executor.runBang());
   }
   try {
     for (const hook of Test.SETUP_METHODS) await rbFSend(testCase, hook);

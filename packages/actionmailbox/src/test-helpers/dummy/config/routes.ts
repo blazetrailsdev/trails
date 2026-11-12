@@ -1,4 +1,3 @@
-import type { RouteSet } from "@blazetrails/actionpack";
-import { TopLevel } from "@blazetrails/activesupport";
+import { Trails } from "@blazetrails/trailties";
 
-(TopLevel.Trails!.application!.routes() as unknown as RouteSet).draw(function () {});
+Trails.application!.routes().draw(function () {});

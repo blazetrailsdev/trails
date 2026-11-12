@@ -1,4 +1,4 @@
-import { ActiveRecord, Base } from "@blazetrails/activerecord";
+import { Base } from "@blazetrails/activerecord";
 import { getEnv } from "@blazetrails/activesupport";
 
 const arunit = Base.configurations().configsFor({ envName: "arunit", name: "primary" })!;
@@ -17,7 +17,5 @@ function databaseName(): string {
 }
 
 export default {
-  [String(ActiveRecord.ConnectionHandling.DEFAULT_ENV())]: {
-    primary: { ...arunit.configurationHash, database: databaseName() },
-  },
+  test: { ...arunit.configurationHash, database: databaseName() },
 };

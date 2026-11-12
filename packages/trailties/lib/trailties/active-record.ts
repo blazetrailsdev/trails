@@ -225,6 +225,12 @@ export class Trailtie extends BaseTrailtie {
       );
     });
 
+    this.initializer("active_record.logger", () => {
+      onLoad("active_record", function (this: typeof ActiveRecord.Base) {
+        this.logger ??= Trails.logger;
+      });
+    });
+
     this.initializer("active_record.backtrace_cleaner", () => {
       onLoad("active_record", { runOnce: true }, setLogSubscriberBacktraceCleaner);
     });
