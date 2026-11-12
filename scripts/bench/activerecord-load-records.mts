@@ -1,5 +1,3 @@
-// Run: npx tsx scripts/bench/activerecord-load-records.mts (after `pnpm build`). The
-// `Story.first()` warm-up keeps the first query's one-time module loading out of the timed loads.
 import { Base } from "@blazetrails/activerecord";
 
 const ROWS = 12_000;
