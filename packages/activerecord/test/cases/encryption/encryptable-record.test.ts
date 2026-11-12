@@ -431,9 +431,9 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it.skipIf(authorNameLimit == null)("validate column sizes", async () => {
     expect(await new EncryptedAuthor({ name: "jorge" }).isValid()).toBeTruthy();
     expect(
-      await new EncryptedAuthor({ name: "a".repeat(authorNameLimit + 1) }).isValid(),
+      await new EncryptedAuthor({ name: "a".repeat(authorNameLimit! + 1) }).isValid(),
     ).toBeFalsy();
-    const author = await EncryptedAuthor.create({ name: "a".repeat(authorNameLimit + 1) });
+    const author = await EncryptedAuthor.create({ name: "a".repeat(authorNameLimit! + 1) });
     expect(await author.isValid()).toBeFalsy();
   });
 
@@ -487,7 +487,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
       new Book();
       await Book.insert({ name: "<untitled>" });
       const book = await Book.last();
-      expect(book.name).toBe("<untitled>");
+      expect(book!.name).toBe("<untitled>");
     },
   );
   it("can dump and load records that use encryption", async () => {
@@ -499,7 +499,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
     const rawValues = book._attributes.valuesForDatabase();
 
-    const loadedBook = Book.instantiate(rawValues);
+    const loadedBook = Book.instantiate(rawValues as Record<string, unknown>);
 
     expect(loadedBook.name).toBe("Dune");
   });
@@ -636,7 +636,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = makeEncryptedBookWithCustomCompressor();
     new Book();
     const name = "a".repeat(141);
-    expect((await Book.createBang({ name })).name.startsWith("[compressed]")).toBeTruthy();
+    expect((await Book.createBang({ name })).name!.startsWith("[compressed]")).toBeTruthy();
   });
   it("type method returns cast type", async () => {
     await freshAdapter();
@@ -645,8 +645,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await freshAdapter();
     const Post = makeEncryptedPost();
     new Post();
-    expect(Book.typeForAttribute("name").type()).toBe("string");
-    expect(Post.typeForAttribute("body").type()).toBe("text");
+    expect(Book.typeForAttribute("name")!.type()).toBe("string");
+    expect(Post.typeForAttribute("body")!.type()).toBe("text");
   });
 
   it("encrypts normalized data", async () => {

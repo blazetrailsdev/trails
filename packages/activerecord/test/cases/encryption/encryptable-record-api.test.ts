@@ -18,6 +18,7 @@ import {
   Encryption,
 } from "./helper.js";
 import { Scheme } from "../../../lib/encryption/scheme.js";
+import type { EncryptedAttributeType } from "../../../lib/encryption/encrypted-attribute-type.js";
 import { fixtures } from "../../support/use-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
@@ -179,7 +180,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
     const author = await Author.create({ name: "david" });
 
-    const oldType = Author.typeForAttribute("name").previousTypes[0];
+    const oldType = (Author.typeForAttribute("name") as EncryptedAttributeType).previousTypes[0];
     const valueEncryptedWithOldType = oldType.serialize("dhh") as string;
     await Encryption.withoutEncryption(() =>
       author.updateColumns({ name: valueEncryptedWithOldType }),
