@@ -1607,7 +1607,10 @@ export const Marshal = {
    *
    * @boundary: a String with no `E` / `encoding` ivar loads as its bytes, one
    *  character per byte, and one with the ivar is re-read through
-   *  `forceEncoding`. A Hash loads as ruby-compat's `Hash`, a whole-valued
+   *  `forceEncoding`. A Hash loads as ruby-compat's `Hash` where it needs one of
+   *  its features (a default, identity comparison, a user class, a non-String
+   *  key), and as a plain object otherwise (README § "When a Ruby Hash is a
+   *  `Hash` and when it is an object"), a whole-valued
    *  Float loads boxed (`rbDbl2num`), and a Bignum goes through `rbBigNorm`.
    *  `rb_obj_alloc` runs the class's allocator (`rbDefineAllocFunc`), else it
    *  is `Object.create(klass.prototype)`, so no constructor runs. A class
