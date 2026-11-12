@@ -9,6 +9,11 @@ type SanitizerClass = { allowedTags: Set<string>; allowedAttributes: Set<string>
 
 type RenderOptions = Record<string, unknown>;
 
+type ViewHost = ContentHelper & {
+  prefixPartialPathWithControllerNamespace: boolean;
+  render(options: RenderOptions, block?: () => unknown): unknown;
+};
+
 export class ContentHelper {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
@@ -29,13 +34,8 @@ export class ContentHelper {
   declare allowedTags: Iterable<string> | null;
   declare allowedAttributes: Iterable<string> | null;
   declare scrubber: unknown;
-  declare prefixPartialPathWithControllerNamespace: boolean;
-  declare render: (
-    options: RenderOptions,
-    block?: () => unknown,
-  ) => Promise<SafeBuffer | string> | SafeBuffer | string;
 
-  async renderActionTextContent(content: Content): Promise<SafeBuffer> {
+  async renderActionTextContent(this: ViewHost, content: Content): Promise<SafeBuffer> {
     this.prefixPartialPathWithControllerNamespace = false;
     return this.sanitizeActionTextContent(await this.renderActionTextAttachments(content));
   }
@@ -58,7 +58,7 @@ export class ContentHelper {
     );
   }
 
-  async renderActionTextAttachments(content: Content): Promise<Content> {
+  async renderActionTextAttachments(this: ViewHost, content: Content): Promise<Content> {
     return (
       await content.renderAttachments(undefined, async (attachment) => {
         if (!(await content.galleryAttachments()).includes(attachment)) {
@@ -91,6 +91,7 @@ export class ContentHelper {
 
   /** @internal */
   async renderActionTextAttachment(
+    this: ViewHost,
     attachment: Attachment,
     { locals = {} }: { locals?: Record<string, unknown> } = {},
   ): Promise<string> {
