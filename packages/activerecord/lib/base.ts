@@ -360,7 +360,7 @@ import {
 import { DynamicMatchers } from "./dynamic-matchers.js";
 
 /** @noRailsEquivalent PERMANENT */
-export type AbstractModel = Omit<typeof Base, never> & (abstract new (...args: any[]) => Base);
+export type AbstractModel = Omit<typeof Base, never> & (abstract new (...args: never[]) => Base);
 
 export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
