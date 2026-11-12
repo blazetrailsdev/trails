@@ -5522,6 +5522,7 @@ def run
     extractor.load_hook_targets.each do |hook, fqns|
       fqns.each do |fqn|
         info = data[:classes][fqn] || data[:modules][fqn]
+        next unless info
         hook_mixins.select { |m| m[:hook] == hook }.each { |m| (info[:bootMixins] ||= []) << m[:statement] }
       end
     end
