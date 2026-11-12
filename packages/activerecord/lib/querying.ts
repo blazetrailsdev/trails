@@ -2,7 +2,7 @@ import { Nodes } from "@blazetrails/arel";
 import { hasKey, toI } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
-import type { Base } from "./base.js";
+import type { AbstractModel, Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { FutureResult, Complete } from "./future-result.js";
 import type { FindEachOptions, Relation } from "./relation.js";
@@ -254,6 +254,11 @@ export function _loadFromSql<T extends typeof Base>(
   });
 }
 
+export function from<T extends AbstractModel>(
+  this: T,
+  source: string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode,
+  subqueryName?: string,
+): Relation<InstanceType<T>>;
 export function from<T extends typeof Base>(
   this: T,
   source: string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode,

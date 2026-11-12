@@ -359,6 +359,9 @@ import {
 } from "./store.js";
 import { DynamicMatchers } from "./dynamic-matchers.js";
 
+/** @noRailsEquivalent PERMANENT */
+export type AbstractModel = Omit<typeof Base, never> & (abstract new (...args: any[]) => Base);
+
 export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
@@ -599,6 +602,7 @@ export class Base extends Model {
 
   declare static readonly predicateBuilder: import("./relation/predicate-builder.js").PredicateBuilder;
 
+  static loadSchema(this: AbstractModel): Promise<void>;
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
     if (Object.hasOwn(this, "_schemaLoadPromise") && state._schemaLoadPromise) {
@@ -746,7 +750,7 @@ export class Base extends Model {
   /** @internal */
   declare static reloadSchemaFromCache: (recursive?: boolean) => void;
 
-  declare static columnNames: typeof ModelSchema.columnNames;
+  declare static columnNames: (this: AbstractModel) => string[];
   declare static columnsHash: typeof ModelSchema.columnsHash;
   declare static contentColumns: typeof ModelSchema.contentColumns;
   declare static quotedTableName: typeof ModelSchema.quotedTableName;
@@ -1060,6 +1064,10 @@ export class Base extends Model {
     return (this.all().where as any)(...conditions).sole();
   }
 
+  static all<T extends AbstractModel>(
+    this: T,
+    options?: { allQueries?: boolean | null },
+  ): Relation<InstanceType<T>>;
   static all<T extends typeof Base>(
     this: T,
     options?: { allQueries?: boolean | null },
@@ -1074,22 +1082,22 @@ export class Base extends Model {
     return this.defaultScoped({ allQueries: options?.allQueries });
   }
 
-  static where<T extends typeof Base>(this: T): WhereChain<Relation<InstanceType<T>>>;
-  static where<T extends typeof Base>(
+  static where<T extends AbstractModel>(this: T): WhereChain<Relation<InstanceType<T>>>;
+  static where<T extends AbstractModel>(
     this: T,
     conditions: Record<string, unknown>,
   ): Relation<InstanceType<T>>;
-  static where<T extends typeof Base>(
+  static where<T extends AbstractModel>(
     this: T,
     conditions: Map<unknown, unknown>,
   ): Relation<InstanceType<T>>;
-  static where<T extends typeof Base>(
+  static where<T extends AbstractModel>(
     this: T,
     sql: string | Nodes.SqlLiteral,
     ...binds: unknown[]
   ): Relation<InstanceType<T>>;
-  static where<T extends typeof Base>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
-  static where<T extends typeof Base>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
+  static where<T extends AbstractModel>(this: T, conditions: unknown[]): Relation<InstanceType<T>>;
+  static where<T extends AbstractModel>(this: T, node: Nodes.Node): Relation<InstanceType<T>>;
   static where<T extends typeof Base>(
     this: T,
     conditionsOrSql?:
