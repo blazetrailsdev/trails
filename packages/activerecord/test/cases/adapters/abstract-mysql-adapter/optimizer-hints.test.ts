@@ -1,12 +1,9 @@
 import { it, expect, beforeAll } from "vitest";
 import { asJson } from "@blazetrails/activesupport";
-import {
-  describeIfMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../../support/supports.js";
 import { Base } from "../../../../lib/index.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Post } from "../../../models/post.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

@@ -8,7 +8,7 @@ import {
 } from "../../lib/index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Account } from "../models/account.js";
 import { Client } from "../models/company.js";
 import "../support/canonical-model-index.js";
@@ -16,7 +16,7 @@ import { Cpk, CpkBook, CpkReview } from "../models/cpk.js";
 import { Entrant } from "../models/entrant.js";
 import { ClothingItem } from "../models/clothing-item.js";
 import { NonPrimaryKey } from "../models/non-primary-key.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { Topic as CanonicalTopic, BlankTopic as CanonicalBlankTopic } from "../models/topic.js";
 import { assertQueriesCount, assertNoQueries } from "../../lib/testing/query-assertions.js";
 import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";

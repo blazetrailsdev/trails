@@ -23,7 +23,7 @@ import { currentAdapter } from "../../support/adapter-helper.js";
 import { Treasure } from "../../models/treasure.js";
 import "../../models/parrot.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Author, AuthorAddress } from "../../models/author.js";
 import { Essay } from "../../models/essay.js";
 import { Account } from "../../models/account.js";

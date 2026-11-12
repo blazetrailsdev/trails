@@ -1,10 +1,6 @@
 import { it, expect, vi } from "vitest";
 import pg from "pg";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { deprecator } from "../../../../lib/deprecator.js";
 import { pgConnection } from "../../../../lib/pg/connection.js";
 

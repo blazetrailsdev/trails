@@ -2,9 +2,9 @@ import { readFile } from "fs/promises";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { File as RubyFile, Marshal } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/base.js";
-import { TEST_ROOT } from "../../lib/config.js";
+import { TEST_ROOT } from "../config.js";
 import { formatVersion, setFormatVersion } from "../../lib/marshalling.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import "../models/reply.js";
 

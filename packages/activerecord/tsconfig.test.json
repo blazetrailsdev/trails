@@ -5,19 +5,7 @@
     "rootDir": "."
   },
   "exclude": ["test/fixtures/all/admin/**"],
-  "include": [
-    "test",
-    "lib/**/*.bench.ts",
-    "lib/adapters/abstract-mysql-adapter/test-helper.ts",
-    "lib/adapters/postgresql/test-helper.ts",
-    "lib/cases/helper.ts",
-    "lib/cases/json-shared-test-cases.ts",
-    "lib/cases/test-case.ts",
-    "lib/encryption/test-helpers.ts",
-    "lib/test-adapter.ts",
-    "lib/test-helpers",
-    "lib/test-setup-*.ts"
-  ],
+  "include": ["test"],
   "references": [
     {
       "path": "./tsconfig.json"

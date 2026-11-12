@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../lib/base.js";
 import { Tagging } from "../../models/tagging.js";
 import { Post } from "../../models/post.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 class NamespacedPost extends Base {
   static _tableName = "posts";

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import { Reply } from "../models/reply.js";
 import { NamespacedCompany } from "../models/company.js";

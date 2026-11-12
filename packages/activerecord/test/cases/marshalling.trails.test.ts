@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { marshallingFormatVersion, setMarshallingFormatVersion } from "../../lib/active-record.js";
 import { Methods } from "../../lib/marshalling.js";
 import { Base } from "../../lib/base.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Comment } from "../models/comment.js";
 
 describe("ActiveRecord.marshalling_format_version", () => {

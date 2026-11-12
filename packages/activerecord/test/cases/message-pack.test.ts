@@ -13,7 +13,7 @@ import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../lib/index.js";
 import { Extensions } from "../../lib/message-pack.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { assertNoQueries } from "../../lib/testing/query-assertions.js";
 import type { Author } from "../models/author.js";
 import { Binary } from "../models/binary.js";

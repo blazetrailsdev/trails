@@ -620,25 +620,25 @@ export default defineConfig({
           // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.
           globalSetup: ["./packages/activerecord/test/support/template-global-setup.ts"],
           setupFiles: [
-            "./packages/activerecord/lib/test-setup-worker-db.ts",
+            "./packages/activerecord/test/support/test-setup-worker-db.ts",
             "./packages/vitest-matchers/lib/setup.ts",
             // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
             // which helper.rb picks up by requiring active_support/test_case.
             "./packages/activesupport/lib/testing/autorun.ts",
-            "./packages/activerecord/lib/cases/helper.ts",
+            "./packages/activerecord/test/cases/helper.ts",
             "./packages/bcrypt/lib/index.ts",
             "./packages/actionview/test/support/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
-              ? ["./packages/activerecord/lib/test-setup-mysql.ts"]
+              ? ["./packages/activerecord/test/support/test-setup-mysql.ts"]
               : []),
             ...(process.env.ARCONN === "postgresql"
-              ? ["./packages/activerecord/lib/test-setup-pg-cancel-trace.ts"]
+              ? ["./packages/activerecord/test/support/test-setup-pg-cancel-trace.ts"]
               : []),
-            "./packages/activerecord/lib/test-setup-dy.ts",
+            "./packages/activerecord/test/support/test-setup-dy.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
             // Opt-in DDL timing profiler, gated on DDL_PROFILE=1 (dormant/no-op when off).
             ...(process.env.DDL_PROFILE === "1"
-              ? ["./packages/activerecord/lib/test-setup-ddl-profile.ts"]
+              ? ["./packages/activerecord/test/support/test-setup-ddl-profile.ts"]
               : []),
           ],
           retry: 0,

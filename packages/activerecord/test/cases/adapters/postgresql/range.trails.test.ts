@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RangeType } from "../../../../lib/connection-adapters/postgresql/oid/range.js";
 import { Range } from "../../../../lib/relation.js";
 import { Base } from "../../../../lib/index.js";
@@ -13,7 +10,7 @@ import { Date as OidDate } from "../../../../lib/connection-adapters/postgresql/
 import { Decimal } from "../../../../lib/connection-adapters/postgresql/oid/decimal.js";
 import { Timestamp } from "../../../../lib/connection-adapters/postgresql/oid/timestamp.js";
 import { TimestampWithTimeZone } from "../../../../lib/connection-adapters/postgresql/oid/timestamp-with-time-zone.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 beforeAll(() => {

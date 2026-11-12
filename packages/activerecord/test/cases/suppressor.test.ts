@@ -3,7 +3,7 @@ import {
   assertDifference,
   assertNoDifference,
 } from "@blazetrails/activesupport/testing/assertions";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Notification } from "../models/notification.js";
 import { User, UserWithNotification } from "../models/user.js";
 

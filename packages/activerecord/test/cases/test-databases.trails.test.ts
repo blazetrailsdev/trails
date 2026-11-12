@@ -6,7 +6,7 @@ import { Base } from "../../lib/index.js";
 import { DatabaseConfigurations } from "../../lib/database-configurations.js";
 import { DatabaseTasks } from "../../lib/tasks/database-tasks.js";
 import * as connectionHandling from "../../lib/connection-handling.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

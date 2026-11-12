@@ -3,7 +3,7 @@ import { Base } from "../../lib/index.js";
 import { formatForInspect } from "../../lib/attribute-methods.js";
 
 import { PP } from "@blazetrails/ruby-compat";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "../models/topic.js";
 import { LoosePerson } from "../models/person.js";
 import {

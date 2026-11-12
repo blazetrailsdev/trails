@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Invoice } from "../../../models/invoice.js";
 import { LineItem } from "../../../models/line-item.js";
 

@@ -1,7 +1,7 @@
 import type { Base } from "../../lib/base.js";
 
 import { underscore } from "@blazetrails/activesupport";
-import { FIXTURES_ROOT } from "../../lib/config.js";
+import { FIXTURES_ROOT } from "../config.js";
 import { File } from "../../lib/fixture-set/file.js";
 import * as FixtureData from "../fixtures/index.js";
 

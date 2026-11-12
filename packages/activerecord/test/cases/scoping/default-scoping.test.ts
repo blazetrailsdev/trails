@@ -10,7 +10,7 @@ import { Nodes } from "@blazetrails/arel";
 import { Time as RubyTime } from "@blazetrails/date";
 import "../../../lib/index.js";
 import { RecordNotFound } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import {
   Developer,
   DeveloperOrderedBySalary,

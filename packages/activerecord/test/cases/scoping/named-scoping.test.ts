@@ -10,8 +10,8 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import "../../../lib/index.js";
 import { assertNoQueries, assertQueriesCount } from "../../../lib/testing/query-assertions.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { fixtures } from "../../support/use-fixtures.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { Temporal } from "@blazetrails/date";
 import { Topic } from "../../models/topic.js";
 import { Reply } from "../../models/reply.js";

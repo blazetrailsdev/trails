@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CpkBook } from "../models/cpk.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Base } from "../../lib/base.js";
 import { Country } from "../models/country.js";
 import { Keyboard } from "../models/keyboard.js";

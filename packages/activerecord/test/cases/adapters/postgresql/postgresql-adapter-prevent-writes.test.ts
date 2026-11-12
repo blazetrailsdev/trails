@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { describeIfPg } from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import type { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
 import { ReadOnlyError } from "../../../../lib/errors.js";
 import { withExampleTable as withDdlHelperTable } from "../../../support/ddl-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgreSQLAdapterPreventWritesTest", () => {

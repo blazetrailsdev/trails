@@ -2,7 +2,7 @@ import { Thread } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import "../../lib/index.js";
 import { Base } from "../../lib/base.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
 import { Course } from "../models/course.js";
 import { Entrant } from "../models/entrant.js";

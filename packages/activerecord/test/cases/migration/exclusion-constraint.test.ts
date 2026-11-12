@@ -6,7 +6,7 @@ import { Base } from "../../../lib/base.js";
 import { Rollback, StatementInvalid } from "../../../lib/errors.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 import { describeIfSupports } from "../../support/supports.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 const EXPRESSION = "daterange(start_date, end_date) WITH &&";
 

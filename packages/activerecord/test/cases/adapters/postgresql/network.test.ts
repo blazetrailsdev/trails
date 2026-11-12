@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { IPAddr } from "@blazetrails/ruby-compat";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
 import type { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";

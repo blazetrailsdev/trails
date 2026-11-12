@@ -11,10 +11,10 @@ import { Migrator } from "../../lib/migration.js";
 import { SchemaMigration } from "../../lib/schema-migration.js";
 import { InternalMetadata } from "../../lib/internal-metadata.js";
 
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { itIfSupports } from "../support/supports.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

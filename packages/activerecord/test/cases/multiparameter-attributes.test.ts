@@ -4,7 +4,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone, toFs, zone as timeZone } from "@blazetrails/activesupport";
 import { assertNotRespondTo, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import { Address, Customer } from "../models/customer.js";
 

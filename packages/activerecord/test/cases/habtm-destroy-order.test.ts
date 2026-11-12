@@ -10,7 +10,7 @@ import { Rollback } from "../../lib/index.js";
 import "../support/canonical-model-index.js";
 import { Lesson, LessonError } from "../models/lesson.js";
 import { Student } from "../models/student.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 const { self } = fixtures([]);
 

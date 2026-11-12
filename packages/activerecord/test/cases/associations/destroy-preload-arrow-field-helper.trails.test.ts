@@ -11,7 +11,7 @@ import {
   RestrictedWithErrorFirm,
   Client,
 } from "../../models/company.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ArrowFieldAccount extends Base {

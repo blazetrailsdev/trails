@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import type { HasManyAssociation } from "../../../lib/associations/has-many-association.js";
 import type { HasOneAssociation } from "../../../lib/associations/has-one-association.js";
 import { Comment, SpecialComment, VerySpecialComment } from "../../models/comment.js";

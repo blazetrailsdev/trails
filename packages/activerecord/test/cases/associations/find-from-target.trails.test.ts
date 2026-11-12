@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Author } from "../../models/author.js";
 import { Post } from "../../models/post.js";
 import { Developer, AuditLog } from "../../models/developer.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 interface AssociationLike {
   isFindFromTarget(): boolean;

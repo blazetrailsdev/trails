@@ -2,7 +2,7 @@ import { it, expect } from "vitest";
 import "../../../../lib/index.js";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 function copyTable(conn: any, from: string, to: string, options: Record<string, unknown> = {}) {
   return conn.copyTable(from, to, { temporary: true, ...options });

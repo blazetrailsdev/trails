@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { isPresent } from "@blazetrails/activesupport";
 import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { ambientConnection } from "../../support/rocket-tables.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import type { AbstractMysqlAdapter } from "../../../lib/connection-adapters/abstract-mysql-adapter.js";
 import type { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 import type { SchemaStatements } from "../../../lib/connection-adapters/abstract/schema-statements.js";

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Base, LookupContext, Renderer, Template, TseHandler } from "@blazetrails/actionview";
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Post } from "../models/post.js";
 
 function commentsLoaded(post: Post): boolean {

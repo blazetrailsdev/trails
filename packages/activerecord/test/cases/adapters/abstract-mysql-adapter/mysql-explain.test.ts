@@ -1,12 +1,8 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
-import {
-  describeIfMysqlAdapter,
-  isMariaDb,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../../../lib/connection-adapters/abstract-adapter.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
 import { Author } from "../../../models/author.js";
 import { Post } from "../../../models/post.js";

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Relation, Base } from "../../lib/index.js";
 import { ORDER_IGNORE_MESSAGE } from "../../lib/relation/batches.js";
 import { BatchEnumerator } from "../../lib/relation/batches/batch-enumerator.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { StringIO, regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { currentAdapter } from "../support/adapter-helper.js";

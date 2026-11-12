@@ -40,16 +40,16 @@ import {
   setDbWarningsAction,
   setDbWarningsIgnore,
   setDefaultTimezone,
-} from "../active-record.js";
-import { Base } from "../base.js";
-import type { PoolManager } from "../connection-adapters/pool-manager.js";
-import { FixtureSet } from "../fixtures.js";
-import { ActiveRecord } from "../namespaces.js";
-import type { AssociationReflection } from "../reflection.js";
-import { AdapterHelper } from "../../test/support/adapter-helper.js";
-import { LoadSchemaHelper } from "../../test/support/load-schema-helper.js";
-import { TestFixtures, type ClassMethods } from "../test-fixtures.js";
-import { QueryAssertions, SQLCounter } from "../testing/query-assertions.js";
+} from "../../lib/active-record.js";
+import { Base } from "../../lib/base.js";
+import type { PoolManager } from "../../lib/connection-adapters/pool-manager.js";
+import { FixtureSet } from "../../lib/fixtures.js";
+import { ActiveRecord } from "../../lib/namespaces.js";
+import type { AssociationReflection } from "../../lib/reflection.js";
+import { AdapterHelper } from "../support/adapter-helper.js";
+import { LoadSchemaHelper } from "../support/load-schema-helper.js";
+import { TestFixtures, type ClassMethods } from "../../lib/test-fixtures.js";
+import { QueryAssertions, SQLCounter } from "../../lib/testing/query-assertions.js";
 import { FIXTURES_ROOT } from "../config.js";
 import { ValidationsRepairHelper } from "./validations-repair-helper.js";
 

@@ -3,13 +3,9 @@ import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport/te
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../../../lib/base.js";
 import { UrlConfig } from "../../../../lib/database-configurations/url-config.js";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../../support/supports.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import * as Arel from "@blazetrails/arel";
 import {
   ConnectionFailed,

@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import "../../lib/index.js";
 import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Relation } from "../../lib/relation.js";
 import { DeferredIdsNotIn } from "../../lib/relation/predicate-builder/deferred-distinct-pk-in.js";
 import { Post } from "../models/post.js";

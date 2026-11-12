@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { DerivedSecretKeyProvider } from "../../../lib/encryption/derived-secret-key-provider.js";
-import { assertEncryptorWorksWith } from "../../../lib/encryption/test-helpers.js";
+import { assertEncryptorWorksWith } from "./helper.js";
 import { Encryption } from "../../../lib/encryption.js";
 import { Message } from "../../../lib/encryption/message.js";
 import { Key } from "../../../lib/encryption/key.js";

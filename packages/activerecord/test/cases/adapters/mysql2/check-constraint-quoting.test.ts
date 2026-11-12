@@ -4,7 +4,7 @@ import {
   isMariaDb,
   leaseMysqlAdapter,
   Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "../abstract-mysql-adapter/test-helper.js";
 import { describeIfSupports } from "../../../support/supports.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

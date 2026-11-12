@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import { constantize } from "@blazetrails/activesupport";
 import { rbModName } from "@blazetrails/ruby-compat";
 import "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import "../../support/canonical-model-index.js";
 import { Developer as CanonicalDeveloper } from "../../models/developer.js";
 import { Project as CanonicalProject } from "../../models/project.js";

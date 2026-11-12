@@ -2,15 +2,15 @@ import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll, beforeEach
 import { NoMethodError, include } from "@blazetrails/ruby-compat";
 import { Minitest } from "@blazetrails/activesupport/testing/assertions";
 import "../../lib/relation.js";
-import { TestCase } from "../../lib/cases/test-case.js";
-import { FIXTURES_ROOT } from "../../lib/config.js";
+import { TestCase } from "./test-case.js";
+import { FIXTURES_ROOT } from "../config.js";
 import { TestFixtures } from "../../lib/test-fixtures.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
-} from "../../lib/encryption/test-helpers.js";
+} from "./encryption/helper.js";
 import { File as FixtureFile } from "../../lib/fixture-set/file.js";
 import { Visitors } from "@blazetrails/arel";
 import { Base } from "../../lib/base.js";
@@ -310,7 +310,7 @@ async function resolvePrimaryModel(entry: {
 
 async function setupScopedEncryption(): Promise<() => void> {
   const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
-    await import("../../lib/encryption/test-helpers.js");
+    await import("./encryption/helper.js");
   const snapshot = snapshotEncryptionConfig();
   configureEncryption();
   return () => restoreEncryptionConfig(snapshot);

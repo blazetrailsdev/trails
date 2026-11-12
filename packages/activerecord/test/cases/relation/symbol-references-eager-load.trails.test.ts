@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import "../../../lib/index.js";
 import { Post } from "../../models/post.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("a leading-colon references value", () => {
   fixtures(["posts", "comments"]);

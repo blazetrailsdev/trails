@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../lib/base.js";
 import { ambientConnection } from "../../support/rocket-tables.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 
 describe("Migration", () => {

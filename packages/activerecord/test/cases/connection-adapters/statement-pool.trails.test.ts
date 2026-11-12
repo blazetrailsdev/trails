@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { StatementPool } from "../../../lib/connection-adapters/statement-pool.js";
 import { isSqliteRun } from "../../support/sqlite-template.js";
-import { checkoutRawTestAdapter } from "../../../lib/test-adapter.js";
+import { checkoutRawTestAdapter } from "../../support/test-adapter.js";
 
 class EvictingPool extends StatementPool<string> {
   protected dealloc(_stmt: string): void {}

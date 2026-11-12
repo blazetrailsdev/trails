@@ -5,9 +5,9 @@ import { Base } from "../../lib/base.js";
 import { Migration, IrreversibleMigration, type MigrationClass } from "../../lib/migration.js";
 import { CommandRecorder } from "../../lib/migration/command-recorder.js";
 import { itIfSupports } from "../support/supports.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { loadSchemaFromAdapter } from "../../lib/model-schema.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 class Horse extends Base {
   static {

@@ -5,7 +5,7 @@ import { base36, BigDecimal, TimeWithZone, TimeZone, toFs } from "@blazetrails/a
 import "../../../../lib/index.js";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import * as Type from "../../../../lib/type.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { defaultTimezone, setDefaultTimezone } from "../../../../lib/active-record.js";

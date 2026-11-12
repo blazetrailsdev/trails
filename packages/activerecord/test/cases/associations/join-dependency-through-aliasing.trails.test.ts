@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import "../../support/canonical-model-index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Author } from "../../models/author.js";
 import { JoinDependency } from "../../../lib/associations/join-dependency.js";
 import type { JoinPart } from "../../../lib/associations/join-dependency/join-part.js";

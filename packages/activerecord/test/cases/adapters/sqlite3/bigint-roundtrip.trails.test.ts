@@ -3,7 +3,7 @@ import "../../../../lib/index.js";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { BigIntegerType, IntegerType, BooleanType } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 
 let adapter: SQLite3Adapter;

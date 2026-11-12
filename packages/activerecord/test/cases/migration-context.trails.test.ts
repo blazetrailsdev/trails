@@ -9,14 +9,14 @@ import type { MigrationProxy } from "../../lib/migration.js";
 import { Base } from "../../lib/base.js";
 import { SchemaMigration, NullSchemaMigration } from "../../lib/schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "../../lib/internal-metadata.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { DEFAULT_ENV } from "../../lib/connection-handling.js";
 import {
   setTimestampedMigrations,
   setValidateMigrationTimestamps,
   timestampedMigrations,
 } from "../../lib/active-record.js";
-import { MIGRATIONS_ROOT } from "../../lib/config.js";
+import { MIGRATIONS_ROOT } from "../config.js";
 
 describe("MigrationContext", () => {
   afterEach(() => {

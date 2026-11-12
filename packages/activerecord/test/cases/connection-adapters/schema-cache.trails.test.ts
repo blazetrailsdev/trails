@@ -14,7 +14,7 @@ import type { SchemaQuoter } from "../../../lib/connection-adapters/abstract/ass
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";
-import { checkoutRawTestAdapter } from "../../../lib/test-adapter.js";
+import { checkoutRawTestAdapter } from "../../support/test-adapter.js";
 import { include } from "@blazetrails/activesupport";
 import { Column } from "../../../lib/connection-adapters/column.js";
 import { SqlTypeMetadata } from "../../../lib/connection-adapters/sql-type-metadata.js";

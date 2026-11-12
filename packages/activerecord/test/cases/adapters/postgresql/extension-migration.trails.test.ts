@@ -1,11 +1,7 @@
 import { StringIO } from "@blazetrails/ruby-compat";
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../../../lib/index.js";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgresqlExtensionMigrationTest (trails)", () => {
   let adapter: PostgreSQLAdapter;

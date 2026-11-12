@@ -1,10 +1,6 @@
 import { it, expect, beforeAll, afterAll, vi } from "vitest";
-import {
-  describeIfPg,
-  leasePgAdapter,
-  PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfPg, leasePgAdapter, PostgreSQLAdapter } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

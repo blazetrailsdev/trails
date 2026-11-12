@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../lib/index.js";
 import "../../../lib/relation.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
   assertEncryptedAttribute,
   assertNotEncryptedAttribute,
-} from "../../../lib/encryption/test-helpers.js";
+} from "./helper.js";
 import { Encryption } from "../../../lib/encryption.js";
 import { NullEncryptor } from "../../../lib/encryption/null-encryptor.js";
 import { Configuration as ConfigurationError } from "../../../lib/encryption/errors.js";

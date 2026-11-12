@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Base } from "../../../lib/base.js";
 import type { Version } from "../../../lib/connection-adapters/abstract-adapter.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { currentAdapter } from "../../support/adapter-helper.js";
 import { adapterSupports, SUPPORTS_FEATURES } from "../../support/supports.js";
 

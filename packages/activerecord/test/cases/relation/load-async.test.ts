@@ -5,9 +5,9 @@ import { asyncQueryExecutor, setAsyncQueryExecutor } from "../../../lib/active-r
 import { Rollback } from "../../../lib/errors.js";
 import type { Relation } from "../../../lib/relation.js";
 import { Post } from "../../models/post.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";
-import { waitForAsyncQuery } from "../../../lib/cases/helper.js";
+import { waitForAsyncQuery } from "../helper.js";
 import { Base } from "../../../lib/base.js";
 import { ARUnit2Model } from "../../models/arunit2-model.js";
 import { OtherDog } from "../../models/other-dog.js";

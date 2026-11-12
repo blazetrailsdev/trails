@@ -1,7 +1,7 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Base } from "../../lib/base.js";
 import { Entry } from "../models/entry.js";
 

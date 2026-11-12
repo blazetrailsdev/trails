@@ -1,4 +1,4 @@
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { quotingHost } from "../support/quoting-host.js";
 import { describe, it, expect, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";

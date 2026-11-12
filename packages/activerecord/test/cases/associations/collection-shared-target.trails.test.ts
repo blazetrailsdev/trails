@@ -4,7 +4,7 @@ import { Author } from "../../models/author.js";
 import { Post } from "../../models/post.js";
 import { Category } from "../../models/category.js";
 import { Categorization } from "../../models/categorization.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 interface AuthorWithCollections {
   id: unknown;

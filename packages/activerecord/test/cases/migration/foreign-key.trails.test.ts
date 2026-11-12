@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementInvalid } from "../../../lib/errors.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import {
   ambientConnection,
   withCompositeRocketTables,
   withRocketTables,
 } from "../../support/rocket-tables.js";
 import { Base } from "../../../lib/base.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 
 describe("removeForeignKey option narrowing", () => {
   fixtures([], { useTransactionalTests: false });

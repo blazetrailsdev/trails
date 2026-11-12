@@ -4,7 +4,7 @@ import type { CollectionAssociation } from "../../../lib/associations/collection
 import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/index.js";
 import { Associations } from "../../../lib/associations.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 class StvAuthor extends Base {
   static {

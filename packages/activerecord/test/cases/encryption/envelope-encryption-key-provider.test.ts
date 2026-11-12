@@ -4,7 +4,7 @@ import { EnvelopeEncryptionKeyProvider } from "../../../lib/encryption/envelope-
 import { KeyProvider } from "../../../lib/encryption/key-provider.js";
 import type { Message } from "../../../lib/encryption/message.js";
 import { Encryptor } from "../../../lib/encryption/encryptor.js";
-import { assertEncryptorWorksWith } from "../../../lib/encryption/test-helpers.js";
+import { assertEncryptorWorksWith } from "./helper.js";
 import * as crypto from "crypto";
 
 function makePrimaryKey(): string {

@@ -4,7 +4,7 @@ import { SecurePassword } from "@blazetrails/activemodel";
 import { Assertion, assertInDelta } from "@blazetrails/activesupport/testing/assertions";
 import { assertCalledWith } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { assertNoQueries } from "../../lib/testing/query-assertions.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 async function retryFlakyTest(fn: () => Promise<void>, retryCount = 3): Promise<void> {
   for (let attempt = 0; ; attempt++) {

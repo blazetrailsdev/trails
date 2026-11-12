@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../../lib/index.js";
 import { Account } from "../models/account.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 describe("SignedIdTrailsTest", () => {
   fixtures({});

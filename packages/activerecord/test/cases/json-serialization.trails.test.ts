@@ -7,7 +7,7 @@ import { Comment } from "../models/comment.js";
 import { Tag } from "../models/tag.js";
 import { Tagging } from "../models/tagging.js";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../../lib/associations/collection-proxy.js";
 import "../../lib/association-relation.js";
 

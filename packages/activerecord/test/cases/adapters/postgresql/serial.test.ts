@@ -1,10 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import type { Column } from "../../../../lib/connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 

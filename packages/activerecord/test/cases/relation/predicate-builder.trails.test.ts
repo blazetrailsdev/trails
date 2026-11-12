@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/test/support/connection.js";
 import { IntegerType, ValueType } from "@blazetrails/activemodel";
 import { Nodes, Table, Visitors, Collectors, type ArelNode } from "@blazetrails/arel";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Company, Firm } from "../../models/company.js";
 import { Author } from "../../models/author.js";
 import { PriceEstimate } from "../../models/price-estimate.js";

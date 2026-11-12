@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { isBlank } from "@blazetrails/activesupport";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { InvalidForeignKey, StatementInvalid } from "../../../../lib/errors.js";

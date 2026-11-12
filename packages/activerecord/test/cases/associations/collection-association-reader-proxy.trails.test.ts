@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Author } from "../../models/author.js";
 import { Post } from "../../models/post.js";
 

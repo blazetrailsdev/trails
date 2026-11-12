@@ -3,7 +3,7 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { Hash, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { WhereClause } from "../../../lib/relation/where-clause.js";
 import "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Topic } from "../../models/topic.js";
 
 constSet(TopLevel, "Topic", Topic);

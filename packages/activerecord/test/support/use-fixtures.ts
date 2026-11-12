@@ -9,7 +9,7 @@ import {
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
-import { File as FixtureFile } from "../fixture-set/file.js";
+import { File as FixtureFile } from "../../lib/fixture-set/file.js";
 import {
   fixtureRegistry,
   isJoinTableEntry,
@@ -17,14 +17,14 @@ import {
   type RegistryModel,
   type RegistryData,
   type IsJoinTableName,
-} from "../../test/support/fixtures-registry.js";
-import { ensureCanonicalTables } from "../../test/support/canonical-table-rebuild.js";
-export type { FixtureName } from "../../test/support/fixtures-registry.js";
-import { Base } from "../base.js";
+} from "./fixtures-registry.js";
+import { ensureCanonicalTables } from "./canonical-table-rebuild.js";
+export type { FixtureName } from "./fixtures-registry.js";
+import { Base } from "../../lib/base.js";
 import type { TestCase as ActiveRecordTestCase } from "../cases/test-case.js";
-import { ActiveRecord } from "../namespaces.js";
-import type { WithTransactionalFixturesOptions } from "../test-fixtures/with-transactional-fixtures.js";
-import { eagerWarmSchemaCache } from "../../test/support/schema-cache-dump.js";
+import { ActiveRecord } from "../../lib/namespaces.js";
+import type { WithTransactionalFixturesOptions } from "../../lib/test-fixtures/with-transactional-fixtures.js";
+import { eagerWarmSchemaCache } from "./schema-cache-dump.js";
 
 type BaseClass = typeof Base;
 type FixtureAttrs = Record<string, unknown>;

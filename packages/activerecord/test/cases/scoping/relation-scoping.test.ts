@@ -4,7 +4,7 @@ import { isBlank } from "@blazetrails/activesupport";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base, Range, RecordNotFound } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import {
   Developer,
   DeveloperFilteredOnJoins,

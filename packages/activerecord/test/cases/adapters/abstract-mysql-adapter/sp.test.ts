@@ -1,11 +1,8 @@
 import { describe, it, expect } from "vitest";
-import {
-  describeIfMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { Topic } from "../../../models/topic.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("StoredProcedureTest", () => {

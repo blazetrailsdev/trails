@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 import { RecordNotFound } from "../../../lib/index.js";
 import { Company, Firm } from "../../models/company.js";
 import { Account } from "../../models/account.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 type AccountAttributes = { credit_limit: number };
 type AccountBuilders = {

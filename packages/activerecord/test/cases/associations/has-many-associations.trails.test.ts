@@ -3,7 +3,7 @@ import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, RecordNotDestroyed } from "../../../lib/index.js";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Client, Firm } from "../../models/company.js";
 import { CpkBook, CpkOrder } from "../../models/cpk.js";
 

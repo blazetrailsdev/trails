@@ -5,8 +5,8 @@ import {
   assertInDelta,
 } from "@blazetrails/activesupport/testing/assertions";
 import { DateTime, Time as RubyTime } from "@blazetrails/date";
-import { inTimeZone } from "../../lib/cases/helper.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { inTimeZone } from "./helper.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Task } from "../models/task.js";
 import { Topic } from "../models/topic.js";
 import { Base } from "../../lib/index.js";

@@ -4,7 +4,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
 import { Base } from "../../lib/index.js";
 import { StatementInvalid } from "../../lib/errors.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 
 describe("Instrumentation exception payload (trails)", () => {

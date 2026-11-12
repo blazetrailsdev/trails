@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Invoice } from "../models/invoice.js";
 import { surreptitiouslyTouch, touchDeferredAttributes } from "../../lib/touch-later.js";

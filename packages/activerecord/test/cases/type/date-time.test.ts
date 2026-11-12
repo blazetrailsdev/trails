@@ -2,7 +2,7 @@ import { describe, it, expect, afterAll, vi } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { DateTime } from "../../../lib/type/date-time.js";
 import { Base } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 fixtures([]);

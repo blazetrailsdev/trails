@@ -1,4 +1,4 @@
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    The test class spells `include ActiveRecord::Migration::TestHelper` (migration/helper.rb:10); the
    empty class/interface merge carries the mixed-in methods onto its type. */
@@ -8,7 +8,7 @@ import { BigDecimal, Duration } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/ruby-compat";
 import { TestHelper, TestModel } from "../../support/migration-helper.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 
 class ColumnAttributesTest {}
 interface ColumnAttributesTest extends TestHelper {}

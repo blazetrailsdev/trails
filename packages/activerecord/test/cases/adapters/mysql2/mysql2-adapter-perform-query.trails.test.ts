@@ -3,7 +3,7 @@ import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
   Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "../abstract-mysql-adapter/test-helper.js";
 import { asJson, BigDecimal } from "@blazetrails/activesupport";
 import { BigIntegerType } from "@blazetrails/activemodel";
 import { Base } from "../../../../lib/base.js";

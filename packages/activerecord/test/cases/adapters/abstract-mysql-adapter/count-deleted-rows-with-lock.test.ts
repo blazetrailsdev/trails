@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { describeIfMysqlAdapter } from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfMysqlAdapter } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Bulb } from "../../../models/bulb.js";
 import { Author } from "../../../models/author.js";
 import { Car } from "../../../models/car.js";

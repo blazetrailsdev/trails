@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { RecordInvalid } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Author } from "../../models/author.js";
 import { Club } from "../../models/club.js";
 import { SpecialComment } from "../../models/comment.js";

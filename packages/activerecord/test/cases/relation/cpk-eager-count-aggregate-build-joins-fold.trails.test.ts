@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../../models/cpk.js";
 
 const RAISE = 'Expected corresponding value for ["shop_id", "id"] to be an Array';

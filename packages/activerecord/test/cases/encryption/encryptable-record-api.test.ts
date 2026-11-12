@@ -16,9 +16,10 @@ import {
   assertNotEncryptedAttribute,
   assertCiphertextDecryptsTo,
   Encryption,
-} from "../../../lib/encryption/test-helpers.js";
+} from "./helper.js";
 import { Scheme } from "../../../lib/encryption/scheme.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import type { EncryptedAttributeType } from "../../../lib/encryption/encrypted-attribute-type.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
@@ -179,7 +180,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
 
     const author = await Author.create({ name: "david" });
 
-    const oldType = Author.typeForAttribute("name").previousTypes[0];
+    const oldType = (Author.typeForAttribute("name") as EncryptedAttributeType).previousTypes[0];
     const valueEncryptedWithOldType = oldType.serialize("dhh") as string;
     await Encryption.withoutEncryption(() =>
       author.updateColumns({ name: valueEncryptedWithOldType }),

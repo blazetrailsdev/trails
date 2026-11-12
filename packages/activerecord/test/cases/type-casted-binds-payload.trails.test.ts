@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Notifications, NotificationEvent as Event } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../lib/base.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Task } from "../models/task.js";
 
 describe("sql.active_record type_casted_binds", () => {

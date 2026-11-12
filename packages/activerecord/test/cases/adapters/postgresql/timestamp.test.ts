@@ -3,12 +3,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Duration, TimeWithZone } from "@blazetrails/activesupport";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  withNativeDatabaseTypeOverrides,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfPg, PostgreSQLAdapter, withNativeDatabaseTypeOverrides } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Topic } from "../../../models/topic.js";
 import { Developer, AuditLog, AuditLogRequired } from "../../../models/developer.js";
 import { Base } from "../../../../lib/index.js";

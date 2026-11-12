@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Person } from "../../models/person.js";
 import { Friendship } from "../../models/friendship.js";
 import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";

@@ -2,7 +2,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { loadSingularTarget } from "../support/load-singular-target.js";
 import { StrictLoadingViolationError } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Developer, AuditLog } from "../models/developer.js";
 import { Ship } from "../models/ship.js";
 import { Project } from "../models/project.js";

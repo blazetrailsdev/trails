@@ -2,7 +2,7 @@ import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries } from "../../../lib/testing/query-assertions.js";
 import { Author, AuthorFavorite } from "../../models/author.js";

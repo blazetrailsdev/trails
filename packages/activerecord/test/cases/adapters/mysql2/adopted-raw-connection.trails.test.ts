@@ -4,7 +4,7 @@ import {
   describeIfMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "../abstract-mysql-adapter/test-helper.js";
 import { deprecator } from "../../../../lib/deprecator.js";
 import { mysql2Client } from "../../../../lib/mysql2/client.js";
 

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, onTestFinished, vi } from "vitest";
-import { type LeasedTestAdapter, type TestDatabaseAdapter } from "../../../lib/test-adapter.js";
+import { type LeasedTestAdapter, type TestDatabaseAdapter } from "../../support/test-adapter.js";
 import { Base } from "../../../lib/base.js";
 import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { NullTransaction } from "../../../lib/connection-adapters/abstract/transaction.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 async function primaryAdapter(): Promise<TestDatabaseAdapter> {
   return await Base.leaseConnection();

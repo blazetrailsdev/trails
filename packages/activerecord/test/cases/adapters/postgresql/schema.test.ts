@@ -2,15 +2,12 @@ import { DescendantsTracker } from "@blazetrails/activesupport";
 import { Time as RubyTime } from "@blazetrails/date";
 import { StringIO, constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../../support/supports.js";
 import { StatementInvalid } from "../../../../lib/errors.js";
 import { Name } from "../../../../lib/connection-adapters/postgresql/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 import type { AssociationProxy } from "../../../../lib/associations/collection-proxy.js";
 import { Base } from "../../../../lib/index.js";

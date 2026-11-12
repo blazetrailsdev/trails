@@ -1,8 +1,8 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { repairValidations } from "../../lib/cases/validations-repair-helper.js";
+import { fixtures } from "../support/use-fixtures.js";
+import { repairValidations } from "./validations-repair-helper.js";
 import { clearTimestampAttributes } from "../../lib/timestamp.js";
 import { DefaultScope } from "../../lib/scoping/default.js";
 import type { Relation } from "../../lib/relation.js";

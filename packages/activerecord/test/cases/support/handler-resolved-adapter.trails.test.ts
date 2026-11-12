@@ -1,6 +1,6 @@
 import { describe, it, afterAll, beforeAll, expect } from "vitest";
 import { Base } from "../../../lib/base.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 class HandlerResolvedPost extends Base {
   static {

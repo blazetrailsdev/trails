@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { InternalMetadata } from "../../lib/internal-metadata.js";
 import { Base } from "../../lib/base.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { NullPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import { toSqlAndBinds } from "../../lib/connection-adapters/abstract/database-statements.js";
 import { Nodes } from "@blazetrails/arel";

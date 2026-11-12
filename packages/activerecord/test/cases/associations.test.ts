@@ -23,7 +23,7 @@ import {
   assertSame,
 } from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Author, type Author as AuthorT } from "../models/author.js";
 import { CpkOrder, CpkBook } from "../models/cpk.js";
 import type { Firm as FirmT } from "../models/company.js";

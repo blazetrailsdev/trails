@@ -7,7 +7,7 @@ import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
 import { SchemaMigration } from "../../../lib/schema-migration.js";
 import { Base } from "../../../lib/base.js";
 import { UnknownMigrationVersionError } from "../../../lib/migration.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { restoreWorkerConnection } from "../../support/connection.js";
 
 const REVERT_LOG = "__trailsRollbackReverted";

@@ -1,35 +1,31 @@
 import { expect } from "vitest";
 import { Table, UpdateManager } from "@blazetrails/arel";
-import type { TestDatabaseAdapter } from "../test-adapter.js";
-import { ensureCanonicalTables } from "../../test/support/canonical-table-rebuild.js";
-import { Base } from "../index.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { TestDatabaseAdapter } from "../../support/test-adapter.js";
+import { ensureCanonicalTables } from "../../support/canonical-table-rebuild.js";
+import { Base } from "../../../lib/index.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 
 export { Base };
-import { type Compressor } from "./config.js";
-import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
-import { Encryptor as EncryptorImpl } from "./encryptor.js";
-import type { KeyProviderLike } from "./encryptor.js";
-import { type Scheme } from "./scheme.js";
-import * as Errors from "./errors.js";
+import { type Compressor } from "../../../lib/encryption/config.js";
+import { DerivedSecretKeyProvider } from "../../../lib/encryption/derived-secret-key-provider.js";
+import { Encryptor as EncryptorImpl } from "../../../lib/encryption/encryptor.js";
+import type { KeyProviderLike } from "../../../lib/encryption/encryptor.js";
+import { type Scheme } from "../../../lib/encryption/scheme.js";
+import * as Errors from "../../../lib/encryption/errors.js";
 import { assertEqual, assertNotEqual } from "@blazetrails/activesupport/testing/assertions";
-import { Encryption } from "../encryption.js";
-import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
+import { Encryption } from "../../../lib/encryption.js";
+import { MessagePackMessageSerializer } from "../../../lib/encryption/message-pack-message-serializer.js";
 
-import { Key } from "./key.js";
+import { Key } from "../../../lib/encryption/key.js";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
-import { Fixture } from "../fixtures.js";
-import { EncryptedFixtures } from "./encrypted-fixtures.js";
+import { Fixture } from "../../../lib/fixtures.js";
+import { EncryptedFixtures } from "../../../lib/encryption/encrypted-fixtures.js";
 export { Encryption, Errors };
 
 prepend(Fixture, EncryptedFixtures);
 
-import {
-  TEST_PRIMARY_KEY,
-  TEST_DETERMINISTIC_KEY,
-  TEST_KEY_DERIVATION_SALT,
-} from "../cases/helper.js";
+import { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "../helper.js";
 
 interface ConfigSnapshot {
   primaryKey: string | string[] | null | undefined;
@@ -106,6 +102,76 @@ export async function freshAdapter(): Promise<TestDatabaseAdapter> {
   return adapter;
 }
 
+export declare class PlainPostRecord extends Base {
+  title: string | null;
+  body: string | null;
+}
+
+export declare class EncryptedAuthorRecord extends Base {
+  name: string | null;
+  static findByName: (name: string) => Promise<EncryptedAuthorRecord | null>;
+}
+
+export declare class EncryptedPostRecord extends Base {
+  title: string | null;
+  body: string | null;
+}
+
+export declare class EncryptedBookRecord extends Base {
+  name: string | null;
+  static findByName: (name: string) => Promise<EncryptedBookRecord | null>;
+}
+
+export declare class EncryptedBookWithDowncaseNameRecord extends Base {
+  name: string | null;
+  static findByName: (name: string) => Promise<EncryptedBookWithDowncaseNameRecord | null>;
+}
+
+export declare class EncryptedBookThatIgnoresCaseRecord extends Base {
+  get name(): string | null;
+  set name(value: unknown);
+  static findByName: (name: string) => Promise<EncryptedBookThatIgnoresCaseRecord | null>;
+}
+
+export declare class EncryptedBookWithCustomCompressorRecord extends Base {
+  name: string | null;
+  static findByName: (name: string) => Promise<EncryptedBookWithCustomCompressorRecord | null>;
+}
+
+export declare class BookThatWillFailToEncryptNameRecord extends Base {
+  name: string | null;
+  static findByName: (name: string) => Promise<BookThatWillFailToEncryptNameRecord | null>;
+}
+
+export declare class EncryptedTrafficLightRecord extends Base {}
+
+export declare class EncryptedTrafficLightWithStoreStateRecord extends Base {
+  color: string | null;
+  long_state: string[] | null;
+}
+
+export declare class EncryptedBookWithBinaryMessagePackSerializedRecord extends Base {}
+
+export declare class MsgPackTextBookRecord extends Base {
+  name: string | null;
+  static findByName: (name: string) => Promise<MsgPackTextBookRecord | null>;
+}
+
+export declare class UnencryptedBookRecord extends Base {
+  name: string | null;
+  static findByName: (name: string) => Promise<UnencryptedBookRecord | null>;
+}
+
+export declare class EncryptedBookWithUniquenessValidationRecord extends Base {
+  name: string | null;
+  static findByName: (name: string) => Promise<EncryptedBookWithUniquenessValidationRecord | null>;
+}
+
+export declare class EncryptedBookAttributeRecord extends Base {
+  name: Date | null;
+  static findByName: (name: string) => Promise<EncryptedBookAttributeRecord | null>;
+}
+
 export function makePlainPost() {
   return class PlainPost extends Base {
     static {
@@ -114,7 +180,7 @@ export function makePlainPost() {
       this.attribute("title", "string");
       this.attribute("body", "string");
     }
-  } as any;
+  } as unknown as typeof PlainPostRecord;
 }
 
 export function makeEncryptedAuthorWithPreviousSchemes(previousSchemes: Scheme[]) {
@@ -125,7 +191,7 @@ export function makeEncryptedAuthorWithPreviousSchemes(previousSchemes: Scheme[]
       this.attribute("name", "string");
       this.encrypts("name", { previousSchemes });
     }
-  } as any;
+  } as unknown as typeof EncryptedAuthorRecord;
 }
 
 class MutableDerivedSecretKeyProvider extends DerivedSecretKeyProvider {
@@ -150,7 +216,7 @@ export function makeEncryptedPost() {
         keyProvider: new MutableDerivedSecretKeyProvider("my post body secret!"),
       });
     }
-  } as any;
+  } as unknown as typeof EncryptedPostRecord;
 }
 
 export function makeEncryptedBook() {
@@ -163,7 +229,7 @@ export function makeEncryptedBook() {
       this.attribute("name", "string", { default: "<untitled>" });
       this.encrypts("name", { deterministic: true });
     }
-  } as any;
+  } as unknown as typeof EncryptedBookRecord;
 }
 
 export function makeEncryptedBookWithDowncaseName() {
@@ -176,7 +242,7 @@ export function makeEncryptedBookWithDowncaseName() {
       this.attribute("name", "string", { default: "<untitled>" });
       this.encrypts("name", { deterministic: true, downcase: true });
     }
-  } as any;
+  } as unknown as typeof EncryptedBookWithDowncaseNameRecord;
 }
 
 export function makeEncryptedBookThatIgnoresCase() {
@@ -190,13 +256,13 @@ export function makeEncryptedBookThatIgnoresCase() {
       this.attribute("original_name", "string");
       this.encrypts("name", { deterministic: true, ignoreCase: true });
     }
-  } as any;
+  } as unknown as typeof EncryptedBookThatIgnoresCaseRecord;
 }
 
-export async function createUnencryptedBookIgnoringCase(
-  encryptedBookThatIgnoresCase: any,
+export async function createUnencryptedBookIgnoringCase<T extends typeof Base>(
+  encryptedBookThatIgnoresCase: T,
   { name }: { name: string },
-): Promise<any> {
+): Promise<InstanceType<T>> {
   const book = await Encryption.withoutEncryption(() =>
     encryptedBookThatIgnoresCase.createBang({ name }),
   );
@@ -219,7 +285,7 @@ export function makeEncryptedAuthor() {
       this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
       this.encrypts("name");
     }
-  } as any;
+  } as unknown as typeof EncryptedAuthorRecord;
 }
 
 export function makeEncryptedBookWithCustomCompressor() {
@@ -240,7 +306,7 @@ export function makeEncryptedBookWithCustomCompressor() {
       this.attribute("name", "string");
       this.encrypts("name", { compressor: customCompressor });
     }
-  } as any;
+  } as unknown as typeof EncryptedBookWithCustomCompressorRecord;
 }
 
 class FailingKeyProvider {
@@ -261,7 +327,7 @@ export function makeBookThatWillFailToEncryptName() {
       this.attribute("name", "string");
       this.encrypts("name", { keyProvider: new FailingKeyProvider() });
     }
-  } as any;
+  } as unknown as typeof BookThatWillFailToEncryptNameRecord;
 }
 
 export function makeEncryptedTrafficLight() {
@@ -277,7 +343,7 @@ export function makeEncryptedTrafficLight() {
       this.serialize("long_state", { type: Array });
       this.encrypts("state");
     }
-  } as any;
+  } as unknown as typeof EncryptedTrafficLightRecord;
 }
 
 export function makeEncryptedTrafficLightWithStoreState() {
@@ -293,7 +359,7 @@ export function makeEncryptedTrafficLightWithStoreState() {
       this.encrypts("state");
       this.storeAccessor("state", "color");
     }
-  } as any;
+  } as unknown as typeof EncryptedTrafficLightWithStoreStateRecord;
 }
 
 export function makeEncryptedBookWithBinaryMessagePackSerialized() {
@@ -302,7 +368,7 @@ export function makeEncryptedBookWithBinaryMessagePackSerialized() {
       this._tableName = "encrypted_books";
       this.encrypts("logo", { messageSerializer: new MessagePackMessageSerializer() });
     }
-  } as any;
+  } as unknown as typeof EncryptedBookWithBinaryMessagePackSerializedRecord;
 }
 
 export function makeMsgPackTextBook() {
@@ -315,7 +381,7 @@ export function makeMsgPackTextBook() {
       this.attribute("name", "string", { default: "<untitled>" });
       this.encrypts("name", { messageSerializer: new MessagePackMessageSerializer() });
     }
-  } as any;
+  } as unknown as typeof MsgPackTextBookRecord;
 }
 
 export function makeUnencryptedBook() {
@@ -327,7 +393,7 @@ export function makeUnencryptedBook() {
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
     }
-  } as any;
+  } as unknown as typeof UnencryptedBookRecord;
 }
 
 export function makeEncryptedBookWithUniquenessValidation() {
@@ -341,7 +407,7 @@ export function makeEncryptedBookWithUniquenessValidation() {
       this.validatesUniquenessOf("name");
       this.encrypts("name", { deterministic: true });
     }
-  } as any;
+  } as unknown as typeof EncryptedBookWithUniquenessValidationRecord;
 }
 
 export function makeEncryptedBookAttribute() {
@@ -354,22 +420,37 @@ export function makeEncryptedBookAttribute() {
       this.attribute("name", "date");
       this.encrypts("name");
     }
-  } as any;
+  } as unknown as typeof EncryptedBookAttributeRecord;
+}
+
+function attributeOf(model: Base, name: string): unknown {
+  return (model as unknown as Record<string, unknown>)[name];
+}
+
+function typeOf(model: Base, name: string): EncryptedAttributeTypeLike {
+  return model.constructor.typeForAttribute(name) as unknown as EncryptedAttributeTypeLike;
+}
+
+interface EncryptedAttributeTypeLike {
+  deserialize(value: unknown): unknown;
+  serialize(value: unknown): unknown;
+  isEncrypted?: unknown;
+  keyProvider: { keys: Key[] };
 }
 
 export function assertCiphertextDecryptsTo(
-  model: any,
+  model: Base,
   attributeName: string,
   ciphertext: unknown,
 ): void {
-  assertNotEqual(model[attributeName], ciphertext);
+  assertNotEqual(attributeOf(model, attributeName), ciphertext);
   assertNotEqual(model.readAttribute(attributeName), ciphertext);
-  const cleartext = model.constructor.typeForAttribute(attributeName).deserialize(ciphertext);
+  const cleartext = typeOf(model, attributeName).deserialize(ciphertext);
   assertEqual(model.readAttribute(attributeName), cleartext);
 }
 
 export async function assertEncryptedAttribute(
-  model: any,
+  model: Base,
   attributeName: string,
   expectedValue: unknown,
 ): Promise<void> {
@@ -378,7 +459,7 @@ export async function assertEncryptedAttribute(
     attributeName,
     model.readAttributeBeforeTypeCast(attributeName),
   );
-  assertEqual(expectedValue, model[attributeName]);
+  assertEqual(expectedValue, attributeOf(model, attributeName));
   if (!model.isNewRecord()) {
     await model.reload();
     assertCiphertextDecryptsTo(
@@ -386,15 +467,15 @@ export async function assertEncryptedAttribute(
       attributeName,
       model.readAttributeBeforeTypeCast(attributeName),
     );
-    assertEqual(expectedValue, model[attributeName]);
+    assertEqual(expectedValue, attributeOf(model, attributeName));
   }
 }
 
 export async function assertInvalidKeyCantReadAttribute(
-  model: any,
+  model: Base,
   attributeName: string,
 ): Promise<void> {
-  if (rbObjRespondTo(model.constructor.typeForAttribute(attributeName).keyProvider, "keys")) {
+  if (rbObjRespondTo(typeOf(model, attributeName).keyProvider, "keys")) {
     await assertInvalidKeyCantReadAttributeWithCustomKeyProvider(model, attributeName);
   } else {
     await assertInvalidKeyCantReadAttributeWithDefaultKeyProvider(model, attributeName);
@@ -402,7 +483,7 @@ export async function assertInvalidKeyCantReadAttribute(
 }
 
 async function assertInvalidKeyCantReadAttributeWithDefaultKeyProvider(
-  model: any,
+  model: Base,
   attributeName: string,
 ): Promise<void> {
   await model.reload();
@@ -410,16 +491,16 @@ async function assertInvalidKeyCantReadAttributeWithDefaultKeyProvider(
   await Encryption.withEncryptionContext(
     { keyProvider: new DerivedSecretKeyProvider("a different 256 bits key for now") },
     () => {
-      expect(() => model[attributeName]).toThrow(Errors.Decryption);
+      expect(() => attributeOf(model, attributeName)).toThrow(Errors.Decryption);
     },
   );
 }
 
 async function assertInvalidKeyCantReadAttributeWithCustomKeyProvider(
-  model: any,
+  model: Base,
   attributeName: string,
 ): Promise<void> {
-  const attributeType = model.constructor.typeForAttribute(attributeName);
+  const attributeType = typeOf(model, attributeName);
 
   await model.reload();
 
@@ -427,26 +508,25 @@ async function assertInvalidKeyCantReadAttributeWithCustomKeyProvider(
   try {
     attributeType.keyProvider.keys = [Key.deriveFrom("other custom attribute secret")];
 
-    expect(() => model[attributeName]).toThrow(Errors.Decryption);
+    expect(() => attributeOf(model, attributeName)).toThrow(Errors.Decryption);
   } finally {
     attributeType.keyProvider.keys = originalKeys;
   }
 }
 
 export function assertNotEncryptedAttribute(
-  model: any,
+  model: Base,
   attributeName: string,
   expectedValue: unknown,
 ): void {
-  assertEqual(expectedValue, model[attributeName]);
+  assertEqual(expectedValue, attributeOf(model, attributeName));
   assertEqual(expectedValue, model.readAttributeBeforeTypeCast(attributeName));
 }
 
-export function ciphertextFor(model: any, attrName: string): unknown {
-  const klass = model.constructor;
-  const type = klass.typeForAttribute?.(attrName);
+export function ciphertextFor(model: Base, attrName: string): unknown {
+  const type = typeOf(model, attrName);
   if (type && typeof type.serialize === "function" && typeof type.isEncrypted === "function") {
-    const value = model[attrName];
+    const value = attributeOf(model, attrName);
     return type.serialize(value);
   }
   return model.readAttributeBeforeTypeCast(attrName);

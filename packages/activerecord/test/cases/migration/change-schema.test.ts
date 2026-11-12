@@ -1,4 +1,4 @@
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../../../lib/base.js";
 import { Migration } from "../../../lib/migration.js";
@@ -7,7 +7,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ambientConnection } from "../../support/rocket-tables.js";
 import { currentAdapter } from "../../support/adapter-helper.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { describeIfSupports } from "../../support/supports.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import type { Column } from "../../../lib/connection-adapters/column.js";

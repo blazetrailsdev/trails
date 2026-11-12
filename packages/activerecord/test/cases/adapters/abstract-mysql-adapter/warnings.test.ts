@@ -1,11 +1,7 @@
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { SQLWarning } from "../../../../lib/errors.js";
 import { Base } from "../../../../lib/base.js";
 import type { Mysql2Result } from "../../../../lib/mysql2/client.js";

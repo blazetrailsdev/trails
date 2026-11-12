@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { Post } from "../models/post.js";
 import { Topic } from "../models/topic.js";

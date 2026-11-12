@@ -29,8 +29,8 @@ import {
 } from "../../lib/index.js";
 import type { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
 import { adapterSupports } from "../support/supports.js";
 import { ChatMessage, ChatMessageCustomPk } from "../models/chat-message.js";
 import { ClothingItem, ClothingItemSized } from "../models/clothing-item.js";

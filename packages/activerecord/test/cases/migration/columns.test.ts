@@ -8,7 +8,7 @@ import type { Column } from "../../../lib/connection-adapters/column.js";
 import type { Column as MysqlColumn } from "../../../lib/connection-adapters/mysql/column.js";
 import { ActiveRecordError, StatementInvalid, NotNullViolation } from "../../../lib/errors.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { isMariaDb, serverVersion } from "../../support/mysql-server-version.js";
 import { supportsDefaultExpression } from "../../support/adapter-helper.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -16,7 +16,7 @@ import { assertDifference, assertRaises } from "@blazetrails/activesupport/testi
 import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import { adapterSupports } from "../../support/supports.js";
 import { rbInspect } from "@blazetrails/ruby-compat";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 const mariaDbRejectsUniqueColumnDrop =
   adapterType === "mysql" && isMariaDb && (serverVersion?.compare("10.2.8") ?? -1) >= 0;

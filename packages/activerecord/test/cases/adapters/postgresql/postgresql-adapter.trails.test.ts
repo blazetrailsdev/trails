@@ -1,16 +1,12 @@
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { StringIO, Thread } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import { Socket } from "net";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { ValueType } from "@blazetrails/activemodel";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
   ConnectionNotEstablished,
   Deadlocked,

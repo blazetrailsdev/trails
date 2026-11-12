@@ -7,9 +7,9 @@ import {
   makeEncryptedBookWithBinaryMessagePackSerialized,
   makeMsgPackTextBook,
   assertEncryptedAttribute,
-} from "../../../lib/encryption/test-helpers.js";
-import { type TestDatabaseAdapter } from "../../../lib/test-adapter.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+} from "./helper.js";
+import { type TestDatabaseAdapter } from "../../support/test-adapter.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Encoding } from "../../../lib/encryption/errors.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest", () => {

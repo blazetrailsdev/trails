@@ -5,7 +5,7 @@ import { UrlConfig } from "../../../lib/database-configurations/url-config.js";
 import { Base } from "../../../lib/base.js";
 import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
 import { restoreWorkerConnection } from "../../support/connection.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 async function adminQuery(sql: string): Promise<pg.QueryResult> {
   const client = new pg.Client({ connectionString: PG_TEST_URL });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Client, Company } from "../models/company.js";
 import { ProtectedParams } from "../support/stubs/strong-parameters.js";
 import { isFinderNeedsTypeCondition } from "../../lib/inheritance.js";

@@ -5,7 +5,7 @@ import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adap
 import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";
 import { ReadOnlyError } from "../../../../lib/errors.js";
 import { Result } from "../../../../lib/result.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 let adapter: SQLite3Adapter;
 

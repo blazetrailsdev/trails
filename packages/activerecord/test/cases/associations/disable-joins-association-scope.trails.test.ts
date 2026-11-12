@@ -6,7 +6,7 @@ import { Base } from "../../../lib/index.js";
 import { Associations } from "../../../lib/associations.js";
 import { DisableJoinsAssociationScope } from "../../../lib/associations/disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../../../lib/disable-joins-association-relation.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("DisableJoinsAssociationScope", () => {
   fixtures([]);

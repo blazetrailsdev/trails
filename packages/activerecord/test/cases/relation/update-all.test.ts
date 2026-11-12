@@ -8,9 +8,9 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { ActiveRecordError } from "../../../lib/errors.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Author } from "../../models/author.js";
 import { Comment } from "../../models/comment.js";
 import { Developer } from "../../models/developer.js";

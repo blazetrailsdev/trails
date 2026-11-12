@@ -1,6 +1,6 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Preloader } from "../../../../lib/associations/preloader.js";
 import { Post } from "../../../models/post.js";
 import { Comment } from "../../../models/comment.js";

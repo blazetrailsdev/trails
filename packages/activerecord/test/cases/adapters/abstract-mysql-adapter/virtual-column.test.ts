@@ -1,12 +1,8 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { assertPredicate } from "@blazetrails/activesupport/testing/assertions";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../../support/supports.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/base.js";
 import type { Column as MySQLColumn } from "../../../../lib/connection-adapters/mysql/column.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";

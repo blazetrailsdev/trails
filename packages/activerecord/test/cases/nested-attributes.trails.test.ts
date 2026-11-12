@@ -2,7 +2,7 @@ import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, hashAref, TopLevel } from "@blazetrails/ruby-compat";
 import type { Base } from "../../lib/index.js";
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "../models/cpk.js";
 import { Category } from "../models/category.js";
 import { Categorization } from "../models/categorization.js";

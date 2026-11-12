@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Base, transaction } from "../../lib/index.js";
 import { NullTransaction } from "../../lib/connection-adapters/abstract/transaction.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic as CanonicalTopic } from "../models/topic.js";
 import { WrongReply } from "../models/reply.js";
 import { CpkBook } from "../models/cpk.js";

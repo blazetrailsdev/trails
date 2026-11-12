@@ -7,7 +7,7 @@ import { Electron } from "../models/electron.js";
 import { NumericData } from "../models/numeric-data.js";
 import { ClothingItem } from "../models/clothing-item.js";
 import { RecordNotFound } from "../../lib/errors.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 
 fixtures([]);

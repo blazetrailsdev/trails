@@ -15,14 +15,14 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { ArgumentError, ForbiddenAttributesError } from "@blazetrails/activemodel";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { StatementInvalid } from "../../lib/errors.js";
 import { deprecator } from "../../lib/deprecator.js";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { assertAsyncEqual } from "../support/async-helper.js";
 import { ProtectedParams } from "../support/stubs/strong-parameters.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Account } from "../models/account.js";
 import { Company, DependentFirm, Client } from "../models/company.js";

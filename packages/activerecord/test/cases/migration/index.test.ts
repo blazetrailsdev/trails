@@ -5,7 +5,7 @@ import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-
 import type { AddIndexOptions } from "../../../lib/connection-adapters/abstract/schema-definitions.js";
 import { ambientConnection } from "../../support/rocket-tables.js";
 import { adapterSupports } from "../../support/supports.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 
 function goodIndexName(connection: AbstractAdapter): string {
   return "x".repeat(connection.indexNameLength());

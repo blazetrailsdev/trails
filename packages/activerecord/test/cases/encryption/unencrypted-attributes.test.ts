@@ -6,8 +6,8 @@ import {
   assertEncryptedAttribute,
   assertNotEncryptedAttribute,
   Encryption,
-} from "../../../lib/encryption/test-helpers.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+} from "./helper.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import type { EncryptedPost as EncryptedPostType } from "../../models/post-encrypted.js";
 import { Decryption } from "../../../lib/encryption/errors.js";
 

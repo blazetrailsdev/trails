@@ -9,8 +9,8 @@ import {
   dumpSchemaAfterMigration,
   setDumpSchemaAfterMigration,
 } from "../../../lib/active-record.js";
-import { MIGRATIONS_ROOT } from "../../../lib/config.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { MIGRATIONS_ROOT } from "../../config.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { restoreWorkerConnection } from "../../support/connection.js";
 
 describe("DatabaseTasksMigrateAllMetadataTest", () => {

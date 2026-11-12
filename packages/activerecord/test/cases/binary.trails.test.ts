@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { TypeError } from "@blazetrails/ruby-compat";
 import { Attribute, BinaryData, BinaryType } from "@blazetrails/activemodel";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Binary } from "../models/binary.js";
 import { Base } from "../../lib/base.js";
 

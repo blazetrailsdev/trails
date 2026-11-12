@@ -1,12 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { SchemaMigration } from "../../../../lib/schema-migration.js";
 import { InternalMetadata } from "../../../../lib/internal-metadata.js";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import type { Mysql2Result } from "../../../../lib/mysql2/client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

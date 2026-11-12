@@ -4,7 +4,7 @@ import type { CollectionAssociation } from "../../../lib/associations/collection
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base } from "../../../lib/index.js";
 import type { TableDefinition } from "../../../lib/connection-adapters/abstract/schema-definitions.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import {
   HasManyThroughAssociationPolymorphicSourceError,
   HasManyThroughAssociationPointlessSourceTypeError,

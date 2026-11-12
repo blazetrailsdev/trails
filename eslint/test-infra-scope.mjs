@@ -79,7 +79,7 @@ const testInfraExemptGlobs = [
 
 /** The test-infra that stays under `activerecordSrcRoot`, because library
  *  files import it, relative to that root. */
-const libTestInfraExemptGlobs = ["test-helpers/**", "test-fixtures/**"];
+const libTestInfraExemptGlobs = ["test-fixtures/**"];
 
 /** The same list as repo-relative globs, for flat-config `ignores`. */
 export const testInfraExemptIgnores = [

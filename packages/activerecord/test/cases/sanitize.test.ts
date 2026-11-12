@@ -9,7 +9,7 @@ import {
   UnknownAttributeReference,
 } from "../../lib/index.js";
 import type { Relation } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Author } from "../models/author.js";
 import { Binary } from "../models/binary.js";

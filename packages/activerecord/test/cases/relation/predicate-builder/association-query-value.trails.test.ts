@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { AssociationQueryValue } from "../../../../lib/relation/predicate-builder/association-query-value.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { CpkBook, CpkOrder } from "../../../models/cpk.js";
 
 const queriesOf = (av: AssociationQueryValue) =>

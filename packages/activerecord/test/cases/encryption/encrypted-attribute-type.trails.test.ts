@@ -6,7 +6,7 @@ import {
   makeKeyProvider,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
-} from "../../../lib/encryption/test-helpers.js";
+} from "./helper.js";
 import { EncryptedAttributeType } from "../../../lib/encryption/encrypted-attribute-type.js";
 import { Scheme } from "../../../lib/encryption/scheme.js";
 import { Encryption } from "../../../lib/encryption.js";

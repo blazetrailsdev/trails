@@ -3,7 +3,7 @@ import { Thread, rbInspect, constSet, TopLevel } from "@blazetrails/ruby-compat"
 import { ExplainRegistry, Base } from "../../lib/index.js";
 import { renderBind } from "../../lib/explain.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Car } from "../models/car.js";
 import { Bulb } from "../models/bulb.js";
 

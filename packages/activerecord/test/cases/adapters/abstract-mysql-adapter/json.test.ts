@@ -1,12 +1,8 @@
 import { beforeEach } from "vitest";
 import "../../../../lib/index.js";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  supportsJson,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { jsonSharedTestCases } from "../../../../lib/cases/json-shared-test-cases.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, supportsJson } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
+import { jsonSharedTestCases } from "../../json-shared-test-cases.js";
 import type { TableDefinition } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 
 const columnType = "json";

@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 
 import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Book } from "../models/book.js";
 import { Author } from "../models/author.js";

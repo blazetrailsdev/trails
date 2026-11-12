@@ -11,7 +11,7 @@ import {
 } from "../../lib/attribute-methods.js";
 import { formatForInspect } from "../../lib/attribute-methods.js";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Minivan } from "../models/minivan.js";
 import { CpkBook, CpkOrder } from "../models/cpk.js";
 

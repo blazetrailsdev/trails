@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { IntegerOutOf64BitRange } from "../../../../lib/connection-adapters/postgresql/quoting.js";
 import { RangeType } from "../../../../lib/connection-adapters/postgresql/oid/range.js";
 import { Bit } from "../../../../lib/connection-adapters/postgresql/oid/bit.js";

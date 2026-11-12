@@ -1,10 +1,10 @@
 import { expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { File as FixtureFile } from "../../../../lib/fixture-set/file.js";
-import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../../../lib/config.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../../config.js";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/index.js";
 import { FixtureSet } from "../../../../lib/fixtures.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { virtualColumnFixtureData } from "../../../fixtures/virtual-columns.js";
 import { itIfSupports } from "../../../support/supports.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";

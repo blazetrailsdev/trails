@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import type { Relation } from "../../lib/relation.js";
 import { Post } from "../models/post.js";
 import { Comment } from "../models/comment.js";

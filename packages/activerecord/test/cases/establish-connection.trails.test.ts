@@ -6,7 +6,7 @@ import { Mysql2Adapter } from "../../lib/connection-adapters/mysql2-adapter.js";
 import { ConnectionHandler } from "../../lib/connection-adapters/abstract/connection-handler.js";
 import { join } from "path";
 import { tmpdir } from "os";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 let originalHandler: ConnectionHandler;
 

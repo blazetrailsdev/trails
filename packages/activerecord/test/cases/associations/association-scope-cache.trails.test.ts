@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
 import { Base } from "../../../lib/index.js";
 import { AssociationScope } from "../../../lib/associations/association-scope.js";
 import { StatementCache } from "../../../lib/statement-cache.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Author } from "../../models/author.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";

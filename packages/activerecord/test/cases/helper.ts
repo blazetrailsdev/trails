@@ -1,28 +1,28 @@
-import "../sqlite/better-sqlite3.js";
-import "../associations/collection-proxy.js";
-import "../association-relation.js";
-import "../associations/disable-joins-association-scope.js";
+import "../../lib/sqlite/better-sqlite3.js";
+import "../../lib/associations/collection-proxy.js";
+import "../../lib/association-relation.js";
+import "../../lib/associations/disable-joins-association-scope.js";
 import { afterAll, afterEach, expect } from "vitest";
 import { Timeout } from "@blazetrails/ruby-compat";
-import { Base } from "../base.js";
+import { Base } from "../../lib/base.js";
 import "./test-case.js";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
-import { rootTestCase } from "../test-helpers/use-fixtures.js";
-import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import { rootTestCase } from "../support/use-fixtures.js";
+import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import type { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import { I18n } from "@blazetrails/activemodel";
 import { zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { travelBack } from "@blazetrails/activesupport/testing/time-helpers";
-import { DelegateCache } from "../relation/delegation.js";
-import { register } from "../connection-adapters.js";
-import { Encryption } from "../encryption.js";
-import { ExtendedDeterministicQueries } from "../encryption/extended-deterministic-queries.js";
-import { ExtendedDeterministicUniquenessValidator } from "../encryption/extended-deterministic-uniqueness-validator.js";
-import { setPermanentConnectionCheckout } from "../active-record.js";
+import { DelegateCache } from "../../lib/relation/delegation.js";
+import { register } from "../../lib/connection-adapters.js";
+import { Encryption } from "../../lib/encryption.js";
+import { ExtendedDeterministicQueries } from "../../lib/encryption/extended-deterministic-queries.js";
+import { ExtendedDeterministicUniquenessValidator } from "../../lib/encryption/extended-deterministic-uniqueness-validator.js";
+import { setPermanentConnectionCheckout } from "../../lib/active-record.js";
 import {
   setBelongsToRequiredValidatesForeignKey,
   setRaiseOnAssignToAttrReadonly,
-} from "../active-record.js";
+} from "../../lib/active-record.js";
 
 register(
   "abstract",

@@ -10,8 +10,8 @@ import {
 import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { deprecator } from "../../lib/deprecator.js";
-import { adapterType } from "../../lib/test-adapter.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import { Reply, SillyReply } from "../models/reply.js";
 import { Keyboard } from "../models/keyboard.js";

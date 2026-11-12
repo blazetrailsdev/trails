@@ -1,11 +1,11 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { StrictValidationFailed } from "@blazetrails/activemodel";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Subscriber } from "../../models/subscriber.js";
 import { Topic } from "../../models/topic.js";
-import { checkoutRawTestAdapter } from "../../../lib/test-adapter.js";
-import type { TestDatabaseAdapter } from "../../../lib/test-adapter.js";
+import { checkoutRawTestAdapter } from "../../support/test-adapter.js";
+import type { TestDatabaseAdapter } from "../../support/test-adapter.js";
 import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";
 import { assertQueriesCount, assertNoQueries } from "../../../lib/testing/query-assertions.js";
 import { establishConnectionTo } from "../../support/adapter-double.js";

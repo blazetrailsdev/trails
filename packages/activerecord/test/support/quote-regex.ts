@@ -2,7 +2,7 @@ import { RuntimeError } from "@blazetrails/ruby-compat";
 import * as mysqlQuoting from "../../lib/connection-adapters/mysql/quoting.js";
 import * as pgQuoting from "../../lib/connection-adapters/postgresql/quoting.js";
 import * as sqliteQuoting from "../../lib/connection-adapters/sqlite3/quoting.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 
 function _selectImpl() {
   switch (adapterType) {

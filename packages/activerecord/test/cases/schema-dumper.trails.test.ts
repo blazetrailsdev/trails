@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaDumper } from "../../lib/connection-adapters/abstract/schema-dumper.js";
 import { SchemaDumper as BaseSchemaDumper } from "../../lib/schema-dumper.js";
 import { Base } from "../../lib/base.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import type { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
@@ -19,7 +19,7 @@ import {
   IndexDefinition,
 } from "../../lib/connection-adapters/abstract/schema-definitions.js";
 import { dumpTableSchema, FULL_DUMP_TIMEOUT_MS } from "../support/schema-dumping-helper.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import type { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
 
 function column(name: string, type: string, defaultFunction: string | null = null): Column {

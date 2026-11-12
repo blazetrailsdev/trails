@@ -4,7 +4,7 @@ import {
   pgSupportsNativePartitioning,
   PostgreSQLAdapter,
   PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+} from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

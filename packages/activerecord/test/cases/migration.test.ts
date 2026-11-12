@@ -13,7 +13,7 @@ import { Base, Migrator, Rollback, StatementInvalid } from "../../lib/index.js";
 import { SchemaMigration } from "../../lib/schema-migration.js";
 import type { MigrationProxy } from "../../lib/migration.js";
 import { CheckPending, ConcurrentMigrationError, MigrationContext } from "../../lib/migration.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { quoteDefaultExpression } from "../../lib/connection-adapters/abstract/quoting.js";
@@ -27,7 +27,7 @@ import { GiveMeBigNumbers } from "../migrations/decimal/1_give_me_big_numbers.js
 import { WeNeedThings } from "../migrations/rename/1_we_need_things.js";
 import { RenameThings } from "../migrations/rename/2_rename_things.js";
 import { WeNeedReminders } from "../migrations/valid/2_we_need_reminders.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { VERSION } from "../../lib/gem-version.js";
 import { TableDefinition } from "../../lib/connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "../../lib/connection-adapters/postgresql/schema-creation.js";
@@ -57,7 +57,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Mysql2Adapter } from "../../lib/connection-adapters/mysql2-adapter.js";
 import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
-import { leaseMysqlAdapter } from "../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { leaseMysqlAdapter } from "./adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "../support/anonymous-migration.js";
 import { InternalMetadata } from "../../lib/internal-metadata.js";
 import { migrationProxy } from "../support/migration-proxy.js";
@@ -69,7 +69,7 @@ import {
   setValidateMigrationTimestamps,
   validateMigrationTimestamps,
 } from "../../lib/active-record.js";
-import { MIGRATIONS_ROOT } from "../../lib/config.js";
+import { MIGRATIONS_ROOT } from "../config.js";
 
 async function freshAdapterWithPeople(): Promise<DatabaseAdapter> {
   return await Base.leaseConnection();

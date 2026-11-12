@@ -1,4 +1,4 @@
 import "../../lib/encryption.js";
-import { configureEncryption } from "../../lib/encryption/test-helpers.js";
+import { configureEncryption } from "../cases/encryption/helper.js";
 
 configureEncryption();

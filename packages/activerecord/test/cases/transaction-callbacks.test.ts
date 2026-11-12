@@ -10,7 +10,7 @@ import { ArgumentError } from "@blazetrails/activesupport";
 import { assertEmpty, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 
 import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { setRunAfterTransactionCallbacksInOrderDefined } from "../../lib/active-record.js";
 
 function defineBehaviourTopic() {

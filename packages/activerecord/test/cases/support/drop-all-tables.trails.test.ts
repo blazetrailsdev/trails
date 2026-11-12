@@ -9,7 +9,7 @@ import { provisionSecondDatabase } from "../../support/setup-second-pool.js";
 import { ARUnit2Model } from "../../models/arunit2-model.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { typeRegistryKeyFor } from "../../support/type-registry-key.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { ConnectionFailed, ConnectionNotEstablished } from "../../../lib/errors.js";
 import { PG } from "../../../lib/pg/pg.js";
 

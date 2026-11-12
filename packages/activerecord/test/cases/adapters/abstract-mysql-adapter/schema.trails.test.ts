@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Post } from "../../../models/post.js";

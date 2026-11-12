@@ -3,7 +3,7 @@ import { Base } from "../../../lib/base.js";
 import { currentRole } from "../../../lib/core.js";
 import { ConnectionNotDefined } from "../../../lib/errors.js";
 import { ArgumentError, setEnv } from "@blazetrails/ruby-compat";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";
 import { Person } from "../../models/person.js";
 import { getEnv } from "@blazetrails/activesupport";

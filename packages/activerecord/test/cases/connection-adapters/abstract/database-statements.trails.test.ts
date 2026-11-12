@@ -58,7 +58,7 @@ import {
 import { Result } from "../../../../lib/result.js";
 import type { QueryTransformer } from "../../../../lib/query-transformers.js";
 import type { Quoting } from "../../../../lib/connection-adapters/abstract/quoting.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
 import { queryTransformers } from "../../../../lib/active-record.js";
 import { resultFromRowHashes } from "../../../support/result-from-row-hashes.js";

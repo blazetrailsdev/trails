@@ -3,7 +3,7 @@ import { includedModules } from "@blazetrails/ruby-compat";
 import { Base } from "../../../lib/base.js";
 import { AttributeMethods } from "../../../lib/namespaces.js";
 import { adapterDouble, establishConnectionTo } from "../../support/adapter-double.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("per-instance @primary_key slot", () => {
   fixtures({}, { useTransactionalTests: false });

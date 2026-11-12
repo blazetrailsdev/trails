@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { ActiveRecordError, MultiparameterAssignmentErrors } from "../../lib/index.js";
 import { baseClass } from "../../lib/inheritance.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import { Post } from "../models/post.js";
 import { Customer } from "../models/customer.js";

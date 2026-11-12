@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { Base } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 
 describe.skipIf(inMemoryDb())("TestDisconnectedAdapter", () => {

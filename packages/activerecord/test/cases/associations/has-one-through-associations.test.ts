@@ -4,7 +4,7 @@ import { SingularAssociation } from "../../../lib/associations/singular-associat
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rbFSend, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { assertQueriesCount, assertNoQueries } from "../../../lib/testing/query-assertions.js";
 import {
   assert,

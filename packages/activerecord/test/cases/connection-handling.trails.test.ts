@@ -11,7 +11,7 @@ import {
   setPermanentConnectionCheckout,
 } from "../../lib/active-record.js";
 import { Relation } from "../../lib/relation.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import { BetterSQLite3Adapter } from "../../lib/connection-adapters/better-sqlite3-adapter.js";
 import {
@@ -20,7 +20,7 @@ import {
   currentShard,
   currentPreventingWrites,
 } from "../../lib/core.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { restoreWorkerConnection } from "../support/connection.js";
 import { DEFAULT_ENV } from "../../lib/connection-handling.js";
 import { DatabaseConfigurations } from "../../lib/database-configurations.js";

@@ -27,7 +27,7 @@ import { YAMLColumn } from "../../lib/coders/yaml-column.js";
 import * as Type from "../../lib/type.js";
 import { Text } from "../../lib/type/text.js";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { SerializedPerson } from "../models/person.js";
 import { TrafficLight } from "../models/traffic-light.js";
 import {

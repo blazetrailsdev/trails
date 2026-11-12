@@ -203,6 +203,22 @@ describe("planTestMoves assets", () => {
     expect(plan.flagged).toEqual(["lib/data.json", "lib/shared.json"]);
     expect(plan.moves.map(([from]) => from)).not.toContain("lib/unused.txt");
   });
+
+  it("moves an unreferenced support asset, a directory symlink included, as one entry", () => {
+    const plan = planTestMoves(
+      fixture({
+        libDir: "lib",
+        files: [],
+        libImported: new Set(),
+        comparison: [],
+        assetRefs: new Map([["test-helpers/fixtures/all/admin", []]]),
+        railsTestDirs: new Set(["fixtures"]),
+      }),
+    );
+    expect(plan.moves).toEqual([
+      ["lib/test-helpers/fixtures/all/admin", "test/fixtures/all/admin"],
+    ]);
+  });
 });
 
 describe("registerLibTestPackage", () => {
@@ -244,6 +260,22 @@ describe("rewriteSpecifiers", () => {
         'declare module "../../../src/relation.js" {}',
         'vi.mock("../../../src/relation.js");',
         'const m = await import("../../../src/relation/sibling.js");',
+      ].join("\n"),
+    );
+  });
+
+  it("re-points a file that stays at a moved target and leaves its other specifiers alone", () => {
+    const moved = new Map([["lib/cases/helper.ts", "test/cases/helper.ts"]]);
+    const source = [
+      'import { helper } from "./cases/helper.js";',
+      'import { models } from "./.trails/models/index.js";',
+      'import { Handlers } from "../lib/handlers.js";',
+    ].join("\n");
+    expect(rewriteSpecifiers(source, "lib/bench.ts", "lib/bench.ts", moved)).toBe(
+      [
+        'import { helper } from "../test/cases/helper.js";',
+        'import { models } from "./.trails/models/index.js";',
+        'import { Handlers } from "../lib/handlers.js";',
       ].join("\n"),
     );
   });

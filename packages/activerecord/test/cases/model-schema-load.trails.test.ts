@@ -8,7 +8,7 @@ import { Column } from "../../lib/connection-adapters/column.js";
 import { SchemaCache } from "../../lib/connection-adapters/schema-cache.js";
 import { lookupCastTypeFromColumn } from "../../lib/connection-adapters/postgresql/quoting.js";
 import { adapterDouble, establishConnectionTo } from "../support/adapter-double.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 class UuidType extends ValueType {
   override type(): string {

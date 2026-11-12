@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../../support/supports.js";
 
 const mysqlProbe =

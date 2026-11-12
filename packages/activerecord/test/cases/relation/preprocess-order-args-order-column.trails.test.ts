@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { Nodes, Table } from "@blazetrails/arel";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Topic } from "../../models/topic.js";
 import {
   columnReferences,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Post } from "../../models/post.js";
 import { HasManyAssociation } from "../../../lib/associations/has-many-association.js";
 

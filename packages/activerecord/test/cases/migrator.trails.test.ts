@@ -24,7 +24,7 @@ import { SchemaMigration } from "../../lib/schema-migration.js";
 import { InternalMetadata } from "../../lib/internal-metadata.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { DatabaseTasks } from "../../lib/tasks/database-tasks.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { anonymousMigration } from "../support/anonymous-migration.js";
 import { migrationProxy } from "../support/migration-proxy.js";
 

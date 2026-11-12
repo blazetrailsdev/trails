@@ -8,13 +8,13 @@ import {
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
-} from "../../lib/encryption/test-helpers.js";
+} from "./encryption/helper.js";
 import { EncryptedBookWithSerializedFirstBinary } from "../models/book-encrypted.js";
 import { EncryptedAttributeType } from "../../lib/encryption/encrypted-attribute-type.js";
 import { Associations } from "../../lib/associations.js";
 import { AggregateReflection, ThroughReflection, create } from "../../lib/reflection.js";
 import { NameError } from "../../lib/errors.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Post } from "../models/post.js";
 import { Tagging } from "../models/tagging.js";
 import { Reply, WebReply } from "../models/reply.js";

@@ -1,9 +1,5 @@
 import { it, expect, vi } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgresqlConnectionTest (trails)", () => {
   it("non-default minMessages is applied to connection", async () => {

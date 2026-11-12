@@ -12,17 +12,17 @@ function isMysqlTableNotFoundError(reason: unknown): boolean {
 
 const HANDLER_KEY = Symbol.for("activerecord.mysql.unhandledRejectionHandler");
 
-if (!(globalThis as any)[HANDLER_KEY]) {
+if (!(globalThis as Record<symbol, unknown>)[HANDLER_KEY]) {
   const handler = (reason: unknown) => {
     if (isMysqlTableNotFoundError(reason)) return;
     throw reason;
   };
 
-  (globalThis as any)[HANDLER_KEY] = handler;
+  (globalThis as Record<symbol, unknown>)[HANDLER_KEY] = handler;
   process.on("unhandledRejection", handler);
 
   afterAll(() => {
     process.off("unhandledRejection", handler);
-    delete (globalThis as any)[HANDLER_KEY];
+    delete (globalThis as Record<symbol, unknown>)[HANDLER_KEY];
   });
 }

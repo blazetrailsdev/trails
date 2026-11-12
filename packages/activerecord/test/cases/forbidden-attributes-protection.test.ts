@@ -8,7 +8,7 @@ import { Company, Client } from "../models/company.js";
 import { ShipPart } from "../models/ship-part.js";
 import { Ship } from "../models/ship.js";
 import { Treasure } from "../models/treasure.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { ProtectedParams } from "../support/stubs/strong-parameters.js";
 
 constSet(TopLevel, "ShipPart", ShipPart);

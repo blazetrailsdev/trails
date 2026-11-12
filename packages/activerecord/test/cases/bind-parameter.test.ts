@@ -7,7 +7,7 @@ import { Nodes } from "@blazetrails/arel";
 import { LogSubscriber } from "../../lib/log-subscriber.js";
 import { QueryAttribute } from "../../lib/relation/query-attribute.js";
 import { Base, RecordNotFound } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Topic } from "../models/topic.js";
 import { Author } from "../models/author.js";

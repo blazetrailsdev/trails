@@ -2,11 +2,7 @@ import { StandardError } from "@blazetrails/ruby-compat";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Migration } from "../../../../lib/index.js";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

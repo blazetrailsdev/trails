@@ -2,13 +2,13 @@ import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Company } from "../models/company.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { EncryptedAttributeType } from "../../lib/encryption/encrypted-attribute-type.js";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
-} from "../../lib/encryption/test-helpers.js";
+} from "./encryption/helper.js";
 
 class EncryptedCompany extends Company {}
 class OtherEncryptedCompany extends Company {}

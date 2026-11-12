@@ -1,7 +1,7 @@
 import { describe, it, beforeEach } from "vitest";
 import { assertRespondTo, assertNotRespondTo } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 let Topic: typeof Base;
 fixtures([]);

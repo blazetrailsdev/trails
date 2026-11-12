@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Firm, Company, Client } from "../../models/company.js";
 
 describe("getModelColumns virtual-attribute eager projection", () => {

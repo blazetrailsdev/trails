@@ -6,10 +6,10 @@ import { PostgreSQLAdapter } from "../../../../lib/connection-adapters/postgresq
 import { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
 import { indexes as sqliteIndexes } from "../../../../lib/connection-adapters/sqlite3/schema-statements.js";
 import { ForeignKeyDefinition } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { NotImplementedError } from "../../../../lib/errors.js";
 import { ambientConnection, withRocketTables } from "../../../support/rocket-tables.js";
-import { adapterType } from "../../../../lib/test-adapter.js";
+import { adapterType } from "../../../support/test-adapter.js";
 import { resultFromRowHashes } from "../../../support/result-from-row-hashes.js";
 
 const guardsIfNotExists = adapterType !== "sqlite";

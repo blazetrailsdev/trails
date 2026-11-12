@@ -3,7 +3,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../../../lib/index.js";
 import { clearReflectionsCache } from "../../../lib/reflection.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { JoinDependency } from "../../../lib/associations/join-dependency.js";
 import { aliasTrackerFor } from "../../support/join-dependency-paths.js";
 import * as Arel from "@blazetrails/arel";

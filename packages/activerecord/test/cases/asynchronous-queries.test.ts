@@ -18,7 +18,7 @@ import { AsynchronousQueryInsideTransactionError, StatementInvalid } from "../..
 import { FutureResult } from "../../lib/future-result.js";
 import { Result } from "../../lib/result.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { ARUnit2Model } from "../models/arunit2-model.js";
 
 function asynchronousQueriesSharedTests(connection: () => AbstractAdapter): void {

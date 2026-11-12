@@ -11,7 +11,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { Book, PublishedBook } from "../models/book.js";
 import { Author } from "../models/author.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 class MockLogger extends Logger {
   private _logged: Record<string, string[]> = { warn: [] };

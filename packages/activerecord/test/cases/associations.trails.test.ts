@@ -4,7 +4,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../lib/index.js";
 import type { CollectionAssociation } from "../../lib/associations/collection-association.js";
 import { Preloader } from "../../lib/associations/preloader.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import {
   CpkOrder,

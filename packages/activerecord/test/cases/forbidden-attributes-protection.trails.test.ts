@@ -8,7 +8,7 @@ import { Bird } from "../models/bird.js";
 import { Pirate } from "../models/pirate.js";
 import { Ship } from "../models/ship.js";
 import { User } from "../models/user.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { ProtectedParams } from "../support/stubs/strong-parameters.js";
 
 describe("ForbiddenAttributesProtectionUpdateTest", () => {

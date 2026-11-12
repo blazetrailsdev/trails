@@ -4,10 +4,10 @@ import { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.
 import { AdapterError, ConnectionFailed } from "../../lib/errors.js";
 import { Base } from "../../lib/index.js";
 import { Result } from "../../lib/result.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { establishConnectionTo } from "../support/adapter-double.js";
 import { resultFromRowHashes } from "../support/result-from-row-hashes.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 class LifecycleTestAdapter extends AbstractAdapter {
   private _connected = false;

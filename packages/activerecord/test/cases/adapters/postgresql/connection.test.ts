@@ -1,10 +1,5 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-  SQLSubscriber,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../../../lib/relation/query-attribute.js";
 import { Value } from "../../../../lib/type.js";
 import { assertQueriesCount } from "../../../../lib/testing/query-assertions.js";

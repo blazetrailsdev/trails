@@ -4,7 +4,7 @@ import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Base, ConfigurationError } from "../../lib/index.js";
 
 import { AdminUser } from "../models/admin/user.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 const { "admin/users": adminUsers } = fixtures(["admin/accounts", "admin/users"]);
 
