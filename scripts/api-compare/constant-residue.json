@@ -37,7 +37,7 @@
     }
   },
   "actionmailbox": {
-    "rows": 21,
+    "rows": 25,
     "excluded": ["base-controller.ts::BaseController"],
     "unwalked": [
       "callbacks.ts::Callbacks",
@@ -50,7 +50,12 @@
       "router.ts::Router.RoutingError",
       "routing.ts::Routing"
     ],
-    "residue": {}
+    "residue": {
+      "action-mailbox/inbound-emails-controller.ts::InboundEmailsController": "Trails::Conductor::ActionMailbox::InboundEmailsController",
+      "action-mailbox/inbound-emails/sources-controller.ts::SourcesController": "Trails::Conductor::ActionMailbox::InboundEmails::SourcesController",
+      "action-mailbox/incinerates-controller.ts::IncineratesController": "Trails::Conductor::ActionMailbox::IncineratesController",
+      "action-mailbox/reroutes-controller.ts::ReroutesController": "Trails::Conductor::ActionMailbox::ReroutesController"
+    }
   },
   "actionmailer": {
     "rows": 31,

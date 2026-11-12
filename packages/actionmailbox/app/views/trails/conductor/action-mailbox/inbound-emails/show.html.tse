@@ -1,0 +1,15 @@
+<% provide("title", this.inboundEmail.messageId) %>
+
+<h1><%= this.inboundEmail.messageId %>: <%= this.inboundEmail.status %></h1>
+
+<ul>
+  <li><%= buttonTo("Route again", mainApp.trailsConductorInboundEmailReroutePath(this.inboundEmail), { method: "post" }) %></li>
+  <li><%= buttonTo("Incinerate", mainApp.trailsConductorInboundEmailIncineratePath(this.inboundEmail), { method: "post" }) %></li>
+</ul>
+
+<details>
+  <summary>Full email source</summary>
+  <pre><%= await this.inboundEmail.source() %></pre>
+</details>
+
+<%= linkTo("Back to all inbound emails", mainApp.trailsConductorInboundEmailsPath()) %>

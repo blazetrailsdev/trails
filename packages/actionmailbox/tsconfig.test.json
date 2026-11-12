@@ -15,6 +15,9 @@
     },
     {
       "path": "../trails-tsc"
+    },
+    {
+      "path": "../vitest-matchers"
     }
   ]
 }

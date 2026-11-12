@@ -1,0 +1,12 @@
+<% provide("title", "Deliver new inbound email by source") %>
+
+<h1>Deliver new inbound email by source</h1>
+
+<%= formWith({ url: mainApp.trailsConductorInboundEmailSourcesPath(), local: true }, (form) => { %>
+  <div>
+    <%= form.label("source", "Source") %><br>
+    <%= form.textarea("source", { size: "80x60" }) %>
+  </div>
+
+  <%= form.submit("Deliver inbound email") %>
+<% }) %>
