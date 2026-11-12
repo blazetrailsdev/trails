@@ -2451,7 +2451,7 @@ class JobWithAnAdapter extends ActiveJob.Base {
 
   perform(): void {}
 }
-JobWithAnAdapter.setQueueAdapter("async");
+JobWithAnAdapter.queueAdapter = "async";
 
 class QueueAdapterTest extends TestCase {
   static override toString(): string {

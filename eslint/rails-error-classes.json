@@ -1311,12 +1311,10 @@
       },
       "queue-adapter.ts": {
         "*": {
-          "queueAdapter": ["ArgumentError"],
-          "setQueueAdapter": ["ArgumentError"]
+          "queueAdapter": ["ArgumentError"]
         },
         "ClassMethods": {
-          "queueAdapter": ["ArgumentError"],
-          "setQueueAdapter": ["ArgumentError"]
+          "queueAdapter": ["ArgumentError"]
         }
       },
       "queue-adapters/abstract-adapter.ts": {

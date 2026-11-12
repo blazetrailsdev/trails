@@ -64,7 +64,7 @@ class JobWithPriority extends ApplicationJob {
 
 class JobUsingAsyncAdapter extends ApplicationJob {
   static {
-    this.setQueueAdapter("async");
+    this.queueAdapter = "async";
   }
 
   perform(): void {
@@ -103,9 +103,9 @@ describe("SolidQueue::RecurringTaskTest", () => {
     await loadAppSchema();
     const pool = RecurringTask.connectionPool();
     await pool.schemaReflection.loadAllBang(pool);
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
     oldQueueAdapter = Base.queueAdapter;
-    Base.setQueueAdapter(new SolidQueueAdapter());
+    Base.queueAdapter = new SolidQueueAdapter();
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
   });
@@ -120,7 +120,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
 
   afterAll(() => {
     setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
-    Base.setQueueAdapter(oldQueueAdapter);
+    Base.queueAdapter = oldQueueAdapter;
   });
 
   async function enqueueAndAssertPerformedWithResult(task: RecurringTask, result: unknown) {

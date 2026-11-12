@@ -24,7 +24,6 @@ interface QueueAdapterClass {
   _queueAdapterName: string | null;
   _queueAdapter: unknown;
   queueAdapter: unknown;
-  setQueueAdapter(nameOrAdapter: unknown): void;
   assignAdapter(adapterName: string, queueAdapter: unknown): void;
   isQueueAdapter(object: unknown): boolean;
 }
@@ -45,25 +44,26 @@ const QUEUE_ADAPTER_METHODS = Object.freeze(["enqueue", "enqueueAt"]);
 export class ClassMethods {
   static get queueAdapter(): unknown {
     const self = this as unknown as QueueAdapterClass;
-    if (self._queueAdapter == null) self.setQueueAdapter("async");
+    if (self._queueAdapter == null) self.queueAdapter = "async";
     return self._queueAdapter;
   }
 
   static get queueAdapterName(): string {
     const self = this as unknown as QueueAdapterClass;
-    if (self._queueAdapterName == null) self.setQueueAdapter("async");
+    if (self._queueAdapterName == null) self.queueAdapter = "async";
     return self._queueAdapterName!;
   }
 
-  static setQueueAdapter(this: QueueAdapterClass, nameOrAdapter: unknown): void {
+  static set queueAdapter(nameOrAdapter: unknown) {
+    const self = this as unknown as QueueAdapterClass;
     if (typeof nameOrAdapter === "string") {
       const queueAdapter = new (QueueAdapters.lookup(nameOrAdapter) as new () => object)();
       tryCall(queueAdapter, "checkAdapter");
-      this.assignAdapter(String(nameOrAdapter), queueAdapter);
+      self.assignAdapter(String(nameOrAdapter), queueAdapter);
     } else {
-      if (this.isQueueAdapter(nameOrAdapter)) {
+      if (self.isQueueAdapter(nameOrAdapter)) {
         const adapterName = underscore(ActiveJob.adapterName(nameOrAdapter));
-        this.assignAdapter(adapterName, nameOrAdapter);
+        self.assignAdapter(adapterName, nameOrAdapter);
       } else {
         throw new ArgumentError();
       }

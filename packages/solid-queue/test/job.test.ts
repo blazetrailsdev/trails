@@ -67,7 +67,7 @@ describe("SolidQueue::JobTest", () => {
 
   beforeAll(async () => {
     await loadAppSchema();
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
   });
 
   beforeEach(async () => {

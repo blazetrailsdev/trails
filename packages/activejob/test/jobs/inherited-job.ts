@@ -6,4 +6,4 @@ export class InheritedJob extends ApplicationJob {
   }
 }
 constSet(TopLevel, "InheritedJob", InheritedJob);
-InheritedJob.setQueueAdapter("inline");
+InheritedJob.queueAdapter = "inline";

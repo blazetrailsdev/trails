@@ -240,7 +240,7 @@ export class LogSubscriber extends BaseLogSubscriber {
 
   /** @internal */
   override get logger(): Logger | null {
-    return Base.logger as Logger | null;
+    return Base.logger;
   }
 
   protected override info(progname: string | null = null, block?: () => string): boolean | null {

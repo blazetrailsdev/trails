@@ -1,6 +1,7 @@
 import {
   Callbacks as ASCallbacks,
   type Included,
+  type Logger,
   Rescuable,
   runLoadHooks,
   zone,
@@ -43,8 +44,8 @@ export interface Base
     Rescuable,
     Included<typeof ASCallbacks>,
     Pick<Included<typeof Instrumentation>, "instrument"> {
-  get logger(): unknown;
-  set logger(logger: unknown);
+  get logger(): Logger | null;
+  set logger(logger: Logger | null);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -59,7 +60,6 @@ export class Base {
   declare static queueAdapterName: string;
   declare static _queueAdapterName: string | null;
   declare static _queueAdapter: unknown;
-  declare static setQueueAdapter: typeof QueueAdapterClassMethods.setQueueAdapter;
   /** @internal */
   declare static assignAdapter: typeof QueueAdapterClassMethods.assignAdapter;
   /** @internal */
@@ -93,7 +93,7 @@ export class Base {
   declare static retryOn: typeof ExceptionsClassMethods.retryOn;
   declare static discardOn: typeof ExceptionsClassMethods.discardOn;
   declare static afterDiscard: typeof ExceptionsClassMethods.afterDiscard;
-  declare static logger: unknown;
+  declare static logger: Logger | null;
   declare static logArguments: boolean;
   declare static isLogArguments: boolean;
   declare static rescueHandlers: unknown[][];

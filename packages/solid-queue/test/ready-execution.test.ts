@@ -21,7 +21,7 @@ describe("SolidQueue::ReadyExecutionTest", () => {
   let jobs: Relation<Job>;
 
   beforeAll(async () => {
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
   });
 
   beforeEach(async () => {

@@ -63,7 +63,7 @@ class LoggingTest extends TestCase {
   }
 
   declare logger: TaggedTestLogger;
-  oldLogger: unknown;
+  oldLogger: Logger | null = null;
 
   override setup(): void {
     logSubscriberTestHelperSetup.call(this as never);
@@ -80,7 +80,7 @@ class LoggingTest extends TestCase {
     this.setLogger(this.oldLogger);
   }
 
-  setLogger(logger: unknown): void {
+  setLogger(logger: Logger | null): void {
     Base.logger = logger;
   }
 
@@ -517,7 +517,7 @@ describe("LoggingTest", () => {
         },
       });
 
-      Base.setQueueAdapter(stubbedInlineAdapter);
+      Base.queueAdapter = stubbedInlineAdapter;
 
       await ActiveJob.performAllLater(
         new LoggingJob("Dummy"),
@@ -526,7 +526,7 @@ describe("LoggingTest", () => {
       );
       expect(t.logger.messages).toMatch(/Failed enqueuing 3 jobs to .+/);
     } finally {
-      Base.setQueueAdapter(originalAdapter);
+      Base.queueAdapter = originalAdapter;
     }
   });
 

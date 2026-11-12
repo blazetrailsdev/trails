@@ -10,10 +10,10 @@ export class OverriddenLoggingJob extends Base {
   _logger?: Logger;
 
   perform(dummy: unknown): void {
-    (this.logger as Logger).info(`Dummy, here is it: ${rbObjAsString(dummy)}`);
+    this.logger.info(`Dummy, here is it: ${rbObjAsString(dummy)}`);
   }
 
-  get logger(): unknown {
+  override get logger(): Logger {
     return (this._logger ??= TaggedLogging.new(new Logger(null)));
   }
 }

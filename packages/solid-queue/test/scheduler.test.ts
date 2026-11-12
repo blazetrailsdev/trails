@@ -39,7 +39,7 @@ describe("SchedulerTest", () => {
     await loadAppSchema();
     const pool = RecurringTask.connectionPool();
     await pool.schemaReflection.loadAllBang(pool);
-    ApplicationJob.setQueueAdapter(new SolidQueueAdapter());
+    ApplicationJob.queueAdapter = new SolidQueueAdapter();
     oldPermanentConnectionCheckout = permanentConnectionCheckout();
     setPermanentConnectionCheckout(true);
   });

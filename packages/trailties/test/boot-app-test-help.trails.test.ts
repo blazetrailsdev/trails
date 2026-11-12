@@ -193,11 +193,11 @@ describe("test_help wires a booted app into the test case classes", () => {
   it("performs an app/jobs job through the inline adapter by its constantized job_class", async () => {
     const { WelcomeEmailJob } = await import("./fixtures/boot-app/app/jobs/welcome-email-job.js");
     const previous = ActiveJob.Base.queueAdapter;
-    ActiveJob.Base.setQueueAdapter("inline");
+    ActiveJob.Base.queueAdapter = "inline";
     try {
       await WelcomeEmailJob.performLater("david");
     } finally {
-      ActiveJob.Base.setQueueAdapter(previous);
+      ActiveJob.Base.queueAdapter = previous;
     }
     expect(WelcomeEmailJob.performed).toEqual([["david"]]);
     expect(constantize("WelcomeEmailJob")).toBe(WelcomeEmailJob);

@@ -12,7 +12,9 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
-type AfterDiscardProc = (this: unknown, job: unknown, exception: unknown) => unknown;
+type AfterDiscardProc = {
+  proc(this: object, job: object, exception: Error): unknown;
+}["proc"];
 type RetryBlock = (job: unknown, error: unknown) => unknown;
 
 interface ExceptionsJob {
@@ -113,7 +115,10 @@ export class ClassMethods {
     );
   }
 
-  static afterDiscard(this: ExceptionsClass, blk: AfterDiscardProc): void {
+  static afterDiscard<K extends ExceptionsClass & (abstract new (...args: never[]) => object)>(
+    this: K,
+    blk: (this: InstanceType<K>, job: InstanceType<K>, exception: Error) => unknown,
+  ): void {
     this.afterDiscardProcs = [...this.afterDiscardProcs, blk];
   }
 }
@@ -195,7 +200,7 @@ export class Exceptions {
     const exceptions: unknown[] = [];
     for (const blk of this.afterDiscardProcs) {
       try {
-        await blk.call(this, this, exception);
+        await blk.call(this, this, exception as Error);
       } catch (e) {
         if (!(e instanceof StandardError)) throw e;
         exceptions.push(e);

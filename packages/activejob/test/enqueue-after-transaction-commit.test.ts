@@ -73,7 +73,7 @@ constSet(
   ErrorEnqueueAfterCommitJob,
 );
 constSet(ErrorEnqueueAfterCommitJob, "EnqueueErrorAdapter", EnqueueErrorAdapter);
-ErrorEnqueueAfterCommitJob.setQueueAdapter(new EnqueueErrorAdapter());
+ErrorEnqueueAfterCommitJob.queueAdapter = new EnqueueErrorAdapter();
 ErrorEnqueueAfterCommitJob.enqueueAfterTransactionCommit = true;
 constSet(
   constGet(Object, "EnqueueAfterTransactionCommitTest") as object,
