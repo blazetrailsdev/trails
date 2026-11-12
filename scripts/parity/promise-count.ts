@@ -130,14 +130,12 @@ export function raisedMarks(base: Counts, mark: Counts): string[] {
   return rows;
 }
 
+/** The mark committed at `ref`, or null where `ref` has no mark file; any other git failure throws. */
 async function markAt(ref: string): Promise<Counts | null> {
-  try {
-    return JSON.parse(
-      await git(["show", `${ref}:scripts/parity/promise-count-mark.json`]),
-    ) as Counts;
-  } catch {
-    return null;
-  }
+  const file = "scripts/parity/promise-count-mark.json";
+  const listed = await git(["ls-tree", "--name-only", ref, "--", file]);
+  if (listed.trim() === "") return null;
+  return JSON.parse(await git(["show", `${ref}:${file}`])) as Counts;
 }
 
 /**
