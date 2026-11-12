@@ -49,5 +49,9 @@ describe("Minitest::TrailsPluginTest", () => {
     withPlugin({ fullBacktrace: true }, backtraceFilter, () => {
       expect(Minitest.backtraceFilter).toBe(backtraceFilter);
     });
+
+    withPlugin({ fullBacktrace: true }, backtraceFilter, () => {
+      expect(Minitest.backtraceFilter).toBe(backtraceFilter);
+    });
   });
 });

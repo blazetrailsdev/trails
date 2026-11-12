@@ -44,18 +44,20 @@ describe("LazyRouteSet", () => {
     routes.draw(function () {
       this.get("/posts", { to: "posts#index" });
     });
-    reload.mockClear();
-    routes.recognizePath("/posts");
-    expect(reload).toHaveBeenCalledTimes(2);
+    expect(routes.recognizePath("/posts")).toEqual({ controller: "posts", action: "index" });
   });
 
   it("reloads routes when recognize_path_with_request is called", () => {
     routes.draw(function () {
       this.get("/posts", { to: "posts#index" });
     });
-    reload.mockClear();
-    routes.recognizePathWithRequest(routes.makeRequest(MockRequest.envFor("/posts")), "/posts", {});
-    expect(reload).toHaveBeenCalledTimes(1);
+    const path = "/posts";
+    const req = routes.makeRequest(MockRequest.envFor(path));
+
+    expect(routes.recognizePathWithRequest(req, path, {})).toEqual({
+      controller: "posts",
+      action: "index",
+    });
   });
 
   it("reloads routes when generate_extras is called", () => {

@@ -115,8 +115,7 @@ export const ClassMethods = {
   async sourcePathsForSearch(this: ActionsClassHost): Promise<string[]> {
     let paths: string[] = [];
     paths = paths.concat(this.sourcePaths());
-    const sourceRoot = await this.sourceRoot();
-    if (sourceRoot != null) paths.push(sourceRoot);
+    if ((await this.sourceRoot()) != null) paths.push((await this.sourceRoot())!);
     paths = paths.concat(this.fromSuperclass("sourcePaths", []) as string[]);
     return paths;
   },
