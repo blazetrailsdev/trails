@@ -131,6 +131,7 @@ interface LoadArg {
   symbols: string[];
   data: Map<number, unknown>;
   compatTbl: Map<object, object> | null;
+  links: Set<number>;
 }
 
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
@@ -1188,6 +1189,7 @@ function rObjectFor(
           throw new ArgumentError("dump format error (unlinked)");
         }
         v = arg.data.get(id);
+        arg.links.add(id);
         break;
       }
 
@@ -1369,7 +1371,7 @@ function rObjectFor(
           !uclass &&
           !hash.isCompareByIdentity() &&
           [...hash.keys()].every((key) => typeof key === "string") &&
-          ![...hash.values()].includes(hash)
+          !arg.links.has(idx)
         ) {
           v = rEntry0(Object.fromEntries(hash), idx, arg);
         }
@@ -1534,7 +1536,14 @@ function rbMarshalLoadWithProc(port: unknown): unknown {
   if (v === null) {
     throw new TypeError("instance of IO needed");
   }
-  const arg: LoadArg = { src: v, offset: 0, symbols: [], data: new Map(), compatTbl: null };
+  const arg: LoadArg = {
+    src: v,
+    offset: 0,
+    symbols: [],
+    data: new Map(),
+    compatTbl: null,
+    links: new Set(),
+  };
 
   const major = rByte(arg);
   const minor = rByte(arg);

@@ -526,6 +526,16 @@ describe("Marshal.load", () => {
     expect(loaded.get("self")).toBe(loaded);
   });
 
+  it("loads a Hash reached again through a nested value as one Hash", () => {
+    const h = new Hash<string, unknown>();
+    h.set("a", [h]);
+    h.set("b", { c: h });
+    const loaded = Marshal.load(Marshal.dump(h)) as Hash<string, unknown>;
+    expect(loaded).toBeInstanceOf(Hash);
+    expect((loaded.get("a") as unknown[])[0]).toBe(loaded);
+    expect((loaded.get("b") as Record<string, unknown>).c).toBe(loaded);
+  });
+
   it("loads what Marshal.dump dumped", () => {
     for (const [name, value] of Object.entries(VALUES)) {
       expect(Marshal.load(Marshal.dump(value))).toEqual(name in LOADED ? LOADED[name] : value);
