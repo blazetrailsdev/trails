@@ -254,6 +254,7 @@ export {
   product,
   union,
   uniq,
+  uniqBang,
   unpack,
   unpack1,
   rbAryFetch,

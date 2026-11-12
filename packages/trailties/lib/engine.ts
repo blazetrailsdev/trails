@@ -14,13 +14,13 @@ import {
   getFs,
   getPath,
   LOAD_PATH,
-  rbAryReplace,
   rbFLoad,
   rbFRequireFile,
   rbObjRespondTo,
   rbProcCall,
   block,
   setEnv,
+  uniqBang,
 } from "@blazetrails/ruby-compat";
 import { DSL, Task } from "@blazetrails/rake";
 import {
@@ -212,9 +212,10 @@ export class Engine extends Trailtie {
     const cfg = this._config;
     if (cfg instanceof EngineConfiguration) return cfg;
     const klass = this.constructor as typeof Engine;
-    const newCfg = new EngineConfiguration(klass.findRoot(klass.calledFrom()));
-    if (klass.calledFrom() !== undefined && !File.isExist(`${newCfg.root}/lib`)) {
-      newCfg.paths().add("lib", { with: klass.calledFrom(), loadPath: true });
+    const calledFrom = klass.calledFrom();
+    const newCfg = new EngineConfiguration(klass.findRoot(calledFrom));
+    if (calledFrom !== undefined && !File.isExist(File.join(newCfg.root!, "lib"))) {
+      newCfg.paths().add("lib", { with: calledFrom, loadPath: true });
     }
     this._config = newCfg;
     return newCfg;
@@ -438,7 +439,7 @@ Engine.initializer(
     ].reverse()) {
       if (File.isDirectory(path)) LOAD_PATH.unshift(path);
     }
-    rbAryReplace(LOAD_PATH, [...new Set(LOAD_PATH)]);
+    uniqBang(LOAD_PATH);
   },
 );
 

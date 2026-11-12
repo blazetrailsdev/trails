@@ -219,15 +219,27 @@ describe("SQLite3Adapter busy handler", () => {
     await writer.execute("ROLLBACK");
     await impatient.disconnectBang();
   });
-  it("waits at a direct driver call, so the lock holder can commit", async () => {
+
+  it("retries a direct driver call that raises busy", async () => {
     await waiter.execute("SELECT 1");
     const raw = waiter._rawConnection!;
-    const pragma = raw.pragma.bind(raw);
-    vi.spyOn(raw, "pragma").mockImplementationOnce(() => {
+    const pragma = vi.spyOn(raw, "pragma").mockImplementationOnce(() => {
       throw new BusyException("database is locked");
     });
-    vi.spyOn(raw, "pragma").mockImplementation(pragma);
 
     expect(await waiter.encoding()).toBe("UTF-8");
+    expect(pragma).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries reconnect's rollback when it raises busy", async () => {
+    await waiter.execute("SELECT 1");
+    const raw = waiter._rawConnection!;
+    const rollback = vi.spyOn(raw, "rollback").mockImplementationOnce(() => {
+      throw new BusyException("database is locked");
+    });
+
+    await waiter.reconnect();
+
+    expect(rollback).toHaveBeenCalledTimes(2);
   });
 });
