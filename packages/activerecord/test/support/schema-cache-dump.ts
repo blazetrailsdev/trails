@@ -1,6 +1,6 @@
 /** @internal */
 import { getEnv, hexdigest } from "@blazetrails/activesupport";
-import { getOsAsync, File } from "@blazetrails/ruby-compat";
+import { getOsAsync, File, rbObjDup } from "@blazetrails/ruby-compat";
 import type {
   AbstractAdapter as DatabaseAdapter,
   AdapterName,
@@ -172,7 +172,7 @@ async function replaySchemaCacheDump(
   const cached = dumpedTables(dumped.marshalDump());
   const shapes = await schemaShapes(adapter);
   if (fingerprintOf(shapes, cached) !== templateSchemaFingerprint()) return false;
-  pool.schemaReflection = new SchemaReflection(null, dumped.initializeDup());
+  pool.schemaReflection = new SchemaReflection(null, rbObjDup(dumped));
   for (const table of shapes.keys()) {
     if (!cached.has(table)) await pool.schemaReflection.add(pool, table);
   }

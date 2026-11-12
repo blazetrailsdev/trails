@@ -89,12 +89,15 @@ export class IndexedRow {
 
 export class Result {
   readonly columns: string[];
-  readonly rows: unknown[][];
-  readonly columnTypes: ColumnTypes;
+  rows: unknown[][];
+  columnTypes: ColumnTypes;
 
-  #hashRows: Record<string, unknown>[] | null = null;
-  #columnIndexes: Record<string, number> | null = null;
-  #indexedRows: readonly IndexedRow[] | null = null;
+  /** @internal */
+  _hashRows: Record<string, unknown>[] | null = null;
+  /** @internal */
+  _columnIndexes: Record<string, number> | null = null;
+  /** @internal */
+  _indexedRows: readonly IndexedRow[] | null = null;
 
   constructor(columns: string[], rows: unknown[][], columnTypes: ColumnTypes | null = null) {
     this.columns = columns;
@@ -198,13 +201,13 @@ export class Result {
     if (this.columns.length === 1) {
       const type = Array.isArray(typeOverrides)
         ? typeOverrides[0]
-        : this.#columnType(this.columns[0], 0, typeOverrides);
+        : this.columnType(this.columns[0], 0, typeOverrides);
 
       return this.rows.map(([value]) => type.deserialize(value));
     } else {
       const types = Array.isArray(typeOverrides)
         ? typeOverrides
-        : this.columns.map((name, i) => this.#columnType(name, i, typeOverrides));
+        : this.columns.map((name, i) => this.columnType(name, i, typeOverrides));
 
       return this.rows.map((values) =>
         Array.from({ length: values.length }, (_, i) => types[i].deserialize(values[i])),
@@ -212,8 +215,10 @@ export class Result {
     }
   }
 
-  dup(): Result {
-    return new Result(this.columns, this.rows.slice(), { ...this.columnTypes });
+  initializeCopy(other: Result): void {
+    this.rows = this.rows.slice();
+    this.columnTypes = { ...this.columnTypes };
+    this._hashRows = null;
   }
 
   freeze(): this {
@@ -224,7 +229,7 @@ export class Result {
   }
 
   get columnIndexes(): Record<string, number> {
-    return (this.#columnIndexes ??= (() => {
+    return (this._columnIndexes ??= (() => {
       let index = 0;
       const hash: Record<string, number> = {};
       const length = this.columns.length;
@@ -237,7 +242,7 @@ export class Result {
   }
 
   get indexedRows(): readonly IndexedRow[] {
-    return (this.#indexedRows ??= (() => {
+    return (this._indexedRows ??= (() => {
       const columns = this.columnIndexes;
       return Object.freeze(this.rows.map((row) => new IndexedRow(columns, row)));
     })());
@@ -245,14 +250,15 @@ export class Result {
 
   /** @internal */
   private hashRows(): Record<string, unknown>[] {
-    return (this.#hashRows ??= this.rows.map((row) =>
+    return (this._hashRows ??= this.rows.map((row) =>
       Object.fromEntries(
         Object.entries(this.columnIndexes).map(([key, index]) => [key, row[index]]),
       ),
     ));
   }
 
-  #columnType(
+  /** @internal */
+  private columnType(
     name: string,
     index: number,
     typeOverrides: ColumnTypes | Hash<string, ColumnType>,

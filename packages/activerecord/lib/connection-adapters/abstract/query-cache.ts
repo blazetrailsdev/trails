@@ -14,6 +14,7 @@ import {
   included,
   rbCallSuper,
   rbEnsure,
+  rbObjDup,
   Thread,
 } from "@blazetrails/ruby-compat";
 
@@ -399,7 +400,7 @@ function cacheSql(
           this.cacheNotificationInfoResult(sql, name, binds, result),
         );
       }
-      return result.dup();
+      return rbObjDup(result);
     });
 }
 

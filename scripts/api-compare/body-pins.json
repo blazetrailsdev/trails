@@ -25878,6 +25878,14 @@
   {
     "package": "activerecord",
     "rubyFile": "aggregations.rb",
+    "rubyName": "initialize_dup",
+    "digest": "9f725de370832c04",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "aggregations.rb",
     "rubyName": "reader_method",
     "digest": "16736f78f6e27c30",
     "ref": "v8.0.2"
@@ -26049,6 +26057,14 @@
     "rubyName": "init_internals",
     "digest": "27e0a8c15db3c9b4",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "associations.rb",
+    "rubyName": "initialize_dup",
+    "digest": "1db74c5c8b94111a",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -27481,6 +27497,14 @@
   {
     "package": "activerecord",
     "rubyFile": "associations/collection_proxy.rb",
+    "rubyName": "inspect",
+    "digest": "53f05fc608afb7ae",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "associations/collection_proxy.rb",
     "rubyName": "last",
     "digest": "53f05fc608afb7ae",
     "ref": "v8.0.2"
@@ -27519,6 +27543,14 @@
     "rubyName": "prepend",
     "digest": "b29079917d922925",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "associations/collection_proxy.rb",
+    "rubyName": "pretty_print",
+    "digest": "53f05fc608afb7ae",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -28510,9 +28542,25 @@
   {
     "package": "activerecord",
     "rubyFile": "associations/preloader/association.rb",
+    "rubyName": "eql?",
+    "digest": "e0a08990bef31e5a",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "associations/preloader/association.rb",
     "rubyName": "future_classes",
     "digest": "b0acc7e79e412a5f",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "associations/preloader/association.rb",
+    "rubyName": "hash",
+    "digest": "bef644080d228211",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -30694,6 +30742,14 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
+    "rubyName": "current_time_from_proper_timezone",
+    "digest": "ad7ad0d069317769",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "base.rb",
     "rubyName": "define_delegated_type_methods",
     "digest": "801baa619f79bdf1",
     "ref": "v8.0.2"
@@ -30760,6 +30816,14 @@
     "rubyName": "deterministic_encrypted_attributes",
     "digest": "96ba6213022cee78",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "base.rb",
+    "rubyName": "encode_with",
+    "digest": "ffff2b86213f0d8e",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -30841,6 +30905,14 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
+    "rubyName": "hash",
+    "digest": "4546a43934c08506",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "base.rb",
     "rubyName": "i18n_scope",
     "digest": "c3b4996fa6a21640",
     "ref": "v8.0.2"
@@ -30893,6 +30965,14 @@
     "rubyName": "initialize",
     "digest": "970b0ba7b94b7533",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "base.rb",
+    "rubyName": "inspect",
+    "digest": "e63d80a34f5724d9",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -30956,6 +31036,14 @@
     "rubyName": "present?",
     "digest": "357b923f2251ef17",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "base.rb",
+    "rubyName": "pretty_print",
+    "digest": "ff237d57795a662f",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -31320,6 +31408,14 @@
     "rubyName": "dump",
     "digest": "746cf12258a23987",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "coders/column_serializer.rb",
+    "rubyName": "init_with",
+    "digest": "ceea4bd898a2b220",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -31754,6 +31850,14 @@
     "rubyName": "initialize",
     "digest": "63991ceb55e7b278",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/abstract/connection_pool.rb",
+    "rubyName": "inspect",
+    "digest": "e4c4db41bd2e2b5f",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -35517,6 +35621,14 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_adapter.rb",
+    "rubyName": "inspect",
+    "digest": "d8fd29483038e9a8",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "instrumenter",
     "digest": "a21757c74b9e02cb",
     "ref": "v8.0.2"
@@ -37176,6 +37288,14 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/column.rb",
+    "rubyName": "encode_with",
+    "digest": "67bbc50e40b44ad1",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/column.rb",
     "rubyName": "has_default?",
     "digest": "3d9e43a8d20df071",
     "ref": "v8.0.2"
@@ -37183,9 +37303,25 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/column.rb",
+    "rubyName": "hash",
+    "digest": "d5d96dc781c6c005",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/column.rb",
     "rubyName": "human_name",
     "digest": "7f2ff7d6cad9c174",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/column.rb",
+    "rubyName": "init_with",
+    "digest": "858e01e98e683dae",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -37799,6 +37935,14 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/mysql/type_metadata.rb",
+    "rubyName": "hash",
+    "digest": "ecb38f4ac434934f",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/mysql/type_metadata.rb",
     "rubyName": "initialize",
     "digest": "dabc2ffabc7422a8",
     "ref": "v8.0.2"
@@ -38212,6 +38356,14 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql/column.rb",
+    "rubyName": "encode_with",
+    "digest": "049f379cab761c67",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/postgresql/column.rb",
     "rubyName": "enum?",
     "digest": "58d46d266b207038",
     "ref": "v8.0.2"
@@ -38226,9 +38378,25 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql/column.rb",
+    "rubyName": "hash",
+    "digest": "9d9750e224fd58c2",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/postgresql/column.rb",
     "rubyName": "identity?",
     "digest": "c2cdb567d97250f5",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/postgresql/column.rb",
+    "rubyName": "init_with",
+    "digest": "92ee82ec7f391b90",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -40347,6 +40515,14 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql/type_metadata.rb",
+    "rubyName": "hash",
+    "digest": "6ee265db39f4f583",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/postgresql/type_metadata.rb",
     "rubyName": "initialize",
     "digest": "33ffc624cb830005",
     "ref": "v8.0.2"
@@ -40364,6 +40540,14 @@
     "rubyName": "extract_schema_qualified_name",
     "digest": "e908b49066c7b8ae",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/postgresql/utils.rb",
+    "rubyName": "hash",
+    "digest": "8e47084237d83c31",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -41355,6 +41539,14 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/schema_cache.rb",
+    "rubyName": "encode_with",
+    "digest": "90cdef50c1d41cbd",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/schema_cache.rb",
     "rubyName": "for_lone_connection",
     "digest": "f72c0e3994d3b0f9",
     "ref": "v8.0.2"
@@ -41376,9 +41568,25 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/schema_cache.rb",
+    "rubyName": "init_with",
+    "digest": "58fc617e98dc41d3",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/schema_cache.rb",
     "rubyName": "initialize",
     "digest": "71e97731a30e159a",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/schema_cache.rb",
+    "rubyName": "initialize_dup",
+    "digest": "e5eee0f5f4e7add0",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -41488,6 +41696,14 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/sql_type_metadata.rb",
+    "rubyName": "hash",
+    "digest": "17663682cb970609",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/sql_type_metadata.rb",
     "rubyName": "initialize",
     "digest": "de052049cccbe671",
     "ref": "v8.0.2"
@@ -41516,9 +41732,33 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/sqlite3/column.rb",
+    "rubyName": "encode_with",
+    "digest": "cdc8b2ade719bcdf",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/sqlite3/column.rb",
     "rubyName": "has_default?",
     "digest": "524e222cdefaff37",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/sqlite3/column.rb",
+    "rubyName": "hash",
+    "digest": "6187e44491867cde",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/sqlite3/column.rb",
+    "rubyName": "init_with",
+    "digest": "63ac7f6fec790a9b",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -43007,6 +43247,14 @@
   {
     "package": "activerecord",
     "rubyFile": "core.rb",
+    "rubyName": "encode_with",
+    "digest": "ffff2b86213f0d8e",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "core.rb",
     "rubyName": "filter_attributes",
     "digest": "1bec478dc1da736f",
     "ref": "v8.0.2"
@@ -43063,6 +43311,14 @@
   {
     "package": "activerecord",
     "rubyFile": "core.rb",
+    "rubyName": "hash",
+    "digest": "4546a43934c08506",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "core.rb",
     "rubyName": "init_attributes",
     "digest": "27e4bf0201ecbf4d",
     "ref": "v8.0.2"
@@ -43077,6 +43333,14 @@
   {
     "package": "activerecord",
     "rubyFile": "core.rb",
+    "rubyName": "init_with",
+    "digest": "838a9de67a0242c5",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "core.rb",
     "rubyName": "init_with_attributes",
     "digest": "4a067309a03c1e38",
     "ref": "v8.0.2"
@@ -43087,6 +43351,14 @@
     "rubyName": "initialize",
     "digest": "970b0ba7b94b7533",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "core.rb",
+    "rubyName": "initialize_dup",
+    "digest": "f69f44e203e6ca1f",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -43108,6 +43380,14 @@
     "rubyName": "initialize_internals_callback",
     "digest": "c379738c3a38aa9c",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "core.rb",
+    "rubyName": "inspect",
+    "digest": "e63d80a34f5724d9",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -43136,6 +43416,14 @@
     "rubyName": "present?",
     "digest": "357b923f2251ef17",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "core.rb",
+    "rubyName": "pretty_print",
+    "digest": "0d5572901f7fa326",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -43434,6 +43722,14 @@
   {
     "package": "activerecord",
     "rubyFile": "database_configurations/connection_url_resolver.rb",
+    "rubyName": "to_hash",
+    "digest": "11dc021a190b6123",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "database_configurations/connection_url_resolver.rb",
     "rubyName": "uri_parser",
     "digest": "557b32d47f880628",
     "ref": "v8.0.2"
@@ -43500,6 +43796,14 @@
     "rubyName": "initialize",
     "digest": "6ebbdc6819ce0634",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "database_configurations/database_config.rb",
+    "rubyName": "inspect",
+    "digest": "8d4f29ddfc88da7e",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -43983,6 +44287,14 @@
     "rubyName": "initialize",
     "digest": "c8faeecddad5917a",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "encryption/cipher/aes256_gcm.rb",
+    "rubyName": "inspect",
+    "digest": "8d7ea8f998c4cd70",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -45156,6 +45468,14 @@
   {
     "package": "activerecord",
     "rubyFile": "encryption/properties.rb",
+    "rubyName": "to_h",
+    "digest": "a1bb621e0aed92b0",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "encryption/properties.rb",
     "rubyName": "validate_value_type",
     "digest": "a7373b06cc913fc6",
     "ref": "v8.0.2"
@@ -45271,6 +45591,14 @@
     "rubyName": "support_unencrypted_data?",
     "digest": "ddb21dec17b15980",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "encryption/scheme.rb",
+    "rubyName": "to_h",
+    "digest": "08fda601f8818140",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -45778,6 +46106,14 @@
   },
   {
     "package": "activerecord",
+    "rubyFile": "fixture_set/table_row.rb",
+    "rubyName": "to_hash",
+    "digest": "ae2e035cf6af152f",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
     "rubyFile": "fixture_set/table_rows.rb",
     "rubyName": "build_table_rows_from",
     "digest": "ce24697ea2440e9d",
@@ -45796,6 +46132,14 @@
     "rubyName": "model_metadata",
     "digest": "9dd115cf5b711bf5",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "fixture_set/table_rows.rb",
+    "rubyName": "to_hash",
+    "digest": "ab99a9fd7489fe48",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -45940,6 +46284,14 @@
   {
     "package": "activerecord",
     "rubyFile": "inheritance.rb",
+    "rubyName": "dup",
+    "digest": "228d5f81c3ef577f",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "inheritance.rb",
     "rubyName": "ensure_proper_type",
     "digest": "8db1b8c46b5aed43",
     "ref": "v8.0.2"
@@ -45965,6 +46317,14 @@
     "digest": "59f9559bd24a35bd",
     "ref": "v8.0.2",
     "reason": "activemodel-score-core-object-freeze-and-initialize-clone"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "inheritance.rb",
+    "rubyName": "initialize_dup",
+    "digest": "d0d9984c1cb1cd65",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -46529,6 +46889,14 @@
   {
     "package": "activerecord",
     "rubyFile": "locking/optimistic.rb",
+    "rubyName": "encode_with",
+    "digest": "f9fe21e518f23c7c",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "locking/optimistic.rb",
     "rubyName": "hook_attribute_type",
     "digest": "134e62e93079c3e8",
     "ref": "v8.0.2"
@@ -46539,6 +46907,22 @@
     "rubyName": "increment!",
     "digest": "25ff5b2b9686e3f9",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "locking/optimistic.rb",
+    "rubyName": "init_with",
+    "digest": "e0c6da59473b0397",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "locking/optimistic.rb",
+    "rubyName": "initialize_dup",
+    "digest": "6d8837a23cea7f86",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -48720,6 +49104,14 @@
   {
     "package": "activerecord",
     "rubyFile": "normalization.rb",
+    "rubyName": "hash",
+    "digest": "37b77ac88cbaf8cd",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "normalization.rb",
     "rubyName": "initialize",
     "digest": "87673bd718589a43",
     "ref": "v8.0.2"
@@ -50407,6 +50799,14 @@
   {
     "package": "activerecord",
     "rubyFile": "relation.rb",
+    "rubyName": "initialize_copy",
+    "digest": "f0e3f96feb3ea1cc",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "relation.rb",
     "rubyName": "insert",
     "digest": "c7d9ef5b5ccab3a0",
     "ref": "v8.0.2"
@@ -50431,6 +50831,14 @@
     "rubyName": "insert_all!",
     "digest": "aa78e816995a5fbd",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "relation.rb",
+    "rubyName": "inspect",
+    "digest": "68cf9e20d95c8726",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -50529,6 +50937,14 @@
     "rubyName": "preload_associations",
     "digest": "0e5cc144b5d42759",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "relation.rb",
+    "rubyName": "pretty_print",
+    "digest": "516ac79856ab4a1f",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -52991,6 +53407,14 @@
   {
     "package": "activerecord",
     "rubyFile": "relation/where_clause.rb",
+    "rubyName": "to_h",
+    "digest": "86173abc4a5a6ba0",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "relation/where_clause.rb",
     "rubyName": "wrap_sql_literal",
     "digest": "159c2e4117a039f7",
     "ref": "v8.0.2"
@@ -53114,6 +53538,14 @@
     "rubyName": "initialize",
     "digest": "dddf31cbd89b91a3",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "result.rb",
+    "rubyName": "initialize_copy",
+    "digest": "c48e5e87886f8225",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -55260,6 +55692,14 @@
   {
     "package": "activerecord",
     "rubyFile": "timestamp.rb",
+    "rubyName": "initialize_dup",
+    "digest": "f4d9e7081d0d79b9",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "timestamp.rb",
     "rubyName": "max_updated_column_timestamp",
     "digest": "049eb5e31f5fe03a",
     "ref": "v8.0.2"
@@ -55834,9 +56274,25 @@
   {
     "package": "activerecord",
     "rubyFile": "type/date.rb",
+    "rubyName": "default_timezone",
+    "digest": "c7428e338b5c19c6",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "type/date.rb",
     "rubyName": "is_utc?",
     "digest": "1f69164dbe5a8437",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "type/date_time.rb",
+    "rubyName": "default_timezone",
+    "digest": "c7428e338b5c19c6",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
@@ -56061,6 +56517,14 @@
     "rubyName": "cast_value",
     "digest": "054ed5354e8fee6e",
     "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "type/time.rb",
+    "rubyName": "default_timezone",
+    "digest": "c7428e338b5c19c6",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-protocol-bodies"
   },
   {
     "package": "activerecord",
