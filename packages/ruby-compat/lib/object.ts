@@ -916,6 +916,8 @@ function checkDefinition(mod: { prototype: object }, mid: string, inherit = true
   return false;
 }
 
+const moduleIncludesKey = Symbol.for("@blazetrails/ruby-compat:moduleIncludes");
+
 /**
  * `Module#method_defined?` (`rb_mod_method_defined`,
  * `vendor/ruby/v3.3.11/vm_method.c:2055`). A JS entry carries no visibility, so
@@ -926,17 +928,24 @@ function checkDefinition(mod: { prototype: object }, mid: string, inherit = true
  * A `Module` instance keeps its method table on a private carrier and answers
  * through its own `isMethodDefined`, for that table only whatever `inherit` is:
  * a ruby-compat `Module` copies an included module's methods into its includer
- * and records no ancestor to walk.
+ * and records no ancestor to walk. A plain-object module answers for its own
+ * enumerable members, its instance methods, and with `inherit` for the
+ * modules it recorded including.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModMethodDefined(
-  mod: { prototype: object } | { isMethodDefined(mid: string): boolean },
+  mod: { prototype: object } | { isMethodDefined(mid: string): boolean } | object,
   mid: string,
   inherit = true,
 ): boolean {
-  if (!("prototype" in mod)) return mod.isMethodDefined(mid);
-  return checkDefinition(mod, mid, inherit);
+  if ("prototype" in mod) return checkDefinition(mod as { prototype: object }, mid, inherit);
+  if ("isMethodDefined" in mod) return mod.isMethodDefined(mid);
+  const me = Object.getOwnPropertyDescriptor(mod, mid);
+  if (me?.enumerable) return typeof me.value === "function" || me.get !== undefined;
+  if (!inherit) return false;
+  const included = (mod as Record<symbol, Set<object> | undefined>)[moduleIncludesKey];
+  return [...(included ?? [])].some((m) => rbModMethodDefined(m, mid));
 }
 
 /**

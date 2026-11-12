@@ -5,11 +5,11 @@ import {
   isPlainObject,
 } from "@blazetrails/activesupport";
 import {
-  Module,
   hasKey,
   hashAref,
   hashAset,
   isSymbol,
+  rbCallSuper,
   rtest,
   symbolToS,
 } from "@blazetrails/ruby-compat";
@@ -45,18 +45,18 @@ export function urlFor(this: Host, options: UrlForOptions = null): string {
   if ((typeof options === "string" && !isSymbol(options)) || options instanceof SafeBuffer) {
     return options as unknown as string;
   } else if (options == null) {
-    return RoutingUrlFor.superMethod(this, "urlFor")!({
+    return rbCallSuper(this, urlFor, {
       onlyPath: this._generatePathsByDefault(),
     }) as string;
   } else if (isPlainObject(options)) {
     options = { ...(options as Record<string, unknown>) };
     this.ensureOnlyPathOption(options as Record<string, unknown>);
 
-    return RoutingUrlFor.superMethod(this, "urlFor")!(options) as string;
+    return rbCallSuper(this, urlFor, options) as string;
   } else if (options instanceof TopLevel.ActionController!.Parameters) {
     this.ensureOnlyPathOption(options);
 
-    return RoutingUrlFor.superMethod(this, "urlFor")!(options) as string;
+    return rbCallSuper(this, urlFor, options) as string;
   } else if (options === ":back") {
     return this._backUrl();
   } else if (Array.isArray(options)) {
@@ -91,7 +91,7 @@ export function urlFor(this: Host, options: UrlForOptions = null): string {
 export function urlOptions(this: Host): Record<string, unknown> {
   const controller = this.controller as { urlOptions?: () => Record<string, unknown> } | null;
   if (typeof controller?.urlOptions !== "function")
-    return RoutingUrlFor.superMethod(this, "urlOptions")!() as Record<string, unknown>;
+    return rbCallSuper(this, urlOptions) as Record<string, unknown>;
   return controller.urlOptions();
 }
 
@@ -105,7 +105,7 @@ export function optimizeRoutesGeneration(this: Host): boolean {
   const controller = this.controller as { optimizeRoutesGeneration?: () => boolean } | null;
   return typeof controller?.optimizeRoutesGeneration === "function"
     ? controller.optimizeRoutesGeneration()
-    : (RoutingUrlFor.superMethod(this, "optimizeRoutesGeneration")!() as boolean);
+    : (rbCallSuper(this, optimizeRoutesGeneration) as boolean);
 }
 
 /** @internal */
@@ -124,11 +124,11 @@ export function ensureOnlyPathOption(
   }
 }
 
-export const RoutingUrlFor = new Module((mod) => {
-  mod.defineMethod("urlFor", urlFor);
-  mod.defineMethod("urlOptions", urlOptions);
-  mod.defineMethod("_routesContext", _routesContext);
-  mod.defineMethod("optimizeRoutesGeneration", optimizeRoutesGeneration);
-  mod.defineMethod("_generatePathsByDefault", _generatePathsByDefault);
-  mod.defineMethod("ensureOnlyPathOption", ensureOnlyPathOption);
-});
+export const RoutingUrlFor = {
+  urlFor,
+  urlOptions,
+  _routesContext,
+  optimizeRoutesGeneration,
+  _generatePathsByDefault,
+  ensureOnlyPathOption,
+};

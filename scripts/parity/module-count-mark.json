@@ -1,13 +1,13 @@
 {
   "actionpack": {
-    "newModule": 14,
+    "newModule": 13,
     "superMethod": 16,
-    "moduleImport": 6
+    "moduleImport": 5
   },
   "actionview": {
-    "newModule": 7,
-    "superMethod": 13,
-    "moduleImport": 5
+    "newModule": 5,
+    "superMethod": 8,
+    "moduleImport": 3
   },
   "activejob": {
     "newModule": 0,
