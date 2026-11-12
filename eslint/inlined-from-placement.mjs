@@ -75,8 +75,23 @@ function memberOf(sourceCode, comment) {
   while (node?.parent && node.parent.range[0] === token.range[0]) node = node.parent;
   if (node?.type !== "MethodDefinition") return null;
   if (node.kind === "constructor") return "constructor";
-  if (node.static) return null;
+  if (node.static) return isStaticNewBesideHiddenConstructor(node) ? "constructor" : null;
   return node.key.type === "Identifier" ? node.key.name : null;
+}
+
+/**
+ * RFC 0234 § Design 2(a): `static async new` holds the async remainder of
+ * `initialize` beside a `protected` or `private` constructor, so the hooks
+ * the constructor may cite may be cited on it too.
+ */
+function isStaticNewBesideHiddenConstructor(node) {
+  if (node.key.type !== "Identifier" || node.key.name !== "new") return false;
+  const ctor = node.parent.body.find(
+    (member) => member.type === "MethodDefinition" && member.kind === "constructor",
+  );
+  return (
+    ctor !== undefined && (ctor.accessibility === "protected" || ctor.accessibility === "private")
+  );
 }
 
 const rule = {

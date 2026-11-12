@@ -223,3 +223,16 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    the manifest `pnpm parity:api` builds. Without a compare run it silently
    passes everything, then fails in the `Rails API/Test Comparison` CI job.
 7. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
+8. **Left a promise unawaited, or started one in a constructor?**
+   `pnpm parity:promises` (RFC 0234) counts, per package, the
+   `@typescript-eslint/no-floating-promises` findings (repo-wide, sources and
+   tests, `ignoreVoid: false`, so `void <promise>` is one) and the
+   `blazetrails/constructor-creates-no-promise` findings, against
+   `scripts/parity/promise-count-mark.json`. Both rules are `warn` in
+   `eslint.config.mjs`; this gate is what reds. It is **only-shrink** with no
+   reseed: a package absent from the mark is held at 0, a finding converges by
+   awaiting, returning or handing the promise to a `Thread` (async
+   `initialize` work moves to `static async new` behind a `protected`
+   constructor), and `pnpm parity:promises:tighten` writes each mark DOWN
+   after a convergence. CI runs `pnpm parity:promises:ci` over the packages
+   the PR changes.

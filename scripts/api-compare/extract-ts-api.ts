@@ -5154,6 +5154,35 @@ export function constClassExpression(
   return { seat: decl.name.text, cls: init };
 }
 
+/**
+ * RFC 0234 § Design 2(a): where `initialize` does async work, the class keeps
+ * the synchronous part in a `protected` constructor and the rest in
+ * `static async new`. The two together are Ruby's `initialize`, so a `static new`
+ * carrying `@inlinedFrom` tags beside a non-public constructor hands its tags
+ * and its body's calls to the constructor, which the call gates and
+ * `parity:api:inlined` already pair with `initialize`.
+ */
+export function foldStaticNewIntoConstructor(
+  instanceMethods: MethodInfo[],
+  classMethods: MethodInfo[],
+): void {
+  const staticNew = classMethods.find((m) => m.name === "new" && m.inlinedFrom !== undefined);
+  const ctor = instanceMethods.find((m) => m.name === "constructor");
+  if (staticNew === undefined || ctor === undefined || ctor.visibility === "public") return;
+  ctor.inlinedFrom = [...(ctor.inlinedFrom ?? []), ...staticNew.inlinedFrom!];
+  delete staticNew.inlinedFrom;
+  if (staticNew.calls !== undefined) {
+    ctor.calls = [...new Set([...(ctor.calls ?? []), ...staticNew.calls])].sort();
+  }
+  if (staticNew.callSeq !== undefined)
+    ctor.callSeq = [...(ctor.callSeq ?? []), ...staticNew.callSeq];
+  if (staticNew.callArgs !== undefined) {
+    ctor.callArgs = [...(ctor.callArgs ?? []), ...staticNew.callArgs];
+  }
+  if (staticNew.skeleton !== undefined)
+    ctor.skeleton = [...(ctor.skeleton ?? []), ...staticNew.skeleton];
+}
+
 export function extractClass(
   node: ts.ClassDeclaration | ts.ClassExpression,
   checker: ts.TypeChecker,
@@ -5432,6 +5461,8 @@ export function extractClass(
     const merged = new Set([...(method.calls ?? []), ...helperCalls]);
     method.calls = [...merged].sort();
   }
+
+  foldStaticNewIntoConstructor(instanceMethods, classMethods);
 
   const noRailsEquivalent = noRailsEquivalentReason(node);
 

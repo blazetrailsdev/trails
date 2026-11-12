@@ -477,6 +477,9 @@ jobs:
       - name: ESLint violation counts
         if: ${{ github.event_name == 'pull_request' && matrix.shard == 'rest' }}
         run: pnpm parity:lint:counts:ci
+      - name: Promise finding counts
+        if: ${{ github.event_name == 'pull_request' && matrix.shard == 'rest' }}
+        run: pnpm parity:promises:ci
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
   # work; GitHub bills every job rounded UP to a whole minute, so running them

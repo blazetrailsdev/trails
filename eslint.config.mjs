@@ -17,6 +17,7 @@ import railsErrorParity from "./eslint/rails-error-parity.mjs";
 import railsCallbackInvocations from "./eslint/rails-callback-invocations.mjs";
 import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
+import constructorCreatesNoPromise from "./eslint/constructor-creates-no-promise.mjs";
 import inlinedFromPlacement from "./eslint/inlined-from-placement.mjs";
 import perfTagPlacement from "./eslint/perf-tag-placement.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
@@ -311,6 +312,7 @@ export default defineConfig(
           "rails-arel-tosql": railsArelTosql,
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "inlined-from-placement": inlinedFromPlacement,
+          "constructor-creates-no-promise": constructorCreatesNoPromise,
           "perf-tag-placement": perfTagPlacement,
           "no-native-date": noNativeDate,
           "no-conditional-in-test": noConditionalInTest,
@@ -1213,19 +1215,16 @@ export default defineConfig(
     },
   },
 
-  // ── dropped-Promise guards (RFC 0063 async-validation) ──
-  // As `isValid()`/`validate()` flip to returning `Promise<boolean>`, lint must
-  // catch a forgotten `await`. Two rules cover the footguns over the two
-  // packages the flip touches (src + tests); both need type info, supplied by
-  // the projectService block above.
+  // ── dropped-Promise guards (RFC 0063, widened by RFC 0234) ──
+  // Both rules need type info, supplied by the projectService block above,
+  // which covers every `**/*.ts`.
   //
-  //  - no-misused-promises (all three sub-checks on): `checksConditionals`
-  //    catches a Promise in a boolean position (`if (record.isValid())` is
-  //    always truthy); `checksVoidReturn` catches an async callback / adapter
-  //    override passed where a void return is expected; `checksSpreads` catches
-  //    a Promise spread into an object.
-  //  - no-floating-promises: catches a dropped Promise statement — a bare
-  //    `record.save()` whose result nobody awaits.
+  //  - no-misused-promises (all three sub-checks on), over the two packages
+  //    RFC 0063's async-validation flip touched: `checksConditionals` catches a
+  //    Promise in a boolean position (`if (record.isValid())` is always
+  //    truthy); `checksVoidReturn` catches an async callback / adapter override
+  //    passed where a void return is expected; `checksSpreads` catches a
+  //    Promise spread into an object.
   {
     files: [
       "packages/activemodel/lib/**/*.ts",
@@ -1237,7 +1236,19 @@ export default defineConfig(
         "error",
         { checksConditionals: true, checksVoidReturn: true, checksSpreads: true },
       ],
-      "@typescript-eslint/no-floating-promises": "error",
+    },
+  },
+  //  - no-floating-promises, over every package's sources and tests and
+  //    `scripts/`, with `ignoreVoid: false` so `void <promise>` is a finding
+  //    (RFC 0234 § 1); and constructor-creates-no-promise (RFC 0234 § 2). Both
+  //    are `warn`: `pnpm parity:promises` holds each package to its
+  //    only-shrink mark in `scripts/parity/promise-count-mark.json`, so a new
+  //    finding reds CI there.
+  {
+    files: ["packages/**/*.ts", "scripts/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-floating-promises": ["warn", { ignoreVoid: false }],
+      "blazetrails/constructor-creates-no-promise": "warn",
     },
   },
 );

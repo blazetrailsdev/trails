@@ -8784,6 +8784,28 @@ describe("extractClass — @inlinedFrom on a constructor", () => {
   });
 });
 
+describe("extractClass — @inlinedFrom on a static async new", () => {
+  const api = "ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84";
+
+  it("folds the tags and calls of static new into a protected constructor", () => {
+    const info = extractFromSource(
+      `class Foo {\n  protected constructor() { this.a(); }\n  /** @inlinedFrom ${api} */\n  static async new() { const obj = new this(); await obj.b(); return obj; }\n}`,
+    );
+    const ctor = info.instanceMethods.find((m) => m.name === "constructor")!;
+    expect(ctor.inlinedFrom?.map((t) => t.module)).toEqual(["ActiveModel::API"]);
+    expect(ctor.calls).toEqual(expect.arrayContaining(["a", "b"]));
+    expect(info.classMethods.find((m) => m.name === "new")!.inlinedFrom).toBeUndefined();
+  });
+
+  it("leaves a public constructor and its static new apart", () => {
+    const info = extractFromSource(
+      `class Foo {\n  constructor() {}\n  /** @inlinedFrom ${api} */\n  static async new() { return new this(); }\n}`,
+    );
+    expect(info.instanceMethods.find((m) => m.name === "constructor")!.inlinedFrom).toBeUndefined();
+    expect(info.classMethods.find((m) => m.name === "new")!.inlinedFrom).toHaveLength(1);
+  });
+});
+
 describe("a top-level rbModDefineMethod seat", () => {
   it("is recorded as a method of the file, with params and call set", () => {
     const info = extractFromFiles("/p", {
