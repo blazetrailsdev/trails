@@ -170,6 +170,18 @@ defineConstants([
   [() => m32.Helpers, "ActionController::Helpers"],
   [() => m32.ClassMethods, "ActionController::Helpers::ClassMethods"],
   [() => m33.HttpAuthentication, "ActionController::HttpAuthentication"],
+  [
+    () => m33.HttpAuthentication.Basic.ControllerMethods,
+    "ActionController::HttpAuthentication::Basic::ControllerMethods",
+  ],
+  [
+    () => m33.HttpAuthentication.Digest.ControllerMethods,
+    "ActionController::HttpAuthentication::Digest::ControllerMethods",
+  ],
+  [
+    () => m33.HttpAuthentication.Token.ControllerMethods,
+    "ActionController::HttpAuthentication::Token::ControllerMethods",
+  ],
   [() => m34.ImplicitRender, "ActionController::ImplicitRender"],
   [() => m35.Instrumentation, "ActionController::Instrumentation"],
   [() => m35.ClassMethods, "ActionController::Instrumentation::ClassMethods"],

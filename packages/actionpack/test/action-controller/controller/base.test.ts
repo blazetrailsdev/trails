@@ -429,8 +429,7 @@ describe("EmptyUrlOptionsTest", () => {
 });
 
 describe("BaseTest", () => {
-  // BLOCKED: http-authentication-controller-methods-are-namespaces-not-modules
-  it.skip("included modules are tracked", () => {
+  it("included modules are tracked", () => {
     expect(
       Base.MODULES.map((m) => String(rbModName(m)).replace(/^ActionController::/, "")),
     ).toEqual([

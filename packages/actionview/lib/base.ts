@@ -22,7 +22,7 @@ import { Helpers } from "./helpers.js";
 import type * as HelperExports from "./helpers/index.js";
 import type { _objectForFormBuilder } from "./helpers/form-helper.js";
 import type { _backUrl, _filteredReferrer } from "./helpers/url-helper.js";
-import { assignController } from "./helpers/controller-helper.js";
+import { assignController, CONTROLLER_DELEGATES } from "./helpers/controller-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import type { Template } from "./template.js";
 import { StrictLocalsError } from "./template/error.js";
@@ -34,6 +34,8 @@ import {
   include,
   isModuleIncluded,
   NotImplementedError,
+  rbDeclareIvar,
+  rbObjIvarSet,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { Resolver } from "./template/resolver.js";
@@ -251,7 +253,7 @@ export class Base {
   assign(newAssigns: Record<string, unknown>): void {
     this._assigns = newAssigns;
     for (const [key, value] of Object.entries(newAssigns)) {
-      (this as unknown as Record<string, unknown>)[key] = value;
+      rbObjIvarSet(this, `@${key}`, value);
     }
   }
 
@@ -381,6 +383,8 @@ export class Base {
     return result;
   }
 }
+
+for (const name of CONTROLLER_DELEGATES) rbDeclareIvar(Base, `@${name}`, `_${name}`);
 
 Object.defineProperty(Base.prototype, "yield", {
   get(this: Base): SafeBuffer | Promise<SafeBuffer> | null {

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { DebugView } from "../../../lib/action-dispatch/middleware/debug-view.js";
+import { rbObjIvarDefined, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { BadRequest } from "../../../lib/action-controller/metal/exceptions.js";
 
 describe("DebugView", () => {
@@ -72,5 +73,25 @@ describe("DebugView", () => {
       const view = new DebugView({ request: { parameters: { id: 1 } } });
       expect(view.isParamsValid()).toEqual({ id: 1 });
     });
+  });
+
+  it("seats a controller-delegate assign as its ivar", async () => {
+    const response = { headers: { "Content-Type": "text/html" } };
+    const view = new DebugView({
+      request: {
+        filteredParameters: () => ({}),
+        session: {},
+        env: {},
+        constructor: { ENV_METHODS: [] },
+      },
+      response,
+    });
+    expect(rbObjIvarDefined(view, "@response")).toBe(true);
+    expect(rbObjIvarGet(view, "@response")).toBe(response);
+    expect(typeof (view as unknown as Record<string, unknown>).response).toBe("function");
+    const out = String(
+      await view.render({ partial: "rescues/request_and_response", formats: [":text"] }),
+    );
+    expect(out).toContain("Content-Type");
   });
 });

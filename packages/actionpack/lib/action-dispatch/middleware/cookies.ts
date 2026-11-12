@@ -73,7 +73,7 @@ function hashEqual(a: Record<string, unknown> | undefined, b: Record<string, unk
 }
 
 export interface SetCookieOptions {
-  value: string;
+  value: string | null;
   path?: string;
   domain?: string | string[] | ((request: unknown) => string | undefined);
   tldLength?: number;
@@ -157,7 +157,7 @@ export class ChainedCookieJars {
   }
 }
 
-export class CookieJar implements Iterable<[string, string]> {
+export class CookieJar implements Iterable<[string, string | null]> {
   declare permanent: PermanentCookieJar;
   declare signed: SignedKeyRotatingCookieJar;
   declare encrypted: EncryptedKeyRotatingCookieJar;
@@ -170,7 +170,7 @@ export class CookieJar implements Iterable<[string, string]> {
   declare isUpgradeLegacyHmacAesCbcCookies: () => boolean;
   /** @internal */
   declare isPrepareUpgradeLegacyHmacAesCbcCookies: () => boolean;
-  private _cookies: Map<string, string> = new Map();
+  private _cookies: Map<string, string | null> = new Map();
   private _setCookies: Map<string, SetCookieOptions> = new Map();
   private _deletedCookies: Map<string, Partial<SetCookieOptions>> = new Map();
   private _committed = false;
@@ -205,7 +205,7 @@ export class CookieJar implements Iterable<[string, string]> {
     return jar;
   }
 
-  get(key: string): string | undefined {
+  get(key: string): string | null | undefined {
     return this._cookies.get(key);
   }
 
@@ -219,11 +219,11 @@ export class CookieJar implements Iterable<[string, string]> {
 
   declare hasKey: CookieJar["isKey"];
 
-  declare toH: () => Record<string, string>;
+  declare toH: () => Record<string, string | null>;
 
   declare toHash: CookieJar["toH"];
 
-  update(otherHash: Record<string, string> | Map<string, string>): this {
+  update(otherHash: Record<string, string | null> | Map<string, string | null>): this {
     update(this._cookies, otherHash);
     return this;
   }
@@ -241,16 +241,16 @@ export class CookieJar implements Iterable<[string, string]> {
 
   toHeader(): string {
     return new Enumerable(this._cookies)
-      .map(([k, v]: [string, string]) => `${this.escape(k)}=${this.escape(v)}`)
+      .map(([k, v]: [string, string | null]) => `${this.escape(k)}=${this.escape(v)}`)
       .join("; ");
   }
 
-  set(name: string, options: string | SetCookieOptions | null): string | undefined {
-    let value: string;
+  set(name: string, options: string | SetCookieOptions | null): string | null {
+    let value: string | null;
     if (isPlainObject(options)) {
       value = (options as SetCookieOptions).value;
     } else {
-      value = options as string;
+      value = options as string | null;
       options = { value };
     }
     this.handleOptions(options as SetCookieOptions);
@@ -310,7 +310,7 @@ export class CookieJar implements Iterable<[string, string]> {
     }
   }
 
-  delete(name: string, options: Partial<SetCookieOptions> = {}): string | undefined {
+  delete(name: string, options: Partial<SetCookieOptions> = {}): string | null | undefined {
     if (!this._cookies.has(name)) return undefined;
 
     this.handleOptions(options);
@@ -330,7 +330,7 @@ export class CookieJar implements Iterable<[string, string]> {
     for (const k of [...this._cookies.keys()]) this.delete(k, options);
   }
 
-  each(fn: (key: string, value: string) => void): this {
+  each(fn: (key: string, value: string | null) => void): this {
     for (const [k, v] of this._cookies) {
       fn(k, v);
     }
@@ -338,7 +338,7 @@ export class CookieJar implements Iterable<[string, string]> {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  [Symbol.iterator](): Iterator<[string, string]> {
+  [Symbol.iterator](): Iterator<[string, string | null]> {
     return this._cookies[Symbol.iterator]();
   }
 
@@ -362,7 +362,7 @@ export class CookieJar implements Iterable<[string, string]> {
   }
 
   /** @internal */
-  private escape(string: string): string {
+  private escape(string: string | null): string {
     return rackEscape(string);
   }
 

@@ -1,4 +1,11 @@
-import { PP, rbInspect, rbObjRespondTo, rtest, StringIO } from "@blazetrails/ruby-compat";
+import {
+  PP,
+  rbInspect,
+  rbObjIvarGet,
+  rbObjRespondTo,
+  rtest,
+  StringIO,
+} from "@blazetrails/ruby-compat";
 import { isPresent, type Logger } from "@blazetrails/activesupport";
 import { Base, LookupContext } from "@blazetrails/actionview";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
@@ -77,7 +84,7 @@ export class DebugView extends Base {
 
   isParamsValid(): unknown {
     try {
-      return (this._request as { parameters: unknown }).parameters;
+      return (rbObjIvarGet(this, "@request") as { parameters: unknown }).parameters;
     } catch (e) {
       if (e instanceof BadRequest) return false;
       throw e;

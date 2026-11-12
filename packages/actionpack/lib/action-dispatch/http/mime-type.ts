@@ -349,10 +349,6 @@ export class MimeType {
     return EXTENSION_LOOKUP.get(ext);
   }
 
-  static all(): MimeType[] {
-    return MimeType.SET.select(() => true);
-  }
-
   static registerCallback(callback: (type: MimeType) => void): void {
     MimeType.registerCallbacks.push(callback);
   }

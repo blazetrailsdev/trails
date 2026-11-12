@@ -14,4 +14,4 @@
 </div>
 
 <h2 class="response-heading">Response</h2>
-<p><b>Headers</b>:</p> <pre><%= debugHeaders(RubyCompat.rbObjIvarDefined(this, "@response") ? this.response.headers : {}) %></pre>
+<p><b>Headers</b>:</p> <pre><%= debugHeaders(RubyCompat.rbObjIvarDefined(this, "@response") ? RubyCompat.rbObjIvarGet(this, "@response").headers : {}) %></pre>

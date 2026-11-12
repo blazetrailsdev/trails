@@ -126,7 +126,7 @@ describe("CookieJarTest", () => {
 
   it("each", () => {
     const jar = CookieJar.build(cookieRequest(), { a: "1", b: "2" });
-    const entries: [string, string][] = [];
+    const entries: [string, string | null][] = [];
     jar.each((k, v) => entries.push([k, v]));
     expect(entries).toEqual([
       ["a", "1"],
