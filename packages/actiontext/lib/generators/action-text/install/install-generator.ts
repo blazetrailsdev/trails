@@ -1,7 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
 import type * as ThorActions from "@blazetrails/thor/actions";
-import { copyFile, uncommentLines } from "@blazetrails/thor/actions/file-manipulation";
-import { insertIntoFile } from "@blazetrails/thor/actions/inject-into-file";
 import { Base } from "@blazetrails/trailties/generators";
 
 const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathname));
@@ -18,6 +16,9 @@ export class InstallGenerator extends Base {
   }
 
   declare run: OmitThisParameter<typeof ThorActions.run>;
+  declare insertIntoFile: OmitThisParameter<typeof ThorActions.Actions.insertIntoFile>;
+  declare copyFile: OmitThisParameter<typeof ThorActions.Actions.copyFile>;
+  declare uncommentLines: OmitThisParameter<typeof ThorActions.Actions.uncommentLines>;
 
   /** @internal */
   private _usingJsRuntime?: boolean;
@@ -40,8 +41,7 @@ export class InstallGenerator extends Base {
 
     const applicationJavascriptPath = File.join(destination, "app/javascript/application.js");
     if (await File.isExistAsync(applicationJavascriptPath)) {
-      await insertIntoFile.call(
-        this as never,
+      await this.insertIntoFile(
         applicationJavascriptPath,
         `\nimport "trix"\nimport "@rails/actiontext"\n`,
       );
@@ -66,14 +66,12 @@ export class InstallGenerator extends Base {
 
     const gemRoot = `${__dir__}/../../../..`;
 
-    await copyFile.call(
-      this as never,
+    await this.copyFile(
       `${gemRoot}/app/views/active-storage/blobs/_blob.html.tse`,
       "app/views/active-storage/blobs/_blob.html.tse",
     );
 
-    await copyFile.call(
-      this as never,
+    await this.copyFile(
       `${gemRoot}/app/views/layouts/action_text/contents/_content.html.tse`,
       "app/views/layouts/action_text/contents/_content.html.tse",
     );
@@ -89,7 +87,7 @@ export class InstallGenerator extends Base {
       if (
         (await File.readAsync(gemfilePath)).split("\n").some((l) => imageProcessingRegex.test(l))
       ) {
-        await uncommentLines.call(this as never, gemfilePath, imageProcessingRegex);
+        await this.uncommentLines(gemfilePath, imageProcessingRegex);
       } else {
         await this.run("pnpm add --lockfile-only @blazetrails/image-processing");
       }
