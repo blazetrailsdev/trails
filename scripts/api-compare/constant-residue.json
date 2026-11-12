@@ -1502,7 +1502,7 @@
     }
   },
   "tzinfo": {
-    "rows": 14,
+    "rows": 16,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1512,6 +1512,7 @@
       "data-sources/timezone-info.ts::TimezoneInfo": "TZInfo::DataSources::TimezoneInfo",
       "data-timezone.ts::DataTimezone": "TZInfo::DataTimezone",
       "info-timezone.ts::InfoTimezone": "TZInfo::InfoTimezone",
+      "offset-timezone-period.ts::OffsetTimezonePeriod": "TZInfo::OffsetTimezonePeriod",
       "timestamp.ts::Timestamp": "TZInfo::Timestamp",
       "timezone-offset.ts::TimezoneOffset": "TZInfo::TimezoneOffset",
       "timezone-period.ts::TimezonePeriod": "TZInfo::TimezonePeriod",
@@ -1519,7 +1520,8 @@
       "timezone.ts::AmbiguousTime": "TZInfo::AmbiguousTime",
       "timezone.ts::InvalidTimezoneIdentifier": "TZInfo::InvalidTimezoneIdentifier",
       "timezone.ts::PeriodNotFound": "TZInfo::PeriodNotFound",
-      "timezone.ts::Timezone": "TZInfo::Timezone"
+      "timezone.ts::Timezone": "TZInfo::Timezone",
+      "transitions-timezone-period.ts::TransitionsTimezonePeriod": "TZInfo::TransitionsTimezonePeriod"
     }
   },
   "zeitwerk": {

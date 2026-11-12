@@ -7,10 +7,12 @@ import { TimezoneInfo } from "./data-sources/timezone-info.js";
 import { DataTimezone } from "./data-timezone.js";
 import { InfoTimezone } from "./info-timezone.js";
 import { AmbiguousTime, InvalidTimezoneIdentifier, PeriodNotFound, Timezone } from "./timezone.js";
+import { OffsetTimezonePeriod } from "./offset-timezone-period.js";
 import { TimezoneOffset } from "./timezone-offset.js";
 import { TimezonePeriod } from "./timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
 import { Timestamp } from "./timestamp.js";
+import { TransitionsTimezonePeriod } from "./transitions-timezone-period.js";
 
 export {
   AmbiguousTime,
@@ -20,6 +22,7 @@ export {
   InfoTimezone,
   InvalidCountryCode,
   InvalidTimezoneIdentifier,
+  OffsetTimezonePeriod,
   PeriodNotFound,
   Timestamp,
   Timezone,
@@ -27,6 +30,7 @@ export {
   TimezoneOffset,
   TimezonePeriod,
   TimezoneTransition,
+  TransitionsTimezonePeriod,
 };
 
 export const TZInfo = {
@@ -35,6 +39,8 @@ export const TZInfo = {
   InfoTimezone,
   DataTimezone,
   TimezonePeriod,
+  OffsetTimezonePeriod,
+  TransitionsTimezonePeriod,
   TimezoneOffset,
   TimezoneTransition,
   AmbiguousTime,

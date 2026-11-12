@@ -5,7 +5,7 @@ import { Timezone } from "@blazetrails/tzinfo";
 import { Temporal, Time } from "@blazetrails/date";
 import { DATE_FORMATS } from "../lib/core-ext/time/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
-import { rbObjClass, rbObjClassname } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjClass, rbObjClassname } from "@blazetrails/ruby-compat";
 
 describe("TimeWithZone sub-millisecond precision", () => {
   const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
@@ -180,8 +180,8 @@ describe("TZInfo periods read tzdata transitions", () => {
   it("equates two instants of one period by its transitions", () => {
     const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
     const july = eastern.periodForUtc(Time.utc(2006, 7, 1));
-    expect(july.equals(eastern.periodForUtc(Time.utc(2006, 8, 1)))).toBe(true);
-    expect(july.equals(eastern.periodForUtc(Time.utc(2007, 7, 1)))).toBe(false);
+    expect(rbEqual(july, eastern.periodForUtc(Time.utc(2006, 8, 1)))).toBe(true);
+    expect(rbEqual(july, eastern.periodForUtc(Time.utc(2007, 7, 1)))).toBe(false);
     expect(july.startTransition!.timestampValue).toBe(Date.UTC(2006, 3, 2, 7) / 1000);
     expect(july.endTransition!.timestampValue).toBe(Date.UTC(2006, 9, 29, 6) / 1000);
   });
@@ -201,14 +201,14 @@ describe("TZInfo periods across an offset-only transition", () => {
     const after = cancun.periodForUtc(Time.utc(1998, 9, 1));
     expect([before.utcOffset, before.stdOffset]).toEqual([-18000, 3600]);
     expect([after.utcOffset, after.stdOffset]).toEqual([-21600, 3600]);
-    expect(after.equals(before)).toBe(false);
+    expect(rbEqual(after, before)).toBe(false);
   });
 
   it("compares constant-offset periods by their offsets", () => {
     const plusFive = Timezone.get("Etc/GMT+5").periodForUtc(Time.utc(2020, 1, 1));
     const utc = Timezone.get("Etc/UTC").periodForUtc(Time.utc(2020, 1, 1));
-    expect(plusFive.equals(utc)).toBe(false);
-    expect(utc.equals(Timezone.get("Etc/UTC").periodForUtc(Time.utc(2021, 1, 1)))).toBe(true);
+    expect(rbEqual(plusFive, utc)).toBe(false);
+    expect(rbEqual(utc, Timezone.get("Etc/UTC").periodForUtc(Time.utc(2021, 1, 1)))).toBe(true);
   });
 });
 
@@ -239,7 +239,7 @@ describe("TZInfo periods read base offsets from tzdata", () => {
     expect(before.endTransition!.timestampValue).toBe(637970400);
     expect(after.startTransition!.timestampValue).toBe(637970400);
     expect(after.endTransition!.timestampValue).toBe(764200800);
-    expect(before.equals(after)).toBe(false);
+    expect(rbEqual(before, after)).toBe(false);
   });
 });
 
