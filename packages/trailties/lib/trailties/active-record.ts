@@ -66,6 +66,8 @@ export interface ActiveRecordConfig {
   maintainTestSchema: boolean;
   hasManyInversing: boolean;
   sqlite3AdapterStrictStringsByDefault?: boolean;
+  tableNamePrefix?: string;
+  tableNameSuffix?: string;
   postgresqlAdapterDecodeDates?: boolean;
   queryLogTagsEnabled: boolean;
   queryLogTags: string[];
@@ -221,6 +223,12 @@ export class Trailtie extends BaseTrailtie {
         { runOnce: true },
         onPostgresqlAdapterLoadedPushTimestamptz,
       );
+    });
+
+    this.initializer("active_record.logger", () => {
+      onLoad("active_record", function (this: typeof ActiveRecord.Base) {
+        this.logger ??= Trails.logger;
+      });
     });
 
     this.initializer("active_record.backtrace_cleaner", () => {

@@ -1,7 +1,11 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MockInstance } from "vitest";
 
-import type { TestCase } from "../../lib/test-case.js";
+import { TopLevel, include } from "@blazetrails/ruby-compat";
+import { Executor } from "../../lib/executor.js";
+import { TestHelper as ExecutorTestHelper } from "../../lib/executor/test-helper.js";
+import { TestCase } from "../../lib/test-case.js";
+import { registerSpecType } from "../../lib/testing/autorun.js";
 import { Assertion, UnexpectedError } from "../../lib/testing/assertions.js";
 
 describe("autorun captures the body's exception (minitest/test.rb:190-198)", () => {
@@ -126,5 +130,41 @@ describe("autorun captures the body's exception (minitest/test.rb:190-198)", () 
     const testCase = ran.get("skipped")!;
     expect(testCase.isError()).toBe(false);
     expect(testCase.isSkipped()).toBe(true);
+  });
+});
+
+const order: string[] = [];
+class AppExecutor extends Executor {}
+class ExecutorTestCase extends TestCase {
+  override async beforeSetup(): Promise<void> {
+    order.push(`before_setup active=${AppExecutor.active()}`);
+    await super.beforeSetup();
+  }
+}
+include(ExecutorTestCase, ExecutorTestHelper);
+registerSpecType((desc: string) => desc === "an executor-wrapped spec", ExecutorTestCase);
+
+describe("an executor-wrapped spec", () => {
+  let previousTrails: typeof TopLevel.Trails;
+
+  beforeAll(() => {
+    previousTrails = TopLevel.Trails;
+    TopLevel.Trails = {
+      ...previousTrails,
+      application: { ...previousTrails?.application, executor: AppExecutor },
+    } as typeof TopLevel.Trails;
+  });
+
+  afterAll(() => {
+    TopLevel.Trails = previousTrails;
+  });
+
+  beforeEach(() => {
+    order.push(`beforeEach active=${AppExecutor.active()}`);
+  });
+
+  it("runs before_setup first, both inside the executor", () => {
+    expect(order).toEqual(["before_setup active=true", "beforeEach active=true"]);
+    expect(AppExecutor.active()).toBe(true);
   });
 });
