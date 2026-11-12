@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { RoutingUrlFor, type RoutingUrlForHost } from "../lib/routing-url-for.js";
 import { _backUrl, type UrlHelperHost } from "../lib/helpers/url-helper.js";
 import { TopLevel, include } from "@blazetrails/activesupport";
+import { UrlFor } from "@blazetrails/actionpack";
+import { isModuleIncluded } from "@blazetrails/ruby-compat";
+import { Base } from "../lib/base.js";
 
 class Parameters {
   constructor(private readonly data: Record<string, unknown>) {}
@@ -185,5 +188,50 @@ describe("ActionView::RoutingUrlFor private helpers", () => {
     const options: Record<string, unknown> = { onlyPath: false };
     host.ensureOnlyPathOption(options);
     expect(options).toEqual({ onlyPath: false });
+  });
+});
+
+describe("ActionView::RoutingUrlFor including ActionDispatch::Routing::UrlFor", () => {
+  it("does not run UrlFor's included block on a class that included RoutingUrlFor before it", () => {
+    class Bare {
+      controller = null;
+    }
+    include(Bare, RoutingUrlFor);
+    RoutingUrlFor.include(UrlFor);
+    expect(Object.hasOwn(Bare, "defaultUrlOptions")).toBe(false);
+    expect(Object.hasOwn(Bare.prototype, "defaultUrlOptions")).toBe(false);
+    expect(typeof (new Bare() as unknown as { routeFor: unknown }).routeFor).toBe("function");
+  });
+
+  it("reaches UrlFor#url_options through super in a class that included RoutingUrlFor before it", () => {
+    class Early {
+      controller = null;
+      get defaultUrlOptions(): Record<string, unknown> {
+        return { host: "example.net" };
+      }
+    }
+    include(Early, RoutingUrlFor);
+    RoutingUrlFor.include(UrlFor);
+    const early = new Early() as unknown as RoutingUrlFor;
+    expect(early.urlOptions()).toEqual({ host: "example.net" });
+    expect(typeof (early as unknown as { routeFor: unknown }).routeFor).toBe("function");
+  });
+
+  it("reaches UrlFor#url_options through super in a class that includes RoutingUrlFor after it", () => {
+    RoutingUrlFor.include(UrlFor);
+    class Late {
+      controller = null;
+      get defaultUrlOptions(): Record<string, unknown> {
+        return { host: "example.org" };
+      }
+    }
+    include(Late, RoutingUrlFor);
+    const late = new Late() as unknown as RoutingUrlFor;
+    expect(late.urlOptions()).toEqual({ host: "example.org" });
+    expect(typeof (late as unknown as { fullUrlFor: unknown }).fullUrlFor).toBe("function");
+  });
+
+  it("is not included by ActionView::Base before the action_controller load hook", () => {
+    expect(isModuleIncluded(Base, RoutingUrlFor)).toBe(false);
   });
 });

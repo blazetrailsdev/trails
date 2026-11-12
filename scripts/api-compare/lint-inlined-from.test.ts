@@ -363,6 +363,28 @@ describe("inlinedFromFindings", () => {
     ]);
   });
 
+  it("asks no constructor of a class module, whose Ruby counterpart is a module and has no new", () => {
+    const rubyModule = {
+      packages: {
+        ...ruby.packages,
+        activerecord: {
+          ...ruby.packages.activerecord,
+          modules: {
+            ...ruby.packages.activerecord.modules,
+            "ActiveRecord::Mixin": entity("mixin.rb", [], {
+              includes: ["ActiveModel::API"],
+              mixinOrder: [{ kind: "include", names: ["ActiveModel::API"] }],
+            }),
+          },
+        },
+      },
+    } as unknown as ApiManifest;
+    const ts = {
+      packages: { activerecord: { classes: { Mixin: entity("mixin.ts") }, modules: {} } },
+    } as unknown as ApiManifest;
+    expect(inlinedFromFindings(rubyModule, ts, ["activerecord"])).toEqual([]);
+  });
+
   it("leaves the missing-tag arm off for a package that is not enrolled", () => {
     expect(messages([])).toEqual([]);
     expect(MISSING_TAG_PACKAGES).toEqual([

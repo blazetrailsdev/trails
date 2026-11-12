@@ -15,7 +15,7 @@ import {
 import {
   ArgumentError,
   InvalidURIError,
-  Module,
+  include,
   RFC2396_PARSER,
   RuntimeError,
   URI,
@@ -515,20 +515,31 @@ export function removeTrailingSlashBang(urlString: string): string {
   return urlString;
 }
 
-export const UrlHelper = new Module((mod) => {
-  extend(mod, Concern);
-
-  mod.include(TagHelper);
-  mod.include(ContentExfiltrationPreventionHelper);
-
-  mod.moduleEval((m) => {
-    Object.assign(m, { urlFor, _backUrl, _filteredReferrer });
-    Object.assign(m, { linkTo, buttonTo, linkToUnlessCurrent, linkToUnless, linkToIf, mailTo });
-    Object.assign(m, { isCurrentPage, smsTo, phoneTo });
-    Object.assign(m, { convertOptionsToDataAttributes, urlTarget, isLinkToRemoteOptions });
-    Object.assign(m, { addMethodToAttributesBang, methodForOptions, isMethodNotGetMethod });
-    Object.assign(m, { tokenTag, methodTag, toFormParams, removeTrailingSlashBang });
-  });
-
-  (mod as unknown as { ClassMethods: typeof ClassMethods }).ClassMethods = ClassMethods;
-});
+export const UrlHelper = {
+  ClassMethods,
+  urlFor,
+  _backUrl,
+  _filteredReferrer,
+  linkTo,
+  buttonTo,
+  linkToUnlessCurrent,
+  linkToUnless,
+  linkToIf,
+  mailTo,
+  isCurrentPage,
+  smsTo,
+  phoneTo,
+  convertOptionsToDataAttributes,
+  urlTarget,
+  isLinkToRemoteOptions,
+  addMethodToAttributesBang,
+  methodForOptions,
+  isMethodNotGetMethod,
+  tokenTag,
+  methodTag,
+  toFormParams,
+  removeTrailingSlashBang,
+};
+extend(UrlHelper, Concern);
+include(UrlHelper, TagHelper);
+include(UrlHelper, ContentExfiltrationPreventionHelper);
