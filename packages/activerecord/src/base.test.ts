@@ -2063,29 +2063,32 @@ describe("BasicsTest", () => {
   });
 
   it.skipIf(inMemoryDb())("connection in local time", async () => {
-    await self().withTimezoneConfig({ default: "utc" }, async () => {
-      const newConfig = {
-        ...Base.connectionDbConfig().configurationHash,
-        defaultTimezone: "local",
-      };
-      await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
-      cleanupConnections.push(async () => {
-        await Base.establishConnection(":arunit");
+    await self().withEnvTz("America/New_York", async () => {
+      await self().withTimezoneConfig({ default: "utc" }, async () => {
+        const newConfig = {
+          ...Base.connectionDbConfig().configurationHash,
+          defaultTimezone: "local",
+        };
+        await Base.establishConnection(newConfig as Parameters<typeof Base.establishConnection>[0]);
+        cleanupConnections.push(async () => {
+          await Base.establishConnection(":arunit");
+          await Default.resetColumnInformation();
+        });
         await Default.resetColumnInformation();
+        await Default.loadSchema();
+
+        const defaultRecord = new Default() as any;
+
+        expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
+        expect(defaultRecord.fixed_time).toEqual(RubyTime.local(2004, 1, 1, 0, 0, 0, 0));
+        expect(defaultRecord.fixed_time.utcOffset).toBe(-18000);
+
+        if (adapterType === "postgres") {
+          expect(defaultRecord.fixed_time_with_time_zone).toEqual(
+            RubyTime.utc(2004, 1, 1, 0, 0, 0, 0),
+          );
+        }
       });
-      await Default.resetColumnInformation();
-      await Default.loadSchema();
-
-      const defaultRecord = new Default() as any;
-
-      expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
-      expect(defaultRecord.fixed_time).toEqual(RubyTime.local(2004, 1, 1, 0, 0, 0, 0));
-
-      if (adapterType === "postgres") {
-        expect(defaultRecord.fixed_time_with_time_zone).toEqual(
-          RubyTime.utc(2004, 1, 1, 0, 0, 0, 0),
-        );
-      }
     });
   });
 
