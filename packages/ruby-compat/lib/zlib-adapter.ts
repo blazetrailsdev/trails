@@ -40,6 +40,13 @@ export interface GzipWriterIO {
 /** @noRailsEquivalent PERMANENT */
 export interface GzipWriterHandle {
   mtime: number | null;
+  /**
+   * Feeds `data` and, for a `flush` other than `Z_NO_FLUSH`, queues that flush,
+   * as `gzfile_write` does under sync mode (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2808-2820`).
+   * Node's gzip stream is asynchronous, so the compressed bytes reach the IO, and a
+   * stream error is raised, only at the next awaited `flush` or `finish`; a caller
+   * that reads the IO awaits one first.
+   */
   write(data: Uint8Array, flush: number): void;
   flush(flush: number): Promise<void>;
   finish(): Promise<void>;
