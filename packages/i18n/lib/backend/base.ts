@@ -39,8 +39,7 @@ import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Temporal, strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import {
-  Transliterator,
-  type transliterate,
+  transliterate,
   type HashTransliterator,
   type ProcTransliterator,
 } from "./transliterator.js";
@@ -566,4 +565,4 @@ export abstract class Base {
   }
 }
 
-include(Base, Transliterator);
+include(Base, { transliterate });

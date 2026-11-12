@@ -18,8 +18,6 @@ export function transliterate(
   return this.transliterators[locale].transliterate(string, replacement);
 }
 
-export const Transliterator = { transliterate };
-
 export function get(rule: unknown = null): HashTransliterator | ProcTransliterator {
   if (rule == null || rule === false || isHash(rule)) {
     return new HashTransliterator(rule as Record<string, unknown> | null);

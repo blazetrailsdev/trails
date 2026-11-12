@@ -11,6 +11,7 @@ describe("Backend::Simple", () => {
     expect(new Simple()).not.toBeInstanceOf(Base);
     expect(typeof new Simple().translate).toBe("function");
     expect(typeof new Simple().transliterate).toBe("function");
+    expect(Simple.prototype.storeTranslations).not.toBe(Base.prototype.storeTranslations);
   });
 
   it("keeps the seam a mixin sits in, with super reaching Simple's bodies", () => {
