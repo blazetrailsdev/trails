@@ -459,11 +459,6 @@ function wEncoding(encname: Encname, arg: DumpArg, limit: number): number {
 /** @noRailsEquivalent PERMANENT */
 const PLAIN_OBJECT_IVAR = "@__trails_object";
 
-/** @noRailsEquivalent PERMANENT */
-function isPlainObjectHash(obj: unknown, arg: DumpArg): obj is object {
-  return arg.markPlainObjects && !(obj instanceof Map) && rbObjIsKindOf(obj, Hash);
-}
-
 /**
  * `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). Only a boxed `String` (the
  * ASCII-8BIT String a `_dump` answers) holds ivars, as its own non-index properties.
@@ -473,7 +468,7 @@ function isPlainObjectHash(obj: unknown, arg: DumpArg): obj is object {
 function hasIvars(obj: unknown, encname: Encname, arg: DumpArg): number {
   let num = encname !== null ? 1 : 0;
   if (obj instanceof String) num += Object.keys(obj).length - obj.length;
-  else if (isPlainObjectHash(obj, arg)) num += 1;
+  else if (arg.markPlainObjects && !(obj instanceof Map) && rbObjIsKindOf(obj, Hash)) num += 1;
   return num;
 }
 
@@ -491,7 +486,7 @@ function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void 
     }
     return;
   }
-  if (isPlainObjectHash(obj, arg)) {
+  if (arg.markPlainObjects && !(obj instanceof Map) && rbObjIsKindOf(obj, Hash)) {
     wSymbol(`:${PLAIN_OBJECT_IVAR}`, arg);
     wObject(true, arg, limit);
     return;
@@ -759,7 +754,15 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     }
   }
   if (hasiv) {
-    wIvar(hasiv, isPlainObjectHash(obj, arg) ? obj : undefined, encname, arg, limit);
+    wIvar(
+      hasiv,
+      arg.markPlainObjects && !(obj instanceof Map) && rbObjIsKindOf(obj, Hash)
+        ? (obj as object)
+        : undefined,
+      encname,
+      arg,
+      limit,
+    );
   }
 }
 
