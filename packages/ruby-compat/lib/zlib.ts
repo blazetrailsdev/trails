@@ -181,7 +181,7 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
   write(string: string | Uint8Array): number {
     const buffer = typeof string === "string" ? new TextEncoder().encode(string) : string;
     this.headerFinished = true;
-    this.z.write(buffer);
+    this.z.write(buffer, this.syncFlag ? Zlib.SYNC_FLUSH : Zlib.NO_FLUSH);
     return buffer.length;
   }
 

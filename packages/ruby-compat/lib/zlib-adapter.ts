@@ -40,7 +40,7 @@ export interface GzipWriterIO {
 /** @noRailsEquivalent PERMANENT */
 export interface GzipWriterHandle {
   mtime: number | null;
-  write(data: Uint8Array): void;
+  write(data: Uint8Array, flush: number): void;
   flush(flush: number): Promise<void>;
   finish(): Promise<void>;
 }
@@ -110,7 +110,7 @@ export class GzipWriter implements GzipWriterHandle {
   /** @noRailsEquivalent PERMANENT */
   write(data: Uint8Array): void {
     this.headerFinished = true;
-    this.handle.write(data);
+    this.handle.write(data, 0);
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -226,7 +226,10 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       };
       const handle: GzipWriterHandle = {
         mtime: null,
-        write: (data) => stream.write(data),
+        write: (data, flush) => {
+          stream.write(data);
+          if (flush !== 0) stream.flush(flush, () => {});
+        },
         flush: async (flush) => {
           await new Promise<void>((res) => stream.flush(flush, res));
           writeRaw();
