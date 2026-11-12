@@ -26,4 +26,20 @@ describe("AutoFilteredParametersTrailsTest", () => {
     expect(application.config.filterParameters).toContain("post.catchphrase");
     expect(application.config.filterParameters).not.toContain("admin/post.catchphrase");
   });
+
+  it("an encrypted attribute is added to the model's filter_attributes", () => {
+    const application = { config: { filterParameters: [] as Array<string | RegExp> } };
+    const autoFilteredParameters = new AutoFilteredParameters(application);
+
+    class FilteredPirate extends Pirate {
+      static {
+        this.tableName = "pirates";
+      }
+    }
+    FilteredPirate.encrypts("catchphrase");
+    autoFilteredParameters.enable();
+
+    expect(FilteredPirate.filterAttributes).toContain("catchphrase");
+    expect(Pirate.filterAttributes).not.toContain("catchphrase");
+  });
 });

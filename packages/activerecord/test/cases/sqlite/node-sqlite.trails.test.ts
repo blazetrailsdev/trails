@@ -37,6 +37,12 @@ describe.skipIf(!isNodeSqliteAvailable)("SqliteDriver — node-sqlite round-trip
     await expect((async () => conn.rollback())()).rejects.toThrow();
   });
 
+  it("getFirstValue() reads the first column of the first row by name, and null for a non-reader", async () => {
+    expect(await conn.getFirstValue("SELECT 2 AS b, 1 AS a")).toBe(2);
+    expect(await conn.getFirstValue("SELECT name FROM widgets WHERE 0")).toBe(null);
+    expect(await conn.getFirstValue("UPDATE widgets SET qty = qty WHERE 0")).toBe(null);
+  });
+
   it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
     const rows = await conn.execute("SELECT name FROM widgets WHERE qty = ?", [42]);
     expect(rows).toEqual([{ name: "sprocket" }]);

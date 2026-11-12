@@ -186,8 +186,14 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
   }
 
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown {
-    const row = this.execute(sql, bindVars)[0];
-    if (row) return Object.values(row as object)[0];
+    const rs = this.prepare(sql);
+    try {
+      for (const row of rs.iterate(bindVars)) {
+        return (row as Record<string, unknown>)[rs.columns()[0].name];
+      }
+    } finally {
+      rs.close();
+    }
     return null;
   }
 

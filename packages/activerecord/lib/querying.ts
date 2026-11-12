@@ -2,7 +2,7 @@ import { Nodes } from "@blazetrails/arel";
 import { hasKey, toI } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
-import type { Base } from "./base.js";
+import type { AbstractModel, Base } from "./base.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { FutureResult, Complete } from "./future-result.js";
 import type { FindEachOptions, Relation } from "./relation.js";
@@ -13,7 +13,12 @@ import type {
   JoinSpec,
   UnscopeArg,
 } from "./relation/query-methods.js";
-import type { SumBlock } from "./relation/calculations.js";
+import type {
+  CalculationMethods,
+  PluckColumn,
+  PluckedRow,
+  SumBlock,
+} from "./relation/calculations.js";
 
 export const QUERYING_METHODS = [
   "find",
@@ -249,9 +254,16 @@ export function _loadFromSql<T extends typeof Base>(
   });
 }
 
+type _FromSource = string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode;
+
+export function from<T extends AbstractModel>(
+  this: T,
+  source: _FromSource,
+  subqueryName?: string,
+): Relation<InstanceType<T>>;
 export function from<T extends typeof Base>(
   this: T,
-  source: string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode,
+  source: _FromSource,
   subqueryName?: string,
 ): Relation<InstanceType<T>> {
   return this.all().from(source, subqueryName);
@@ -564,12 +576,28 @@ export function sum<T extends typeof Base>(
   )(column, block);
 }
 
+export function pluck<T extends typeof Base, K extends PluckColumn<InstanceType<T>>>(
+  this: T,
+  column: K,
+): Promise<InstanceType<T>[K][]>;
+export function pluck<
+  T extends typeof Base,
+  K extends [
+    PluckColumn<InstanceType<T>>,
+    PluckColumn<InstanceType<T>>,
+    ...PluckColumn<InstanceType<T>>[],
+  ],
+>(this: T, ...columns: K): Promise<PluckedRow<InstanceType<T>, K>[]>;
 export function pluck<T extends typeof Base>(
   this: T,
-  ...columns: Parameters<ReturnType<T["all"]>["pluck"]>
-): ReturnType<ReturnType<T["all"]>["pluck"]> {
-  const rel = this.all() as ReturnType<T["all"]>;
-  return rel.pluck(...columns) as ReturnType<ReturnType<T["all"]>["pluck"]>;
+  ...columns: Parameters<CalculationMethods["pluck"]>
+): Promise<unknown[]>;
+export function pluck<T extends typeof Base>(
+  this: T,
+  ...columns: Parameters<CalculationMethods["pluck"]>
+): Promise<unknown[]> {
+  const rel = this.all();
+  return rel.pluck(...columns);
 }
 
 export function ids<T extends typeof Base>(this: T): Promise<unknown[]> | unknown[] {

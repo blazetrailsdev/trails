@@ -53,6 +53,12 @@ describe("SqliteDriver — libsql round-trip", () => {
     await expect((async () => driver.rollback())()).rejects.toThrow();
   });
 
+  it("getFirstValue() reads the first column of the first row by name, and null for a non-reader", async () => {
+    expect(await driver.getFirstValue("SELECT 2 AS b, 1 AS a")).toBe(2);
+    expect(await driver.getFirstValue("SELECT name FROM widgets WHERE 0")).toBe(null);
+    expect(await driver.getFirstValue("UPDATE widgets SET qty = qty WHERE 0")).toBe(null);
+  });
+
   it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
     const rows = await driver.execute("SELECT name FROM widgets WHERE qty = ?", [42]);
     expect(rows).toEqual([{ name: "sprocket" }]);

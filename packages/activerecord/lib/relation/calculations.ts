@@ -546,6 +546,16 @@ export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
   return Promise.resolve(this.async().ids());
 }
 
+export type PluckColumn<T> = {
+  [K in keyof T & string]: K extends `_${string}`
+    ? never
+    : T[K] extends (...args: never[]) => unknown
+      ? never
+      : K;
+}[keyof T & string];
+
+export type PluckedRow<T, K extends readonly unknown[]> = { [I in keyof K]: T[K[I] & keyof T] };
+
 type Grouped<G extends boolean, S, M> = boolean extends G ? S | M : G extends true ? M : S;
 
 export interface CalculationMethods<G extends boolean = boolean> {
