@@ -1,3 +1,4 @@
+import { Location } from "./backtrace-location.js";
 import { Deprecate } from "./gem/deprecate.js";
 import { Version } from "./gem/version.js";
 import { getOs } from "./os-adapter.js";
@@ -39,6 +40,18 @@ export const Gem = {
    */
   get path(): string[] {
     return [Gem.defaultDir];
+  },
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/rubygems.rb:626-632` — `Gem.location_of_caller`:
+   * the `[file, lineno]` of `caller[depth]`, counted from the method that
+   * calls it.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem.location_of_caller`.
+   */
+  locationOfCaller(depth = 1): [string, number] {
+    const location = new Location(new Error().stack?.split("\n")[2 + depth] ?? "");
+    return [location.path, location.lineno];
   },
 
   /**
