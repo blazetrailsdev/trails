@@ -5,6 +5,7 @@ import {
   isPlainObject,
 } from "@blazetrails/activesupport";
 import {
+  classModule,
   hasKey,
   hashAref,
   hashAset,
@@ -26,19 +27,22 @@ type Host = RoutingUrlFor & RoutingUrlForHost & Pick<UrlHelperHost, "_backUrl">;
 
 type Parameters = InstanceType<NonNullable<typeof TopLevel.ActionController>["Parameters"]>;
 
-export interface RoutingUrlFor {
-  urlFor(options?: unknown): string;
-  urlOptions(): Record<string, unknown>;
+export class RoutingUrlFor {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
+  declare urlFor: (options?: unknown) => string;
+  declare urlOptions: () => Record<string, unknown>;
   /** @internal */
-  optimizeRoutesGeneration(): boolean;
-  polymorphicPath(record: unknown, options: Record<string, unknown>): string;
-  polymorphicUrl(record: unknown, options: Record<string, unknown>): string;
+  declare optimizeRoutesGeneration: () => boolean;
+  declare polymorphicPath: (record: unknown, options: Record<string, unknown>) => string;
+  declare polymorphicUrl: (record: unknown, options: Record<string, unknown>) => string;
   /** @internal */
-  _routesContext(): unknown;
+  declare _routesContext: () => unknown;
   /** @internal */
-  _generatePathsByDefault(): boolean;
+  declare _generatePathsByDefault: () => boolean;
   /** @internal */
-  ensureOnlyPathOption(options: Record<string, unknown> | Parameters): void;
+  declare ensureOnlyPathOption: (options: Record<string, unknown> | Parameters) => void;
 }
 
 export function urlFor(this: Host, options: UrlForOptions = null): string {
@@ -124,11 +128,11 @@ export function ensureOnlyPathOption(
   }
 }
 
-export const RoutingUrlFor = {
+Object.assign(RoutingUrlFor.prototype, {
   urlFor,
   urlOptions,
   _routesContext,
   optimizeRoutesGeneration,
   _generatePathsByDefault,
   ensureOnlyPathOption,
-};
+});

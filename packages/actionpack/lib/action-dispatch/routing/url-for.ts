@@ -6,6 +6,7 @@ import {
   reverseMergeBang,
 } from "@blazetrails/activesupport";
 import {
+  classModule,
   extend,
   Hash,
   dup,
@@ -198,7 +199,7 @@ include(UrlFor, PolymorphicRoutes);
   UrlFor as unknown as { included(base: null, block: (this: UrlForIncluder) => void): void }
 ).included(null, function (this: UrlForIncluder) {
   if (!rbModMethodDefined(this, "defaultUrlOptions")) {
-    if (typeof this === "function") {
+    if (typeof this === "function" && !Object.hasOwn(this, classModule)) {
       classAttribute.call(this, "defaultUrlOptions");
     } else {
       mattrWriter.call(this, "defaultUrlOptions");
