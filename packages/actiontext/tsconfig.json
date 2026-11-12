@@ -17,6 +17,9 @@
     { "path": "../globalid" },
     { "path": "../html-sanitizer" },
     { "path": "../nokogiri" },
-    { "path": "../ruby-compat" }
+    { "path": "../rake" },
+    { "path": "../ruby-compat" },
+    { "path": "../thor" },
+    { "path": "../trailties" }
   ]
 }

@@ -614,6 +614,7 @@ export default defineConfig({
             "packages/solid-cable/test/generators/**",
             "packages/solid-queue/test/generators/**",
             "packages/actionmailbox/src/generators/**",
+            "packages/actiontext/test/generators/**",
           ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
@@ -747,6 +748,7 @@ export default defineConfig({
             "packages/solid-cable/test/generators/**/*.test.ts",
             "packages/solid-queue/test/generators/**/*.test.ts",
             "packages/actionmailbox/src/generators/**/*.test.ts",
+            "packages/actiontext/test/generators/**/*.test.ts",
           ],
           exclude: SHARED_EXCLUDE,
           globalSetup: [
@@ -755,6 +757,7 @@ export default defineConfig({
             "./packages/solid-cable/test/support/build-templates.ts",
             "./packages/solid-queue/test/support/build-templates.ts",
             "./packages/actionmailbox/src/test-helpers/support/build-templates.ts",
+            "./packages/actiontext/test/support/build-templates.ts",
           ],
           setupFiles: otherSetupFiles,
         },

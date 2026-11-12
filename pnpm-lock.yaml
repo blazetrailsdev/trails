@@ -377,16 +377,22 @@ importers:
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../nokogiri
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/thor':
+        specifier: workspace:*
+        version: link:../thor
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
     devDependencies:
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc
-      '@blazetrails/trailties':
-        specifier: workspace:*
-        version: link:../trailties
 
   packages/actionview:
     dependencies:

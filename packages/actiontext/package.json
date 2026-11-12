@@ -20,11 +20,12 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "app"
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "rm -rf dist/app dist/.trails && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place"
+    "build:templates": "rm -rf dist/app dist/.trails && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place && cp -R lib/generators/action-text/install/templates dist/generators/action-text/install/ && cp -R lib/trails/generators/test-unit/install/templates dist/trails/generators/test-unit/install/ && trails-tsc-views build-templates dist/generators dist/trails/generators"
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
@@ -36,13 +37,15 @@
     "@blazetrails/globalid": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/rake": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/thor": "workspace:*",
+    "@blazetrails/trailties": "workspace:*"
   },
   "engines": {
     "node": ">=26"
   },
   "devDependencies": {
-    "@blazetrails/trailties": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*"
   }
 }
