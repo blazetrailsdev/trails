@@ -46,10 +46,6 @@ export class SessionId {
     return inspect(this.publicId);
   }
 
-  asJson(): { public_id: string } {
-    return { public_id: this.publicId };
-  }
-
   /** @internal */
   hashSid(sid: string): string {
     return getCrypto().createHash("sha256").update(sid).digest("hex");

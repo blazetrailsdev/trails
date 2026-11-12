@@ -1,5 +1,5 @@
 import { HashWithIndifferentAccess, included, kernelArray } from "@blazetrails/activesupport";
-import { include, rbCallSuper, rbObjAsString } from "@blazetrails/ruby-compat";
+import { include, rbCallSuper, rbDeclareIvar, rbObjAsString } from "@blazetrails/ruby-compat";
 
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -29,6 +29,8 @@ export class Dirty {
     base.attributeMethodAffix({ prefix: "restore", suffix: "!", parameters: false });
     base.attributeMethodAffix({ prefix: "clear", suffix: "Change", parameters: false });
     include(base, SuperMethods);
+    rbDeclareIvar(base, "@mutations_from_database", "_mutationsFromDatabase");
+    rbDeclareIvar(base, "@mutations_before_last_save", "_mutationsBeforeLastSave");
   }
 
   declare _attributes: AttributeSet;
@@ -190,8 +192,8 @@ export interface DirtyDupHost extends DirtyInternalsHost {
 export function asJson(this: object, options: Record<string, unknown> = {}): unknown {
   const except = [
     ...kernelArray(options["except"]),
-    "_mutationsFromDatabase",
-    "_mutationsBeforeLastSave",
+    "mutations_from_database",
+    "mutations_before_last_save",
   ];
   options = { ...options, except };
   return rbCallSuper(this, asJson, options);

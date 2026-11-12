@@ -11,7 +11,7 @@ import {
   Unary,
 } from "../nodes/node.js";
 import { TransitionTable, type Edge } from "./transition-table.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Hash, groupBy, uniq } from "@blazetrails/ruby-compat";
 
 const DUMMY_END_NODE = new Dummy("<end>");
 
@@ -21,7 +21,7 @@ export class Builder {
   readonly endpoints: unknown[] = [];
 
   /** @internal */
-  private readonly followpos: Map<Node, Node[]>;
+  private readonly followpos: Hash<Node, Node[]>;
 
   constructor(root: Node) {
     this.root = root;
@@ -31,63 +31,35 @@ export class Builder {
 
   transitionTable(): TransitionTable {
     const dtrans = new TransitionTable();
-    const marked = new Set<readonly Node[]>();
-    const stateId = new Map<unknown, number>();
-    const idFor = (key: unknown): number => {
-      let id = stateId.get(key);
-      if (id === undefined) {
-        id = stateId.size;
-        stateId.set(key, id);
-      }
-      return id;
-    };
+    const marked = new Hash<readonly Node[], boolean>().compareByIdentity();
+    const stateId = new Hash<unknown, number>((h, k) => {
+      h.set(k, h.length());
+      return h.get(k)!;
+    }).compareByIdentity();
     const dstates: Array<readonly Node[]> = [this.firstpos(this.root)];
 
     while (dstates.length > 0) {
       const s = dstates.shift()!;
-      if (marked.has(s)) continue;
-      marked.add(s);
+      if (marked.get(s)) continue;
+      marked.set(s, true);
 
-      const groups = new Map<Edge, Node[]>();
-      const seen = new Map<string, Edge>();
-      for (const state of s) {
-        const sym = this.symbol(state);
-        const key = typeof sym === "string" ? `s:${sym}` : `r:${sym.source}\0${sym.flags}`;
-        let canonical = seen.get(key);
-        if (!canonical) {
-          canonical = sym;
-          seen.set(key, canonical);
-          groups.set(canonical, []);
-        }
-        groups.get(canonical)!.push(state);
-      }
-
-      for (const [sym, ps] of groups) {
-        const u: Node[] = [];
-        const uSeen = new Set<Node>();
-        for (const l of ps) {
-          for (const fp of this.followpos.get(l) ?? []) {
-            if (!uSeen.has(fp)) {
-              uSeen.add(fp);
-              u.push(fp);
-            }
-          }
-        }
+      for (const [sym, ps] of groupBy(s, (state) => this.symbol(state))) {
+        const u = uniq(ps.flatMap((l) => this.followpos.get(l)!));
         if (u.length === 0) continue;
 
-        const from = idFor(s);
+        const from = stateId.get(s)!;
 
         if (u.every((pos) => pos === DUMMY_END_NODE)) {
-          const to = idFor({});
+          const to = stateId.get({})!;
           dtrans.set(from, to, sym);
           dtrans.addAccepting(to);
           for (const state of ps) dtrans.addMemo(to, state.memo);
         } else {
-          const to = idFor(u);
+          const to = stateId.get(u)!;
           dtrans.set(from, to, sym);
           if (u.includes(DUMMY_END_NODE)) {
             for (const state of ps) {
-              if ((this.followpos.get(state) ?? []).includes(DUMMY_END_NODE)) {
+              if (this.followpos.get(state)!.includes(DUMMY_END_NODE)) {
                 dtrans.addMemo(to, state.memo);
               }
             }
@@ -168,14 +140,15 @@ export class Builder {
   }
 
   /** @internal */
-  private buildFollowpos(): Map<Node, Node[]> {
-    const table = new Map<Node, Node[]>();
+  private buildFollowpos(): Hash<Node, Node[]> {
+    const table = new Hash<Node, Node[]>((h, k) => {
+      h.set(k, []);
+      return h.get(k)!;
+    }).compareByIdentity();
     this.ast.each((n) => {
       if (n instanceof Cat) {
         for (const i of this.lastpos(n.left as Node)) {
-          const list = table.get(i) ?? [];
-          for (const r of this.firstpos(n.right)) list.push(r);
-          table.set(i, list);
+          table.set(i, [...table.get(i)!, ...this.firstpos(n.right)]);
         }
       }
     });

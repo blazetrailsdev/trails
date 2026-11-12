@@ -61,6 +61,7 @@ export function rbHash(value: unknown): number {
   /* boundary: a JS Date reaches a ported `hash` the same way it reaches
      `rbEqual`, and Ruby hashes it by value. */
   if (value instanceof Date) return stringHash(`Date(${value.toISOString()})`);
+  if (value instanceof RegExp) return stringHash(`/${value.source}/${value.flags}`);
   /* A Ruby Hash, whose `hash` (`vendor/ruby/v3.3.11/hash.c:3865` `rb_hash_hash`) folds
      every key and value; the sort keeps it insertion-order independent, as
      Ruby's is. It has two JS seats — a plain object and a `Map` — and `rbEqual`

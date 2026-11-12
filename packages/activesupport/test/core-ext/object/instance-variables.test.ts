@@ -8,7 +8,7 @@ describe("ObjectInstanceVariableTest", () => {
   }
 
   it("instance variable names", () => {
-    expect(Object.instanceVariableNames(source()).sort()).toEqual(["bar", "baz"]);
+    expect(Object.instanceVariableNames(source()).sort()).toEqual(["@bar", "@baz"]);
   });
 
   it("instance values", () => {

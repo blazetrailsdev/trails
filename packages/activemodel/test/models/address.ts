@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include` (address.rb:4); the class/interface merge is how `include()` surfaces those members on the type side. */
-import { InstanceVariablesObject, include } from "@blazetrails/activesupport";
+import { InstanceVariablesObject, camelize, include } from "@blazetrails/activesupport";
 import { JSON as SerializersJSON } from "../../lib/serializers/json.js";
 
 export interface Address extends SerializersJSON {}
@@ -60,7 +60,7 @@ export class Address {
 function instanceValues(address: Address): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(InstanceVariablesObject.instanceValues(address)).map(([ivar, value]) => [
-      ivar.replace(/^_/, ""),
+      camelize(ivar.replace(/^_/, ""), false),
       value,
     ]),
   );

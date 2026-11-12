@@ -82,7 +82,7 @@
     }
   },
   "actionpack": {
-    "rows": 325,
+    "rows": 331,
     "excluded": [
       "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
@@ -128,6 +128,12 @@
       "action-controller/metal/helpers.ts::ClassMethods",
       "action-controller/metal/helpers.ts::Helpers",
       "action-controller/metal/http-authentication.ts::HttpAuthentication",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic.ControllerMethods",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest.ControllerMethods",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token.ControllerMethods",
       "action-controller/metal/implicit-render.ts::ImplicitRender",
       "action-controller/metal/instrumentation.ts::ClassMethods",
       "action-controller/metal/live.ts::ClassMethods",
@@ -819,7 +825,7 @@
     }
   },
   "activesupport": {
-    "rows": 171,
+    "rows": 172,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -878,6 +884,7 @@
       "concern.ts::Concern",
       "concurrency/null-lock.ts::NullLock",
       "configurable.ts::Configurable",
+      "configurable.ts::Configurable.ClassMethods",
       "deep-mergeable.ts::DeepMergeable",
       "delegation.ts::Delegation",
       "dependencies.ts::Dependencies",
