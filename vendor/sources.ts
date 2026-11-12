@@ -1112,6 +1112,95 @@ export const SOURCES: readonly UpstreamSource[] = [
       },
     ],
   },
+  {
+    name: "turbo-rails",
+    origin: {
+      type: "git",
+      url: "https://github.com/hotwired/turbo-rails.git",
+      ref: "v2.0.23",
+    },
+    packages: [
+      {
+        name: "turbo-rails",
+        libPath: "lib/turbo",
+        libEntryFile: "lib/turbo-rails.rb",
+        extraLibPaths: [
+          "app/channels/turbo",
+          "app/controllers/turbo",
+          "app/controllers/concerns/turbo",
+          "app/helpers/turbo",
+          "app/jobs/turbo",
+          "app/models/turbo",
+          "app/models/concerns/turbo",
+        ],
+        testPath: "test",
+        compareApi: false,
+        apiExcludedReason:
+          "packages/turbo-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+        compareTests: false,
+        testsExcludedReason:
+          "packages/turbo-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+      },
+    ],
+  },
+  {
+    name: "stimulus-rails",
+    origin: {
+      type: "git",
+      url: "https://github.com/hotwired/stimulus-rails.git",
+      ref: "v1.3.4",
+    },
+    packages: [
+      {
+        name: "stimulus-rails",
+        libPath: "lib/stimulus",
+        libEntryFile: "lib/stimulus-rails.rb",
+        extraLibPaths: ["lib/generators/stimulus"],
+        testPath: "test",
+        compareApi: false,
+        apiExcludedReason:
+          "packages/stimulus-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+        compareTests: false,
+        testsExcludedReason:
+          "packages/stimulus-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+      },
+    ],
+  },
+  {
+    // One monorepo, two gems. The `vite_ruby@3.11.1` tag postdates
+    // `vite_rails@3.11.1` and leaves `vite_rails/lib` unchanged, so it pins both.
+    name: "vite_ruby",
+    origin: {
+      type: "git",
+      url: "https://github.com/ElMassimo/vite_ruby.git",
+      ref: "vite_ruby@3.11.1",
+    },
+    packages: [
+      {
+        name: "vite-ruby",
+        libPath: "vite_ruby/lib/vite_ruby",
+        libEntryFile: "vite_ruby/lib/vite_ruby.rb",
+        testPath: "test",
+        compareApi: false,
+        apiExcludedReason:
+          "packages/vite-ruby does not exist yet; the hotwire-via-vite RFC creates it.",
+        compareTests: false,
+        testsExcludedReason:
+          "The monorepo's one test/ dir covers both gems; the hotwire-via-vite RFC splits it per package.",
+      },
+      {
+        name: "vite-rails",
+        libPath: "vite_rails/lib/vite_rails",
+        libEntryFile: "vite_rails/lib/vite_rails.rb",
+        compareApi: false,
+        apiExcludedReason:
+          "packages/vite-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+        compareTests: false,
+        testsExcludedReason:
+          "The monorepo's one test/ dir covers both gems; the hotwire-via-vite RFC splits it per package.",
+      },
+    ],
+  },
 ];
 
 /**
@@ -1166,12 +1255,13 @@ export const VENDOR_DIR = dirname(fileURLToPath(import.meta.url));
 /**
  * The version directory a source's clone lives under, derived from its ref:
  * `v8.0.2` stays `v8.0.2`, and MRI's underscore tag `v3_3_11` becomes
- * `v3.3.11`. The lockfile keeps the verbatim ref as the fetch input; the
+ * `v3.3.11`, and a monorepo's `<gem>@<version>` tag (`vite_ruby@3.11.1`)
+ * becomes `v3.11.1`. The lockfile keeps the verbatim ref as the fetch input; the
  * directory is the normalized spelling a human reads (RFC 0159, Open
  * question 1).
  */
 export function versionDir(ref: string): string {
-  return ref.replaceAll("_", ".");
+  return ref.replace(/^[\w-]+@/, "v").replaceAll("_", ".");
 }
 
 /**

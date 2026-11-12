@@ -321,6 +321,7 @@ describe("vendor/sources.ts", () => {
   it("versionDir keeps a dotted tag and normalizes an underscore tag", () => {
     expect(versionDir("v8.0.2")).toBe("v8.0.2");
     expect(versionDir("v3_3_11")).toBe("v3.3.11");
+    expect(versionDir("vite_ruby@3.11.1")).toBe("v3.11.1");
   });
 
   it("every source root is vendor/<name>/<versionDir of its ref>", () => {

@@ -154,6 +154,21 @@ differences from the gem:
 `specify "..." do`, which `scripts/test-compare/extract-ruby-tests.rb` reads as
 it reads `it`.
 
+## `vendor/turbo-rails/`, `vendor/stimulus-rails/`, `vendor/vite_ruby/` — the Hotwire-via-Vite anchors
+
+The hotwire-via-vite RFC ports `turbo-rails` (**2.0.23**), `stimulus-rails`
+(**1.3.4**) and two gems from the `ElMassimo/vite_ruby` monorepo, `vite_ruby`
+and `vite_rails` (both **3.11.1**). Each is the newest release on rubygems.org
+as of 2026-11-12. The monorepo tags each gem separately; `vite_ruby@3.11.1`
+is the later tag and leaves `vite_rails/lib` as `vite_rails@3.11.1` released
+it, so it pins both. `versionDir` turns its `<gem>@<version>` tag into
+`v3.11.1`, the spelling the citation pattern reads.
+
+The JavaScript these gems ship (`turbo-rails/app/javascript/turbo/`, the npm
+`@hotwired/turbo-rails`; the monorepo's `vite-plugin-ruby`) is an npm
+dependency, not a port. `compareApi` and `compareTests` are off until the RFC
+creates each `packages/<name>`.
+
 ## Scoping a Rails bump (drift report)
 
 We pin `rails` to one tag in `sources.ts` (today `v8.0.2`) while upstream moves
