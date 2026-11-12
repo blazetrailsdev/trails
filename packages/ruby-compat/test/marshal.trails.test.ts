@@ -518,6 +518,14 @@ describe("Marshal.load", () => {
     expect(() => Marshal.load('\x04\bI"\x06a\x07:\x06ET:\x07@xi\x06')).toThrow(FrozenError);
   });
 
+  it("loads a Hash holding itself as a Hash, keeping its identity", () => {
+    const h = new Hash<string, unknown>();
+    h.set("self", h);
+    const loaded = Marshal.load(Marshal.dump(h)) as Hash<string, unknown>;
+    expect(loaded).toBeInstanceOf(Hash);
+    expect(loaded.get("self")).toBe(loaded);
+  });
+
   it("loads what Marshal.dump dumped", () => {
     for (const [name, value] of Object.entries(VALUES)) {
       expect(Marshal.load(Marshal.dump(value))).toEqual(name in LOADED ? LOADED[name] : value);

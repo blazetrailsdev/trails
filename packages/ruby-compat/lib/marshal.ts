@@ -1168,6 +1168,7 @@ function rObject0(arg: LoadArg, ivp: { value: boolean } | null, extmod: Module[]
  * arm.
  *
  * @inventedArm rEntry0 — PERMANENT
+ * @inventedArm if — PERMANENT
  */
 function rObjectFor(
   arg: LoadArg,
@@ -1367,7 +1368,8 @@ function rObjectFor(
         } else if (
           !uclass &&
           !hash.isCompareByIdentity() &&
-          [...hash.keys()].every((key) => typeof key === "string")
+          [...hash.keys()].every((key) => typeof key === "string") &&
+          ![...hash.values()].includes(hash)
         ) {
           v = rEntry0(Object.fromEntries(hash), idx, arg);
         }

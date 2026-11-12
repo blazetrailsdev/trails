@@ -295,6 +295,17 @@ describe("FileStore coder fidelity", () => {
     } catch {}
   });
 
+  it("reads undefined back as nil", async () => {
+    await store.write("u", undefined);
+    expect(await store.read("u")).toBeNull();
+  });
+
+  it("raises TypeError writing a JS Date, which Marshal has no dump for", async () => {
+    await expect(store.write("d", new Date())).rejects.toThrow(
+      "no _dump_data is defined for class Time",
+    );
+  });
+
   it("round-trips bigint values", async () => {
     await store.write("b", 9007199254740993n);
     expect(await store.read("b")).toBe(9007199254740993n);
