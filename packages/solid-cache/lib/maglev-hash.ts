@@ -1,4 +1,5 @@
 import { ArgumentError, Digest, Zlib, toS, unpack1 } from "@blazetrails/ruby-compat";
+import { SolidCache } from "./solid-cache.js";
 
 export class MaglevHash {
   readonly nodes: string[];
@@ -95,3 +96,4 @@ class Preferences {
   }
 }
 MaglevHash.Preferences = Preferences;
+SolidCache.MaglevHash = MaglevHash;

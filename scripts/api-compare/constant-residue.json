@@ -1289,6 +1289,7 @@
     "unwalked": [],
     "residue": {}
   },
+  "solid-cache": { "rows": 1, "excluded": [], "unwalked": [], "residue": {} },
   "solid-queue": {
     "rows": 61,
     "excluded": [

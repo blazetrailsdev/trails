@@ -358,6 +358,7 @@ const alias = {
   "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/lib") + "/",
   "@blazetrails/solid-cable": path.resolve(__dirname, "packages/solid-cable/lib/index.ts"),
   "@blazetrails/solid-cache/": path.resolve(__dirname, "packages/solid-cache/lib") + "/",
+  "@blazetrails/solid-cache": path.resolve(__dirname, "packages/solid-cache/lib/index.ts"),
   "@blazetrails/activestorage/test-helpers/":
     path.resolve(__dirname, "packages/activestorage/test/support") + "/",
   "@blazetrails/activestorage/": path.resolve(__dirname, "packages/activestorage/lib") + "/",

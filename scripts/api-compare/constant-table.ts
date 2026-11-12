@@ -79,6 +79,7 @@ export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
   rackup: { root: "Rackup", siblings: true },
   rake: { root: "Rake", siblings: true },
   "solid-cable": { root: "SolidCable", siblings: true },
+  "solid-cache": { root: "SolidCache", siblings: true },
   "solid-queue": { root: "SolidQueue" },
   thor: { root: "Thor", collapse: ["parser"], siblings: true },
   trailties: { root: "Rails", collapse: ["commands"] },
