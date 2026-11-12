@@ -139,8 +139,7 @@ export class Chain {
   }
 }
 
-class _ChainProbe extends Base {}
-for (const source of [Base.prototype, new _ChainProbe()]) {
+for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
     if (Object.hasOwn(Chain.prototype, key)) continue;

@@ -33,66 +33,64 @@ interface RackErrors {
   puts(string?: string): unknown;
 }
 
-class Base64 {
-  encode(str: string | Uint8Array): string {
-    return RubyCompat.Base64.strictEncode64(str);
-  }
-
-  decode(str: string): unknown {
-    return RubyCompat.Base64.decode64(str);
-  }
-
-  static Marshal = class Marshal extends Base64 {
-    override encode(str: unknown): string {
-      return super.encode(RubyCompat.Marshal.dump(str));
-    }
-
-    override decode(str: string | null): unknown {
-      if (!isTruthy(str)) return null;
-      try {
-        return RubyCompat.Marshal.load(super.decode(str!) as string);
-      } catch (error) {
-        if (!(error instanceof StandardError)) throw error;
-        return null;
-      }
-    }
-  };
-
-  static JSON = class JSON extends Base64 {
-    override encode(obj: unknown): string {
-      return super.encode(RubyCompat.JSON.dump(obj));
-    }
-
-    override decode(str: string | null): unknown {
-      if (!isTruthy(str)) return null;
-      try {
-        return RubyCompat.JSON.parse(super.decode(str!) as string);
-      } catch (error) {
-        if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
-        return null;
-      }
-    }
-  };
-
-  static ZipJSON = class ZipJSON extends Base64 {
-    override encode(obj: unknown): string {
-      return super.encode(Zlib.Deflate.deflate(RubyCompat.JSON.dump(obj)));
-    }
-
-    override decode(str: string | null): unknown {
-      try {
-        if (!isTruthy(str)) return null;
-        return RubyCompat.JSON.parse(Zlib.Inflate.inflate(super.decode(str!) as string));
-      } catch (error) {
-        if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
-        return null;
-      }
-    }
-  };
-}
-
 export class Cookie extends PersistedSecure {
-  static Base64 = Base64;
+  static Base64 = class Base64 {
+    encode(str: string | Uint8Array): string {
+      return RubyCompat.Base64.strictEncode64(str);
+    }
+
+    decode(str: string): unknown {
+      return RubyCompat.Base64.decode64(str);
+    }
+
+    static Marshal = class Marshal extends Base64 {
+      override encode(str: unknown): string {
+        return super.encode(RubyCompat.Marshal.dump(str));
+      }
+
+      override decode(str: string | null): unknown {
+        if (!isTruthy(str)) return null;
+        try {
+          return RubyCompat.Marshal.load(super.decode(str!) as string);
+        } catch (error) {
+          if (!(error instanceof StandardError)) throw error;
+          return null;
+        }
+      }
+    };
+
+    static JSON = class JSON extends Base64 {
+      override encode(obj: unknown): string {
+        return super.encode(RubyCompat.JSON.dump(obj));
+      }
+
+      override decode(str: string | null): unknown {
+        if (!isTruthy(str)) return null;
+        try {
+          return RubyCompat.JSON.parse(super.decode(str!) as string);
+        } catch (error) {
+          if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
+          return null;
+        }
+      }
+    };
+
+    static ZipJSON = class ZipJSON extends Base64 {
+      override encode(obj: unknown): string {
+        return super.encode(Zlib.Deflate.deflate(RubyCompat.JSON.dump(obj)));
+      }
+
+      override decode(str: string | null): unknown {
+        try {
+          if (!isTruthy(str)) return null;
+          return RubyCompat.JSON.parse(Zlib.Inflate.inflate(super.decode(str!) as string));
+        } catch (error) {
+          if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
+          return null;
+        }
+      }
+    };
+  };
 
   static Identity = class Identity {
     encode<T>(str: T): T {

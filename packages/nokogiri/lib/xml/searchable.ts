@@ -1,11 +1,11 @@
 import { aryJoin } from "@blazetrails/ruby-compat";
 
 import type { Node } from "../html5/node.js";
-import type { NodeSet } from "./node-set.js";
-import { nodeSetCtor, xpathContextCtor } from "./node-set-ctor.js";
+import { NodeSet } from "./node-set.js";
 import { xpathFor } from "../css.js";
 import { BuiltinsConfig, XPathVisitor } from "../css/xpath-visitor.js";
 import { usesLibxml } from "../version/info.js";
+import { XPathContext } from "./xpath-context.js";
 
 export interface SearchableHost {
   readonly document: unknown;
@@ -143,13 +143,13 @@ export function xpathInternal(
   binds: Record<string, unknown> | null,
 ): NodeSet {
   const document = node.document;
-  if (document == null) return new (nodeSetCtor())(document);
+  if (document == null) return new NodeSet(document);
 
   if (paths.length === 1) return this.xpathImpl(node, paths[0], handler, ns, binds);
 
   return paths.reduce(
     (combined, path) => combined.plus(this.xpathImpl(node, path, handler, ns, binds)),
-    new (nodeSetCtor())(document),
+    new NodeSet(document),
   );
 }
 
@@ -162,7 +162,7 @@ export function xpathImpl(
   ns: Record<string, string>,
   binds: Record<string, unknown> | null,
 ): NodeSet {
-  const context = new (xpathContextCtor())(node);
+  const context = new XPathContext(node);
   context.registerNamespaces(ns);
   context.registerVariables(binds);
 

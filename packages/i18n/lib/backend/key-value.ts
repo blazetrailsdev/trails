@@ -186,8 +186,7 @@ export class KeyValue {
   }
 }
 
-class _KeyValueProbe extends Base {}
-for (const source of [Base.prototype, new _KeyValueProbe()]) {
+for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
     if (Object.hasOwn(KeyValue.prototype, key)) continue;

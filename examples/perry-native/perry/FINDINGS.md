@@ -43,6 +43,16 @@ Status of each wall after re-verification:
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
 
+## Framework source is unpatched on this branch
+
+The workarounds walls 16, 18 and 19 needed in `i18n` (`simple`, `chain`,
+`key-value`), `nokogiri` (`searchable` and the `xml/node-set-ctor.ts` holder)
+and `rack-session/cookie` are compiler defects, not TypeScript shortcomings, so
+they do not ship in the framework. They are kept as
+[`framework-scaffolding.patch`](framework-scaffolding.patch): apply it with
+`git apply` before reproducing rung 07 or later natively, and drop each hunk as
+the Perry fork fixes the wall behind it. Node runs every rung without it.
+
 ## The ladder
 
 | Rung                                                              | Node | Perry       |                                                                  |

@@ -1,0 +1,363 @@
+diff --git b/packages/i18n/lib/backend/chain.ts a/packages/i18n/lib/backend/chain.ts
+index 9f03e13a62..7468ce4ab6 100644
+--- b/packages/i18n/lib/backend/chain.ts
++++ a/packages/i18n/lib/backend/chain.ts
+@@ -139,7 +139,8 @@ export class Chain {
+   }
+ }
+ 
+-for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
++class _ChainProbe extends Base {}
++for (const source of [Base.prototype, new _ChainProbe()]) {
+   for (const key of Object.getOwnPropertyNames(source)) {
+     if (key === "constructor") continue;
+     if (Object.hasOwn(Chain.prototype, key)) continue;
+diff --git b/packages/i18n/lib/backend/key-value.ts a/packages/i18n/lib/backend/key-value.ts
+index 276ea1f68a..50052c7e23 100644
+--- b/packages/i18n/lib/backend/key-value.ts
++++ a/packages/i18n/lib/backend/key-value.ts
+@@ -186,7 +186,8 @@ export class KeyValue {
+   }
+ }
+ 
+-for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
++class _KeyValueProbe extends Base {}
++for (const source of [Base.prototype, new _KeyValueProbe()]) {
+   for (const key of Object.getOwnPropertyNames(source)) {
+     if (key === "constructor") continue;
+     if (Object.hasOwn(KeyValue.prototype, key)) continue;
+diff --git b/packages/i18n/lib/backend/simple.ts a/packages/i18n/lib/backend/simple.ts
+index a5c63cf84c..b10c24ad0e 100644
+--- b/packages/i18n/lib/backend/simple.ts
++++ a/packages/i18n/lib/backend/simple.ts
+@@ -117,7 +117,8 @@ export class Simple {
+   }
+ }
+ 
+-for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
++class _SimpleProbe extends Base {}
++for (const source of [Base.prototype, new _SimpleProbe()]) {
+   for (const key of Object.getOwnPropertyNames(source)) {
+     if (key === "constructor") continue;
+     if (Object.hasOwn(Simple.prototype, key)) continue;
+diff --git b/packages/nokogiri/lib/html5/document.ts a/packages/nokogiri/lib/html5/document.ts
+index d5bf402b26..2db557efcd 100644
+--- b/packages/nokogiri/lib/html5/document.ts
++++ a/packages/nokogiri/lib/html5/document.ts
+@@ -7,6 +7,7 @@ import { DocumentFragment } from "./document-fragment.js";
+ import type { NodeSet } from "../xml/node-set.js";
+ import * as Searchable from "../xml/searchable.js";
+ import { XPathVisitor } from "../css/xpath-visitor.js";
++import "../xml/xpath-context.js";
+ 
+ type Parse5Document = DefaultTreeAdapterMap["document"];
+ 
+diff --git b/packages/nokogiri/lib/html5/node.ts a/packages/nokogiri/lib/html5/node.ts
+index ffe8610c70..d09ce9a6c5 100644
+--- b/packages/nokogiri/lib/html5/node.ts
++++ a/packages/nokogiri/lib/html5/node.ts
+@@ -20,6 +20,7 @@ import {
+ import { DocumentFragment } from "./document-fragment.js";
+ import { HTML5 } from "../namespaces.js";
+ import * as Searchable from "../xml/searchable.js";
++import "../xml/xpath-context.js";
+ import { SaveOptions } from "../xml/node/save-options.js";
+ 
+ type Parse5Node = DefaultTreeAdapterMap["childNode"];
+diff --git b/packages/nokogiri/lib/xml/document.ts a/packages/nokogiri/lib/xml/document.ts
+index df3071d5ee..1c2f9831df 100644
+--- b/packages/nokogiri/lib/xml/document.ts
++++ a/packages/nokogiri/lib/xml/document.ts
+@@ -10,6 +10,7 @@ import { ParseOptions } from "./parse-options.js";
+ import { type Readable, readSource } from "../readable.js";
+ import { SyntaxError } from "./syntax-error.js";
+ import { XPathVisitor } from "../css/xpath-visitor.js";
++import "./xpath-context.js";
+ 
+ export class XmlDocument {
+   declare css: (...args: unknown[]) => NodeSet;
+diff --git b/packages/nokogiri/lib/xml/node-set-ctor.ts a/packages/nokogiri/lib/xml/node-set-ctor.ts
+new file mode 100644
+index 0000000000..e357012479
+--- /dev/null
++++ a/packages/nokogiri/lib/xml/node-set-ctor.ts
+@@ -0,0 +1,37 @@
++import type { Node } from "../html5/node.js";
++import type { NodeSet } from "./node-set.js";
++import type { ContextHost, XPathContext } from "./xpath-context.js";
++
++export type NodeSetCtor = new (document: unknown, list?: Node[]) => NodeSet;
++
++let ctor: NodeSetCtor | undefined;
++
++/** @internal */
++export function registerNodeSetCtor(value: NodeSetCtor): void {
++  ctor = value;
++}
++
++/** @internal */
++export function nodeSetCtor(): NodeSetCtor {
++  if (ctor === undefined) {
++    throw new Error("NodeSet was used before xml/node-set.js finished initialising");
++  }
++  return ctor;
++}
++
++export type XPathContextCtor = new (node: ContextHost) => XPathContext;
++
++let xpathCtor: XPathContextCtor | undefined;
++
++/** @internal */
++export function registerXPathContextCtor(value: XPathContextCtor): void {
++  xpathCtor = value;
++}
++
++/** @internal */
++export function xpathContextCtor(): XPathContextCtor {
++  if (xpathCtor === undefined) {
++    throw new Error("XPathContext was used before xml/xpath-context.js finished initialising");
++  }
++  return xpathCtor;
++}
+diff --git b/packages/nokogiri/lib/xml/node-set.ts a/packages/nokogiri/lib/xml/node-set.ts
+index f3991d5b4a..d85252cc5f 100644
+--- b/packages/nokogiri/lib/xml/node-set.ts
++++ a/packages/nokogiri/lib/xml/node-set.ts
+@@ -5,7 +5,9 @@ import { Namespace } from "./namespace.js";
+ 
+ import type { Node } from "../html5/node.js";
+ import * as Searchable from "./searchable.js";
++import { registerNodeSetCtor } from "./node-set-ctor.js";
+ import type { SearchableHost } from "./searchable.js";
++import "./xpath-context.js";
+ 
+ export class NodeSet implements Iterable<Node> {
+   declare atCss: (...args: unknown[]) => Node | undefined;
+@@ -122,3 +124,4 @@ export class NodeSet implements Iterable<Node> {
+ include(NodeSet, Enumerable);
+ include(NodeSet, Searchable);
+ constSet(XML, "NodeSet", NodeSet);
++registerNodeSetCtor(NodeSet);
+diff --git b/packages/nokogiri/lib/xml/node.ts a/packages/nokogiri/lib/xml/node.ts
+index dddb13f4da..d71a1c44cf 100644
+--- b/packages/nokogiri/lib/xml/node.ts
++++ a/packages/nokogiri/lib/xml/node.ts
+@@ -16,6 +16,7 @@ import type { DocumentFragment } from "./document-fragment.js";
+ import { NodeSet } from "./node-set.js";
+ import { SaveOptions } from "./node/save-options.js";
+ import * as Searchable from "./searchable.js";
++import "./xpath-context.js";
+ 
+ export interface AttrNode {
+   nodeName: string;
+diff --git b/packages/nokogiri/lib/xml/searchable.ts a/packages/nokogiri/lib/xml/searchable.ts
+index 0651f3bd03..8024b2bb0d 100644
+--- b/packages/nokogiri/lib/xml/searchable.ts
++++ a/packages/nokogiri/lib/xml/searchable.ts
+@@ -1,11 +1,11 @@
+ import { aryJoin } from "@blazetrails/ruby-compat";
+ 
+ import type { Node } from "../html5/node.js";
+-import { NodeSet } from "./node-set.js";
++import type { NodeSet } from "./node-set.js";
++import { nodeSetCtor, xpathContextCtor } from "./node-set-ctor.js";
+ import { xpathFor } from "../css.js";
+ import { BuiltinsConfig, XPathVisitor } from "../css/xpath-visitor.js";
+ import { usesLibxml } from "../version/info.js";
+-import { XPathContext } from "./xpath-context.js";
+ 
+ export interface SearchableHost {
+   readonly document: unknown;
+@@ -143,13 +143,13 @@ export function xpathInternal(
+   binds: Record<string, unknown> | null,
+ ): NodeSet {
+   const document = node.document;
+-  if (document == null) return new NodeSet(document);
++  if (document == null) return new (nodeSetCtor())(document);
+ 
+   if (paths.length === 1) return this.xpathImpl(node, paths[0], handler, ns, binds);
+ 
+   return paths.reduce(
+     (combined, path) => combined.plus(this.xpathImpl(node, path, handler, ns, binds)),
+-    new NodeSet(document),
++    new (nodeSetCtor())(document),
+   );
+ }
+ 
+@@ -162,7 +162,7 @@ export function xpathImpl(
+   ns: Record<string, string>,
+   binds: Record<string, unknown> | null,
+ ): NodeSet {
+-  const context = new XPathContext(node);
++  const context = new (xpathContextCtor())(node);
+   context.registerNamespaces(ns);
+   context.registerVariables(binds);
+ 
+diff --git b/packages/nokogiri/lib/xml/xpath-context.ts a/packages/nokogiri/lib/xml/xpath-context.ts
+index 0726471bc9..02cf5794b8 100644
+--- b/packages/nokogiri/lib/xml/xpath-context.ts
++++ a/packages/nokogiri/lib/xml/xpath-context.ts
+@@ -21,7 +21,8 @@ import { Node } from "../html5/node.js";
+ import { XML } from "../namespaces.js";
+ import { Attr } from "./attr.js";
+ import { XmlNode as XMLNode } from "./node.js";
+-import { NodeSet } from "./node-set.js";
++import type { NodeSet } from "./node-set.js";
++import { nodeSetCtor, registerXPathContextCtor } from "./node-set-ctor.js";
+ import { Namespace } from "./namespace.js";
+ import {
+   evaluate,
+@@ -260,7 +261,7 @@ const LIBXML_TREE: Tree<LibXmlXPathNode> = {
+   },
+ };
+ 
+-interface ContextHost {
++export interface ContextHost {
+   readonly document: unknown;
+   readonly _node: unknown;
+ }
+@@ -424,7 +425,7 @@ export class XPathContext {
+ 
+   private xpath2ruby(value: Value<XPathNode>): NodeSet | string | number | boolean {
+     if (Array.isArray(value)) {
+-      return new NodeSet(
++      return new (nodeSetCtor())(
+         this._document,
+         value.map((n) => this.wrap(n)),
+       );
+@@ -452,10 +453,10 @@ export class XPathContext {
+     if (rbRetval === false) return false;
+     if (rbRetval == null) return null;
+     if (Array.isArray(rbRetval)) {
+-      const rbNodeSet = new NodeSet(this._document, rbRetval as Node[]);
++      const rbNodeSet = new (nodeSetCtor())(this._document, rbRetval as Node[]);
+       return rbNodeSet.map((n) => (n as unknown as { _node: XPathNode })._node);
+     }
+-    if (rbRetval instanceof NodeSet) {
++    if (rbRetval instanceof nodeSetCtor()) {
+       return rbRetval.map((n) => (n as unknown as { _node: XPathNode })._node);
+     }
+     throw new RuntimeError("Invalid return type");
+@@ -463,3 +464,4 @@ export class XPathContext {
+ }
+ 
+ constSet(XML, "XPathContext", XPathContext);
++registerXPathContextCtor(XPathContext);
+diff --git b/packages/rack-session/lib/cookie.ts a/packages/rack-session/lib/cookie.ts
+index 532e3d4b4f..7d37336f42 100644
+--- b/packages/rack-session/lib/cookie.ts
++++ a/packages/rack-session/lib/cookie.ts
+@@ -33,64 +33,66 @@ interface RackErrors {
+   puts(string?: string): unknown;
+ }
+ 
+-export class Cookie extends PersistedSecure {
+-  static Base64 = class Base64 {
+-    encode(str: string | Uint8Array): string {
+-      return RubyCompat.Base64.strictEncode64(str);
+-    }
++class Base64 {
++  encode(str: string | Uint8Array): string {
++    return RubyCompat.Base64.strictEncode64(str);
++  }
+ 
+-    decode(str: string): unknown {
+-      return RubyCompat.Base64.decode64(str);
++  decode(str: string): unknown {
++    return RubyCompat.Base64.decode64(str);
++  }
++
++  static Marshal = class Marshal extends Base64 {
++    override encode(str: unknown): string {
++      return super.encode(RubyCompat.Marshal.dump(str));
+     }
+ 
+-    static Marshal = class Marshal extends Base64 {
+-      override encode(str: unknown): string {
+-        return super.encode(RubyCompat.Marshal.dump(str));
++    override decode(str: string | null): unknown {
++      if (!isTruthy(str)) return null;
++      try {
++        return RubyCompat.Marshal.load(super.decode(str!) as string);
++      } catch (error) {
++        if (!(error instanceof StandardError)) throw error;
++        return null;
+       }
++    }
++  };
+ 
+-      override decode(str: string | null): unknown {
+-        if (!isTruthy(str)) return null;
+-        try {
+-          return RubyCompat.Marshal.load(super.decode(str!) as string);
+-        } catch (error) {
+-          if (!(error instanceof StandardError)) throw error;
+-          return null;
+-        }
+-      }
+-    };
++  static JSON = class JSON extends Base64 {
++    override encode(obj: unknown): string {
++      return super.encode(RubyCompat.JSON.dump(obj));
++    }
+ 
+-    static JSON = class JSON extends Base64 {
+-      override encode(obj: unknown): string {
+-        return super.encode(RubyCompat.JSON.dump(obj));
++    override decode(str: string | null): unknown {
++      if (!isTruthy(str)) return null;
++      try {
++        return RubyCompat.JSON.parse(super.decode(str!) as string);
++      } catch (error) {
++        if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
++        return null;
+       }
++    }
++  };
+ 
+-      override decode(str: string | null): unknown {
+-        if (!isTruthy(str)) return null;
+-        try {
+-          return RubyCompat.JSON.parse(super.decode(str!) as string);
+-        } catch (error) {
+-          if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
+-          return null;
+-        }
+-      }
+-    };
+-
+-    static ZipJSON = class ZipJSON extends Base64 {
+-      override encode(obj: unknown): string {
+-        return super.encode(Zlib.Deflate.deflate(RubyCompat.JSON.dump(obj)));
+-      }
++  static ZipJSON = class ZipJSON extends Base64 {
++    override encode(obj: unknown): string {
++      return super.encode(Zlib.Deflate.deflate(RubyCompat.JSON.dump(obj)));
++    }
+ 
+-      override decode(str: string | null): unknown {
+-        try {
+-          if (!isTruthy(str)) return null;
+-          return RubyCompat.JSON.parse(Zlib.Inflate.inflate(super.decode(str!) as string));
+-        } catch (error) {
+-          if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
+-          return null;
+-        }
++    override decode(str: string | null): unknown {
++      try {
++        if (!isTruthy(str)) return null;
++        return RubyCompat.JSON.parse(Zlib.Inflate.inflate(super.decode(str!) as string));
++      } catch (error) {
++        if (!(error instanceof StandardError || error instanceof SyntaxError)) throw error;
++        return null;
+       }
+-    };
++    }
+   };
++}
++
++export class Cookie extends PersistedSecure {
++  static Base64 = Base64;
+ 
+   static Identity = class Identity {
+     encode<T>(str: T): T {

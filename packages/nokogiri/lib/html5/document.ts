@@ -7,7 +7,6 @@ import { DocumentFragment } from "./document-fragment.js";
 import type { NodeSet } from "../xml/node-set.js";
 import * as Searchable from "../xml/searchable.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
-import "../xml/xpath-context.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 

@@ -117,8 +117,7 @@ export class Simple {
   }
 }
 
-class _SimpleProbe extends Base {}
-for (const source of [Base.prototype, new _SimpleProbe()]) {
+for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
   for (const key of Object.getOwnPropertyNames(source)) {
     if (key === "constructor") continue;
     if (Object.hasOwn(Simple.prototype, key)) continue;
