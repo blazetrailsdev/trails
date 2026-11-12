@@ -478,7 +478,7 @@
     }
   },
   "activerecord": {
-    "rows": 565,
+    "rows": 559,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
@@ -715,21 +715,15 @@
       "migration.ts::Current": "ActiveRecord::Migration::Current",
       "migration.ts::ReversibleBlockHelper": "ActiveRecord::Migration::ReversibleBlockHelper",
       "migration/compatibility.ts::V4_2": "ActiveRecord::Migration::Compatibility::V4_2",
-      "migration/compatibility.ts::V4_2.TableDefinition": "ActiveRecord::Migration::Compatibility::V4_2::TableDefinition",
       "migration/compatibility.ts::V5_0": "ActiveRecord::Migration::Compatibility::V5_0",
-      "migration/compatibility.ts::V5_0.TableDefinition": "ActiveRecord::Migration::Compatibility::V5_0::TableDefinition",
       "migration/compatibility.ts::V5_1": "ActiveRecord::Migration::Compatibility::V5_1",
       "migration/compatibility.ts::V5_2": "ActiveRecord::Migration::Compatibility::V5_2",
-      "migration/compatibility.ts::V5_2.TableDefinition": "ActiveRecord::Migration::Compatibility::V5_2::TableDefinition",
       "migration/compatibility.ts::V6_0": "ActiveRecord::Migration::Compatibility::V6_0",
       "migration/compatibility.ts::V6_0.ReferenceDefinition": "ActiveRecord::Migration::Compatibility::V6_0::ReferenceDefinition",
-      "migration/compatibility.ts::V6_0.TableDefinition": "ActiveRecord::Migration::Compatibility::V6_0::TableDefinition",
       "migration/compatibility.ts::V6_1": "ActiveRecord::Migration::Compatibility::V6_1",
       "migration/compatibility.ts::V6_1.PostgreSQLCompat": "ActiveRecord::Migration::Compatibility::V6_1::PostgreSQLCompat",
-      "migration/compatibility.ts::V6_1.TableDefinition": "ActiveRecord::Migration::Compatibility::V6_1::TableDefinition",
       "migration/compatibility.ts::V7_0": "ActiveRecord::Migration::Compatibility::V7_0",
       "migration/compatibility.ts::V7_0.LegacyIndexName": "ActiveRecord::Migration::Compatibility::V7_0::LegacyIndexName",
-      "migration/compatibility.ts::V7_0.TableDefinition": "ActiveRecord::Migration::Compatibility::V7_0::TableDefinition",
       "migration/compatibility.ts::V7_1": "ActiveRecord::Migration::Compatibility::V7_1",
       "migration/compatibility.ts::V7_2": "ActiveRecord::Migration::Compatibility::V7_2",
       "migration/pending-migration-connection.ts::PendingMigrationConnection": "ActiveRecord::PendingMigrationConnection",
@@ -1228,15 +1222,13 @@
     }
   },
   "rack-session": {
-    "rows": 19,
+    "rows": 17,
     "excluded": [],
     "unwalked": [
       "cookie.ts::Cookie.Base64",
       "cookie.ts::Cookie.Base64.JSON",
-      "cookie.ts::Cookie.Base64.Marshal",
       "cookie.ts::Cookie.Base64.ZipJSON",
       "cookie.ts::Cookie.Identity",
-      "cookie.ts::Cookie.Marshal",
       "cookie.ts::Cookie.SessionId",
       "encryptor.ts::Encryptor.Error",
       "encryptor.ts::Encryptor.InvalidMessage",
@@ -1310,13 +1302,11 @@
     "residue": {}
   },
   "thor": {
-    "rows": 41,
+    "rows": 39,
     "excluded": ["thor.ts::Thor"],
     "unwalked": [
       "actions.ts::Actions",
       "base.ts::Base",
-      "error.ts::UndefinedCommandError.SpellChecker",
-      "error.ts::UnknownArgumentError.SpellChecker",
       "invocation.ts::Invocation",
       "shell.ts::Shell"
     ],

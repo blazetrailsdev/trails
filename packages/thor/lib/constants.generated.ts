@@ -64,7 +64,5 @@ defineConstants([
   [() => m23.TablePrinter, "Thor::Shell::TablePrinter"],
   [() => m24.WrappedPrinter, "Thor::Shell::WrappedPrinter"],
   [() => m10.UndefinedCommandError, "Thor::UndefinedCommandError"],
-  [() => m10.UndefinedCommandError.SpellChecker, "Thor::UndefinedCommandError::SpellChecker"],
   [() => m10.UnknownArgumentError, "Thor::UnknownArgumentError"],
-  [() => m10.UnknownArgumentError.SpellChecker, "Thor::UnknownArgumentError::SpellChecker"],
 ]);

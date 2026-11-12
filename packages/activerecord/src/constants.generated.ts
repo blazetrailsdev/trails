@@ -587,47 +587,23 @@ defineConstants([
   [() => m131.CommandRecorder, "ActiveRecord::Migration::CommandRecorder"],
   [() => m132, "ActiveRecord::Migration::Compatibility"],
   [() => m132.V4_2, "ActiveRecord::Migration::Compatibility::V4_2"],
-  [
-    () => m132.V4_2.TableDefinition,
-    "ActiveRecord::Migration::Compatibility::V4_2::TableDefinition",
-  ],
   [() => m132.V5_0, "ActiveRecord::Migration::Compatibility::V5_0"],
-  [
-    () => m132.V5_0.TableDefinition,
-    "ActiveRecord::Migration::Compatibility::V5_0::TableDefinition",
-  ],
   [() => m132.V5_1, "ActiveRecord::Migration::Compatibility::V5_1"],
   [() => m132.V5_2, "ActiveRecord::Migration::Compatibility::V5_2"],
-  [
-    () => m132.V5_2.TableDefinition,
-    "ActiveRecord::Migration::Compatibility::V5_2::TableDefinition",
-  ],
   [() => m132.V6_0, "ActiveRecord::Migration::Compatibility::V6_0"],
   [
     () => m132.V6_0.ReferenceDefinition,
     "ActiveRecord::Migration::Compatibility::V6_0::ReferenceDefinition",
-  ],
-  [
-    () => m132.V6_0.TableDefinition,
-    "ActiveRecord::Migration::Compatibility::V6_0::TableDefinition",
   ],
   [() => m132.V6_1, "ActiveRecord::Migration::Compatibility::V6_1"],
   [
     () => m132.V6_1.PostgreSQLCompat,
     "ActiveRecord::Migration::Compatibility::V6_1::PostgreSQLCompat",
   ],
-  [
-    () => m132.V6_1.TableDefinition,
-    "ActiveRecord::Migration::Compatibility::V6_1::TableDefinition",
-  ],
   [() => m132.V7_0, "ActiveRecord::Migration::Compatibility::V7_0"],
   [
     () => m132.V7_0.LegacyIndexName,
     "ActiveRecord::Migration::Compatibility::V7_0::LegacyIndexName",
-  ],
-  [
-    () => m132.V7_0.TableDefinition,
-    "ActiveRecord::Migration::Compatibility::V7_0::TableDefinition",
   ],
   [() => m132.V7_1, "ActiveRecord::Migration::Compatibility::V7_1"],
   [() => m132.V7_2, "ActiveRecord::Migration::Compatibility::V7_2"],

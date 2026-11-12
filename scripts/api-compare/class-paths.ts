@@ -408,7 +408,11 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
           const nested = await Promise.all(
             ambiguous.get(key)!.map((fqn) => tsPath({ ...entry, fqn })),
           );
-          if (nested.every((p) => p !== null && p.includes("."))) {
+          const namespaced = new RegExp(`^\\s+export\\s+namespace\\s+${entry.tsName}\\b`, "m");
+          if (
+            namespaced.test(await read(entry.file)) &&
+            nested.every((p) => p !== null && p.includes("."))
+          ) {
             ambiguous
               .get(key)!
               .forEach((fqn, i) => entries.push({ ...entry, fqn, tsName: nested[i]!, ...placed }));
