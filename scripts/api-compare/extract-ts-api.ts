@@ -1265,15 +1265,17 @@ export function extractFromProgram(
     // `ClassMethods.tasks = ClassMethods.commands;` — Ruby's
     // `alias_method :tasks, :commands` on a plain-object module whose literal
     // types the alias with a placeholder slot.
-    for (const statement of sourceFile.statements) {
+    // A class static block seats a nested module's alias the same way:
+    // `V6_0.TableDefinition.belongsTo = V6_0.TableDefinition.references;`.
+    for (const statement of [...sourceFile.statements, ...staticBlockStatements]) {
       const expr = ts.isExpressionStatement(statement) ? statement.expression : undefined;
       if (!expr || !ts.isBinaryExpression(expr)) continue;
       if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
       const { left, right } = expr;
       if (!ts.isPropertyAccessExpression(left) || !ts.isPropertyAccessExpression(right)) continue;
-      if (!ts.isIdentifier(left.expression) || !ts.isIdentifier(right.expression)) continue;
-      if (left.expression.text !== right.expression.text) continue;
-      const mod = info.modules[`${relPath}:${left.expression.text}`];
+      const receiver = left.expression.getText(sourceFile);
+      if (receiver !== right.expression.getText(sourceFile)) continue;
+      const mod = info.modules[`${relPath}:${receiver}`];
       if (!mod) continue;
       for (const list of [mod.instanceMethods, mod.classMethods]) {
         const original = list.find((m) => m.name === right.name.text && !m.bodyless);
@@ -3961,7 +3963,8 @@ function sameFileConstStrings(name: string, sourceFile: ts.SourceFile): string[]
 }
 
 /**
- * `delegate.call(Klass.prototype, "m", …, { to: "target" })` at a file's top level —
+ * `delegate.call(Klass.prototype, "m", …, { to: "target" })`, or
+ * `delegate.call(PlainModule, …)` for a plain-object module, at a file's top level —
  * Ruby's `delegate :m, to: :target` in a class module's body
  * (`core_ext/module/delegation.rb:171`), which defines instance readers only.
  */
@@ -3970,7 +3973,12 @@ function readPrototypeDelegateCall(
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
   const [recv, ...rest] = node.arguments;
-  const receiver = recv !== undefined ? prototypeReceiver(recv) : undefined;
+  const receiver =
+    recv === undefined
+      ? undefined
+      : ts.isIdentifier(recv)
+        ? importedName(recv, sourceFile)
+        : prototypeReceiver(recv);
   if (receiver === undefined || enclosingEntity(node) !== undefined) return null;
   const opts = rest.at(-1);
   const options = opts !== undefined && ts.isObjectLiteralExpression(opts) ? opts : undefined;
