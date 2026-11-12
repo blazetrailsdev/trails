@@ -95,7 +95,7 @@ beforeEach(async () => {
     'import { Module } from "@blazetrails/ruby-compat";\nnew Module();\n',
   );
   await write("packages/vitest-matchers/package.json", "{}");
-  await write("packages/solid-cache/package.json", '{"description":"Solid Cache for Trails"}');
+  await write("packages/minitest/package.json", '{"description":"Minitest for Trails"}');
   await write("packages/not-a-package/README.md", "");
   await write(
     "scripts/api-compare/call-mismatches-exclude/activerecord/a.json",
@@ -227,7 +227,7 @@ describe("package-summary", () => {
 
   it("emits one entry per package.json with its metadata", async () => {
     const { packages } = await summarize(root);
-    expect(packages.map((p) => p.name)).toEqual(["activerecord", "solid-cache", "vitest-matchers"]);
+    expect(packages.map((p) => p.name)).toEqual(["activerecord", "minitest", "vitest-matchers"]);
     const [ar, , vm] = packages;
     expect(ar.railsCounterpart).toBe("activerecord");
     expect(ar.description).toBe("ORM layer");
@@ -240,22 +240,22 @@ describe("package-summary", () => {
   });
 
   it("appends why parity:api skips a package to its description", async () => {
-    const cache = (await summarize(root)).packages.find((p) => p.name === "solid-cache")!;
-    expect(cache.railsCounterpart).toBe("solid_cache");
-    expect(cache.description).toContain(
-      `Solid Cache for Trails (Not in parity:api: ${apiExcludedReasonOf("solid-cache")})`,
+    const minitest = (await summarize(root)).packages.find((p) => p.name === "minitest")!;
+    expect(minitest.railsCounterpart).toBe("minitest");
+    expect(minitest.description).toContain(
+      `Minitest for Trails (Not in parity:api: ${apiExcludedReasonOf("minitest")})`,
     );
-    expect(apiExcludedReasonOf("solid-cache")).toContain("no packages/solid-cache");
+    expect(apiExcludedReasonOf("minitest")).toContain("no packages/minitest");
     expect(apiExcludedReasonOf("date")).toBeNull();
     expect(apiExcludedReasonOf("activerecord")).toBeNull();
   });
 
   it("appends why parity:test skips a package to its description", async () => {
-    const cache = (await summarize(root)).packages.find((p) => p.name === "solid-cache")!;
-    expect(cache.description).toBe(
-      `Solid Cache for Trails (Not in parity:api: ${apiExcludedReasonOf("solid-cache")}) (Not in parity:test: ${testsExcludedReasonOf("solid-cache")})`,
+    const minitest = (await summarize(root)).packages.find((p) => p.name === "minitest")!;
+    expect(minitest.description).toBe(
+      `Minitest for Trails (Not in parity:api: ${apiExcludedReasonOf("minitest")}) (Not in parity:test: ${testsExcludedReasonOf("minitest")})`,
     );
-    expect(testsExcludedReasonOf("solid-cache")).toContain("solid-cache-package-skeleton");
+    expect(testsExcludedReasonOf("minitest")).toContain("map-vendored-minitest");
     expect(testsExcludedReasonOf("activerecord")).toBeNull();
   });
 

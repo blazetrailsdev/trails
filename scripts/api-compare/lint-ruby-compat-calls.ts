@@ -128,6 +128,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "rails-html-sanitizer",
   "rake",
   "solid-cable",
+  "solid-cache",
   "solid-queue",
   "sqlite3",
   "thor",

@@ -25,7 +25,10 @@ export class MaglevHash {
     return this.nodes[this.lookup[this.quickHash(key) % MaglevHash.TABLE_SIZE]!];
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs new — PERMANENT
+   */
   private buildLookup(): (number | null)[] {
     const lookup = new Array<number | null>(MaglevHash.TABLE_SIZE).fill(null);
 
@@ -50,7 +53,10 @@ export class MaglevHash {
     return new MaglevHash.Preferences(offset, skip);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs unpack1 — PERMANENT
+   */
   private md5(...args: string[]): number {
     return unpack1(Digest.MD5.digest(args.join("")), "L>") as number;
   }
