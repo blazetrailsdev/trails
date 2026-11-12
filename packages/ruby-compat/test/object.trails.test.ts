@@ -1621,3 +1621,15 @@ describe("nameErrMesgReceiver", () => {
     expect(nameErrMesgReceiver(new Customer())).toBe("an instance of Customer");
   });
 });
+
+describe("rbModMethodDefined on a plain-object module", () => {
+  it("answers its own members and those of a module it recorded including", () => {
+    const inner = { innerMethod(): void {} };
+    const outer = { outerMethod(): void {} };
+    include(outer, inner);
+    expect(rbModMethodDefined(outer, "outerMethod")).toBe(true);
+    expect(rbModMethodDefined(outer, "innerMethod")).toBe(true);
+    expect(rbModMethodDefined(outer, "innerMethod", false)).toBe(false);
+    expect(rbModMethodDefined(outer, "missing")).toBe(false);
+  });
+});
