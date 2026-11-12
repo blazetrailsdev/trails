@@ -1,5 +1,5 @@
 import { constSet } from "./include.js";
-import { TopLevel } from "./object.js";
+import { TopLevel, rbObjRespondTo } from "./object.js";
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
 import type { StringIO } from "./string-io.js";
@@ -56,6 +56,12 @@ class GzipFile<IO extends { close(): void } = File> {
 class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
   private readonly z: GzipReaderHandle;
 
+  /**
+   * `gz->z.buf` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2894`). `gzfile_calc_crc`
+   * (`zlib.c:2900`) has no port: `gunzipSync` checks the footer CRC.
+   */
+  private buf: Uint8Array | null = null;
+
   constructor(io: File | StringIO<Uint8Array>) {
     super(io);
     this.z = getZlib().gzipReader(io);
@@ -89,9 +95,6 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
     return gzfileWrap(gz, block);
   }
 
-  /** The inflated bytes not yet read, `gz->z.buf` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2894`). */
-  private buf: Uint8Array | null = null;
-
   /**
    * `rb_gzreader_read` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4009`): with no
    * length `gzfile_read_all` (`zlib.c:2946`), otherwise `gzfile_read`
@@ -99,6 +102,8 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
    * are one character per byte; `gzfile_newstr` (`zlib.c:2859`) tags them
    * with the default external encoding without converting them, and a JS
    * string carries no tag, so a text reader takes them through `forceEncoding`.
+   *
+   * @missingRailsCall gzfile_read_more — CONVERGEABLE ruby-compat-gzip-sync-zstream-and-footer-errors
    */
   read(len?: null): string;
   read(len: number): string | null;
@@ -177,6 +182,8 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
   /**
    * `rb_gzwriter_write` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3745`). A
    * `Uint8Array` is an ASCII-8BIT String's bytes, as for `IO#write`.
+   *
+   * @missingRailsCall gzfile_write_raw — CONVERGEABLE ruby-compat-gzip-sync-zstream-and-footer-errors
    */
   write(string: string | Uint8Array): number {
     const buffer = typeof string === "string" ? new TextEncoder().encode(string) : string;
@@ -188,8 +195,9 @@ class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
   /** `rb_gzwriter_flush` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3721`). */
   async flush(flush: number = Zlib.SYNC_FLUSH): Promise<this> {
     this.headerFinished = true;
-    if (flush !== Zlib.NO_FLUSH) {
-      await this.z.flush(flush);
+    await this.z.flush(flush);
+    if (rbObjRespondTo(this.io, "flush")) {
+      this.io.flush();
     }
     return this;
   }

@@ -231,7 +231,7 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
           if (flush !== 0) stream.flush(flush, () => {});
         },
         flush: async (flush) => {
-          await new Promise<void>((res) => stream.flush(flush, res));
+          if (flush !== 0) await new Promise<void>((res) => stream.flush(flush, res));
           writeRaw();
           if (failure !== null) throw failure;
         },
