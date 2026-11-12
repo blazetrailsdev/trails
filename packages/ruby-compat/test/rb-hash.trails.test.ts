@@ -14,4 +14,9 @@ describe("rbHash", () => {
     expect(rbHash(hash)).toBe(rbHash({ count: 5 }));
     expect(rbHash(except({ count: 5, if: "admin" }, "if"))).toBe(rbHash({ count: 5 }));
   });
+
+  it("hashes a RegExp by source and flags, as rb_reg_hash does", () => {
+    expect(rbHash(/[^/.?]+/)).toBe(rbHash(new RegExp("[^/.?]+")));
+    expect(rbHash(/a/i)).not.toBe(rbHash(/a/));
+  });
 });
