@@ -31,6 +31,8 @@ export interface PackageLayout {
   collapse?: string[];
   /** A second class in `foo.ts` is `Foo`'s sibling (`Arel::Nodes::Between`), not nested in it. */
   siblings?: boolean;
+  /** An exported `const` plain-object module or `Struct.new` class is walked as a constant. */
+  constModules?: boolean;
 }
 
 /** A package with no row has its directories for roots. */
@@ -68,7 +70,7 @@ export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
   fugit: { root: "Fugit" },
   globalid: { root: "GlobalID" },
   i18n: { root: "I18n", siblings: true },
-  mail: { root: "Mail", collapse: ["fields", "elements"] },
+  mail: { root: "Mail", collapse: ["fields", "elements"], constModules: true },
   marcel: { root: "Marcel", siblings: true },
   "mini-magick": { root: "MiniMagick", siblings: true },
   msgpack: { root: "MessagePack" },
@@ -183,10 +185,35 @@ export async function derivedConstantPath(
   return [...segments, ...nested].join("::");
 }
 
+/**
+ * The constants an exported statement declares: a class, or a `const` holding
+ * a plain-object module (`export const Utilities = { … }`) or a `Struct.new`
+ * class (`export const PhraseListsStruct = Struct.new(…)`).
+ */
+function seatedNames(statement: ts.Statement, constModules: boolean): string[] {
+  if (ts.isClassDeclaration(statement)) return statement.name ? [statement.name.text] : [];
+  if (!constModules || !ts.isVariableStatement(statement)) return [];
+  if (!(statement.declarationList.flags & ts.NodeFlags.Const)) return [];
+  return statement.declarationList.declarations.flatMap((decl) => {
+    if (!ts.isIdentifier(decl.name) || !/^[A-Z][a-z]/.test(decl.name.text)) return [];
+    const init = decl.initializer;
+    const isModule = init !== undefined && ts.isObjectLiteralExpression(init);
+    const isStruct =
+      init !== undefined &&
+      ts.isCallExpression(init) &&
+      ts.isPropertyAccessExpression(init.expression) &&
+      ts.isIdentifier(init.expression.expression) &&
+      init.expression.expression.text === "Struct" &&
+      init.expression.name.text === "new";
+    return isModule || isStruct ? [decl.name.text] : [];
+  });
+}
+
 /** Walks `dir`'s `src/` as the loader does, and answers each exported class's derived row. */
 export async function walkConstants(dir: string): Promise<Map<string, string>> {
   const loader = await loaderFor(dir);
   const src = srcRoot(dir);
+  const constModules = PACKAGE_LAYOUTS[dir]?.constModules ?? false;
   const rows = new Map<string, string>();
   const walk = async (subdir: string): Promise<void> => {
     await loader.ls(subdir, async (_basename, abspath, ftype) => {
@@ -195,17 +222,14 @@ export async function walkConstants(dir: string): Promise<Map<string, string>> {
       const file = abspath.slice(src.length + 1);
       const parsed = ts.createSourceFile(abspath, source, ts.ScriptTarget.Latest);
       for (const statement of parsed.statements) {
-        if (!ts.isClassDeclaration(statement) || statement.name === undefined) continue;
-        const exported = ts
-          .getModifiers(statement)
-          ?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
-        const ambient = ts
-          .getModifiers(statement)
-          ?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword);
+        const modifiers = ts.canHaveModifiers(statement) ? ts.getModifiers(statement) : undefined;
+        const exported = modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+        const ambient = modifiers?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword);
         if (!exported || ambient) continue;
-        const tsName = statement.name.text;
-        const fqn = await derivedConstantPath(dir, file, tsName);
-        if (fqn !== null) rows.set(`${file}::${tsName}`, fqn);
+        for (const tsName of seatedNames(statement, constModules)) {
+          const fqn = await derivedConstantPath(dir, file, tsName);
+          if (fqn !== null) rows.set(`${file}::${tsName}`, fqn);
+        }
       }
     });
   };

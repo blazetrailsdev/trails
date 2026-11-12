@@ -10,3 +10,11 @@ describe("CommonAddressField#value=", () => {
     }).toThrow(NoMethodError);
   });
 });
+
+describe("CommonAddressField#encode_if_needed", () => {
+  it("passes a binary-read UTF-8 address through as a string", () => {
+    const field = new ToField("a@b.c");
+    const bytes = new TextEncoder().encode("Mikel Lindsäar <mikel@test.lindsaar.net>");
+    expect(field.encodeIfNeeded(bytes, null)).toBe("Mikel Lindsäar <mikel@test.lindsaar.net>");
+  });
+});
