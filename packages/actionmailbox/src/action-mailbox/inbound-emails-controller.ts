@@ -50,8 +50,8 @@ export class InboundEmailsController extends Trails.Conductor.BaseController {
         "subject",
         "body",
         { attachments: [] },
-      ],
-    }) as Parameters;
+      ] as const,
+    });
   }
 
   /** @internal */
