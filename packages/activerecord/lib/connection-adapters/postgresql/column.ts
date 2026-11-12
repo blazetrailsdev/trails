@@ -100,9 +100,9 @@ export class Column extends BaseColumn {
   }
 
   override initWith(coder: ColumnCoder): void {
-    this._serial = (coder["serial"] as boolean) ?? false;
-    this._identity = (coder["identity"] as string | null) ?? null;
-    this._generated = (coder["generated"] as string | null) ?? null;
+    this._serial = coder["serial"] as boolean;
+    this._identity = coder["identity"] as string | null;
+    this._generated = coder["generated"] as string | null;
     super.initWith(coder);
   }
 

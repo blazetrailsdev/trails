@@ -129,12 +129,12 @@ export class Column {
 
   initWith(coder: ColumnCoder): void {
     this.name = coder["name"] as string;
-    this.sqlTypeMetadata = (coder["sql_type_metadata"] as SqlTypeMetadata | null) ?? null;
+    this.sqlTypeMetadata = coder["sql_type_metadata"] as SqlTypeMetadata | null;
     this.null = coder["null"] as boolean;
     this.default = coder["default"] as string | Uint8Array | null;
-    this.defaultFunction = (coder["default_function"] as string | null) ?? null;
-    this.collation = (coder["collation"] as string | null) ?? null;
-    this.comment = (coder["comment"] as string | null) ?? null;
+    this.defaultFunction = coder["default_function"] as string | null;
+    this.collation = coder["collation"] as string | null;
+    this.comment = coder["comment"] as string | null;
   }
 
   encodeWith(coder: ColumnCoder): void {

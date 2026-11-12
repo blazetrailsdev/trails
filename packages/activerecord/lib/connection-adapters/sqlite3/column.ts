@@ -70,7 +70,7 @@ export class Column extends BaseColumn {
   }
 
   override initWith(coder: ColumnCoder): void {
-    this._autoIncrement = (coder["auto_increment"] as boolean) ?? false;
+    this._autoIncrement = coder["auto_increment"] as boolean;
     super.initWith(coder);
   }
 
