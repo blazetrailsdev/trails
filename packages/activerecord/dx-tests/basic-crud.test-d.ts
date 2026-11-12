@@ -102,7 +102,15 @@ describe("basic CRUD DX — defining and using a model", () => {
   it("User.count / exists / pluck have concrete return types", () => {
     expectTypeOf(User.count).returns.resolves.toEqualTypeOf<number>();
     expectTypeOf(User.isExists).returns.resolves.toBeBoolean();
-    expectTypeOf(User.pluck).returns.resolves.toEqualTypeOf<unknown[]>();
+    expectTypeOf(User.pluck("count(*)")).resolves.toEqualTypeOf<unknown[]>();
+  });
+
+  it("pluck of literal column names types each row from the model's attributes", async () => {
+    expectTypeOf(await User.pluck("name")).toEqualTypeOf<string[]>();
+    expectTypeOf(await User.pluck("name", "email")).toEqualTypeOf<[string, string][]>();
+    expectTypeOf(await User.where({ name: "x" }).pluck("email")).toEqualTypeOf<string[]>();
+    expectTypeOf(await User.pluck("count(*)")).toEqualTypeOf<unknown[]>();
+    expectTypeOf(await User.pluck(User.arelTable.get("name"))).toEqualTypeOf<unknown[]>();
   });
 
   it("awaiting a typed Relation<User> resolves to User[]", async () => {

@@ -69,7 +69,12 @@ import { FutureResult, Complete } from "./future-result.js";
 import { ScopeRegistry } from "./scoping.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import { Calculations, type CalculationMethods } from "./relation/calculations.js";
+import {
+  Calculations,
+  type CalculationMethods,
+  type PluckColumn,
+  type PluckedRow,
+} from "./relation/calculations.js";
 import { FinderMethods } from "./relation/finder-methods.js";
 import { SpawnMethods } from "./relation/spawn-methods.js";
 import { FromClause } from "./relation/from-clause.js";
@@ -1881,6 +1886,11 @@ export interface Relation<T extends Base, G extends boolean = false>
     Included<SignedIdRelationMethods<T>>,
     Included<TokenForRelationMethods<T>>,
     CalculationMethods<G> {
+  pluck<K extends PluckColumn<T>>(column: K): Promise<T[K][]>;
+  pluck<K extends [PluckColumn<T>, PluckColumn<T>, ...PluckColumn<T>[]]>(
+    ...columns: K
+  ): Promise<PluckedRow<T, K>[]>;
+  pluck(...columns: Parameters<CalculationMethods<G>["pluck"]>): Promise<unknown[]>;
   find(block: (record: T) => unknown): Promise<T | null>;
   find(ids: unknown[]): Promise<T[]>;
   find(id: unknown): Promise<T>;

@@ -13,7 +13,12 @@ import type {
   JoinSpec,
   UnscopeArg,
 } from "./relation/query-methods.js";
-import type { SumBlock } from "./relation/calculations.js";
+import type {
+  CalculationMethods,
+  PluckColumn,
+  PluckedRow,
+  SumBlock,
+} from "./relation/calculations.js";
 
 export const QUERYING_METHODS = [
   "find",
@@ -564,12 +569,28 @@ export function sum<T extends typeof Base>(
   )(column, block);
 }
 
+export function pluck<T extends typeof Base, K extends PluckColumn<InstanceType<T>>>(
+  this: T,
+  column: K,
+): Promise<InstanceType<T>[K][]>;
+export function pluck<
+  T extends typeof Base,
+  K extends [
+    PluckColumn<InstanceType<T>>,
+    PluckColumn<InstanceType<T>>,
+    ...PluckColumn<InstanceType<T>>[],
+  ],
+>(this: T, ...columns: K): Promise<PluckedRow<InstanceType<T>, K>[]>;
 export function pluck<T extends typeof Base>(
   this: T,
-  ...columns: Parameters<ReturnType<T["all"]>["pluck"]>
-): ReturnType<ReturnType<T["all"]>["pluck"]> {
-  const rel = this.all() as ReturnType<T["all"]>;
-  return rel.pluck(...columns) as ReturnType<ReturnType<T["all"]>["pluck"]>;
+  ...columns: Parameters<CalculationMethods["pluck"]>
+): Promise<unknown[]>;
+export function pluck<T extends typeof Base>(
+  this: T,
+  ...columns: Parameters<CalculationMethods["pluck"]>
+): Promise<unknown[]> {
+  const rel = this.all();
+  return rel.pluck(...columns);
 }
 
 export function ids<T extends typeof Base>(this: T): Promise<unknown[]> | unknown[] {

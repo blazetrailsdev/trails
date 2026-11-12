@@ -1,4 +1,5 @@
 import type { PermittedAttributes } from "@blazetrails/activemodel";
+import type { PluckColumn, PluckedRow } from "../relation/calculations.js";
 import { NoMethodError, extend } from "@blazetrails/ruby-compat";
 import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
@@ -328,6 +329,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return (await this._association.find(...args)) as T | T[];
   }
 
+  override pluck<K extends PluckColumn<T>>(column: K): Promise<T[K][]>;
+  override pluck<K extends [PluckColumn<T>, PluckColumn<T>, ...PluckColumn<T>[]]>(
+    ...columns: K
+  ): Promise<PluckedRow<T, K>[]>;
+  override pluck(
+    ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
+  ): Promise<unknown[]>;
   override async pluck(
     ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
