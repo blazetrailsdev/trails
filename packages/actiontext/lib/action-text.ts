@@ -10,9 +10,11 @@ import type { AttachmentGallery } from "./attachment-gallery.js";
 import type { Caching } from "./attachments/caching.js";
 import type { Minification } from "./attachments/minification.js";
 import type { TrixConversion } from "./attachments/trix-conversion.js";
+import type { Content } from "./content.js";
 import type { Fragment } from "./fragment.js";
 import type { HtmlConversion } from "./html-conversion.js";
 import type { PlainTextConversion } from "./plain-text-conversion.js";
+import type { Rendering } from "./rendering.js";
 import type { TrixAttachment } from "./trix-attachment.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -27,9 +29,11 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_text/attachments/caching": () => import("./attachments/caching.js"),
   "action_text/attachments/minification": () => import("./attachments/minification.js"),
   "action_text/attachments/trix_conversion": () => import("./attachments/trix-conversion.js"),
+  "action_text/content": () => import("./content.js"),
   "action_text/fragment": () => import("./fragment.js"),
   "action_text/html_conversion": () => import("./html-conversion.js"),
   "action_text/plain_text_conversion": () => import("./plain-text-conversion.js"),
+  "action_text/rendering": () => import("./rendering.js"),
   "action_text/trix_attachment": () => import("./trix-attachment.js"),
 };
 
@@ -69,10 +73,11 @@ export const ActionText = {
   Attachment?: typeof Attachment;
   AttachmentGallery?: typeof AttachmentGallery;
   Attachments: typeof Attachments;
-  Content?: { render(...args: unknown[]): unknown };
+  Content?: typeof Content;
   Fragment?: typeof Fragment;
   HtmlConversion?: typeof HtmlConversion;
   PlainTextConversion?: typeof PlainTextConversion;
+  Rendering?: typeof Rendering;
   TrixAttachment?: typeof TrixAttachment;
 };
 extend(ActionText, Autoload);
@@ -81,9 +86,11 @@ constSet(TopLevel, "ActionText", ActionText);
 ActionText.autoload("Attachable");
 ActionText.autoload("Attachment");
 ActionText.autoload("AttachmentGallery");
+ActionText.autoload("Content");
 ActionText.autoload("Fragment");
 ActionText.autoload("HtmlConversion");
 ActionText.autoload("PlainTextConversion");
+ActionText.autoload("Rendering");
 ActionText.autoload("TrixAttachment");
 
 const Attachments = { name: "ActionText::Attachments", loadPath } as AutoloadModule & {

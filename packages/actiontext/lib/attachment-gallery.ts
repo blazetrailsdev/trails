@@ -8,22 +8,25 @@ import { Fragment } from "./fragment.js";
 const TAG_NAME = "div";
 
 export class AttachmentGallery extends Model {
-  static fragmentByCanonicalizingAttachmentGalleries(content: unknown): Fragment {
+  static fragmentByCanonicalizingAttachmentGalleries(content: unknown): Promise<Fragment> {
     return this.fragmentByReplacingAttachmentGalleryNodes(
       content,
       (node) => `<${TAG_NAME}>${node.innerHtml()}</${TAG_NAME}>`,
     );
   }
 
-  static fragmentByReplacingAttachmentGalleryNodes(
+  static async fragmentByReplacingAttachmentGalleryNodes(
     content: unknown,
     block: (node: Html5Node) => unknown,
-  ): Fragment {
-    return Fragment.wrap(content).update((source) => {
-      for (const node of this.findAttachmentGalleryNodes(source)) {
-        node.replace(toS(block(node)));
-      }
+  ): Promise<Fragment> {
+    let nodes: Html5Node[] = [];
+    const fragment = Fragment.wrap(content).update((source) => {
+      nodes = this.findAttachmentGalleryNodes(source);
     });
+    for (const node of nodes) {
+      node.replace(toS(await block(node)));
+    }
+    return fragment;
   }
 
   static findAttachmentGalleryNodes(content: unknown): Html5Node[] {

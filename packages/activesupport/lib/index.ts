@@ -279,6 +279,7 @@ export { BigDecimal, toD } from "./core-ext/big-decimal/conversions.js";
 export { toF, toI } from "./core-ext/string/conversions.js";
 export { endsWith, startsWith } from "./core-ext/string/starts-ends-with.js";
 export {
+  threadCattrAccessor,
   threadMattrAccessor,
   threadMattrKey,
 } from "./core-ext/module/attribute-accessors-per-thread.js";
