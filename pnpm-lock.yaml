@@ -1052,6 +1052,9 @@ importers:
       '@blazetrails/globalid':
         specifier: workspace:*
         version: link:../globalid
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

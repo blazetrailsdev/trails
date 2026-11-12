@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BetterSQLite3Adapter } from "./better-sqlite3-adapter.js";
+import { BusyException } from "../sqlite/errors.js";
 
 describe("SQLite3Adapter busy handler", () => {
   let dir: string;
@@ -217,5 +218,16 @@ describe("SQLite3Adapter busy handler", () => {
     await expect(impatient.execute("INSERT INTO t VALUES (2)")).rejects.toThrow(/locked/);
     await writer.execute("ROLLBACK");
     await impatient.disconnectBang();
+  });
+  it("waits at a direct driver call, so the lock holder can commit", async () => {
+    await waiter.execute("SELECT 1");
+    const raw = waiter._rawConnection!;
+    const pragma = raw.pragma.bind(raw);
+    vi.spyOn(raw, "pragma").mockImplementationOnce(() => {
+      throw new BusyException("database is locked");
+    });
+    vi.spyOn(raw, "pragma").mockImplementation(pragma);
+
+    expect(await waiter.encoding()).toBe("UTF-8");
   });
 });

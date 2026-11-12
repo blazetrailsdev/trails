@@ -3,6 +3,7 @@ import "./support/dummy-application.js";
 import { Engine, SolidQueue } from "../lib/index.js";
 import { Base } from "../lib/processes/base.js";
 import { Record } from "../lib/record.js";
+import { Task } from "@blazetrails/rake";
 
 async function runConfigInitializer(): Promise<void> {
   const initializer = Engine.initializers.find((i) => i.name === "solid_queue.config")!;
@@ -18,6 +19,14 @@ describe("SolidQueue::Engine", () => {
       "solid_queue.active_job.extensions",
       "solid_queue.include_interruptible_concern",
     ]);
+  });
+
+  it("loads solid_queue/tasks from its rake_tasks block", async () => {
+    await Engine.instance().runTasksBlocks({});
+
+    expect(Task.isTaskDefined("solid_queue:install")).toBe(true);
+    expect(Task.isTaskDefined("solid_queue:start")).toBe(true);
+    expect((await Task.get("solid_queue:start")).prerequisites).toEqual(["environment"]);
   });
 
   it("includes Interruptible into Processes::Base and seats the app executor", () => {

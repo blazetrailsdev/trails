@@ -378,9 +378,12 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return SQLite3Adapter.NATIVE_DATABASE_TYPES;
   }
 
+  /** @inventedArm retryBusy — PERMANENT */
   async encoding(): Promise<string> {
     const rawConnection = (await this.anyRawConnection()) as SqliteConnection;
-    return SQLite3Adapter.parseEncoding(await rawConnection.pragma("encoding"));
+    return SQLite3Adapter.parseEncoding(
+      await retryBusy(rawConnection, () => rawConnection.pragma("encoding")),
+    );
   }
 
   override supportsExplain(): boolean {
@@ -1039,11 +1042,14 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm retryBusy — PERMANENT
+   */
   override async reconnect(): Promise<void> {
     if (await this.active()) {
       try {
-        await this._rawConnection!.rollback();
+        await retryBusy(this._rawConnection!, () => this._rawConnection!.rollback());
       } catch {}
     } else {
       await this.connect();
