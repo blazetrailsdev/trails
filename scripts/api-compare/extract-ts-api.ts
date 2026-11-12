@@ -1265,8 +1265,6 @@ export function extractFromProgram(
     // `ClassMethods.tasks = ClassMethods.commands;` — Ruby's
     // `alias_method :tasks, :commands` on a plain-object module whose literal
     // types the alias with a placeholder slot.
-    // A class static block seats a nested module's alias the same way:
-    // `V6_0.TableDefinition.belongsTo = V6_0.TableDefinition.references;`.
     for (const statement of [...sourceFile.statements, ...staticBlockStatements]) {
       const expr = ts.isExpressionStatement(statement) ? statement.expression : undefined;
       if (!expr || !ts.isBinaryExpression(expr)) continue;

@@ -3547,8 +3547,6 @@ export function buildModuleIncluderFqns(
     // `def self.included(base); base.send :include, Invocation; end`
     // (thor/base.rb:116-120): whatever includes `fqn` includes these too, so
     // `fqn` stands in as their includer and the transitive walk reaches its own.
-    // A boot-time `Fixture.prepend EncryptedFixtures` (railtie.rb:357-362) is
-    // recorded on the class as a boot mixin and is an include edge the same way.
     for (const hook of [...(info.includedHookMixins ?? []), ...(info.bootMixins ?? [])]) {
       for (const name of hook.names) {
         const modFqn = resolveModuleName(name, fqn, moduleFqnByShort);
