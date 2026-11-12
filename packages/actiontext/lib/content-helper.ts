@@ -58,6 +58,7 @@ export class ContentHelper {
     );
   }
 
+  /** @missingRailsArgs join — PERMANENT */
   async renderActionTextAttachments(this: ViewHost, content: Content): Promise<Content> {
     return (
       await content.renderAttachments(undefined, async (attachment) => {
