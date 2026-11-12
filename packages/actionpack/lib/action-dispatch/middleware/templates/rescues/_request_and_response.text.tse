@@ -16,4 +16,4 @@ Env dump
 <%= debugHash(RubyCompat.slice(this.request.env, ...this.request.constructor.ENV_METHODS)) %>
 
 Response headers
-<%= RubyCompat.rbObjIvarDefined(this, "@response") ? RubyCompat.rbInspect(this.response.headers).replaceAll(',', ",\n") : 'None' %>
+<%= RubyCompat.rbObjIvarDefined(this, "@response") ? RubyCompat.rbInspect(RubyCompat.rbObjIvarGet(this, "@response").headers).replaceAll(',', ",\n") : 'None' %>

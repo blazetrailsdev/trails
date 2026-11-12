@@ -1496,7 +1496,8 @@ class SessionsController extends ActionController.Base {
       configurable: true,
     });
     await this.render({
-      inline: "<%= urlFor([workshop, session]) %>\n<%= linkTo('Session', [workshop, session]) %>",
+      inline:
+        "<%= urlFor([workshop, this._session]) %>\n<%= linkTo('Session', [workshop, this._session]) %>",
     });
   }
 
@@ -1509,7 +1510,8 @@ class SessionsController extends ActionController.Base {
       configurable: true,
     });
     await this.render({
-      inline: "<%= urlFor([workshop, session]) %>\n<%= linkTo('Session', [workshop, session]) %>",
+      inline:
+        "<%= urlFor([workshop, this._session]) %>\n<%= linkTo('Session', [workshop, this._session]) %>",
     });
   }
 

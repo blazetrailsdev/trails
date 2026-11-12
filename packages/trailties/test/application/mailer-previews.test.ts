@@ -653,15 +653,15 @@ describe("MailerPreviewsTest", { timeout: 120_000 }, () => {
         "Notifier",
         `${FROM}
         foo(name: string) {
-          this["@name"] = name;
+          this.name = name;
           return this.mail({ to: "to@example.org" });
         }`,
       ),
     );
 
-    await t.htmlTemplate("notifier/foo", "<p>Hello, <%= this['@name'] %>!</p>");
+    await t.htmlTemplate("notifier/foo", "<p>Hello, <%= this.name %>!</p>");
 
-    await t.textTemplate("notifier/foo", "Hello, <%= this['@name'] %>!");
+    await t.textTemplate("notifier/foo", "Hello, <%= this.name %>!");
 
     await t.mailerPreview(
       "notifier",

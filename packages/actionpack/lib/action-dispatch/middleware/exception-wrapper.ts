@@ -59,7 +59,6 @@ function _idFor(err: object): number {
   return id;
 }
 
-export type TraceEntry = { file: string; line: number };
 export type TraceWithId = {
   exceptionObjectId: number;
   id: number;
@@ -200,14 +199,10 @@ export class ExceptionWrapper {
     return typeof v === "function" ? v.call(this.exception) : [];
   }
   fileName(): string | null {
-    return typeof this._e.fileName === "string"
-      ? this._e.fileName
-      : (this.sourceLocation?.file ?? null);
+    return this._e.fileName();
   }
-  lineNumber(): number | null {
-    return typeof this._e.lineNumber === "number"
-      ? this._e.lineNumber
-      : (this.sourceLocation?.line ?? null);
+  lineNumber(): string | null {
+    return this._e.lineNumber();
   }
   actions(): Record<string, () => void> {
     return ActionableError.actions(this.exception);
@@ -283,13 +278,6 @@ export class ExceptionWrapper {
 
   sourceToShowId(): number | undefined {
     return this.traces[this.traceToShow()][0]?.id;
-  }
-
-  get sourceLocation(): TraceEntry | null {
-    const firstTrace = this.backtrace[0];
-    if (!firstTrace) return null;
-    const [file, line] = this.extractFileAndLineNumber(firstTrace);
-    return file == null ? null : { file, line };
   }
 
   static statusCodeForException(className: string): number {

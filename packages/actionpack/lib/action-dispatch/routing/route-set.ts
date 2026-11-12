@@ -23,6 +23,9 @@ import {
   rbAnyToS,
   rbInspect,
   rbObjClone,
+  rbDeclareIvar,
+  rbObjIvarGet,
+  rbObjIvarSet,
   rbObjRespondTo,
   rbModMethodDefined,
   rbModDefineMethod,
@@ -337,6 +340,11 @@ export const MountedHelpers = class {
   static readonly [included] = (base: unknown): void => {
     if (typeof base === "function") {
       mountedHelpersIncluders.add(new WeakRef((base as { prototype: object }).prototype));
+      for (const key of Object.getOwnPropertyNames(MountedHelpers.prototype)) {
+        if (key.startsWith("_") && Object.hasOwn(MountedHelpers.prototype, key.slice(1))) {
+          rbDeclareIvar(base as { prototype: object }, `@${key}`, `_${key}`);
+        }
+      }
     }
   };
 };
@@ -1088,18 +1096,24 @@ export class RouteSet {
     Object.defineProperty(MountedHelpers.prototype, name, {
       configurable: true,
       get(this: Record<string, unknown>): RoutesProxy {
-        return (this[`@_${name}`] ??= (this[`_${name}`] as () => RoutesProxy).call(
-          this,
-        )) as RoutesProxy;
+        const ivar = `@_${name}`;
+        let proxy = rbObjIvarGet(this, ivar) as RoutesProxy | null;
+        if (proxy == null) {
+          proxy = (this[`_${name}`] as () => RoutesProxy).call(this);
+          rbObjIvarSet(this, ivar, proxy);
+        }
+        return proxy;
       },
     });
 
+    rbDeclareIvar(MountedHelpers, `@_${name}`, `__${name}`);
     for (const includer of mountedHelpersIncluders) {
       const proto = includer.deref();
       if (!proto) {
         mountedHelpersIncluders.delete(includer);
         continue;
       }
+      rbDeclareIvar({ prototype: proto }, `@_${name}`, `__${name}`);
       for (const key of [`_${name}`, name]) {
         if (Object.hasOwn(proto, key)) continue;
         Object.defineProperty(
