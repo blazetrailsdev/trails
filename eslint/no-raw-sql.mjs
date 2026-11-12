@@ -61,7 +61,7 @@ const rule = {
     type: "problem",
     docs: {
       description:
-        "Ban raw SQL strings in activerecord src outside the adapter/DDL layer; build queries with @blazetrails/arel.",
+        "Ban raw SQL strings in activerecord lib outside the adapter/DDL layer; build queries with @blazetrails/arel.",
     },
     schema: [],
     messages: {
@@ -75,7 +75,7 @@ const rule = {
   create(context) {
     const filename = context.filename ?? context.getFilename();
     const rel = repoRel(filename);
-    // Outside activerecord src or out-of-scope dir → no-op.
+    // Outside activerecord lib or out-of-scope dir → no-op.
     if (!rel || isExcludedPath(rel)) return {};
 
     return {

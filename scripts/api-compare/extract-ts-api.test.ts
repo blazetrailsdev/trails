@@ -8939,7 +8939,7 @@ describe("object-literal modules and Struct.new constants", () => {
   });
 
   it("leaves a cast namespace literal with no bodies alone", () => {
-    // activerecord/src/namespaces.ts: `export const ActiveRecord = { name, loadPath } as AutoloadModule & …`
+    // activerecord/lib/namespaces.ts: `export const ActiveRecord = { name, loadPath } as AutoloadModule & …`
     const info = extractFromFiles("/p", {
       "namespaces.ts": `
         const loadPath = { a: 1 };
@@ -8950,7 +8950,7 @@ describe("object-literal modules and Struct.new constants", () => {
   });
 
   it("leaves an `as const` section literal alone", () => {
-    // activerecord/src/relation/calculations.ts: CalculationsPublicInstanceMethods
+    // activerecord/lib/relation/calculations.ts: CalculationsPublicInstanceMethods
     const info = extractFromFiles("/p", {
       "calculations.ts": `export const Section = { pick(): void {} } as const;`,
     });
@@ -8996,7 +8996,7 @@ describe("object-literal modules and Struct.new constants", () => {
   });
 
   it("does not credit a string-valued data property as an accessor slot", () => {
-    // activerecord/src/sqlite/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
+    // activerecord/lib/sqlite/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
     const info = extractFromFiles("/p", {
       "driver.ts": `
         declare function extend<T>(obj: T, ...mods: object[]): T;
