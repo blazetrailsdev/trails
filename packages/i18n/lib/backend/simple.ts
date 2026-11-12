@@ -7,7 +7,7 @@ import {
   type Locale,
   type TranslationKey,
 } from "../i18n.js";
-import { Hash, hashAref, isSymbol, toSym } from "@blazetrails/ruby-compat";
+import { Hash, hashAref, include, isSymbol, toSym } from "@blazetrails/ruby-compat";
 import { deepMergeBang, deepSymbolizeKeys, except, type TranslationData } from "../utils.js";
 import { Base, type TranslateOptions } from "./base.js";
 
@@ -117,14 +117,4 @@ export class Simple {
   }
 }
 
-for (const source of [Base.prototype, new (Base as unknown as new () => Base)()]) {
-  for (const key of Object.getOwnPropertyNames(source)) {
-    if (key === "constructor") continue;
-    if (Object.hasOwn(Simple.prototype, key)) continue;
-    Object.defineProperty(
-      Simple.prototype,
-      key,
-      Object.getOwnPropertyDescriptor(source, key) as PropertyDescriptor,
-    );
-  }
-}
+include(Simple, Base);

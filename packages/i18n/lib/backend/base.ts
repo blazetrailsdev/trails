@@ -32,12 +32,14 @@ import {
   rbInspect,
   toSym,
   trTrans,
+  classModule,
+  include,
 } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Temporal, strftime } from "@blazetrails/date";
 import { interpolate as interpolateString } from "../interpolate/ruby.js";
 import {
-  transliterate,
+  Transliterator,
   type HashTransliterator,
   type ProcTransliterator,
 } from "./transliterator.js";
@@ -190,14 +192,17 @@ function localizable(object: unknown): unknown {
 }
 
 export abstract class Base {
-  transliterate = transliterate;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
+  declare transliterate: typeof Transliterator.transliterate;
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
    */
   transliterators?: Record<Locale, HashTransliterator | ProcTransliterator>;
 
-  private eagerLoadedFlag = false;
+  declare private _eagerLoaded?: boolean;
 
   loadTranslations(...filenames: unknown[]): void {
     const block =
@@ -317,11 +322,11 @@ export abstract class Base {
   }
 
   async eagerLoadBang(): Promise<void> {
-    this.eagerLoadedFlag = true;
+    this._eagerLoaded = true;
   }
 
   protected eagerLoaded(): boolean {
-    return this.eagerLoadedFlag;
+    return (this._eagerLoaded ||= false);
   }
 
   protected lookup(
@@ -560,3 +565,5 @@ export abstract class Base {
     return key;
   }
 }
+
+include(Base, Transliterator);

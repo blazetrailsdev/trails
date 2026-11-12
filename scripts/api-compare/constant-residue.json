@@ -1047,9 +1047,9 @@
     }
   },
   "i18n": {
-    "rows": 27,
+    "rows": 28,
     "excluded": [],
-    "unwalked": ["locale.ts::Locale"],
+    "unwalked": ["backend/transliterator.ts::Transliterator", "locale.ts::Locale"],
     "residue": {
       "backend/key-value.ts::SubtreeProxy": "I18n::Backend::KeyValue::SubtreeProxy",
       "backend/transliterator.ts::HashTransliterator": "I18n::Backend::Transliterator::HashTransliterator",

@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, afterEach } from "vitest";
 import { ArgumentError } from "../../lib/exceptions.js";
 import { config, setBackend, transliterate } from "../../lib/i18n.js";
 import { Simple } from "../../lib/backend/simple.js";
-import { HashTransliterator, get } from "../../lib/backend/transliterator.js";
+import { HashTransliterator, Transliterator } from "../../lib/backend/transliterator.js";
+
+const { get } = Transliterator;
 
 describe("I18nBackendTransliterator", () => {
   function storeTranslations(locale: string, data: Record<string, unknown>): void {

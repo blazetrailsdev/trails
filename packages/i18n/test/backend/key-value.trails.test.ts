@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Hash, TypeError } from "@blazetrails/ruby-compat";
-import { SubtreeProxy } from "../../lib/backend/key-value.js";
+import { Base } from "../../lib/backend/base.js";
+import { KeyValue, SubtreeProxy } from "../../lib/backend/key-value.js";
 
 describe("prototype-chain method_missing", () => {
   it("a subclass with a #private field still answers the dynamic names", () => {
@@ -35,5 +36,13 @@ describe("prototype-chain method_missing", () => {
     expect(() => sub.isA(() => {})).toThrow(TypeError);
     expect(() => sub.isInstanceOf(() => {})).toThrow(TypeError);
     expect(SubtreeProxy.prototype.isKindOf).toBe(SubtreeProxy.prototype.isA);
+  });
+});
+
+describe("Backend::KeyValue", () => {
+  it("includes Base without replacing KeyValue's own members", () => {
+    expect(KeyValue.prototype.storeTranslations).not.toBe(Base.prototype.storeTranslations);
+    expect(KeyValue.prototype.availableLocales).not.toBe(Base.prototype.availableLocales);
+    expect(typeof new KeyValue(null).transliterate).toBe("function");
   });
 });

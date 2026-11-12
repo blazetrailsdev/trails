@@ -1,11 +1,10 @@
-import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
-import { ArgumentError } from "../exceptions.js";
-import { t, type Locale } from "../i18n.js";
+import { TopLevel, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import type { Locale } from "../i18n.js";
 import type { Base } from "./base.js";
 
 export const DEFAULT_REPLACEMENT_CHAR = "?";
 
-export function transliterate(
+function transliterate(
   this: Base,
   locale: Locale,
   string: string,
@@ -13,18 +12,18 @@ export function transliterate(
 ): string {
   this.transliterators ??= {};
   this.transliterators[locale] ??= get(
-    t("i18n.transliterate.rule", { locale, resolve: false, default: {} }),
+    TopLevel.I18n!.t("i18n.transliterate.rule", { locale, resolve: false, default: {} }),
   );
   return this.transliterators[locale].transliterate(string, replacement);
 }
 
-export function get(rule: unknown = null): HashTransliterator | ProcTransliterator {
+function get(rule: unknown = null): HashTransliterator | ProcTransliterator {
   if (rule == null || rule === false || isHash(rule)) {
     return new HashTransliterator(rule as Record<string, unknown> | null);
   } else if (typeof rule === "function") {
     return new ProcTransliterator(rule as (string: string) => string);
   } else {
-    throw new ArgumentError("Transliteration rule must be a proc or a hash.");
+    throw new TopLevel.I18n!.ArgumentError("Transliteration rule must be a proc or a hash.");
   }
 }
 
@@ -273,3 +272,19 @@ export class HashTransliterator {
     }
   }
 }
+
+export const Transliterator = Object.defineProperties(
+  { transliterate },
+  {
+    get: { value: get },
+    DEFAULT_REPLACEMENT_CHAR: { value: DEFAULT_REPLACEMENT_CHAR },
+    ProcTransliterator: { value: ProcTransliterator },
+    HashTransliterator: { value: HashTransliterator },
+  },
+) as {
+  transliterate: typeof transliterate;
+  get: typeof get;
+  DEFAULT_REPLACEMENT_CHAR: typeof DEFAULT_REPLACEMENT_CHAR;
+  ProcTransliterator: typeof ProcTransliterator;
+  HashTransliterator: typeof HashTransliterator;
+};

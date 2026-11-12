@@ -21,6 +21,7 @@ defineConstants([
   [() => m3.KeyValue, "I18n::Backend::KeyValue"],
   [() => m3.SubtreeProxy, "I18n::Backend::KeyValue::SubtreeProxy"],
   [() => m4.Simple, "I18n::Backend::Simple"],
+  [() => m5.Transliterator, "I18n::Backend::Transliterator"],
   [() => m5.HashTransliterator, "I18n::Backend::Transliterator::HashTransliterator"],
   [() => m5.ProcTransliterator, "I18n::Backend::Transliterator::ProcTransliterator"],
   [() => m6.Config, "I18n::Config"],
