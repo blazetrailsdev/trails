@@ -1438,6 +1438,9 @@ importers:
       '@blazetrails/solid-cable':
         specifier: workspace:*
         version: link:../../packages/solid-cable
+      '@blazetrails/solid-cache':
+        specifier: workspace:*
+        version: link:../../packages/solid-cache
       '@blazetrails/solid-queue':
         specifier: workspace:*
         version: link:../../packages/solid-queue
