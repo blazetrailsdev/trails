@@ -1271,8 +1271,8 @@ export function extractFromProgram(
       if (expr.operatorToken.kind !== ts.SyntaxKind.EqualsToken) continue;
       const { left, right } = expr;
       if (!ts.isPropertyAccessExpression(left) || !ts.isPropertyAccessExpression(right)) continue;
-      const receiver = left.expression.getText(sourceFile);
-      if (receiver !== right.expression.getText(sourceFile)) continue;
+      const receiver = identifierChain(left.expression);
+      if (receiver === undefined || receiver !== identifierChain(right.expression)) continue;
       const mod = info.modules[`${relPath}:${receiver}`];
       if (!mod) continue;
       for (const list of [mod.instanceMethods, mod.classMethods]) {
@@ -3945,6 +3945,28 @@ function prototypeReceiver(expr: ts.Expression): string | undefined {
     : undefined;
 }
 
+/** `A` or `A.B.C` for an identifier or a chain of identifier property reads. */
+function identifierChain(expr: ts.Expression): string | undefined {
+  if (ts.isIdentifier(expr)) return expr.text;
+  if (!ts.isPropertyAccessExpression(expr)) return undefined;
+  const head = identifierChain(expr.expression);
+  return head === undefined ? undefined : `${head}.${expr.name.text}`;
+}
+
+/** `NAME` when this file declares `const NAME = { … }`, a plain-object module. */
+function sameFileObjectModule(name: string, sourceFile: ts.SourceFile): string | undefined {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const decl of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(decl.name) || decl.name.text !== name) continue;
+      return decl.initializer !== undefined && ts.isObjectLiteralExpression(decl.initializer)
+        ? name
+        : undefined;
+    }
+  }
+  return undefined;
+}
+
 /** A same-file `const NAME = ["a", "b"] as const`'s strings, for a `...NAME` macro argument. */
 function sameFileConstStrings(name: string, sourceFile: ts.SourceFile): string[] | undefined {
   for (const statement of sourceFile.statements) {
@@ -3975,7 +3997,7 @@ function readPrototypeDelegateCall(
     recv === undefined
       ? undefined
       : ts.isIdentifier(recv)
-        ? importedName(recv, sourceFile)
+        ? sameFileObjectModule(recv.text, sourceFile)
         : prototypeReceiver(recv);
   if (receiver === undefined || enclosingEntity(node) !== undefined) return null;
   const opts = rest.at(-1);
