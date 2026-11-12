@@ -301,7 +301,7 @@
     }
   },
   "actiontext": {
-    "rows": 17,
+    "rows": 20,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -314,6 +314,7 @@
       "attachments/caching.ts::Caching": "ActionText::Attachments::Caching",
       "attachments/minification.ts::Minification": "ActionText::Attachments::Minification",
       "attachments/trix-conversion.ts::TrixConversion": "ActionText::Attachments::TrixConversion",
+      "attribute.ts::Attribute": "ActionText::Attribute",
       "content-helper.ts::ContentHelper": "ActionText::ContentHelper",
       "content.ts::Content": "ActionText::Content",
       "fragment.ts::Fragment": "ActionText::Fragment",
@@ -321,6 +322,8 @@
       "html-conversion.ts::HtmlConversion": "ActionText::HtmlConversion",
       "plain-text-conversion.ts::PlainTextConversion": "ActionText::PlainTextConversion",
       "rendering.ts::Rendering": "ActionText::Rendering",
+      "rich-text.ts::RichText": "ActionText::RichText",
+      "serialization.ts::Serialization": "ActionText::Serialization",
       "trix-attachment.ts::TrixAttachment": "ActionText::TrixAttachment"
     }
   },

@@ -19,6 +19,7 @@ import { ContentHelper } from "./content-helper.js";
 import { AttachmentGallery } from "./attachment-gallery.js";
 import { Fragment } from "./fragment.js";
 import { Rendering, type RenderingClassMethods } from "./rendering.js";
+import { Serialization } from "./serialization.js";
 
 interface ContentOptions {
   canonicalize?: boolean;
@@ -26,6 +27,7 @@ interface ContentOptions {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rendering, Serialization, ContentHelper` (content.rb:25); the class/interface merge is how `include()` surfaces on the type side.
 export interface Content extends Included<typeof Rendering>, ContentHelper {
+  _dump(...args: unknown[]): string | null;
   render(...args: unknown[]): unknown;
 }
 
@@ -35,9 +37,13 @@ export class Content {
   declare static actionControllerRenderer: RenderingClassMethods["actionControllerRenderer"];
   declare static withRenderer: RenderingClassMethods["withRenderer"];
   declare static render: RenderingClassMethods["render"];
+  declare static load: (content: unknown) => unknown;
+  declare static dump: (content: unknown) => string | null;
+  declare static _load: (content: unknown) => unknown;
 
   static {
     include(this, Rendering);
+    include(this, Serialization);
     include(this, ContentHelper);
   }
 
@@ -69,6 +75,7 @@ export class Content {
     withDefaultsBang(options, { canonicalize: true });
 
     if (options.canonicalize) {
+      this.fragment = Fragment.wrap(content);
       this.canonicalized = (this.constructor as typeof Content)
         .fragmentByCanonicalizingContent(content)
         .then((fragment) => {
