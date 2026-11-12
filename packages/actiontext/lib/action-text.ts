@@ -14,6 +14,7 @@ import type { Content } from "./content.js";
 import type { Fragment } from "./fragment.js";
 import type { HtmlConversion } from "./html-conversion.js";
 import type { PlainTextConversion } from "./plain-text-conversion.js";
+import type { ContentHelper } from "./content-helper.js";
 import type { Rendering } from "./rendering.js";
 import type { TrixAttachment } from "./trix-attachment.js";
 
@@ -74,6 +75,7 @@ export const ActionText = {
   AttachmentGallery?: typeof AttachmentGallery;
   Attachments: typeof Attachments;
   Content?: typeof Content;
+  ContentHelper?: typeof ContentHelper;
   Fragment?: typeof Fragment;
   HtmlConversion?: typeof HtmlConversion;
   PlainTextConversion?: typeof PlainTextConversion;

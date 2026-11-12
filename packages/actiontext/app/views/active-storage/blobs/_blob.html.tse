@@ -1,0 +1,14 @@
+<figure class="attachment attachment--<%= blob.isRepresentable() ? "preview" : "file" %> attachment--<%= blob.filename.extension() %>">
+  <% if (blob.isRepresentable()) { %>
+    <%= imageTag(blob.representation({ resizeToLimit: localAssigns.inGallery ? [ 800, 600 ] : [ 1024, 768 ] })) %>
+  <% } %>
+
+  <figcaption class="attachment__caption">
+    <% const caption = blob.caption; if (caption != null) { %>
+      <%= caption %>
+    <% } else { %>
+      <span class="attachment__name"><%= blob.filename %></span>
+      <span class="attachment__size"><%= numberToHumanSize(blob.byteSize) %></span>
+    <% } %>
+  </figcaption>
+</figure>
