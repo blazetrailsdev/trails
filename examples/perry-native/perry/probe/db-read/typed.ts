@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe: an erased (`any`) receiver is the thing under test; see FINDINGS "Walls 9-11". */
 // Static native-table lowering (typed receiver) vs dynamic handle-method
 // dispatch (erased receiver), on the SAME handle. Every earlier probe used
 // `as any` and so only ever tested the dynamic path.

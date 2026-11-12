@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe */
 // Wall 11 bisect: my own 2-file class (keeps its methods at 3 modules) plus a
 // bulk import purely to inflate the graph. If Leaf now loses its methods, the
 // trigger is graph SIZE and this is the repro: two small files + one import.

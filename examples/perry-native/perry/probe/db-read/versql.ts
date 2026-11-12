@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe: an erased (`any`) receiver is the thing under test; see FINDINGS "Walls 9-11". */
 // The failing statement is `SELECT sqlite_version(*)`. Does prepare accept it?
 // js_sqlite_prepare returns -1 on failure, and nanbox maps only 0 -> null,
 // so a rejected prepare would yield a valid-looking but unusable handle.

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe */
 // Wall 11 shape test, no imports: does a method's SIGNATURE decide whether it
 // survives? StatementInvalid.setQuery returns `StatementInvalid | Promise<StatementInvalid>`
 // -- self-referential and a union -- unlike every method that survived so far.

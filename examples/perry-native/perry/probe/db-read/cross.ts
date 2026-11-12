@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe: an erased (`any`) receiver is the thing under test; see FINDINGS "Walls 9-11". */
 // The untested cell: field receiver AND spread args together.
 import Database from "better-sqlite3";
 const db = new Database(":memory:") as any;

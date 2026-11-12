@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe */
 // An unresolved RELATIVE import of a class. Node refuses to run at all;
 // Perry warns once and compiles a program whose class is silently empty.
 //

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe */
 // Wall 11: does a class lose its own methods across a RE-EXPORT hop?
 // Importing the same class directly (declmerge.ts) keeps them.
 import { Leaf, AdErr, Exc } from "./reexport-barrel.ts";

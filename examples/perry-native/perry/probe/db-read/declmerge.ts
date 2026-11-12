@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe */
 // Wall 11: does a declaration-merged base class cost the LEAF its own methods?
 import { Leaf, AdErr, Exc } from "./declmerge-dep.ts";
 

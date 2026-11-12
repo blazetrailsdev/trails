@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe: an erased (`any`) receiver is the thing under test; see FINDINGS "Walls 9-11". */
 // Untested cell: the DATABASE as a class field, as BetterSqlite3Driver holds it.
 // js_sqlite_prepare returns -1 on failure; a bogus handle would make run()
 // return undefined without throwing.

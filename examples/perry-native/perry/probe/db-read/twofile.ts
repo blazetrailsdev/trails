@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe */
 // Two modules, nothing else. Does a class lose its own methods merely by being
 // imported? Local classes kept theirs (sigshape.ts); the barrel-imported
 // StatementInvalid did not.

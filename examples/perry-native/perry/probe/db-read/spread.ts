@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe: an erased (`any`) receiver is the thing under test; see FINDINGS "Walls 9-11". */
 // Does a spread call into the native table lose its return value?
 // Call methods directly (never capture them as values -- a handle property
 // read returns undefined in Perry, which would mask the thing under test).

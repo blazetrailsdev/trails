@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe */
 // Wall 11: the real chain's base class comes from ANOTHER PACKAGE
 // (StandardError from @blazetrails/ruby-compat). Everything local survived;
 // does extending an imported-from-package base cost the leaf its own methods?

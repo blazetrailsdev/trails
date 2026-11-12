@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe: an erased (`any`) receiver is the thing under test; see FINDINGS "Walls 9-11". */
 // Same minimal call, but inside the big ActiveRecord graph.
 // If this fails where cross.ts/field.ts pass, the native-table match is
 // graph-dependent, not shape-dependent.

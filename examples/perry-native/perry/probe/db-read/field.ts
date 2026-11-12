@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe: an erased (`any`) receiver is the thing under test; see FINDINGS "Walls 9-11". */
 // Does a native-table call lose its return value when the receiver is a
 // class field rather than a local?
 import Database from "better-sqlite3";

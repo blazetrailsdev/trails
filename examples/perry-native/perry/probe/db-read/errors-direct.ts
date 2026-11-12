@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe */
 // The real error classes, imported DIRECTLY by relative path, so the graph is
 // small. If setQuery survives here but not through the barrel, the trigger is
 // graph size or the module hop -- not the class.

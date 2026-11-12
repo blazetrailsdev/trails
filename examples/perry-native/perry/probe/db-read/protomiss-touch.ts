@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- probe: an erased (`any`) receiver is the thing under test; see FINDINGS "Walls 9-11". */
 // StatementInvalid.prototype.setQuery is missing at construction.
 // Is it this class, this chain, or any imported class's own method?
 import {
