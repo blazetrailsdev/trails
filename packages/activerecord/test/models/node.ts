@@ -1,0 +1,30 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Tree } from "./tree.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Node extends Base {
+  declare children: AssociationProxy<Node>;
+  declare name: string;
+  declare parent_id: number;
+  declare tree_id: number;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
+
+  static {
+    this.belongsTo("tree", { touch: true });
+    this.belongsTo("parent", { className: "Node", touch: true, optional: true });
+    this.hasMany("children", { className: "Node", foreignKey: "parent_id", dependent: "destroy" });
+  }
+}
+constSet(TopLevel, "Node", Node);
+DescendantsTracker.registerSubclass(Base, Node);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Node {
+  get tree(): Tree | null | Promise<Tree | null>;
+  set tree(value: Tree | null);
+  get parent(): Node | null | Promise<Node | null>;
+  set parent(value: Node | null);
+}

@@ -1,0 +1,72 @@
+import { describe, expect, beforeEach, afterEach } from "vitest";
+
+import { ExplainSubscriber } from "../../lib/explain-subscriber.js";
+import { ExplainRegistry } from "../../lib/explain-registry.js";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
+import { itIfSupports } from "../support/supports.js";
+
+const SUBSCRIBER = new ExplainSubscriber();
+
+describe("ExplainSubscriberTest", () => {
+  beforeEach(() => {
+    ExplainRegistry.reset();
+    ExplainRegistry.collect = true;
+  });
+
+  afterEach(() => {
+    ExplainRegistry.reset();
+  });
+
+  itIfSupports("explain", "collects nothing if the payload has an exception", () => {
+    SUBSCRIBER.finish(null, null, { exception: new Error("boom") });
+    assertEmpty(ExplainRegistry.queries);
+  });
+
+  itIfSupports("explain", "collects nothing for ignored payloads", () => {
+    for (const ip of ExplainSubscriber.IGNORED_PAYLOADS) {
+      SUBSCRIBER.finish(null, null, { name: ip });
+    }
+    assertEmpty(ExplainRegistry.queries);
+  });
+
+  itIfSupports("explain", "collects nothing if collect is false", () => {
+    ExplainRegistry.collect = false;
+    SUBSCRIBER.finish(null, null, { name: "SQL", sql: "select 1 from users", binds: [1, 2] });
+    assertEmpty(ExplainRegistry.queries);
+  });
+
+  itIfSupports("explain", "collects pairs of queries and binds", () => {
+    const sql = "select 1 from users";
+    const binds = [1, 2];
+    SUBSCRIBER.finish(null, null, { name: "SQL", sql, binds });
+    expect(ExplainRegistry.queries.length).toBe(1);
+    expect(ExplainRegistry.queries[0][0]).toBe(sql);
+    expect(ExplainRegistry.queries[0][1]).toEqual(binds);
+  });
+
+  itIfSupports("explain", "collects nothing if the statement is not explainable", () => {
+    SUBSCRIBER.finish(null, null, { name: "SQL", sql: "SHOW max_identifier_length" });
+    assertEmpty(ExplainRegistry.queries);
+  });
+
+  itIfSupports("explain", "collects nothing if the statement is only partially matched", () => {
+    SUBSCRIBER.finish(null, null, { name: "SQL", sql: "select_db yo_mama" });
+    assertEmpty(ExplainRegistry.queries);
+  });
+
+  itIfSupports("explain", "collects cte queries", () => {
+    SUBSCRIBER.finish(null, null, {
+      name: "SQL",
+      sql: "with s as (values(3)) select 1 from s",
+    });
+    expect(ExplainRegistry.queries.length).toBe(1);
+  });
+
+  itIfSupports("explain", "collects queries starting with comment", () => {
+    SUBSCRIBER.finish(null, null, {
+      name: "SQL",
+      sql: "/* comment */ select 1 from users",
+    });
+    expect(ExplainRegistry.queries.length).toBe(1);
+  });
+});

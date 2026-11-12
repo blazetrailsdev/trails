@@ -1,0 +1,80 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { SchemaMigration } from "../../../../lib/schema-migration.js";
+import { InternalMetadata } from "../../../../lib/internal-metadata.js";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import type { Mysql2Result } from "../../../../lib/mysql2/client.js";
+
+describeIfMysqlAdapter("Mysql2Adapter", () => {
+  let adapter: Mysql2Adapter;
+  beforeEach(async () => {
+    adapter = await leaseMysqlAdapter();
+  });
+
+  describe("SchemaMigrationsTest", () => {
+    fixtures({}, { useTransactionalTests: false });
+
+    it("renaming index on foreign key", async () => {
+      try {
+        await adapter.addIndex("engines", "car_id");
+        await adapter.addForeignKey("engines", "cars", { name: "fk_engines_cars" });
+
+        await adapter.renameIndex("engines", "index_engines_on_car_id", "idx_renamed");
+        const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
+        expect(idxNames).toEqual(["idx_renamed"]);
+      } finally {
+        await adapter.removeForeignKey("engines", undefined, {
+          name: "fk_engines_cars",
+          ifExists: true,
+        });
+        await adapter.removeIndex("engines", { name: "idx_renamed", ifExists: true });
+        await adapter.removeIndex("engines", { name: "index_engines_on_car_id", ifExists: true });
+      }
+    });
+
+    it("initializes schema migrations for encoding utf8mb4", async () => {
+      await withEncodingUtf8mb4(adapter, async () => {
+        const schemaMigration = new SchemaMigration(adapter.pool);
+        const tableName = schemaMigration.tableName;
+        await adapter.dropTable(tableName, { ifExists: true });
+        await schemaMigration.createTable();
+        expect(await adapter.columnExists(tableName, "version")).toBeTruthy();
+      });
+    });
+
+    it("initializes internal metadata for encoding utf8mb4", async () => {
+      await withEncodingUtf8mb4(adapter, async () => {
+        const internalMetadata = new InternalMetadata(adapter.pool);
+        const tableName = internalMetadata.tableName;
+        await adapter.dropTable(tableName, { ifExists: true });
+        await internalMetadata.createTable();
+        expect(await adapter.columnExists(tableName, "key")).toBeTruthy();
+        await internalMetadata.createTableAndSetFlags("test");
+      });
+    });
+  });
+});
+
+async function withEncodingUtf8mb4(adapter: Mysql2Adapter, fn: () => Promise<void>): Promise<void> {
+  const result = (await adapter.execute(
+    "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
+      "FROM information_schema.schemata WHERE schema_name = DATABASE()",
+  )) as Mysql2Result;
+  const row = result.toA()[0];
+  if (!row) throw new Error("Could not read database charset from information_schema.schemata");
+  const originalCharset = row[0] as string;
+  const originalCollation = row[1] as string;
+
+  await adapter.execute("ALTER DATABASE DEFAULT CHARACTER SET utf8mb4");
+  try {
+    await fn();
+  } finally {
+    await adapter.execute(
+      `ALTER DATABASE DEFAULT CHARACTER SET ${originalCharset} COLLATE ${originalCollation}`,
+    );
+  }
+}

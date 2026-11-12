@@ -34,9 +34,9 @@ describe("package-roots", () => {
   });
 
   it("answers src for an unmoved package", () => {
-    expect(libRoot("activerecord")).toBe("src");
-    expect(testRoots("activerecord")).toEqual(["src"]);
-    expect(sourceRoots("activerecord")).toEqual(["src"]);
+    expect(libRoot("actionmailbox")).toBe("src");
+    expect(testRoots("actionmailbox")).toEqual(["src"]);
+    expect(sourceRoots("actionmailbox")).toEqual(["src"]);
   });
 
   it("matches a package's src segment and nothing longer", () => {

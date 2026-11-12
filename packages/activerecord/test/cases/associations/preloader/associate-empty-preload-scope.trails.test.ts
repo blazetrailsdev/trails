@@ -1,0 +1,35 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { Association } from "../../../../lib/associations/preloader/association.js";
+import type { AssociationReflection } from "../../../../lib/reflection.js";
+import type { Relation } from "../../../../lib/relation.js";
+import { Post } from "../../../models/post.js";
+import { Comment } from "../../../models/comment.js";
+
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+
+describe("Preloader::Association#initialize @associate", () => {
+  const { posts } = fixtures(["posts", "comments"]);
+
+  it("associates records when the preload scope is present but empty", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const reflection = (
+      Post as unknown as { _reflectOnAssociation(name: string): AssociationReflection }
+    )._reflectOnAssociation("comments");
+    const preloadScope = (Comment as unknown as { unscoped(): Relation<Comment> }).unscoped();
+
+    expect(preloadScope.isEmptyScope).toBe(true);
+
+    const loader = new Association(Comment, [post], reflection, preloadScope, undefined, false);
+    await loader.run();
+
+    const association = post.association("comments") as unknown as {
+      isLoaded(): boolean;
+      target: Comment[];
+    };
+    expect(association.isLoaded()).toBe(true);
+    expect(association.target.length).toBeGreaterThan(0);
+  });
+});

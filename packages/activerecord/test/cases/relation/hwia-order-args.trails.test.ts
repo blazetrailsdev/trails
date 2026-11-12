@@ -1,0 +1,38 @@
+import { describe, it, expect } from "vitest";
+import "../../../lib/index.js";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import {
+  columnReferences,
+  flattenedArgs,
+  validateOrderArgs,
+} from "../../../lib/relation/query-methods.js";
+import { Topic } from "../../models/topic.js";
+
+describe("HashWithIndifferentAccess order arguments", () => {
+  it("walks to the same result as the plain hash it stands for", () => {
+    const hash = new HashWithIndifferentAccess<unknown>({ id: "desc" });
+    expect(flattenedArgs([hash])).toEqual(flattenedArgs([{ id: "desc" }]));
+    expect(columnReferences([hash])).toEqual(columnReferences([{ id: "desc" }]));
+  });
+
+  it("validates its directions", () => {
+    const host = {} as never;
+    expect(() =>
+      validateOrderArgs.call(host, [new HashWithIndifferentAccess({ id: "desc" })]),
+    ).not.toThrow();
+    expect(() =>
+      validateOrderArgs.call(host, [new HashWithIndifferentAccess({ id: "sideways" })]),
+    ).toThrow(/Direction "sideways" is invalid/);
+  });
+
+  it("rejects a direction outside Rails' eight spellings", () => {
+    expect(() => validateOrderArgs.call({} as never, [{ id: "Asc" }])).toThrow(
+      'Direction "Asc" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]',
+    );
+  });
+
+  it("orders by the same SQL as the plain hash", () => {
+    const hash: Map<string, "desc"> = new HashWithIndifferentAccess<"desc">({ id: "desc" });
+    expect(Topic.order(hash).toSql()).toEqual(Topic.order({ id: "desc" }).toSql());
+  });
+});

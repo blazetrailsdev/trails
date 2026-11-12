@@ -1,0 +1,1019 @@
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { rbObjSingletonClass, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base, StatementInvalid, UnknownPrimaryKey, ValueTooLong } from "../../../lib/index.js";
+import { adapterType } from "../../../lib/test-adapter.js";
+import { itIfSupports } from "../../support/supports.js";
+import { assertQueriesCount, assertNoQueries } from "../../../lib/testing/query-assertions.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Topic } from "../../models/topic.js";
+import { Reply, UniqueReply, SillyUniqueReply } from "../../models/reply.js";
+import { WarehouseThing } from "../../models/warehouse-thing.js";
+import { Keyboard } from "../../models/keyboard.js";
+import { Event } from "../../models/event.js";
+import { Guid } from "../../models/guid.js";
+import { Author } from "../../models/author.js";
+import { Person } from "../../models/person.js";
+import { Essay } from "../../models/essay.js";
+import { CpkBook } from "../../models/cpk.js";
+import { UuidItem, UuidValidatingItem } from "../../models/uuid-item.js";
+import "../../support/canonical-model-index.js";
+import { Range } from "@blazetrails/ruby-compat";
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import {
+  assertChanges,
+  assertEmpty,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
+import "../../models/cpk.js";
+
+const INT_MAX_VALUE = 2147483647;
+
+class Wizard extends Base {
+  static {
+    this.abstractClass = true;
+    this.validatesUniquenessOf("name");
+  }
+}
+
+class IneptWizard extends Wizard {
+  static _tableName = "inept_wizards";
+  static {
+    this.validatesUniquenessOf("city");
+  }
+}
+
+class Conjurer extends IneptWizard {}
+class Thaumaturgist extends IneptWizard {}
+
+class ReplyWithTitleObject extends Reply {
+  static {
+    this.validatesUniquenessOf("content", { scope: "title" });
+  }
+}
+
+class CoolTopic extends Topic {
+  static {
+    this.validatesUniquenessOf("id");
+  }
+}
+
+class TopicWithAfterCreate extends Topic {
+  static {
+    this.afterCreate(async (record: TopicWithAfterCreate) => {
+      await record.updateBang({
+        author_name: `${record.readAttribute("title")} ${(record as { id: number }).id}`,
+      });
+    });
+  }
+}
+
+class LessonWithUniqKeyboard extends Base {
+  static _tableName = "lessons";
+  static {
+    this.belongsTo("keyboard", { primaryKey: "name", foreignKey: "name" });
+    this.validatesUniquenessOf("keyboard");
+  }
+}
+
+class DashboardWithoutPrimaryKey extends Base {
+  static _tableName = "dashboards";
+  static name = "Dashboard";
+  static {
+    this.validatesUniquenessOf("dashboard_id");
+  }
+}
+
+class BookWithUniqueRevision extends CpkBook {
+  static {
+    this.validates("revision", { uniqueness: true });
+  }
+}
+
+constSet(TopLevel, "ReplyWithTitleObject", ReplyWithTitleObject);
+DescendantsTracker.registerSubclass(Reply, ReplyWithTitleObject);
+constSet(TopLevel, "CoolTopic", CoolTopic);
+DescendantsTracker.registerSubclass(Topic, CoolTopic);
+constSet(TopLevel, "TopicWithAfterCreate", TopicWithAfterCreate);
+DescendantsTracker.registerSubclass(Topic, TopicWithAfterCreate);
+constSet(TopLevel, "Wizard", Wizard);
+DescendantsTracker.registerSubclass(Base, Wizard);
+constSet(TopLevel, "IneptWizard", IneptWizard);
+DescendantsTracker.registerSubclass(Wizard, IneptWizard);
+constSet(TopLevel, "Conjurer", Conjurer);
+DescendantsTracker.registerSubclass(IneptWizard, Conjurer);
+constSet(TopLevel, "Thaumaturgist", Thaumaturgist);
+DescendantsTracker.registerSubclass(IneptWizard, Thaumaturgist);
+
+describe("UniquenessValidationTest", () => {
+  fixtures(["topics", "warehouseThings"]);
+
+  beforeAll(() => {
+    constSet(TopLevel, "Topic", Topic);
+    constSet(TopLevel, "Reply", Reply);
+    constSet(TopLevel, "UniqueReply", UniqueReply);
+    constSet(TopLevel, "SillyUniqueReply", SillyUniqueReply);
+    constSet(TopLevel, "ReplyWithTitleObject", ReplyWithTitleObject);
+    constSet(TopLevel, "WarehouseThing", WarehouseThing);
+    constSet(TopLevel, "Keyboard", Keyboard);
+    constSet(TopLevel, "Event", Event);
+    constSet(TopLevel, "Guid", Guid);
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Person", Person);
+    constSet(TopLevel, "Essay", Essay);
+    constSet(TopLevel, "IneptWizard", IneptWizard);
+    constSet(TopLevel, "Conjurer", Conjurer);
+    constSet(TopLevel, "Thaumaturgist", Thaumaturgist);
+  });
+
+  afterEach(() => {
+    Topic.clearValidatorsBang();
+    Reply.clearValidatorsBang();
+  });
+
+  it("validate uniqueness", async () => {
+    Topic.validatesUniquenessOf("title");
+
+    const t = new Topic({ title: "I'm uniqué!" });
+    expect(await t.save()).toBeTruthy();
+
+    t.writeAttribute("content", "Remaining unique");
+    expect(await t.save()).toBeTruthy();
+
+    const t2 = new Topic({ title: "I'm uniqué!" });
+    expect(await t2.isValid()).toBeFalsy();
+    expect(await t2.save()).toBeFalsy();
+    expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
+
+    t2.writeAttribute("title", "Now I am really also unique");
+    expect(await t2.save()).toBeTruthy();
+  });
+
+  it("validate uniqueness with singleton class", async () => {
+    await Topic.createBang({ title: "abc" });
+
+    const t2 = new Topic({ title: "abc" });
+    (rbObjSingletonClass(t2) as typeof Topic).validates("title", { uniqueness: true });
+    expect(await t2.isValid()).toBeFalsy();
+
+    const t3 = new Topic({ title: "abc" });
+    expect(await t3.isValid()).toBeTruthy();
+  });
+
+  it("validate uniqueness with alias attribute", async () => {
+    Topic.validatesUniquenessOf("heading");
+
+    const topic = new Topic({ title: "abc" });
+    expect(await topic.save()).toBeTruthy();
+  });
+
+  it("validates uniqueness with nil value", async () => {
+    Topic.validatesUniquenessOf("title");
+
+    const t = new Topic({ title: null });
+    expect(await t.save()).toBeTruthy();
+
+    const t2 = new Topic({ title: null });
+    expect(await t2.isValid()).toBeFalsy();
+    expect(await t2.save()).toBeFalsy();
+    expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
+  });
+
+  it("validates uniqueness with validates", async () => {
+    Topic.validates("title", { uniqueness: true });
+    await Topic.createBang({ title: "abc" });
+
+    const t2 = new Topic({ title: "abc" });
+    expect(await t2.save()).toBeFalsy();
+    expect(t2.errors.messagesFor("title")).toBeTruthy();
+  });
+
+  it("validate uniqueness when integer out of range", async () => {
+    const entry = await BigIntTest.create({ engines_count: INT_MAX_VALUE + 1 });
+    expect(entry.errors.messagesFor("engines_count")).toEqual(["is not included in the list"]);
+  });
+
+  it("validate uniqueness when integer out of range show order does not matter", async () => {
+    const entry = await BigIntReverseTest.create({ engines_count: INT_MAX_VALUE + 1 });
+    expect(entry.errors.messagesFor("engines_count")).toEqual(["is not included in the list"]);
+  });
+
+  it("validates uniqueness with newline chars", async () => {
+    Topic.validatesUniquenessOf("title", { caseSensitive: false });
+
+    const t = new Topic({ title: "new\nline" });
+    expect(await t.save()).toBeTruthy();
+  });
+
+  it("validate uniqueness with scope", async () => {
+    Reply.validatesUniquenessOf("content", { scope: "parent_id" });
+
+    const t = await Topic.create({ title: "I'm unique!" });
+
+    const r1 = await (t as any).replies.create({ title: "r1", content: "hello world" });
+    expect(r1.isPersisted()).toBeTruthy();
+
+    const r2 = new Reply({ title: "r2", content: "hello world", parent_id: (t as any).id });
+    expect(await r2.save()).toBeFalsy();
+
+    r2.writeAttribute("content", "something else");
+    expect(await r2.save()).toBeTruthy();
+
+    const t2 = await Topic.create({ title: "I'm unique too!" });
+    const r3 = await (t2 as any).replies.create({ title: "r3", content: "hello world" });
+    expect(r3.isPersisted()).toBeTruthy();
+  });
+
+  it("validate uniqueness with aliases", async () => {
+    Reply.validatesUniquenessOf("new_content", { scope: "new_parent_id" });
+
+    const t = await Topic.create({ title: "I'm unique!" });
+
+    const r1 = await (t as any).replies.create({ title: "r1", content: "hello world" });
+    expect(r1.isPersisted()).toBeTruthy();
+
+    const r2 = new Reply({ title: "r2", content: "hello world", parent_id: (t as any).id });
+    expect(await r2.save()).toBeFalsy();
+
+    r2.writeAttribute("content", "something else");
+    expect(await r2.save()).toBeTruthy();
+
+    const t2 = await Topic.create({ title: "I'm unique too!" });
+    const r3 = await (t2 as any).replies.create({ title: "r3", content: "hello world" });
+    expect(r3.isPersisted()).toBeTruthy();
+  });
+
+  it("validate uniqueness with scope invalid syntax", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => {
+      Reply.validatesUniquenessOf("content", { scope: { parent_id: false } as any });
+    });
+    expect(error.message).toMatch(/Pass a symbol or an array of symbols instead/);
+  });
+
+  it("validate uniqueness with object scope", async () => {
+    Reply.validatesUniquenessOf("content", { scope: "topic" });
+
+    const t = await Topic.create({ title: "I'm unique!" });
+
+    const r1 = await (t as any).replies.create({ title: "r1", content: "hello world" });
+    expect(r1.isPersisted()).toBeTruthy();
+
+    const r2 = new Reply({ title: "r2", content: "hello world", parent_id: (t as any).id });
+    expect(await r2.save()).toBeFalsy();
+  });
+
+  it("validate uniqueness with polymorphic object scope", async () => {
+    Essay.validatesUniquenessOf("name", { scope: ["writer_id", "writer_type"] });
+    try {
+      const a = await Author.create({ name: "Sergey" });
+      const p = await Person.create({ first_name: "Sergey" });
+
+      const e1 = await (a as any).essays.create({ name: "Essay" });
+      expect(e1.isPersisted()).toBeTruthy();
+
+      const e2 = await (p as any).essays.create({ name: "Essay" });
+      expect(e2.isPersisted()).toBeTruthy();
+    } finally {
+      Essay.clearValidatorsBang();
+    }
+  });
+
+  it("validate uniqueness with composed attribute scope", async () => {
+    const r1 = await ReplyWithTitleObject.create({ title: "r1", content: "hello world" });
+    expect(r1.isPersisted()).toBeTruthy();
+
+    const r2 = new ReplyWithTitleObject({ title: "r1", content: "hello world" });
+    expect(await r2.save()).toBeFalsy();
+  });
+
+  it("validate uniqueness with object arg", async () => {
+    Reply.validatesUniquenessOf("topic");
+
+    const t = await Topic.create({ title: "I'm unique!" });
+
+    const r1 = await (t as any).replies.create({ title: "r1", content: "hello world" });
+    expect(r1.isPersisted()).toBeTruthy();
+
+    const r2 = new Reply({ title: "r2", content: "hello world", parent_id: (t as any).id });
+    expect(await r2.save()).toBeFalsy();
+  });
+
+  it("validate uniqueness scoped to defining class", async () => {
+    const t = await Topic.create({ title: "What, me worry?" });
+
+    const r1 = await (t as any).uniqueReplies.create({
+      title: "r1",
+      content: "a barrel of fun",
+    });
+    expect(r1.isPersisted()).toBeTruthy();
+
+    const r2 = new SillyUniqueReply({
+      title: "r2",
+      content: "a barrel of fun",
+      parent_id: (t as any).id,
+    });
+    expect(await r2.save()).toBeFalsy();
+
+    const r3 = await (t as any).replies.create({
+      title: "r2",
+      content: "a barrel of fun",
+    });
+    expect(r3.isPersisted()).toBeTruthy();
+  });
+
+  it("validate uniqueness with scope array", async () => {
+    Reply.validatesUniquenessOf("author_name", {
+      scope: ["author_email_address", "parent_id"],
+    });
+
+    const t = await Topic.create({ title: "The earth is actually flat!" });
+    const tid = (t as any).id;
+
+    const r1 = new Reply({
+      author_name: "jeremy",
+      author_email_address: "jeremy@rubyonrails.com",
+      title: "You're joking!",
+      content: "Silly reply",
+      parent_id: tid,
+    });
+    expect(await r1.save()).toBeTruthy();
+
+    const r2 = new Reply({
+      author_name: "jeremy",
+      author_email_address: "jeremy@rubyonrails.com",
+      title: "You're joking!",
+      content: "Silly reply again...",
+      parent_id: tid,
+    });
+    expect(await r2.save()).toBeFalsy();
+
+    r2.writeAttribute("author_email_address", "jeremy_alt_email@rubyonrails.com");
+    expect(await r2.save()).toBeTruthy();
+
+    const r3 = new Reply({
+      author_name: "jeremy",
+      author_email_address: "jeremy_alt_email@rubyonrails.com",
+      title: "You're wrong",
+      content: "It's cubic",
+      parent_id: tid,
+    });
+    expect(await r3.save()).toBeFalsy();
+
+    r3.writeAttribute("author_name", "jj");
+    expect(await r3.save()).toBeTruthy();
+
+    r3.writeAttribute("author_name", "jeremy");
+    expect(await r3.save()).toBeFalsy();
+  });
+
+  it("validate case insensitive uniqueness", async () => {
+    Topic.validatesUniquenessOf("title", "parent_id", { caseSensitive: false, allowNil: true });
+
+    const t = new Topic({ title: "I'm unique!", parent_id: 2 });
+    expect(await t.save()).toBeTruthy();
+
+    t.writeAttribute("content", "Remaining unique");
+    expect(await t.save()).toBeTruthy();
+
+    const t2 = new Topic({ title: "I'm UNIQUE!", parent_id: 1 });
+    expect(await t2.isValid()).toBeFalsy();
+    expect(await t2.save()).toBeFalsy();
+    expect(t2.errors.messagesFor("title").length > 0).toBeTruthy();
+    expect(t2.errors.messagesFor("parent_id").length > 0).toBeTruthy();
+    expect(t2.errors.messagesFor("title")).toEqual(["has already been taken"]);
+
+    t2.writeAttribute("title", "I'm truly UNIQUE!");
+    expect(await t2.isValid()).toBeFalsy();
+    expect(await t2.save()).toBeFalsy();
+    assertEmpty(t2.errors.messagesFor("title"));
+    expect(t2.errors.messagesFor("parent_id").length > 0).toBeTruthy();
+
+    t2.writeAttribute("parent_id", 4);
+    expect(await t2.save()).toBeTruthy();
+
+    t2.writeAttribute("parent_id", null);
+    t2.writeAttribute("title", null);
+    expect(await t2.isValid()).toBeTruthy();
+    expect(await t2.save()).toBeTruthy();
+
+    const tUtf8 = new Topic({ title: "Я тоже уникальный!" });
+    expect(await tUtf8.save()).toBeTruthy();
+
+    if (adapterType !== "sqlite") {
+      const t2Utf8 = new Topic({ title: "я тоже УНИКАЛЬНЫЙ!" });
+      expect(await t2Utf8.isValid()).toBeFalsy();
+      expect(await t2Utf8.save()).toBeFalsy();
+    }
+  });
+
+  it("validate case sensitive uniqueness with special sql like chars", async () => {
+    Topic.validatesUniquenessOf("title", { caseSensitive: true });
+
+    const t = new Topic({ title: "I'm unique!" });
+    expect(await t.save()).toBeTruthy();
+
+    const t2 = new Topic({ title: "I'm %" });
+    expect(await t2.save()).toBeTruthy();
+
+    const t3 = new Topic({ title: "I'm uniqu_!" });
+    expect(await t3.save()).toBeTruthy();
+  });
+
+  it("validate case insensitive uniqueness with special sql like chars", async () => {
+    Topic.validatesUniquenessOf("title", { caseSensitive: false });
+
+    const t = new Topic({ title: "I'm unique!" });
+    expect(await t.save()).toBeTruthy();
+
+    const t2 = new Topic({ title: "I'm %" });
+    expect(await t2.save()).toBeTruthy();
+
+    const t3 = new Topic({ title: "I'm uniqu_!" });
+    expect(await t3.save()).toBeTruthy();
+  });
+
+  it("validate uniqueness by default database collation", async () => {
+    Topic.validatesUniquenessOf("author_email_address");
+
+    const topic1 = new Topic({ author_email_address: "david@loudthinking.com" });
+    const topic2 = new Topic({ author_email_address: "David@loudthinking.com" });
+
+    expect(await Topic.where({ author_email_address: "david@loudthinking.com" }).count()).toBe(1);
+
+    expect(await topic1.isValid()).toBeFalsy();
+    expect(await topic1.save()).toBeFalsy();
+
+    if (adapterType === "mysql") {
+      expect(await topic2.isValid()).toBeFalsy();
+      expect(await topic2.save()).toBeFalsy();
+    } else {
+      expect(await topic2.isValid()).toBeTruthy();
+      expect(await topic2.save()).toBeTruthy();
+    }
+
+    expect(await Topic.where({ author_email_address: "david@loudthinking.com" }).count()).toBe(1);
+    expect(await Topic.where({ author_email_address: "David@loudthinking.com" }).count()).toBe(1);
+  });
+
+  it("validate case sensitive uniqueness", async () => {
+    Topic.validatesUniquenessOf("title", { caseSensitive: true, allowNil: true });
+
+    const t = new Topic({ title: "I'm unique!" });
+    expect(await t.save()).toBeTruthy();
+
+    t.writeAttribute("content", "Remaining unique");
+    expect(await t.save()).toBeTruthy();
+
+    const t2 = new Topic({ title: "I'M UNIQUE!" });
+    expect(await t2.isValid()).toBeTruthy();
+    expect(await t2.save()).toBeTruthy();
+    assertEmpty(t2.errors.messagesFor("title"));
+    assertEmpty(t2.errors.messagesFor("parent_id"));
+    expect(t2.errors.messagesFor("title")).not.toEqual(["has already been taken"]);
+
+    const t3 = new Topic({ title: "I'M uNiQUe!" });
+    expect(await t3.isValid()).toBeTruthy();
+    expect(await t3.save()).toBeTruthy();
+    assertEmpty(t3.errors.messagesFor("title"));
+    assertEmpty(t3.errors.messagesFor("parent_id"));
+    expect(t3.errors.messagesFor("title")).not.toEqual(["has already been taken"]);
+  });
+
+  it("validate case sensitive uniqueness with attribute passed as integer", async () => {
+    Topic.validatesUniquenessOf("title", { caseSensitive: true });
+    await Topic.createBang({ title: 101 as any });
+
+    const t2 = new Topic({ title: 101 as any });
+    expect(await t2.save()).toBeFalsy();
+    expect(t2.errors.messagesFor("title")).toBeTruthy();
+  });
+
+  it("validate uniqueness with non standard table names", async () => {
+    const i1 = await WarehouseThing.create({ value: 1000 });
+    expect(await i1.isValid()).toBeFalsy();
+    expect(i1.errors.messagesFor("value").length > 0).toBeTruthy();
+  });
+
+  it("validates uniqueness inside scoping", async () => {
+    Topic.validatesUniquenessOf("title");
+
+    const t1 = new Topic({ title: "I'm unique!", author_name: "Mary" });
+    expect(await t1.save()).toBeTruthy();
+
+    const t2 = new Topic({ title: "I'm unique!", author_name: "David" });
+    expect(await t2.save()).toBeFalsy();
+  });
+
+  it("validate uniqueness with columns which are sql keywords", async () => {
+    Guid.validatesUniquenessOf("key");
+    try {
+      const g = new Guid();
+      g.writeAttribute("key", "foo");
+      await assertNothingRaised(async () => !(await g.isValid()));
+    } finally {
+      Guid.clearValidatorsBang();
+    }
+  });
+
+  it("validate uniqueness with limit", async () => {
+    if (adapterType === "sqlite") {
+      const e1 = await Event.create({ title: "abcdefgh" });
+      expect(await e1.isValid()).toBeTruthy();
+
+      const e2 = await Event.create({ title: "abcdefgh" });
+      expect(await e2.isValid()).toBeFalsy();
+    } else if (adapterType === "mysql" || adapterType === "postgres") {
+      await expect(Event.create({ title: "abcdefgh" })).rejects.toThrow(ValueTooLong);
+    } else {
+      await expect(Event.create({ title: "abcdefgh" })).rejects.toThrow(StatementInvalid);
+    }
+  });
+
+  it("validate uniqueness with limit and utf8", async () => {
+    if (adapterType === "sqlite") {
+      const e1 = await Event.create({ title: "一二三四五六七八" });
+      expect(await e1.isValid()).toBeTruthy();
+
+      const e2 = await Event.create({ title: "一二三四五六七八" });
+      expect(await e2.isValid()).toBeFalsy();
+    } else if (adapterType === "mysql" || adapterType === "postgres") {
+      await expect(Event.create({ title: "一二三四五六七八" })).rejects.toThrow(ValueTooLong);
+    } else {
+      await expect(Event.create({ title: "一二三四五六七八" })).rejects.toThrow(StatementInvalid);
+    }
+  });
+
+  it("validate straight inheritance uniqueness", async () => {
+    const w1 = await IneptWizard.create({ name: "Rincewind", city: "Ankh-Morpork" });
+    expect(await w1.isValid()).toBeTruthy();
+
+    const w2 = new IneptWizard({ name: "Rincewind", city: "Quirm" });
+    expect(await w2.isValid()).toBeFalsy();
+    expect(w2.errors.messagesFor("name").length > 0).toBeTruthy();
+    expect(w2.errors.messagesFor("name")).toEqual(["has already been taken"]);
+
+    const w3 = new Conjurer({ name: "Rincewind", city: "Quirm" });
+    expect(await w3.isValid()).toBeFalsy();
+    expect(w3.errors.messagesFor("name").length > 0).toBeTruthy();
+    expect(w3.errors.messagesFor("name")).toEqual(["has already been taken"]);
+
+    const w4 = await Conjurer.create({ name: "The Amazing Bonko", city: "Quirm" });
+    expect(await w4.isValid()).toBeTruthy();
+
+    const w5 = new Thaumaturgist({ name: "The Amazing Bonko", city: "Lancre" });
+    expect(await w5.isValid()).toBeFalsy();
+    expect(w5.errors.messagesFor("name").length > 0).toBeTruthy();
+    expect(w5.errors.messagesFor("name")).toEqual(["has already been taken"]);
+
+    const w6 = new Thaumaturgist({ name: "Mustrum Ridcully", city: "Quirm" });
+    expect(await w6.isValid()).toBeFalsy();
+    expect(w6.errors.messagesFor("city").length > 0).toBeTruthy();
+    expect(w6.errors.messagesFor("city")).toEqual(["has already been taken"]);
+  });
+
+  it("validate uniqueness with conditions", async () => {
+    Topic.validatesUniquenessOf("title", {
+      conditions: function (this: any) {
+        return this.where({ approved: true });
+      },
+    });
+    await Topic.create({ title: "I'm a topic", approved: true });
+    await Topic.create({ title: "I'm an unapproved topic", approved: false });
+
+    const t3 = new Topic({ title: "I'm a topic", approved: true });
+    expect(await t3.save()).toBeFalsy();
+
+    const t4 = new Topic({ title: "I'm an unapproved topic", approved: false });
+    expect(await t4.save()).toBeTruthy();
+  });
+
+  it("validate uniqueness with non callable conditions is not supported", () => {
+    expect(() =>
+      Topic.validatesUniquenessOf("title", {
+        conditions: Topic.where({ approved: true }) as any,
+      }),
+    ).toThrow(ArgumentError);
+  });
+
+  it("validate uniqueness with conditions with record arg", async () => {
+    Topic.validatesUniquenessOf("title", {
+      conditions: function (this: any, record: any) {
+        return this.where({ author_name: record.readAttribute("author_name") });
+      },
+    } as any);
+
+    const todays = new Topic({ title: "Highlights of the Day", author_name: "A" });
+    expect(await todays.save()).toBeTruthy();
+
+    const duplicate = new Topic({ title: "Highlights of the Day", author_name: "A" });
+    expect(await duplicate.isInvalid()).toBeTruthy();
+
+    const other = new Topic({ title: "Highlights of the Day", author_name: "B" });
+    expect(await other.isValid()).toBeTruthy();
+  });
+
+  it("validate uniqueness on existing relation", async () => {
+    const event = await Event.create({ title: "ev1" });
+    const t1 = new TopicWithUniqEvent({ parent_id: (event as any).id });
+    expect(await t1.save()).toBeTruthy();
+
+    const topic = new TopicWithUniqEvent({ parent_id: (event as any).id });
+    expect(await topic.save()).toBeFalsy();
+    expect(topic.errors.messagesFor("event")).toEqual(["has already been taken"]);
+  });
+
+  it("validate uniqueness on empty relation", async () => {
+    const topic = new TopicWithUniqEvent();
+    expect(await topic.isValid()).toBeTruthy();
+  });
+
+  it("validate uniqueness of custom primary key", async () => {
+    Keyboard.validatesUniquenessOf("key_number");
+    try {
+      await Keyboard.createBang({ key_number: 10 });
+      const key2 = await Keyboard.createBang({ key_number: 11 });
+
+      key2.writeAttribute("key_number", 10);
+      expect(await key2.save()).toBeFalsy();
+    } finally {
+      Keyboard.clearValidatorsBang();
+    }
+  });
+
+  it("validate uniqueness without primary key", async () => {
+    const abc = await DashboardWithoutPrimaryKey.createBang({ dashboard_id: "abc" });
+    expect(await new DashboardWithoutPrimaryKey({ dashboard_id: "xyz" }).isValid()).toBeTruthy();
+    expect(await new DashboardWithoutPrimaryKey({ dashboard_id: "abc" }).isValid()).toBeFalsy();
+
+    abc.writeAttribute("dashboard_id", "def");
+
+    const e = await assertRaises([UnknownPrimaryKey], {}, () => abc.saveBang());
+    expect(e.message).toMatch(/^Unknown primary key for table dashboards in model/);
+    expect(e.message).toMatch(
+      /Cannot validate uniqueness for persisted record without primary key.$/,
+    );
+  });
+
+  it("validate uniqueness ignores itself when primary key changed", async () => {
+    Topic.validatesUniquenessOf("title");
+
+    const t = new Topic({ title: "This is a unique title" });
+    expect(await t.save()).toBeTruthy();
+
+    const id = t.readAttribute("id");
+    t.writeAttribute("id", typeof id === "bigint" ? id + 1n : (id as number) + 1);
+    expect(await t.isValid()).toBeTruthy();
+    expect(await t.save()).toBeTruthy();
+  });
+
+  it("validate uniqueness with after create performing save", async () => {
+    TopicWithAfterCreate.validatesUniquenessOf("title");
+    try {
+      const topic = await TopicWithAfterCreate.createBang({ title: "Title1" });
+      expect((topic.readAttribute("author_name") as string).startsWith("Title1")).toBeTruthy();
+
+      const topic2 = new TopicWithAfterCreate({ title: "Title1" });
+      expect(await topic2.save()).toBeFalsy();
+      expect(topic2.errors.messagesFor("title")).toEqual(["has already been taken"]);
+    } finally {
+      TopicWithAfterCreate.clearValidatorsBang();
+    }
+  });
+
+  it.skipIf(adapterType !== "postgres")("validate uniqueness uuid", async () => {
+    const item = await UuidItem.createBang({ uuid: crypto.randomUUID(), title: "item1" });
+    await item.update({ title: "item1-title2" });
+    assertEmpty(item.errors);
+
+    const item2 = await UuidValidatingItem.createBang({
+      uuid: crypto.randomUUID(),
+      title: "item2",
+    });
+    await item2.update({ title: "item2-title2" });
+    assertEmpty(item2.errors);
+  });
+
+  it("validate uniqueness regular id", async () => {
+    const item = await CoolTopic.createBang({ title: "MyItem" });
+    assertEmpty(item.errors);
+
+    const item2 = new CoolTopic({ id: (item as { id: number }).id, title: "MyItem2" });
+    expect(await item2.save()).toBeFalsy();
+    expect(item2.errors.messagesFor("id")).toEqual(["has already been taken"]);
+  });
+});
+
+describe("UniquenessValidationWithIndexTest", () => {
+  fixtures(["topics"], { useTransactionalTests: false });
+
+  beforeAll(() => {
+    constSet(TopLevel, "Topic", Topic);
+    constSet(TopLevel, "Event", Event);
+    constSet(TopLevel, "Keyboard", Keyboard);
+  });
+
+  beforeEach(async () => {
+    const connection = await Base.leaseConnection();
+    await connection.schemaCache.clearDataSourceCacheBang("topics");
+    await Topic.deleteAll();
+    await Event.deleteAll();
+  });
+
+  afterEach(async () => {
+    Topic.clearValidatorsBang();
+    await (
+      await Base.leaseConnection()
+    ).removeIndex("topics", { name: "topics_index", ifExists: true });
+  });
+
+  it("new record", async () => {
+    Topic.validatesUniquenessOf("title");
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = new Topic({ title: "abc" });
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("changing non unique attribute", async () => {
+    Topic.validatesUniquenessOf("title");
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("author_name", "John");
+    await assertNoQueries(false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("changing unique attribute", async () => {
+    Topic.validatesUniquenessOf("title");
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("title", "abc v2");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("changing non unique attribute and unique attribute is nil", async () => {
+    Topic.validatesUniquenessOf("title");
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({});
+    expect(t.readAttribute("title")).toBeNull();
+    t.writeAttribute("author_name", "John");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("conditions", async () => {
+    Topic.validatesUniquenessOf("title", {
+      conditions: function (this: any) {
+        return this.where().not({ author_name: null });
+      },
+    });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("title", "abc v2");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("case sensitive", async () => {
+    Topic.validatesUniquenessOf("title", { caseSensitive: true });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("title", "abc v2");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  itIfSupports("partial_index", "partial index", async () => {
+    Topic.validatesUniquenessOf("title");
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "title", {
+      unique: true,
+      where: "approved",
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("author_name", "John");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("non unique index", async () => {
+    Topic.validatesUniquenessOf("title");
+    await (await Base.leaseConnection()).addIndex("topics", "title", { name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("author_name", "John");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("scope", async () => {
+    Topic.validatesUniquenessOf("title", { scope: "author_name" });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", ["author_name", "title"], {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    t.writeAttribute("content", "hello world");
+    await assertNoQueries(false, async () => {
+      await t.isValid();
+    });
+
+    t.writeAttribute("author_name", "Amy");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("uniqueness on relation", async () => {
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "parent_id", {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const e1 = await Event.createBang({ title: "abc" });
+    const e2 = await Event.createBang({ title: "cde" });
+    const t = await TopicWithEvent.createBang({ event: e1 });
+    try {
+      t.writeAttribute("content", "hello world");
+      await assertNoQueries(false, async () => {
+        await t.isValid();
+      });
+
+      t.event = e2;
+      await assertQueriesCount(1, false, async () => {
+        await t.isValid();
+      });
+    } finally {
+      await Event.deleteAll();
+    }
+  });
+
+  it("uniqueness on custom relation primary key", async () => {
+    await Keyboard.createBang({ name: "Keyboard #1" });
+    await LessonWithUniqKeyboard.createBang({ name: "Keyboard #1" });
+
+    const another = new LessonWithUniqKeyboard({ name: "Keyboard #1" });
+    expect(await another.isValid()).toBeFalsy();
+    expect(another.errors.messagesFor("keyboard")).toEqual(["has already been taken"]);
+  });
+
+  it("index of sublist of columns", async () => {
+    Topic.validatesUniquenessOf("title", { scope: "author_name" });
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "author_name", {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    t.writeAttribute("content", "hello world");
+    await assertNoQueries(false, async () => {
+      await t.isValid();
+    });
+
+    t.writeAttribute("author_name", "Amy");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it("index of columns list and extra columns", async () => {
+    Topic.validatesUniquenessOf("title");
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", ["title", "author_name"], {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    t.writeAttribute("content", "hello world");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+
+  it.skipIf(adapterType !== "postgres")("expression index", async () => {
+    Topic.validatesUniquenessOf("title");
+    await (
+      await Base.leaseConnection()
+    ).addIndex("topics", "LOWER(title)", {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    t.writeAttribute("content", "hello world");
+
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
+  });
+});
+
+describe("UniquenessWithCompositeKey", () => {
+  fixtures(["cpkAuthors"]);
+
+  it("uniqueness validation for model with composite key", async () => {
+    const bookOne = await BookWithUniqueRevision.createBang({
+      id: [1, 42] as any,
+      title: "Author 1's book",
+      revision: 36,
+    });
+    const bookTwo = await BookWithUniqueRevision.createBang({
+      id: [2, 42] as any,
+      title: "Author 2's book",
+      revision: 37,
+    });
+
+    expect(bookOne.readAttribute("revision")).not.toEqual(bookTwo.readAttribute("revision"));
+
+    await assertChanges(
+      () => bookTwo.isValid(),
+      null,
+      { from: true, to: false },
+      () => {
+        bookTwo.writeAttribute("revision", bookOne.readAttribute("revision"));
+      },
+    );
+  });
+});
+
+class BigIntTest extends Base {
+  static _tableName = "cars";
+  static {
+    this.validates("engines_count", {
+      uniqueness: true,
+      inclusion: { in: new Range(0, INT_MAX_VALUE) },
+    });
+  }
+}
+
+class BigIntReverseTest extends Base {
+  static _tableName = "cars";
+  static {
+    this.validates("engines_count", { inclusion: { in: new Range(0, INT_MAX_VALUE) } });
+    this.validates("engines_count", { uniqueness: true });
+  }
+}
+
+class TopicWithEvent extends Topic {
+  declare event: Event | null;
+  static {
+    this.belongsTo("event", { foreignKey: "parent_id" });
+    this.validatesUniquenessOf("event");
+  }
+}
+
+class TopicWithUniqEvent extends Topic {
+  static {
+    this.belongsTo("event", { foreignKey: "parent_id" });
+    this.validates("event", { uniqueness: true });
+  }
+}
+
+constSet(TopLevel, "BigIntTest", BigIntTest);
+DescendantsTracker.registerSubclass(Base, BigIntTest);
+constSet(TopLevel, "BigIntReverseTest", BigIntReverseTest);
+DescendantsTracker.registerSubclass(Base, BigIntReverseTest);
+constSet(TopLevel, "TopicWithEvent", TopicWithEvent);
+DescendantsTracker.registerSubclass(Topic, TopicWithEvent);
+constSet(TopLevel, "TopicWithUniqEvent", TopicWithUniqEvent);
+DescendantsTracker.registerSubclass(Topic, TopicWithUniqEvent);

@@ -1,0 +1,19 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Section } from "./section.js";
+import type { Session } from "./session.js";
+import { Base } from "../../lib/base.js";
+
+export class Seminar extends Base {
+  declare sections: AssociationProxy<Section>;
+  declare sessions: AssociationProxy<Session>;
+  declare name: string;
+
+  static {
+    this.hasMany("sections", { inverseOf: "seminar", autosave: true, dependent: "destroy" });
+    this.hasMany("sessions", { through: "sections" });
+  }
+}
+constSet(TopLevel, "Seminar", Seminar);
+DescendantsTracker.registerSubclass(Base, Seminar);

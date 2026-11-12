@@ -1,0 +1,180 @@
+import { describe, it, expect } from "vitest";
+import { StringIO } from "@blazetrails/ruby-compat";
+import { ValueType } from "@blazetrails/activemodel";
+import { SchemaDumper } from "../../../../lib/connection-adapters/abstract/schema-dumper.js";
+import { IntegerType, DecimalType, BooleanType, StringType } from "@blazetrails/activemodel";
+import { Column } from "../../../../lib/connection-adapters/column.js";
+import { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
+import { SqlTypeMetadata } from "../../../../lib/connection-adapters/sql-type-metadata.js";
+
+type Meta = ConstructorParameters<typeof SqlTypeMetadata>[0];
+
+function col(
+  name: string,
+  meta: Meta,
+  options: { null?: boolean; defaultFunction?: string | null } = {},
+): Column {
+  return new Column(
+    name,
+    null,
+    new SqlTypeMetadata(meta),
+    options.null ?? true,
+    options.defaultFunction ?? null,
+  );
+}
+
+const emptySource: any = {
+  supportsVirtualColumns: async () => false,
+  tables: async () => [],
+  columns: async () => [],
+  indexes: async () => [],
+  lookupCastTypeFromColumn: () => new ValueType(),
+};
+
+describe("SchemaDumper", () => {
+  it("create returns a SchemaDumper instance", () => {
+    const dumper = SchemaDumper.create(emptySource);
+    expect(dumper).toBeInstanceOf(SchemaDumper);
+  });
+
+  it("create accepts options", () => {
+    const dumper = SchemaDumper.create(emptySource, { tableNamePrefix: "app_" });
+    expect(dumper).toBeInstanceOf(SchemaDumper);
+  });
+
+  it("DEFAULT_DATETIME_PRECISION is 6", () => {
+    expect(SchemaDumper.DEFAULT_DATETIME_PRECISION).toBe(6);
+  });
+});
+
+describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
+  function makeAdapterDumper(
+    column: Record<string, unknown>,
+    type:
+      | InstanceType<typeof IntegerType>
+      | InstanceType<typeof DecimalType>
+      | InstanceType<typeof BooleanType>
+      | InstanceType<typeof StringType>,
+  ) {
+    const adapter = { lookupCastTypeFromColumn: () => type };
+    const dumper = SchemaDumper.create(adapter as any);
+    return (dumper as any).schemaDefault(column) as string | undefined;
+  }
+
+  it("integer column with raw string default deserializes to number literal", () => {
+    const result = makeAdapterDumper(
+      { hasDefault: true, default: "5", type: "integer" },
+      new IntegerType(),
+    );
+    expect(result).toBe("5");
+  });
+
+  it("boolean column with raw string default deserializes to true/false literal", () => {
+    const result = makeAdapterDumper(
+      { hasDefault: true, default: "1", type: "boolean" },
+      new BooleanType(),
+    );
+    expect(result).toBe("true");
+  });
+
+  it("text column with raw string default keeps quoted string", () => {
+    const result = makeAdapterDumper(
+      { hasDefault: true, default: "hello", type: "string" },
+      new StringType(),
+    );
+    expect(result).toBe('"hello"');
+  });
+
+  it("decimal column with raw string default rounds via type", () => {
+    const result = makeAdapterDumper(
+      { hasDefault: true, default: "2.789", type: "decimal" },
+      new DecimalType({ precision: 5, scale: 2 }),
+    );
+    expect(result).toBe('"2.79"');
+  });
+
+  it("null default falls through to schemaExpression", () => {
+    const result = makeAdapterDumper(
+      { hasDefault: true, default: null, defaultFunction: "uuid()" },
+      new StringType(),
+    );
+    expect(result).toContain("uuid()");
+  });
+});
+
+describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
+  const dumper = SchemaDumper.create(emptySource) as any;
+
+  it("schemaPrecision emits TS `null` (not Ruby `nil`) for datetime without precision", () => {
+    expect(dumper.schemaPrecision({ type: "datetime", precision: null })).toBe("null");
+  });
+
+  it("schemaExpression emits a TS arrow (not a Ruby lambda) for a default function", () => {
+    expect(dumper.schemaExpression({ defaultFunction: "now()" })).toBe('() => "now()"');
+  });
+
+  it("columnSpec output round-trips through formatColspec as valid TS-DSL", async () => {
+    const [type, spec] = await dumper.columnSpec(
+      col(
+        "created_at",
+        { type: "datetime", sqlType: "datetime" },
+        {
+          null: false,
+          defaultFunction: "now()",
+        },
+      ),
+    );
+    expect(type).toBe(":datetime");
+    const text = dumper.formatColspec(spec);
+    expect(text).toContain("precision: null");
+    expect(text).toContain("null: false");
+    expect(text).toContain('default: () => "now()"');
+    expect(text).not.toContain("nil");
+    expect(text).not.toContain("-> {");
+  });
+});
+
+describe("SchemaDumper raises on a column whose type is not a valid native type", () => {
+  const connection = (source: object) =>
+    Object.assign(Object.create(AbstractAdapter.prototype), source) as AbstractAdapter;
+  const source = {
+    tables: async () => ["widgets"],
+    supportsForeignKeys: () => false,
+    columns: (_t: string) => [
+      col("id", { type: "integer", sqlType: "integer" }),
+      col("kind", { sqlType: "composite_type" }),
+    ],
+    indexes: (_t: string) => [],
+    isValidType: (type: string | null | undefined) => type === "integer",
+    primaryKey: async () => "id",
+  };
+
+  it("emits the Could-not-dump comment instead of a fabricated t.column line", async () => {
+    const output = (await connection(source).createSchemaDumper({}).dump(new StringIO())).string();
+    expect(output).toContain(`# Could not dump table "widgets" because of following StandardError`);
+    expect(output).toContain(`#   Unknown type 'composite_type' for column 'kind'`);
+    expect(output).not.toContain("createTable");
+    expect(output).not.toContain('t.column("kind"');
+  });
+
+  it("still dumps the table normally when every column type is a valid native type", async () => {
+    const validSource = {
+      tables: async () => ["widgets"],
+      supportsForeignKeys: () => false,
+      columns: (_t: string) => [
+        col("id", { type: "integer", sqlType: "integer" }),
+        col("name", { type: "string", sqlType: "varchar(255)", limit: 255 }),
+      ],
+      indexes: (_t: string) => [],
+      isValidType: (type: string | null | undefined) => type === "integer" || type === "string",
+      nativeDatabaseTypes: () => ({ integer: { name: "integer" }, string: { name: "varchar" } }),
+      primaryKey: async () => "id",
+    };
+    const output = (
+      await connection(validSource).createSchemaDumper({}).dump(new StringIO())
+    ).string();
+    expect(output).not.toContain("# Could not dump table");
+    expect(output).toContain(`await ctx.createTable("widgets"`);
+    expect(output).toContain(`t.string("name"`);
+  });
+});

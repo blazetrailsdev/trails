@@ -2,7 +2,7 @@ import { RuleTester } from "eslint";
 import { expect } from "vitest";
 import rule, { macroOfCall } from "./no-standalone-associations.mjs";
 
-const FILENAME = "packages/activerecord/src/associations.test.ts";
+const FILENAME = "packages/activerecord/test/cases/associations.test.ts";
 
 const tester = new RuleTester({
   languageOptions: {

@@ -115,7 +115,7 @@ did-you-mean **78**, globalid **9**, date **3**, activemodel/arel **0**.
 > "The JS/TS ecosystem uses factories or ad-hoc Model.create instead; Trails
 > users won't ship YAML fixtures."
 
-That reason is no longer true. `packages/activerecord/src/fixtures.ts`,
+That reason is no longer true. `packages/activerecord/lib/fixtures.ts`,
 `test-fixtures.ts`, and the full canonical fixture corpus
 (`test-helpers/fixtures/`) shipped; CLAUDE.md names `fixtures({ ... })` as
 _the_ canonical test surface, and `parity:fixtures` is a gate over that very

@@ -1,0 +1,191 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  configureEncryption,
+  snapshotEncryptionConfig,
+  restoreEncryptionConfig,
+} from "../../../lib/encryption/test-helpers.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Encryption } from "../../../lib/encryption.js";
+import { ExtendedDeterministicQueries } from "../../../lib/encryption/extended-deterministic-queries.js";
+import { EncryptedAttributeType } from "../../../lib/encryption/encrypted-attribute-type.js";
+import { Relation } from "../../../lib/relation.js";
+import { Base } from "../../../lib/index.js";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
+import { RecordInvalid } from "../../../lib/validations.js";
+
+fixtures([]);
+
+describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+  let savedExtendQueries: boolean;
+  const savedMethods: {
+    where?: (...args: any[]) => unknown;
+    isExists?: (...args: any[]) => unknown;
+    scopeForCreate?: (...args: any[]) => unknown;
+    findBy?: (...args: any[]) => unknown;
+    serialize?: (...args: any[]) => unknown;
+  } = {};
+
+  beforeEach(() => {
+    configSnapshot = snapshotEncryptionConfig();
+    savedExtendQueries = Encryption.config.extendQueries;
+    Encryption.config.previousSchemes = [];
+    configureEncryption();
+
+    savedMethods.where = Relation.prototype.where;
+    savedMethods.isExists = (Relation.prototype as any).isExists;
+    savedMethods.scopeForCreate = (Relation.prototype as any).scopeForCreate;
+    savedMethods.findBy = (Base as any).findBy;
+    savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
+
+    Encryption.config.extendQueries = true;
+    ExtendedDeterministicQueries.installSupport();
+  });
+
+  afterEach(() => {
+    Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
+    (Relation.prototype as any).isExists = savedMethods.isExists;
+    (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
+    (Base as any).findBy = savedMethods.findBy;
+    EncryptedAttributeType.prototype.serialize =
+      savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
+
+    restoreEncryptionConfig(configSnapshot);
+    Encryption.config.extendQueries = savedExtendQueries;
+  });
+
+  it("uniqueness validations work", async () => {
+    class EncryptedBookWithDowncaseName extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniquenessOf("name");
+        this.encrypts("name", { deterministic: true, downcase: true });
+      }
+    }
+
+    await EncryptedBookWithDowncaseName.createBang({ name: "dune" });
+    await expect(EncryptedBookWithDowncaseName.createBang({ name: "dune" })).rejects.toThrow(
+      RecordInvalid,
+    );
+  });
+
+  it("uniqueness validations work when mixing encrypted an unencrypted data", async () => {
+    Encryption.config.supportUnencryptedData = true;
+
+    class EncryptedBookWithDowncaseName extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniquenessOf("name");
+        this.encrypts("name", { deterministic: true, downcase: true });
+      }
+    }
+
+    class UnencryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+      }
+    }
+
+    await UnencryptedBook.createBang({ name: "dune" });
+    await expect(EncryptedBookWithDowncaseName.createBang({ name: "DUNE" })).rejects.toThrow(
+      RecordInvalid,
+    );
+  });
+
+  it("uniqueness validations do not work when mixing encrypted an unencrypted data and unencrypted data is opted out per-attribute", async () => {
+    Encryption.config.supportUnencryptedData = true;
+
+    class EncryptedBookWithUnencryptedDataOptedOut extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniquenessOf("name");
+        this.encrypts("name", { deterministic: true, supportUnencryptedData: false });
+      }
+    }
+
+    class UnencryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+      }
+    }
+
+    await UnencryptedBook.createBang({ name: "dune" });
+    await assertNothingRaised(() =>
+      EncryptedBookWithUnencryptedDataOptedOut.createBang({ name: "dune" }),
+    );
+  });
+
+  it("uniqueness validations work when mixing encrypted an unencrypted data and unencrypted data is opted in per-attribute", async () => {
+    Encryption.config.supportUnencryptedData = true;
+
+    class EncryptedBookWithUnencryptedDataOptedIn extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniquenessOf("name");
+        this.encrypts("name", { deterministic: true, supportUnencryptedData: true });
+      }
+    }
+
+    class UnencryptedBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+      }
+    }
+
+    await UnencryptedBook.createBang({ name: "dune" });
+    await expect(
+      EncryptedBookWithUnencryptedDataOptedIn.createBang({ name: "dune" }),
+    ).rejects.toThrow(RecordInvalid);
+  });
+
+  it("uniqueness validations work when using old encryption schemes", async () => {
+    Encryption.config.supportUnencryptedData = false;
+    Encryption.config.previous = [{ downcase: true, deterministic: true }];
+
+    class OldEncryptionBook extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniquenessOf("name");
+        this.encrypts("name", { deterministic: true, downcase: false });
+      }
+    }
+
+    await (OldEncryptionBook as any).createBang({ name: "dune" });
+
+    await expect((OldEncryptionBook as any).createBang({ name: "DUNE" })).rejects.toThrow(
+      RecordInvalid,
+    );
+  });
+
+  it("uniqueness validation does not revalidate the attribute with current encryption type", async () => {
+    class EncryptedBookWithUniquenessValidation extends Base {
+      static {
+        this._tableName = "encrypted_books";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { default: "<untitled>" });
+        this.validatesUniquenessOf("name");
+        this.encrypts("name", { deterministic: true });
+      }
+    }
+
+    await EncryptedBookWithUniquenessValidation.create({ name: "dune" });
+    const dup = await EncryptedBookWithUniquenessValidation.create({ name: "dune" });
+    expect(dup.errors.count).toBe(1);
+  });
+});

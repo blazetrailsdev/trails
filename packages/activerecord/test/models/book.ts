@@ -1,0 +1,215 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Relation } from "../../lib/relation.js";
+import type { ScopeOn } from "../../lib/scoping/named.js";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Author } from "./author.js";
+import type { Citation } from "./citation.js";
+import type { Essay } from "./essay.js";
+import type { Reference } from "./reference.js";
+import type { Subscriber } from "./subscriber.js";
+import type { Subscription } from "./subscription.js";
+import { Base } from "../../lib/base.js";
+
+declare module "../../lib/relation.js" {
+  interface RelationScopes<T extends Base> {
+    unread: ScopeOn<T, Book>;
+    reading: ScopeOn<T, Book>;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Book extends Base {
+  declare citations: AssociationProxy<Citation>;
+  declare references: AssociationProxy<Reference>;
+  declare subscriptions: AssociationProxy<Subscription>;
+  declare subscribers: AssociationProxy<Subscriber>;
+  declare isProposed: () => boolean;
+  declare proposedBang: () => Promise<true | undefined>;
+  declare static proposed: () => Relation<Book>;
+  declare static notProposed: () => Relation<Book>;
+  declare isWritten: () => boolean;
+  declare writtenBang: () => Promise<true | undefined>;
+  declare static written: () => Relation<Book>;
+  declare static notWritten: () => Relation<Book>;
+  declare isPublished: () => boolean;
+  declare static published: () => Relation<Book>;
+  declare static notPublished: () => Relation<Book>;
+  declare isUnread: () => boolean;
+  declare unreadBang: () => Promise<true | undefined>;
+  declare static unread: () => Relation<Book>;
+  declare static notUnread: () => Relation<Book>;
+  declare isReading: () => boolean;
+  declare readingBang: () => Promise<true | undefined>;
+  declare static reading: () => Relation<Book>;
+  declare static notReading: () => Relation<Book>;
+  declare isRead: () => boolean;
+  declare readBang: () => Promise<true | undefined>;
+  declare static read: () => Relation<Book>;
+  declare static notRead: () => Relation<Book>;
+  declare isSingle: () => boolean;
+  declare singleBang: () => Promise<true | undefined>;
+  declare static single: () => Relation<Book>;
+  declare static notSingle: () => Relation<Book>;
+  declare isMarried: () => boolean;
+  declare marriedBang: () => Promise<true | undefined>;
+  declare static married: () => Relation<Book>;
+  declare static notMarried: () => Relation<Book>;
+  declare isInEnglish: () => boolean;
+  declare inEnglishBang: () => Promise<true | undefined>;
+  declare static inEnglish: () => Relation<Book>;
+  declare static notInEnglish: () => Relation<Book>;
+  declare isInSpanish: () => boolean;
+  declare inSpanishBang: () => Promise<true | undefined>;
+  declare static inSpanish: () => Relation<Book>;
+  declare static notInSpanish: () => Relation<Book>;
+  declare isInFrench: () => boolean;
+  declare inFrenchBang: () => Promise<true | undefined>;
+  declare static inFrench: () => Relation<Book>;
+  declare static notInFrench: () => Relation<Book>;
+  declare isAuthorVisibilityVisible: () => boolean;
+  declare authorVisibilityVisibleBang: () => Promise<true | undefined>;
+  declare static authorVisibilityVisible: () => Relation<Book>;
+  declare static notAuthorVisibilityVisible: () => Relation<Book>;
+  declare isAuthorVisibilityInvisible: () => boolean;
+  declare authorVisibilityInvisibleBang: () => Promise<true | undefined>;
+  declare static authorVisibilityInvisible: () => Relation<Book>;
+  declare static notAuthorVisibilityInvisible: () => Relation<Book>;
+  declare isIllustratorVisibilityVisible: () => boolean;
+  declare illustratorVisibilityVisibleBang: () => Promise<true | undefined>;
+  declare static illustratorVisibilityVisible: () => Relation<Book>;
+  declare static notIllustratorVisibilityVisible: () => Relation<Book>;
+  declare isIllustratorVisibilityInvisible: () => boolean;
+  declare illustratorVisibilityInvisibleBang: () => Promise<true | undefined>;
+  declare static illustratorVisibilityInvisible: () => Relation<Book>;
+  declare static notIllustratorVisibilityInvisible: () => Relation<Book>;
+  declare isWithSmallFontSize: () => boolean;
+  declare withSmallFontSizeBang: () => Promise<true | undefined>;
+  declare static withSmallFontSize: () => Relation<Book>;
+  declare static notWithSmallFontSize: () => Relation<Book>;
+  declare isWithMediumFontSize: () => boolean;
+  declare withMediumFontSizeBang: () => Promise<true | undefined>;
+  declare static withMediumFontSize: () => Relation<Book>;
+  declare static notWithMediumFontSize: () => Relation<Book>;
+  declare isWithLargeFontSize: () => boolean;
+  declare withLargeFontSizeBang: () => Promise<true | undefined>;
+  declare static withLargeFontSize: () => Relation<Book>;
+  declare static notWithLargeFontSize: () => Relation<Book>;
+  declare isEasyToRead: () => boolean;
+  declare easyToReadBang: () => Promise<true | undefined>;
+  declare static easyToRead: () => Relation<Book>;
+  declare static notEasyToRead: () => Relation<Book>;
+  declare isMediumToRead: () => boolean;
+  declare mediumToReadBang: () => Promise<true | undefined>;
+  declare static mediumToRead: () => Relation<Book>;
+  declare static notMediumToRead: () => Relation<Book>;
+  declare isHardToRead: () => boolean;
+  declare hardToReadBang: () => Promise<true | undefined>;
+  declare static hardToRead: () => Relation<Book>;
+  declare static notHardToRead: () => Relation<Book>;
+  declare isForgotten: () => boolean;
+  declare forgottenBang: () => Promise<true | undefined>;
+  declare static forgotten: () => Relation<Book>;
+  declare static notForgotten: () => Relation<Book>;
+  declare isHard: () => boolean;
+  declare hardBang: () => Promise<true | undefined>;
+  declare static hard: () => Relation<Book>;
+  declare static notHard: () => Relation<Book>;
+  declare isSoft: () => boolean;
+  declare softBang: () => Promise<true | undefined>;
+  declare static soft: () => Relation<Book>;
+  declare static notSoft: () => Relation<Book>;
+  declare isEnabled: () => boolean;
+  declare enabledBang: () => Promise<true | undefined>;
+  declare static enabled: () => Relation<Book>;
+  declare static notEnabled: () => Relation<Book>;
+  declare isDisabled: () => boolean;
+  declare disabledBang: () => Promise<true | undefined>;
+  declare static disabled: () => Relation<Book>;
+  declare static notDisabled: () => Relation<Book>;
+  declare author_id: number;
+  declare author_visibility: "visible" | "invisible" | null;
+  declare boolean_status: "enabled" | "disabled" | null;
+  declare cover: "hard" | "soft" | null;
+  declare created_at: RubyTime | Temporal.PlainDateTime;
+  declare difficulty: "easy" | "medium" | "hard" | null;
+  declare external_id: string;
+  declare font_size: "small" | "medium" | "large" | null;
+  declare format: string;
+  declare format_record_id: number;
+  declare format_record_type: string;
+  declare illustrator_visibility: "visible" | "invisible" | null;
+  declare isbn: string;
+  declare language: "english" | "spanish" | "french" | null;
+  declare last_read: "unread" | "reading" | "read" | "forgotten";
+  declare name: string;
+  declare nullable_status: "single" | "married" | null;
+  declare original_name: string;
+  declare published_on: RubyTime | Temporal.PlainDateTime;
+  declare status: "proposed" | "written" | "published" | null;
+  declare tags_count: number | null;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
+  declare updated_on: Temporal.PlainDate;
+
+  async publishedBang(): Promise<string> {
+    // @ts-expect-error — generated bang lives on the interposed carrier.
+    await super.publishedBang();
+    return "do publish work...";
+  }
+
+  static {
+    this.belongsTo("author");
+    this.belongsTo("formatRecord", { polymorphic: true });
+    this.hasMany("citations", { inverseOf: "book" });
+    this.hasMany(
+      "references",
+      function (this: Relation<Reference>) {
+        return this.distinct();
+      },
+      { through: "citations", source: "referenceOf" },
+    );
+    this.hasMany("subscriptions");
+    this.hasMany("subscribers", { through: "subscriptions" });
+    this.hasOne("essay");
+    this.aliasAttribute("title", "name");
+    this.enum("status", ["proposed", "written", "published"]);
+    this.enum("last_read", { unread: 0, reading: 2, read: 3, forgotten: null });
+    this.enum("nullable_status", ["single", "married"]);
+    this.enum("language", ["english", "spanish", "french"], { prefix: "in" });
+    this.enum("author_visibility", ["visible", "invisible"], { prefix: true });
+    this.enum("illustrator_visibility", ["visible", "invisible"], { prefix: true });
+    this.enum("font_size", ["small", "medium", "large"], { prefix: "with", suffix: true });
+    this.enum("difficulty", ["easy", "medium", "hard"], { suffix: "to_read" });
+    this.enum("cover", { hard: "hard", soft: "soft" });
+    this.enum("boolean_status", { enabled: true, disabled: false });
+  }
+}
+constSet(TopLevel, "Book", Book);
+DescendantsTracker.registerSubclass(Base, Book);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Book {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get formatRecord(): Base | null | Promise<Base | null>;
+  set formatRecord(value: Base | null);
+  get essay(): Essay | null | Promise<Essay | null>;
+  set essay(value: Essay | null);
+}
+
+export class PublishedBook extends Base {
+  declare cover: "hard" | "soft" | null;
+  declare isHard: () => boolean;
+  declare isSoft: () => boolean;
+  declare static hard: () => Relation<PublishedBook>;
+  declare static soft: () => Relation<PublishedBook>;
+
+  static _tableName = "books";
+
+  static {
+    this.enum("cover", { hard: "0", soft: "1" }, { default: "hard" });
+    this.validates("isbn", { uniqueness: true });
+  }
+}
+constSet(TopLevel, "PublishedBook", PublishedBook);
+DescendantsTracker.registerSubclass(Base, PublishedBook);

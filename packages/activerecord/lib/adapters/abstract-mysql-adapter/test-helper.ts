@@ -1,0 +1,27 @@
+import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
+import { arunitDatabaseNames } from "../../../test/support/arunit2-config.js";
+import { mysqlSettings } from "../../../test/support/config.js";
+import { Base } from "../../base.js";
+
+export { describeIfMysqlAdapter } from "../../../test/support/describe-if-mysql-adapter.js";
+export {
+  MYSQL_TEST_URL,
+  isMariaDb,
+  mysqlVersion,
+  supportsExpressionIndex,
+  supportsOptimizerHints,
+  supportsRenameIndex,
+  supportsJson,
+} from "../../../test/support/mysql-server-version.js";
+
+export const { arunit: ARUNIT_DATABASE, arunit2: ARUNIT2_DATABASE } = arunitDatabaseNames(
+  mysqlSettings().database,
+);
+
+export { Mysql2Adapter };
+
+export async function leaseMysqlAdapter(): Promise<Mysql2Adapter> {
+  const adapter = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+  await adapter.materializeTransactions();
+  return adapter;
+}

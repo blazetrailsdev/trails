@@ -18,7 +18,7 @@ const FIXTURES: Record<string, { input: string; recited: string }> = {
       "/** Mirrors `vendor/ruby/rational.c:580` and vendor/rack-session/lib/rack/session/pool.rb */\n",
     recited: `/** Mirrors \`vendor/ruby/${ruby}/rational.c:580\` and vendor/rack-session/${activeVersion(SOURCES.find((s) => s.name === "rack-session")!)}/lib/rack/session/pool.rb */\n`,
   },
-  "packages/activerecord/src/versioned.ts": {
+  "packages/activerecord/lib/versioned.ts": {
     input: `// vendor/rails/${rails}/activerecord/lib/active_record/base.rb:12\n`,
     recited: `// vendor/rails/${rails}/activerecord/lib/active_record/base.rb:12\n`,
   },
@@ -38,7 +38,7 @@ FIXTURES["packages/ruby-compat/lib/bare-ref.ts"] = {
 
 const TAG = "@inlinedFrom ActiveModel::API#initialize";
 
-FIXTURES["packages/activerecord/src/tagged.ts"] = {
+FIXTURES["packages/activerecord/lib/tagged.ts"] = {
   input: `/**\n * ${TAG} rails/v7.1.0/activemodel/lib/active_model/api.rb:80-84\n */\n`,
   recited: `/**\n * ${TAG} rails/${rails}/activemodel/lib/active_model/api.rb:80-84\n */\n`,
 };
@@ -74,7 +74,7 @@ describe("vendor:recite", () => {
       const changed = await recite(root, PATHS);
       expect(changed.sort()).toEqual([
         "docs/stale.md",
-        "packages/activerecord/src/tagged.ts",
+        "packages/activerecord/lib/tagged.ts",
         "packages/ruby-compat/lib/bare-ref.ts",
         "packages/ruby-compat/lib/unversioned.ts",
       ]);

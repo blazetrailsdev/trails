@@ -15,7 +15,7 @@
 // its import evaluates the graph fresh with `TableDefinition` as the entry.
 //
 // The import below is deliberately the first thing this module touches.
-import { TableDefinition } from "../../packages/activerecord/src/connection-adapters/postgresql/schema-definitions.js";
+import { TableDefinition } from "../../packages/activerecord/lib/connection-adapters/postgresql/schema-definitions.js";
 import { describe, it, expect } from "vitest";
 
 describe("postgresql schema-definitions circular-init", () => {

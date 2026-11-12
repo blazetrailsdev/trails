@@ -1,0 +1,58 @@
+import { describe, it, expect } from "vitest";
+import { File as FixtureFile } from "../../lib/fixture-set/file.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../lib/config.js";
+import { FixtureSet } from "../../lib/fixtures.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { Account } from "../models/account.js";
+import { Company } from "../models/company.js";
+import { Tree } from "../models/tree.js";
+import "../../lib/relation.js";
+import { nakedYmlAccountsFixtureData } from "../fixtures/naked/yml/accounts.js";
+import { nakedYmlCompaniesFixtureData } from "../fixtures/naked/yml/companies.js";
+import { nakedYmlParrotsFixtureData } from "../fixtures/naked/yml/parrots.js";
+import { nakedYmlTreesFixtureData } from "../fixtures/naked/yml/trees.js";
+
+describe("tableless useFixtures (naked/yml)", () => {
+  describe("test_empty_yaml_fixture", () => {
+    const { accounts } = fixtures({ accounts: [Account, nakedYmlAccountsFixtureData] });
+
+    it("loads an empty fixture set without error", () => {
+      expect(accounts.all()).toHaveLength(0);
+    });
+  });
+
+  describe("test_empty_yaml_fixture_with_a_comment_in_it", () => {
+    const { companies } = fixtures({ companies: [Company, nakedYmlCompaniesFixtureData] });
+
+    it("loads a comment-only fixture set without error", () => {
+      expect(companies.all()).toHaveLength(0);
+    });
+  });
+
+  describe("test_yaml_file_with_invalid_column", () => {
+    it("raises with Rails-mirrored message listing all unknown columns", async () => {
+      FixtureSet.resetCache();
+      FixtureFile.registerModule(
+        `${TS_FIXTURES_ROOT}/naked/yml/parrots.ts`,
+        nakedYmlParrotsFixtureData,
+      );
+      await expect(
+        FixtureSet.createFixtures(`${TS_FIXTURES_ROOT}/naked/yml`, "parrots"),
+      ).rejects.toThrow('table "parrots" has no columns named "arrr", "foobar".');
+    });
+  });
+
+  describe("test_yaml_file_with_symbol_columns", () => {
+    const { trees } = fixtures({ trees: [Tree, nakedYmlTreesFixtureData] });
+
+    it("inserts the row and it can be found by primary key", async () => {
+      const root = await Tree.findBy({ id: 1 });
+      expect(root).not.toBeNull();
+      expect(root!.name).toBe("The Root");
+    });
+
+    it(".all() returns all rows", () => {
+      expect(trees.all()).toHaveLength(1);
+    });
+  });
+});

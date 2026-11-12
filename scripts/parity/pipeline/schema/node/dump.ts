@@ -17,7 +17,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 // Relative imports so tsx can resolve from source without a prior build.
 // These paths are resolved relative to this file's location by the module system.
-import { Base } from "../../../../../packages/activerecord/src/base.js";
+import { Base } from "../../../../../packages/activerecord/lib/base.js";
 import { canonicalize } from "./canonicalize.js";
 import type { NativeDump, NativeColumn, NativeIndex } from "./canonicalize.js";
 
@@ -51,9 +51,9 @@ function usage(): never {
 function assertRepoRoot(): void {
   // Fixture arguments (argv[2], argv[3]) are resolved relative to CWD.
   // Fail fast with a clear message rather than a cryptic path error later.
-  if (!existsSync("packages/activerecord/src/base.ts")) {
+  if (!existsSync("packages/activerecord/lib/base.ts")) {
     process.stderr.write(
-      "parity dump: must be run from the repo root (packages/activerecord/src/base.ts not found)\n",
+      "parity dump: must be run from the repo root (packages/activerecord/lib/base.ts not found)\n",
     );
     process.exit(1);
   }

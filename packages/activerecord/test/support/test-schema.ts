@@ -1,0 +1,1758 @@
+import type { Schema } from "./schema-types.js";
+
+export const TEST_SCHEMA: Schema = {
+  "1_need_quoting": {
+    name: "string",
+  },
+
+  accounts: {
+    firm_id: "big_integer",
+    firm_name: "string",
+    credit_limit: "integer",
+    status: "string",
+    updated_at: "datetime",
+  },
+
+  admin_accounts: {
+    name: { type: "string", null: true },
+  },
+
+  admin_users: {
+    columns: {
+      name: "string",
+      settings: { type: "string", null: true, limit: 1024 },
+      parent: { type: "string", null: true, limit: 1024 },
+      spouse: { type: "string", null: true, limit: 1024 },
+      configs: { type: "string", null: true, limit: 1024 },
+      preferences: { type: "string", null: true, default: "", limit: 1024 },
+      json_data: { type: "string", null: true, limit: 1024 },
+      json_data_empty: { type: "string", null: true, default: "", limit: 1024 },
+      params: "text",
+      account_id: "big_integer",
+      json_options: "json",
+    },
+    indexes: [{ columns: "account_id" }],
+  },
+
+  admin_user_jsons: {
+    columns: {
+      name: "string",
+      settings: { type: "string", null: true, limit: 1024 },
+      parent: { type: "string", null: true, limit: 1024 },
+      spouse: { type: "string", null: true, limit: 1024 },
+      configs: { type: "string", null: true, limit: 1024 },
+      preferences: { type: "string", null: true, default: "", limit: 1024 },
+      json_data: { type: "string", null: true, limit: 1024 },
+      json_data_empty: { type: "string", null: true, default: "", limit: 1024 },
+      params: "text",
+      account_id: "big_integer",
+    },
+    indexes: [{ columns: "account_id" }],
+  },
+
+  aircraft: {
+    name: "string",
+    wheels_count: { type: "integer", default: 0, null: false },
+    wheels_owned_at: "datetime",
+    manufactured_at: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" },
+  },
+
+  articles: {},
+
+  articles_magazines: {
+    columns: {
+      article_id: "big_integer",
+      magazine_id: "big_integer",
+    },
+    indexes: [{ columns: "article_id" }, { columns: "magazine_id" }],
+  },
+
+  articles_tags: {
+    columns: {
+      article_id: "big_integer",
+      tag_id: "big_integer",
+    },
+    indexes: [{ columns: "article_id" }, { columns: "tag_id" }],
+  },
+
+  attachments: {
+    columns: {
+      record_type: { type: "string", null: false },
+      record_id: { type: "big_integer", null: false },
+    },
+    indexes: [{ columns: ["record_type", "record_id"], name: "index_attachments_on_record" }],
+  },
+
+  audit_logs: {
+    message: { type: "string", null: false },
+    developer_id: { type: "integer", null: false },
+    unvalidated_developer_id: "integer",
+  },
+
+  author_addresses: {},
+
+  authors: {
+    columns: {
+      name: { type: "string", null: false },
+      author_address_id: "big_integer",
+      author_address_extra_id: "big_integer",
+      organization_id: "string",
+      owned_essay_id: "string",
+    },
+    indexes: [{ columns: "author_address_id" }, { columns: "author_address_extra_id" }],
+    foreignKeys: [
+      { toTable: "author_addresses", column: "author_address_id", deferrable: "immediate" },
+    ],
+  },
+
+  author_favorites: {
+    author_id: "integer",
+    favorite_author_id: "integer",
+  },
+
+  auto_id_tests: {
+    columns: {
+      value: "integer",
+      published_at: { type: "datetime", precision: null, defaultFunction: "CURRENT_TIMESTAMP" },
+      auto_id: "integer",
+    },
+    primaryKey: ["auto_id"],
+  },
+
+  binaries: {
+    name: "string",
+    data: "binary",
+    short_data: { type: "binary", limit: 2048 },
+    blob_data: "binary",
+  },
+
+  birds: {
+    name: "string",
+    color: "string",
+    pirate_id: "integer",
+  },
+
+  books: {
+    columns: {
+      author_id: "big_integer",
+      format: "string",
+      format_record_id: "integer",
+      format_record_type: "string",
+      name: "string",
+      status: { type: "integer", default: 0 },
+      last_read: { type: "integer", default: 0 },
+      nullable_status: "integer",
+      language: { type: "integer", default: 0 },
+      author_visibility: { type: "integer", default: 0 },
+      illustrator_visibility: { type: "integer", default: 0 },
+      font_size: { type: "integer", default: 0 },
+      difficulty: { type: "integer", default: 0 },
+      cover: { type: "string", default: "hard" },
+      isbn: "string",
+      external_id: "string",
+      original_name: "string",
+      published_on: "datetime",
+      boolean_status: "boolean",
+      tags_count: { type: "integer", default: 0 },
+      created_at: "datetime",
+      updated_at: "datetime",
+      updated_on: "date",
+    },
+    indexes: [
+      { columns: ["author_id", "name"], unique: true },
+      { columns: "isbn", unique: true, where: "published_on IS NOT NULL" },
+      { columns: "(lower(external_id))", unique: true },
+      { columns: "author_id" },
+    ],
+  },
+
+  encrypted_books: {
+    columns: {
+      author_id: "big_integer",
+      format: "string",
+      name: { type: "string", default: "<untitled>", limit: 1024 },
+      original_name: "string",
+      logo: "binary",
+      created_at: "datetime",
+      updated_at: "datetime",
+    },
+    indexes: [{ columns: "author_id" }],
+  },
+
+  hardbacks: {},
+
+  booleans: {
+    value: "boolean",
+    has_fun: { type: "boolean", null: false, default: false },
+  },
+
+  branches: {
+    columns: {
+      branch_id: "big_integer",
+    },
+    indexes: [{ columns: "branch_id" }],
+  },
+
+  bulbs: {
+    columns: {
+      ID: "integer",
+      car_id: "integer",
+      name: "string",
+      frickinawesome: { type: "boolean", default: false },
+      color: "string",
+    },
+    primaryKey: ["ID"],
+  },
+
+  CamelCase: {
+    name: "string",
+  },
+
+  cars: {
+    columns: {
+      person_id: "big_integer",
+      name: "string",
+      engines_count: "integer",
+      wheels_count: { type: "integer", default: 0, null: false },
+      wheels_owned_at: "datetime",
+      bulbs_count: "integer",
+      custom_tyres_count: "integer",
+      lock_version: { type: "integer", null: false, default: 0 },
+      created_at: { type: "datetime", null: false },
+      updated_at: { type: "datetime", null: false },
+    },
+    indexes: [{ columns: "person_id" }],
+  },
+
+  old_cars: {
+    columns: { id: { type: "integer" } },
+    primaryKey: ["id"],
+  },
+
+  carriers: {},
+
+  carts: {
+    columns: {
+      shop_id: "big_integer",
+      id: { type: "big_integer", null: false },
+      title: "string",
+    },
+    primaryKey: ["shop_id", "id"],
+  },
+
+  categories: {
+    name: { type: "string", null: false },
+    type: "string",
+    categorizations_count: "integer",
+  },
+
+  categories_posts: {
+    category_id: { type: "integer", null: false },
+    post_id: { type: "integer", null: false },
+  },
+
+  categorizations: {
+    category_id: "integer",
+    named_category_name: "string",
+    post_id: "integer",
+    author_id: "integer",
+    special: "boolean",
+  },
+
+  citations: {
+    columns: {
+      book1_id: "big_integer",
+      book2_id: "big_integer",
+      citation_id: "big_integer",
+    },
+    indexes: [{ columns: "book1_id" }, { columns: "book2_id" }, { columns: "citation_id" }],
+  },
+
+  cpk_books: {
+    columns: {
+      author_id: "integer",
+      id: "integer",
+      title: "string",
+      revision: "integer",
+      order_id: "integer",
+      shop_id: "integer",
+    },
+    primaryKey: ["author_id", "id"],
+  },
+
+  cpk_chapters: {
+    columns: {
+      author_id: "integer",
+      id: "integer",
+      book_id: "integer",
+      title: "string",
+    },
+    primaryKey: ["author_id", "id"],
+  },
+
+  cpk_authors: {
+    name: "string",
+  },
+
+  cpk_posts: {
+    columns: {
+      title: "string",
+      author: "string",
+    },
+    primaryKey: ["title", "author"],
+  },
+
+  cpk_comments: {
+    commentable_title: "string",
+    commentable_author: "string",
+    commentable_type: "string",
+    text: "text",
+  },
+
+  cpk_reviews: {
+    author_id: "integer",
+    number: "integer",
+    rating: "integer",
+    comment: "string",
+  },
+
+  cpk_orders: {
+    shop_id: "integer",
+    status: "string",
+    books_count: { type: "integer", default: 0 },
+  },
+
+  cpk_order_tags: {
+    columns: {
+      order_id: "integer",
+      tag_id: "integer",
+      attached_by: "string",
+      attached_reason: "string",
+    },
+    primaryKey: ["order_id", "tag_id"],
+  },
+
+  cpk_tags: {
+    name: { type: "string", null: false },
+  },
+
+  cpk_order_agreements: {
+    order_id: "integer",
+    signature: "string",
+  },
+
+  cpk_cars: {
+    columns: {
+      make: { type: "string", null: false },
+      model: { type: "string", null: false },
+    },
+    primaryKey: ["make", "model"],
+  },
+
+  cpk_car_reviews: {
+    car_make: { type: "string", null: false },
+    car_model: { type: "string", null: false },
+    comment: "text",
+    rating: "integer",
+  },
+
+  paragraphs: {
+    columns: {
+      book_id: "big_integer",
+    },
+    indexes: [{ columns: "book_id" }],
+  },
+
+  clothing_items: {
+    clothing_type: "string",
+    color: "string",
+    type: "string",
+    size: "string",
+    description: "text",
+  },
+
+  sharded_blogs: {
+    name: "string",
+  },
+
+  sharded_blog_posts: {
+    columns: {
+      title: "string",
+      parent_type: "string",
+      parent_id: "big_integer",
+      blog_id: "integer",
+      revision: "integer",
+    },
+    indexes: [
+      { columns: ["parent_type", "parent_id"], name: "index_sharded_blog_posts_on_parent" },
+    ],
+  },
+
+  sharded_comments: {
+    body: "string",
+    blog_post_id: "integer",
+    blog_id: "integer",
+  },
+
+  sharded_tags: {
+    name: "string",
+    blog_id: "integer",
+  },
+
+  sharded_blog_posts_tags: {
+    blog_id: "integer",
+    blog_post_id: "integer",
+    tag_id: "integer",
+  },
+
+  clubs: {
+    name: "string",
+    category_id: "integer",
+  },
+
+  collections: {
+    name: "string",
+  },
+
+  colnametests: {
+    references: { type: "integer", null: false },
+  },
+
+  columns: {
+    columns: {
+      record_id: "big_integer",
+    },
+    indexes: [{ columns: "record_id" }],
+  },
+
+  comments: {
+    columns: {
+      post_id: { type: "integer", null: false },
+      body: { type: "text", null: false },
+      type: "string",
+      label: { type: "integer", default: 0 },
+      tags_count: { type: "integer", default: 0 },
+      children_count: { type: "integer", default: 0 },
+      parent_id: "integer",
+      author_type: "string",
+      author_id: "big_integer",
+      resource_id: "string",
+      resource_type: "string",
+      origin_id: "integer",
+      origin_type: "string",
+      developer_id: "integer",
+      updated_at: "datetime",
+      deleted_at: "datetime",
+      comments: "integer",
+      company: "integer",
+    },
+    indexes: [{ columns: ["author_type", "author_id"], name: "index_comments_on_author" }],
+  },
+
+  comment_overlapping_counter_caches: {
+    user_comments_count_id: "integer",
+    post_comments_count_id: "integer",
+    commentable_type: "string",
+    commentable_id: "big_integer",
+  },
+
+  companies: {
+    columns: {
+      type: "string",
+      firm_id: "big_integer",
+      firm_name: "string",
+      name: "string",
+      client_of: "big_integer",
+      rating: { type: "big_integer", default: 1 },
+      account_id: "integer",
+      description: { type: "string", default: "" },
+      status: { type: "integer", default: 0 },
+    },
+    indexes: [
+      { columns: ["name", "rating"], order: { name: "desc", rating: "desc" } },
+      { columns: ["name", "description"], length: 10 },
+      {
+        columns: ["firm_id", "type", "rating"],
+        name: "company_index",
+        length: { type: 10 },
+        order: { rating: "desc" },
+      },
+      {
+        columns: ["firm_id", "type"],
+        name: "company_partial_index",
+        where: "(rating > 10)",
+      },
+      { columns: ["firm_id"], name: "company_nulls_not_distinct", nullsNotDistinct: true },
+      { columns: "name", name: "company_name_index", using: "btree" },
+      {
+        columns: "(CASE WHEN rating > 0 THEN lower(name) END) DESC",
+        name: "company_expression_index",
+      },
+      {
+        columns: "(CONCAT_WS(`firm_name`, `name`, _utf8mb4' '))",
+        name: "full_name_index",
+        adapters: ["mysql2"],
+      },
+    ],
+  },
+
+  content: {
+    columns: {
+      title: "string",
+      book_id: "big_integer",
+      book_destroy_async_id: "big_integer",
+    },
+    indexes: [{ columns: "book_id" }, { columns: "book_destroy_async_id" }],
+  },
+
+  content_positions: {
+    content_id: "integer",
+  },
+
+  vegetables: {
+    name: "string",
+    seller_id: "integer",
+    custom_type: "string",
+  },
+
+  computers: {
+    system: "string",
+    developer: { type: "integer", null: false },
+    extendedWarranty: { type: "integer", null: false },
+    timezone: "integer",
+    created_at: "datetime",
+    updated_at: "datetime",
+  },
+
+  computers_developers: {
+    columns: {
+      computer_id: "big_integer",
+      developer_id: "big_integer",
+      created_at: "datetime",
+      updated_at: "datetime",
+    },
+    indexes: [{ columns: "computer_id" }, { columns: "developer_id" }],
+    primaryKey: false,
+  },
+
+  contracts: {
+    developer_id: "big_integer",
+    company_id: "big_integer",
+    metadata: "string",
+    count: "integer",
+  },
+
+  customers: {
+    name: "string",
+    balance: { type: "integer", default: 0 },
+    address_street: "string",
+    address_city: "string",
+    address_country: "string",
+    gps_location: "string",
+  },
+
+  customer_carriers: {
+    columns: {
+      customer_id: "big_integer",
+      carrier_id: "big_integer",
+    },
+    indexes: [{ columns: "customer_id" }, { columns: "carrier_id" }],
+  },
+
+  dashboards: {
+    columns: {
+      dashboard_id: "string",
+      name: "string",
+    },
+    primaryKey: false,
+  },
+
+  destroy_async_parents: {
+    columns: {
+      parent_id: "integer",
+      name: "string",
+      tags_count: { type: "integer", default: 0 },
+    },
+    primaryKey: ["parent_id"],
+  },
+
+  destroy_async_parent_soft_deletes: {
+    tags_count: { type: "integer", default: 0 },
+    deleted: "boolean",
+  },
+
+  discounts: {
+    amount: "integer",
+  },
+
+  dl_keyed_belongs_tos: {
+    columns: {
+      belongs_key: "integer",
+      destroy_async_parent_id: "big_integer",
+    },
+    indexes: [{ columns: "destroy_async_parent_id" }],
+    primaryKey: ["belongs_key"],
+  },
+
+  dl_keyed_belongs_to_soft_deletes: {
+    columns: {
+      destroy_async_parent_soft_delete_id: "big_integer",
+      deleted: "boolean",
+    },
+    indexes: [{ columns: "destroy_async_parent_soft_delete_id", name: "soft_del_parent" }],
+  },
+
+  dl_keyed_has_ones: {
+    columns: {
+      has_one_key: "integer",
+      destroy_async_parent_id: "big_integer",
+      destroy_async_parent_soft_delete_id: "big_integer",
+    },
+    indexes: [
+      { columns: "destroy_async_parent_id" },
+      { columns: "destroy_async_parent_soft_delete_id" },
+    ],
+    primaryKey: ["has_one_key"],
+  },
+
+  dl_keyed_has_manies: {
+    columns: {
+      many_key: "integer",
+      destroy_async_parent_id: "big_integer",
+    },
+    indexes: [{ columns: "destroy_async_parent_id" }],
+    primaryKey: ["many_key"],
+  },
+
+  dl_keyed_has_many_throughs: {
+    columns: {
+      through_key: "integer",
+    },
+    primaryKey: ["through_key"],
+  },
+
+  dl_keyed_joins: {
+    columns: {
+      joins_key: "integer",
+      destroy_async_parent_id: "big_integer",
+      dl_keyed_has_many_through_id: "big_integer",
+    },
+    indexes: [{ columns: "destroy_async_parent_id" }, { columns: "dl_keyed_has_many_through_id" }],
+    primaryKey: ["joins_key"],
+  },
+
+  developers: {
+    name: "string",
+    first_name: "string",
+    salary: { type: "integer", default: 70000 },
+    firm_id: "big_integer",
+    mentor_id: "integer",
+    legacy_created_at: "datetime",
+    legacy_updated_at: "datetime",
+    legacy_created_on: "datetime",
+    legacy_updated_on: "datetime",
+  },
+
+  developers_projects: {
+    columns: {
+      developer_id: { type: "integer", null: false },
+      project_id: { type: "integer", null: false },
+      joined_on: "date",
+      access_level: { type: "integer", default: 1 },
+    },
+    primaryKey: false,
+  },
+
+  dog_lovers: {
+    trained_dogs_count: { type: "integer", default: 0 },
+    bred_dogs_count: { type: "integer", default: 0 },
+    dogs_count: { type: "integer", default: 0 },
+  },
+
+  dogs: {
+    trainer_id: "integer",
+    breeder_id: "integer",
+    dog_lover_id: "integer",
+    alias: "string",
+  },
+
+  doubloons: {
+    pirate_id: "integer",
+    weight: "integer",
+  },
+
+  edges: {
+    columns: {
+      source_id: { type: "integer", null: false },
+      sink_id: { type: "integer", null: false },
+    },
+    primaryKey: false,
+    indexes: [{ columns: ["source_id", "sink_id"], unique: true, name: "unique_edge_index" }],
+  },
+
+  editorships: {
+    publication_id: "string",
+    editor_id: "string",
+  },
+
+  editors: {
+    name: "string",
+  },
+
+  engines: {
+    car_id: "big_integer",
+  },
+
+  entrants: {
+    name: { type: "string", null: false },
+    course_id: { type: "integer", null: false },
+  },
+
+  entries: {
+    entryable_type: { type: "string", null: false },
+    entryable_id: { type: "integer", null: false },
+    account_id: { type: "integer", null: false },
+    updated_at: "datetime",
+  },
+
+  essays: {
+    columns: {
+      type: "string",
+      name: "string",
+      writer_id: "string",
+      writer_type: "string",
+      category_id: "string",
+      author_id: "string",
+      book_id: "big_integer",
+    },
+    indexes: [{ columns: "book_id" }],
+  },
+
+  events: {
+    title: { type: "string", limit: 5 },
+  },
+
+  eyes: {},
+
+  families: {},
+
+  family_trees: {
+    columns: {
+      family_id: "big_integer",
+      member_id: "big_integer",
+      token: "string",
+    },
+    indexes: [{ columns: "family_id" }, { columns: "member_id" }],
+  },
+
+  frogs: {
+    name: "string",
+  },
+
+  funny_jokes: {
+    name: "string",
+  },
+
+  cold_jokes: {
+    cold_name: "string",
+  },
+
+  friendships: {
+    friend_id: "integer",
+    follower_id: "integer",
+  },
+
+  goofy_string_id: {
+    columns: {
+      id: { type: "string", null: false },
+      info: "string",
+    },
+    primaryKey: false,
+  },
+
+  having: {
+    where: "string",
+  },
+
+  guids: {
+    key: "string",
+  },
+
+  guitars: {
+    color: "string",
+  },
+
+  inept_wizards: {
+    name: { type: "string", null: false },
+    city: { type: "string", null: false },
+    type: "string",
+  },
+
+  integer_limits: {
+    c_int_without_limit: "integer",
+    c_int_1: { type: "integer", limit: 1 },
+    c_int_2: { type: "integer", limit: 2 },
+    c_int_3: { type: "integer", limit: 3 },
+    c_int_4: { type: "integer", limit: 4 },
+    c_int_5: { type: "integer", limit: 5 },
+    c_int_6: { type: "integer", limit: 6 },
+    c_int_7: { type: "integer", limit: 7 },
+    c_int_8: { type: "integer", limit: 8 },
+  },
+
+  invoices: {
+    balance: "integer",
+    updated_at: "datetime",
+  },
+
+  iris: {
+    columns: {
+      eye_id: "big_integer",
+      color: "string",
+    },
+    indexes: [{ columns: "eye_id" }],
+  },
+
+  items: {
+    name: "string",
+  },
+
+  jobs: {
+    ideal_reference_id: "integer",
+  },
+
+  jobs_pool: {
+    columns: {
+      job_id: { type: "big_integer", null: false },
+      user_id: { type: "big_integer", null: false },
+    },
+    indexes: [{ columns: "job_id" }, { columns: "user_id" }],
+    primaryKey: false,
+  },
+
+  keyboards: {
+    columns: {
+      key_number: "integer",
+      name: "string",
+    },
+    primaryKey: ["key_number"],
+  },
+
+  kitchens: {},
+
+  legacy_things: {
+    tps_report_number: "integer",
+    version: { type: "integer", null: false, default: 0 },
+  },
+
+  lessons: {
+    name: "string",
+  },
+
+  students: {
+    name: "string",
+    active: "boolean",
+    college_id: "integer",
+  },
+
+  lessons_students: {
+    columns: {
+      lesson_id: "big_integer",
+      student_id: "big_integer",
+    },
+    indexes: [{ columns: "lesson_id" }, { columns: "student_id" }],
+    foreignKeys: [
+      {
+        toTable: "students",
+        column: "student_id",
+        onDelete: "cascade",
+        deferrable: "immediate",
+      },
+    ],
+    primaryKey: false,
+  },
+
+  lint_models: {},
+
+  line_items: {
+    invoice_id: "integer",
+    amount: "integer",
+  },
+
+  line_item_discount_applications: {
+    line_item_id: "integer",
+    discount_id: "integer",
+  },
+
+  lions: {
+    gender: "integer",
+    is_vegetarian: { type: "boolean", default: false },
+  },
+
+  lock_without_defaults: {
+    title: "string",
+    lock_version: "integer",
+    created_at: { type: "datetime", null: true },
+    updated_at: { type: "datetime", null: true },
+  },
+
+  lock_without_defaults_cust: {
+    title: "string",
+    custom_lock_version: "integer",
+    created_at: { type: "datetime", null: true },
+    updated_at: { type: "datetime", null: true },
+  },
+
+  magazines: {},
+
+  mateys: {
+    columns: {
+      pirate_id: "integer",
+      target_id: "integer",
+      weight: "integer",
+    },
+    primaryKey: false,
+  },
+
+  members: {
+    name: "string",
+    member_type_id: "big_integer",
+    admittable_type: "string",
+    admittable_id: "big_integer",
+  },
+
+  member_details: {
+    member_id: "integer",
+    organization_id: "integer",
+    extra_data: "string",
+  },
+
+  member_friends: {
+    columns: {
+      member_id: "integer",
+      friend_id: "integer",
+    },
+    primaryKey: false,
+  },
+
+  memberships: {
+    joined_on: "datetime",
+    club_id: "integer",
+    member_id: "integer",
+    favorite: { type: "boolean", default: false },
+    type: "integer",
+    created_at: "datetime",
+    updated_at: "datetime",
+  },
+
+  member_types: {
+    name: "string",
+  },
+
+  mentors: {
+    name: "string",
+  },
+
+  messages: {
+    subject: "string",
+    updated_at: "datetime",
+  },
+
+  minivans: {
+    columns: {
+      minivan_id: "string",
+      name: "string",
+      speedometer_id: "string",
+      color: "string",
+    },
+    primaryKey: false,
+  },
+
+  minimalistics: {
+    expires_at: "big_integer",
+  },
+
+  mixed_case_monkeys: {
+    columns: {
+      monkeyID: "integer",
+      fleaCount: "integer",
+    },
+    primaryKey: ["monkeyID"],
+  },
+
+  mixins: {
+    parent_id: "integer",
+    pos: "integer",
+    created_at: "datetime",
+    updated_at: "datetime",
+    lft: "integer",
+    rgt: "integer",
+    root_id: "integer",
+    type: "string",
+  },
+
+  mice: {
+    name: "string",
+  },
+
+  movies: {
+    columns: {
+      movieid: "integer",
+      name: "string",
+    },
+    primaryKey: ["movieid"],
+  },
+  notifications: {
+    message: "string",
+  },
+
+  numeric_data: {
+    bank_balance: { type: "decimal", precision: 10, scale: 2 },
+    big_bank_balance: { type: "decimal", precision: 15, scale: 2 },
+    unscaled_bank_balance: { type: "decimal", precision: 10 },
+    world_population: { type: "decimal", precision: 20, scale: 0 },
+    my_house_population: { type: "decimal", precision: 2, scale: 0 },
+    decimal_number: "decimal",
+    decimal_number_with_default: { type: "decimal", precision: 3, scale: 2, default: 2.78 },
+    numeric_number: "decimal",
+    temperature: "float",
+    temperature_with_limit: { type: "float", limit: 24 },
+    decimal_number_big_precision: { type: "decimal", precision: 20 },
+    atoms_in_universe: { type: "decimal", precision: 55, scale: 0 },
+  },
+
+  orders: {
+    name: "string",
+    billing_customer_id: "integer",
+    shipping_customer_id: "integer",
+  },
+
+  organizations: {
+    name: "string",
+  },
+
+  owners: {
+    columns: {
+      owner_id: "integer",
+      name: "string",
+      updated_at: "datetime",
+      happy_at: "datetime",
+      essay_id: "string",
+    },
+    primaryKey: ["owner_id"],
+  },
+
+  paint_colors: {
+    non_poly_one_id: "integer",
+  },
+
+  paint_textures: {
+    non_poly_two_id: "integer",
+  },
+
+  parrots: {
+    name: "string",
+    breed: { type: "integer", default: 0 },
+    color: "string",
+    parrot_sti_class: "string",
+    killer_id: "integer",
+    updated_count: { type: "integer", default: 0 },
+    integer: { type: "integer", default: 0 },
+    created_at: { type: "datetime", precision: 0 },
+    created_on: { type: "datetime", precision: 0 },
+    updated_at: { type: "datetime", precision: 0 },
+    updated_on: { type: "datetime", precision: 0 },
+  },
+
+  pirates: {
+    catchphrase: "string",
+    parrot_id: "integer",
+    non_validated_parrot_id: "integer",
+    created_on: "datetime",
+    updated_on: "datetime",
+  },
+
+  treasures: {
+    columns: {
+      name: "string",
+      type: "string",
+      looter_type: "string",
+      looter_id: "big_integer",
+      ship_id: "big_integer",
+    },
+    indexes: [
+      { columns: ["looter_type", "looter_id"], name: "index_treasures_on_looter" },
+      { columns: "ship_id" },
+    ],
+  },
+
+  parrots_pirates: {
+    columns: {
+      parrot_id: "big_integer",
+      pirate_id: "big_integer",
+    },
+    indexes: [{ columns: "parrot_id" }, { columns: "pirate_id" }],
+    foreignKeys: [
+      { toTable: "parrots", column: "parrot_id" },
+      { toTable: "pirates", column: "pirate_id" },
+    ],
+    primaryKey: false,
+  },
+
+  parrots_treasures: {
+    columns: {
+      parrot_id: "big_integer",
+      treasure_id: "big_integer",
+    },
+    indexes: [{ columns: "parrot_id" }, { columns: "treasure_id" }],
+    foreignKeys: [
+      { toTable: "parrots", column: "parrot_id" },
+      { toTable: "treasures", column: "treasure_id" },
+    ],
+    primaryKey: false,
+  },
+
+  parrot_treasures: {
+    columns: {
+      parrot_id: "big_integer",
+      treasure_id: "big_integer",
+    },
+    indexes: [{ columns: "parrot_id" }, { columns: "treasure_id" }],
+    foreignKeys: [
+      { toTable: "parrots", column: "parrot_id" },
+      { toTable: "treasures", column: "treasure_id" },
+    ],
+    primaryKey: false,
+  },
+
+  people: {
+    columns: {
+      first_name: { type: "string", null: false },
+      primary_contact_id: "big_integer",
+      gender: { type: "string", limit: 1 },
+      number1_fan_id: "big_integer",
+      lock_version: { type: "integer", null: false, default: 0 },
+      comments: "string",
+      followers_count: { type: "integer", default: 0 },
+      friends_too_count: { type: "integer", default: 0 },
+      best_friend_id: "big_integer",
+      best_friend_of_id: "big_integer",
+      insures: { type: "integer", null: false, default: 0 },
+      born_at: "datetime",
+      cars_count: { type: "integer", default: 0 },
+      created_at: { type: "datetime", null: false },
+      updated_at: { type: "datetime", null: false },
+    },
+    indexes: [
+      { columns: "primary_contact_id" },
+      { columns: "number1_fan_id" },
+      { columns: "best_friend_id" },
+      { columns: "best_friend_of_id" },
+    ],
+  },
+
+  peoples_treasures: {
+    columns: {
+      rich_person_id: "integer",
+      treasure_id: "integer",
+    },
+    primaryKey: false,
+  },
+
+  personal_legacy_things: {
+    tps_report_number: "integer",
+    person_id: "integer",
+    version: { type: "integer", null: false, default: 0 },
+  },
+
+  pets: {
+    columns: {
+      pet_id: "integer",
+      name: "string",
+      owner_id: "integer",
+      integer: { type: "integer", null: true },
+      created_at: "datetime",
+      updated_at: "datetime",
+    },
+    primaryKey: ["pet_id"],
+  },
+
+  pets_treasures: {
+    treasure_id: "integer",
+    pet_id: "integer",
+    rainbow_color: "string",
+  },
+
+  posts: {
+    columns: {
+      author_id: "big_integer",
+      title: { type: "string", null: false },
+      body: { type: "text", null: false },
+      type: "string",
+      legacy_comments_count: { type: "integer", default: 0 },
+      taggings_with_delete_all_count: { type: "integer", default: 0 },
+      taggings_with_destroy_count: { type: "integer", default: 0 },
+      tags_count: { type: "integer", default: 0 },
+      indestructible_tags_count: { type: "integer", default: 0 },
+      tags_with_destroy_count: { type: "integer", default: 0 },
+      tags_with_nullify_count: { type: "integer", default: 0 },
+    },
+    indexes: [{ columns: "author_id" }],
+  },
+
+  postesques: {
+    author_name: "string",
+    author_id: "string",
+  },
+
+  post_comments_counts: {
+    comments_count: { type: "integer", default: 0 },
+  },
+
+  serialized_posts: {
+    author_id: "integer",
+    title: { type: "string", null: false },
+  },
+
+  images: {
+    imageable_identifier: "integer",
+    imageable_class: "string",
+  },
+
+  price_estimates: {
+    estimate_of_type: "string",
+    estimate_of_id: "integer",
+    price: "integer",
+    currency: "string",
+  },
+
+  products: {
+    columns: {
+      collection_id: "big_integer",
+      type_id: "big_integer",
+      name: "string",
+      price: "decimal",
+      discounted_price: "decimal",
+    },
+    indexes: [{ columns: "collection_id" }, { columns: "type_id" }],
+  },
+
+  product_types: {
+    name: "string",
+  },
+
+  projects: {
+    name: "string",
+    type: "string",
+    firm_id: "big_integer",
+    mentor_id: "integer",
+  },
+
+  publications: {
+    name: "string",
+    editor_in_chief_id: "integer",
+  },
+
+  randomly_named_table1: {
+    some_attribute: "string",
+    another_attribute: "integer",
+  },
+
+  randomly_named_table2: {
+    some_attribute: "string",
+    another_attribute: "integer",
+  },
+
+  randomly_named_table3: {
+    some_attribute: "string",
+    another_attribute: "integer",
+  },
+
+  ratings: {
+    comment_id: "integer",
+    value: "integer",
+  },
+
+  readers: {
+    post_id: { type: "integer", null: false },
+    person_id: { type: "integer", null: false },
+    skimmer: { type: "boolean", default: false },
+    first_post_id: "integer",
+  },
+
+  references: {
+    person_id: "integer",
+    job_id: "integer",
+    favorite: "boolean",
+    lock_version: { type: "integer", default: 0 },
+  },
+
+  rooms: {
+    columns: {
+      user_id: "big_integer",
+      owner_id: "big_integer",
+      landlord_id: "big_integer",
+      tenant_id: "big_integer",
+    },
+    indexes: [
+      { columns: "user_id" },
+      { columns: "owner_id" },
+      { columns: "landlord_id" },
+      { columns: "tenant_id" },
+    ],
+  },
+
+  seminars: { name: "string" },
+
+  sessions: {
+    start_date: "date",
+    end_date: "date",
+    name: "string",
+  },
+
+  sections: {
+    columns: {
+      short_name: "string",
+      session_id: "big_integer",
+      seminar_id: "big_integer",
+    },
+    indexes: [{ columns: "session_id" }, { columns: "seminar_id" }],
+    foreignKeys: [
+      { toTable: "sessions", column: "session_id" },
+      { toTable: "seminars", column: "seminar_id" },
+    ],
+  },
+
+  shape_expressions: {
+    paint_type: "string",
+    paint_id: "integer",
+    shape_type: "string",
+    shape_id: "integer",
+  },
+
+  shipping_lines: {
+    invoice_id: "integer",
+    amount: "integer",
+  },
+
+  shipping_line_discount_applications: {
+    shipping_line_id: "integer",
+    discount_id: "integer",
+  },
+
+  ships: {
+    columns: {
+      name: "string",
+      pirate_id: "integer",
+      developer_id: "big_integer",
+      update_only_pirate_id: "integer",
+      treasures_count: { type: "integer", default: 0 },
+      created_at: "datetime",
+      created_on: "datetime",
+      updated_at: "datetime",
+      updated_on: "datetime",
+    },
+    indexes: [{ columns: "developer_id" }],
+  },
+
+  ship_parts: {
+    name: "string",
+    ship_id: "integer",
+    updated_at: "datetime",
+  },
+
+  squeaks: { mouse_id: "integer" },
+
+  prisoners: {
+    columns: { ship_id: "big_integer" },
+    indexes: [{ columns: "ship_id" }],
+  },
+
+  sinks: {
+    columns: {
+      kitchen_id: "big_integer",
+    },
+    indexes: [{ columns: "kitchen_id" }],
+  },
+
+  shop_accounts: {
+    columns: {
+      customer_id: "big_integer",
+      customer_carrier_id: "big_integer",
+    },
+    indexes: [{ columns: "customer_id" }, { columns: "customer_carrier_id" }],
+  },
+
+  speedometers: {
+    columns: {
+      speedometer_id: "string",
+      name: "string",
+      dashboard_id: "string",
+    },
+    primaryKey: false,
+  },
+
+  sponsors: {
+    club_id: "integer",
+    sponsorable_type: "string",
+    sponsorable_id: "big_integer",
+    sponsor_type: "string",
+    sponsor_id: "big_integer",
+  },
+
+  string_key_objects: {
+    columns: {
+      id: { type: "string", null: false },
+      name: "string",
+      lock_version: { type: "integer", null: false, default: 0 },
+    },
+    primaryKey: false,
+    indexes: [{ columns: "id", unique: true }],
+  },
+
+  subscribers: {
+    columns: {
+      nick: { type: "string", null: false },
+      name: "string",
+      id: "integer",
+      books_count: { type: "integer", null: false, default: 0 },
+      update_count: { type: "integer", null: false, default: 0 },
+    },
+    primaryKey: false,
+    indexes: [{ columns: "nick", unique: true }],
+  },
+
+  subscriptions: {
+    subscriber_id: "string",
+    book_id: "integer",
+  },
+
+  tags: {
+    name: "string",
+    taggings_count: { type: "integer", default: 0 },
+  },
+
+  taggings: {
+    tag_id: "integer",
+    super_tag_id: "integer",
+    taggable_type: "string",
+    taggable_id: "integer",
+    comment: "string",
+    type: "string",
+  },
+
+  tasks: {
+    starting: "datetime",
+    ending: "datetime",
+  },
+
+  topics: {
+    columns: {
+      title: { type: "string", limit: 250 },
+      author_name: "string",
+      author_email_address: "string",
+      written_on: "datetime",
+      bonus_time: "time",
+      last_read: "date",
+      content: "text",
+      important: "text",
+      binary_content: "binary",
+      approved: { type: "boolean", default: true },
+      replies_count: { type: "integer", default: 0 },
+      unique_replies_count: { type: "integer", default: 0 },
+      parent_id: "integer",
+      parent_title: "string",
+      type: "string",
+      group: "string",
+      created_at: { type: "datetime", null: true },
+      updated_at: { type: "datetime", null: true },
+    },
+    indexes: [{ columns: ["author_name", "title"] }],
+  },
+
+  toys: {
+    columns: {
+      toy_id: "integer",
+      name: "string",
+      pet_id: "integer",
+      integer: "integer",
+      created_at: { type: "datetime", null: false },
+      updated_at: { type: "datetime", null: false },
+    },
+    primaryKey: ["toy_id"],
+  },
+
+  traffic_lights: {
+    location: "string",
+    state: "string",
+    long_state: { type: "text", null: false },
+    created_at: "datetime",
+    updated_at: "datetime",
+  },
+
+  translations: {
+    columns: {
+      locale: { type: "string", null: false },
+      key: { type: "string", null: false },
+      value: { type: "string", null: false },
+      attachment_id: "big_integer",
+    },
+    indexes: [{ columns: "attachment_id" }],
+  },
+
+  tuning_pegs: {
+    guitar_id: "integer",
+    pitch: "float",
+  },
+
+  tyres: { car_id: "integer" },
+
+  unused_destroy_asyncs: {},
+
+  unused_belongs_to: {
+    columns: { unused_destroy_async_id: "big_integer" },
+    indexes: [{ columns: "unused_destroy_async_id" }],
+  },
+
+  variants: {
+    columns: {
+      product_id: "big_integer",
+      name: "string",
+    },
+    indexes: [{ columns: "product_id" }],
+  },
+
+  vertices: { label: "string" },
+
+  "warehouse-things": { value: "integer" },
+
+  circles: {},
+  squares: {},
+  triangles: {},
+  non_poly_ones: {},
+  non_poly_twos: {},
+
+  humans: { name: "string" },
+
+  faces: {
+    description: "string",
+    human_id: "integer",
+    polymorphic_human_id: "integer",
+    polymorphic_human_type: "string",
+    poly_human_without_inverse_id: "integer",
+    poly_human_without_inverse_type: "string",
+    puzzled_polymorphic_human_id: "integer",
+    puzzled_polymorphic_human_type: "string",
+    super_human_type: "string",
+    super_human_id: "big_integer",
+  },
+
+  interests: {
+    topic: "string",
+    human_id: "integer",
+    polymorphic_human_id: "integer",
+    polymorphic_human_type: "string",
+    zine_id: "integer",
+  },
+
+  zines: { title: "string" },
+  strict_zines: { title: "string" },
+
+  wheels: {
+    columns: {
+      size: "integer",
+      wheelable_type: "string",
+      wheelable_id: "big_integer",
+    },
+    indexes: [{ columns: ["wheelable_type", "wheelable_id"], name: "index_wheels_on_wheelable" }],
+  },
+
+  countries: {
+    columns: {
+      country_id: "string",
+      name: "string",
+    },
+    primaryKey: ["country_id"],
+  },
+
+  treaties: {
+    columns: {
+      treaty_id: "string",
+      name: "string",
+    },
+    primaryKey: ["treaty_id"],
+  },
+
+  countries_treaties: {
+    columns: {
+      country_id: { type: "string", null: false },
+      treaty_id: { type: "string", null: false },
+    },
+    primaryKey: ["country_id", "treaty_id"],
+  },
+
+  liquid: { name: "string" },
+  molecules: { liquid_id: "integer", name: "string" },
+  electrons: { molecule_id: "integer", name: "string" },
+
+  weirds: {
+    a$b: "string",
+    なまえ: "string",
+    from: "string",
+  },
+
+  nodes: {
+    tree_id: "integer",
+    parent_id: "integer",
+    name: "string",
+    updated_at: "datetime",
+  },
+  trees: {
+    name: "string",
+    updated_at: "datetime",
+  },
+
+  hotels: {},
+  departments: { hotel_id: "integer" },
+  cake_designers: {},
+  drink_designers: { name: "string" },
+  chefs: {
+    employable_id: "integer",
+    employable_type: "string",
+    department_id: "integer",
+    employable_list_type: "string",
+    employable_list_id: "integer",
+    created_at: "datetime",
+    updated_at: "datetime",
+  },
+  recipes: { chef_id: "integer", hotel_id: "integer" },
+
+  recipients: {
+    message_id: "integer",
+    email_address: "string",
+  },
+
+  records: {},
+
+  fk_test_has_pk: {
+    columns: {
+      pk_id: { type: "big_integer", null: false },
+    },
+    primaryKey: ["pk_id"],
+  },
+  fk_test_has_fk: {
+    columns: {
+      fk_id: { type: "big_integer", null: false },
+    },
+    indexes: [{ columns: "fk_id" }],
+    foreignKeys: [
+      { toTable: "fk_test_has_pk", column: "fk_id", primaryKey: "pk_id", name: "fk_name" },
+    ],
+  },
+
+  fk_object_to_point_tos: {},
+  fk_pointing_to_non_existent_objects: {
+    columns: {
+      fk_object_to_point_to_id: { type: "big_integer", null: false },
+    },
+    foreignKeys: [
+      {
+        toTable: "fk_object_to_point_tos",
+        column: "fk_object_to_point_to_id",
+        name: "fk_that_will_be_broken",
+      },
+    ],
+  },
+
+  overloaded_types: {
+    overloaded_float: { type: "float", default: 500 },
+    unoverloaded_float: "float",
+    overloaded_string_with_limit: { type: "string", limit: 255 },
+    string_with_default: { type: "string", default: "the original default" },
+    inferred_string: { type: "string", limit: 255 },
+    starts_at: "datetime",
+    ends_at: "datetime",
+  },
+
+  users: {
+    token: "string",
+    auth_token: "string",
+    password_digest: "string",
+    recovery_password_digest: "string",
+    created_at: { type: "datetime", null: true },
+    updated_at: { type: "datetime", null: true },
+  },
+
+  user_comments_counts: {
+    comments_count: { type: "integer", default: 0 },
+  },
+
+  test_with_keyword_column_name: {
+    desc: "string",
+  },
+
+  non_primary_keys: {
+    columns: {
+      id: "integer",
+      created_at: "datetime",
+    },
+    primaryKey: false,
+  },
+
+  toooooooooooooooooooooooooooooooooo_long_table_names: {
+    toooooooo_long_a_id: { type: "big_integer", null: false },
+    toooooooo_long_b_id: { type: "big_integer", null: false },
+  },
+};
+
+export const ARUNIT2_SCHEMA: Schema = {
+  courses: {
+    columns: {
+      name: { type: "string", null: false },
+      college_id: "integer",
+    },
+    indexes: [{ columns: "college_id" }],
+  },
+  colleges: { name: { type: "string", null: false } },
+  professors: { name: { type: "string", null: false } },
+  courses_professors: {
+    columns: {
+      course_id: "big_integer",
+      professor_id: "big_integer",
+    },
+    indexes: [{ columns: "course_id" }, { columns: "professor_id" }],
+    primaryKey: false,
+  },
+};
+
+export const POSTGRESQL_SPECIFIC_SCHEMA: Schema = {
+  chat_messages: {
+    columns: {
+      id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
+      content: "text",
+    },
+    primaryKey: ["id"],
+  },
+  chat_messages_custom_pk: {
+    columns: {
+      message_id: { type: "uuid", defaultFunction: "uuid_generate_v4()" },
+      content: "text",
+    },
+    primaryKey: ["message_id"],
+  },
+  uuid_parents: {
+    columns: {
+      id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
+      name: "string",
+    },
+    primaryKey: ["id"],
+  },
+  uuid_children: {
+    columns: {
+      id: { type: "uuid", defaultFunction: "gen_random_uuid()" },
+      name: "string",
+      uuid_parent_id: "uuid",
+    },
+    primaryKey: ["id"],
+  },
+};

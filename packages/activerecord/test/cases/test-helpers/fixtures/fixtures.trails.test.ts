@@ -1,0 +1,553 @@
+import { describe, it, expect, vi } from "vitest";
+import { File as FixtureFile } from "../../../../lib/fixture-set/file.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
+import {
+  defaultInsertValue,
+  insertFixturesSet,
+} from "../../../../lib/connection-adapters/abstract/database-statements.js";
+import { Visitors } from "@blazetrails/arel";
+import { FixtureSet } from "../../../../lib/fixtures.js";
+import { adminAccountsFixtureData } from "../../../fixtures/admin/accounts.js";
+import { adminUsersFixtureData } from "../../../fixtures/admin/users.js";
+import { adminRandomlyNamedA9FixtureData } from "../../../fixtures/admin/randomly-named-a9.js";
+import { adminRandomlyNamedB0FixtureData } from "../../../fixtures/admin/randomly-named-b0.js";
+import { topicFixtureData } from "../../../fixtures/topics.js";
+import { postFixtureData } from "../../../fixtures/posts.js";
+import { commentFixtureData } from "../../../fixtures/comments.js";
+import { authorFixtureData } from "../../../fixtures/authors.js";
+import { bookFixtureData } from "../../../fixtures/books.js";
+import { authorAddressFixtureData } from "../../../fixtures/author-addresses.js";
+import { companyFixtureData } from "../../../fixtures/companies.js";
+import { accountFixtureData } from "../../../fixtures/accounts.js";
+import { developerFixtureData } from "../../../fixtures/developers.js";
+import { projectFixtureData } from "../../../fixtures/projects.js";
+import { developersProjectsFixtureData } from "../../../fixtures/developers-projects.js";
+import { doubleColumnsHash } from "../../../support/double-columns.js";
+
+function makeAdapter(): DatabaseAdapter {
+  return {
+    execute: vi.fn(async () => []),
+    beginTransaction: vi.fn(async () => {}),
+    commit: vi.fn(async () => {}),
+    rollback: vi.fn(async () => {}),
+    createSavepoint: vi.fn(async () => {}),
+    releaseSavepoint: vi.fn(async () => {}),
+    rollbackToSavepoint: vi.fn(async () => {}),
+    executeBatch: vi.fn(async () => {}),
+    insertFixturesSet,
+    schemaCache: { columnsHash: async (table: string) => doubleColumnsHash(table) },
+    lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    supportsVirtualColumns: async () => false,
+    defaultInsertValue,
+    get visitor() {
+      return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+    },
+    quoteString: (v: string) => v.replace(/'/g, "''"),
+    disableReferentialIntegrity: async (fn: () => Promise<void>) => {
+      await fn();
+    },
+    transaction: async <T>(fn: () => Promise<T> | T) => fn(),
+    quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
+    quoteTableName: (n: string) => `"${n}"`,
+    quoteColumnName: (n: string) => `"${n}"`,
+  } as unknown as DatabaseAdapter;
+}
+
+function executedStatements(adapter: DatabaseAdapter): string[] {
+  return (
+    (adapter as unknown as { executeBatch: ReturnType<typeof vi.fn> }).executeBatch.mock
+      .calls as unknown[][]
+  ).flatMap((c) => c[0] as string[]);
+}
+
+async function createFixtures(
+  adapter: DatabaseAdapter,
+  modelClass: any,
+  data: Record<string, Record<string, unknown>>,
+): Promise<Record<string, any>> {
+  const pool = { withConnection: async (block: (c: unknown) => unknown) => block(adapter) };
+  modelClass.connectionPool = () => pool;
+  FixtureSet.resetCache();
+  FixtureFile.registerModule(`fixtures-trails/${modelClass.tableName}.ts`, data);
+  const [fixtureSet] = await FixtureSet.createFixtures(
+    "fixtures-trails",
+    [modelClass.tableName],
+    { [modelClass.tableName]: modelClass },
+    modelClass,
+  );
+  const rows: Record<string, any> = {};
+  for (const [label, fixture] of Object.entries(fixtureSet.fixtures))
+    rows[label] = fixture.toHash();
+  return rows;
+}
+
+function makeModel(tableName: string, pk = "id") {
+  const rows = new Map<unknown, Record<string, unknown>>();
+  const Model = {
+    tableName,
+    primaryKey: pk,
+    isCompositePrimaryKey: () => false,
+    loadSchema: async () => {},
+    definedEnums: {},
+    _reflections: {},
+    columns: () => Object.values(doubleColumnsHash(tableName)),
+    typeForAttribute: () => ({ type: () => "integer" }),
+    findBy: vi.fn(async (attrs: Record<string, unknown>) => {
+      const val = attrs[pk];
+      return rows.get(val) ?? null;
+    }),
+    _rows: rows,
+  } as any;
+  return Model;
+}
+
+function idOf(data: Record<string, { id?: number }>, label: string): number {
+  return data[label]?.id ?? FixtureSet.identify(label);
+}
+
+function findInsertWithPk(sqls: string[], pk: number): string | undefined {
+  const re = new RegExp(`\\(\\s*${pk}\\b`);
+  return sqls.find((s) => re.test(s));
+}
+
+function expectValueInRow(sql: string | undefined, fkId: number): void {
+  expect(sql).toBeTruthy();
+  const tuples = [...(sql ?? "").matchAll(/\(([^)]*)\)/gu)].map((m) => m[1]);
+  const vals = tuples.flatMap((tuple) => tuple.split(",").map((v) => v.trim()));
+  expect(vals).toContain(String(fkId));
+}
+
+function seedRows(
+  Model: ReturnType<typeof makeModel>,
+  label: string,
+  data: Record<string, { id?: number }>,
+  extra: Record<string, unknown> = {},
+) {
+  const id = idOf(data, label);
+  Model._rows.set(id, { id, ...extra });
+}
+
+describe("topicFixtureData", () => {
+  it("exports five fixtures with correct keys", () => {
+    const keys = Object.keys(topicFixtureData);
+    expect(keys).toEqual(["first", "second", "third", "fourth", "fifth"]);
+  });
+
+  it("first fixture has expected data", () => {
+    expect(topicFixtureData.first).toMatchObject({
+      title: "The First Topic",
+      author_name: "David",
+      approved: false,
+      replies_count: 1,
+    });
+    expect("type" in topicFixtureData.first).toBe(false);
+  });
+
+  it("second fixture has Mary as author and a cross-ref to first", () => {
+    expect(topicFixtureData.second.author_name).toBe("Mary");
+    expect(topicFixtureData.second.parent_id).toBe(topicFixtureData.first.id);
+  });
+
+  it("createFixtures resolves cross-refs: second.parent_id equals first's declared id", async () => {
+    const adapter = makeAdapter();
+    const Topic = makeModel("topics");
+    for (const k of Object.keys(topicFixtureData) as Array<keyof typeof topicFixtureData>) {
+      seedRows(Topic, k, topicFixtureData, { title: topicFixtureData[k].title });
+    }
+
+    const topics = await createFixtures(adapter, Topic, topicFixtureData);
+    expect(topics.first).toBeTruthy();
+    expect(topics.second).toBeTruthy();
+
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("topics"),
+    );
+    const secondInsert = findInsertWithPk(insertSqls, topicFixtureData.second.id);
+    expect(secondInsert).toBeTruthy();
+    expectValueInRow(secondInsert, topicFixtureData.first.id);
+  });
+});
+
+describe("postFixtureData", () => {
+  it("exports welcome and thinking posts", () => {
+    expect(postFixtureData.welcome.title).toBe("Welcome to the weblog");
+    expect(postFixtureData.thinking.title).toBe("So I was thinking");
+  });
+
+  it("posts reference authors table via ref()", () => {
+    expect(postFixtureData.welcome.author_id).toBe(authorFixtureData.david.id);
+  });
+});
+
+describe("commentFixtureData", () => {
+  it("greetings comment references welcome post via ref()", () => {
+    expect(commentFixtureData.greetings.body).toBe("Thank you for the welcome");
+    expect(commentFixtureData.greetings.post_id).toBe(postFixtureData.welcome.id);
+  });
+
+  it("does_it_hurt is a SpecialComment on thinking post", () => {
+    expect(commentFixtureData.does_it_hurt.type).toBe("SpecialComment");
+    expect(commentFixtureData.does_it_hurt.post_id).toBe(postFixtureData.thinking.id);
+  });
+
+  it("createFixtures resolves comment→post cross-ref correctly", async () => {
+    const adapter = makeAdapter();
+    const Comment = makeModel("comments");
+    for (const k of Object.keys(commentFixtureData) as Array<keyof typeof commentFixtureData>) {
+      seedRows(Comment, k, commentFixtureData);
+    }
+
+    await createFixtures(adapter, Comment, commentFixtureData);
+
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("comments"),
+    );
+    const greetingsInsert = findInsertWithPk(insertSqls, commentFixtureData.greetings.id);
+    expect(greetingsInsert).toBeTruthy();
+    expectValueInRow(greetingsInsert, postFixtureData.welcome.id);
+    expect(greetingsInsert).not.toContain(String(FixtureSet.identify("welcome")));
+  });
+});
+
+describe("authorFixtureData", () => {
+  it("exports david, mary, bob", () => {
+    expect(Object.keys(authorFixtureData)).toEqual(["david", "mary", "bob"]);
+  });
+
+  it("david has correct name and cross-refs to author_addresses", () => {
+    expect(authorFixtureData.david.name).toBe("David");
+    expect(authorFixtureData.david.author_address_id).toBe(
+      authorAddressFixtureData.david_address.id,
+    );
+  });
+
+  it("mary refs mary_address", () => {
+    expect(authorFixtureData.mary.author_address_id).toBe(authorAddressFixtureData.mary_address.id);
+  });
+
+  it("createFixtures resolves author→address cross-ref", async () => {
+    const adapter = makeAdapter();
+    const Author = makeModel("authors");
+    for (const k of Object.keys(authorFixtureData) as Array<keyof typeof authorFixtureData>) {
+      seedRows(Author, k, authorFixtureData, { name: authorFixtureData[k].name });
+    }
+
+    await createFixtures(adapter, Author, authorFixtureData);
+
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("authors"),
+    );
+    const davidInsert = findInsertWithPk(insertSqls, authorFixtureData.david.id);
+    expect(davidInsert).toBeTruthy();
+    expectValueInRow(davidInsert, authorAddressFixtureData.david_address.id);
+    expect(davidInsert).not.toContain(String(FixtureSet.identify("david_address")));
+  });
+});
+
+describe("bookFixtureData", () => {
+  it("exports awdr, rfr, ddd, tlg", () => {
+    expect(Object.keys(bookFixtureData)).toEqual(["awdr", "rfr", "ddd", "tlg"]);
+  });
+
+  it("awdr has correct name and format", () => {
+    expect(bookFixtureData.awdr.name).toBe("Agile Web Development with Rails");
+    expect(bookFixtureData.awdr.format).toBe("paperback");
+  });
+
+  it("rfr refs authors via ref()", () => {
+    expect(bookFixtureData.rfr.author_id).toBe(authorFixtureData.david.id);
+  });
+
+  it("createFixtures resolves book→author cross-ref", async () => {
+    const adapter = makeAdapter();
+    const Book = makeModel("books");
+    for (const k of Object.keys(bookFixtureData) as Array<keyof typeof bookFixtureData>) {
+      seedRows(Book, k, bookFixtureData, { name: bookFixtureData[k].name });
+    }
+
+    await createFixtures(adapter, Book, bookFixtureData);
+
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("books"),
+    );
+    const awdrInsert = findInsertWithPk(insertSqls, bookFixtureData.awdr.id);
+    expect(awdrInsert).toBeTruthy();
+    expectValueInRow(awdrInsert, authorFixtureData.david.id);
+    expect(awdrInsert).not.toContain(String(FixtureSet.identify("david")));
+  });
+
+  it("ref() resolves cross-table to declared id once target fixture set is loaded", async () => {
+    const adapter = makeAdapter();
+    const Author = makeModel("authors");
+    const Book = makeModel("books");
+    for (const k of Object.keys(authorFixtureData) as Array<keyof typeof authorFixtureData>) {
+      seedRows(Author, k, authorFixtureData, { name: authorFixtureData[k].name });
+    }
+    for (const k of Object.keys(bookFixtureData) as Array<keyof typeof bookFixtureData>) {
+      seedRows(Book, k, bookFixtureData, { name: bookFixtureData[k].name });
+    }
+
+    await createFixtures(adapter, Author, authorFixtureData);
+    await createFixtures(adapter, Book, bookFixtureData);
+
+    const bookInserts = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("books"),
+    );
+    const awdrInsert = findInsertWithPk(bookInserts, bookFixtureData.awdr.id);
+    expect(awdrInsert).toBeTruthy();
+    expectValueInRow(awdrInsert, authorFixtureData.david.id);
+    expect(authorFixtureData.david.id).not.toBe(FixtureSet.identify("david"));
+  });
+});
+
+describe("companyFixtureData", () => {
+  it("exports all 12 Rails companies fixtures", () => {
+    expect(Object.keys(companyFixtureData)).toEqual([
+      "first_firm",
+      "first_client",
+      "second_client",
+      "another_firm",
+      "another_client",
+      "a_third_client",
+      "rails_core",
+      "leetsoft",
+      "jadedpixel",
+      "odegy",
+      "another_first_firm_client",
+      "recursive_association_fk",
+    ]);
+  });
+
+  it("first_firm is a Firm with STI type column", () => {
+    expect(companyFixtureData.first_firm.type).toBe("Firm");
+    expect(companyFixtureData.first_firm.name).toBe("37signals");
+  });
+
+  it("first_client is a Client with firm_id cross-ref to first_firm and self-ref client_of", () => {
+    expect(companyFixtureData.first_client.type).toBe("Client");
+    expect(companyFixtureData.first_client.firm_id).toBe(companyFixtureData.first_firm.id);
+    expect(companyFixtureData.first_client.client_of).toBe(companyFixtureData.first_client.id);
+  });
+
+  it("rails_core is a DependentFirm", () => {
+    expect(companyFixtureData.rails_core.type).toBe("DependentFirm");
+  });
+
+  it("leetsoft has no type (falls back to Company base)", () => {
+    expect((companyFixtureData.leetsoft as any).type).toBeUndefined();
+    expect(companyFixtureData.leetsoft.client_of).toBe(companyFixtureData.rails_core.id);
+  });
+
+  it("odegy is an ExclusivelyDependentFirm", () => {
+    expect(companyFixtureData.odegy.type).toBe("ExclusivelyDependentFirm");
+  });
+
+  it("createFixtures resolves first_client.firm_id to first_firm id", async () => {
+    const adapter = makeAdapter();
+    const Company = makeModel("companies");
+    for (const k of Object.keys(companyFixtureData) as Array<keyof typeof companyFixtureData>) {
+      seedRows(Company, k, companyFixtureData, { name: (companyFixtureData[k] as any).name });
+    }
+
+    await createFixtures(adapter, Company, companyFixtureData);
+
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("companies"),
+    );
+    const clientInsert = findInsertWithPk(insertSqls, companyFixtureData.first_client.id);
+    expect(clientInsert).toBeTruthy();
+    expectValueInRow(clientInsert, companyFixtureData.first_firm.id);
+  });
+});
+
+describe("accountFixtureData", () => {
+  it("exports all 6 Rails accounts fixtures", () => {
+    expect(Object.keys(accountFixtureData)).toEqual([
+      "signals37",
+      "unknown",
+      "rails_core_account",
+      "last_account",
+      "rails_core_account_2",
+      "odegy_account",
+    ]);
+  });
+
+  it("signals37 has firm_id cross-ref to first_firm and correct credit_limit", () => {
+    expect(accountFixtureData.signals37.credit_limit).toBe(50);
+    expect(accountFixtureData.signals37.firm_id).toBe(companyFixtureData.first_firm.id);
+  });
+
+  it("unknown has no firm_id", () => {
+    expect((accountFixtureData.unknown as any).firm_id).toBeUndefined();
+    expect(accountFixtureData.unknown.credit_limit).toBe(50);
+  });
+
+  it("odegy_account references odegy company", () => {
+    expect(accountFixtureData.odegy_account.firm_id).toBe(companyFixtureData.odegy.id);
+  });
+
+  it("createFixtures: signals37.firm_id resolves to first_firm's pinned id when companies set isn't loaded", async () => {
+    const adapter = makeAdapter();
+    const Account = makeModel("accounts");
+    for (const k of Object.keys(accountFixtureData) as Array<keyof typeof accountFixtureData>) {
+      seedRows(Account, k, accountFixtureData, {
+        credit_limit: (accountFixtureData[k] as any).credit_limit,
+      });
+    }
+
+    await createFixtures(adapter, Account, accountFixtureData);
+
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("accounts"),
+    );
+    const signals37Insert = findInsertWithPk(insertSqls, accountFixtureData.signals37.id);
+    expect(signals37Insert).toBeTruthy();
+    expectValueInRow(signals37Insert, companyFixtureData.first_firm.id);
+    expect(signals37Insert).not.toContain(String(FixtureSet.identify("first_firm")));
+  });
+});
+
+describe("developerFixtureData", () => {
+  it("exports david, jamis, dev_3..dev_10, poor_jamis", () => {
+    const keys = Object.keys(developerFixtureData);
+    expect(keys).toContain("david");
+    expect(keys).toContain("jamis");
+    expect(keys).toContain("poor_jamis");
+    expect(keys.filter((k) => k.startsWith("dev_"))).toHaveLength(8);
+  });
+
+  it("david has correct name and salary", () => {
+    expect(developerFixtureData.david.name).toBe("David");
+    expect(developerFixtureData.david.salary).toBe(80000);
+  });
+
+  it("jamis has high salary, poor_jamis has low salary", () => {
+    expect(developerFixtureData.jamis.salary).toBe(150000);
+    expect(developerFixtureData.poor_jamis.salary).toBe(9000);
+  });
+
+  it("createFixtures inserts david", async () => {
+    const adapter = makeAdapter();
+    const Developer = makeModel("developers");
+    Developer._reflections = {
+      sharedComputers: {
+        name: "sharedComputers",
+        macro: "hasMany",
+        options: { through: "computers_developers" },
+        isThroughReflection: () => true,
+        parentReflection: { macro: "hasAndBelongsToMany" },
+        foreignKey: () => "computer_id",
+        klass: {
+          tableName: "computers",
+          primaryKey: "id",
+          typeForAttribute: () => ({ type: () => "integer" }),
+        },
+        throughReflection: {
+          foreignKey: () => "developer_id",
+          tableName: "computers_developers",
+          klass: { allTimestampAttributesInModel: () => [] },
+        },
+      },
+    };
+    for (const k of Object.keys(developerFixtureData) as Array<keyof typeof developerFixtureData>) {
+      seedRows(Developer, k, developerFixtureData, { name: developerFixtureData[k].name });
+    }
+    await createFixtures(adapter, Developer, developerFixtureData);
+    const insertSqls = executedStatements(adapter).filter(
+      (s) => s.includes("INSERT INTO") && s.includes("developers"),
+    );
+    expect(findInsertWithPk(insertSqls, developerFixtureData.david.id)).toBeTruthy();
+  });
+});
+
+describe("projectFixtureData", () => {
+  it("exports active_record and action_controller", () => {
+    expect(Object.keys(projectFixtureData)).toEqual(["active_record", "action_controller"]);
+  });
+
+  it("active_record has correct name", () => {
+    expect(projectFixtureData.active_record.name).toBe("Active Record");
+  });
+});
+
+describe("developersProjectsFixtureData", () => {
+  it("exports four join rows", () => {
+    expect(Object.keys(developersProjectsFixtureData)).toHaveLength(4);
+  });
+
+  it("david_active_record refs david in developers and active_record in projects", () => {
+    const row = developersProjectsFixtureData.david_active_record;
+    expect(row.developer_id).toBe(developerFixtureData.david.id);
+    expect(row.project_id).toBe(projectFixtureData.active_record.id);
+  });
+});
+
+describe("authorAddressFixtureData", () => {
+  it("exports david_address, david_address_extra, mary_address, bob_address", () => {
+    expect(Object.keys(authorAddressFixtureData)).toEqual([
+      "david_address",
+      "david_address_extra",
+      "mary_address",
+      "bob_address",
+    ]);
+  });
+
+  it("address fixtures are PK-only rows mirroring Rails ids", () => {
+    expect(authorAddressFixtureData.david_address).toEqual({ id: 1 });
+    expect(authorAddressFixtureData.mary_address).toEqual({ id: 3 });
+  });
+});
+
+describe("admin/accounts (slash-keyed subdir fixture)", () => {
+  it("exports signals37 with correct name", () => {
+    expect(Object.keys(adminAccountsFixtureData)).toEqual(["signals37"]);
+    expect(adminAccountsFixtureData.signals37.name).toBe("37signals");
+  });
+});
+
+describe("admin/users (slash-keyed subdir fixture)", () => {
+  it("exports david and jamis", () => {
+    expect(Object.keys(adminUsersFixtureData)).toEqual(["david", "jamis"]);
+  });
+
+  it("david has correct name and account_id ref to admin_accounts", () => {
+    expect(adminUsersFixtureData.david.name).toBe("David");
+    expect(adminUsersFixtureData.david.account).toBe("signals37");
+  });
+
+  it("jamis has settings with symbol key and account_id ref", () => {
+    expect(adminUsersFixtureData.jamis.name).toBe("Jamis");
+    expect(adminUsersFixtureData.jamis.account).toBe("signals37");
+    expect((adminUsersFixtureData.jamis.settings as Record<string, string>).symbol).toBe("symbol");
+  });
+});
+
+describe("admin/randomlyNamedA9 (slash-keyed subdir fixture)", () => {
+  it("exports first_instance and second_instance", () => {
+    expect(Object.keys(adminRandomlyNamedA9FixtureData)).toEqual([
+      "first_instance",
+      "second_instance",
+    ]);
+  });
+
+  it("rows have correct attribute values", () => {
+    expect(adminRandomlyNamedA9FixtureData.first_instance.some_attribute).toBe("AAA");
+    expect(adminRandomlyNamedA9FixtureData.first_instance.another_attribute).toBe(0);
+    expect(adminRandomlyNamedA9FixtureData.second_instance.some_attribute).toBe("BBB");
+    expect(adminRandomlyNamedA9FixtureData.second_instance.another_attribute).toBe(999);
+  });
+});
+
+describe("admin/randomlyNamedB0 (slash-keyed subdir fixture)", () => {
+  it("exports first_instance and second_instance", () => {
+    expect(Object.keys(adminRandomlyNamedB0FixtureData)).toEqual([
+      "first_instance",
+      "second_instance",
+    ]);
+  });
+
+  it("rows have correct attribute values mirroring B0 table (randomly_named_table3)", () => {
+    expect(adminRandomlyNamedB0FixtureData.first_instance.some_attribute).toBe("AAA");
+    expect(adminRandomlyNamedB0FixtureData.second_instance.another_attribute).toBe(999);
+  });
+});

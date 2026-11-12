@@ -1,0 +1,249 @@
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { Temporal } from "@blazetrails/date";
+import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
+import { Base, RecordNotFound } from "../../lib/index.js";
+import { UnknownPrimaryKey } from "../../lib/errors.js";
+import { Account } from "../models/account.js";
+import { Toy } from "../models/toy.js";
+import { Company } from "../models/company.js";
+import { Matey } from "../models/matey.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+
+const SIGNED_ID_VERIFIER_TEST_SECRET = () =>
+  "This is normally set by the railtie initializer when used with Rails!";
+
+const MINUTE = 60;
+
+describe("SignedIdTest", () => {
+  class GetSignedIDInCallback extends Base {
+    static _tableName = "accounts";
+    signedIdFromCallback: string | null = null;
+    static {
+      this.afterCreate(function (record: GetSignedIDInCallback) {
+        record.signedIdFromCallback = (record as any).signedId();
+      });
+    }
+  }
+
+  fixtures(["accounts", "companies", "toys"]);
+
+  beforeAll(async () => {
+    constSet(TopLevel, "Account", Account);
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Toy", Toy);
+  });
+
+  let account: Account;
+  let toy: Toy;
+  beforeEach(async () => {
+    Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
+    account = (await Account.first())!;
+    toy = (await Toy.first())!;
+  });
+
+  afterEach(() => {
+    travelBack();
+    Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
+  });
+
+  it("find signed record", async () => {
+    expect((await Account.findSigned((account as any).signedId()))?.id).toBe(account.id);
+  });
+
+  it("find signed record on relation", async () => {
+    expect((await Account.where("1=1").findSigned((account as any).signedId()))?.id).toBe(
+      account.id,
+    );
+
+    expect(await Account.where("1=0").findSigned((account as any).signedId())).toBeNull();
+  });
+
+  it("find signed record with custom primary key", async () => {
+    expect((await Toy.findSigned((toy as any).signedId()))?.id).toEqual((toy as any).id);
+  });
+
+  it("find signed record for single table inheritance (STI Models)", async () => {
+    const company = (await Company.first())!;
+    expect((await Company.findSigned((company as any).signedId()))?.id).toBe(company.id);
+  });
+
+  it("find signed record raises UnknownPrimaryKey when a model has no primary key", async () => {
+    const error = await assertRaises([UnknownPrimaryKey], {}, () =>
+      Matey.findSigned("this will not be even verified"),
+    );
+    expect(error.message).toBe("Unknown primary key for table mateys in model Matey.");
+  });
+
+  it("find signed record with a bang", async () => {
+    expect((await Account.findSignedBang((account as any).signedId())).id).toBe(account.id);
+  });
+
+  it("find signed record with a bang on relation", async () => {
+    expect((await Account.where("1=1").findSignedBang((account as any).signedId())).id).toBe(
+      account.id,
+    );
+
+    await expect(Account.where("1=0").findSignedBang((account as any).signedId())).rejects.toThrow(
+      RecordNotFound,
+    );
+  });
+
+  it("find signed record with a bang with custom primary key", async () => {
+    expect((await Toy.findSignedBang((toy as any).signedId())).id).toEqual((toy as any).id);
+  });
+
+  it("find signed record with a bang for single table inheritance (STI Models)", async () => {
+    const company = (await Company.first())!;
+    expect((await Company.findSignedBang((company as any).signedId())).id).toBe(company.id);
+  });
+
+  it("fail to find record from broken signed id", async () => {
+    expect(await Account.findSigned("this won't find anything")).toBeNull();
+  });
+
+  it("find signed record within expiration duration", async () => {
+    expect((await Account.findSigned((account as any).signedId({ expiresIn: MINUTE })))?.id).toBe(
+      account.id,
+    );
+  });
+
+  it("fail to find signed record within expiration duration", async () => {
+    const signedId = (account as any).signedId({ expiresIn: MINUTE });
+    travel(2 * MINUTE);
+    expect(await Account.findSigned(signedId)).toBeNull();
+  });
+
+  it("fail to find record from that has since been destroyed", async () => {
+    const signedId = (account as any).signedId({ expiresIn: MINUTE });
+    await account.destroy();
+    expect(await Account.findSigned(signedId)).toBeNull();
+  });
+
+  it("find signed record within expiration time", async () => {
+    expect(
+      (
+        await Account.findSigned(
+          (account as any).signedId({ expiresAt: Temporal.Now.instant().add({ minutes: 1 }) }),
+        )
+      )?.id,
+    ).toBe(account.id);
+  });
+
+  it("fail to find signed record within expiration time", async () => {
+    const signedId = (account as any).signedId({
+      expiresAt: Temporal.Now.instant().add({ minutes: 1 }),
+    });
+    travel(2 * MINUTE);
+    expect(await Account.findSigned(signedId)).toBeNull();
+  });
+
+  it("find signed record with purpose", async () => {
+    expect(
+      (await Account.findSigned((account as any).signedId({ purpose: "v1" }), { purpose: "v1" }))
+        ?.id,
+    ).toBe(account.id);
+  });
+
+  it("fail to find signed record with purpose", async () => {
+    expect(await Account.findSigned((account as any).signedId({ purpose: "v1" }))).toBeNull();
+
+    expect(
+      await Account.findSigned((account as any).signedId({ purpose: "v1" }), { purpose: "v2" }),
+    ).toBeNull();
+  });
+
+  it("finding record from broken signed id raises on the bang", async () => {
+    await expect(Account.findSignedBang("this will blow up")).rejects.toThrow();
+  });
+
+  it("find signed record with a bang within expiration duration", async () => {
+    expect(
+      (await Account.findSignedBang((account as any).signedId({ expiresIn: MINUTE }))).id,
+    ).toBe(account.id);
+  });
+
+  it("finding signed record outside expiration duration raises on the bang", async () => {
+    const signedId = (account as any).signedId({ expiresIn: MINUTE });
+    travel(2 * MINUTE);
+
+    await expect(Account.findSignedBang(signedId)).rejects.toThrow();
+  });
+
+  it("finding signed record that has been destroyed raises on the bang", async () => {
+    const signedId = (account as any).signedId({ expiresIn: MINUTE });
+    await account.destroy();
+
+    await expect(Account.findSignedBang(signedId)).rejects.toThrow(RecordNotFound);
+  });
+
+  it("find signed record with bang with purpose", async () => {
+    expect(
+      (
+        await Account.findSignedBang((account as any).signedId({ purpose: "v1" }), {
+          purpose: "v1",
+        })
+      ).id,
+    ).toBe(account.id);
+  });
+
+  it("find signed record with bang with purpose raises", async () => {
+    await expect(
+      Account.findSignedBang((account as any).signedId({ purpose: "v1" })),
+    ).rejects.toThrow();
+
+    await expect(
+      Account.findSignedBang((account as any).signedId({ purpose: "v1" }), { purpose: "v2" }),
+    ).rejects.toThrow();
+  });
+
+  it("fail to work without a signed_id_verifier_secret", async () => {
+    Base.signedIdVerifierSecret = null;
+    (Account as any)._signedIdVerifier = null;
+
+    try {
+      expect(() => (account as any).signedId()).toThrow(ArgumentError);
+    } finally {
+      Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
+    }
+  });
+
+  it("fail to work without when signed_id_verifier_secret lambda is nil", async () => {
+    Base.signedIdVerifierSecret = () => null;
+    (Account as any)._signedIdVerifier = null;
+
+    try {
+      expect(() => (account as any).signedId()).toThrow(ArgumentError);
+    } finally {
+      Base.signedIdVerifierSecret = SIGNED_ID_VERIFIER_TEST_SECRET;
+    }
+  });
+
+  it("always output url_safe", async () => {
+    const signedId = (account as any).signedId({ purpose: "~~~~~~~~~" });
+    expect(signedId.includes("+")).toBeFalsy();
+  });
+
+  it("use a custom verifier", async () => {
+    const oldVerifier = Account.signedIdVerifier;
+    Account.signedIdVerifier = new MessageVerifier("sekret");
+    try {
+      expect(Base.signedIdVerifier).not.toBe(Account.signedIdVerifier);
+      expect((await Account.findSigned((account as any).signedId()))?.id).toBe(account.id);
+    } finally {
+      Account.signedIdVerifier = oldVerifier;
+    }
+  });
+
+  it("cannot get a signed ID for a new record", async () => {
+    expect(() => (new Account() as any).signedId()).toThrow(
+      /Cannot get a signed_id for a new record/,
+    );
+  });
+
+  it("can get a signed ID in an after_create", async () => {
+    expect((await GetSignedIDInCallback.create()).signedIdFromCallback).not.toBeNull();
+  });
+});

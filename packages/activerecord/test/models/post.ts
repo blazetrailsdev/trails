@@ -1,0 +1,1148 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import type { ScopeOn } from "../../lib/scoping/named.js";
+import { kernelThrow, rbCallSuper, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { Relation } from "../../lib/relation.js";
+import type { Author } from "./author.js";
+import type { AuthorAddress } from "./author.js";
+import type { AuthorFavorite } from "./author.js";
+import type { Categorization } from "./categorization.js";
+import type { Category } from "./category.js";
+import type { CommentThatAutomaticallyAltersPostBody } from "./comment.js";
+import type { CommentWithDefaultScopeReferencesAssociation } from "./comment.js";
+import type { Essay } from "./essay.js";
+import type { Image } from "./image.js";
+import type { IndestructibleTagging } from "./tagging.js";
+import type { LazyReader } from "./reader.js";
+import type { OrderedTag } from "./tag.js";
+import type { Person } from "./person.js";
+import type { Rating } from "./rating.js";
+import type { Reader } from "./reader.js";
+import type { SecureReader } from "./reader.js";
+import type { SpecialCategory } from "./category.js";
+import type { SpecialComment } from "./comment.js";
+import type { Tag } from "./tag.js";
+import type { VerySpecialComment } from "./comment.js";
+import { ModelName, type ModelLike } from "@blazetrails/activemodel";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import { Base } from "../../lib/base.js";
+import type { Column } from "../../lib/connection-adapters/column.js";
+import { ScopeRegistry } from "../../lib/scoping.js";
+import { DelegateCache } from "../../lib/relation/delegation.js";
+import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import type { Comment } from "./comment.js";
+import type { Tagging } from "./tagging.js";
+
+declare module "../../lib/relation.js" {
+  interface RelationScopes<T extends Base> {
+    orderedByPostId: ScopeOn<T, Comment | Post>;
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class CategoryPost extends Base {
+  static {
+    this._tableName = "categories_posts";
+    this.belongsTo("group", { foreignKey: "category_id", className: "Category" });
+    this.belongsTo("category");
+    this.belongsTo("post");
+  }
+}
+constSet(TopLevel, "CategoryPost", CategoryPost);
+DescendantsTracker.registerSubclass(Base, CategoryPost);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CategoryPost {
+  get group(): Category | null | Promise<Category | null>;
+  set group(value: Category | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Post extends Base {
+  declare comments_count: number;
+  declare static containingTheLetterA: () => Relation<Post>;
+  declare static titledWithAnApostrophe: () => Relation<Post>;
+  declare static rankedByComments: () => Relation<Post>;
+  declare static orderedByPostId: () => Relation<Post>;
+  declare static limitBy: (l: number) => Relation<Post>;
+  declare static locked: () => Relation<Post>;
+  declare static mostCommented: (commentsCount: number) => Relation<Post>;
+  declare static noComments: () => Relation<Post>;
+  declare static withSpecialComments: () => Relation<Post>;
+  declare static withVerySpecialComments: () => Relation<Post>;
+  declare static withPost: (postId: number) => Relation<Post>;
+  declare static withComments: () => Relation<Post>;
+  declare static withTags: () => Relation<Post>;
+  declare static withTagsCte: () => Relation<Post>;
+  declare static taggedWith: (id: number) => Relation<Post>;
+  declare static taggedWithComment: (comment: string) => Relation<Post>;
+  declare static typographicallyInteresting: () => Relation<Post>;
+  get firstComment(): Promise<string | null> {
+    return Promise.resolve(
+      Reflect.get(Object.getPrototypeOf(Post.prototype), "firstComment", this),
+    ).then((c: any) => c?.body ?? null);
+  }
+  declare commentsWithExtend: AssociationProxy<Comment>;
+  declare commentsWithExtending: AssociationProxy<Comment>;
+  declare commentsWithExtend_2: AssociationProxy<Comment>;
+  declare authorFavorites: AssociationProxy<AuthorFavorite>;
+  declare authorFavoritesWithScope: AssociationProxy<AuthorFavorite>;
+  declare authorCategorizations: AssociationProxy<Categorization>;
+  declare authorAddresses: AssociationProxy<AuthorAddress>;
+  declare authorAddressExtraWithAddress: AssociationProxy<AuthorAddress>;
+  declare commentsWithStringJoins: AssociationProxy<Comment>;
+  declare ratingsViaStringJoinComments: AssociationProxy<Rating>;
+  declare specialComments: AssociationProxy<SpecialComment>;
+  declare nonexistentComments: AssociationProxy<Comment>;
+  declare specialCommentsRatings: AssociationProxy<Rating>;
+  declare specialCommentsRatingsTaggings: AssociationProxy<Tagging>;
+  declare categoryPosts: AssociationProxy<CategoryPost>;
+  declare scategories: AssociationProxy<Category>;
+  declare hmtSpecialCategories: AssociationProxy<Category>;
+  declare categories: AssociationProxy<Category>;
+  declare specialCategories: AssociationProxy<SpecialCategory>;
+  declare essays: AssociationProxy<Essay>;
+  declare authorsOfEssaysNamedBob: AssociationProxy<Author>;
+  declare tags: AssociationProxy<Tag>;
+  declare indestructibleTaggings: AssociationProxy<IndestructibleTagging>;
+  declare indestructibleTags: AssociationProxy<Tag>;
+  declare tagsWithDestroy: AssociationProxy<Tag>;
+  declare tagsWithNullify: AssociationProxy<Tag>;
+  declare miscTags: AssociationProxy<Tag>;
+  declare funkyTags: AssociationProxy<Tag>;
+  declare superTags: AssociationProxy<Tag>;
+  declare orderedTags: AssociationProxy<OrderedTag>;
+  declare tagsWithPrimaryKey: AssociationProxy<Tag>;
+  declare firstTaggings: AssociationProxy<Tagging>;
+  declare firstBlueTags: AssociationProxy<Tag>;
+  declare firstBlueTags_2: AssociationProxy<Tag>;
+  declare invalidTaggings: AssociationProxy<Tagging>;
+  declare invalidTags: AssociationProxy<Tag>;
+  declare categorizations: AssociationProxy<Categorization>;
+  declare authors: AssociationProxy<Author>;
+  declare categorizationsUsingAuthorId: AssociationProxy<Categorization>;
+  declare authorsUsingAuthorId: AssociationProxy<Author>;
+  declare taggingsUsingAuthorId: AssociationProxy<Tagging>;
+  declare tagsUsingAuthorId: AssociationProxy<Tag>;
+  declare images: AssociationProxy<Image>;
+  declare standardCategorizations: AssociationProxy<Categorization>;
+  declare authorUsingCustomPk: AssociationProxy<Author>;
+  declare authorsUsingCustomPk: AssociationProxy<Author>;
+  declare namedCategories: AssociationProxy<Category>;
+  declare readers: AssociationProxy<Reader>;
+  declare secureReaders: AssociationProxy<SecureReader>;
+  declare readersWithPerson: AssociationProxy<Reader>;
+  declare people: AssociationProxy<Person>;
+  declare singlePeople: AssociationProxy<Person>;
+  declare peopleWithCallbacks: AssociationProxy<Person>;
+  declare skimmers: AssociationProxy<Reader>;
+  declare impatientPeople: AssociationProxy<Person>;
+  declare lazyReaders: AssociationProxy<LazyReader>;
+  declare lazyReadersSkimmersOrNot: AssociationProxy<LazyReader>;
+  declare lazyPeople: AssociationProxy<Person>;
+  declare lazyReadersUnscopeSkimmers: AssociationProxy<LazyReader>;
+  declare lazyPeopleUnscopeSkimmers: AssociationProxy<Person>;
+  declare author_id: number;
+  declare indestructible_tags_count: number | null;
+  declare legacy_comments_count: number | null;
+  declare taggings_with_delete_all_count: number | null;
+  declare taggings_with_destroy_count: number | null;
+  declare tags_count: number | null;
+  declare tags_with_destroy_count: number | null;
+  declare tags_with_nullify_count: number | null;
+  declare "type": string;
+
+  declare title: string;
+  declare body: string;
+  declare comments: AssociationProxy<Comment>;
+  declare taggings: AssociationProxy<Tagging>;
+  declare taggingsWithDeleteAll: AssociationProxy<Tagging>;
+  declare taggingsWithDestroy: AssociationProxy<Tagging>;
+
+  static namedExtension = {
+    author(): string {
+      return "lifo";
+    },
+
+    greeting(this: object): string {
+      return `${rbCallSuper(this, Post.namedExtension.greeting) as string} :)`;
+    },
+  };
+
+  declare static CommentsWithExtendAssociationExtension: Record<string, unknown>;
+
+  static namedExtension2 = {
+    greeting(): string {
+      return "hullo";
+    },
+  };
+
+  static _log: Array<[any, any, any]> = [];
+
+  static {
+    this.aliasAttribute("text", "body");
+    this.aliasAttribute("comments_count", "legacy_comments_count");
+
+    this.scope("containingTheLetterA", function () {
+      return this.where("body LIKE '%a%'");
+    });
+    this.scope("titledWithAnApostrophe", function () {
+      return this.where("title LIKE '%''%'");
+    });
+    this.scope("rankedByComments", function () {
+      return this.order(this.model.arelTable.get("comments_count").desc());
+    });
+    this.scope("orderedByPostId", function () {
+      return this.order("posts.post_id ASC");
+    });
+    this.scope("limitBy", function (l: number) {
+      return this.limit(l);
+    });
+    this.scope("locked", function () {
+      return this.lock();
+    });
+    this.scope("mostCommented", function (commentsCount: number) {
+      return this.joins(":comments")
+        .group("posts.id")
+        .having("count(comments.id) >= ?", commentsCount);
+    });
+
+    this.scope("noComments", function () {
+      return this.leftJoins(":comments").where({ comments: { id: null } });
+    });
+    this.scope("withSpecialComments", function () {
+      return this.joins(":comments").where({ comments: { type: "SpecialComment" } });
+    });
+    this.scope("withVerySpecialComments", function () {
+      return this.joins(":comments").where({ comments: { type: "VerySpecialComment" } });
+    });
+    this.scope("withPost", function (postId: number) {
+      return this.joins(":comments").where({ comments: { post_id: postId } });
+    });
+    this.scope("withComments", function () {
+      return this.preload(":comments");
+    });
+    this.scope("withTags", function () {
+      return this.preload(":taggings");
+    });
+    this.scope("withTagsCte", function () {
+      return this.with({ posts_with_tags: this.model.where("tags_count > 0") }).from(
+        "posts_with_tags AS posts",
+      );
+    });
+    this.scope("taggedWith", function (id: number) {
+      return this.joins(":taggings").where({ taggings: { tag_id: id } });
+    });
+    this.scope("taggedWithComment", function (comment: string) {
+      return this.joins(":taggings").where({ taggings: { comment } });
+    });
+    this.scope("typographicallyInteresting", function () {
+      return this.where("body LIKE '%a%'").or(this.where("title LIKE '%''%'"));
+    });
+
+    this.belongsTo("author");
+    this.belongsTo(
+      "readonlyAuthor",
+      function () {
+        return this.readonly();
+      },
+      {
+        className: "Author",
+        foreignKey: "author_id",
+      },
+    );
+    this.belongsTo(
+      "authorWithPosts",
+      function () {
+        return this.includes(":posts");
+      },
+      {
+        className: "Author",
+        foreignKey: "author_id",
+      },
+    );
+    this.belongsTo(
+      "authorWithAddress",
+      function () {
+        return this.includes(":authorAddress");
+      },
+      {
+        className: "Author",
+        foreignKey: "author_id",
+      },
+    );
+    this.belongsTo(
+      "authorWithSelect",
+      function () {
+        return this.select("id");
+      },
+      {
+        className: "Author",
+        foreignKey: "author_id",
+      },
+    );
+    this.belongsTo(
+      "authorWithTheLetterA",
+      function () {
+        return this.where("name LIKE '%a%'");
+      },
+      {
+        className: "Author",
+        foreignKey: "author_id",
+      },
+    );
+
+    this.hasOne(
+      "firstComment",
+      function () {
+        return this.order("id ASC");
+      },
+      { className: "Comment" },
+    );
+    this.hasOne(
+      "lastComment",
+      function () {
+        return this.order("id desc");
+      },
+      { className: "Comment" },
+    );
+
+    this.hasMany("comments", {
+      extend: {
+        async findMostRecent(this: any) {
+          return this.order("id DESC").first();
+        },
+        async newest(this: any) {
+          return this.created().last();
+        },
+        theAssociation(this: any) {
+          return this.proxyAssociation;
+        },
+        async withContent(this: any, ...args: unknown[]) {
+          const content = args[0] as string;
+          const all = await this.toArray();
+          return all.find((c: any) => c.body === content) ?? null;
+        },
+      },
+    });
+    this.hasMany(
+      "commentsWithExtend",
+      null,
+      { extend: Post.namedExtension, className: "Comment", foreignKey: "post_id" },
+      (mod) => {
+        mod.greeting = () => "hello";
+      },
+    );
+    this.hasMany(
+      "commentsWithExtending",
+      function () {
+        return this.extending(Post.namedExtension);
+      },
+      {
+        className: "Comment",
+        foreignKey: "post_id",
+      },
+    );
+    this.hasMany("commentsWithExtend_2", {
+      extend: [Post.namedExtension, Post.namedExtension2],
+      className: "Comment",
+      foreignKey: "post_id",
+    });
+
+    this.hasMany("authorFavorites", { through: "author" });
+    this.hasMany("authorFavoritesWithScope", {
+      through: "author",
+      className: "AuthorFavoriteWithScope",
+      source: "authorFavorites",
+    });
+    this.hasMany("authorCategorizations", { through: "author", source: "categorizations" });
+    this.hasMany("authorAddresses", { through: "author" });
+    this.hasMany("authorAddressExtraWithAddress", {
+      through: "authorWithAddress",
+      source: "authorAddressExtra",
+    });
+
+    this.hasOne("verySpecialComment");
+    this.hasOne(
+      "verySpecialCommentWithPost",
+      function () {
+        return this.includes(":post");
+      },
+      {
+        className: "VerySpecialComment",
+      },
+    );
+    this.hasOne(
+      "verySpecialCommentWithPostWithJoins",
+      function () {
+        return this.joins(":post").order("posts.id");
+      },
+      { className: "VerySpecialComment" },
+    );
+    this.hasOne(
+      "verySpecialCommentWithStringJoins",
+      function () {
+        return this.joins("JOIN posts AS p1 ON comments.post_id = p1.id")
+          .where()
+          .not({ p1: { id: 999999 } });
+      },
+      { className: "VerySpecialComment" },
+    );
+    this.hasMany(
+      "commentsWithStringJoins",
+      function () {
+        return this.joins("JOIN posts AS p2 ON comments.post_id = p2.id")
+          .where()
+          .not({ p2: { id: 999999 } });
+      },
+      { className: "Comment", foreignKey: "post_id" },
+    );
+    this.hasMany("ratingsViaStringJoinComments", {
+      through: "commentsWithStringJoins",
+      source: "ratings",
+    });
+    this.hasMany("specialComments");
+    this.hasMany(
+      "nonexistentComments",
+      function () {
+        return this.where("comments.id < 0");
+      },
+      {
+        className: "Comment",
+      },
+    );
+
+    this.hasMany("specialCommentsRatings", { through: "specialComments", source: "ratings" });
+    this.hasMany("specialCommentsRatingsTaggings", {
+      through: "specialCommentsRatings",
+      source: "taggings",
+    });
+
+    this.hasMany("categoryPosts", { className: "CategoryPost" });
+    this.hasMany("scategories", { through: "categoryPosts", source: "category" });
+    this.hasMany(
+      "hmtSpecialCategories",
+      function () {
+        return this.where().not({ name: null });
+      },
+      {
+        through: "categoryPosts",
+        source: "category",
+        className: "SpecialCategory",
+      },
+    );
+    this.hasAndBelongsToMany("categories");
+    this.hasAndBelongsToMany("specialCategories", {
+      joinTable: "categories_posts",
+      associationForeignKey: "category_id",
+    });
+
+    this.hasMany("essays", { through: "categories" });
+    this.hasMany(
+      "authorsOfEssaysNamedBob",
+      function () {
+        return this.where({ name: "Bob" });
+      },
+      {
+        through: "essays",
+        source: "writer",
+        sourceType: "Author",
+      },
+    );
+
+    this.hasMany("taggings", { as: "taggable", counterCache: "tags_count" });
+    this.hasMany("tags", {
+      through: "taggings",
+      extend: {
+        addJoinsAndSelect(this: any) {
+          return this.select("tags.*, authors.id as author_id")
+            .joins(
+              "left outer join posts on taggings.taggable_id = posts.id left outer join authors on posts.author_id = authors.id",
+            )
+            .toArray();
+        },
+      },
+    });
+
+    this.hasMany("indestructibleTaggings", {
+      as: "taggable",
+      counterCache: "indestructible_tags_count",
+    });
+    this.hasMany("indestructibleTags", { through: "indestructibleTaggings", source: "tag" });
+
+    this.hasMany("taggingsWithDeleteAll", {
+      className: "Tagging",
+      as: "taggable",
+      dependent: "deleteAll",
+      counterCache: "taggings_with_delete_all_count",
+    });
+    this.hasMany("taggingsWithDestroy", {
+      className: "Tagging",
+      as: "taggable",
+      dependent: "destroy",
+      counterCache: "taggings_with_destroy_count",
+    });
+
+    this.hasMany("tagsWithDestroy", {
+      through: "taggings",
+      source: "tag",
+      dependent: "destroy",
+      counterCache: "tags_with_destroy_count",
+    });
+    this.hasMany("tagsWithNullify", {
+      through: "taggings",
+      source: "tag",
+      dependent: "nullify",
+      counterCache: "tags_with_nullify_count",
+    });
+
+    this.hasMany(
+      "miscTags",
+      function () {
+        return this.where({ tags: { name: "Misc" } });
+      },
+      {
+        through: "taggings",
+        source: "tag",
+      },
+    );
+    this.hasMany("funkyTags", { through: "taggings", source: "tag" });
+    this.hasMany("superTags", { through: "taggings" });
+    this.hasMany("orderedTags", { through: "taggings" });
+    this.hasMany("tagsWithPrimaryKey", { through: "taggings", source: "tagWithPrimaryKey" });
+    this.hasOne("tagging", { as: "taggable" });
+
+    this.hasMany(
+      "firstTaggings",
+      function () {
+        return this.where({ taggings: { comment: "first" } });
+      },
+      {
+        as: "taggable",
+        className: "Tagging",
+      },
+    );
+    this.hasMany(
+      "firstBlueTags",
+      function () {
+        return this.where({ tags: { name: "Blue" } });
+      },
+      {
+        through: "firstTaggings",
+        source: "tag",
+      },
+    );
+    this.hasMany(
+      "firstBlueTags_2",
+      function () {
+        return this.where({ taggings: { comment: "first" } });
+      },
+      {
+        through: "taggings",
+        source: "blueTag",
+      },
+    );
+
+    this.hasMany(
+      "invalidTaggings",
+      function () {
+        return this.where("taggings.id < 0");
+      },
+      {
+        as: "taggable",
+        className: "Tagging",
+      },
+    );
+    this.hasMany("invalidTags", { through: "invalidTaggings", source: "tag" });
+
+    this.hasMany("categorizations", { foreignKey: "category_id" });
+    this.hasMany("authors", { through: "categorizations" });
+
+    this.hasMany("categorizationsUsingAuthorId", {
+      primaryKey: "author_id",
+      foreignKey: "post_id",
+      className: "Categorization",
+    });
+    this.hasMany("authorsUsingAuthorId", {
+      through: "categorizationsUsingAuthorId",
+      source: "author",
+    });
+
+    this.hasMany("taggingsUsingAuthorId", {
+      primaryKey: "author_id",
+      as: "taggable",
+      className: "Tagging",
+    });
+    this.hasMany("tagsUsingAuthorId", { through: "taggingsUsingAuthorId", source: "tag" });
+
+    this.hasMany("images", {
+      as: "imageable",
+      foreignKey: "imageable_identifier",
+      foreignType: "imageable_class",
+    });
+    this.hasOne("mainImage", {
+      as: "imageable",
+      foreignKey: "imageable_identifier",
+      foreignType: "imageable_class",
+      className: "Image",
+    });
+
+    this.hasMany("standardCategorizations", {
+      className: "Categorization",
+      foreignKey: "post_id",
+    });
+    this.hasMany("authorUsingCustomPk", { through: "standardCategorizations" });
+    this.hasMany("authorsUsingCustomPk", { through: "standardCategorizations" });
+    this.hasMany("namedCategories", { through: "standardCategorizations" });
+
+    this.hasMany("readers");
+    this.hasMany("secureReaders");
+    this.hasMany(
+      "readersWithPerson",
+      function () {
+        return this.includes(":person");
+      },
+      { className: "Reader" },
+    );
+    this.hasMany("people", { through: "readers" });
+    this.hasMany("singlePeople", { through: "readers" });
+    this.hasMany("peopleWithCallbacks", {
+      source: "person",
+      through: "readers",
+      beforeAdd: (_owner: any, reader: any) => {
+        Post.log("added", "before", reader.first_name);
+      },
+      afterAdd: (_owner: any, reader: any) => {
+        Post.log("added", "after", reader.first_name);
+      },
+      beforeRemove: (_owner: any, reader: any) => {
+        Post.log("removed", "before", reader.first_name);
+      },
+      afterRemove: (_owner: any, reader: any) => {
+        Post.log("removed", "after", reader.first_name);
+      },
+    });
+    this.hasMany(
+      "skimmers",
+      function () {
+        return this.where({ skimmer: true });
+      },
+      { className: "Reader" },
+    );
+    this.hasMany("impatientPeople", { through: "skimmers", source: "person" });
+
+    this.hasMany("lazyReaders");
+    this.hasMany(
+      "lazyReadersSkimmersOrNot",
+      function () {
+        return this.where({ skimmer: [true, false] });
+      },
+      {
+        className: "LazyReader",
+      },
+    );
+    this.hasMany("lazyPeople", { through: "lazyReaders", source: "person" });
+    this.hasMany(
+      "lazyReadersUnscopeSkimmers",
+      function () {
+        return this.skimmersOrNot();
+      },
+      {
+        className: "LazyReader",
+      },
+    );
+    this.hasMany("lazyPeopleUnscopeSkimmers", {
+      through: "lazyReadersUnscopeSkimmers",
+      source: "person",
+    });
+  }
+
+  static top(limit: number) {
+    return (this as any).rankedByComments().limitBy(limit);
+  }
+
+  static writtenBy(author: any) {
+    return this.where({ id: author.posts.select("id") });
+  }
+
+  static resetLog(this: typeof Post) {
+    this._log = [];
+  }
+
+  static log(
+    this: typeof Post,
+    message?: any,
+    side?: any,
+    newRecord?: any,
+  ): Array<[any, any, any]> {
+    if (message == null) return this._log;
+    this._log.push([message, side, newRecord]);
+    return this._log;
+  }
+}
+constSet(TopLevel, "Post", Post);
+DescendantsTracker.registerSubclass(Base, Post);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Post {
+  get verySpecialCommentWithPost(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithPost(value: VerySpecialComment | null);
+  get verySpecialCommentWithPostWithJoins():
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithPostWithJoins(value: VerySpecialComment | null);
+  get verySpecialCommentWithStringJoins():
+    | VerySpecialComment
+    | null
+    | Promise<VerySpecialComment | null>;
+  set verySpecialCommentWithStringJoins(value: VerySpecialComment | null);
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Post {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  createAuthorBang(attributes?: Record<string, unknown>): Promise<Author>;
+  get readonlyAuthor(): Author | null | Promise<Author | null>;
+  set readonlyAuthor(value: Author | null);
+  get authorWithPosts(): Author | null | Promise<Author | null>;
+  set authorWithPosts(value: Author | null);
+  get authorWithAddress(): Author | null | Promise<Author | null>;
+  set authorWithAddress(value: Author | null);
+  get authorWithSelect(): Author | null | Promise<Author | null>;
+  set authorWithSelect(value: Author | null);
+  get authorWithTheLetterA(): Author | null | Promise<Author | null>;
+  set authorWithTheLetterA(value: Author | null);
+  get lastComment(): Comment | null | Promise<Comment | null>;
+  set lastComment(value: Comment | null);
+  get verySpecialComment(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
+  set verySpecialComment(value: VerySpecialComment | null);
+  get tagging(): Tagging | null | Promise<Tagging | null>;
+  set tagging(value: Tagging | null);
+  get mainImage(): Image | null | Promise<Image | null>;
+  set mainImage(value: Image | null);
+}
+
+export class SpecialPost extends Post {}
+constSet(TopLevel, "SpecialPost", SpecialPost);
+DescendantsTracker.registerSubclass(Post, SpecialPost);
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class StiPost extends Post {
+  static {
+    this.hasOne("specialComment", { className: "SpecialComment" });
+  }
+}
+constSet(TopLevel, "StiPost", StiPost);
+DescendantsTracker.registerSubclass(Post, StiPost);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface StiPost {
+  get specialComment(): SpecialComment | null | Promise<SpecialComment | null>;
+  set specialComment(value: SpecialComment | null);
+}
+
+export class AbstractStiPost extends Post {
+  static {
+    this.abstractClass = true;
+  }
+}
+constSet(TopLevel, "AbstractStiPost", AbstractStiPost);
+DescendantsTracker.registerSubclass(Post, AbstractStiPost);
+
+export class SubStiPost extends StiPost {
+  static {
+    this._tableName = "posts";
+  }
+}
+constSet(TopLevel, "SubStiPost", SubStiPost);
+DescendantsTracker.registerSubclass(StiPost, SubStiPost);
+
+export class SubAbstractStiPost extends AbstractStiPost {
+  static {
+    this._tableName = "posts";
+  }
+}
+constSet(TopLevel, "SubAbstractStiPost", SubAbstractStiPost);
+DescendantsTracker.registerSubclass(AbstractStiPost, SubAbstractStiPost);
+
+export class NullPost extends Post {
+  static {
+    this.defaultScope(function () {
+      return this.none();
+    });
+  }
+}
+constSet(TopLevel, "NullPost", NullPost);
+DescendantsTracker.registerSubclass(Post, NullPost);
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class FirstPost extends Base {
+  declare comments: AssociationProxy<Comment>;
+
+  static {
+    this.inheritanceColumn = "disabled";
+    this._tableName = "posts";
+    this.defaultScope(function () {
+      return this.where({ id: 1 });
+    });
+
+    this.hasMany("comments", { foreignKey: "post_id" });
+    this.hasOne("comment", { foreignKey: "post_id" });
+    this.hasOne("commentWithInverse", {
+      className: "Comment",
+      inverseOf: "postWithInverse",
+    });
+  }
+}
+constSet(TopLevel, "FirstPost", FirstPost);
+DescendantsTracker.registerSubclass(Base, FirstPost);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface FirstPost {
+  get comment(): Comment | null | Promise<Comment | null>;
+  set comment(value: Comment | null);
+  get commentWithInverse(): Comment | null | Promise<Comment | null>;
+  set commentWithInverse(value: Comment | null);
+}
+
+export class PostWithDefaultSelect extends Base {
+  static {
+    this._tableName = "posts";
+    this.defaultScope(function () {
+      return this.select("author_id");
+    });
+  }
+}
+constSet(TopLevel, "PostWithDefaultSelect", PostWithDefaultSelect);
+DescendantsTracker.registerSubclass(Base, PostWithDefaultSelect);
+
+export class TaggedPost extends Post {
+  declare taggings: AssociationProxy<Tagging>;
+  declare tags: AssociationProxy<Tag>;
+
+  static {
+    this.hasMany(
+      "taggings",
+      function () {
+        return this.rewhere({ taggable_type: "TaggedPost" });
+      },
+      {
+        as: "taggable",
+      },
+    );
+    this.hasMany("tags", { through: "taggings" });
+  }
+}
+constSet(TopLevel, "TaggedPost", TaggedPost);
+DescendantsTracker.registerSubclass(Post, TaggedPost);
+
+export class PostWithDefaultInclude extends Base {
+  declare comments: AssociationProxy<Comment>;
+
+  static {
+    this.inheritanceColumn = "disabled";
+    this._tableName = "posts";
+    this.defaultScope(function () {
+      return this.includes(":comments");
+    });
+    this.hasMany("comments", { foreignKey: "post_id" });
+  }
+}
+constSet(TopLevel, "PostWithDefaultInclude", PostWithDefaultInclude);
+DescendantsTracker.registerSubclass(Base, PostWithDefaultInclude);
+
+export class PostWithSpecialCategorization extends Post {
+  declare categorizations: AssociationProxy<Categorization>;
+
+  static {
+    this.hasMany("categorizations", { foreignKey: "post_id" });
+    this.defaultScope(function () {
+      return this.where({ type: "PostWithSpecialCategorization" })
+        .joins(":categorizations")
+        .where({ categorizations: { special: true } });
+    });
+  }
+}
+constSet(TopLevel, "PostWithSpecialCategorization", PostWithSpecialCategorization);
+DescendantsTracker.registerSubclass(Post, PostWithSpecialCategorization);
+
+export class PostWithDefaultScope extends Base {
+  static {
+    this.inheritanceColumn = "disabled";
+    this._tableName = "posts";
+    this.defaultScope(function () {
+      return this.order("title");
+    });
+  }
+}
+constSet(TopLevel, "PostWithDefaultScope", PostWithDefaultScope);
+DescendantsTracker.registerSubclass(Base, PostWithDefaultScope);
+
+export class PostWithPreloadDefaultScope extends Base {
+  declare readers: AssociationProxy<Reader>;
+
+  static {
+    this._tableName = "posts";
+    this.hasMany("readers", { foreignKey: "post_id" });
+    this.defaultScope(function () {
+      return this.preload(":readers");
+    });
+  }
+}
+constSet(TopLevel, "PostWithPreloadDefaultScope", PostWithPreloadDefaultScope);
+DescendantsTracker.registerSubclass(Base, PostWithPreloadDefaultScope);
+
+export class PostWithIncludesDefaultScope extends Base {
+  declare readers: AssociationProxy<Reader>;
+
+  static {
+    this._tableName = "posts";
+    this.hasMany("readers", { foreignKey: "post_id" });
+    this.defaultScope(function () {
+      return this.includes(":readers");
+    });
+  }
+}
+constSet(TopLevel, "PostWithIncludesDefaultScope", PostWithIncludesDefaultScope);
+DescendantsTracker.registerSubclass(Base, PostWithIncludesDefaultScope);
+
+export class SpecialPostWithDefaultScope extends Base {
+  declare static unscopedAll: () => Relation<SpecialPostWithDefaultScope>;
+  declare static authorless: () => Relation<SpecialPostWithDefaultScope>;
+
+  static {
+    this.inheritanceColumn = "disabled";
+    this._tableName = "posts";
+    this.defaultScope(function () {
+      return this.where({ id: [1, 5, 6] });
+    });
+    this.scope("unscopedAll", function () {
+      return this.model.unscoped(() => this.model.all());
+    });
+    this.scope("authorless", function (this: any) {
+      return this.model.unscoped(() => this.model.where({ author_id: 0 }));
+    });
+  }
+}
+constSet(TopLevel, "SpecialPostWithDefaultScope", SpecialPostWithDefaultScope);
+DescendantsTracker.registerSubclass(Base, SpecialPostWithDefaultScope);
+
+export class PostThatLoadsCommentsInAnAfterSaveHook extends Base {
+  declare comments: AssociationProxy<CommentThatAutomaticallyAltersPostBody>;
+
+  static {
+    this.inheritanceColumn = "disabled";
+    this._tableName = "posts";
+    this.hasMany("comments", {
+      className: "CommentThatAutomaticallyAltersPostBody",
+      foreignKey: "post_id",
+    });
+    this.afterSave(async function (this: PostThatLoadsCommentsInAnAfterSaveHook) {
+      await this.comments.load();
+    });
+  }
+}
+constSet(
+  TopLevel,
+  "PostThatLoadsCommentsInAnAfterSaveHook",
+  PostThatLoadsCommentsInAnAfterSaveHook,
+);
+DescendantsTracker.registerSubclass(Base, PostThatLoadsCommentsInAnAfterSaveHook);
+
+export class PostWithAfterCreateCallback extends Base {
+  declare comments: AssociationProxy<Comment>;
+  declare categories: AssociationProxy<Category>;
+
+  static {
+    this.inheritanceColumn = "disabled";
+    this._tableName = "posts";
+    this.hasMany("comments", { foreignKey: "post_id" });
+    this.hasAndBelongsToMany("categories", { foreignKey: "post_id" });
+    this.afterCreate(async function (this: PostWithAfterCreateCallback) {
+      const firstComment = await this.comments.first();
+      await this.updateAttribute("author_id", firstComment?.id);
+    });
+  }
+}
+constSet(TopLevel, "PostWithAfterCreateCallback", PostWithAfterCreateCallback);
+DescendantsTracker.registerSubclass(Base, PostWithAfterCreateCallback);
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
+  declare commentWithDefaultScopeReferencesAssociations: AssociationProxy<CommentWithDefaultScopeReferencesAssociation>;
+
+  static {
+    this.inheritanceColumn = "disabled";
+    this._tableName = "posts";
+    this.hasMany("commentWithDefaultScopeReferencesAssociations", { foreignKey: "post_id" });
+    this.hasOne("firstComment", {
+      className: "CommentWithDefaultScopeReferencesAssociation",
+      foreignKey: "post_id",
+    });
+  }
+}
+constSet(
+  TopLevel,
+  "PostWithCommentWithDefaultScopeReferencesAssociation",
+  PostWithCommentWithDefaultScopeReferencesAssociation,
+);
+DescendantsTracker.registerSubclass(Base, PostWithCommentWithDefaultScopeReferencesAssociation);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface PostWithCommentWithDefaultScopeReferencesAssociation {
+  get firstComment():
+    | CommentWithDefaultScopeReferencesAssociation
+    | null
+    | Promise<CommentWithDefaultScopeReferencesAssociation | null>;
+  set firstComment(value: CommentWithDefaultScopeReferencesAssociation | null);
+}
+
+export class SerializedPost extends Base {
+  declare author_id: number;
+  declare title: string;
+
+  static {
+    this.serialize("title");
+  }
+}
+constSet(TopLevel, "SerializedPost", SerializedPost);
+DescendantsTracker.registerSubclass(Base, SerializedPost);
+
+export class ConditionalStiPost extends Post {
+  static {
+    this.defaultScope(function () {
+      return this.where({ title: "Untitled" });
+    });
+  }
+}
+constSet(TopLevel, "ConditionalStiPost", ConditionalStiPost);
+DescendantsTracker.registerSubclass(Post, ConditionalStiPost);
+
+export class SubConditionalStiPost extends ConditionalStiPost {}
+constSet(TopLevel, "SubConditionalStiPost", SubConditionalStiPost);
+DescendantsTracker.registerSubclass(ConditionalStiPost, SubConditionalStiPost);
+
+export class PostWithDestroyCallback extends Base {
+  static {
+    this.inheritanceColumn = "disabled";
+    this._tableName = "posts";
+    this.beforeDestroy(function (this: PostWithDestroyCallback) {
+      if (Number(this.id) === 1) kernelThrow(":abort");
+    });
+  }
+}
+constSet(TopLevel, "PostWithDestroyCallback", PostWithDestroyCallback);
+DescendantsTracker.registerSubclass(Base, PostWithDestroyCallback);
+
+export class FakeKlass {
+  static relationDelegateClass = DelegateCache.relationDelegateClass;
+  static initializeRelationDelegateCache = DelegateCache.initializeRelationDelegateCache;
+  static generateRelationMethod = DelegateCache.generateRelationMethod;
+  static generatedRelationMethods = DelegateCache.generatedRelationMethods;
+  static includeRelationMethods = DelegateCache.includeRelationMethods;
+
+  static scopeRegistry(): ScopeRegistry {
+    return ScopeRegistry.instance();
+  }
+
+  static adapterClass(): typeof AbstractAdapter {
+    return Post.adapterClass();
+  }
+
+  static leaseConnection(): unknown {
+    return Post.leaseConnection();
+  }
+
+  static get tableName(): string {
+    return "posts";
+  }
+
+  static get attributeAliases(): Record<string, string> {
+    return {};
+  }
+
+  static sanitizeSql(sql: unknown): unknown {
+    return sql;
+  }
+
+  static sanitizeSqlForOrder(sql: unknown): unknown {
+    return sql;
+  }
+
+  static disallowRawSqlBang(..._args: unknown[]): void {}
+
+  static columnsHash(): Record<string, Column> {
+    return { name: null as unknown as Column };
+  }
+
+  static get arelTable(): unknown {
+    return Post.arelTable;
+  }
+
+  static get predicateBuilder(): unknown {
+    return Post.predicateBuilder;
+  }
+
+  static isFinderNeedsTypeCondition(): boolean {
+    return false;
+  }
+
+  static isBaseClass(): boolean {
+    return true;
+  }
+
+  static deterministicEncryptedAttributes(): undefined {
+    return undefined;
+  }
+
+  static {
+    FakeKlass.initializeRelationDelegateCache.call(this as unknown as typeof Base);
+  }
+}
+constSet(TopLevel, "FakeKlass", FakeKlass);
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Postesque extends Base {
+  declare author_id: string;
+  declare author_name: string;
+
+  static {
+    this.belongsTo("author", {
+      className: "Author",
+      foreignKey: "author_name",
+      primaryKey: "name",
+    });
+    this.belongsTo("authorWithAddress", {
+      className: "Author",
+      foreignKey: "author_id",
+    });
+    this.belongsTo("authorWithTheLetterA", {
+      className: "Author",
+      foreignKey: "author_id",
+    });
+  }
+}
+constSet(TopLevel, "Postesque", Postesque);
+DescendantsTracker.registerSubclass(Base, Postesque);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Postesque {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get authorWithAddress(): Author | null | Promise<Author | null>;
+  set authorWithAddress(value: Author | null);
+  get authorWithTheLetterA(): Author | null | Promise<Author | null>;
+  set authorWithTheLetterA(value: Author | null);
+}
+
+export class PostRecord extends Base {
+  declare comments: AssociationProxy<Comment>;
+
+  static get modelName(): ModelName {
+    return new ModelName(this as unknown as ModelLike, null, "Post");
+  }
+
+  static {
+    this.hasMany("comments");
+  }
+}
+constSet(TopLevel, "PostRecord", PostRecord);
+DescendantsTracker.registerSubclass(Base, PostRecord);

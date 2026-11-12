@@ -1,0 +1,500 @@
+import { describe, it, expect, beforeAll, vi } from "vitest";
+import { Base } from "../../lib/index.js";
+import { Type, ValueType, StringType, IntegerType } from "@blazetrails/activemodel";
+import { Array as OidArray } from "../../lib/connection-adapters/postgresql/oid/array.js";
+import { RangeType } from "../../lib/connection-adapters/postgresql/oid/range.js";
+import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
+import { assertNotCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { DateTimeType } from "@blazetrails/activemodel";
+import { Time } from "@blazetrails/date";
+import { rbObjClassname, keys, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { TimeZoneConverter } from "../../lib/attribute-methods/time-zone-conversion.js";
+
+import { loadSchemaFromAdapter } from "../../lib/model-schema.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { adapterType } from "../../lib/test-adapter.js";
+
+vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute member is an accessor pair (read.rb:35 / write.rb:36 cast asymmetry); the class/interface merge is how it surfaces on the type side.
+class OverloadedType extends Base {
+  static {
+    this.tableName = "overloaded_types";
+    this.attribute("overloaded_float", "integer");
+    this.attribute("overloaded_string_with_limit", "string", { limit: 50 });
+    this.attribute("non_existent_decimal", "decimal");
+    this.attribute("string_with_default", "string", { default: "the overloaded default" });
+    constSet(TopLevel, "OverloadedType", this);
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute member is an accessor pair (read.rb:35 / write.rb:36 cast asymmetry); the class/interface merge is how it surfaces on the type side.
+interface OverloadedType {
+  get non_existent_decimal(): BigDecimal | null;
+  set non_existent_decimal(value: unknown);
+  get overloaded_float(): number | null;
+  set overloaded_float(value: unknown);
+}
+
+class ChildOfOverloadedType extends OverloadedType {}
+
+class GrandchildOfOverloadedType extends ChildOfOverloadedType {
+  static {
+    this.attribute("overloaded_float", "float");
+  }
+}
+
+class UnoverloadedType extends Base {
+  static {
+    this.tableName = "overloaded_types";
+    constSet(TopLevel, "UnoverloadedType", this);
+  }
+}
+
+describe("CustomPropertiesTest", () => {
+  const { self } = fixtures([]);
+  beforeAll(async () => {
+    await loadSchemaFromAdapter.call(OverloadedType);
+    await loadSchemaFromAdapter.call(UnoverloadedType);
+  });
+
+  const withImmutableStrings = async (fn: () => void): Promise<void> => {
+    const old = Base.immutableStringsByDefault;
+    Base.immutableStringsByDefault = true;
+    try {
+      void OverloadedType.resetColumnInformation();
+      await loadSchemaFromAdapter.call(OverloadedType);
+      fn();
+    } finally {
+      Base.immutableStringsByDefault = old;
+      void OverloadedType.resetColumnInformation();
+      await loadSchemaFromAdapter.call(OverloadedType);
+    }
+  };
+
+  it("overloading types", () => {
+    const data = new OverloadedType();
+
+    data.overloaded_float = "1.1";
+    (data as any).unoverloaded_float = "1.1";
+
+    expect(data.overloaded_float).toBe(1);
+    expect((data as any).unoverloaded_float).toBe(1.1);
+  });
+
+  it("overloaded properties save", async () => {
+    const data = new OverloadedType();
+
+    data.overloaded_float = "2.2";
+    await data.save();
+    await data.reload();
+
+    expect(data.overloaded_float).toBe(2);
+    const lastOverloaded = await OverloadedType.last();
+    expect(Number.isInteger(lastOverloaded!.overloaded_float)).toBe(true);
+    expect(((await UnoverloadedType.last()) as any).overloaded_float).toEqual(new Number(2.0));
+    expect(rbObjClassname(((await UnoverloadedType.last()) as any).overloaded_float)).toBe("Float");
+  });
+
+  it("properties assigned in constructor", () => {
+    const data = new OverloadedType({ overloaded_float: "3.3" });
+
+    expect(data.overloaded_float).toBe(3);
+  });
+
+  it(".type_for_attribute supports attribute aliases", () => {
+    class WithAlias extends OverloadedType {
+      static {
+        this.aliasAttribute("overloaded_float", "x");
+      }
+    }
+
+    expect(WithAlias.typeForAttribute("overloaded_float")).toEqual(WithAlias.typeForAttribute("x"));
+  });
+
+  it("overloaded properties with limit", () => {
+    expect(OverloadedType.typeForAttribute("overloaded_string_with_limit")!.limit).toBe(50);
+    expect(UnoverloadedType.typeForAttribute("overloaded_string_with_limit")!.limit).toBe(255);
+  });
+
+  it("overloaded default but keeping its own type", () => {
+    class WithDefault extends UnoverloadedType {
+      static {
+        this.attribute("overloaded_string_with_limit", {
+          default: "the overloaded default",
+        });
+      }
+    }
+
+    expect(UnoverloadedType.columnsHash().overloaded_string_with_limit.limit).toBe(255);
+    expect(WithDefault.columnsHash().overloaded_string_with_limit.limit).toBe(255);
+
+    expect((new UnoverloadedType() as any).overloaded_string_with_limit).toBeNull();
+    expect((new WithDefault() as any).overloaded_string_with_limit).toBe("the overloaded default");
+  });
+
+  it("attributes with overridden types keep their type when a default value is configured separately", () => {
+    class Child extends OverloadedType {
+      static {
+        this.attribute("overloaded_float", { default: "123" });
+      }
+    }
+
+    expect(Child.typeForAttribute("overloaded_float")).toEqual(
+      OverloadedType.typeForAttribute("overloaded_float"),
+    );
+    expect(new Child().overloaded_float).toBe(123);
+  });
+
+  it("extra options are forwarded to the type caster constructor", () => {
+    class WithStartsAt extends OverloadedType {
+      static {
+        this.attribute("starts_at", "datetime", {
+          precision: 3,
+          limit: 2,
+          scale: 1,
+          default: () => Time.now(),
+        });
+      }
+    }
+
+    const startsAtType = WithStartsAt.typeForAttribute("starts_at")!;
+
+    expect(startsAtType.precision).toBe(3);
+    expect(startsAtType.limit).toBe(2);
+    expect(startsAtType.scale).toBe(1);
+
+    expect(startsAtType).toBeInstanceOf(DateTimeType);
+    expect((new WithStartsAt() as any).starts_at).toBeInstanceOf(Time);
+  });
+
+  it("time zone aware attribute", async () => {
+    await self().withTimezoneConfig(
+      { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+      async () => {
+        class WithTimes extends OverloadedType {
+          static {
+            this.attribute("starts_at", "datetime", {
+              precision: 3,
+              default: () => Time.now(),
+            });
+            this.attribute("ends_at", { default: () => Time.now() });
+          }
+        }
+
+        const startsAtType = WithTimes.typeForAttribute("starts_at")!;
+        const endsAtType = WithTimes.typeForAttribute("ends_at")!;
+
+        expect(startsAtType).toBeInstanceOf(TimeZoneConverter);
+        expect(endsAtType).toBeInstanceOf(TimeZoneConverter);
+        expect((startsAtType as TimeZoneConverter).__getobj__()).toBeInstanceOf(DateTimeType);
+        expect((endsAtType as TimeZoneConverter).__getobj__()).toBeInstanceOf(DateTimeType);
+        expect((new WithTimes() as any).starts_at).toBeInstanceOf(TimeWithZone);
+        expect((new WithTimes() as any).ends_at).toBeInstanceOf(TimeWithZone);
+      },
+    );
+  });
+
+  it("nonexistent attribute", () => {
+    const data = new OverloadedType({ non_existent_decimal: 1 });
+
+    expect(data.non_existent_decimal).toEqual(new BigDecimal(1));
+    expect(() => new UnoverloadedType({ non_existent_decimal: 1 } as any)).toThrow(
+      "unknown attribute 'non_existent_decimal'",
+    );
+  });
+
+  it("model with nonexistent attribute with default value can be saved", async () => {
+    class WithNonexistentDefault extends OverloadedType {
+      static {
+        this.attribute("non_existent_string_with_default", "string", { default: "nonexistent" });
+      }
+    }
+
+    const model = new WithNonexistentDefault();
+    expect(await model.save()).toBeTruthy();
+  });
+
+  it("changing defaults", () => {
+    const data = new OverloadedType();
+    const unoverloadedData = new UnoverloadedType();
+
+    expect((data as any).string_with_default).toBe("the overloaded default");
+    expect((unoverloadedData as any).string_with_default).toBe("the original default");
+  });
+
+  it("defaults are not touched on the columns", () => {
+    expect(OverloadedType.columnsHash().string_with_default.default).toBe("the original default");
+  });
+
+  it("children inherit custom properties", () => {
+    const data = new ChildOfOverloadedType({ overloaded_float: "4.4" });
+
+    expect(data.overloaded_float).toBe(4);
+  });
+
+  it("children can override parents", () => {
+    const data = new GrandchildOfOverloadedType({ overloaded_float: "4.4" });
+
+    expect(data.overloaded_float).toBe(4.4);
+  });
+
+  it("overloading properties does not attribute method order", () => {
+    const attributeNames = OverloadedType.attributeNames();
+    expect(attributeNames).toEqual([...OverloadedType.columnNames(), "non_existent_decimal"]);
+  });
+
+  it("caches are cleared", async () => {
+    class Klass extends OverloadedType {}
+    await loadSchemaFromAdapter.call(Klass);
+    const columnCount = Klass.columns().length;
+
+    expect(keys(Klass.attributeTypes()).length).toBe(columnCount + 1);
+    expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 1);
+    expect(Klass.attributeNames().length).toBe(columnCount + 1);
+    expect(keys(Klass.attributeTypes()).includes("wibble")).toBeFalsy();
+
+    Klass.attribute("wibble", new ValueType());
+
+    expect(keys(Klass.attributeTypes()).length).toBe(columnCount + 2);
+    expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 2);
+    expect(Klass.attributeNames().length).toBe(columnCount + 2);
+    expect(keys(Klass.attributeTypes())).toContain("wibble");
+  });
+
+  it("the given default value is cast from user", () => {
+    class CustomType extends ValueType {
+      cast(): unknown {
+        return "from user";
+      }
+      deserialize(): unknown {
+        return "from database";
+      }
+    }
+
+    class Klass extends OverloadedType {
+      static {
+        this.attribute("wibble", new CustomType() as any, { default: "default" });
+      }
+    }
+    const model = new Klass();
+
+    expect((model as any).wibble).toBe("from user");
+  });
+
+  it("procs for default values", () => {
+    let counter = 0;
+    class Klass extends OverloadedType {
+      static {
+        this.attribute("counter", "integer", { default: () => (counter += 1) });
+      }
+    }
+
+    expect((new Klass() as any).counter).toBe(1);
+    expect((new Klass() as any).counter).toBe(2);
+  });
+
+  it("procs for default values are evaluated even after column_defaults is called", () => {
+    let counter = 0;
+    class Klass extends OverloadedType {
+      static {
+        this.attribute("counter", "integer", { default: () => (counter += 1) });
+      }
+    }
+
+    expect((new Klass() as any).counter).toBe(1);
+
+    void Klass.columnDefaults;
+
+    expect((new Klass() as any).counter).toBe(3);
+  });
+
+  it("procs are memoized before type casting", () => {
+    let counter = 0;
+    class Klass extends OverloadedType {
+      static {
+        this.attribute("counter", "integer", { default: () => (counter += 1) });
+      }
+    }
+
+    const model = new Klass();
+    expect((model as any).readAttributeBeforeTypeCast("counter")).toBe(1);
+    expect((model as any).readAttributeBeforeTypeCast("counter")).toBe(1);
+  });
+
+  it("user provided defaults are persisted even if unchanged", async () => {
+    const model = await OverloadedType.create();
+
+    expect(((await model.reload()) as any).string_with_default).toBe("the overloaded default");
+  });
+
+  it.skipIf(adapterType !== "postgres")("array types can be specified", () => {
+    class Klass extends OverloadedType {
+      static {
+        this.attribute("my_array", "string", { limit: 50, array: true });
+        this.attribute("my_int_array", "integer", { array: true });
+      }
+    }
+
+    const stringArray = new OidArray(new StringType({ limit: 50 }));
+    const intArray = new OidArray(new IntegerType());
+    expect(stringArray).not.toEqual(intArray);
+    expect(stringArray).toEqual(Klass.typeForAttribute("my_array"));
+    expect(intArray).toEqual(Klass.typeForAttribute("my_int_array"));
+  });
+
+  it.skipIf(adapterType !== "postgres")("range types can be specified", () => {
+    class Klass extends OverloadedType {
+      static {
+        this.attribute("my_range", "string", { limit: 50, range: true });
+        this.attribute("my_int_range", "integer", { range: true });
+      }
+    }
+
+    const stringRange = new RangeType(new StringType({ limit: 50 }));
+    const intRange = new RangeType(new IntegerType());
+    expect(stringRange).not.toEqual(intRange);
+    expect(stringRange).toEqual(Klass.typeForAttribute("my_range"));
+    expect(intRange).toEqual(Klass.typeForAttribute("my_int_range"));
+  });
+
+  it("attributes added after subclasses load are inherited", () => {
+    class Parent extends Base {
+      static {
+        this.tableName = "topics";
+        constSet(TopLevel, "Parent", this);
+      }
+    }
+
+    class Child extends Parent {}
+    new Child();
+
+    Parent.attribute("foo", new ValueType());
+
+    expect((new Child({ foo: "bar" } as any) as any).foo).toBe("bar");
+  });
+
+  it("attributes not backed by database columns are not dirty when unchanged", () => {
+    expect((new OverloadedType() as any).attributeChanged("non_existent_decimal")).toBeFalsy();
+  });
+
+  it("attributes not backed by database columns are always initialized", async () => {
+    await OverloadedType.create();
+    const model = (await OverloadedType.last())!;
+
+    expect(model.non_existent_decimal).toBeNull();
+    model.non_existent_decimal = "123";
+    expect(model.non_existent_decimal).toEqual(new BigDecimal(123));
+  });
+
+  it("attributes not backed by database columns return the default on models loaded from database", async () => {
+    class Child extends OverloadedType {
+      static {
+        this.attribute("non_existent_decimal", "decimal", { default: 123 });
+      }
+    }
+    await Child.create();
+    const model = (await Child.last())!;
+
+    expect(model.non_existent_decimal).toEqual(new BigDecimal(123));
+  });
+
+  it("attributes not backed by database columns keep their type when a default value is configured separately", () => {
+    class Child extends OverloadedType {
+      static {
+        this.attribute("non_existent_decimal", { default: "123" });
+      }
+    }
+
+    expect(Child.typeForAttribute("non_existent_decimal")).toEqual(
+      OverloadedType.typeForAttribute("non_existent_decimal"),
+    );
+    expect(new Child().non_existent_decimal).toEqual(new BigDecimal(123));
+  });
+
+  it("attributes not backed by database columns properly interact with mutation and dirty", async () => {
+    class Child extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("foo", "string", { default: "lol" });
+        constSet(TopLevel, "Child", this);
+      }
+    }
+    await Child.create();
+    const model = (await Child.last())!;
+
+    expect((model as any).foo).toBe("lol");
+
+    (model as any).foo = (model as any).foo + "asdf";
+    expect((model as any).foo).toBe("lolasdf");
+    expect((model as any).fooChanged()).toBeTruthy();
+
+    await model.reload();
+    expect((model as any).foo).toBe("lol");
+
+    (model as any).foo = "lol";
+    expect(model.isChanged).toBeFalsy();
+  });
+
+  it("attributes not backed by database columns appear in inspect", () => {
+    const inspection = (new OverloadedType() as any).fullInspect() as string;
+
+    expect(inspection).toContain("non_existent_decimal");
+  });
+
+  it("attributes do not require a type", () => {
+    class Klass extends OverloadedType {
+      static {
+        this.attribute("no_type", new ValueType());
+      }
+    }
+    expect((new Klass({ no_type: 1 } as any) as any).no_type).toBe(1);
+    expect((new Klass({ no_type: "foo" } as any) as any).no_type).toBe("foo");
+  });
+
+  it("attributes do not require a connection is established", () => {
+    void assertNotCalled(Base, "leaseConnection", null, () => {
+      class Klass extends OverloadedType {
+        static {
+          this.attribute("foo", "string");
+        }
+      }
+      void Klass;
+    });
+  });
+
+  it("unknown type error is raised", () => {
+    expect(() => OverloadedType.attribute("foo", "unknown")).toThrow();
+  });
+
+  it("immutable_strings_by_default changes schema inference for string columns", async () => {
+    await withImmutableStrings(() => {
+      const immutableStringType = Type.lookup("immutable_string").constructor as new () => unknown;
+      expect(OverloadedType.typeForAttribute("inferred_string")).toBeInstanceOf(
+        immutableStringType,
+      );
+    });
+  });
+
+  it("immutable_strings_by_default retains limit information", async () => {
+    await withImmutableStrings(() => {
+      expect(OverloadedType.typeForAttribute("inferred_string")!.limit).toBe(255);
+    });
+  });
+
+  it("immutable_strings_by_default does not affect `attribute :foo, :string`", async () => {
+    await withImmutableStrings(() => {
+      const defaultStringType = Type.lookup("string").constructor as new () => unknown;
+      expect(OverloadedType.typeForAttribute("string_with_default")).toBeInstanceOf(
+        defaultStringType,
+      );
+    });
+  });
+
+  it("serialize boolean for both string types", () => {
+    const defaultStringType = Type.lookup("string");
+    const immutableStringType = Type.lookup("immutable_string");
+    expect(defaultStringType.serialize(true)).toBe(immutableStringType.serialize(true));
+    expect(defaultStringType.serialize(false)).toBe(immutableStringType.serialize(false));
+  });
+});

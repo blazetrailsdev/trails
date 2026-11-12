@@ -46,16 +46,16 @@ Every read and every write is a `Promise`. Concretely:
 - **Finders**: `find`, `findBy`, `first`, `last`, `take`, `exists`,
   `count`, `sum`, `minimum`, `maximum`, `pluck`, `ids`, `each`,
   `findEach`, `findInBatches`, `inBatches` — all async. See
-  `packages/activerecord/src/relation/finder-methods.ts` and
-  `packages/activerecord/src/relation.ts` (`exists`, `findEach`).
+  `packages/activerecord/lib/relation/finder-methods.ts` and
+  `packages/activerecord/lib/relation.ts` (`exists`, `findEach`).
 - **Relation materialization**: `toArray()` replaces Rails' `to_a`/
   implicit `each`, and is async. Relations are lazy like in Rails, but
   you have to explicitly await the terminal operation.
 - **Persistence**: `save`, `saveBang`, `create`, `update`, `updateBang`,
   `destroy`, `destroyBang`, `toggleBang`, `touch`, `updateColumn`,
   `updateColumns`, `incrementBang`, `decrementBang` — all async. See
-  `packages/activerecord/src/base.ts` and
-  `packages/activerecord/src/persistence.ts`. The Rails bang
+  `packages/activerecord/lib/base.ts` and
+  `packages/activerecord/lib/persistence.ts`. The Rails bang
   convention (`save!`, `destroy!`) becomes a `Bang` suffix because `!`
   isn't a legal identifier character in JS/TS.
 - **Associations**: `user.posts`, `post.author` return relations/
@@ -74,7 +74,7 @@ access through async drivers.
   awaited, so DB-backed validators (like `uniqueness`) run inline and
   `record.errors` is populated by the time it resolves. `save()` runs the
   same chain. See
-  `packages/activerecord/src/validations/uniqueness.ts`.
+  `packages/activerecord/lib/validations/uniqueness.ts`.
 - Sequencing matters. `user.posts.toArray()` and `user.posts.count()`
   are separate round-trips unless you preload. Accidentally awaiting
   the same relation twice issues two queries.
@@ -113,11 +113,11 @@ transaction and rolls back on any thrown error. The differences:
   function takes the model class as its first argument so it can find
   the right adapter. An instance-level `record.transaction(fn)` is also
   available (mirrors `ActiveRecord::Base#transaction`, see
-  `packages/activerecord/src/base.ts`).
+  `packages/activerecord/lib/base.ts`).
 - **Transaction state rides on `AsyncLocalStorage`**, not a thread
   local. Nested `await`s see the correct surrounding transaction
   because the async context propagates automatically. See
-  `packages/activerecord/src/transactions.ts` and the async-context
+  `packages/activerecord/lib/transactions.ts` and the async-context
   adapter in `@blazetrails/activesupport`.
 - Options (`isolation`, `requiresNew`, `joinable`) are passed as a
   third argument rather than as keyword args.
@@ -132,7 +132,7 @@ wrapped by `@blazetrails/activesupport`'s `getAsyncContext()`.
 
 Current uses:
 
-- **Current transaction** — `packages/activerecord/src/transactions.ts`.
+- **Current transaction** — `packages/activerecord/lib/transactions.ts`.
 - **Query-prohibit scopes** — `connection-handling.ts` uses an
   `AsyncContext<boolean>` to track `whileDisconnecting` and friends.
 - **Current attributes** — `current-attributes.ts` in ActiveSupport.
@@ -151,7 +151,7 @@ Rails does, and pools are acquired per query rather than checked out
 per thread.
 `establishConnection` / `connectsTo` shape mirrors Rails; the
 underlying pool model is different because there are no threads to
-pool over. See `packages/activerecord/src/connection-handling.ts`.
+pool over. See `packages/activerecord/lib/connection-handling.ts`.
 
 ### Adapter config: `statementLimit` and `preparedStatements`
 
@@ -207,7 +207,7 @@ Rails' `ActiveRecord::Relation` uses `method_missing` to forward
 unknown calls to the model class (for named scopes and class-method
 delegation). We do the same thing with a `Proxy` wrapper
 (`wrapWithScopeProxy` in
-`packages/activerecord/src/relation/delegation.ts`). Every relation
+`packages/activerecord/lib/relation/delegation.ts`). Every relation
 returned by `all()`, `where()`, `order()`, etc. is wrapped so that
 `User.where({ active: true }).published()` resolves `published`
 against the model's registered scopes.
@@ -223,7 +223,7 @@ declare the scope signatures on their Relation type.
 the function in a `_scopes` Map on the class and defines a static
 method that delegates through `all()`. The Relation proxy above picks
 the scope up on relation instances. See
-`packages/activerecord/src/scoping/named.ts`.
+`packages/activerecord/lib/scoping/named.ts`.
 
 ## 7. Enums: explicit `defineProperty`, async bang methods
 
@@ -232,7 +232,7 @@ Rails' `enum status: [:draft, :published]` generates `draft?`,
 but:
 
 - Generation happens in `Base.enum`
-  (`packages/activerecord/src/enum.ts`) via `Object.defineProperty`,
+  (`packages/activerecord/lib/enum.ts`) via `Object.defineProperty`,
   not `define_method`.
 - The **bang methods are async** because persisting the change hits
   the DB:
@@ -302,7 +302,7 @@ has_many :birds_with_add_load,
 
 In trails the callback dispatch path is still synchronous (`addToTarget`
 → `replaceOnTarget` → `callback` in
-`packages/activerecord/src/associations/collection-association.ts`, and
+`packages/activerecord/lib/associations/collection-association.ts`, and
 the public `build()` is a sync Rails-parity API), but the collection load
 (`loadTarget` / `toArray`) is **async** — it goes through the async
 driver. A synchronous proc therefore cannot `await` the load, so the best

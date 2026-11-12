@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { extractTestsFromSource } from "./extract-ts-core.js";
 
 /** Index a file's extracted tests by description → assertionCount. */
-function tsAssertionCounts(source: string, relPath = "packages/activerecord/src/x.test.ts") {
+function tsAssertionCounts(source: string, relPath = "packages/activerecord/test/cases/x.test.ts") {
   const info = extractTestsFromSource(source, relPath);
   const out: Record<string, number | undefined> = {};
   for (const tc of info.testCases) out[tc.description] = tc.assertionCount;
@@ -428,7 +428,7 @@ describe("TS extractor assertion-count collection", () => {
 });
 
 /** Index a file's extracted tests by description → assertionKinds. */
-function tsAssertionKinds(source: string, relPath = "packages/activerecord/src/x.test.ts") {
+function tsAssertionKinds(source: string, relPath = "packages/activerecord/test/cases/x.test.ts") {
   const info = extractTestsFromSource(source, relPath);
   const out: Record<string, string[] | undefined> = {};
   for (const tc of info.testCases) out[tc.description] = tc.assertionKinds;
@@ -499,7 +499,7 @@ describe("TS extractor assertion-kind collection", () => {
 });
 
 /** Index a file's extracted tests by description → assertionValues. */
-function tsAssertionValues(source: string, relPath = "packages/activerecord/src/x.test.ts") {
+function tsAssertionValues(source: string, relPath = "packages/activerecord/test/cases/x.test.ts") {
   const info = extractTestsFromSource(source, relPath);
   const out: Record<string, (string | null)[] | undefined> = {};
   for (const tc of info.testCases) out[tc.description] = tc.assertionValues;

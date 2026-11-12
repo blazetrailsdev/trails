@@ -1,0 +1,1307 @@
+import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
+import { rbObjInspect, RuntimeError, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { tmpdir } from "os";
+import { join } from "path";
+import { describe, it, expect, vi } from "vitest";
+import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
+import { Result } from "../../lib/result.js";
+import { NoMethodError } from "@blazetrails/activemodel";
+import { Reaper } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
+import {
+  ConnectionPool,
+  NullPool,
+} from "../../lib/connection-adapters/abstract/connection-pool.js";
+import { ConnectionNotEstablished, ConnectionTimeoutError } from "../../lib/errors.js";
+import { Store } from "../../lib/connection-adapters/abstract/query-cache.js";
+import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";
+import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
+import {
+  SchemaReflection,
+  BoundSchemaReflection,
+} from "../../lib/connection-adapters/schema-cache.js";
+import { HashConfig } from "../../lib/database-configurations/hash-config.js";
+import { rawTestAdapterConfiguration } from "../../lib/test-adapter.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
+import type { LeasedTestAdapter } from "../../lib/test-adapter.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { lazilyLoadSchemaCache, setLazilyLoadSchemaCache } from "../../lib/active-record.js";
+
+function makeAmbientDbConfig(overrides: Record<string, unknown> = {}): HashConfig {
+  return new HashConfig("test", "primary", {
+    ...rawTestAdapterConfiguration(),
+    checkoutTimeout: 0.2,
+    reapingFrequency: null,
+    ...overrides,
+  });
+}
+
+function makeAmbientPool(overrides: Record<string, unknown> = {}): ConnectionPool {
+  const dbConfig = makeAmbientDbConfig(overrides);
+  const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");
+  return new ConnectionPool(pc);
+}
+
+async function withCacheDir<T>(fn: (dir: string) => Promise<T>): Promise<T> {
+  const dir = await mkdtemp(join(tmpdir(), "trails-schema-cache-"));
+  try {
+    return await fn(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function closePoolConnections(pool: ConnectionPool): Promise<void> {
+  await pool.disconnectBang();
+}
+
+function makePool(size: number = 5): ConnectionPool {
+  return makeAmbientPool({ pool: size });
+}
+
+it("isConnected probes each pooled connection's connected state", async () => {
+  const pool = makePool();
+  const conn = await pool.checkout();
+  await conn.verifyBang();
+  expect(pool.isConnected()).toBe(true);
+  pool.checkin(conn);
+  await conn.disconnectBang();
+  expect(pool.connections.length).toBe(1);
+  expect(pool.isConnected()).toBe(false);
+});
+
+it("subsequent pinned checkout verifies and reconnects a connection that died mid-session", async () => {
+  const pool = makePool();
+  await pool.pinConnectionBang();
+
+  const conn = await pool.checkout();
+  const verify = vi.spyOn(conn, "verifyBang");
+  const active = vi.spyOn(conn, "active");
+  const reconnect = vi.spyOn(conn, "reconnectBang").mockImplementation(async () => {
+    active.mockRestore();
+  });
+
+  expect(await pool.checkout()).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(1);
+  expect(reconnect).not.toHaveBeenCalled();
+
+  active.mockResolvedValue(false);
+  const again = await pool.checkout();
+  expect(again).toBe(conn);
+  expect(verify).toHaveBeenCalledTimes(2);
+  expect(reconnect).toHaveBeenCalledWith({ restoreTransactions: true });
+  expect(await again.active()).toBe(true);
+
+  verify.mockRestore();
+  reconnect.mockRestore();
+  await pool.unpinConnectionBang();
+});
+
+it("verifyBang on a checked-out adapter establishes the raw connection on every lane", async () => {
+  const pool = makePool();
+  const conn = await pool.checkout();
+  try {
+    await conn.verifyBang();
+    expect(conn.isConnected()).toBe(true);
+    expect(pool.isConnected()).toBe(true);
+  } finally {
+    pool.checkin(conn);
+    await closePoolConnections(pool);
+  }
+});
+
+it("a checkout racing discardBang across the awaited reap raises ConnectionNotEstablished", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+  const checkout = new Thread(() => pool.checkout()).value();
+  await pool.discardBang();
+  await expect(checkout).rejects.toThrow(ConnectionNotEstablished);
+  await expect(checkout).rejects.toThrow("Connection pool has been discarded");
+  expect(held).toBeTruthy();
+});
+
+it("leaseConnection routes its verify through checkout and establishes on verifyBang", async () => {
+  const pool = makePool();
+  const checkoutSpy = vi.spyOn(pool, "checkout");
+  try {
+    const conn = await pool.leaseConnection();
+    expect(checkoutSpy).toHaveBeenCalledTimes(1);
+    await conn.verifyBang();
+    expect(conn.isConnected()).toBe(true);
+    expect(pool.isConnected()).toBe(true);
+  } finally {
+    checkoutSpy.mockRestore();
+    pool.releaseConnection();
+    await closePoolConnections(pool);
+  }
+});
+
+it("with connection prevent permanent checkout releases connection", async () => {
+  const pool = makePool();
+  await pool.leaseConnection();
+  expect(pool.activeConnection).toBeTruthy();
+  await pool.withConnection(
+    (conn) => {
+      expect(conn).toBeTruthy();
+    },
+    { preventPermanentCheckout: true },
+  );
+  expect(pool.activeConnection).toBeTruthy();
+  pool.releaseConnection();
+});
+
+it("with connection prevent permanent checkout on fresh lease releases", async () => {
+  const pool = makePool();
+  await pool.withConnection(
+    (conn) => {
+      expect(conn).toBeTruthy();
+    },
+    { preventPermanentCheckout: true },
+  );
+  expect(pool.activeConnection).toBeNull();
+});
+
+it("with connection prevent permanent checkout on fresh lease keeps the lease permanent", async () => {
+  const pool = makePool();
+  expect(pool.isPermanentLease()).toBe(true);
+  await pool.withConnection(() => undefined, { preventPermanentCheckout: true });
+  expect(pool.isPermanentLease()).toBe(true);
+});
+
+it("withConnection overlapping on an empty lease checks out one connection", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout");
+  const seen: DatabaseAdapter[] = [];
+  const release = vi.spyOn(pool, "releaseConnection");
+  await Promise.all([
+    pool.withConnection(async (conn) => {
+      seen.push(conn);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      expect(pool.isActiveConnection()).toBe(conn);
+    }),
+    pool.withConnection((conn) => {
+      seen.push(conn);
+    }),
+  ]);
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(seen[0]).toBe(seen[1]);
+  expect(release).toHaveBeenCalledTimes(1);
+  expect(pool.isActiveConnection()).toBeNull();
+});
+
+it("leaseConnection overlapping on an empty lease checks out one connection", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout");
+  const [first, second] = await Promise.all([pool.leaseConnection(), pool.leaseConnection()]);
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(second).toBe(first);
+  expect(pool.isActiveConnection()).toBe(first);
+});
+
+it("withConnection joining after the checkout resolved releases once both settle", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout");
+  const events: string[] = [];
+  vi.spyOn(pool, "releaseConnection").mockImplementation(function (this: ConnectionPool) {
+    events.push("release");
+    return ConnectionPool.prototype.releaseConnection.call(this);
+  });
+  let finishFirst!: () => void;
+  const first = pool.withConnection(async () => {
+    events.push("first");
+    await new Promise<void>((resolve) => (finishFirst = resolve));
+    events.push("first done");
+  });
+  await vi.waitFor(() => expect(events).toContain("first"));
+  const second = pool.withConnection(async (conn) => {
+    expect(conn).toBe(pool.isActiveConnection());
+    events.push("second done");
+  });
+  await second;
+  finishFirst();
+  await first;
+  expect(checkout).toHaveBeenCalledTimes(1);
+  expect(events).toEqual(["first", "second done", "first done", "release"]);
+});
+
+it("withConnection overlapping calls with different preventPermanentCheckout release the lease", async () => {
+  const pool = makePool(2);
+  await Promise.all([
+    pool.withConnection(() => undefined, { preventPermanentCheckout: true }),
+    pool.withConnection(() => undefined),
+  ]);
+  expect(pool.isActiveConnection()).toBeNull();
+  expect(pool.isPermanentLease()).toBe(true);
+  expect(pool.stat().busy).toBe(0);
+});
+
+it("withConnection retries the checkout after an overlapping checkout rejects", async () => {
+  const pool = makePool(2);
+  const checkout = vi.spyOn(pool, "checkout").mockRejectedValueOnce(new Error("boom"));
+  const results = await Promise.allSettled([
+    pool.withConnection(() => undefined),
+    pool.withConnection(() => undefined),
+  ]);
+  expect(results.map((r) => r.status)).toEqual(["rejected", "rejected"]);
+  await pool.withConnection(() => undefined);
+  expect(checkout).toHaveBeenCalledTimes(2);
+  expect(pool.isActiveConnection()).toBeNull();
+});
+
+it("withConnection after a rejected overlapping checkout keeps a retry's connection leased", async () => {
+  const pool = makePool(2);
+  vi.spyOn(pool, "checkout").mockRejectedValueOnce(new Error("boom"));
+  let open!: () => void;
+  let retry!: Promise<void>;
+  const first = pool
+    .withConnection(() => undefined)
+    .catch(() => {
+      retry = pool.withConnection(async () => {
+        await new Promise<void>((resolve) => (open = resolve));
+      });
+    });
+  const second = pool.withConnection(() => undefined).catch(() => undefined);
+  await Promise.all([first, second]);
+  await vi.waitFor(() => expect(open).toBeDefined());
+  expect(pool.isActiveConnection()).not.toBeNull();
+  open();
+  await retry;
+  expect(pool.isActiveConnection()).toBeNull();
+});
+
+it("withConnection waits for a released connection when pool is saturated", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+
+  let connSeen: DatabaseAdapter | undefined;
+  const waiter = pool.withConnection((conn) => {
+    connSeen = conn;
+  });
+  pool.checkin(held);
+  await waiter;
+  expect(connSeen).toBe(held);
+  expect(pool.stat().busy).toBe(0);
+  expect(pool.stat().idle).toBe(1);
+});
+
+it("withConnection rejects with ConnectionTimeoutError when pool stays saturated past timeout", async () => {
+  const { ConnectionTimeoutError } = await import("../../lib/errors.js");
+  vi.useFakeTimers();
+  try {
+    const pool = makeAmbientPool({ pool: 1, checkoutTimeout: 0.05 });
+    await pool.checkout();
+
+    const waiter = pool.withConnection(() => {});
+    const assertion = expect(waiter).rejects.toThrow(ConnectionTimeoutError);
+    await vi.runAllTimersAsync();
+    await assertion;
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+it("withConnection waits using pool default timeout without explicit checkoutTimeout", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+
+  let connSeen: DatabaseAdapter | undefined;
+  const waiter = pool.withConnection((conn) => {
+    connSeen = conn;
+  });
+  pool.checkin(held);
+  await waiter;
+  expect(connSeen).toBe(held);
+  expect(pool.stat().busy).toBe(0);
+});
+
+it("withConnectionSync on a saturated pool borrows a busy connection instead of timing out", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+
+  const seen = pool.withConnectionSync((conn) => conn);
+  expect(seen).toBe(held);
+  expect(pool.stat().busy).toBe(1);
+  expect(pool.isActiveConnection()).toBeNull();
+});
+
+it("withConnectionSync raises when a borrowed connection's block goes async", async () => {
+  const pool = makePool(1);
+  await pool.checkout();
+
+  expect(() => pool.withConnectionSync(async () => 1)).toThrow(RuntimeError);
+  expect(pool.stat().busy).toBe(1);
+});
+
+it("withConnectionSync restores a non-sticky lease after borrowing with preventPermanentCheckout", async () => {
+  const pool = makePool(1);
+  await pool.checkout();
+  const lease = pool["connectionLease"]();
+  lease.sticky = null;
+
+  pool.withConnectionSync((conn) => conn, { preventPermanentCheckout: true });
+  expect(lease.sticky).toBeNull();
+});
+
+it("withConnectionSync does not borrow a connection with an open transaction", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+  held.isTransactionOpen = () => true;
+
+  expect(() => pool.withConnectionSync((conn) => conn)).toThrow(ConnectionTimeoutError);
+});
+
+it("withConnectionSync leaves a borrowed connection checked out when its block throws", async () => {
+  const pool = makePool(1);
+  const held = await pool.checkout();
+
+  expect(() =>
+    pool.withConnectionSync(() => {
+      throw new RuntimeError("boom");
+    }),
+  ).toThrow("boom");
+  expect(pool.stat().busy).toBe(1);
+  expect(held.isInUse()).not.toBeNull();
+});
+
+it("withConnectionSync checks out an idle connection rather than borrowing", async () => {
+  const pool = makePool(2);
+  const held = await pool.checkout();
+  pool.checkin(held);
+  const other = await pool.checkout();
+
+  const seen = pool.withConnectionSync((conn) => conn);
+  expect(seen).not.toBe(other);
+});
+
+it("full pool async checkout timeout", async () => {
+  const pool = makePool(1);
+  await pool.checkout();
+  await expect(pool.checkout(0.05)).rejects.toThrow(/could not obtain a connection/);
+});
+
+it("reaper flushes idle connections after idle_timeout", async () => {
+  try {
+    vi.useFakeTimers();
+    const pool = makeAmbientPool({ idleTimeout: 1, reapingFrequency: 10 });
+    const conn = await pool.checkout();
+    pool.checkin(conn);
+    expect(pool.stat().connections).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(pool.stat().connections).toBe(1);
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(pool.stat().connections).toBe(0);
+  } finally {
+    (Reaper as any).threads.clear();
+    (Reaper as any).pools.clear();
+    vi.useRealTimers();
+  }
+});
+
+it("disconnect calls disconnectBang on each pooled connection", async () => {
+  const pool = makePool(3);
+  const c1 = await pool.checkout();
+  const c2 = await pool.checkout();
+  pool.checkin(c1);
+  pool.checkin(c2);
+  const spy1 = vi.fn();
+  const spy2 = vi.fn();
+  (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
+  (c2 as unknown as { disconnectBang: () => void }).disconnectBang = spy2;
+
+  await pool.disconnectBang();
+
+  expect(spy1).toHaveBeenCalled();
+  expect(spy2).toHaveBeenCalled();
+  expect(pool.connections).toEqual([]);
+});
+
+it("disconnect under exclusive acquisition checks out idle connections during the block", async () => {
+  const pool = makePool(2);
+  const c1 = await pool.checkout();
+  pool.checkin(c1);
+  const stat = pool.stat();
+  expect(stat.busy).toBe(0);
+  expect(stat.idle).toBe(1);
+
+  await pool.disconnectBang();
+  expect(pool.stat().connections).toBe(0);
+});
+
+it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and releases it when the connect raises", async () => {
+  const pool = makePool(2) as any;
+  const seen: number[] = [];
+  pool.checkoutNewConnection = () => {
+    seen.push(pool._nowConnecting);
+    throw new ConnectionNotEstablished("boom");
+  };
+  await expect(pool.tryToCheckoutNewConnection()).rejects.toThrow("boom");
+  expect(seen).toEqual([1]);
+  expect(pool._nowConnecting).toBe(0);
+
+  pool._nowConnecting = 2;
+  expect(await pool.tryToCheckoutNewConnection()).toBeNull();
+});
+
+it("the exclusive sweep keeps waiting while a connect is in flight", async () => {
+  const pool = makePool(2) as any;
+  pool.checkin(await pool.checkout());
+  pool._nowConnecting = 1;
+  await expect(pool.withExclusivelyAcquiredAllConnections(true, () => "done")).rejects.toThrow(
+    /could not obtain ownership of all database connections/,
+  );
+  pool._nowConnecting = 0;
+  expect(await pool.withExclusivelyAcquiredAllConnections(true, () => "done")).toBe("done");
+});
+
+it("clearReloadableConnections only disconnects reloadable adapters", async () => {
+  const pool = makePool(3);
+  const c1 = await pool.checkout();
+  const c2 = await pool.checkout();
+  pool.checkin(c1);
+  pool.checkin(c2);
+  (c1 as unknown as { requiresReloading: () => boolean }).requiresReloading = () => true;
+  (c2 as unknown as { requiresReloading: () => boolean }).requiresReloading = () => false;
+  const spy1 = vi.fn();
+  const spy2 = vi.fn();
+  (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
+  (c2 as unknown as { disconnectBang: () => void }).disconnectBang = spy2;
+
+  await pool.clearReloadableConnectionsBang();
+
+  expect(spy1).toHaveBeenCalled();
+  expect(spy2).not.toHaveBeenCalled();
+  expect(pool.connections).toContain(c2);
+  expect(pool.connections).not.toContain(c1);
+  expect(pool.stat().busy).toBe(0);
+  const reused = await pool.checkout();
+  expect(reused).toBe(c2);
+  pool.checkin(reused);
+});
+
+it("pin connection reuses leased connection and checks in on unpin", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    const leased = (await pool.leaseConnection()) as LeasedTestAdapter;
+
+    await pool.pinConnectionBang();
+    const pinned = (await pool.checkout()) as LeasedTestAdapter;
+    expect(pinned).toBe(leased);
+    expect(leased.transactionManager.openTransactions).toBe(1);
+    expect(leased.transactionManager.currentTransaction.joinable).toBe(false);
+
+    const clean = await pool.unpinConnectionBang();
+    expect(clean).toBe(true);
+    expect(leased.transactionManager.openTransactions).toBe(0);
+
+    expect(pool.stat().idle).toBe(1);
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
+it("scheduleQuery runs each task on its own lease", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  (pool as unknown as { asyncExecutor: ThreadPoolExecutor }).asyncExecutor = new ThreadPoolExecutor(
+    {
+      minThreads: 0,
+      maxThreads: 5,
+      maxQueue: 20,
+      fallbackPolicy: "caller_runs",
+    },
+  );
+  const leases: unknown[] = [];
+  const task = {
+    executeOrSkip: () => {
+      leases.push((pool as unknown as { connectionLease(): unknown }).connectionLease());
+    },
+  };
+  pool.scheduleQuery(task);
+  pool.scheduleQuery(task);
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(leases).toHaveLength(2);
+  expect(leases[0]).not.toBe(leases[1]);
+});
+
+it("a nested execution context shares the pool's single pinned connection", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  let ctx1Conn: DatabaseAdapter | null = null;
+
+  try {
+    await new Thread(async () => {
+      await pool.pinConnectionBang();
+      ctx1Conn = await pool.checkout();
+
+      await new Thread(async () => {
+        await pool.pinConnectionBang();
+        expect(await pool.checkout()).toBe(ctx1Conn);
+        await pool.unpinConnectionBang();
+      }).value();
+
+      expect(await pool.checkout()).toBe(ctx1Conn);
+      await pool.unpinConnectionBang();
+    }).value();
+
+    expect(ctx1Conn).toBeTruthy();
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
+it("the pinned connection survives across execution contexts (vitest beforeEach/afterEach)", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  let pinned: DatabaseAdapter | null = null;
+  try {
+    await new Thread(async () => {
+      await pool.pinConnectionBang();
+      pinned = await pool.checkout();
+    }).value();
+    await new Thread(async () => {
+      expect(await pool.checkout()).toBe(pinned);
+      const clean = await pool.unpinConnectionBang();
+      expect(clean).toBe(true);
+    }).value();
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
+it("the pinned connection holds a leased connection", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    const established = await pool.checkout();
+    pool.checkin(established);
+    expect(established.isInUse()).toBeFalsy();
+
+    await new Thread(async () => {
+      await pool.pinConnectionBang();
+      expect((await pool.checkout()).isInUse()).toBeTruthy();
+      await pool.unpinConnectionBang();
+    }).value();
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
+it("nested pinConnectionBang bumps the depth; the connection is released at depth zero", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    await pool.pinConnectionBang();
+    await new Thread(async () => {
+      await pool.pinConnectionBang();
+      const before = await pool.checkout();
+      await pool.unpinConnectionBang();
+      expect(await pool.checkout()).toBe(before);
+    }).value();
+    await pool.unpinConnectionBang();
+    await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
+it("concurrent unpinConnectionBang calls do not interleave inside the pin tear-down", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    await pool.pinConnectionBang();
+    const pinned = (await pool.checkout()) as LeasedTestAdapter;
+
+    const tm = pinned.transactionManager as unknown as {
+      rollbackTransaction: (...args: unknown[]) => Promise<unknown>;
+    };
+    const original = tm.rollbackTransaction.bind(tm);
+    const events: string[] = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    tm.rollbackTransaction = async (...args: unknown[]) => {
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      events.push("rollback:begin");
+      try {
+        await Promise.resolve();
+        return await original(...args);
+      } finally {
+        events.push("rollback:end");
+        inFlight--;
+      }
+    };
+
+    const [first, second] = await Promise.allSettled([
+      pool.unpinConnectionBang(),
+      pool.unpinConnectionBang(),
+    ]);
+
+    expect(maxInFlight).toBe(1);
+    expect(events).toEqual(["rollback:begin", "rollback:end"]);
+    expect(first).toMatchObject({ status: "fulfilled", value: true });
+    expect(second).toMatchObject({ status: "rejected" });
+    expect((second as PromiseRejectedResult).reason).toMatchObject({
+      message: expect.stringContaining("isn't a pinned connection"),
+    });
+    expect(pinned.transactionManager.openTransactions).toBe(0);
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
+it("unpinConnectionBang leaves the connection checked out when the rollback raises", async () => {
+  const pool = makeAmbientPool({ pool: 5 });
+  try {
+    await pool.pinConnectionBang();
+    const pinned = (await pool.checkout()) as LeasedTestAdapter;
+
+    const tm = pinned.transactionManager as unknown as {
+      rollbackTransaction: (...args: unknown[]) => Promise<unknown>;
+    };
+    tm.rollbackTransaction = async () => {
+      throw new Error("rollback exploded");
+    };
+
+    await expect(pool.unpinConnectionBang()).rejects.toThrow("rollback exploded");
+    expect(pinned.isInUse()).toBeTruthy();
+    await expect(pool.unpinConnectionBang()).rejects.toThrow(/isn't a pinned connection/);
+  } finally {
+    await closePoolConnections(pool);
+  }
+});
+
+describe("ConnectionPool schema cache", () => {
+  fixtures(["posts"], { useTransactionalTests: false });
+
+  it("exposes a BoundSchemaReflection via pool.schemaCache", async () => {
+    const pool = makePool();
+    expect(pool.schemaCache).toBeInstanceOf(BoundSchemaReflection);
+  });
+
+  it("memoizes the bound reflection across calls", async () => {
+    const pool = makePool();
+    expect(pool.schemaCache).toBe(pool.schemaCache);
+  });
+
+  it("swapping schemaReflection invalidates the cached BoundSchemaReflection", async () => {
+    const pool = makePool();
+    const before = pool.schemaCache;
+    pool.schemaReflection = new SchemaReflection("db/other_cache.json");
+    const after = pool.schemaCache;
+    expect(after).not.toBe(before);
+  });
+
+  const realisticColumnJson = {
+    name: "id",
+    default: null,
+    sqlTypeMetadata: {
+      sqlType: "INTEGER",
+      type: "integer",
+      limit: null,
+      precision: null,
+      scale: null,
+    },
+    null: false,
+    defaultFunction: null,
+    collation: null,
+    comment: null,
+    primaryKey: true,
+  };
+
+  async function writeCacheFixture(
+    cacheFile: string,
+    tableName: string,
+    version: string | number | null,
+  ): Promise<void> {
+    await writeFile(
+      cacheFile,
+      "--- !ruby/object:ActiveRecord::ConnectionAdapters::SchemaCache\n" +
+        JSON.stringify({
+          columns: { [tableName]: [realisticColumnJson] },
+          primary_keys: { [tableName]: "id" },
+          data_sources: { [tableName]: true },
+          indexes: {},
+          version,
+        }),
+    );
+  }
+
+  it("lazily loads the schema cache on first connection when enabled", async () => {
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
+
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "more_testings", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
+        expect(await pool.schemaCache.isCached("more_testings")).toBe(true);
+        expect(await pool.poolConfig.schemaReflection.loadedCache!.isCached("more_testings")).toBe(
+          true,
+        );
+      } finally {
+        setLazilyLoadSchemaCache(prevLazy);
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
+  it("a pool too small for a second connection times out validating the lazily loaded cache", async () => {
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "more_testings", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile, pool: 1, checkoutTimeout: 0.05 });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        expect(warn.mock.calls[0][0]).toMatch(
+          /^Failed to validate the schema cache because of ActiveRecord::ConnectionTimeoutError/,
+        );
+        expect(pool.stat().connections).toBe(1);
+        expect(await pool.schemaCache.isCached("more_testings")).toBe(false);
+      } finally {
+        setLazilyLoadSchemaCache(prevLazy);
+        vi.restoreAllMocks();
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
+  it("rejects a stale schema cache when checkSchemaCacheDumpVersion is enabled", async () => {
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "stale_thing", 42);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
+        expect(await pool.schemaCache.isCached("stale_thing")).toBe(false);
+      } finally {
+        setLazilyLoadSchemaCache(prevLazy);
+        vi.restoreAllMocks();
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
+  it("does not lazy-load when the flag is off (default)", async () => {
+    expect(lazilyLoadSchemaCache()).toBe(false);
+
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "widgets", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        expect(pool.schemaReflection.loadedCache).toBeNull();
+        expect(await pool.schemaCache.isCached("widgets")).toBeNull();
+      } finally {
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
+  it.skipIf(inMemoryDb())(
+    "BoundSchemaReflection.dumpTo(filename) round-trips through the pool",
+    async () => {
+      await withCacheDir(async (dir) => {
+        const pool = makeAmbientPool();
+        try {
+          const filename = join(dir, "schema_cache.yml");
+          await pool.schemaCache.dumpTo(filename);
+          const parsed = yamlParse(await readFile(filename, "utf8"), { maxAliasCount: -1 }) as {
+            columns: Record<string, unknown[]>;
+          };
+          expect(Object.keys(parsed.columns)).toContain("posts");
+        } finally {
+          await closePoolConnections(pool);
+        }
+      });
+    },
+  );
+
+  it("PoolConfig primes SchemaReflection with the config's schemaCachePath", async () => {
+    const dbConfig = makeAmbientDbConfig({ schemaCachePath: "db/custom_cache.json" });
+    const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");
+    const reflection = pc.schemaReflection;
+    expect(reflection).toBeInstanceOf(SchemaReflection);
+    expect((reflection as unknown as { _cachePath: string | null })._cachePath).toBe(
+      "db/custom_cache.json",
+    );
+  });
+});
+
+describe("ConnectionPoolConfiguration query cache", () => {
+  describe("context-keyed cache registry", () => {
+    it("two concurrent execution contexts each get their own Store", async () => {
+      const pool = makePool(2);
+
+      let cacheA: Store | null = null;
+      let cacheB: Store | null = null;
+
+      await Promise.all([
+        new Thread(async () => {
+          const conn = await pool.checkout();
+          cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
+          pool.checkin(conn);
+        }).value(),
+        new Thread(async () => {
+          const conn = await pool.checkout();
+          cacheB = (conn as unknown as { _queryCache: Store | null })._queryCache;
+          pool.checkin(conn);
+        }).value(),
+      ]);
+
+      expect(cacheA).toBeInstanceOf(Store);
+      expect(cacheB).toBeInstanceOf(Store);
+      expect(cacheA).not.toBe(cacheB);
+    });
+
+    it("writing to the cache in context X is not visible in context Y", async () => {
+      const pool = makePool(2);
+      const KEY = "SELECT 1";
+
+      let cacheA: Store | null = null;
+      let cacheB: Store | null = null;
+
+      await new Thread(async () => {
+        const conn = await pool.checkout();
+        cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
+        cacheA!.enabled = true;
+        await cacheA!.computeIfAbsent(KEY, async () => new Result(["x"], [[1]]));
+        pool.checkin(conn);
+      }).value();
+
+      await new Thread(async () => {
+        const conn = await pool.checkout();
+        cacheB = (conn as unknown as { _queryCache: Store | null })._queryCache;
+        pool.checkin(conn);
+      }).value();
+
+      expect(cacheA).not.toBe(cacheB);
+      expect(cacheA!.get(KEY)).toBeDefined();
+      expect(cacheB!.get(KEY)).toBeUndefined();
+    });
+  });
+
+  describe("pin wiring", () => {
+    it("pinConnectionBang pins a connection; unpinConnectionBang unpins it", async () => {
+      const pool = makeAmbientPool({ pool: 1 });
+
+      const pinnedCount = (): number =>
+        (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
+
+      try {
+        expect(pinnedCount()).toBe(0);
+
+        await new Thread(async () => {
+          await pool.pinConnectionBang();
+          expect(pinnedCount()).toBe(1);
+          await pool.unpinConnectionBang();
+          expect(pinnedCount()).toBe(0);
+        }).value();
+      } finally {
+        await closePoolConnections(pool);
+      }
+    });
+
+    it("two concurrent contexts share the pool's single pinned connection", async () => {
+      const pool = makeAmbientPool({ pool: 2 });
+      const pinnedCount = (): number =>
+        (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
+
+      try {
+        await Promise.all([
+          new Thread(async () => {
+            await pool.pinConnectionBang();
+            expect(pinnedCount()).toBeGreaterThanOrEqual(1);
+            await pool.unpinConnectionBang();
+          }).value(),
+          new Thread(async () => {
+            await pool.pinConnectionBang();
+            expect(pinnedCount()).toBeGreaterThanOrEqual(1);
+            await pool.unpinConnectionBang();
+          }).value(),
+        ]);
+
+        expect(pinnedCount()).toBe(0);
+      } finally {
+        await closePoolConnections(pool);
+      }
+    });
+
+    it("leaves the connection pinned when beginTransaction throws", async () => {
+      const pool = makeAmbientPool({ pool: 1 });
+      try {
+        const seed = await pool.checkout();
+        pool.checkin(seed);
+        vi.spyOn(seed, "verifyBang").mockResolvedValue(undefined);
+        (seed as unknown as { _transactionManager: unknown })._transactionManager = {
+          beginTransaction: async () => {
+            throw new Error("begin failed");
+          },
+          get currentTransaction() {
+            return { open: false };
+          },
+          enableLazyTransactionsBang() {},
+        };
+
+        const pinnedCount = (): number =>
+          (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
+
+        await new Thread(async () => {
+          await expect(pool.pinConnectionBang()).rejects.toThrow("begin failed");
+          expect(pinnedCount()).toBe(1);
+        }).value();
+      } finally {
+        await closePoolConnections(pool);
+      }
+    });
+
+    it("propagates a verify failure from pinConnectionBang instead of pinning a dead connection", async () => {
+      const pool = makeAmbientPool({ pool: 1 });
+      try {
+        const seed = await pool.checkout();
+        pool.checkin(seed);
+        vi.spyOn(seed, "verifyBang").mockRejectedValue(new Error("connection is dead"));
+
+        const pinnedCount = (): number =>
+          (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
+
+        await new Thread(async () => {
+          await expect(pool.pinConnectionBang()).rejects.toThrow("connection is dead");
+          expect(pinnedCount()).toBe(1);
+        }).value();
+      } finally {
+        vi.restoreAllMocks();
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
+  describe("checkout/checkin cache attachment", () => {
+    it("checkout attaches a Store; checkin clears it", async () => {
+      const pool = makePool(1);
+      const conn = await pool.checkout();
+      const qc = (conn as unknown as { _queryCache: Store | null })._queryCache;
+      expect(qc).toBeInstanceOf(Store);
+      pool.checkin(conn);
+      expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
+    });
+
+    it("checkout attaches a Store on the fast (idle) path", async () => {
+      const pool = makePool(1);
+      const seed = await pool.checkout();
+      pool.checkin(seed);
+
+      await new Thread(async () => {
+        const conn = await pool.checkout();
+        expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(
+          Store,
+        );
+        pool.checkin(conn);
+      }).value();
+    });
+  });
+
+  describe("pool-level enable/disable propagation", () => {
+    it("enableQueryCacheBang on the pool flips the checked-out connection's Store", async () => {
+      const pool = makePool(1);
+      pool.enableQueryCacheBang();
+      const conn = await pool.checkout();
+      const qc = (conn as unknown as { _queryCache: Store | null })._queryCache!;
+      expect(qc.enabled).toBe(true);
+      pool.disableQueryCacheBang();
+      expect(qc.enabled).toBe(false);
+      pool.checkin(conn);
+    });
+
+    it("enableQueryCache enables for the duration of fn and clears on exit", async () => {
+      const pool = makePool(1);
+      let observed: Store | null = null;
+      await pool.enableQueryCache(async () => {
+        const conn = await pool.checkout();
+        observed = (conn as unknown as { _queryCache: Store | null })._queryCache;
+        expect(observed!.enabled).toBe(true);
+        await observed!.computeIfAbsent("SELECT 1", async () => new Result(["x"], [[1]]));
+        expect(observed!.size).toBe(1);
+        pool.checkin(conn);
+      });
+      pool.clearQueryCache();
+      expect(observed!.enabled).toBe(false);
+      expect(observed!.size).toBe(0);
+    });
+  });
+
+  describe("queryCacheMaxSize wiring", () => {
+    it("threads dbConfig.queryCache through to the Store's max size", async () => {
+      const dbConfig = makeAmbientDbConfig({ pool: 1, queryCache: 7 });
+      const pc = new PoolConfig(
+        new ConnectionDescriptor("primary"),
+        dbConfig,
+        "writing",
+        "default",
+      );
+      const pool = new ConnectionPool(pc);
+      const max = (pool.queryCache as unknown as { _maxSize: number })._maxSize;
+      expect(max).toBe(7);
+    });
+  });
+
+  describe("dead-thread eviction", () => {
+    it("drops a dead thread's Store from _threadQueryCaches on the next insert", async () => {
+      const pool = makePool(1);
+      const registry = (
+        pool as unknown as { _threadQueryCaches: { _map: { _map: Map<unknown, Store> } } }
+      )._threadQueryCaches;
+
+      let seenSize = -1;
+      await new Thread(async () => {
+        const conn = await pool.checkout();
+        pool.checkin(conn);
+        seenSize = registry._map._map.size;
+      }).value();
+      expect(seenSize).toBeGreaterThan(0);
+
+      const conn = await pool.checkout();
+      pool.checkin(conn);
+      expect(registry._map._map.size).toBe(1);
+    });
+  });
+});
+
+describe("checkout/checkin callbacks", () => {
+  it("pinned checkout verifies on every handout (reconnect-on-drop) and skips query-cache wiring", async () => {
+    const pool = makeAmbientPool({ pool: 5 });
+    await pool.pinConnectionBang();
+    const pinned = (await pool.checkout()) as LeasedTestAdapter;
+    const spy = vi.spyOn(pinned, "verifyBang");
+    try {
+      const again = await pool.checkout();
+      expect(again).toBe(pinned);
+      expect(spy).toHaveBeenCalledTimes(1);
+      const againAgain = await pool.checkout();
+      expect(againAgain).toBe(pinned);
+      expect(spy).toHaveBeenCalledTimes(2);
+      expect((pinned as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(
+        Store,
+      );
+    } finally {
+      await pool.unpinConnectionBang();
+      await closePoolConnections(pool);
+    }
+  });
+
+  it("checkin runs the registered :checkin :after callbacks (unset_query_cache!, enable_lazy_transactions!)", async () => {
+    const pool = makeAmbientPool({ pool: 1 });
+    try {
+      const conn = await pool.checkout();
+      expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(Store);
+
+      const lazySpy = vi.spyOn(conn, "enableLazyTransactionsBang");
+      pool.checkin(conn);
+
+      expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
+      expect(lazySpy).toHaveBeenCalledTimes(1);
+    } finally {
+      await closePoolConnections(pool);
+    }
+  });
+
+  it("setCallback registers a custom :checkout callback that runs on checkout", async () => {
+    const calls: string[] = [];
+    const callback = function (this: AbstractAdapter) {
+      calls.push(this.adapterName);
+    };
+    AbstractAdapter.setCallback("checkout", "after", callback);
+    const pool = makeAmbientPool({ pool: 1 });
+    try {
+      const conn = await pool.checkout();
+      expect(calls).toEqual([conn.adapterName]);
+    } finally {
+      await closePoolConnections(pool);
+      checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);
+    }
+  });
+
+  it("an async :checkout :after callback settles before checkout resolves", async () => {
+    const calls: string[] = [];
+    const callback = async function () {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      calls.push("after");
+    };
+    AbstractAdapter.setCallback("checkout", "after", callback);
+    const pool = makeAmbientPool({ pool: 1 });
+    try {
+      await pool.checkout();
+      expect(calls).toEqual(["after"]);
+    } finally {
+      await closePoolConnections(pool);
+      checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);
+    }
+  });
+
+  it("a synchronous lease refuses an async :checkout callback and removes the connection", async () => {
+    const callback = async function () {};
+    AbstractAdapter.setCallback("checkout", "after", callback);
+    const pool = makeAmbientPool({ pool: 1 });
+    try {
+      expect(() => pool.withConnectionSync(() => null)).toThrow(RuntimeError);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(pool.connections).toHaveLength(0);
+    } finally {
+      await closePoolConnections(pool);
+      checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);
+    }
+  });
+
+  it("setCallback on a subclass clones the registry and does not leak onto AbstractAdapter", async () => {
+    class SubAdapter extends AbstractAdapter {}
+    const before = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks.entries.length;
+
+    SubAdapter.setCallback("checkout", "after", function () {});
+
+    const sub = checkoutCallbacks(SubAdapter)._checkoutCallbacks;
+    const base = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks;
+    expect(sub).not.toBe(base);
+    expect(sub.entries.length).toBe(before + 1);
+    expect(base.entries.length).toBe(before);
+  });
+
+  it("subclass without its own callback inherits AbstractAdapter's shared registry", async () => {
+    class SharedAdapter extends AbstractAdapter {}
+    const sub = checkoutCallbacks(SharedAdapter)._checkoutCallbacks;
+    const base = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks;
+    expect(sub).toBe(base);
+  });
+});
+
+function checkoutCallbacks(klass: typeof AbstractAdapter) {
+  return klass as unknown as {
+    _checkoutCallbacks: { entries: unknown[] };
+    skipCallback(name: string, ...filterList: unknown[]): void;
+  };
+}
+
+describe("NullPool member parity", () => {
+  it("defines no role or shard, matching Rails' NullPool", () => {
+    const pool = new NullPool();
+    expect("role" in pool).toBe(false);
+    expect("shard" in pool).toBe(false);
+  });
+
+  it("raises NoMethodError on a pool-less adapter's role, shard and inspect", () => {
+    const adapter = new AbstractAdapter({});
+    expect(adapter.pool).toBeInstanceOf(NullPool);
+    expect(() => adapter.role).toThrow(/undefined method 'role'/);
+    expect(() => adapter.shard).toThrow(/undefined method 'shard'/);
+    expect(() => adapter.inspect()).toThrow(/undefined method 'shard'/);
+  });
+
+  it("raises NoMethodError for every send it has no method for", () => {
+    const pool = new NullPool() as unknown as Record<string, unknown>;
+    for (const name of ["clearQueryCache", "withConnection", "connectionClass", "flush"]) {
+      expect(() => pool[name]).toThrow(NoMethodError);
+    }
+    expect(pool.dirtiesQueryCache).toBe(true);
+    expect(pool.schemaCache).toBeNull();
+    for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType"]) {
+      expect(pool[probe]).toBeUndefined();
+    }
+    expect(pool.inspect).toBeUndefined();
+    expect(rbObjInspect(pool)).toMatch(
+      /^#<ActiveRecord::ConnectionAdapters::NullPool:0x[0-9a-f]+ .*@server_version=nil/,
+    );
+    expect(pool.toString).toBe(Object.prototype.toString);
+    expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();
+  });
+
+  it("awaits and serializes a pool-less adapter's NullPool", async () => {
+    const pool = new NullPool();
+    expect(await pool).toBe(pool);
+    expect(() => JSON.stringify({ pool })).not.toThrow();
+  });
+
+  it("lets a failing assertion whose subject holds a NullPool report its own failure", () => {
+    const adapter = new AbstractAdapter({});
+    expect(() =>
+      expect({ pool: adapter.pool, n: 1 }).toEqual({ pool: adapter.pool, n: 2 }),
+    ).toThrow(/expected/i);
+  });
+});
+
+describe("ConnectionPool#newConnection", () => {
+  it("stamps the pool onto a ConnectionNotEstablished raised by the db config", () => {
+    const pool = makeAmbientPool();
+    const error = new ConnectionNotEstablished("connection refused");
+    vi.spyOn(pool.dbConfig, "newConnection").mockImplementation(() => {
+      throw error;
+    });
+
+    expect(() => pool.newConnection()).toThrow(error);
+    expect(error.connectionPool).toBe(pool);
+  });
+});
+
+describe("execution context at Rails thread-spawn sites", () => {
+  it("unscoped top-level code resolves to ROOT_CONTEXT", () => {
+    expect(Thread.current().id).toBe(0);
+  });
+
+  it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
+    const seen = new Map<number, number[]>();
+    let stopped = false;
+    const pools = [0.01, 0.02].map((frequency) => ({
+      reap: async () => {
+        const ids = seen.get(frequency) ?? [];
+        ids.push(Thread.current().id);
+        seen.set(frequency, ids);
+      },
+      flush: async () => {},
+      isDiscarded: () => stopped,
+    }));
+    void Reaper.registerPool(pools[0], 0.01);
+    void Reaper.registerPool(pools[1], 0.02);
+    try {
+      await vi.waitFor(() => {
+        expect(seen.get(0.01)?.length ?? 0).toBeGreaterThanOrEqual(2);
+        expect(seen.get(0.02)?.length ?? 0).toBeGreaterThanOrEqual(2);
+      });
+    } finally {
+      stopped = true;
+    }
+    const [a1, a2] = seen.get(0.01)!;
+    const [b1, b2] = seen.get(0.02)!;
+    expect(a1).not.toBe(0);
+    expect(a1).toBe(a2);
+    expect(b1).toBe(b2);
+    expect(a1).not.toBe(b1);
+  });
+});
+
+describe("NullPool method_missing in the prototype chain", () => {
+  it("lets a subclass with a #private field construct and still raises on unknown names", () => {
+    class Sub extends NullPool {
+      #tag = "sub";
+      tag(): string {
+        return this.#tag;
+      }
+    }
+    const pool = new Sub();
+    expect(pool.tag()).toBe("sub");
+    expect(() => (pool as unknown as { anything: unknown }).anything).toThrow(/undefined method/);
+    expect(pool instanceof Sub).toBe(true);
+    expect(Object.getPrototypeOf(pool)).toBe(Sub.prototype);
+  });
+});

@@ -1,0 +1,101 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import { Nodes } from "@blazetrails/arel";
+import "../../../lib/index.js";
+import { Range } from "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Topic } from "../../models/topic.js";
+
+constSet(TopLevel, "Topic", Topic);
+
+const sortedIds = (rows: Array<{ id: unknown }>) =>
+  rows.map((r) => Number(r.id)).sort((a, b) => a - b);
+
+type BoundSqlLiteralBuilders = {
+  buildBoundSqlLiteral(statement: string, values: unknown[]): Nodes.BoundSqlLiteral;
+  buildNamedBoundSqlLiteral(
+    statement: string,
+    values: Record<string, unknown>,
+  ): Nodes.BoundSqlLiteral;
+};
+
+describe("bound SQL literal with Relation bind value", () => {
+  fixtures(["topics"]);
+
+  it("inlines a Relation positional bind as an IN subquery", async () => {
+    const approved = Topic.where({ approved: true });
+    const approvedIds = Topic.where({ approved: true }).select("id");
+    const relation = Topic.where("id IN (?)", approvedIds);
+
+    expect(relation.toSql()).toContain("IN (SELECT");
+
+    const expected = sortedIds(await approved);
+    expect(sortedIds(await relation)).toEqual(expected);
+    expect(expected.length).toBeGreaterThan(0);
+  });
+
+  it("inlines a Relation named bind as an IN subquery", async () => {
+    const approved = Topic.where({ approved: true });
+    const approvedIds = Topic.where({ approved: true }).select("id");
+    const relation = Topic.where("id IN (:ids)", { ids: approvedIds });
+
+    expect(relation.toSql()).toContain("IN (SELECT");
+
+    const expected = sortedIds(await approved);
+    expect(sortedIds(await relation)).toEqual(expected);
+    expect(expected.length).toBeGreaterThan(0);
+  });
+
+  it("extracts id_for_database from an AR object positional bind", async () => {
+    const [first] = sortedIds(await Topic.where({ approved: true }));
+    const topic = await Topic.find(first);
+    const relation = Topic.where("id = ?", topic);
+
+    expect(relation.toSql()).toContain(String(first));
+    const rows = await relation;
+    expect(rows.map((r) => Number(r.id))).toEqual([first]);
+  });
+
+  it("maps id_for_database over an array positional bind", async () => {
+    const ids = sortedIds(await Topic.where({ approved: true }));
+    const topics = await Topic.where({ approved: true });
+    const relation = Topic.where("id IN (?)", topics);
+
+    expect(sortedIds(await relation)).toEqual(ids);
+    expect(ids.length).toBeGreaterThan(0);
+  });
+
+  it("buildBoundSqlLiteral inlines a Relation positional bind as a SqlLiteral", () => {
+    const approvedIds = Topic.where({ approved: true }).select("id");
+    const builders = Topic.all() as unknown as BoundSqlLiteralBuilders;
+    const node = builders.buildBoundSqlLiteral("id IN (?)", [approvedIds]);
+
+    const bind = node.positionalBinds![0];
+    expect(bind).toBeInstanceOf(Nodes.SqlLiteral);
+    expect((bind as Nodes.SqlLiteral).toString()).toContain("SELECT");
+  });
+
+  it("buildNamedBoundSqlLiteral inlines a Relation named bind as a SqlLiteral", () => {
+    const approvedIds = Topic.where({ approved: true }).select("id");
+    const builders = Topic.all() as unknown as BoundSqlLiteralBuilders;
+    const node = builders.buildNamedBoundSqlLiteral("id IN (:ids)", { ids: approvedIds });
+
+    const bind = node.namedBinds!.ids;
+    expect(bind).toBeInstanceOf(Nodes.SqlLiteral);
+    expect((bind as Nodes.SqlLiteral).toString()).toContain("SELECT");
+  });
+
+  it("maps a Range positional bind to its members", async () => {
+    const [first, second, third] = sortedIds(await Topic.all());
+    const relation = Topic.where("id IN (?)", new Range(first, third));
+
+    expect(sortedIds(await relation)).toEqual([first, second, third]);
+  });
+
+  it("maps a Range named bind to its members", async () => {
+    const [first, second, third] = sortedIds(await Topic.all());
+    const relation = Topic.where("id IN (:ids)", { ids: new Range(first, third) });
+
+    expect(sortedIds(await relation)).toEqual([first, second, third]);
+  });
+});

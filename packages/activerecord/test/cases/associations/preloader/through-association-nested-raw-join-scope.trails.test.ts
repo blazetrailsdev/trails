@@ -1,0 +1,150 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import { ConfigurationError } from "../../../../lib/errors.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { Preloader } from "../../../../lib/associations/preloader.js";
+import { ThroughAssociation } from "../../../../lib/associations/preloader/through-association.js";
+import { Member } from "../../../models/member.js";
+import { Club } from "../../../models/club.js";
+import { Membership, CurrentMembership } from "../../../models/membership.js";
+import { Category } from "../../../models/category.js";
+
+constSet(TopLevel, "Member", Member);
+constSet(TopLevel, "Club", Club);
+Membership.inheritanceColumn = "type";
+constSet(TopLevel, "Membership", Membership);
+constSet(TopLevel, "CurrentMembership", CurrentMembership);
+Category.inheritanceColumn = "type";
+constSet(TopLevel, "Category", Category);
+
+type JoinWhere = {
+  joins: (sql: string) => JoinWhere;
+  where: (sql: string) => JoinWhere;
+};
+type HasManyHost = {
+  hasMany: (
+    name: string,
+    scope: (rel: JoinWhere) => JoinWhere,
+    options: Record<string, unknown>,
+  ) => void;
+};
+type HasOneHost = {
+  hasOne: (
+    name: string,
+    scope: (rel: JoinWhere) => JoinWhere,
+    options: Record<string, unknown>,
+  ) => void;
+};
+
+(Member as unknown as HasManyHost).hasMany(
+  "rawMembersOfClub",
+  function (this: JoinWhere) {
+    return this.joins("INNER JOIN categories ON categories.id = memberships.club_id").where(
+      "categories.name = 'General'",
+    );
+  },
+  {
+    through: "club",
+    source: "members",
+  },
+);
+
+(Club as unknown as HasManyHost).hasMany(
+  "rawMembers",
+  function (this: JoinWhere) {
+    return this.joins("INNER JOIN categories ON categories.id = members.id").where(
+      "categories.name = 'General'",
+    );
+  },
+  {
+    through: "memberships",
+    source: "member",
+  },
+);
+(Member as unknown as HasManyHost).hasMany(
+  "membersViaRawClub",
+  function (this: JoinWhere) {
+    return this.where("clubs.name IS NOT NULL");
+  },
+  {
+    through: "club",
+    source: "rawMembers",
+  },
+);
+
+(Member as unknown as HasManyHost).hasMany(
+  "noWhereRawMembersOfClub",
+  function (this: JoinWhere) {
+    return this.joins("INNER JOIN categories ON categories.id = memberships.club_id");
+  },
+  {
+    through: "club",
+    source: "members",
+  },
+);
+
+(Member as unknown as HasOneHost).hasOne(
+  "rawCategoryOfClub",
+  function (this: JoinWhere) {
+    return this.joins(
+      "INNER JOIN categorizations ON categorizations.category_id = categories.id",
+    ).where("categorizations.author_id = 1");
+  },
+  {
+    through: "club",
+    source: "category",
+  },
+);
+
+describe("Preloader::ThroughAssociation#through_scope nested raw-join handling", () => {
+  const { members } = fixtures(["memberTypes", "members", "clubs", "memberships", "categories"]);
+
+  async function throughLoader(owners: Member[], name: string): Promise<ThroughAssociation> {
+    const loader = (
+      await new Preloader({
+        records: owners,
+        associations: [name],
+        associateByDefault: false,
+      }).loaders()
+    ).find((l) => l instanceof ThroughAssociation);
+    if (!loader) throw new Error("expected a ThroughAssociation loader");
+    return loader;
+  }
+
+  function buildSql(loader: ThroughAssociation): string {
+    return (loader as unknown as { throughScope: () => { toSql: () => string } })
+      .throughScope()
+      .toSql();
+  }
+
+  it("raises when the outer reflection's own scope carries a raw join", async () => {
+    const groucho = members("groucho");
+    const loader = await throughLoader([groucho], "rawMembersOfClub");
+    expect(() => buildSql(loader)).toThrow(ConfigurationError);
+  });
+
+  it("raises when only the source sub-chain carries a raw join, matching Rails", async () => {
+    const groucho = members("groucho");
+    const loader = await throughLoader([groucho], "membersViaRawClub");
+    expect(() => buildSql(loader)).toThrow(ConfigurationError);
+  });
+
+  it("raises for a has_one nested through whose scope carries a raw join", async () => {
+    const groucho = members("groucho");
+    const loader = await throughLoader([groucho], "rawCategoryOfClub");
+    expect(() => buildSql(loader)).toThrow(ConfigurationError);
+  });
+
+  it("does NOT raise when the chain carries a raw join but an empty where_clause", async () => {
+    const groucho = members("groucho");
+    const loader = await throughLoader([groucho], "noWhereRawMembersOfClub");
+    expect(() => buildSql(loader)).not.toThrow();
+  });
+
+  it("raises ConfigurationError on preload, matching Rails", async () => {
+    const groucho = members("groucho");
+    await expect(Member.where({ id: groucho.id }).preload(":membersViaRawClub")).rejects.toThrow(
+      ConfigurationError,
+    );
+  });
+});

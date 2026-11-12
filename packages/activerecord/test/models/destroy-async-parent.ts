@@ -1,0 +1,55 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import "../../lib/destroy-association-async-job.js";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { DlKeyedHasMany } from "./dl-keyed-has-many.js";
+import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
+import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
+import type { DlKeyedJoin } from "./dl-keyed-join.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class DestroyAsyncParent extends Base {
+  declare dlKeyedHasMany: AssociationProxy<DlKeyedHasMany>;
+  declare dlKeyedJoin: AssociationProxy<DlKeyedJoin>;
+  declare dlKeyedHasManyThrough: AssociationProxy<DlKeyedHasManyThrough>;
+  declare name: string;
+  declare parent_id: number;
+  declare tags_count: number | null;
+
+  static {
+    this.primaryKey = "parent_id";
+  }
+
+  static {
+    this.hasOne("dlKeyedHasOne", {
+      dependent: "destroyAsync",
+      foreignKey: "destroy_async_parent_id",
+      primaryKey: "parent_id",
+    });
+    this.hasMany("dlKeyedHasMany", {
+      dependent: "destroyAsync",
+      foreignKey: "many_key",
+      primaryKey: "parent_id",
+    });
+    this.hasMany("dlKeyedJoin", {
+      dependent: "destroyAsync",
+      foreignKey: "destroy_async_parent_id",
+      primaryKey: "parent_id",
+    });
+    this.hasMany("dlKeyedHasManyThrough", {
+      through: "dlKeyedJoin",
+      dependent: "destroyAsync",
+      foreignKey: "dl_has_many_through_key_id",
+      primaryKey: "through_key",
+    });
+  }
+}
+constSet(TopLevel, "DestroyAsyncParent", DestroyAsyncParent);
+DescendantsTracker.registerSubclass(Base, DestroyAsyncParent);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface DestroyAsyncParent {
+  get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;
+  set dlKeyedHasOne(value: DlKeyedHasOne | null);
+  setDlKeyedHasOne(value: DlKeyedHasOne | null): Promise<unknown>;
+}

@@ -6,7 +6,7 @@
  * `get hasChangesToSave(): boolean` (activemodel/lib/model.ts). Those getters
  * are deliberately never wired through `include()`, because `include()`
  * replaces the getter descriptor with a data property (see the Category A note
- * in activerecord/src/base.ts).
+ * in activerecord/lib/base.ts).
  *
  * Ruby's uniform-access principle makes `record.has_changes_to_save?` read the
  * same whether it's an attribute or a method, so a port transcribed from Rails

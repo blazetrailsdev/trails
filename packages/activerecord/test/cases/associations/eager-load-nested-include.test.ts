@@ -1,0 +1,210 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import { Base } from "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
+import { assertNoQueries } from "../../../lib/testing/query-assertions.js";
+import { Author, AuthorFavorite } from "../../models/author.js";
+import { Post } from "../../models/post.js";
+import { Comment } from "../../models/comment.js";
+import { Category } from "../../models/category.js";
+import { Categorization } from "../../models/categorization.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class ShapeExpression extends Base {
+  declare shape_type: string;
+  declare shape_id: number;
+  declare paint_type: string;
+  declare paint_id: number;
+
+  static {
+    this._tableName = "shape_expressions";
+    this.attribute("shape_type", "string");
+    this.attribute("shape_id", "integer");
+    this.attribute("paint_type", "string");
+    this.attribute("paint_id", "integer");
+    this.belongsTo("shape", { polymorphic: true });
+    this.belongsTo("paint", { polymorphic: true });
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface ShapeExpression {
+  get shape(): Base | null | Promise<Base | null>;
+  set shape(value: Base | null);
+  get paint(): Base | null | Promise<Base | null>;
+  set paint(value: Base | null);
+}
+class Circle extends Base {
+  static {
+    this._tableName = "circles";
+  }
+}
+class Square extends Base {
+  static {
+    this._tableName = "squares";
+  }
+}
+class Triangle extends Base {
+  static {
+    this._tableName = "triangles";
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class PaintColor extends Base {
+  declare non_poly_one_id: number;
+
+  static {
+    this._tableName = "paint_colors";
+    this.attribute("non_poly_one_id", "integer");
+    this.belongsTo("nonPoly", {
+      foreignKey: "non_poly_one_id",
+      className: "NonPolyOne",
+    });
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface PaintColor {
+  get nonPoly(): NonPolyOne | null | Promise<NonPolyOne | null>;
+  set nonPoly(value: NonPolyOne | null);
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class PaintTexture extends Base {
+  declare non_poly_two_id: number;
+
+  static {
+    this._tableName = "paint_textures";
+    this.attribute("non_poly_two_id", "integer");
+    this.belongsTo("nonPoly", {
+      foreignKey: "non_poly_two_id",
+      className: "NonPolyTwo",
+    });
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface PaintTexture {
+  get nonPoly(): NonPolyTwo | null | Promise<NonPolyTwo | null>;
+  set nonPoly(value: NonPolyTwo | null);
+}
+class NonPolyOne extends Base {
+  static {
+    this._tableName = "non_poly_ones";
+  }
+}
+class NonPolyTwo extends Base {
+  static {
+    this._tableName = "non_poly_twos";
+  }
+}
+
+constSet(TopLevel, "ShapeExpression", ShapeExpression);
+DescendantsTracker.registerSubclass(Base, ShapeExpression);
+constSet(TopLevel, "Circle", Circle);
+DescendantsTracker.registerSubclass(Base, Circle);
+constSet(TopLevel, "Square", Square);
+DescendantsTracker.registerSubclass(Base, Square);
+constSet(TopLevel, "Triangle", Triangle);
+DescendantsTracker.registerSubclass(Base, Triangle);
+constSet(TopLevel, "PaintColor", PaintColor);
+DescendantsTracker.registerSubclass(Base, PaintColor);
+constSet(TopLevel, "PaintTexture", PaintTexture);
+DescendantsTracker.registerSubclass(Base, PaintTexture);
+constSet(TopLevel, "NonPolyOne", NonPolyOne);
+DescendantsTracker.registerSubclass(Base, NonPolyOne);
+constSet(TopLevel, "NonPolyTwo", NonPolyTwo);
+DescendantsTracker.registerSubclass(Base, NonPolyTwo);
+
+const NUM_SIMPLE_OBJS = 50;
+const NUM_SHAPE_EXPRESSIONS = 100;
+
+function sample<T>(arr: T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+describe("EagerLoadPolyAssocsTest", () => {
+  fixtures([]);
+
+  it("include query", async () => {
+    const circles: Circle[] = [];
+    const squares: Square[] = [];
+    const triangles: Triangle[] = [];
+    const nonPolyOnes: NonPolyOne[] = [];
+    const nonPolyTwos: NonPolyTwo[] = [];
+    const paintColors: PaintColor[] = [];
+    const paintTextures: PaintTexture[] = [];
+
+    for (let i = 0; i < NUM_SIMPLE_OBJS; i++) {
+      circles.push(await Circle.create({}));
+      squares.push(await Square.create({}));
+      triangles.push(await Triangle.create({}));
+      nonPolyOnes.push(await NonPolyOne.create({}));
+      nonPolyTwos.push(await NonPolyTwo.create({}));
+    }
+    for (let i = 0; i < NUM_SIMPLE_OBJS; i++) {
+      paintColors.push(await PaintColor.create({ non_poly_one_id: sample(nonPolyOnes).id }));
+      paintTextures.push(await PaintTexture.create({ non_poly_two_id: sample(nonPolyTwos).id }));
+    }
+    for (let i = 0; i < NUM_SHAPE_EXPRESSIONS; i++) {
+      const shapePool = sample([circles, squares, triangles]) as Base[];
+      const shape = sample(shapePool);
+      const shapeType = shape.constructor.name;
+      const usePaintColor = Math.random() < 0.5;
+      const paint = usePaintColor ? sample(paintColors) : sample(paintTextures);
+      const paintType = usePaintColor ? "PaintColor" : "PaintTexture";
+      await ShapeExpression.create({
+        shape_type: shapeType,
+        shape_id: shape.id,
+        paint_type: paintType,
+        paint_id: paint.id,
+      });
+    }
+
+    const res = await ShapeExpression.all().includes(":shape", { ":paint": ":nonPoly" });
+    expect(res.length).toBe(NUM_SHAPE_EXPRESSIONS);
+    await assertNoQueries(false, async () => {
+      for (const se of res) {
+        const paint = se.association("paint").target as Base;
+        expect(paint.association("nonPoly").target).not.toBeNull();
+        expect(se.association("shape").target).not.toBeNull();
+      }
+    });
+  });
+});
+
+describe("EagerLoadNestedIncludeWithMissingDataTest", () => {
+  fixtures(["categories"]);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "AuthorFavorite", AuthorFavorite);
+
+  it("missing data in a nested include should not cause errors when constructing objects", async () => {
+    const daveyMcdave = await Author.create({ name: "Davey McDave" });
+    const firstPost = await Post.create({
+      author_id: daveyMcdave.id,
+      title: "Davey Speaks",
+      body: "Expressive wordage",
+    });
+    await Comment.create({ post_id: firstPost.id, body: "Inflammatory doublespeak" });
+    const firstCategory = (await Category.first()) as Category;
+    await Categorization.create({
+      author_id: daveyMcdave.id,
+      category_id: firstCategory.id,
+      post_id: firstPost.id,
+    });
+
+    await assertNothingRaised(() =>
+      Author.all()
+        .includes(
+          { ":posts": ":comments" },
+          { ":categorizations": ":category" },
+          { ":authorFavorites": ":favoriteAuthor" },
+        )
+        .where({ authors: { name: (daveyMcdave as unknown as { name: string }).name } })
+        .order("categories.name")
+        .toArray(),
+    );
+  });
+});

@@ -1,0 +1,36 @@
+import { describe, it, expect } from "vitest";
+import pg from "pg";
+import { canonicalSchemaStamp } from "../../support/canonical-schema-stamp.js";
+import { RUN_TOKEN_ENV } from "../../support/run-token.js";
+import { PG_TEMPLATE_ENV } from "../../support/template-global-setup.js";
+import { postgresSettings, settingsUrl, withDatabase } from "../../support/config.js";
+import { activeLane } from "../../support/connection.js";
+
+const pgActive = activeLane() === "postgres";
+
+describe.skipIf(!pgActive)("PG template-clone (Phase 1 probe)", () => {
+  it("globalSetup provisioned the PG template for this run", () => {
+    expect(
+      process.env[PG_TEMPLATE_ENV],
+      `${PG_TEMPLATE_ENV} must be set by globalSetup`,
+    ).toBeTruthy();
+  });
+
+  it("the template DB is stamped with the canonical schema SHA1", async () => {
+    const expectedSha1 = canonicalSchemaStamp(process.env[RUN_TOKEN_ENV]!);
+
+    const templateDb = process.env[PG_TEMPLATE_ENV]!;
+    const url = settingsUrl("postgres", withDatabase(postgresSettings(), templateDb));
+
+    const client = new pg.Client(url);
+    await client.connect();
+    try {
+      const res = await client.query<{ value: string }>(
+        "SELECT value FROM ar_internal_metadata WHERE key = 'schema_sha1'",
+      );
+      expect(res.rows[0]?.value, "template must carry the stamped schema_sha1").toBe(expectedSha1);
+    } finally {
+      await client.end();
+    }
+  });
+});

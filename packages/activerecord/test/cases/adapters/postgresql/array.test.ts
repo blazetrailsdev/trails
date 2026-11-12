@@ -1,0 +1,562 @@
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from "vitest";
+import {
+  describeIfPg,
+  PostgreSQLAdapter,
+} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { Base, ColumnNotSerializableError, StatementInvalid } from "../../../../lib/index.js";
+import { TimeZone, setZone, change as timeChange } from "@blazetrails/activesupport";
+import { Time as RubyTime } from "@blazetrails/date";
+import { Array as OidArray } from "../../../../lib/connection-adapters/postgresql/oid/array.js";
+import { ValueType, StringType } from "@blazetrails/activemodel";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+
+const textArray = new OidArray(new ValueType());
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+fixtures([]);
+
+describeIfPg("PostgreSQLAdapter", () => {
+  let adapter: PostgreSQLAdapter;
+  beforeAll(async () => {
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
+    await adapter.execute(`DROP TABLE IF EXISTS pg_arrays`);
+    await adapter.execute(`CREATE EXTENSION IF NOT EXISTS hstore`);
+    await adapter.execute(`
+      CREATE TABLE pg_arrays (
+        id serial primary key,
+        tags character varying(255)[],
+        ratings integer[],
+        datetimes timestamp(6)[],
+        hstores hstore[],
+        decimals numeric(10,2)[] DEFAULT '{}',
+        timestamps timestamp(6)[] DEFAULT '{}'
+      )
+    `);
+    await adapter.loadAdditionalTypes();
+  });
+  afterEach(async () => {
+    await adapter.schemaCache.clearDataSourceCacheBang("pg_arrays");
+  });
+  afterAll(async () => {
+    await adapter.execute(`DROP TABLE IF EXISTS pg_arrays`).catch(() => {});
+  });
+  describe("PostgresqlArrayTest", () => {
+    class PgArray extends Base {
+      declare tags: any;
+      declare ratings: any;
+      declare datetimes: any;
+      declare timestamps: any;
+      static tableName = "pg_arrays";
+    }
+    let column: any;
+    let type: any;
+    beforeEach(async () => {
+      await PgArray.resetColumnInformation();
+      await PgArray.loadSchema();
+      column = PgArray.columnsHash()["tags"];
+      type = PgArray.typeForAttribute("tags");
+    });
+    it("column", async () => {
+      expect(column.type).toBe("string");
+      expect(column.sqlType).toBe("character varying(255)");
+      expect(column.isArray()).toBeTruthy();
+      expect(type.isBinary()).toBeFalsy();
+
+      const ratingsColumn: any = PgArray.columnsHash()["ratings"];
+      expect(ratingsColumn.type).toBe("integer");
+      expect(ratingsColumn.isArray()).toBeTruthy();
+    });
+    it("not compatible with serialize array", async () => {
+      class PgArrayNotSerializable extends Base {
+        static tableName = "pg_arrays";
+      }
+      await PgArrayNotSerializable.loadSchema();
+      expect(() => {
+        PgArrayNotSerializable.serialize("tags", { type: Array });
+        new PgArrayNotSerializable();
+      }).toThrow(ColumnNotSerializableError);
+    });
+    it("array with serialized attributes", async () => {
+      class MyTags {
+        constructor(public tags: string[]) {}
+        toArray(): string[] {
+          return this.tags;
+        }
+        static load(tags: unknown): MyTags {
+          return new MyTags(
+            Array.isArray(tags) ? (tags as string[]) : tags == null ? [] : [String(tags)],
+          );
+        }
+        static dump(object: unknown): unknown {
+          return object instanceof MyTags ? object.toArray() : object;
+        }
+      }
+      class PgArraySerialized extends Base {
+        declare tags: any;
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArraySerialized.loadSchema();
+      PgArraySerialized.serialize("tags", { coder: MyTags });
+
+      await PgArraySerialized.create({ tags: new MyTags(["one", "two"]) } as any);
+      const record = (await PgArraySerialized.first())!;
+      expect(record.tags).toBeInstanceOf(MyTags);
+      expect((record.tags as MyTags).toArray()).toEqual(["one", "two"]);
+
+      record.tags = new MyTags(["three", "four"]);
+      await record.save();
+      await (record as any).reload();
+      expect((record.tags as MyTags).toArray()).toEqual(["three", "four"]);
+    });
+    it("default", async () => {
+      await adapter.addColumn("pg_arrays", "score", "integer", { array: true, default: [4, 4, 2] });
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      try {
+        await PgArrays.resetColumnInformation();
+        expect((PgArrays as any).columnDefaults["score"]).toEqual([4, 4, 2]);
+        expect((new PgArrays() as any).score).toEqual([4, 4, 2]);
+      } finally {
+        void PgArrays.resetColumnInformation();
+      }
+    });
+    it("default strings", async () => {
+      await adapter.addColumn("pg_arrays", "names", "string", {
+        array: true,
+        default: ["foo", "bar"],
+      });
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      try {
+        await PgArrays.resetColumnInformation();
+        expect((PgArrays as any).columnDefaults["names"]).toEqual(["foo", "bar"]);
+        expect((new PgArrays() as any).names).toEqual(["foo", "bar"]);
+      } finally {
+        void PgArrays.resetColumnInformation();
+      }
+    });
+    it("schema dump with shorthand", async () => {
+      const output = await dumpTableSchema("pg_arrays");
+      expect(output).toMatch(/t\.string\("tags",\s+\{ limit: 255,\s+array: true/);
+      expect(output).toMatch(/t\.integer\("ratings",\s+\{ array: true/);
+      expect(output).toMatch(
+        /t\.decimal\("decimals",\s+\{ precision: 10,\s+scale: 2,\s+default: \[\],\s+array: true/,
+      );
+    });
+    it("change column with array", async () => {
+      await adapter.addColumn("pg_arrays", "snippets", "string", { array: true, default: [] });
+      await adapter.changeColumn("pg_arrays", "snippets", "text", { array: true, default: [] });
+      await PgArray.resetColumnInformation();
+      const column: any = PgArray.columnsHash()["snippets"];
+      expect(column.type).toBe("text");
+      expect(PgArray.columnDefaults["snippets"]).toEqual([]);
+      expect(column.isArray()).toBeTruthy();
+    });
+    it("change column from non array to array", async () => {
+      await adapter.addColumn("pg_arrays", "snippets", "string");
+      await adapter.changeColumn("pg_arrays", "snippets", "text", {
+        array: true,
+        default: [],
+        using: `string_to_array("snippets", ',')`,
+      });
+      await PgArray.resetColumnInformation();
+      const column: any = PgArray.columnsHash()["snippets"];
+      expect(column.type).toBe("text");
+      expect(PgArray.columnDefaults["snippets"]).toEqual([]);
+      expect(column.isArray()).toBeTruthy();
+    });
+    it("change column cant make non array column to array", async () => {
+      await adapter.addColumn("pg_arrays", "a_string", "string");
+      await expect(
+        adapter.transaction(async () => {
+          await adapter.changeColumn("pg_arrays", "a_string", "string", { array: true });
+        }),
+      ).rejects.toThrow(StatementInvalid);
+    });
+    it("change column default with array", async () => {
+      await adapter.changeColumnDefault("pg_arrays", "tags", []);
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.resetColumnInformation();
+      expect((PgArrays as any).columnDefaults["tags"]).toEqual([]);
+    });
+
+    it("type cast array", async () => {
+      expect(type.deserialize("{1,2,3}")).toEqual(["1", "2", "3"]);
+      expect(type.deserialize("{}")).toEqual([]);
+      expect(type.deserialize("{NULL}")).toEqual([null]);
+    });
+
+    it("type cast integers", async () => {
+      const x = new PgArray({ ratings: ["1", "2"] });
+
+      expect(x.ratings).toEqual([1, 2]);
+
+      await x.saveBang();
+      await x.reload();
+
+      expect(x.ratings).toEqual([1, 2]);
+    });
+
+    it("select with strings", async () => {
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
+      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
+      expect(rows[0].tags).toEqual(["1", "2", "3"]);
+    });
+
+    it("rewrite with strings", async () => {
+      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ('{1,2,3}')`);
+      const rows = await adapter.execute(`SELECT id FROM pg_arrays`);
+      const id = rows[0].id;
+      await adapter.execQuery(
+        `UPDATE pg_arrays SET tags = '{"1","2","3","4"}' WHERE id = $1`,
+        "SQL",
+        [id],
+      );
+      const updated = (
+        await adapter.execQuery(`SELECT tags FROM pg_arrays WHERE id = $1`, "SQL", [id])
+      ).toArray();
+      expect(updated[0].tags).toEqual(["1", "2", "3", "4"]);
+    });
+
+    it("select with integers", async () => {
+      await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
+      const rows = await adapter.execute(`SELECT ratings FROM pg_arrays`);
+      expect(rows[0].ratings).toEqual([1, 2, 3]);
+    });
+
+    it("rewrite with integers", async () => {
+      await adapter.execute(`INSERT INTO pg_arrays (ratings) VALUES ('{1,2,3}')`);
+      const rows = await adapter.execute(`SELECT id FROM pg_arrays`);
+      const id = rows[0].id;
+      await adapter.execQuery(`UPDATE pg_arrays SET ratings = '{2,3,4}' WHERE id = $1`, "SQL", [
+        id,
+      ]);
+      const updated = (
+        await adapter.execQuery(`SELECT ratings FROM pg_arrays WHERE id = $1`, "SQL", [id])
+      ).toArray();
+      expect(updated[0].ratings).toEqual([2, 3, 4]);
+    });
+
+    it("multi dimensional with strings", async () => {
+      await assertCycle("tags", [
+        [["1"], ["2"]],
+        [["2"], ["3"]],
+      ]);
+    });
+
+    it("with empty strings", async () => {
+      await assertCycle("tags", ["1", "2", "", "4", "", "5"]);
+    });
+
+    it("with multi dimensional empty strings", async () => {
+      await assertCycle("tags", [
+        [
+          ["1", "2"],
+          ["", "4"],
+          ["", "5"],
+        ],
+      ]);
+    });
+
+    it("with arbitrary whitespace", async () => {
+      await assertCycle("tags", [
+        [
+          ["1", "2"],
+          ["    ", "4"],
+          ["    ", "5"],
+        ],
+      ]);
+    });
+
+    it("multi dimensional with integers", async () => {
+      await assertCycle("ratings", [
+        [[1], [7]],
+        [[8], [10]],
+      ]);
+    });
+
+    it("strings with quotes", async () => {
+      await assertCycle("tags", ["this has", 'some "s that need to be escaped"']);
+    });
+
+    it("strings with commas", async () => {
+      await assertCycle("tags", ["this,has", "many,values"]);
+    });
+
+    it("strings with array delimiters", async () => {
+      await assertCycle("tags", ["{", "}"]);
+    });
+
+    it("strings with null strings", async () => {
+      await assertCycle("tags", ["NULL", "NULL"]);
+    });
+
+    it("contains nils", async () => {
+      await assertCycle("tags", ["1", null, null]);
+    });
+
+    it("insert fixture", async () => {
+      const tagValues = ["val1", "val2", "val3_with_'_multiple_quote_'_chars"];
+      await (adapter as any).insertFixture({ tags: tagValues }, "pg_arrays");
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.loadSchema();
+      const last = await (PgArrays as any).last();
+      expect(last.tags).toEqual(tagValues);
+    });
+    it("attribute for inspect for array field", async () => {
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays();
+      (record as any).ratings = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      expect((record as any).attributeForInspect("ratings")).toBe(
+        "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]",
+      );
+    });
+    it("attribute for inspect for array field for large array", async () => {
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays();
+      (record as any).ratings = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      expect((record as any).attributeForInspect("ratings")).toBe(
+        "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+      );
+    });
+
+    it("escaping", async () => {
+      const unknown = 'foo\\",bar,baz,\\';
+      const tags = [`hello_${unknown}`];
+      await adapter.execQuery(`INSERT INTO pg_arrays (tags) VALUES ($1)`, "SQL", [
+        textArray.serialize(tags),
+      ]);
+      const rows = await adapter.execute(`SELECT tags FROM pg_arrays`);
+      expect(rows[0].tags).toEqual(tags);
+    });
+
+    it("string quoting rules match pg behavior", async () => {
+      const tags = [
+        "",
+        "one{",
+        "two}",
+        'three"',
+        "four\\",
+        "five ",
+        "six\t",
+        "seven\n",
+        "eight,",
+        "nine",
+        "ten\r",
+        "NULL",
+      ];
+      const x = await PgArray.createBang({ tags });
+      await x.reload();
+
+      expect(x.isChanged).toBeFalsy();
+    });
+
+    it("quoting non standard delimiters", async () => {
+      const strings = ["hello,", "world;"];
+      const commaDelim = new OidArray(new StringType(), ",");
+      const semicolonDelim = new OidArray(new StringType(), ";");
+      expect(adapter.typeCast(commaDelim.serialize(strings))).toBe('{"hello,",world;}');
+      expect(adapter.typeCast(semicolonDelim.serialize(strings))).toBe('{hello,;"world;"}');
+    });
+
+    it("mutate array", async () => {
+      const x = await PgArray.createBang({ tags: ["one", "two"] });
+
+      x.tags.push("three");
+      await x.saveBang();
+      await x.reload();
+
+      expect(x.tags).toEqual(["one", "two", "three"]);
+      expect(x.isChanged).toBeFalsy();
+    });
+
+    it("mutate value in array", async () => {
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.loadSchema();
+      const x = await (PgArrays as any).create({
+        hstores: [{ a: "a" }, { b: "b" }],
+      });
+      x.hstores[0]["a"] = "c";
+      await x.save();
+      await x.reload();
+      expect(x.hstores).toEqual([{ a: "c" }, { b: "b" }]);
+      expect(x.isChanged).toBeFalsy();
+    });
+    it("datetime with timezone awareness", async () => {
+      const tz = "Pacific Time (US & Canada)";
+      const zone = TimeZone.find(tz)!;
+      setZone(tz);
+      try {
+        class PgArrays extends Base {
+          declare datetimes: any;
+          static tableName = "pg_arrays";
+          static timeZoneAwareAttributes = true;
+          static {
+            this.attribute("id", "integer");
+          }
+        }
+        await PgArrays.loadSchema();
+        const timeString = "2020-06-15T10:00:00-07:00";
+        const time = zone.parse(timeString);
+
+        const record = new PgArrays({ datetimes: [timeString] });
+        expect(record.datetimes).toEqual([time]);
+        expect(record.datetimes[0].timeZone).toEqual(zone);
+
+        await record.saveBang();
+        await record.reload();
+
+        expect(record.datetimes).toEqual([time]);
+        expect(record.datetimes[0].timeZone).toEqual(zone);
+      } finally {
+        setZone(null);
+      }
+    });
+    it("assigning non array value", async () => {
+      class PgArrays extends Base {
+        declare tags: any;
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays({ tags: "not-an-array" } as any);
+      expect(record.tags).toEqual([]);
+      expect((record as any).attributeBeforeTypeCast("tags")).toBe("not-an-array");
+      expect(await record.save()).toBeTruthy();
+      expect(record.tags).toEqual((await record.reload()).tags);
+    });
+    it("assigning empty string", async () => {
+      class PgArrays extends Base {
+        declare tags: any;
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays({ tags: "" } as any);
+      expect(record.tags).toEqual([]);
+      expect((record as any).attributeBeforeTypeCast("tags")).toBe("");
+      expect(await record.save()).toBeTruthy();
+      expect(record.tags).toEqual((await record.reload()).tags);
+    });
+    it("assigning valid pg array literal", async () => {
+      class PgArrays extends Base {
+        declare tags: any;
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.loadSchema();
+      const record = new PgArrays({ tags: "{1,2,3}" } as any);
+      expect(record.tags).toEqual(["1", "2", "3"]);
+      expect((record as any).attributeBeforeTypeCast("tags")).toBe("{1,2,3}");
+      expect(await record.save()).toBeTruthy();
+      expect(record.tags).toEqual((await record.reload()).tags);
+    });
+
+    it("where by attribute with array", async () => {
+      const tags = ["black", "blue"];
+      const record = await PgArray.createBang({ tags });
+      expect((await PgArray.where({ tags }).take())!.id).toEqual(record.id);
+    });
+
+    it("uniqueness validation", async () => {
+      class Klass extends PgArray {
+        static {
+          this.validatesUniquenessOf("tags");
+        }
+        static override get modelName() {
+          return PgArray.modelName;
+        }
+      }
+      const e1 = await Klass.create({ tags: ["black", "blue"] });
+      expect(e1.isPersisted(), "Saving e1").toBeTruthy();
+
+      const e2 = await Klass.create({ tags: ["black", "blue"] });
+      expect(e2.isPersisted(), "e2 shouldn't be valid").toBeFalsy();
+      expect(e2.errors.get("tags").length > 0, "Should have errors for tags").toBeTruthy();
+      expect(e2.errors.get("tags"), "Should have uniqueness message for tags").toEqual([
+        "has already been taken",
+      ]);
+    });
+
+    it("encoding arrays of utf8 strings", async () => {
+      const arraysOfUtf8Strings = ["nový", "ファイル"];
+      expect(type.deserialize(type.serialize(arraysOfUtf8Strings))).toEqual(arraysOfUtf8Strings);
+      expect(type.deserialize(type.serialize([arraysOfUtf8Strings]))).toEqual([
+        arraysOfUtf8Strings,
+      ]);
+    });
+
+    it("precision is respected on timestamp columns", async () => {
+      const time = timeChange(RubyTime.now(), { usec: 123 });
+      const record = await PgArray.createBang({ timestamps: [time] });
+
+      expect(record.timestamps[0].usec).toBe(123);
+      await record.reload();
+      expect(record.timestamps[0].usec).toBe(123);
+    });
+
+    async function assertCycle(field: string, array: unknown): Promise<void> {
+      let x = await (PgArray as any).createBang({ [field]: array });
+      await x.reload();
+      expect(x[field]).toEqual(array);
+
+      x = await (PgArray as any).createBang({ [field]: [] });
+      x[field] = array;
+      await x.saveBang();
+      await x.reload();
+      expect(x[field]).toEqual(array);
+    }
+  });
+});

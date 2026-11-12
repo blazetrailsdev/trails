@@ -1,0 +1,56 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  describeIfPg,
+  PostgreSQLAdapter,
+} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { Base } from "../../../../lib/base.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+import type { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
+
+describeIfPg("PostgreSQLAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  let adapter: PostgreSQLAdapter;
+  beforeEach(async () => {
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
+    await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
+    await adapter.execute(`CREATE TABLE tsvectors (id serial primary key, text_vector tsvector)`);
+  });
+  afterEach(async () => {
+    await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
+  });
+
+  describe("PostgresqlFullTextTest", () => {
+    it("tsvector column", async () => {
+      const cols = await adapter.columns("tsvectors");
+      const column = cols.find((c) => c.name === "text_vector") as unknown as PgColumn;
+      expect(column.type).toBe("tsvector");
+      expect(column.sqlType).toBe("tsvector");
+      expect(column.isArray()).toBeFalsy();
+
+      const type = await adapter.lookupCastTypeFromColumn(column);
+      expect(type.isBinary()).toBeFalsy();
+    });
+
+    it("schema dump with shorthand", async () => {
+      const output = await dumpTableSchema("tsvectors");
+      expect(output).toMatch(/t\.tsvector\("text_vector"\)/);
+    });
+
+    it("update tsvector", async () => {
+      await adapter.execute(
+        `INSERT INTO tsvectors (text_vector) VALUES ($$'text' 'vector'$$::tsvector)`,
+      );
+      const rows = await adapter.execute(`SELECT text_vector FROM tsvectors`);
+      expect(String(rows[0].text_vector)).toBe("'text' 'vector'");
+
+      await adapter.execute(
+        `UPDATE tsvectors SET text_vector = $$'new' 'text' 'vector'$$::tsvector`,
+      );
+      const updated = await adapter.execute(`SELECT text_vector FROM tsvectors`);
+      expect(updated).toBeTruthy();
+      expect(String(updated[0].text_vector)).toBe("'new' 'text' 'vector'");
+    });
+  });
+});

@@ -1,0 +1,147 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { presence } from "@blazetrails/activesupport";
+import { describe, it, expect } from "vitest";
+import { Relation } from "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Author } from "../../models/author.js";
+import { Post } from "../../models/post.js";
+import { Comment } from "../../models/comment.js";
+
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+
+describe("Thenable", () => {
+  const { posts } = fixtures(["authorAddresses", "authors", "posts", "comments"]);
+
+  it("Relation is directly awaitable", async () => {
+    const authors = await Author.where({ id: [1, 2] });
+    expect(Array.isArray(authors)).toBe(true);
+    expect(authors).toHaveLength(2);
+  });
+
+  it("Relation .then() chains work", async () => {
+    const names = await Author.where({ id: [1, 2] }).then((records: Author[]) =>
+      records.map((r) => r.readAttribute("name")),
+    );
+    expect(names).toContain("David");
+    expect(names).toContain("Mary");
+  });
+
+  it("chained relation remains thenable", async () => {
+    const authors = await Author.where({ id: [1, 2] })
+      .order("name")
+      .limit(1);
+    expect(Array.isArray(authors)).toBe(true);
+    expect(authors).toHaveLength(1);
+    expect(authors[0].readAttribute("name")).toBe("David");
+  });
+
+  it("works with Promise.all", async () => {
+    const [pair, single] = await Promise.all([
+      Author.where({ id: [1, 2] }),
+      Author.where({ id: [3] }),
+    ]);
+    expect(pair).toHaveLength(2);
+    expect(single).toHaveLength(1);
+  });
+
+  it("does not eagerly evaluate on construction", async () => {
+    const relation = Author.where({ id: [1, 2] });
+    expect(relation.isLoaded).toBe(false);
+
+    await relation;
+    expect(relation.isLoaded).toBe(true);
+  });
+
+  it("Relation is not instanceof Promise", () => {
+    const relation = Author.where({ id: [1, 2] });
+    expect(relation).not.toBeInstanceOf(Promise);
+  });
+
+  it(".toArray() still works", async () => {
+    const authors = await Author.where({ id: 1 });
+    expect(Array.isArray(authors)).toBe(true);
+    expect(authors).toHaveLength(1);
+  });
+
+  it("load() returns the relation, not an array", async () => {
+    const rel = Author.where({ id: 1 });
+    const loaded = await rel.load();
+    expect(loaded).toBeInstanceOf(Relation);
+    expect(loaded.isLoaded).toBe(true);
+  });
+
+  it("reload() returns the relation, not an array", async () => {
+    const rel = Author.where({ id: 1 });
+    await rel.load();
+    const reloaded = await rel.reload();
+    expect(reloaded).toBeInstanceOf(Relation);
+  });
+
+  it("presence() returns the relation when records exist", async () => {
+    const rel = Author.where({ id: 1 });
+    const present = await presence(rel);
+    expect(present).toBeInstanceOf(Relation);
+  });
+
+  it("presence() returns null when no records exist", async () => {
+    const rel = Author.where({ id: 99 });
+    const present = await presence(rel);
+    expect(present).toBeNull();
+  });
+
+  describe("CollectionProxy", () => {
+    it("CollectionProxy is directly awaitable", async () => {
+      const post = posts("welcome");
+
+      const proxy = post.comments;
+      const comments = await proxy;
+      expect(Array.isArray(comments)).toBe(true);
+      expect(comments).toHaveLength(2);
+    });
+  });
+
+  it("relation stays awaitable after load", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const loaded = await davids.load();
+    expect(loaded.isLoaded).toBe(true);
+
+    const records = await davids;
+    expect(Array.isArray(records)).toBe(true);
+    expect(records).toHaveLength(1);
+  });
+
+  it("load returns a stable view that shares state with the relation", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const first = await davids.load();
+    const second = await davids.load();
+    expect(second).toBe(first);
+
+    expect(davids.isLoaded).toBe(true);
+    expect(await first.toArray()).toEqual(await davids);
+  });
+
+  it("chaining load off a loaded relation does not nest views", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const once = await davids.load();
+    const twice = await once.load();
+    const thrice = await (await twice.reload()).load();
+
+    expect(twice).toBe(once);
+    expect(thrice).toBe(once);
+    expect(await thrice.toArray()).toHaveLength(1);
+  });
+
+  it("relation stays awaitable after destroyAll", async () => {
+    const davids = Author.where({ name: "David" });
+    expect(await davids).toHaveLength(1);
+
+    await davids.destroyAll();
+
+    expect(await davids).toEqual([]);
+  });
+});

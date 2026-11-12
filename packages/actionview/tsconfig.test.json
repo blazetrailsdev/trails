@@ -5,7 +5,7 @@
     "paths": {
       "@blazetrails/actionpack": ["../actionpack/lib/index.ts"],
       "@blazetrails/activemodel": ["../activemodel/lib/index.ts"],
-      "@blazetrails/activerecord": ["../activerecord/src/index.ts"],
+      "@blazetrails/activerecord": ["../activerecord/lib/index.ts"],
       "@blazetrails/rack": ["../rack/lib/index.ts"],
       "@blazetrails/trails-tsc": ["../trails-tsc/lib/index.ts"],
       "@blazetrails/trailties/engine": ["../trailties/lib/engine.ts"],

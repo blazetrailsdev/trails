@@ -1,0 +1,13 @@
+import { Migration } from "../../../lib/migration.js";
+
+export class WeNeedThings extends Migration.Current {
+  async up(): Promise<void> {
+    await this.createTable("things", (t) => {
+      t.column("content", "text");
+    });
+  }
+
+  async down(): Promise<void> {
+    await this.dropTable("things");
+  }
+}

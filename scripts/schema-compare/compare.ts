@@ -1,10 +1,10 @@
 // parity:schema — structural parity check of the two hand transcriptions of
 // vendor/rails/v8.0.2/activerecord/test/schema/schema.rb against the vendored source
 // they are documented to mirror, and against each other:
-//   * TEST_SCHEMA (packages/activerecord/src/test-helpers/test-schema.ts) — the
+//   * TEST_SCHEMA (packages/activerecord/test/support/test-schema.ts) — the
 //     declarative map, read by the canonical-table ESLint rule and
 //     parity:fixtures;
-//   * the canonical registry (packages/activerecord/src/support/
+//   * the canonical registry (packages/activerecord/test/support/
 //     canonical-schema.ts) — the `create_table` sequence that actually lays
 //     every table at boot.
 // Checking only the first left the one that builds the database unverified, so
@@ -24,19 +24,19 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
+import { TEST_SCHEMA } from "../../packages/activerecord/test/support/test-schema.js";
 import type {
   ColumnSpec,
   ForeignKeySpec,
   IndexSpec,
   Schema,
   TableSchema,
-} from "../../packages/activerecord/src/support/schema-types.js";
+} from "../../packages/activerecord/test/support/schema-types.js";
 import {
   columnsOf,
   isWrappedSchema,
-} from "../../packages/activerecord/src/support/schema-types.js";
-import { canonicalRegistrySchema } from "../../packages/activerecord/src/support/canonical-schema.js";
+} from "../../packages/activerecord/test/support/schema-types.js";
+import { canonicalRegistrySchema } from "../../packages/activerecord/test/support/canonical-schema.js";
 import type { RailsColumnOptions, RailsTable } from "./parse-schema-rb.js";
 import { parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
@@ -882,7 +882,7 @@ export async function main(): Promise<void> {
   }
   if (registryBaseline.regressions.length > 0 || registryOptionFatal.length > 0) {
     console.log(
-      "\nThe canonical registry (packages/activerecord/src/support/canonical-schema.ts) is the " +
+      "\nThe canonical registry (packages/activerecord/test/support/canonical-schema.ts) is the " +
         "transcription that lays every table at boot; it mirrors the same schema.rb. Fix the " +
         "create_table block — the baseline records TEST_SCHEMA debt only and will not absorb it.",
     );

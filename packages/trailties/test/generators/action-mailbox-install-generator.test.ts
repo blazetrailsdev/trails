@@ -9,7 +9,7 @@ import { TestCase } from "../../lib/generators/test-case.js";
 import { withDatabaseConfiguration } from "./generators-test-helper.js";
 
 const databasesTasks = File.expandPath(
-  "../../../activerecord/src/trailties/databases.ts",
+  "../../../activerecord/lib/trailties/databases.ts",
   import.meta.dirname,
 );
 

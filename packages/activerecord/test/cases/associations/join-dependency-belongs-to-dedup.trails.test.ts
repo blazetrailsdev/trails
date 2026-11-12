@@ -1,0 +1,97 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach } from "vitest";
+import { Base } from "../../../lib/index.js";
+import { Associations } from "../../../lib/associations.js";
+import { aliasedRow } from "../../support/join-dependency-aliased-row.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { JoinDependency } from "../../../lib/associations/join-dependency.js";
+import { Nodes } from "@blazetrails/arel";
+import { resultFromRowHashes } from "../../support/result-from-row-hashes.js";
+
+describe("JoinDependency cross-parent belongsTo dedup", () => {
+  fixtures({});
+
+  class Author extends Base {
+    static {
+      this.attribute("id", "integer");
+      this.attribute("name", "string");
+    }
+  }
+
+  class Post extends Base {
+    static {
+      this.attribute("id", "integer");
+      this.attribute("author_id", "integer");
+      this.attribute("title", "string");
+    }
+  }
+
+  beforeEach(() => {
+    for (const m of [Author, Post]) {
+      m._reflections = {};
+    }
+    constSet(TopLevel, "Author", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "Post", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+
+    Associations.belongsTo.call(Post, "author", { className: "Author" });
+  });
+
+  it("shares a single author instance across posts with the same author", () => {
+    const jd = new JoinDependency(Post, Post.arelTable, "author", Nodes.OuterJoin);
+
+    const rows = [
+      aliasedRow(jd, {
+        "": { id: 1, author_id: 42, title: "Post A" },
+        author: { id: 42, name: "Alice" },
+      }),
+      aliasedRow(jd, {
+        "": { id: 2, author_id: 42, title: "Post B" },
+        author: { id: 42, name: "Alice" },
+      }),
+      aliasedRow(jd, {
+        "": { id: 3, author_id: 42, title: "Post C" },
+        author: { id: 42, name: "Alice" },
+      }),
+    ];
+
+    const parents = jd.instantiate(resultFromRowHashes(rows));
+
+    expect(parents).toHaveLength(3);
+
+    const authors = parents.map((p) => {
+      const proxy = p.association("author");
+      return proxy?.target;
+    });
+
+    expect(authors[0]).toBeDefined();
+    expect(authors[0]).toBe(authors[1]);
+    expect(authors[0]).toBe(authors[2]);
+  });
+
+  it("creates distinct instances for different authors", () => {
+    const jd = new JoinDependency(Post, Post.arelTable, "author", Nodes.OuterJoin);
+
+    const rows = [
+      aliasedRow(jd, {
+        "": { id: 1, author_id: 42, title: "Post A" },
+        author: { id: 42, name: "Alice" },
+      }),
+      aliasedRow(jd, {
+        "": { id: 2, author_id: 99, title: "Post B" },
+        author: { id: 99, name: "Bob" },
+      }),
+    ];
+
+    const parents = jd.instantiate(resultFromRowHashes(rows));
+
+    const author1 = parents[0].association("author")?.target;
+    const author2 = parents[1].association("author")?.target;
+
+    expect(author1).toBeDefined();
+    expect(author2).toBeDefined();
+    expect(author1).not.toBe(author2);
+  });
+});

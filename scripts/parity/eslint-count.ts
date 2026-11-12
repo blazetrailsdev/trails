@@ -88,10 +88,23 @@ export async function measureAt(ref: string, files: string[], cwd = ROOT_DIR): P
   const present = new Set(
     (await git(["ls-tree", "-r", "--name-only", ref, "--", "packages"], cwd)).split("\n"),
   );
+  const movedFromSrc = new Map<string, string>();
+  for (const line of (
+    await git(["diff", "-M", "-l0", "--name-status", "--diff-filter=R", ref, "--", "packages"], cwd)
+  ).split("\n")) {
+    const [status, from, to] = line.split("\t");
+    if (
+      status?.startsWith("R") &&
+      /^packages\/[^/]+\/src\//.test(from) &&
+      !/^packages\/[^/]+\/src\//.test(to)
+    )
+      movedFromSrc.set(to, from);
+  }
   const counts: RuleCounts = {};
   for (const file of files) {
-    if (!present.has(file)) continue;
-    const text = await git(["show", `${ref}:${file}`], cwd);
+    const atRef = present.has(file) ? file : movedFromSrc.get(file);
+    if (atRef === undefined || !present.has(atRef)) continue;
+    const text = await git(["show", `${ref}:${atRef}`], cwd);
     const filePath = path.join(cwd, file);
     if (await eslint.isPathIgnored(filePath)) continue;
     for (const r of await eslint.lintText(text, { filePath }))

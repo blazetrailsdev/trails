@@ -1,0 +1,160 @@
+import { describe, it, expect } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
+import { isAny } from "@blazetrails/ruby-compat";
+import { Base } from "../../lib/index.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { adapterType } from "../../lib/test-adapter.js";
+import { PreparedStatementCacheExpired } from "../../lib/errors.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+
+function getPreparedStatementCache(connection: DatabaseAdapter): Record<string, unknown> {
+  return (connection as unknown as { _statements: { cache: Record<string, unknown> } })._statements
+    .cache;
+}
+
+describe("HotCompatibilityTest", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  async function withTwoConnections(
+    body: (ddlConnection: DatabaseAdapter) => Promise<void>,
+  ): Promise<void> {
+    const pool = Base.connectionPool();
+    await pool.disconnectBang();
+    const ddlConnection = await pool.checkout();
+    try {
+      await body(ddlConnection);
+    } finally {
+      pool.checkin(ddlConnection);
+      await pool.disconnectBang();
+    }
+  }
+
+  async function setupHotCompatibility(): Promise<{
+    klass: typeof Base;
+    adapter: DatabaseAdapter;
+  }> {
+    const adapter = await Base.leaseConnection();
+    await adapter.createTable("hot_compatibilities", { force: true }, (t) => {
+      t.string("foo");
+      t.string("bar");
+    });
+
+    class HotCompatibility extends Base {}
+    HotCompatibility.tableName = "hot_compatibilities";
+    return { klass: HotCompatibility, adapter };
+  }
+
+  it("insert after remove_column", async () => {
+    const { klass, adapter } = await setupHotCompatibility();
+    try {
+      await klass.createBang();
+
+      expect(klass.columns().length).toBe(3);
+
+      await adapter.removeColumn("hot_compatibilities", "bar");
+
+      expect(klass.columns().length).toBe(3);
+
+      const record = await klass.createBang({ foo: "foo" });
+      await record.reload();
+      expect((record as unknown as { foo: string }).foo).toBe("foo");
+    } finally {
+      await adapter.dropTable("hot_compatibilities", { ifExists: true });
+    }
+  });
+
+  it("update after remove_column", async () => {
+    const { klass, adapter } = await setupHotCompatibility();
+    try {
+      const record = await klass.createBang({ foo: "foo" });
+      expect(klass.columns().length).toBe(3);
+      await adapter.removeColumn("hot_compatibilities", "bar");
+      expect(klass.columns().length).toBe(3);
+
+      await record.reload();
+      expect((record as unknown as { foo: string }).foo).toBe("foo");
+      (record as unknown as { foo: string }).foo = "bar";
+      await record.saveBang();
+      await record.reload();
+      expect((record as unknown as { foo: string }).foo).toBe("bar");
+    } finally {
+      await adapter.dropTable("hot_compatibilities", { ifExists: true });
+    }
+  });
+
+  it.skipIf(adapterType !== "postgres")(
+    "cleans up after prepared statement failure in a transaction",
+    async () => {
+      await withTwoConnections(async (ddlConnection) => {
+        const { klass, adapter } = await setupHotCompatibility();
+        try {
+          const record = await klass.createBang({ bar: "bar" });
+
+          await klass.transaction(async () => {
+            await record.reload();
+          });
+
+          expect(
+            isAny(Object.entries(getPreparedStatementCache(adapter))),
+            "expected prepared statement cache to have something in it",
+          ).toBeTruthy();
+
+          await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
+
+          await expect(
+            klass.transaction(async () => {
+              await record.reload();
+            }),
+          ).rejects.toThrow(PreparedStatementCacheExpired);
+
+          expect(
+            getPreparedStatementCache(adapter),
+            "expected prepared statement cache to be empty but it wasn't",
+          ).toBeEmpty();
+        } finally {
+          await adapter.dropTable("hot_compatibilities", { ifExists: true });
+        }
+      });
+    },
+  );
+
+  it.skipIf(adapterType !== "postgres")(
+    "cleans up after prepared statement failure in nested transactions",
+    async () => {
+      await withTwoConnections(async (ddlConnection) => {
+        const { klass, adapter } = await setupHotCompatibility();
+        try {
+          const record = await klass.createBang({ bar: "bar" });
+
+          await klass.transaction(async () => {
+            await record.reload();
+          });
+
+          expect(
+            isAny(Object.entries(getPreparedStatementCache(adapter))),
+            "expected prepared statement cache to have something in it",
+          ).toBeTruthy();
+
+          await ddlConnection.addColumn("hot_compatibilities", "baz", "string");
+
+          await expect(
+            klass.transaction(async () => {
+              await klass.transaction(async () => {
+                await klass.transaction(async () => {
+                  await record.reload();
+                });
+              });
+            }),
+          ).rejects.toThrow(PreparedStatementCacheExpired);
+
+          expect(
+            getPreparedStatementCache(adapter),
+            "expected prepared statement cache to be empty but it wasn't",
+          ).toBeEmpty();
+        } finally {
+          await adapter.dropTable("hot_compatibilities", { ifExists: true });
+        }
+      });
+    },
+  );
+});

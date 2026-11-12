@@ -1,0 +1,1927 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { readFile } from "fs/promises";
+import {
+  env,
+  File as RubyFile,
+  include,
+  rbObjRespondTo,
+  RuntimeError,
+  setEnv,
+  toI,
+  constSet,
+  TopLevel,
+  ArgumentError,
+  Dir,
+  rbInspect,
+  Tempfile,
+  rbModRemoveConst,
+  StandardError,
+  Struct,
+} from "@blazetrails/ruby-compat";
+import { FixtureSet, FixtureError, Fixture } from "../../lib/fixtures.js";
+import { File as FixtureFile } from "../../lib/fixture-set/file.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../lib/config.js";
+import { PrimaryKeyError } from "../../lib/fixture-set/table-row.js";
+import { Time } from "@blazetrails/date";
+import { Notifications, Duration, Logger } from "@blazetrails/activesupport";
+import * as Arel from "@blazetrails/arel";
+import {
+  assertDifference,
+  assertNoDifference,
+  assertNothingRaised,
+  assertNotEmpty,
+  assertRaises,
+  Minitest,
+  assertInDelta,
+} from "@blazetrails/activesupport/testing/assertions";
+import { primaryKeyErrorFixtureData } from "../fixtures/primary-key-error/primary-key-error.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { Base } from "../../lib/base.js";
+import { TestCase } from "../../lib/cases/test-case.js";
+import { squish } from "@blazetrails/activesupport";
+import { fkObjectToPointToFixtureData } from "../fixtures/fk-object-to-point-to.js";
+import { currentAdapter } from "../support/adapter-helper.js";
+import { doubleColumnsHash } from "../support/double-columns.js";
+import { TestFixtures } from "../../lib/test-fixtures.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
+import { Organization } from "../models/organization.js";
+import { ClassNameThatDoesNotFollowCONVENTIONS } from "../models/randomly-named-c1.js";
+import {
+  AdminClassNameThatDoesNotFollowCONVENTIONS1,
+  AdminClassNameThatDoesNotFollowCONVENTIONS2,
+} from "../models/admin/randomly-named-c1.js";
+import { Bulb } from "../models/bulb.js";
+import { Dog } from "../models/dog.js";
+import { OtherDog } from "../models/other-dog.js";
+import { Comment } from "../models/comment.js";
+import { TrafficLight } from "../models/traffic-light.js";
+import "../models/movie.js";
+import "../models/computer.js";
+import { ActiveRecordError, NotNullViolation, StatementInvalid } from "../../lib/errors.js";
+import type { Mysql2Adapter } from "../../lib/connection-adapters/mysql2-adapter.js";
+import { runWithoutConnection } from "../support/connection-helper.js";
+import { CpkOrder } from "../models/cpk.js";
+import { Task } from "../models/task.js";
+import { Topic } from "../models/topic.js";
+import { Tree } from "../models/tree.js";
+import { otherTopicFixtureData } from "../fixtures/other-topics.js";
+import { nakedYmlParrotsFixtureData } from "../fixtures/naked/yml/parrots.js";
+import { nakedYmlTreesFixtureData } from "../fixtures/naked/yml/trees.js";
+import { allDevelopersFixtureData } from "../fixtures/all/developers.js";
+import { allPeopleFixtureData } from "../fixtures/all/people.js";
+import { allTasksFixtureData } from "../fixtures/all/tasks.js";
+import { toBeLinkedAccountsFixtureData } from "../fixtures/to-be-linked/accounts.js";
+import { toBeLinkedUsersFixtureData } from "../fixtures/to-be-linked/users.js";
+import { categoriesSpecialCategoriesFixtureData } from "../fixtures/categories/special-categories.js";
+import { categoriesSubsubdirArbitraryFilenameFixtureData } from "../fixtures/categories/subsubdir/arbitrary-filename.js";
+
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/parrots.ts`, nakedYmlParrotsFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/other_topics.ts`, otherTopicFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/trees.ts`, nakedYmlTreesFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/developers.ts`, allDevelopersFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/people.ts`, allPeopleFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/tasks.ts`, allTasksFixtureData);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/all/admin/accounts.ts`,
+  toBeLinkedAccountsFixtureData,
+);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/admin/users.ts`, toBeLinkedUsersFixtureData);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/categories/special_categories.ts`,
+  categoriesSpecialCategoriesFixtureData,
+);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/categories/subsubdir/arbitrary_filename.ts`,
+  categoriesSubsubdirArbitraryFilenameFixtureData,
+);
+import { Aircraft } from "../models/aircraft.js";
+import { Parrot } from "../models/parrot.js";
+import { Post } from "../models/post.js";
+import { Joke } from "../models/joke.js";
+import { Book } from "../models/book.js";
+import { Course } from "../models/course.js";
+import { College } from "../models/college.js";
+import { withSecondPool } from "../support/setup-second-pool.js";
+import { assertNoQueries } from "../../lib/testing/query-assertions.js";
+import { Account } from "../models/account.js";
+import { Binary } from "../models/binary.js";
+import { Developer } from "../models/developer.js";
+import { Company } from "../models/company.js";
+import { SpecialCategory } from "../models/category.js";
+import { Matey } from "../models/matey.js";
+import { DeadParrot, LiveParrot } from "../models/parrot.js";
+import {
+  badPostFixtureData,
+  courseFixtureData,
+  funnyJokeFixtureData,
+  itemFixtureData,
+} from "../fixtures/index.js";
+import "../../lib/relation.js";
+import {
+  setVerifyForeignKeysForFixtures,
+  verifyForeignKeysForFixtures,
+} from "../../lib/active-record.js";
+import "../models/reply.js";
+import "../models/organization.js";
+
+describe("PrimaryKeyErrorTest", () => {
+  it("generates the correct value", async () => {
+    const adapter = {
+      execute: vi.fn(async () => []),
+      beginTransaction: vi.fn(async () => {}),
+      commit: vi.fn(async () => {}),
+      rollback: vi.fn(async () => {}),
+      createSavepoint: vi.fn(async () => {}),
+      releaseSavepoint: vi.fn(async () => {}),
+      rollbackToSavepoint: vi.fn(async () => {}),
+      quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),
+      quoteTableName: (n: string) => `"${n}"`,
+      quoteColumnName: (n: string) => `"${n}"`,
+    } as unknown as DatabaseAdapter;
+    const pool = { withConnection: async (block: (c: unknown) => unknown) => block(adapter) };
+
+    const AuthorModel = {
+      connectionPool: () => pool,
+      tableName: "authors",
+      primaryKey: "id",
+      isCompositePrimaryKey: () => false,
+      loadSchema: async () => {},
+      columns: () => Object.values(doubleColumnsHash("authors")),
+      typeForAttribute: () => ({ type: () => "integer" }),
+      definedEnums: {},
+      _reflections: {
+        ownedEssay: {
+          name: "ownedEssay",
+          joinForeignKey: "owned_essay_id",
+          macro: "belongsTo",
+          isPolymorphic: () => false,
+          joinPrimaryKey: () => "name",
+          klass: { primaryKey: "id", name: "Essay" },
+          foreignKey: () => "owned_essay_id",
+        },
+      },
+      findBy: vi.fn(async () => null),
+    } as any;
+
+    FixtureFile.registerModule(
+      `${TS_FIXTURES_ROOT}/primary_key_error.ts`,
+      primaryKeyErrorFixtureData,
+    );
+    const e = await FixtureSet.createFixtures(
+      TS_FIXTURES_ROOT,
+      "primary_key_error",
+      { primary_key_error: AuthorModel },
+      AuthorModel,
+    ).catch((err: Error) => err);
+    expect(() => {
+      throw e;
+    }).toThrow(PrimaryKeyError);
+    expect((e as Error).message).toContain("Unable to set");
+  });
+});
+
+describe("FixturesWithForeignKeyViolationsTest", () => {
+  async function withVerifyForeignKeysForFixtures(block: () => Promise<void>): Promise<void> {
+    const settingWas = verifyForeignKeysForFixtures();
+    setVerifyForeignKeysForFixtures(true);
+    try {
+      await block();
+    } finally {
+      setVerifyForeignKeysForFixtures(settingWas);
+    }
+  }
+
+  afterEach(() => {
+    FixtureSet.resetCache();
+  });
+
+  it("raises fk violations", async () => {
+    FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/fk_pointing_to_non_existent_objects.ts`, {
+      first: { fk_object_to_point_to_id: 4242 },
+    });
+    await withVerifyForeignKeysForFixtures(async () => {
+      const load = (): Promise<unknown> =>
+        FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["fk_pointing_to_non_existent_objects"]);
+      if (currentAdapter("SQLite3Adapter", "PostgreSQLAdapter")) {
+        const error = await load().catch((e: Error) => e);
+        expect(() => {
+          throw error;
+        }).toThrow(RuntimeError);
+        expect((error as Error).message).toContain(
+          "Foreign key violations found in your fixture data. Ensure you aren't referring to labels that don't exist on associations.",
+        );
+        expect((error as Error).message).toContain("fk_pointing_to_non_existent_objects");
+      } else {
+        await expect(load()).resolves.not.toThrow();
+      }
+    });
+  });
+
+  it("does not raise if no fk violations", async () => {
+    FixtureFile.registerModule(
+      `${TS_FIXTURES_ROOT}/fk_object_to_point_tos.ts`,
+      fkObjectToPointToFixtureData,
+    );
+    await FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["fk_object_to_point_tos"]);
+    FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/fk_pointing_to_non_existent_objects.ts`, {
+      first: { fk_object_to_point_to_id: 1 },
+    });
+    await withVerifyForeignKeysForFixtures(async () => {
+      await expect(
+        FixtureSet.createFixtures(TS_FIXTURES_ROOT, ["fk_pointing_to_non_existent_objects"]),
+      ).resolves.not.toThrow();
+    });
+  });
+});
+
+class InsertQuerySubscriber {
+  events: string[] = [];
+
+  call(event: { payload: Record<string, unknown> }): void {
+    const sql = event.payload.sql as string;
+    if (/INSERT/.test(sql)) this.events.push(sql);
+  }
+}
+
+function stubMaxAllowedPacket(conn: unknown, packetSize: number) {
+  return vi
+    .spyOn(conn as { maxAllowedPacket(): Promise<number | null> }, "maxAllowedPacket")
+    .mockResolvedValue(packetSize);
+}
+
+describe("FixturesTest", () => {
+  const { self, topics, developers, binaries, trafficLights, categories } = fixtures(
+    [
+      "topics",
+      "developers",
+      "accounts",
+      "tasks",
+      "categories",
+      "funnyJokes",
+      "binaries",
+      "trafficLights",
+      "trees",
+    ],
+    { useInstantiatedFixtures: true, useTransactionalTests: false },
+  );
+
+  const YAML_FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
+  const FIXTURES = [
+    "accounts",
+    "binaries",
+    "companies",
+    "customers",
+    "developers",
+    "developers_projects",
+    "entrants",
+    "movies",
+    "projects",
+    "subscribers",
+    "topics",
+    "tasks",
+  ];
+  const MATCH_ATTRIBUTE_NAME = /[a-zA-Z][-\w]*/;
+
+  let engine: typeof Arel.Table.engine;
+
+  beforeEach(() => {
+    engine = Arel.Table.engine;
+    Arel.Table.engine = null;
+  });
+
+  afterEach(() => {
+    Arel.Table.engine = engine;
+  });
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
+    "bulk insert",
+    async () => {
+      const subscriber = new InsertQuerySubscriber();
+      const subscription = Notifications.subscribe("sql.active_record", (e) =>
+        subscriber.call(e as never),
+      );
+      try {
+        await self().createFixtures("bulbs");
+        expect(subscriber.events.length, "It takes one INSERT query to insert two fixtures").toBe(
+          1,
+        );
+      } finally {
+        Notifications.unsubscribe(subscription);
+      }
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
+    "bulk insert multiple table with a multi statement query",
+    async () => {
+      const subscriber = new InsertQuerySubscriber();
+      const subscription = Notifications.subscribe("sql.active_record", (e) =>
+        subscriber.call(e as never),
+      );
+      try {
+        await self().createFixtures("bulbs", "movies", "computers");
+        const conn = await Base.leaseConnection();
+        const expectedSql = [
+          `INSERT INTO ${conn.quoteTableName("bulbs")} .*`,
+          `INSERT INTO ${conn.quoteTableName("movies")} .*`,
+          `INSERT INTO ${conn.quoteTableName("computers")} .*`,
+        ].join("\n");
+        expect(subscriber.events.length).toBe(1);
+        expect(subscriber.events[0]).toMatch(new RegExp(expectedSql));
+      } finally {
+        Notifications.unsubscribe(subscription);
+      }
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
+    "bulk insert with a multi statement query raises an exception when any insert fails",
+    async () => {
+      expect(Aircraft.columnsHash()["wheels_count"].null).toBe(false);
+      const fixtures = {
+        aircraft: [
+          { name: "working_aircrafts", wheels_count: 2 },
+          { name: "broken_aircrafts", wheels_count: null },
+        ],
+      };
+
+      await assertNoDifference(
+        async () => await Aircraft.count(),
+        null,
+        async () => {
+          await expect((await Base.leaseConnection()).insertFixturesSet(fixtures)).rejects.toThrow(
+            NotNullViolation,
+          );
+        },
+      );
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter", "PostgreSQLAdapter"))(
+    "bulk insert with a multi statement query in a nested transaction",
+    async () => {
+      const fixtures = {
+        traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a"] }],
+      };
+
+      await assertDifference(
+        async () => await TrafficLight.count(),
+        1,
+        null,
+        async () => {
+          await Base.transaction(async () => {
+            const conn = await Base.leaseConnection();
+            expect(conn.openTransactions()).toBe(1);
+            await conn.insertFixturesSet(fixtures);
+            expect(conn.openTransactions()).toBe(1);
+          });
+        },
+      );
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "bulk insert with multi statements enabled",
+    async () => {
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: ["MULTI_STATEMENTS"] });
+
+        const fixtures = {
+          traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a"] }],
+        };
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).resolves.not.toThrow();
+
+        await assertDifference(
+          async () => await TrafficLight.count(),
+          1,
+          null,
+          async () => {
+            await Base.transaction(async () => {
+              const conn = await Base.leaseConnection();
+              expect(conn.openTransactions()).toBe(1);
+              await conn.insertFixturesSet(fixtures);
+              expect(conn.openTransactions()).toBe(1);
+            });
+          },
+        );
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).resolves.not.toThrow();
+      });
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "bulk insert with multi statements disabled",
+    async () => {
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: [] });
+
+        const fixtures = {
+          traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a"] }],
+        };
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).rejects.toThrow(StatementInvalid);
+
+        await assertDifference(
+          async () => await TrafficLight.count(),
+          1,
+          null,
+          async () => {
+            const conn = await Base.leaseConnection();
+            await conn.insertFixturesSet(fixtures);
+          },
+        );
+
+        await expect(
+          (async () => {
+            const conn = await Base.leaseConnection();
+            await conn.execute("SELECT 1; SELECT 2;");
+            (await (conn as unknown as Mysql2Adapter).rawConnection())!.abandonResultsBang();
+          })(),
+        ).rejects.toThrow(StatementInvalid);
+      });
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "insert fixtures set raises an error when max allowed packet is smaller than fixtures set size",
+    async () => {
+      const conn = await Base.leaseConnection();
+      const mysqlMargin = 2;
+      const packetSize = 1024;
+      const bytesNeededToHaveA1024BytesFixture = 906;
+      const fixtures = {
+        traffic_lights: [
+          {
+            location: "US",
+            state: ["NY"],
+            long_state: ["a".repeat(bytesNeededToHaveA1024BytesFixture)],
+          },
+        ],
+      };
+
+      const stub = stubMaxAllowedPacket(conn, packetSize - mysqlMargin);
+      try {
+        const error = await assertRaises([ActiveRecordError], {}, () =>
+          conn.insertFixturesSet(fixtures),
+        );
+        expect(error.message).toMatch(new RegExp(`Fixtures set is too large ${packetSize}\\.`));
+      } finally {
+        stub.mockRestore();
+      }
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "insert fixture set when max allowed packet is bigger than fixtures set size",
+    async () => {
+      const conn = await Base.leaseConnection();
+      const packetSize = 1024;
+      const fixtures = {
+        traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a".repeat(51)] }],
+      };
+
+      const stub = stubMaxAllowedPacket(conn, packetSize);
+      try {
+        await assertDifference(
+          async () => await TrafficLight.count(),
+          1,
+          null,
+          async () => {
+            await conn.insertFixturesSet(fixtures);
+          },
+        );
+      } finally {
+        stub.mockRestore();
+      }
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "insert fixtures set split the total sql into two chunks smaller than max allowed packet",
+    async () => {
+      const subscriber = new InsertQuerySubscriber();
+      const subscription = Notifications.subscribe("sql.active_record", (e) =>
+        subscriber.call(e as never),
+      );
+      const conn = await Base.leaseConnection();
+      const packetSize = 1024;
+      const fixtures = {
+        traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a".repeat(450)] }],
+        comments: [{ post_id: 1, body: "a".repeat(450) }],
+      };
+
+      const stub = stubMaxAllowedPacket(conn, packetSize);
+      try {
+        await conn.insertFixturesSet(fixtures);
+
+        expect(subscriber.events.length).toBe(2);
+        expect(new TextEncoder().encode(subscriber.events[0]).length).toBeLessThan(packetSize);
+        expect(new TextEncoder().encode(subscriber.events[1]).length).toBeLessThan(packetSize);
+      } finally {
+        stub.mockRestore();
+        Notifications.unsubscribe(subscription);
+      }
+    },
+  );
+
+  it.skipIf(!currentAdapter("Mysql2Adapter", "TrilogyAdapter"))(
+    "insert fixtures set concat total sql into a single packet smaller than max allowed packet",
+    async () => {
+      const subscriber = new InsertQuerySubscriber();
+      const subscription = Notifications.subscribe("sql.active_record", (e) =>
+        subscriber.call(e as never),
+      );
+      const conn = await Base.leaseConnection();
+      const packetSize = 1024;
+      const fixtures = {
+        traffic_lights: [{ location: "US", state: ["NY"], long_state: ["a".repeat(200)] }],
+        comments: [{ post_id: 1, body: "a".repeat(200) }],
+      };
+
+      const stub = stubMaxAllowedPacket(conn, packetSize);
+      try {
+        await assertDifference(
+          [async () => await TrafficLight.count(), async () => await Comment.count()],
+          +1,
+          null,
+          async () => {
+            await conn.insertFixturesSet(fixtures);
+          },
+        );
+        expect(subscriber.events.length).toBe(1);
+      } finally {
+        stub.mockRestore();
+        Notifications.unsubscribe(subscription);
+      }
+    },
+  );
+
+  it("auto value on primary key", async () => {
+    const fixtures = [
+      { name: "first", wheels_count: 2 },
+      { name: "second", wheels_count: 3 },
+    ];
+    const conn = await Base.leaseConnection();
+    await expect(
+      conn.insertFixturesSet({ aircraft: fixtures }, ["aircraft"]),
+    ).resolves.not.toThrow();
+    const result = await conn.selectAll("SELECT name, wheels_count FROM aircraft ORDER BY id");
+    expect(result.toArray()).toEqual(fixtures);
+  });
+
+  it("attributes", async () => {
+    const [topics] = await self().createFixtures("topics");
+    expect(topics.get("first")!.get("title")).toBe("The First Topic");
+    expect(topics.get("second")!.get("author_email_address")).toBeNull();
+  });
+
+  it("no args returns all", () => {
+    const allTopics = topics();
+    expect(allTopics.length).toBe(5);
+    expect(allTopics[0].title).toBe("The First Topic");
+    expect(allTopics[allTopics.length - 1].id).toBe(5);
+  });
+
+  it("no args record returns all without array", () => {
+    const allBinaries = binaries();
+    expect(allBinaries).toBeInstanceOf(Array);
+    expect(binaries().length).toBe(2);
+  });
+
+  it("nil raises", () => {
+    expect(() => topics(null as never)).toThrow();
+    expect(() => topics([null] as never)).toThrow();
+  });
+
+  it("inserts", async () => {
+    await self().createFixtures("topics");
+    const firstRow = await (
+      await Base.leaseConnection()
+    ).selectOne("SELECT * FROM topics WHERE author_name = 'David'");
+    expect(firstRow?.["title"]).toBe("The First Topic");
+
+    const secondRow = await (
+      await Base.leaseConnection()
+    ).selectOne("SELECT * FROM topics WHERE author_name = 'Mary'");
+    expect(secondRow?.["author_email_address"]).toBeNull();
+  });
+
+  it("inserts with pre and suffix", async () => {
+    FixtureSet.resetCache();
+
+    await (
+      await Base.leaseConnection()
+    ).createTable("prefix_other_topics_suffix", {}, (t) => {
+      t.column("title", "string");
+      t.column("author_name", "string");
+      t.column("author_email_address", "string");
+      t.column("written_on", "datetime");
+      t.column("bonus_time", "time");
+      t.column("last_read", "date");
+      t.column("content", "string");
+      t.column("approved", "boolean", { default: true });
+      t.column("replies_count", "integer", { default: 0 });
+      t.column("parent_id", "integer");
+      t.column("type", "string", { limit: 50 });
+    });
+
+    const oldPrefix = Base.tableNamePrefix;
+    const oldSuffix = Base.tableNameSuffix;
+
+    try {
+      Base.tableNamePrefix = "prefix_";
+      Base.tableNameSuffix = "_suffix";
+
+      const otherTopicKlass = class extends Base {
+        static override get name() {
+          return "OtherTopic";
+        }
+      };
+
+      const topics = [await self().createFixtures("other_topics")].flat()[0];
+
+      expect(
+        topics,
+        "Fixture data inserted, but fixture objects not returned from create",
+      ).not.toBeNull();
+
+      const firstRow = await (
+        await Base.leaseConnection()
+      ).selectOne("SELECT * FROM prefix_other_topics_suffix WHERE author_name = 'David'");
+      expect(
+        firstRow,
+        "The prefix_other_topics_suffix table appears to be empty despite create_fixtures: the row with author_name = 'David' was not found",
+      ).not.toBeNull();
+      expect(firstRow!["title"]).toBe("The First Topic");
+
+      const secondRow = await (
+        await Base.leaseConnection()
+      ).selectOne("SELECT * FROM prefix_other_topics_suffix WHERE author_name = 'Mary'");
+      expect(secondRow!["author_email_address"]).toBeNull();
+
+      expect(topics.tableName).toBe("prefix_other_topics_suffix");
+      expect(otherTopicKlass.tableName).toBe("prefix_other_topics_suffix");
+    } finally {
+      Base.tableNamePrefix = oldPrefix;
+      Base.tableNameSuffix = oldSuffix;
+
+      try {
+        await (await Base.leaseConnection()).dropTable("prefix_other_topics_suffix");
+      } catch {}
+    }
+  });
+
+  it("insert with datetime", async () => {
+    await self().createFixtures("tasks");
+    const first = await Task.find(1);
+    expect(first).toBeTruthy();
+  });
+
+  it("insert with default function", async () => {
+    await self().createFixtures("aircrafts");
+    const aircraft = await Aircraft.findBy({ name: "boeing-with-no-manufactured-at" });
+    assertInDelta(Time.now().toF(), (aircraft!.manufactured_at as Time).toF(), 1.1);
+  });
+
+  it("insert with default value", async () => {
+    await self().createFixtures("aircrafts");
+    const aircraft = await Aircraft.findBy({ name: "boeing-with-no-wheels" });
+    expect(aircraft?.wheels_count).toBe(0);
+  });
+
+  it("logger level invariant", async () => {
+    const previousLogger = Base.logger;
+    try {
+      Base.logger = new Logger(null);
+
+      const level = Base.logger.level;
+      await self().createFixtures("topics");
+      expect(Base.logger.level).toBe(level);
+    } finally {
+      Base.logger = previousLogger;
+    }
+  });
+
+  it("instantiation", async () => {
+    const [topics] = await self().createFixtures("topics");
+    expect(await topics.get("first")!.find()).toBeInstanceOf(Topic);
+  });
+
+  it("complete instantiation", () => {
+    expect((self()["@first"] as Topic).title).toBe("The First Topic");
+  });
+
+  it("fixtures from root yml with instantiation", () => {
+    expect((self()["@unknown"] as Account).credit_limit).toBe(50);
+  });
+
+  it("yaml file with invalid column", async () => {
+    const e = await FixtureSet.createFixtures(`${TS_FIXTURES_ROOT}/naked/yml`, "parrots", {
+      parrots: Parrot,
+    }).catch((err: Error) => err);
+    expect(() => {
+      throw e;
+    }).toThrow(FixtureError);
+    expect((e as Error).message).toBe('table "parrots" has no columns named "arrr", "foobar".');
+  });
+
+  it("yaml file with symbol columns", async () => {
+    await FixtureSet.createFixtures(`${TS_FIXTURES_ROOT}/naked/yml`, "trees", { trees: Tree });
+    const root = await Tree.find(1);
+    expect(root).toBeTruthy();
+  });
+
+  it("erb in fixtures", () => {
+    expect((self()["@dev_5"] as Developer).name).toBe("fixture_5");
+  });
+
+  it("empty yaml fixture", () => {
+    expect(
+      new FixtureSet(null, "accounts", Account, YAML_FIXTURES_ROOT + "/naked/yml/accounts"),
+    ).not.toBeNull();
+  });
+
+  it("empty yaml fixture with a comment in it", () => {
+    expect(
+      new FixtureSet(null, "companies", Company, YAML_FIXTURES_ROOT + "/naked/yml/companies"),
+    ).not.toBeNull();
+  });
+
+  it("clean fixtures", async () => {
+    for (const name of FIXTURES) {
+      let fixtures = null as FixtureSet | null;
+      await assertNothingRaised(async () => {
+        fixtures = (await self().createFixtures(name))[0];
+      });
+      expect(fixtures).toBeInstanceOf(FixtureSet);
+      fixtures!.each((_name, fixture) => {
+        fixture.each((key) => {
+          expect(key).toMatch(MATCH_ATTRIBUTE_NAME);
+        });
+      });
+    }
+  });
+
+  it("broken yaml exception", async () => {
+    const badyaml = Tempfile.new(["foo", ".yml"]);
+    try {
+      badyaml.write("a: : ");
+      badyaml.flush();
+
+      const dir = RubyFile.dirname(badyaml.path()!);
+      const name = RubyFile.basename(badyaml.path()!, ".yml");
+      await assertRaises([Fixture.FormatError], {}, () => FixtureSet.createFixtures(dir, name));
+    } finally {
+      badyaml.close();
+      badyaml.unlink();
+    }
+  });
+
+  it("create fixtures", async () => {
+    const fixtures = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "organizations");
+    expect(
+      await Organization.findBy({ name: "No Such Agency" }),
+      "'No Such Agency' is not in the database",
+    ).toBeTruthy();
+    expect(
+      fixtures.find((f) => f.name === "organizations"),
+      `no fixtures named 'organizations' in ${rbInspect(fixtures.map((f) => f.name))}`,
+    ).toBeTruthy();
+  });
+
+  it("multiple clean fixtures", async () => {
+    let fixturesArray = null as FixtureSet[] | null;
+    await assertNothingRaised(async () => {
+      fixturesArray = await self().createFixtures(...FIXTURES);
+    });
+    expect(fixturesArray).toBeInstanceOf(Array);
+    for (const fixtures of fixturesArray!) expect(fixtures).toBeInstanceOf(FixtureSet);
+  });
+
+  it("create symbol fixtures", async () => {
+    const fixtures = await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "collections", {
+      collections: Course,
+    });
+
+    expect(
+      await Course.findBy({ name: "Collection" }),
+      "course is not in the database",
+    ).toBeTruthy();
+    expect(
+      fixtures.find((f) => f.name === "collections"),
+      `no fixtures named 'collections' in ${rbInspect(fixtures.map((f) => f.name))}`,
+    ).toBeTruthy();
+  });
+
+  it("nonexistent fixture file", async () => {
+    const nonexistentFixturePath = TS_FIXTURES_ROOT + "/imnothere";
+
+    expect(Dir.glob(nonexistentFixturePath + "*")).toBeEmpty();
+
+    await assertRaises([ArgumentError], {}, () => {
+      new FixtureSet(null, "companies", Company, nonexistentFixturePath);
+    });
+  });
+
+  it("dirty dirty yaml file", async () => {
+    const fixturePath = YAML_FIXTURES_ROOT + "/naked/yml/courses";
+    const error = await assertRaises([Fixture.FormatError], {}, () => {
+      new FixtureSet(null, "courses", Course, fixturePath);
+    });
+    expect(error.message).toBe(`fixture is not a hash: ${fixturePath}.yml`);
+  });
+
+  it("yaml file with one invalid fixture", async () => {
+    const fixturePath = YAML_FIXTURES_ROOT + "/naked/yml/courses_with_invalid_key";
+    const error = await assertRaises([Fixture.FormatError], {}, () => {
+      new FixtureSet(null, "courses", Course, fixturePath);
+    });
+    expect(error.message).toBe(`fixture key is not a hash: ${fixturePath}.yml, keys: ["two"]`);
+  });
+
+  it("yml file in subdirectory", () => {
+    expect(categories("sub_special_1" as never).name).toBe("A special category in a subdir file");
+    expect(categories("sub_special_1" as never).constructor).toBe(SpecialCategory);
+  });
+
+  it("subsubdir file with arbitrary name", () => {
+    expect(categories("sub_special_3" as never).name).toBe(
+      "A special category in an arbitrarily named subsubdir file",
+    );
+    expect(categories("sub_special_3" as never).constructor).toBe(SpecialCategory);
+  });
+
+  it("binary in fixtures", async () => {
+    const data = new Uint8Array(await readFile(new URL("../assets/flowers.jpg", import.meta.url)));
+    expect(new Uint8Array((self()["@flowers"] as Binary).data)).toEqual(data);
+    expect(new Uint8Array((self()["@binary_helper"] as Binary).data)).toEqual(data);
+  });
+
+  it("serialized fixtures", () => {
+    expect(trafficLights("uk").state).toEqual(["Green", "Red", "Orange"]);
+  });
+
+  it("fixtures are set up with database env variable", async () => {
+    const dbUrlTmp = env["DATABASE_URL"];
+    setEnv("DATABASE_URL", "sqlite3::memory:");
+    const configurations = vi.spyOn(Base, "configurations").mockReturnValue({} as never);
+    try {
+      const testCase = class extends TestCase {
+        declare accounts: (name: string) => Promise<Account>;
+
+        static {
+          this.fixtures("accounts");
+        }
+
+        async testFixtures() {
+          expect(await this.accounts("signals37")).toBeTruthy();
+        }
+      };
+
+      const result = await new testCase("testFixtures").run();
+
+      expect(
+        result.isPassed(),
+        `Expected ${result.name} to pass:\n${result.failure?.message}`,
+      ).toBeTruthy();
+    } finally {
+      configurations.mockRestore();
+      setEnv("DATABASE_URL", dbUrlTmp);
+    }
+  });
+
+  it("fixture method and private alias", () => {
+    expect(topics("first").title).toBe("The First Topic");
+    expect((self().fixture("topics", "first") as Topic).title).toBe("The First Topic");
+    expect((self().activeRecordFixture("topics", "first") as Topic).title).toBe("The First Topic");
+  });
+
+  it("fixture method does not clash with a test case method", async () => {
+    // @ts-expect-error -- fixtures_test.rb:638-641 defines a private #fixture over TestFixtures#fixture
+    const testCase = class extends TestCase {
+      declare accounts: (name: string) => Promise<Account>;
+
+      static {
+        this.fixtures("accounts");
+      }
+
+      async testFixtures() {
+        expect(await this.accounts("signals37")).toBeTruthy();
+      }
+
+      private fixture() {
+        return new Account();
+      }
+    };
+
+    const result = await new testCase("testFixtures").run();
+
+    expect(
+      result.isPassed(),
+      `Expected ${result.name} to pass:\n${result.failure?.message}`,
+    ).toBeTruthy();
+  });
+});
+
+describe("FixturesWithoutInstantiationTest", () => {
+  const { self, topics, developers, accounts } = fixtures(["topics", "developers", "accounts"], {
+    useInstantiatedFixtures: false,
+  });
+
+  it("without complete instantiation", () => {
+    expect("@first" in self()).toBeFalsy();
+    expect("@topics" in self()).toBeFalsy();
+    expect("@developers" in self()).toBeFalsy();
+    expect("@accounts" in self()).toBeFalsy();
+  });
+
+  it("fixtures from root yml without instantiation", () => {
+    expect("@unknown" in self(), "@unknown is not defined").toBeFalsy();
+  });
+
+  it("visibility of accessor method", () => {
+    expect(rbObjRespondTo(self(), "topics"), "confirm to respond surely").toBe(true);
+  });
+
+  it("accessor methods", () => {
+    expect(topics("first").title).toBe("The First Topic");
+    expect(developers("jamis").name).toBe("Jamis");
+    expect(accounts("signals37").credit_limit).toBe(50);
+  });
+
+  it("accessor methods with multiple args", () => {
+    expect(topics("first", "second").length).toBe(2);
+    expect(() => topics(["first", "second"] as never)).toThrow();
+  });
+
+  it("reloading fixtures through accessor methods", async () => {
+    expect(topics("first").title).toBe("The First Topic");
+    const topic = Struct.new("title");
+    await assertCalled(
+      self()._loadedFixtures["topics"].get("first")!,
+      "find",
+      null,
+      { returns: Promise.resolve(new topic("Fresh Topic!")) },
+      async () => {
+        expect((await topics("first", true)).title).toBe("Fresh Topic!");
+      },
+    );
+  });
+});
+
+describe("FixturesWithoutInstanceInstantiationTest", () => {
+  const { self } = fixtures(["topics", "developers", "accounts"], {
+    useInstantiatedFixtures: ":no_instances",
+  });
+
+  it("without instance instantiation", () => {
+    expect("@first" in self(), "@first is not defined").toBeFalsy();
+  });
+});
+
+describe("TransactionalFixturesTest", () => {
+  const { self } = fixtures(["topics"], {
+    useInstantiatedFixtures: true,
+    useTransactionalTests: true,
+  });
+
+  it("destroy", async () => {
+    expect(self()["@first"]).not.toBeNull();
+    await (self()["@first"] as Topic).destroy();
+  });
+
+  it("destroy just kidding", () => {
+    expect(self()["@first"]).not.toBeNull();
+  });
+});
+
+interface SetupTestState {
+  first?: boolean;
+  second?: boolean;
+}
+
+describe("MultipleFixturesTest", () => {
+  fixtures(["topics"]);
+  const test = fixtures(["developers", "accounts"]);
+
+  it("fixture table names", () => {
+    expect(test.fixtureTableNames).toEqual(["accounts", "developers", "topics"]);
+  });
+});
+
+function setupTest(): SetupTestState {
+  const state: SetupTestState = {};
+
+  beforeEach(() => {
+    state.first = true;
+  });
+
+  return state;
+}
+
+describe("SetupTest", () => {
+  setupTest();
+
+  it("nothing", () => {});
+});
+
+describe("SetupSubclassTest", () => {
+  const state = setupTest();
+
+  beforeEach(() => {
+    state.second = true;
+  });
+
+  it("nothing", () => {});
+
+  it("subclassing should preserve setups", () => {
+    expect(state.first).toBeTruthy();
+    expect(state.second).toBeTruthy();
+  });
+});
+
+describe("OverlappingFixturesTest", () => {
+  fixtures(["topics", "developers"]);
+  const test = fixtures(["developers", "accounts"]);
+
+  it("fixture table names", () => {
+    expect(test.fixtureTableNames).toEqual(["accounts", "developers", "topics"]);
+  });
+});
+
+describe("ForeignKeyFixturesTest", () => {
+  fixtures(["fkTestHasPk", "fkTestHasFk"]);
+
+  it("number1", () => {
+    expect(true).toBeTruthy();
+  });
+
+  it("number2", () => {
+    expect(true).toBeTruthy();
+  });
+});
+
+describe("OverRideFixtureMethodTest", () => {
+  const { topics: superTopics } = fixtures(["topics"]);
+
+  function topics(name: "first") {
+    const topic = superTopics(name);
+    topic.title = "omg";
+    return topic;
+  }
+
+  it("fixture methods can be overridden", () => {
+    const x = topics("first");
+    expect(x.title).toBe("omg");
+  });
+});
+
+describe("FixtureWithSetModelClassTest", () => {
+  const { otherPosts, otherComments } = fixtures(["otherPosts", "otherComments"], {
+    useTransactionalTests: false,
+  });
+
+  it("uses fixture class defined in yaml", () => {
+    expect(otherPosts("second_welcome")).toBeInstanceOf(Post);
+  });
+
+  it("loads the associations to fixtures with set model class", async () => {
+    const post = otherPosts("second_welcome");
+    const comment = otherComments("second_greetings");
+    expect((await post.comments).map((c) => c.id)).toEqual([comment.id]);
+    expect((await comment.post)?.id).toBe(post.id);
+  });
+});
+
+describe("FixtureWithSetModelClassPrevailsOverNamingConventionTest", () => {
+  const { self } = fixtures([]);
+
+  it("model class in fixture file is respected", async () => {
+    try {
+      constSet(TopLevel, "OtherPost", class extends Base {});
+      const otherPosts = (await self().createFixtures("other_posts"))[0];
+      expect(await otherPosts.get("second_welcome")!.find()).toBeInstanceOf(Post);
+    } finally {
+      rbModRemoveConst(TopLevel, "OtherPost");
+    }
+  });
+});
+
+describe("SetFixtureClassPrevailsTest", () => {
+  const { badPosts } = fixtures(
+    { badPosts: [Post, badPostFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("uses set fixture class", () => {
+    expect(badPosts("bad_welcome")).toBeInstanceOf(Post);
+  });
+});
+
+describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTest", () => {
+  const { self } = fixtures(["accounts", "companies"], { useTransactionalTests: false });
+  withSecondPool();
+
+  let instances: Base[];
+
+  beforeEach(async () => {
+    await Course.loadSchema();
+    instances = [
+      new Account({ credit_limit: 50 }),
+      new Company({ name: "RoR Consulting" }),
+      new Course({ name: "Test" }),
+    ];
+    FixtureSet.resetCache();
+  });
+
+  it("resets to min pk with specified pk and sequence", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor;
+      await model.deleteAll();
+      const connection = (await model.leaseConnection()) as unknown as {
+        resetPkSequenceBang(
+          table: string,
+          pk?: string | null,
+          sequence?: string | null,
+        ): Promise<void>;
+      };
+      await connection.resetPkSequenceBang(
+        model.tableName!,
+        model.primaryKey as string,
+        await model.sequenceName,
+      );
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);
+    }
+  });
+
+  it("resets to min pk with default pk and sequence", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor;
+      await model.deleteAll();
+      const connection = (await model.leaseConnection()) as unknown as {
+        resetPkSequenceBang(table: string): Promise<void>;
+      };
+      await connection.resetPkSequenceBang(model.tableName!);
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);
+    }
+  });
+
+  it("create fixtures resets sequences when not cached", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor;
+      const maxId = Object.entries(
+        (await self().createFixtures(model.tableName!))[0].fixtures,
+      ).reduce((_maxId, [, fixture]) => {
+        const fixtureId = Number(toI(fixture.get("id")));
+        return fixtureId > _maxId ? fixtureId : _maxId;
+      }, 0);
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(maxId + 1);
+    }
+  });
+});
+
+describe("CheckSetTableNameFixturesTest", () => {
+  const { funnyJokes } = fixtures(
+    { funnyJokes: [Joke, funnyJokeFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("table method", () => {
+    expect(funnyJokes("a_joke")).toBeInstanceOf(Joke);
+  });
+});
+
+describe("FixtureNameIsNotTableNameFixturesTest", () => {
+  const { items } = fixtures({ items: [Book, itemFixtureData] }, { useTransactionalTests: false });
+
+  it("named accessor", () => {
+    expect(items("dvd")).toBeInstanceOf(Book);
+  });
+});
+
+describe("FixtureNameIsNotTableNameMultipleFixturesTest", () => {
+  const { items, funnyJokes } = fixtures(
+    { items: [Book, itemFixtureData], funnyJokes: [Joke, funnyJokeFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("named accessor of differently named fixture", () => {
+    expect(items("dvd")).toBeInstanceOf(Book);
+  });
+
+  it("named accessor of same named fixture", () => {
+    expect(funnyJokes("a_joke")).toBeInstanceOf(Joke);
+  });
+});
+
+describe("CustomConnectionFixturesTest", () => {
+  constSet(TopLevel, "College", College);
+  const { courses } = fixtures(
+    { courses: [Course, courseFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("leaky destroy", async () => {
+    expect(() => courses("ruby")).not.toThrow();
+    await courses("ruby").destroy();
+  });
+
+  it("it twice in whatever order to check for fixture leakage", async () => {
+    expect(() => courses("ruby")).not.toThrow();
+    await courses("ruby").destroy();
+  });
+});
+
+describe("TransactionalFixturesOnCustomConnectionTest", () => {
+  constSet(TopLevel, "College", College);
+  const { courses } = fixtures({ courses: [Course, courseFixtureData] });
+
+  it("leaky destroy", async () => {
+    expect(() => courses("ruby")).not.toThrow();
+    await courses("ruby").destroy();
+  });
+
+  it("it twice in whatever order to check for fixture leakage", async () => {
+    expect(() => courses("ruby")).not.toThrow();
+    await courses("ruby").destroy();
+  });
+});
+
+describe("CheckEscapedYamlFixturesTest", () => {
+  const { funnyJokes } = fixtures(
+    { funnyJokes: [Joke, funnyJokeFixtureData] },
+    { useTransactionalTests: false },
+  );
+
+  it("proper escaped fixture", () => {
+    expect(funnyJokes("another_joke").name).toBe("The \\n Aristocrats\nAte the candy\n");
+  });
+});
+
+class DevelopersProject {}
+describe("ManyToManyFixturesWithClassDefined", () => {
+  fixtures(["developersProjects"]);
+
+  it("this should run cleanly", () => {
+    expect(true).toBeTruthy();
+  });
+});
+
+const TIMESTAMP_COLUMNS = ["created_at", "created_on", "updated_at", "updated_on"] as const;
+
+describe("LoadAllFixturesTest", () => {
+  const { self } = fixtures([]);
+
+  it("all there", () => {
+    try {
+      (self().constructor as typeof TestCase).fixturePaths = [TS_FIXTURES_ROOT + "/all"];
+      (self().constructor as typeof TestCase).fixtures(":all");
+
+      if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
+        expect([...self().fixtureTableNames].sort()).toEqual([
+          "admin/accounts",
+          "admin/users",
+          "developers",
+          "namespaced/accounts",
+          "people",
+          "tasks",
+        ]);
+      }
+    } finally {
+      FixtureSet.resetCache();
+    }
+  });
+});
+
+describe("LoadAllFixturesWithArrayTest", () => {
+  const { self } = fixtures([]);
+
+  it("all there", () => {
+    try {
+      (self().constructor as typeof TestCase).fixturePaths = [
+        TS_FIXTURES_ROOT + "/all",
+        TS_FIXTURES_ROOT + "/categories",
+      ];
+      (self().constructor as typeof TestCase).fixtures(":all");
+
+      if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
+        expect([...self().fixtureTableNames].sort()).toEqual([
+          "admin/accounts",
+          "admin/users",
+          "developers",
+          "namespaced/accounts",
+          "people",
+          "special_categories",
+          "subsubdir/arbitrary_filename",
+          "tasks",
+        ]);
+      }
+    } finally {
+      FixtureSet.resetCache();
+    }
+  });
+});
+
+describe("FasterFixturesTest", () => {
+  const { self } = fixtures(["categories", "authors", "authorAddresses"], {
+    useTransactionalTests: false,
+  });
+
+  async function loadExtraFixture(name: string) {
+    const fixture = (await self().createFixtures(name))[0];
+    expect(fixture instanceof FixtureSet).toBeTruthy();
+    self()._loadedFixtures[fixture.tableName] = fixture;
+  }
+
+  it("cache", async () => {
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "categories")).toBeTruthy();
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "authors")).toBeTruthy();
+
+    await assertNoQueries(false, async () => {
+      await self().createFixtures("categories");
+      await self().createFixtures("authors");
+    });
+
+    await loadExtraFixture("posts");
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "posts")).toBeTruthy();
+    (self().constructor as typeof TestCase).setupFixtureAccessors("posts");
+    expect(
+      (await (self() as unknown as { posts(name: string): Promise<Post> }).posts("welcome")).title,
+    ).toBe("Welcome to the weblog");
+  });
+});
+
+describe("FoxyFixturesTest", () => {
+  const {
+    parrots,
+    pirates,
+    treasures,
+    ships,
+    computers,
+    developers,
+    "admin/accounts": adminAccounts,
+    "admin/users": adminUsers,
+    liveParrots,
+    deadParrots,
+    books,
+  } = fixtures(
+    [
+      "parrots",
+      "parrotsPirates",
+      "pirates",
+      "treasures",
+      "mateys",
+      "ships",
+      "computers",
+      "developers",
+      "admin/accounts",
+      "admin/users",
+      "liveParrots",
+      "deadParrots",
+      "books",
+    ],
+    { useTransactionalTests: false },
+  );
+
+  it("identifies strings", () => {
+    expect(FixtureSet.identify("foo")).toBe(FixtureSet.identify("foo"));
+    expect(FixtureSet.identify("foo")).not.toBe(FixtureSet.identify("FOO"));
+  });
+
+  it("identifies symbols", () => {
+    expect(FixtureSet.identify("foo")).toBe(FixtureSet.identify("foo"));
+  });
+
+  it("identifies consistently", () => {
+    expect(FixtureSet.identify("ruby")).toBe(207281424);
+    expect(FixtureSet.identify("sapphire_2")).toBe(1066363776);
+
+    expect(FixtureSet.identify("daddy", ":uuid")).toBe("f92b6bda-0d0d-5fe1-9124-502b18badded");
+    expect(FixtureSet.identify("sonny", ":uuid")).toBe("b4b10018-ad47-595d-b42f-d8bdaa6d01bf");
+  });
+
+  it("populates timestamp columns", () => {
+    for (const property of TIMESTAMP_COLUMNS) {
+      expect(parrots("george").readAttribute(property), `should set ${property}`).not.toBeNull();
+    }
+  });
+
+  it("does not populate timestamp columns if model has set record timestamps to false", () => {
+    for (const property of TIMESTAMP_COLUMNS) {
+      expect(ships("black_pearl").readAttribute(property), `should not set ${property}`).toBeNull();
+    }
+  });
+
+  it("populates all columns with the same time", () => {
+    let last: unknown = null;
+
+    for (const property of TIMESTAMP_COLUMNS) {
+      const current = parrots("george").readAttribute(property);
+      last ??= current;
+
+      expect(current).toEqual(last);
+      last = current;
+    }
+  });
+
+  it("only populates columns that exist", () => {
+    expect(pirates("blackbeard").created_on).not.toBeNull();
+    expect(pirates("blackbeard").updated_on).not.toBeNull();
+  });
+
+  it("preserves existing fixture data", () => {
+    expect(String((pirates("redbeard").created_on as Time).toDate())).toBe(
+      String(Duration.weeks(2).ago(Time.now()).toDate()),
+    );
+    expect(String((pirates("redbeard").updated_on as Time).toDate())).toBe(
+      String(Duration.weeks(2).ago(Time.now()).toDate()),
+    );
+  });
+
+  it("generates unique ids", () => {
+    expect(parrots("george").id).not.toBeNull();
+    expect(parrots("george").id).not.toBe(parrots("louis").id);
+  });
+
+  it("automatically sets primary key", () => {
+    expect(ships("black_pearl")).not.toBeNull();
+  });
+
+  it("preserves existing primary key", () => {
+    expect(ships("interceptor").id).toBe(2);
+  });
+
+  it("resolves belongs to symbols", async () => {
+    expect((await pirates("blackbeard").parrot)?.id).toBe(parrots("george").id);
+  });
+
+  it("ignores belongs to symbols if association and foreign key are named the same", async () => {
+    expect((await computers("workstation").developer)?.id).toBe(developers("david").id);
+  });
+
+  it("supports join tables", async () => {
+    expect(await pirates("blackbeard").parrots.isInclude(parrots("george"))).toBeTruthy();
+    expect(await pirates("blackbeard").parrots.isInclude(parrots("louis"))).toBeTruthy();
+    expect(await parrots("george").pirates.isInclude(pirates("blackbeard"))).toBeTruthy();
+  });
+
+  it("supports timestamps in join tables", async () => {
+    expect(developers("david").created_at).not.toBeNull();
+    expect(computers("laptop").created_at).not.toBeNull();
+
+    const klass = class extends Base {
+      static {
+        this.tableName = "computers_developers";
+      }
+    };
+
+    const computersDevelopers = await klass.findBy({
+      developer_id: developers("david").id,
+      computer_id: computers("laptop").id,
+    });
+    expect(computersDevelopers?.readAttribute("created_at")).not.toBeNull();
+  });
+
+  it("supports inline habtm", async () => {
+    expect(await parrots("george").treasures.isInclude(treasures("diamond"))).toBeTruthy();
+    expect(await parrots("george").treasures.isInclude(treasures("sapphire"))).toBeTruthy();
+    expect(await parrots("george").treasures.isInclude(treasures("ruby"))).toBeFalsy();
+  });
+
+  it("supports inline habtm with specified id", async () => {
+    expect(await parrots("polly").treasures.isInclude(treasures("ruby"))).toBeTruthy();
+    expect(await parrots("polly").treasures.isInclude(treasures("sapphire"))).toBeTruthy();
+    expect(await parrots("polly").treasures.isInclude(treasures("diamond"))).toBeFalsy();
+  });
+
+  it("supports yaml arrays", async () => {
+    expect(await parrots("louis").treasures.isInclude(treasures("diamond"))).toBeTruthy();
+    expect(await parrots("louis").treasures.isInclude(treasures("sapphire"))).toBeTruthy();
+  });
+
+  it("strips DEFAULTS key", async () => {
+    expect(() => parrots("DEFAULTS" as never)).toThrow();
+
+    for (const t of ["sapphire", "ruby"] as const) {
+      expect(await parrots("davey").treasures.isInclude(treasures(t))).toBeTruthy();
+    }
+  });
+
+  it("supports label interpolation", () => {
+    expect(parrots("frederick").name).toBe("frederick");
+  });
+
+  it("supports label string interpolation", () => {
+    expect(pirates("mark").catchphrase).toBe("X marks the spot!");
+  });
+
+  it("supports label interpolation for integer label", () => {
+    expect(pirates("1").catchphrase).toBe("#1 pirate!");
+  });
+
+  it("supports polymorphic belongs to", async () => {
+    expect((await treasures("sapphire").looter)?.id).toBe(pirates("redbeard").id);
+    expect((await treasures("ruby").looter)?.id).toBe(parrots("louis").id);
+  });
+
+  it("only generates a pk if necessary", async () => {
+    const m = (await Matey.first())!;
+    expect(() => {
+      m.pirate = pirates("blackbeard");
+      m.target = pirates("redbeard");
+    }).not.toThrow();
+  });
+
+  it("supports sti", async () => {
+    expect(parrots("polly")).toBeInstanceOf(DeadParrot);
+    expect((await (parrots("polly") as DeadParrot).killer)?.id).toBe(pirates("blackbeard").id);
+  });
+
+  it("supports sti with respective files", async () => {
+    expect(liveParrots("dusty")).toBeInstanceOf(LiveParrot);
+    expect(deadParrots("deadbird")).toBeInstanceOf(DeadParrot);
+    expect((await deadParrots("deadbird").killer)?.id).toBe(pirates("blackbeard").id);
+  });
+
+  it("resolves enums in sti subclasses", () => {
+    expect((parrots("george") as LiveParrot).isAustralian()).toBeTruthy();
+    expect((parrots("louis") as LiveParrot).isAfrican()).toBeTruthy();
+    expect((parrots("frederick") as LiveParrot).isAfrican()).toBeTruthy();
+  });
+
+  it("namespaced models", async () => {
+    expect((await adminAccounts("signals37").users).map((u) => u.id)).toContain(
+      adminUsers("david").id,
+    );
+    expect(await adminAccounts("signals37").users.size()).toBe(2);
+  });
+
+  it("resolves enums", () => {
+    expect(books("awdr").isPublished()).toBeTruthy();
+    expect(books("awdr").isRead()).toBeTruthy();
+    expect(books("rfr").isProposed()).toBeTruthy();
+    expect(books("ddd").isPublished()).toBeTruthy();
+  });
+});
+
+describe("ActiveSupportSubclassWithFixturesTest", () => {
+  const { organizations } = fixtures(["organizations"]);
+
+  it("foo", async () => {
+    expect((await (Organization as any).findByName("No Such Agency"))?.id).toBe(
+      organizations("nsa").id,
+    );
+  });
+});
+
+describe("CustomNameForFixtureOrModelTest", () => {
+  const {
+    randomlyNamedA9,
+    "admin/randomlyNamedA9": adminRandomlyNamedA9,
+    "admin/randomlyNamedB0": adminRandomlyNamedB0,
+  } = fixtures(["randomlyNamedA9", "admin/randomlyNamedA9", "admin/randomlyNamedB0"]);
+
+  it("named accessor for randomly named fixture and class", () => {
+    expect(randomlyNamedA9("first_instance")).toBeInstanceOf(ClassNameThatDoesNotFollowCONVENTIONS);
+  });
+
+  it("named accessor for randomly named namespaced fixture and class", () => {
+    expect(adminRandomlyNamedA9("first_instance")).toBeInstanceOf(
+      AdminClassNameThatDoesNotFollowCONVENTIONS1,
+    );
+    expect(adminRandomlyNamedB0("second_instance")).toBeInstanceOf(
+      AdminClassNameThatDoesNotFollowCONVENTIONS2,
+    );
+  });
+
+  it("table name is defined in the model", () => {
+    expect(FixtureSet.allLoadedFixtures["admin/randomly_named_a9"].tableName).toBe(
+      "randomly_named_table2",
+    );
+    expect(AdminClassNameThatDoesNotFollowCONVENTIONS1.tableName).toBe("randomly_named_table2");
+  });
+});
+
+describe("IgnoreFixturesTest", () => {
+  const { otherBooks, parrots } = fixtures(
+    ["otherBooks", "parrots", "parrotsPirates", "pirates", "treasures"],
+    { useTransactionalTests: false },
+  );
+
+  it("ignores books fixtures", async () => {
+    expect(() => otherBooks("published" as never)).toThrow();
+    expect(() => otherBooks("published_paperback" as never)).toThrow();
+    expect(() => otherBooks("published_ebook" as never)).toThrow();
+
+    expect(await Book.count()).toBe(2);
+    expect(otherBooks("awdr").name).toBe("Agile Web Development with Rails");
+    expect(otherBooks("awdr").status).toBe("published");
+    expect(otherBooks("awdr").format).toBe("paperback");
+    expect(otherBooks("awdr").language).toBe("english");
+
+    expect(otherBooks("rfr").name).toBe("Ruby for Rails");
+    expect(otherBooks("rfr").format).toBe("ebook");
+    expect(otherBooks("rfr").status).toBe("published");
+  });
+
+  it("ignores parrots fixtures", () => {
+    expect(() => parrots("DEFAULT" as never)).toThrow();
+    expect(() => parrots("DEAD_PARROT" as never)).toThrow();
+
+    expect(parrots("polly").parrot_sti_class).toBe("DeadParrot");
+  });
+});
+
+describe("FixturesWithDefaultScopeTest", () => {
+  const { bulbs } = fixtures(["bulbs"]);
+
+  it("inserts fixtures excluded by a default scope", async () => {
+    expect(await Bulb.count()).toBe(1);
+    expect(await Bulb.unscoped().count()).toBe(2);
+  });
+
+  it("allows access to fixtures excluded by a default scope", () => {
+    expect(bulbs("special").name).toBe("special");
+  });
+});
+
+describe("FixturesWithAbstractBelongsTo", () => {
+  const { pirates, doubloons } = fixtures(["pirates", "doubloons"]);
+
+  it("creates fixtures with belongs_to associations defined in abstract base classes", async () => {
+    expect(doubloons("blackbeards_doubloon")).not.toBeNull();
+    expect((await doubloons("blackbeards_doubloon").pirate)?.id).toBe(pirates("blackbeard").id);
+  });
+});
+
+describe("FixtureClassNamesTest", () => {
+  let klass: (new () => object) & { fixtureClassNames: Record<string, unknown> };
+  let savedCache: Record<string, unknown>;
+
+  beforeEach(() => {
+    klass = class extends Minitest.Test {} as unknown as typeof klass;
+    include(klass, TestFixtures);
+    savedCache = { ...klass.fixtureClassNames };
+  });
+
+  afterEach(() => {
+    klass.fixtureClassNames = savedCache;
+  });
+
+  it("fixture_class_names returns nil for unregistered identifier", () => {
+    expect(klass.fixtureClassNames["unregistered_identifier"]).toBeUndefined();
+  });
+});
+
+describe("SameNameDifferentDatabaseFixturesTest", () => {
+  const { self, dogs, otherDogs } = fixtures(["dogs", "otherDogs"]);
+
+  it("fixtures are properly loaded", async () => {
+    FixtureSet.resetCache();
+    await self().createFixtures("dogs", "other_dogs");
+
+    expect(dogs("sophie")).toBeInstanceOf(Dog);
+    expect(otherDogs("lassie")).toBeInstanceOf(OtherDog);
+  });
+});
+
+describe("MultipleFixtureConnectionsTest", () => {
+  describe("CompositePkFixturesTest", () => {
+    const { cpkOrders, cpkBooks, cpkAuthors, cpkReviews, cpkOrderAgreements } = fixtures([
+      "cpkOrders",
+      "cpkBooks",
+      "cpkAuthors",
+      "cpkReviews",
+      "cpkOrderAgreements",
+    ]);
+
+    it("generates composite primary key for partially filled fixtures", () => {
+      const alice = cpkAuthors("cpk_great_author");
+      const aliceCpkBook = cpkBooks("cpk_great_author_first_book");
+      const aliceCpkBookId = aliceCpkBook.id as unknown[];
+
+      assertNotEmpty(aliceCpkBookId.filter((v) => v != null));
+      expect(aliceCpkBookId[0]).toBe(alice.id);
+      expect(aliceCpkBookId[aliceCpkBookId.length - 1]).not.toBeNull();
+    });
+
+    it("generates composite primary key ids", () => {
+      assertNotEmpty((cpkOrders("cpk_groceries_order_1").id as unknown[]).filter((v) => v != null));
+
+      for (const idColumn of cpkBooks("cpk_great_author_first_book").id as unknown[]) {
+        expect(idColumn).not.toBeNull();
+      }
+    });
+
+    it("generates composite primary key with unique components", () => {
+      expect(new Set(cpkOrders("cpk_groceries_order_1").id as unknown[]).size).toBe(2);
+    });
+
+    it("resolves associations using composite primary keys", async () => {
+      const review = cpkReviews("first_book_review");
+      const generatedBook = cpkBooks("cpk_book_with_generated_pk");
+
+      expect([review.author_id, review.number]).toEqual(generatedBook.id);
+      expect(await review.book).toEqual(generatedBook);
+    });
+
+    it("resolves associations using composite primary keys with partially filled values", async () => {
+      const review = cpkReviews("second_book_review_for_book_with_partial_pk_defined");
+      const bookWithPartiallyFilledCpk = cpkBooks("cpk_great_author_first_book");
+
+      expect([review.author_id, review.number]).toEqual(bookWithPartiallyFilledCpk.id);
+      expect(await review.book).toEqual(bookWithPartiallyFilledCpk);
+    });
+
+    it("association with custom primary key", async () => {
+      const order = cpkOrders("cpk_groceries_order_2");
+      const orderAgreement = cpkOrderAgreements("order_agreement_three");
+
+      const [, orderId] = order.id as unknown[];
+
+      expect(orderAgreement.order_id).toBe(orderId);
+      expect((await orderAgreement.order)?.id).toEqual(order.id);
+    });
+
+    it("composite identify resolves to same values", () => {
+      const identifyOne = FixtureSet.compositeIdentify("label", ["a", "b", "c"]);
+      const identifyTwo = FixtureSet.compositeIdentify("label", ["a", "b", "c"]);
+
+      expect(identifyOne).toEqual(identifyTwo);
+    });
+
+    it("composite identify returns hash with key names", () => {
+      const id = FixtureSet.compositeIdentify("order", CpkOrder.primaryKey as string[]);
+
+      expect(Object.keys(id)).toEqual(["shop_id", "id"]);
+    });
+
+    it("composite identify uses same hashing algorithm as identify for first attribute", () => {
+      const idHash = FixtureSet.compositeIdentify("order", ["first_attribute", "second_attribute"]);
+      const id = FixtureSet.identify("order");
+
+      expect(idHash["first_attribute"]).toBe(id);
+      expect(idHash["second_attribute"]).not.toBe(id);
+    });
+
+    it("composite identify hashes one label to same values irrespective of column names", () => {
+      const idHashOne = FixtureSet.compositeIdentify("order", [
+        "first_attribute",
+        "second_attribute",
+      ]);
+      const idHashTwo = FixtureSet.compositeIdentify("order", ["shop_id", "id"]);
+
+      expect(Object.values(idHashOne)).toEqual(Object.values(idHashTwo));
+      expect(Object.keys(idHashOne)).not.toEqual(Object.keys(idHashTwo));
+    });
+
+    it("composite identify hashes to same values based on position in key", () => {
+      const id = FixtureSet.identify("order");
+      const idHashTwo = FixtureSet.compositeIdentify("order", ["one", "two"]);
+      const idHashThree = FixtureSet.compositeIdentify("order", ["one", "two", "three"]);
+
+      expect(Object.values(idHashTwo)[0]).toBe(id);
+      expect(Object.values(idHashThree)[0]).toBe(id);
+      expect(Object.values(idHashThree).slice(0, 2)).toEqual(Object.values(idHashTwo));
+    });
+  });
+});
+
+describe("NilFixturePathTest", () => {
+  fixtures([]);
+
+  it("raises an error when all fixtures loaded", async () => {
+    const error = await assertRaises([StandardError], {}, () => {
+      const testCase = class extends TestCase {};
+      Object.defineProperty(testCase, "name", { value: "NilFixturePathTest::TestCase" });
+      testCase.fixturePaths = null as never;
+      testCase.fixtures(":all");
+    });
+    expect(error.message).toBe(
+      squish(`
+        No fixture path found.
+        Please set \`NilFixturePathTest::TestCase.fixture_paths\`.
+      `),
+    );
+  });
+});
+
+describe("FileFixtureConflictTest", () => {
+  const { self } = fixtures([]);
+
+  it("ignores file fixtures", () => {
+    const klass = self().constructor as typeof TestCase;
+    const oldFileFixturePath = klass.fileFixturePath;
+    const oldFixturePaths = klass.fixturePaths;
+    klass.fileFixturePath = TS_FIXTURES_ROOT + "/all/admin";
+    try {
+      klass.fixturePaths = [TS_FIXTURES_ROOT + "/all"];
+      klass.fixtures(":all");
+
+      expect([...self().fixtureTableNames].sort()).toEqual([
+        "developers",
+        "namespaced/accounts",
+        "people",
+        "tasks",
+      ]);
+    } finally {
+      klass.fileFixturePath = oldFileFixturePath;
+      klass.fixturePaths = oldFixturePaths;
+      FixtureSet.resetCache();
+    }
+  });
+});
+
+describe("HasManyThroughFixture", () => {
+  fixtures([]);
+
+  const YAML_FIXTURES_ROOT = new URL("./fixture-set/test-data", import.meta.url).pathname;
+
+  function makeModel(name: string): typeof Base {
+    const klass = class extends Base {};
+    Object.defineProperty(klass, "name", { value: name });
+    return klass;
+  }
+
+  function loadHasAndBelongsToMany(): Map<string, Record<string, unknown>[]> {
+    const parrot = makeModel("Parrot");
+    parrot.hasAndBelongsToMany("treasures");
+
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
+
+    const fs = new FixtureSet(null, "parrots", parrot, parrots);
+    return fs.tableRows();
+  }
+
+  it("has many through with join table name changed to match habtm table name", () => {
+    const pt = makeModel("ParrotTreasure");
+    const parrot = makeModel("Parrot");
+    const treasure = makeModel("Treasure");
+
+    pt.tableName = "parrots_treasures";
+    pt.belongsTo("parrot", { anonymousClass: parrot });
+    pt.belongsTo("treasure", { anonymousClass: treasure });
+
+    parrot.hasMany("parrot_treasures", { anonymousClass: pt });
+    parrot.hasMany("treasures", { through: "parrot_treasures" });
+
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
+
+    const fs = new FixtureSet(null, "parrots", parrot, parrots);
+    const rows = fs.tableRows();
+    expect(rows.get("parrots_treasures")).toEqual(
+      loadHasAndBelongsToMany().get("parrots_treasures"),
+    );
+  });
+
+  it("has many through with default table name on join table", () => {
+    const pt = makeModel("ParrotTreasure");
+    const parrot = makeModel("Parrot");
+    const treasure = makeModel("Treasure");
+
+    pt.belongsTo("parrot", { anonymousClass: parrot });
+    pt.belongsTo("treasure", { anonymousClass: treasure });
+
+    parrot.hasMany("parrot_treasures", { anonymousClass: pt });
+    parrot.hasMany("treasures", { through: "parrot_treasures" });
+
+    const parrots = `${YAML_FIXTURES_ROOT}/parrots`;
+
+    const fs = new FixtureSet(null, "parrots", parrot, parrots);
+    const rows = fs.tableRows();
+    expect(rows.get("parrot_treasures")).toEqual(
+      loadHasAndBelongsToMany().get("parrots_treasures"),
+    );
+  });
+
+  it("has and belongs to many order", () => {
+    expect([...loadHasAndBelongsToMany().keys()]).toEqual(["parrots", "parrots_treasures"]);
+  });
+});

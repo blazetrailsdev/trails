@@ -114,7 +114,6 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   actioncontroller: "action-controller",
   abstractcontroller: "abstract-controller",
   actionpackversion: "action-pack",
-  "activerecord-test-support": "support",
   "rails-dom-testing": "rails-dom-testing",
   mysql2: "mysql2",
   pg: "pg",
@@ -127,7 +126,7 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
 /**
  * Src dirs of the packages nested inside `pkg`'s own src dir. The container's
  * extraction walk skips them so each file lands in exactly one package manifest
- * (`activerecord` must not also extract `src/support/`, which belongs to
+ * (`activerecord` must not also extract a nested dir that belongs to
  * `activerecord-test-support`).
  *
  * Actionpack's four packages are siblings under `src/`, with no package rooted
@@ -172,8 +171,15 @@ export function apiComparePackageRoots(): PackageRoots[] {
   });
 }
 
+/** A package whose sources sit outside its directory's library root (RFC 0223). */
+export const PACKAGE_SRC_ROOT_OVERRIDES: Record<string, string> = {
+  "activerecord-test-support": "test/support",
+};
+
 export function packageSrcDir(pkg: string): string {
   const dirName = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
+  const root = PACKAGE_SRC_ROOT_OVERRIDES[pkg];
+  if (root) return path.join(ROOT_DIR, "packages", dirName, root);
   const subDir = PACKAGE_SRC_SUBDIR[pkg];
   return subDir
     ? path.join(ROOT_DIR, "packages", dirName, libRoot(dirName), subDir)

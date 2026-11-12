@@ -54,7 +54,7 @@ describe("closingStoryReferences", () => {
     "   */",
   ].join("\n");
 
-  const refsFor = (source: string, file = "packages/activerecord/src/x.ts"): StoryReference[] =>
+  const refsFor = (source: string, file = "packages/activerecord/lib/x.ts"): StoryReference[] =>
     extractStoryReferences(source, file);
 
   it("flags a citation of a story the PR declares closed", () => {
@@ -64,7 +64,7 @@ describe("closingStoryReferences", () => {
       new Set(closesStoryIds(body)),
     );
     expect(findings.map((f) => f.slug)).toEqual(["mysql-native-type-map-converges-onto-type-map"]);
-    expect(formatFindings(findings)).toContain("packages/activerecord/src/x.ts:1");
+    expect(formatFindings(findings)).toContain("packages/activerecord/lib/x.ts:1");
   });
 
   it("clears once the citation is deleted, as #7083 did", () => {

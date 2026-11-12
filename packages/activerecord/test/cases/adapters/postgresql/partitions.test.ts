@@ -1,0 +1,35 @@
+import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import {
+  describeIfPg,
+  pgSupportsNativePartitioning,
+  PostgreSQLAdapter,
+  PG_TEST_URL,
+} from "../../../../lib/adapters/postgresql/test-helper.js";
+
+describeIfPg("PostgreSQLAdapter", () => {
+  let adapter: PostgreSQLAdapter;
+  beforeEach(async () => {
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+  });
+  afterEach(async () => {
+    await adapter.dropTable("partitioned_events", { ifExists: true });
+    await adapter.disconnectBang();
+  });
+
+  describe("PostgresqlPartitionsTest", () => {
+    it.skipIf(!pgSupportsNativePartitioning)("partitions table exists", async () => {
+      await adapter.createTable(
+        "partitioned_events",
+        {
+          force: true,
+          id: false,
+          options: "partition by range (issued_at)",
+        },
+        (t) => {
+          t.column("issued_at", "timestamp");
+        },
+      );
+      expect(await adapter.tableExists("partitioned_events")).toBeTruthy();
+    });
+  });
+});

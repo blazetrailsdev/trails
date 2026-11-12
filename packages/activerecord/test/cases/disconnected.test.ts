@@ -1,0 +1,39 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { Base } from "../../lib/index.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { adapterType } from "../../lib/test-adapter.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
+
+describe.skipIf(inMemoryDb())("TestDisconnectedAdapter", () => {
+  fixtures([], {
+    usesTransaction: ["reconnects to execute statements when disconnected"],
+  });
+
+  let connection: AbstractAdapter;
+
+  beforeEach(async () => {
+    connection = await Base.leaseConnection();
+  });
+
+  function rawConnection(conn: AbstractAdapter): unknown {
+    const sqlite = conn as unknown as { _rawConnection?: { isOpen(): boolean } };
+    if (adapterType === "sqlite") {
+      return sqlite._rawConnection?.isOpen() ? sqlite._rawConnection : null;
+    }
+    return (conn as unknown as { _rawConnection: unknown })._rawConnection;
+  }
+
+  it("reconnects to execute statements when disconnected", async () => {
+    await connection.execute("SELECT count(*) from products");
+    const firstConnection = rawConnection(connection);
+
+    await connection.disconnectBang();
+    expect(rawConnection(connection)).toBeNull();
+
+    await connection.execute("SELECT count(*) from products");
+    const secondConnection = rawConnection(connection);
+
+    expect(secondConnection).not.toBe(firstConnection);
+  });
+});

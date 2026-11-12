@@ -1,0 +1,72 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Content extends Base {
+  static _tableName = "content";
+
+  static destroyedIds: number[] = [];
+
+  static {
+    this.hasOne("contentPosition", { dependent: "destroy" });
+    this.beforeDestroy((record: Content) => {
+      Content.destroyedIds.push(record.id as number);
+    });
+  }
+}
+constSet(TopLevel, "Content", Content);
+DescendantsTracker.registerSubclass(Base, Content);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Content {
+  get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
+  set contentPosition(value: ContentPosition | null);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class ContentWhichRequiresTwoDestroyCalls extends Base {
+  static _tableName = "content";
+
+  private destroyCount: number = 0;
+
+  static {
+    this.hasOne("contentPosition", { foreignKey: "content_id", dependent: "destroy" });
+    this.afterInitialize((record: ContentWhichRequiresTwoDestroyCalls) => {
+      record.destroyCount = 0;
+    });
+    this.beforeDestroy((record: ContentWhichRequiresTwoDestroyCalls) => {
+      record.destroyCount++;
+      if (record.destroyCount === 1) {
+        kernelThrow(":abort");
+      }
+    });
+  }
+}
+constSet(TopLevel, "ContentWhichRequiresTwoDestroyCalls", ContentWhichRequiresTwoDestroyCalls);
+DescendantsTracker.registerSubclass(Base, ContentWhichRequiresTwoDestroyCalls);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ContentWhichRequiresTwoDestroyCalls {
+  get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
+  set contentPosition(value: ContentPosition | null);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class ContentPosition extends Base {
+  declare content_id: number;
+
+  static destroyedIds: number[] = [];
+
+  static {
+    this.belongsTo("content", { dependent: "destroy" });
+    this.beforeDestroy((record: ContentPosition) => {
+      ContentPosition.destroyedIds.push(record.id as number);
+    });
+  }
+}
+constSet(TopLevel, "ContentPosition", ContentPosition);
+DescendantsTracker.registerSubclass(Base, ContentPosition);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ContentPosition {
+  get content(): Content | null | Promise<Content | null>;
+  set content(value: Content | null);
+}

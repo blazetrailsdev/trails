@@ -1,0 +1,568 @@
+import { assertRaise, assertRaises } from "@blazetrails/activesupport/testing/assertions";
+import { describe, it, expect } from "vitest";
+import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "../../lib/index.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { ContextualCallbacksDeveloper } from "../models/contextual-callbacks-developer.js";
+import { ArgumentError, Range, kernelThrow } from "@blazetrails/ruby-compat";
+
+type HistoryEntry = [string, string];
+
+const CALLBACK_METHODS = [
+  "afterInitialize",
+  "afterFind",
+  "beforeValidation",
+  "afterValidation",
+  "beforeSave",
+  "afterSave",
+  "beforeCreate",
+  "afterCreate",
+  "beforeUpdate",
+  "afterUpdate",
+  "beforeDestroy",
+  "afterDestroy",
+  "afterCommit",
+  "afterRollback",
+] as const;
+
+function snakeCase(camel: string): string {
+  return camel.replace(/([A-Z])/g, "_$1").toLowerCase();
+}
+
+function registerCallbackHistory(klass: typeof Base): void {
+  for (const cm of CALLBACK_METHODS) {
+    const name = snakeCase(cm);
+    const register = (klass as any)[cm].bind(klass);
+    for (const kind of ["method", "proc", "object", "block"] as const) {
+      register((model: any) => model.history.push([name, kind]));
+    }
+  }
+}
+
+class CallbackDeveloper extends Base {
+  declare name: string;
+  declare salary: number;
+  declare private _history?: HistoryEntry[];
+  get history(): HistoryEntry[] {
+    return (this._history ??= []);
+  }
+
+  static {
+    this.tableName = "developers";
+    this.attribute("name", "string");
+    this.attribute("salary", "integer");
+    registerCallbackHistory(this);
+  }
+}
+
+class CallbackDeveloperWithHaltedValidation extends CallbackDeveloper {
+  static {
+    this.beforeValidation((model: CallbackDeveloperWithHaltedValidation) => {
+      model.history.push(["before_validation", "throwing_abort"]);
+      kernelThrow(":abort");
+    });
+    this.beforeValidation((model: CallbackDeveloperWithHaltedValidation) => {
+      model.history.push(["before_validation", "should_never_get_here"]);
+    });
+  }
+}
+
+class ParentDeveloper extends Base {
+  declare name: string;
+  afterSaveCalled = false;
+
+  static {
+    this.tableName = "developers";
+    this.attribute("name", "string");
+    this.attribute("salary", "integer");
+    this.beforeValidation((record: ParentDeveloper) => {
+      record.afterSaveCalled = true;
+    });
+  }
+}
+
+class ChildDeveloper extends ParentDeveloper {}
+
+class ImmutableDeveloper extends Base {
+  declare salary: number;
+
+  static {
+    this.tableName = "developers";
+    this.attribute("name", "string");
+    this.attribute("salary", "integer");
+    this.validates("salary", { inclusion: { in: new Range(50000, 200000) } });
+    this.beforeSave((record: ImmutableDeveloper) => record.cancel());
+    this.beforeDestroy((record: ImmutableDeveloper) => record.cancel());
+  }
+
+  private cancel(): boolean {
+    return false;
+  }
+}
+
+class DeveloperWithCanceledCallbacks extends Base {
+  declare salary: number;
+
+  static {
+    this.tableName = "developers";
+    this.attribute("name", "string");
+    this.attribute("salary", "integer");
+    this.validates("salary", { inclusion: { in: new Range(50000, 200000) } });
+    this.beforeSave((record: DeveloperWithCanceledCallbacks) => record.cancel());
+    this.beforeDestroy((record: DeveloperWithCanceledCallbacks) => record.cancel());
+  }
+
+  private cancel(): void {
+    kernelThrow(":abort");
+  }
+}
+
+class OnCallbacksDeveloper extends Base {
+  declare name: string;
+  declare salary: number;
+  declare private _history?: string[];
+  get history(): string[] {
+    return (this._history ??= []);
+  }
+
+  static {
+    this.tableName = "developers";
+    this.attribute("name", "string");
+    this.attribute("salary", "integer");
+
+    this.beforeValidation((r: OnCallbacksDeveloper) => r.history.push("before_validation"));
+    this.beforeValidation(
+      (r: OnCallbacksDeveloper) => r.history.push("before_validation_on_create"),
+      { on: "create" },
+    );
+    this.beforeValidation(
+      (r: OnCallbacksDeveloper) => r.history.push("before_validation_on_update"),
+      { on: "update" },
+    );
+
+    this.validate((r: OnCallbacksDeveloper) => r.history.push("validate"));
+
+    this.afterValidation((r: OnCallbacksDeveloper) => r.history.push("after_validation"));
+    this.afterValidation(
+      (r: OnCallbacksDeveloper) => r.history.push("after_validation_on_create"),
+      { on: "create" },
+    );
+    this.afterValidation(
+      (r: OnCallbacksDeveloper) => r.history.push("after_validation_on_update"),
+      { on: "update" },
+    );
+  }
+}
+
+class CallbackHaltedDeveloper extends Base {
+  declare salary: number;
+  afterSaveCalled = false;
+  afterCreateCalled = false;
+  afterUpdateCalled = false;
+  afterDestroyCalled = false;
+  declare cancelBeforeSave?: boolean;
+  cancelBeforeCreate?: boolean;
+  cancelBeforeUpdate?: boolean;
+  cancelBeforeDestroy?: boolean;
+
+  static {
+    this.tableName = "developers";
+    this.attribute("name", "string");
+    this.attribute("salary", "integer");
+
+    this.beforeSave((r: CallbackHaltedDeveloper) => {
+      if (r.cancelBeforeSave !== undefined) kernelThrow(":abort");
+    });
+    this.beforeCreate((r: CallbackHaltedDeveloper) => {
+      if (r.cancelBeforeCreate) kernelThrow(":abort");
+    });
+    this.beforeUpdate((r: CallbackHaltedDeveloper) => {
+      if (r.cancelBeforeUpdate) kernelThrow(":abort");
+    });
+    this.beforeDestroy((r: CallbackHaltedDeveloper) => {
+      if (r.cancelBeforeDestroy) kernelThrow(":abort");
+    });
+
+    this.afterSave((r: CallbackHaltedDeveloper) => {
+      r.afterSaveCalled = true;
+    });
+    this.afterUpdate((r: CallbackHaltedDeveloper) => {
+      r.afterUpdateCalled = true;
+    });
+    this.afterCreate((r: CallbackHaltedDeveloper) => {
+      r.afterCreateCalled = true;
+    });
+    this.afterDestroy((r: CallbackHaltedDeveloper) => {
+      r.afterDestroyCalled = true;
+    });
+  }
+}
+
+fixtures({}, { useTransactionalTests: false });
+const { developers } = fixtures(["developers"]);
+
+function assertSaveCallbacksNotCalled(someone: CallbackHaltedDeveloper): void {
+  expect(someone.afterSaveCalled).toBeFalsy();
+  expect(someone.afterCreateCalled).toBeFalsy();
+  expect(someone.afterUpdateCalled).toBeFalsy();
+}
+
+describe("CallbacksTest", () => {
+  it("initialize", () => {
+    const david = new CallbackDeveloper();
+    expect(david.history).toEqual([
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+    ]);
+  });
+
+  it("find", async () => {
+    const david = await CallbackDeveloper.find(developers("david").id);
+    expect(david.history).toEqual([
+      ["after_find", "method"],
+      ["after_find", "proc"],
+      ["after_find", "object"],
+      ["after_find", "block"],
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+    ]);
+  });
+
+  it("new valid?", async () => {
+    const david = new CallbackDeveloper();
+    await david.isValid();
+    expect(david.history).toEqual([
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+      ["before_validation", "method"],
+      ["before_validation", "proc"],
+      ["before_validation", "object"],
+      ["before_validation", "block"],
+      ["after_validation", "method"],
+      ["after_validation", "proc"],
+      ["after_validation", "object"],
+      ["after_validation", "block"],
+    ]);
+  });
+
+  it("existing valid?", async () => {
+    const david = await CallbackDeveloper.find(developers("david").id);
+    await david.isValid();
+    expect(david.history).toEqual([
+      ["after_find", "method"],
+      ["after_find", "proc"],
+      ["after_find", "object"],
+      ["after_find", "block"],
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+      ["before_validation", "method"],
+      ["before_validation", "proc"],
+      ["before_validation", "object"],
+      ["before_validation", "block"],
+      ["after_validation", "method"],
+      ["after_validation", "proc"],
+      ["after_validation", "object"],
+      ["after_validation", "block"],
+    ]);
+  });
+
+  it("create", async () => {
+    const david = await CallbackDeveloper.create({ name: "David", salary: 1000000 });
+    expect(david.history).toEqual([
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+      ["before_validation", "method"],
+      ["before_validation", "proc"],
+      ["before_validation", "object"],
+      ["before_validation", "block"],
+      ["after_validation", "method"],
+      ["after_validation", "proc"],
+      ["after_validation", "object"],
+      ["after_validation", "block"],
+      ["before_save", "method"],
+      ["before_save", "proc"],
+      ["before_save", "object"],
+      ["before_save", "block"],
+      ["before_create", "method"],
+      ["before_create", "proc"],
+      ["before_create", "object"],
+      ["before_create", "block"],
+      ["after_create", "method"],
+      ["after_create", "proc"],
+      ["after_create", "object"],
+      ["after_create", "block"],
+      ["after_save", "method"],
+      ["after_save", "proc"],
+      ["after_save", "object"],
+      ["after_save", "block"],
+      ["after_commit", "block"],
+      ["after_commit", "object"],
+      ["after_commit", "proc"],
+      ["after_commit", "method"],
+    ]);
+  });
+
+  it("validate on create", async () => {
+    const david = await OnCallbacksDeveloper.create({ name: "David", salary: 1000000 });
+    expect(david.history).toEqual([
+      "before_validation",
+      "before_validation_on_create",
+      "validate",
+      "after_validation",
+      "after_validation_on_create",
+    ]);
+  });
+
+  it("validate on contextual create", async () => {
+    const david = await ContextualCallbacksDeveloper.create({
+      name: "David",
+      salary: 1000000,
+    });
+    expect(david.history).toEqual([
+      "before_validation",
+      "before_validation_on_create",
+      "validate",
+      "after_validation",
+      "after_validation_on_create",
+    ]);
+  });
+
+  it("update", async () => {
+    const david = await CallbackDeveloper.find(developers("david").id);
+    await david.save();
+    expect(david.history).toEqual([
+      ["after_find", "method"],
+      ["after_find", "proc"],
+      ["after_find", "object"],
+      ["after_find", "block"],
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+      ["before_validation", "method"],
+      ["before_validation", "proc"],
+      ["before_validation", "object"],
+      ["before_validation", "block"],
+      ["after_validation", "method"],
+      ["after_validation", "proc"],
+      ["after_validation", "object"],
+      ["after_validation", "block"],
+      ["before_save", "method"],
+      ["before_save", "proc"],
+      ["before_save", "object"],
+      ["before_save", "block"],
+      ["before_update", "method"],
+      ["before_update", "proc"],
+      ["before_update", "object"],
+      ["before_update", "block"],
+      ["after_update", "method"],
+      ["after_update", "proc"],
+      ["after_update", "object"],
+      ["after_update", "block"],
+      ["after_save", "method"],
+      ["after_save", "proc"],
+      ["after_save", "object"],
+      ["after_save", "block"],
+      ["after_commit", "block"],
+      ["after_commit", "object"],
+      ["after_commit", "proc"],
+      ["after_commit", "method"],
+    ]);
+  });
+
+  it("validate on update", async () => {
+    const david = await OnCallbacksDeveloper.find(developers("david").id);
+    await david.save();
+    expect(david.history).toEqual([
+      "before_validation",
+      "before_validation_on_update",
+      "validate",
+      "after_validation",
+      "after_validation_on_update",
+    ]);
+  });
+
+  it("validate on contextual update", async () => {
+    const david = await ContextualCallbacksDeveloper.find(developers("david").id);
+    await david.save();
+    expect(david.history).toEqual([
+      "before_validation",
+      "before_validation_on_update",
+      "validate",
+      "after_validation",
+      "after_validation_on_update",
+    ]);
+  });
+
+  it("destroy", async () => {
+    const david = await CallbackDeveloper.find(developers("david").id);
+    await david.destroy();
+    expect(david.history).toEqual([
+      ["after_find", "method"],
+      ["after_find", "proc"],
+      ["after_find", "object"],
+      ["after_find", "block"],
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+      ["before_destroy", "method"],
+      ["before_destroy", "proc"],
+      ["before_destroy", "object"],
+      ["before_destroy", "block"],
+      ["after_destroy", "method"],
+      ["after_destroy", "proc"],
+      ["after_destroy", "object"],
+      ["after_destroy", "block"],
+      ["after_commit", "block"],
+      ["after_commit", "object"],
+      ["after_commit", "proc"],
+      ["after_commit", "method"],
+    ]);
+  });
+
+  it("delete", async () => {
+    const david = await CallbackDeveloper.find(developers("david").id);
+    await CallbackDeveloper.delete(david.id);
+    expect(david.history).toEqual([
+      ["after_find", "method"],
+      ["after_find", "proc"],
+      ["after_find", "object"],
+      ["after_find", "block"],
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+    ]);
+  });
+
+  it("before create throwing abort", async () => {
+    const someone = new CallbackHaltedDeveloper();
+    someone.cancelBeforeCreate = true;
+    expect(await someone.isValid()).toBeTruthy();
+    expect(await someone.save()).toBeFalsy();
+    assertSaveCallbacksNotCalled(someone);
+  });
+
+  it("before save throwing abort", async () => {
+    let david = await DeveloperWithCanceledCallbacks.find(developers("david").id);
+    expect(await david.isValid()).toBeTruthy();
+    expect(await david.save()).toBeFalsy();
+    const exc = await assertRaise([RecordNotSaved], {}, () => david.saveBang());
+    expect(exc.record).toBe(david);
+
+    david = await DeveloperWithCanceledCallbacks.find(developers("david").id);
+    david.salary = 10_000_000;
+    expect(await david.isValid()).toBeFalsy();
+    expect(await david.save()).toBeFalsy();
+    await assertRaise([RecordInvalid], {}, () => david.saveBang());
+
+    const someone = await CallbackHaltedDeveloper.find(developers("david").id);
+    someone.cancelBeforeSave = true;
+    expect(await someone.isValid()).toBeTruthy();
+    expect(await someone.save()).toBeFalsy();
+    assertSaveCallbacksNotCalled(someone);
+  });
+
+  it("before update throwing abort", async () => {
+    const someone = await CallbackHaltedDeveloper.find(developers("david").id);
+    someone.cancelBeforeUpdate = true;
+    expect(await someone.isValid()).toBeTruthy();
+    expect(await someone.save()).toBeFalsy();
+    assertSaveCallbacksNotCalled(someone);
+  });
+
+  it("before destroy throwing abort", async () => {
+    const david = await DeveloperWithCanceledCallbacks.find(developers("david").id);
+    expect(await david.destroy()).toBeFalsy();
+    const exc = await assertRaise([RecordNotDestroyed], {}, () => david.destroyBang());
+    expect(exc.record).toBe(david);
+    expect(await (ImmutableDeveloper as any).findById(developers("david").id)).not.toBeNull();
+
+    const someone = await CallbackHaltedDeveloper.find(developers("david").id);
+    someone.cancelBeforeDestroy = true;
+    expect(await someone.destroy()).toBeFalsy();
+    await assertRaise([RecordNotDestroyed], {}, () => someone.destroyBang());
+    expect(someone.afterDestroyCalled).toBeFalsy();
+  });
+
+  it("callback throwing abort", async () => {
+    const david = await CallbackDeveloperWithHaltedValidation.find(developers("david").id);
+    await david.save();
+    expect(david.history).toEqual([
+      ["after_find", "method"],
+      ["after_find", "proc"],
+      ["after_find", "object"],
+      ["after_find", "block"],
+      ["after_initialize", "method"],
+      ["after_initialize", "proc"],
+      ["after_initialize", "object"],
+      ["after_initialize", "block"],
+      ["before_validation", "method"],
+      ["before_validation", "proc"],
+      ["before_validation", "object"],
+      ["before_validation", "block"],
+      ["before_validation", "throwing_abort"],
+    ]);
+  });
+
+  it("inheritance of callbacks", async () => {
+    const parent = new ParentDeveloper();
+    expect(parent.afterSaveCalled).toBeFalsy();
+    await parent.save();
+    expect(parent.afterSaveCalled).toBeTruthy();
+
+    const child = new ChildDeveloper();
+    expect(child.afterSaveCalled).toBeFalsy();
+    await child.save();
+    expect(child.afterSaveCalled).toBeTruthy();
+  });
+
+  it("before save doesnt allow on option", async () => {
+    const exception = await assertRaises([ArgumentError], {}, () => {
+      class T extends Base {
+        static {
+          this.attribute("title", "string");
+          this.beforeSave(() => {}, { on: "create" } as any);
+        }
+      }
+      void T;
+    });
+    expect(exception.message).toBe("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
+  });
+
+  it("around save doesnt allow on option", async () => {
+    const exception = await assertRaises([ArgumentError], {}, () => {
+      class T extends Base {
+        static {
+          this.attribute("title", "string");
+          this.aroundSave((_r, proceed) => proceed(), { on: "create" } as any);
+        }
+      }
+      void T;
+    });
+    expect(exception.message).toBe("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
+  });
+
+  it("after save doesnt allow on option", async () => {
+    const exception = await assertRaises([ArgumentError], {}, () => {
+      class T extends Base {
+        static {
+          this.attribute("title", "string");
+          this.afterSave(() => {}, { on: "create" } as any);
+        }
+      }
+      void T;
+    });
+    expect(exception.message).toBe("Unknown key: :on. Valid keys are: :if, :unless, :prepend");
+  });
+});

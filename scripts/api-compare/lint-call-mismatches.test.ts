@@ -495,7 +495,7 @@ describe("auto-tightening the shards a branch's own diff modifies", () => {
       shardsFromDiffPaths([
         `scripts/api-compare/call-mismatches-exclude/${MINE}`,
         `scripts/api-compare/call-mismatches-unreviewed/${THEIRS}`,
-        "packages/activerecord/src/base.ts",
+        "packages/activerecord/lib/base.ts",
         "scripts/api-compare/lint-call-mismatches.ts",
       ]),
     ).toEqual(new Set([MINE, THEIRS]));

@@ -1,0 +1,154 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect, vi } from "vitest";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Author } from "../../models/author.js";
+import { Post } from "../../models/post.js";
+import { Person } from "../../models/person.js";
+import { Firm, Client } from "../../models/company.js";
+import { CollectionPersistedAssignmentError } from "../../../lib/associations/errors.js";
+import { Reader } from "../../models/reader.js";
+
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Person", Person);
+constSet(TopLevel, "Firm", Firm);
+constSet(TopLevel, "Client", Client);
+constSet(TopLevel, "Reader", Reader);
+
+describe("collection replace diffs instead of clearing", () => {
+  const { authors, posts, people, companies } = fixtures([
+    "authors",
+    "posts",
+    "people",
+    "readers",
+    "companies",
+  ]);
+
+  it("leaves records common to the old and new target untouched", async () => {
+    const author = await Author.find(authors("david").id);
+    const current = await author.postsWithCallbacks;
+    expect(current.length).toBeGreaterThan(1);
+    const [dropped, ...kept] = current;
+
+    author.postLog = [];
+    await author.postsWithCallbacks.replace(kept);
+
+    expect(author.postLog).toEqual([`before_removing${dropped.id}`, `after_removing${dropped.id}`]);
+  });
+
+  it("an equal-by-id set of distinct instances compares equal and opens no transaction", async () => {
+    const author = await Author.find(authors("david").id);
+    const current = await author.postsWithCallbacks;
+    expect(current.length).toBeGreaterThan(1);
+    const fresh = await Post.where({ author_id: author.id });
+    const replacement = current.map((post) => fresh.find((f) => f.id === post.id)!);
+    expect(replacement[0]).not.toBe(current[0]);
+
+    const association = author.association("postsWithCallbacks") as unknown as {
+      transaction(fn: () => unknown): unknown;
+    };
+    const transaction = vi.spyOn(association, "transaction");
+    author.postLog = [];
+    const result = await author.postsWithCallbacks.replace(replacement);
+
+    expect(transaction).not.toHaveBeenCalled();
+    expect(result).toBe(replacement);
+    expect(author.postLog).toEqual([]);
+  });
+
+  it("diffs an unloaded persisted collection against the loaded baseline", async () => {
+    const author = await Author.find(authors("david").id);
+    const all = await Post.where({ author_id: author.id });
+    expect(all.length).toBeGreaterThan(1);
+    const [dropped, ...kept] = all;
+
+    const fresh = await Author.find(authors("david").id);
+    fresh.postLog = [];
+    await fresh.postsWithCallbacks.replace(kept);
+
+    expect(fresh.postLog).toEqual([`before_removing${dropped.id}`, `after_removing${dropped.id}`]);
+    expect((await Post.where({ author_id: author.id })).map((p) => Number(p.id))).toEqual(
+      kept.map((p) => Number(p.id)),
+    );
+  });
+
+  it("adds only the records the new target gained", async () => {
+    const author = await Author.find(authors("david").id);
+    const current = await author.postsWithCallbacks;
+    const incoming = (await Post.where({ author_id: authors("mary").id }))[0];
+
+    author.postLog = [];
+    await author.postsWithCallbacks.replace([...current, incoming]);
+
+    expect(author.postLog).toEqual([`before_adding${incoming.id}`, `after_adding${incoming.id}`]);
+  });
+
+  it("creates one join row per occurrence for has_many :through", async () => {
+    const post = await Post.find(posts("thinking").id);
+    const david = await Person.find(people("david").id);
+
+    await post.people.replace([david]);
+    const afterOne = await Reader.where({ post_id: post.id }).count();
+    await post.people.replace([david, david]);
+
+    expect(await Reader.where({ post_id: post.id }).count()).toBe(Number(afterOne) + 1);
+  });
+
+  it("re-creates the join row when a duplicate is replaced by a single occurrence", async () => {
+    const post = await Post.find(posts("thinking").id);
+    const david = await Person.find(people("david").id);
+
+    await post.people.replace([david, david]);
+    const duplicated = await Reader.where({ post_id: post.id });
+    expect(duplicated.length).toBe(2);
+
+    await post.people.replace([david]);
+    const remaining = await Reader.where({ post_id: post.id });
+
+    expect(remaining.length).toBe(1);
+    expect(duplicated.map((r) => Number(r.id))).not.toContain(Number(remaining[0].id));
+  });
+
+  it("rolls the whole replace back when one of the new records cannot be saved", async () => {
+    const firm = await Firm.find(companies("first_firm").id);
+    const good = new Client({ name: "Good" });
+    const bad = new Client({ name: "Bad" });
+    bad.raiseOnSave = true;
+
+    const beforeIds = (await firm.clientsOfFirm).map((c) => c.id);
+    await expect(firm.clientsOfFirm.replace([good, bad])).rejects.toThrow(Client.RaisedOnSave);
+
+    const after = await Firm.find(companies("first_firm").id);
+    expect((await after.clientsOfFirm).map((c) => c.id)).toEqual(beforeIds);
+  });
+
+  it("loads the baseline for a new owner whose primary key is already set", async () => {
+    const persisted = await Firm.find(companies("first_firm").id);
+    const existing = await persisted.clients;
+    expect(existing.length).toBeGreaterThan(0);
+
+    const firm = new Firm({ id: companies("first_firm").id });
+    expect(firm.isNewRecord()).toBe(true);
+    await firm.clients.replace([]);
+
+    expect((await firm.clients).length).toBe(0);
+    expect(await Client.where({ client_of: companies("first_firm").id })).toEqual([]);
+  });
+
+  it("refuses assignAttributes on a persisted owner's collection", async () => {
+    const firm = await Firm.find(companies("first_firm").id);
+    expect(() => firm.assignAttributes({ clients: [] })).toThrow(
+      CollectionPersistedAssignmentError,
+    );
+    expect((await Client.where({ client_of: firm.id })).length).toBeGreaterThan(0);
+  });
+
+  it("refuses a mass-assigned replace that owes the database", async () => {
+    const id = companies("first_firm").id;
+    expect(() => new Firm({ id, clients: [] })).toThrow(CollectionPersistedAssignmentError);
+    expect((await Client.where({ client_of: id })).length).toBeGreaterThan(0);
+
+    const fresh = new Firm({ name: "fresh" });
+    expect(() => fresh.assignAttributes({ clients: [] })).not.toThrow();
+  });
+});

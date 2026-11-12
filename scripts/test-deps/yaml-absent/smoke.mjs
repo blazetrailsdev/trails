@@ -22,7 +22,6 @@ const dist = (path) => import(new URL(path, packagesDir).href);
 const { Base } = await dist("activerecord/dist/index.js");
 const { constSet, TopLevel } = await dist("ruby-compat/dist/index.js");
 const { FixtureSet } = await dist("activerecord/dist/fixtures.js");
-const { loadCanonicalSchema } = await dist("activerecord/dist/support/canonical-schema.js");
 const { File: FixtureFile } = await dist("activerecord/dist/fixture-set/file.js");
 const { loadDatabaseConfig } = await dist("activerecord-cli/dist/index.js");
 const I18n = await dist("i18n/dist/index.js");
@@ -37,7 +36,12 @@ class Topic extends Base {
   }
 }
 
-await Base.connectionPool().withConnection((conn) => loadCanonicalSchema(conn));
+await Base.connectionPool().withConnection((conn) =>
+  conn.createTable("topics", (t) => {
+    t.string("title", { limit: 250 });
+    t.text("content");
+  }),
+);
 
 const topic = await Topic.create({ title: "serialized", content: { a: [1, 2] } });
 const reloaded = await Topic.find(topic.id);

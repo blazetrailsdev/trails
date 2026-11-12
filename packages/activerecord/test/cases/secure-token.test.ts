@@ -1,0 +1,132 @@
+import { describe, it, expect, beforeAll, beforeEach } from "vitest";
+import { Base } from "../../lib/index.js";
+import { User } from "../models/user.js";
+import { MinimumLengthError } from "../../lib/secure-token.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+
+describe("SecureTokenTest", () => {
+  fixtures([]);
+  beforeAll(async () => {
+    await User.loadSchema();
+  });
+
+  let user: User;
+  beforeEach(() => {
+    user = new User();
+  });
+
+  async function onInitializeModel() {
+    class TokenUser extends Base {
+      declare token: string;
+      static _tableName = "users";
+    }
+    await TokenUser.loadSchema();
+    TokenUser.defineAttributeMethods();
+    TokenUser.hasSecureToken("token", { on: "initialize" });
+    return TokenUser;
+  }
+
+  it("token values are generated for specified attributes and persisted on save", async () => {
+    await user.save();
+    expect(user.token).not.toBeNull();
+    expect(user.auth_token).not.toBeNull();
+    expect(user.token.length).toBe(24);
+    expect(user.auth_token.length).toBe(36);
+  });
+
+  it("generating token on initialize does not affect reading from the column", async () => {
+    const model = await onInitializeModel();
+
+    const token = "abc123";
+
+    const created = await model.create({ token });
+
+    expect(created.token).toBe(token);
+    expect((await created.reload()).token).toBe(token);
+    expect((await model.find(created.id)).token).toBe(token);
+  });
+
+  it("generating token on initialize happens only once", async () => {
+    const model = await onInitializeModel();
+
+    const token = "    ";
+
+    const u = new model();
+    await u.update({ token });
+
+    expect(u.token).toBe(token);
+    expect((await u.reload()).token).toBe(token);
+    expect((await model.find(u.id)).token).toBe(token);
+  });
+
+  it("generating token on initialize is skipped if column was not selected", async () => {
+    const model = await onInitializeModel();
+
+    await model.create();
+    await expect(model.select("id").last()).resolves.not.toThrow();
+  });
+
+  it("regenerating the secure token", async () => {
+    await user.save();
+    const oldToken = user.token;
+    const oldAuthToken = user.auth_token;
+    await (user as any).regenerateToken();
+    await (user as any).regenerateAuthToken();
+
+    expect(user.token).not.toBe(oldToken);
+    expect(user.auth_token).not.toBe(oldAuthToken);
+
+    expect(user.token.length).toBe(24);
+    expect(user.auth_token.length).toBe(36);
+  });
+
+  it("token value not overwritten when present", async () => {
+    user.token = "custom-secure-token";
+    await user.save();
+
+    expect(user.token).toBe("custom-secure-token");
+  });
+
+  it("token length cannot be less than 24 characters", () => {
+    expect(() => User.hasSecureToken("not_valid_token", { length: 12 })).toThrow(
+      MinimumLengthError,
+    );
+  });
+
+  it("token on callback", async () => {
+    const model = await onInitializeModel();
+
+    const u = new model();
+
+    expect((u as any).token).toBeTruthy();
+  });
+
+  it("token calls the setter method", async () => {
+    class TokenUser extends Base {
+      static _tableName = "users";
+    }
+    await TokenUser.loadSchema();
+    TokenUser.defineAttributeMethods();
+    TokenUser.hasSecureToken("token", { on: "initialize" });
+
+    const proto = TokenUser.prototype as any;
+    let superDesc: PropertyDescriptor | undefined;
+    for (let p = proto; p && !superDesc; p = Object.getPrototypeOf(p)) {
+      superDesc = Object.getOwnPropertyDescriptor(p, "token");
+    }
+    Object.defineProperty(proto, "token", {
+      configurable: true,
+      get(this: any) {
+        return superDesc!.get!.call(this);
+      },
+      set(this: any, value: unknown) {
+        superDesc!.set!.call(this, value);
+        this.modifiedToken = `${value}_modified`;
+      },
+    });
+
+    const u = new TokenUser();
+
+    expect((u as any).modifiedToken).toBe(`${(u as any).token}_modified`);
+  });
+});

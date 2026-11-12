@@ -110,7 +110,7 @@ const requireTableTeardownRawSqlExclude = JSON.parse(
  */
 function canonicalTableNames() {
   const source = readFileSync(
-    new URL("./packages/activerecord/src/test-helpers/test-schema.ts", import.meta.url),
+    new URL("./packages/activerecord/test/support/test-schema.ts", import.meta.url),
     "utf8",
   );
   const declaration = source.slice(source.indexOf("export const TEST_SCHEMA"));
@@ -240,7 +240,7 @@ export default defineConfig(
     files: [
       "packages/arel/lib/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
       "packages/rack/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
@@ -262,15 +262,15 @@ export default defineConfig(
       "packages/activesupport/lib/http-adapter.ts",
       // Node-only modules exposed via subpath imports (no browser equivalent)
       "packages/activerecord-cli/lib/tsc-wrapper/**",
-      "packages/activerecord/src/sqlite/node-sqlite.ts",
-      "packages/activerecord/src/sqlite/expo-sqlite.ts",
-      "packages/activerecord/src/encryption/config.ts",
-      "packages/activerecord/src/encryption/context.ts",
-      "packages/activerecord/src/connection-handling.ts",
+      "packages/activerecord/lib/sqlite/node-sqlite.ts",
+      "packages/activerecord/lib/sqlite/expo-sqlite.ts",
+      "packages/activerecord/lib/encryption/config.ts",
+      "packages/activerecord/lib/encryption/context.ts",
+      "packages/activerecord/lib/connection-handling.ts",
       // MigrationProxy uses createRequire for synchronous file loading — Node-only
-      "packages/activerecord/src/deprecator.ts",
+      "packages/activerecord/lib/deprecator.ts",
       // Migrator.fromDir scans filesystem and uses pathToFileURL for ESM import — Node-only
-      "packages/activerecord/src/migration.ts",
+      "packages/activerecord/lib/migration.ts",
     ],
     rules: {
       "blazetrails/no-node-builtins": "error",
@@ -379,7 +379,7 @@ export default defineConfig(
     files: [
       "packages/arel/lib/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
       "packages/rack/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
@@ -445,7 +445,7 @@ export default defineConfig(
       "packages/actionview/lib/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
       "packages/activejob/lib/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "packages/rack/lib/**/*.ts",
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
@@ -474,7 +474,7 @@ export default defineConfig(
       "packages/activesupport/lib/**/*.ts",
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/lib/**/*.ts",
       "packages/rack/lib/**/*.ts",
       "packages/did-you-mean/lib/**/*.ts",
       "packages/bcrypt/lib/**/*.ts",
@@ -505,7 +505,7 @@ export default defineConfig(
   //    any increase. ──
   {
     files: [
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
     ],
@@ -558,7 +558,7 @@ export default defineConfig(
   //    `pnpm tsx scripts/build-rails-privates-manifest.ts`, refreshed on
   //    `pnpm parity:api`). ──
   {
-    files: ["packages/activerecord/src/**/*.ts"],
+    files: ["packages/activerecord/{lib,test}/**/*.ts"],
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-callback-invocations": "error",
@@ -573,7 +573,7 @@ export default defineConfig(
   //    manifest). ──
   {
     files: [
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
       "packages/arel/lib/**/*.ts",
     ],
@@ -600,7 +600,7 @@ export default defineConfig(
       "packages/activemodel/lib/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -628,8 +628,8 @@ export default defineConfig(
             "packages/arel/lib/**/*.ts",
             "packages/activemodel/lib/**/*.ts",
             "packages/actioncable/lib/**/*.ts",
-            "packages/activerecord/src/connection-adapters/**/*.ts",
-            "packages/activerecord/src/adapters/**/*.ts",
+            "packages/activerecord/lib/connection-adapters/**/*.ts",
+            "packages/activerecord/{lib,test/cases}/adapters/**/*.ts",
           ],
           ignores: ["**/*.test.ts"],
           rules: {
@@ -674,7 +674,7 @@ export default defineConfig(
   // initiative (tracked as stories in the tasks repo; see `pnpm tasks`).
   {
     files: [
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "packages/actionpack/lib/**/*.ts",
       "packages/actionview/lib/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
@@ -692,7 +692,7 @@ export default defineConfig(
   //    tracked in eslint/expected-fixtures-exclude.json and ratcheted down
   //    as porters migrate. See eslint/expected-fixtures.mjs. ──
   {
-    files: ["packages/activerecord/src/**/*.test.ts"],
+    files: ["packages/activerecord/test/**/*.test.ts"],
     rules: {
       "blazetrails/expected-fixtures": "error",
     },
@@ -705,7 +705,7 @@ export default defineConfig(
   //    eslint/test-fixture-parity-exclude.json and ratcheted down as porters
   //    adopt useFixtures. Mapping: eslint/test-fixture-parity.json (committed). ──
   {
-    files: ["packages/activerecord/src/**/*.test.ts"],
+    files: ["packages/activerecord/test/**/*.test.ts"],
     rules: {
       "blazetrails/test-fixture-parity": "error",
     },
@@ -719,7 +719,7 @@ export default defineConfig(
   //    — an afterEach/afterAll or a finally (`failureSafe`, on by default), as
   //    Rails' `teardown` does. See eslint/require-table-teardown.mjs. ──
   {
-    files: ["packages/activerecord/src/**/*.test.ts"],
+    files: ["packages/activerecord/test/**/*.test.ts"],
     ignores: testInfraExemptIgnores,
     rules: {
       "blazetrails/require-table-teardown": ["error", { rawSql: true }],
@@ -747,7 +747,7 @@ export default defineConfig(
   //    test-helpers/** is exempt — the canonical loaders are its subject under
   //    test. See eslint/require-canonical-rebuild.mjs. ──
   {
-    files: ["packages/activerecord/src/**/*.test.ts"],
+    files: ["packages/activerecord/test/**/*.test.ts"],
     ignores: testInfraExemptIgnores,
     rules: {
       "blazetrails/require-canonical-rebuild": ["error", { canonicalTables }],
@@ -881,7 +881,7 @@ export default defineConfig(
 
   // ── no-load-schema-with-stubbed-ddl: a test that stubs any DDL emitter the
   //    canonical half goes through (see
-  //    packages/activerecord/src/support/stubbed-ddl-methods.ts) lays
+  //    packages/activerecord/test/support/stubbed-ddl-methods.ts) lays
   //    nothing on the database, so `loadSchema`'s canonical half would query
   //    tables that were never created (PR #5676). Those arm-content covers must
   //    call `loadAdapterSpecificSchema` directly. The self-test allowlist in
@@ -889,12 +889,14 @@ export default defineConfig(
   //    files, so this rule is what closes the hole.
   //    See eslint/no-load-schema-with-stubbed-ddl.mjs. ──
   {
-    files: ["packages/activerecord/src/**/*.test.ts"],
+    files: ["packages/activerecord/test/**/*.test.ts"],
     // The guard cover is the one file that must do exactly what the rule
     // forbids: it stubs those emitters to assert `loadSchema` *refuses* such an
     // adapter (support/load-schema-helper.ts, assertNotArmProbe) instead of
     // running its canonical half.
-    ignores: ["packages/activerecord/src/support/load-schema-helper-arm-guard.trails.test.ts"],
+    ignores: [
+      "packages/activerecord/test/cases/support/load-schema-helper-arm-guard.trails.test.ts",
+    ],
     rules: {
       "blazetrails/no-load-schema-with-stubbed-ddl": "error",
     },
@@ -903,8 +905,8 @@ export default defineConfig(
   // ── sqlite-driver-await: driver call sites must be awaited ──
   {
     files: [
-      "packages/activerecord/src/connection-adapters/sqlite3/**/*.ts",
-      "packages/activerecord/src/connection-adapters/sqlite3-adapter.ts",
+      "packages/activerecord/{lib,test/cases}/connection-adapters/sqlite3/**/*.ts",
+      "packages/activerecord/lib/connection-adapters/sqlite3-adapter.ts",
     ],
     ignores: ["**/*.test.ts"],
     rules: {
@@ -918,7 +920,7 @@ export default defineConfig(
     files: [
       "packages/arel/{lib,test}/**/*.ts",
       "packages/activemodel/lib/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "packages/activesupport/lib/**/*.ts",
     ],
     rules: {
@@ -961,7 +963,7 @@ export default defineConfig(
   // Package-wide rule relaxations (src + tests). no-explicit-any is handled
   // separately below so it can ratchet per-area.
   {
-    files: ["packages/activerecord/src/**/*.ts"],
+    files: ["packages/activerecord/{lib,test}/**/*.ts"],
     rules: {
       "@typescript-eslint/no-this-alias": "off",
       "unused-imports/no-unused-vars": "off",
@@ -974,7 +976,7 @@ export default defineConfig(
   // (scripts/parity/eslint-count.ts): a file above its base count, or a new
   // file with any `any`, is red. Fix the `any`.
   {
-    files: ["packages/activerecord/src/**/*.ts"],
+    files: ["packages/activerecord/{lib,test}/**/*.ts"],
     rules: { "@typescript-eslint/no-explicit-any": "warn" },
   },
   // ── no-explicit-any-disable: forbid silencing `no-explicit-any` inline.
@@ -982,7 +984,7 @@ export default defineConfig(
   //    inline `eslint-disable`. Disabling the rule must itself be an error —
   //    fix the `any`. No allowlist; applies to src and tests. ──
   {
-    files: ["packages/activerecord/src/**/*.ts", "packages/arel/{lib,test}/**/*.ts"],
+    files: ["packages/activerecord/{lib,test}/**/*.ts", "packages/arel/{lib,test}/**/*.ts"],
     rules: {
       "blazetrails/no-explicit-any-disable": "error",
     },
@@ -1120,7 +1122,7 @@ export default defineConfig(
   // it in a follow-up PR as the sites are driven to zero.
   {
     files: [
-      "packages/activerecord/src/**/*.test.ts",
+      "packages/activerecord/test/**/*.test.ts",
       "packages/activerecord/dx-tests/**/*.test.ts",
       "packages/activerecord/virtualized-dx-tests/**/*.test.ts",
     ],
@@ -1229,7 +1231,7 @@ export default defineConfig(
   {
     files: [
       "packages/activemodel/lib/**/*.ts",
-      "packages/activerecord/src/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "scripts/**/*.ts",
     ],
     rules: {

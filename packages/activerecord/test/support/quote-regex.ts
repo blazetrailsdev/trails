@@ -1,0 +1,24 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
+import * as mysqlQuoting from "../../lib/connection-adapters/mysql/quoting.js";
+import * as pgQuoting from "../../lib/connection-adapters/postgresql/quoting.js";
+import * as sqliteQuoting from "../../lib/connection-adapters/sqlite3/quoting.js";
+import { adapterType } from "../../lib/test-adapter.js";
+
+function _selectImpl() {
+  switch (adapterType) {
+    case "mysql":
+      return mysqlQuoting;
+    case "postgres":
+      return pgQuoting;
+    case "sqlite":
+      return sqliteQuoting;
+    default: {
+      const _exhaustive: never = adapterType;
+      throw new RuntimeError(`quote-regex: unsupported adapterType ${String(_exhaustive)}`);
+    }
+  }
+}
+
+const _impl = _selectImpl();
+
+export const quoteColumnName: (name: string) => string = _impl.quoteColumnName;

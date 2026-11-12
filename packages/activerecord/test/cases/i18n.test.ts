@@ -1,0 +1,113 @@
+import { describe, it, expect, beforeEach } from "vitest";
+import { Base } from "../../lib/index.js";
+import { I18n } from "@blazetrails/activemodel";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { resetI18n } from "../support/i18n.js";
+
+fixtures([]);
+beforeEach(() => {
+  resetI18n();
+});
+describe("ActiveRecordI18nTests", () => {
+  it("translated model attributes", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+
+    I18n.backend().storeTranslations("en", {
+      activerecord: { attributes: { topic: { title: "topic title attribute" } } },
+    });
+
+    expect(Topic.humanAttributeName("title")).toBe("topic title attribute");
+  });
+
+  it("translated model attributes with symbols", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+
+    I18n.backend().storeTranslations("en", {
+      activerecord: { attributes: { topic: { title: "topic title attribute" } } },
+    });
+
+    expect(Topic.humanAttributeName("title")).toBe("topic title attribute");
+  });
+
+  it("translated model attributes with sti", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class Reply extends Topic {}
+
+    I18n.backend().storeTranslations("en", {
+      activerecord: { attributes: { reply: { title: "reply title attribute" } } },
+    });
+
+    expect(Reply.humanAttributeName("title")).toBe("reply title attribute");
+  });
+
+  it("translated model attributes with sti fallback", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class Reply extends Topic {}
+
+    I18n.backend().storeTranslations("en", {
+      activerecord: { attributes: { topic: { title: "topic title attribute" } } },
+    });
+
+    expect(Reply.humanAttributeName("title")).toBe("topic title attribute");
+  });
+
+  it("translated model names", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+
+    I18n.backend().storeTranslations("en", {
+      activerecord: { models: { topic: "topic model" } },
+    });
+
+    expect(Topic.modelName.human()).toBe("topic model");
+  });
+
+  it("translated model names with sti", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class Reply extends Topic {}
+
+    I18n.backend().storeTranslations("en", {
+      activerecord: { models: { reply: "reply model" } },
+    });
+
+    expect(Reply.modelName.human()).toBe("reply model");
+  });
+
+  it("translated model names with sti fallback", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    class Reply extends Topic {}
+
+    I18n.backend().storeTranslations("en", {
+      activerecord: { models: { topic: "topic model" } },
+    });
+
+    expect(Reply.modelName.human()).toBe("topic model");
+  });
+});

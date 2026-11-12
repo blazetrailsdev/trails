@@ -1,10 +1,10 @@
 {
   "story": "converge-module-eval-import-cycle-edges",
   "edges": [
-    "packages/activerecord/src/pg/pg.ts -> packages/activerecord/src/pg/connection.ts [connect]",
-    "packages/activerecord/src/pg/pg.ts -> packages/activerecord/src/pg/result.ts [PGResult]",
-    "packages/activerecord/src/relation.ts -> packages/activerecord/src/relation/calculations.ts [Calculations]",
-    "packages/activerecord/src/relation.ts -> packages/activerecord/src/relation/spawn-methods.ts [SpawnMethods]",
+    "packages/activerecord/lib/pg/pg.ts -> packages/activerecord/lib/pg/connection.ts [connect]",
+    "packages/activerecord/lib/pg/pg.ts -> packages/activerecord/lib/pg/result.ts [PGResult]",
+    "packages/activerecord/lib/relation.ts -> packages/activerecord/lib/relation/calculations.ts [Calculations]",
+    "packages/activerecord/lib/relation.ts -> packages/activerecord/lib/relation/spawn-methods.ts [SpawnMethods]",
     "packages/activesupport/lib/core-ext/date-and-time/calculations.ts -> packages/activesupport/lib/core-ext/date-and-time/calculations.ts [DateAndTimeCalculations]",
     "packages/activesupport/lib/core-ext/date-time/calculations.ts -> packages/activesupport/lib/core-ext/date-time/conversions.ts [nsec]",
     "packages/activesupport/lib/core-ext/date/calculations.ts -> packages/activesupport/lib/core-ext/date-and-time/calculations.ts [DAYS_INTO_WEEK]",

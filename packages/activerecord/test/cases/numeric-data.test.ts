@@ -1,0 +1,110 @@
+import { describe, it, expect, beforeAll } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { Base } from "../../lib/index.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { adapterType } from "../../lib/test-adapter.js";
+
+fixtures([]);
+
+beforeAll(async () => {
+  await NumericData.loadSchema();
+});
+
+class NumericData extends Base {
+  declare bank_balance: BigDecimal | null;
+  declare big_bank_balance: BigDecimal | null;
+  declare my_house_population: number | bigint | null;
+  declare world_population: number | bigint | null;
+  static _tableName = "numeric_data";
+  static {
+    this.attribute("world_population", "big_integer");
+    this.attribute("my_house_population", "big_integer");
+  }
+}
+
+describe("NumericDataTest", () => {
+  it("big decimal conditions", async () => {
+    const m = new NumericData({
+      bank_balance: 1586.43,
+      big_bank_balance: "1000234000567.95",
+      world_population: 6000000000,
+      my_house_population: 3,
+    });
+    expect(await m.save()).toBeTruthy();
+    expect(await NumericData.where("bank_balance > ?", 2000.0).count()).toBe(0);
+  });
+
+  it("numeric fields", async () => {
+    const m = new NumericData({
+      bank_balance: 1586.43,
+      big_bank_balance: "1000234000567.95",
+      world_population: 2n ** 62n,
+      my_house_population: 3,
+    });
+    expect(await m.save()).toBeTruthy();
+
+    const m1 = await NumericData.findBy({
+      bank_balance: 1586.43,
+      big_bank_balance: "1000234000567.95",
+    });
+
+    expect(Object(m1!.world_population)).toBeInstanceOf(BigInt);
+    expect(m1!.world_population).toBe(2n ** 62n);
+
+    expect(Object(m1!.my_house_population)).toBeInstanceOf(Number);
+    expect(m1!.my_house_population).toBe(3);
+
+    expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
+    expect(m1!.bank_balance!.toString("F")).toBe("1586.43");
+
+    expect(m1!.big_bank_balance).toBeInstanceOf(BigDecimal);
+    expect(m1!.big_bank_balance!.toString("F")).toBe("1000234000567.95");
+  });
+
+  it("numeric fields with scale", async () => {
+    const m = new NumericData({
+      bank_balance: 1586.43122334,
+      big_bank_balance: "234000567.952344",
+      world_population: 2n ** 62n,
+      my_house_population: 3,
+    });
+    expect(await m.save()).toBeTruthy();
+
+    const m1 = await NumericData.findBy({
+      bank_balance: 1586.43122334,
+      big_bank_balance: "234000567.952344",
+    });
+
+    expect(Object(m1!.world_population)).toBeInstanceOf(BigInt);
+    expect(m1!.world_population).toBe(2n ** 62n);
+
+    expect(Object(m1!.my_house_population)).toBeInstanceOf(Number);
+    expect(m1!.my_house_population).toBe(3);
+
+    expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
+    expect(m1!.bank_balance!.toString("F")).toBe("1586.43");
+
+    expect(m1!.big_bank_balance).toBeInstanceOf(BigDecimal);
+    expect(m1!.big_bank_balance!.toString("F")).toBe("234000567.95");
+  });
+
+  it.skipIf(adapterType !== "postgres")("numeric fields with nan", async () => {
+    const m = new NumericData({
+      bank_balance: BigDecimal.NAN,
+      big_bank_balance: BigDecimal.NAN,
+      world_population: 2n ** 62n,
+      my_house_population: 3,
+    });
+    expect(m.bank_balance!.isNan()).toBeTruthy();
+    expect(m.big_bank_balance!.isNan()).toBeTruthy();
+    expect(await m.save()).toBeTruthy();
+
+    const m1 = await NumericData.findBy({
+      bank_balance: BigDecimal.NAN,
+      big_bank_balance: BigDecimal.NAN,
+    });
+
+    expect(m1!.bank_balance!.isNan()).toBeTruthy();
+    expect(m1!.big_bank_balance!.isNan()).toBeTruthy();
+  });
+});

@@ -34,7 +34,7 @@ Rails' `ArrayHandler#call` constructs `Arel::Nodes::HomogeneousIn` for
 multi-value `where` clauses. Our TS version uses `In` / `NotIn` instead.
 Wire `HomogeneousIn` — it exists in `@blazetrails/arel`.
 
-**Files:** `packages/activerecord/src/relation/predicate-builder/array-handler.ts`
+**Files:** `packages/activerecord/lib/relation/predicate-builder/array-handler.ts`
 
 ### Slot 2-B: Bin in caseSensitiveComparison
 
@@ -42,7 +42,7 @@ Wire `HomogeneousIn` — it exists in `@blazetrails/arel`.
 `Arel::Nodes::Bin` for case-insensitive collations. Our TS has a TODO
 comment but doesn't use it. Wire `Bin` (exists in arel `nodes/unary.ts`).
 
-**Files:** `packages/activerecord/src/connection-adapters/abstract-mysql-adapter.ts`
+**Files:** `packages/activerecord/lib/connection-adapters/abstract-mysql-adapter.ts`
 
 ### Slot 2-C: OuterJoin in join-association joinConstraints
 
@@ -50,7 +50,7 @@ Rails' `JoinAssociation#join_constraints` uses `Arel::Nodes::OuterJoin`.
 Our TS references `Nodes.OuterJoin` in some paths but the linter flags a
 missing ref — verify which code path is missing the usage.
 
-**Files:** `packages/activerecord/src/associations/join-dependency/join-association.ts`
+**Files:** `packages/activerecord/lib/associations/join-dependency/join-association.ts`
 
 ### Slot 2-D: SqlLiteral gaps (join-dependency + relation + where-clause)
 
@@ -72,34 +72,34 @@ missing ref — verify which code path is missing the usage.
 - `preprocessOrderArgs` — missing `Node`, `Attribute`
 - `buildNamedBoundSqlLiteral` / `buildBoundSqlLiteral` — missing `BindError`
 
-**Files:** `packages/activerecord/src/relation/query-methods.ts`
+**Files:** `packages/activerecord/lib/relation/query-methods.ts`
 
 ### Slot 2-F: internal-metadata / schema-migration Count + BindParam
 
 Both `count` methods use `NamedFunction`+`star` but not `Count` node.
 Rails uses `Arel::Nodes::Count`. Also `selectEntry` missing `BindParam`.
 
-**Files:** `packages/activerecord/src/internal-metadata.ts`,
-`packages/activerecord/src/schema-migration.ts`
+**Files:** `packages/activerecord/lib/internal-metadata.ts`,
+`packages/activerecord/lib/schema-migration.ts`
 
 ### Slot 2-G: relation \_substituteValues — Grouping
 
 Missing `Arel::Nodes::Grouping` in `_substituteValues`.
 
-**Files:** `packages/activerecord/src/relation.ts`
+**Files:** `packages/activerecord/lib/relation.ts`
 
 ### Slot 2-H: where-clause invertPredicate — Not
 
 Missing `Arel::Nodes::Not` in `invertPredicate`.
 
-**Files:** `packages/activerecord/src/relation/where-clause.ts`
+**Files:** `packages/activerecord/lib/relation/where-clause.ts`
 
 ### Slot 2-I: postgresql-adapter arelVisitor — PostgreSQL
 
 Missing `Arel::Visitors::PostgreSQL` reference. Verify if this is a
 visitor-class instantiation gap or just a naming issue.
 
-**Files:** `packages/activerecord/src/connection-adapters/postgresql-adapter.ts`
+**Files:** `packages/activerecord/lib/connection-adapters/postgresql-adapter.ts`
 
 ---
 
@@ -111,22 +111,22 @@ visitor-class instantiation gap or just a naming issue.
 `ActiveModel::Attribute` and `UserProvidedDefault` from
 `@blazetrails/activemodel`. Both exist in the AM package.
 
-**Files:** `packages/activerecord/src/attributes.ts`
+**Files:** `packages/activerecord/lib/attributes.ts`
 
 ### Slot 3-B: quoting.ts — Attribute in typeCastedBinds
 
 Rails' `typeCastedBinds` iterates `ActiveModel::Attribute` objects.
 Verify our TS version uses the AM `Attribute` type.
 
-**Files:** `packages/activerecord/src/connection-adapters/abstract/quoting.ts`
+**Files:** `packages/activerecord/lib/connection-adapters/abstract/quoting.ts`
 
 ### Slot 3-C: enum.ts — Type, model-schema.ts — Builder
 
 `_enum` references `ActiveModel::Type`; `attributesBuilder` references
 `ActiveModel::AttributeSet::Builder`. Wire the imports.
 
-**Files:** `packages/activerecord/src/enum.ts`,
-`packages/activerecord/src/model-schema.ts`
+**Files:** `packages/activerecord/lib/enum.ts`,
+`packages/activerecord/lib/model-schema.ts`
 
 ### Slot 3-D: suppress / triage non-existent AM types
 
@@ -135,24 +135,24 @@ Ruby-specific (AttrNames is a C-extension optimization, YAMLEncoder is
 Psych-specific). Add `// lint-deps-ignore: activemodel` or filter in
 `normalizeRubyRef`.
 
-**Files:** `packages/activerecord/src/attribute-methods/read.ts`,
-`packages/activerecord/src/attribute-methods/write.ts`,
-`packages/activerecord/src/model-schema.ts`
+**Files:** `packages/activerecord/lib/attribute-methods/read.ts`,
+`packages/activerecord/lib/attribute-methods/write.ts`,
+`packages/activerecord/lib/model-schema.ts`
 
 ### Slot 3-E: encryption + serialized — Data type
 
 `textToDatabaseType` and `encoded` reference `ActiveModel::Type::Data`
 (the `Data` class). Verify if this is a real type or Ruby-specific.
 
-**Files:** `packages/activerecord/src/encryption/encrypted-attribute-type.ts`,
-`packages/activerecord/src/type/serialized.ts`
+**Files:** `packages/activerecord/lib/encryption/encrypted-attribute-type.ts`,
+`packages/activerecord/lib/type/serialized.ts`
 
 ### Slot 3-F: query.ts — FALSE_VALUES
 
 `queryCastAttribute` references `ActiveModel::Type::Boolean::FALSE_VALUES`.
 Verify if our Boolean type exports this constant.
 
-**Files:** `packages/activerecord/src/attribute-methods/query.ts`
+**Files:** `packages/activerecord/lib/attribute-methods/query.ts`
 
 ---
 
@@ -163,21 +163,21 @@ Verify if our Boolean type exports this constant.
 `associations/join_dependency.rb` — implement `makeConstraints`. Uses Arel
 joins/constraints. May overlap with join-dependency-arel-plan.md.
 
-**Files:** `packages/activerecord/src/associations/join-dependency.ts`
+**Files:** `packages/activerecord/lib/associations/join-dependency.ts`
 
 ### Slot 4-B: Calculations#calculate
 
 `relation/calculations.rb` — implement `calculate`. The main dispatch
 method for `count`/`sum`/`average`/etc. Uses Arel aggregate nodes.
 
-**Files:** `packages/activerecord/src/relation/calculations.ts`
+**Files:** `packages/activerecord/lib/relation/calculations.ts`
 
 ### Slot 4-C: QueryMethods#in_order_of
 
 `relation/query_methods.rb` — implement `inOrderOf`. Uses Arel `Case`
 node to order by a specific value list.
 
-**Files:** `packages/activerecord/src/relation/query-methods.ts`
+**Files:** `packages/activerecord/lib/relation/query-methods.ts`
 
 ---
 

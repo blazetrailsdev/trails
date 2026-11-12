@@ -27,7 +27,7 @@ raw-SQL teardown burndown as a churn lever. The burndown remains valuable as a
 ## Methodology
 
 Same instrumentation as the original audit: the opt-in `DDL_PROFILE=1` profiler
-(`packages/activerecord/src/test-helpers/ddl-profile.ts`, PR #3904), which
+(`packages/activerecord/test/support/ddl-profile.ts`, PR #3904), which
 monkey-patches the `execute`/`executeMutation` leaf DDL primitives, classifies
 each statement by leading keyword, and flushes per-worker `byOp`/`byTable`/`byFile`
 JSON aggregates. Distinct-table count is the number of distinct names appearing

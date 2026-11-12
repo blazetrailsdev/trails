@@ -1,0 +1,66 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  register,
+  lookup,
+  registry,
+  setRegistry,
+  adapterNameFrom,
+  AdapterSpecificRegistry,
+} from "../../lib/type.js";
+import { Base } from "../../lib/base.js";
+import { ValueType } from "@blazetrails/activemodel";
+
+class ArgType extends ValueType<unknown> {
+  readonly name = "arg_type";
+  readonly args: unknown;
+  constructor(args?: unknown) {
+    super();
+    this.args = args;
+  }
+  cast(value: unknown) {
+    return value;
+  }
+  override type() {
+    return "arg_type";
+  }
+}
+
+class PgArgType extends ArgType {
+  override type() {
+    return "pg_arg_type";
+  }
+}
+
+describe("TypeTest", () => {
+  let oldRegistry: AdapterSpecificRegistry;
+
+  beforeEach(() => {
+    oldRegistry = registry();
+    setRegistry(new AdapterSpecificRegistry());
+  });
+
+  afterEach(() => {
+    setRegistry(oldRegistry);
+  });
+
+  it("registering a new type", () => {
+    register("foo", ArgType);
+    expect(lookup("foo", ":arg")).toStrictEqual(new ArgType(":arg"));
+  });
+
+  it("looking up a type for a specific adapter", () => {
+    register("foo", ArgType, { override: false });
+    register("foo", PgArgType, { adapter: "postgresql" });
+
+    expect(lookup("foo", { adapter: "sqlite3" })).toStrictEqual(new ArgType());
+    expect(lookup("foo", { adapter: "postgresql" })).toStrictEqual(new PgArgType());
+  });
+
+  it("lookup defaults to the current adapter", () => {
+    const currentAdapter = adapterNameFrom(Base);
+    register("foo", ArgType, { override: false });
+    register("foo", PgArgType, { adapter: currentAdapter });
+
+    expect(lookup("foo")).toStrictEqual(new PgArgType());
+  });
+});

@@ -18,7 +18,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 const ROOT = path.resolve(__dirname, "..");
-const PKG_SRC = path.join(ROOT, "packages/activerecord/src");
+const PKG_SRC = path.join(ROOT, "packages/activerecord/lib");
 
 type RubyParam = { name: string; kind: string };
 type RubyMethod = { name: string; params: RubyParam[]; visibility?: string };
@@ -193,7 +193,7 @@ for (const fileEntry of ar.files) {
   src = src.replace(trailingStubRe, "\n");
 
   // Determine import for NotImplementedError. The errors module lives at
-  // packages/activerecord/src/errors.ts. Compute relative import.
+  // packages/activerecord/lib/errors.ts. Compute relative import.
   const fromDir = path.dirname(tsAbs);
   let relImport = path.relative(fromDir, path.join(PKG_SRC, "errors")).replaceAll("\\", "/");
   if (!relImport.startsWith(".")) relImport = "./" + relImport;

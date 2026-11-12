@@ -1,0 +1,43 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Comment } from "./comment.js";
+import type { Tagging } from "./tagging.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Rating extends Base {
+  declare taggings: AssociationProxy<Tagging>;
+  declare taggingsWithoutTag: AssociationProxy<Tagging>;
+  declare taggingsWithNoTag: AssociationProxy<Tagging>;
+  declare comment_id: number;
+  declare value: number;
+
+  static {
+    this.belongsTo("comment");
+    this.hasMany("taggings", { as: "taggable" });
+    this.hasMany(
+      "taggingsWithoutTag",
+      function () {
+        return this.leftJoins(":tag").where({ "tags.id": [null, 0] });
+      },
+      { as: "taggable", className: "Tagging" },
+    );
+    this.hasMany(
+      "taggingsWithNoTag",
+      function () {
+        return this.joins("LEFT OUTER JOIN tags ON tags.id = taggings.tag_id").where({
+          "tags.id": null,
+        });
+      },
+      { as: "taggable", className: "Tagging" },
+    );
+  }
+}
+constSet(TopLevel, "Rating", Rating);
+DescendantsTracker.registerSubclass(Base, Rating);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Rating {
+  get comment(): Comment | null | Promise<Comment | null>;
+  set comment(value: Comment | null);
+}

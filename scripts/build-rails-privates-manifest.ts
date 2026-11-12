@@ -684,7 +684,7 @@ function callbackTsNames(rubyMethod: string): string[] {
 function emitCallbackInvocationsManifest(): void {
   const CALLBACK_OUT = path.join(ROOT, "eslint/rails-callback-invocations.json");
   const libPaths = libPathsManifest();
-  // Scoped to ActiveRecord (the ESLint rule scopes to packages/activerecord/src).
+  // Scoped to ActiveRecord (the ESLint rule scopes to packages/activerecord/lib).
   const libDir = libPaths.activerecord;
   const pkgDir = PACKAGE_DIRS.activerecord;
   // Keys are file-qualified `<repo-rel-ts-path>#<tsName>` so a requirement

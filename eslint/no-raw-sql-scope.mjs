@@ -35,7 +35,7 @@ export const noRawSqlIgnores = [
   // `test_fixtures.rb:113` code (RFC 0064 bucket D); it renders DDL/DML
   // directly for the same reason the rest of the test-infra does. Anchored to
   // the exact ported files — matching `fixtures.ts` by basename would also
-  // exempt any future same-named module elsewhere under activerecord/src.
+  // exempt any future same-named module elsewhere under activerecord/lib.
   "fixtures.ts",
   "test-fixtures.ts",
   "test-fixtures/**",

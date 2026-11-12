@@ -1,0 +1,234 @@
+import { NoMethodError } from "@blazetrails/ruby-compat";
+import { quotingHost } from "../../../support/quoting-host.js";
+import { NotImplementedError } from "../../../../lib/errors.js";
+import { describe, expect, it } from "vitest";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { BinaryData } from "@blazetrails/activemodel";
+import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
+import { Value as TimeValue } from "../../../../lib/type/time.js";
+import {
+  quote,
+  ClassMethods,
+  quotedBinary,
+  quotedDate as quotedDateFn,
+  quotedTime,
+  typeCast,
+} from "../../../../lib/connection-adapters/abstract/quoting.js";
+
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call(quotingHost(), value);
+
+describe("quotedDate", () => {
+  it("formats a Temporal.Instant as UTC datetime string", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55Z");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("formats a Temporal.PlainDateTime", () => {
+    const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("formats a Temporal.PlainDate", () => {
+    const v = Temporal.PlainDate.from("2026-04-26");
+    expect(quotedDate(v)).toBe("2026-04-26");
+  });
+
+  it("formats a TimeWithZone through its UTC instant", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const v = new TimeWithZone(Temporal.Instant.from("2026-04-26T14:23:55Z"), eastern);
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("quote and type_cast route a TimeWithZone through quotedDate", () => {
+    const eastern = TimeZone.find("Eastern Time (US & Canada)")!;
+    const v = new TimeWithZone(Temporal.Instant.from("2026-04-26T14:23:55Z"), eastern);
+    expect(quote.call(quotingHost(), v)).toBe("'2026-04-26 14:23:55'");
+    expect(typeCast.call(quotingHost(), v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("formats a Temporal.ZonedDateTime via its instant", () => {
+    const v = Temporal.ZonedDateTime.from("2026-04-26T14:23:55+00:00[UTC]");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("formats an already-UTC Time, which default_timezone=:utc leaves unconverted", () => {
+    const v = RubyTime.utc(2026, 4, 26, 14, 23, 55);
+    expect(v.isUtc()).toBe(true);
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("formats in local time when the connection's default_timezone is local", () => {
+    const v = RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456);
+    const local = v.getlocal();
+    expect(quotedDateFn.call({ defaultTimezone: "local" }, v)).toBe(
+      `${local.strftime("%Y-%m-%d %H:%M:%S")}.123456`,
+    );
+  });
+
+  it("throws for unrecognised types", () => {
+    expect(() => quotedDate("2026-04-26" as never)).toThrow(NoMethodError);
+  });
+});
+
+describe("quotedTime", () => {
+  it("formats a Time::Value stripping the date prefix", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
+    expect(quotedTime.call(quotingHost(), v)).toBe("14:23:55");
+  });
+
+  it("formats a Time::Value with fractional seconds stripping the date", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456));
+    expect(quotedTime.call(quotingHost(), v)).toBe("14:23:55.123456");
+  });
+
+  it("normalises the date component to 2000-01-01", () => {
+    const v = new TimeValue(RubyTime.utc(2099, 12, 31, 9, 0, 0));
+    expect(quotedTime.call(quotingHost(), v)).toBe("09:00:00");
+  });
+
+  it("dispatches through this.quotedDate (mirrors Rails quoted_time → self.quoted_date)", () => {
+    const host = quotingHost({ quotedDate: () => "2000-01-01 11:22:33" });
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 11, 22, 33));
+    expect(quotedTime.call(host, v)).toBe("11:22:33");
+  });
+});
+
+describe("quote dispatches through quoted_date/quoted_time", () => {
+  it("routes Date/Time values through this.quotedDate", () => {
+    const host = quotingHost({ quotedDate: () => "DISPATCHED" });
+    const v = Temporal.PlainDate.from("2026-04-26");
+    expect(quote.call(host, v)).toBe("'DISPATCHED'");
+  });
+
+  it("routes Time::Value through this.quotedTime", () => {
+    const host = quotingHost({ quotedTime: () => "DISPATCHED_TIME" });
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
+    expect(quote.call(host, v)).toBe("'DISPATCHED_TIME'");
+  });
+
+  it("uses the abstract quoted_date on a receiver that does not override it", () => {
+    const v = Temporal.PlainDate.from("2026-04-26");
+    expect(quote.call(quotingHost(), v)).toBe("'2026-04-26'");
+  });
+
+  it("uses the abstract quoted_time on a receiver that does not override it", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
+    expect(quote.call(quotingHost(), v)).toBe("'14:23:55'");
+  });
+});
+
+describe("quote dispatches through quoted_binary", () => {
+  it("routes Type::Binary::Data through this.quotedBinary", () => {
+    const host = quotingHost({ quotedBinary: () => "DISPATCHED_BINARY" });
+    expect(quote.call(host, new BinaryData(new Uint8Array([0xde, 0xad])))).toBe(
+      "DISPATCHED_BINARY",
+    );
+  });
+
+  it("passes the Type::Binary::Data itself to this.quotedBinary", () => {
+    let received: unknown;
+    const host = quotingHost({
+      quotedBinary: (value: unknown) => {
+        received = value;
+        return "";
+      },
+    });
+    const data = new BinaryData(new Uint8Array([0xde, 0xad]));
+    quote.call(host, data);
+    expect(received).toBe(data);
+  });
+
+  it("raises for a bare byte view, which only Type::Binary::Data carries to quoted_binary", () => {
+    expect(() => quote.call(quotingHost(), new Uint8Array([0xde, 0xad]))).toThrow(
+      "can't quote String",
+    );
+  });
+
+  it("falls back to the module quoted_binary helper without a host", () => {
+    expect(quote.call(quotingHost(), new BinaryData("ab"))).toBe("'ab'");
+  });
+
+  it("normalises every byte source in the module quoted_binary fallback", () => {
+    expect(quotedBinary(new BinaryData(new Uint8Array([0x61, 0x62])))).toBe("'ab'");
+    expect(quotedBinary(new BinaryData("ab"))).toBe("'ab'");
+  });
+
+  it("keeps non-UTF-8 bytes byte-exact in the module quoted_binary fallback", () => {
+    const bytes = [0xde, 0xad, 0xbe, 0xef];
+    const expected = `'${bytes.map((b) => String.fromCharCode(b)).join("")}'`;
+    expect(quotedBinary(new BinaryData(new Uint8Array(bytes)))).toBe(expected);
+  });
+});
+
+describe("type_cast unwraps Type::Binary::Data", () => {
+  it("returns the raw bytes, not a lossy UTF-8 decode", () => {
+    const bytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+    const out = typeCast.call(quotingHost(), new BinaryData(bytes));
+    expect(out).toBeInstanceOf(Uint8Array);
+    expect(out).toEqual(bytes);
+  });
+});
+
+describe("type_cast dispatches through quoted_date/quoted_time", () => {
+  it("routes Date/Time values through this.quotedDate", () => {
+    const host = quotingHost({ quotedDate: () => "DISPATCHED" });
+    const v = Temporal.PlainDate.from("2026-04-26");
+    expect(typeCast.call(host, v)).toBe("DISPATCHED");
+  });
+
+  it("routes Time::Value through this.quotedTime", () => {
+    const host = quotingHost({ quotedTime: () => "DISPATCHED_TIME" });
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
+    expect(typeCast.call(host, v)).toBe("DISPATCHED_TIME");
+  });
+
+  it("uses the abstract quoted_date on a receiver that does not override it", () => {
+    const v = Temporal.PlainDate.from("2026-04-26");
+    expect(typeCast.call(quotingHost(), v)).toBe("2026-04-26");
+  });
+
+  it("uses the abstract quoted_time on a receiver that does not override it", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55));
+    expect(typeCast.call(quotingHost(), v)).toBe("14:23:55");
+  });
+});
+
+describe("quote_table_name dispatches through quote_column_name", () => {
+  it("routes through this.quoteColumnName", () => {
+    const host = quotingHost({ quoteColumnName: (n: string) => `<<${n}>>` });
+    expect(ClassMethods.quoteTableName.call(host, "people")).toBe("<<people>>");
+  });
+
+  it("raises on a receiver with no quoter rather than answering with ANSI quotes", () => {
+    expect(() => ClassMethods.quoteTableName.call(quotingHost(), "people")).toThrow(
+      NotImplementedError,
+    );
+  });
+});
+
+describe("boolean literals dispatch through the host", () => {
+  const host = quotingHost({
+    quotedTrue: () => "1",
+    quotedFalse: () => "0",
+    unquotedTrue: () => 1,
+    unquotedFalse: () => 0,
+  });
+
+  it("routes quote through this.quotedTrue/quotedFalse when present", () => {
+    expect(quote.call(host, true)).toBe("1");
+    expect(quote.call(host, false)).toBe("0");
+  });
+
+  it("routes type_cast through this.unquotedTrue/unquotedFalse when present", () => {
+    expect(typeCast.call(host, true)).toBe(1);
+    expect(typeCast.call(host, false)).toBe(0);
+  });
+
+  it("uses the abstract literals on a receiver that does not override them", () => {
+    expect(quote.call(quotingHost(), true)).toBe("TRUE");
+    expect(quote.call(quotingHost(), false)).toBe("FALSE");
+    expect(typeCast.call(quotingHost(), true)).toBe(true);
+    expect(typeCast.call(quotingHost(), false)).toBe(false);
+  });
+});

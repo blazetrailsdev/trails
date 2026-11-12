@@ -2568,7 +2568,7 @@ describe("selectMisplacedFile", () => {
 
 describe("buildEntitiesByName", () => {
   it("includes entities from the current package", () => {
-    const base = cls("packages/activerecord/src/base.ts", "Base");
+    const base = cls("packages/activerecord/lib/base.ts", "Base");
     const ts = makeManifest({ activerecord: { classes: { Base: base } } });
     const map = buildEntitiesByName("activerecord", ts);
     expect(map.get("Base")).toContain(base);
@@ -2579,7 +2579,7 @@ describe("buildEntitiesByName", () => {
     const model = cls("packages/activemodel/lib/model.ts", "Model");
     model.instanceMethods = [method("attributes")];
 
-    const base = cls("packages/activerecord/src/base.ts", "Base");
+    const base = cls("packages/activerecord/lib/base.ts", "Base");
     base.superclass = "Model";
 
     const ts = makeManifest({
@@ -2626,7 +2626,7 @@ describe("buildEntitiesByName", () => {
   });
 
   it("current-package entities appear before dep-package entities (same name)", () => {
-    const localModel = cls("packages/activerecord/src/model.ts", "Model");
+    const localModel = cls("packages/activerecord/lib/model.ts", "Model");
     const depModel = cls("packages/activemodel/lib/model.ts", "Model");
     const ts = makeManifest({
       activerecord: { classes: { LocalModel: localModel } },

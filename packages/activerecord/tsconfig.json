@@ -3,35 +3,20 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "exclude": [
-    "src/**/*.test.ts",
-    "src/test-setup-*.ts",
-    "src/**/*.bench.ts",
-    "src/test-helpers",
-    "src/adapters/abstract-mysql-adapter/test-helper.ts",
-    "src/cases/helper.ts",
-    "src/cases/test-case.ts",
-    "src/encryption/test-helpers.ts",
-    "src/support/adapter-helper.ts",
-    "src/support/canonical-model-index-encryption-setup.ts",
-    "src/support/canonical-model-index.ts",
-    "src/support/canonical-schema-stamp.ts",
-    "src/support/connection.ts",
-    "src/support/describe-if-mysql-adapter.ts",
-    "src/support/describe-if-postgresql-adapter.ts",
-    "src/support/describe-if-sqlite.ts",
-    "src/support/drop-all-tables.ts",
-    "src/support/load-schema-helper.ts",
-    "src/support/quote-regex.ts",
-    "src/support/schema-cache-dump.ts",
-    "src/support/setup-second-pool.ts",
-    "src/support/sqlite-template.ts",
-    "src/support/supports.ts",
-    "src/support/template-global-setup.ts",
-    "src/test-adapter.ts"
+    "lib/test-setup-*.ts",
+    "lib/**/*.bench.ts",
+    "lib/adapters/abstract-mysql-adapter/test-helper.ts",
+    "lib/adapters/postgresql/test-helper.ts",
+    "lib/cases/helper.ts",
+    "lib/cases/json-shared-test-cases.ts",
+    "lib/cases/test-case.ts",
+    "lib/encryption/test-helpers.ts",
+    "lib/test-adapter.ts",
+    "lib/test-helpers"
   ],
   "references": [
     {

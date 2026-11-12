@@ -52,7 +52,7 @@ RFC 0086 called for an audit before productionizing. It was run on 2026-08-05
 The one genuinely unique signal — `score.ts:skeletonTokens`' **ordered** call
 skeleton, which a set-based call comparison is blind to — was ported into
 `api:calls:wide` first (RFC 0084, #6152), so nothing was lost in the deletion.
-The two `// prism-mro:` markers in `packages/activerecord/src/base.ts` were
+The two `// prism-mro:` markers in `packages/activerecord/lib/base.ts` were
 replaced with the plain MRO note they encoded.
 
 The generator-improvement work the audit inventoried (nested class/module
@@ -235,7 +235,7 @@ canonicalized on both sides. Resolution chases exported functions, the
 `perform*` mixin-map indirection, wrapper calls, and both predicate name
 candidates — with an arity guard on fallback candidates (Rails `readonly?`
 must not match the port of Rails `readonly(value)`) — and falls back to a
-global index over `packages/activerecord/src` for methods ported into a
+global index over `packages/activerecord/lib` for methods ported into a
 different file than the Rails twin (unambiguous hits only). Between exact
 match and divergent sits a `reordered` tier (identical token multiset,
 different order); on the current corpus it is empty — reordered-looking
@@ -370,7 +370,7 @@ computes at runtime:
    names the file merely _calls_ on other receivers (`Array#first`, `#one?`) are
    not swept in (the `await` rule is receiver-blind, so an unscoped union would
    await unrelated same-named calls). Beyond the twin file, a whole-program
-   async manifest over `packages/activerecord/src` (`buildAsyncManifest`) carries
+   async manifest over `packages/activerecord/lib` (`buildAsyncManifest`) carries
    `await` across file boundaries: a name that exactly one other port file
    defines async, and that Rails `def`s somewhere in the target set, is awaited
    too — the same unambiguous-global-hit rule the scorer's cross-file fallback

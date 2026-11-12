@@ -1,0 +1,59 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+
+describeIfMysqlAdapter("Mysql2Adapter", () => {
+  let adapter: Mysql2Adapter;
+  beforeEach(async () => {
+    adapter = await leaseMysqlAdapter();
+  });
+
+  describe("AutoIncrementTest", () => {
+    afterEach(async () => {
+      await adapter.dropTable("auto_increments", { ifExists: true });
+    });
+
+    it("auto increment without primary key", async () => {
+      await adapter.createTable("auto_increments", { id: false, force: true }, (t: any) => {
+        t.integer("id", { null: false, autoIncrement: true });
+        t.index(["id"]);
+      });
+      const output = await dumpTableSchema("auto_increments");
+      expect(output).toMatch(/t\.integer\("id", \{ null: false, autoIncrement: true \}\)/);
+    });
+
+    it("auto increment with composite primary key", async () => {
+      await adapter.createTable(
+        "auto_increments",
+        { primaryKey: ["id", "created_at"], force: true },
+        (t: any) => {
+          t.integer("id", { null: false, autoIncrement: true });
+          t.datetime("created_at", { null: false });
+        },
+      );
+      const output = await dumpTableSchema("auto_increments");
+      expect(output).toMatch(/t\.integer\("id", \{ null: false, autoIncrement: true \}\)/);
+    });
+
+    it("auto increment false with custom primary key", async () => {
+      await adapter.createTable("auto_increments", { id: false, force: "cascade" }, (t: any) => {
+        t.column("id", "primary_key", { autoIncrement: false });
+      });
+      const columns = await adapter.columns("auto_increments");
+      const col = (columns as any[]).find((c) => c.name === "id");
+      assertNotPredicate(col, (c) => c.isAutoIncrement());
+    });
+
+    it("auto increment false with create table", async () => {
+      await adapter.createTable("auto_increments", { autoIncrement: false, force: "cascade" });
+      const columns = await adapter.columns("auto_increments");
+      const col = (columns as any[]).find((c) => c.name === "id");
+      assertNotPredicate(col, (c) => c.isAutoIncrement());
+    });
+  });
+});

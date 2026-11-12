@@ -1,0 +1,23 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { Molecule } from "./molecule.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Electron extends Base {
+  declare molecule_id: number;
+  declare name: string;
+
+  static {
+    this.belongsTo("molecule");
+
+    this.validatesPresenceOf("name");
+  }
+}
+constSet(TopLevel, "Electron", Electron);
+DescendantsTracker.registerSubclass(Base, Electron);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Electron {
+  get molecule(): Molecule | null | Promise<Molecule | null>;
+  set molecule(value: Molecule | null);
+}

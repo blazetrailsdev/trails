@@ -88,10 +88,10 @@ beforeEach(async () => {
   await write("CLAUDE.md", ROOT_CLAUDE);
   await write("packages/activerecord/package.json", JSON.stringify({ description: "ORM layer" }));
   await write("packages/activerecord/CLAUDE.md", "## Local rule\n\nLocal lede.\n");
-  await write("packages/activerecord/src/a.ts", SOURCE);
-  await write("packages/activerecord/src/a.test.ts", TEST);
+  await write("packages/activerecord/lib/a.ts", SOURCE);
+  await write("packages/activerecord/test/cases/a.test.ts", TEST);
   await write(
-    "packages/activerecord/src/b.ts",
+    "packages/activerecord/lib/b.ts",
     'import { Module } from "@blazetrails/ruby-compat";\nnew Module();\n',
   );
   await write("packages/vitest-matchers/package.json", "{}");
@@ -306,7 +306,7 @@ describe("package-summary", () => {
     expect(tagSites.find((s) => s.declaration === "constructor")).toMatchObject({
       tag: "noRailsEquivalent",
       receipt: "CONVERGEABLE",
-      file: "packages/activerecord/src/a.ts",
+      file: "packages/activerecord/lib/a.ts",
       line: 17,
     });
     expect(tagSites.find((s) => s.tag === "missingRailsCall")).toMatchObject({
@@ -338,9 +338,13 @@ describe("package-summary", () => {
     const [ar] = (await summarize(root)).packages;
     expect(ar.permanentSkips).toEqual({
       "CLAUDE.md#ruby-strings-are-js-string-primitives-no-mutable-string-carrier": [
-        { file: "packages/activerecord/src/a.test.ts", line: 2, testName: "reads the encoding" },
+        {
+          file: "packages/activerecord/test/cases/a.test.ts",
+          line: 2,
+          testName: "reads the encoding",
+        },
       ],
-      "": [{ file: "packages/activerecord/src/a.test.ts", line: 5, testName: "other" }],
+      "": [{ file: "packages/activerecord/test/cases/a.test.ts", line: 5, testName: "other" }],
     });
   });
 
@@ -366,7 +370,7 @@ describe("package-summary", () => {
 
   it("fails on a citation no heading resolves", async () => {
     await write(
-      "packages/activerecord/src/c.test.ts",
+      "packages/activerecord/test/cases/c.test.ts",
       '// PERMANENT-SKIP: CLAUDE.md, "No such section".\nit.skip("x", () => {});\n',
     );
     await expect(summarize(root)).rejects.toThrow(/cites CLAUDE.md, "No such section"/);

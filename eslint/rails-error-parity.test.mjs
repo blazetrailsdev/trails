@@ -55,7 +55,7 @@ manifest.bareRaises = {
 };
 manifest.errinfo = { activerecord: ["RestoreError"] };
 
-const excludedRel = "packages/activerecord/src/excluded.ts";
+const excludedRel = "packages/activerecord/lib/excluded.ts";
 
 fs.writeFileSync(MANIFEST_FIXTURE, JSON.stringify(manifest, null, 2));
 process.env.RAILS_ERROR_CLASSES_PATH = MANIFEST_FIXTURE;
@@ -68,8 +68,8 @@ process.on("exit", () => {
 // ESM hoisting of this import is harmless.
 const { default: rule } = await import("./rails-error-parity.mjs");
 
-const errorsFile = path.join(REPO_ROOT, "packages/activerecord/src/errors.ts");
-const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
+const errorsFile = path.join(REPO_ROOT, "packages/activerecord/lib/errors.ts");
+const baseFile = path.join(REPO_ROOT, "packages/activerecord/lib/base.ts");
 const excludedFile = path.join(REPO_ROOT, excludedRel);
 const rackFile = path.join(REPO_ROOT, "packages/rack/lib/response.ts");
 const asErrorsFile = path.join(REPO_ROOT, "packages/activesupport/lib/errors.ts");

@@ -1,0 +1,636 @@
+import { block as rbBlock, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect, afterEach } from "vitest";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
+import { Base } from "../../lib/base.js";
+import { Migration, IrreversibleMigration, type MigrationClass } from "../../lib/migration.js";
+import { CommandRecorder } from "../../lib/migration/command-recorder.js";
+import { itIfSupports } from "../support/supports.js";
+import { adapterType } from "../../lib/test-adapter.js";
+import { loadSchemaFromAdapter } from "../../lib/model-schema.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+
+class Horse extends Base {
+  static {
+    this.tableName = "horses";
+    constSet(TopLevel, "Horse", this);
+  }
+}
+
+class SilentMigration extends Migration.Current {
+  write(): void {}
+}
+
+class InvertibleMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await this.createTable("horses", (t) => {
+      t.column("content", "text");
+      t.column("remind_at", "datetime");
+      t.column("place_id", "integer");
+      t.column("parent_id", "bigint");
+    });
+  }
+}
+
+class InvertibleChangeTableMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await this.changeTable("horses", {}, async (t) => {
+      await t.column("name", "string");
+      await t.remove("remind_at", { type: "datetime" });
+    });
+  }
+}
+
+class InvertibleTransactionMigration extends InvertibleMigration {
+  async change(): Promise<void> {
+    await this.methodMissing("transaction", async () => {
+      await super.change();
+    });
+  }
+}
+
+class InvertibleRevertMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await this.revert(
+      rbBlock(async () => {
+        await this.createTable("horses", (t) => {
+          t.column("content", "text");
+          t.column("remind_at", "datetime");
+        });
+      }),
+    );
+  }
+}
+
+class InvertibleByPartsMigration extends SilentMigration {
+  test?: (dir: symbol) => void | Promise<void>;
+  async change(): Promise<void> {
+    await this.createTable("new_horses", (t) => {
+      t.column("breed", "string");
+    });
+    await this.reversible(async (dir) => {
+      await this.test?.(Symbol.for("both"));
+      await dir.up(async () => this.test?.(Symbol.for("up")));
+      await dir.down(async () => this.test?.(Symbol.for("down")));
+    });
+    await this.revert(
+      rbBlock(async () => {
+        await this.createTable("horses", (t) => {
+          t.column("content", "text");
+          t.column("remind_at", "datetime");
+        });
+      }),
+    );
+  }
+}
+
+class NonInvertibleMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await this.createTable("horses", (t) => {
+      t.column("content", "text");
+      t.column("remind_at", "datetime");
+    });
+    await this.removeColumn("horses", "content");
+  }
+}
+
+class RemoveIndexMigration1 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.createTable("horses", (t) => {
+      t.column("name", "string");
+      t.column("color", "string");
+      t.index(["name", "color"]);
+      t.index(["color"]);
+    });
+  }
+}
+
+class RemoveIndexMigration2 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.changeTable("horses", {}, async (t) => {
+      await t.removeIndex(["name", "color"]);
+      if (await (t as any).indexExists?.(["color"])) {
+        await t.removeIndex(["color"]);
+      }
+    });
+  }
+}
+
+class ChangeColumnDefault1 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.createTable("horses", (t) => {
+      t.column("name", "string", { default: "Sekitoba" });
+    });
+  }
+}
+
+class ChangeColumnDefault2 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.changeColumnDefault("horses", "name", { from: "Sekitoba", to: "Diomed" });
+  }
+}
+
+class ChangeColumnComment1 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.createTable("horses", (t) => {
+      t.column("name", "string", { comment: "Sekitoba" });
+    });
+  }
+}
+
+class ChangeColumnComment2 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.changeColumnComment("horses", "name", { from: "Sekitoba", to: "Diomed" });
+  }
+}
+
+class ChangeTableComment1 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.createTable("horses", { comment: "Sekitoba" });
+  }
+}
+
+class ChangeTableComment2 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.changeTableComment("horses", { from: "Sekitoba", to: "Diomed" });
+  }
+}
+
+class DisableExtension1 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.enableExtension("hstore");
+  }
+}
+
+class DisableExtension2 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.disableExtension("hstore", { force: "cascade" });
+  }
+}
+
+class DropTableMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await (this.dropTable as (name: string, fn: (t: any) => void) => Promise<void>)(
+      "horses",
+      (t) => {
+        t.string("name");
+      },
+    );
+  }
+}
+
+class LegacyMigration extends Migration.Current {
+  static async up(): Promise<void> {
+    const m = Migration.delegate ?? new LegacyMigration();
+    await m.createTable("horses", (t) => {
+      t.column("content", "text");
+      t.column("remind_at", "datetime");
+    });
+  }
+  static async down(): Promise<void> {
+    const m = Migration.delegate ?? new LegacyMigration();
+    await m.dropTable("horses");
+  }
+}
+
+class RevertWholeMigration extends SilentMigration {
+  protected _migration: MigrationClass;
+  constructor(migration: MigrationClass) {
+    super();
+    this._migration = migration;
+  }
+  async change(): Promise<void> {
+    await this.revert(this._migration);
+  }
+}
+
+class NestedRevertWholeMigration extends RevertWholeMigration {
+  async change(): Promise<void> {
+    await this.revert(
+      rbBlock(async () => {
+        await super.change();
+      }),
+    );
+  }
+}
+
+class RevertNamedIndexMigration1 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.createTable("horses", (t) => {
+      t.column("content", "string");
+      t.column("remind_at", "datetime");
+    });
+    await this.addIndex("horses", "content");
+  }
+}
+
+class RevertNamedIndexMigration2 extends SilentMigration {
+  async change(): Promise<void> {
+    await this.addIndex("horses", "content", { name: "horses_index_named" });
+  }
+}
+
+class RevertNonNamedExpressionIndexMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await this.addIndex("horses", "remind_at, place_id");
+  }
+}
+
+class RevertCustomForeignKeyTable extends SilentMigration {
+  async change(): Promise<void> {
+    await this.changeTable("horses", {}, async (t) => {
+      await t.references("owner", { foreignKey: { toTable: "developers" } } as any);
+    });
+  }
+}
+
+class UpOnlyMigration extends SilentMigration {
+  async change(): Promise<void> {
+    await this.addColumn("horses", "oldie", "integer", { default: 0 });
+    await this.upOnly(async () => {
+      await (await this.connection).execute("update horses set oldie = 1");
+    });
+  }
+}
+
+class RevertForeignKeyWithInvalidOption extends SilentMigration {
+  async change(): Promise<void> {
+    await this.addForeignKey("horses", "horses", { column: "parent_id", invalid: "option" } as any);
+  }
+}
+
+class RevertUniqueConstraintWithInvalidOption extends SilentMigration {
+  async change(): Promise<void> {
+    await this.addUniqueConstraint("horses", "place_id", { invalid: "option" });
+  }
+}
+
+class RevertCheckConstraintWithInvalidOption extends SilentMigration {
+  async change(): Promise<void> {
+    await this.addCheckConstraint("horses", "place_id > 0", { invalid: "option" });
+  }
+}
+
+async function resetHorse(): Promise<void> {
+  void Horse.resetColumnInformation();
+  await loadSchemaFromAdapter.call(Horse);
+}
+
+describe("InvertibleMigrationTest", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  afterEach(async () => {
+    const connection = await Base.leaseConnection();
+    for (const table of ["horses", "new_horses"]) {
+      if (await connection.tableExists(table)) {
+        await connection.dropTable(table);
+      }
+    }
+    void Horse.resetColumnInformation();
+  });
+
+  it("no reverse", async () => {
+    const migration = new NonInvertibleMigration();
+    await migration.migrate("up");
+    await expect(migration.migrate("down")).rejects.toThrow(IrreversibleMigration);
+  });
+
+  it("exception on removing index without column option", async () => {
+    const indexDefinition: [string, string[]] = ["horses", ["name", "color"]];
+    const migration1 = new RemoveIndexMigration1();
+    await migration1.migrate("up");
+    expect(await (await migration1.connection).indexExists(...indexDefinition)).toBeTruthy();
+
+    const migration2 = new RemoveIndexMigration2();
+    await migration2.migrate("up");
+    expect(await (await migration2.connection).indexExists(...indexDefinition)).toBeFalsy();
+
+    await migration2.migrate("down");
+    expect(await (await migration2.connection).indexExists(...indexDefinition)).toBeTruthy();
+  });
+
+  it("migrate up", async () => {
+    const migration = new InvertibleMigration();
+    await migration.migrate("up");
+    expect(await (await migration.connection).tableExists("horses")).toBeTruthy();
+  });
+
+  it("migrate down", async () => {
+    const migration = new InvertibleMigration();
+    await migration.migrate("up");
+    await migration.migrate("down");
+    expect(await (await migration.connection).tableExists("horses")).toBeFalsy();
+  });
+
+  it("migrate revert", async () => {
+    const migration = new InvertibleMigration();
+    const revert = new InvertibleRevertMigration();
+    await migration.migrate("up");
+    await revert.migrate("up");
+    expect(await (await migration.connection).tableExists("horses")).toBeFalsy();
+    await revert.migrate("down");
+    expect(await (await migration.connection).tableExists("horses")).toBeTruthy();
+    await migration.migrate("down");
+    expect(await (await migration.connection).tableExists("horses")).toBeFalsy();
+  });
+
+  it("migrate revert change table", async () => {
+    await new InvertibleMigration().migrate("up");
+    const migration = new InvertibleChangeTableMigration();
+    await migration.migrate("up");
+    expect(await (await migration.connection).columnExists("horses", "remind_at")).toBeFalsy();
+    await migration.migrate("down");
+    expect(await (await migration.connection).columnExists("horses", "remind_at")).toBeTruthy();
+  });
+
+  it("migrate revert by part", async () => {
+    await new InvertibleMigration().migrate("up");
+    const received: symbol[] = [];
+    const migration = new InvertibleByPartsMigration();
+    migration.test = async (dir) => {
+      expect(await (await migration.connection).tableExists("horses")).toBeTruthy();
+      expect(await (await migration.connection).tableExists("new_horses")).toBeTruthy();
+      received.push(dir);
+    };
+    await migration.migrate("up");
+    expect(received).toEqual([Symbol.for("both"), Symbol.for("up")]);
+    expect(await (await migration.connection).tableExists("horses")).toBeFalsy();
+    expect(await (await migration.connection).tableExists("new_horses")).toBeTruthy();
+    await migration.migrate("down");
+    expect(received).toEqual([
+      Symbol.for("both"),
+      Symbol.for("up"),
+      Symbol.for("both"),
+      Symbol.for("down"),
+    ]);
+    expect(await (await migration.connection).tableExists("horses")).toBeTruthy();
+    expect(await (await migration.connection).tableExists("new_horses")).toBeFalsy();
+  });
+
+  it("migrate revert whole migration", async () => {
+    const migration = new InvertibleMigration();
+    for (const klass of [LegacyMigration, InvertibleMigration]) {
+      const revert = new RevertWholeMigration(klass);
+      await migration.migrate("up");
+      await revert.migrate("up");
+      expect(await (await migration.connection).tableExists("horses")).toBeFalsy();
+      await revert.migrate("down");
+      expect(await (await migration.connection).tableExists("horses")).toBeTruthy();
+      await migration.migrate("down");
+      expect(await (await migration.connection).tableExists("horses")).toBeFalsy();
+    }
+  });
+
+  it("migrate nested revert whole migration", async () => {
+    const revert = new NestedRevertWholeMigration(InvertibleRevertMigration);
+    await revert.migrate("down");
+    expect(await (await revert.connection).tableExists("horses")).toBeTruthy();
+    await revert.migrate("up");
+    expect(await (await revert.connection).tableExists("horses")).toBeFalsy();
+  });
+
+  it("migrate revert transaction", async () => {
+    const migration = new InvertibleTransactionMigration();
+    await migration.migrate("up");
+    expect(await (await migration.connection).tableExists("horses")).toBeTruthy();
+    await migration.migrate("down");
+    expect(await (await migration.connection).tableExists("horses")).toBeFalsy();
+  });
+
+  it("migrate revert change column default", async () => {
+    const migration1 = new ChangeColumnDefault1();
+    await migration1.migrate("up");
+    await resetHorse();
+    expect(new Horse().readAttribute("name")).toBe("Sekitoba");
+
+    const migration2 = new ChangeColumnDefault2();
+    await migration2.migrate("up");
+    await resetHorse();
+    expect(new Horse().readAttribute("name")).toBe("Diomed");
+
+    await migration2.migrate("down");
+    await resetHorse();
+    expect(new Horse().readAttribute("name")).toBe("Sekitoba");
+  });
+
+  itIfSupports("comments", "migrate revert change column comment", async () => {
+    const migration1 = new ChangeColumnComment1();
+    await migration1.migrate("up");
+    await resetHorse();
+    expect(Horse.columnsHash()["name"].comment).toBe("Sekitoba");
+
+    const migration2 = new ChangeColumnComment2();
+    await migration2.migrate("up");
+    await resetHorse();
+    expect(Horse.columnsHash()["name"].comment).toBe("Diomed");
+
+    await migration2.migrate("down");
+    await resetHorse();
+    expect(Horse.columnsHash()["name"].comment).toBe("Sekitoba");
+  });
+
+  itIfSupports("comments", "migrate revert change table comment", async () => {
+    const connection = await Base.leaseConnection();
+    const migration1 = new ChangeTableComment1();
+    await migration1.migrate("up");
+    expect(await (connection as any).tableComment("horses")).toBe("Sekitoba");
+
+    const migration2 = new ChangeTableComment2();
+    await migration2.migrate("up");
+    expect(await (connection as any).tableComment("horses")).toBe("Diomed");
+
+    await migration2.migrate("down");
+    expect(await (connection as any).tableComment("horses")).toBe("Sekitoba");
+  });
+
+  it.skipIf(adapterType !== "postgres")("migrate enable and disable extension", async () => {
+    const connection = await Horse.leaseConnection();
+    const migration1 = new InvertibleMigration();
+    const migration2 = new DisableExtension1();
+    const migration3 = new DisableExtension2();
+
+    expect(await (connection as any).extensionAvailable("hstore")).toBe(true);
+
+    await migration1.migrate("up");
+    await migration2.migrate("up");
+    expect(await (connection as any).extensionEnabled("hstore")).toBe(true);
+
+    await migration3.migrate("up");
+    expect(await (connection as any).extensionEnabled("hstore")).toBe(false);
+
+    await migration3.migrate("down");
+    expect(await (connection as any).extensionEnabled("hstore")).toBe(true);
+
+    await migration2.migrate("down");
+    expect(await (connection as any).extensionEnabled("hstore")).toBe(false);
+
+    await (connection as any).enableExtension("hstore");
+  });
+
+  it("migrate revert drop table", async () => {
+    const connection = await Base.leaseConnection();
+    const migration1 = new InvertibleMigration();
+    await migration1.migrate("up");
+    expect(await connection.tableExists("horses")).toBeTruthy();
+
+    const migration2 = new DropTableMigration();
+    await migration2.migrate("up");
+    expect(await connection.tableExists("horses")).toBeFalsy();
+
+    await migration2.migrate("down");
+    expect(await connection.tableExists("horses")).toBeTruthy();
+  });
+
+  it("revert order", async () => {
+    const block = (t: any) => t.string("name");
+    const recorder = new CommandRecorder(await Base.leaseConnection());
+    await recorder.record("createTable", ["apples", block]);
+    await recorder.revert(async () => {
+      await recorder.record("createTable", ["bananas", block]);
+      await recorder.revert(async () => {
+        await recorder.record("createTable", ["clementines"]);
+        await recorder.record("createTable", ["dates"]);
+      });
+      await recorder.record("createTable", ["elderberries"]);
+    });
+    await recorder.revert(async () => {
+      await recorder.record("createTable", ["figs"]);
+      await recorder.record("createTable", ["grapes"]);
+    });
+    expect(recorder.commands).toEqual([
+      ["createTable", ["apples", block], undefined],
+      ["dropTable", ["elderberries"], undefined],
+      ["createTable", ["clementines"], undefined],
+      ["createTable", ["dates"], undefined],
+      ["dropTable", ["bananas", block], undefined],
+      ["dropTable", ["grapes"], undefined],
+      ["dropTable", ["figs"], undefined],
+    ]);
+  });
+
+  it("legacy up", async () => {
+    await LegacyMigration.migrate("up");
+    expect(await (await Base.leaseConnection()).tableExists("horses")).toBeTruthy();
+  });
+
+  it("legacy down", async () => {
+    await LegacyMigration.migrate("up");
+    await LegacyMigration.migrate("down");
+    expect(await (await Base.leaseConnection()).tableExists("horses")).toBeFalsy();
+  });
+
+  it("up", async () => {
+    await LegacyMigration.up();
+    expect(await (await Base.leaseConnection()).tableExists("horses")).toBeTruthy();
+  });
+
+  it("down", async () => {
+    await LegacyMigration.up();
+    await LegacyMigration.down();
+    expect(await (await Base.leaseConnection()).tableExists("horses")).toBeFalsy();
+  });
+
+  it("migrate down with table name prefix", async () => {
+    Base.tableNamePrefix = "p_";
+    Base.tableNameSuffix = "_s";
+    try {
+      const migration = new InvertibleMigration();
+      await migration.migrate("up");
+      await expect(migration.migrate("down")).resolves.not.toThrow();
+      expect(await (await Base.leaseConnection()).tableExists("p_horses_s")).toBeFalsy();
+    } finally {
+      Base.tableNamePrefix = "";
+      Base.tableNameSuffix = "";
+    }
+  });
+
+  it("migrations can handle foreign keys to specific tables", async () => {
+    const migration = new RevertCustomForeignKeyTable();
+    await new InvertibleMigration().migrate("up");
+    await migration.migrate("up");
+    expect(await (await Base.leaseConnection()).columnExists("horses", "owner_id")).toBeTruthy();
+    await migration.migrate("down");
+    expect(await (await Base.leaseConnection()).columnExists("horses", "owner_id")).toBeFalsy();
+  });
+
+  it("migrate revert add index without name on expression", async () => {
+    await new InvertibleMigration().migrate("up");
+    await new RevertNonNamedExpressionIndexMigration().migrate("up");
+
+    const connection = await Base.leaseConnection();
+    expect(await connection.indexExists("horses", ["remind_at", "place_id"])).toBeTruthy();
+
+    await new RevertNonNamedExpressionIndexMigration().migrate("down");
+
+    expect(await connection.indexExists("horses", ["remind_at", "place_id"])).toBeFalsy();
+  });
+
+  it.skipIf(adapterType === "mysql")("migrate revert add index with name", async () => {
+    await new RevertNamedIndexMigration1().migrate("up");
+    await new RevertNamedIndexMigration2().migrate("up");
+    await new RevertNamedIndexMigration2().migrate("down");
+
+    const connection = await Base.leaseConnection();
+    expect(await connection.indexExists("horses", "content")).toBeTruthy();
+    expect(
+      await connection.indexExists("horses", "content", { name: "horses_index_named" }),
+    ).toBeFalsy();
+  });
+
+  it("up only", async () => {
+    await new InvertibleMigration().migrate("up");
+    const horse1 = await Horse.create();
+    await new UpOnlyMigration().migrate("up");
+    void Horse.resetColumnInformation();
+    await horse1.reload();
+    const horse2 = await Horse.create();
+
+    expect(horse1.readAttribute("oldie")).toBe(1);
+    expect(horse2.readAttribute("oldie")).toBe(0);
+
+    await new UpOnlyMigration().migrate("down");
+    const connection = await Base.leaseConnection();
+    expect(await connection.columnExists("horses", "oldie")).toBeFalsy();
+    void Horse.resetColumnInformation();
+  });
+
+  itIfSupports(
+    "unique_constraints",
+    "migrate revert add unique constraint with invalid option",
+    async () => {
+      await new InvertibleMigration().migrate("up");
+      await new RevertUniqueConstraintWithInvalidOption().migrate("up");
+
+      const connection = await Base.leaseConnection();
+      expect((await (connection as any).uniqueConstraints("horses")).length).toBe(1);
+
+      await new RevertUniqueConstraintWithInvalidOption().migrate("down");
+      assertEmpty(await (connection as any).uniqueConstraints("horses"));
+    },
+  );
+
+  it("migrate revert add foreign key with invalid option", async () => {
+    await new InvertibleMigration().migrate("up");
+    await new RevertForeignKeyWithInvalidOption().migrate("up");
+
+    const connection = await Base.leaseConnection();
+    expect((await connection.foreignKeys("horses")).length).toBe(1);
+
+    await new RevertForeignKeyWithInvalidOption().migrate("down");
+    assertEmpty(await connection.foreignKeys("horses"));
+  });
+
+  itIfSupports(
+    "check_constraints",
+    "migrate revert add check constraint with invalid option",
+    async () => {
+      await new InvertibleMigration().migrate("up");
+      await new RevertCheckConstraintWithInvalidOption().migrate("up");
+
+      const connection = await Base.leaseConnection();
+      expect((await (connection as any).checkConstraints("horses")).length).toBe(1);
+
+      await new RevertCheckConstraintWithInvalidOption().migrate("down");
+      assertEmpty(await (connection as any).checkConstraints("horses"));
+    },
+  );
+});

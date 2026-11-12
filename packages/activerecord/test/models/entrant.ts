@@ -1,0 +1,21 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { Course } from "./course.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Entrant extends Base {
+  declare course_id: number;
+  declare name: string;
+
+  static {
+    this.belongsTo("course");
+  }
+}
+constSet(TopLevel, "Entrant", Entrant);
+DescendantsTracker.registerSubclass(Base, Entrant);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Entrant {
+  get course(): Course | null | Promise<Course | null>;
+  set course(value: Course | null);
+}

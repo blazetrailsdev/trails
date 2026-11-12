@@ -16,9 +16,10 @@ import {
   canonicalLoaderUnenforceableRoots,
 } from "./test-infra-scope.mjs";
 
-const FILENAME = "packages/activerecord/src/dirty.test.ts";
-const OWN_TEST = "packages/activerecord/src/support/canonical-schema.trails.test.ts";
-const OWN_REBUILD_TEST = "packages/activerecord/src/support/canonical-table-rebuild.trails.test.ts";
+const FILENAME = "packages/activerecord/test/cases/dirty.test.ts";
+const OWN_TEST = "packages/activerecord/test/cases/support/canonical-schema.trails.test.ts";
+const OWN_REBUILD_TEST =
+  "packages/activerecord/test/cases/support/canonical-table-rebuild.trails.test.ts";
 
 const tester = new RuleTester({
   languageOptions: {
@@ -49,7 +50,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     },
     // load-schema-helper's own unit test may import loadSchema directly.
     {
-      filename: "packages/activerecord/src/support/load-schema-helper.trails.test.ts",
+      filename: "packages/activerecord/test/cases/support/load-schema-helper.trails.test.ts",
       code: 'import { loadSchema } from "./load-schema-helper.js";',
     },
     // A banned symbol imported from an unrelated module is not the loader.
@@ -83,7 +84,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     },
     // Deeper relative path (adapters/mysql2/*.test.ts reaching up two levels).
     {
-      filename: "packages/activerecord/src/adapters/mysql2/mysql2-adapter.test.ts",
+      filename: "packages/activerecord/test/cases/adapters/mysql2/mysql2-adapter.test.ts",
       code: 'import { ensureCanonicalTables } from "../../support/canonical-table-rebuild.js";',
       errors: [{ messageId: "banned", data: { name: "ensureCanonicalTables" } }],
     },
@@ -91,7 +92,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     // test) — the most likely place to reach for the loaders via
     // `./canonical-schema.js`. Must still be caught.
     {
-      filename: "packages/activerecord/src/support/schema-file-generator.test.ts",
+      filename: "packages/activerecord/test/support/schema-file-generator.test.ts",
       code: 'import { loadCanonicalSchema } from "./canonical-schema.js";',
       errors: [{ messageId: "banned", data: { name: "loadCanonicalSchema" } }],
     },
@@ -99,7 +100,7 @@ tester.run("no-internal-canonical-loaders", rule, {
     // wired to every scan root, not just activerecord.
     {
       filename: "packages/activesupport/test/schema-wiring.test.ts",
-      code: 'import { loadCanonicalSchema } from "../../activerecord/src/support/canonical-schema.js";',
+      code: 'import { loadCanonicalSchema } from "../../activerecord/test/support/canonical-schema.js";',
       errors: [{ messageId: "banned", data: { name: "loadCanonicalSchema" } }],
     },
     // Both banned symbols in one import → one report each.
@@ -123,7 +124,7 @@ const repoRoot = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
  * `support/load-schema-helper.ts`, and the rule already lets it through because
  * it matches on module basename as well as symbol.
  */
-const nonLoaderBannedExporters = new Set(["packages/activerecord/src/model-schema.ts"]);
+const nonLoaderBannedExporters = new Set(["packages/activerecord/lib/model-schema.ts"]);
 
 /** Names exported by `source`, covering the export forms used in activerecord. */
 function exportedNames(source) {
@@ -155,7 +156,7 @@ const TEST_MODULE = /\.test\.[cm]?[jt]sx?$/;
 
 /**
  * Walks every workspace package and the top-level `scripts/` tree, not just
- * `packages/activerecord/src`: the rule matches on module basename with no
+ * `packages/activerecord/lib`: the rule matches on module basename with no
  * package anchoring, so a loader relocated into another package (a new
  * `packages/ar-test-infra/`, say) or into a `scripts/` helper is exactly the
  * silent-reopen case being guarded — the same hole as `support/<subdir>/`, two

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isExcludedPath, noRawSqlFiles, noRawSqlIgnores, repoRel } from "./no-raw-sql-scope.mjs";
 
-const SRC = "packages/activerecord/src";
+const SRC = "packages/activerecord/lib";
 
 describe("no-raw-sql scope", () => {
   it("keeps ordinary activerecord src files in scope", () => {

@@ -1,0 +1,1196 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
+import { describe, it, expect, beforeAll } from "vitest";
+import { loadSingularTarget } from "../../support/load-singular-target.js";
+import {
+  Base,
+  InverseOfAssociationNotFoundError,
+  InverseOfAssociationRecursiveError,
+  RecordNotFound,
+} from "../../../lib/index.js";
+import {
+  assert,
+  assertPredicate,
+  assertNotPredicate,
+  assertRaises,
+  assertRespondTo,
+  assertNothingRaised,
+} from "@blazetrails/activesupport/testing/assertions";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Branch, BrokenBranch } from "../../models/branch.js";
+import { Human } from "../../models/human.js";
+import { Face } from "../../models/face.js";
+import { Interest } from "../../models/interest.js";
+import { MixedCaseMonkey } from "../../models/mixed-case-monkey.js";
+import { Car } from "../../models/car.js";
+import { CpkCar, CpkCarReview, CpkAuthor, CpkBook, CpkOrder } from "../../models/cpk.js";
+import { Bulb } from "../../models/bulb.js";
+import { Comment } from "../../models/comment.js";
+import { Rating } from "../../models/rating.js";
+import { Post } from "../../models/post.js";
+import { Author } from "../../models/author.js";
+import { Sponsor } from "../../models/sponsor.js";
+import { Club } from "../../models/club.js";
+import { AdminAccount } from "../../models/admin/account.js";
+import { AdminUser } from "../../models/admin/user.js";
+import { User } from "../../models/user.js";
+import { Room } from "../../models/room.js";
+import { Company, Firm } from "../../models/company.js";
+import { Project } from "../../models/project.js";
+import { Developer } from "../../models/developer.js";
+import { SpecialContract } from "../../models/contract.js";
+import { Book } from "../../models/book.js";
+import { Subscription } from "../../models/subscription.js";
+import "../../models/zine.js";
+import "../../models/subscriber.js";
+import "../../models/mixed-case-monkey.js";
+import "../../models/author.js";
+import "../../models/sponsor.js";
+import "../../models/club.js";
+import "../../models/admin/account.js";
+import "../../models/admin/user.js";
+import "../../models/contract.js";
+import "../../models/subscription.js";
+
+describe("AutomaticInverseFindingTests", () => {
+  const { self, books } = fixtures([
+    "ratings",
+    "comments",
+    "cars",
+    "bulbs",
+    "books",
+    "subscriptions",
+    "subscribers",
+  ]);
+
+  it("has one and belongs to should find inverse automatically on multiple word name", () => {
+    const monkeyReflection = (MixedCaseMonkey as any).reflectOnAssociation("human");
+    const humanReflection = (Human as any).reflectOnAssociation("mixedCaseMonkey");
+
+    expect(monkeyReflection.hasInverse()).toBeTruthy();
+    expect(monkeyReflection.inverseOf()).toBe(humanReflection);
+
+    expect(humanReflection.hasInverse()).toBeTruthy();
+    expect(humanReflection.inverseOf()).toBe(monkeyReflection);
+  });
+
+  it("has many and belongs to should find inverse automatically for model in module", () => {
+    const accountReflection = (AdminAccount as any).reflectOnAssociation("users");
+    const userReflection = (AdminUser as any).reflectOnAssociation("account");
+    expect(accountReflection.hasInverse()).toBeTruthy();
+    expect(accountReflection.inverseOf()).toBe(userReflection);
+  });
+
+  it("has one and belongs to should find inverse automatically", () => {
+    const carReflection = (Car as any).reflectOnAssociation("bulb");
+    const bulbReflection = (Bulb as any).reflectOnAssociation("car");
+
+    expect(carReflection.hasInverse()).toBeTruthy();
+    expect(carReflection.inverseOf()).toBe(bulbReflection);
+
+    expect(bulbReflection.hasInverse()).toBeTruthy();
+    expect(bulbReflection.inverseOf()).toBe(carReflection);
+  });
+
+  it("has many and belongs to should find inverse automatically", () => {
+    const commentReflection = (Comment as any).reflectOnAssociation("ratings");
+    const ratingReflection = (Rating as any).reflectOnAssociation("comment");
+
+    expect(commentReflection.hasInverse()).toBeTruthy();
+    expect(commentReflection.inverseOf()).toBe(ratingReflection);
+  });
+
+  it("has many and belongs to should find inverse automatically for extension block", () => {
+    const commentReflection = (Comment as any).reflectOnAssociation("post");
+    const postReflection = (Post as any).reflectOnAssociation("comments");
+
+    expect(postReflection.hasInverse()).toBeTruthy();
+    expect(postReflection.inverseOf()).toBe(commentReflection);
+  });
+
+  it("has many and belongs to should find inverse automatically for sti", () => {
+    const authorReflection = (Author as any).reflectOnAssociation("posts");
+    const authorChildReflection = (Author as any).reflectOnAssociation("specialPosts");
+    const postReflection = (Post as any).reflectOnAssociation("author");
+
+    assertRespondTo(authorReflection, "hasInverse");
+    assertPredicate(
+      authorReflection,
+      (r: any) => r.hasInverse(),
+      "The Author reflection should have an inverse",
+    );
+    expect(authorReflection.inverseOf()).toBe(postReflection);
+
+    assertRespondTo(authorChildReflection, "hasInverse");
+    assertPredicate(
+      authorChildReflection,
+      (r: any) => r.hasInverse(),
+      "The Author reflection should have an inverse",
+    );
+    expect(authorChildReflection.inverseOf()).toBe(postReflection);
+  });
+
+  it("has one and belongs to with non default foreign key should not find inverse automatically", async () => {
+    const user = await User.create({});
+    const ownedRoom = await Room.create({ owner_id: (user as any).id });
+    expect(await (user as any).room).toBeNull();
+    expect((ownedRoom as any).user).toBeNull();
+    expect((await (ownedRoom as any).owner).id).toBe((user as any).id);
+    expect((await (user as any).ownedRoom).id).toBe((ownedRoom as any).id);
+  });
+
+  it("has one and belongs to with custom association name should not find wrong inverse automatically", () => {
+    const userReflection = (Room as any).reflectOnAssociation("user");
+    const ownerReflection = (Room as any).reflectOnAssociation("owner");
+    const roomReflection = (User as any).reflectOnAssociation("room");
+    expect(userReflection.hasInverse()).toBeTruthy();
+    expect(userReflection.inverseOf()).toBe(roomReflection);
+    expect(ownerReflection.hasInverse()).toBeFalsy();
+    expect(ownerReflection.inverseOf()).not.toBe(roomReflection);
+  });
+
+  it("has many and belongs to with a scope and automatic scope inversing should find inverse automatically", async () => {
+    const contactsReflection = (Company as any).reflectOnAssociation("specialContracts");
+    const companyReflection = (SpecialContract as any).reflectOnAssociation("company");
+    expect(contactsReflection.scope).toBeTruthy();
+    expect(companyReflection.scope).toBeFalsy();
+    await self().withAutomaticScopeInversing(contactsReflection, companyReflection, () => {
+      expect(contactsReflection.hasInverse()).toBeTruthy();
+      expect(contactsReflection.inverseOf()).toBe(companyReflection);
+      expect(companyReflection.inverseOf()).not.toBe(contactsReflection);
+    });
+  });
+
+  it("has one and belongs to with a scope and automatic scope inversing should find inverse automatically", async () => {
+    const postReflection = (Author as any).reflectOnAssociation("recentPost");
+    const authorReflection = (Post as any).reflectOnAssociation("author");
+    expect(postReflection.scope).toBeTruthy();
+    expect(authorReflection.scope).toBeFalsy();
+    await self().withAutomaticScopeInversing(postReflection, authorReflection, () => {
+      expect(postReflection.hasInverse()).toBeTruthy();
+      expect(postReflection.inverseOf()).toBe(authorReflection);
+      expect(authorReflection.inverseOf()).not.toBe(postReflection);
+    });
+  });
+
+  it("has many with scoped belongs to does not find inverse automatically", async () => {
+    const book = books("tlg");
+    await (book as any).updateAttribute("author_visibility", 1);
+    expect(await book.subscriptions.build({}).book).toBeNull();
+
+    const subscriptionReflection = (Book as any).reflectOnAssociation("subscriptions");
+    const bookReflection = (Subscription as any).reflectOnAssociation("book");
+    expect(subscriptionReflection.scope).toBeFalsy();
+    expect(bookReflection.scope).toBeTruthy();
+
+    await self().withAutomaticScopeInversing(bookReflection, subscriptionReflection, async () => {
+      expect(await book.subscriptions.build({}).book).toBeNull();
+    });
+  });
+
+  it("has one and belongs to automatic inverse shares objects", async () => {
+    const car = (await Car.first())!;
+    const bulb = await Bulb.createBang({ car });
+
+    expect((car as any).bulb).toBe(bulb);
+
+    (car as any).bulb.color = "Blue";
+    expect((car as any).bulb.color).toBe((bulb as any).color);
+
+    (bulb as any).color = "Red";
+    expect((bulb as any).color).toBe((car as any).bulb.color);
+  });
+
+  it("has many and belongs to automatic inverse shares objects on rating", async () => {
+    const comment = (await Comment.first())!;
+    const rating = await Rating.createBang({ comment_id: (comment as any).id });
+
+    const ratingComment = (await loadSingularTarget(rating, "comment")) as any;
+    expect(ratingComment.id).toBe((comment as any).id);
+
+    ratingComment.body = "Fennec foxes are the smallest of the foxes.";
+    expect((rating as any).comment.body).toBe(ratingComment.body);
+
+    ratingComment.body = "Kittens are adorable.";
+    expect(ratingComment.body).toBe((rating as any).comment.body);
+  });
+
+  it("has many and belongs to automatic inverse shares objects on comment", async () => {
+    const rating = await Rating.createBang({});
+    const comment = (await Comment.first())!;
+    await loadSingularTarget(rating, "comment");
+    (rating as any).comment = comment;
+
+    expect((rating as any).comment).toBe(comment);
+
+    (rating as any).comment.body = "Fennec foxes are the smallest of the foxes.";
+    expect((rating as any).comment.body).toBe((comment as any).body);
+
+    (comment as any).body = "Kittens are adorable.";
+    expect((comment as any).body).toBe((rating as any).comment.body);
+  });
+
+  it("belongs to should find inverse has many automatically", async () => {
+    expect((Subscription as any).automaticallyInvertPluralAssociations).toBe(true);
+
+    const book = await Book.createBang({});
+    const subscriber = (book as any).subscribers.new({ nick: "Nickname" });
+
+    await subscriber.saveBang();
+
+    const reloaded = await book.reload();
+    const subscribers = await (reloaded as any).subscribers.toArray();
+    expect(subscribers.map((s: any) => s.nick)).toEqual([subscriber.nick]);
+    expect(await (reloaded as any).subscribers.count()).toBe(1);
+  });
+
+  it("polymorphic and has many through relationships should not have inverses", () => {
+    const sponsorReflection = (Sponsor as any).reflectOnAssociation("sponsorable");
+    expect(sponsorReflection.hasInverse()).toBeFalsy();
+
+    const clubReflection = (Club as any).reflectOnAssociation("members");
+    expect(clubReflection.hasInverse()).toBeFalsy();
+  });
+
+  it("polymorphic has one should find inverse automatically", () => {
+    const humanReflection = (Human as any).reflectOnAssociation("polymorphicFaceWithoutInverse");
+    expect(humanReflection.hasInverse()).toBeTruthy();
+  });
+
+  it("has many inverse of derived automatically despite of composite foreign key", () => {
+    const carReviewReflection = (CpkCar as any).reflectOnAssociation("carReviews");
+    expect(carReviewReflection.hasInverse()).toBeTruthy();
+    expect(carReviewReflection.inverseOf()).toBe((CpkCarReview as any).reflectOnAssociation("car"));
+  });
+
+  it("belongs to inverse of derived automatically despite of composite foreign key", () => {
+    const carReflection = (CpkCarReview as any).reflectOnAssociation("car");
+    expect(carReflection.hasInverse()).toBeTruthy();
+    expect(carReflection.inverseOf()).toBe((CpkCar as any).reflectOnAssociation("carReviews"));
+  });
+});
+
+describe("InverseAssociationTests", () => {
+  fixtures({
+    companies: [Company, {}],
+    developers: [Developer, {}],
+    projects: [Project, {}],
+  });
+
+  beforeAll(() => {
+    Company.inheritanceColumn = "type";
+    constSet(TopLevel, "Firm", Firm);
+  });
+
+  it("should allow for inverse of options in associations", () => {
+    expect(() => {
+      class Wheels extends Base {}
+      (Wheels as any).hasMany("wheels", { inverseOf: "car" });
+    }).not.toThrow();
+    expect(() => {
+      class Engines extends Base {}
+      (Engines as any).hasOne("engine", { inverseOf: "car" });
+    }).not.toThrow();
+    expect(() => {
+      class Cars extends Base {}
+      (Cars as any).belongsTo("car", { inverseOf: "driver" });
+    }).not.toThrow();
+  });
+
+  it("should be able to ask a reflection if it has an inverse", () => {
+    expect((Human as any).reflectOnAssociation("face").hasInverse()).toBeTruthy();
+    expect((Human as any).reflectOnAssociation("interests").hasInverse()).toBeTruthy();
+    expect((Face as any).reflectOnAssociation("human").hasInverse()).toBeTruthy();
+
+    expect((Club as any).reflectOnAssociation("sponsor").hasInverse()).toBeFalsy();
+    expect((Club as any).reflectOnAssociation("memberships").hasInverse()).toBeFalsy();
+    expect((Sponsor as any).reflectOnAssociation("sponsorClub").hasInverse()).toBeFalsy();
+  });
+
+  it("inverse of method should supply the actual reflection instance it is the inverse of", () => {
+    expect((Human as any).reflectOnAssociation("face").inverseOf()).toBe(
+      (Face as any).reflectOnAssociation("human"),
+    );
+    expect((Human as any).reflectOnAssociation("interests").inverseOf()).toBe(
+      (Interest as any).reflectOnAssociation("human"),
+    );
+    expect((Face as any).reflectOnAssociation("human").inverseOf()).toBe(
+      (Human as any).reflectOnAssociation("face"),
+    );
+  });
+
+  it("associations with no inverse of should return nil", () => {
+    expect((Club as any).reflectOnAssociation("sponsor").inverseOf()).toBeNull();
+    expect((Club as any).reflectOnAssociation("memberships").inverseOf()).toBeNull();
+    expect((Sponsor as any).reflectOnAssociation("sponsorClub").inverseOf()).toBeNull();
+  });
+
+  it("polymorphic associations dont attempt to find inverse of", () => {
+    const sponsorRef = (Sponsor as any).reflectOnAssociation("sponsor");
+    expect(() => sponsorRef.klass).toThrow();
+    expect(sponsorRef.inverseOf()).toBeNull();
+
+    const superHumanRef = (Face as any).reflectOnAssociation("superHuman");
+    expect(() => superHumanRef.klass).toThrow();
+    expect(superHumanRef.inverseOf()).toBeNull();
+  });
+
+  it("this inverse stuff", async () => {
+    const firm = await Firm.create({ name: "Adequate Holdings" });
+    await Project.create({ name: "Project 1", firm });
+    await Developer.create({ name: "Gorbypuff", firm });
+
+    const newProject = (await (Project as any).last()) as Project;
+    expect((Project as any).reflectOnAssociation("leadDeveloper").inverseOf()).toBeTruthy();
+    expect(await (newProject as any).leadDeveloper).toBeTruthy();
+  });
+});
+
+describe("InverseHasOneTests", () => {
+  const { humans } = fixtures(["humans", "faces"]);
+  beforeAll(() => {
+    constSet(TopLevel, "Human", Human);
+    constSet(TopLevel, "Face", Face);
+  });
+
+  it("parent instance should be shared with child on find", async () => {
+    const human = humans("gordon");
+    const face = (await loadSingularTarget(human, "face"))!;
+    expect((face as any).human.name).toBe(human.name);
+    (human as any).name = "Bongo";
+    expect((face as any).human.name).toBe((human as any).name);
+    (face as any).human.name = "Mungo";
+    expect((face as any).human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with eager loaded child on find", async () => {
+    let human = (await Human.where({ name: "Gordon" }).includes(":face"))[0];
+    let face = (human as any).face;
+    expect(face.human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect(face.human.name).toBe((human as any).name);
+    face.human.name = "Mungo";
+    expect(face.human.name).toBe((human as any).name);
+
+    human = (await Human.where({ name: "Gordon" }).includes(":face").order("faces.id"))[0];
+    face = (human as any).face;
+    expect(face.human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect(face.human.name).toBe((human as any).name);
+    face.human.name = "Mungo";
+    expect(face.human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with newly built child", async () => {
+    const human = (await Human.first())!;
+    const face = await (human as any).buildFace({ description: "haunted" });
+    expect(face.human).not.toBeNull();
+    expect(face.human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect(face.human.name).toBe((human as any).name);
+    face.human.name = "Mungo";
+    expect(face.human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with newly created child", async () => {
+    const human = (await Human.first())!;
+    const face = await (human as any).createFace({ description: "haunted" });
+    expect(face.human).not.toBeNull();
+    expect(face.human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect(face.human.name).toBe((human as any).name);
+    face.human.name = "Mungo";
+    expect(face.human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with newly created child via bang method", async () => {
+    const human = (await Human.first())!;
+    const face = await (human as any).createFaceBang({ description: "haunted" });
+    expect(face.human).not.toBeNull();
+    expect(face.human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect(face.human.name).toBe((human as any).name);
+    face.human.name = "Mungo";
+    expect(face.human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with replaced via accessor child", async () => {
+    const human = (await Human.first())!;
+    const face = new Face({ description: "haunted" }) as any;
+    await (human as any).setFace(face);
+    expect(face.human).not.toBeNull();
+    expect(face.human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect(face.human.name).toBe((human as any).name);
+    face.human.name = "Mungo";
+    expect(face.human.name).toBe((human as any).name);
+  });
+
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const human = humans("gordon");
+    const face = await Face.createBang({ description: "haunted", human: humans("steve") });
+    (face as any).human = human;
+    expect((human as any).face).toBe(face);
+    expect((human as any).face.description).toBe((face as any).description);
+    (face as any).description = "Bongo";
+    expect((human as any).face.description).toBe((face as any).description);
+    (human as any).face.description = "Mungo";
+    expect((human as any).face.description).toBe((face as any).description);
+  });
+
+  it("trying to use inverses that dont exist should raise an error", async () => {
+    const human = (await Human.first())!;
+    await expect(loadSingularTarget(human, "confusedFace")).rejects.toThrow(
+      InverseOfAssociationNotFoundError,
+    );
+  });
+
+  it("trying to use inverses that dont exist should have suggestions for fix", async () => {
+    const error: any = await assertRaises([InverseOfAssociationNotFoundError], {}, async () =>
+      loadSingularTarget((await Human.first())!, "confusedFace"),
+    );
+
+    expect(error.detailedMessage()).toMatch("Did you mean?");
+    expect(error.corrections[0]).toBe("confusedHuman");
+  });
+});
+
+describe("InverseHasManyTests", () => {
+  const { humans, comments, authors } = fixtures([
+    "humans",
+    "interests",
+    "authors",
+    "posts",
+    "comments",
+    "cpkAuthors",
+    "cpkOrders",
+    "cpkBooks",
+  ]);
+  beforeAll(async () => {
+    await (CpkAuthor as any).loadSchema();
+    await (CpkBook as any).loadSchema();
+    await (CpkOrder as any).loadSchema();
+  });
+
+  it("parent instance should be shared with every child on find", async () => {
+    const human = humans("gordon");
+    const interests = await human.interests;
+    for (const interest of interests) {
+      expect((interest as any).human.name).toBe(human.name);
+      (human as any).name = "Bongo";
+      expect((interest as any).human.name).toBe((human as any).name);
+      (interest as any).human.name = "Mungo";
+      expect((interest as any).human.name).toBe((human as any).name);
+    }
+  });
+
+  it("parent instance should be shared with every child on find for sti", async () => {
+    const author = authors("david");
+    const posts = await author.posts;
+    for (const post of posts) {
+      expect((post as any).author.name).toBe((author as any).name);
+      (author as any).name = "Bongo";
+      expect((post as any).author.name).toBe((author as any).name);
+      (post as any).author.name = "Mungo";
+      expect((post as any).author.name).toBe((author as any).name);
+    }
+
+    const specialPosts = await author.specialPosts;
+    for (const post of specialPosts) {
+      expect((post as any).author.name).toBe((author as any).name);
+      (author as any).name = "Bongo";
+      expect((post as any).author.name).toBe((author as any).name);
+      (post as any).author.name = "Mungo";
+      expect((post as any).author.name).toBe((author as any).name);
+    }
+  });
+
+  it("parent instance should be shared with eager loaded children", async () => {
+    let human = (await Human.where({ name: "Gordon" }).includes(":interests"))[0];
+    let interests = (human as any).interests;
+    for (const interest of await interests.toArray()) {
+      expect(interest.human.name).toBe((human as any).name);
+      (human as any).name = "Bongo";
+      expect(interest.human.name).toBe((human as any).name);
+      interest.human.name = "Mungo";
+      expect(interest.human.name).toBe((human as any).name);
+    }
+
+    human = (await Human.where({ name: "Gordon" }).includes(":interests").order("interests.id"))[0];
+    interests = (human as any).interests;
+    for (const interest of await interests.toArray()) {
+      expect(interest.human.name).toBe((human as any).name);
+      (human as any).name = "Bongo";
+      expect(interest.human.name).toBe((human as any).name);
+      interest.human.name = "Mungo";
+      expect(interest.human.name).toBe((human as any).name);
+    }
+  });
+
+  it("parent instance should be shared with newly block style built child", async () => {
+    const human = (await Human.first())!;
+    const interest = (human.association("interests") as CollectionAssociation).reader.build({
+      topic: "Industrial Revolution",
+    });
+    expect((interest as any).topic).not.toBeNull();
+    expect((interest as any).human).not.toBeNull();
+    expect((interest as any).human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect((interest as any).human.name).toBe((human as any).name);
+    (interest as any).human.name = "Mungo";
+    expect((interest as any).human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with newly created via bang method child", async () => {
+    const human = (await Human.first())!;
+    const interest = await human.interests.createBang({
+      topic: "Industrial Revolution Re-enactment",
+    });
+    expect((interest as any).human).not.toBeNull();
+    expect((interest as any).human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect((interest as any).human.name).toBe((human as any).name);
+    (interest as any).human.name = "Mungo";
+    expect((interest as any).human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with newly block style created child", async () => {
+    const human = (await Human.first())!;
+    const interest = await human.interests.create({}, (ii: any) => {
+      ii.topic = "Industrial Revolution Re-enactment";
+    });
+    expect((interest as any).topic).not.toBeNull();
+    expect((interest as any).human).not.toBeNull();
+    expect((interest as any).human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect((interest as any).human.name).toBe((human as any).name);
+    (interest as any).human.name = "Mungo";
+    expect((interest as any).human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared within create block of new child", async () => {
+    const human = (await Human.first())!;
+    const interest = await human.interests.create({}, (i: any) => {
+      assert(i.human === human, "Human of child should be the same instance as a parent");
+    });
+    assert(
+      (interest as any).human === human,
+      "Human of the child should still be the same instance as a parent",
+    );
+  });
+
+  it("parent instance should be shared within build block of new child", async () => {
+    const human = (await Human.first())!;
+    const interest = human.interests.build({}, (i: any) => {
+      assert(i.human === human, "Human of child should be the same instance as a parent");
+    });
+    assert(
+      (interest as any).human === human,
+      "Human of the child should still be the same instance as a parent",
+    );
+  });
+
+  it("parent instance should be shared with poked in child", async () => {
+    const human = humans("gordon");
+    const interest = await Interest.create({ topic: "Industrial Revolution Re-enactment" });
+    await human.interests.push(interest);
+    expect((interest as any).human).not.toBeNull();
+    expect((interest as any).human.name).toBe(human.name);
+    (human as any).name = "Bongo";
+    expect((interest as any).human.name).toBe((human as any).name);
+    (interest as any).human.name = "Mungo";
+    expect((interest as any).human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with replaced via accessor children", async () => {
+    const human = (await Human.first())!;
+    const interest = new Interest({ topic: "Industrial Revolution Re-enactment" });
+    await human.interests.replace([interest]);
+    expect((interest as any).human).not.toBeNull();
+    expect((interest as any).human.name).toBe((human as any).name);
+    (human as any).name = "Bongo";
+    expect((interest as any).human.name).toBe((human as any).name);
+    (interest as any).human.name = "Mungo";
+    expect((interest as any).human.name).toBe((human as any).name);
+  });
+
+  it("parent instance should be shared with first and last child", async () => {
+    const human = (await Human.first())!;
+    const interests = human.interests;
+    assert(((await interests.first()) as any).human === human);
+    assert(((await interests.last()) as any).human === human);
+  });
+
+  it("parent instance should be shared with first n and last n children", async () => {
+    const human = (await Human.first())!;
+    const interests = human.interests;
+    const firstTwo = (await interests.first(2)) as any[];
+    assert(firstTwo[0].human === human);
+    assert(firstTwo[1].human === human);
+    const lastTwo = (await interests.last(2)) as any[];
+    assert(lastTwo[0].human === human);
+    assert(lastTwo[1].human === human);
+  });
+
+  it("parent instance should find child instance using child instance id", async () => {
+    const human = await Human.create({});
+    const interest = await Interest.create({});
+    await human.interests.replace([interest]);
+    const proxy = human.interests;
+    assert(interest === (await proxy.first()));
+    assert(interest === (await proxy.find((interest as any).id)));
+    assert(human === ((await proxy.first()) as any).human);
+    assert(human === ((await proxy.find((interest as any).id)) as any).human);
+  });
+
+  it("parent instance should find child instance using child instance id when created", async () => {
+    const human = await Human.create({});
+    const interest = await Interest.create({ human_id: (human as any).id });
+    const proxy = human.interests;
+    assert(human === ((await proxy.first()) as any).human);
+    assert(human === ((await proxy.find((interest as any).id)) as any).human);
+
+    expect(((await proxy.find((interest as any).id)) as any).human.name).toBeNull();
+    (human as any).name = "Ben Bitdiddle";
+    expect(((await proxy.find((interest as any).id)) as any).human.name).toBe((human as any).name);
+    ((await proxy.find((interest as any).id)) as any).human.name = "Alyssa P. Hacker";
+    expect(((await proxy.find((interest as any).id)) as any).human.name).toBe((human as any).name);
+  });
+
+  it("find on child instance with id should not load all child records", async () => {
+    const human = await Human.create({});
+    const interest = await Interest.create({ human_id: (human as any).id });
+    const proxy = human.interests;
+    await proxy.find((interest as any).id);
+    assertNotPredicate(proxy, (p) => p.loaded);
+  });
+
+  it("find on child instance with id should set inverse instances", async () => {
+    const human = await Human.create({});
+    const interest = await Interest.create({ human_id: (human as any).id });
+    const child = (await human.interests.find((interest as any).id)) as any;
+    assertPredicate(child.association("human"), (a: any) => a.isLoaded());
+  });
+
+  it("find on child instances with ids should set inverse instances", async () => {
+    const human = await Human.create({});
+    const i1 = await Interest.create({ human_id: (human as any).id });
+    const i2 = await Interest.create({ human_id: (human as any).id });
+    const children = (await (human.association("interests") as CollectionAssociation).reader.find([
+      (i1 as any).id,
+      (i2 as any).id,
+    ])) as any[];
+    for (const child of children) {
+      assertPredicate(child.association("human"), (a: any) => a.isLoaded());
+    }
+  });
+
+  it("inverse should be set on composite primary key child", async () => {
+    const author = new CpkAuthor({ name: "John" });
+    const book = (author.association("books") as CollectionAssociation).reader.build({
+      id: [null, 1],
+      title: "The Rails Way",
+    });
+    new CpkOrder({ book, status: "paid" });
+    await (author as any).saveBang();
+
+    assertPredicate((book as any).association("order"), (a: any) => a.isLoaded());
+  });
+
+  it("raise record not found error when no ids are passed", async () => {
+    const human = await Human.create({});
+    const proxy = human.interests;
+
+    const exception: any = await assertRaises([RecordNotFound], {}, async () => {
+      await proxy.load();
+      await (proxy as any).find();
+    });
+
+    expect(exception.model).toBe("Interest");
+    expect(exception.primaryKey).toBe("id");
+  });
+
+  it("trying to use inverses that dont exist should raise an error", async () => {
+    const human = (await Human.first())!;
+    await expect(async () => human.secretInterests).rejects.toThrow(
+      InverseOfAssociationNotFoundError,
+    );
+  });
+
+  it("child instance should point to parent without saving", async () => {
+    const human = new Human();
+    const interest = await Interest.create({ topic: "Industrial Revolution Re-enactment" });
+    await human.interests.push(interest);
+    expect((interest as any).human).not.toBeNull();
+    (interest as any).human.name = "Charles";
+    expect((interest as any).human.name).toBe((human as any).name);
+    assertNotPredicate(human, (r) => r.isPersisted());
+  });
+
+  it("inverse instance should be set before find callbacks are run", async () => {
+    (Interest as any).afterFind((interest: any) => {
+      if (!(interest.association("human").isLoaded() && interest.human != null)) {
+        throw new Error("inverse not set before after_find");
+      }
+    });
+    try {
+      const human = (await Human.first())!;
+      assertPredicate(await human.interests, (records) => records.length > 0);
+      const preloaded = (await (Human as any).includes(":interests").first())!;
+      assertPredicate(
+        preloaded.association("interests").target,
+        (records: any[]) => records.length > 0,
+      );
+      const joined = (await (Human as any).joins(":interests").includes(":interests").first())!;
+      assertPredicate(
+        joined.association("interests").target,
+        (records: any[]) => records.length > 0,
+      );
+    } finally {
+      (Interest as any).resetCallbacks("find");
+    }
+  });
+
+  it("inverse instance should be set before initialize callbacks are run", async () => {
+    (Interest as any).afterInitialize((interest: any) => {
+      if (!(interest.association("human").isLoaded() && interest.human != null)) {
+        throw new Error("inverse not set before after_initialize");
+      }
+    });
+    try {
+      const human = (await Human.first())!;
+      assertPredicate(await human.interests, (records) => records.length > 0);
+      const preloaded = (await (Human as any).includes(":interests").first())!;
+      assertPredicate(
+        preloaded.association("interests").target,
+        (records: any[]) => records.length > 0,
+      );
+      const joined = (await (Human as any).joins(":interests").includes(":interests").first())!;
+      assertPredicate(
+        joined.association("interests").target,
+        (records: any[]) => records.length > 0,
+      );
+    } finally {
+      (Interest as any).resetCallbacks("initialize");
+    }
+  });
+
+  it("inverse works when the association self references the same object", async () => {
+    const comment = comments("greetings");
+    await Comment.create({
+      parent_id: (comment as any).id,
+      post_id: (comment as any).post_id,
+      body: "New Comment",
+    });
+    (comment as any).body = "OMG";
+    const children = await comment.children;
+    expect((children[0] as any).parent.body).toBe((comment as any).body);
+  });
+
+  it("changing the association id makes the inversed association target stale", async () => {
+    const post1 = (await Post.first())!;
+    const post2 = (await Post.all().order("id").offset(1).first())!;
+    const comment = (await post1.comments)[0] as any;
+    expect(await loadSingularTarget(comment, "post")).toBe(post1);
+    await comment.updateBang({ post_id: (post2 as any).id });
+    const reloaded = (await loadSingularTarget(comment, "post")) as any;
+    expect(reloaded.id).toBe((post2 as any).id);
+  });
+
+  it("raise record not found error when invalid ids are passed", async () => {
+    await Interest.deleteAll();
+
+    const human = await Human.createBang();
+
+    const invalidId = 245324523;
+    await expect((human as any).interests.find(invalidId)).rejects.toThrow(RecordNotFound);
+
+    const invalidIds = [8432342, 2390102913, 2453245234523452];
+    await expect((human as any).interests.find(invalidIds)).rejects.toThrow(RecordNotFound);
+  });
+});
+
+describe("InverseBelongsToTests", () => {
+  const { self, faces, interests } = fixtures(["humans", "faces", "interests"]);
+
+  it("child instance should be shared with parent on find", async () => {
+    const face = faces("trusting");
+    const human = (await loadSingularTarget(face, "human"))!;
+    expect((human as any).face.description).toBe((face as any).description);
+    (face as any).description = "gormless";
+    expect((human as any).face.description).toBe((face as any).description);
+    (human as any).face.description = "pleasing";
+    expect((human as any).face.description).toBe((face as any).description);
+  });
+
+  it("eager loaded child instance should be shared with parent on find", async () => {
+    let face = (await Face.where({ description: "trusting" }).includes(":human"))[0] as any;
+    let human = face.human;
+    expect(human.face.description).toBe(face.description);
+    face.description = "gormless";
+    expect(human.face.description).toBe(face.description);
+    human.face.description = "pleasing";
+    expect(human.face.description).toBe(face.description);
+
+    face = (
+      await Face.where({ description: "trusting" }).includes(":human").order("humans.id")
+    )[0] as any;
+    human = face.human;
+    expect(human.face.description).toBe(face.description);
+    face.description = "gormless";
+    expect(human.face.description).toBe(face.description);
+    human.face.description = "pleasing";
+    expect(human.face.description).toBe(face.description);
+  });
+
+  it("child instance should be shared with newly built parent", async () => {
+    const face = faces("trusting");
+    const human = (face as any).buildHuman({ name: "Charles" });
+    expect(human.face).not.toBeNull();
+    expect(human.face.description).toBe((face as any).description);
+    (face as any).description = "gormless";
+    expect(human.face.description).toBe((face as any).description);
+    human.face.description = "pleasing";
+    expect(human.face.description).toBe((face as any).description);
+  });
+
+  it("child instance should be shared with newly created parent", async () => {
+    const face = faces("trusting");
+    const human = await (face as any).createHuman({ name: "Charles" });
+    expect(human.face).not.toBeNull();
+    expect(human.face.description).toBe((face as any).description);
+    (face as any).description = "gormless";
+    expect(human.face.description).toBe((face as any).description);
+    human.face.description = "pleasing";
+    expect(human.face.description).toBe((face as any).description);
+  });
+
+  it("should not try to set inverse instances when the inverse is a has many", async () => {
+    const interest = interests("trainspotting");
+    const human = (await loadSingularTarget(interest, "human"))!;
+    expect((human as any).interests).not.toBeNull();
+    const iz = await (human as any).interests.detect((i: any) => i.id === (interest as any).id);
+    expect(iz).toBeDefined();
+    expect(iz.topic).toBe((interest as any).topic);
+    (interest as any).topic = "Eating cheese with a spoon";
+    expect(iz.topic).not.toBe((interest as any).topic);
+    iz.topic = "Cow tipping";
+    expect((interest as any).topic).not.toBe(iz.topic);
+  });
+
+  it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const interest = interests("trainspotting");
+      const human = (await loadSingularTarget(interest, "human")) as any;
+      expect(human.interests).not.toBeNull();
+      const cached = human.association("interests").target as any[];
+      const iz = cached.find((i: any) => i.id === (interest as any).id);
+      expect(iz).toBeDefined();
+      expect(iz.topic).toBe((interest as any).topic);
+      (interest as any).topic = "Eating cheese with a spoon";
+      expect(iz.topic).toBe((interest as any).topic);
+      iz.topic = "Cow tipping";
+      expect((interest as any).topic).toBe(iz.topic);
+    });
+  });
+
+  it("with has many inversing should have single record when setting record through attribute in build method", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const human = await Human.create({});
+      human.interests.build({ human });
+      expect(await human.interests.size()).toBe(1);
+      await (human as any).saveBang();
+      expect(await human.interests.size()).toBe(1);
+    });
+  });
+
+  it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const interest = interests("trainspotting");
+      const human = (await loadSingularTarget(interest, "humanWithCallbacks")) as any;
+      assertNotPredicate(human, (h: any) => h.addCallbackCalled);
+    });
+  });
+
+  it("with has many inversing does not add duplicate associated objects", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const human = new Human();
+      const interest = new Interest();
+      (interest as any).human = human;
+      await human.interests.push(interest);
+      expect(await human.interests.size()).toBe(1);
+    });
+  });
+
+  it("with has many inversing does not add unsaved duplicate records when collection is loaded", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const human = await Human.create({});
+      await human.interests.load();
+      const interest = new Interest();
+      (interest as any).human = human;
+      await human.interests.push(interest);
+      expect(await human.interests.size()).toBe(1);
+    });
+  });
+
+  it("with has many inversing does not add saved duplicate records when collection is loaded", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const human = await Human.create({});
+      await human.interests.load();
+      const interest = await Interest.create({ human_id: (human as any).id });
+      await human.interests.push(interest);
+      expect(await human.interests.size()).toBe(1);
+    });
+  });
+
+  it("unscope does not set inverse when incorrect", async () => {
+    const interest = interests("trainspotting");
+    const human = (await loadSingularTarget(interest, "human"))!;
+    const createdHuman = await Human.create({ name: "wrong human" });
+    const foundInterest = await (createdHuman as any).interests
+      .or((human as any).interests)
+      .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
+    const foundHuman = await loadSingularTarget(foundInterest, "human");
+    expect((foundHuman as any).id).toBe((human as any).id);
+  });
+
+  it("or does not set inverse when incorrect", async () => {
+    const interest = interests("trainspotting");
+    const human = (await loadSingularTarget(interest, "human"))!;
+    const createdHuman = await Human.create({ name: "wrong human" });
+    const foundInterest = await (createdHuman as any).interests
+      .unscope(":where")
+      .detect((thisInterest: any) => (interest as any).id === thisInterest.id);
+    const foundHuman = await loadSingularTarget(foundInterest, "human");
+    expect((foundHuman as any).id).toBe((human as any).id);
+  });
+
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const face = faces("trusting");
+    const human = new Human({ name: "Charles" });
+    (face as any).human = human;
+    expect((human as any).face).not.toBeNull();
+    expect((human as any).face.description).toBe((face as any).description);
+    (face as any).description = "gormless";
+    expect((human as any).face.description).toBe((face as any).description);
+    (human as any).face.description = "pleasing";
+    expect((human as any).face.description).toBe((face as any).description);
+  });
+
+  it("trying to use inverses that dont exist should raise an error", async () => {
+    const face = (await Face.first())!;
+    await expect(loadSingularTarget(face, "confusedHuman")).rejects.toThrow(
+      InverseOfAssociationNotFoundError,
+    );
+  });
+
+  it("trying to use inverses that dont exist should have suggestions for fix", async () => {
+    const error: any = await assertRaises([InverseOfAssociationNotFoundError], {}, async () =>
+      loadSingularTarget((await Face.first())!, "confusedHuman"),
+    );
+
+    expect(error.detailedMessage()).toMatch("Did you mean?");
+    expect(error.corrections[0]).toBe("confusedFace");
+  });
+
+  it("building has many parent association inverses one record", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const interest = new Interest();
+      (interest as any).buildHuman();
+      expect(await (interest as any).human.association("interests").reader.size()).toBe(1);
+      await (interest as any).saveBang();
+      expect(await (interest as any).human.association("interests").reader.size()).toBe(1);
+    });
+  });
+});
+
+describe("InversePolymorphicBelongsToTests", () => {
+  const { self, faces, interests } = fixtures(["humans", "faces", "interests"]);
+
+  it("child instance should be shared with parent on find", async () => {
+    const face = faces("confused");
+    const human = (await loadSingularTarget(face, "polymorphicHuman")) as any;
+    expect(human.polymorphicFace.description).toBe((face as any).description);
+    (face as any).description = "gormless";
+    expect(human.polymorphicFace.description).toBe((face as any).description);
+    human.polymorphicFace.description = "pleasing";
+    expect(human.polymorphicFace.description).toBe((face as any).description);
+  });
+
+  it("eager loaded child instance should be shared with parent on find", async () => {
+    let face = (await Face.where({ description: "confused" }).includes(":human"))[0] as any;
+    let human = (await loadSingularTarget(face, "polymorphicHuman")) as any;
+    expect(human.polymorphicFace.description).toBe(face.description);
+    face.description = "gormless";
+    expect(human.polymorphicFace.description).toBe(face.description);
+    human.polymorphicFace.description = "pleasing";
+    expect(human.polymorphicFace.description).toBe(face.description);
+
+    face = (
+      await Face.where({ description: "confused" }).includes(":human").order("humans.id")
+    )[0] as any;
+    human = (await loadSingularTarget(face, "polymorphicHuman")) as any;
+    expect(human.polymorphicFace.description).toBe(face.description);
+    face.description = "gormless";
+    expect(human.polymorphicFace.description).toBe(face.description);
+    human.polymorphicFace.description = "pleasing";
+    expect(human.polymorphicFace.description).toBe(face.description);
+  });
+
+  it("child instance should be shared with replaced via accessor parent", async () => {
+    const face = faces("confused");
+    await (face as any).polymorphicHuman;
+    expect((face as any).polymorphicHuman).not.toBeNull();
+    const newHuman = new Human();
+    (face as any).polymorphicHuman = newHuman;
+    expect((newHuman as any).polymorphicFace.description).toBe((face as any).description);
+    (face as any).description = "Bongo";
+    expect((newHuman as any).polymorphicFace.description).toBe((face as any).description);
+    (newHuman as any).polymorphicFace.description = "Mungo";
+    expect((newHuman as any).polymorphicFace.description).toBe((face as any).description);
+  });
+
+  it("inversed instance should not be reloaded after stale state changed", async () => {
+    const newHuman = new Human();
+    const face = new Face();
+    await (newHuman as any).setFace(face);
+    const oldInversedHuman = (face as any).human;
+    await (newHuman as any).saveBang();
+    const newInversedHuman = (face as any).human;
+    expect(oldInversedHuman).toBe(newInversedHuman);
+  });
+
+  it("inversed instance should not be reloaded after stale state changed with validation", async () => {
+    const face = new Face({ human: new Human() });
+    const oldInversedHuman = (face as any).human;
+    await (face as any).saveBang();
+    const newInversedHuman = (face as any).human;
+    expect(oldInversedHuman).toBe(newInversedHuman);
+  });
+
+  it("inversed instance should load after autosave if it is not already loaded", async () => {
+    const human = await Human.createBang({});
+    await Face.createBang({ human_id: (human as any).id });
+    const faceAssoc = (human as any).association("autosaveFace");
+    const face = await faceAssoc.loadTarget();
+
+    await face.reload();
+    face.description = "new description";
+    await human.saveBang();
+
+    expect(face.association("autosaveHuman").target).not.toBeNull();
+  });
+
+  it("should not try to set inverse instances when the inverse is a has many", async () => {
+    const interest = interests("llama_wrangling");
+    const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
+    expect(human.polymorphicInterests).not.toBeNull();
+    const iz = await human.polymorphicInterests.detect((i: any) => i.id === (interest as any).id);
+    expect(iz).toBeDefined();
+    expect(iz.topic).toBe((interest as any).topic);
+    (interest as any).topic = "Eating cheese with a spoon";
+    expect(iz.topic).not.toBe((interest as any).topic);
+    iz.topic = "Cow tipping";
+    expect((interest as any).topic).not.toBe(iz.topic);
+  });
+
+  it("with has many inversing should try to set inverse instances when the inverse is a has many", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const interest = interests("llama_wrangling");
+      const human = (await loadSingularTarget(interest, "polymorphicHuman")) as any;
+      expect(human.polymorphicInterests).not.toBeNull();
+      const cached = human.association("polymorphicInterests").target as any[];
+      const iz = cached.find((i: any) => i.id === (interest as any).id);
+      expect(iz).toBeDefined();
+      expect(iz.topic).toBe((interest as any).topic);
+      (interest as any).topic = "Eating cheese with a spoon";
+      expect(iz.topic).toBe((interest as any).topic);
+      iz.topic = "Cow tipping";
+      expect((interest as any).topic).toBe(iz.topic);
+    });
+  });
+
+  it("with has many inversing does not trigger association callbacks on set when the inverse is a has many", async () => {
+    await self().withHasManyInversing(Interest, async () => {
+      const interest = interests("llama_wrangling");
+      const human = await (interest as any).polymorphicHumanWithCallbacks;
+      assertNotPredicate(human, (h: any) => h.addCallbackCalled);
+    });
+  });
+
+  it("trying to access inverses that dont exist shouldnt raise an error", async () => {
+    await assertNothingRaised(async () =>
+      loadSingularTarget((await Face.first())!, "puzzledPolymorphicHuman"),
+    );
+  });
+
+  it("trying to set polymorphic inverses that dont exist at all should raise an error", async () => {
+    const face = (await Face.first())!;
+    const human = (await Human.first())!;
+    expect(() => {
+      (face as any).puzzledPolymorphicHuman = human;
+    }).toThrow(InverseOfAssociationNotFoundError);
+  });
+
+  it("trying to set polymorphic inverses that dont exist on the instance being set should raise an error", async () => {
+    const face1 = (await Face.first())!;
+    const human = (await Human.first())!;
+    expect(() => {
+      (face1 as any).polymorphicHuman = human;
+    }).not.toThrow();
+    const face2 = (await Face.first())!;
+    const interest = (await Interest.first())!;
+    expect(() => {
+      (face2 as any).polymorphicHuman = interest;
+    }).toThrow(InverseOfAssociationNotFoundError);
+  });
+});
+
+describe("InverseMultipleHasManyInversesForSameModel", () => {
+  fixtures(["humans", "interests", "zines"]);
+
+  it("that we can load associations that have the same reciprocal name from different models", async () => {
+    await assertNothingRaised(async () => {
+      const interest = (await Interest.first())!;
+      await loadSingularTarget(interest, "zine");
+      await loadSingularTarget(interest, "human");
+    });
+  });
+
+  it("that we can create associations that have the same reciprocal name from different models", async () => {
+    await assertNothingRaised(async () => {
+      const interest = (await Interest.first()) as any;
+      interest.buildZine({ title: "Get Some in Winter! 2008" });
+      interest.buildHuman({ name: "Gordon" });
+      await interest.saveBang();
+    });
+  });
+});
+
+describe("InverseBelongsToTests", () => {
+  const { self } = fixtures({});
+
+  it("recursive model has many inversing", async () => {
+    await self().withHasManyInversing(Branch, async () => {
+      const main = await Branch.create({});
+      const feature = (await main.branches.create({})) as any;
+      const topic = feature.association("branches").reader.build({});
+      expect(topic.branch.branch).toBe(main);
+    });
+  });
+
+  it("recursive inverse on recursive model has many inversing", async () => {
+    await self().withHasManyInversing(BrokenBranch, async () => {
+      const main = await BrokenBranch.create({});
+      const feature = await main.branches.create({});
+      const topic = (feature.association("branches") as CollectionAssociation).reader.build({});
+      const error = await assertRaises([InverseOfAssociationRecursiveError], {}, () =>
+        loadSingularTarget(topic, "branch"),
+      );
+
+      expect(error.message).toBe(
+        "Inverse association branch (:branch in BrokenBranch) is recursive.",
+      );
+    });
+  });
+});

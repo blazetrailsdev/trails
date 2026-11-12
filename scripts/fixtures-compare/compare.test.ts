@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 // prettier-ignore
 import { belongsToAssociationsByClass, joinLabelAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable, rowsByTable, staleFixtureEntries, classesByName, loadRubyModelsManifest, MODELS_RUBY_DIRS } from "./compare.js";
 import type { RubyClass } from "./compare.js";
-import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
+import type { Schema } from "../../packages/activerecord/test/support/schema-types.js";
 
 // prettier-ignore
 const idIndex = new Map<string, Map<number, string[]>>([["authors", new Map([[1, ["david"]], [2, ["mary"]], [3, ["dup_a", "dup_b"]]])]]);

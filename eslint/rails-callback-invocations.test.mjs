@@ -13,7 +13,7 @@ const MANIFEST_FIXTURE = path.join(__dirname, ".tmp-rails-callback-invocations.t
 // Manifest keys are file-qualified `<repo-rel path>#<method>` so a requirement
 // only lands on the specific ported method whose Rails source fires the
 // callback — a same-named method in another file is not constrained.
-const srcRel = "packages/activerecord/src/persistence.ts";
+const srcRel = "packages/activerecord/lib/persistence.ts";
 const manifest = {
   methods: {
     [`${srcRel}#destroy`]: ["destroy"],
@@ -33,7 +33,7 @@ process.on("exit", () => {
 // ESM hoisting of this import is harmless.
 const { default: rule } = await import("./rails-callback-invocations.mjs");
 
-const srcFile = path.join(REPO_ROOT, "packages/activerecord/src/persistence.ts");
+const srcFile = path.join(REPO_ROOT, "packages/activerecord/lib/persistence.ts");
 const outOfScopeFile = path.join(REPO_ROOT, "packages/activemodel/lib/callbacks.ts");
 
 const tester = new RuleTester({
@@ -87,7 +87,7 @@ tester.run("rails-callback-invocations", rule, {
     // File-scoped lookup: a same-named method in a different in-scope file has
     // no `<rel>#destroy` entry, so it is not constrained despite firing nothing.
     {
-      filename: path.join(REPO_ROOT, "packages/activerecord/src/relation.ts"),
+      filename: path.join(REPO_ROOT, "packages/activerecord/lib/relation.ts"),
       code: `export function destroy(this: any) { return this._reallyDestroy(); }\n`,
     },
     // Out-of-scope package — rule does not apply.

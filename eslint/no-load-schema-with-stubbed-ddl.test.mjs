@@ -6,7 +6,8 @@ import { describe, it, expect } from "vitest";
 import { Linter } from "eslint";
 import rule, { STUBBED_DDL_METHODS } from "./no-load-schema-with-stubbed-ddl.mjs";
 
-const FILENAME = "packages/activerecord/src/support/load-schema-helper-uuid-default.trails.test.ts";
+const FILENAME =
+  "packages/activerecord/test/cases/support/load-schema-helper-uuid-default.trails.test.ts";
 
 const tester = new RuleTester({
   languageOptions: {
@@ -35,7 +36,7 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
     },
     // loadSchema with no DDL emitter stubbed is the ordinary schema load.
     {
-      filename: "packages/activerecord/src/support/load-schema-helper.trails.test.ts",
+      filename: "packages/activerecord/test/cases/support/load-schema-helper.trails.test.ts",
       code: `
         import { loadSchema } from "./load-schema-helper.js";
         await loadSchema(adapter);
@@ -54,7 +55,7 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
     // `Model.loadSchema()` is AR's own reflection load, unrelated to the
     // test-infra helper — migration.test.ts pairs it with a createTable stub.
     {
-      filename: "packages/activerecord/src/migration.test.ts",
+      filename: "packages/activerecord/test/cases/migration.test.ts",
       code: `
         const delegate = { createTable: () => "hi mom!" };
         await BigNumber.loadSchema();
@@ -62,7 +63,7 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
     },
     // Naming the method without intercepting it is not a stub.
     {
-      filename: "packages/activerecord/src/migration.test.ts",
+      filename: "packages/activerecord/test/cases/migration.test.ts",
       code: `
         import { loadSchema } from "./support/load-schema-helper.js";
         expect(migration.methodMissing("createTable")).toBe("hi mom!");
@@ -73,7 +74,7 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
     // helper: a migration class laying tables through `createTable`, or an
     // adapter cover that never routes through the full load, stays valid.
     {
-      filename: "packages/activerecord/src/migration.test.ts",
+      filename: "packages/activerecord/test/cases/migration.test.ts",
       code: `
         class Probe extends BetterSQLite3Adapter {
           override async createTable() {}
@@ -85,7 +86,7 @@ tester.run("no-load-schema-with-stubbed-ddl", rule, {
     // implements it is the one that would lay nothing, and that class body arms
     // the rule on its own.
     {
-      filename: "packages/activerecord/src/migration.test.ts",
+      filename: "packages/activerecord/test/cases/migration.test.ts",
       code: `
         import { loadSchema } from "./support/load-schema-helper.js";
         abstract class Base {
@@ -268,7 +269,7 @@ describe("the real arm-content cover", () => {
 describe("the guarded method set", () => {
   it("is the runtime guard's, parsed out of its declaration site", async () => {
     const { STUBBED_DDL_METHODS: runtimeMethods } =
-      await import("../packages/activerecord/src/support/stubbed-ddl-methods.ts");
+      await import("../packages/activerecord/test/support/stubbed-ddl-methods.ts");
     expect([...STUBBED_DDL_METHODS].sort()).toEqual([...runtimeMethods].sort());
     expect(STUBBED_DDL_METHODS.has("createTable")).toBe(true);
   });

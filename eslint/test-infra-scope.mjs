@@ -16,7 +16,10 @@
  */
 
 /** Root every scope list below is anchored to (repo-relative). */
-export const activerecordSrcRoot = "packages/activerecord/src";
+export const activerecordSrcRoot = "packages/activerecord/lib";
+
+/** Root of the activerecord test tree, which the test-infra lists below are anchored to. */
+export const activerecordTestRoot = "packages/activerecord/test";
 
 /**
  * Repo-relative roots the `no-internal-canonical-loaders` guard test walks when
@@ -25,7 +28,7 @@ export const activerecordSrcRoot = "packages/activerecord/src";
  * `isCanonicalSchemaModule` matches on module basename with no package
  * anchoring, so a loader relocated into ANY workspace package — or into a
  * top-level `scripts/` helper — is invisible to the rule's pinned module list
- * and reopens the ban silently. Scanning only `packages/activerecord/src` left
+ * and reopens the ban silently. Scanning only `packages/activerecord/lib` left
  * exactly that hole one level up, so the scan spans the whole workspace.
  */
 export const canonicalLoaderScanRoots = ["packages", "scripts"];
@@ -59,22 +62,30 @@ export const canonicalLoaderUnenforceableRoots = [];
 
 /**
  * Test-infra paths exempt from the table-lifecycle rules, relative to
- * `activerecordSrcRoot`. `fixtures.ts` / `test-fixtures.ts` are anchored as
+ * `activerecordTestRoot`. `fixtures.ts` / `test-fixtures.ts` are anchored as
  * exact ported files rather than by basename — see no-raw-sql-scope.mjs.
  */
 const testInfraExemptGlobs = [
-  "test-helpers/**",
+  "models/**",
+  "fixtures/**",
+  "migrations/**",
   "support/**",
-  "fixtures.test.ts",
-  "naked-fixtures.trails.test.ts",
-  "test-fixtures.test.ts",
-  "test-fixtures/**",
+  "cases/support/**",
+  "cases/fixtures.test.ts",
+  "cases/naked-fixtures.trails.test.ts",
+  "cases/test-fixtures.test.ts",
+  "cases/test-fixtures/**",
 ];
 
+/** The test-infra that stays under `activerecordSrcRoot`, because library
+ *  files import it, relative to that root. */
+const libTestInfraExemptGlobs = ["test-helpers/**", "test-fixtures/**"];
+
 /** The same list as repo-relative globs, for flat-config `ignores`. */
-export const testInfraExemptIgnores = testInfraExemptGlobs.map(
-  (glob) => `${activerecordSrcRoot}/${glob}`,
-);
+export const testInfraExemptIgnores = [
+  ...testInfraExemptGlobs.map((glob) => `${activerecordTestRoot}/${glob}`),
+  ...libTestInfraExemptGlobs.map((glob) => `${activerecordSrcRoot}/${glob}`),
+];
 
 /**
  * Internal canonical-schema loader modules, by basename (they live in
@@ -96,15 +107,15 @@ export const canonicalLoaderSelfTests = [
   // `load-schema-helper`'s self-tests are trails inventions too — the two
   // former siblings (the `loadSchema` table-set assertion and the trails-only
   // guard on the boot-laid table snapshot) now live in one `.trails.` file.
-  `${activerecordSrcRoot}/support/canonical-schema.trails.test.ts`,
-  `${activerecordSrcRoot}/support/canonical-table-rebuild.trails.test.ts`,
-  `${activerecordSrcRoot}/support/load-schema-helper.trails.test.ts`,
-  `${activerecordSrcRoot}/support/load-schema-helper-uuid-default.trails.test.ts`,
+  `${activerecordTestRoot}/cases/support/canonical-schema.trails.test.ts`,
+  `${activerecordTestRoot}/cases/support/canonical-table-rebuild.trails.test.ts`,
+  `${activerecordTestRoot}/cases/support/load-schema-helper.trails.test.ts`,
+  `${activerecordTestRoot}/cases/support/load-schema-helper-uuid-default.trails.test.ts`,
   // …and a third: the cover for `loadSchema`'s own arm-probe guard, which has
   // to call `loadSchema` to assert it refuses a stubbed `createTable`.
-  `${activerecordSrcRoot}/support/load-schema-helper-arm-guard.trails.test.ts`,
+  `${activerecordTestRoot}/cases/support/load-schema-helper-arm-guard.trails.test.ts`,
   // …and the pin on `STUBBED_DDL_METHODS`, which drives `loadCanonicalSchema`
   // through a recording proxy to assert the guarded set still covers every
   // adapter member the lay path touches.
-  `${activerecordSrcRoot}/support/stubbed-ddl-methods.trails.test.ts`,
+  `${activerecordTestRoot}/cases/support/stubbed-ddl-methods.trails.test.ts`,
 ];

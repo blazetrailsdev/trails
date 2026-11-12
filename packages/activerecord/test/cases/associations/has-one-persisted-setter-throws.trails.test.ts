@@ -1,0 +1,96 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeAll } from "vitest";
+import { AssociationTypeMismatch } from "../../../lib/index.js";
+import { Company, Firm } from "../../models/company.js";
+import { Account } from "../../models/account.js";
+import { Member } from "../../models/member.js";
+import { Membership } from "../../models/membership.js";
+import { Club } from "../../models/club.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
+
+interface HasOneOwner {
+  account?: unknown;
+  club?: unknown;
+  setAccount(value: unknown): void | Promise<void>;
+  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+  update(attrs: Record<string, unknown>): Promise<boolean>;
+}
+
+describe("HasOnePersistedSetterThrows", () => {
+  fixtures(["companies", "accounts", "members", "memberships", "clubs"]);
+
+  beforeAll(() => {
+    constSet(TopLevel, "Company", Company);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Account", Account);
+    constSet(TopLevel, "Member", Member);
+    constSet(TopLevel, "Membership", Membership);
+    constSet(TopLevel, "Club", Club);
+  });
+
+  it("set#{Name} persists the replacement on a persisted owner", async () => {
+    const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
+    const account = await Account.create({ credit_limit: 1000 });
+    await firm.setAccount(account);
+    expect((account as unknown as { firm_id: number }).firm_id).toBe(
+      Number((firm as unknown as { id: unknown }).id),
+    );
+  });
+
+  it("assigning the property is a plain JS write to a getter-only accessor", async () => {
+    const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
+    const account = await Account.create({ credit_limit: 1000 });
+    expect(() => {
+      firm.account = account;
+    }).toThrow(TypeError);
+  });
+
+  it("mass-assignment raises the type mismatch before the persisted-owner throw", async () => {
+    const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
+    expect(() =>
+      (firm as unknown as { association(n: string): { syncWrite(v: unknown): void } })
+        .association("account")
+        .syncWrite(1),
+    ).toThrow(AssociationTypeMismatch);
+  });
+
+  it("mass-assignment (setAttributes) awaits the has_one writer", async () => {
+    const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
+    const account = await Account.create({ credit_limit: 1000 });
+    await firm.setAttributes({ account });
+    expect((account as unknown as { firm_id: number }).firm_id).toBe(
+      Number((firm as unknown as { id: unknown }).id),
+    );
+  });
+
+  it("update awaits the has_one writer on a persisted owner", async () => {
+    const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
+    const account = await Account.create({ credit_limit: 1000 });
+    await firm.update({ account });
+    expect((account as unknown as { firm_id: number }).firm_id).toBe(
+      Number((firm as unknown as { id: unknown }).id),
+    );
+  });
+
+  it("has_one_through mass-assignment awaits the through writer", async () => {
+    const member = (await Member.create({ name: "Groucho" })) as unknown as HasOneOwner;
+    const club = await Club.create({ name: "Moustache" });
+    await member.setAttributes({ club });
+    expect(await (member as unknown as { club: Promise<unknown> }).club).toBeTruthy();
+  });
+
+  it("construction issues no query for the association assignment", async () => {
+    const account = new Account({ credit_limit: 1000 });
+    await assertQueriesCount(0, false, async () => {
+      new Firm({ name: "GlobalMegaCorp", account });
+    });
+  });
+
+  it("construction does the in-memory replace on an unpersisted owner", async () => {
+    const account = new Account({ credit_limit: 1000 });
+    const firm = new Firm({ name: "GlobalMegaCorp", account });
+    await firm.save();
+    expect((account as unknown as { firm_id: number }).firm_id).toBe(Number(firm.id));
+  });
+});

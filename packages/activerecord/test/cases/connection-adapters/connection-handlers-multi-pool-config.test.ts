@@ -1,0 +1,65 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNot } from "@blazetrails/activesupport/testing/assertions";
+import { ConnectionHandler } from "../../../lib/connection-adapters/abstract/connection-handler.js";
+import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
+import { ambientPoolConfiguration } from "../../../lib/test-adapter.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
+
+describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
+  let handler: ConnectionHandler;
+
+  const primaryConfig = () => new HashConfig("default_env", "primary", ambientPoolConfiguration());
+
+  beforeEach(() => {
+    handler = new ConnectionHandler();
+  });
+
+  afterEach(async () => {
+    await handler.clearAllConnectionsBang();
+  });
+
+  it("establish connection with pool configs", async () => {
+    await handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    await handler.establishConnection(primaryConfig(), {
+      ownerName: "primary",
+      shard: "pool_config_two",
+    });
+
+    const defaultPool = handler.retrieveConnectionPool("primary", { shard: "default" });
+    const otherPool = handler.retrieveConnectionPool("primary", { shard: "pool_config_two" });
+
+    expect(defaultPool).not.toBeUndefined();
+    expect(defaultPool).not.toBe(otherPool);
+
+    expect(handler.retrieveConnectionPool("primary")).toBe(defaultPool);
+  });
+
+  it("remove connection", async () => {
+    await handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    await handler.establishConnection(primaryConfig(), {
+      ownerName: "primary",
+      shard: "pool_config_two",
+    });
+
+    await handler.removeConnectionPool("primary");
+
+    expect(handler.retrieveConnectionPool("primary")).toBeUndefined();
+    expect(
+      handler.retrieveConnectionPool("primary", { shard: "pool_config_two" }),
+    ).not.toBeUndefined();
+  });
+
+  it("connected?", async () => {
+    await handler.establishConnection(primaryConfig(), { ownerName: "primary" });
+    await handler.establishConnection(primaryConfig(), {
+      ownerName: "primary",
+      shard: "pool_config_two",
+    });
+
+    await (await handler.connectionPoolList("writing")[0].checkout()).connectBang();
+
+    expect(handler.isConnected("primary")).toBeTruthy();
+    expect(handler.isConnected("primary", { shard: "default" })).toBeTruthy();
+    assertNot(handler.isConnected("primary", { shard: "pool_config_two" }));
+  });
+});

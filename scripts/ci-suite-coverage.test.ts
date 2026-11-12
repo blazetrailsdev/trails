@@ -236,7 +236,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *    followed by the tsc-wrapper CLI over
  *    packages/activerecord/virtualized-dx-tests/tsconfig.json. That
  *    tsconfig maps @blazetrails/activerecord to
- *    packages/activerecord/src/index.ts — the WHOLE public type surface,
+ *    packages/activerecord/lib/index.ts — the WHOLE public type surface,
  *    not the type-virtualization or tsc-wrapper subtrees — plus
  *    activemodel, arel, activesupport, i18n, date and globalid src. So
  *    the tempting narrowing (the story's own hypothesis: trails-tsc plus
@@ -947,18 +947,18 @@ describe("CI runs every tooling test suite", () => {
     const runGate = await gateRunner(yml);
 
     const runs = [
-      "packages/activerecord/src/relation.ts",
+      "packages/activerecord/lib/relation.ts",
       "packages/activemodel/lib/validations.ts",
       "packages/website/docs/guides/active-record-basics.md",
       "scripts/guides-typecheck/check.ts",
     ];
     const skips = [
-      "packages/activerecord/src/relation.test.ts",
-      "packages/activerecord/src/test-helpers/models/topic.ts",
-      "packages/activerecord/src/test-helpers/fixtures/topics.yml",
+      "packages/activerecord/test/cases/relation.test.ts",
+      "packages/activerecord/test/models/topic.ts",
+      "packages/activerecord/test/fixtures/topics.yml",
       "packages/arel/test/__snapshots__/visitors.test.ts.snap",
-      "packages/activerecord/src/test-fixtures.ts",
-      "packages/activerecord/src/test-fixtures/fixture-connection.ts",
+      "packages/activerecord/lib/test-fixtures.ts",
+      "packages/activerecord/lib/test-fixtures/with-transactional-fixtures.ts",
     ];
     const fired = await Promise.all([...runs, ...skips].map((f) => runGate(f)));
     const outcome = Object.fromEntries(
@@ -981,26 +981,26 @@ describe("CI runs every tooling test suite", () => {
       const runGate = await gateRunner(yml);
 
       const runs = [
-        "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
-        "packages/activerecord/src/connection-adapters/postgresql/column.ts",
-        "packages/activerecord/src/connection-adapters/mysql2-adapter.ts",
-        "packages/activerecord/src/connection-adapters/mysql/quoting.ts",
-        "packages/activerecord/src/connection-adapters/abstract-mysql-adapter.ts",
-        "packages/activerecord/src/adapters/postgresql/range.test.ts",
+        "packages/activerecord/lib/connection-adapters/postgresql-adapter.ts",
+        "packages/activerecord/lib/connection-adapters/postgresql/column.ts",
+        "packages/activerecord/lib/connection-adapters/mysql2-adapter.ts",
+        "packages/activerecord/lib/connection-adapters/mysql/quoting.ts",
+        "packages/activerecord/lib/connection-adapters/abstract-mysql-adapter.ts",
+        "packages/activerecord/test/cases/adapters/postgresql/range.test.ts",
         // Shared substrate: breaks one backend without naming it.
-        "packages/activerecord/src/connection-adapters/abstract/quoting.ts",
-        "packages/activerecord/src/connection-adapters/abstract-adapter.ts",
-        "packages/activerecord/src/connection-adapters/sql-classification.ts",
+        "packages/activerecord/lib/connection-adapters/abstract/quoting.ts",
+        "packages/activerecord/lib/connection-adapters/abstract-adapter.ts",
+        "packages/activerecord/lib/connection-adapters/sql-classification.ts",
         "packages/arel/lib/visitors/postgresql.ts",
         "packages/arel/lib/visitors/mysql.ts",
         "packages/activerecord-cli/test/__e2e__/postgres-happy-path.test.ts",
       ];
       const skips = [
-        "packages/activerecord/src/relation.ts",
-        "packages/activerecord/src/associations.ts",
-        "packages/activerecord/src/base.test.ts",
-        "packages/activerecord/src/connection-adapters/better-sqlite3-adapter.ts",
-        "packages/activerecord/src/adapters/sqlite3/test-helper.ts",
+        "packages/activerecord/lib/relation.ts",
+        "packages/activerecord/lib/associations.ts",
+        "packages/activerecord/test/cases/base.test.ts",
+        "packages/activerecord/lib/connection-adapters/better-sqlite3-adapter.ts",
+        "packages/activerecord/lib/adapters/sqlite3/test-helper.ts",
         "packages/arel/lib/visitors/to-sql.ts",
       ];
       const fired = await Promise.all([...runs, ...skips].map((f) => runGate(f)));
@@ -1084,7 +1084,7 @@ describe("CI runs every tooling test suite", () => {
   //
   // scripts/mixin-declaration-drift.test.ts is the same shape from the other
   // direction: it reads the adapter sources under
-  // packages/activerecord/src/connection-adapters/ rather than importing them,
+  // packages/activerecord/lib/connection-adapters/ rather than importing them,
   // so an adapter-only PR — the one that introduces the drift — never ran it
   // while it lived only in the unit-tests job.
   const AR_IMPORTING_SUITES = [
@@ -1198,7 +1198,7 @@ describe("CI runs every tooling test suite", () => {
       "tsconfig.base.json",
       // eslint/no-load-schema-with-stubbed-ddl.mjs:38 parses this array out of
       // the source, so it is rule data that happens to live in a package.
-      "packages/activerecord/src/support/stubbed-ddl-methods.ts",
+      "packages/activerecord/test/support/stubbed-ddl-methods.ts",
       // eslint/expected-fixtures.mjs reads the Rails-declared fixture sets.
       "vendor/rails/v8.0.2/activerecord/test/cases/base_test.rb",
     ]) {
@@ -1207,8 +1207,8 @@ describe("CI runs every tooling test suite", () => {
 
     // Ordinary source must NOT trip the fallback, or the scoping is a no-op.
     for (const ordinary of [
-      "packages/activerecord/src/relation.ts",
-      "packages/activerecord/src/relation.test.ts",
+      "packages/activerecord/lib/relation.ts",
+      "packages/activerecord/test/cases/relation.test.ts",
       "scripts/ci-suite-coverage.test.ts",
     ]) {
       expect(lintAll.test(ordinary), `${ordinary} must not force a full lint`).toBe(false);
@@ -1484,7 +1484,7 @@ describe("CI runs every tooling test suite", () => {
         "packages/activerecord-cli packages/solid-cable packages/solid-queue",
       );
       expect(
-        (await runGate("packages/solid-queue/lib/a.ts\npackages/activerecord/src/b.ts")).ar_scope,
+        (await runGate("packages/solid-queue/lib/a.ts\npackages/activerecord/lib/b.ts")).ar_scope,
       ).toBe("");
       expect(
         (await runGate("packages/ruby-compat/lib/a.ts\npackages/activestorage/lib/b.ts"))
@@ -1680,7 +1680,7 @@ describe("CI runs every tooling test suite", () => {
   it("keeps comparison_affected off for website-only changes", async () => {
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
     expect((await runGate("packages/website/src/app.ts")).comparison_affected).toBe("false");
-    expect((await runGate("packages/activerecord/src/relation.ts")).comparison_affected).toBe(
+    expect((await runGate("packages/activerecord/lib/relation.ts")).comparison_affected).toBe(
       "true",
     );
   });

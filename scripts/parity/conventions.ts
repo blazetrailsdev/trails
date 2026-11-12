@@ -1031,7 +1031,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "`config` / `config_file` / `read_config` are the memoized read of " +
       "test/config.yml; trails ships no config.yml — the `connections:` hash " +
       "is expressed directly as the CONNECTIONS table in " +
-      "packages/activerecord/src/support/connection.ts and the sub-setting " +
+      "packages/activerecord/test/support/connection.ts and the sub-setting " +
       "readers in config.ts — so there is no file to locate, copy from " +
       "config.example.yml, or parse. Scoped to config.rb, the only Ruby file " +
       "in the tree that defines these names. `expand_config` is NOT skipped: " +

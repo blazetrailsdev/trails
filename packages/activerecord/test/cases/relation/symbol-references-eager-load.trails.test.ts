@@ -1,0 +1,20 @@
+import { describe, it, expect } from "vitest";
+import "../../../lib/index.js";
+import { Post } from "../../models/post.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+
+describe("a leading-colon references value", () => {
+  fixtures(["posts", "comments"]);
+
+  it("is subtracted from the joined tables like the bare string", () => {
+    expect(Post.includes(":comments").references(":posts").toSql()).toBe(
+      Post.includes(":comments").references("posts").toSql(),
+    );
+  });
+
+  it("promotes includes to an eager join like the bare string", () => {
+    expect(Post.includes(":comments").references(":comments").toSql()).toBe(
+      Post.includes(":comments").references("comments").toSql(),
+    );
+  });
+});

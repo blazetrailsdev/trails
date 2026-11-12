@@ -1,0 +1,114 @@
+import { describe, it, expect } from "vitest";
+import { BinaryType, StringType } from "@blazetrails/activemodel";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { Serialized } from "../../../lib/type/serialized.js";
+
+const jsonCoder: Serialized["coder"] = {
+  dump: (value) => (value == null ? null : JSON.stringify(value)),
+  load: (value) => (value == null ? {} : typeof value === "string" ? JSON.parse(value) : value),
+};
+
+describe("Serialized#isChanged", () => {
+  const type = new Serialized(new StringType(), jsonCoder);
+
+  it("treats same key/value pairs in a different insertion order as unchanged", () => {
+    expect(type.isChanged({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(false);
+    expect(type.isChanged({ a: 1, b: 2 }, { b: 3, a: 1 })).toBe(true);
+  });
+
+  it("normalizes nested object key order", () => {
+    const oldValue = { outer: { x: 1, y: 2 }, list: [{ p: 1, q: 2 }] };
+    const newValue = { list: [{ q: 2, p: 1 }], outer: { y: 2, x: 1 } };
+    expect(type.isChanged(oldValue, newValue)).toBe(false);
+  });
+
+  it("normalizes key order through HashWithIndifferentAccess toHash unwrap", () => {
+    const oldValue = new HashWithIndifferentAccess({ a: 1, b: 2 });
+    const newValue = new HashWithIndifferentAccess({ b: 2, a: 1 });
+    expect(type.isChanged(oldValue, newValue)).toBe(false);
+  });
+
+  it("treats two value-equal Dates as unchanged, matching Ruby Date#==", () => {
+    expect(type.isChanged(new Date("2026-07-08"), new Date("2026-07-08"))).toBe(false);
+    expect(type.isChanged(new Date("2026-07-08"), new Date("2026-07-09"))).toBe(true);
+  });
+
+  it("dispatches to an explicit equals method, honoring cross-class value equality", () => {
+    class Instant {
+      constructor(readonly ms: number) {}
+      equals(other: unknown) {
+        return other instanceof Date ? this.ms === other.getTime() : false;
+      }
+    }
+    expect(type.isChanged(new Instant(100), new Date(100))).toBe(false);
+    expect(type.isChanged(new Instant(100), new Date(200))).toBe(true);
+  });
+
+  it("does not equate unrelated classes that yield the same valueOf primitive", () => {
+    class Cents {
+      valueOf() {
+        return 100;
+      }
+    }
+    const cents = new Cents();
+    const sameMillis = new Date(100);
+    expect(type.isChanged(cents, sameMillis)).toBe(true);
+  });
+
+  it("reports changed (not throws) for a null-prototype hash vs a Date", () => {
+    const nullProto = Object.assign(Object.create(null), { a: 1 });
+    expect(type.isChanged(nullProto, new Date(100))).toBe(true);
+  });
+
+  it("distinguishes NaN, undefined, and null Hash values, matching Ruby Hash#==", () => {
+    expect(type.isChanged({ a: NaN }, { a: null })).toBe(true);
+    expect(type.isChanged({ a: undefined }, { a: null })).toBe(true);
+    expect(type.isChanged({ a: NaN }, { a: undefined })).toBe(true);
+    expect(type.isChanged({ a: Infinity }, { a: null })).toBe(true);
+    expect(type.isChanged([NaN], [null])).toBe(true);
+    expect(type.isChanged({ a: undefined }, {})).toBe(true);
+    expect(type.isChanged({ a: undefined }, { a: undefined })).toBe(false);
+  });
+
+  it("reports changed for two distinct NaN Hash values, matching Ruby NaN non-reflexivity", () => {
+    expect(type.isChanged({ a: NaN }, { a: NaN })).toBe(true);
+    expect(type.isChanged([NaN], [NaN])).toBe(true);
+    expect(type.isChanged({ a: { b: NaN } }, { a: { b: NaN } })).toBe(true);
+    expect(type.isChanged({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(false);
+  });
+
+  it("compares nested value objects by their own equality, not JSON canonicalization", () => {
+    expect(type.isChanged({ at: new Date(100) }, { at: new Date(100) })).toBe(false);
+    expect(type.isChanged({ at: new Date(100) }, { at: new Date(200) })).toBe(true);
+    class Instant {
+      constructor(readonly ms: number) {}
+      equals(other: unknown) {
+        return other instanceof Date ? this.ms === other.getTime() : false;
+      }
+    }
+    expect(type.isChanged({ at: new Instant(100) }, { at: new Date(100) })).toBe(false);
+    expect(type.isChanged([new Instant(100)], [new Date(200)])).toBe(true);
+  });
+
+  it("falls back to reference equality for identity-== object_class instances", () => {
+    class Custom {}
+    const oldValue = new Custom();
+    const newValue = new Custom();
+    expect(type.isChanged(oldValue, newValue)).toBe(true);
+    expect(type.isChanged(oldValue, oldValue)).toBe(false);
+  });
+});
+
+describe("Serialized#type", () => {
+  it("forwards to the subtype, as DelegateClass(Type::Value) does", () => {
+    expect(new Serialized(new StringType(), jsonCoder).type()).toBe("string");
+    expect(new Serialized(new BinaryType(), jsonCoder).type()).toBe("binary");
+  });
+});
+
+describe("Serialized#inspect", () => {
+  it("is Kernel#inspect, not the delegated subtype's", () => {
+    const type = new Serialized(new StringType(), jsonCoder);
+    expect(type.inspect()).toMatch(/^#<(ActiveRecord::Type::)?Serialized:0x[0-9a-f]+ .*@coder=/);
+  });
+});

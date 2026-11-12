@@ -20,14 +20,14 @@ import {
   staleDivergenceAllowances,
   unresolvedCallSites,
 } from "./compare.js";
-import { canonicalRegistrySchema } from "../../packages/activerecord/src/support/canonical-schema.js";
-import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
+import { canonicalRegistrySchema } from "../../packages/activerecord/test/support/canonical-schema.js";
+import { TEST_SCHEMA } from "../../packages/activerecord/test/support/test-schema.js";
 import type { Finding } from "./compare.js";
-import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
+import type { Schema } from "../../packages/activerecord/test/support/schema-types.js";
 import {
   columnsOf,
   isWrappedSchema,
-} from "../../packages/activerecord/src/support/schema-types.js";
+} from "../../packages/activerecord/test/support/schema-types.js";
 
 const parse = (rb: string) => parseSchemaRb(`ActiveRecord::Schema.define do\n${rb}\nend\n`);
 const columnsOfTable = (rb: string, table: string) => [...parse(rb).get(table)!.columns.keys()];

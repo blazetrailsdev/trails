@@ -1,0 +1,607 @@
+import { rbFLoad, StringIO, type IO } from "@blazetrails/ruby-compat";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { SchemaDumper } from "../../lib/connection-adapters/abstract/schema-dumper.js";
+import { SchemaDumper as BaseSchemaDumper } from "../../lib/schema-dumper.js";
+import { Base } from "../../lib/base.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import type { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
+import { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { ValueType } from "@blazetrails/activemodel";
+import { Column } from "../../lib/connection-adapters/column.js";
+import { SqlTypeMetadata } from "../../lib/connection-adapters/sql-type-metadata.js";
+import {
+  CheckConstraintDefinition,
+  ForeignKeyDefinition,
+  IndexDefinition,
+} from "../../lib/connection-adapters/abstract/schema-definitions.js";
+import { dumpTableSchema, FULL_DUMP_TIMEOUT_MS } from "../support/schema-dumping-helper.js";
+import { adapterType } from "../../lib/test-adapter.js";
+import type { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
+
+function column(name: string, type: string, defaultFunction: string | null = null): Column {
+  return new Column(
+    name,
+    null,
+    new SqlTypeMetadata({ sqlType: type, type }),
+    true,
+    defaultFunction,
+  );
+}
+
+const PRIMARY_KEY_ADAPTER = {
+  primaryKey: async () => "id",
+  lookupCastTypeFromColumn: () => new ValueType(),
+  supportsForeignKeys: () => false,
+};
+
+function pool(connection: DatabaseAdapter): ConnectionPool {
+  return { withConnection: (block: (c: DatabaseAdapter) => unknown) => block(connection) } as any;
+}
+
+function connection(source: Record<string, any>): DatabaseAdapter {
+  return Object.assign(
+    Object.create(AbstractAdapter.prototype),
+    { isValidType: () => true, primaryKey: async () => null },
+    source,
+    source.adapter,
+  );
+}
+
+const EMPTY_SOURCE = {
+  tables: async () => [],
+  columns: async () => [],
+  indexes: async () => [],
+  adapter: { defaultIndexType: AbstractAdapter.prototype.defaultIndexType },
+};
+
+describe("SchemaDumper trails-only cases", () => {
+  it("schema dump emits defaultFunction as arrow for non-PK columns", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const source = {
+      tables: async () => ["gen_defaults"],
+      columns: async () => [
+        column("id", "integer"),
+        column("token", "string", "gen_random_uuid()"),
+      ],
+      indexes: async () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      adapter: PRIMARY_KEY_ADAPTER,
+    };
+    const output = (await TopLevelDumper.dump(pool(connection(source)), new StringIO())).string();
+    expect(output).toContain(`() => "gen_random_uuid()"`);
+  });
+
+  it("schema dump separates tables with one blank line and ends the last table without one", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const source = (tables: string[]) => ({
+      tables: async () => tables,
+      columns: async () => [column("id", "integer")],
+      indexes: async () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      adapter: PRIMARY_KEY_ADAPTER,
+    });
+    const one = (
+      await TopLevelDumper.dump(pool(connection(source(["books"]))), new StringIO())
+    ).string();
+    expect(one).not.toContain("});\n\n}");
+
+    const two = (
+      await TopLevelDumper.dump(pool(connection(source(["authors", "books"]))), new StringIO())
+    ).string();
+    expect(two).toContain('});\n\n  await ctx.createTable("books"');
+    expect(two).not.toContain("});\n\n}");
+  });
+
+  it("schema dump round-trips PG range/network/bit-varying types via DSL helpers", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const source = {
+      tables: async () => ["dsl_types"],
+      supportsForeignKeys: () => false,
+      columns: async () => [
+        column("id", "integer"),
+        column("r1", "int4range"),
+        column("r2", "int8range"),
+        column("r3", "numrange"),
+        column("r4", "daterange"),
+        column("r5", "tsrange"),
+        column("r6", "tstzrange"),
+        column("n1", "inet"),
+        column("n2", "cidr"),
+        column("n3", "macaddr"),
+        column("bv", "bitVarying"),
+      ],
+      indexes: async () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      adapter: PRIMARY_KEY_ADAPTER,
+    };
+    const output = (await TopLevelDumper.dump(pool(connection(source)), new StringIO())).string();
+    for (const helper of [
+      "int4range",
+      "int8range",
+      "numrange",
+      "daterange",
+      "tsrange",
+      "tstzrange",
+      "inet",
+      "cidr",
+      "macaddr",
+      "bitVarying",
+    ]) {
+      expect(output).toContain(`t.${helper}(`);
+    }
+    expect(output).toContain('t.bitVarying("bv")');
+    expect(output).not.toContain('t.column("bv"');
+    expect(output).not.toContain("t.enum(");
+    expect(output).not.toContain('"enum"');
+  });
+
+  it("schema dump round-trips timestamptz/uuid/interval/oid without misclassifying as enum", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const source = {
+      tables: async () => ["non_helper_types"],
+      supportsForeignKeys: () => false,
+      columns: async () => [
+        column("id", "integer"),
+        column("ts", "timestamptz"),
+        column("guid", "uuid"),
+        column("span", "interval"),
+        column("obj_id", "oid"),
+      ],
+      indexes: async () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      adapter: PRIMARY_KEY_ADAPTER,
+    };
+    const output = (await TopLevelDumper.dump(pool(connection(source)), new StringIO())).string();
+    expect(output).toContain('t.timestamptz("ts"');
+    expect(output).toContain('t.uuid("guid"');
+    expect(output).toContain('t.interval("span"');
+    expect(output).toContain('t.oid("obj_id"');
+    expect(output).not.toContain("t.enum(");
+  });
+
+  it("indexParts emits include for covering indexes", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const emptySource = { ...EMPTY_SOURCE };
+    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const parts = dumper.indexParts({ columns: ["a"], unique: false, include: ["b", "c"] });
+    expect(parts.join(", ")).toContain(`include: ["b","c"]`);
+  });
+
+  it("indexParts emits NULLS FIRST/LAST order strings verbatim", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const emptySource = { ...EMPTY_SOURCE };
+    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const parts = dumper.indexParts({
+      columns: ["created_at"],
+      unique: false,
+      orders: "desc NULLS LAST",
+    });
+    expect(parts.join(", ")).toContain(`order: "desc NULLS LAST"`);
+  });
+
+  it("indexParts collapses uniform multi-column orders to a scalar", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const emptySource = { ...EMPTY_SOURCE };
+    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const parts = dumper.indexParts(
+      new IndexDefinition("t", "i", false, ["name", "rating"], {
+        orders: { name: "desc", rating: "desc" },
+      }),
+    );
+    expect(parts.join(", ")).toContain(`order: "desc"`);
+  });
+
+  it("indexParts keeps mixed multi-column orders as a map", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const emptySource = { ...EMPTY_SOURCE };
+    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const parts = dumper.indexParts({
+      columns: ["name", "rating"],
+      unique: false,
+      orders: { name: "desc", rating: "asc" },
+    });
+    expect(parts.join(", ")).toContain(`order: { name: "desc", rating: "asc" }`);
+  });
+
+  it("indexParts collapses uniform multi-column opclasses to a scalar", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const emptySource = { ...EMPTY_SOURCE };
+    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const parts = dumper.indexParts(
+      new IndexDefinition("t", "i", false, ["name", "description"], {
+        opclasses: { name: "varchar_pattern_ops", description: "varchar_pattern_ops" },
+      }),
+    );
+    expect(parts.join(", ")).toContain(`opclass: "varchar_pattern_ops"`);
+  });
+
+  it("indexParts routes using: through the connection's defaultIndexType predicate", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const { AbstractMysqlAdapter } =
+      await import("../../lib/connection-adapters/abstract-mysql-adapter.js");
+    const index = { columns: ["name"], unique: false, using: "btree" };
+
+    const sqliteLike = new (TopLevelDumper as any)(connection(EMPTY_SOURCE));
+    expect(sqliteLike.indexParts(index).join(", ")).toContain(`using: "btree"`);
+
+    const mysqlLike = new (TopLevelDumper as any)(
+      connection({ defaultIndexType: AbstractMysqlAdapter.prototype.defaultIndexType }),
+    );
+    expect(mysqlLike.indexParts(index).join(", ")).not.toContain("using:");
+    expect(mysqlLike.indexParts({ ...index, using: "hash" }).join(", ")).toContain(`using: "hash"`);
+  });
+
+  it("fkIgnorePattern suppresses name for matching FK names, includes name for non-matching", async () => {
+    const mkSource = (fkName: string) => ({
+      tables: async () => ["books"],
+      supportsForeignKeys: () => true,
+      columns: async (_t: string) => [column("id", "integer")],
+      indexes: async () => [],
+      foreignKeyColumnFor: () => "author_id",
+      foreignKeys: async () => [
+        new ForeignKeyDefinition("books", "authors", {
+          column: "author_id",
+          primaryKey: "id",
+          name: fkName,
+        }),
+      ],
+    });
+    const autoName = "fk_rails_abc123def4";
+    const autoOutput = (
+      await SchemaDumper.dump(pool(connection(mkSource(autoName))), new StringIO())
+    ).string();
+    expect(autoOutput).toContain("addForeignKey");
+    expect(autoOutput).not.toContain(`"${autoName}"`);
+    const customName = "fk_books_author_id";
+    const customOutput = (
+      await SchemaDumper.dump(pool(connection(mkSource(customName))), new StringIO())
+    ).string();
+    expect(customOutput).toContain(`name: "${customName}"`);
+  });
+
+  it("chkIgnorePattern suppresses name for matching check constraint names, includes name for non-matching", async () => {
+    const mkSource = (chkName: string) => ({
+      tables: async () => ["products"],
+      supportsForeignKeys: () => false,
+      columns: async (_t: string) => [column("price", "decimal")],
+      indexes: async () => [],
+      supportsCheckConstraints: async () => true,
+      checkConstraints: async () => [
+        new CheckConstraintDefinition("products", "price > 0", { name: chkName }),
+      ],
+    });
+    const autoName = "chk_rails_abc123def4";
+    const autoOutput = (
+      await SchemaDumper.dump(pool(connection(mkSource(autoName))), new StringIO())
+    ).string();
+    expect(autoOutput).toContain("t.checkConstraint");
+    expect(autoOutput).not.toContain(`"${autoName}"`);
+    const customChkName = "products_price_check";
+    const customOutput = (
+      await SchemaDumper.dump(pool(connection(mkSource(customChkName))), new StringIO())
+    ).string();
+    expect(customOutput).toContain(`name: "${customChkName}"`);
+  });
+});
+
+describe("SchemaDumper types its dump against the connected adapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  afterEach(async () => {
+    await (await Base.leaseConnection()).dropTable("json_data_type", { ifExists: true });
+  });
+
+  it.skipIf(adapterType !== "postgres")(
+    "a PostgreSQL dump names PostgreSQLAdapter, so t.jsonb and t.oid typecheck",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
+      await connection.createTable("json_data_type", { force: true }, (t) => {
+        t.jsonb("payload");
+      });
+      const output = await dumpTableSchema("json_data_type", "postgresql_oids");
+
+      expect(output).toContain(
+        'import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";',
+      );
+      expect(output).toMatch(/^await Schema\.get\([\d.]+\)\.define<PostgreSQLAdapter>\(/m);
+      expect(output).toContain('t.jsonb("payload")');
+      expect(output).toContain('t.oid("obj_id")');
+
+      await connection.dropTable("json_data_type");
+      const storage = await mkdtemp(join(tmpdir(), "trails-schema-dumper-"));
+      try {
+        await writeFile(join(storage, "schema.ts"), output);
+        await rbFLoad(join(storage, "schema.ts"));
+      } finally {
+        await rm(storage, { recursive: true, force: true });
+      }
+      expect((await connection.columns("json_data_type")).map((c) => c.sqlType)).toContain("jsonb");
+    },
+  );
+
+  it(
+    "the dump's own schemaFormat decides the type syntax, over the global one",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const ignoreTablesWas = BaseSchemaDumper.ignoreTables;
+      BaseSchemaDumper.ignoreTables = [/./];
+      try {
+        const asJs = (
+          await SchemaDumper.dump(Base.connectionPool(), new StringIO(), { schemaFormat: "js" })
+        ).string();
+        expect(asJs).not.toContain("import type");
+        expect(asJs).toMatch(/\.define\((?:\{ version: [0-9_]+ \}, )?async \(ctx\) => \{/);
+
+        const asTs = (
+          await SchemaDumper.dump(Base.connectionPool(), new StringIO(), { schemaFormat: "ts" })
+        ).string();
+        expect(asTs).toMatch(/^import type \{ \w+Adapter \} from /m);
+        expect(asTs).toMatch(/\.define<\w+Adapter>\(/);
+      } finally {
+        BaseSchemaDumper.ignoreTables = ignoreTablesWas;
+      }
+    },
+  );
+
+  it("an adapter-less dumper names no adapter", async () => {
+    const output = (
+      await SchemaDumper.dump(pool(connection(EMPTY_SOURCE)), new StringIO())
+    ).string();
+    expect(output).not.toContain("import type");
+    expect(output).toMatch(/^await Schema\.get\([\d.]+\)\.define\(async \(ctx\) => \{/m);
+  });
+
+  it("schema dump does not emit id false for normal tables", async () => {
+    const output = await dumpTableSchema("authors");
+    expect(output).not.toContain("id: false");
+    expect(output).not.toContain('t.integer("id"');
+  });
+});
+
+describe("SchemaDumperAdapterTest", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
+  });
+
+  it("dumps schema from adapter introspection", async () => {
+    await adapter.createTable("horses", {}, (t) => {
+      t.string("title", { null: false });
+      t.text("body");
+    });
+    const result = await dumpTableSchema("horses");
+    expect(result).toContain("horses");
+    expect(result).toContain('"title"');
+    expect(result).toContain('"body"');
+  });
+
+  it("dumps schema with indexes from adapter", async () => {
+    await adapter.createTable("testings", {}, (t) => {
+      t.integer("post_id");
+    });
+    await adapter.addIndex("testings", "post_id", { name: "index_testings_on_post_id" });
+    const result = await dumpTableSchema("testings");
+    expect(result).toContain("t.index(");
+    expect(result).toContain("index_testings_on_post_id");
+  });
+
+  it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
+    await adapter.createTable("octopi", {}, (t) => {
+      t.datetime("happened_at", { precision: null });
+    });
+    const result = await dumpTableSchema("octopi");
+    expect(result).toMatch(/t\.datetime\("happened_at"[^}]*precision\s*:\s*null/);
+  });
+
+  it("adapter-backed dump preserves explicit string limit through AdapterSchemaSource", async () => {
+    await adapter.createTable("barcodes", {}, (t) => {
+      t.string("code", { limit: 10 });
+    });
+    const result = await dumpTableSchema("barcodes");
+    expect(result).toMatch(/t\.string\("code"[^}]*limit\s*:\s*10/);
+  });
+
+  it("skips internal tables when dumping from adapter", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const { SchemaMigration } = await import("../../lib/schema-migration.js");
+    const { InternalMetadata } = await import("../../lib/internal-metadata.js");
+    await new SchemaMigration(adapter.pool).createTable();
+    await new InternalMetadata(adapter.pool).createTable();
+    await adapter.createTable("reminders", {}, (t) => {
+      t.string("name");
+    });
+    const result = (
+      await TopLevelDumper.dump(adapter.pool as ConnectionPool, new StringIO())
+    ).string();
+    expect(result).toContain("reminders");
+    expect(result).not.toContain("schema_migrations");
+    expect(result).not.toContain("ar_internal_metadata");
+  }, 60000);
+
+  it("emitTable forwards comment from tableOptions into createTable options", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const source = {
+      tables: async () => ["users"],
+      columns: async () => [column("id", "integer")],
+      indexes: async () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      tableOptions: async () => ({ comment: "user accounts" }),
+      adapter: PRIMARY_KEY_ADAPTER,
+    };
+    const dumper = TopLevelDumper.create(connection(source));
+    const lines = new StringIO();
+    await (dumper as any).table("users", lines);
+    expect(lines.string()).toContain(`comment: "user accounts"`);
+  });
+
+  it("emitTable emits charset and collation from adapterTableOpts before force", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const source = {
+      tables: async () => ["t"],
+      columns: async () => [column("id", "integer")],
+      indexes: async () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
+      adapter: PRIMARY_KEY_ADAPTER,
+    };
+    const dumper = TopLevelDumper.create(connection(source));
+    const lines = new StringIO();
+    await (dumper as any).table("t", lines);
+    const header = lines.string().split("\n")[0];
+    expect(header).toContain(`charset: "utf8mb4"`);
+    expect(header).toContain(`collation: "utf8mb4_bin"`);
+    expect(header.indexOf("charset")).toBeLessThan(header.indexOf("force"));
+  });
+
+  it("emitTable emits primaryKey array for composite primary keys", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const source = {
+      tables: async () => ["t"],
+      columns: async () => [column("id", "integer"), column("account_id", "integer")],
+      indexes: async () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      adapter: { ...PRIMARY_KEY_ADAPTER, primaryKey: async () => ["id", "account_id"] },
+    };
+    const dumper = TopLevelDumper.create(connection(source));
+    const lines = new StringIO();
+    await (dumper as any).table("t", lines);
+    expect(lines.string().split("\n")[0]).toContain(`primaryKey: ["id","account_id"]`);
+    expect(lines.string().split("\n")[0]).not.toContain(`id: false`);
+  });
+
+  afterEach(async () => {
+    const o = { ifExists: true } as const;
+    await (await Base.leaseConnection()).dropTable("barcodes", o);
+    await (await Base.leaseConnection()).dropTable("horses", o);
+    await (await Base.leaseConnection()).dropTable("octopi", o);
+    await (await Base.leaseConnection()).dropTable("reminders", o);
+    await (await Base.leaseConnection()).dropTable("testings", o);
+  });
+});
+
+describe("SchemaDumper async header ordering", () => {
+  it("schemas → extensions → types appear in that order when all three are async", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const log: string[] = [];
+    class OrderedDumper extends TopLevelDumper {
+      protected override async schemas(lines: IO | StringIO): Promise<void> {
+        await Promise.resolve();
+        lines.puts("SCHEMAS");
+        log.push("schemas");
+      }
+      protected override async extensions(lines: IO | StringIO): Promise<void> {
+        await Promise.resolve();
+        lines.puts("EXTENSIONS");
+        log.push("extensions");
+      }
+      protected override async types(lines: IO | StringIO): Promise<void> {
+        await Promise.resolve();
+        lines.puts("TYPES");
+        log.push("types");
+      }
+    }
+    const source = {
+      tables: async () => [],
+      supportsForeignKeys: () => false,
+      columns: async () => [],
+      indexes: async () => [],
+    };
+    const dumper = new (OrderedDumper as any)(connection(source));
+    const result = (await dumper.dump(new StringIO())).string();
+    expect(log).toEqual(["schemas", "extensions", "types"]);
+    const schemasIdx = result.indexOf("SCHEMAS");
+    const extensionsIdx = result.indexOf("EXTENSIONS");
+    const typesIdx = result.indexOf("TYPES");
+    expect(schemasIdx).toBeLessThan(extensionsIdx);
+    expect(extensionsIdx).toBeLessThan(typesIdx);
+  });
+});
+
+describe("formatColspec", () => {
+  const dumper = SchemaDumper.create(
+    connection({
+      tables: async () => [],
+      supportsForeignKeys: () => false,
+      columns: async () => [],
+      indexes: async () => [],
+      lookupCastTypeFromColumn: () => new ValueType(),
+    }),
+  );
+
+  it("emits values verbatim (Rails format_colspec), not re-quoted", () => {
+    expect(
+      dumper.formatColspec({
+        null: "false",
+        limit: "255",
+        precision: "null",
+        default: '() => "now()"',
+        comment: '"a note"',
+      }),
+    ).toBe('null: false, limit: 255, precision: null, default: () => "now()", comment: "a note"');
+  });
+
+  it("recurses into nested objects (primary-key `id: { type:, … }` spec)", () => {
+    expect(
+      dumper.formatColspec({ id: { type: '"uuid"', default: "null" }, force: '"cascade"' }),
+    ).toBe('id: { type: "uuid", default: null }, force: "cascade"');
+  });
+});
+
+describe("SchemaDumper#indexes", () => {
+  it("emits sorted addIndex statements for a table", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const dumper = new (TopLevelDumper as any)({
+      tables: async () => ["posts"],
+      columns: async () => [],
+      indexes: async () => [
+        { table: "posts", columns: ["title"], unique: true, name: "index_posts_on_title" },
+        { table: "posts", columns: ["body"], unique: false, name: "index_posts_on_body" },
+      ],
+      lookupCastTypeFromColumn: () => new ValueType(),
+      defaultIndexType: AbstractAdapter.prototype.defaultIndexType,
+    });
+    const stream = new StringIO();
+    await dumper.indexes("posts", stream);
+    expect(stream.string()).toBe(
+      '  addIndex("posts", ["body"], { name: "index_posts_on_body" });\n' +
+        '  addIndex("posts", ["title"], { name: "index_posts_on_title", unique: true });\n\n',
+    );
+  });
+
+  it("writes nothing when the table has no indexes", async () => {
+    const { SchemaDumper: TopLevelDumper } =
+      await import("../../lib/connection-adapters/abstract/schema-dumper.js");
+    const dumper = new TopLevelDumper({
+      ...EMPTY_SOURCE,
+      lookupCastTypeFromColumn: () => new ValueType(),
+      adapter: PRIMARY_KEY_ADAPTER,
+    } as never);
+    const stream = new StringIO();
+    await dumper.indexes("posts", stream);
+    expect(stream.string()).toBe("");
+  });
+});

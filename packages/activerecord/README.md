@@ -304,7 +304,7 @@ A URL config maps the `sqlite:`, `postgres:` and `mysql:` schemes onto those
 names (`ActiveRecord.protocolAdapters`). There is also a raw
 `sqlite3-adapter.js` subpath. Register your own adapter with
 `ConnectionAdapters.register(name, className, path, loader)` (see
-[`src/connection-adapters.ts`](src/connection-adapters.ts)).
+[`lib/connection-adapters.ts`](lib/connection-adapters.ts)).
 
 ```ts
 await Base.establishConnection({ adapter: "postgresql", url: process.env.DATABASE_URL });

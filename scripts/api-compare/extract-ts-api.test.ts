@@ -3728,7 +3728,7 @@ describe("extractFromProgram — include() detection", () => {
   });
 
   it("captures shorthand-property and callable-RHS object members", () => {
-    // Mirrors packages/activerecord/src/locking/pessimistic.ts — bug
+    // Mirrors packages/activerecord/lib/locking/pessimistic.ts — bug
     // flagged in PR #961 review.
     const info = extractFromFiles("/p", {
       "pessimistic.ts": `
@@ -6217,13 +6217,12 @@ describe("sub-package de-overlap", () => {
 
   it("maps activerecord's src/support to the activerecord-test-support package", () => {
     expect(overlappingSubDirs("activerecord")).toEqual([
-      packageSrcDir("activerecord-test-support"),
       packageSrcDir("mysql2"),
       packageSrcDir("pg"),
       packageSrcDir("sqlite3"),
     ]);
     expect(packageSrcDir("activerecord-test-support")).toBe(
-      path.join(packageSrcDir("activerecord"), "support"),
+      path.join(path.dirname(packageSrcDir("activerecord")), "test", "support"),
     );
   });
 
@@ -7520,7 +7519,7 @@ describe("callArgs", () => {
 });
 
 describe("declaringFile (RFC 0126)", () => {
-  const SRC = "/repo/packages/activerecord/src";
+  const SRC = "/repo/packages/activerecord/lib";
 
   // Only `getSourceFile().fileName` and which declaration is picked matter, so
   // a stub says exactly what the checker would hand back.
@@ -8939,7 +8938,7 @@ describe("object-literal modules and Struct.new constants", () => {
   });
 
   it("leaves a cast namespace literal with no bodies alone", () => {
-    // activerecord/src/namespaces.ts: `export const ActiveRecord = { name, loadPath } as AutoloadModule & …`
+    // activerecord/lib/namespaces.ts: `export const ActiveRecord = { name, loadPath } as AutoloadModule & …`
     const info = extractFromFiles("/p", {
       "namespaces.ts": `
         const loadPath = { a: 1 };
@@ -8950,7 +8949,7 @@ describe("object-literal modules and Struct.new constants", () => {
   });
 
   it("leaves an `as const` section literal alone", () => {
-    // activerecord/src/relation/calculations.ts: CalculationsPublicInstanceMethods
+    // activerecord/lib/relation/calculations.ts: CalculationsPublicInstanceMethods
     const info = extractFromFiles("/p", {
       "calculations.ts": `export const Section = { pick(): void {} } as const;`,
     });
@@ -8996,7 +8995,7 @@ describe("object-literal modules and Struct.new constants", () => {
   });
 
   it("does not credit a string-valued data property as an accessor slot", () => {
-    // activerecord/src/sqlite/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
+    // activerecord/lib/sqlite/better-sqlite3.ts: `name: "better-sqlite3"` is a driver tag, not state
     const info = extractFromFiles("/p", {
       "driver.ts": `
         declare function extend<T>(obj: T, ...mods: object[]): T;

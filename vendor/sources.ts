@@ -32,7 +32,7 @@ export interface PackageEntry {
    * only where that file defines real methods a trails file ports:
    * `active_record.rb` defines the `ActiveRecord` module's `def self.` methods
    * and `singleton_class.attr_*` config seats, ported in
-   * `packages/activerecord/src/active-record.ts`. Without it the file is only
+   * `packages/activerecord/lib/active-record.ts`. Without it the file is only
    * scanned for its class, module and constant declarations.
    */
   libEntryFile?: string;
@@ -115,14 +115,14 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "activerecord",
         libPath: "activerecord/lib/active_record",
         // The `def self.` methods on the `ActiveRecord` module are ported in
-        // `packages/activerecord/src/active-record.ts`.
+        // `packages/activerecord/lib/active-record.ts`.
         libEntryFile: "activerecord/lib/active_record.rb",
         testPath: "activerecord/test/cases",
       },
       {
         // Rails' test-support helpers (`test/support/*.rb`) — DDL/schema-dump/
         // connection helpers our suite ports into
-        // `packages/activerecord/src/support/`. A pseudo-package rather than a
+        // `packages/activerecord/test/support/`. A pseudo-package rather than a
         // second root on `activerecord` because api-compare keys one lib dir
         // per package. No `testPath`: these are helpers, not test cases.
         name: "activerecord-test-support",
@@ -392,7 +392,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [
       {
         // The driver gem `Mysql2Adapter` calls into; its ports live in
-        // `packages/activerecord/src/mysql2/`.
+        // `packages/activerecord/lib/mysql2/`.
         name: "mysql2",
         libPath: "lib/mysql2",
         libEntryFile: "lib/mysql2.rb",
@@ -426,7 +426,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         // The driver-layer gem `SQLite3Adapter` calls into
         // (`sqlite3_adapter.rb:838-844` reaches `::SQLite3::Pragmas`); its
-        // ports live in `packages/activerecord/src/sqlite/`.
+        // ports live in `packages/activerecord/lib/sqlite/`.
         name: "sqlite3",
         libPath: "lib/sqlite3",
       },

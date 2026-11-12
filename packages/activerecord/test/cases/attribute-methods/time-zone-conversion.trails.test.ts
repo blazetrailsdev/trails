@@ -1,0 +1,214 @@
+import { describe, it, expect } from "vitest";
+import * as Types from "@blazetrails/activemodel";
+import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Base } from "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { loadSchemaFromAdapter } from "../../../lib/model-schema.js";
+import { Array as ArrayType } from "../../../lib/connection-adapters/postgresql/oid/array.js";
+import { RangeType } from "../../../lib/connection-adapters/postgresql/oid/range.js";
+import { TimeZoneConverter } from "../../../lib/attribute-methods/time-zone-conversion.js";
+import { Range } from "@blazetrails/ruby-compat";
+import { adapterDouble, establishConnectionTo } from "../../support/adapter-double.js";
+
+fixtures({});
+
+describe("TimeZoneConversionTest", () => {
+  it("wraps datetime attribute when timeZoneAwareAttributes is true", async () => {
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = true;
+        this.attribute("published_at", "datetime");
+      }
+    }
+    const type = Post.typeForAttribute("published_at");
+    expect(type).toBeInstanceOf(TimeZoneConverter);
+  });
+
+  it("does not wrap datetime attribute when timeZoneAwareAttributes is false", async () => {
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = false;
+        this.attribute("published_at", "datetime");
+      }
+    }
+    const type = Post.typeForAttribute("published_at");
+    expect(type).not.toBeInstanceOf(TimeZoneConverter);
+  });
+
+  it("does not wrap non-datetime attribute even when timeZoneAwareAttributes is true", async () => {
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = true;
+        this.attribute("title", "string");
+      }
+    }
+    const type = Post.typeForAttribute("title");
+    expect(type).not.toBeInstanceOf(TimeZoneConverter);
+  });
+
+  it("does not wrap attribute listed in skipTimeZoneConversionForAttributes", async () => {
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = true;
+        this.skipTimeZoneConversionForAttributes = ["published_at"];
+        this.attribute("published_at", "datetime");
+      }
+    }
+    const type = Post.typeForAttribute("published_at");
+    expect(type).not.toBeInstanceOf(TimeZoneConverter);
+  });
+
+  it("wraps time attribute when timeZoneAwareAttributes is true", async () => {
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = true;
+        this.attribute("starts_at", "time");
+      }
+    }
+    const type = Post.typeForAttribute("starts_at");
+    expect(type).toBeInstanceOf(TimeZoneConverter);
+  });
+
+  it("instance attribute type matches _attributeDefinitions after _defaultAttributes replay", async () => {
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = true;
+        this.attribute("published_at", "datetime");
+      }
+    }
+    const defaults = Post._defaultAttributes();
+    const attr = defaults.getAttribute("published_at");
+    expect(attr?.type).toBeInstanceOf(TimeZoneConverter);
+  });
+
+  it("wraps schema-reflected datetime column when timeZoneAwareAttributes is true", async () => {
+    const datetimeType = Types.Type.lookup("datetime");
+    const stringType = Types.Type.lookup("string");
+    const cols = {
+      published_at: { sqlType: "datetime" },
+      title: { sqlType: "string" },
+    } as Record<string, unknown>;
+    const cache = {
+      dataSourceExists: async () => true,
+      columnsHash: async () => cols,
+      getCachedColumnsHash: () => cols,
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => true,
+      isCached: () => true,
+      primaryKeys: async () => null,
+    };
+    const adapter = adapterDouble({
+      schemaCache: cache,
+      lookupCastTypeFromColumn(col: { sqlType: string }) {
+        return col.sqlType === "datetime" ? datetimeType : stringType;
+      },
+    });
+    class Post extends Base {
+      static {
+        this.timeZoneAwareAttributes = true;
+      }
+      static override tableName = "posts";
+    }
+    await establishConnectionTo(Post, adapter as never);
+    await loadSchemaFromAdapter.call(Post);
+    expect(Post.typeForAttribute("published_at")).toBeInstanceOf(TimeZoneConverter);
+    expect(Post.typeForAttribute("title")).not.toBeInstanceOf(TimeZoneConverter);
+  });
+});
+
+describe("TimeZoneConverter#isChanged", () => {
+  const zone = new TimeZone("Europe/Paris");
+  const MS1 = 1_000_000n;
+
+  function converter(precision?: number) {
+    return new TimeZoneConverter(
+      new Types.DateTimeType(precision !== undefined ? { precision } : {}),
+    );
+  }
+  function twz(ns: bigint) {
+    return new TimeWithZone(Temporal.Instant.fromEpochNanoseconds(ns), zone);
+  }
+
+  it("two distinct TimeWithZone wrapping the same instant are unchanged (DB round-trip)", async () => {
+    expect(converter().isChanged(twz(MS1), twz(MS1))).toBe(false);
+  });
+
+  it("TimeWithZone objects differing by one microsecond are changed (precision=null)", async () => {
+    expect(converter().isChanged(twz(MS1), twz(MS1 + 1000n))).toBe(true);
+  });
+
+  it("TimeWithZone objects differing by one millisecond are changed (precision=3)", async () => {
+    expect(converter(3).isChanged(twz(MS1), twz(MS1 + 1_000_000n))).toBe(true);
+  });
+
+  it("Temporal.Instant values with same epoch are unchanged", async () => {
+    const a = Temporal.Instant.fromEpochNanoseconds(MS1);
+    const b = Temporal.Instant.fromEpochNanoseconds(MS1);
+    expect(converter().isChanged(a, b)).toBe(false);
+  });
+
+  it("null vs null is unchanged", async () => {
+    expect(converter().isChanged(null, null)).toBe(false);
+  });
+
+  it("null vs TimeWithZone is changed", async () => {
+    expect(converter().isChanged(null, twz(MS1))).toBe(true);
+  });
+});
+
+describe("TimeZoneConverter#serialize containers", () => {
+  const zone = new TimeZone("Europe/Paris");
+  const instant = Temporal.Instant.from("2020-06-15T10:00:00Z");
+  const twz = () => new TimeWithZone(instant, zone);
+
+  it("forwards TimeWithZone range bounds to the subtype untouched", async () => {
+    const converter = new TimeZoneConverter(new RangeType(new Types.DateTimeType({})));
+    const serialized = converter.serialize(new Range(twz(), twz(), true)) as Range;
+    expect(serialized.begin).toBeInstanceOf(RubyTime);
+    expect((serialized.begin as RubyTime).toZonedDateTime().toInstant().epochNanoseconds).toBe(
+      instant.epochNanoseconds,
+    );
+  });
+
+  it("forwards TimeWithZone bounds through an array of ranges", async () => {
+    const converter = new TimeZoneConverter(
+      new ArrayType(new RangeType(new Types.DateTimeType({}))),
+    );
+    const serialized = converter.serialize([new Range(twz(), twz(), true)]) as { values: Range[] };
+    const begin = serialized.values[0].begin;
+    expect(begin).toBeInstanceOf(RubyTime);
+    expect((begin as RubyTime).toZonedDateTime().toInstant().epochNanoseconds).toBe(
+      instant.epochNanoseconds,
+    );
+  });
+
+  it("is_changed? compares two Times by instant when Time.zone is unset", async () => {
+    const converter = new TimeZoneConverter(new Types.DateTimeType({}));
+    const a = converter.cast(RubyTime.utc(2024, 6, 15, 14, 30, 0));
+    const b = converter.cast(RubyTime.utc(2024, 6, 15, 14, 30, 0));
+
+    expect(a).toBeInstanceOf(RubyTime);
+    expect(a).not.toBe(b);
+    expect(converter.isChanged(a, b)).toBe(false);
+    expect(converter.isChanged(a, converter.cast(RubyTime.utc(2024, 6, 15, 14, 30, 1)))).toBe(true);
+  });
+
+  it("leaves an infinite range bound untouched", async () => {
+    const converter = new TimeZoneConverter(new RangeType(new Types.DateTimeType({})));
+    const serialized = converter.serialize(new Range<unknown>(-Infinity, twz(), false)) as Range;
+    expect(serialized.begin).toBe(-Infinity);
+  });
+
+  it("answers respond_to?(:infinite?) for a value carrying its own infinite?", async () => {
+    const converter = new TimeZoneConverter(new RangeType(new Types.DateTimeType({})));
+    const deserialized = converter.deserialize(
+      new Range<unknown>(BigDecimal.INFINITY, null, false),
+    ) as Range;
+    expect(deserialized.begin).toBe(BigDecimal.INFINITY);
+
+    const finite = new BigDecimal("1.5");
+    const stillFinite = converter.deserialize(new Range<unknown>(finite, null, false)) as Range;
+    expect(stillFinite.begin).not.toBe(finite);
+  });
+});

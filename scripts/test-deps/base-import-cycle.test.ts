@@ -25,7 +25,7 @@ import { describe, it, expect } from "vitest";
 
 const SRC = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../../packages/activerecord/src",
+  "../../packages/activerecord/lib",
 );
 
 const IMPORT_RE = /(?:^|\n)\s*(?:import|export)\s+([\s\S]*?)\s*from\s*["']([^"']+)["']/g;

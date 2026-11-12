@@ -1,0 +1,147 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { IPAddr } from "@blazetrails/ruby-compat";
+import {
+  describeIfPg,
+  PostgreSQLAdapter,
+} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { Base } from "../../../../lib/index.js";
+import type { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
+
+class PostgresqlNetworkAddress extends Base {
+  static {
+    this.tableName = "postgresql_network_addresses";
+    this.attribute("id", "integer");
+  }
+}
+
+describeIfPg("PostgreSQLAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
+  let connection: PostgreSQLAdapter;
+
+  beforeEach(async () => {
+    connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
+    await connection.createTable("postgresql_network_addresses", { force: true }, (t) => {
+      t.inet("inet_address", { default: "192.168.1.1" });
+      t.cidr("cidr_address", { default: "192.168.1.0/24" });
+      t.macaddr("mac_address", { default: "ff:ff:ff:ff:ff:ff" });
+    });
+    void PostgresqlNetworkAddress.resetColumnInformation();
+    await PostgresqlNetworkAddress.loadSchema();
+  });
+
+  afterEach(async () => {
+    await connection.dropTable("postgresql_network_addresses", { ifExists: true });
+    void PostgresqlNetworkAddress.resetColumnInformation();
+  });
+
+  describe("PostgresqlNetworkTest", () => {
+    it("cidr column", async () => {
+      const column = PostgresqlNetworkAddress.columnsHash()["cidr_address"] as unknown as PgColumn;
+      expect(column.type).toBe("cidr");
+      expect(column.sqlType).toBe("cidr");
+      expect(column.isArray()).toBeFalsy();
+
+      const type = PostgresqlNetworkAddress.typeForAttribute("cidr_address")!;
+      expect(type.isBinary()).toBeFalsy();
+    });
+
+    it("inet column", async () => {
+      const column = PostgresqlNetworkAddress.columnsHash()["inet_address"] as unknown as PgColumn;
+      expect(column.type).toBe("inet");
+      expect(column.sqlType).toBe("inet");
+      expect(column.isArray()).toBeFalsy();
+
+      const type = PostgresqlNetworkAddress.typeForAttribute("inet_address")!;
+      expect(type.isBinary()).toBeFalsy();
+    });
+
+    it("macaddr column", async () => {
+      const column = PostgresqlNetworkAddress.columnsHash()["mac_address"] as unknown as PgColumn;
+      expect(column.type).toBe("macaddr");
+      expect(column.sqlType).toBe("macaddr");
+      expect(column.isArray()).toBeFalsy();
+
+      const type = PostgresqlNetworkAddress.typeForAttribute("mac_address")!;
+      expect(type.isBinary()).toBeFalsy();
+    });
+
+    it("network types", async () => {
+      await PostgresqlNetworkAddress.create({
+        cidr_address: "192.168.0.0/24",
+        inet_address: "172.16.1.254/32",
+        mac_address: "01:23:45:67:89:0a",
+      });
+
+      const address = (await PostgresqlNetworkAddress.first()) as any;
+      expect(address.cidr_address.equals(new IPAddr("192.168.0.0/24"))).toBe(true);
+      expect(address.inet_address.equals(new IPAddr("172.16.1.254"))).toBe(true);
+      expect(address.mac_address).toBe("01:23:45:67:89:0a");
+
+      address.cidr_address = "10.1.2.3/32";
+      address.inet_address = "10.0.0.0/8";
+      address.mac_address = "bc:de:f0:12:34:56";
+
+      await address.saveBang();
+      expect(await address.reload()).toBeTruthy();
+      expect(address.cidr_address.equals(new IPAddr("10.1.2.3/32"))).toBe(true);
+      expect(address.inet_address.equals(new IPAddr("10.0.0.0/8"))).toBe(true);
+      expect(address.mac_address).toBe("bc:de:f0:12:34:56");
+    });
+
+    it("invalid network address", async () => {
+      const invalidAddress = new PostgresqlNetworkAddress({
+        cidr_address: "invalid addr",
+        inet_address: "invalid addr",
+      }) as any;
+      expect(invalidAddress.cidr_address).toBeNull();
+      expect(invalidAddress.inet_address).toBeNull();
+      expect(invalidAddress.cidr_addressBeforeTypeCast).toBe("invalid addr");
+      expect(invalidAddress.inet_addressBeforeTypeCast).toBe("invalid addr");
+      expect(await invalidAddress.save()).toBeTruthy();
+
+      await invalidAddress.reload();
+      expect(invalidAddress.cidr_address).toBeNull();
+      expect(invalidAddress.inet_address).toBeNull();
+      expect(invalidAddress.cidr_addressBeforeTypeCast).toBeNull();
+      expect(invalidAddress.inet_addressBeforeTypeCast).toBeNull();
+    });
+
+    it("schema dump with shorthand", async () => {
+      const output = await dumpTableSchema("postgresql_network_addresses");
+      expect(output).toMatch(/t\.inet\(\s*"inet_address",\s*\{[^}]*default:\s*"192\.168\.1\.1"/);
+      expect(output).toMatch(
+        /t\.cidr\(\s*"cidr_address",\s*\{[^}]*default:\s*"192\.168\.1\.0\/24"/,
+      );
+      expect(output).toMatch(
+        /t\.macaddr\(\s*"mac_address",\s*\{[^}]*default:\s*"ff:ff:ff:ff:ff:ff"/,
+      );
+    });
+
+    it("cidr change prefix", async () => {
+      const model = (await PostgresqlNetworkAddress.create({
+        cidr_address: "192.168.1.0/24",
+      })) as any;
+      model.cidr_address = "192.168.1.0/24";
+      expect(model.isChanged).toBeFalsy();
+
+      model.cidr_address = "192.168.2.0/24";
+      expect(model.isChanged).toBeTruthy();
+
+      model.cidr_address = "192.168.1.0/25";
+      expect(model.isChanged).toBeTruthy();
+    });
+
+    it("mac address change case does not mark dirty", async () => {
+      const model = (await PostgresqlNetworkAddress.create({
+        mac_address: "Ab:Cd:Ef:01:02:03",
+      })) as any;
+      model.mac_address = (model.mac_address as string).replace(/[a-zA-Z]/g, (c: string) =>
+        c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase(),
+      );
+      expect(model.isChanged).toBeFalsy();
+    });
+  });
+});

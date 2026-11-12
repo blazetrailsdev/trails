@@ -266,13 +266,13 @@ as convergence classes.
   there — e.g. `vendor/rails/v8.0.2/activerecord/lib/active_record/...` and
   `vendor/rails/v8.0.2/activerecord/test/cases/...`. The canonical test schema is
   `vendor/rails/v8.0.2/activerecord/test/schema/schema.rb`, which
-  `packages/activerecord/src/test-helpers/test-schema.ts` mirrors — when a
+  `packages/activerecord/test/support/test-schema.ts` mirrors — when a
   test needs a table or column, check schema.rb first; if it's not there,
   don't invent it. Likewise, Rails' test models live in
   `vendor/rails/v8.0.2/activerecord/test/models/` (ours:
-  `packages/activerecord/src/test-helpers/models/`) and its fixture data in
+  `packages/activerecord/test/models/`) and its fixture data in
   `vendor/rails/v8.0.2/activerecord/test/fixtures/` (ours:
-  `packages/activerecord/src/test-helpers/fixtures/`) — mirror those too
+  `packages/activerecord/test/fixtures/`) — mirror those too
   rather than making up models or fixture rows.
 - To map a trails test name or method/constant to its vendored Rails
   `file:line` instead of hand-grepping, run `pnpm rails:find <query>` — it
@@ -455,7 +455,7 @@ and not added ones.
   re-declare a table inline or invent a free table name. For lower-level setup,
   the canonical loader (`loadCanonicalSchema` in `support/canonical-schema.ts`)
   lays the schema directly. Use the official
-  models in `packages/activerecord/src/test-helpers/models/`. Table, column, and
+  models in `packages/activerecord/test/models/`. Table, column, and
   model names must match Rails exactly. If a test needs something the canonical
   schema lacks, add it to the canonical schema — do not reach for a bespoke
   schema. (`defineSchema` is the retired trails invention being removed by RFC

@@ -11,7 +11,7 @@ populated with `virtualize.ts`, `walker.ts`, `synthesize.ts`,
 `type-registry.ts`, `transitive-extends-walker.ts`, `resolve-target.ts`.
 
 Open: entire Phase 2.1–2.6 tsserver-plugin track (~1400 LOC across 6 PRs;
-`packages/activerecord/src/tsserver-plugin/` does not exist yet). Phase 3
+`packages/activerecord/lib/tsserver-plugin/` does not exist yet). Phase 3
 docs + consumer cutover (~150 LOC). Follow-ups: association-option
 `scope:` narrowing, enum value-label unions, adoption metrics.
 
@@ -70,9 +70,9 @@ The first divergence this plan addresses:
   CollectionProxy inherits from Relation and is awaitable / chainable.
   Trails' `AssociationProxy<T>` is the exact analog. The
   `CollectionProxy` class lives in
-  `packages/activerecord/src/associations/collection-proxy.ts` and the
+  `packages/activerecord/lib/associations/collection-proxy.ts` and the
   `new Proxy(...)` wrapper that adds Relation delegation is in
-  `packages/activerecord/src/associations.ts` (`wrapCollectionProxy`).
+  `packages/activerecord/lib/associations.ts` (`wrapCollectionProxy`).
   It just isn't wired into the reader. Phase R below swaps it in.
 
 Other surfaces (`belongsTo` / `hasOne` returning the record or null,
@@ -354,19 +354,19 @@ independently testable and shippable:
   `collectBaseDescendants(program)` returns `{ baseNames, modelRegistry }`.
   Runs against the language service's `program` instead of a CLI-built
   one.
-- `packages/activerecord/src/tsc-wrapper/auto-import.ts` —
+- `packages/activerecord/lib/tsc-wrapper/auto-import.ts` —
   `resolveAutoImports(text, fileName, modelRegistry, baseNames)`
   returns the `import type { ... }` lines to prepend. Same call site.
 - `packages/activerecord-cli/lib/type-virtualization/resolve-target.ts` —
   `resolveAssociationTarget(call)` already shared between the
   virtualizer and auto-import resolver.
 - `packages/activerecord-cli/lib/type-virtualization/virtualize.ts#remapLine`
-  - `packages/activerecord/src/tsc-wrapper/remap.ts#remapDiagnostics`
+  - `packages/activerecord/lib/tsc-wrapper/remap.ts#remapDiagnostics`
     (with the optional `originalSfCache`) — reused for mapping IDE
     positions back to user coordinates.
 
 **New code lives in:**
-`packages/activerecord/src/tsserver-plugin/` with entry
+`packages/activerecord/lib/tsserver-plugin/` with entry
 `index.ts` exporting the canonical TypeScript-plugin factory:
 
 ```ts
@@ -425,10 +425,10 @@ beyond a one-file text transform.
 
 **Deliverables:**
 
-- `packages/activerecord/src/tsserver-plugin/index.ts` with the
+- `packages/activerecord/lib/tsserver-plugin/index.ts` with the
   canonical `function init({ typescript })` factory. CJS output so
   tsserver can `require()` it.
-- `packages/activerecord/src/tsserver-plugin/host-proxy.ts` wrapping
+- `packages/activerecord/lib/tsserver-plugin/host-proxy.ts` wrapping
   `info.languageServiceHost` to override `getScriptSnapshot(fileName)`:
   1. Call the underlying host to get the original snapshot text.
   2. Read the current file version from
@@ -443,7 +443,7 @@ beyond a one-file text transform.
   6. Cache by `(fileName, originalVersion)` — when the host's
      script version changes, re-virtualize. Avoid re-parsing
      unchanged files.
-- `packages/activerecord/src/tsserver-plugin/snapshot-cache.ts` — a
+- `packages/activerecord/lib/tsserver-plugin/snapshot-cache.ts` — a
   tiny `Map<string, { version: string; snapshot: ts.IScriptSnapshot; deltas: LineDelta[]; originalText: string }>`,
   where `version` is the host's script version string for that
   file. The LineDelta + originalText are needed by later sub-PRs
@@ -481,7 +481,7 @@ file add / remove / save, not on every keystroke.
 
 **Deliverables:**
 
-- `packages/activerecord/src/tsserver-plugin/registry.ts`:
+- `packages/activerecord/lib/tsserver-plugin/registry.ts`:
   - `class RegistryCache { readonly baseNames: ReadonlySet<string>; readonly modelRegistry: ReadonlyMap<string, string>; constructor(program: ts.Program); }`
   - Populated by calling `collectBaseDescendants(program)` from the
     shared walker. Single pass; cached on the cache instance.
@@ -528,7 +528,7 @@ rewrite injected `declare` text the user never wrote.
 
 **Deliverables:**
 
-- `packages/activerecord/src/tsserver-plugin/position-remap.ts` —
+- `packages/activerecord/lib/tsserver-plugin/position-remap.ts` —
   two inverse helpers:
   - `virtualToOriginal(fileName, virtualPos, cache)` — the common
     case. Uses the cached `deltas` + a lazily-parsed original
@@ -580,7 +580,7 @@ rewrite injected `declare` text the user never wrote.
     `span: number, length: number, classification` triples. Translate
     each span virtual→original and drop any inside injected ranges.
 - New test util
-  `packages/activerecord/src/tsserver-plugin/test-utils/language-service-harness.ts`:
+  `packages/activerecord/lib/tsserver-plugin/test-utils/language-service-harness.ts`:
   in-process harness that creates a `ts.server.LanguageService` with
   our plugin applied, so integration tests can call
   `service.getQuickInfoAtPosition(...)` directly. Cheaper than
@@ -690,7 +690,7 @@ on every snapshot change.
   Fallback to "everything changed" if the change range straddles an
   injected block.
 - Perf harness
-  `packages/activerecord/src/tsserver-plugin/perf.bench.ts`: generate
+  `packages/activerecord/test/cases/tsserver-plugin/perf.bench.ts`: generate
   a synthetic repo with N∈{10, 100, 500, 2000} models, run
   `getScriptSnapshot` and `getQuickInfoAtPosition` under the plugin,
   record p50 / p95 / p99 latencies, fail if p95 exceeds the budget.

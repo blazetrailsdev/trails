@@ -14,7 +14,7 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 const MANIFEST_FIXTURE = path.join(__dirname, ".tmp-rails-deprecated-methods.test.json");
 const fixture = {
   files: {
-    "packages/activerecord/src/connection-handling.ts": ["connection"],
+    "packages/activerecord/lib/connection-handling.ts": ["connection"],
   },
 };
 fs.writeFileSync(MANIFEST_FIXTURE, JSON.stringify(fixture, null, 2));
@@ -25,7 +25,7 @@ process.on("exit", () => fs.rmSync(MANIFEST_FIXTURE, { force: true }));
 // hoisting of this import is harmless.
 const { default: rule } = await import("./rails-deprecated-jsdoc.mjs");
 
-const connFile = path.join(REPO_ROOT, "packages/activerecord/src/connection-handling.ts");
+const connFile = path.join(REPO_ROOT, "packages/activerecord/lib/connection-handling.ts");
 
 const tester = new RuleTester({
   languageOptions: {
@@ -119,7 +119,7 @@ describe("rails-deprecated-jsdoc manifest fixture", () => {
       fs.readFileSync(path.join(__dirname, "rails-deprecated-methods.json"), "utf8"),
     );
     expect(Object.keys(committed.files)).toContain(
-      "packages/activerecord/src/connection-adapters/mysql/schema-definitions.ts",
+      "packages/activerecord/lib/connection-adapters/mysql/schema-definitions.ts",
     );
   });
 });

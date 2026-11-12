@@ -1,0 +1,24 @@
+import { describe, it, expect } from "vitest";
+import { Point } from "../../../../../lib/connection-adapters/postgresql/oid/point.js";
+import { ActiveRecord } from "../../../../../lib/namespaces.js";
+
+describe("Point", () => {
+  it("reports no change for a member-equal point", () => {
+    const type = new Point();
+    expect(type.isChanged(new ActiveRecord.Point(1, 2), new ActiveRecord.Point(1, 2), null)).toBe(
+      false,
+    );
+  });
+
+  it("reports a change for a differing member", () => {
+    const type = new Point();
+    expect(type.isChanged(new ActiveRecord.Point(1, 2), new ActiveRecord.Point(1, 3), null)).toBe(
+      true,
+    );
+  });
+
+  it("reports no change in place for a member-equal point", () => {
+    const type = new Point();
+    expect(type.isChangedInPlace("(1,2)", new ActiveRecord.Point(1, 2))).toBe(false);
+  });
+});

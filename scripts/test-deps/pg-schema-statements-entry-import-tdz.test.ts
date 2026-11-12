@@ -1,4 +1,4 @@
-import { SchemaStatements } from "../../packages/activerecord/src/connection-adapters/postgresql/schema-statements.js";
+import { SchemaStatements } from "../../packages/activerecord/lib/connection-adapters/postgresql/schema-statements.js";
 import { describe, it, expect } from "vitest";
 
 describe("postgresql schema-statements entry circular-init", () => {

@@ -1,0 +1,154 @@
+import { describe, expect, it } from "vitest";
+import { Temporal } from "@blazetrails/date";
+import { TimeZone } from "@blazetrails/activesupport";
+import { RangeType } from "../../../../../lib/connection-adapters/postgresql/oid/range.js";
+import { Range } from "@blazetrails/ruby-compat";
+
+const integerSubtype = {
+  cast: (value: unknown) => (value == null ? null : Number(value)),
+  serialize: (value: unknown) => (value == null ? null : Number(value)),
+  deserialize: (value: unknown) => (value == null ? null : Number(value)),
+};
+
+describe("PostgreSQL::OID::Range", () => {
+  it("can still represent query range values", () => {
+    const range = new Range(1, 10, true);
+
+    expect(range.begin).toBe(1);
+    expect(range.end).toBe(10);
+    expect(range.excludeEnd).toBe(true);
+  });
+
+  it("casts PostgreSQL range strings through the subtype", () => {
+    const type = new RangeType(integerSubtype, "int4range");
+    const range = type.castValue("[1,10)") as Range;
+
+    expect(range.begin).toBe(1);
+    expect(range.end).toBe(10);
+    expect(range.excludeEnd).toBe(true);
+  });
+
+  it("raises for excluded finite starts", () => {
+    const type = new RangeType(integerSubtype, "int4range");
+
+    expect(() => type.castValue("(1,10]")).toThrow(/excluding the beginning/);
+  });
+
+  it("serializes range bounds through the subtype", () => {
+    const type = new RangeType(integerSubtype, "int4range");
+    const range = type.serialize(new Range("1", "10", false)) as Range;
+
+    expect(range.begin).toBe(1);
+    expect(range.end).toBe(10);
+    expect(range.excludeEnd).toBe(false);
+  });
+
+  it("serialize returns non-range values unchanged", () => {
+    const type = new RangeType(integerSubtype, "int4range");
+
+    expect(type.serialize("not a range")).toBe("not a range");
+  });
+
+  it("castValue returns non-string values unchanged", () => {
+    const type = new RangeType(integerSubtype, "int4range");
+    const value = { begin: 1, end: 10 };
+
+    expect(type.castValue(value)).toBe(value);
+  });
+
+  it("keeps numeric infinite bounds when the opposite bound is numeric", () => {
+    const type = new RangeType(integerSubtype, "int4range");
+    const range = type.castValue("[,10]") as Range;
+
+    expect(range.begin).toBe(-Infinity);
+    expect(range.end).toBe(10);
+  });
+
+  it("keeps an endless daterange's Infinity end against a Date begin", () => {
+    const toDate = (value: unknown) =>
+      value == null ? null : Temporal.PlainDate.from(String(value));
+    const dateSubtype = { cast: toDate, serialize: (value: unknown) => value, deserialize: toDate };
+    const type = new RangeType(dateSubtype, "daterange");
+    const range = type.castValue("[2012-01-02,)") as Range;
+
+    expect(range.begin).toEqual(Temporal.PlainDate.from("2012-01-02"));
+    expect(range.end).toBe(Infinity);
+  });
+
+  it("uses subtype infinity values for unbounded ranges", () => {
+    const infinityCalls: Array<{ negative?: boolean } | undefined> = [];
+    const type = new RangeType(
+      {
+        ...integerSubtype,
+        infinity: (options?: { negative?: boolean }) => {
+          infinityCalls.push(options);
+          return options?.negative ? -Infinity : Infinity;
+        },
+      },
+      "tsrange",
+    );
+    const range = type.castValue("[,]") as Range;
+
+    expect(range.begin).toBe(-Infinity);
+    expect(range.end).toBe(Infinity);
+    expect(infinityCalls).toEqual([{ negative: true }, { negative: false }]);
+  });
+
+  it("maps range bounds", () => {
+    const type = new RangeType(integerSubtype, "int4range");
+    const range = type.map(new Range(1, 10), (value) => Number(value) + 1);
+
+    expect(range.begin).toBe(2);
+    expect(range.end).toBe(11);
+  });
+
+  it("forces equality for range values", () => {
+    const type = new RangeType(integerSubtype, "int4range");
+
+    expect(type.isForceEquality(new Range(1, 10))).toBe(true);
+    expect(type.isForceEquality([1, 10])).toBe(false);
+  });
+
+  describe("typeCastForSchema / inspect()", () => {
+    const passthroughSubtype = {
+      cast: (v: unknown) => v,
+      serialize: (v: unknown) => v,
+      deserialize: (v: unknown) => v,
+    };
+
+    it("formats a value as a string via String()", () => {
+      const type = new RangeType(passthroughSubtype, "int4range");
+      expect(type.typeCastForSchema(new Range(1, 10))).toBe("1..10");
+    });
+
+    it("formats a Temporal.Instant value via inspect()", () => {
+      const type = new RangeType(passthroughSubtype, "tstzrange");
+      const instant = Temporal.Instant.from("2026-04-28T00:00:00Z");
+      expect(type.typeCastForSchema(instant)).toContain("2026-04-28");
+    });
+
+    it("formats a TimeWithZone via its own inspect, as range.rb:16's value.inspect", () => {
+      const type = new RangeType(passthroughSubtype, "tstzrange");
+      const twz = TimeZone.find("UTC")!.local(2026, 4, 28);
+      expect(type.typeCastForSchema(twz)).toBe(twz.inspect());
+    });
+
+    it("does not reject a Date passed directly to typeCastForSchema / inspect()", () => {
+      const type = new RangeType(passthroughSubtype, "tsrange");
+      const date = new Date(Date.UTC(2020, 0, 2, 3, 4, 5));
+      expect(type.typeCastForSchema(date)).toBe(String(date));
+    });
+  });
+
+  it("delegates user_input_in_time_zone to the subtype", () => {
+    const type = new RangeType(
+      {
+        ...integerSubtype,
+        userInputInTimeZone: (value: unknown) => `${String(value)}@sub`,
+      },
+      "tsrange",
+    );
+
+    expect(type.userInputInTimeZone("ts")).toBe("ts@sub");
+  });
+});

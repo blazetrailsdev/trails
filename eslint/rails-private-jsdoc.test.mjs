@@ -13,8 +13,8 @@ const FIXTURE = {
     // include-graph resolution (Rails Base extends Inheritance::ClassMethods
     // through the Concern `included` hook). Both rules just do a file-scoped
     // lookup.
-    "packages/activerecord/src/inheritance.ts": ["computeType"],
-    "packages/activerecord/src/base.ts": ["computeType"],
+    "packages/activerecord/lib/inheritance.ts": ["computeType"],
+    "packages/activerecord/lib/base.ts": ["computeType"],
     // Rails' `Rack::Lock` declares a private `unlock` (rack/lib/rack/lock.rb);
     // lock.ts also hosts a local `Mutex` protocol whose `unlock` mirrors the
     // PUBLIC stdlib `Mutex#unlock`.
@@ -26,11 +26,11 @@ const FIXTURE = {
     // `loadRecords` folds out of both file-wide unions: private on the nested
     // `LoaderRecords` (activerecord/lib/active_record/associations/preloader/
     // association.rb:91), public on `Association` (:197).
-    "packages/activerecord/src/associations/preloader/association.ts": [],
+    "packages/activerecord/lib/associations/preloader/association.ts": [],
   },
   entities: {
     "packages/rack/lib/lock.ts": ["Lock", "Rack"],
-    "packages/activerecord/src/associations/preloader/association.ts": [
+    "packages/activerecord/lib/associations/preloader/association.ts": [
       "ActiveRecord",
       "Associations",
       "Association",
@@ -41,22 +41,22 @@ const FIXTURE = {
   },
   instanceFiles: {
     "packages/activemodel/lib/attributes.ts": ["attribute"],
-    "packages/activerecord/src/associations/preloader/association.ts": [],
+    "packages/activerecord/lib/associations/preloader/association.ts": [],
   },
   entityInstanceFiles: {
-    "packages/activerecord/src/associations/preloader/association.ts": {
+    "packages/activerecord/lib/associations/preloader/association.ts": {
       LoaderRecords: ["loadRecords", "loaderQuery"],
     },
   },
 };
 setManifestForTests(FIXTURE);
-const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/src/inheritance.ts");
-const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
+const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/lib/inheritance.ts");
+const baseFile = path.join(REPO_ROOT, "packages/activerecord/lib/base.ts");
 const lockFile = path.join(REPO_ROOT, "packages/rack/lib/lock.ts");
 const attributesFile = path.join(REPO_ROOT, "packages/activemodel/lib/attributes.ts");
 const preloaderAssociationFile = path.join(
   REPO_ROOT,
-  "packages/activerecord/src/associations/preloader/association.ts",
+  "packages/activerecord/lib/associations/preloader/association.ts",
 );
 
 const tester = new RuleTester({

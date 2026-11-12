@@ -1,0 +1,68 @@
+import { describe, it, expect } from "vitest";
+import { Base } from "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import "../../support/canonical-model-index.js";
+import { Firm } from "../../models/company.js";
+
+type CollectionProxyLike = {
+  loadTarget(): Promise<Base[]>;
+  find(...args: unknown[]): Promise<Base | Base[]>;
+};
+
+type RecordInternals = {
+  _attributes: { writeCastValue(name: string, value: unknown): void };
+  _readAttribute(name: string): unknown;
+  association(name: string): {
+    find(...args: unknown[]): Promise<Base | Base[] | null>;
+    findByScan(args: unknown[]): Promise<Base | Base[] | undefined>;
+    isLoaded(): boolean;
+  };
+  clientsOfFirm: CollectionProxyLike;
+};
+
+const internals = (record: Base): RecordInternals => record as unknown as RecordInternals;
+
+describe("CollectionAssociation BigInt PK / number find(id) key match", () => {
+  const { companies } = fixtures(["companies"]);
+
+  async function loadFirmWithBigIntTargetPk(): Promise<{
+    firm: Base;
+    target: Base;
+    numberId: number;
+  }> {
+    const firm = (await Firm.find(companies("first_firm").id)) as Base;
+    const clients = await internals(firm).clientsOfFirm.loadTarget();
+    expect(clients.length).toBeGreaterThan(0);
+
+    const target = clients[0];
+    const numberId = Number(internals(target)._readAttribute("id"));
+    internals(target)._attributes.writeCastValue("id", BigInt(numberId));
+    return { firm, target, numberId };
+  }
+
+  it("finds a loaded record via CollectionAssociation#findByScan when its in-memory PK is a BigInt and the id is a number", async () => {
+    const { firm, numberId } = await loadFirmWithBigIntTargetPk();
+
+    const assoc = internals(firm).association("clientsOfFirm");
+    const found = (await assoc.find(numberId)) as Base;
+    expect(Number(internals(found)._readAttribute("id"))).toBe(numberId);
+  });
+
+  it("finds a loaded record via the collection proxy find(id) when its in-memory PK is a BigInt and the id is a number", async () => {
+    const { firm, numberId } = await loadFirmWithBigIntTargetPk();
+
+    const found = (await internals(firm).clientsOfFirm.find(numberId)) as Base;
+    expect(Number(internals(found)._readAttribute("id"))).toBe(numberId);
+  });
+
+  it("find_by_scan loads the target of an unloaded collection before scanning it", async () => {
+    const firm = (await Firm.find(companies("first_firm").id)) as Base;
+    const assoc = internals(firm).association("clientsOfFirm");
+    expect(assoc.isLoaded()).toBe(false);
+
+    const id = companies("second_client").id;
+    const found = (await assoc.findByScan([id])) as Base;
+    expect(assoc.isLoaded()).toBe(true);
+    expect(internals(found)._readAttribute("id")).toBe(id);
+  });
+});
