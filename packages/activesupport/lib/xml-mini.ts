@@ -50,7 +50,7 @@ const DEFAULT_ENCODINGS: Record<string, string> = {
   binary: "base64",
 };
 
-const FORMATTING: Record<string, (value: unknown) => string> = {
+const FORMATTING: Record<string, { call(value: unknown): string }["call"]> = {
   symbol: (value) => {
     const s = String(value);
     return s.startsWith(":") ? s.slice(1) : s;
