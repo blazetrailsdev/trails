@@ -128,7 +128,10 @@ export class CommonAddressField extends NamedStructuredField {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs valid_encoding? — PERMANENT
+   */
   protected utf8IfNeeded(
     val: string | Uint8Array,
     valCharset: unknown,
