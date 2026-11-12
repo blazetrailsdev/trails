@@ -8,23 +8,12 @@
     "packages/activesupport/lib/core-ext/date-and-time/calculations.ts -> packages/activesupport/lib/core-ext/date-and-time/calculations.ts [DateAndTimeCalculations]",
     "packages/activesupport/lib/core-ext/date-time/calculations.ts -> packages/activesupport/lib/core-ext/date-time/conversions.ts [nsec]",
     "packages/activesupport/lib/core-ext/date/calculations.ts -> packages/activesupport/lib/core-ext/date-and-time/calculations.ts [DAYS_INTO_WEEK]",
-    "packages/activesupport/lib/i18n.ts -> packages/activesupport/lib/locale/en.ts [en]",
     "packages/activesupport/lib/inflector.ts -> packages/activesupport/lib/inflector.ts [Inflector]",
-    "packages/activesupport/lib/logger.ts -> packages/activesupport/lib/logger-thread-safe-level.ts [LoggerThreadSafeLevel]",
     "packages/activesupport/lib/xml-mini.ts -> packages/activesupport/lib/xml-mini/rexml.ts [XmlMini_REXML]",
     "packages/et-orbi/lib/et-orbi.ts -> packages/et-orbi/lib/info.ts [_makeInfo, platformInfo, renderNozoneTime]",
     "packages/et-orbi/lib/et-orbi.ts -> packages/et-orbi/lib/make.ts [isChronicEnabled, make, makeTime, now, parse, setChronicEnabled]",
-    "packages/i18n/lib/backend/simple.ts -> packages/i18n/lib/backend/base.ts [Base]",
     "packages/ruby-compat/lib/string/method-table.ts -> packages/ruby-compat/lib/string/byte-methods.ts [rbStrBytesplice, rbStrSetbyte]",
     "packages/ruby-compat/lib/string/method-table.ts -> packages/ruby-compat/lib/string/each.ts [rbStrBytes, rbStrChars, rbStrCodepoints, rbStrEachByte, rbStrEachChar, rbStrEachCodepoint, rbStrEachGraphemeCluster, rbStrEachLine, rbStrGraphemeClusters, rbStrLines, rbStrUpto]",
-    "packages/ruby-compat/lib/string/method-table.ts -> packages/ruby-compat/lib/string/sub.ts [rbStrMatchM, rbStrMatchMP, rbStrScan, rbStrSub, rbStrSubBang]",
-    "packages/solid-queue/lib/blocked-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
-    "packages/solid-queue/lib/claimed-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
-    "packages/solid-queue/lib/failed-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
-    "packages/solid-queue/lib/failed-execution.ts -> packages/solid-queue/lib/execution/dispatching.ts [Dispatching]",
-    "packages/solid-queue/lib/job.ts -> packages/solid-queue/lib/job/executable.ts [Executable]",
-    "packages/solid-queue/lib/ready-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
-    "packages/solid-queue/lib/scheduled-execution.ts -> packages/solid-queue/lib/execution.ts [Execution]",
-    "packages/solid-queue/lib/scheduled-execution.ts -> packages/solid-queue/lib/execution/dispatching.ts [Dispatching]"
+    "packages/ruby-compat/lib/string/method-table.ts -> packages/ruby-compat/lib/string/sub.ts [rbStrMatchM, rbStrMatchMP, rbStrScan, rbStrSub, rbStrSubBang]"
   ]
 }

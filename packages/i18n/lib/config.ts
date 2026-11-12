@@ -1,9 +1,8 @@
 import { enforceAvailableLocalesBang, type Locale, type TranslationKey } from "./i18n.js";
 import { ExceptionHandler, MissingInterpolationArgument, NoMethodError } from "./exceptions.js";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { TopLevel, rbInspect } from "@blazetrails/ruby-compat";
 import { DEFAULT_INTERPOLATION_PATTERNS } from "./interpolate/ruby.js";
 import type { Base } from "./backend/base.js";
-import { Simple } from "./backend/simple.js";
 
 export type ExceptionHandlerLike =
   | string
@@ -43,7 +42,7 @@ export class Config {
   }
 
   get backend(): Base {
-    backend ??= new Simple();
+    backend ??= new TopLevel.I18n!.Backend.Simple();
     return backend;
   }
 

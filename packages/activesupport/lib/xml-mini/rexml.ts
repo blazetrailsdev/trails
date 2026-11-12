@@ -1,5 +1,5 @@
 import { rbInspect } from "@blazetrails/ruby-compat";
-import * as XmlMini from "../xml-mini.js";
+import { ActiveSupport } from "../namespaces.js";
 import { Document, Element, ParseException } from "../rexml/document.js";
 import { isBlank } from "../string-utils.js";
 
@@ -14,7 +14,7 @@ export function parse(data: string | null | undefined): Record<string, unknown> 
     const doc = new Document(io);
 
     if (doc.root) {
-      return mergeElementBang({}, doc.root, XmlMini.depth());
+      return mergeElementBang({}, doc.root, ActiveSupport.XmlMini.depth());
     } else {
       throw new ParseException(`The document ${rbInspect(String(doc))} does not have a valid root`);
     }

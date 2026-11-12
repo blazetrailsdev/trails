@@ -88,6 +88,7 @@ export const SolidQueue = {
   onStart(block: () => unknown): void;
   onStop(block: () => unknown): void;
   Process?: typeof import("./process.js").Process;
+  Job?: typeof import("./job.js").Job;
   onSchedulerStart(block: () => unknown): void;
   onSchedulerStop(block: () => unknown): void;
   onDispatcherStart(block: () => unknown): void;

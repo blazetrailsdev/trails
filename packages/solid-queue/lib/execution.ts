@@ -7,7 +7,7 @@ import {
   JobAttributes,
   type ClassMethods as JobAttributesClassMethods,
 } from "./execution/job-attributes.js";
-import { Job } from "./job.js";
+import type { Job } from "./job.js";
 
 export class UndiscardableError extends StandardError {}
 
@@ -100,7 +100,7 @@ export class Execution extends Record {
 
   /** @internal */
   protected static async discardJobs(jobIds: unknown[]): Promise<number> {
-    return await Job.where({ id: jobIds }).deleteAll();
+    return await SolidQueue.Job!.where({ id: jobIds }).deleteAll();
   }
 
   type(): string {

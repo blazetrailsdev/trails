@@ -1,7 +1,7 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, Logger } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { NameError } from "./core-ext/name-error.js";
-import { LOG_LEVELS, type LogLevel } from "./logger.js";
+import type { LogLevel } from "./logger.js";
 
 function inspect(value: unknown): string {
   if (typeof value === "string") return JSON.stringify(value);
@@ -27,13 +27,16 @@ export class LoggerThreadSafeLevel {
       value = level;
     } else if (typeof level === "string" && level.startsWith(":")) {
       const constantName = level.slice(1).toUpperCase();
-      value = LOG_LEVELS[`:${level.slice(1).toLowerCase()}` as LogLevel];
-      if (value === undefined) {
+      const severity = (Logger.Severity as unknown as Record<string, number | undefined>)[
+        constantName
+      ];
+      if (severity === undefined) {
         throw new NameError(
           `uninitialized constant Logger::Severity::${constantName}`,
           constantName,
         );
       }
+      value = severity;
     } else if (level == null) {
       value = null;
     } else {

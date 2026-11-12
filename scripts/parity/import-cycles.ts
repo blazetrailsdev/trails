@@ -290,8 +290,8 @@ function isInvokedInPlace(fn: ts.Node): boolean {
   return ts.isCallExpression(callee.parent) && callee.parent.expression === callee;
 }
 
-/** Whether a read at `node` runs while the module body is evaluated. */
-function isModuleEvalTime(node: ts.Node): boolean {
+/** The innermost function or member whose body defers a read at `node`, or `null` at module-eval time. */
+function deferringBoundary(node: ts.Node): ts.Node | null {
   for (let n: ts.Node = node; n.parent; n = n.parent) {
     const p = n.parent;
     if (
@@ -306,14 +306,35 @@ function isModuleEvalTime(node: ts.Node): boolean {
       if ("name" in p && p.name === n) continue;
       if (ts.isDecorator(n)) continue;
       if (isInvokedInPlace(p)) continue;
-      return false;
+      return p;
     }
     if (ts.isPropertyDeclaration(p) && p.initializer === n) {
       const isStatic = ts.getModifiers(p)?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword);
-      if (!isStatic) return false;
+      if (!isStatic) return p;
     }
   }
-  return true;
+  return null;
+}
+
+/** A file's top-level function declarations and `const` function or arrow bindings, by name. */
+function localFunctions(sf: ts.SourceFile): Map<ts.Node, string> {
+  const out = new Map<ts.Node, string>();
+  for (const stmt of sf.statements) {
+    if (ts.isFunctionDeclaration(stmt) && stmt.name && stmt.body) out.set(stmt, stmt.name.text);
+    if (ts.isVariableStatement(stmt)) {
+      for (const d of stmt.declarationList.declarations) {
+        const init = d.initializer;
+        if (
+          ts.isIdentifier(d.name) &&
+          init &&
+          (ts.isArrowFunction(init) || ts.isFunctionExpression(init))
+        ) {
+          out.set(init, d.name.text);
+        }
+      }
+    }
+  }
+  return out;
 }
 
 export function parseErrors(file: string, text: string): string[] {
@@ -335,12 +356,35 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
     if (!e) edges.set(to, (e = { to, evalNames: new Set(), evalLine: 0, value: false }));
     return e;
   };
+  const fnNodes = localFunctions(sf);
+  const fnNames = new Set(fnNodes.values());
+  const fnReads = new Map<string, { name: string; node: ts.Node }[]>();
+  const fnCalls = new Map<string, Set<string>>();
+  const evalCalls = new Set<string>();
+  const addEval = (name: string, node: ts.Node) => {
+    const e = edgeFor(locals.get(name)!);
+    e.evalNames.add(name);
+    if (!e.evalLine) e.evalLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+  };
   const read = (name: string, node: ts.Node) => {
     const e = edgeFor(locals.get(name)!);
     e.value = true;
-    if (isModuleEvalTime(node) && !isOwnNamespaceSeat(name, node)) {
-      e.evalNames.add(name);
-      if (!e.evalLine) e.evalLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+    if (isOwnNamespaceSeat(name, node)) return;
+    const boundary = deferringBoundary(node);
+    if (boundary === null) addEval(name, node);
+    else if (fnNodes.has(boundary)) {
+      const owner = fnNodes.get(boundary)!;
+      if (!fnReads.has(owner)) fnReads.set(owner, []);
+      fnReads.get(owner)!.push({ name, node });
+    }
+  };
+  const call = (callee: string, node: ts.Node) => {
+    const boundary = deferringBoundary(node);
+    if (boundary === null) evalCalls.add(callee);
+    else if (fnNodes.has(boundary)) {
+      const owner = fnNodes.get(boundary)!;
+      if (!fnCalls.has(owner)) fnCalls.set(owner, new Set());
+      fnCalls.get(owner)!.add(callee);
     }
   };
 
@@ -402,12 +446,30 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
     ) {
       read(node.name.text, node);
     }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      fnNames.has(node.expression.text) &&
+      !locals.has(node.expression.text) &&
+      !isShadowed(node.expression)
+    ) {
+      call(node.expression.text, node);
+    }
     ts.forEachChild(node, visit);
   };
   for (const stmt of sf.statements) {
     if (ts.isImportDeclaration(stmt)) continue;
     if (ts.isExportDeclaration(stmt) && stmt.moduleSpecifier) continue;
     visit(stmt);
+  }
+  const seen = new Set<string>();
+  const queue = [...evalCalls];
+  while (queue.length) {
+    const fn = queue.pop()!;
+    if (seen.has(fn)) continue;
+    seen.add(fn);
+    for (const r of fnReads.get(fn) ?? []) addEval(r.name, r.node);
+    for (const next of fnCalls.get(fn) ?? []) queue.push(next);
   }
 
   return [...edges.values()].filter((e) => e.value);

@@ -109,6 +109,36 @@ describe("import-cycles scanFile", () => {
     const [f] = scanA([IMPORT_B, "const y = () => B;"]);
     expect([...f.evalNames]).toEqual([]);
   });
+
+  it("counts a read inside a local function called at module-eval time", () => {
+    const [e] = scanA([IMPORT_B, "function f() { return B; }", "const x = f();"]);
+    expect([...e.evalNames]).toEqual(["B"]);
+    const [g] = scanA([IMPORT_B, "const g = () => B;", "g();"]);
+    expect([...g.evalNames]).toEqual(["B"]);
+  });
+
+  it("follows module-eval calls through other local functions", () => {
+    const [e] = scanA([
+      IMPORT_B,
+      "function h() { return B; }",
+      "function f() { return h(); }",
+      "function r() { return r(); }",
+      "f();",
+      "r();",
+    ]);
+    expect([...e.evalNames]).toEqual(["B"]);
+  });
+
+  it("keeps a local helper called only from a method deferred", () => {
+    const [e] = scanA([
+      IMPORT_B,
+      "function f() { return B; }",
+      "const k = () => () => B;",
+      "k();",
+      "class C { m() { return f(); } }",
+    ]);
+    expect([...e.evalNames]).toEqual([]);
+  });
 });
 
 describe("import-cycles makeResolver", () => {
