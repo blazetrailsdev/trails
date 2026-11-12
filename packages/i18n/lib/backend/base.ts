@@ -192,6 +192,7 @@ function localizable(object: unknown): unknown {
 }
 
 export abstract class Base {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
   declare transliterate: typeof Transliterator.transliterate;
