@@ -12,7 +12,9 @@ export class InstallGenerator extends Base {
     this.methodAdded("createActiontextFiles");
     this.methodAdded("enableImageProcessingGem");
     this.methodAdded("createMigrations");
-    this.hookFor("testFramework");
+    this.methodAdded("isUsingJsRuntime");
+    this.methodAdded("isUsingBun");
+    this.methodAdded("isUsingNode");
   }
 
   declare run: OmitThisParameter<typeof ThorActions.run>;
@@ -85,11 +87,12 @@ export class InstallGenerator extends Base {
       );
       const imageProcessingRegex = /"@blazetrails\/image-processing"/;
       if (
-        (await File.readAsync(gemfilePath)).split("\n").some((l) => imageProcessingRegex.test(l))
+        (await File.readlinesAsync(gemfilePath)).filter((l) => imageProcessingRegex.test(l))
+          .length > 0
       ) {
         await this.uncommentLines(gemfilePath, imageProcessingRegex);
       } else {
-        await this.run("pnpm add --lockfile-only @blazetrails/image-processing");
+        await this.gem("@blazetrails/image-processing");
       }
     }
   }
@@ -116,6 +119,10 @@ export class InstallGenerator extends Base {
     return (this._usingNode ||=
       (await this.isUsingJsRuntime()) &&
       !(await File.isExistAsync(File.join(this.destinationRoot, "bun.config.js"))));
+  }
+
+  static {
+    this.hookFor("testFramework");
   }
 }
 

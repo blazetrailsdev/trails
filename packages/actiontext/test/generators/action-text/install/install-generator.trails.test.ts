@@ -1,5 +1,6 @@
 import { Task } from "@blazetrails/rake";
-import { File, FileUtils, LOAD_PATH } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, LOAD_PATH } from "@blazetrails/ruby-compat";
+import { Trails } from "@blazetrails/trailties";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InstallGenerator } from "../../../../lib/generators/action-text/install/install-generator.js";
 
@@ -8,8 +9,8 @@ class Generator extends InstallGenerator {
     void this.sourceRoot(InstallGenerator.sourceRoot());
   }
 
-  override trailsCommand = async (command: string) => {
-    commands.push(`trails ${command}`);
+  override trailsCommand = async (command: string, options?: Record<string, unknown>) => {
+    commands.push(`trails ${command} ${JSON.stringify(options)}`);
   };
 }
 
@@ -21,7 +22,7 @@ describe("ActionText::Generators::InstallGenerator", () => {
   let app: string;
 
   beforeEach(async () => {
-    app = File.expandPath(`../../../../tmp-install-${Date.now()}`, import.meta.dirname);
+    app = File.join(Dir.tmpdir(), `actiontext-install-${crypto.randomUUID()}`);
     await FileUtils.mkdirPAsync(File.join(app, "app/javascript"));
     await FileUtils.mkdirPAsync(File.join(app, "config"));
     await File.writeAsync(
@@ -49,8 +50,7 @@ describe("ActionText::Generators::InstallGenerator", () => {
 
     expect(commands).toEqual([
       "pnpm add @rails/actiontext trix",
-      "pnpm add --lockfile-only @blazetrails/image-processing",
-      "trails railties:install:migrations FROM=active_storage,action_text",
+      'trails railties:install:migrations FROM=active_storage,action_text {"inline":true}',
     ]);
     expect(await read("app/javascript/application.js")).toContain(
       '\nimport "trix"\nimport "@rails/actiontext"\n',
@@ -63,6 +63,9 @@ describe("ActionText::Generators::InstallGenerator", () => {
     expect(await read("app/views/layouts/action_text/contents/_content.html.tse")).toContain(
       "trix-content",
     );
+    expect(JSON.parse(await read("package.json")).dependencies).toHaveProperty(
+      "@blazetrails/image-processing",
+    );
     expect(await read("test/fixtures/action_text/rich_texts.yml")).toContain("# one:");
   });
 
@@ -74,7 +77,26 @@ describe("ActionText::Generators::InstallGenerator", () => {
 
   it("defines the action_text:install rake task", async () => {
     await import("../../../../lib/tasks/actiontext.js");
-    const task = await Task.get("action_text:install");
-    expect(task.name).toBe("action_text:install");
+    const invoke = vi.spyOn(Trails.Command!, "invoke").mockResolvedValue(undefined as never);
+    await (await Task.get("action_text:install")).execute();
+    expect(invoke).toHaveBeenCalledWith("generate", ["action_text:install"]);
+  });
+
+  it("tells the user to import the modules when application.js is missing", async () => {
+    await FileUtils.rmAsync(File.join(app, "app/javascript/application.js"));
+    const say = vi.spyOn(Generator.prototype, "say");
+    await Generator.start(["-t=test_unit", "--quiet"], { destinationRoot: app });
+    expect(say).toHaveBeenCalledWith(
+      "You must import the @rails/actiontext and trix JavaScript modules in your application entrypoint.\n",
+      "green",
+    );
+  });
+
+  it("skips the JavaScript install and image_processing without a package.json", async () => {
+    await FileUtils.rmAsync(File.join(app, "package.json"));
+    await Generator.start(["-t=test_unit", "--quiet"], { destinationRoot: app });
+    expect(commands).toEqual([
+      'trails railties:install:migrations FROM=active_storage,action_text {"inline":true}',
+    ]);
   });
 });
