@@ -74,4 +74,14 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         'generators_test.rb:105 asserts the snake_case namespace; trails dasherizes a generator namespace (trails#9399, generators.trails.test.ts "resolves a generator from either spelling")',
     },
   ],
+  "trailties:minitest/rails_plugin_test.rb › Minitest::RailsPluginTest › does not replace backtrace filter when using --backtrace option":
+    [
+      {
+        kind: "assert_same",
+        value: null,
+        as: null,
+        reason:
+          "rails_plugin_test.rb:41-43 repeats the arm with the -b alias; Minitest.process_args is unported, so the port passes the parsed fullBacktrace option and the alias has no distinct input",
+      },
+    ],
 };

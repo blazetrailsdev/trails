@@ -18,6 +18,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import {
+  assertCalled,
   assertMock,
   assertNotCalled,
   Mock,
@@ -343,20 +344,22 @@ describe("ActionsTest", () => {
 
   it("readme", async () => {
     File.write(File.join(root, "README.md"), "Get your application up and running.\n");
-    TestGenerator.sourceRoot(root);
     const gen = generator();
-    expect(await capture("stdout", () => gen.readme("README.md"))).toMatch(
-      "application up and running",
-    );
+    await assertCalled(TestGenerator, "sourceRoot", null, { times: 2, returns: root }, async () => {
+      expect(await capture("stdout", () => gen.readme("README.md"))).toMatch(
+        "application up and running",
+      );
+    });
   });
 
   it("readme with quiet", async () => {
     File.write(File.join(root, "README.md"), "Get your application up and running.\n");
-    TestGenerator.sourceRoot(root);
     const gen = generator({ quiet: true });
-    expect(await capture("stdout", () => gen.readme("README.md"))).not.toMatch(
-      "application up and running",
-    );
+    await assertCalled(TestGenerator, "sourceRoot", null, { times: 2, returns: root }, async () => {
+      expect(await capture("stdout", () => gen.readme("README.md"))).not.toMatch(
+        "application up and running",
+      );
+    });
   });
 
   it("log", async () => {
