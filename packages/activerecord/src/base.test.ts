@@ -192,6 +192,10 @@ function timeToA(time: any): unknown[] {
   ];
 }
 
+function easternTimeZone(): string {
+  return "America/New_York";
+}
+
 describe("LintTest", () => {
   class LintModel extends Base {}
 
@@ -465,10 +469,6 @@ describe("BasicsTest", async () => {
       );
     });
   });
-
-  function easternTimeZone(): string {
-    return "America/New_York";
-  }
 
   it("custom mutator", async () => {
     const topic = (await Topic.find(1)) as any;
@@ -2063,7 +2063,7 @@ describe("BasicsTest", () => {
   });
 
   it.skipIf(inMemoryDb())("connection in local time", async () => {
-    await self().withEnvTz("America/New_York", async () => {
+    await self().withEnvTz(easternTimeZone(), async () => {
       await self().withTimezoneConfig({ default: "utc" }, async () => {
         const newConfig = {
           ...Base.connectionDbConfig().configurationHash,
