@@ -316,7 +316,11 @@ function deferringBoundary(node: ts.Node): ts.Node | null {
   return null;
 }
 
-/** A file's top-level function declarations and `const` function or arrow bindings, by name. */
+/**
+ * A file's top-level function declarations and `const` function or arrow bindings, by name.
+ * A module-eval call of one counts only the reads its own body makes; a closure nested in
+ * it stays deferred, since whether the closure runs during the call is not decidable here.
+ */
 function localFunctions(sf: ts.SourceFile): Map<ts.Node, string> {
   const out = new Map<ts.Node, string>();
   for (const stmt of sf.statements) {

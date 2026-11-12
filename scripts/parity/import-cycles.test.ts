@@ -129,6 +129,11 @@ describe("import-cycles scanFile", () => {
     expect([...e.evalNames]).toEqual(["B"]);
   });
 
+  it("keeps a closure nested in a module-eval-called local function deferred", () => {
+    const [e] = scanA([IMPORT_B, "function f() { return [1].map(() => B); }", "f();"]);
+    expect([...e.evalNames]).toEqual([]);
+  });
+
   it("keeps a local helper called only from a method deferred", () => {
     const [e] = scanA([
       IMPORT_B,
