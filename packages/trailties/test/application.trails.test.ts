@@ -6,6 +6,7 @@ import { Logger, OrderedOptions } from "@blazetrails/activesupport";
 import { Dir, File, FileUtils, NameError, SecureRandom } from "@blazetrails/ruby-compat";
 import { MockRequest } from "@blazetrails/rack";
 import { Application } from "../lib/application.js";
+import { Trails } from "../lib/trails.js";
 
 declare module "@blazetrails/trailties/trailtie/configuration" {
   interface Configuration {
@@ -241,5 +242,35 @@ describe("Application#messageVerifiers", () => {
     const token = old.messageVerifiers().get("salt").generate("message");
     app.messageVerifiers().rotate({ secretKeyBase: "old" });
     expect(app.messageVerifier("salt").verified(token)).toBe("message");
+  });
+});
+
+describe("Application configuration from the class body", () => {
+  it("config.autoloadLib and autoloadLibOnce run from the application's static block", () => {
+    const root = File.realpath(Dir.mktmpdir("autoload-lib-static-block"));
+    Trails.application = null;
+    try {
+      class AutoloadLibStaticBlockApp extends Application {
+        static {
+          Application.register(this, root);
+          this.config.setRoot(root);
+          this.config.autoloadLib({ ignore: ["assets", "tasks"] });
+          this.config.autoloadLibOnce({ ignore: "generators" });
+        }
+      }
+      const app = AutoloadLibStaticBlockApp.instance();
+      const lib = File.join(root, "lib");
+
+      expect(app.config.autoloadPaths).toContain(lib);
+      expect(app.config.autoloadOncePaths).toContain(lib);
+      expect([...app.autoloaders.main.ignoredGlobPatterns]).toEqual([
+        File.join(lib, "assets"),
+        File.join(lib, "tasks"),
+      ]);
+      expect([...app.autoloaders.once.ignoredGlobPatterns]).toEqual([File.join(lib, "generators")]);
+    } finally {
+      Trails.application = null;
+      FileUtils.rmRf(root);
+    }
   });
 });

@@ -66,11 +66,11 @@ export const Authentication: {
 extend(Authentication, Concern);
 
 (Authentication as unknown as Concern).included(null, function (this: typeof ActionController.API) {
-  this.beforeAction("requireAuthentication");
+  this.beforeAction(":requireAuthentication");
 });
 
 (Authentication as unknown as Concern).classMethods((mod) => {
   mod.allowUnauthenticatedAccess = function (this: typeof ActionController.API, options = {}) {
-    this.skipBeforeAction("requireAuthentication", options);
+    this.skipBeforeAction(":requireAuthentication", options);
   };
 });

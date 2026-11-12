@@ -57,8 +57,8 @@ export async function buildManifest(loader: Loader): Promise<Manifest> {
   try {
     const { manifest } = loader;
     loader.manifest = null;
-    await loader.recomputeIgnoredPaths();
-    await loader.recomputeCollapseDirs();
+    loader.recomputeIgnoredPaths();
+    loader.recomputeCollapseDirs();
     loader.manifest = manifest;
 
     const roots = await loader.actualRoots();

@@ -379,19 +379,19 @@ export default { development: env("development"), test: env("test"), production:
       "utf-8",
     );
     if (/^\s*(?:const .*=\s*)?await\b/m.test(str)) {
-      const classEnd = /(\n(?:\/\/.*\n)*await [\s\S]*)$/.exec(environment);
-      if (!classEnd) throw new Error("addToConfig: no top-level await in config/application.ts");
+      const declaration = environment.search(/\ndeclare module /);
+      const at = declaration === -1 ? environment.length : declaration;
       await puts(
         File.join(appPath, "config/application.ts"),
-        environment.slice(0, classEnd.index) + `\n${str}\n` + classEnd[1],
+        environment.slice(0, at) + `\n${str}\n` + environment.slice(at),
       );
       return;
     }
-    const match = /(\n\s*\}\n(?:\s*\/\/.*\n)*}\n\n(?:\/\/.*\n)*await [\s\S]*)$/.exec(environment);
+    const match = /\n\s*\}\n\}\n/.exec(environment);
     if (match) {
       await puts(
         File.join(appPath, "config/application.ts"),
-        environment.slice(0, match.index) + `\n${str}\n` + match[1],
+        environment.slice(0, match.index) + `\n${str}\n` + environment.slice(match.index),
       );
     }
   }

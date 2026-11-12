@@ -89,21 +89,21 @@ export const Config = {
     });
   },
 
-  async ignore(this: Loader, ...globPatterns: GlobArg[]): Promise<void> {
+  ignore(this: Loader, ...globPatterns: GlobArg[]): void {
     globPatterns = this.expandPaths(globPatterns);
-    const paths = await this.expandGlobPatterns(globPatterns as string[]);
     this.mutex.synchronize(() => {
       for (const pattern of globPatterns as string[]) this.ignoredGlobPatterns.add(pattern);
-      for (const path of paths) this.ignoredPaths.add(path);
+      for (const path of this.expandGlobPatterns(globPatterns as string[]))
+        this.ignoredPaths.add(path);
     });
   },
 
-  async collapse(this: Loader, ...globPatterns: GlobArg[]): Promise<void> {
+  collapse(this: Loader, ...globPatterns: GlobArg[]): void {
     globPatterns = this.expandPaths(globPatterns);
-    const paths = await this.expandGlobPatterns(globPatterns as string[]);
     this.mutex.synchronize(() => {
       for (const pattern of globPatterns as string[]) this.collapseGlobPatterns.add(pattern);
-      for (const path of paths) this.collapseDirs.add(path);
+      for (const path of this.expandGlobPatterns(globPatterns as string[]))
+        this.collapseDirs.add(path);
     });
   },
 
@@ -192,23 +192,23 @@ export const Config = {
   },
 
   /** @internal */
-  async expandGlobPatterns(this: Loader, globPatterns: Iterable<string>): Promise<string[]> {
+  expandGlobPatterns(this: Loader, globPatterns: Iterable<string>): string[] {
     const found: string[] = [];
     if (this.manifest != null && !this.isReloadingEnabled()) return found;
-    for (const globPattern of globPatterns) found.push(...(await Dir.globAsync(globPattern)));
+    for (const globPattern of globPatterns) found.push(...Dir.glob(globPattern));
     return found;
   },
 
   /** @internal */
-  async recomputeIgnoredPaths(this: Loader): Promise<void> {
-    const paths = await this.expandGlobPatterns(this.ignoredGlobPatterns);
+  recomputeIgnoredPaths(this: Loader): void {
+    const paths = this.expandGlobPatterns(this.ignoredGlobPatterns);
     this.ignoredPaths.clear();
     for (const path of paths) this.ignoredPaths.add(path);
   },
 
   /** @internal */
-  async recomputeCollapseDirs(this: Loader): Promise<void> {
-    const dirs = await this.expandGlobPatterns(this.collapseGlobPatterns);
+  recomputeCollapseDirs(this: Loader): void {
+    const dirs = this.expandGlobPatterns(this.collapseGlobPatterns);
     this.collapseDirs.clear();
     for (const dir of dirs) this.collapseDirs.add(dir);
   },

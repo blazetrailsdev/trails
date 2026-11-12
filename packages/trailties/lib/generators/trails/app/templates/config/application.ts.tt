@@ -10,6 +10,19 @@ export class <%= this.appConstBase() %> extends Application {
 
     // Initialize configuration defaults for originally generated trails version.
     this.config.loadDefaults("<%= this.build("configTargetVersion") %>");
+
+    // Please, add to the `ignore` list any other `lib` subdirectories that do
+    // not contain `.ts` files, or that should not be reloaded or eager loaded.
+    // Common ones are `templates`, `generators`, or `middleware`, for example.
+    this.config.autoloadLib({ ignore: ["assets", "tasks"] });
+
+    // Configuration for the application, engines, and trailties goes here.
+    //
+    // These settings can be overridden in specific environments using the files
+    // in config/environments, which are processed later.
+    //
+    // config.timeZone = "Central Time (US & Canada)";
+    // config.eagerLoadPaths.push("extras");
 <% if (this.options.api) { -%>
 
     // Only loads a smaller set of middleware suitable for API only apps.
@@ -18,20 +31,7 @@ export class <%= this.appConstBase() %> extends Application {
     this.config.apiOnly = true;
 <% } -%>
   }
-
-  // Configuration for the application, engines, and trailties goes here.
-  //
-  // These settings can be overridden in specific environments using the files
-  // in config/environments, which are processed later.
-  //
-  // config.timeZone = "Central Time (US & Canada)";
-  // config.eagerLoadPaths.push("extras");
 }
-
-// Please, add to the `ignore` list any other `lib` subdirectories that do
-// not contain `.ts` files, or that should not be reloaded or eager loaded.
-// Common ones are `templates`, `generators`, or `middleware`, for example.
-await <%= this.appConstBase() %>.config.autoloadLib({ ignore: ["assets", "tasks"] });
 
 declare module "@blazetrails/trailties" {
   interface ApplicationRegistry {

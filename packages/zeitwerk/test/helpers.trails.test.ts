@@ -26,7 +26,7 @@ describe("Zeitwerk::Loader::Helpers", () => {
     await withFiles(
       [["html-parser.ts"], ["a/b.ts"], ["empty/notes.txt"], [".hidden.ts"], ["ignored.ts"]],
       async () => {
-        await loader.ignore("ignored.ts");
+        loader.ignore("ignored.ts");
         const seen: [string, string][] = [];
         await loader.ls(Dir.pwd(), (b, _a, t) => {
           seen.push([b, t]);

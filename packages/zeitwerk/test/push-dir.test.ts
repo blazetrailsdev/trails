@@ -73,7 +73,7 @@ describe("TesPushDir", () => {
       await loader.pushDir("rd1");
       await loader.pushDir("rd2");
       await loader.pushDir("rd3");
-      await loader.ignore("rd2");
+      loader.ignore("rd2");
       checkDirs();
     });
   });
@@ -109,7 +109,7 @@ describe("TesPushDir", () => {
       await loader.pushDir("rd1", { namespace: Namespace });
       await loader.pushDir("rd2", { namespace: Namespace });
       await loader.pushDir("rd3", { namespace: Namespace });
-      await loader.ignore("rd2");
+      loader.ignore("rd2");
       checkDirs();
     });
   });

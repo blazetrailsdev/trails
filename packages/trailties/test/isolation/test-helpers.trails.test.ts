@@ -54,3 +54,34 @@ describe("TestCase#with_env", () => {
     expect("WITH_ENV_PROBE" in ENV).toBe(false);
   });
 });
+
+describe("TestHelpers::Generation#add_to_config", () => {
+  let t: GenerationTest;
+
+  afterEach(() => t.teardownApp());
+
+  it("keeps inserting into the class body and after it across repeated calls", async () => {
+    t = new GenerationTest("test");
+    await t.buildApp();
+    const configFile = `${await t.appPath()}/config/application.ts`;
+
+    await t.addToConfig(`await Promise.resolve("first");`);
+    await t.addToConfig(`this.config.first = "first";`);
+    await t.addToConfig(`await Promise.resolve("second");`);
+    await t.addToConfig(`this.config.second = "second";`);
+
+    const config = await getFs().readFile(configFile, "utf-8");
+    const classEnd = config.search(/\n\}\n/);
+    const declaration = config.search(/\ndeclare module /);
+
+    for (const line of ['this.config.first = "first";', 'this.config.second = "second";']) {
+      expect(config.indexOf(line)).toBeGreaterThan(-1);
+      expect(config.indexOf(line)).toBeLessThan(classEnd);
+    }
+    const first = config.indexOf('await Promise.resolve("first");');
+    const second = config.indexOf('await Promise.resolve("second");');
+    expect(first).toBeGreaterThan(classEnd);
+    expect(second).toBeGreaterThan(first);
+    expect(second).toBeLessThan(declaration);
+  }, 120_000);
+});

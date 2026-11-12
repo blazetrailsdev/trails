@@ -112,8 +112,8 @@ describe("TestEagerLoadDir", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.ignore("y.ts");
-      await loader.ignore("m/n");
+      loader.ignore("y.ts");
+      loader.ignore("m/n");
       await loader.setup();
       await loader.eagerLoadDir(".");
 
