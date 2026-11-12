@@ -82,7 +82,7 @@
     }
   },
   "actionpack": {
-    "rows": 328,
+    "rows": 325,
     "excluded": [
       "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
@@ -128,9 +128,6 @@
       "action-controller/metal/helpers.ts::ClassMethods",
       "action-controller/metal/helpers.ts::Helpers",
       "action-controller/metal/http-authentication.ts::HttpAuthentication",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic.ControllerMethods",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest.ControllerMethods",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token.ControllerMethods",
       "action-controller/metal/implicit-render.ts::ImplicitRender",
       "action-controller/metal/instrumentation.ts::ClassMethods",
       "action-controller/metal/live.ts::ClassMethods",
