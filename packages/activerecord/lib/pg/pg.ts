@@ -15,7 +15,9 @@ import { Array as TextDecoderArray } from "./text-decoder/array.js";
 import { Array as TextEncoderArray } from "./text-encoder/array.js";
 
 export const PG = {
-  Result: PGResult,
+  get Result(): typeof PGResult {
+    return PGResult;
+  },
   get Connection(): typeof Connection {
     return Connection;
   },

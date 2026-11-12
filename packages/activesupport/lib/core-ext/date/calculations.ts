@@ -240,7 +240,7 @@ declare module "@blazetrails/date" {
   }
 }
 
-Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek, DAYS_INTO_WEEK });
+Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek });
 
 Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { change });
 

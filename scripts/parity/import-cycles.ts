@@ -17,6 +17,9 @@
  * seat (`Seat.X = XModule`) reads no binding and is not counted. A read inside a function, method, accessor,
  * constructor or instance field initializer is deferred and is not counted:
  * ESM import bindings are live, so being in a cycle is harmless there.
+ * A module-eval reference to an exported `function` declaration that does not
+ * call it is not counted either: ESM instantiates function declarations before
+ * any module body runs.
  *
  * Each such edge can throw `Cannot access 'X' before initialization` when the
  * graph is entered at the wrong module. `import-cycles-mark.json` lists every
@@ -60,6 +63,8 @@ interface ScannedEdge {
   to: string;
   evalNames: Set<string>;
   evalLine: number;
+  /** Each module-eval name's exported name (`*` for a namespace) and whether a read calls it. */
+  evalRefs: Map<string, { imported: string; called: boolean }>;
 }
 
 export type Resolver = (from: string, spec: string) => string | null;
@@ -353,11 +358,16 @@ export function parseErrors(file: string, text: string): string[] {
 export function scanFile(file: string, text: string, resolve: Resolver): ScannedEdge[] {
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const locals = new Map<string, string>();
+  const importedAs = new Map<string, string>();
   const namespaces = new Set<string>();
   const edges = new Map<string, ScannedEdge & { value: boolean }>();
   const edgeFor = (to: string) => {
     let e = edges.get(to);
-    if (!e) edges.set(to, (e = { to, evalNames: new Set(), evalLine: 0, value: false }));
+    if (!e)
+      edges.set(
+        to,
+        (e = { to, evalNames: new Set(), evalLine: 0, evalRefs: new Map(), value: false }),
+      );
     return e;
   };
   const fnNodes = localFunctions(sf);
@@ -368,6 +378,13 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
   const addEval = (name: string, node: ts.Node) => {
     const e = edgeFor(locals.get(name)!);
     e.evalNames.add(name);
+    const called =
+      ts.isCallExpression(node.parent) && node.parent.expression === node && ts.isIdentifier(node);
+    const prev = e.evalRefs.get(name);
+    e.evalRefs.set(name, {
+      imported: importedAs.get(name) ?? "*",
+      called: called || (prev?.called ?? false),
+    });
     if (!e.evalLine) e.evalLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
   };
   const read = (name: string, node: ts.Node) => {
@@ -409,14 +426,21 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
         continue;
       }
       if (clause.isTypeOnly) continue;
-      if (clause.name) locals.set(clause.name.text, to);
+      if (clause.name) {
+        locals.set(clause.name.text, to);
+        importedAs.set(clause.name.text, "default");
+      }
       const nb = clause.namedBindings;
       if (nb && ts.isNamespaceImport(nb)) {
         locals.set(nb.name.text, to);
         namespaces.add(nb.name.text);
       }
       if (nb && ts.isNamedImports(nb)) {
-        for (const s of nb.elements) if (!s.isTypeOnly) locals.set(s.name.text, to);
+        for (const s of nb.elements) {
+          if (s.isTypeOnly) continue;
+          locals.set(s.name.text, to);
+          importedAs.set(s.name.text, (s.propertyName ?? s.name).text);
+        }
       }
     } else if (
       ts.isExportDeclaration(stmt) &&
@@ -549,6 +573,27 @@ async function workspacePackages(root: string): Promise<Map<string, WorkspacePac
 }
 
 /** Every module-eval edge inside an import cycle, across the workspace. */
+/**
+ * The names a file exports as `function` declarations. ESM instantiates a
+ * function declaration before any module body runs, so a module-eval
+ * reference to one that does not call it cannot meet a TDZ.
+ */
+export function hoistedFunctionExports(file: string, text: string): Set<string> {
+  const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const out = new Set<string>();
+  for (const stmt of sf.statements) {
+    if (
+      ts.isFunctionDeclaration(stmt) &&
+      stmt.name &&
+      stmt.body &&
+      ts.getModifiers(stmt)?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword)
+    ) {
+      out.add(stmt.name.text);
+    }
+  }
+  return out;
+}
+
 export async function measureEdges(root = ROOT_DIR): Promise<Edge[]> {
   const packages = await workspacePackages(root);
   const list: string[] = [];
@@ -559,18 +604,29 @@ export async function measureEdges(root = ROOT_DIR): Promise<Edge[]> {
   }
   const resolve = makeResolver(new Set(list), packages);
   const scans = new Map<string, ScannedEdge[]>();
-  for (const f of list) scans.set(f, scanFile(f, await fs.readFile(f, "utf-8"), resolve));
+  const hoisted = new Map<string, Set<string>>();
+  for (const f of list) {
+    const text = await fs.readFile(f, "utf-8");
+    scans.set(f, scanFile(f, text, resolve));
+    hoisted.set(f, hoistedFunctionExports(f, text));
+  }
   const graph = new Map([...scans].map(([f, s]) => [f, s.map((e) => e.to)]));
   const comp = new Map<string, number>();
   stronglyConnected(graph).forEach((c, i) => c.forEach((f) => comp.set(f, i)));
   const edges: Edge[] = [];
   for (const [from, s] of scans) {
     for (const e of s) {
-      if (e.evalNames.size === 0 || comp.get(from) !== comp.get(e.to)) continue;
+      if (comp.get(from) !== comp.get(e.to)) continue;
+      const fns = hoisted.get(e.to) ?? new Set();
+      const names = [...e.evalNames].filter((n) => {
+        const ref = e.evalRefs.get(n);
+        return !ref || ref.called || !fns.has(ref.imported);
+      });
+      if (names.length === 0) continue;
       edges.push({
         from: path.relative(root, from),
         to: path.relative(root, e.to),
-        evalNames: [...e.evalNames].sort(),
+        evalNames: names.sort(),
         evalLine: e.evalLine,
       });
     }

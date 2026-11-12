@@ -2,6 +2,7 @@ import * as path from "path";
 import { describe, expect, it } from "vitest";
 import {
   edgeKey,
+  hoistedFunctionExports,
   makeResolver,
   matchExports,
   parseErrors,
@@ -172,6 +173,27 @@ describe("import-cycles makeResolver", () => {
     expect(matchExports({ ".": "./dist/i.js" }, ".")).toBe("./dist/i.js");
     expect(matchExports({ "./a": { import: "./dist/a.js" } }, "./a")).toBe("./dist/a.js");
     expect(matchExports({ "./*": "./dist/*.js" }, "./b/c")).toBe("./dist/b/c.js");
+  });
+});
+
+describe("import-cycles hoisted function exports", () => {
+  it("lists exported function declarations only", () => {
+    const text = [
+      "export function f() {}",
+      "export async function g() {}",
+      "function h() {}",
+      "export const k = () => 1;",
+      "export class C {}",
+    ].join("\n");
+    expect([...hoistedFunctionExports("/p/b.ts", text)].sort()).toEqual(["f", "g"]);
+  });
+
+  it("records the exported name and whether a module-eval read calls it", () => {
+    const [e] = scanA([`import { B as X, D } from "./b.js";`, "const t = { X };", "D();"]);
+    expect(Object.fromEntries(e.evalRefs)).toEqual({
+      X: { imported: "B", called: false },
+      D: { imported: "D", called: true },
+    });
   });
 });
 

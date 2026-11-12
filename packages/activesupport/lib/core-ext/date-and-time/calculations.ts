@@ -486,6 +486,7 @@ declare module "@blazetrails/date" {
 
 include(RubyTime, DateAndTimeCalculations);
 include(RubyDate, DateAndTimeCalculations);
+Object.assign(RubyDate, { DAYS_INTO_WEEK });
 
 (TopLevel.DateAndTime ??= { name: "DateAndTime" }).Calculations = DateAndTimeCalculations;
 
