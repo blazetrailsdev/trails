@@ -3,6 +3,8 @@ import { RoutingUrlFor, type RoutingUrlForHost } from "../lib/routing-url-for.js
 import { _backUrl, type UrlHelperHost } from "../lib/helpers/url-helper.js";
 import { TopLevel, include } from "@blazetrails/activesupport";
 import { UrlFor } from "@blazetrails/actionpack";
+import { isModuleIncluded } from "@blazetrails/ruby-compat";
+import { Base } from "../lib/base.js";
 
 class Parameters {
   constructor(private readonly data: Record<string, unknown>) {}
@@ -202,5 +204,9 @@ describe("ActionView::RoutingUrlFor including ActionDispatch::Routing::UrlFor", 
     const late = new Late() as unknown as RoutingUrlFor;
     expect(late.urlOptions()).toEqual({ host: "example.org" });
     expect(typeof (late as unknown as { fullUrlFor: unknown }).fullUrlFor).toBe("function");
+  });
+
+  it("is not included by ActionView::Base before the action_controller load hook", () => {
+    expect(isModuleIncluded(Base, RoutingUrlFor)).toBe(false);
   });
 });

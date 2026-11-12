@@ -34,15 +34,15 @@ export class RoutingUrlFor {
   declare urlFor: (options?: unknown) => string;
   declare urlOptions: () => Record<string, unknown>;
   /** @internal */
-  declare optimizeRoutesGeneration: () => boolean;
-  declare polymorphicPath: (record: unknown, options: Record<string, unknown>) => string;
-  declare polymorphicUrl: (record: unknown, options: Record<string, unknown>) => string;
-  /** @internal */
   declare _routesContext: () => unknown;
+  /** @internal */
+  declare optimizeRoutesGeneration: () => boolean;
   /** @internal */
   declare _generatePathsByDefault: () => boolean;
   /** @internal */
   declare ensureOnlyPathOption: (options: Record<string, unknown> | Parameters) => void;
+  declare polymorphicPath: (record: unknown, options: Record<string, unknown>) => string;
+  declare polymorphicUrl: (record: unknown, options: Record<string, unknown>) => string;
 }
 
 export function urlFor(this: Host, options: UrlForOptions = null): string {
