@@ -11,7 +11,7 @@ import {
   Unary,
 } from "../nodes/node.js";
 import { TransitionTable, type Edge } from "./transition-table.js";
-import { ArgumentError, Hash } from "@blazetrails/ruby-compat";
+import { ArgumentError, Hash, groupBy, uniq } from "@blazetrails/ruby-compat";
 
 const DUMMY_END_NODE = new Dummy("<end>");
 
@@ -43,31 +43,8 @@ export class Builder {
       if (marked.get(s)) continue;
       marked.set(s, true);
 
-      const groups = new Map<Edge, Node[]>();
-      const seen = new Map<string, Edge>();
-      for (const state of s) {
-        const sym = this.symbol(state);
-        const key = typeof sym === "string" ? `s:${sym}` : `r:${sym.source}\0${sym.flags}`;
-        let canonical = seen.get(key);
-        if (!canonical) {
-          canonical = sym;
-          seen.set(key, canonical);
-          groups.set(canonical, []);
-        }
-        groups.get(canonical)!.push(state);
-      }
-
-      for (const [sym, ps] of groups) {
-        const u: Node[] = [];
-        const uSeen = new Set<Node>();
-        for (const l of ps) {
-          for (const fp of this.followpos.get(l)!) {
-            if (!uSeen.has(fp)) {
-              uSeen.add(fp);
-              u.push(fp);
-            }
-          }
-        }
+      for (const [sym, ps] of groupBy(s, (state) => this.symbol(state))) {
+        const u = uniq(ps.flatMap((l) => this.followpos.get(l)!));
         if (u.length === 0) continue;
 
         const from = stateId.get(s)!;

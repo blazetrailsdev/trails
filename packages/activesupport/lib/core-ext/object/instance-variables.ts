@@ -8,6 +8,6 @@ export class Object {
   }
 
   static instanceVariableNames(self: object): string[] {
-    return rbObjInstanceVariables(self).map((ivar) => ivar);
+    return rbObjInstanceVariables(self);
   }
 }
