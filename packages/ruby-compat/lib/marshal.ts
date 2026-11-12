@@ -461,12 +461,7 @@ const PLAIN_OBJECT_IVAR = "@__trails_object";
 
 /** @noRailsEquivalent PERMANENT */
 function isPlainObjectHash(obj: unknown, arg: DumpArg): obj is object {
-  return (
-    arg.markPlainObjects &&
-    !(obj instanceof Map) &&
-    rbObjIsKindOf(obj, Hash) &&
-    !(obj instanceof String)
-  );
+  return arg.markPlainObjects && !(obj instanceof Map) && rbObjIsKindOf(obj, Hash);
 }
 
 /**
