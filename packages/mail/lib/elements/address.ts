@@ -128,9 +128,7 @@ export class Address {
     } else if (typeof value === "string") {
       if (!Utilities.isBlank(value)) {
         const addressList = AddressListsParser.parse(value);
-        this._data =
-          (addressList.addresses as InstanceType<typeof AddressListsParser.AddressStruct>[])[0] ??
-          null;
+        this._data = addressList.addresses[0] ?? null;
       }
     }
   }

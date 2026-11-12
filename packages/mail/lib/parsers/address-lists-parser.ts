@@ -5,7 +5,7 @@ import { AddressList } from "../elements/address-list.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-export const AddressListStruct = Struct.new("addresses", "groupNames", "error");
+export const AddressListStruct = Struct.new<"addresses" | "groupNames" | "error", { addresses: InstanceType<typeof AddressStruct>[]; groupNames: string[]; error: unknown }>("addresses", "groupNames", "error");
 export const AddressStruct = Struct.new("raw", "domain", "comments", "local", "obsDomainList", "displayName", "group", "error");
 
 export const AddressListsParser = extend(
@@ -32,7 +32,7 @@ export const AddressListsParser = extend(
     enCommentTail: 2449,
     enMain: 2461,
 
-    parse(data: string | Uint8Array | null): any {
+    parse(data: string | Uint8Array | null): InstanceType<typeof AddressListStruct> {
       const self = AddressListsParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, addressList: any, phraseS: number | null = null, phraseE: number | null = null, qstrS: number | null = null, qstr: any, commentS: number | null = null, groupNameS: number | null = null, domainS: number | null = null, groupName: any, localDotAtomS: number | null = null, localDotAtomE: number | null = null, localDotAtomPreCommentE: number | null = null, obsDomainListS: number | null = null, addressS: number | null = null, address: any, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, group: any;
       data = (data == null ? data : b(data)) as Uint8Array;

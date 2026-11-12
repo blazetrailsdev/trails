@@ -33,6 +33,10 @@ interface Parser {
   body: string[];
 }
 
+const STRUCT_MEMBER_TYPES: Record<string, Record<string, string>> = {
+  AddressListStruct: { addresses: "InstanceType<typeof AddressStruct>[]", groupNames: "string[]" },
+};
+
 function read(rb: string): Parser {
   const lines = rb.split("\n");
   const [, kind, name] = /^\s*(module|class) (\w+Parser)$/m.exec(rb)!;
@@ -258,10 +262,14 @@ function generate(p: Parser): string {
       ? [`import { Utilities } from "../utilities.js";`]
       : []),
     "",
-    ...p.structs.map(
-      ([n, members]) =>
-        `export const ${n} = Struct.new(${members.map((x) => JSON.stringify(x)).join(", ")});`,
-    ),
+    ...p.structs.map(([n, members]) => {
+      const types = STRUCT_MEMBER_TYPES[n];
+      const generic =
+        types === undefined
+          ? ""
+          : `<${members.map((x) => JSON.stringify(x)).join(" | ")}, { ${members.map((x) => `${x}: ${types[x] ?? "unknown"}`).join("; ")} }>`;
+      return `export const ${n} = Struct.new${generic}(${members.map((x) => JSON.stringify(x)).join(", ")});`;
+    }),
     "",
     ...(p.kind === "class"
       ? [`export class ${p.name} {`]
@@ -272,7 +280,7 @@ function generate(p: Parser): string {
     ),
     ...p.scalars.map(([n, v]) => `    ${member(camel(n))}${v}${end}`),
     "",
-    `    ${p.kind === "class" ? "static " : ""}parse(data: string | Uint8Array | null): any {`,
+    `    ${p.kind === "class" ? "static " : ""}parse(data: string | Uint8Array | null): ${STRUCT_MEMBER_TYPES[p.structs[0][0]] === undefined ? "any" : `InstanceType<typeof ${p.structs[0][0]}>`} {`,
     `      const self = ${p.name} as any;`,
     `      let ${["p", "pe", "eof", "stack", "cs", "top", ...[...t.locals].filter((x) => !["p", "pe", "eof", "stack", "cs", "top"].includes(x))].map((x) => `${x}: ${localType(x)}`).join(", ")};`,
     "      data = (data == null ? data : b(data)) as Uint8Array;",
