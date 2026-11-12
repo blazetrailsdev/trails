@@ -6,7 +6,6 @@ import { TSE } from "@blazetrails/actionview/template/handlers/tse.js";
 import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers.js";
 import { File } from "@blazetrails/ruby-compat";
 import "./test-helper.js";
-import "../../actionview/test/support/setup-compile-template.js";
 import { Content } from "../lib/content.js";
 import { ContentHelper } from "../lib/content-helper.js";
 
