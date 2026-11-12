@@ -73,7 +73,7 @@ describe("databaseConfiguration", () => {
         shared: { primary: { adapter: "sqlite3" }, animals: { adapter: "postgresql" } },
         test: {
           primary: { database: "storage/test.sqlite3" },
-          animals: { database: "db/animals_test", adapter: "sqlite3" },
+          animals: { database: "storage/animals_test", adapter: "sqlite3" },
         },
       }),
     );
@@ -84,7 +84,7 @@ describe("databaseConfiguration", () => {
       Record<string, Record<string, unknown>>
     >;
     expect(config.test.primary).toEqual({ adapter: "sqlite3", database: "storage/test.sqlite3" });
-    expect(config.test.animals).toEqual({ adapter: "sqlite3", database: "db/animals_test" });
+    expect(config.test.animals).toEqual({ adapter: "sqlite3", database: "storage/animals_test" });
   });
 
   it("resolves an unlisted environment to shared", async () => {
@@ -93,14 +93,14 @@ describe("databaseConfiguration", () => {
     nodeFs.writeFileSync(
       nodePath.join(tmpRoot, "config", "database.json"),
       JSON.stringify({
-        shared: { adapter: "sqlite3", database: "db/shared.sqlite3" },
+        shared: { adapter: "sqlite3", database: "storage/shared.sqlite3" },
         test: { database: "storage/test.sqlite3" },
       }),
     );
     setTrailsRoot(tmpRoot);
 
     const config = (await databaseConfiguration()) as Record<string, Record<string, unknown>>;
-    expect(config.staging).toEqual({ adapter: "sqlite3", database: "db/shared.sqlite3" });
+    expect(config.staging).toEqual({ adapter: "sqlite3", database: "storage/shared.sqlite3" });
     expect(Object.keys(config)).toEqual(["test"]);
   });
 
@@ -109,13 +109,13 @@ describe("databaseConfiguration", () => {
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
     nodeFs.writeFileSync(
       nodePath.join(tmpRoot, "config", "database.js"),
-      `export default { test: { adapter: "sqlite3", database: "storage/test.sqlite3" }, staging: { adapter: "sqlite3", database: "db/staging.sqlite3" } };`,
+      `export default { test: { adapter: "sqlite3", database: "storage/test.sqlite3" }, staging: { adapter: "sqlite3", database: "storage/staging.sqlite3" } };`,
     );
     const originalEnv = Trails.env;
     Trails.env = "staging";
     try {
       const config = await loadDatabaseConfig(undefined, tmpRoot);
-      expect(config.database).toBe("db/staging.sqlite3");
+      expect(config.database).toBe("storage/staging.sqlite3");
     } finally {
       Trails.env = originalEnv;
     }
