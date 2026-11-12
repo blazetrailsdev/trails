@@ -3,32 +3,42 @@ import { defaultTreeAdapter, html, parseFragment, type DefaultTreeAdapterMap } f
 import { Document } from "./document.js";
 import { childNodes, Node } from "./node.js";
 import { NodeSet } from "../xml/node-set.js";
+import { DocumentFragment as XmlDocumentFragment } from "../xml/document-fragment.js";
+import { HTML5 } from "../namespaces.js";
 
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
-export class DocumentFragment {
-  errors: unknown[];
+/** @noRailsEquivalent CONVERGEABLE nokogiri-html5-node-is-xml-node */
+const _XmlDocumentFragment = XmlDocumentFragment as unknown as new (
+  document: Document,
+) => Omit<XmlDocumentFragment, "_node" | "document" | "children" | "css" | "atCss" | "errors">;
+
+export class DocumentFragment extends _XmlDocumentFragment {
+  declare document: Document;
+  declare errors: unknown[];
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  readonly _node: Parse5Parent;
+  declare readonly _node: Parse5Parent;
 
   /** @missingRailsCall fragment — CONVERGEABLE nokogiri-html5-document-fragment-gumbo-fragment */
   constructor(
-    public document: Document,
+    document: Document,
     input: string | null = null,
     context: Node | string | null = null,
     _options: Record<string, unknown> = {},
   ) {
+    super(document);
+    this.document = document;
     this.errors = [];
-    this._node = defaultTreeAdapter.createDocumentFragment();
+    (this as { _node: Parse5Parent })._node = defaultTreeAdapter.createDocumentFragment();
     if (input == null) return;
 
     if (typeof context === "string") {
       context = new Node(defaultTreeAdapter.createElement(context, html.NS.HTML, []), document);
     }
-    this._node =
+    (this as { _node: Parse5Parent })._node =
       context !== null && context.isElement()
         ? parseFragment(context._node as DefaultTreeAdapterMap["element"], input, {})
         : parseFragment(input);
@@ -93,3 +103,5 @@ export class DocumentFragment {
     return this.children.map((child) => child.toString()).join("");
   }
 }
+
+HTML5.DocumentFragment = DocumentFragment;

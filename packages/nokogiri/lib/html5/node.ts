@@ -7,6 +7,7 @@ import {
 } from "parse5";
 
 import { Attr } from "../xml/attr.js";
+import { Namespace } from "../xml/namespace.js";
 import { NodeSet } from "../xml/node-set.js";
 import {
   ArgumentError,
@@ -17,7 +18,7 @@ import {
   constSet,
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
-import { DocumentFragment } from "./document-fragment.js";
+import type { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
 import * as Searchable from "../xml/searchable.js";
 import { SaveOptions } from "../xml/node/save-options.js";
@@ -43,7 +44,7 @@ export class Node {
   declare atXpath: (...args: unknown[]) => Node | undefined;
   declare search: (...args: unknown[]) => NodeSet;
 
-  static readonly IMPLIED_XPATH_CONTEXTS = [".//"] as const;
+  static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly ELEMENT_NODE = 1;
   static readonly TEXT_NODE = 3;
   static readonly CDATA_SECTION_NODE = 4;
@@ -56,7 +57,7 @@ export class Node {
      * @noRailsEquivalent PERMANENT
      */
     readonly _node: Parse5Node,
-    readonly document: unknown = null,
+    public document: unknown = null,
   ) {}
 
   get pointerId(): number {
@@ -372,6 +373,82 @@ export class Node {
     );
   }
 
+  get namespace(): Namespace | null {
+    const n = this._node as { tagName?: string; namespaceURI?: string };
+    if (n.namespaceURI === undefined || n.namespaceURI === "") return null;
+    const colon = n.tagName?.indexOf(":") ?? -1;
+    const prefix = colon > 0 ? n.tagName!.slice(0, colon) : null;
+    return (
+      this.namespaceScopes.find((ns) => ns.prefix === prefix && ns.href === n.namespaceURI) ?? null
+    );
+  }
+
+  set namespace(ns: Namespace | null) {
+    if (ns == null) {
+      this.setNamespace(ns);
+      return;
+    }
+
+    if (!(ns instanceof Namespace)) {
+      throw new TypeError(`${rbObjClassname(ns)} can't be coerced into Nokogiri::XML::Namespace`);
+    }
+    if (ns.document !== this.document) {
+      throw new ArgumentError("namespace must be declared on the same document");
+    }
+
+    this.setNamespace(ns);
+  }
+
+  /** @internal */
+  private setNamespace(namespace: Namespace | null): void {
+    (this._node as { namespaceURI: string }).namespaceURI = namespace?.href ?? "";
+  }
+
+  addNamespaceDefinition(prefix: string | null, href: string): Namespace {
+    let ns = this.namespaceDefinitions.find((n) => n.prefix === prefix);
+    if (ns === undefined) {
+      this.set(prefix == null ? "xmlns" : `xmlns:${prefix}`, href);
+      ns = new Namespace({ owner: this, prefix, href }, this.document);
+    }
+    if (prefix == null) this.setNamespace(ns);
+    return ns;
+  }
+
+  get namespaceDefinitions(): Namespace[] {
+    const attrs = (this._node as { attrs?: Parse5Attr[] }).attrs ?? [];
+    return attrs.flatMap((attr) => {
+      const key = attr.prefix ? `${attr.prefix}:${attr.name}` : attr.name;
+      const match = HTML5.Document.NCNAME_RE.exec(key);
+      if (match === null) return [];
+      return [
+        new Namespace({ owner: this, prefix: match[1] ?? null, href: attr.value }, this.document),
+      ];
+    });
+  }
+
+  get namespaceScopes(): Namespace[] {
+    const scopes: Namespace[] = [];
+    const seen = new Set<string | null>();
+    for (const node of [this, ...this.ancestors().toA()]) {
+      if (!node.isElement()) continue;
+      for (const ns of node.namespaceDefinitions) {
+        if (seen.has(ns.prefix)) continue;
+        seen.add(ns.prefix);
+        scopes.push(ns);
+      }
+    }
+    return scopes;
+  }
+
+  get namespaces(): Record<string, string> {
+    return this.namespaceScopes.reduce<Record<string, string>>((hash, ns) => {
+      const prefix = ns.prefix;
+      const key = prefix != null ? `xmlns:${prefix}` : "xmlns";
+      hash[key] = ns.href;
+      return hash;
+    }, {});
+  }
+
   removeAttribute(name: string): Attr | undefined {
     const attr = this.attributes[name];
     attr?.remove();
@@ -408,7 +485,7 @@ export class Node {
   /** @internal */
   protected coerce(data: Node | DocumentFragment | NodeSet | string): Node | NodeSet {
     if (data instanceof NodeSet) return data;
-    if (data instanceof DocumentFragment) return new NodeSet(data.document, data.children);
+    if (data instanceof HTML5.DocumentFragment) return new NodeSet(data.document, data.children);
     if (typeof data === "string") {
       return new NodeSet(
         this.document,

@@ -1,33 +1,31 @@
 import { defaultTreeAdapter, html, parse, type DefaultTreeAdapterMap } from "parse5";
-import { ArgumentError, include, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { readSource, type Readable } from "../readable.js";
 import { childNodes, Node } from "./node.js";
 import { DocumentFragment } from "./document-fragment.js";
-import type { NodeSet } from "../xml/node-set.js";
-import * as Searchable from "../xml/searchable.js";
+import { HTML5 } from "../namespaces.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 
-export class Document {
-  declare css: (...args: unknown[]) => NodeSet;
-  declare atCss: (...args: unknown[]) => Node | undefined;
-  declare xpath: (...args: unknown[]) => NodeSet;
-  declare atXpath: (...args: unknown[]) => Node | undefined;
+export class Document extends Node {
+  declare document: Document;
 
-  static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
+  static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = ["//"];
+  static readonly NCNAME_START_CHAR = "A-Za-z_";
+  static readonly NCNAME_CHAR = `${Document.NCNAME_START_CHAR}\\-\\.0-9`;
+  static readonly NCNAME_RE = new RegExp(
+    `^xmlns(?::([${Document.NCNAME_START_CHAR}][${Document.NCNAME_CHAR}]*))?$`,
+  );
 
   url: string | null = null;
   encoding: string | null = null;
 
-  constructor(
-    /**
-     * @internal
-     * @noRailsEquivalent PERMANENT
-     */
-    readonly _node: Parse5Document = defaultTreeAdapter.createDocument(),
-  ) {}
+  constructor(_node: Parse5Document = defaultTreeAdapter.createDocument()) {
+    super(_node as never);
+    this.document = this;
+  }
 
   static parse(
     stringOrIo: string | Readable | null = null,
@@ -74,26 +72,20 @@ export class Document {
     return doc;
   }
 
-  get document(): Document {
-    return this;
-  }
-
   get root(): Node | null {
-    const root = childNodes(this._node, this).find((node) => node.isElement());
+    const root = childNodes(this._node as unknown as Parse5Document, this).find((node) =>
+      node.isElement(),
+    );
     return root ?? null;
   }
 
   dup(level = 1): Document {
-    const copy = new Document(new Node(this._node as never).dup(level)._node as never);
+    const copy = new Document(super.dup(level)._node as never);
     copy.url = this.url;
     copy.encoding = this.encoding;
     return copy;
   }
 
-  /**
-   * @missingRailsCall add_namespace_definition — CONVERGEABLE nokogiri-html5-create-element-namespace-definitions
-   * @missingRailsCall namespace_definitions — CONVERGEABLE nokogiri-html5-create-element-namespace-definitions
-   */
   createElement(name: string, ...contentsOrAttrs: unknown[]): Node {
     const block =
       typeof contentsOrAttrs.at(-1) === "function"
@@ -104,11 +96,22 @@ export class Document {
     for (const arg of contentsOrAttrs) {
       if (arg !== null && typeof arg === "object") {
         for (const [k, v] of Object.entries(arg)) {
-          elm.set(String(k), String(v));
+          const key = String(k);
+          const match = Document.NCNAME_RE.exec(key);
+          if (match !== null) {
+            const nsName = match[1] ?? null;
+            elm.addNamespaceDefinition(nsName, v as string);
+          } else {
+            elm.set(String(k), String(v));
+          }
         }
       } else {
         elm.content = arg;
       }
+    }
+    const ns = elm.namespaceDefinitions.find((n) => n.prefix == null || n.prefix === "");
+    if (ns !== undefined) {
+      elm.namespace = ns;
     }
     return elm;
   }
@@ -129,4 +132,4 @@ export class Document {
   }
 }
 
-include(Document, Searchable);
+HTML5.Document = Document;
