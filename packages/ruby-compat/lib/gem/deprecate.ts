@@ -1,7 +1,7 @@
 import { isModuleObject, rbClassPath } from "../classpath.js";
-import { Gem } from "../gem.js";
 import { format } from "../kernel-format.js";
 import { warn } from "../kernel-warn.js";
+import { locationOfCaller } from "./location-of-caller.js";
 import { rbModName } from "../object.js";
 
 /**
@@ -37,7 +37,7 @@ export const Deprecate = {
         `NOTE: ${target}${name} is deprecated`,
         repl === ":none" ? " with no replacement" : `; use ${repl} instead`,
         format(". It will be removed on or after %4d-%02d.", year, month),
-        `\n${target}${name} called from ${Gem.locationOfCaller().join(":")}`,
+        `\n${target}${name} called from ${locationOfCaller().join(":")}`,
       ];
       if (!Deprecate.skip) warn(`${msg.join("")}.`);
       return (this as typeof host)[old](...args);
