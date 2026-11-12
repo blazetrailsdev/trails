@@ -128,6 +128,12 @@
       "action-controller/metal/helpers.ts::ClassMethods",
       "action-controller/metal/helpers.ts::Helpers",
       "action-controller/metal/http-authentication.ts::HttpAuthentication",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic.ControllerMethods",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest.ControllerMethods",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token.ControllerMethods",
       "action-controller/metal/implicit-render.ts::ImplicitRender",
       "action-controller/metal/instrumentation.ts::ClassMethods",
       "action-controller/metal/live.ts::ClassMethods",
@@ -194,12 +200,6 @@
       "action-controller/metal/exceptions.ts::UnknownFormat": "ActionController::UnknownFormat",
       "action-controller/metal/exceptions.ts::UnknownHttpMethod": "ActionController::UnknownHttpMethod",
       "action-controller/metal/exceptions.ts::UrlGenerationError": "ActionController::UrlGenerationError",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic": "ActionController::HttpAuthentication::Basic",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic.ControllerMethods": "ActionController::HttpAuthentication::Basic::ControllerMethods",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest": "ActionController::HttpAuthentication::Digest",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest.ControllerMethods": "ActionController::HttpAuthentication::Digest::ControllerMethods",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token": "ActionController::HttpAuthentication::Token",
-      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token.ControllerMethods": "ActionController::HttpAuthentication::Token::ControllerMethods",
       "action-controller/metal/mime-responds.ts::VariantCollector": "ActionController::MimeResponds::Collector::VariantCollector",
       "action-controller/metal/renderers.ts::MissingRenderer": "ActionController::MissingRenderer",
       "action-controller/metal/request-forgery-protection.ts::Exception": "ActionController::RequestForgeryProtection::ProtectionMethods::Exception",
@@ -478,7 +478,7 @@
     }
   },
   "activerecord": {
-    "rows": 559,
+    "rows": 565,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
@@ -715,15 +715,21 @@
       "migration.ts::Current": "ActiveRecord::Migration::Current",
       "migration.ts::ReversibleBlockHelper": "ActiveRecord::Migration::ReversibleBlockHelper",
       "migration/compatibility.ts::V4_2": "ActiveRecord::Migration::Compatibility::V4_2",
+      "migration/compatibility.ts::V4_2.TableDefinition": "ActiveRecord::Migration::Compatibility::V4_2::TableDefinition",
       "migration/compatibility.ts::V5_0": "ActiveRecord::Migration::Compatibility::V5_0",
+      "migration/compatibility.ts::V5_0.TableDefinition": "ActiveRecord::Migration::Compatibility::V5_0::TableDefinition",
       "migration/compatibility.ts::V5_1": "ActiveRecord::Migration::Compatibility::V5_1",
       "migration/compatibility.ts::V5_2": "ActiveRecord::Migration::Compatibility::V5_2",
+      "migration/compatibility.ts::V5_2.TableDefinition": "ActiveRecord::Migration::Compatibility::V5_2::TableDefinition",
       "migration/compatibility.ts::V6_0": "ActiveRecord::Migration::Compatibility::V6_0",
       "migration/compatibility.ts::V6_0.ReferenceDefinition": "ActiveRecord::Migration::Compatibility::V6_0::ReferenceDefinition",
+      "migration/compatibility.ts::V6_0.TableDefinition": "ActiveRecord::Migration::Compatibility::V6_0::TableDefinition",
       "migration/compatibility.ts::V6_1": "ActiveRecord::Migration::Compatibility::V6_1",
       "migration/compatibility.ts::V6_1.PostgreSQLCompat": "ActiveRecord::Migration::Compatibility::V6_1::PostgreSQLCompat",
+      "migration/compatibility.ts::V6_1.TableDefinition": "ActiveRecord::Migration::Compatibility::V6_1::TableDefinition",
       "migration/compatibility.ts::V7_0": "ActiveRecord::Migration::Compatibility::V7_0",
       "migration/compatibility.ts::V7_0.LegacyIndexName": "ActiveRecord::Migration::Compatibility::V7_0::LegacyIndexName",
+      "migration/compatibility.ts::V7_0.TableDefinition": "ActiveRecord::Migration::Compatibility::V7_0::TableDefinition",
       "migration/compatibility.ts::V7_1": "ActiveRecord::Migration::Compatibility::V7_1",
       "migration/compatibility.ts::V7_2": "ActiveRecord::Migration::Compatibility::V7_2",
       "migration/pending-migration-connection.ts::PendingMigrationConnection": "ActiveRecord::PendingMigrationConnection",
@@ -824,7 +830,7 @@
     }
   },
   "activesupport": {
-    "rows": 171,
+    "rows": 172,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -883,6 +889,7 @@
       "concern.ts::Concern",
       "concurrency/null-lock.ts::NullLock",
       "configurable.ts::Configurable",
+      "configurable.ts::Configurable.ClassMethods",
       "deep-mergeable.ts::DeepMergeable",
       "delegation.ts::Delegation",
       "dependencies.ts::Dependencies",
@@ -1221,13 +1228,15 @@
     }
   },
   "rack-session": {
-    "rows": 17,
+    "rows": 19,
     "excluded": [],
     "unwalked": [
       "cookie.ts::Cookie.Base64",
       "cookie.ts::Cookie.Base64.JSON",
+      "cookie.ts::Cookie.Base64.Marshal",
       "cookie.ts::Cookie.Base64.ZipJSON",
       "cookie.ts::Cookie.Identity",
+      "cookie.ts::Cookie.Marshal",
       "cookie.ts::Cookie.SessionId",
       "encryptor.ts::Encryptor.Error",
       "encryptor.ts::Encryptor.InvalidMessage",
@@ -1301,11 +1310,13 @@
     "residue": {}
   },
   "thor": {
-    "rows": 39,
+    "rows": 41,
     "excluded": ["thor.ts::Thor"],
     "unwalked": [
       "actions.ts::Actions",
       "base.ts::Base",
+      "error.ts::UndefinedCommandError.SpellChecker",
+      "error.ts::UnknownArgumentError.SpellChecker",
       "invocation.ts::Invocation",
       "shell.ts::Shell"
     ],

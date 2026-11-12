@@ -387,7 +387,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       const source = await read(entry.file);
       if (isExported(source, entry.tsName)) return entry.tsName;
       const member = new RegExp(
-        `^\\s*(?:public\\s+)?static\\s+(?:readonly\\s+)?${entry.tsName}\\b|^\\s+export\\s+class\\s+${entry.tsName}\\b`,
+        `^\\s*(?:public\\s+)?static\\s+(?:readonly\\s+)?${entry.tsName}\\b|^\\s+export\\s+(?:class|namespace)\\s+${entry.tsName}\\b`,
         "m",
       ).exec(source);
       if (!member) return null;
@@ -405,6 +405,15 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       if (ambiguous.has(key)) {
         const seated = seatedFqn(await read(entry.file), entry.tsName, ambiguous.get(key)!);
         if (seated === undefined) {
+          const nested = await Promise.all(
+            ambiguous.get(key)!.map((fqn) => tsPath({ ...entry, fqn })),
+          );
+          if (nested.every((p) => p !== null && p.includes("."))) {
+            ambiguous
+              .get(key)!
+              .forEach((fqn, i) => entries.push({ ...entry, fqn, tsName: nested[i]!, ...placed }));
+            continue;
+          }
           ambiguousUnseated.add(`${dir}/${entry.file}::${entry.tsName}`);
           continue;
         }

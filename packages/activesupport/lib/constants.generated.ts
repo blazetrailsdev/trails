@@ -147,6 +147,7 @@ defineConstants([
     "ActiveSupport::Concurrency::ThreadLoadInterlockAwareMonitor",
   ],
   [() => m18.Configurable, "ActiveSupport::Configurable"],
+  [() => m18.Configurable.ClassMethods, "ActiveSupport::Configurable::ClassMethods"],
   [() => m18.Configuration, "ActiveSupport::Configurable::Configuration"],
   [() => m28.CurrentAttributes, "ActiveSupport::CurrentAttributes"],
   [() => m29.DeepMergeable, "ActiveSupport::DeepMergeable"],
