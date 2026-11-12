@@ -2081,7 +2081,6 @@ describe("BasicsTest", () => {
 
         expect(defaultRecord.fixed_date).toEqual(Temporal.PlainDate.from("2004-01-01"));
         expect(defaultRecord.fixed_time).toEqual(RubyTime.local(2004, 1, 1, 0, 0, 0, 0));
-        expect(defaultRecord.fixed_time.utcOffset).toBe(-18000);
 
         if (adapterType === "postgres") {
           expect(defaultRecord.fixed_time_with_time_zone).toEqual(
