@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { defaultTimezone } from "../../lib/active-record.js";
 import { currentTimeFromProperTimezone, type TimestampHost } from "../../lib/timestamp.js";
 import { Toy } from "../models/toy.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 describe("current_time_from_proper_timezone", () => {
   fixtures(["toys"]);

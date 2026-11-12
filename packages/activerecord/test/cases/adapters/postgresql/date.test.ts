@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal, Time } from "@blazetrails/date";
-import { describeIfPg } from "../../../../lib/adapters/postgresql/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfPg } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Topic } from "../../../models/topic.js";
 
 function infinite(value: unknown): number | null {

@@ -1,11 +1,7 @@
 import { RuntimeError, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { resetConnection } from "../../../support/connection-helper.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
@@ -13,7 +9,7 @@ import {
   defaultRowFormat,
   isRowFormatDynamicByDefault,
 } from "../../../../lib/connection-adapters/mysql/schema-statements.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

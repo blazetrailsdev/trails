@@ -5,10 +5,10 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "./test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { Post } from "../../../models/post.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

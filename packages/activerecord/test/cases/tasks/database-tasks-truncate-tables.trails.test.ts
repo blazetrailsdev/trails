@@ -8,7 +8,7 @@ import "../../../lib/tasks/sqlite-database-tasks.js";
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { Base } from "../../../lib/base.js";
 import { resetRegisteredTasks } from "../../support/registered-tasks.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("DatabaseTasksTruncateTablesTest", () => {
   fixtures({}, { useTransactionalTests: false });

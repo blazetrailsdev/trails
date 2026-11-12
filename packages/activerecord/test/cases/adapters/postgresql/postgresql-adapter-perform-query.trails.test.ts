@@ -1,16 +1,11 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-  SQLSubscriber,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, SQLSubscriber } from "./test-helper.js";
 import { QueryAttribute } from "../../../../lib/relation/query-attribute.js";
 import { Value } from "../../../../lib/type.js";
 import { Base } from "../../../../lib/base.js";
 import type { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
 import { ReadOnlyError, StatementInvalid } from "../../../../lib/errors.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   let adapter: PostgreSQLAdapter;

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../../../lib/base.js";
 import { connectedToStack } from "../../../lib/core.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("ConnectionHandlersShardingDbTest (trails-only)", () => {
   const { self } = fixtures({}, { useTransactionalTests: false });

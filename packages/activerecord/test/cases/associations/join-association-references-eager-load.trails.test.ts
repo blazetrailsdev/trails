@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Person } from "../../models/person.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 
 describe("JoinAssociation#join_constraints references_values", () => {

@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { Base } from "../../lib/base.js";
-import { ambientPoolConfiguration, checkoutRawTestAdapter } from "../../lib/test-adapter.js";
+import { ambientPoolConfiguration, checkoutRawTestAdapter } from "../support/test-adapter.js";
 import { currentAdapter, inMemoryDb } from "../support/adapter-helper.js";
 
 describe("ambientPoolConfiguration", () => {

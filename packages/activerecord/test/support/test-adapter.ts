@@ -1,8 +1,8 @@
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
-import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
-import type { SQLite3Config } from "./connection-adapters/pool-config.js";
-import { activeLane, testConfigurationHashes } from "../test/support/connection.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import type { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
+import type { TransactionManager } from "../../lib/connection-adapters/abstract/transaction.js";
+import type { SQLite3Config } from "../../lib/connection-adapters/pool-config.js";
+import { activeLane, testConfigurationHashes } from "./connection.js";
 
 export const adapterType: "sqlite" | "postgres" | "mysql" = activeLane();
 
@@ -45,12 +45,12 @@ export function rawTestAdapterConfiguration(): Record<string, unknown> {
 /** @internal */
 export let newRawTestAdapter: () => DatabaseAdapter;
 
-const { HashConfig } = await import("./database-configurations/hash-config.js");
-const { PoolConfig } = await import("./connection-adapters/pool-config.js");
+const { HashConfig } = await import("../../lib/database-configurations/hash-config.js");
+const { PoolConfig } = await import("../../lib/connection-adapters/pool-config.js");
 const { ConnectionPool: RealConnectionPool } =
-  await import("./connection-adapters/abstract/connection-pool.js");
+  await import("../../lib/connection-adapters/abstract/connection-pool.js");
 const { ConnectionDescriptor } =
-  await import("./connection-adapters/abstract/connection-handler.js");
+  await import("../../lib/connection-adapters/abstract/connection-handler.js");
 
 /**
  * @internal
@@ -75,12 +75,12 @@ export async function checkoutRawTestAdapter(): Promise<{
 }
 
 if (adapterType === "postgres") {
-  const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
+  const { PostgreSQLAdapter } = await import("../../lib/connection-adapters/postgresql-adapter.js");
   rawTestAdapterCaps = { max: 1 };
   newRawTestAdapter = () =>
     new PostgreSQLAdapter({ ..._primaryConfiguration, max: 1 }) as unknown as DatabaseAdapter;
 } else if (adapterType === "mysql") {
-  const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
+  const { Mysql2Adapter } = await import("../../lib/connection-adapters/mysql2-adapter.js");
   rawTestAdapterCaps = { connectionLimit: 1, flags: ["FOUND_ROWS"] };
   newRawTestAdapter = () =>
     new Mysql2Adapter({
@@ -89,7 +89,8 @@ if (adapterType === "postgres") {
       flags: ["FOUND_ROWS"],
     }) as unknown as DatabaseAdapter;
 } else {
-  const { BetterSQLite3Adapter } = await import("./connection-adapters/better-sqlite3-adapter.js");
+  const { BetterSQLite3Adapter } =
+    await import("../../lib/connection-adapters/better-sqlite3-adapter.js");
   newRawTestAdapter = () =>
     new BetterSQLite3Adapter(_primaryConfiguration as SQLite3Config) as unknown as DatabaseAdapter;
 }

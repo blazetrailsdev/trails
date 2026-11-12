@@ -6,8 +6,8 @@ import type { EncryptorLike } from "../../../lib/encryption/encryptor.js";
 import { encrypts } from "../../../lib/encryption/encryptable-record.js";
 import type { SchemeOptions } from "../../../lib/encryption/scheme.js";
 import { Base } from "../../../lib/index.js";
-import { Encryption } from "../../../lib/encryption/test-helpers.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Encryption } from "./helper.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 fixtures([]);
 

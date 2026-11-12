@@ -16,9 +16,9 @@ import {
   assertNotEncryptedAttribute,
   assertCiphertextDecryptsTo,
   Encryption,
-} from "../../../lib/encryption/test-helpers.js";
+} from "./helper.js";
 import { Scheme } from "../../../lib/encryption/scheme.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableRecordApiTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;

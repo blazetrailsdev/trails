@@ -7,7 +7,7 @@ import {
   setIndexNestedAttributeErrors,
 } from "../../../lib/active-record.js";
 import { NestedError } from "../../../lib/associations/nested-error.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
 import { Guitar } from "../../models/guitar.js";
 import { TuningPeg } from "../../models/tuning-peg.js";

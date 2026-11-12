@@ -13,10 +13,10 @@ import { transaction, Rollback, RecordInvalid } from "../../lib/index.js";
 import { afterAllTransactionsCommit } from "../../lib/active-record.js";
 import { deprecator } from "../../lib/deprecator.js";
 
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { itIfSupports } from "../support/supports.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic as CanonicalTopic } from "../models/topic.js";
 import { Movie } from "../models/movie.js";
 import { CpkBook } from "../models/cpk.js";

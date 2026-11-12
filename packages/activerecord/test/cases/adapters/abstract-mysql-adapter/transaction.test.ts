@@ -6,12 +6,8 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { Thread, rbObjSingletonClass } from "@blazetrails/ruby-compat";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/base.js";
 import {
   StatementTimeout,

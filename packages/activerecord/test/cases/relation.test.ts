@@ -12,7 +12,7 @@ import { Relation } from "../../lib/index.js";
 import { WhereClause } from "../../lib/relation/where-clause.js";
 import { Base } from "../../lib/base.js";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { HashMerger } from "../../lib/relation/merger.js";
 import { Post as CanonPost, NullPost, FirstPost } from "../models/post.js";

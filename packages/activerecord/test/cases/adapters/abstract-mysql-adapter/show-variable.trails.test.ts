@@ -1,9 +1,5 @@
 import { describe, it, beforeEach, expect } from "vitest";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 
 describeIfMysqlAdapter("AbstractMysqlAdapter#showVariable", () => {
   let adapter: Mysql2Adapter;

@@ -1,12 +1,8 @@
 import { describe, it, beforeEach, expect } from "vitest";
 import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../../../lib/index.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   const { self } = fixtures({});

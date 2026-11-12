@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Pirate } from "../../models/pirate.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { AutoFilteredParameters } from "../../../lib/encryption/auto-filtered-parameters.js";
 
 describe("AutoFilteredParametersTrailsTest", () => {

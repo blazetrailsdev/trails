@@ -3,7 +3,7 @@ import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import "../../../lib/index.js";
 import { Range } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Topic } from "../../models/topic.js";
 
 constSet(TopLevel, "Topic", Topic);

@@ -2,7 +2,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import { DisableJoinsAssociationScope } from "../../../lib/associations/disable-joins-association-scope.js";

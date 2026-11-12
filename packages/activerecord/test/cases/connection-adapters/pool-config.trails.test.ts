@@ -4,7 +4,7 @@ import { ConnectionDescriptor } from "../../../lib/connection-adapters/abstract/
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { SchemaReflection } from "../../../lib/connection-adapters/schema-cache.js";
 import { Monitor } from "@blazetrails/activesupport";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 function makeDbConfig(name = "primary") {
   return new HashConfig("default", name, {

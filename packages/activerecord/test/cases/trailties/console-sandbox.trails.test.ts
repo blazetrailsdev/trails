@@ -3,7 +3,7 @@ import { ConnectionPool } from "../../../lib/connection-adapters/abstract/connec
 import { ConnectionDescriptor } from "../../../lib/connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "../../../lib/connection-adapters/pool-config.js";
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
-import { rawTestAdapterConfiguration } from "../../../lib/test-adapter.js";
+import { rawTestAdapterConfiguration } from "../../support/test-adapter.js";
 
 function makePool(): ConnectionPool {
   const dbConfig = new HashConfig("test", "primary", {

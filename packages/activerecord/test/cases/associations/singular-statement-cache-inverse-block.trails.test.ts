@@ -4,7 +4,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Face } from "../../models/face.js";
 import { Human } from "../../models/human.js";
 import { PartialQuery, Substitute } from "../../../lib/statement-cache.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import type { Base } from "../../../lib/base.js";
 
 interface AssociationLike {

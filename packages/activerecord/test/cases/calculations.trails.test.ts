@@ -2,7 +2,7 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 import { Base } from "../../lib/index.js";
 import type { JoinDependency } from "../../lib/associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies, typeFor } from "../../lib/relation/calculations.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 
 // @internal

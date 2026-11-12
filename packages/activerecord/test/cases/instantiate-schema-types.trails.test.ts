@@ -3,7 +3,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "../../lib/base.js";
 import { adapterDouble, establishConnectionTo } from "../support/adapter-double.js";
 import { defaultValue } from "../../lib/type.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Bulb } from "../models/bulb.js";
 
 class DoublingType extends ValueType {

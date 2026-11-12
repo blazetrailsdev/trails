@@ -3,7 +3,7 @@ import { ConnectionPool } from "../../lib/connection-adapters/abstract/connectio
 import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";
 import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
-import { rawTestAdapterConfiguration } from "../../lib/test-adapter.js";
+import { rawTestAdapterConfiguration } from "../support/test-adapter.js";
 import { ConnectionTimeoutError } from "../../lib/errors.js";
 
 function establishConnection(poolSize: number, checkoutTimeout: number): ConnectionPool {

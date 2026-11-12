@@ -3,11 +3,11 @@ import { ConnectionHandler } from "../../../lib/connection-adapters/abstract/con
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { Base } from "../../../lib/base.js";
 import { AdapterNotFound } from "../../../lib/errors.js";
-import { ambientPoolConfiguration } from "../../../lib/test-adapter.js";
+import { ambientPoolConfiguration } from "../../support/test-adapter.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { deprecator } from "../../../lib/deprecator.js";
 import { restoreWorkerConnection } from "../../support/connection.js";

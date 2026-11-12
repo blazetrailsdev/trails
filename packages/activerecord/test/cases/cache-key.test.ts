@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Base } from "../../lib/index.js";
-import { adapterType } from "../../lib/test-adapter.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 function usec(ts: unknown): string {
   if (ts instanceof RubyTime) ts = ts.getutc().toZonedDateTime().toInstant();

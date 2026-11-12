@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { CpkOrder } from "../../models/cpk.js";
 
 describe("Relation#to_sql composite-PK eager load with limit", () => {

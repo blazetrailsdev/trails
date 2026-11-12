@@ -9,7 +9,7 @@ import {
   StatementInvalid,
 } from "../../lib/errors.js";
 
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { connectedToStack } from "../../lib/core.js";
 import { Logger, TimeWithZone } from "@blazetrails/activesupport";
@@ -27,7 +27,7 @@ import {
   assertDifference,
 } from "@blazetrails/activesupport/testing/assertions";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel";
 import * as Lint from "@blazetrails/activemodel/testing/lint";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";

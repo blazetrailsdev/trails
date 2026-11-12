@@ -51,7 +51,7 @@ import {
   CpkBrokenOrderWithNonCpkBooks,
 } from "../../models/cpk.js";
 import { CompositePrimaryKeyMismatchError } from "../../../lib/associations/errors.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { resetI18n } from "../../support/i18n.js";
 import { assertQueriesCount, assertNoQueries } from "../../../lib/testing/query-assertions.js";
 import { isPresent } from "@blazetrails/activesupport";

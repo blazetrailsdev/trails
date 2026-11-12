@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import "../../support/canonical-model-index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Topic } from "../../models/topic.js";
 import { Reply } from "../../models/reply.js";
 

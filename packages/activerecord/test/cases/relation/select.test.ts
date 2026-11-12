@@ -4,7 +4,7 @@ import { describe, it, expect } from "vitest";
 import "../../../lib/index.js";
 import { StatementInvalid } from "../../../lib/index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Post, PostWithDefaultSelect } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";

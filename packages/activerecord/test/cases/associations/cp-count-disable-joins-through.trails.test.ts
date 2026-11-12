@@ -5,7 +5,7 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base } from "../../../lib/index.js";
 import { Associations } from "../../../lib/associations.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("CollectionProxy#count — disable_joins through", () => {
   fixtures([]);

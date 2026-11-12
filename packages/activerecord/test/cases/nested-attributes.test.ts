@@ -3,7 +3,7 @@ import { hashAref, isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat"
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, RecordNotFound, REJECT_ALL_BLANK_PROC, TooManyRecords } from "../../lib/index.js";
 import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
 import { Human } from "../models/human.js";
 import { Interest } from "../models/interest.js";
@@ -29,7 +29,7 @@ import {
   assertNothingRaised,
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
-import { repairValidations } from "../../lib/cases/validations-repair-helper.js";
+import { repairValidations } from "./validations-repair-helper.js";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";
 
 type ExtraFixtures = Record<string, readonly [typeof Base, Record<string, unknown>]>;

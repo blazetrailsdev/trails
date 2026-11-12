@@ -1,7 +1,7 @@
 import { expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import type { QueryCanceled } from "./errors.js";
-import { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
+import type { QueryCanceled } from "../../lib/errors.js";
+import { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
 
 interface CancelRecord {
   at: string;

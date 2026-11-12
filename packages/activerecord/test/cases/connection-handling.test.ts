@@ -6,7 +6,7 @@ import {
   assertDeprecated,
   assertNotDeprecated,
 } from "@blazetrails/activesupport/testing/deprecation";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Post } from "../models/post.js";
 import { connectedToStack } from "../../lib/core.js";
 import {

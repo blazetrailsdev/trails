@@ -22,7 +22,7 @@ import { Nodes } from "@blazetrails/arel";
 import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "../../lib/index.js";
 import * as Type from "../../lib/type.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Inheritance, stiName, isBaseClass, baseClass } from "../../lib/inheritance.js";
 import {
   ActiveRecordError,

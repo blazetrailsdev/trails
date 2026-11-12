@@ -1,35 +1,31 @@
 import { expect } from "vitest";
 import { Table, UpdateManager } from "@blazetrails/arel";
-import type { TestDatabaseAdapter } from "../test-adapter.js";
-import { ensureCanonicalTables } from "../../test/support/canonical-table-rebuild.js";
-import { Base } from "../index.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { TestDatabaseAdapter } from "../../support/test-adapter.js";
+import { ensureCanonicalTables } from "../../support/canonical-table-rebuild.js";
+import { Base } from "../../../lib/index.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 
 export { Base };
-import { type Compressor } from "./config.js";
-import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
-import { Encryptor as EncryptorImpl } from "./encryptor.js";
-import type { KeyProviderLike } from "./encryptor.js";
-import { type Scheme } from "./scheme.js";
-import * as Errors from "./errors.js";
+import { type Compressor } from "../../../lib/encryption/config.js";
+import { DerivedSecretKeyProvider } from "../../../lib/encryption/derived-secret-key-provider.js";
+import { Encryptor as EncryptorImpl } from "../../../lib/encryption/encryptor.js";
+import type { KeyProviderLike } from "../../../lib/encryption/encryptor.js";
+import { type Scheme } from "../../../lib/encryption/scheme.js";
+import * as Errors from "../../../lib/encryption/errors.js";
 import { assertEqual, assertNotEqual } from "@blazetrails/activesupport/testing/assertions";
-import { Encryption } from "../encryption.js";
-import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
+import { Encryption } from "../../../lib/encryption.js";
+import { MessagePackMessageSerializer } from "../../../lib/encryption/message-pack-message-serializer.js";
 
-import { Key } from "./key.js";
+import { Key } from "../../../lib/encryption/key.js";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
-import { Fixture } from "../fixtures.js";
-import { EncryptedFixtures } from "./encrypted-fixtures.js";
+import { Fixture } from "../../../lib/fixtures.js";
+import { EncryptedFixtures } from "../../../lib/encryption/encrypted-fixtures.js";
 export { Encryption, Errors };
 
 prepend(Fixture, EncryptedFixtures);
 
-import {
-  TEST_PRIMARY_KEY,
-  TEST_DETERMINISTIC_KEY,
-  TEST_KEY_DERIVATION_SALT,
-} from "../cases/helper.js";
+import { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "../helper.js";
 
 interface ConfigSnapshot {
   primaryKey: string | string[] | null | undefined;

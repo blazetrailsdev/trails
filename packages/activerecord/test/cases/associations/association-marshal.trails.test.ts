@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Marshal, rbObjIvarGet } from "@blazetrails/ruby-compat";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Firm } from "../../models/company.js";
 import { Association } from "../../../lib/associations/association.js";
 

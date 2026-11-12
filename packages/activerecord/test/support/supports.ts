@@ -1,6 +1,6 @@
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import { describe, it, type SuiteFactory, type TestFunction } from "vitest";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import {
   inMemoryDb,
   supportsDefaultExpression,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import {
   DestroyAssociationAsyncError,
   DestroyAssociationAsyncJob,

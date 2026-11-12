@@ -5,7 +5,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "../../lib/base.js";
 import { adapterDouble, establishConnectionTo } from "../support/adapter-double.js";
 import { reloadSchemaFromCache } from "../../lib/model-schema.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 class UuidType extends ValueType {
   override type(): string {

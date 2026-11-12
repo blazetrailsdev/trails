@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/index.js";
-import { adapterType } from "../../../lib/test-adapter.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { adapterType } from "../../support/test-adapter.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Post as CanonicalPost } from "../../models/post.js";
 
 fixtures({});

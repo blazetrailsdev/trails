@@ -1,11 +1,8 @@
 import { it, expect, beforeAll } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { describeIfSupports } from "../../../support/supports.js";
 import { Base } from "../../../../lib/index.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Post } from "../../../models/post.js";
 
 describeIfPg("PostgreSQLAdapter", () => {

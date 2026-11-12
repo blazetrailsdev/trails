@@ -4,7 +4,7 @@ import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
   Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "../abstract-mysql-adapter/test-helper.js";
 import type { Mysql2Result } from "../../../../lib/mysql2/client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {

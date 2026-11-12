@@ -10,7 +10,7 @@ import { CpkBook } from "../models/cpk.js";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { Base } from "../../lib/base.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 
 class TokenUser extends User {

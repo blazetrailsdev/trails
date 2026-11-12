@@ -16,7 +16,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { assertNoQueries, assertQueriesCount } from "../../../lib/testing/query-assertions.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Author, AuthorAddress, AuthorFavorite } from "../../models/author.js";
 import { Post, SpecialPost, SubAbstractStiPost, StiPost, SubStiPost } from "../../models/post.js";
 import { Tag } from "../../models/tag.js";

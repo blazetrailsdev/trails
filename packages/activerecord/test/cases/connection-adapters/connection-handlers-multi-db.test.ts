@@ -9,7 +9,7 @@ import { Base } from "../../../lib/base.js";
 import { currentRole } from "../../../lib/core.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";
 import { Person } from "../../models/person.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import {
   readingRole,
   setReadingRole,

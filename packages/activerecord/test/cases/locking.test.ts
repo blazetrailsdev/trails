@@ -8,7 +8,7 @@ import {
   RecordNotFound,
 } from "../../lib/index.js";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Person, RichPerson } from "../models/person.js";
 import { Frog } from "../models/frog.js";
 import { Treasure } from "../models/treasure.js";
@@ -38,7 +38,7 @@ import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecat
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { Time as RubyTime } from "@blazetrails/date";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { deprecator } from "../../lib/deprecator.js";
 
 describe("OptimisticLockingTest", () => {

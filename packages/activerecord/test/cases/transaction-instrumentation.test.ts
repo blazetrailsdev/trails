@@ -8,7 +8,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
 import { assertEmpty, assertNot, assertSame } from "@blazetrails/activesupport/testing/assertions";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { topicFixtureData } from "../fixtures/topics.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 

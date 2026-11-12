@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Error as ActiveModelError, I18n } from "@blazetrails/activemodel";
 import "../../support/canonical-model-index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { repairValidations } from "../../../lib/cases/validations-repair-helper.js";
+import { fixtures } from "../../support/use-fixtures.js";
+import { repairValidations } from "../validations-repair-helper.js";
 import { Topic } from "../../models/topic.js";
 import { Reply } from "../../models/reply.js";
 

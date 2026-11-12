@@ -15,7 +15,7 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "./test-helper.js";
 import { NoDatabaseError, DatabaseVersionError } from "../../../../lib/errors.js";
 import { Mysql2, type Mysql2Result } from "../../../../lib/mysql2/client.js";
 import { Base } from "../../../../lib/base.js";

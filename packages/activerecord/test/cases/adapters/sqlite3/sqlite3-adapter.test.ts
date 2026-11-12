@@ -3,7 +3,7 @@ import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import "../../../../lib/index.js";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Owner } from "../../../models/owner.js";
 import { ARUnit2Model } from "../../../models/arunit2-model.js";
 import { inMemoryDb } from "../../../support/adapter-helper.js";
@@ -16,7 +16,7 @@ import type { Database } from "better-sqlite3";
 
 import { QueryAttribute } from "../../../../lib/relation/query-attribute.js";
 import { ValueType, IntegerType } from "@blazetrails/activemodel";
-import { assertLogged } from "../../../../lib/adapters/sqlite3/test-helper.js";
+import { assertLogged } from "./test-helper.js";
 import type { Column as SQLite3Column } from "../../../../lib/connection-adapters/sqlite3/column.js";
 import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import {

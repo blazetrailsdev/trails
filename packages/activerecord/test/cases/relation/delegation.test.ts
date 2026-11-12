@@ -10,7 +10,7 @@ import { Calculations } from "../../../lib/relation/calculations.js";
 import { FinderMethods } from "../../../lib/relation/finder-methods.js";
 import { QueryMethods } from "../../../lib/relation/query-methods.js";
 import { SpawnMethods } from "../../../lib/relation/spawn-methods.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { tsName } from "../../support/array-delegate-spellings.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";

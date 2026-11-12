@@ -3,7 +3,7 @@ import "../../../lib/index.js";
 import { Range } from "../../../lib/index.js";
 import { ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { ProtectedParams } from "../../support/stubs/strong-parameters.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { seconds } from "@blazetrails/activesupport";
 import {
   assertEmpty,
@@ -13,7 +13,7 @@ import {
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
 import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import { assertNotCalledOnInstanceOf } from "@blazetrails/activesupport/testing/method-call-assertions";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { rational, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";

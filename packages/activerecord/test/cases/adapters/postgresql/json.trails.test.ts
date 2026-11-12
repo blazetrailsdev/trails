@@ -2,8 +2,8 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import "../../../../lib/index.js";
 import { describeIfPostgresqlAdapter } from "../../../support/describe-if-postgresql-adapter.js";
 import { Base } from "../../../../lib/base.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { JsonDataType as klass } from "../../../../lib/cases/json-shared-test-cases.js";
+import { fixtures } from "../../../support/use-fixtures.js";
+import { JsonDataType as klass } from "../../json-shared-test-cases.js";
 import type { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
 import type { TableDefinition } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 

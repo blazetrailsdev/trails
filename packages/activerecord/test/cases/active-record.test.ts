@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../lib/index.js";
 import { disconnectAllBang } from "../../lib/active-record.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 
 describe("ActiveRecordTest", () => {

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/test/support/connection.js";
 import { Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "../../../lib/relation/predicate-builder.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Topic } from "../../models/topic.js";
 import { Reply } from "../../models/reply.js";
 import { regexpEscape, constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";

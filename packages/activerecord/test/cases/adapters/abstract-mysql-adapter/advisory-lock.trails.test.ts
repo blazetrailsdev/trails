@@ -1,11 +1,7 @@
 import { describe, it, beforeEach, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-  Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 
 describeIfMysqlAdapter("AbstractMysqlAdapter advisory locks", () => {
   let adapter: Mysql2Adapter;

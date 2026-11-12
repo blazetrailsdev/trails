@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Owner } from "../../models/owner.js";
 import { Pet } from "../../models/pet.js";
 import { Range, constSet, TopLevel } from "@blazetrails/ruby-compat";

@@ -13,7 +13,7 @@ import { Category } from "../models/category.js";
 import { DogLover } from "../models/dog-lover.js";
 import { Subscriber } from "../models/subscriber.js";
 import { CpkOrder } from "../models/cpk.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";

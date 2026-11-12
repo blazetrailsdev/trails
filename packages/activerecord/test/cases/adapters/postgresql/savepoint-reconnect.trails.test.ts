@@ -1,9 +1,5 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { ConnectionFailed } from "../../../../lib/errors.js";
 
 interface RetryLoopSeams {

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../../support/rocket-tables.js";
 import { currentAdapter } from "../../support/adapter-helper.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 function invalidAddColumnOptionExceptionMessage(key: string): string {

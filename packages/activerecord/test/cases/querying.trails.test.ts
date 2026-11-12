@@ -6,7 +6,7 @@ import { Result } from "../../lib/result.js";
 import { TableNotSpecified } from "../../lib/errors.js";
 import { Topic } from "../models/topic.js";
 import { Reply } from "../models/reply.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { resultFromRowHashes } from "../support/result-from-row-hashes.js";
 
 fixtures({ topics: [Topic, {}] });

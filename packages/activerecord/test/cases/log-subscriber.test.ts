@@ -8,7 +8,7 @@ import {
   NotificationEvent as Event,
   Logger,
 } from "@blazetrails/activesupport";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Developer } from "../models/developer.js";
 import { setVerboseQueryLogs } from "../../lib/active-record.js";
 import {

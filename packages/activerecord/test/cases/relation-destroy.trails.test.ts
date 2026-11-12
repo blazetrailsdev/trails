@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Topic } from "../models/topic.js";
 import { CpkBook } from "../models/cpk.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 describe("RelationDestroyTrailsTest", () => {
   const { cpkBooks } = fixtures(["topics", "cpkAuthors", "cpkBooks"]);

@@ -8,7 +8,7 @@ import { NotImplementedError } from "../../../lib/errors.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Company, Firm } from "../../models/company.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { CollectionProxy } from "../../../lib/associations/collection-proxy.js";
 import { Relation } from "../../../lib/relation.js";
 import { AssociationRelation } from "../../../lib/association-relation.js";

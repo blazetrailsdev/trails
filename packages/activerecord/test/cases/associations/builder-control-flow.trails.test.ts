@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { Hash } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base, RecordNotDestroyed } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import "../../support/canonical-model-index.js";
 import { Account } from "../../models/account.js";
 import { Firm } from "../../models/company.js";

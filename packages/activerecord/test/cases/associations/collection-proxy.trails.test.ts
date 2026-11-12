@@ -6,7 +6,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { Base, RecordNotFound } from "../../../lib/index.js";
 import { Relation } from "../../../lib/relation.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import "../../support/canonical-model-index.js";
 import { Author } from "../../models/author.js";
 import { Post } from "../../models/post.js";

@@ -23,10 +23,10 @@ import {
   Encryption,
   Errors,
   Base,
-} from "../../../lib/encryption/test-helpers.js";
+} from "./helper.js";
 import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
 import { itIfSupports } from "../../support/supports.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 import {
   EncryptedBook,

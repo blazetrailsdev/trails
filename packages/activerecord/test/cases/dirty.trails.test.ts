@@ -2,7 +2,7 @@ import { Hash } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { hashAref, hasKey } from "@blazetrails/ruby-compat";
 import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import { _touchRow as dirtyTouchRow } from "../../lib/attribute-methods/dirty.js";
 

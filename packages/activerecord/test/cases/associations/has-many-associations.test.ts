@@ -53,7 +53,7 @@ import {
 import { assertNotCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 function setup(): void {
   beforeEach(() => {

@@ -6,7 +6,7 @@ import { Client, Firm } from "../models/company.js";
 import { Owner } from "../models/owner.js";
 import { Pet } from "../models/pet.js";
 import { CpkBook, CpkOrder } from "../models/cpk.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 constSet(TopLevel, "Owner", Owner);
 constSet(TopLevel, "Pet", Pet);

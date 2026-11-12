@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { StringIO } from "@blazetrails/ruby-compat";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  pgServerVersion,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.js";
 import { SchemaDumper } from "../../../../lib/connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../../../lib/index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -17,7 +13,7 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import { StatementInvalid } from "../../../../lib/errors.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 class PostgresqlEnum extends Base {

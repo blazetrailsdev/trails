@@ -4,8 +4,8 @@ import { Base } from "../../lib/index.js";
 import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { ReadOnlyError, StatementInvalid } from "../../lib/errors.js";
 import { itIfSupports } from "../support/supports.js";
-import { adapterType } from "../../lib/test-adapter.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 let connection: AbstractAdapter;
 

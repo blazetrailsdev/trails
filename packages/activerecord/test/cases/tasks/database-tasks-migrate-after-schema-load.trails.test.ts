@@ -7,8 +7,8 @@ import { DatabaseTasks } from "../../../lib/tasks/database-tasks.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
 import { Base } from "../../../lib/base.js";
 import { schemaFormat, setSchemaFormat } from "../../../lib/active-record.js";
-import { MIGRATIONS_ROOT } from "../../../lib/config.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { MIGRATIONS_ROOT } from "../../config.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   fixtures({}, { useTransactionalTests: false });

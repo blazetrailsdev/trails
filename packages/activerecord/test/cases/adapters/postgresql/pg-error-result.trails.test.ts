@@ -1,10 +1,6 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import pg from "pg";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import {
   ConnectionFailed,
   ConnectionNotEstablished,
@@ -13,7 +9,7 @@ import {
 } from "../../../../lib/errors.js";
 import { pgConnection, type PGConnection } from "../../../../lib/pg/connection.js";
 import { PG } from "../../../../lib/pg/pg.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 describeIfPg("PG::Error#result (trails)", () => {
   let adapter: PostgreSQLAdapter;

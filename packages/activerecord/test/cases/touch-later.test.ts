@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
 import { Time as RubyTime } from "@blazetrails/date";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { assertNoQueries } from "../../lib/testing/query-assertions.js";
 import { Invoice } from "../models/invoice.js";

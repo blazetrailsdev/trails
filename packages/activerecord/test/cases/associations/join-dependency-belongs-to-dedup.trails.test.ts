@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "../../../lib/index.js";
 import { Associations } from "../../../lib/associations.js";
 import { aliasedRow } from "../../support/join-dependency-aliased-row.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { JoinDependency } from "../../../lib/associations/join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 import { resultFromRowHashes } from "../../support/result-from-row-hashes.js";

@@ -6,9 +6,9 @@ import {
   restoreEncryptionConfig,
   makeEncryptedPost,
   assertEncryptedAttribute,
-} from "../../../lib/encryption/test-helpers.js";
+} from "./helper.js";
 import { Encryption } from "../../../lib/encryption.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import {
   EncryptedBookWithSerializedFirstBinary,
   EncryptedBookWithSerializedSecondBinary,

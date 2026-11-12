@@ -12,7 +12,7 @@ import { Minitest } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../lib/base.js";
 import "../../lib/relation.js";
 import { TestFixtures } from "../../lib/test-fixtures.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { ConnectionHandler } from "../../lib/connection-adapters/abstract/connection-handler.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { Zine } from "../models/zine.js";

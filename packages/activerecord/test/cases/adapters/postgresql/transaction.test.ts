@@ -1,10 +1,5 @@
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-  PG_TEST_URL,
-  suiteTable,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL, suiteTable } from "./test-helper.js";
 import {
   SerializationFailure,
   Deadlocked,

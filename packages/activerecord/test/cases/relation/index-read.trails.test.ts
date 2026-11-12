@@ -4,7 +4,7 @@ import { Post } from "../../models/post.js";
 import { ShipPart } from "../../models/ship-part.js";
 import { Ship } from "../../models/ship.js";
 import { Treasure } from "../../models/treasure.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 constSet(TopLevel, "ShipPart", ShipPart);
 constSet(TopLevel, "Ship", Ship);

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Time } from "../../../lib/type/time.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Topic } from "../../models/topic.js";
 
 describe("TimeTest", () => {

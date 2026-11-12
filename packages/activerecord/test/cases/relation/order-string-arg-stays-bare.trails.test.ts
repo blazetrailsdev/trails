@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Customer } from "../../models/customer.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
 

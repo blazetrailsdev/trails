@@ -3,7 +3,7 @@ import { Encryption } from "../../../lib/encryption.js";
 import { DerivedSecretKeyProvider } from "../../../lib/encryption/derived-secret-key-provider.js";
 import { Book } from "../../models/book.js";
 import { Pirate } from "../../models/pirate.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import {
   AutoFilteredParameters,
   type AutoFilteredParametersApp,

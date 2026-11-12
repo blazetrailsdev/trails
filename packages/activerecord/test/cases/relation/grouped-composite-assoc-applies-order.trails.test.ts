@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor } from "../../models/cpk.js";
 import { sql as arelSql } from "@blazetrails/arel";
 

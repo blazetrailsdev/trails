@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base } from "../../lib/index.js";
 import { User } from "../models/user.js";
 import { MinimumLengthError } from "../../lib/secure-token.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 describe("SecureTokenTest", () => {
   fixtures([]);

@@ -4,7 +4,7 @@ import { SingularAssociation } from "../../lib/associations/singular-association
 import { loadSingularTarget } from "../support/load-singular-target.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, StrictLoadingViolationError } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Developer, AuditLog, AuditLogRequired } from "../models/developer.js";
 import { Ship } from "../models/ship.js";
 import { ShipPart } from "../models/ship-part.js";

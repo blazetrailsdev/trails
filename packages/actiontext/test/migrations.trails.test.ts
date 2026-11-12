@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Base, Migration } from "@blazetrails/activerecord";
-import { fixtures } from "../../activerecord/lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../activerecord/test/support/use-fixtures.js";
 import "./test-helper.js";
 import { CreateActionTextTables } from "../lib/db/migrate/20180528164100_create_action_text_tables.js";
 import { Message } from "./dummy/app/models/message.js";

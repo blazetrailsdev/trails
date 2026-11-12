@@ -11,8 +11,8 @@ import { rbObjClassname, keys, constSet, TopLevel } from "@blazetrails/ruby-comp
 import { TimeZoneConverter } from "../../lib/attribute-methods/time-zone-conversion.js";
 
 import { loadSchemaFromAdapter } from "../../lib/model-schema.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 

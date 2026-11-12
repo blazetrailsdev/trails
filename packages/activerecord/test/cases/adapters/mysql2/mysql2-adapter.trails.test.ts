@@ -1,11 +1,11 @@
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   describeIfMysqlAdapter,
   leaseMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "../abstract-mysql-adapter/test-helper.js";
 import {
   ConnectionFailed,
   ConnectionNotEstablished,

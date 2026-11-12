@@ -4,11 +4,11 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../../lib/index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
-import { adapterType } from "../../lib/test-adapter.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
-import { inTimeZone } from "../../lib/cases/helper.js";
+import { inTimeZone } from "./helper.js";
 import { zone } from "@blazetrails/activesupport";
 import { inTimeZone as dateInTimeZone } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 import { Base } from "../../lib/index.js";
 import { ReadOnlyError } from "../../lib/errors.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 describe("DDL through execute (trails)", () => {
   fixtures([], { useTransactionalTests: false });

@@ -4,8 +4,8 @@ import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { DateTime } from "@blazetrails/date";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { File as RubyFile, Hash, RuntimeError } from "@blazetrails/ruby-compat";
-import { TEST_ROOT } from "../../lib/config.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { TEST_ROOT } from "../config.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 import { Author } from "../models/author.js";
 

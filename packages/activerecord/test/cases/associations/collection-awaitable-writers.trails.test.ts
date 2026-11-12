@@ -7,7 +7,7 @@ import { Author } from "../../models/author.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Category } from "../../models/category.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 interface CollectionOwner {
   setAttributes(attrs: Record<string, unknown>): Promise<void> | void;

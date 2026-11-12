@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { asyncQueryExecutor, setAsyncQueryExecutor } from "../../../lib/active-record.js";
 import { Post } from "../../models/post.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("load_async on the null executor (trails-only)", () => {
   fixtures(["posts"]);

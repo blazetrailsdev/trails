@@ -1,18 +1,10 @@
-import { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.js";
+import { PostgreSQLAdapter } from "../../../../lib/connection-adapters/postgresql-adapter.js";
 import { Notifications, squish } from "@blazetrails/activesupport";
 import type { NotificationSubscriber, NotificationEvent } from "@blazetrails/activesupport";
-import {
-  pgAvailable,
-  pgHasHintPlan,
-  pgServerVersion,
-} from "../../../test/support/describe-if-pg.js";
-import { Base } from "../../base.js";
+import { pgAvailable, pgHasHintPlan, pgServerVersion } from "../../../support/describe-if-pg.js";
+import { Base } from "../../../../lib/base.js";
 
-export {
-  describeIfPg,
-  pgServerVersion,
-  PG_TEST_URL,
-} from "../../../test/support/describe-if-pg.js";
+export { describeIfPg, pgServerVersion, PG_TEST_URL } from "../../../support/describe-if-pg.js";
 
 export const pgSupportsOptimizerHints = pgAvailable && pgHasHintPlan;
 export const pgSupportsNativePartitioning = pgServerVersion >= 100000;

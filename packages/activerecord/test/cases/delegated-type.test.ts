@@ -1,9 +1,9 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, vi } from "vitest";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { assertRespondTo } from "@blazetrails/activesupport/testing/assertions";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Base } from "../../lib/base.js";
 import { Entry } from "../models/entry.js";
 import { Message } from "../models/message.js";

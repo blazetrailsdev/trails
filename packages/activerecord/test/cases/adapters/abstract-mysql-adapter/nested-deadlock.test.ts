@@ -2,11 +2,8 @@ import { DescendantsTracker } from "@blazetrails/activesupport";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import {
-  describeIfMysqlAdapter,
-  leaseMysqlAdapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Base } from "../../../../lib/base.js";
 import { Deadlocked, Rollback, StatementInvalid } from "../../../../lib/errors.js";
 import { SavepointTransaction } from "../../../../lib/connection-adapters/abstract/transaction.js";

@@ -14,11 +14,11 @@ import { Base } from "../../lib/base.js";
 import type { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
 import type { SchemaMigration } from "../../lib/schema-migration.js";
 import type { InternalMetadata } from "../../lib/internal-metadata.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { anonymousMigration } from "../support/anonymous-migration.js";
 import { migrationProxy } from "../support/migration-proxy.js";
 import "../support/migration-helper.js";
-import { MIGRATIONS_ROOT } from "../../lib/config.js";
+import { MIGRATIONS_ROOT } from "../config.js";
 
 function migration(name: string, version?: number): MigrationProxy {
   return migrationProxy({

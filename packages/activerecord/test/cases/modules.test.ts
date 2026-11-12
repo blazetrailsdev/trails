@@ -8,7 +8,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { constDefined, rbModRemoveConst, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { assertNoQueries } from "../../lib/testing/query-assertions.js";
 import {
   MyAppBusinessCompany,

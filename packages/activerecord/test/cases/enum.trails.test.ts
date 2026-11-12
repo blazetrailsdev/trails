@@ -16,7 +16,7 @@ import {
 import { ArgumentError, DecimalType, IntegerType } from "@blazetrails/activemodel";
 import { Base } from "../../lib/index.js";
 import { Map as MapCaster } from "../../lib/type-caster/map.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Book } from "../models/book.js";
 import { Lion } from "../models/cat.js";
 

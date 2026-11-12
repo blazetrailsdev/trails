@@ -11,7 +11,7 @@ import { Base } from "../../lib/base.js";
 import { ARUnit2Model } from "../models/arunit2-model.js";
 import { migrationProxy } from "../support/migration-proxy.js";
 import "../support/migration-helper.js";
-import { MIGRATIONS_ROOT } from "../../lib/config.js";
+import { MIGRATIONS_ROOT } from "../config.js";
 
 const PATH_A = [`${MIGRATIONS_ROOT}/valid`];
 const PATH_B = [`${MIGRATIONS_ROOT}/to_copy`];

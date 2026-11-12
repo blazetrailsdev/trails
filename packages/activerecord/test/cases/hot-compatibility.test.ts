@@ -3,9 +3,9 @@ import type {} from "@blazetrails/vitest-matchers";
 import { isAny } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { adapterType } from "../support/test-adapter.js";
 import { PreparedStatementCacheExpired } from "../../lib/errors.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 function getPreparedStatementCache(connection: DatabaseAdapter): Record<string, unknown> {
   return (connection as unknown as { _statements: { cache: Record<string, unknown> } })._statements

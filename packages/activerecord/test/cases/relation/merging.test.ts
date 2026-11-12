@@ -3,7 +3,7 @@ import { Nodes } from "@blazetrails/arel";
 import { sql as arelSql } from "@blazetrails/arel";
 
 import { Range } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { itIfSupports } from "../../support/supports.js";
 import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";

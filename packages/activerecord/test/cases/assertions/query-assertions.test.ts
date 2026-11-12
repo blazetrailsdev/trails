@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import {
   assertQueriesCount,
   assertNoQueries,

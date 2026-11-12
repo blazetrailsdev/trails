@@ -1,16 +1,13 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { Range } from "../../../../lib/relation.js";
 import { Base } from "../../../../lib/index.js";
 import { defaultTimezone } from "../../../../lib/active-record.js";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { inTimeZone } from "../../../../lib/cases/helper.js";
+import { inTimeZone } from "../../helper.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, setZone, zone, BigDecimal } from "@blazetrails/activesupport";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

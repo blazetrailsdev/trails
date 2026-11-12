@@ -5,7 +5,7 @@ import { Range } from "../../../lib/index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isBlank as blank } from "@blazetrails/activesupport";
 import { Nodes } from "@blazetrails/arel";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Author } from "../../models/author.js";

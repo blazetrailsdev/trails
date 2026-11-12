@@ -45,7 +45,7 @@ tester.run("no-raw-sql", rule, {
     // test-setup-*.ts worker-db bootstrap is likewise scoped out.
     {
       code: 'connection.execute("DROP TABLE posts");',
-      filename: "packages/activerecord/lib/test-setup-worker-db.ts",
+      filename: "packages/activerecord/test/support/test-setup-worker-db.ts",
     },
     // Surgery on a variable that isn't named `sql`.
     { code: 'query.replace(/LIMIT \\d+/, "");', filename: IN },

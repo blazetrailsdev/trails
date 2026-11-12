@@ -4,7 +4,7 @@ import type { AssociationProxy } from "../../../lib/associations/collection-prox
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base, RecordInvalid, RecordNotFound, RecordNotSaved } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { assertDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import {
   assertDifference,

@@ -4,8 +4,8 @@ import { HashConfig } from "../../../lib/database-configurations/hash-config.js"
 import { Base } from "../../../lib/base.js";
 import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
-import { adapterType, ambientPoolConfiguration } from "../../../lib/test-adapter.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { adapterType, ambientPoolConfiguration } from "../../support/test-adapter.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("DatabaseTasksWithTemporaryPoolTest", () => {
   fixtures({}, { useTransactionalTests: false });

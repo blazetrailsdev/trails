@@ -1,13 +1,10 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
-import {
-  describeIfPg,
-  PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { RecordNotFound } from "../../../../lib/errors.js";
 import { itIfSupports } from "../../../support/supports.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Base, Migration, Migrator } from "../../../../lib/index.js";
 import type { MigrationProxy } from "../../../../lib/migration.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";

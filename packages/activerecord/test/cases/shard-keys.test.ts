@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "../../lib/base.js";
 import { DatabaseConfigurations } from "../../lib/database-configurations.js";
 import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 describe("ShardsKeysTest", () => {
   const { self } = fixtures([]);

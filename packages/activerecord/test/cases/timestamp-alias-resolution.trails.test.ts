@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Developer } from "../models/developer.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 describe("timestamp alias resolution", () => {
   fixtures(["developers"]);

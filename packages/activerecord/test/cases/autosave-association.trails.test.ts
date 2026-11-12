@@ -12,7 +12,7 @@ import { Bird as CanonicalBird } from "../models/bird.js";
 import { Ship } from "../models/ship.js";
 import { Developer } from "../models/developer.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "../models/eye.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import {
   aroundSaveCollectionAssociation,
   build,

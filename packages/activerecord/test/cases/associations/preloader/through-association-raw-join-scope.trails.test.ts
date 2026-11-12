@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ConfigurationError } from "../../../../lib/errors.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Preloader } from "../../../../lib/associations/preloader.js";
 import { ThroughAssociation } from "../../../../lib/associations/preloader/through-association.js";
 import { Member } from "../../../models/member.js";

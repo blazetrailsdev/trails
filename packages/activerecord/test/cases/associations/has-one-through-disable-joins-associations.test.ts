@@ -25,7 +25,7 @@ import {
   TenantMembership,
 } from "../../models/membership.js";
 import "../../models/contract.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 
 constSet(TopLevel, "Member", Member);

@@ -4,12 +4,12 @@ import {
   stringify as yamlStringify,
   parse as yamlParse,
 } from "@blazetrails/ruby-compat/psych-adapter";
-import { Base } from "../base.js";
-import { ColumnNotSerializableError } from "../attribute-methods/serialization.js";
+import { Base } from "../../lib/base.js";
+import { ColumnNotSerializableError } from "../../lib/attribute-methods/serialization.js";
 import { PP } from "@blazetrails/ruby-compat";
-import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
-import { dumpTableSchema } from "../../test/support/schema-dumping-helper.js";
+import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import type { Table } from "../../lib/connection-adapters/abstract/schema-definitions.js";
+import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 export interface JSONSharedTestCasesHost {
   columnType: string;

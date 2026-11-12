@@ -4,7 +4,7 @@ import { Hash } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, sql } from "@blazetrails/arel";
 import { WhereClause } from "../../../lib/relation/where-clause.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 function table(): Table {
   return new Table("table");

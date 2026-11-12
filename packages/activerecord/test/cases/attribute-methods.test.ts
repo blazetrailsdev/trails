@@ -29,11 +29,11 @@ import {
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "../../lib/index.js";
 
 import { TimeZoneConverter } from "../../lib/attribute-methods/time-zone-conversion.js";
-import { inTimeZone } from "../../lib/cases/helper.js";
+import { inTimeZone } from "./helper.js";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { deprecator } from "../../lib/deprecator.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
 import { Topic as CanonicalTopic, TitlePrimaryKeyTopic } from "../models/topic.js";
 import { NumericData } from "../models/numeric-data.js";
 import { Category } from "../models/category.js";

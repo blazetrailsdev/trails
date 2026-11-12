@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../../lib/base.js";
 import { ShardSelector } from "../../lib/middleware/shard-selector.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
-import { ambientPoolConfiguration } from "../../lib/test-adapter.js";
+import { ambientPoolConfiguration } from "../support/test-adapter.js";
 import { TopLevel } from "@blazetrails/activesupport";
 
 class TestRequest {

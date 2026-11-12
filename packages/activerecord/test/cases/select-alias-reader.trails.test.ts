@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Comment } from "../models/comment.js";
 import { rbClearMethodCache, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { _virtualAttributePrototypeCache } from "../../lib/persistence.js";

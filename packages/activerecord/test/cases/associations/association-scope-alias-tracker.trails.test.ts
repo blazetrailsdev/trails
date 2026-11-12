@@ -5,7 +5,7 @@ import { Base } from "../../../lib/index.js";
 import { AssociationScope } from "../../../lib/associations/association-scope.js";
 import { AliasTracker } from "../../../lib/associations/alias-tracker.js";
 import { RuntimeReflection } from "../../../lib/reflection.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("AssociationScope — AliasTracker aliases repeated tables", () => {
   fixtures([]);

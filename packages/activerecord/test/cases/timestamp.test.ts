@@ -4,7 +4,7 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { assertInDelta, assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { Base } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import {
   Developer,
   DeveloperCalledJamis,

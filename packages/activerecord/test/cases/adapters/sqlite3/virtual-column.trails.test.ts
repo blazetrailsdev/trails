@@ -2,7 +2,7 @@ import { it, expect, beforeEach, afterEach } from "vitest";
 import "../../../../lib/index.js";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
 import { Base } from "../../../../lib/base.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../../../lib/connection-adapters/sqlite3/column.js";
 

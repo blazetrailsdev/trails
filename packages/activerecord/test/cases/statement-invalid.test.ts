@@ -2,8 +2,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { assertNot, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../lib/index.js";
 import { StatementInvalid } from "../../lib/errors.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
 
 class MockDatabaseError extends Error {}
 

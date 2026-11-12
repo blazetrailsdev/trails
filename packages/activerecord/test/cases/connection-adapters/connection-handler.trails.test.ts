@@ -3,7 +3,7 @@ import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { ConnectionHandler } from "../../../lib/connection-adapters/abstract/connection-handler.js";
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { Base } from "../../../lib/base.js";
-import { ambientPoolConfiguration } from "../../../lib/test-adapter.js";
+import { ambientPoolConfiguration } from "../../support/test-adapter.js";
 import { restoreWorkerConnection } from "../../support/connection.js";
 
 describe("ConnectionHandler selector defaults (trails)", () => {

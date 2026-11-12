@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
 import { Company } from "../../models/company.js";

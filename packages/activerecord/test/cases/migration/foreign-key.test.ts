@@ -10,14 +10,14 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { StatementInvalid } from "../../../lib/errors.js";
 import type { ReferentialAction } from "../../../lib/connection-adapters/abstract/schema-definitions.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import {
   ambientConnection,
   withCompositeRocketTables,
   withRocketTables,
 } from "../../support/rocket-tables.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { currentAdapter } from "../../support/adapter-helper.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../../support/supports.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";

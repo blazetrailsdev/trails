@@ -4,7 +4,7 @@ import { KeyGenerator } from "../../../lib/encryption/key-generator.js";
 import { Encryption } from "../../../lib/encryption.js";
 import { NullEncryptor } from "../../../lib/encryption/null-encryptor.js";
 import { Book } from "../../models/book.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { AutoFilteredParameters } from "../../../lib/encryption/auto-filtered-parameters.js";
 
 describe("ActiveRecord::Encryption::Configurable (trails)", () => {

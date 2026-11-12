@@ -1,7 +1,7 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { RecordNotSaved, type Base } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Pirate } from "../../models/pirate.js";
 import { Ship } from "../../models/ship.js";
 import { ExclusivelyDependentFirm } from "../../models/company.js";

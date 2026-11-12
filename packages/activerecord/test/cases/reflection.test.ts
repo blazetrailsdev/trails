@@ -60,7 +60,7 @@ import { DrinkDesigner, MocktailDesigner } from "../models/drink-designer.js";
 import { CakeDesigner } from "../models/cake-designer.js";
 import { Recipe } from "../models/recipe.js";
 import { FirstPost } from "../models/post.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 const { self } = fixtures(["topics", "customers", "companies", "subscribers", "priceEstimates"]);
 

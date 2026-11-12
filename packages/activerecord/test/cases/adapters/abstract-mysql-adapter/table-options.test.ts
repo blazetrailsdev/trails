@@ -9,7 +9,7 @@ import {
   mysqlVersion,
   leaseMysqlAdapter,
   Mysql2Adapter,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "./test-helper.js";
 import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 const skipNoTableOptions =

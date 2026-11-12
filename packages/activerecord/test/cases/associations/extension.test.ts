@@ -5,7 +5,7 @@ import { Marshal, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base, CollectionProxy } from "../../../lib/index.js";
 import { HasMany } from "../../../lib/associations/builder/has-many.js";
 
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Post } from "../../models/post.js";
 import { Comment, OopsError } from "../../models/comment.js";
 import { Developer } from "../../models/developer.js";

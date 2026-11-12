@@ -3,7 +3,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { MemberDetail } from "../../models/member-detail.js";
 import { Member } from "../../models/member.js";
 import { Organization } from "../../models/organization.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("ThroughAssociation#build_record seeds the source inverse foreign key", () => {
   const { memberDetails, organizations } = fixtures(["members", "memberDetails", "organizations"]);

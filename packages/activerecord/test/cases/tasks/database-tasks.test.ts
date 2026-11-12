@@ -41,18 +41,18 @@ import { Base } from "../../../lib/base.js";
 import { ConnectionAdapters } from "../../../lib/namespaces.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
 import { assertCalledOnInstanceOf } from "@blazetrails/activesupport/testing/method-call-assertions";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { Backup } from "../../../lib/sqlite/backup.js";
 import { betterSqlite3Driver } from "../../../lib/sqlite/better-sqlite3.js";
 import type { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { resetRegisteredTasks } from "../../support/registered-tasks.js";
 import { ARUnit2Model } from "../../models/arunit2-model.js";
 import { Course } from "../../models/course.js";
 import { College } from "../../models/college.js";
 import type { InternalMetadata } from "../../../lib/internal-metadata.js";
-import { MIGRATIONS_ROOT } from "../../../lib/config.js";
+import { MIGRATIONS_ROOT } from "../../config.js";
 
 function configFor(envName: string, name: string): HashConfig | undefined {
   return Base.configurations().configsFor({ envName, name });

@@ -3,7 +3,7 @@ import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
 import { Base } from "../../../lib/base.js";
 import { DatabaseConfigurations } from "../../../lib/database-configurations.js";
 import { currentRole, currentPreventingWrites } from "../../../lib/core.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("ConnectionSwappingNestedTest", () => {
   fixtures({}, { useTransactionalTests: false });

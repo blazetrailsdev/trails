@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import "../../../lib/relation.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
     const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
-      await import("../../../lib/encryption/test-helpers.js");
+      await import("./helper.js");
     const snapshot = snapshotEncryptionConfig();
     configureEncryption();
     restoreEncryption = () => restoreEncryptionConfig(snapshot);
@@ -27,7 +27,7 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   let restoreEncryption: (() => void) | undefined;
   beforeAll(async () => {
     const { configureEncryption, snapshotEncryptionConfig, restoreEncryptionConfig } =
-      await import("../../../lib/encryption/test-helpers.js");
+      await import("./helper.js");
     const snapshot = snapshotEncryptionConfig();
     configureEncryption();
     restoreEncryption = () => restoreEncryptionConfig(snapshot);
@@ -41,7 +41,7 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
   it("preserved columns due to ignore_case: true gets encrypted automatically", async () => {
     const book = encryptedBookThatIgnoresCases("rfr");
     expect((book as any).name).toEqual("Ruby for Rails");
-    const { assertEncryptedAttribute } = await import("../../../lib/encryption/test-helpers.js");
+    const { assertEncryptedAttribute } = await import("./helper.js");
     await assertEncryptedAttribute(book, "name", "Ruby for Rails");
 
     const { isEncryptedAttribute } = await import("../../../lib/encryption/encryptable-record.js");

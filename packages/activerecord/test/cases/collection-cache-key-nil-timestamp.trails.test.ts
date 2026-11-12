@@ -2,7 +2,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "../../lib/index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Developer } from "../models/developer.js";
 
 constSet(TopLevel, "Developer", Developer);

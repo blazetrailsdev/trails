@@ -24,8 +24,8 @@ import {
   Rollback,
 } from "../../lib/index.js";
 import { Result } from "../../lib/result.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../support/use-fixtures.js";
+import { adapterType } from "../support/test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { itIfSupports } from "../support/supports.js";
 import { runWithoutConnection } from "../support/connection-helper.js";
@@ -42,7 +42,7 @@ import {
   leaseMysqlAdapter,
   ARUNIT_DATABASE,
   ARUNIT2_DATABASE,
-} from "../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "./adapters/abstract-mysql-adapter/test-helper.js";
 import {
   disablePreparedStatements,
   setDisablePreparedStatements,

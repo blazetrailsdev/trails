@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Rational } from "@blazetrails/ruby-compat";
-import { describeIfMysqlAdapter } from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
-import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfMysqlAdapter } from "./test-helper.js";
+import { fixtures } from "../../../support/use-fixtures.js";
 import { Post } from "../../../models/post.js";
 import { Topic } from "../../../models/topic.js";
 

@@ -3,7 +3,7 @@ import { Marshal, rbModName } from "@blazetrails/ruby-compat";
 import type { CollectionProxy } from "../../../lib/associations/collection-proxy.js";
 import type { Base } from "../../../lib/base.js";
 import type { Relation } from "../../../lib/relation.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Reply } from "../../models/reply.js";
 import { Topic } from "../../models/topic.js";
 

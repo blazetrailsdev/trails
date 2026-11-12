@@ -6,7 +6,7 @@ import { Base } from "../../../lib/index.js";
 import { Associations } from "../../../lib/associations.js";
 import { loadSingularTarget } from "../../support/load-singular-target.js";
 import { AssociationScope, ReflectionProxy } from "../../../lib/associations/association-scope.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { Author } from "../../models/author.js";
 import { Post } from "../../models/post.js";
 import "../../models/company.js";

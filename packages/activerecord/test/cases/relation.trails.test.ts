@@ -16,7 +16,7 @@ import { CpkOrder } from "../models/cpk.js";
 import { AssociationRelation } from "../../lib/association-relation.js";
 import { AliasTracker } from "../../lib/associations/alias-tracker.js";
 
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Company as CanonCompany, Firm as CanonFirm } from "../models/company.js";
 import { Post as CanonPost } from "../models/post.js";
 import {

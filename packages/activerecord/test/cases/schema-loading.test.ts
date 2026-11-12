@@ -3,7 +3,7 @@ import { Concern } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { extend, include, rbCallSuper } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 type SchemaLoadCounted = typeof Base & { loadSchemaCalls?: number };
 

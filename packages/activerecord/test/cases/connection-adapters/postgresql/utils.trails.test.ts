@@ -4,7 +4,7 @@ import {
   describeIfPg,
   PG_TEST_URL,
   PostgreSQLAdapter,
-} from "../../../../lib/adapters/postgresql/test-helper.js";
+} from "../../adapters/postgresql/test-helper.js";
 import { Name } from "../../../../lib/connection-adapters/postgresql/utils.js";
 
 describe("PostgreSQL::Name#quoted", () => {

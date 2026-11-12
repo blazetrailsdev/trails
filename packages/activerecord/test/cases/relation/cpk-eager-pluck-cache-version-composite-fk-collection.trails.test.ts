@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 import { CpkBook, CpkAuthor, CpkChapter } from "../../models/cpk.js";
 import { nodeAt, nodePaths, aliasTrackerFor } from "../../support/join-dependency-paths.js";
 import { JoinDependency } from "../../../lib/associations/join-dependency.js";

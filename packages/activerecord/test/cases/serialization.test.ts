@@ -6,7 +6,7 @@ import { Book } from "../models/book.js";
 import { Author } from "../models/author.js";
 import { SerializedPost } from "../models/post.js";
 import { bookFixtureData } from "../fixtures/books.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 beforeAll(() => {
   constSet(TopLevel, "Author", Author);

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../../support/rocket-tables.js";
 import { describeIfSupports } from "../../support/supports.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 
 describe("Migration", () => {
   describeIfSupports("check_constraints", "CheckConstraintTrailsTest", () => {

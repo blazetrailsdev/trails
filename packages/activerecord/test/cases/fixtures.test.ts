@@ -20,7 +20,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError, Fixture } from "../../lib/fixtures.js";
 import { File as FixtureFile } from "../../lib/fixture-set/file.js";
-import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../lib/config.js";
+import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../config.js";
 import { PrimaryKeyError } from "../../lib/fixture-set/table-row.js";
 import { Time } from "@blazetrails/date";
 import { Notifications, Duration, Logger } from "@blazetrails/activesupport";
@@ -37,13 +37,13 @@ import {
 import { primaryKeyErrorFixtureData } from "../fixtures/primary-key-error/primary-key-error.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { Base } from "../../lib/base.js";
-import { TestCase } from "../../lib/cases/test-case.js";
+import { TestCase } from "./test-case.js";
 import { squish } from "@blazetrails/activesupport";
 import { fkObjectToPointToFixtureData } from "../fixtures/fk-object-to-point-to.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { doubleColumnsHash } from "../support/double-columns.js";
 import { TestFixtures } from "../../lib/test-fixtures.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Organization } from "../models/organization.js";
 import { ClassNameThatDoesNotFollowCONVENTIONS } from "../models/randomly-named-c1.js";

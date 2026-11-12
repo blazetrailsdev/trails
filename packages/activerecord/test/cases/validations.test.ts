@@ -3,7 +3,7 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
 import { DecimalType } from "@blazetrails/activemodel";
 import { Base, RecordInvalid } from "../../lib/index.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { assertNoQueries } from "../../lib/testing/query-assertions.js";
 import { Topic } from "../models/topic.js";

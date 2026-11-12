@@ -17,10 +17,10 @@ import {
   ProtectedEnvironmentError,
 } from "../../../lib/migration.js";
 import type { HashConfig } from "../../../lib/database-configurations/hash-config.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 import { inMemoryDb } from "../../support/adapter-helper.js";
 import { resetRegisteredTasks } from "../../support/registered-tasks.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../../support/use-fixtures.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => {
   fixtures({}, { useTransactionalTests: false });

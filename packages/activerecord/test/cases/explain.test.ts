@@ -5,7 +5,7 @@ import { buildExplainClause } from "../../lib/explain.js";
 import { QueryAttribute } from "../../lib/relation/query-attribute.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { itIfSupports } from "../support/supports.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Car } from "../models/car.js";
 import { Bulb } from "../models/bulb.js";
 

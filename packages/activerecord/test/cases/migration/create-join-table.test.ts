@@ -1,7 +1,7 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { describe, it, expect, afterEach } from "vitest";
 import { ambientConnection } from "../../support/rocket-tables.js";
-import { adapterType } from "../../../lib/test-adapter.js";
+import { adapterType } from "../../support/test-adapter.js";
 
 describe("Migration", () => {
   describe("CreateJoinTableTest", () => {

@@ -6,7 +6,7 @@ import { Base } from "../../lib/base.js";
 import { adapterDouble, establishConnectionTo } from "../support/adapter-double.js";
 import { resetColumnInformation } from "../../lib/model-schema.js";
 import { defaultValue } from "../../lib/type.js";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 
 class UuidType extends ValueType {
   override type(): string {

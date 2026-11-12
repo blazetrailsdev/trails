@@ -1,8 +1,8 @@
 import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
 import { afterEach, describe, expect, it } from "vitest";
 import "../../support/canonical-model-index.js";
-import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { repairValidations } from "../../../lib/cases/validations-repair-helper.js";
+import { fixtures } from "../../support/use-fixtures.js";
+import { repairValidations } from "../validations-repair-helper.js";
 import { Topic } from "../../models/topic.js";
 import { Reply } from "../../models/reply.js";
 import { Human } from "../../models/human.js";

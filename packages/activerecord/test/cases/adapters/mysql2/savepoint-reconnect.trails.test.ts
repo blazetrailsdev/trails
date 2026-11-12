@@ -3,7 +3,7 @@ import {
   describeIfMysqlAdapter,
   Mysql2Adapter,
   MYSQL_TEST_URL,
-} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+} from "../abstract-mysql-adapter/test-helper.js";
 import { ConnectionFailed } from "../../../../lib/errors.js";
 
 interface RetryLoopSeams {

@@ -4,7 +4,7 @@ import { EnqueueAfterTransactionCommit } from "@blazetrails/activejob/enqueue-af
 import { TestAdapter } from "@blazetrails/activejob/queue-adapters/test-adapter";
 import { EnqueueError } from "@blazetrails/activejob/enqueuing";
 import { include, TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { fixtures } from "../support/use-fixtures.js";
 import { Topic } from "../models/topic.js";
 
 include(JobBase, EnqueueAfterTransactionCommit);
