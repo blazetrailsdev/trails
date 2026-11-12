@@ -40,8 +40,15 @@ export interface GzipWriterIO {
 /** @noRailsEquivalent PERMANENT */
 export interface GzipWriterHandle {
   mtime: number | null;
-  write(data: Uint8Array): void;
-  flush(): Promise<void>;
+  /**
+   * Feeds `data` and, for a `flush` other than `Z_NO_FLUSH`, queues that flush,
+   * as `gzfile_write` does under sync mode (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2808-2820`).
+   * Node's gzip stream is asynchronous, so the compressed bytes reach the IO, and a
+   * stream error is raised, only at the next awaited `flush` or `finish`; a caller
+   * that reads the IO awaits one first.
+   */
+  write(data: Uint8Array, flush: number): void;
+  flush(flush: number): Promise<void>;
   finish(): Promise<void>;
 }
 
@@ -71,7 +78,7 @@ export interface GzipReaderHandle {
    * (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2709-2717,2743`).
    */
   readonly mtime: number;
-  read(): Promise<Uint8Array>;
+  read(): Uint8Array;
 }
 
 /**
@@ -110,13 +117,13 @@ export class GzipWriter implements GzipWriterHandle {
   /** @noRailsEquivalent PERMANENT */
   write(data: Uint8Array): void {
     this.headerFinished = true;
-    this.handle.write(data);
+    this.handle.write(data, 0);
   }
 
   /** @noRailsEquivalent PERMANENT */
-  async flush(): Promise<void> {
+  async flush(flush = Z_SYNC_FLUSH): Promise<void> {
     this.headerFinished = true;
-    await this.handle.flush();
+    await this.handle.flush(flush);
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -179,8 +186,7 @@ function setGzipHeaderMtime(header: Uint8Array, mtime: number): void {
 type NodeGzipStream = {
   on(event: string, listener: (arg?: unknown) => void): void;
   write(data: Uint8Array): boolean;
-  once(event: string, listener: () => void): void;
-  flush(callback: () => void): void;
+  flush(kind: number, callback: () => void): void;
   end(): void;
 };
 
@@ -192,7 +198,6 @@ type NodeZlib = {
   inflateRawSync: (data: Uint8Array, options: { finishFlush: number }) => Uint8Array;
   unzipSync: (data: Uint8Array, options: { finishFlush: number }) => Uint8Array;
   createGzip: () => NodeGzipStream;
-  createGunzip: () => NodeGzipStream;
 };
 
 const GZFILE_READ_SIZE = 2048;
@@ -228,9 +233,12 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       };
       const handle: GzipWriterHandle = {
         mtime: null,
-        write: (data) => stream.write(data),
-        flush: async () => {
-          await new Promise<void>((res) => stream.flush(res));
+        write: (data, flush) => {
+          stream.write(data);
+          if (flush !== 0) stream.flush(flush, () => {});
+        },
+        flush: async (flush) => {
+          if (flush !== 0) await new Promise<void>((res) => stream.flush(flush, res));
           writeRaw();
           if (failure !== null) throw failure;
         },
@@ -264,17 +272,6 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
       return handle;
     },
     gzipReader: (io) => {
-      const stream = zlib.createGunzip();
-      let chunks: Uint8Array[] = [];
-      let failure: Error | null = null;
-      stream.on("data", (chunk) => chunks.push(chunk as Uint8Array));
-      const ended = new Promise<void>((res) => {
-        stream.on("end", () => res());
-        stream.on("error", (err) => {
-          failure = err as Error;
-          res();
-        });
-      });
       const toBytes = (str: string | Uint8Array): Uint8Array =>
         typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
       const header = toBytes(io.read(GZIP_HEADER_LENGTH) ?? new Uint8Array());
@@ -282,37 +279,24 @@ function wrap(zlib: NodeZlib): ZlibAdapter {
         throw new Zlib.GzipFile.Error("not in gzip format");
       }
       const mtime = (header[4] | (header[5] << 8) | (header[6] << 16) | (header[7] << 24)) >>> 0;
-      stream.write(header);
-      const readMore = async (): Promise<void> => {
-        let str: string | Uint8Array | null;
-        while (failure === null && (str = io.read(GZFILE_READ_SIZE)) !== null) {
-          if (str.length === 0) continue;
-          const bytes = toBytes(str);
-          if (!stream.write(bytes)) {
-            await new Promise<void>((res) => {
-              stream.once("drain", res);
-              void ended.then(res);
-            });
-          }
-        }
-        stream.end();
-        await ended;
-      };
-      let finished: Promise<void> | null = null;
+      let finished = false;
       return {
         mtime,
-        read: async () => {
-          finished ??= readMore();
-          await finished;
-          if (failure !== null) throw failure;
-          const dst = new Uint8Array(chunks.reduce((n, chunk) => n + chunk.length, 0));
+        read: () => {
+          if (finished) return new Uint8Array();
+          finished = true;
+          const chunks: Uint8Array[] = [header];
+          let str: string | Uint8Array | null;
+          while ((str = io.read(GZFILE_READ_SIZE)) !== null && str.length > 0) {
+            chunks.push(toBytes(str));
+          }
+          const src = new Uint8Array(chunks.reduce((n, chunk) => n + chunk.length, 0));
           let offset = 0;
           for (const chunk of chunks) {
-            dst.set(chunk, offset);
+            src.set(chunk, offset);
             offset += chunk.length;
           }
-          chunks = [];
-          return dst;
+          return zlib.gunzipSync(src);
         },
       };
     },

@@ -8,8 +8,41 @@ import {
   rbCString,
   rbFSend,
   rbObjClass,
+  Tempfile,
+  Zlib,
 } from "@blazetrails/ruby-compat";
 import { ExtensionValue, MessagePack, Packer } from "../lib/index.js";
+
+class DummyIO {
+  private buf = new Uint8Array(0);
+  private pos = 0;
+
+  write(val: Uint8Array): void {
+    const buf = new Uint8Array(this.buf.length + val.length);
+    buf.set(this.buf);
+    buf.set(val, this.buf.length);
+    this.buf = buf;
+  }
+
+  read(length: number | null = null): Uint8Array | null {
+    if (this.pos === this.buf.length) {
+      return null;
+    } else if (length == null) {
+      const val = this.buf.slice(this.pos, this.buf.length + 1);
+      this.pos = this.buf.length;
+      return val;
+    } else {
+      const val = this.buf.slice(this.pos, this.pos + length + 1);
+      this.pos += val.length;
+      if (this.pos > this.buf.length) this.pos = this.buf.length;
+      return val;
+    }
+  }
+
+  flush(): void {}
+
+  close(): void {}
+}
 
 class ValueOne {
   constructor(readonly num: number) {}
@@ -33,6 +66,48 @@ describe("MessagePack::Packer", () => {
     new Packer(new StringIO());
     new Packer({});
     new Packer(new StringIO(), {});
+  });
+
+  it("gets IO or object which has #write to write/append data to it", async () => {
+    const sampleData = { message: "morning!", num: 1 };
+    const samplePacked = MessagePack.pack(sampleData);
+
+    Tempfile.open("for_io", undefined, (file) => {
+      file.sync = true;
+      const p1 = new Packer(file);
+      p1.write(sampleData);
+      p1.flush();
+
+      file.rewind();
+      expect(file.binmode().read()).toEqual(samplePacked);
+      file.unlink();
+    });
+
+    let dio = new StringIO(new Uint8Array(0));
+    const p2 = new Packer(dio);
+    p2.write(sampleData);
+    p2.flush();
+    dio.rewind();
+    expect(dio.string()).toEqual(samplePacked);
+
+    dio = new StringIO(new Uint8Array(0));
+    const writer = new Zlib.GzipWriter(dio);
+    writer.sync = true;
+    const p3 = new Packer(writer);
+    p3.write(sampleData);
+    p3.flush();
+    await writer.flush(Zlib.FINISH);
+    await writer.close();
+    dio.rewind();
+    const compressed = dio.string();
+    const str = await Zlib.GzipReader.wrap(new StringIO(compressed), (gz) => gz.read());
+    expect(str).toEqual(String.fromCharCode(...samplePacked));
+
+    const dio4 = new DummyIO();
+    const p4 = new Packer(dio4);
+    p4.write(sampleData);
+    p4.flush();
+    expect(dio4.read()).toEqual(samplePacked);
   });
 
   it("write", () => {

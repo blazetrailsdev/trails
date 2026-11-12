@@ -1,11 +1,12 @@
 import { constSet } from "./include.js";
-import { TopLevel } from "./object.js";
+import { TopLevel, rbObjRespondTo } from "./object.js";
 import { File } from "./file.js";
 import type { Tempfile } from "./tempfile.js";
 import type { StringIO } from "./string-io.js";
 import { getZlib, type GzipReaderHandle, type GzipWriterHandle } from "./zlib-adapter.js";
 import { b } from "./string/b.js";
 import { StandardError } from "./standard-error.js";
+import { ArgumentError } from "./argument-error.js";
 
 class ZError extends StandardError {}
 
@@ -24,7 +25,20 @@ class GzipFile<IO extends { close(): void } = File> {
   /** `ZSTREAM_FLAG_READY` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:575`), cleared by `zstream_end`. */
   protected zstreamReady = true;
 
+  /** `GZFILE_FLAG_SYNC` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2368`). */
+  protected syncFlag = false;
+
   constructor(protected io: IO) {}
+
+  /** `rb_gzfile_sync` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3514`). */
+  get sync(): boolean {
+    return this.syncFlag;
+  }
+
+  /** `rb_gzfile_set_sync` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3529`). */
+  set sync(mode: boolean) {
+    this.syncFlag = mode;
+  }
 
   close(): Promise<void> | void {
     if (!this.zstreamReady) {
@@ -42,6 +56,12 @@ class GzipFile<IO extends { close(): void } = File> {
 class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
   private readonly z: GzipReaderHandle;
 
+  /**
+   * `gz->z.buf` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:2894`). `gzfile_calc_crc`
+   * (`zlib.c:2900`) has no port: `gunzipSync` checks the footer CRC.
+   */
+  private buf: Uint8Array | null = null;
+
   constructor(io: File | StringIO<Uint8Array>) {
     super(io);
     this.z = getZlib().gzipReader(io);
@@ -53,6 +73,14 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
    */
   get mtime(): number {
     return this.z.mtime;
+  }
+
+  /** `rb_gzfile_s_wrap` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3222`). */
+  static wrap<T>(
+    io: File | StringIO<Uint8Array>,
+    block: (gz: GzipReader) => T | Promise<T>,
+  ): Promise<T> {
+    return gzfileWrap(new GzipReader(io), block);
   }
 
   static open(filename: string): GzipReader;
@@ -68,14 +96,34 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
   }
 
   /**
-   * `rb_gzreader_read` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4009`) with no
-   * length: the inflated bytes, one character per byte. `gzfile_newstr`
-   * (`zlib.c:2859`) tags them with the default external encoding without
-   * converting them, and a JS string carries no tag, so a text reader takes
-   * them through `forceEncoding`.
+   * `rb_gzreader_read` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4009`): with no
+   * length `gzfile_read_all` (`zlib.c:2946`), otherwise `gzfile_read`
+   * (`zlib.c:2894`), which answers `nil` at the end of the stream. The bytes
+   * are one character per byte; `gzfile_newstr` (`zlib.c:2859`) tags them
+   * with the default external encoding without converting them, and a JS
+   * string carries no tag, so a text reader takes them through `forceEncoding`.
+   *
+   * @missingRailsCall gzfile_read_more — CONVERGEABLE ruby-compat-gzip-sync-zstream-and-footer-errors
    */
-  async read(): Promise<string> {
-    const bytes = await this.z.read();
+  read(len?: null): string;
+  read(len: number): string | null;
+  read(len: number | null = null): string | null {
+    this.buf ??= this.z.read();
+    if (len == null) {
+      return this.shiftBuffer(this.buf.length);
+    }
+    if (len < 0) {
+      throw new ArgumentError(`negative length ${len} given`);
+    }
+    if (len === 0) return "";
+    if (this.buf.length === 0) return null;
+    return this.shiftBuffer(Math.min(len, this.buf.length));
+  }
+
+  /** `zstream_shift_buffer` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:823`). */
+  private shiftBuffer(len: number): string {
+    const bytes = this.buf!.subarray(0, len);
+    this.buf = this.buf!.subarray(len);
     let str = "";
     for (let i = 0; i < bytes.length; i++) str += String.fromCharCode(bytes[i]);
     return str;
@@ -86,10 +134,10 @@ class GzipReader extends GzipFile<File | StringIO<Uint8Array>> {
  * `Zlib::GzipWriter` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:4859`); `open` is
  * `gzfile_s_open(argc, argv, klass, "wb")` (`zlib.c:3661`).
  */
-class GzipWriter extends GzipFile<File | Tempfile> {
+class GzipWriter extends GzipFile<File | Tempfile | StringIO<Uint8Array>> {
   private readonly z: GzipWriterHandle;
 
-  constructor(io: File | Tempfile) {
+  constructor(io: File | Tempfile | StringIO<Uint8Array>) {
     super(io);
     this.z = getZlib().gzipWriter(io);
   }
@@ -111,6 +159,14 @@ class GzipWriter extends GzipFile<File | Tempfile> {
     this.z.mtime = mtime;
   }
 
+  /** `rb_gzfile_s_wrap` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3222`). */
+  static wrap<T>(
+    io: File | Tempfile | StringIO<Uint8Array>,
+    block: (gz: GzipWriter) => T | Promise<T>,
+  ): Promise<T> {
+    return gzfileWrap(new GzipWriter(io), block);
+  }
+
   static open(filename: string): GzipWriter;
   static open<T>(filename: string, block: (gz: GzipWriter) => T | Promise<T>): Promise<T>;
   static open<T>(
@@ -126,18 +182,23 @@ class GzipWriter extends GzipFile<File | Tempfile> {
   /**
    * `rb_gzwriter_write` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3745`). A
    * `Uint8Array` is an ASCII-8BIT String's bytes, as for `IO#write`.
+   *
+   * @missingRailsCall gzfile_write_raw — CONVERGEABLE ruby-compat-gzip-sync-zstream-and-footer-errors
    */
   write(string: string | Uint8Array): number {
     const buffer = typeof string === "string" ? new TextEncoder().encode(string) : string;
     this.headerFinished = true;
-    this.z.write(buffer);
+    this.z.write(buffer, this.syncFlag ? Zlib.SYNC_FLUSH : Zlib.NO_FLUSH);
     return buffer.length;
   }
 
-  /** `rb_gzwriter_flush` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3720`). */
-  async flush(): Promise<this> {
+  /** `rb_gzwriter_flush` (`vendor/ruby/v3.3.11/ext/zlib/zlib.c:3721`). */
+  async flush(flush: number = Zlib.SYNC_FLUSH): Promise<this> {
     this.headerFinished = true;
-    await this.z.flush();
+    await this.z.flush(flush);
+    if (rbObjRespondTo(this.io, "flush")) {
+      this.io.flush();
+    }
     return this;
   }
 
@@ -314,6 +375,27 @@ export const Zlib = {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::Inflate`.
    */
   Inflate,
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4797` — zlib.h's `Z_NO_FLUSH`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::NO_FLUSH`.
+   */
+  NO_FLUSH: 0,
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4804` — zlib.h's `Z_SYNC_FLUSH`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::SYNC_FLUSH`.
+   */
+  SYNC_FLUSH: 2,
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4815` — zlib.h's `Z_FINISH`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Zlib::FINISH`.
+   */
+  FINISH: 4,
 
   /**
    * `vendor/ruby/v3.3.11/ext/zlib/zlib.c:4783` — zlib.h's `MAX_WBITS`.
