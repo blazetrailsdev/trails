@@ -147,6 +147,8 @@ export class API extends Metal {
   declare viewRuntime: number | null;
 
   /**
+   * @inventedArm if — PERMANENT
+   * @inlinedFrom ActiveRecord::Railties::ControllerRuntime#initialize rails/v8.0.2/activerecord/lib/active_record/railties/controller_runtime.rb:26-29
    * @inlinedFrom ActionController::Instrumentation#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/instrumentation.rb:23-26
    * @inlinedFrom ActionController::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/url_for.rb:32-35
    * @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114

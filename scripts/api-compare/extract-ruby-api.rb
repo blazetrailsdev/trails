@@ -675,7 +675,11 @@ class ApiExtractor
       consumed_call = process_define_method_block(node)
       process_each_include(node)
       unless process_each_codegen(node)
-        @in_on_load += 1 if on_load_block?(node)
+        on_load = on_load_block?(node)
+        if on_load
+          @in_on_load += 1
+          (@on_load_hooks ||= []) << on_load_hook_name(node[1])
+        end
         included_target = concern_included_block?(node) ? (@modules[current_fqn]) : nil
         included_mark = included_target && included_target[:classMethods].length
         @in_concern_included += 1 if included_target
@@ -684,7 +688,10 @@ class ApiExtractor
         if included_target
           included_target[:classMethods][included_mark..].each { |m| m[:included] = true }
         end
-        @in_on_load -= 1 if on_load_block?(node)
+        if on_load
+          @in_on_load -= 1
+          @on_load_hooks.pop
+        end
       end
     when :sclass
       process_sclass(node)
@@ -1254,6 +1261,7 @@ class ApiExtractor
   end
 
   def process_method_add_arg(node)
+    record_load_hook_target(node)
     if node[1].is_a?(Array) && node[1][0] == :call &&
        record_boot_mixin(node[1][1], ident_name(node[1][3]), node[2])
       return
@@ -1396,8 +1404,43 @@ class ApiExtractor
     found
   end
 
+  # `ActiveSupport.on_load(:action_controller) { include ControllerRuntime }`
+  # (activerecord/railtie.rb:267-269) runs with self bound to each class that
+  # calls `run_load_hooks(:action_controller, self)` (lazy_load_hooks.rb:91-93),
+  # so the include is recorded per hook and resolved onto those classes.
+  def on_load_hook_name(call)
+    found = nil
+    walker = lambda do |n|
+      return if found || !n.is_a?(Array)
+      found = ident_name(n[1][1]) if n[0] == :symbol_literal && n[1].is_a?(Array) && n[1][0] == :symbol
+      n.each { |c| walker.call(c) if c.is_a?(Array) }
+    end
+    walker.call(call)
+    found
+  end
+
+  public def hook_mixins = @hook_mixins || []
+  public def load_hook_targets = @load_hook_targets || {}
+
+  def record_on_load_include(names)
+    hook = (@on_load_hooks || []).last
+    return unless hook && names.any?
+    (@hook_mixins ||= []) << { hook: hook, statement: { kind: "include", names: names } }
+  end
+
+  def record_load_hook_target(node)
+    return unless node[1].is_a?(Array) && node[1][0] == :call && ident_name(node[1][3]) == "run_load_hooks"
+    args = node[2].is_a?(Array) && node[2][0] == :arg_paren ? node[2][1] : nil
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    return unless args.is_a?(Array) && args.length == 2
+    hook = args[0].is_a?(Array) && args[0][0] == :symbol_literal ? ident_name(args[0][1][1]) : nil
+    return unless hook && args[1].is_a?(Array) && args[1][0] == :var_ref && args[1][1][1] == "self"
+    fqn = current_fqn
+    ((@load_hook_targets ||= {})[hook] ||= []) << fqn if @classes[fqn] || @modules[fqn]
+  end
+
   def process_include(args)
-    return if @in_on_load.positive?
+    return record_on_load_include(extract_const_args(args, keep_absolute: true)) if @in_on_load.positive?
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
     return unless target
@@ -1465,7 +1508,7 @@ class ApiExtractor
   end
 
   def process_include_from_arg_paren(args)
-    return if @in_on_load.positive?
+    return record_on_load_include(extract_const_args_from_paren(args, keep_absolute: true)) if @in_on_load.positive?
     fqn = current_fqn
     target = @classes[fqn] || @modules[fqn]
     return unless target
@@ -5403,10 +5446,12 @@ def run
     packages: {},
   }
 
+  extractors = {}
   PACKAGE_DIRS.each do |pkg_name, pkg_dir|
     next unless File.directory?(pkg_dir)
 
     extractor = ApiExtractor.new
+    extractors[pkg_name] = extractor
     rb_files = Dir.glob(File.join(pkg_dir, "**", "*.rb")).sort
 
     puts "Processing #{pkg_name}: #{rb_files.length} files..."
@@ -5467,6 +5512,19 @@ def run
       fileConstants: extractor.file_constants,
       fileHashKeys: extractor.file_hash_keys.transform_values { |ks| ks.to_a.sort },
     }
+  end
+
+  # An `on_load` hook's include lands on classes in whichever package runs the
+  # hook, so it is resolved once every package has been extracted.
+  hook_mixins = extractors.values.flat_map(&:hook_mixins)
+  extractors.each do |pkg_name, extractor|
+    data = manifest[:packages][pkg_name]
+    extractor.load_hook_targets.each do |hook, fqns|
+      fqns.each do |fqn|
+        info = data[:classes][fqn] || data[:modules][fqn]
+        hook_mixins.select { |m| m[:hook] == hook }.each { |m| (info[:bootMixins] ||= []) << m[:statement] }
+      end
+    end
   end
 
   # Print summary
