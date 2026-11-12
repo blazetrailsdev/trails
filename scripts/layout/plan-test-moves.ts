@@ -147,7 +147,11 @@ export function planTestMoves(input: PlanInput): Plan {
     }
   }
   for (const [asset, refs] of input.assetRefs ?? []) {
-    if (refs.length === 0) continue;
+    if (refs.length === 0) {
+      const home = supportHome(asset, input.railsTestDirs);
+      if (home !== null) placed.set(asset, home);
+      continue;
+    }
     const dirs = new Set(
       refs.map((ref) => (placed.has(ref) ? path.posix.dirname(placed.get(ref)!) : null)),
     );
@@ -173,8 +177,9 @@ const SPECIFIER_RE =
 
 /**
  * Rewrites each relative module specifier in `source`, a file moving from
- * `from` to `to` (package-root-relative), so it names the same target after
- * the move, `moved` (old path to new path) included.
+ * `from` to `to` (package-root-relative; the same path for a file that
+ * stays), so it names the same target after the move, `moved` (old path to
+ * new path) included. A specifier whose file and target both stay is kept.
  */
 export function rewriteSpecifiers(
   source: string,
@@ -185,11 +190,12 @@ export function rewriteSpecifiers(
   return source.replace(SPECIFIER_RE, (whole, lead: string, quote: string, spec: string) => {
     const target = path.posix.normalize(path.posix.join(path.posix.dirname(from), spec));
     const ts = target.replace(/\.js$/, ".ts");
+    if (from === to && !moved.has(ts)) return whole;
     const dest = moved.has(ts)
       ? moved.get(ts)!.replace(/\.ts$/, path.posix.extname(target))
       : target;
     let rel = path.posix.relative(path.posix.dirname(to), dest);
-    if (!rel.startsWith(".")) rel = `./${rel}`;
+    if (!rel.startsWith("./") && !rel.startsWith("../")) rel = `./${rel}`;
     if (spec.endsWith("/") && !rel.endsWith("/")) rel += "/";
     return rel === spec ? whole : `${lead}${quote}${rel}${quote}`;
   });
@@ -215,8 +221,7 @@ async function assetReferences(
   libPath: string,
   files: readonly string[],
 ): Promise<Map<string, string[]>> {
-  const { stdout } = await promisify(execFile)("git", ["ls-files"], { cwd: libPath });
-  const assets = stdout.split("\n").filter((f) => f !== "" && !f.endsWith(".ts"));
+  const assets = (await trackedFiles(libPath)).filter((f) => !f.endsWith(".ts"));
   const refs = new Map(assets.map((a): [string, string[]] => [a, []]));
   for (const file of files) {
     const source = await fs.readFile(path.join(libPath, file), "utf-8");
@@ -226,6 +231,13 @@ async function assetReferences(
     }
   }
   return refs;
+}
+
+/** Every file git tracks under `dir`, relative to it. A symlinked directory is
+ *  one entry, so it moves as one and its targets are not walked. */
+async function trackedFiles(dir: string): Promise<string[]> {
+  const { stdout } = await promisify(execFile)("git", ["ls-files"], { cwd: dir });
+  return stdout.split("\n").filter((f) => f !== "");
 }
 
 /** Files under `libDir` that a non-test file there imports by relative specifier. */
@@ -266,9 +278,10 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
     () => "src",
   );
   const libPath = path.join(pkgDir, libDir);
-  const files = (await walkTsFiles(libPath, COMMITTED_TS_FILES)).map((f) =>
-    path.relative(libPath, f),
-  );
+  const tracked = new Set(await trackedFiles(libPath));
+  const files = (await walkTsFiles(libPath, COMMITTED_TS_FILES))
+    .map((f) => path.relative(libPath, f))
+    .filter((f) => tracked.has(f));
   const comparison = JSON.parse(await fs.readFile(COMPARISON_JSON, "utf-8")) as {
     results: ComparedPackage[];
   };
@@ -291,8 +304,10 @@ export async function main(args: readonly string[], cwd = ROOT_DIR): Promise<str
       await git("git", ["mv", from, to], { cwd: pkgDir });
     }
     const moved = new Map(plan.moves);
-    for (const [from, to] of plan.moves) {
+    const back = new Map(plan.moves.map(([from, to]) => [to, from]));
+    for (const to of await trackedFiles(pkgDir)) {
       if (!to.endsWith(".ts")) continue;
+      const from = back.get(to) ?? to;
       const file = path.join(pkgDir, to);
       const source = await fs.readFile(file, "utf-8");
       const rewritten = rewriteSpecifiers(source, from, to, moved);
