@@ -133,16 +133,13 @@ export class CommonAddressField extends NamedStructuredField {
     val: string | Uint8Array,
     valCharset: unknown,
   ): string | Uint8Array | null {
-    let utf8: string | Uint8Array;
     if (/^UTF-?8$/i.test(String(valCharset ?? ""))) {
       return val;
     } else if (rbObjEncoding(val) === Encoding.UTF_8) {
       return val;
-    } else if (
-      ((utf8 = forceEncoding(rbObjDup(val) as string, Encoding.UTF_8)),
-      isValidEncoding(val, Encoding.UTF_8))
-    ) {
-      return utf8;
+    } else {
+      const utf8 = forceEncoding(rbObjDup(val) as string, Encoding.UTF_8);
+      if (isValidEncoding(val, Encoding.UTF_8)) return utf8;
     }
     return null;
   }

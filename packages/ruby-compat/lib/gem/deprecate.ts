@@ -11,8 +11,6 @@ import { rbModName } from "../object.js";
  * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem::Deprecate`.
  */
 export const Deprecate = {
-  skip: false,
-
   /**
    * `Gem::Deprecate#deprecate` (`vendor/ruby/v3.3.11/lib/rubygems/deprecate.rb:101-118`):
    * wraps the receiver's `name` so each call warns of `repl` (or of no
@@ -39,4 +37,8 @@ export const Deprecate = {
       return (this as typeof host)[old](...args);
     };
   },
+} as {
+  deprecate(this: object, name: string, repl: string, year: number, month: number): void;
+  skip: boolean;
 };
+Object.defineProperty(Deprecate, "skip", { value: false, writable: true, enumerable: false });

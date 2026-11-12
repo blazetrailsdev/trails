@@ -23,4 +23,11 @@ describe("Mail::CheckDeliveryParams deprecations", () => {
     expect(CheckDeliveryParams.checkAddr("To", "to@example.org")).toBe("to@example.org");
     expect(write).not.toHaveBeenCalled();
   });
+
+  it("hands the block through to the wrapped method", () => {
+    Gem.Deprecate.skip = true;
+    const yielded: string[] = [];
+    CheckDeliveryParams.validateSmtpAddr("a\nb", (message) => yielded.push(message));
+    expect(yielded).toEqual(["may not contain CR or LF line breaks"]);
+  });
 });
