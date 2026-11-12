@@ -1,6 +1,16 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const trailties: Record<string, AssertionReceipt[]> = {
+  "trailties:minitest/rails_plugin_test.rb › Minitest::RailsPluginTest › does not replace backtrace filter when using --backtrace option":
+    [
+      {
+        kind: "assert_same",
+        value: null,
+        as: null,
+        reason:
+          "rails_plugin_test.rb:41-43 repeats the arm with the -b alias; Minitest.process_args is unported, so the port passes the parsed fullBacktrace option and the alias has no distinct input",
+      },
+    ],
   "trailties:command/base_test.rb › Rails::Command::BaseTest › ::executable integrates ::bin": [
     {
       kind: "assert_equal",

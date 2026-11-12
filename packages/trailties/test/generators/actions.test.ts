@@ -18,12 +18,12 @@ import {
   assertRaises,
 } from "@blazetrails/activesupport/testing/assertions";
 import {
+  assertCalled,
   assertMock,
   assertNotCalled,
   Mock,
 } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { capture } from "@blazetrails/activesupport/testing/stream";
-import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
 import "../../lib/trailties/active-record.js";
