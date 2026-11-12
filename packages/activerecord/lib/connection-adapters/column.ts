@@ -64,7 +64,7 @@ export class Column {
   }
 
   get hasDefault(): boolean {
-    return this.default != null || this.defaultFunction !== null;
+    return this.default != null || this.defaultFunction != null;
   }
 
   isBigint(): boolean {
@@ -80,7 +80,7 @@ export class Column {
   }
 
   isAutoPopulated(): boolean {
-    return this.isAutoIncrementedByDb() || this.defaultFunction !== null;
+    return this.isAutoIncrementedByDb() || this.defaultFunction != null;
   }
 
   equals(other: unknown): boolean {
