@@ -1,6 +1,36 @@
 import { ArgumentError, Digest, Zlib, unpack1 } from "@blazetrails/ruby-compat";
 
+/** @internal */
+class Preferences {
+  /** @internal */
+  private readonly preferredSlots: number[];
+  /** @internal */
+  private rank: number;
+
+  constructor(offset: number, skip: number) {
+    this.preferredSlots = Array.from(
+      { length: MaglevHash.TABLE_SIZE },
+      (_, i) => (offset + i * skip) % MaglevHash.TABLE_SIZE,
+    );
+    this.rank = 0;
+  }
+
+  preferredFreeSlot(lookup: (number | null)[]): number {
+    while (true) {
+      const slot = this.nextSlot();
+      if (lookup[slot] == null) return slot;
+    }
+  }
+
+  /** @internal */
+  private nextSlot(): number {
+    return this.preferredSlots[this.rank++];
+  }
+}
+
 export class MaglevHash {
+  static Preferences = Preferences;
+
   readonly nodes: string[];
 
   static readonly TABLE_SIZE = 2053;
@@ -44,7 +74,7 @@ export class MaglevHash {
     const offset = this.md5(node, "offset") % MaglevHash.TABLE_SIZE;
     const skip = (this.md5(node, "skip") % (MaglevHash.TABLE_SIZE - 1)) + 1;
 
-    return new Preferences(offset, skip);
+    return new MaglevHash.Preferences(offset, skip);
   }
 
   /** @internal */
@@ -55,33 +85,5 @@ export class MaglevHash {
   /** @internal */
   private quickHash(key: unknown): number {
     return Zlib.crc32(String(key));
-  }
-}
-
-/** @internal */
-class Preferences {
-  /** @internal */
-  private readonly preferredSlots: number[];
-  /** @internal */
-  private rank: number;
-
-  constructor(offset: number, skip: number) {
-    this.preferredSlots = Array.from(
-      { length: MaglevHash.TABLE_SIZE },
-      (_, i) => (offset + i * skip) % MaglevHash.TABLE_SIZE,
-    );
-    this.rank = 0;
-  }
-
-  preferredFreeSlot(lookup: (number | null)[]): number {
-    while (true) {
-      const slot = this.nextSlot();
-      if (lookup[slot] == null) return slot;
-    }
-  }
-
-  /** @internal */
-  private nextSlot(): number {
-    return this.preferredSlots[this.rank++];
   }
 }
