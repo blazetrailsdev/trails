@@ -34,7 +34,7 @@ interface Parser {
 }
 
 const STRUCT_MEMBER_TYPES: Record<string, Record<string, string>> = {
-  AddressListStruct: { addresses: "InstanceType<typeof AddressStruct>[]" },
+  AddressListStruct: { addresses: "InstanceType<typeof AddressStruct>[]", groupNames: "string[]" },
 };
 
 function read(rb: string): Parser {
@@ -280,7 +280,7 @@ function generate(p: Parser): string {
     ),
     ...p.scalars.map(([n, v]) => `    ${member(camel(n))}${v}${end}`),
     "",
-    `    ${p.kind === "class" ? "static " : ""}parse(data: string | Uint8Array | null): any {`,
+    `    ${p.kind === "class" ? "static " : ""}parse(data: string | Uint8Array | null): ${STRUCT_MEMBER_TYPES[p.structs[0][0]] === undefined ? "any" : `InstanceType<typeof ${p.structs[0][0]}>`} {`,
     `      const self = ${p.name} as any;`,
     `      let ${["p", "pe", "eof", "stack", "cs", "top", ...[...t.locals].filter((x) => !["p", "pe", "eof", "stack", "cs", "top"].includes(x))].map((x) => `${x}: ${localType(x)}`).join(", ")};`,
     "      data = (data == null ? data : b(data)) as Uint8Array;",
