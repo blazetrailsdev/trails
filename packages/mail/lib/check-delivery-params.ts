@@ -60,10 +60,10 @@ deprecate.call(
   2023,
   6,
 );
-deprecate.call(CheckDeliveryParams, "checkFrom", "none", 2023, 6);
-deprecate.call(CheckDeliveryParams, "checkTo", "none", 2023, 6);
-deprecate.call(CheckDeliveryParams, "checkAddr", "none", 2023, 6);
-deprecate.call(CheckDeliveryParams, "validateSmtpAddr", "none", 2023, 6);
-deprecate.call(CheckDeliveryParams, "checkMessage", "none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "checkFrom", ":none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "checkTo", ":none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "checkAddr", ":none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "validateSmtpAddr", ":none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "checkMessage", ":none", 2023, 6);
 
 Mail.CheckDeliveryParams = CheckDeliveryParams;

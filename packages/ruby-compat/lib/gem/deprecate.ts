@@ -16,26 +16,27 @@ export const Deprecate = {
   /**
    * `Gem::Deprecate#deprecate` (`vendor/ruby/v3.3.11/lib/rubygems/deprecate.rb:101-118`):
    * wraps the receiver's `name` so each call warns of `repl` (or of no
-   * replacement for `"none"`, Ruby's `:none`) and the year and month it goes
+   * replacement for `":none"`) and the year and month it goes
    * away, unless `Gem::Deprecate.skip`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem::Deprecate#deprecate`.
    */
   deprecate(this: object, name: string, repl: string, year: number, month: number): void {
     const host = this as Record<string, (...args: unknown[]) => unknown>;
-    const old = host[name];
+    const old = `_deprecated_${name}`;
+    host[old] = host[name];
     host[name] = function (this: object, ...args: unknown[]): unknown {
       const klass =
         typeof this === "function" || isModuleObject(this) || rbClassPath(this) !== undefined;
       const target = klass ? `${rbModName(this)}.` : `${rbModName(this.constructor)}#`;
       const msg = [
         `NOTE: ${target}${name} is deprecated`,
-        repl === "none" ? " with no replacement" : `; use ${repl} instead`,
+        repl === ":none" ? " with no replacement" : `; use ${repl} instead`,
         format(". It will be removed on or after %4d-%02d.", year, month),
         `\n${target}${name} called from ${Gem.locationOfCaller().join(":")}`,
       ];
       if (!Deprecate.skip) warn(`${msg.join("")}.`);
-      return old.apply(this, args);
+      return (this as typeof host)[old](...args);
     };
   },
 };

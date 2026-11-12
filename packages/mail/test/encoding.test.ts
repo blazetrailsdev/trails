@@ -7,9 +7,6 @@ import { SubjectField } from "../lib/fields/subject-field.js";
 import { Part } from "../lib/part.js";
 import { Utilities } from "../lib/utilities.js";
 
-const encodedField = (mail: ReturnType<typeof Mail.new>, name: string): unknown =>
-  (mail.get(name) as Field).encoded();
-
 describe("mail encoding", () => {
   it("should allow you to assign an email-wide charset", () => {
     const mail = Mail.new();
@@ -23,7 +20,7 @@ describe("mail encoding", () => {
       mail.charset = "utf-8";
       mail.setSubject("This is あ string");
       const result = "Subject: =?UTF-8?Q?This_is_=E3=81=82_string?=\r\n";
-      expect(encodedField(mail, "subject")).toEqual(result);
+      expect((mail.get("subject") as Field).encoded()).toEqual(result);
     });
 
     it("should allow you to send in unencoded strings to address fields and encode them", () => {
@@ -31,7 +28,7 @@ describe("mail encoding", () => {
       mail.charset = "utf-8";
       mail.setTo("Mikel Lindsああr <mikel@test.lindsaar.net>");
       const result = "To: =?UTF-8?B?TWlrZWwgTGluZHPjgYLjgYJy?= <mikel@test.lindsaar.net>\r\n";
-      expect(encodedField(mail, "to")).toEqual(result);
+      expect((mail.get("to") as Field).encoded()).toEqual(result);
     });
 
     it("should allow you to send in unencoded strings to address fields and encode them", () => {
@@ -39,7 +36,7 @@ describe("mail encoding", () => {
       mail.charset = "utf-8";
       mail.setTo("あdあ <ada@test.lindsaar.net>");
       const result = "To: =?UTF-8?B?44GCZOOBgg==?= <ada@test.lindsaar.net>\r\n";
-      expect(encodedField(mail, "to")).toEqual(result);
+      expect((mail.get("to") as Field).encoded()).toEqual(result);
     });
 
     it("should allow you to send in multiple unencoded strings to address fields and encode them", () => {
@@ -48,7 +45,7 @@ describe("mail encoding", () => {
       mail.setTo(["Mikel Lindsああr <mikel@test.lindsaar.net>", "あdあ <ada@test.lindsaar.net>"]);
       const result =
         "To: =?UTF-8?B?TWlrZWwgTGluZHPjgYLjgYJy?= <mikel@test.lindsaar.net>, \r\n =?UTF-8?B?44GCZOOBgg==?= <ada@test.lindsaar.net>\r\n";
-      expect(encodedField(mail, "to")).toEqual(result);
+      expect((mail.get("to") as Field).encoded()).toEqual(result);
     });
 
     it("should allow you to send unquoted non us-ascii strings, with spaces in them", () => {
@@ -56,7 +53,7 @@ describe("mail encoding", () => {
       mail.charset = "utf-8";
       mail.setTo(["Foo áëô îü <extended@example.net>"]);
       const result = "To: =?UTF-8?B?Rm9vIMOhw6vDtCDDrsO8?= <extended@example.net>\r\n";
-      expect(encodedField(mail, "to")).toEqual(result);
+      expect((mail.get("to") as Field).encoded()).toEqual(result);
     });
 
     it("should allow you to send in multiple unencoded strings to any address field", () => {
@@ -74,7 +71,7 @@ describe("mail encoding", () => {
           "あdあ <ada@test.lindsaar.net>",
         ]);
         const result = `${field}: =?UTF-8?B?TWlrZWwgTGluZHPjgYLjgYJy?= <mikel@test.lindsaar.net>, \r\n =?UTF-8?B?44GCZOOBgg==?= <ada@test.lindsaar.net>\r\n`;
-        expect(encodedField(mail, field)).toEqual(result);
+        expect((mail.get(field) as Field).encoded()).toEqual(result);
       }
     });
 
@@ -84,7 +81,7 @@ describe("mail encoding", () => {
       mail.setTo("test1@lindsaar.net, group: test2@lindsaar.net, me@lindsaar.net;");
       const result =
         "To: test1@lindsaar.net, \r\n group: test2@lindsaar.net, \r\n me@lindsaar.net;\r\n";
-      expect(encodedField(mail, "to")).toEqual(result);
+      expect((mail.get("to") as Field).encoded()).toEqual(result);
     });
 
     it("should handle groups with funky characters", () => {
@@ -95,7 +92,7 @@ describe("mail encoding", () => {
       );
       const result =
         "To: =?UTF-8?B?TWlrZWwgTGluZHPjgYLjgYJy?= <test1@lindsaar.net>, \r\n group: =?UTF-8?B?44GCZOOBgg==?= <test2@lindsaar.net>, \r\n me@lindsaar.net;\r\n";
-      expect(encodedField(mail, "to")).toEqual(result);
+      expect((mail.get("to") as Field).encoded()).toEqual(result);
     });
 
     describe("quoting token safe chars", () => {
@@ -103,7 +100,7 @@ describe("mail encoding", () => {
         const mail = Mail.new();
         mail.charset = "utf-8";
         mail.setTo("Mikel Lindsaar <mikel@test.lindsaar.net>");
-        expect(encodedField(mail, "to")).toEqual(
+        expect((mail.get("to") as Field).encoded()).toEqual(
           "To: Mikel Lindsaar <mikel@test.lindsaar.net>\r\n",
         );
       });
@@ -112,7 +109,7 @@ describe("mail encoding", () => {
         const mail = Mail.new();
         mail.charset = "utf-8";
         mail.setTo('"Mikel Lindsaar" <mikel@test.lindsaar.net>');
-        expect(encodedField(mail, "to")).toEqual(
+        expect((mail.get("to") as Field).encoded()).toEqual(
           "To: Mikel Lindsaar <mikel@test.lindsaar.net>\r\n",
         );
       });
@@ -123,7 +120,7 @@ describe("mail encoding", () => {
         const mail = Mail.new();
         mail.charset = "utf-8";
         mail.setTo("Mikel @ me Lindsaar <mikel@test.lindsaar.net>");
-        expect(encodedField(mail, "to")).toEqual(
+        expect((mail.get("to") as Field).encoded()).toEqual(
           'To: "Mikel @ me Lindsaar" <mikel@test.lindsaar.net>\r\n',
         );
       });
@@ -132,7 +129,7 @@ describe("mail encoding", () => {
         const mail = Mail.new();
         mail.charset = "utf-8";
         mail.setTo('"Mikel @ me Lindsaar" <mikel@test.lindsaar.net>');
-        expect(encodedField(mail, "to")).toEqual(
+        expect((mail.get("to") as Field).encoded()).toEqual(
           'To: "Mikel @ me Lindsaar" <mikel@test.lindsaar.net>\r\n',
         );
       });
@@ -151,7 +148,7 @@ describe("mail encoding", () => {
       const mail = Mail.new();
       mail.charset = "ISO-8859-1";
       mail.setSubject(latin1("This is \xE4 string"));
-      const result = encodedField(mail, "subject");
+      const result = (mail.get("subject") as Field).encoded();
       expect(result).toEqual("Subject: =?ISO-8859-1?Q?This_is_=E4_string?=\r\n");
     });
 
@@ -159,7 +156,7 @@ describe("mail encoding", () => {
       const mail = Mail.new();
       mail.charset = "ISO-8859-1";
       mail.setTo(latin1("Mikel Linds\xE4r <mikel@test.lindsaar.net>"));
-      const result = encodedField(mail, "to");
+      const result = (mail.get("to") as Field).encoded();
       expect(result).toEqual(
         "To: Mikel =?ISO-8859-1?B?TGluZHPkcg==?= <mikel@test.lindsaar.net>\r\n",
       );
@@ -171,7 +168,7 @@ describe("mail encoding", () => {
       mail.setTo(
         ["Mikel Linds\xE4r <mikel@test.lindsaar.net>", "\xE4d <ada@test.lindsaar.net>"].map(latin1),
       );
-      const result = encodedField(mail, "to");
+      const result = (mail.get("to") as Field).encoded();
       expect(result).toEqual(
         "To: Mikel =?ISO-8859-1?B?TGluZHPkcg==?= <mikel@test.lindsaar.net>, \r\n =?ISO-8859-1?B?5GQ=?= <ada@test.lindsaar.net>\r\n",
       );
@@ -195,7 +192,7 @@ describe("mail encoding", () => {
         mail[setter](array);
         expect((mail.get(field) as Field).field.errors).toEqual([]);
 
-        const result = encodedField(mail, field);
+        const result = (mail.get(field) as Field).encoded();
         expect(result).toEqual(
           `${field}: Mikel =?ISO-8859-1?B?TGluZHPkcg==?= <mikel@test.lindsaar.net>, \r\n =?ISO-8859-1?B?5GQ=?= <ada@test.lindsaar.net>\r\n`,
         );
