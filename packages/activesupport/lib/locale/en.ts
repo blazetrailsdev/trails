@@ -1,4 +1,4 @@
-import { ordinal } from "../inflector.js";
+import { ActiveSupport } from "../namespaces.js";
 
 export const en: Record<string, unknown> = {
   date: {
@@ -171,7 +171,7 @@ export const en: Record<string, unknown> = {
       },
 
       ordinalized: (_key: unknown, options: { number?: unknown }) =>
-        `${options.number}${ordinal(Number(options.number))}`,
+        `${options.number}${ActiveSupport.Inflector.ordinal(Number(options.number))}`,
     },
   },
 };

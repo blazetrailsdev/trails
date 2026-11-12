@@ -5,7 +5,6 @@ import { indexBy } from "@blazetrails/activesupport";
 import { Execution } from "./execution.js";
 import { QueueSelector } from "./queue-selector.js";
 import { ClaimedExecution } from "./claimed-execution.js";
-import { Job } from "./job.js";
 
 export class ReadyExecution extends Execution {
   declare static queuedAs: (queueName: unknown) => Relation<ReadyExecution>;
@@ -94,7 +93,9 @@ export class ReadyExecution extends Execution {
 
   /** @internal */
   protected static override async discardJobs(jobIds: unknown[]): Promise<number> {
-    await Job.releaseAllConcurrencyLocks(await Job.where({ id: jobIds }).toArray());
+    await SolidQueue.Job!.releaseAllConcurrencyLocks(
+      await SolidQueue.Job!.where({ id: jobIds }).toArray(),
+    );
     return await super.discardJobs(jobIds);
   }
 }

@@ -24,6 +24,7 @@ import { Document as Html5Document } from "./html5/document.js";
 import { DocumentFragment as Html5DocumentFragment } from "./html5/document-fragment.js";
 import type { Node as Html5Node } from "./html5/node.js";
 import { NodeSet } from "./xml/node-set.js";
+import "./xml/xpath-context.js";
 import { SyntaxError as CssSyntaxError } from "./css/syntax-error.js";
 import { Node as CssNode } from "./css/node.js";
 import { Parser as CssParser } from "./css/parser.js";
