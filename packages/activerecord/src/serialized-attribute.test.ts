@@ -1054,4 +1054,157 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     void topic.foo;
     expect(topic.isChanged).toBeFalsy();
   });
+
+  it("serialized class attribute", async () => {
+    setYamlColumnPermittedClasses([...yamlColumnPermittedClasses(), rbCClass]);
+
+    const topic = await (await ClassifiedTopic.create({ important: rbCSymbol })).reload();
+    expect(topic.important).toEqual(rbCSymbol);
+    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
+  });
+
+  it("serialized class does not become frozen", async () => {
+    setYamlColumnPermittedClasses([...yamlColumnPermittedClasses(), rbCClass]);
+
+    expect(Object.isFrozen(rbCSymbol)).toBeFalsy();
+    await ClassifiedTopic.create({ important: rbCSymbol });
+    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
+    expect(Object.isFrozen(rbCSymbol)).toBeFalsy();
+  });
+
+  it("serialized attribute should raise exception on assignment with wrong type", async () => {
+    Topic.serialize("content", { type: Hash });
+    await assertRaises([SerializationTypeMismatch], {}, () => {
+      new Topic({ content: "string" });
+    });
+  });
+
+  it("serialized attribute with class constraint", async () => {
+    const settings = { color: "blue" };
+    Topic.serialize("content", { type: Hash });
+    const topic = new Topic({ content: settings });
+    expect(await topic.save()).toBeTruthy();
+    expect((await Topic.find(topic.id)).content).toEqual(hashOf(settings));
+  });
+
+  it("where by serialized attribute with array", async () => {
+    const settings = [{ color: "green" }];
+    Topic.serialize("content", { type: Array });
+    const topic = await Topic.createBang({ content: settings });
+    expect((await Topic.where({ content: settings }).take())!.equals(topic)).toBe(true);
+  });
+
+  it("where by serialized attribute with hash", async () => {
+    const settings = { color: "green" };
+    Topic.serialize("content", { type: Hash });
+    const topic = await Topic.createBang({ content: settings });
+    expect((await Topic.where({ content: settings }).take())!.equals(topic)).toBe(true);
+  });
+
+  it("where by serialized attribute with hash in array", async () => {
+    const settings = { color: "green" };
+    Topic.serialize("content", { type: Hash });
+    const topic = await Topic.createBang({ content: settings });
+    expect(
+      (await Topic.where({ content: [settings, { herring: "red" }] }).take())!.equals(topic),
+    ).toBe(true);
+  });
+
+  it("serialize attribute can be serialized in an integer column", async () => {
+    const insures = ["life"];
+    let person = new SerializedPerson({ first_name: "David", insures });
+    expect(await person.save()).toBeTruthy();
+    person = await person.reload();
+    expect(person.insures).toEqual(insures);
+  });
+
+  it("classes without no arg constructors are not supported", async () => {
+    await assertRaises([ArgumentError], {}, () => {
+      Topic.serialize("content", { type: RegExp });
+    });
+  });
+
+  it("is not changed when stored blob", async () => {
+    Topic.serialize("binary_content", { type: Array });
+    Topic.serialize("content", { type: Array });
+
+    const value = ["Fée"];
+    const model = await Topic.createBang({ binary_content: value, content: value });
+    await model.reload();
+
+    model.binary_content = value;
+    expect(model.attributeChanged("binary_content")).toBeFalsy();
+
+    model.content = value;
+    expect(model.attributeChanged("content")).toBeFalsy();
+  });
+
+  it("is not changed when stored in blob frozen payload", async () => {
+    Topic.serialize("binary_content", { coder: new FrozenCoder("binary_content", Array) });
+    Topic.serialize("content", { coder: new FrozenCoder("content", Array) });
+
+    const value = ["Fée"];
+    const model = await Topic.createBang({ binary_content: value, content: value });
+    await model.reload();
+
+    model.content = value;
+    expect(model.attributeChanged("content")).toBeFalsy();
+  });
+
+  it("decorated type with type for attribute", async () => {
+    const oldRegistry = Type.registry();
+    Type.setRegistry(rbObjDup(Type.registry()));
+    try {
+      Type.register("encrypted", EncryptedType);
+
+      const klass = class extends Base {
+        declare content: any;
+
+        static {
+          this.tableName = Topic.tableName;
+          this.store("content", { coder: CodersJSON });
+          this.attribute("content", "encrypted", { subtype: this.typeForAttribute("content") });
+        }
+      };
+
+      const topic = await klass.createBang({ content: { trial: true } });
+
+      expect(rbEqual(topic.content, { trial: true })).toBe(true);
+    } finally {
+      Type.setRegistry(oldRegistry);
+    }
+  });
+
+  it("decorated type with decorator block", async () => {
+    const klass = class extends Base {
+      declare content: any;
+
+      static {
+        this.tableName = Topic.tableName;
+        this.store("content", { coder: CodersJSON });
+        this.decorateAttributes(["content"], (_name, type) => {
+          return new EncryptedType({ subtype: type! });
+        });
+      }
+    };
+
+    const topic = await klass.createBang({ content: { trial: true } });
+    expect(rbEqual(topic.content, { trial: true })).toBe(true);
+  });
+
+  it("serialized attribute works under concurrent initial access", async () => {
+    const model = (() => class extends Topic {})();
+
+    const topic = await model.createBang();
+    await topic.update({ group: "1" });
+
+    model.serialize("group", { coder: JSON });
+    model.resetColumnInformation();
+
+    const threads = Array.from({ length: 4 }, async () => {
+      return (await topic.reload()).group;
+    });
+
+    expect(await Promise.all(threads)).toEqual(Array(threads.length).fill(1));
+  });
 });

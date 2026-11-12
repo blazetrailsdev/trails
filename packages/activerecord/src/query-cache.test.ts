@@ -31,6 +31,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
+import { setUseYamlUnsafeLoad, useYamlUnsafeLoad } from "./active-record.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";
 
 function middleware(
@@ -829,12 +830,62 @@ describe("QueryCacheMutableParamTest", () => {
 });
 
 describe("QuerySerializedParamTest", () => {
-  it.skip("query serialized active record", () => {
-    // BLOCKED: serializes a hash containing an ActiveRecord instance through a
+  fixtures(["topics"], { useTransactionalTests: false });
+
+  class YAMLObj extends Base {
+    declare payload: any;
+
+    static {
+      this.tableName = "yaml_objs";
+
+      this.serialize("payload");
+    }
+  }
+  constSet(TopLevel, "YAMLObj", YAMLObj);
+
+  let useYamlUnsafeLoadWas: boolean;
+
+  beforeEach(async () => {
+    useYamlUnsafeLoadWas = useYamlUnsafeLoad();
+
+    await (
+      await Base.leaseConnection()
+    ).createTable("yaml_objs", { force: true }, (t) => {
+      t.text("payload");
+    });
+
+    (await Base.leaseConnection()).enableQueryCacheBang();
   });
 
-  it.skip("query serialized string", () => {
-    // BLOCKED: depends on the Ruby YAML `serialize` coder round-trip used by the
+  afterEach(async () => {
+    (await Base.leaseConnection()).disableQueryCacheBang();
+    await (await Base.leaseConnection()).dropTable("yaml_objs", { ifExists: true });
+
+    setUseYamlUnsafeLoad(useYamlUnsafeLoadWas);
+  });
+
+  it("query serialized active record", async () => {
+    setUseYamlUnsafeLoad(true);
+
+    const topic = (await Topic.first())!;
+    expect(topic).not.toBeNull();
+
+    const obj = await YAMLObj.createBang({ payload: { topic: topic } });
+
+    expect(await YAMLObj.where({ payload: { topic: topic } }).first()).toEqual(obj);
+
+    const relation = YAMLObj.where({ payload: { topic: topic } });
+    topic.title = "New Title";
+    expect(await relation.first()).toEqual(obj);
+
+    expect(await YAMLObj.where({ payload: { topic: topic } }).first()).toBeNull();
+  });
+
+  it("query serialized string", async () => {
+    setUseYamlUnsafeLoad(false);
+
+    const obj = await YAMLObj.createBang({ payload: "payload" });
+    expect(await YAMLObj.findByBang({ payload: "payload" })).toEqual(obj);
   });
 });
 

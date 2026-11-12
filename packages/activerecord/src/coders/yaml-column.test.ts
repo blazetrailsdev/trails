@@ -127,6 +127,46 @@ describe("YAMLColumnTestWithSafeLoad", () => {
     setYamlColumnPermittedClasses(yamlColumnPermittedClassesDefault);
   });
 
+  it("initialize takes class", () => {
+    const coder = new YAMLColumn("attr_name", Object as never);
+    expect(coder.objectClass).toBe(Object);
+  });
+  it("type mismatch on different classes on dump", async () => {
+    const coder = new YAMLColumn("tags", Array as never);
+    const error = await assertRaises([SerializationTypeMismatch], {}, () => coder.dump("a"));
+    expect(error.message).toEqual(
+      'can\'t dump `tags`: was supposed to be a Array, but was a String. -- "a"',
+    );
+  });
+  it("type mismatch on different classes", async () => {
+    const coder = new YAMLColumn("tags", Array as never);
+    const error = await assertRaises([SerializationTypeMismatch], {}, () => coder.load("--- foo"));
+    expect(error.message).toEqual(
+      'can\'t load `tags`: was supposed to be a Array, but was a String. -- "foo"',
+    );
+  });
+  it("nil is ok", () => {
+    const coder = new YAMLColumn("attr_name");
+    expect(coder.load("--- ")).toBeNull();
+  });
+  it("returns new with different class", () => {
+    const coder = new YAMLColumn("attr_name", SerializationTypeMismatch as never);
+    expect((coder.load("--- ") as object).constructor).toBe(SerializationTypeMismatch);
+  });
+  it("returns string unless starts with dash", () => {
+    const coder = new YAMLColumn("attr_name");
+    expect(coder.load("foo")).toBe("foo");
+  });
+  it("load raises on other classes", () => {
+    const coder = new YAMLColumn("attr_name");
+    expect(() => coder.load([])).toThrow(TypeError);
+  });
+  it("load doesnt swallow yaml exceptions", () => {
+    const coder = new YAMLColumn("attr_name");
+    const badYaml = "--- {";
+    expect(() => coder.load(badYaml)).toThrow(Psych.SyntaxError);
+  });
+
   it("yaml column permitted classes are consumed by safe load", () => {
     setYamlColumnPermittedClasses([Symbol, Time]);
 
