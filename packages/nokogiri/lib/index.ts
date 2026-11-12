@@ -5,6 +5,7 @@ import { parseXml } from "./xml/parse.js";
 import { SyntaxError } from "./xml/syntax-error.js";
 import { SaxDocument } from "./xml/sax/document.js";
 import { SaxParser } from "./xml/sax/parser.js";
+import "./xml/xpath-context.js";
 
 export const XML = {
   Document: XmlDocument,
