@@ -18,9 +18,15 @@ const tester = new RuleTester({
 });
 
 const declarations = `
+  import { Thread } from "./ruby-compat/lib/thread";
   declare function later(): Promise<void>;
   declare function now(): number;
-  declare class Thread { constructor(fn: () => Promise<void>); value(): Promise<void>; }
+  declare const rescuable: { catch(fn: () => void): void };
+`;
+
+const localThread = `
+  declare function later(): Promise<void>;
+  declare class Thread { constructor(fn: () => Promise<void>); then(fn: () => void): void; }
 `;
 
 const inCtor = (body, extra = "") =>
@@ -37,6 +43,7 @@ tester.run("constructor-creates-no-promise", rule, {
     inCtor("now();"),
     inCtor("this.p = () => later();"),
     inCtor("this.p = new Thread(async () => { await later(); });"),
+    inCtor("rescuable.catch(() => {});"),
     `${declarations} class Klass { method() { void later(); } }`,
     `${declarations} class Klass { protected constructor() {} static async new() { const obj = new Klass(); await later(); return obj; } }`,
     `${declarations} class Klass { private constructor() {} static async new() { return new Klass(); } }`,
@@ -47,6 +54,11 @@ tester.run("constructor-creates-no-promise", rule, {
     at(inCtor("this.p = later();"), "promise"),
     at(inCtor("this.p = new Promise<void>((resolve) => resolve());"), "promise"),
     at(inCtor("this.p = new Thread(async () => {}).value();"), "promise"),
+    at(inCtor("this.p = new Thread(async () => {}).join();"), "promise"),
+    at(
+      `${localThread} class Klass { p: unknown; constructor() { this.p = new Thread(later); } }`,
+      "promise",
+    ),
     at(inCtor("(this.p as Promise<void>).finally(now);"), "chain"),
     at(inCtor("later().then(now);"), "chain"),
     at(inCtor("(async () => { await later(); })();"), "asyncIife"),

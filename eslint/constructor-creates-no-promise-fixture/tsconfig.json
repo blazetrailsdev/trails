@@ -6,5 +6,5 @@
     "strict": true,
     "types": []
   },
-  "files": ["file.ts"]
+  "files": ["file.ts", "ruby-compat/lib/thread.ts"]
 }

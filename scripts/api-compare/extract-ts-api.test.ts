@@ -8787,14 +8787,27 @@ describe("extractClass — @inlinedFrom on a constructor", () => {
 describe("extractClass — @inlinedFrom on a static async new", () => {
   const api = "ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84";
 
-  it("folds the tags and calls of static new into a protected constructor", () => {
+  const NEW =
+    "ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:56-78";
+
+  it("folds static new into a protected constructor at its new this(...) call", () => {
     const info = extractFromSource(
-      `class Foo {\n  protected constructor() { this.a(); }\n  /** @inlinedFrom ${api} */\n  static async new() { const obj = new this(); await obj.b(); return obj; }\n}`,
+      `class Foo {\n  protected constructor() { this.a(); }\n  /**\n   * @inlinedFrom ${NEW}\n   * @inlinedFrom ${api}\n   */\n  static async new() { this.pre(); const obj = new this(); await obj.post(1); return obj; }\n}`,
     );
     const ctor = info.instanceMethods.find((m) => m.name === "constructor")!;
-    expect(ctor.inlinedFrom?.map((t) => t.module)).toEqual(["ActiveModel::API"]);
-    expect(ctor.calls).toEqual(expect.arrayContaining(["a", "b"]));
-    expect(info.classMethods.find((m) => m.name === "new")!.inlinedFrom).toBeUndefined();
+    expect(ctor.inlinedFrom?.map((t) => t.module)).toEqual([
+      "ActiveRecord::Inheritance::ClassMethods",
+      "ActiveModel::API",
+    ]);
+    expect(ctor.callSeq).toEqual(["pre", "a", "post"]);
+    expect(ctor.callArgs?.map((c) => c.name)).toEqual(["pre", "a", "post"]);
+    expect(ctor.calls).not.toContain("constructor");
+    const staticNew = info.classMethods.find((m) => m.name === "new")!;
+    expect([staticNew.inlinedFrom, staticNew.calls, staticNew.callSeq]).toEqual([
+      undefined,
+      undefined,
+      undefined,
+    ]);
   });
 
   it("leaves a public constructor and its static new apart", () => {

@@ -1,7 +1,16 @@
 import * as fs from "fs/promises";
 import { describe, expect, it } from "vitest";
 
-import { MARK_PATH, RULES, exceedances, packageOf, tally, tightened } from "./promise-count.js";
+import {
+  MARK_PATH,
+  RULES,
+  changesEveryPackage,
+  exceedances,
+  packageOf,
+  raisedMarks,
+  tally,
+  tightened,
+} from "./promise-count.js";
 
 const [FLOAT, CTOR] = RULES;
 
@@ -35,6 +44,25 @@ describe("promise-count gate", () => {
       [CTOR]: {},
     });
     expect(tightened(mark, current, ["rack"])).toEqual(mark);
+  });
+
+  it("fails a mark raised above the base, an unmarked base package counting 0", () => {
+    const base = { [FLOAT]: { rack: 2 }, [CTOR]: {} };
+    expect(raisedMarks(base, { [FLOAT]: { rack: 1 }, [CTOR]: {} })).toEqual([]);
+    expect(raisedMarks(base, { [FLOAT]: { rack: 3 }, [CTOR]: {} })).toHaveLength(1);
+    expect(raisedMarks(base, { [FLOAT]: { rack: 2 }, [CTOR]: { rake: 1 } })).toHaveLength(1);
+  });
+
+  it("re-measures every package when a rule, the config or a tsconfig changes", () => {
+    for (const file of [
+      "eslint/constructor-creates-no-promise.mjs",
+      "eslint.config.mjs",
+      "scripts/parity/promise-count-mark.json",
+      "packages/rack/tsconfig.json",
+    ]) {
+      expect(changesEveryPackage(file)).toBe(true);
+    }
+    expect(changesEveryPackage("packages/rack/lib/a.ts")).toBe(false);
   });
 
   it("commits a mark for each gated rule", async () => {

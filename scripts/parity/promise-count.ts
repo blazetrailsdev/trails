@@ -12,8 +12,10 @@
  * absent from the mark is held at 0. A finding converges by awaiting,
  * returning or `Thread`-owning the promise, never by raising a mark.
  *
- * `--changed <ref>` lints only the packages holding a file that differs from
- * `<ref>`; with no packages named every package is linted.
+ * `--changed <ref>` first fails any mark raised above the mark committed at
+ * `<ref>`, then lints the packages holding a file that differs from `<ref>`,
+ * or every package when the rules, the config or a tsconfig changed. With no
+ * packages named every package is linted.
  *
  * Hard rules: no node:* imports, no process.*, async fs only, no third-party
  * runtime deps. The entry point throws on failure, which is the exit status.
@@ -98,26 +100,66 @@ async function allPackages(): Promise<string[]> {
   return [...entries.filter((e) => e.isDirectory()).map((e) => e.name), "scripts"].sort();
 }
 
+/** A change to one of these can move any package's count, so it re-measures every package. */
+export function changesEveryPackage(file: string): boolean {
+  return (
+    file.startsWith("eslint/") ||
+    file === "eslint.config.mjs" ||
+    file === "package.json" ||
+    file === "pnpm-lock.yaml" ||
+    file.startsWith("scripts/parity/promise-count") ||
+    /(?:^|\/)tsconfig[^/]*\.json$/.test(file)
+  );
+}
+
 async function changedPackages(ref: string): Promise<string[]> {
-  const files = (await git(["diff", "--name-only", ref, "--", "packages", "scripts"])).split("\n");
+  const files = (await git(["diff", "--name-only", ref])).split("\n").filter((f) => f !== "");
+  if (files.some(changesEveryPackage)) return allPackages();
   return [...new Set(files.map(packageOf).filter((p): p is string => p !== null))].sort();
 }
 
+/** `rule::package` rows whose mark is above the mark committed at `base`; an unmarked base package is 0. */
+export function raisedMarks(base: Counts, mark: Counts): string[] {
+  const rows: string[] = [];
+  for (const rule of RULES) {
+    for (const [pkg, n] of Object.entries(mark[rule] ?? {}).sort()) {
+      const was = base[rule]?.[pkg] ?? 0;
+      if (n > was) rows.push(`${rule}::${pkg}: mark ${was} → ${n}`);
+    }
+  }
+  return rows;
+}
+
+async function markAt(ref: string): Promise<Counts | null> {
+  try {
+    return JSON.parse(
+      await git(["show", `${ref}:scripts/parity/promise-count-mark.json`]),
+    ) as Counts;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One ESLint instance per package: a single instance over every package holds
+ * every package's TypeScript program at once and exhausts the 10 GB heap.
+ */
 export async function measure(packages: string[]): Promise<Counts> {
-  if (packages.length === 0) return tally([]);
-  const eslint = new ESLint({
-    cwd: ROOT_DIR,
-    errorOnUnmatchedPattern: false,
-    ruleFilter: ({ ruleId }) => (RULES as readonly string[]).includes(ruleId),
-  });
-  const targets = packages.map((p) => (p === "scripts" ? "scripts" : `packages/${p}`));
-  const results = await eslint.lintFiles(targets);
-  return tally(
-    results.map((r) => ({
-      file: path.relative(ROOT_DIR, r.filePath),
-      ruleIds: r.messages.map((m) => m.ruleId),
-    })),
-  );
+  const results: { file: string; ruleIds: (string | null)[] }[] = [];
+  for (const pkg of packages) {
+    const eslint = new ESLint({
+      cwd: ROOT_DIR,
+      errorOnUnmatchedPattern: false,
+      ruleFilter: ({ ruleId }) => (RULES as readonly string[]).includes(ruleId),
+    });
+    for (const r of await eslint.lintFiles([pkg === "scripts" ? "scripts" : `packages/${pkg}`])) {
+      results.push({
+        file: path.relative(ROOT_DIR, r.filePath),
+        ruleIds: r.messages.map((m) => m.ruleId),
+      });
+    }
+  }
+  return tally(results);
 }
 
 export async function main(args: string[] = []): Promise<string> {
@@ -127,6 +169,15 @@ export async function main(args: string[] = []): Promise<string> {
   const named = args.filter((a, i) => !a.startsWith("--") && i !== changed + 1);
   const packages =
     ref !== undefined ? await changedPackages(ref) : named.length > 0 ? named : await allPackages();
+  const base = ref === undefined ? null : await markAt(ref);
+  const raised = base === null ? [] : raisedMarks(base, mark);
+  if (raised.length > 0) {
+    throw new Error(
+      `promise-count gate: ${raised.length} mark(s) raised above ${ref}. The mark is ` +
+        "ONLY-SHRINK; converge the finding instead:\n" +
+        raised.map((row) => `  ${row}`).join("\n"),
+    );
+  }
   const current = await measure(packages);
   if (args.includes("--tighten")) {
     await fs.writeFile(

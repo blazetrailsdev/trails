@@ -5157,10 +5157,15 @@ export function constClassExpression(
 /**
  * RFC 0234 § Design 2(a): where `initialize` does async work, the class keeps
  * the synchronous part in a `protected` constructor and the rest in
- * `static async new`. The two together are Ruby's `initialize`, so a `static new`
- * carrying `@inlinedFrom` tags beside a non-public constructor hands its tags
- * and its body's calls to the constructor, which the call gates and
- * `parity:api:inlined` already pair with `initialize`.
+ * `static async new`, which builds the object with `new this(...)`. The two
+ * together are Ruby's `ClassMethods#new` then `initialize`, so a `static new`
+ * carrying `@inlinedFrom` tags beside a non-public constructor hands its tags and
+ * body to the constructor, which the call gates and `parity:api:inlined` pair
+ * with `initialize`. The constructor's own body is spliced in where `static new`
+ * calls `new this(...)`, so what runs before it is the head of the chain, as a
+ * `ClassMethods#new` segment is, and what runs after it is the tail, and the
+ * `new this(...)` itself is dropped. The `static new` member keeps no body of
+ * its own to compare.
  */
 export function foldStaticNewIntoConstructor(
   instanceMethods: MethodInfo[],
@@ -5169,18 +5174,29 @@ export function foldStaticNewIntoConstructor(
   const staticNew = classMethods.find((m) => m.name === "new" && m.inlinedFrom !== undefined);
   const ctor = instanceMethods.find((m) => m.name === "constructor");
   if (staticNew === undefined || ctor === undefined || ctor.visibility === "public") return;
-  ctor.inlinedFrom = [...(ctor.inlinedFrom ?? []), ...staticNew.inlinedFrom!];
-  delete staticNew.inlinedFrom;
+  const tags = staticNew.inlinedFrom!;
+  ctor.inlinedFrom = [
+    ...tags.filter((tag) => tag.hook === "new"),
+    ...(ctor.inlinedFrom ?? []),
+    ...tags.filter((tag) => tag.hook !== "new"),
+  ];
+  const splice = <T>(outer: T[] | undefined, inner: T[] | undefined, isNew: (x: T) => boolean) => {
+    if (outer === undefined) return inner;
+    const at = outer.findIndex(isNew);
+    if (at < 0) return [...outer, ...(inner ?? [])];
+    return [...outer.slice(0, at), ...(inner ?? []), ...outer.slice(at + 1)];
+  };
   if (staticNew.calls !== undefined) {
-    ctor.calls = [...new Set([...(ctor.calls ?? []), ...staticNew.calls])].sort();
+    const own = new Set(ctor.calls ?? []);
+    const added = staticNew.calls.filter((c) => c !== "constructor" || own.has(c));
+    ctor.calls = [...new Set([...own, ...added])].sort();
   }
-  if (staticNew.callSeq !== undefined)
-    ctor.callSeq = [...(ctor.callSeq ?? []), ...staticNew.callSeq];
-  if (staticNew.callArgs !== undefined) {
-    ctor.callArgs = [...(ctor.callArgs ?? []), ...staticNew.callArgs];
+  ctor.callSeq = splice(staticNew.callSeq, ctor.callSeq, (c) => c === "constructor");
+  ctor.callArgs = splice(staticNew.callArgs, ctor.callArgs, (c) => c.name === "constructor");
+  ctor.skeleton = splice(staticNew.skeleton, ctor.skeleton, (t) => t.startsWith("new:"));
+  for (const key of ["inlinedFrom", "calls", "callSeq", "callArgs", "skeleton"] as const) {
+    delete staticNew[key];
   }
-  if (staticNew.skeleton !== undefined)
-    ctor.skeleton = [...(ctor.skeleton ?? []), ...staticNew.skeleton];
 }
 
 export function extractClass(
