@@ -12,7 +12,6 @@ type HasRichTextOptions = {
   storeIfBlank?: boolean;
 };
 
-/** @inventedArm if — PERMANENT */
 function loadedRichText(record: RichTextHost, associationName: string): RichText | null {
   const richText = record[associationName] as RichText | null | Promise<RichText | null>;
   if (!(richText instanceof Promise)) return richText;
