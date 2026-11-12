@@ -80,7 +80,7 @@ function frexp(number: number): number {
 }
 
 function floatRoundOverflow(ndigits: number, binexp: number): boolean {
-  const floatDig = 15 + 2;
+  const floatDig = FLOAT_DIG + 2;
   return ndigits >= floatDig - (binexp > 0 ? Math.trunc(binexp / 4) : Math.trunc(binexp / 3) - 1);
 }
 
