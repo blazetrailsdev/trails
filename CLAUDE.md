@@ -1234,6 +1234,15 @@ ratified here so no port re-derives them.
 A test that depends on one of these ports the assertions that do not, and parks
 the rest as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
 
+## RubyGems is not ported (`Gem::Deprecate`)
+
+RubyGems is Ruby's package manager; trails ships through npm, so a gem body's
+RubyGems machinery has no port. `Mail::CheckDeliveryParams`'
+`extend Gem::Deprecate` and its six `deprecate` calls
+(`vendor/mail/2.8.1/lib/mail/check_delivery_params.rb:8-62`) are omitted, and
+the methods are plain ports. ruby-compat keeps only the `Gem::Deprecate.skip`
+state `Gem::Version` reads. Ruled by the operator on 2026-11-12 (trails#10021).
+
 ## Node's event loop stands in for Action Cable's nio4r selector (`StreamEventLoop`, `Stream#write`)
 
 Moved to [packages/actioncable/CLAUDE.md](packages/actioncable/CLAUDE.md#nodes-event-loop-stands-in-for-action-cables-nio4r-selector-streameventloop-streamwrite); unchanged, heading kept for citations.
