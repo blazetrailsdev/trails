@@ -20,7 +20,7 @@ import {
   assertPredicate,
 } from "../../../lib/testing/assertions.js";
 import { Store } from "../../../lib/cache/store.js";
-import { File, regexpEscape } from "@blazetrails/ruby-compat";
+import { File, regexpEscape, TypeError } from "@blazetrails/ruby-compat";
 import { isPresent } from "../../../lib/core-ext/object/blank.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheLoggingBehavior } from "../behaviors/cache-logging-behavior.js";
@@ -300,10 +300,18 @@ describe("FileStore coder fidelity", () => {
     expect(await store.read("u")).toBeNull();
   });
 
+  it("round-trips Time values", async () => {
+    const time = Time.at(1781879786, 123456, "usec");
+    await store.write("t", time);
+    const result = await store.read("t");
+    expect(result).toBeInstanceOf(Time);
+    expect((result as Time).equals(time)).toBe(true);
+  });
+
   it("raises TypeError writing a JS Date, which Marshal has no dump for", async () => {
-    await expect(store.write("d", new Date())).rejects.toThrow(
-      "no _dump_data is defined for class Time",
-    );
+    const error = await store.write("d", new Date()).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as Error).message).toBe("no _dump_data is defined for class Time");
   });
 
   it("round-trips bigint values", async () => {
