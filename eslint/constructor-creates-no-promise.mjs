@@ -40,6 +40,19 @@ function isThenable(type, checker) {
   });
 }
 
+function isChained(node) {
+  const { parent } = node;
+  return (
+    parent.type === "MemberExpression" &&
+    parent.object === node &&
+    !parent.computed &&
+    parent.property.type === "Identifier" &&
+    CHAINS.has(parent.property.name) &&
+    parent.parent.type === "CallExpression" &&
+    parent.parent.callee === parent
+  );
+}
+
 function isThread(node) {
   return node.callee.type === "Identifier" && node.callee.name === "Thread";
 }
@@ -83,7 +96,7 @@ const rule = {
           CHAINS.has(callee.property.name)
         ) {
           context.report({ node, messageId: "chain", data: { name: callee.property.name } });
-        } else if (thenable(node)) {
+        } else if (!isChained(node) && thenable(node)) {
           context.report({ node, messageId: "promise" });
         }
       },

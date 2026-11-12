@@ -48,6 +48,7 @@ tester.run("constructor-creates-no-promise", rule, {
     at(inCtor("this.p = new Promise<void>((resolve) => resolve());"), "promise"),
     at(inCtor("this.p = new Thread(async () => {}).value();"), "promise"),
     at(inCtor("(this.p as Promise<void>).finally(now);"), "chain"),
+    at(inCtor("later().then(now);"), "chain"),
     at(inCtor("(async () => { await later(); })();"), "asyncIife"),
     at(
       `${declarations} class Klass { constructor() {} static async new() { return new Klass(); } }`,

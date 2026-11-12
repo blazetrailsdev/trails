@@ -27,10 +27,10 @@
   "blazetrails/constructor-creates-no-promise": {
     "actioncable": 1,
     "actionpack": 2,
-    "actiontext": 3,
-    "activerecord": 4,
+    "actiontext": 2,
+    "activerecord": 3,
     "mini-magick": 2,
-    "rackup": 2,
+    "rackup": 1,
     "ruby-compat": 1,
     "solid-cable": 1,
     "thor": 2,
