@@ -1136,10 +1136,10 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "test",
         compareApi: false,
         apiExcludedReason:
-          "packages/turbo-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+          "packages/turbo-rails does not exist yet; story turbo-rails-package-helpers-and-turbo-stream-format creates it and enrolls it.",
         compareTests: false,
         testsExcludedReason:
-          "packages/turbo-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+          "packages/turbo-rails does not exist yet; story turbo-rails-package-helpers-and-turbo-stream-format creates it and enrolls it.",
       },
     ],
   },
@@ -1159,10 +1159,10 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "test",
         compareApi: false,
         apiExcludedReason:
-          "packages/stimulus-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+          "packages/stimulus-rails does not exist yet; story stimulus-rails-package-and-install creates it and enrolls it.",
         compareTests: false,
         testsExcludedReason:
-          "packages/stimulus-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+          "packages/stimulus-rails does not exist yet; story stimulus-rails-package-and-install creates it and enrolls it.",
       },
     ],
   },
@@ -1181,10 +1181,10 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "test",
         compareApi: false,
         apiExcludedReason:
-          "packages/vite-ruby does not exist yet; the hotwire-via-vite RFC creates it.",
+          "packages/vite-ruby does not exist yet; story vite-ruby-core-package creates it and enrolls it.",
         compareTests: false,
         testsExcludedReason:
-          "The monorepo's one test/ dir covers both gems; the hotwire-via-vite RFC splits it per package.",
+          "The monorepo's one test/ dir covers both gems; story vite-ruby-core-package splits it per package and enrolls it.",
       },
       {
         name: "vite-rails",
@@ -1192,10 +1192,10 @@ export const SOURCES: readonly UpstreamSource[] = [
         libEntryFile: "vite_rails/lib/vite_rails.rb",
         compareApi: false,
         apiExcludedReason:
-          "packages/vite-rails does not exist yet; the hotwire-via-vite RFC creates it.",
+          "packages/vite-rails does not exist yet; story vite-rails-package-and-tag-helpers creates it and enrolls it.",
         compareTests: false,
         testsExcludedReason:
-          "The monorepo's one test/ dir covers both gems; the hotwire-via-vite RFC splits it per package.",
+          "The monorepo's one test/ dir covers both gems; story vite-ruby-core-package splits it per package and enrolls it.",
       },
     ],
   },

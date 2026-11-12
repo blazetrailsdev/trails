@@ -322,6 +322,8 @@ describe("vendor/sources.ts", () => {
     expect(versionDir("v8.0.2")).toBe("v8.0.2");
     expect(versionDir("v3_3_11")).toBe("v3.3.11");
     expect(versionDir("vite_ruby@3.11.1")).toBe("v3.11.1");
+    expect(versionDir("vite_rails@3.11.1")).toBe("v3.11.1");
+    expect(versionDir("v2.0.23")).toBe("v2.0.23");
   });
 
   it("every source root is vendor/<name>/<versionDir of its ref>", () => {
