@@ -42,6 +42,7 @@ export class InboundEmail extends Record {
   declare isBounced: () => boolean;
   declare bouncedBang: () => Promise<unknown>;
   declare deliveredBang: () => Promise<unknown>;
+  declare pendingBang: () => Promise<unknown>;
   declare processingBang: () => Promise<unknown>;
   declare failedBang: () => Promise<unknown>;
 

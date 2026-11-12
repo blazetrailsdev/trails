@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "node -e \"require('fs').cpSync('src/trails/generators', 'dist/trails/generators', { recursive: true, filter: (source) => !/\\\\.ts$/.test(source) })\" && trails-tsc-views build-templates dist/trails/generators"
+    "build:templates": "rm -rf dist/app dist/.trails && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place && node -e \"require('fs').cpSync('src/trails/generators', 'dist/trails/generators', { recursive: true, filter: (source) => !/\\\\.ts$/.test(source) })\" && trails-tsc-views build-templates dist/trails/generators"
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
@@ -43,6 +43,7 @@
   },
   "devDependencies": {
     "@blazetrails/actionmailer": "workspace:*",
-    "@blazetrails/trails-tsc": "workspace:*"
+    "@blazetrails/trails-tsc": "workspace:*",
+    "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

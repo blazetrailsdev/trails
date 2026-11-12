@@ -1,0 +1,16 @@
+<% provide("title", "Deliver new inbound email") %>
+
+<h1>All inbound emails</h1>
+
+<%= linkTo("New inbound email by form", mainApp.newTrailsConductorInboundEmailPath()) %> |
+<%= linkTo("New inbound email by source", mainApp.newTrailsConductorInboundEmailSourcePath()) %>
+
+<table>
+  <tr><th>Message ID</th><th>Status</th></tr>
+  <% for (const inboundEmail of this.inboundEmails) { %>
+    <tr>
+      <td><%= linkTo(inboundEmail.messageId, mainApp.trailsConductorInboundEmailPath(inboundEmail)) %></td>
+      <td><%= inboundEmail.status %></td>
+    </tr>
+  <% } %>
+</table>

@@ -16,3 +16,7 @@ export { BaseController } from "./base-controller.js";
 import "./ingresses/mailgun/inbound-emails-controller.js";
 import "./ingresses/mandrill/inbound-emails-controller.js";
 import "./ingresses/relay/inbound-emails-controller.js";
+import "./action-mailbox/inbound-emails-controller.js";
+import "./action-mailbox/inbound-emails/sources-controller.js";
+import "./action-mailbox/incinerates-controller.js";
+import "./action-mailbox/reroutes-controller.js";
