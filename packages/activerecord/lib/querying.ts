@@ -254,14 +254,16 @@ export function _loadFromSql<T extends typeof Base>(
   });
 }
 
+type _FromSource = string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode;
+
 export function from<T extends AbstractModel>(
   this: T,
-  source: string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode,
+  source: _FromSource,
   subqueryName?: string,
 ): Relation<InstanceType<T>>;
 export function from<T extends typeof Base>(
   this: T,
-  source: string | Relation<any, boolean> | import("@blazetrails/arel").ArelNode,
+  source: _FromSource,
   subqueryName?: string,
 ): Relation<InstanceType<T>> {
   return this.all().from(source, subqueryName);

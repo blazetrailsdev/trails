@@ -549,7 +549,7 @@ export function asyncIds(this: CalculationRelation): Promise<unknown[]> {
 export type PluckColumn<T> = {
   [K in keyof T & string]: K extends `_${string}`
     ? never
-    : T[K] extends (...args: any[]) => any
+    : T[K] extends (...args: never[]) => unknown
       ? never
       : K;
 }[keyof T & string];
