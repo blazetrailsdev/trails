@@ -16,7 +16,6 @@ import type { DocumentFragment } from "./document-fragment.js";
 import { NodeSet } from "./node-set.js";
 import { SaveOptions } from "./node/save-options.js";
 import * as Searchable from "./searchable.js";
-import "./xpath-context.js";
 
 export interface AttrNode {
   nodeName: string;
