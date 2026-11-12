@@ -14,4 +14,5 @@ export { Base } from "./base.js";
 export { Callbacks } from "./callbacks.js";
 export { BaseController } from "./base-controller.js";
 import "./ingresses/mailgun/inbound-emails-controller.js";
+import "./ingresses/mandrill/inbound-emails-controller.js";
 import "./ingresses/relay/inbound-emails-controller.js";

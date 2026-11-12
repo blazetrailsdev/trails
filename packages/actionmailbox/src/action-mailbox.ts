@@ -15,6 +15,7 @@ import type { Callbacks } from "./callbacks.js";
 import type { InboundEmail } from "./inbound-email.js";
 import type { IncinerationJob } from "./incineration-job.js";
 import type { InboundEmailsController as MailgunInboundEmailsController } from "./ingresses/mailgun/inbound-emails-controller.js";
+import type { InboundEmailsController as MandrillInboundEmailsController } from "./ingresses/mandrill/inbound-emails-controller.js";
 import type { InboundEmailsController as RelayInboundEmailsController } from "./ingresses/relay/inbound-emails-controller.js";
 import type { Record as ActionMailboxRecord } from "./record.js";
 import type { Relayer } from "./relayer.js";
@@ -36,6 +37,7 @@ export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModu
   Callbacks: typeof Callbacks;
   Ingresses: {
     Mailgun: { InboundEmailsController?: typeof MailgunInboundEmailsController };
+    Mandrill: { InboundEmailsController?: typeof MandrillInboundEmailsController };
     Relay: { InboundEmailsController?: typeof RelayInboundEmailsController };
   };
   InboundEmail: typeof InboundEmail;
@@ -57,7 +59,7 @@ export const ActionMailbox = { name: "ActionMailbox", loadPath } as AutoloadModu
 extend(ActionMailbox, Autoload);
 constSet(TopLevel, "ActionMailbox", ActionMailbox);
 
-ActionMailbox.Ingresses = { Mailgun: {}, Relay: {} };
+ActionMailbox.Ingresses = { Mailgun: {}, Mandrill: {}, Relay: {} };
 
 ActionMailbox.autoload("Base");
 ActionMailbox.autoload("Router");

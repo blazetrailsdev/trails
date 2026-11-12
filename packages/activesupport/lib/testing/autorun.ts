@@ -11,11 +11,13 @@ import {
   env,
   isModuleIncluded,
   rbFSend,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
 import { Isolation } from "./isolation.js";
 import { TestHelper as ExecutorTestHelper } from "../executor/test-helper.js";
+import type { Executor } from "../executor.js";
 import { Assertion, Skip, Test, UnexpectedError, _takeAssertions } from "./assertions.js";
 
 declare module "vitest" {
@@ -105,6 +107,8 @@ export function describe(suite: DescribedSuite | undefined): SpecClass {
   return cls;
 }
 
+const executions = new WeakMap<TestCase, { completeBang(): unknown }>();
+
 const capturing = new WeakSet<object>();
 const captured = new WeakMap<TestCase, { from: number; at: number; count: number }>();
 
@@ -115,7 +119,7 @@ beforeEach(async (context: TestContext) => {
   const defined = rbModMethodDefined(klass, testName);
   if (defined) throw new RuntimeError(`${testName} is already defined in ${rbModToS(klass)}`);
   const testCase = (context.testCase = new klass(testName));
-  if (isModuleIncluded(klass, Isolation) || isModuleIncluded(klass, ExecutorTestHelper)) {
+  if (isModuleIncluded(klass, Isolation)) {
     const body = getFn(context.task);
     const isolated = async (): Promise<void> => {
       try {
@@ -158,6 +162,14 @@ beforeEach(async (context: TestContext) => {
   const test = getFn(context.task);
   iseqLocationSetup(test, context.task.file.filepath, context.task.location?.line ?? 0);
   Object.defineProperty(testCase, testName, { value: test, configurable: true });
+  if (isModuleIncluded(klass, ExecutorTestHelper)) {
+    executions.set(
+      testCase,
+      (await (TopLevel.Trails!.application!.executor as typeof Executor).runBang()) as {
+        completeBang(): unknown;
+      },
+    );
+  }
   try {
     for (const hook of Test.SETUP_METHODS) await rbFSend(testCase, hook);
   } catch (e) {
@@ -173,12 +185,7 @@ beforeEach(async (context: TestContext) => {
 
 afterEach(async (context: TestContext) => {
   const testCase = context.testCase;
-  if (
-    testCase === undefined ||
-    isModuleIncluded(testCase.constructor, Isolation) ||
-    isModuleIncluded(testCase.constructor, ExecutorTestHelper)
-  )
-    return;
+  if (testCase === undefined || isModuleIncluded(testCase.constructor, Isolation)) return;
   const task = context.task as {
     mode?: string;
     result?: { state?: string; errors?: unknown[] };
@@ -193,8 +200,13 @@ afterEach(async (context: TestContext) => {
     testCase.failures.push(new Skip());
   }
   const failures = testCase.failures.length;
-  for (const hook of Test.TEARDOWN_METHODS) {
-    await testCase.captureExceptions(() => rbFSend(testCase, hook));
+  try {
+    for (const hook of Test.TEARDOWN_METHODS) {
+      await testCase.captureExceptions(() => rbFSend(testCase, hook));
+    }
+  } finally {
+    await executions.get(testCase)?.completeBang();
+    executions.delete(testCase);
   }
   if (testCase.failures.length > failures) throw testCase.failures[failures];
 });

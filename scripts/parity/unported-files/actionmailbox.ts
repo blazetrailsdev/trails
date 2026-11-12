@@ -2,12 +2,6 @@ import type { UnportedFile } from "./types.js";
 
 export const ACTIONMAILBOX_UNPORTED_FILES: UnportedFile[] = [
   {
-    pattern: "ingresses/mandrill/inbound_emails_controller.rb",
-    testFile: "controllers/ingresses/mandrill/inbound_emails_controller_test.rb",
-    package: "actionmailbox",
-    reason: "CONVERGEABLE actionmailbox-mandrill-ingress",
-  },
-  {
     pattern: "ingresses/postmark/inbound_emails_controller.rb",
     testFile: "controllers/ingresses/postmark/inbound_emails_controller_test.rb",
     package: "actionmailbox",

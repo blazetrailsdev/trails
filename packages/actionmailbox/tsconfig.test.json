@@ -2,10 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist-test",
-    "declarationDir": "dist-test/types",
-    "paths": {
-      "@blazetrails/activestorage/test-helpers/*": ["../activestorage/test/support/*.ts"]
-    }
+    "declarationDir": "dist-test/types"
   },
   "exclude": [],
   "include": ["src/**/*.test.ts", "src/test-helpers/**/*"],
@@ -15,9 +12,6 @@
     },
     {
       "path": "../activerecord/tsconfig.test.json"
-    },
-    {
-      "path": "../activestorage/tsconfig.test.json"
     },
     {
       "path": "../trails-tsc"

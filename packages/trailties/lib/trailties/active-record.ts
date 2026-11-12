@@ -66,6 +66,8 @@ export interface ActiveRecordConfig {
   maintainTestSchema: boolean;
   hasManyInversing: boolean;
   sqlite3AdapterStrictStringsByDefault?: boolean;
+  tableNamePrefix?: string;
+  tableNameSuffix?: string;
   postgresqlAdapterDecodeDates?: boolean;
   queryLogTagsEnabled: boolean;
   queryLogTags: string[];

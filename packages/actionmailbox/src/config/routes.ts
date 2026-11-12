@@ -11,6 +11,15 @@ import { TopLevel } from "@blazetrails/activesupport";
         as: "trails_relay_inbound_emails",
       });
 
+      this.get("/mandrill/inbound_emails", {
+        to: "mandrill/inbound_emails#healthCheck",
+        as: "trails_mandrill_inbound_health_check",
+      });
+      this.post("/mandrill/inbound_emails", {
+        to: "mandrill/inbound_emails#create",
+        as: "trails_mandrill_inbound_emails",
+      });
+
       this.post("/mailgun/inbound_emails/mime", {
         to: "mailgun/inbound_emails#create",
         as: "trails_mailgun_inbound_emails",

@@ -1,18 +1,15 @@
-import "@blazetrails/activestorage/test-helpers/database/setup";
 import "../../constants.generated.js";
-import "../../engine.js";
-import { Base } from "@blazetrails/activerecord";
-import { NullLogger, TopLevel } from "@blazetrails/activesupport";
-import { Dir, File } from "@blazetrails/ruby-compat";
+import "../dummy/config/environment.js";
+import { CreateActiveStorageTables } from "@blazetrails/activestorage/db/migrate/20170806125915_create_active_storage_tables";
+import { Attachment } from "@blazetrails/activestorage/attachment";
+import { Blob } from "@blazetrails/activestorage/blob";
 import { InboundEmail } from "../../inbound-email.js";
 import { CreateActionMailboxTables } from "../../db/migrate/20180917164000_create_action_mailbox_tables.js";
 
-Base.logger ??= new NullLogger();
-TopLevel.Trails!.configuration!.activeStorage.serviceConfigurations!.test_email = {
-  service: "Disk",
-  root: File.join(Dir.tmpdir(), "storage_email"),
-};
+await CreateActiveStorageTables.migrate("up");
 await CreateActionMailboxTables.migrate("up");
+await Blob.loadSchema();
+await Attachment.loadSchema();
 await InboundEmail.loadSchema();
 import "../mailboxes/application-mailbox.js";
 import "../mailboxes/messages-mailbox.js";

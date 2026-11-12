@@ -4,13 +4,14 @@ import * as m1 from "./callbacks.js";
 import * as m2 from "./gem-version.js";
 import * as m3 from "./incineration-job.js";
 import * as m4 from "./ingresses/mailgun/inbound-emails-controller.js";
-import * as m5 from "./ingresses/relay/inbound-emails-controller.js";
-import * as m6 from "./record.js";
-import * as m7 from "./relayer.js";
-import * as m8 from "./router.js";
-import * as m9 from "./router/route.js";
-import * as m10 from "./routing-job.js";
-import * as m11 from "./routing.js";
+import * as m5 from "./ingresses/mandrill/inbound-emails-controller.js";
+import * as m6 from "./ingresses/relay/inbound-emails-controller.js";
+import * as m7 from "./record.js";
+import * as m8 from "./relayer.js";
+import * as m9 from "./router.js";
+import * as m10 from "./router/route.js";
+import * as m11 from "./routing-job.js";
+import * as m12 from "./routing.js";
 
 defineConstants([
   [() => m0.Base, "ActionMailbox::Base"],
@@ -21,14 +22,19 @@ defineConstants([
     () => m4.InboundEmailsController.Authenticator,
     "ActionMailbox::Ingresses::Mailgun::InboundEmailsController::Authenticator",
   ],
-  [() => m5.InboundEmailsController, "ActionMailbox::Ingresses::Relay::InboundEmailsController"],
-  [() => m6.Record, "ActionMailbox::Record"],
-  [() => m7.Relayer, "ActionMailbox::Relayer"],
-  [() => m7.Relayer.Result, "ActionMailbox::Relayer::Result"],
-  [() => m8.Router, "ActionMailbox::Router"],
-  [() => m9.Route, "ActionMailbox::Router::Route"],
-  [() => m8.Router.RoutingError, "ActionMailbox::Router::RoutingError"],
-  [() => m11.Routing, "ActionMailbox::Routing"],
-  [() => m10.RoutingJob, "ActionMailbox::RoutingJob"],
+  [() => m5.InboundEmailsController, "ActionMailbox::Ingresses::Mandrill::InboundEmailsController"],
+  [
+    () => m5.InboundEmailsController.Authenticator,
+    "ActionMailbox::Ingresses::Mandrill::InboundEmailsController::Authenticator",
+  ],
+  [() => m6.InboundEmailsController, "ActionMailbox::Ingresses::Relay::InboundEmailsController"],
+  [() => m7.Record, "ActionMailbox::Record"],
+  [() => m8.Relayer, "ActionMailbox::Relayer"],
+  [() => m8.Relayer.Result, "ActionMailbox::Relayer::Result"],
+  [() => m9.Router, "ActionMailbox::Router"],
+  [() => m10.Route, "ActionMailbox::Router::Route"],
+  [() => m9.Router.RoutingError, "ActionMailbox::Router::RoutingError"],
+  [() => m12.Routing, "ActionMailbox::Routing"],
+  [() => m11.RoutingJob, "ActionMailbox::RoutingJob"],
   [() => m2.VERSION, "ActionMailbox::VERSION"],
 ]);
