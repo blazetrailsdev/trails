@@ -1,6 +1,6 @@
 import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/tse/util.js";
-import { BigDecimal, toD } from "@blazetrails/ruby-compat";
+import { Base64, BigDecimal, toD } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { LoadError, StringIO } from "@blazetrails/ruby-compat";
 import { Temporal, Date as RubyDate, DateTime, Time as RubyTime } from "@blazetrails/date";
@@ -50,7 +50,7 @@ const DEFAULT_ENCODINGS: Record<string, string> = {
   binary: "base64",
 };
 
-const FORMATTING: Record<string, (value: unknown) => string> = {
+const FORMATTING: Record<string, { call(value: unknown): string }["call"]> = {
   symbol: (value) => {
     const s = String(value);
     return s.startsWith(":") ? s.slice(1) : s;
@@ -59,20 +59,10 @@ const FORMATTING: Record<string, (value: unknown) => string> = {
   time: (value) => (value instanceof Temporal.PlainTime ? value.toString() : String(value)),
   dateTime: formatDateTime,
   duration: (value) => (value instanceof Temporal.Duration ? value.toString() : String(value)),
-  binary: encode64,
+  binary(binary: string | Uint8Array) {
+    return Base64.encode64(binary);
+  },
 };
-
-function encode64(value: unknown): string {
-  const bytes =
-    typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value as Uint8Array);
-  const b64 = bytes.toString("base64");
-  if (b64 === "") return "";
-  return (b64.match(/.{1,60}/g) ?? []).join("\n") + "\n";
-}
-
-function decode64(value: string): string {
-  return Buffer.from(value, "base64").toString("binary");
-}
 
 function formatDateTime(value: unknown): string {
   // boundary: legacy JS Date values serialize as ISO 8601 dateTime.
@@ -128,7 +118,7 @@ export const PARSING: Record<
       return yaml;
     }
   },
-  base64Binary: (bin) => decode64(String(bin)),
+  base64Binary: (bin) => Base64.decode64(String(bin)),
   hexBinary: (bin) => _parseHexBinary(String(bin)),
   binary: (bin, entity) => _parseBinary(String(bin), entity ?? {}),
   file: (file, entity) => _parseFile(String(file), entity ?? {}),
@@ -352,7 +342,7 @@ export function _dasherize(key: string): string {
 export function _parseBinary(bin: string, entity: Record<string, string | undefined>): string {
   switch (entity["encoding"]) {
     case "base64":
-      return decode64(bin);
+      return Base64.decode64(bin);
     case "hex":
     case "hexBinary":
       return _parseHexBinary(bin);
@@ -366,7 +356,7 @@ export function _parseFile(
   file: string,
   entity: Record<string, string | undefined>,
 ): StringIO & typeof FileLike {
-  const f = new StringIO(decode64(file));
+  const f = new StringIO(Base64.decode64(file));
   Object.defineProperties(f, Object.getOwnPropertyDescriptors(FileLike));
   const fileLike = f as StringIO & typeof FileLike;
   fileLike.originalFilename = entity["name"];
