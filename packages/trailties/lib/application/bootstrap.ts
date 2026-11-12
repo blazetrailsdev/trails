@@ -133,6 +133,7 @@ Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async
   }
 });
 
+/** @inventedArm ignore — PERMANENT */
 Bootstrap.initializer<BootstrapHost>(
   "setup_once_autoloader",
   { after: "set_eager_load_paths", before: "bootstrap_hook" },
