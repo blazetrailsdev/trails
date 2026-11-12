@@ -164,13 +164,25 @@
       "ref": "v2.6.0",
       "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
     },
+    "stimulus-rails": {
+      "ref": "v1.3.4",
+      "sha": "8e34f2e4dd7716224317b635db1e5d9ed58324b1"
+    },
     "thor": {
       "ref": "v1.3.2",
       "sha": "33b9682da680cda9404f9961a62ec208832cbff3"
     },
+    "turbo-rails": {
+      "ref": "v2.0.23",
+      "sha": "435135b26a4b62e49d2f55bb4b1fd419e3bfb228"
+    },
     "tzinfo": {
       "ref": "v2.0.6",
       "sha": "d5893c99bbcd842af86023f02a84fac1659b3031"
+    },
+    "vite_ruby": {
+      "ref": "vite_ruby@3.11.1",
+      "sha": "77de9ea2b94044d72622f72d44d392953843a1d7"
     },
     "zeitwerk": {
       "ref": "v2.7.2",
