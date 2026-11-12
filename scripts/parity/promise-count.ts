@@ -172,7 +172,9 @@ export async function main(args: string[] = []): Promise<string> {
   };
   const only = listAfter("--only");
   const except = listAfter("--except");
-  const valued = new Set(["--changed", "--only", "--except"].map((f) => args.indexOf(f) + 1));
+  const valued = new Set(
+    ["--changed", "--only", "--except"].map((f) => args.indexOf(f) + 1).filter((i) => i > 0),
+  );
   const named = args.filter((a, i) => !a.startsWith("--") && !valued.has(i));
   const packages = (
     ref !== undefined ? await changedPackages(ref) : named.length > 0 ? named : await allPackages()
