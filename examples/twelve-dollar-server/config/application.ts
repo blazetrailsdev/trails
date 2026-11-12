@@ -23,6 +23,8 @@ import "@blazetrails/trailties/all";
 
 export class TwelveDollarServer extends Application {
   static {
+    Application.register(this, import.meta.dirname);
+
     this.config.loadDefaults("8.0");
 
     this.config.autoloadLib({ ignore: ["assets", "tasks"] });
@@ -49,8 +51,6 @@ export class TwelveDollarServer extends Application {
     }
   }
 }
-
-Application.register(TwelveDollarServer, import.meta.dirname);
 
 declare module "@blazetrails/trailties" {
   interface ApplicationRegistry {

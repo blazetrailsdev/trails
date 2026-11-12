@@ -421,24 +421,32 @@ export class Configuration extends EngineConfiguration {
     this._loadedConfigVersion = targetVersion;
   }
 
-  async autoloadLib({ ignore }: { ignore: string | string[] }): Promise<void> {
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  readonly _autoloadLibIgnoredAbspaths: { main: string[]; once: string[] } = { main: [], once: [] };
+
+  autoloadLib({ ignore }: { ignore: string | string[] }): void {
     const lib = File.join(this.root as string, "lib");
 
     this.autoloadPaths.push(lib);
     this.eagerLoadPaths.push(lib);
 
     const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
-    await Trails.autoloaders.main.ignore(ignoredAbspaths);
+    /** @missingRailsCall ignore — PERMANENT */
+    this._autoloadLibIgnoredAbspaths.main.push(...ignoredAbspaths);
   }
 
-  async autoloadLibOnce({ ignore }: { ignore: string | string[] }): Promise<void> {
+  autoloadLibOnce({ ignore }: { ignore: string | string[] }): void {
     const lib = File.join(this.root as string, "lib");
 
     this.autoloadOncePaths.push(lib);
     this.eagerLoadPaths.push(lib);
 
     const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
-    await Trails.autoloaders.once.ignore(ignoredAbspaths);
+    /** @missingRailsCall ignore — PERMANENT */
+    this._autoloadLibIgnoredAbspaths.once.push(...ignoredAbspaths);
   }
 
   get colorizeLogging(): boolean {

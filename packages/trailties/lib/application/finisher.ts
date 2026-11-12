@@ -40,6 +40,7 @@ export interface FinisherExecutor {
 
 export interface FinisherConfig {
   root: string | null;
+  readonly _autoloadLibIgnoredAbspaths: { main: string[] };
   allowConcurrency: boolean | "unsafe" | null;
   toPrepareBlocks: ConfigurationBlock[];
   eagerLoad: boolean | null;
@@ -84,6 +85,7 @@ Finisher.initializer("add_generator_templates", async function (this: FinisherHo
 Finisher.initializer("setup_main_autoloader", async function (this: FinisherHost) {
   const autoloader = this.autoloaders.main;
   autoloader.manifestRoot ??= this.config.root;
+  await autoloader.ignore(this.config._autoloadLibIgnoredAbspaths.main);
 
   const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
 

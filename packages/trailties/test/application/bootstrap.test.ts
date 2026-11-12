@@ -17,6 +17,7 @@ import { Trails } from "../../lib/trails.js";
 
 const baseConfig = (): BootstrapConfig => ({
   root: null,
+  _autoloadLibIgnoredAbspaths: { once: [] },
   activeSupport: {},
   logLevel: "debug",
   logFormatter: null,
