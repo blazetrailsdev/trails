@@ -140,26 +140,44 @@ async function markAt(ref: string): Promise<Counts | null> {
   return JSON.parse(await git(["show", `${ref}:${file}`])) as Counts;
 }
 
+/** One package's findings, linted in this process. */
+export async function measureOne(pkg: string): Promise<Counts> {
+  const eslint = new ESLint({
+    cwd: ROOT_DIR,
+    errorOnUnmatchedPattern: false,
+    ruleFilter: ({ ruleId }) => (RULES as readonly string[]).includes(ruleId),
+  });
+  const results = await eslint.lintFiles([pkg === "scripts" ? "scripts" : `packages/${pkg}`]);
+  return tally(
+    results.map((r) => ({
+      file: path.relative(ROOT_DIR, r.filePath),
+      ruleIds: r.messages.map((m) => m.ruleId),
+    })),
+  );
+}
+
 /**
- * One ESLint instance per package: a single instance over every package holds
- * every package's TypeScript program at once and exhausts the 10 GB heap.
+ * Each package is linted in a child process: the TypeScript programs a typed
+ * lint builds outlive their ESLint instance, so one process over every package
+ * exhausts the 10 GB heap.
  */
 export async function measure(packages: string[]): Promise<Counts> {
-  const results: { file: string; ruleIds: (string | null)[] }[] = [];
+  const counts = tally([]);
   for (const pkg of packages) {
-    const eslint = new ESLint({
-      cwd: ROOT_DIR,
-      errorOnUnmatchedPattern: false,
-      ruleFilter: ({ ruleId }) => (RULES as readonly string[]).includes(ruleId),
-    });
-    for (const r of await eslint.lintFiles([pkg === "scripts" ? "scripts" : `packages/${pkg}`])) {
-      results.push({
-        file: path.relative(ROOT_DIR, r.filePath),
-        ruleIds: r.messages.map((m) => m.ruleId),
-      });
-    }
+    const { stdout } = await promisify(execFile)(
+      "pnpm",
+      [
+        "exec",
+        "tsx",
+        "-e",
+        `import('./scripts/parity/promise-count.ts').then((m) => m.measureOne(${JSON.stringify(pkg)})).then((c) => console.log(JSON.stringify(c)))`,
+      ],
+      { cwd: ROOT_DIR, maxBuffer: 1 << 26 },
+    );
+    const one = JSON.parse(stdout.trim().split("\n").at(-1)!) as Counts;
+    for (const rule of RULES) Object.assign(counts[rule], one[rule]);
   }
-  return tally(results);
+  return counts;
 }
 
 export async function main(args: string[] = []): Promise<string> {
