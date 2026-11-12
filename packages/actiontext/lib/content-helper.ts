@@ -11,7 +11,7 @@ type RenderOptions = Record<string, unknown>;
 
 type ViewHost = ContentHelper & {
   prefixPartialPathWithControllerNamespace: boolean;
-  render(options: RenderOptions, block?: () => unknown): unknown;
+  render(options: RenderOptions, locals?: Record<string, unknown>, block?: () => unknown): unknown;
 };
 
 export class ContentHelper {
@@ -81,8 +81,10 @@ export class ContentHelper {
       }
       return chomp(
         String(
-          await this.render({ layout: attachmentGallery, object: attachmentGallery }, () =>
-            htmlSafe(html.join("")),
+          await this.render(
+            { layout: attachmentGallery, object: attachmentGallery },
+            undefined,
+            () => htmlSafe(html.join("")),
           ),
         ),
       );

@@ -1,3 +1,0 @@
-<div class="attachment-gallery attachment-gallery--<%= await attachmentGallery.size() %>">
-  <%= yield() %>
-</div>

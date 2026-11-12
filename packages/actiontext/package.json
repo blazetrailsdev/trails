@@ -24,7 +24,7 @@
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "cp -R app dist/ && trails-tsc-views build --views dist/app/views --in-place"
+    "build:templates": "rm -rf dist/app dist/.trails && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place"
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
