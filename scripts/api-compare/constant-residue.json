@@ -289,7 +289,7 @@
     }
   },
   "actiontext": {
-    "rows": 16,
+    "rows": 17,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -302,6 +302,7 @@
       "attachments/caching.ts::Caching": "ActionText::Attachments::Caching",
       "attachments/minification.ts::Minification": "ActionText::Attachments::Minification",
       "attachments/trix-conversion.ts::TrixConversion": "ActionText::Attachments::TrixConversion",
+      "content-helper.ts::ContentHelper": "ActionText::ContentHelper",
       "content.ts::Content": "ActionText::Content",
       "fragment.ts::Fragment": "ActionText::Fragment",
       "gem-version.ts::VERSION": "ActionText::VERSION",
