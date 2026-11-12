@@ -165,5 +165,6 @@ describe("an executor-wrapped spec", () => {
 
   it("runs before_setup first, both inside the executor", () => {
     expect(order).toEqual(["before_setup active=true", "beforeEach active=true"]);
+    expect(AppExecutor.active()).toBe(true);
   });
 });
