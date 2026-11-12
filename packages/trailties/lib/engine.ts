@@ -13,6 +13,8 @@ import {
   File,
   getFs,
   getPath,
+  LOAD_PATH,
+  rbAryReplace,
   rbFLoad,
   rbFRequireFile,
   rbObjRespondTo,
@@ -211,6 +213,9 @@ export class Engine extends Trailtie {
     if (cfg instanceof EngineConfiguration) return cfg;
     const klass = this.constructor as typeof Engine;
     const newCfg = new EngineConfiguration(klass.findRoot(klass.calledFrom()));
+    if (klass.calledFrom() !== undefined && !File.isExist(`${newCfg.root}/lib`)) {
+      newCfg.paths().add("lib", { with: klass.calledFrom(), loadPath: true });
+    }
     this._config = newCfg;
     return newCfg;
   }
@@ -420,6 +425,20 @@ Engine.initializer(
     for (const environment of (await this.paths().get("config/environments")?.existent()) ?? []) {
       await rbFRequireFile(environment);
     }
+  },
+);
+
+Engine.initializer(
+  "set_load_path",
+  { before: "bootstrap_hook" },
+  async function (this: Engine, ...args: unknown[]) {
+    const app = args[0] as { config: { addAutoloadPathsToLoadPath: boolean } };
+    for (const path of [
+      ...(await this._allLoadPaths(app.config.addAutoloadPathsToLoadPath)),
+    ].reverse()) {
+      if (File.isDirectory(path)) LOAD_PATH.unshift(path);
+    }
+    rbAryReplace(LOAD_PATH, [...new Set(LOAD_PATH)]);
   },
 );
 

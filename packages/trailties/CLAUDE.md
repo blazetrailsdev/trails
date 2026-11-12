@@ -193,9 +193,16 @@ the host application and takes the application's `lib/` for the engine's root.
 `caller_locations` (`engine.rb:354-366`). A per-engine `findRoot` override was
 rejected because every package-shipped engine would carry the same one.
 
+The same package ships its code in `dist/`, so `Engine#config` points a
+package-root engine's `paths["lib"]` at `called_from` when the root holds no
+`lib/`. `set_load_path` (`engine.rb:571-576`) then puts that directory on
+`LOAD_PATH`, as RubyGems puts a gem's `lib`, and `Generators.lookup` finds the
+package's `generators/` there. Ruled by the operator on 2026-11-11 (trails#10012).
+
 This is a genuine runtime difference, ruled by the operator on 2026-10-23
 (trails#9280). `findRoot` carries `@inventedArm loop` / `if — PERMANENT`
-against this section.
+against this section. `Engine#config`'s `lib` arm is not a compared
+declaration, so this section is its receipt.
 
 ## `Rails::Command::Base.inherited` runs at a subclass's first `methodAdded`
 

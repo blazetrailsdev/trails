@@ -1,7 +1,7 @@
 import { include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import { Record } from "./record.js";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { File, LOAD_PATH, rbFLoad, rbFSend } from "@blazetrails/ruby-compat";
+import { File, rbFLoad, rbFSend } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 import { Base } from "./processes/base.js";
@@ -20,8 +20,6 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
     solidQueue: SolidQueueConfig;
   }
 }
-
-if (!LOAD_PATH.includes(import.meta.dirname)) LOAD_PATH.push(import.meta.dirname);
 
 /** @inventedArm connectsTo — PERMANENT */
 export class Engine extends TrailsEngine {
