@@ -1,10 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import "./support/dummy-application.js";
+import { freezeTime, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { RecurringJob, RecurringTask } from "../lib/index.js";
 import { JobBuffer } from "./support/add-to-buffer-job.js";
 
 describe("RecurringTask (trails)", () => {
+  afterEach(() => travelBack());
+
   it("delayFromNow is seconds until the next cron tick", () => {
+    freezeTime();
     const task = new RecurringTask();
     task.schedule = "* * * * *";
     const delay = task.delayFromNow();
