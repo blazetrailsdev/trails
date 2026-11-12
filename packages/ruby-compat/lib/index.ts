@@ -287,6 +287,7 @@ export {
   include,
   prepend,
   rbCallSuper,
+  rbModAppendFeatures,
   included,
   inherited,
   prepended,

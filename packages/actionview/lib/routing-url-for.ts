@@ -9,6 +9,7 @@ import {
   hasKey,
   include,
   included,
+  rbModAppendFeatures,
   rbSeatSuper,
   hashAref,
   hashAset,
@@ -58,7 +59,9 @@ export class RoutingUrlFor {
 
   /** @noRailsEquivalent PERMANENT */
   static [included](base: unknown): void {
-    if (typeof base === "function") _includers.add(new WeakRef(base));
+    if (typeof base !== "function") return;
+    for (const ref of _includers) if (ref.deref() === base) return;
+    _includers.add(new WeakRef(base));
   }
 
   static include(this: typeof RoutingUrlFor, ...modules: object[]): void {
@@ -75,9 +78,10 @@ export class RoutingUrlFor {
         const copied = ownMethods.filter(
           ([name, desc]) =>
             name !== "constructor" &&
+            typeof desc.value === "function" &&
             Object.getOwnPropertyDescriptor(proto, name)?.value === desc.value,
         );
-        include(klass, mod);
+        rbModAppendFeatures(klass, mod);
         const seats: PropertyDescriptorMap = {};
         for (const [name, desc] of copied) {
           rbSeatSuper(proto, name, desc.value, seats);

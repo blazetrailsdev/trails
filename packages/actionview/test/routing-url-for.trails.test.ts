@@ -192,6 +192,17 @@ describe("ActionView::RoutingUrlFor private helpers", () => {
 });
 
 describe("ActionView::RoutingUrlFor including ActionDispatch::Routing::UrlFor", () => {
+  it("does not run UrlFor's included block on a class that included RoutingUrlFor before it", () => {
+    class Bare {
+      controller = null;
+    }
+    include(Bare, RoutingUrlFor);
+    RoutingUrlFor.include(UrlFor);
+    expect(Object.hasOwn(Bare, "defaultUrlOptions")).toBe(false);
+    expect(Object.hasOwn(Bare.prototype, "defaultUrlOptions")).toBe(false);
+    expect(typeof (new Bare() as unknown as { routeFor: unknown }).routeFor).toBe("function");
+  });
+
   it("reaches UrlFor#url_options through super in a class that included RoutingUrlFor before it", () => {
     class Early {
       controller = null;
