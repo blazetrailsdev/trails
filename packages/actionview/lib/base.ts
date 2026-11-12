@@ -98,6 +98,7 @@ export class Base {
   declare static tseTrimMode: string;
 
   static {
+    for (const name of CONTROLLER_DELEGATES) rbDeclareIvar(this, `@${name}`, `_${name}`);
     cattrAccessor.call(this, "fieldErrorProc", {
       default: () =>
         function (this: Base, htmlTag: unknown, _instance: unknown) {
@@ -383,8 +384,6 @@ export class Base {
     return result;
   }
 }
-
-for (const name of CONTROLLER_DELEGATES) rbDeclareIvar(Base, `@${name}`, `_${name}`);
 
 Object.defineProperty(Base.prototype, "yield", {
   get(this: Base): SafeBuffer | Promise<SafeBuffer> | null {

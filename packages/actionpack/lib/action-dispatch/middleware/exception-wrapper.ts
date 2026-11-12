@@ -201,7 +201,7 @@ export class ExceptionWrapper {
   fileName(): string | null {
     return this._e.fileName();
   }
-  lineNumber(): string | number | null {
+  lineNumber(): string | null {
     return this._e.lineNumber();
   }
   actions(): Record<string, () => void> {
