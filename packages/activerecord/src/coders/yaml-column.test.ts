@@ -69,18 +69,18 @@ describe("YAMLColumnTest", () => {
   afterEach(() => setUseYamlUnsafeLoad(useYamlUnsafeLoadWas));
 
   it("initialize takes class", () => {
-    const coder = new YAMLColumn("attr_name", Object as never);
+    const coder = new YAMLColumn("attr_name", Object);
     expect(coder.objectClass).toBe(Object);
   });
   it("type mismatch on different classes on dump", async () => {
-    const coder = new YAMLColumn("tags", Array as never);
+    const coder = new YAMLColumn("tags", Array);
     const error = await assertRaises([SerializationTypeMismatch], {}, () => coder.dump("a"));
     expect(error.message).toEqual(
       'can\'t dump `tags`: was supposed to be a Array, but was a String. -- "a"',
     );
   });
   it("type mismatch on different classes", async () => {
-    const coder = new YAMLColumn("tags", Array as never);
+    const coder = new YAMLColumn("tags", Array);
     const error = await assertRaises([SerializationTypeMismatch], {}, () => coder.load("--- foo"));
     expect(error.message).toEqual(
       'can\'t load `tags`: was supposed to be a Array, but was a String. -- "foo"',
@@ -91,7 +91,7 @@ describe("YAMLColumnTest", () => {
     expect(coder.load("--- ")).toBeNull();
   });
   it("returns new with different class", () => {
-    const coder = new YAMLColumn("attr_name", SerializationTypeMismatch as never);
+    const coder = new YAMLColumn("attr_name", SerializationTypeMismatch);
     expect((coder.load("--- ") as object).constructor).toBe(SerializationTypeMismatch);
   });
   it("returns string unless starts with dash", () => {
@@ -128,18 +128,18 @@ describe("YAMLColumnTestWithSafeLoad", () => {
   });
 
   it("initialize takes class", () => {
-    const coder = new YAMLColumn("attr_name", Object as never);
+    const coder = new YAMLColumn("attr_name", Object);
     expect(coder.objectClass).toBe(Object);
   });
   it("type mismatch on different classes on dump", async () => {
-    const coder = new YAMLColumn("tags", Array as never);
+    const coder = new YAMLColumn("tags", Array);
     const error = await assertRaises([SerializationTypeMismatch], {}, () => coder.dump("a"));
     expect(error.message).toEqual(
       'can\'t dump `tags`: was supposed to be a Array, but was a String. -- "a"',
     );
   });
   it("type mismatch on different classes", async () => {
-    const coder = new YAMLColumn("tags", Array as never);
+    const coder = new YAMLColumn("tags", Array);
     const error = await assertRaises([SerializationTypeMismatch], {}, () => coder.load("--- foo"));
     expect(error.message).toEqual(
       'can\'t load `tags`: was supposed to be a Array, but was a String. -- "foo"',
@@ -150,7 +150,7 @@ describe("YAMLColumnTestWithSafeLoad", () => {
     expect(coder.load("--- ")).toBeNull();
   });
   it("returns new with different class", () => {
-    const coder = new YAMLColumn("attr_name", SerializationTypeMismatch as never);
+    const coder = new YAMLColumn("attr_name", SerializationTypeMismatch);
     expect((coder.load("--- ") as object).constructor).toBe(SerializationTypeMismatch);
   });
   it("returns string unless starts with dash", () => {

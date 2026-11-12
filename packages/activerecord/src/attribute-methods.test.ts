@@ -632,7 +632,7 @@ describe("AttributeMethodsTest", () => {
   it("YAML dumping a record with time zone-aware attribute", async () => {
     try {
       await inTimeZone("Pacific Time (US & Canada)", () => {
-        const record = new CanonicalTopic({ id: 1 }) as any;
+        const record = new CanonicalTopic({ id: 1 });
         record.written_on = "Jan 01 00:00:00 2014";
         const payload = YAML.dump(record);
         expect(record.equals(YAML.unsafeLoad(payload))).toBe(true);

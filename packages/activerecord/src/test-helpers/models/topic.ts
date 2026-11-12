@@ -21,6 +21,8 @@ declare module "../../relation.js" {
 export interface Topic {
   get content(): unknown;
   set content(value: unknown);
+  get written_on(): RubyTime | Temporal.PlainDateTime;
+  set written_on(value: unknown);
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the reader/writer accessor pair for this model's generated attributes lives in the interface merged above. */
@@ -62,7 +64,6 @@ export class Topic extends Base {
   declare "type": string;
   declare unique_replies_count: number | null;
   declare updated_at: (RubyTime | Temporal.PlainDateTime) | null;
-  declare written_on: RubyTime | Temporal.PlainDateTime;
 
   static {
     this.scope("base", function () {
