@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { EOFError, StringIO, rbFSend, rbObjIsKindOf } from "@blazetrails/ruby-compat";
+import {
+  EOFError,
+  StringIO,
+  Tempfile,
+  Zlib,
+  rbFSend,
+  rbObjIsKindOf,
+} from "@blazetrails/ruby-compat";
 import {
   ExtensionValue,
   MalformedFormatError,
@@ -7,6 +14,37 @@ import {
   UnexpectedTypeError,
   Unpacker,
 } from "../lib/index.js";
+
+class DummyIO {
+  private buf = new Uint8Array(0);
+  private pos = 0;
+
+  write(val: Uint8Array): void {
+    const buf = new Uint8Array(this.buf.length + val.length);
+    buf.set(this.buf);
+    buf.set(val, this.buf.length);
+    this.buf = buf;
+  }
+
+  read(length: number | null = null): Uint8Array | null {
+    if (this.pos === this.buf.length) {
+      return null;
+    } else if (length == null) {
+      const val = this.buf.slice(this.pos, this.buf.length + 1);
+      this.pos = this.buf.length;
+      return val;
+    } else {
+      const val = this.buf.slice(this.pos, this.pos + length + 1);
+      this.pos += val.length;
+      if (this.pos > this.buf.length) this.pos = this.buf.length;
+      return val;
+    }
+  }
+
+  flush(): void {}
+
+  close(): void {}
+}
 
 class ValueOne {
   constructor(readonly data: Uint8Array) {}
@@ -34,6 +72,44 @@ describe("MessagePack::Unpacker", () => {
     expect(u2.isSymbolizeKeys()).toEqual(true);
     expect(u2.isFreeze()).toEqual(true);
     expect(u2.isAllowUnknownExt()).toEqual(true);
+  });
+
+  it("gets IO or object which has #read to read data from it", async () => {
+    const sampleData = { message: "morning!", num: 1 };
+    const samplePacked = MessagePack.pack(sampleData);
+
+    Tempfile.open("for_io", undefined, (file) => {
+      file.sync = true;
+      file.write(samplePacked);
+      file.rewind();
+
+      const u1 = new Unpacker(file);
+      u1.each((obj) => {
+        expect(obj).toEqual(sampleData);
+      });
+      file.unlink();
+    });
+
+    const sio = new StringIO(samplePacked);
+    const u2 = new Unpacker(sio);
+    u2.each((obj) => {
+      expect(obj).toEqual(sampleData);
+    });
+
+    const dio = new StringIO(new Uint8Array(0));
+    await Zlib.GzipWriter.wrap(dio, (gz) => gz.write(samplePacked));
+    const reader = new Zlib.GzipReader(new StringIO(dio.string()));
+    const u3 = new Unpacker(reader);
+    u3.each((obj) => {
+      expect(obj).toEqual(sampleData);
+    });
+
+    const dio4 = new DummyIO();
+    dio4.write(samplePacked);
+    const u4 = new Unpacker(dio4);
+    u4.each((obj) => {
+      expect(obj).toEqual(sampleData);
+    });
   });
 
   it("read_array_header succeeds", () => {
