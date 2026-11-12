@@ -477,9 +477,36 @@ jobs:
       - name: ESLint violation counts
         if: ${{ github.event_name == 'pull_request' && matrix.shard == 'rest' }}
         run: pnpm parity:lint:counts:ci
+  promise-counts:
+    name: Promise finding counts (${{ matrix.shard }})
+    needs: changes
+    if: github.event_name == 'pull_request' && needs.changes.outputs.docs_only != 'true'
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - shard: activerecord
+            filter: --only activerecord
+          - shard: action-and-support
+            filter: --only actionpack,actionview,activesupport,trailties
+          - shard: rest
+            filter: --except activerecord,actionpack,actionview,activesupport,trailties
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 2
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Promise finding counts
-        if: ${{ github.event_name == 'pull_request' && matrix.shard == 'rest' }}
-        run: pnpm parity:promises:ci
+        env:
+          NODE_OPTIONS: --max-old-space-size=10240
+          FILTER: ${{ matrix.filter }}
+        run: |
+          set -euo pipefail
+          read -r flag list <<<"$FILTER"
+          pnpm exec tsx -e "import('./scripts/parity/promise-count.ts').then((m) => m.main(['--changed', 'HEAD^1', '$flag', '$list'])).then(console.log)"
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
   # work; GitHub bills every job rounded UP to a whole minute, so running them
@@ -2747,6 +2774,7 @@ jobs:
       - changes
       - build-and-typecheck
       - lint
+      - promise-counts
       - preflight
       - guides-typecheck
       - leaf-tests
@@ -2809,6 +2837,7 @@ jobs:
           SQLITE_MEM_NOT_REQUIRED: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem')) }}
           MYSQL_PREPARED_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && !(github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')) }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
+          PROMISE_COUNTS_NOT_REQUIRED: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs_only == 'true' }}
           GUIDES_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-guides') }}
         run: |
           set -euo pipefail
@@ -2914,6 +2943,11 @@ jobs:
                      [ "$TSE_COMPILER_AFFECTED" = "false" ] && \
                      { [ "$AR_AFFECTED" = "false" ] || [ "$AR_SCOPED_DX" = "true" ]; } && \
                      { [ "$TRAILTIES_AFFECTED" = "false" ] || [ "$THOR_ONLY" = "true" ] || [ "$ACTIONCABLE_ONLY" = "true" ]; }; then
+                    continue
+                  fi
+                  ;;
+                promise-counts)
+                  if [ "$PROMISE_COUNTS_NOT_REQUIRED" = "true" ]; then
                     continue
                   fi
                   ;;

@@ -15,7 +15,9 @@
  * `--changed <ref>` first fails any mark raised above the mark committed at
  * `<ref>`, then lints the packages holding a file that differs from `<ref>`,
  * or every package when the rules, the config or a tsconfig changed. With no
- * packages named every package is linted.
+ * packages named every package is linted. `--only a,b` and `--except a,b`
+ * narrow the set, so CI can split the run across jobs: the mark is per
+ * package, so each job checks exactly its own packages.
  *
  * Hard rules: no node:* imports, no process.*, async fs only, no third-party
  * runtime deps. The entry point throws on failure, which is the exit status.
@@ -164,9 +166,17 @@ export async function main(args: string[] = []): Promise<string> {
   const mark = JSON.parse(await fs.readFile(MARK_PATH, "utf8")) as Counts;
   const changed = args.indexOf("--changed");
   const ref = changed >= 0 ? args[changed + 1] : undefined;
-  const named = args.filter((a, i) => !a.startsWith("--") && i !== changed + 1);
-  const packages =
-    ref !== undefined ? await changedPackages(ref) : named.length > 0 ? named : await allPackages();
+  const listAfter = (flag: string) => {
+    const at = args.indexOf(flag);
+    return at < 0 ? null : args[at + 1].split(",").filter((p) => p !== "");
+  };
+  const only = listAfter("--only");
+  const except = listAfter("--except");
+  const valued = new Set(["--changed", "--only", "--except"].map((f) => args.indexOf(f) + 1));
+  const named = args.filter((a, i) => !a.startsWith("--") && !valued.has(i));
+  const packages = (
+    ref !== undefined ? await changedPackages(ref) : named.length > 0 ? named : await allPackages()
+  ).filter((p) => (only === null || only.includes(p)) && (except === null || !except.includes(p)));
   const base = ref === undefined ? null : await markAt(ref);
   const raised = base === null ? [] : raisedMarks(base, mark);
   if (raised.length > 0) {
