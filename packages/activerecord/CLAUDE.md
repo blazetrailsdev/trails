@@ -705,8 +705,8 @@ sqlite3-ruby's `busy_handler` runs inside the native step
 await, so a wait would block the event loop holding the lock's other side.
 **`retryBusy` runs the handler between steps instead**, and the driver's own
 `busy_timeout` is always 0: `timeout` waits and yields, `retries` retries, and a
-config with neither raises at once. Statements and the configured pragmas go
-through `retryBusy`; a direct driver call elsewhere does not wait. `execBatch`
+config with neither raises at once. Statements, the configured pragmas and every
+other driver call the adapter makes go through `retryBusy`. `execBatch`
 splits a batch with `sqlite3_complete`'s state machine and steps each statement,
 so a retry resumes at the blocked one. SQLite skips the handler where waiting
 would deadlock, and no driver reports that case apart from an ordinary

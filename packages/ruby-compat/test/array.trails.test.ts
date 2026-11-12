@@ -16,6 +16,7 @@ import {
   arySlice,
   compact,
   compactBang,
+  uniqBang,
   first,
   isIntersect,
   last,
@@ -381,6 +382,13 @@ describe("Array#compact and Array#uniq", () => {
     expect(compactBang(ary)).toBe(ary);
     expect(ary).toEqual([1, 2, 3]);
     expect(compactBang(ary)).toBeNull();
+  });
+
+  it("uniq! dedups in place and answers nil when nothing was removed", () => {
+    const ary = [1, 2, 1, 3, 2];
+    expect(uniqBang(ary)).toBe(ary);
+    expect(ary).toEqual([1, 2, 3]);
+    expect(uniqBang(ary)).toBeNull();
   });
 
   it("dedups by eql?, not identity, keeping the first of each", () => {

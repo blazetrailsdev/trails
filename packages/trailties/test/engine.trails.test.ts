@@ -89,6 +89,20 @@ describe("Engine.findRoot", () => {
   });
 });
 
+describe("Engine#config paths", () => {
+  it("points a package-shipped engine's lib path at the directory it was called from", async () => {
+    class PackageEngine extends Engine {}
+    const out = new URL("./fixtures/package-engine/out", import.meta.url).pathname;
+    Engine.register(PackageEngine, out);
+
+    const paths = PackageEngine.instance().paths();
+    const root = new URL("./fixtures/package-engine", import.meta.url).pathname;
+    expect(await paths.loadPaths()).toEqual([out]);
+    expect(await paths.get("lib/tasks")!.expanded()).toEqual([`${root}/lib/tasks`]);
+    expect(await paths.get("lib/assets")!.expanded()).toEqual([`${root}/lib/assets`]);
+  });
+});
+
 describe("Engine#loadServer awaits server blocks", () => {
   const fixtureRoot = new URL("./fixtures/initializer-engine", import.meta.url).pathname;
 

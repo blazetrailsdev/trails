@@ -1,7 +1,7 @@
 import { include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import { Record } from "./record.js";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { File, rbFLoad, rbFSend } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 import { Base } from "./processes/base.js";
@@ -21,15 +21,16 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
   }
 }
 
-/**
- * @missingRailsCall rake_tasks — CONVERGEABLE port-solid-queue-tasks
- * @inventedArm connectsTo — PERMANENT
- */
+/** @inventedArm connectsTo — PERMANENT */
 export class Engine extends TrailsEngine {
   static {
     TrailsEngine.register(this, import.meta.dirname);
 
     this.isolateNamespace(SolidQueue);
+
+    this.rakeTasks(async () => {
+      await rbFLoad(File.join(import.meta.dirname, `tasks${File.extname(import.meta.filename)}`));
+    });
 
     this.config.set("solidQueue", new OrderedOptions());
 

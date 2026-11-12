@@ -35,6 +35,7 @@
     "@blazetrails/date": "workspace:*",
     "@blazetrails/fugit": "workspace:*",
     "@blazetrails/globalid": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*"

@@ -1188,6 +1188,20 @@ export function uniq<T>(ary: readonly T[], block?: (element: T) => unknown): T[]
 }
 
 /**
+ * Ruby `Array#uniq!` (`vendor/ruby/v3.3.11/array.c:6124` `rb_ary_uniq_bang`):
+ * deduplicates in place as {@link uniq} does, answering the array, or `nil`
+ * when nothing was removed.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function uniqBang<T>(ary: T[], block?: (element: T) => unknown): T[] | null {
+  const result = uniq(ary, block);
+  if (ary.length === result.length) return null;
+  ary.splice(0, ary.length, ...result);
+  return ary;
+}
+
+/**
  * Ruby `Array#include?` (`vendor/ruby/v3.3.11/array.c:5222` `rb_ary_includes`):
  * whether an element is `==` to `item`. Each element is the receiver of the
  * `rb_equal` send, so a class's own `==` answers where a JS `includes`
