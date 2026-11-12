@@ -23,6 +23,8 @@ import {
   rbAnyToS,
   rbInspect,
   rbObjClone,
+  rbObjIvarGet,
+  rbObjIvarSet,
   rbObjRespondTo,
   rbModMethodDefined,
   rbModDefineMethod,
@@ -1088,9 +1090,13 @@ export class RouteSet {
     Object.defineProperty(MountedHelpers.prototype, name, {
       configurable: true,
       get(this: Record<string, unknown>): RoutesProxy {
-        return (this[`@_${name}`] ??= (this[`_${name}`] as () => RoutesProxy).call(
-          this,
-        )) as RoutesProxy;
+        const ivar = `@_${name}`;
+        let proxy = rbObjIvarGet(this, ivar) as RoutesProxy | null;
+        if (proxy == null) {
+          proxy = (this[`_${name}`] as () => RoutesProxy).call(this);
+          rbObjIvarSet(this, ivar, proxy);
+        }
+        return proxy;
       },
     });
 
