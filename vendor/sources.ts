@@ -885,12 +885,10 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "solid-cache",
         libPath: "lib/solid_cache",
+        libEntryFile: "lib/solid_cache.rb",
         testPath: "test",
-        compareApi: false,
-        apiExcludedReason: "no packages/solid-cache exists yet.",
-        compareTests: false,
-        testsExcludedReason:
-          "no packages/solid-cache exists yet; enrolled by solid-cache-package-skeleton.",
+        compareApi: true,
+        compareTests: true,
       },
     ],
   },

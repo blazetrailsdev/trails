@@ -189,7 +189,7 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
-  if (pkg === "solid-queue" || pkg === "solid-cable") {
+  if (pkg === "solid-queue" || pkg === "solid-cable" || pkg === "solid-cache") {
     const rest = rubyFile.replace(/^(unit|models\/solid_queue|jobs|lib)\//, "");
     const dir = path.dirname(rest).replace(/_/g, "-");
     const tsFile =
@@ -1781,6 +1781,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   mail: "packages/mail/test/",
   "solid-queue": "packages/solid-queue/test/",
   "solid-cable": "packages/solid-cable/test/",
+  "solid-cache": "packages/solid-cache/test/",
   erubi: "packages/tse-compiler/test/",
   nokogiri: "packages/nokogiri/test/",
   racc: "packages/nokogiri/test/racc/",

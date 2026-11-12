@@ -18,9 +18,16 @@ export function runSupervisor(options: { [key: string]: unknown } = {}) {
     started.mockRestore();
     return this.start();
   });
+  let exited = false;
   const running = Supervisor.start({ skipRecurring: true, ...options });
-  running.catch(() => {});
+  running.then(
+    () => (exited = true),
+    () => (exited = true),
+  );
   return {
+    get isExists() {
+      return !exited;
+    },
     get supervisor() {
       return supervisors[0];
     },
@@ -32,6 +39,30 @@ export function runSupervisor(options: { [key: string]: unknown } = {}) {
       await running;
     },
   };
+}
+
+export function signalProcess(
+  pid: ReturnType<typeof runSupervisor> | { supervisor: Supervisor; name: string },
+  signal: "TERM" | "INT" | "QUIT" | "KILL",
+  { wait = null }: { wait?: number | null } = {},
+) {
+  return (async () => {
+    if (wait != null) await sleep(wait);
+    const supervisor = pid.supervisor as unknown as {
+      forks: { [name: string]: { _thread: { kill(): unknown } } };
+      signalQueue(): string[];
+      interrupt(): Promise<void>;
+      signalProcess(name: string, signal: string): void;
+    };
+    if (!("name" in pid)) {
+      supervisor.signalQueue().push(signal);
+      await supervisor.interrupt();
+    } else if (signal === "KILL") {
+      supervisor.forks[pid.name]?._thread.kill();
+    } else {
+      supervisor.signalProcess(pid.name, signal);
+    }
+  })();
 }
 
 export async function waitWhileWithTimeout(timeout: number, block: () => Promise<boolean>) {
@@ -98,5 +129,5 @@ export async function waitForProcessTerminationWithTimeout(
     (e: unknown) => e,
   );
   if (error !== null && !(error instanceof SystemExit)) throw error;
-  expect(exitstatus, String(error?.status ?? 0)).toBeTruthy();
+  expect(exitstatus != null, String(error?.status ?? 0)).toBe(true);
 }

@@ -357,6 +357,7 @@ const alias = {
   "@blazetrails/actioncable": path.resolve(__dirname, "packages/actioncable/lib/index.ts"),
   "@blazetrails/solid-cable/": path.resolve(__dirname, "packages/solid-cable/lib") + "/",
   "@blazetrails/solid-cable": path.resolve(__dirname, "packages/solid-cable/lib/index.ts"),
+  "@blazetrails/solid-cache/": path.resolve(__dirname, "packages/solid-cache/lib") + "/",
   "@blazetrails/activestorage/test-helpers/":
     path.resolve(__dirname, "packages/activestorage/test/support") + "/",
   "@blazetrails/activestorage/": path.resolve(__dirname, "packages/activestorage/lib") + "/",
@@ -601,6 +602,7 @@ export default defineConfig({
             "packages/activerecord/scripts/**/*.test.ts",
             "packages/solid-queue/test/**/*.test.ts",
             "packages/solid-cable/test/**/*.test.ts",
+            "packages/solid-cache/test/**/*.test.ts",
             "packages/activestorage/test/**/*.test.ts",
             "packages/actionmailbox/src/**/*.test.ts",
             "packages/actiontext/test/**/*.test.ts",
@@ -697,6 +699,7 @@ export default defineConfig({
             "packages/activerecord/**",
             "packages/solid-queue/**",
             "packages/solid-cable/**",
+            "packages/solid-cache/**",
             "packages/activestorage/**",
             "packages/actionmailbox/**",
             "packages/actiontext/**",

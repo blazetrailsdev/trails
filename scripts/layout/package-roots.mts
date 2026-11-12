@@ -23,6 +23,7 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "fugit",
   "rackup",
   "solid-cable",
+  "solid-cache",
   "nokogiri",
   "mini-magick",
   "image-processing",

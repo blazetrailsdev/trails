@@ -1,0 +1,32 @@
+{
+  "name": "@blazetrails/solid-cache",
+  "version": "0.1.0",
+  "description": "Database-backed Active Support cache store for Trails, mirroring the solid_cache gem",
+  "type": "module",
+  "main": "dist/maglev-hash.js",
+  "types": "dist/maglev-hash.d.ts",
+  "exports": {
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "engines": {
+    "node": ">=26"
+  }
+}

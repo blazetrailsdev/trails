@@ -1026,6 +1026,18 @@ importers:
         specifier: workspace:*
         version: link:../vitest-matchers
 
+  packages/solid-cache:
+    dependencies:
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+
   packages/solid-queue:
     dependencies:
       '@blazetrails/activejob':
