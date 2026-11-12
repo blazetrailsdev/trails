@@ -23,8 +23,13 @@ const onMethod = (name, ...tags) =>
 const onConstructor = (...tags) =>
   `class Base {\n  /**\n${tags.map((tag) => `   * @inlinedFrom ${tag}\n`).join("")}   */\n  constructor() {}\n}\n`;
 
+const onStaticNew = (ctor, ...tags) =>
+  `class Base {\n  ${ctor}constructor() {}\n  /**\n${tags.map((tag) => `   * @inlinedFrom ${tag}\n`).join("")}   */\n  static async new() {}\n}\n`;
+
 tester.run("inlined-from-placement", rule, {
   valid: [
+    { code: onStaticNew("protected ", NEW, API), filename: BASE },
+    { code: onStaticNew("private ", API), filename: BASE },
     { code: onMethod("contentTag", CONTENT_TAG), filename: TAGS_BASE },
     {
       code: onMethod(
@@ -54,6 +59,12 @@ tester.run("inlined-from-placement", rule, {
     },
   ],
   invalid: [
+    { code: onStaticNew("", API), filename: BASE, errors: [{ messageId: "notConstructor" }] },
+    {
+      code: onStaticNew("protected ", CONTENT_TAG),
+      filename: BASE,
+      errors: [{ messageId: "notOnList" }],
+    },
     {
       code: `class Base {\n  /** @inlinedFrom ${CONTENT_TAG} */\n  static contentTag() {}\n}\n`,
       filename: TAGS_BASE,

@@ -64,6 +64,18 @@ tester.run(
       `${declarations} anything();`,
     ],
     invalid: [
+      {
+        code: `${declarations} void later();`,
+        options: [{ ignoreVoid: false }],
+        errors: [
+          {
+            messageId: "floating",
+            suggestions: [
+              { messageId: "floatingFixAwait", output: `${declarations} await later();` },
+            ],
+          },
+        ],
+      },
       floatingVoid("later()"),
       floatingVoid("either(1)"),
       floatingVoid("generic(later())"),
