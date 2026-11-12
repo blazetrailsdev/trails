@@ -1,6 +1,15 @@
 import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { LocalJumpError, rbRegSUnion, rbRegToS, rtest } from "@blazetrails/ruby-compat";
+import {
+  LocalJumpError,
+  rbInspect,
+  rbModName,
+  rbObjId,
+  rbRegSUnion,
+  rbRegToS,
+  rtest,
+  sprintf,
+} from "@blazetrails/ruby-compat";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { SchemaDumper } from "./abstract/schema-dumper.js";
 import type { InsertBuilder } from "../insert-all.js";
@@ -842,9 +851,6 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   _statements?: StatementPool | null;
-  /** @internal */
-  private _inspectId?: number;
-  private static _inspectSeq?: number;
 
   isInUse(): Thread | Fiber | null {
     return this.owner;
@@ -2050,15 +2056,11 @@ export class AbstractAdapter implements Quoting {
   }
 
   inspect(): string {
-    const q = (v: string): string => JSON.stringify(String(v));
-    const dbConfig = this.pool.dbConfig;
-    const envName = dbConfig.envName ?? "test";
-    const configName = dbConfig.name;
-    const nameField = configName && configName !== "primary" ? ` name=${q(configName)}` : "";
-    const shardField = this.shard !== "default" ? ` shard=:${this.shard}` : "";
-    this._inspectId ??= AbstractAdapter._inspectSeq = (AbstractAdapter._inspectSeq ?? 0) + 1;
-    const hex = `0x${this._inspectId.toString(16).padStart(12, "0")}`;
-    return `#<${this.constructor.name}:${hex} env_name=${q(envName)}${nameField} role=:${this.role}${shardField}>`;
+    const nameField =
+      this.pool.dbConfig.name == "primary" ? "" : ` name=${rbInspect(this.pool.dbConfig.name)}`;
+    const shardField = this.shard == "default" ? "" : ` shard=:${this.shard}`;
+
+    return `#<${rbModName(this.constructor)}:${sprintf("%#016x", rbObjId(this) << 1)} env_name=${rbInspect(this.pool.dbConfig.envName)}${nameField} role=:${this.role}${shardField}>`;
   }
 
   /** @internal */

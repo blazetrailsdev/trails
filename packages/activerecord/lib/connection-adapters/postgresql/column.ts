@@ -4,7 +4,7 @@ import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { rbHash, rbStrSend } from "@blazetrails/ruby-compat";
+import { rbHash, rbStrSend, hashAref } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _serial: boolean;
@@ -100,9 +100,9 @@ export class Column extends BaseColumn {
   }
 
   override initWith(coder: ColumnCoder): void {
-    this._serial = (coder["serial"] as boolean) ?? false;
-    this._identity = (coder["identity"] as string | null) ?? null;
-    this._generated = (coder["generated"] as string | null) ?? null;
+    this._serial = hashAref(coder, "serial") as boolean;
+    this._identity = hashAref(coder, "identity") as string | null;
+    this._generated = hashAref(coder, "generated") as string | null;
     super.initWith(coder);
   }
 

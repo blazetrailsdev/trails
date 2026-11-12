@@ -9,6 +9,7 @@ import {
   forceEncoding,
   isEmpty,
   isModuleIncluded,
+  rbCallSuper,
   rbObjRespondTo,
   sort,
   toH,
@@ -403,15 +404,13 @@ export class SchemaCache {
     return callback(File.binread(filename));
   }
 
-  initializeDup(): SchemaCache {
-    const dup = new SchemaCache();
-    dup._columns = new Map(this._columns);
-    dup._columnsHash = new Map(this._columnsHash);
-    dup._primaryKeys = new Map(this._primaryKeys);
-    dup._dataSources = new Map(this._dataSources);
-    dup._indexes = new Map(this._indexes);
-    dup._version = this._version;
-    return dup;
+  initializeDup(other: SchemaCache): void {
+    rbCallSuper(this, SchemaCache.prototype.initializeDup, other);
+    this._columns = new Map(this._columns);
+    this._columnsHash = new Map(this._columnsHash);
+    this._primaryKeys = new Map(this._primaryKeys);
+    this._dataSources = new Map(this._dataSources);
+    this._indexes = new Map(this._indexes);
   }
 
   isCached(tableName: string): boolean {

@@ -9,6 +9,8 @@ import {
   count,
   PROTOCOL_PROBES,
   rbDefineInspectCustom,
+  rbInspect,
+  rbModName,
   rbObjDup,
   rtest,
   RuntimeError,
@@ -678,15 +680,11 @@ export class ConnectionPool implements ReapablePool {
   }
 
   inspect(): string {
-    const q = (v: string) => JSON.stringify(String(v));
-    const nameField = this.dbConfig.name === "primary" ? "" : ` name=${q(this.dbConfig.name)}`;
-    const shardField = this.shard === "default" ? "" : ` shard=:${this.shard}`;
-    const className =
-      this.constructor === ConnectionPool
-        ? "ActiveRecord::ConnectionAdapters::ConnectionPool"
-        : this.constructor.name;
+    const nameField =
+      this.dbConfig.name == "primary" ? "" : ` name=${rbInspect(this.dbConfig.name)}`;
+    const shardField = this.shard == "default" ? "" : ` shard=:${this.shard}`;
 
-    return `#<${className} env_name=${q(this.dbConfig.envName)}${nameField} role=:${this.role}${shardField}>`;
+    return `#<${rbModName(this.constructor)} env_name=${rbInspect(this.dbConfig.envName)}${nameField} role=:${this.role}${shardField}>`;
   }
 
   /**
