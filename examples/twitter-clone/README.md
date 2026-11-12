@@ -51,9 +51,9 @@ contains no config of its own):
 
 ```ts
 const config = {
-  development: { adapter: "sqlite3", database: "db/development.sqlite3", pool: 5 },
+  development: { adapter: "sqlite3", database: "storage/development.sqlite3", pool: 5 },
   test: { adapter: "sqlite3", database: ":memory:", pool: 1 },
-  production: { adapter: "sqlite3", database: "db/production.sqlite3", pool: 5 },
+  production: { adapter: "sqlite3", database: "storage/production.sqlite3", pool: 5 },
 };
 export default config;
 ```
