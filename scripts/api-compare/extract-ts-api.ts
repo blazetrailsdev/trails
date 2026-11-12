@@ -313,7 +313,7 @@ export function foreignManifestMessage(
  * { Math as MathMixin }` must still record `Math`. But a NAMESPACE import
  * (`import * as Querying from "./querying.js"`) aliases to the MODULE symbol,
  * whose `name` is TypeScript's quoted absolute path for the module
- * (`"/mnt/.../packages/activerecord/src/querying"`). That is not a name, it is
+ * (`"/mnt/.../packages/activerecord/lib/querying"`). That is not a name, it is
  * a machine-local path: it never resolves in `tsByShort`, and — because the
  * extracted manifest is published to the cross-worktree shared cache — it
  * leaks one worktree's absolute paths into every sibling worktree's run

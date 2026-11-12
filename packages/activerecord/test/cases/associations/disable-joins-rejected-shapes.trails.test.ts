@@ -1,0 +1,118 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { Base } from "../../../lib/index.js";
+import type { TableDefinition } from "../../../lib/connection-adapters/abstract/schema-definitions.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import {
+  HasManyThroughAssociationPolymorphicSourceError,
+  HasManyThroughAssociationPointlessSourceTypeError,
+} from "../../../lib/associations/errors.js";
+
+describe("disable_joins shapes the deleted routing gate rejected", () => {
+  fixtures([]);
+
+  class RjMember extends Base {
+    static {
+      this._tableName = "rj_members";
+      this.attribute("name", "string");
+    }
+  }
+  class RjComment extends Base {
+    static {
+      this._tableName = "rj_comments";
+      this.attribute("rj_author_id", "integer");
+      this.attribute("origin_id", "integer");
+      this.attribute("origin_type", "string");
+      this.belongsTo("origin", {
+        className: "RjMember",
+        foreignKey: "origin_id",
+        polymorphic: true,
+      });
+      this.belongsTo("rjMember", { className: "RjMember", foreignKey: "origin_id" });
+    }
+  }
+  class RjAuthor extends Base {
+    static {
+      this._tableName = "rj_authors";
+      this.attribute("name", "string");
+      this.hasMany("rjComments", { className: "RjComment", foreignKey: "rj_author_id" });
+      this.hasMany("polySourceNoTypeRjMembers", {
+        className: "RjMember",
+        through: "rjComments",
+        source: "origin",
+        disableJoins: true,
+      });
+      this.hasMany("pointlessSourceTypeRjMembers", {
+        className: "RjMember",
+        through: "rjComments",
+        source: "rjMember",
+        sourceType: "RjMember",
+        disableJoins: true,
+      });
+    }
+  }
+
+  beforeAll(async () => {
+    await (
+      await Base.leaseConnection()
+    ).createTable("rj_authors", { force: true }, (t: TableDefinition) => {
+      t.string("name");
+    });
+    await (
+      await Base.leaseConnection()
+    ).createTable("rj_comments", { force: true }, (t: TableDefinition) => {
+      t.integer("rj_author_id");
+      t.integer("origin_id");
+      t.string("origin_type");
+    });
+    await (
+      await Base.leaseConnection()
+    ).createTable("rj_members", { force: true }, (t: TableDefinition) => {
+      t.string("name");
+    });
+    constSet(TopLevel, "RjAuthor", RjAuthor);
+    DescendantsTracker.registerSubclass(Base, RjAuthor);
+    constSet(TopLevel, "RjComment", RjComment);
+    DescendantsTracker.registerSubclass(Base, RjComment);
+    constSet(TopLevel, "RjMember", RjMember);
+    DescendantsTracker.registerSubclass(Base, RjMember);
+  });
+
+  afterAll(async () => {
+    await (
+      await Base.leaseConnection()
+    ).dropTable("rj_members", "rj_comments", "rj_authors", { ifExists: true });
+  });
+
+  it("a polymorphic source without source_type raises rather than routing anywhere", async () => {
+    const author = await RjAuthor.create({ name: "a" });
+    expect(
+      () => (author.association("polySourceNoTypeRjMembers") as CollectionAssociation).reader,
+    ).toThrow(HasManyThroughAssociationPolymorphicSourceError);
+  });
+
+  it("a source_type on a non-polymorphic source raises rather than routing anywhere", async () => {
+    const author = await RjAuthor.create({ name: "a" });
+    expect(
+      () => (author.association("pointlessSourceTypeRjMembers") as CollectionAssociation).reader,
+    ).toThrow(HasManyThroughAssociationPointlessSourceTypeError);
+  });
+
+  it("a disable_joins association with no through reflection is refused by the macro", () => {
+    expect(() => {
+      class RjNoThrough extends Base {
+        static {
+          this._tableName = "rj_authors";
+          this.hasMany("rjComments", {
+            className: "RjComment",
+            foreignKey: "rj_author_id",
+            disableJoins: true,
+          });
+        }
+      }
+      void RjNoThrough;
+    }).toThrow(/disableJoins/);
+  });
+});

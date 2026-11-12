@@ -9,30 +9,37 @@ import {
 import { noRawSqlRoot } from "./no-raw-sql-scope.mjs";
 import { ALLOW } from "./no-internal-canonical-loaders.mjs";
 
-const SRC = "packages/activerecord/src";
+const SRC = "packages/activerecord/lib";
+const TEST = "packages/activerecord/test";
 
 describe("test-infra lint scope", () => {
   // Pinned to the literal lists the two config blocks and the rule carried
   // before they were converged, so the convergence stays behaviour-preserving.
   it("exposes the exemption globs the table-lifecycle config blocks apply", () => {
     expect(testInfraExemptIgnores).toEqual([
+      `${TEST}/models/**`,
+      `${TEST}/fixtures/**`,
+      `${TEST}/migrations/**`,
+      `${TEST}/support/**`,
+      `${TEST}/cases/support/**`,
+      `${TEST}/cases/fixtures.test.ts`,
+      `${TEST}/cases/naked-fixtures.trails.test.ts`,
+      `${TEST}/cases/test-fixtures.test.ts`,
+      `${TEST}/cases/test-fixtures/**`,
       `${SRC}/test-helpers/**`,
       `${SRC}/support/**`,
-      `${SRC}/fixtures.test.ts`,
-      `${SRC}/naked-fixtures.trails.test.ts`,
-      `${SRC}/test-fixtures.test.ts`,
       `${SRC}/test-fixtures/**`,
     ]);
   });
 
   it("allowlists exactly the canonical loaders' own unit tests", () => {
     expect(canonicalLoaderSelfTests).toEqual([
-      `${SRC}/support/canonical-schema.trails.test.ts`,
-      `${SRC}/support/canonical-table-rebuild.trails.test.ts`,
-      `${SRC}/support/load-schema-helper.trails.test.ts`,
-      `${SRC}/support/load-schema-helper-uuid-default.trails.test.ts`,
-      `${SRC}/support/load-schema-helper-arm-guard.trails.test.ts`,
-      `${SRC}/support/stubbed-ddl-methods.trails.test.ts`,
+      `${TEST}/cases/support/canonical-schema.trails.test.ts`,
+      `${TEST}/cases/support/canonical-table-rebuild.trails.test.ts`,
+      `${TEST}/cases/support/load-schema-helper.trails.test.ts`,
+      `${TEST}/cases/support/load-schema-helper-uuid-default.trails.test.ts`,
+      `${TEST}/cases/support/load-schema-helper-arm-guard.trails.test.ts`,
+      `${TEST}/cases/support/stubbed-ddl-methods.trails.test.ts`,
     ]);
     expect([...ALLOW]).toEqual(canonicalLoaderSelfTests);
     expect(canonicalLoaderModules).toEqual([

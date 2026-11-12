@@ -2,7 +2,7 @@
 /**
  * normalize-skips.ts
  *
- * Walks all *.test.ts files under packages/activerecord/src/ and inserts the
+ * Walks all *.test.ts files under packages/activerecord/test/ and inserts the
  * structured skip annotation into every bare it.skip / xit / test.skip /
  * describe.skip call that does not already have a BLOCKED: comment.
  *
@@ -26,7 +26,7 @@ import * as path from "path";
 import { globSync } from "tinyglobby";
 
 const ROOT_DIR = path.resolve(__dirname, "../..");
-const AR_SRC = path.join(ROOT_DIR, "packages/activerecord/src");
+const AR_SRC = path.join(ROOT_DIR, "packages/activerecord/test");
 
 const DRY_RUN = process.argv.includes("--dry-run");
 

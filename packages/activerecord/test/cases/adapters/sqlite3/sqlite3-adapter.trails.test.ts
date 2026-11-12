@@ -1,0 +1,343 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
+import type { ConnectionPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { Errno, File, FileUtils } from "@blazetrails/ruby-compat";
+import { BusyException, CantOpenException } from "../../../../lib/sqlite/errors.js";
+import {
+  ActiveRecordError,
+  NoDatabaseError,
+  StatementInvalid,
+  StatementTimeout,
+  ValueTooLong,
+} from "../../../../lib/errors.js";
+
+describe("SqliteAdapter", () => {
+  let adapter: SQLite3Adapter;
+  let pool: ConnectionPool;
+
+  beforeEach(async () => {
+    pool = newSqlitePool();
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
+  });
+
+  afterEach(async () => {
+    await adapter.execute(`DROP TABLE IF EXISTS "affinities"`);
+    await pool.disconnect();
+  });
+
+  describe("alterTable", () => {
+    it("round-trips a typeless (BLOB affinity) column", async () => {
+      await adapter.execute(
+        `CREATE TABLE "affinities" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "untyped", "doomed" varchar)`,
+      );
+      await adapter.execute(`INSERT INTO "affinities" ("untyped") VALUES (42)`);
+
+      await adapter.removeColumn("affinities", "doomed");
+
+      const columns = await adapter.columns("affinities");
+      expect(columns.map((c) => c.name)).toEqual(["id", "untyped"]);
+      expect(columns.find((c) => c.name === "untyped")?.sqlType).toBe("");
+      const rows = await adapter.selectAll(`SELECT typeof("untyped") AS t FROM "affinities"`);
+      expect(rows.rows[0]?.[0]).toBe("integer");
+    });
+  });
+
+  const castType = (sqlType: string) => adapter.lookupCastType(sqlType);
+
+  describe("lookupCastType", () => {
+    it("resolves base SQL types", () => {
+      expect(castType("text").type()).toBe("text");
+      expect(castType("integer").type()).toBe("integer");
+      expect(castType("float").type()).toBe("float");
+      expect(castType("boolean").type()).toBe("boolean");
+      expect(castType("date").type()).toBe("date");
+      expect(castType("datetime").type()).toBe("datetime");
+      expect(castType("time").type()).toBe("time");
+      expect(castType("json").type()).toBe("json");
+      expect(castType("blob").type()).toBe("binary");
+    });
+
+    it("strips precision/scale metadata", () => {
+      expect(castType("DECIMAL(10, 0)").type()).toBe("decimal");
+      expect(castType("decimal(5,2)").type()).toBe("decimal");
+      expect(castType("INTEGER(11)").type()).toBe("integer");
+    });
+
+    it("handles case-insensitive types", () => {
+      expect(castType("TEXT").type()).toBe("text");
+      expect(castType("INTEGER").type()).toBe("integer");
+      expect(castType("BOOLEAN").type()).toBe("boolean");
+    });
+
+    it("resolves SQLite affinity types via regex", () => {
+      expect(castType("varchar").type()).toBe("string");
+      expect(castType("character").type()).toBe("string");
+      expect(castType("clob").type()).toBe("text");
+      expect(castType("double").type()).toBe("float");
+      expect(castType("bigint").type()).toBe("integer");
+      expect(castType("tinyint").type()).toBe("integer");
+    });
+  });
+});
+
+describe("SQLite3Adapter pragmas option", () => {
+  let adapter: SQLite3Adapter | undefined;
+
+  afterEach(async () => {
+    await adapter?.disconnectBang();
+    vi.restoreAllMocks();
+  });
+
+  it("applies a valid numeric pragma on connect", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { cache_size: 500 } });
+    await adapter.connectBang();
+    const result = (
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("cache_size") as Array<{ cache_size: number }>;
+    expect(result[0]?.cache_size).toBe(500);
+  });
+
+  it("applies a valid string enum pragma", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { synchronous: "FULL" } });
+    await adapter.connectBang();
+    const result = (
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("synchronous") as Array<{ synchronous: number }>;
+    expect(result[0]?.synchronous).toBe(2);
+  });
+
+  it("converts boolean true to 1 for pragma", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: true } });
+    await adapter.connectBang();
+    const result = (
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("foreign_keys") as Array<{ foreign_keys: number }>;
+    expect(result[0]?.foreign_keys).toBe(1);
+  });
+
+  it("raises SQLite3::CantOpenException opening a missing database file readonly", async () => {
+    const missing = new BetterSQLite3Adapter({
+      database: "tmp/missing-readonly-database.sqlite3",
+      readonly: true,
+    });
+    const error = await missing.connectBang().then(
+      () => null,
+      (e: Error) => e,
+    );
+    expect(error instanceof NoDatabaseError).toBe(false);
+    expect(error instanceof StatementInvalid).toBe(true);
+    expect(error!.message).toBe("SQLite3::CantOpenException: unable to open database file");
+    expect(error!.cause instanceof CantOpenException).toBe(true);
+  });
+
+  it("new_client raises NoDatabaseError for Errno::ENOENT and re-raises anything else", async () => {
+    const newClient = (error: Error) =>
+      Promise.resolve().then(() =>
+        BetterSQLite3Adapter.newClient({
+          database: ":memory:",
+          driver: {
+            name: "raising",
+            open: async () => {
+              throw error;
+            },
+          },
+        } as never),
+      );
+    await expect(newClient(new Errno.ENOENT("tmp/nope.sqlite3"))).rejects.toThrow(NoDatabaseError);
+    const cantOpen = new CantOpenException("unable to open database file");
+    await expect(newClient(cantOpen)).rejects.toBe(cantOpen);
+  });
+
+  it("raises NoDatabaseError with the pool when the database directory cannot be created", () => {
+    FileUtils.mkdirP("tmp");
+    File.write("tmp/not-a-directory", "");
+    try {
+      let error: unknown;
+      try {
+        new BetterSQLite3Adapter({ database: "tmp/not-a-directory/db.sqlite3" });
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(NoDatabaseError);
+      expect((error as NoDatabaseError).message).toBe("Database not found");
+      expect((error as NoDatabaseError).connectionPool).toBeDefined();
+    } finally {
+      FileUtils.rmRf("tmp/not-a-directory");
+    }
+  });
+
+  it("converts boolean false to 0 for pragma", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", pragmas: { foreign_keys: false } });
+    await adapter.connectBang();
+    const result = (
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("foreign_keys") as Array<{ foreign_keys: number }>;
+    expect(result[0]?.foreign_keys).toBe(0);
+  });
+
+  it("warns and skips an invalid pragma name", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    adapter = new BetterSQLite3Adapter({
+      database: ":memory:",
+      pragmas: { "bad-name!": 1 } as Record<string, number>,
+    });
+    await adapter.connectBang();
+    expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: bad-name!");
+  });
+
+  it("warns and skips a string value with unsafe characters", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const dbPath = path.join(os.tmpdir(), `sqlite-pragma-injection-${Date.now()}.db`);
+    const seed = new BetterSQLite3Adapter({ database: dbPath });
+    await seed.connectBang();
+    await seed.execute("CREATE TABLE sentinel (id integer)");
+    await seed.disconnectBang();
+    try {
+      adapter = new BetterSQLite3Adapter({
+        database: dbPath,
+        pragmas: { synchronous: "FULL; DROP TABLE sentinel" },
+      });
+      await expect(adapter.connectBang()).rejects.toThrow(
+        'unrecognized synchronous "FULL; DROP TABLE sentinel"',
+      );
+      const check = new BetterSQLite3Adapter({ database: dbPath });
+      await check.connectBang();
+      const rows = ((await check.rawConnection())!.raw as import("better-sqlite3").Database)
+        .prepare("SELECT count(*) AS c FROM sqlite_master WHERE name = 'sentinel'")
+        .get();
+      expect(rows).toEqual({ c: 1 });
+      await check.dropTable("sentinel", { ifExists: true });
+      await check.disconnectBang();
+    } finally {
+      fs.rmSync(dbPath, { force: true });
+    }
+  });
+
+  it("applies DEFAULT_PRAGMAS when no pragmas option is given", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+    await adapter.connectBang();
+    const result = (
+      (await adapter.rawConnection())!.raw as import("better-sqlite3").Database
+    ).pragma("cache_size") as Array<{ cache_size: number }>;
+    expect(result[0]?.cache_size).toBe(2000);
+  });
+});
+
+describe("SQLite3 databaseExists", () => {
+  it("answers true for an in-memory adapter without connecting", async () => {
+    const a = new BetterSQLite3Adapter({ database: ":memory:" });
+    expect(await a.databaseExists()).toBe(true);
+    await a.disconnectBang();
+  });
+
+  it("answers from the file the driver opens, not a cached handle", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const dbPath = path.join(os.tmpdir(), `sqlite-exists-instance-${Date.now()}.db`);
+    const a = new BetterSQLite3Adapter({ database: dbPath });
+    try {
+      await a.connectBang();
+      expect(await a.databaseExists()).toBe(true);
+      fs.rmSync(dbPath, { force: true });
+      expect(await a.databaseExists()).toBe(false);
+    } finally {
+      await a.disconnectBang();
+      fs.rmSync(dbPath, { force: true });
+    }
+  });
+});
+
+describe("SQLite3 write-path float binds", () => {
+  fixtures([]);
+
+  it("binds a whole-valued float column as SQLITE_FLOAT", async () => {
+    const { NumericData } = await import("../../../models/numeric-data.js");
+    const record = await NumericData.create({ temperature: 2.0 });
+    const rows = (await (
+      await NumericData.leaseConnection()
+    ).execute(
+      `SELECT typeof("temperature") AS t FROM "numeric_data" WHERE "id" = ${record.id}`,
+    )) as Array<{ t: string }>;
+    expect(rows[0].t).toBe("real");
+  });
+});
+
+describe("SQLite3 translateException", () => {
+  let pool: ConnectionPool;
+  let adapter: SQLite3Adapter;
+
+  beforeEach(async () => {
+    pool = newSqlitePool();
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
+  });
+
+  afterEach(async () => {
+    await pool.disconnect();
+  });
+
+  const translate = (exception: unknown) =>
+    adapter.translateException(exception, { message: "msg", sql: "SELECT 1", binds: [] });
+
+  it("classifies a busy database as StatementTimeout", () => {
+    const busy = new BusyException("database is locked");
+    expect(translate(busy)).toBeInstanceOf(StatementTimeout);
+  });
+
+  it("passes an ActiveRecordError through unchanged", () => {
+    const error = new ActiveRecordError("boom");
+    expect(translate(error)).toBe(error);
+  });
+
+  it("does not translate an oversized value", () => {
+    const tooLong = new Error("String or BLOB exceeded size limit");
+    const translated = translate(tooLong);
+    expect(translated).toBeInstanceOf(StatementInvalid);
+    expect(translated).not.toBeInstanceOf(ValueTooLong);
+  });
+});
+
+describe("SQLite3AdapterTest", () => {
+  let adapter: SQLite3Adapter;
+  let pool: ConnectionPool;
+
+  beforeEach(async () => {
+    pool = newSqlitePool();
+    adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
+  });
+
+  afterEach(async () => {
+    await adapter.execute(`DROP TABLE IF EXISTS json_defs`);
+    await pool.disconnect();
+  });
+
+  it("change column default serializes a structured json default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
+    await adapter.changeColumnDefault("json_defs", "options", {});
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual("{}");
+  });
+
+  it("change column default treats a bare to object as a literal default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
+    await adapter.changeColumnDefault("json_defs", "options", { to: 1 });
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual('{"to":1}');
+  });
+
+  it("change column serializes a structured json default", async () => {
+    await adapter.execute(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" TEXT)`);
+    await adapter.changeColumn("json_defs", "options", "json", { default: {} });
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual("{}");
+  });
+
+  it("quote default expression serializes a structured json default once", async () => {
+    expect(await adapter.quoteDefaultExpression({}, { sqlType: "json" })).toEqual("'{}'");
+  });
+});

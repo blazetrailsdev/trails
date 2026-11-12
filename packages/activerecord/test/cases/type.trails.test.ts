@@ -1,0 +1,215 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import {
+  register,
+  lookup,
+  defaultValue,
+  registry,
+  setRegistry,
+  currentAdapterName,
+  adapterNameFrom,
+  AdapterSpecificRegistry,
+} from "../../lib/type.js";
+import { Base } from "../../lib/base.js";
+import { ConnectionNotDefined } from "../../lib/errors.js";
+import { ValueType, StringType } from "@blazetrails/activemodel";
+import "../../lib/connection-adapters/mysql2-adapter.js";
+import "../../lib/connection-adapters/postgresql-adapter.js";
+import { Bytea } from "../../lib/connection-adapters/postgresql/oid/bytea.js";
+import { Date as OidDate } from "../../lib/connection-adapters/postgresql/oid/date.js";
+import { DateTime as OidDateTime } from "../../lib/connection-adapters/postgresql/oid/date-time.js";
+import { Decimal as OidDecimal } from "../../lib/connection-adapters/postgresql/oid/decimal.js";
+import { Interval } from "../../lib/connection-adapters/postgresql/oid/interval.js";
+import { Money } from "../../lib/connection-adapters/postgresql/oid/money.js";
+import { Uuid } from "../../lib/connection-adapters/postgresql/oid/uuid.js";
+
+class GenericType extends ValueType<unknown> {
+  readonly name: string = "generic";
+  cast(value: unknown) {
+    return value;
+  }
+}
+
+class AdapterType extends GenericType {
+  override readonly name: string = "adapter_specific";
+}
+
+function modelWith(adapter: string | undefined) {
+  return { connectionDbConfig: () => ({ adapter }) };
+}
+
+describe("Type.currentAdapterName", () => {
+  it("resolves through Base", () => {
+    expect(currentAdapterName()).toBe(adapterNameFrom(Base));
+  });
+
+  it("normalizes the configured adapter to the registration namespace", () => {
+    expect(adapterNameFrom(modelWith("postgresql"))).toBe("postgresql");
+    expect(adapterNameFrom(modelWith("mysql2"))).toBe("mysql2");
+    expect(adapterNameFrom(modelWith("sqlite3"))).toBe("sqlite3");
+  });
+
+  it("raises when the model has no configuration", () => {
+    expect(() =>
+      adapterNameFrom({
+        connectionDbConfig: () => {
+          throw new ConnectionNotDefined("No database connection defined.");
+        },
+      }),
+    ).toThrow(ConnectionNotDefined);
+    expect(() => adapterNameFrom(modelWith(undefined))).toThrow(TypeError);
+  });
+
+  it("propagates errors other than a missing connection", () => {
+    expect(() =>
+      adapterNameFrom({
+        connectionDbConfig: () => {
+          throw new TypeError("boom");
+        },
+      }),
+    ).toThrow(TypeError);
+  });
+});
+
+describe("Type.lookup under a non-sqlite configuration", () => {
+  let oldRegistry: AdapterSpecificRegistry;
+  let oldDbConfig: unknown;
+
+  beforeEach(() => {
+    oldRegistry = registry();
+    setRegistry(new AdapterSpecificRegistry());
+    oldDbConfig = (Base as unknown as { connectionDbConfig: unknown }).connectionDbConfig;
+  });
+
+  afterEach(() => {
+    setRegistry(oldRegistry);
+    (Base as unknown as { connectionDbConfig: unknown }).connectionDbConfig = oldDbConfig;
+  });
+
+  function stubAdapter(adapter: string): void {
+    (Base as unknown as { connectionDbConfig: () => { adapter: string } }).connectionDbConfig =
+      () => ({ adapter });
+  }
+
+  it("picks the postgres registration", () => {
+    register("foo", GenericType, { override: false });
+    register("foo", AdapterType, { adapter: "postgresql" });
+
+    stubAdapter("postgresql");
+    expect(lookup("foo")).toBeInstanceOf(AdapterType);
+  });
+
+  it("picks the mysql registration for a mysql2 configuration", () => {
+    register("foo", GenericType, { override: false });
+    register("foo", AdapterType, { adapter: "mysql2" });
+
+    stubAdapter("mysql2");
+    expect(lookup("foo")).toBeInstanceOf(AdapterType);
+  });
+
+  it("reaches the mysql2 adapter's own string registration", () => {
+    setRegistry(oldRegistry);
+    stubAdapter("mysql2");
+
+    const type = lookup("string");
+    expect(type).toBeInstanceOf(StringType);
+    expect(type.cast(true)).toBe("1");
+    expect(type.cast(false)).toBe("0");
+  });
+
+  it("leaves the generic registration in place under sqlite", () => {
+    register("foo", GenericType, { override: false });
+    register("foo", AdapterType, { adapter: "postgresql" });
+
+    stubAdapter("sqlite3");
+    expect(lookup("foo")).toBeInstanceOf(GenericType);
+    expect(lookup("foo")).not.toBeInstanceOf(AdapterType);
+  });
+});
+
+describe("ActiveRecord::Type.lookup", () => {
+  it("does not register :value — Type.default_value is not a registry entry", () => {
+    expect(() => lookup("value", { adapter: "sqlite3" })).toThrow("Unknown type :value");
+    expect(defaultValue()).toBeInstanceOf(ValueType);
+  });
+});
+
+describe("the PostgreSQL OID registrations", () => {
+  it("resolve only under a postgres adapter", () => {
+    expect(lookup("money", { adapter: "postgresql" })).toBeInstanceOf(Money);
+    expect(lookup("interval", { adapter: "postgresql" })).toBeInstanceOf(Interval);
+    expect(lookup("uuid", { adapter: "postgresql" })).toBeInstanceOf(Uuid);
+
+    expect(() => lookup("money", { adapter: "sqlite3" })).toThrow("Unknown type :money");
+    expect(() => lookup("interval", { adapter: "mysql2" })).toThrow("Unknown type :interval");
+  });
+
+  it("shadow the generic registrations of the same name under postgres", () => {
+    expect(lookup("date", { adapter: "postgresql" })).toBeInstanceOf(OidDate);
+    expect(lookup("date", { adapter: "sqlite3" })).not.toBeInstanceOf(OidDate);
+
+    expect(lookup("binary", { adapter: "postgresql" })).toBeInstanceOf(Bytea);
+    expect(lookup("binary", { adapter: "sqlite3" })).not.toBeInstanceOf(Bytea);
+
+    expect(lookup("datetime", { adapter: "postgresql" })).toBeInstanceOf(OidDateTime);
+    expect(lookup("decimal", { adapter: "postgresql" })).toBeInstanceOf(OidDecimal);
+  });
+
+  it("cover every type Rails registers for the postgresql adapter", () => {
+    for (const name of [
+      "bit",
+      "bit_varying",
+      "binary",
+      "cidr",
+      "date",
+      "datetime",
+      "decimal",
+      "enum",
+      "hstore",
+      "inet",
+      "interval",
+      "jsonb",
+      "money",
+      "point",
+      "legacy_point",
+      "uuid",
+      "vector",
+      "xml",
+    ]) {
+      expect(() => lookup(name, { adapter: "postgresql" })).not.toThrow();
+    }
+  });
+});
+
+describe("attribute() resolves through the declaring model's adapter", () => {
+  const originalConnectionDbConfig = (Base as unknown as { connectionDbConfig: unknown })
+    .connectionDbConfig;
+
+  afterEach(() => {
+    (Base as unknown as { connectionDbConfig: unknown }).connectionDbConfig =
+      originalConnectionDbConfig;
+  });
+
+  function modelForAdapter(adapter: string): typeof Base {
+    class AdapterScoped extends Base {}
+    (
+      AdapterScoped as unknown as { connectionDbConfig: () => { adapter: string } }
+    ).connectionDbConfig = () => ({ adapter });
+    return AdapterScoped as unknown as typeof Base;
+  }
+
+  it("picks the mysql2 string registration for a mysql2 model", () => {
+    const model = modelForAdapter("mysql2");
+    model.attribute("mystring", "string");
+
+    const type = model.resolveTypeName("string");
+    expect(type.cast(true)).toBe("1");
+    expect(model._defaultAttributes().getAttribute("mystring").type!.cast(true)).toBe("1");
+  });
+
+  it("leaves a sqlite3 model on the generic string registration", () => {
+    const model = modelForAdapter("sqlite3");
+    model.attribute("mystring", "string");
+
+    expect(model._defaultAttributes().getAttribute("mystring").type!.cast(true)).toBe("t");
+  });
+});

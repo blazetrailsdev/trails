@@ -429,7 +429,7 @@ describe("foreignAbsolutePath", () => {
   it("returns null for a worktree-independent payload", () => {
     const body = JSON.stringify({
       classes: { "base.ts:Base": { extends: ["Querying"], file: "base.ts" } },
-      inputs: { "packages/activerecord/src/base.ts": "abc" },
+      inputs: { "packages/activerecord/lib/base.ts": "abc" },
     });
     expect(foreignAbsolutePath(body, root)).toBeNull();
   });
@@ -438,12 +438,12 @@ describe("foreignAbsolutePath", () => {
     const body = JSON.stringify({
       classes: {
         "base.ts:Base": {
-          extends: ['"/mnt/theta/trails/worktrees/other/packages/activerecord/src/querying"'],
+          extends: ['"/mnt/theta/trails/worktrees/other/packages/activerecord/lib/querying"'],
         },
       },
     });
     expect(foreignAbsolutePath(body, root)).toBe(
-      "/mnt/theta/trails/worktrees/other/packages/activerecord/src/querying",
+      "/mnt/theta/trails/worktrees/other/packages/activerecord/lib/querying",
     );
   });
 
@@ -494,11 +494,11 @@ describe("a cache entry cannot supply another worktree's paths", () => {
   const manifestOf = (root: string, extendsName: string) =>
     JSON.stringify({
       package: { classes: { "base.ts:Base": { file: "base.ts", extends: [extendsName] } } },
-      inputs: { "packages/activerecord/src/base.ts": path.basename(root) },
+      inputs: { "packages/activerecord/lib/base.ts": path.basename(root) },
     });
 
   const poisonedIn = (root: string) =>
-    manifestOf(root, `"${root}/packages/activerecord/src/querying"`);
+    manifestOf(root, `"${root}/packages/activerecord/lib/querying"`);
 
   /** What `main()` does for one package: serve a servable shared entry, else
    *  extract (the stand-in for the compiler pass), publish, and use that. */
@@ -540,7 +540,7 @@ describe("a cache entry cannot supply another worktree's paths", () => {
     const inB = await runIn(b, () => manifestOf(b, "Querying"));
     expect(inB.extracted).toBe(true);
     expect(inB.manifest).toBe(manifestOf(b, "Querying"));
-    expect(foreignAbsolutePath(poisonedIn(a), b)).toBe(`${a}/packages/activerecord/src/querying`);
+    expect(foreignAbsolutePath(poisonedIn(a), b)).toBe(`${a}/packages/activerecord/lib/querying`);
   });
 
   it("serves A's worktree-independent entry to B unchanged", async () => {
@@ -601,7 +601,7 @@ describe("the ruby manifests are gated across worktrees too", () => {
     it(`does not serve a ${name} entry carrying another worktree's path`, async () => {
       const { a, b } = linkedWorktrees();
       const poisoned = JSON.stringify({
-        files: [{ path: `${a}/packages/activerecord/src/base.ts` }],
+        files: [{ path: `${a}/packages/activerecord/lib/base.ts` }],
       });
       // Written past the publish gate, as a pre-fix entry would be.
       await writeShared((await sharedCacheDir(a))!, name, KEY, poisoned, path.basename(a));

@@ -1,0 +1,24 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Chef } from "./chef.js";
+import type { Hotel } from "./hotel.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Department extends Base {
+  declare chefs: AssociationProxy<Chef>;
+  declare hotel_id: number;
+
+  static {
+    this.hasMany("chefs");
+    this.belongsTo("hotel");
+  }
+}
+constSet(TopLevel, "Department", Department);
+DescendantsTracker.registerSubclass(Base, Department);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Department {
+  get hotel(): Hotel | null | Promise<Hotel | null>;
+  set hotel(value: Hotel | null);
+}

@@ -1,0 +1,54 @@
+import { describe, it, expect } from "vitest";
+import { Base } from "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+
+fixtures({});
+
+describe("ReadTest", () => {
+  it("the empty-suffix pattern proxies to attribute", () => {
+    class Post extends Base {
+      static {
+        this.attribute("published", "boolean");
+      }
+    }
+    const p = new Post({ published: true }) as Post & {
+      matchedAttributeMethod(name: string): { proxyTarget: string; attrName: string } | null;
+      attributeMissing(match: { proxyTarget: string; attrName: string }): unknown;
+    };
+    const match = p.matchedAttributeMethod("published");
+    expect(match?.proxyTarget).toBe("attribute");
+    expect(p.attributeMissing(match!)).toBe(true);
+  });
+
+  it("_read_attribute returns value for existing attribute", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const p = new Post({ title: "hello" });
+    expect(p._readAttribute("title")).toBe("hello");
+  });
+
+  it("_read_attribute returns null for unset attribute", () => {
+    class Post extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const p = new Post({});
+    expect(p._readAttribute("title")).toBeNull();
+  });
+
+  it("_read_attribute does not apply alias resolution", () => {
+    class Post extends Base {
+      static {
+        this.attribute("body", "string");
+        this.aliasAttribute("content", "body");
+      }
+    }
+    const p = new Post({ body: "text" });
+    expect(p._readAttribute("body")).toBe("text");
+    expect(p._readAttribute("content")).toBeNull();
+  });
+});

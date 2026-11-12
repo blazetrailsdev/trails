@@ -1,0 +1,246 @@
+import { describe, it, expect } from "vitest";
+import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
+import { ArgumentError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { adapterType } from "../../../lib/test-adapter.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Author } from "../../models/author.js";
+import { Post, SpecialPost } from "../../../lib/test-helpers/models/post.js";
+import { Comment } from "../../models/comment.js";
+import { Paragraph } from "../../models/paragraph.js";
+import "../../models/categorization.js";
+
+constSet(TopLevel, "Author", Author);
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "SpecialPost", SpecialPost);
+constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Paragraph", Paragraph);
+
+const byId = (records: any[]) =>
+  [...records].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+describe("OrTest", () => {
+  fixtures(["posts", "authors", "authorAddresses"]);
+
+  it("or with relation", async () => {
+    const expected = await Post.where("id = 1 or id = 2");
+    expect(await Post.where("id = 1").or(Post.where("id = 2"))).toEqual(expected);
+  });
+
+  it("or identity", async () => {
+    const expected = await Post.where("id = 1");
+    expect(await Post.where("id = 1").or(Post.where("id = 1"))).toEqual(expected);
+  });
+
+  it("or with null left", async () => {
+    const expected = await Post.where("id = 1");
+    expect(await Post.none().or(Post.where("id = 1"))).toEqual(expected);
+  });
+
+  it("or with null right", async () => {
+    const expected = await Post.where("id = 1");
+    expect(await Post.where("id = 1").or(Post.none())).toEqual(expected);
+  });
+
+  it("or with large number", async () => {
+    const expected = await Post.where("id = 1 or id = 9223372036854775808");
+    expect(await Post.where({ id: 1 }).or(Post.where({ id: 9223372036854775808n }))).toEqual(
+      expected,
+    );
+  });
+
+  it("or with bind params", async () => {
+    const expected = byId((await Post.find([1, 2])) as any[]);
+    expect(byId(await Post.where({ id: 1 }).or(Post.where({ id: 2 })))).toEqual(expected);
+  });
+
+  it("or with null both", async () => {
+    const expected = await Post.none();
+    expect(await Post.none().or(Post.none())).toEqual(expected);
+  });
+
+  it("or without left where", async () => {
+    const expected = await Post.all();
+    expect(await Post.or(Post.where("id = 1"))).toEqual(expected);
+  });
+
+  it("or without right where", async () => {
+    const expected = await Post.all();
+    expect(await Post.where("id = 1").or(Post.all())).toEqual(expected);
+  });
+
+  it("or preserves other querying methods", async () => {
+    const expected = await Post.where("id = 1 or id = 2 or id = 3").order("body asc");
+    const partial = Post.order("body asc");
+    expect(await partial.where("id = 1").or(partial.where({ id: [2, 3] }))).toEqual(expected);
+    expect(
+      await Post.order("body asc")
+        .where("id = 1")
+        .or(Post.order("body asc").where({ id: [2, 3] })),
+    ).toEqual(expected);
+  });
+
+  it("or with incompatible single value relations", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
+      Post.distinct()
+        .where("id = 1")
+        .or(Post.where({ id: [2, 3] })),
+    );
+
+    expect(error.message).toBe(
+      "Relation passed to #or must be structurally compatible. Incompatible values: [:distinct]",
+    );
+  });
+
+  it("or with incompatible multi value relations", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
+      Post.order("body asc")
+        .where("id = 1")
+        .or(Post.order("id desc").where({ id: [2, 3] })),
+    );
+
+    expect(error.message).toBe(
+      "Relation passed to #or must be structurally compatible. Incompatible values: [:order]",
+    );
+  });
+
+  it("or with unscope where", async () => {
+    const expected = await Post.where("id = 1 or id = 2");
+    const partial = Post.where("id = 1 and id != 2");
+    expect(await partial.or(partial.unscope(":where").where("id = 2"))).toEqual(expected);
+  });
+
+  it("or with unscope where column", async () => {
+    const expected = await Post.where("id = 1 or id = 2");
+    const partial = Post.where({ id: 1 }).where().not({ id: 2 });
+    expect(await partial.or(partial.unscope({ ":where": "id" }).where("id = 2"))).toEqual(expected);
+  });
+
+  it("or with unscope order", async () => {
+    const expected = byId(await Post.where("id = 1 or id = 2"));
+    expect(
+      byId(await Post.order("body asc").where("id = 1").unscope(":order").or(Post.where("id = 2"))),
+    ).toEqual(expected);
+    expect(
+      byId(
+        await Post.order("id")
+          .where("id = 1")
+          .or(Post.order("id").where("id = 2").unscope(":order")),
+      ),
+    ).toEqual(expected);
+  });
+
+  it("or with incompatible unscope", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
+      Post.order("body asc")
+        .where("id = 1")
+        .unscope(":order")
+        .or(Post.order("body asc").where("id = 2")),
+    );
+
+    expect(error.message).toBe(
+      "Relation passed to #or must be structurally compatible. Incompatible values: [:order]",
+    );
+  });
+
+  it("or when grouping", async () => {
+    const groups = Post.where("id < 10").group("body");
+    const expected = await groups.having("COUNT(*) > 1 OR body like 'Such%'").count();
+    expect(
+      await groups.having("COUNT(*) > 1").or(groups.having("body like 'Such%'")).count(),
+    ).toEqual(expected);
+  });
+
+  it("or with named scope", async () => {
+    const expected = await Post.where("id = 1 or body LIKE '%a%'");
+    expect(await Post.where("id = 1").or((Post as any).containingTheLetterA())).toEqual(expected);
+  });
+
+  it("or inside named scope", async () => {
+    const expected = await Post.where("body LIKE '%a%' OR title LIKE ?", "%'%").order("id DESC");
+    expect(
+      await (Post.order({ id: "desc" }) as any).typographicallyInteresting().toArray(),
+    ).toEqual(expected);
+  });
+
+  it("or with sti relation", async () => {
+    const expected = byId(await Post.where("id = 1 or id = 2"));
+    expect(byId(await Post.where({ id: 1 }).or(SpecialPost.all()))).toEqual(expected);
+  });
+
+  it("or on loaded relation", async () => {
+    const expected = await Post.where("id = 1 or id = 2");
+    const p = Post.where("id = 1");
+    await p.load();
+    expect(p.loaded).toBe(true);
+    expect(await p.or(Post.where("id = 2"))).toEqual(expected);
+  });
+
+  it("or with non relation object raises error", async () => {
+    const error = await assertRaises([ArgumentError], {}, () =>
+      Post.where({ id: [1, 2, 3] }).or({ title: "Rails" } as any),
+    );
+
+    expect(error.message).toBe(
+      "You have passed Hash object to #or. Pass an ActiveRecord::Relation object instead.",
+    );
+  });
+
+  it("or with references inequality", async () => {
+    const joined = Post.includes(":author");
+    const actual = joined
+      .where({ authors: { id: 1 } })
+      .or(joined.where({ title: "I don't have any comments" }));
+    const author = (await Author.find(1)) as any;
+    const expected = [
+      ...(await author.posts.toArray()),
+      ...(await Post.where({ title: "I don't have any comments" })),
+    ];
+    expect(byId(await actual).map((p: any) => p.id)).toEqual(byId(expected).map((p: any) => p.id));
+  });
+
+  it("or with scope on association", async () => {
+    const author = (await Author.first()) as any;
+    await assertNothingRaised(() => author.topPosts.or(author.otherTopPosts));
+  });
+
+  it("or with annotate", () => {
+    const quotedPosts = Post.quotedTableName();
+    const tail = (sql: string) => sql.replace(/\s+/g, " ").trimEnd();
+    expect(tail(Post.annotate("foo").or(Post.all()).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
+    );
+    expect(tail(Post.annotate("foo").or(Post.annotate("foo")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
+    );
+    expect(tail(Post.annotate("foo").or(Post.annotate("bar")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/$`),
+    );
+    expect(tail(Post.annotate("foo", "bar").or(Post.annotate("foo")).toSql())).toMatch(
+      new RegExp(`${quotedPosts} /\\* foo \\*/ /\\* bar \\*/$`),
+    );
+  });
+
+  it("structurally incompatible values", async () => {
+    await assertNothingRaised(() => {
+      Post.includes(":author").includes(":author").or(Post.includes(":author"));
+      Post.eagerLoad(":author").eagerLoad(":author").or(Post.eagerLoad(":author"));
+      Post.preload(":author").preload(":author").or(Post.preload(":author"));
+      Post.group("author_id").group("author_id").or(Post.group("author_id"));
+      Post.joins(":author").joins(":author").or(Post.joins(":author"));
+      Post.leftOuterJoins(":author").leftOuterJoins(":author").or(Post.leftOuterJoins(":author"));
+      Post.from("posts").or(Post.from("posts"));
+    });
+  });
+});
+
+describe("TooManyOrTest", () => {
+  fixtures(["paragraphs"]);
+
+  it.skipIf(adapterType === "sqlite")("too many or", async () => {
+    const paragraphs = Array.from({ length: 1001 }, (_, i) =>
+      Paragraph.where({ id: i, book_id: i * i }),
+    );
+    const combined = paragraphs.reduce((acc, rel) => acc.or(rel));
+    expect(await combined.count()).toBe(1001);
+  });
+});

@@ -1,0 +1,235 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { describe, it, beforeEach, afterEach, expect } from "vitest";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
+import { Thread, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { Base } from "../../../../lib/base.js";
+import { Deadlocked, Rollback, StatementInvalid } from "../../../../lib/errors.js";
+import { SavepointTransaction } from "../../../../lib/connection-adapters/abstract/transaction.js";
+
+class Sample extends Base {
+  declare id: number;
+  declare value: number | null;
+  static {
+    this.tableName = "samples";
+  }
+}
+constSet(TopLevel, "Sample", Sample);
+DescendantsTracker.registerSubclass(Base, Sample);
+
+function cyclicBarrier(parties: number): { wait: () => Promise<void> } {
+  let count = 0;
+  let release!: () => void;
+  const gate = new Promise<void>((r) => {
+    release = r;
+  });
+  return {
+    wait: () => {
+      if (++count >= parties) release();
+      return gate;
+    },
+  };
+}
+
+async function makeParentTransactionDirty(): Promise<void> {
+  await Sample.take();
+}
+
+async function assertCurrentTransactionIsSavepointTransaction(): Promise<void> {
+  const currentTransaction = (await Sample.leaseConnection()).currentTransaction();
+  expect(currentTransaction).toBeInstanceOf(SavepointTransaction);
+}
+
+function flunkOnLostSavepoint(errors: unknown[]): void {
+  const lost = errors.find(
+    (e) =>
+      e instanceof StatementInvalid && /SAVEPOINT active_record_. does not exist/.test(String(e)),
+  );
+  if (lost === undefined) return;
+  expect.fail(
+    `ROLLBACK TO SAVEPOINT query issued for savepoint that no longer exists due to deadlock: ${String(lost)}`,
+  );
+}
+
+describeIfMysqlAdapter("Mysql2Adapter", () => {
+  describe("NestedDeadlockTest", () => {
+    fixtures([], { useTransactionalTests: false });
+
+    beforeEach(async () => {
+      const connection = await leaseMysqlAdapter();
+      await connection.clearCacheBang();
+      await connection.createTable("samples", { force: true }, (t) => {
+        t.integer("value");
+      });
+      Sample.resetColumnInformation();
+    });
+
+    afterEach(async () => {
+      Base.connectionHandler.clearActiveConnectionsBang("all");
+      const connection = await leaseMysqlAdapter();
+      await connection.dropTable("samples", { ifExists: true });
+    });
+
+    it("deadlock correctly raises Deadlocked inside nested SavepointTransaction", async () => {
+      const connection = await Sample.leaseConnection();
+      await assertRaises([Deadlocked], {}, async () => {
+        const barrier = cyclicBarrier(2);
+
+        const s1 = await Sample.create({ value: 1 });
+        const s2 = await Sample.create({ value: 2 });
+
+        const thread = new Thread(async () =>
+          Sample.transaction(async () => {
+            await makeParentTransactionDirty();
+            await Sample.transaction(
+              async () => {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await s1.lockBang();
+                await barrier.wait();
+                await s2.update({ value: 1 });
+              },
+              { requiresNew: true },
+            );
+          }),
+        ).value();
+
+        const main = Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          await Sample.transaction(
+            async () => {
+              await assertCurrentTransactionIsSavepointTransaction();
+              await s2.lockBang();
+              await barrier.wait();
+              await s1.update({ value: 2 });
+            },
+            { requiresNew: true },
+          );
+        });
+
+        const outcomes = await Promise.allSettled([thread, main]);
+        const errors = outcomes.filter((o) => o.status === "rejected").map((o) => o.reason);
+        flunkOnLostSavepoint(errors);
+        if (errors.length > 0) throw errors[0];
+      });
+      expect(await connection.active()).toBeTruthy();
+    });
+
+    it("rollback exception is swallowed after a rollback", async () => {
+      const barrier = cyclicBarrier(2);
+      let deadlocks = 0;
+
+      const s1 = await Sample.create({ value: 1 });
+      const s2 = await Sample.create({ value: 2 });
+
+      const thread = new Thread(async () =>
+        Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          await Sample.transaction(
+            async () => {
+              try {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await s1.lockBang();
+                await barrier.wait();
+                await s2.update({ value: 4 });
+              } catch (e) {
+                if (!(e instanceof Deadlocked)) throw e;
+                deadlocks += 1;
+
+                throw new Rollback();
+              }
+            },
+            { requiresNew: true },
+          );
+
+          await s2.update({ value: 10 });
+        }),
+      ).value();
+
+      try {
+        await Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          await Sample.transaction(
+            async () => {
+              try {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await s2.lockBang();
+                await barrier.wait();
+                await s1.update({ value: 3 });
+              } catch (e) {
+                if (!(e instanceof Deadlocked)) throw e;
+                deadlocks += 1;
+                throw new Rollback();
+              }
+            },
+            { requiresNew: true },
+          );
+          await s1.update({ value: 10 });
+        });
+      } finally {
+        await thread;
+      }
+
+      expect(deadlocks).toEqual(1);
+      expect(await Sample.pluck("value")).toEqual([10, 10]);
+    });
+
+    it("deadlock inside nested SavepointTransaction is recoverable", async () => {
+      const barrier = cyclicBarrier(2);
+      let deadlocks = 0;
+
+      const s1 = await Sample.create({ value: 1 });
+      const s2 = await Sample.create({ value: 2 });
+
+      const thread = new Thread(async () =>
+        Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          try {
+            await Sample.transaction(
+              async () => {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await s1.lockBang();
+                await barrier.wait();
+                await s2.update({ value: 4 });
+              },
+              { requiresNew: true },
+            );
+          } catch (e) {
+            if (!(e instanceof Deadlocked)) throw e;
+            deadlocks += 1;
+          }
+          await s2.update({ value: 10 });
+        }),
+      ).value();
+
+      try {
+        await Sample.transaction(async () => {
+          await makeParentTransactionDirty();
+          try {
+            await Sample.transaction(
+              async () => {
+                await assertCurrentTransactionIsSavepointTransaction();
+                await s2.lockBang();
+                await barrier.wait();
+                await s1.update({ value: 3 });
+              },
+              { requiresNew: true },
+            );
+          } catch (e) {
+            if (!(e instanceof Deadlocked)) throw e;
+            deadlocks += 1;
+          }
+          await s1.update({ value: 10 });
+        });
+      } finally {
+        await thread;
+      }
+
+      expect(deadlocks).toEqual(1);
+      expect(await Sample.pluck("value")).toEqual([10, 10]);
+    });
+  });
+});

@@ -1,0 +1,184 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { RecordNotUnique, TransactionIsolationError } from "../../../lib/errors.js";
+
+describe("SQLite3Adapter transaction control", () => {
+  let adapter: SQLite3Adapter;
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-tx-"));
+    adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
+    await adapter.execute(
+      "CREATE TABLE gadgets (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE)",
+    );
+  });
+
+  afterEach(async () => {
+    await adapter.execute("DROP TABLE IF EXISTS gadgets");
+    await adapter.disconnectBang();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  describe("BEGIN IMMEDIATE / COMMIT", () => {
+    it("commits inserted rows", async () => {
+      await adapter.beginDbTransaction();
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('apple')");
+      await adapter.commitDbTransaction();
+
+      const rows = (await adapter.execute("SELECT name FROM gadgets"))!;
+      expect(rows.map((r: any) => r.name)).toEqual(["apple"]);
+    });
+  });
+
+  describe("BEGIN DEFERRED / COMMIT", () => {
+    it("commits inserted rows via deferred transaction", async () => {
+      await adapter.beginDeferredTransaction();
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('deferred')");
+      await adapter.commitDbTransaction();
+
+      const rows = (await adapter.execute("SELECT name FROM gadgets"))!;
+      expect(rows.map((r: any) => r.name)).toEqual(["deferred"]);
+    });
+  });
+
+  describe("BEGIN / ROLLBACK", () => {
+    it("discards inserted rows on rollback", async () => {
+      await adapter.beginDbTransaction();
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('banana')");
+      await adapter.rollbackDbTransaction();
+
+      const rows = (await adapter.execute("SELECT name FROM gadgets"))!;
+      expect(rows).toHaveLength(0);
+    });
+  });
+
+  describe("savepoints", () => {
+    it("releases savepoint on success, keeping outer changes", async () => {
+      await adapter.beginDbTransaction();
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('outer')");
+      await adapter.createSavepoint("sp1");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('inner')");
+      await adapter.releaseSavepoint("sp1");
+      await adapter.commitDbTransaction();
+
+      const rows = (await adapter.execute("SELECT name FROM gadgets ORDER BY id"))!;
+      expect(rows.map((r: any) => r.name)).toEqual(["outer", "inner"]);
+    });
+
+    it("rolls back to savepoint on error, keeping outer changes", async () => {
+      await adapter.beginDbTransaction();
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('outer')");
+      await adapter.createSavepoint("sp1");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('inner')");
+      await adapter.rollbackToSavepoint("sp1");
+      await adapter.commitDbTransaction();
+
+      const rows = (await adapter.execute("SELECT name FROM gadgets ORDER BY id"))!;
+      expect(rows.map((r: any) => r.name)).toEqual(["outer"]);
+    });
+
+    it("supports multiple nested savepoints independently", async () => {
+      await adapter.beginDbTransaction();
+      await adapter.createSavepoint("sp1");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('a')");
+      await adapter.createSavepoint("sp2");
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('b')");
+      await adapter.rollbackToSavepoint("sp2");
+      await adapter.releaseSavepoint("sp1");
+      await adapter.commitDbTransaction();
+
+      const rows = (await adapter.execute("SELECT name FROM gadgets ORDER BY id"))!;
+      expect(rows.map((r: any) => r.name)).toEqual(["a"]);
+    });
+  });
+
+  describe("error mapping", () => {
+    it("maps UNIQUE constraint violation to RecordNotUnique", async () => {
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('dup')");
+      await expect(
+        adapter.insert("INSERT INTO gadgets (name) VALUES ('dup')"),
+      ).rejects.toBeInstanceOf(RecordNotUnique);
+    });
+
+    it("rolls back savepoint on UNIQUE constraint error and continues outer transaction", async () => {
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('dup')");
+      await adapter.beginDbTransaction();
+      await adapter.execute("INSERT INTO gadgets (name) VALUES ('safe')");
+      await adapter.createSavepoint("sp1");
+      await expect(
+        adapter.insert("INSERT INTO gadgets (name) VALUES ('dup')"),
+      ).rejects.toBeInstanceOf(RecordNotUnique);
+      await adapter.rollbackToSavepoint("sp1");
+      await adapter.commitDbTransaction();
+
+      const rows = (await adapter.execute("SELECT name FROM gadgets ORDER BY id"))!;
+      expect(rows.map((r: any) => r.name)).toEqual(["dup", "safe"]);
+    });
+  });
+
+  describe("isolation level guards", () => {
+    it("rejects unsupported isolation levels", async () => {
+      await expect(adapter.beginIsolatedDbTransaction(":serializable")).rejects.toBeInstanceOf(
+        TransactionIsolationError,
+      );
+    });
+
+    it("rejects read_uncommitted without shared-cache mode", async () => {
+      await expect(adapter.beginIsolatedDbTransaction(":read_uncommitted")).rejects.toThrow(
+        "You need to enable the shared-cache mode",
+      );
+    });
+  });
+
+  describe("cross-connection isolation", () => {
+    it("writer changes are not visible to reader until committed", async () => {
+      const reader = new BetterSQLite3Adapter({
+        database: path.join(tmpDir, "db.sqlite3"),
+        readonly: true,
+      });
+      try {
+        await expect(reader.insert("INSERT INTO gadgets (name) VALUES ('x')")).rejects.toThrow(
+          /readonly/i,
+        );
+
+        await adapter.beginDbTransaction();
+        await adapter.execute("INSERT INTO gadgets (name) VALUES ('secret')");
+
+        const beforeCommit = (await reader.execute("SELECT name FROM gadgets"))!;
+        expect(beforeCommit).toHaveLength(0);
+
+        await adapter.commitDbTransaction();
+
+        const afterCommit = (await reader.execute("SELECT name FROM gadgets"))!;
+        expect(afterCommit.map((r: any) => r.name)).toEqual(["secret"]);
+      } finally {
+        await reader.disconnectBang();
+      }
+    });
+  });
+
+  describe("audit: no driver.transaction() callsites", () => {
+    it("sqlite3-adapter and sqlite-drivers dirs use only explicit SQL for transactions", () => {
+      const dirs = [
+        path.resolve(import.meta.dirname, "."),
+        path.resolve(import.meta.dirname, "../../sqlite"),
+      ];
+      const pattern = /\bdriver\.transaction\s*\(/;
+      for (const dir of dirs) {
+        if (!fs.existsSync(dir)) continue;
+        const files = fs
+          .readdirSync(dir)
+          .filter((f) => f.endsWith(".ts") && !f.endsWith(".test.ts"));
+        for (const file of files) {
+          const content = fs.readFileSync(path.join(dir, file), "utf8");
+          expect(content, `${file} must not call driver.transaction()`).not.toMatch(pattern);
+        }
+      }
+    });
+  });
+});

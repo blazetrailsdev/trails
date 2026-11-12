@@ -1,0 +1,150 @@
+import { describe, expect, beforeEach, afterEach } from "vitest";
+import { Time as RubyTime } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { Base } from "../../lib/index.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { itIfSupports } from "../support/supports.js";
+import { Rational } from "@blazetrails/ruby-compat";
+import { dumpTableSchema } from "../../lib/support/schema-dumping-helper.js";
+
+function nsecTime(v: RubyTime): number {
+  return v.nsec;
+}
+
+function timeNowChangeNsec(nsec: number): RubyTime {
+  return RubyTime.at(new Rational(RubyTime.now().toI(), 1)).plus(new Rational(nsec, 1_000_000_000));
+}
+
+describe("TimePrecisionTest", () => {
+  fixtures({}, { useTransactionalTests: false });
+  let adapter: DatabaseAdapter;
+
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
+  });
+  afterEach(async () => {
+    await adapter.dropTable("foos", { ifExists: true });
+  });
+  function makeFoo() {
+    class Foo extends Base {
+      static override tableName = "foos";
+    }
+    return Foo;
+  }
+
+  itIfSupports("datetime_with_precision", "time data type with precision", async () => {
+    await adapter.createTable("foos", { force: true }, () => {});
+    await adapter.addColumn("foos", "start", "time", { precision: 3 });
+    await adapter.addColumn("foos", "finish", "time", { precision: 6 });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+    expect(Foo.columnsHash()["start"].precision).toBe(3);
+    expect(Foo.columnsHash()["finish"].precision).toBe(6);
+  });
+
+  itIfSupports("datetime_with_precision", "time precision is truncated on assignment", async () => {
+    await adapter.createTable("foos", { force: true }, () => {});
+    await adapter.addColumn("foos", "start", "time", { precision: 0 });
+    await adapter.addColumn("foos", "finish", "time", { precision: 6 });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+    const time = timeNowChangeNsec(123456789);
+    const foo = new Foo({ start: time, finish: time });
+    expect(nsecTime((foo as any).start)).toBe(0);
+    expect(nsecTime((foo as any).finish)).toBe(123456000);
+    await (foo as any).save();
+    await (foo as any).reload();
+    expect(nsecTime((foo as any).start)).toBe(0);
+    expect(nsecTime((foo as any).finish)).toBe(123456000);
+  });
+
+  itIfSupports.skipIf(adapterType === "mysql")(
+    "datetime_with_precision",
+    "no time precision isnt truncated on assignment",
+    async () => {
+      await adapter.createTable("foos", { force: true }, () => {});
+      await adapter.addColumn("foos", "start", "time");
+      await adapter.addColumn("foos", "finish", "time", { precision: 6 });
+      const Foo = makeFoo();
+      await Foo.loadSchema();
+      const time = timeNowChangeNsec(123);
+      const foo = new Foo({ start: time, finish: time });
+      expect(nsecTime((foo as any).start)).toBe(123);
+      expect(nsecTime((foo as any).finish)).toBe(0);
+      await (foo as any).save();
+      await (foo as any).reload();
+      expect(nsecTime((foo as any).start)).toBe(0);
+      expect(nsecTime((foo as any).finish)).toBe(0);
+    },
+  );
+
+  itIfSupports(
+    "datetime_with_precision",
+    "passing precision to time does not set limit",
+    async () => {
+      await adapter.createTable("foos", { force: true }, (t) => {
+        t.time("start", { precision: 3 });
+        t.time("finish", { precision: 6 });
+      });
+      const Foo = makeFoo();
+      await Foo.loadSchema();
+      expect(Foo.columnsHash()["start"].limit).toBeNull();
+      expect(Foo.columnsHash()["finish"].limit).toBeNull();
+    },
+  );
+
+  itIfSupports("datetime_with_precision", "invalid time precision raises error", async () => {
+    await expect(
+      adapter.createTable("foos", { force: true }, (t) => {
+        t.time("start", { precision: 7 });
+        t.time("finish", { precision: 7 });
+      }),
+    ).rejects.toThrow(ArgumentError);
+  });
+
+  itIfSupports("datetime_with_precision", "formatting time according to precision", async () => {
+    await adapter.createTable("foos", { force: true }, (t) => {
+      t.time("start", { precision: 0 });
+      t.time("finish", { precision: 4 });
+    });
+    const Foo = makeFoo();
+    await Foo.loadSchema();
+
+    const time = RubyTime.utc(2000, 1, 1, 12, 30, 0, 999999);
+    await Foo.createBang({ start: time, finish: time });
+
+    const foo = (await Foo.findBy({ start: time })) as any;
+    expect(foo).toBeTruthy();
+    expect(await Foo.where({ finish: time }).count()).toBe(1);
+    expect(foo.start.toString()).toBe(time.toString());
+    expect(foo.finish.toString()).toBe(time.toString());
+    expect(foo.start.usec).toBe(0);
+    expect(foo.finish.usec).toBe(999900);
+  });
+
+  itIfSupports("datetime_with_precision", "schema dump includes time precision", async () => {
+    await adapter.createTable("foos", { force: true }, (t) => {
+      t.time("start", { precision: 4 });
+      t.time("finish", { precision: 6 });
+    });
+    const output = await dumpTableSchema("foos");
+    expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*4/);
+    expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*6/);
+  });
+
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "datetime_with_precision",
+    "time precision with zero should be dumped",
+    async () => {
+      await adapter.createTable("foos", { force: true }, (t) => {
+        t.time("start", { precision: 0 });
+        t.time("finish", { precision: 0 });
+      });
+      const output = await dumpTableSchema("foos");
+      expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*0/);
+      expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*0/);
+    },
+  );
+});

@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
  * Phase G Phase A — fixtures-adoption inventory. Classifies every
- * `*.test.ts` under `packages/activerecord/src` into a structural adoption
+ * `*.test.ts` under `packages/activerecord/test` into a structural adoption
  * tier (1 mechanical / 2 loader-gap / 3 bespoke-or-hazard / 4 no-DB-ops)
  * and writes the doc below. Tier rules + scope caveats are documented in
  * the generated doc's header.
@@ -14,8 +14,8 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 const REPO = new URL("../../", import.meta.url);
-const AR_SRC = fileURLToPath(new URL("packages/activerecord/src/", REPO));
-const MODELS_DIR = `${AR_SRC}test-helpers/models/`;
+const AR_SRC = fileURLToPath(new URL("packages/activerecord/test/", REPO));
+const MODELS_DIR = `${AR_SRC}models/`;
 const OUT_REL = "fixtures-adoption-inventory.md";
 const OUT = fileURLToPath(new URL(OUT_REL, REPO));
 

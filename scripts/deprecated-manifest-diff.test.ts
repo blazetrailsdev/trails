@@ -4,7 +4,7 @@ import type { DeprecatedManifest } from "./deprecated-manifest-diff.js";
 
 const expected: DeprecatedManifest = {
   files: {
-    "packages/activerecord/src/connection-adapters/mysql/schema-definitions.ts": [
+    "packages/activerecord/lib/connection-adapters/mysql/schema-definitions.ts": [
       "unsignedDecimal",
       "unsignedFloat",
     ],
@@ -33,7 +33,7 @@ describe("diffDeprecatedManifest", () => {
 
   it("reports a single dropped name as lost", () => {
     const actual = structuredClone(expected);
-    const file = "packages/activerecord/src/connection-adapters/mysql/schema-definitions.ts";
+    const file = "packages/activerecord/lib/connection-adapters/mysql/schema-definitions.ts";
     actual.files[file] = ["unsignedDecimal"];
     expect(diffDeprecatedManifest(expected, actual).lost).toEqual([`${file}: unsignedFloat`]);
   });

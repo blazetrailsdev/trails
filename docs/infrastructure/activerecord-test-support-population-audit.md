@@ -12,7 +12,7 @@ on 2026-10-19 from `pnpm parity:api:extra --json` at `1fedb2eb6c`.
 The story assumed the Ruby side might be Rails' `lib/` tree. It is not.
 `activerecord-test-support` is a pseudo-package in `vendor/sources.ts`, with
 `libPath: "activerecord/test/support"` and no `testPath`. Its TS side is
-`packages/activerecord/src/support/` (`PACKAGE_SRC_SUBDIR` in
+`packages/activerecord/test/support/` (`PACKAGE_SRC_SUBDIR` in
 `scripts/api-compare/config.ts`). `TEST_SUPPORT_PACKAGES` keeps it out of every
 other package's dependency index, so a Rails `lib` method never resolves
 against a test helper.

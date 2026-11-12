@@ -28,7 +28,7 @@
  * The rule treats any reference to `Date` as the global only when it doesn't
  * resolve to a local binding (e.g. an `import { Date } from ...` or a class
  * named `Date` in scope), so files that locally rebind the name (such as
- * `activerecord/src/type.ts` importing the AR `Type::Date` class) are
+ * `activerecord/lib/type.ts` importing the AR `Type::Date` class) are
  * naturally exempt.
  */
 

@@ -1,0 +1,357 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
+import {
+  assert,
+  assertEmpty,
+  assertNotPredicate,
+  assertPredicate,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
+import { ARUnit2Model } from "../../../models/arunit2-model.js";
+import type { NotificationEvent } from "@blazetrails/activesupport";
+import {
+  describeIfMysqlAdapter,
+  isMariaDb,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+  MYSQL_TEST_URL,
+} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { NoDatabaseError, DatabaseVersionError } from "../../../../lib/errors.js";
+import { Mysql2, type Mysql2Result } from "../../../../lib/mysql2/client.js";
+import { Base } from "../../../../lib/base.js";
+import { runWithoutConnection } from "../../../support/connection-helper.js";
+import { ConnectionUrlResolver } from "../../../../lib/database-configurations/connection-url-resolver.js";
+
+function clearVersionCache(adapter: Mysql2Adapter): void {
+  (
+    adapter.pool as unknown as { poolConfig: { setServerVersion: (v: unknown) => void } }
+  ).poolConfig.setServerVersion(null);
+}
+
+describeIfMysqlAdapter("Mysql2Adapter", () => {
+  let adapter: Mysql2Adapter;
+  beforeEach(async () => {
+    adapter = await leaseMysqlAdapter();
+  });
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    Notifications.unsubscribeAll();
+    clearVersionCache(adapter);
+    await adapter.verifyBang();
+  });
+
+  describe("ConnectionTest", () => {
+    it("bad connection", async () => {
+      const u = new URL(MYSQL_TEST_URL);
+      u.pathname = "/inexistent_activerecord_unittest";
+      const badAdapter = new Mysql2Adapter({ uri: u.toString() });
+      try {
+        await assertRaises([NoDatabaseError], {}, () =>
+          badAdapter.dropTable("ex", { ifExists: true }),
+        );
+      } finally {
+        await badAdapter.disconnectBang();
+      }
+    });
+
+    it.skipIf(isMariaDb)(
+      "no automatic reconnection after timeout",
+      async () => {
+        const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
+        try {
+          await singleConn.execute("SET SESSION wait_timeout=1");
+          assertPredicate(await singleConn.active(), (v) => v);
+          await new Promise((r) => setTimeout(r, 2000));
+          assertNotPredicate(await singleConn.active(), (v) => v);
+        } finally {
+          await singleConn.disconnectBang();
+        }
+      },
+      10_000,
+    );
+    it("successful reconnection after timeout with manual reconnect", async () => {
+      const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
+      try {
+        await singleConn.execute("SET SESSION wait_timeout=1");
+        assertPredicate(await singleConn.active(), (v) => v);
+        await new Promise((r) => setTimeout(r, 2000));
+        await singleConn.reconnectBang();
+        assertPredicate(await singleConn.active(), (v) => v);
+      } finally {
+        await singleConn.disconnectBang();
+      }
+    }, 10_000);
+    it("successful reconnection after timeout with verify", async () => {
+      const singleConn = new Mysql2Adapter({ uri: MYSQL_TEST_URL, connectionLimit: 1 });
+      try {
+        await singleConn.execute("SET SESSION wait_timeout=1");
+        assertPredicate(await singleConn.active(), (v) => v);
+        await new Promise((r) => setTimeout(r, 2000));
+        await singleConn.verifyBang();
+        assertPredicate(await singleConn.active(), (v) => v);
+      } finally {
+        await singleConn.disconnectBang();
+      }
+    }, 10_000);
+    it("execute after disconnect reconnects", async () => {
+      await adapter.disconnectBang();
+      const result = (await adapter.execute("SELECT 1+2 AS v")) as Mysql2Result;
+      expect(result.toA()[0][0]).toBe(3);
+    });
+
+    it("quote after disconnect reconnects", async () => {
+      await adapter.disconnectBang();
+      expect(adapter.quote("string")).toBe("'string'");
+    });
+
+    it("active after disconnect", async () => {
+      await adapter.disconnectBang();
+      expect(await adapter.active()).toBe(false);
+    });
+
+    it("wait timeout as string", async () => {
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, waitTimeout: "60" });
+      try {
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.wait_timeout AS v",
+        )) as Mysql2Result;
+        expect(parseInt(result.toA()[0][0] as string, 10)).toBe(60);
+      } finally {
+        await testAdapter.disconnectBang();
+      }
+    });
+    it("wait timeout as url", async () => {
+      const url = new URL(MYSQL_TEST_URL);
+      url.searchParams.set("wait_timeout", "60");
+      const testAdapter = new Mysql2Adapter(new ConnectionUrlResolver(url.toString()).toHash());
+      try {
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.wait_timeout AS v",
+        )) as Mysql2Result;
+        expect(parseInt(result.toA()[0][0] as string, 10)).toBe(60);
+      } finally {
+        await testAdapter.disconnectBang();
+      }
+    });
+
+    it("character set connection is configured", async () => {
+      const connection = new Mysql2Adapter({ uri: MYSQL_TEST_URL, encoding: "cp932" });
+      try {
+        expect(await connection.showVariable("character_set_client")).toBe("cp932");
+        expect(await connection.showVariable("character_set_results")).toBe("cp932");
+        expect(await connection.showVariable("character_set_connection")).toBe("cp932");
+        expect(await connection.showVariable("collation_connection")).toBe("cp932_japanese_ci");
+
+        expect(await connection.queryValue("SELECT 'こんにちは'")).toBe("こんにちは");
+      } finally {
+        await connection.disconnectBang();
+      }
+    });
+
+    it("collation connection is configured", async () => {
+      expect(await adapter.showVariable("collation_connection")).toBe("utf8mb4_unicode_ci");
+      expect(await adapter.queryValue("SELECT 'こんにちは' = 'コンニチハ'")).toBe(1);
+
+      const arunit2 = (await ARUnit2Model.leaseConnection()) as unknown as Mysql2Adapter;
+      expect(await arunit2.showVariable("collation_connection")).toBe("utf8mb4_general_ci");
+      expect(await arunit2.queryValue("SELECT 'こんにちは' = 'コンニチハ'")).toBe(0);
+    });
+    it("mysql default in strict mode", async () => {
+      const result = (await adapter.execute("SELECT @@SESSION.sql_mode AS v")) as Mysql2Result;
+      expect(String(result.toA()[0][0])).toMatch(/STRICT_ALL_TABLES/);
+    });
+    it("mysql strict mode disabled", async () => {
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: false });
+      try {
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.sql_mode AS v",
+        )) as Mysql2Result;
+        expect(String(result.toA()[0][0])).not.toMatch(/STRICT_ALL_TABLES/);
+      } finally {
+        await testAdapter.disconnectBang();
+      }
+    });
+    it("mysql strict mode specified default", async () => {
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, strict: ":default" });
+      try {
+        const globalResult = (await testAdapter.execute(
+          "SELECT @@GLOBAL.sql_mode AS v",
+        )) as Mysql2Result;
+        const sessionResult = (await testAdapter.execute(
+          "SELECT @@SESSION.sql_mode AS v",
+        )) as Mysql2Result;
+        expect(sessionResult.toA()[0][0]).toBe(globalResult.toA()[0][0]);
+      } finally {
+        await testAdapter.disconnectBang();
+      }
+    });
+    it("mysql sql mode variable overrides strict mode", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        variables: { sql_mode: "ansi" },
+      });
+      try {
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.sql_mode AS v",
+        )) as Mysql2Result;
+        expect(String(result.toA()[0][0])).not.toMatch(/STRICT_ALL_TABLES/);
+      } finally {
+        await testAdapter.disconnectBang();
+      }
+    });
+    it("passing arbitrary flags to adapter", async () => {
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: Mysql2.Client.COMPRESS });
+        const connection = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+        expect((await connection.rawConnection())!.queryOptions.flags).toBe(
+          Mysql2.Client.COMPRESS | Mysql2.Client.FOUND_ROWS,
+        );
+      });
+    });
+    it("passing flags by array to adapter", async () => {
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: ["COMPRESS"] });
+        const connection = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+        expect((await connection.rawConnection())!.queryOptions.flags).toEqual([
+          "COMPRESS",
+          "FOUND_ROWS",
+        ]);
+      });
+    });
+    it("mysql set session variable", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        variables: { default_week_format: 3 },
+      });
+      try {
+        const result = (await testAdapter.execute(
+          "SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v",
+        )) as Mysql2Result;
+        expect(parseInt(result.toA()[0][0] as string, 10)).toBe(3);
+      } finally {
+        await testAdapter.disconnectBang();
+      }
+    });
+    it("mysql set session variable to default", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        variables: { default_week_format: ":default" },
+      });
+      try {
+        const globalResult = (await testAdapter.execute(
+          "SELECT @@GLOBAL.DEFAULT_WEEK_FORMAT AS v",
+        )) as Mysql2Result;
+        const sessionResult = (await testAdapter.execute(
+          "SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v",
+        )) as Mysql2Result;
+        expect(sessionResult.toA()[0][0]).toBe(globalResult.toA()[0][0]);
+      } finally {
+        await testAdapter.disconnectBang();
+      }
+    });
+
+    it("logs name show variable", async () => {
+      await adapter.materializeTransactions();
+      const logged: Array<[string, string]> = [];
+      const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+        logged.push([event.payload.sql as string, event.payload.name as string]);
+      });
+      try {
+        await adapter.showVariable("foo");
+        expect(logged[0]?.[1]).toBe("SCHEMA");
+      } finally {
+        Notifications.unsubscribe(sub);
+      }
+    });
+
+    it("logs name rename column for alter", async () => {
+      await adapter.execute("DROP TABLE IF EXISTS `bar_baz`");
+      await adapter.execute("CREATE TABLE `bar_baz` (`foo` varchar(255))");
+      const logged: Array<[string, string]> = [];
+      const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
+        logged.push([event.payload.sql as string, event.payload.name as string]);
+      });
+      try {
+        await adapter.renameColumnForAlter("bar_baz", "foo", "foo2");
+        if (await adapter.supportsRenameColumn()) {
+          assertEmpty(logged);
+        } else {
+          expect(logged[0][1]).toBe("SCHEMA");
+        }
+      } finally {
+        Notifications.unsubscribe(sub);
+        await adapter.execute("DROP TABLE IF EXISTS `bar_baz`");
+      }
+    });
+
+    it("version string", async () => {
+      const spy = vi.spyOn(adapter, "getFullVersion");
+      clearVersionCache(adapter);
+      spy.mockResolvedValueOnce("8.0.35-0ubuntu0.22.04.1");
+      expect((await adapter.getDatabaseVersion()).toString()).toBe("8.0.35");
+
+      clearVersionCache(adapter);
+      spy.mockResolvedValueOnce("5.7.0");
+      expect((await adapter.getDatabaseVersion()).toString()).toBe("5.7.0");
+    });
+
+    it("version string with mariadb", async () => {
+      clearVersionCache(adapter);
+      vi.spyOn(adapter, "getFullVersion").mockResolvedValueOnce(
+        "5.5.5-10.6.5-MariaDB-1:10.6.5+maria~focal",
+      );
+      expect((await adapter.getDatabaseVersion()).toString()).toBe("10.6.5");
+    });
+
+    it("version string invalid", async () => {
+      const spy = vi.spyOn(adapter, "getFullVersion");
+
+      clearVersionCache(adapter);
+      spy.mockResolvedValueOnce("some-database-proxy");
+      let error = await assertRaises([DatabaseVersionError], {}, () =>
+        adapter.getDatabaseVersion(),
+      );
+      expect(error.message).toBe('Unable to parse MySQL version from "some-database-proxy"');
+
+      clearVersionCache(adapter);
+      spy.mockResolvedValueOnce("");
+      error = await assertRaises([DatabaseVersionError], {}, () => adapter.getDatabaseVersion());
+      expect(error.message).toBe('Unable to parse MySQL version from ""');
+
+      clearVersionCache(adapter);
+      spy.mockResolvedValueOnce(null as unknown as string);
+      error = await assertRaises([DatabaseVersionError], {}, () => adapter.getDatabaseVersion());
+      expect(error.message).toBe("Unable to parse MySQL version from nil");
+    });
+
+    it("get and release advisory lock", async () => {
+      const lockName = "test lock'n'name";
+
+      const gotLock = await adapter.getAdvisoryLock(lockName);
+      assert(gotLock, "get_advisory_lock should have returned true but it didn't");
+
+      expect(
+        await testLockFree(lockName),
+        "expected the test advisory lock to be held but it wasn't",
+      ).toBe(false);
+
+      const releasedLock = await adapter.releaseAdvisoryLock(lockName);
+      assert(releasedLock, "expected release_advisory_lock to return true but it didn't");
+
+      assert(
+        await testLockFree(lockName),
+        "expected the test lock to be available after releasing",
+      );
+    });
+
+    it("release non existent advisory lock", async () => {
+      const lockName = "fake lock'n'name";
+      const released = await adapter.releaseAdvisoryLock(lockName);
+      expect(released).toBe(false);
+    });
+
+    async function testLockFree(lockName: string): Promise<boolean> {
+      return (await adapter.selectValue(`SELECT IS_FREE_LOCK(${adapter.quote(lockName)})`)) === 1;
+    }
+  });
+});

@@ -23,7 +23,7 @@ import type { FileDeps } from "./rails-test-deps.js";
 const ROOT = path.resolve(__dirname, "../..");
 const DEPS_PATH = path.join(ROOT, "scripts/test-deps/output/activerecord-test-deps.json");
 const OUT_PATH = path.join(ROOT, "eslint/expected-fixtures-exclude.json");
-const AR_SRC = path.join(ROOT, "packages/activerecord/src");
+const AR_SRC = path.join(ROOT, "packages/activerecord/test/cases");
 
 async function main(): Promise<void> {
   // Dynamic import avoids the CJS-style top-level / static-`.mjs`-import
@@ -69,7 +69,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     const hasAllKeys = foundCall && required.every((k) => keys.has(k));
-    if (!hasAllKeys) excluded.push(path.posix.join("packages/activerecord/src", trailsRel));
+    if (!hasAllKeys) excluded.push(path.posix.join("packages/activerecord/test/cases", trailsRel));
   }
   excluded.sort();
   writeJsonManifest(OUT_PATH, excluded);

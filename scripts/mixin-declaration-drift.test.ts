@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "fs/promises";
-import { BetterSQLite3Adapter } from "../packages/activerecord/src/connection-adapters/better-sqlite3-adapter.js";
-import { PostgreSQLAdapter } from "../packages/activerecord/src/connection-adapters/postgresql-adapter.js";
-import { AbstractMysqlAdapter } from "../packages/activerecord/src/connection-adapters/abstract-mysql-adapter.js";
+import { BetterSQLite3Adapter } from "../packages/activerecord/lib/connection-adapters/better-sqlite3-adapter.js";
+import { PostgreSQLAdapter } from "../packages/activerecord/lib/connection-adapters/postgresql-adapter.js";
+import { AbstractMysqlAdapter } from "../packages/activerecord/lib/connection-adapters/abstract-mysql-adapter.js";
 import {
   findDrift,
   findUninstalled,
@@ -12,7 +12,7 @@ import {
   type SignatureEntry,
 } from "./mixin-declaration-drift.js";
 
-const ADAPTERS = "packages/activerecord/src/connection-adapters/";
+const ADAPTERS = "packages/activerecord/lib/connection-adapters/";
 
 /**
  * Every `include(<Adapter>, <Mixin>)` pair whose mixed-in surface the adapter

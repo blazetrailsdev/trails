@@ -2,12 +2,18 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist-test",
-    "rootDir": "."
+    "rootDir": ".",
+    "paths": {
+      "@blazetrails/activerecord/support/config": ["../activerecord/test/support/config.ts"]
+    }
   },
   "include": ["test", "lib/**/*.d.ts"],
   "references": [
     {
       "path": "./tsconfig.json"
+    },
+    {
+      "path": "../activerecord/tsconfig.test.json"
     }
   ]
 }

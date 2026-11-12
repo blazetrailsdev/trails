@@ -36,7 +36,7 @@ New packages must declare their status before merging.
 `cryptoAdapter` (and others — see [activesupport.md](../activesupport.md) §Adapters).
 Twenty files across activerecord use `getFs()` / `getPath()` / `getCrypto()`
 instead of importing `node:*` directly, and there are zero bare `node:*`
-imports in `packages/activerecord/src` (excluding `tsc-wrapper/`, a
+imports in `packages/activerecord/lib` (excluding `tsc-wrapper/`, a
 build-time tool). This pattern is the template for every future native-dep
 abstraction.
 
@@ -196,7 +196,7 @@ files were closed in #1296 + #1549 (`temporal-type-parsers.ts`).
 Shipped in #1302 — encryption namespace moved behind subpath; `zlib` no
 longer reachable from the activerecord barrel. Historical detail follows.
 
-Original motivation: `packages/activerecord/src/encryption/config.ts:84`
+Original motivation: `packages/activerecord/lib/encryption/config.ts:84`
 did `import { deflateSync, inflateSync } from "zlib"` at module
 top-level, reachable from the activerecord barrel via:
 
@@ -210,7 +210,7 @@ So `import @blazetrails/activerecord` transitively pulls `node:zlib`, even for a
 **Approach: subpath import, mirror the pg/mysql2 pattern from BC-3.** Move the encryption namespace out of barrel reachability:
 
 - Add `@blazetrails/activerecord/encryption` (and potentially nested subpaths if needed) to `package.json` exports.
-- Remove encryption symbols from `packages/activerecord/src/index.ts` (the barrel).
+- Remove encryption symbols from `packages/activerecord/lib/index.ts` (the barrel).
 - Anything currently re-exported from the barrel for ergonomics — `Encryption.configure(...)`, `installExtendedQueriesIfConfigured`, etc. — moves to subpath-only access. Consumers update from `import { configure } from "@blazetrails/activerecord"` to `import { configure } from "@blazetrails/activerecord/encryption"`.
 
 The encryption subsystem is server-only by design (key management, compressor, key generators). Moving the whole namespace to a subpath:

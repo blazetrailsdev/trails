@@ -1,0 +1,139 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
+import { ForbiddenAttributesError } from "@blazetrails/activemodel";
+import "../../lib/index.js";
+import { Person } from "../models/person.js";
+import { Company, Client } from "../models/company.js";
+import { ShipPart } from "../models/ship-part.js";
+import { Ship } from "../models/ship.js";
+import { Treasure } from "../models/treasure.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { ProtectedParams } from "../support/stubs/strong-parameters.js";
+
+constSet(TopLevel, "ShipPart", ShipPart);
+constSet(TopLevel, "Ship", Ship);
+constSet(TopLevel, "Treasure", Treasure);
+
+describe("ForbiddenAttributesProtectionTest", () => {
+  fixtures(["people", "companies"]);
+
+  it("forbidden attributes cannot be used for mass assignment", () => {
+    const params = new ProtectedParams({ first_name: "Guille", gender: "m" });
+    expect(() => new Person(params)).toThrow(ForbiddenAttributesError);
+  });
+
+  it("permitted attributes can be used for mass assignment", () => {
+    const params = new ProtectedParams({ first_name: "Guille", gender: "m" });
+    params.permitBang();
+    const person = new Person(params);
+
+    expect(person.readAttribute("first_name")).toBe("Guille");
+    expect(person.readAttribute("gender")).toBe("m");
+  });
+
+  it("forbidden attributes cannot be used for sti inheritance column", () => {
+    const params = new ProtectedParams({ type: "Client" });
+    expect(() => new Company(params)).toThrow(ForbiddenAttributesError);
+  });
+
+  it("permitted attributes can be used for sti inheritance column", () => {
+    const params = new ProtectedParams({ type: "Client" });
+    params.permitBang();
+    const person = new Company(params);
+
+    expect(person.constructor).toBe(Client);
+  });
+
+  it("regular hash should still be used for mass assignment", () => {
+    const person = new Person({ first_name: "Guille", gender: "m" });
+
+    expect(person.readAttribute("first_name")).toBe("Guille");
+    expect(person.readAttribute("gender")).toBe("m");
+  });
+
+  it("blank attributes should not raise", () => {
+    const person = new Person();
+    expect(person.assignAttributes(new ProtectedParams({}))).toBeUndefined();
+  });
+
+  it("create with checks permitted", () => {
+    const params = new ProtectedParams({ first_name: "Guille", gender: "m" });
+
+    expect(() => Person.createWith(params)).toThrow(ForbiddenAttributesError);
+  });
+
+  it("create with works with permitted params", async () => {
+    const params = new ProtectedParams({ first_name: "Guille" }).permitBang();
+
+    const person = await Person.createWith(params).createBang();
+    expect(person.readAttribute("first_name")).toBe("Guille");
+  });
+
+  it("create with works with params values", async () => {
+    const params = new ProtectedParams({ first_name: "Guille" });
+
+    const person = await Person.createWith({ first_name: params["first_name"] }).createBang();
+    expect(person.readAttribute("first_name")).toBe("Guille");
+  });
+
+  it("where checks permitted", () => {
+    const params = new ProtectedParams({ first_name: "Guille", gender: "m" });
+
+    expect(() => Person.where(params)).toThrow(ForbiddenAttributesError);
+  });
+
+  it("where works with permitted params", async () => {
+    const params = new ProtectedParams({ first_name: "Guille" }).permitBang();
+
+    const person = await Person.where(params).createBang();
+    expect(person.readAttribute("first_name")).toBe("Guille");
+  });
+
+  it("where works with params values", async () => {
+    const params = new ProtectedParams({ first_name: "Guille" });
+
+    const person = await Person.where({ first_name: params["first_name"] }).createBang();
+    expect(person.readAttribute("first_name")).toBe("Guille");
+  });
+
+  it("where not checks permitted", () => {
+    const params = new ProtectedParams({ first_name: "Guille", gender: "m" });
+
+    expect(() => Person.where().not(params)).toThrow(ForbiddenAttributesError);
+  });
+
+  it("where not works with permitted params", async () => {
+    const params = new ProtectedParams({ first_name: "Guille" }).permitBang();
+    await Person.createBang(params);
+
+    const remaining = (await Person.where().not(params)).filter(
+      (p) => p.readAttribute("first_name") === "Guille",
+    );
+    assertEmpty(remaining);
+  });
+
+  it("strong params style objects work with singular associations", () => {
+    const params = new ProtectedParams({
+      name: "Stern",
+      ship_attributes: new ProtectedParams({ name: "The Black Rock" }).permitBang(),
+    }).permitBang();
+    const part = new ShipPart(params);
+
+    expect(part.readAttribute("name")).toBe("Stern");
+    expect((part as any).ship.readAttribute("name")).toBe("The Black Rock");
+  });
+
+  it("strong params style objects work with collection associations", () => {
+    const params = new ProtectedParams({
+      trinkets_attributes: new ProtectedParams({
+        "0": new ProtectedParams({ name: "Necklace" }).permitBang(),
+        "1": new ProtectedParams({ name: "Spoon" }).permitBang(),
+      }).permitBang(),
+    }).permitBang();
+    const part = new ShipPart(params);
+
+    expect((part as any).trinkets[0].readAttribute("name")).toBe("Necklace");
+    expect((part as any).trinkets[1].readAttribute("name")).toBe("Spoon");
+  });
+});

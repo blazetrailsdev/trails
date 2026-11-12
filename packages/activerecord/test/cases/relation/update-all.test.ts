@@ -1,0 +1,517 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  assertNot,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { adapterType } from "../../../lib/test-adapter.js";
+import { ActiveRecordError } from "../../../lib/errors.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Author } from "../../models/author.js";
+import { Comment } from "../../models/comment.js";
+import { Developer } from "../../models/developer.js";
+import { Person } from "../../models/person.js";
+import { Pet } from "../../models/pet.js";
+import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Topic } from "../../models/topic.js";
+import { WarehouseThing } from "../../models/warehouse-thing.js";
+import { CpkOrder } from "../../models/cpk.js";
+import { StaleObjectError } from "../../../lib/errors.js";
+import "../../models/tag.js";
+import "../../models/tagging.js";
+import "../../models/toy.js";
+import "../../models/category.js";
+import "../../models/categorization.js";
+
+function epochMs(v: unknown): number {
+  if (v instanceof RubyTime) return v.toF() * 1000;
+  if (v instanceof Temporal.Instant) return v.epochMilliseconds;
+  if (v instanceof Temporal.PlainDateTime)
+    return v.toZonedDateTime("UTC").toInstant().epochMilliseconds;
+  throw new TypeError(`epochMs: unsupported type ${(v as object)?.constructor?.name}`);
+}
+
+describe("UpdateAllTest", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const {
+    self,
+    authors,
+    tags,
+    posts,
+    pets,
+    developers,
+    people,
+    comments,
+    warehouseThings,
+    cpkOrderAgreements,
+  } = fixtures([
+    "authors",
+    "authorAddresses",
+    "comments",
+    "developers",
+    "posts",
+    "people",
+    "pets",
+    "toys",
+    "tags",
+    "taggings",
+    "warehouseThings",
+    "cpkOrders",
+    "cpkOrderAgreements",
+  ]);
+
+  it("update all with scope", async () => {
+    const tag = tags("general");
+    await Post.taggedWith(tag.id as number).updateAll({ title: "rofl" });
+    const taggedPosts = await Post.taggedWith(tag.id as number);
+    expect(taggedPosts.length).toBeGreaterThan(0);
+    taggedPosts.forEach((post: any) => expect(post.title).toBe("rofl"));
+  });
+
+  it("update all with non standard table name", async () => {
+    expect(await WarehouseThing.where({ id: 1 }).updateAll(["value = ?", 0])).toBe(1);
+    expect(((await WarehouseThing.find(1)) as any).value).toBe(0);
+  });
+
+  it("update all with blank argument", async () => {
+    const error = await assertRaises([ArgumentError], {}, () => Comment.updateAll({} as any));
+
+    expect(error.message).toBe("Empty list of attributes to change");
+  });
+
+  it("update all with group by", async () => {
+    const minimumCommentsCount = 2;
+    await Post.mostCommented(minimumCommentsCount).updateAll({ title: "ig" });
+    const updatedPosts = await Post.mostCommented(minimumCommentsCount);
+
+    expect(updatedPosts.length).toBeGreaterThan(0);
+    const commentsLengths = await Promise.all(
+      updatedPosts.map(async (post: any) => (await post.comments).length),
+    );
+    expect(commentsLengths.every((n) => n >= minimumCommentsCount)).toBeTruthy();
+    expect(updatedPosts.every((post: any) => "ig" === post.title)).toBeTruthy();
+
+    const nonUpdated = await Post.joins(":comments")
+      .group("posts.id")
+      .having(`count(comments.id) < ${minimumCommentsCount}`)
+      .first();
+    expect((nonUpdated as any)?.title).not.toBe("ig");
+  });
+
+  it("update all with joins", async () => {
+    const petsScope = Pet.joins(":toys").where({ toys: { name: "Bone" } });
+
+    expect(await petsScope.isExists()).toBe(true);
+    const sqls = await self().captureSql({}, async () => {
+      const count = await petsScope.count();
+      expect(await petsScope.updateAll({ name: "Bob" })).toBe(count);
+    });
+
+    if (adapterType === "mysql") {
+      expect(sqls[sqls.length - 1]).not.toMatch(
+        new RegExp(`SELECT DISTINCT ${regexpEscape(self().quoteTableName("pets.pet_id"))}`),
+      );
+    } else {
+      expect(sqls[sqls.length - 1]).toMatch(
+        new RegExp(`SELECT ${regexpEscape(self().quoteTableName("pets.pet_id"))}`),
+      );
+    }
+  });
+
+  it("update all with left joins", async () => {
+    const petsScope = Pet.leftJoins(":toys").where({ toys: { name: "Bone" } });
+
+    expect(await petsScope.isExists()).toBe(true);
+    const countBefore = await petsScope.count();
+    expect(await petsScope.updateAll({ name: "Bob" })).toBe(countBefore);
+  });
+
+  it("update all with includes", async () => {
+    const petsScope = Pet.includes(":toys").where({ toys: { name: "Bone" } });
+
+    expect(await petsScope.isExists()).toBe(true);
+    const countBefore = await petsScope.count();
+    expect(await petsScope.updateAll({ name: "Bob" })).toBe(countBefore);
+  });
+
+  it("update all with joins and limit and order", async () => {
+    const welcomePost = posts("welcome");
+    const thinkingPost = posts("thinking");
+    const greetingsComment = comments("greetings");
+    const moreGreetingsComment = comments("more_greetings");
+
+    const commentsScope = Comment.joins(":post")
+      .where({ "posts.id": welcomePost.id })
+      .order("comments.id")
+      .limit(1);
+    expect(await commentsScope.count()).toBe(1);
+    expect(await commentsScope.updateAll({ post_id: thinkingPost.id })).toBe(1);
+
+    await greetingsComment.reload();
+    await moreGreetingsComment.reload();
+    expect(greetingsComment.post_id).toBe(Number(thinkingPost.id));
+    expect(moreGreetingsComment.post_id).toBe(Number(welcomePost.id));
+  });
+
+  it("update all with joins and offset and order", async () => {
+    const welcomePost = posts("welcome");
+    const thinkingPost = posts("thinking");
+    const greetingsComment = comments("greetings");
+    const moreGreetingsComment = comments("more_greetings");
+
+    const commentsScope = Comment.joins(":post")
+      .where({ "posts.id": welcomePost.id })
+      .order("comments.id")
+      .offset(1);
+    expect(await commentsScope.count()).toBe(1);
+    expect(await commentsScope.updateAll({ post_id: thinkingPost.id })).toBe(1);
+
+    await moreGreetingsComment.reload();
+    await greetingsComment.reload();
+    expect(moreGreetingsComment.post_id).toBe(Number(thinkingPost.id));
+    expect(greetingsComment.post_id).toBe(Number(welcomePost.id));
+  });
+
+  it("update counters with joins", async () => {
+    const parrot = pets("parrot");
+    expect(parrot.integer).toBeNull();
+
+    await Pet.joins(":toys")
+      .where({ toys: { name: "Bone" } })
+      .updateCounters({ integer: 1 });
+
+    await parrot.reload();
+    expect(parrot.integer).toBe(1);
+  });
+
+  it("touch all updates records timestamps", async () => {
+    const david = developers("david");
+    const davidPreviouslyUpdatedAt = david.legacy_updated_at;
+    const jamis = developers("jamis");
+    const jamisPreviouslyUpdatedAt = jamis.legacy_updated_at;
+    vi.useFakeTimers({ now: Date.now() + 5000 });
+    await Developer.where({ name: "David" }).touchAll();
+    vi.useRealTimers();
+
+    await david.reload();
+    await jamis.reload();
+    expect(epochMs(david.legacy_updated_at)).not.toBe(epochMs(davidPreviouslyUpdatedAt));
+    expect(epochMs(jamis.legacy_updated_at)).toBe(epochMs(jamisPreviouslyUpdatedAt));
+  });
+
+  it("touch all with custom timestamp", async () => {
+    const developer = developers("david");
+    const previouslyCreatedAt = developer.legacy_created_at;
+    const previouslyUpdatedAt = developer.legacy_updated_at;
+    vi.useFakeTimers({ now: Date.now() + 5000 });
+    await Developer.where({ name: "David" }).touchAll("created_at");
+    vi.useRealTimers();
+    await developer.reload();
+
+    expect(epochMs(developer.legacy_created_at)).not.toBe(epochMs(previouslyCreatedAt));
+    expect(epochMs(developer.legacy_updated_at)).not.toBe(epochMs(previouslyUpdatedAt));
+  });
+
+  it("touch all with aliased for update timestamp", async () => {
+    expect(
+      Object.keys((Developer as any).attributeAliases ?? {}).includes("updated_at"),
+    ).toBeTruthy();
+
+    const developer = developers("david");
+    const previouslyCreatedAt = developer.legacy_created_at;
+    const previouslyUpdatedAt = developer.legacy_updated_at;
+    vi.useFakeTimers({ now: Date.now() + 5000 });
+    await Developer.where({ name: "David" }).touchAll("updated_at");
+    vi.useRealTimers();
+    await developer.reload();
+
+    expect(epochMs(developer.legacy_created_at)).toBe(epochMs(previouslyCreatedAt));
+    expect(epochMs(developer.legacy_updated_at)).not.toBe(epochMs(previouslyUpdatedAt));
+  });
+
+  it("touch all with given time", async () => {
+    const developer = developers("david");
+    const previouslyCreatedAt = developer.legacy_created_at;
+    const previouslyUpdatedAt = developer.legacy_updated_at;
+    const newTime = RubyTime.utc(2015, 2, 16, 4, 54, 0);
+    await Developer.where({ name: "David" }).touchAll("created_at", { time: newTime });
+    await developer.reload();
+
+    expect(epochMs(developer.legacy_created_at)).not.toBe(epochMs(previouslyCreatedAt));
+    expect(epochMs(developer.legacy_updated_at)).not.toBe(epochMs(previouslyUpdatedAt));
+    expect(epochMs(developer.legacy_created_at)).toBe(epochMs(newTime));
+    expect(epochMs(developer.legacy_updated_at)).toBe(epochMs(newTime));
+  });
+
+  it("update on relation", async () => {
+    class TopicWithCallbacks extends Topic {
+      static topicCount: number;
+
+      static {
+        this.beforeUpdate(function (this: TopicWithCallbacks) {
+          if (!(this as any).author_name) (this as any).author_name = "David";
+        });
+        this.afterUpdate(async function () {
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
+        });
+      }
+    }
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
+
+    const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
+    const topic2 = await TopicWithCallbacks.createBang({
+      title: "activerecord",
+      author_name: null,
+    });
+    const topicsScope = TopicWithCallbacks.where({ id: [topic1.id, topic2.id] });
+    await topicsScope.update({ title: "adequaterecord" });
+
+    expect(TopicWithCallbacks.topicCount).toBe(await TopicWithCallbacks.count());
+
+    await topic1.reload();
+    await topic2.reload();
+    expect(topic1.title).toBe("adequaterecord");
+    expect(topic2.title).toBe("adequaterecord");
+    expect(topic1.author_name).toBe("David");
+    expect(topic2.author_name).toBe("David");
+  });
+
+  it("update with ids on relation", async () => {
+    class TopicWithCallbacks extends Topic {
+      static topicCount: number;
+
+      static {
+        this.beforeUpdate(function (this: TopicWithCallbacks) {
+          if (!(this as any).author_name) (this as any).author_name = "David";
+        });
+        this.afterUpdate(async function () {
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
+        });
+      }
+    }
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
+
+    const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
+    const topic2 = await TopicWithCallbacks.createBang({
+      title: "activerecord",
+      author_name: null,
+    });
+    await TopicWithCallbacks.update(
+      [topic1.id, topic2.id],
+      [{ title: "adequaterecord" }, { title: "adequaterecord" }],
+    );
+
+    expect(TopicWithCallbacks.topicCount).toBe(await TopicWithCallbacks.count());
+
+    await topic1.reload();
+    await topic2.reload();
+    expect(topic1.title).toBe("adequaterecord");
+    expect(topic2.title).toBe("adequaterecord");
+    expect(topic1.author_name).toBe("David");
+    expect(topic2.author_name).toBe("David");
+  });
+
+  it("update on relation passing active record object is not permitted", async () => {
+    const topic = await Topic.createBang({ title: "Foo", author_name: null });
+    await expect(
+      Topic.where({ id: topic.id }).update(topic as any, { title: "Bar" } as any),
+    ).rejects.toThrow(ArgumentError);
+  });
+
+  it("update bang on relation", async () => {
+    class TopicWithCallbacks extends Topic {
+      static topicCount: number;
+
+      static {
+        this.beforeUpdate(function (this: TopicWithCallbacks) {
+          if (!(this as any).author_name) (this as any).author_name = "David";
+        });
+        this.afterUpdate(async function () {
+          TopicWithCallbacks.topicCount = await TopicWithCallbacks.count();
+        });
+      }
+    }
+    constSet(TopLevel, "TopicWithCallbacks", TopicWithCallbacks);
+    DescendantsTracker.registerSubclass(Topic, TopicWithCallbacks);
+
+    const topic1 = await TopicWithCallbacks.createBang({ title: "arel", author_name: null });
+    const topic2 = await TopicWithCallbacks.createBang({
+      title: "activerecord",
+      author_name: null,
+    });
+    const topic3 = await TopicWithCallbacks.createBang({ title: "ar", author_name: null });
+    const topicsScope = TopicWithCallbacks.where({ id: [topic1.id, topic2.id] });
+    await topicsScope.updateBang({ title: "adequaterecord" });
+
+    expect(TopicWithCallbacks.topicCount).toBe(await TopicWithCallbacks.count());
+
+    await topic1.reload();
+    await topic2.reload();
+    await topic3.reload();
+    expect(topic1.title).toBe("adequaterecord");
+    expect(topic2.title).toBe("adequaterecord");
+    expect(topic3.title).toBe("ar");
+    expect(topic1.author_name).toBe("David");
+    expect(topic2.author_name).toBe("David");
+    expect(topic3.author_name).toBeNull();
+  });
+
+  it("update all cares about optimistic locking", async () => {
+    const david = people("david");
+
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
+    expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
+
+    const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
+    const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
+    await pplScope.updateAll({ updated_at: now });
+
+    const updatedAts = await pplScope.pluck("updated_at");
+    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(epochMs(now)));
+    expect(await pplScope.pluck("lock_version")).toEqual(expected);
+
+    await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
+  });
+
+  it("update counters cares about optimistic locking", async () => {
+    const david = people("david");
+
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
+    expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
+
+    const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
+    const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
+    await pplScope.updateCounters({ touch: { time: now } } as any);
+
+    const updatedAts = await pplScope.pluck("updated_at");
+    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(epochMs(now)));
+    expect(await pplScope.pluck("lock_version")).toEqual(expected);
+
+    await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
+  });
+
+  it("touch all cares about optimistic locking", async () => {
+    const david = people("david");
+
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
+    expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
+
+    const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
+    const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
+
+    vi.useFakeTimers({ now: epochMs(now) });
+    await pplScope.touchAll();
+    vi.useRealTimers();
+
+    const updatedAts = await pplScope.pluck("updated_at");
+    updatedAts.forEach((ts) => expect(epochMs(ts as any)).toBe(epochMs(now)));
+    expect(await pplScope.pluck("lock_version")).toEqual(expected);
+
+    await expect(david.touch({ time: now })).rejects.toThrow(StaleObjectError);
+  });
+
+  it("klass level update all", async () => {
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
+
+    for (const person of await Person.all()) {
+      expect(epochMs((person as any).updated_at)).not.toBe(epochMs(now));
+    }
+
+    await Person.updateAll({ updated_at: now });
+
+    for (const person of await Person.all()) {
+      expect(epochMs((person as any).updated_at)).toBe(epochMs(now));
+    }
+  });
+
+  it("klass level touch all", async () => {
+    const now = RubyTime.utc(2015, 1, 1, 12, 0, 0);
+
+    for (const person of await Person.all()) {
+      expect(epochMs((person as any).updated_at)).not.toBe(epochMs(now));
+    }
+
+    vi.useFakeTimers({ now: epochMs(now) });
+    await Person.touchAll();
+    vi.useRealTimers();
+
+    for (const person of await Person.all()) {
+      expect(epochMs((person as any).updated_at)).toBe(epochMs(now));
+    }
+  });
+
+  it("update all composite model with join subquery", async () => {
+    const agreement = cpkOrderAgreements("order_agreement_three");
+    const joinScope = CpkOrder.joins(":orderAgreements").where({
+      orderAgreements: { signature: agreement.signature },
+    });
+    expect(await joinScope.updateAll({ status: "shipped" })).toBe(1);
+  });
+
+  it("update all ignores order without limit from association", async () => {
+    const author = await Author.find(authors("david").id);
+    await assertNothingRaised(async () => {
+      const postsWithCats = await (author as any).postsWithCommentsAndCategories.toArray();
+      expect(postsWithCats.length).toBe(
+        await (author as any).postsWithCommentsAndCategories.updateAll([
+          "body = ?",
+          "bulk update!",
+        ]),
+      );
+    });
+  });
+
+  it("update all doesnt ignore order", async () => {
+    expect(Number(authors("david").id) + 1).toBe(Number(authors("mary").id));
+    const testUpdateWithOrderSucceeds = async (order: string) => {
+      try {
+        return await (Author.order(order).updateAll as any)("id = id + 1");
+      } catch (e) {
+        if (e instanceof ActiveRecordError) return false;
+        throw e;
+      }
+    };
+
+    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if test_update_with_order_succeeds.call("id DESC")` (update_all_test.rb:339)
+    if (await testUpdateWithOrderSucceeds("id DESC")) {
+      assertNot(await testUpdateWithOrderSucceeds("id ASC"));
+    } else {
+      await self().assertQueriesMatch(
+        /^UPDATE .+ \(SELECT .* ORDER BY id DESC\)$/i,
+        {},
+        async () => {
+          await testUpdateWithOrderSucceeds("id DESC");
+        },
+      );
+    }
+
+    async function testUpdateAllWithOrderAndLimitUpdatesSubsetOnly() {
+      const author = await Author.find(authors("david").id);
+      const limitedPosts = (author as any).postsSortedByIdLimited;
+      expect(await limitedPosts.size()).toBe(1);
+      expect(await limitedPosts.limit(2).size()).toBe(2);
+      expect(await limitedPosts.updateAll(["body = ?", "bulk update!"])).toBe(1);
+      expect(posts("welcome").body).toBe("bulk update!");
+      expect(posts("thinking").body).not.toBe("bulk update!");
+    }
+
+    async function testUpdateAllWithOrderAndLimitAndOffsetUpdatesSubsetOnly() {
+      const author = await Author.find(authors("david").id);
+      const limitedPosts = (author as any).postsSortedByIdLimited.offset(1);
+      expect(await limitedPosts.size()).toBe(1);
+      expect(await limitedPosts.limit(2).size()).toBe(2);
+      expect(await limitedPosts.updateAll(["body = ?", "bulk update!"])).toBe(1);
+      expect(posts("thinking").body).toBe("bulk update!");
+      expect(posts("welcome").body).not.toBe("bulk update!");
+    }
+  });
+});

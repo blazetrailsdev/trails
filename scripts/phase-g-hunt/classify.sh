@@ -8,11 +8,11 @@
 # Outputs a TSV with: file, LOC, sites, total_classes, canonical_pct, has_creates, non_canonical
 set -euo pipefail
 
-AR_SRC="packages/activerecord/src"
+AR_SRC="packages/activerecord/test"
 
 # Build canonical class name list from model filenames (kebab → PascalCase)
 canonical_classes=$(
-  ls "$AR_SRC/test-helpers/models/"*.ts 2>/dev/null \
+  ls "$AR_SRC/models/"*.ts 2>/dev/null \
     | xargs -I{} basename {} .ts \
     | perl -pe 's/(^|-)(\w)/uc($2)/ge' \
     | sort -u

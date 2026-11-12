@@ -94,17 +94,17 @@ function loadExclude() {
 
 function trailsRelKey(filename) {
   const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)packages\/activerecord\/src\/(.+\.test\.ts)$/);
+  const m = norm.match(/(?:^|\/)packages\/activerecord\/(?:lib|test\/cases)\/(.+\.test\.ts)$/);
   return m ? m[1] : null;
 }
 
 /**
- * Repo-relative path (`packages/activerecord/src/…`) for exclude-list lookup.
+ * Repo-relative path (`packages/activerecord/lib/…`) for exclude-list lookup.
  * Derived from `trailsRelKey` so the path shape has a single source of truth.
  */
 function repoRel(filename) {
   const key = trailsRelKey(filename);
-  return key ? `packages/activerecord/src/${key}` : null;
+  return key ? `packages/activerecord/lib/${key}` : null;
 }
 
 function normalizeDesc(s) {

@@ -8,7 +8,7 @@
 // it while `Relation` was still in its temporal dead zone, crashing with
 // `ReferenceError: Cannot access 'Relation' before initialization`. Those three
 // now resolve at call time through the `ActiveSupport::Autoload` namespaces in
-// `packages/activerecord/src/namespaces.ts` (`Associations.CollectionProxy`,
+// `packages/activerecord/lib/namespaces.ts` (`Associations.CollectionProxy`,
 // `ActiveRecord.AssociationRelation`, `Associations.DisableJoinsAssociationScope`)
 // — see CLAUDE.md, "Call-time constant resolution".
 //
@@ -17,7 +17,7 @@
 // import below really is the entry module.
 //
 // The import is deliberately the first thing this module touches.
-import { Relation } from "../../packages/activerecord/src/relation.js";
+import { Relation } from "../../packages/activerecord/lib/relation.js";
 import { describe, it, expect } from "vitest";
 
 describe("relation entry circular-init", () => {

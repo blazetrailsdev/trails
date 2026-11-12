@@ -1,0 +1,442 @@
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { EncryptedAttributeType } from "../../../lib/encryption/encrypted-attribute-type.js";
+import { Scheme } from "../../../lib/encryption/scheme.js";
+import { Decryption } from "../../../lib/encryption/errors.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
+import type { EncryptorLike } from "../../../lib/encryption/encryptor.js";
+import type { SchemeOptions } from "../../../lib/encryption/scheme.js";
+import { ExtendedDeterministicQueries } from "../../../lib/encryption/extended-deterministic-queries.js";
+import { Relation } from "../../../lib/relation.js";
+import { Base } from "../../../lib/index.js";
+import {
+  freshAdapter,
+  configureEncryption,
+  AUTHOR_NAME_LIMIT,
+  snapshotEncryptionConfig,
+  restoreEncryptionConfig,
+  makeEncryptedAuthor,
+  makeKeyProvider,
+  Encryption,
+} from "../../../lib/encryption/test-helpers.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+
+fixtures([]);
+
+class TestEncryptor implements EncryptorLike {
+  private ciphertextsByClearValue: Record<string, string>;
+
+  constructor(ciphertextsByClearValue: Record<string, string>) {
+    this.ciphertextsByClearValue = ciphertextsByClearValue;
+  }
+
+  encrypt(
+    clearText: string,
+    {
+      keyProvider = null,
+      cipherOptions = {},
+    }: { keyProvider?: unknown; cipherOptions?: object } = {},
+  ): string {
+    return this.ciphertextsByClearValue[clearText] ?? clearText;
+  }
+
+  decrypt(
+    encryptedText: string,
+    {
+      keyProvider = null,
+      cipherOptions = {},
+    }: { keyProvider?: unknown; cipherOptions?: object } = {},
+  ): string {
+    for (const [clearValue, encryptedValue] of Object.entries(this.ciphertextsByClearValue)) {
+      if (encryptedValue === encryptedText) return clearValue;
+    }
+    throw new Decryption(
+      `Couldn't find a match for ${encryptedText} (${rbInspect(this.ciphertextsByClearValue)})`,
+    );
+  }
+
+  isEncrypted(text: string): boolean {
+    try {
+      this.decrypt(text);
+      return true;
+    } catch (error) {
+      if (error instanceof Decryption) return false;
+      throw error;
+    }
+  }
+
+  isBinary(): boolean {
+    return false;
+  }
+}
+
+function makeType(
+  encryptor: EncryptorLike,
+  previousSchemes: Scheme[] = [],
+): EncryptedAttributeType {
+  return new EncryptedAttributeType({ scheme: new Scheme({ encryptor, previousSchemes }) });
+}
+
+describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
+  let savedSupportUnencryptedData: boolean;
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeAll(async () => {
+    await freshAdapter();
+  });
+
+  beforeEach(() => {
+    savedSupportUnencryptedData = Encryption.config.supportUnencryptedData;
+    configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+  });
+
+  afterEach(() => {
+    Encryption.config.supportUnencryptedData = savedSupportUnencryptedData;
+    restoreEncryptionConfig(configSnapshot);
+  });
+
+  it("can decrypt encrypted_value encrypted with a different encryption scheme", async () => {
+    Encryption.config.supportUnencryptedData = false;
+    const prevKeyProvider = makeKeyProvider("prev-key-for-schemes-test-32bytes!!");
+    Encryption.config.previous = [{ keyProvider: prevKeyProvider }] as SchemeOptions[];
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
+    new Author();
+    const author = await Author.create({ name: "david" });
+    const currentType = Author.typeForAttribute("name") as EncryptedAttributeType;
+    const prevType = currentType.previousTypes[0];
+    const oldCiphertext = prevType.serialize("dhh") as string;
+    await Encryption.withoutEncryption(async () => {
+      await author.updateColumns({ name: oldCiphertext });
+    });
+    const reloaded = await Author.find(author.id);
+    expect(reloaded.name).toBe("dhh");
+    expect(reloaded.isEncryptedAttribute("name")).toBeTruthy();
+  });
+
+  it("when defining previous encryption schemes, you still get Decryption errors when using invalid clear values", async () => {
+    Encryption.config.supportUnencryptedData = false;
+    Encryption.config.previous = [
+      { keyProvider: makeKeyProvider("prev-key-for-decryption-error-32b!") },
+    ] as SchemeOptions[];
+    await freshAdapter();
+    const Author = makeEncryptedAuthor();
+    new Author();
+    const author = await Encryption.withoutEncryption(() =>
+      Author.create({ name: "unencrypted author" }),
+    );
+    const reloaded = await Author.find(author.id);
+    expect(() => reloaded.name).toThrow(Decryption);
+  });
+
+  it("use a custom encryptor", async () => {
+    const adp = await freshAdapter();
+    const EncryptedAuthor1 = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.encrypts("name", { encryptor: new TestEncryptor({ "1": "2" }) });
+      }
+    } as any;
+    new EncryptedAuthor1();
+    const author = await EncryptedAuthor1.create({ name: "1" });
+    expect(author.name).toBe("1");
+    expect(author.isEncryptedAttribute("name")).toBeTruthy();
+  });
+
+  it("support previous contexts", async () => {
+    Encryption.config.supportUnencryptedData = true;
+    const adp = await freshAdapter();
+    const EncryptedAuthor2 = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        this.encrypts("name", {
+          encryptor: new TestEncryptor({ "2": "3" }),
+          previousSchemes: [new Scheme({ encryptor: new TestEncryptor({ "1": "2" }) })],
+        });
+      }
+    } as any;
+    new EncryptedAuthor2();
+    const author = await EncryptedAuthor2.create({ name: "2" });
+    expect(author.name).toBe("2");
+    expect(author.equals(await EncryptedAuthor2.findBy({ name: "2" }))).toBe(true);
+    expect(author.isEncryptedAttribute("name")).toBeTruthy();
+    const RawModel = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+      }
+    } as any;
+    new RawModel();
+    const rawRecord = await RawModel.find(author.id);
+    await rawRecord.update({ name: "1" });
+    const reloaded = await EncryptedAuthor2.find(author.id);
+    expect(reloaded.name).toBe("1");
+    expect(reloaded.equals(await EncryptedAuthor2.findBy({ name: "1" }))).toBe(true);
+    expect(reloaded.isEncryptedAttribute("name")).toBeFalsy();
+  });
+
+  it("use global previous schemes to decrypt data encrypted with previous schemes", () => {
+    Encryption.config.supportUnencryptedData = false;
+
+    const prev1Scheme = new Scheme({
+      encryptor: new TestEncryptor({ "0": "1" }),
+    });
+    const prev2Scheme = new Scheme({
+      encryptor: new TestEncryptor({ "1": "2" }),
+    });
+    const type = makeType(new TestEncryptor({ current: "current_cipher" }), [
+      prev1Scheme,
+      prev2Scheme,
+    ]);
+
+    expect(type.previousTypes.length).toBe(2);
+    const [previousType1, previousType2] = type.previousTypes;
+
+    const ciphertext1 = previousType1.serialize("1") as string;
+    expect(type.deserialize(ciphertext1)).toBe("0");
+
+    const ciphertext2 = previousType2.serialize("2") as string;
+    expect(type.deserialize(ciphertext2)).toBe("1");
+  });
+
+  it("use global previous schemes to decrypt data encrypted with previous schemes with unencrypted data", () => {
+    Encryption.config.supportUnencryptedData = true;
+
+    const prev1Scheme = new Scheme({
+      encryptor: new TestEncryptor({ "0": "1" }),
+    });
+    const prev2Scheme = new Scheme({
+      encryptor: new TestEncryptor({ "1": "2" }),
+    });
+    const type = makeType(new TestEncryptor({ current: "current_cipher" }), [
+      prev1Scheme,
+      prev2Scheme,
+    ]);
+
+    expect(type.previousTypes.length).toBe(3);
+    const [previousType1, previousType2] = type.previousTypes;
+
+    const ciphertext1 = previousType1.serialize("1") as string;
+    expect(type.deserialize(ciphertext1)).toBe("0");
+
+    const ciphertext2 = previousType2.serialize("2") as string;
+    expect(type.deserialize(ciphertext2)).toBe("1");
+  });
+
+  it("returns ciphertext all the previous schemes fail to decrypt and support for unencrypted data is on", () => {
+    Encryption.config.supportUnencryptedData = true;
+
+    const prev1Scheme = new Scheme({
+      encryptor: new TestEncryptor({ "0": "1" }),
+    });
+    const prev2Scheme = new Scheme({
+      encryptor: new TestEncryptor({ "1": "2" }),
+    });
+    const type = makeType(new TestEncryptor({ current: "current_cipher" }), [
+      prev1Scheme,
+      prev2Scheme,
+    ]);
+
+    expect(type.deserialize("some ciphertext")).toBe("some ciphertext");
+  });
+
+  it("raise decryption error when all the previous schemes fail to decrypt", () => {
+    Encryption.config.supportUnencryptedData = false;
+
+    const prev1Scheme = new Scheme({
+      encryptor: new TestEncryptor({ "0": "1" }),
+    });
+    const prev2Scheme = new Scheme({
+      encryptor: new TestEncryptor({ "1": "2" }),
+    });
+    const type = makeType(new TestEncryptor({ current: "current_cipher" }), [
+      prev1Scheme,
+      prev2Scheme,
+    ]);
+
+    expect(() => type.deserialize("some invalid ciphertext")).toThrow(Decryption);
+  });
+
+  it("deterministic encryption is fixed by default: it will always use the oldest scheme to encrypt data", async () => {
+    Encryption.config.supportUnencryptedData = false;
+    Encryption.config.deterministicKey = "12345";
+    Encryption.config.previousSchemes = [];
+    Encryption.config.previous = [
+      { downcase: true, deterministic: true } as SchemeOptions,
+      { downcase: false, deterministic: true } as SchemeOptions,
+    ];
+
+    await freshAdapter();
+    const encryptedAuthorClass = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
+        this.encrypts("name", { deterministic: true, downcase: false });
+      }
+    } as any;
+    new encryptedAuthorClass();
+
+    const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
+    expect(author.name).toBe("stephen king");
+  });
+
+  it("don't use global previous schemes with a different deterministic nature", async () => {
+    Encryption.config.supportUnencryptedData = false;
+    Encryption.config.deterministicKey = "12345";
+    Encryption.config.previousSchemes = [];
+    Encryption.config.previous = [
+      { downcase: true, deterministic: false } as SchemeOptions,
+      { downcase: false, deterministic: true } as SchemeOptions,
+    ];
+
+    const adp = await freshAdapter();
+    const encryptedAuthorClass = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
+        this.encrypts("name", { deterministic: true, downcase: false });
+      }
+    } as any;
+    new encryptedAuthorClass();
+
+    const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
+    expect(author.name).toBe("STEPHEN KING");
+  });
+
+  it("deterministic encryption will use the newest encryption scheme to encrypt data when setting it to { fixed: false }", async () => {
+    Encryption.config.supportUnencryptedData = false;
+    Encryption.config.deterministicKey = "12345";
+    Encryption.config.previousSchemes = [];
+    Encryption.config.previous = [
+      { downcase: true, deterministic: true } as SchemeOptions,
+      { downcase: false, deterministic: true } as SchemeOptions,
+    ];
+
+    await freshAdapter();
+    const encryptedAuthorClass = class extends Base {
+      static {
+        this._tableName = "authors";
+        this.attribute("id", "integer");
+        this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
+        this.encrypts("name", { deterministic: { fixed: false }, downcase: false });
+      }
+    } as any;
+    new encryptedAuthorClass();
+
+    const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
+    expect(author.name).toBe("STEPHEN KING");
+  });
+
+  it("use global previous schemes when performing queries", async () => {
+    Encryption.config.supportUnencryptedData = false;
+    const savedExtendQueries = Encryption.config.extendQueries;
+
+    const savedMethods = {
+      where: Relation.prototype.where,
+      isExists: (Relation.prototype as any).isExists,
+      scopeForCreate: (Relation.prototype as any).scopeForCreate,
+      findBy: (Base as any).findBy,
+      serialize: EncryptedAttributeType.prototype.serialize,
+    };
+
+    Encryption.config.extendQueries = true;
+    ExtendedDeterministicQueries.installSupport();
+    try {
+      const prevEncryptor = new TestEncryptor({ alice: "alice_prev_cipher" });
+      const currentEncryptor = new TestEncryptor({ alice: "alice_cur_cipher" });
+
+      Encryption.config.previousSchemes = [];
+      Encryption.config.previous = [
+        { encryptor: prevEncryptor, deterministic: true } as SchemeOptions,
+      ];
+
+      const adp = await freshAdapter();
+      const Author = class extends Base {
+        static {
+          this._tableName = "authors";
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+          this.encrypts("name", {
+            encryptor: currentEncryptor,
+            deterministic: { fixed: false },
+          });
+        }
+      } as any;
+      new Author();
+
+      const Raw = class extends Base {
+        static {
+          this._tableName = "authors";
+          this.attribute("id", "integer");
+          this.attribute("name", "string");
+        }
+      } as any;
+      new Raw();
+
+      const raw = await Raw.create({ name: "alice_prev_cipher" });
+      const found = await Author.findBy({ name: "alice" });
+      expect(String(found!.id)).toBe(String(raw.id));
+      expect(found!.name).toBe("alice");
+    } finally {
+      Relation.prototype.where = savedMethods.where;
+      (Relation.prototype as any).isExists = savedMethods.isExists;
+      (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
+      (Base as any).findBy = savedMethods.findBy;
+      EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
+      Encryption.config.extendQueries = savedExtendQueries;
+    }
+  });
+
+  it("don't use global previous schemes with a different deterministic nature when performing queries", async () => {
+    Encryption.config.supportUnencryptedData = false;
+    Encryption.config.deterministicKey = "12345";
+    const savedExtendQueries = Encryption.config.extendQueries;
+
+    const savedMethods = {
+      where: Relation.prototype.where,
+      isExists: (Relation.prototype as any).isExists,
+      scopeForCreate: (Relation.prototype as any).scopeForCreate,
+      findBy: (Base as any).findBy,
+      serialize: EncryptedAttributeType.prototype.serialize,
+    };
+
+    Encryption.config.extendQueries = true;
+    ExtendedDeterministicQueries.installSupport();
+    try {
+      Encryption.config.previousSchemes = [];
+      Encryption.config.previous = [
+        { downcase: true, deterministic: false } as SchemeOptions,
+        { downcase: false, deterministic: true } as SchemeOptions,
+      ];
+
+      const adp = await freshAdapter();
+      const encryptedAuthorClass = class extends Base {
+        static {
+          this._tableName = "authors";
+          this.attribute("id", "integer");
+          this.attribute("name", "string", { limit: AUTHOR_NAME_LIMIT });
+          this.encrypts("name", { deterministic: true, downcase: false });
+        }
+      } as any;
+      new encryptedAuthorClass();
+      const author = await encryptedAuthorClass.create({ name: "STEPHEN KING" });
+      const found = await encryptedAuthorClass.findBy({ name: "STEPHEN KING" });
+      expect(String(found!.id)).toBe(String(author.id));
+      expect(await encryptedAuthorClass.findBy({ name: "stephen king" })).toBeNull();
+    } finally {
+      Relation.prototype.where = savedMethods.where;
+      (Relation.prototype as any).isExists = savedMethods.isExists;
+      (Relation.prototype as any).scopeForCreate = savedMethods.scopeForCreate;
+      (Base as any).findBy = savedMethods.findBy;
+      EncryptedAttributeType.prototype.serialize = savedMethods.serialize;
+      Encryption.config.extendQueries = savedExtendQueries;
+    }
+  });
+});

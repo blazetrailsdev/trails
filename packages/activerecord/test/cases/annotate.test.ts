@@ -1,0 +1,58 @@
+import { describe, it, expect } from "vitest";
+import "../../lib/index.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { Post } from "../../lib/test-helpers/models/post.js";
+
+describe("AnnotateTest", () => {
+  const { self } = fixtures(["posts"]);
+
+  it("annotate wraps content in an inline comment", async () => {
+    await self().assertQueriesMatch(/SELECT .* FROM .* \/\* foo \*\//i, {}, async () => {
+      const relation = Post.select("id").annotate("foo");
+      expect(await relation.first()).toBeTruthy();
+    });
+  });
+
+  it("annotate is sanitized", async () => {
+    await self().assertQueriesMatch(/SELECT .* FROM .* \/\* \* \/foo\/ \* \*\//i, {}, async () => {
+      const relation = Post.select("id").annotate("*/foo/*");
+      expect(await relation.first()).toBeTruthy();
+    });
+
+    await self().assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \*\* \/\/foo\/\/ \*\* \*\//i,
+      {},
+      async () => {
+        const relation = Post.select("id").annotate("**//foo//**");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
+
+    await self().assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \* \* \/\/foo\/\/ \* \* \*\//i,
+      {},
+      async () => {
+        const relation = Post.select("id").annotate("* *//foo//* *");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
+
+    await self().assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \* \/foo\/ \* \*\/ \/\* \* \/bar \*\//i,
+      {},
+      async () => {
+        const relation = Post.select("id").annotate("*/foo/*").annotate("*/bar");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
+
+    await self().assertQueriesMatch(
+      /SELECT .* FROM .* \/\* \+ MAX_EXECUTION_TIME\(1\) \*\//i,
+      {},
+      async () => {
+        const relation = Post.select("id").annotate("+ MAX_EXECUTION_TIME(1)");
+        expect(await relation.first()).toBeTruthy();
+      },
+    );
+  });
+});

@@ -403,7 +403,7 @@ export function absoluteSourcePath(body: string): string | null {
  * #6964, `extract-ts-api.ts` recorded a namespace import's module symbol —
  * whose TypeScript `name` is the quoted absolute path of the module — onto
  * `ClassInfo.extends`, so a sibling worktree's run was served entries naming
- * `/mnt/.../worktrees/<since-deleted>/packages/activerecord/src/querying`. The
+ * `/mnt/.../worktrees/<since-deleted>/packages/activerecord/lib/querying`. The
  * name resolved to nothing, whole mixins dropped out of the compared surface,
  * and the ratchet reported another branch's numbers (1488 baselined vs this
  * branch's true 417) with no error and no warning.

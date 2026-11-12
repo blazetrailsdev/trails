@@ -1,0 +1,277 @@
+import { afterEach, describe, it, expect, beforeAll, vi } from "vitest";
+import { Base } from "../../../lib/base.js";
+import {
+  dropAllTables,
+  purgeToCanonicalTables,
+  resetTestTables,
+} from "../../../lib/support/drop-all-tables.js";
+import { provisionSecondDatabase } from "../../../lib/support/setup-second-pool.js";
+import { ARUnit2Model } from "../../models/arunit2-model.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
+import { typeRegistryKeyFor } from "../../support/type-registry-key.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { ConnectionFailed, ConnectionNotEstablished } from "../../../lib/errors.js";
+import { PG } from "../../../lib/pg/pg.js";
+
+let adapter: DatabaseAdapter;
+
+fixtures({}, { useTransactionalTests: false });
+
+async function listTables(a: DatabaseAdapter): Promise<string[]> {
+  if (typeRegistryKeyFor(a) === "sqlite3") {
+    return (
+      (
+        await a.selectAll(
+          `SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'`,
+        )
+      ).toArray() as Array<{ name: string }>
+    ).map((r) => r.name);
+  } else if (typeRegistryKeyFor(a) === "postgresql") {
+    return (
+      (
+        await a.selectAll(
+          `SELECT tablename FROM pg_tables WHERE schemaname = ANY(current_schemas(false))`,
+        )
+      ).toArray() as Array<{ tablename: string }>
+    ).map((r) => r.tablename);
+  } else {
+    return (
+      (
+        await a.selectAll(
+          `SELECT table_name AS name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_type = 'BASE TABLE'`,
+        )
+      ).toArray() as Array<{ name?: string; TABLE_NAME?: string }>
+    ).map((r) => (r.name ?? r.TABLE_NAME)!);
+  }
+}
+
+async function tableCount(a: DatabaseAdapter): Promise<number> {
+  return (await listTables(a)).length;
+}
+
+beforeAll(async () => {
+  adapter = await Base.leaseConnection();
+});
+
+describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("retries exactly once when execute throws a connection error and succeeds on retry", async () => {
+    const connErr = new ConnectionFailed("Connection terminated unexpectedly", {
+      cause: new PG.ConnectionBad("Connection terminated unexpectedly\n"),
+    });
+
+    let executeCallCount = 0;
+    const fakeAdapter = {
+      adapterName: "PostgreSQL",
+      execute: vi.fn(async () => {
+        executeCallCount++;
+        if (executeCallCount === 1) throw connErr;
+        return [];
+      }),
+      schemaCache: { clearBang() {} },
+    } as unknown as DatabaseAdapter;
+
+    await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
+    expect(executeCallCount).toBe(4);
+  });
+
+  it("rethrows when execute throws a non-connection error", async () => {
+    const appErr = new Error("syntax error");
+    const fakeAdapter = {
+      adapterName: "PostgreSQL",
+      execute: vi.fn(async () => {
+        throw appErr;
+      }),
+      schemaCache: { clearBang() {} },
+    } as unknown as DatabaseAdapter;
+
+    await expect(dropAllTables(fakeAdapter)).rejects.toThrow(appErr);
+    expect(fakeAdapter.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries when a DROP throws a connection error mid-loop", async () => {
+    const connErr = new ConnectionNotEstablished("client has already ended", {
+      cause: new PG.ConnectionBad("connection is closed"),
+    });
+
+    let mutationCallCount = 0;
+    const fakeAdapter = {
+      adapterName: "PostgreSQL",
+      execute: vi.fn(async (sql: string) => {
+        if (sql.startsWith("DROP")) {
+          mutationCallCount++;
+          if (mutationCallCount === 1) throw connErr;
+          return [];
+        }
+        if (sql.includes("matviewname")) {
+          return mutationCallCount === 0 ? [{ schemaname: "public", name: "mv1" }] : [];
+        }
+        return [];
+      }),
+      schemaCache: { clearBang() {} },
+    } as unknown as DatabaseAdapter;
+
+    await expect(dropAllTables(fakeAdapter)).resolves.toBeUndefined();
+    expect(fakeAdapter.execute).toHaveBeenCalledTimes(5);
+    expect(mutationCallCount).toBe(1);
+  });
+});
+
+describe("resetTestTables", () => {
+  it("truncates canonical tables (keeps shape) instead of dropping them", async () => {
+    await adapter.execute(`INSERT INTO articles (id) VALUES (4242)`);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBeGreaterThan(
+      0,
+    );
+
+    await resetTestTables(adapter);
+
+    expect(await listTables(adapter)).toContain("articles");
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(0);
+  });
+
+  it("drops bespoke (non-canonical) tables so their shape can't leak", async () => {
+    await adapter.execute(`CREATE TABLE bespoke_reset_t (id INTEGER PRIMARY KEY)`);
+    expect(await listTables(adapter)).toContain("bespoke_reset_t");
+
+    await resetTestTables(adapter);
+
+    expect(await listTables(adapter)).not.toContain("bespoke_reset_t");
+    expect(await listTables(adapter)).toContain("articles");
+  });
+
+  it("drops bookkeeping tables (schema_migrations / ar_internal_metadata) like the old drop-all", async () => {
+    await adapter.execute(
+      `CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY)`,
+    );
+
+    await resetTestTables(adapter);
+
+    expect(await listTables(adapter)).not.toContain("schema_migrations");
+  });
+});
+
+describe("dropAllTables", () => {
+  let dropAdapter: DatabaseAdapter;
+
+  beforeAll(async () => {
+    dropAdapter = await ARUnit2Model.leaseConnection();
+  });
+
+  afterEach(provisionSecondDatabase);
+
+  it("drops all tables", async () => {
+    expect(await tableCount(dropAdapter)).toBeGreaterThan(0);
+    await dropAllTables(dropAdapter);
+    expect(await tableCount(dropAdapter)).toBe(0);
+  });
+
+  it("is idempotent — second call is a no-op", async () => {
+    await dropAllTables(dropAdapter);
+    await dropAllTables(dropAdapter);
+    expect(await tableCount(dropAdapter)).toBe(0);
+  });
+
+  it("drops 3-table FK chain without error", async () => {
+    const int = typeRegistryKeyFor(dropAdapter) === "mysql2" ? "INT" : "INTEGER";
+    await dropAdapter.execute(`CREATE TABLE fk_parent (id ${int} PRIMARY KEY)`);
+    await dropAdapter.execute(
+      `CREATE TABLE fk_child (id ${int} PRIMARY KEY, parent_id ${int}, FOREIGN KEY (parent_id) REFERENCES fk_parent(id))`,
+    );
+    await dropAdapter.execute(
+      `CREATE TABLE fk_grandchild (id ${int} PRIMARY KEY, child_id ${int}, FOREIGN KEY (child_id) REFERENCES fk_child(id))`,
+    );
+    await dropAdapter.execute(`INSERT INTO fk_parent (id) VALUES (1)`);
+    await dropAdapter.execute(`INSERT INTO fk_child (id, parent_id) VALUES (1, 1)`);
+    await dropAdapter.execute(`INSERT INTO fk_grandchild (id, child_id) VALUES (1, 1)`);
+    await dropAllTables(dropAdapter);
+    expect(await tableCount(dropAdapter)).toBe(0);
+  });
+});
+
+describe("dropAllTables (shared worker database)", () => {
+  it("leaves the shared canonical schema intact", async () => {
+    const tables = await listTables(adapter);
+    expect(tables.length).toBeGreaterThan(0);
+    expect(tables).toContain("items");
+    expect(tables).toContain("posts");
+  });
+});
+
+describe("purge-only pre-snapshot path", () => {
+  async function freshModules(): Promise<{
+    dropAllTablesModule: typeof import("../../../lib/support/drop-all-tables.js");
+    loadSchemaHelper: typeof import("../../../lib/support/load-schema-helper.js");
+  }> {
+    vi.resetModules();
+    const dropAllTablesModule = await import("../../../lib/support/drop-all-tables.js");
+    const loadSchemaHelper = await import("../../../lib/support/load-schema-helper.js");
+    return { dropAllTablesModule, loadSchemaHelper };
+  }
+
+  const inertAdapter = {
+    adapterName: "None",
+    schemaCache: { clearBang() {} },
+  } as unknown as DatabaseAdapter;
+
+  const armOnlyAdapter = {
+    adapterName: "SQLite",
+    createTable: async () => {},
+  } as unknown as DatabaseAdapter;
+
+  it("rejects a reset that runs before the boot-laid snapshot", async () => {
+    const { dropAllTablesModule } = await freshModules();
+
+    await expect(dropAllTablesModule.resetTestTables(inertAdapter)).rejects.toThrow(
+      /before recordBootLaidTables/,
+    );
+  });
+
+  it("rejects a purge that runs after the adapter-specific arm", async () => {
+    const { dropAllTablesModule, loadSchemaHelper } = await freshModules();
+    await loadSchemaHelper.loadAdapterSpecificSchema(armOnlyAdapter);
+
+    await expect(dropAllTablesModule.purgeToCanonicalTables(inertAdapter)).rejects.toThrow(
+      /after the adapter-specific schema arm/,
+    );
+  });
+
+  it("leaves the purge available on an adapter that has no arm to run", async () => {
+    const { dropAllTablesModule, loadSchemaHelper } = await freshModules();
+    await loadSchemaHelper.loadAdapterSpecificSchema(inertAdapter);
+
+    await expect(dropAllTablesModule.purgeToCanonicalTables(inertAdapter)).resolves.toBeUndefined();
+  });
+
+  it("allows the purge after the arm when the caller names the tables it laid", async () => {
+    const { dropAllTablesModule, loadSchemaHelper } = await freshModules();
+    await loadSchemaHelper.loadAdapterSpecificSchema(armOnlyAdapter);
+
+    await expect(
+      dropAllTablesModule.purgeToCanonicalTables(inertAdapter, ["defaults"]),
+    ).resolves.toBeUndefined();
+  });
+
+  it("rejects a purge that runs after the boot-laid snapshot", async () => {
+    await expect(purgeToCanonicalTables(adapter)).rejects.toThrow(/after recordBootLaidTables/);
+  });
+
+  it("truncates a named adapter-specific table instead of dropping it", async () => {
+    const { dropAllTablesModule } = await freshModules();
+
+    await dropAllTablesModule.purgeToCanonicalTables(adapter, ["defaults"]);
+
+    expect(await listTables(adapter)).toContain("defaults");
+  });
+
+  it("clears the rows of a canonical table, so the boot needs no truncate ahead of it", async () => {
+    const { dropAllTablesModule } = await freshModules();
+    await adapter.execute(`INSERT INTO articles (id) VALUES (4243)`);
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(1);
+
+    await dropAllTablesModule.purgeToCanonicalTables(adapter);
+
+    expect((await adapter.selectAll(`SELECT id FROM articles`)).toArray().length).toBe(0);
+  });
+});

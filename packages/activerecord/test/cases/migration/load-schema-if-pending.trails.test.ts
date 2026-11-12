@@ -1,0 +1,64 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { Base } from "../../../lib/base.js";
+import { Migration } from "../../../lib/migration.js";
+import { DatabaseConfigurations } from "../../../lib/database-configurations.js";
+import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";
+import { currentAdapter } from "../../../lib/support/adapter-helper.js";
+import { DatabaseTasks } from "../../../lib/tasks/database-tasks.js";
+import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
+
+describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendingBang", () => {
+  let originalConfigurations: DatabaseConfigurations;
+  let calls: string[];
+  let upToDate: boolean;
+
+  beforeEach(() => {
+    calls = [];
+    upToDate = true;
+    originalConfigurations = Base.configurations();
+    Base.configurations({
+      [DEFAULT_ENV()]: {
+        primary: { adapter: "sqlite3", database: ":memory:" },
+      },
+    });
+
+    vi.spyOn(DatabaseTasks, "schemaUpToDate").mockImplementation(async () => {
+      calls.push("schemaUpToDate");
+      return upToDate;
+    });
+    vi.spyOn(DatabaseTasks, "withTemporaryPoolForEach").mockImplementation((async (
+      _options: { env?: string },
+      block: (pool: ConnectionPool) => Promise<void>,
+    ) => {
+      await block({ dbConfig: Base.configurations().configsFor({})[0] } as ConnectionPool);
+    }) as never);
+    vi.spyOn(DatabaseTasks, "purge").mockImplementation(async () => {
+      calls.push("purge");
+    });
+    vi.spyOn(DatabaseTasks, "loadSchema").mockImplementation(async () => {
+      calls.push("loadSchema");
+    });
+    vi.spyOn(Base.connectionHandler, "clearAllConnectionsBang").mockImplementation(async () => {
+      calls.push("clearAllConnectionsBang");
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Base.configurations(originalConfigurations);
+  });
+
+  it("skips the repair when every config's schema is up to date", async () => {
+    await Migration.loadSchemaIfPendingBang();
+
+    expect(calls).toEqual(["schemaUpToDate"]);
+  });
+
+  it("loads the schema when a config's schema needs an update", async () => {
+    upToDate = false;
+
+    await Migration.loadSchemaIfPendingBang();
+
+    expect(calls).toEqual(["schemaUpToDate", "clearAllConnectionsBang", "purge", "loadSchema"]);
+  });
+});

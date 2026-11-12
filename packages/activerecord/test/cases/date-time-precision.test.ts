@@ -1,0 +1,330 @@
+import type { TimeZone } from "@blazetrails/activesupport";
+import { describe, expect, beforeEach, afterEach } from "vitest";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { Base } from "../../lib/index.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { itIfSupports } from "../support/supports.js";
+import { dumpTableSchema } from "../../lib/support/schema-dumping-helper.js";
+import { inTimeZone } from "../../lib/cases/helper.js";
+import { zone } from "@blazetrails/activesupport";
+import { inTimeZone as dateInTimeZone } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
+
+function nsec(v: RubyTime): number {
+  return v.nsec;
+}
+
+describe("DateTimePrecisionTest", () => {
+  const { self } = fixtures({}, { useTransactionalTests: false });
+  let adapter: DatabaseAdapter;
+
+  class Foo extends Base {
+    static override tableName = "foos";
+  }
+
+  beforeEach(async () => {
+    adapter = await Base.leaseConnection();
+    await Foo.resetColumnInformation();
+  });
+  afterEach(async () => {
+    await adapter.dropTable("foos", { ifExists: true });
+  });
+
+  itIfSupports("datetime_with_precision", "datetime data type with precision", async () => {
+    await adapter.createTable("foos", { force: true }, () => {});
+    await adapter.addColumn("foos", "created_at", "datetime", { precision: 0 });
+    await adapter.addColumn("foos", "updated_at", "datetime", { precision: 5 });
+    await Foo.loadSchema();
+    expect(Foo.columnsHash()["created_at"].precision).toBe(0);
+    expect(Foo.columnsHash()["updated_at"].precision).toBe(5);
+  });
+
+  itIfSupports(
+    "datetime_with_precision",
+    "datetime precision is truncated on assignment",
+    async () => {
+      await adapter.createTable("foos", { force: true }, () => {});
+      await adapter.addColumn("foos", "created_at", "datetime", { precision: 0 });
+      await adapter.addColumn("foos", "updated_at", "datetime", { precision: 6 });
+      await Foo.loadSchema();
+      const time = RubyTime.now().change({ nsec: 123456789 });
+      const foo = new Foo({ created_at: time, updated_at: time });
+      expect(nsec((foo as any).created_at)).toBe(0);
+      expect(nsec((foo as any).updated_at)).toBe(123456000);
+      await (foo as any).save();
+      await (foo as any).reload();
+      expect(nsec((foo as any).created_at)).toBe(0);
+      expect(nsec((foo as any).updated_at)).toBe(123456000);
+    },
+  );
+
+  itIfSupports.skipIf(adapterType === "mysql")(
+    "datetime_with_precision",
+    "no datetime precision isnt truncated on assignment",
+    async () => {
+      await adapter.createTable("foos", { force: true }, () => {});
+      await adapter.addColumn("foos", "created_at", "datetime", { precision: null });
+      await adapter.addColumn("foos", "updated_at", "datetime");
+      await Foo.loadSchema();
+      const time = RubyTime.now().change({ nsec: 123 });
+      const foo = new Foo({ created_at: time, updated_at: time });
+      expect(nsec((foo as any).created_at)).toBe(123);
+      expect(nsec((foo as any).updated_at)).toBe(0);
+      await (foo as any).save();
+      await (foo as any).reload();
+      expect(nsec((foo as any).created_at)).toBe(0);
+      expect(nsec((foo as any).updated_at)).toBe(0);
+    },
+  );
+
+  itIfSupports("datetime_with_precision", "timestamps helper with custom precision", async () => {
+    await adapter.createTable("foos", { force: true }, (t) => {
+      t.timestamps({ precision: 4 });
+    });
+    await Foo.loadSchema();
+    expect(Foo.columnsHash()["created_at"].precision).toBe(4);
+    expect(Foo.columnsHash()["updated_at"].precision).toBe(4);
+  });
+
+  itIfSupports(
+    "datetime_with_precision",
+    "passing precision to datetime does not set limit",
+    async () => {
+      await adapter.createTable("foos", { force: true }, (t) => {
+        t.timestamps({ precision: 4 });
+      });
+      await Foo.loadSchema();
+      expect(Foo.columnsHash()["created_at"].limit).toBeNull();
+      expect(Foo.columnsHash()["updated_at"].limit).toBeNull();
+    },
+  );
+
+  itIfSupports("datetime_with_precision", "invalid datetime precision raises error", async () => {
+    await expect(
+      adapter.createTable("foos", { force: true }, (t) => {
+        t.timestamps({ precision: 7 });
+      }),
+    ).rejects.toThrow(ArgumentError);
+  });
+
+  itIfSupports(
+    "datetime_with_precision",
+    "formatting datetime according to precision",
+    async () => {
+      await adapter.createTable("foos", { force: true }, () => {});
+      await adapter.addColumn("foos", "created_at", "datetime", { precision: 0 });
+      await adapter.addColumn("foos", "updated_at", "datetime", { precision: 4 });
+      await Foo.loadSchema();
+
+      const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
+      await (Foo as any).create({ created_at: date, updated_at: date });
+
+      const foo = await (Foo as any).findBy({ created_at: date });
+      expect(foo).toBeTruthy();
+      expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
+      expect((foo.created_at as RubyTime).toI()).toBe(date.toI());
+      expect((foo.created_at as RubyTime).toS()).toBe(date.toS());
+      expect((foo.updated_at as RubyTime).toS()).toBe(date.toS());
+      expect((foo.created_at as RubyTime).usec).toBe(0);
+      expect((foo.updated_at as RubyTime).usec).toBe(999900);
+    },
+  );
+
+  itIfSupports(
+    "datetime_with_precision",
+    "formatting datetime according to precision when time zone aware",
+    async () => {
+      await self().withTimezoneConfig(
+        { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+        async () => {
+          await adapter.createTable("foos", { force: true }, (t) => {
+            t.datetime("created_at", { precision: 0 });
+            t.datetime("updated_at", { precision: 4 });
+          });
+          await Foo.loadSchema();
+
+          const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
+          await (Foo as any).create({ created_at: date, updated_at: date });
+
+          const foo = await (Foo as any).findBy({ created_at: date });
+          expect(foo).toBeTruthy();
+          expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
+          expect(foo.created_at.toI()).toBe(date.toI());
+          expect(foo.created_at.toString()).toBe(dateInTimeZone.call(date).toString());
+          expect(foo.updated_at.toString()).toBe(dateInTimeZone.call(date).toString());
+          expect(foo.created_at.usec).toBe(0);
+          expect(foo.updated_at.usec).toBe(999900);
+        },
+      );
+    },
+  );
+
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "datetime_with_precision",
+    "formatting datetime according to precision using timestamptz",
+    async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.createTable("foos", { force: true }, (t) => {
+          t.datetime("created_at", { precision: 0 });
+          t.datetime("updated_at", { precision: 4 });
+        });
+        await Foo.loadSchema();
+
+        const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
+        await (Foo as any).create({ created_at: date, updated_at: date });
+
+        const foo = await (Foo as any).findBy({ created_at: date });
+        expect(foo).toBeTruthy();
+        expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
+        expect(foo.created_at.toI()).toBe(date.toI());
+        expect(foo.created_at.toS()).toBe(date.toS());
+        expect(foo.updated_at.toS()).toBe(date.toS());
+        expect(foo.created_at.usec).toBe(0);
+        expect(foo.updated_at.usec).toBe(999900);
+      });
+    },
+  );
+
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "datetime_with_precision",
+    "formatting datetime according to precision when time zone aware using timestamptz",
+    async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
+        await self().withTimezoneConfig(
+          { awareAttributes: true, zone: "Pacific Time (US & Canada)" },
+          async () => {
+            await adapter.createTable("foos", { force: true }, (t) => {
+              t.datetime("created_at", { precision: 0 });
+              t.datetime("updated_at", { precision: 4 });
+            });
+            await Foo.loadSchema();
+
+            const date = RubyTime.utc(2014, 8, 17, 12, 30, 0, 999999);
+            await (Foo as any).create({ created_at: date, updated_at: date });
+
+            const foo = await (Foo as any).findBy({ created_at: date });
+            expect(foo).toBeTruthy();
+            expect(await (Foo as any).where({ updated_at: date }).count()).toBe(1);
+            expect(foo.created_at.toI()).toBe(date.toI());
+            expect(foo.created_at.toString()).toBe(dateInTimeZone.call(date).toString());
+            expect(foo.updated_at.toString()).toBe(dateInTimeZone.call(date).toString());
+            expect(foo.created_at.usec).toBe(0);
+            expect(foo.updated_at.usec).toBe(999900);
+          },
+        );
+      });
+    },
+  );
+
+  itIfSupports("datetime_with_precision", "writing a blank attribute", async () => {
+    await adapter.createTable("foos", { force: true }, (t) => {
+      t.datetime("happened_at");
+    });
+    await Foo.loadSchema();
+    const r1 = await (Foo as any).create({ happened_at: null });
+    expect(r1.happened_at).toBeNull();
+    const r2 = await (Foo as any).create({ happened_at: "" });
+    expect(r2.happened_at).toBeNull();
+  });
+
+  itIfSupports("datetime_with_precision", "writing a date attribute", async () => {
+    await adapter.createTable("foos", { force: true }, (t) => {
+      t.datetime("happened_at");
+    });
+    await Foo.loadSchema();
+    const date = Temporal.PlainDate.from("2001-02-03");
+    expect((await (Foo as any).create({ happened_at: date })).happened_at).toEqual(date);
+  });
+
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "datetime_with_precision",
+    "writing a blank attribute timestamptz",
+    async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.createTable("foos", { force: true }, (t) => {
+          t.datetime("happened_at");
+        });
+        await Foo.loadSchema();
+        expect((await (Foo as any).create({ happened_at: null })).happened_at).toBeNull();
+        expect((await (Foo as any).create({ happened_at: "" })).happened_at).toBeNull();
+      });
+    },
+  );
+
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "datetime_with_precision",
+    "writing a date attribute timestamptz",
+    async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.createTable("foos", { force: true }, (t) => {
+          t.datetime("happened_at");
+        });
+        await Foo.loadSchema();
+        const date = Temporal.PlainDate.from("2001-02-03");
+        expect((await (Foo as any).create({ happened_at: date })).happened_at).toEqual(date);
+      });
+    },
+  );
+
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "datetime_with_precision",
+    "writing a time with zone attribute timestamptz",
+    async () => {
+      await self().withPostgresqlDatetimeType("timestamptz", async () => {
+        await adapter.createTable("foos", { force: true }, (t) => {
+          t.datetime("happened_at");
+        });
+        await Foo.loadSchema();
+        await inTimeZone("Pacific Time (US & Canada)", () => {
+          const time = (zone() as TimeZone).now();
+          expect((new Foo({ happened_at: time }) as any).happened_at.zone).toBe(time.zone);
+        });
+      });
+    },
+  );
+
+  itIfSupports(
+    "datetime_with_precision",
+    "schema dump with default precision is not dumped",
+    async () => {
+      await adapter.createTable("foos", { force: true }, (t) => {
+        t.timestamps({ precision: 6 });
+      });
+      const output = await dumpTableSchema("foos");
+      expect(output).toMatch(/t\.datetime\("created_at",\s*\{\s*null:\s*false\s*\}\)/);
+      expect(output).toMatch(/t\.datetime\("updated_at",\s*\{\s*null:\s*false\s*\}\)/);
+    },
+  );
+
+  itIfSupports(
+    "datetime_with_precision",
+    "schema dump with without precision has precision as nil",
+    async () => {
+      await adapter.createTable("foos", { force: true }, (t) => {
+        t.timestamps({ precision: null });
+      });
+      const output = await dumpTableSchema("foos");
+      expect(output).toMatch(/t\.datetime\("created_at".*precision.*null/);
+      expect(output).toMatch(/t\.datetime\("updated_at".*precision.*null/);
+    },
+  );
+
+  itIfSupports.skipIf(adapterType !== "postgres")(
+    "datetime_with_precision",
+    "datetime precision with zero should be dumped",
+    async () => {
+      await adapter.createTable("foos", { force: true }, (t) => {
+        t.timestamps({ precision: 0 });
+      });
+      const output = await dumpTableSchema("foos");
+      expect(output).toMatch(
+        /t\.datetime\("created_at",\s*\{\s*precision:\s*0,\s*null:\s*false\s*\}\)/,
+      );
+      expect(output).toMatch(
+        /t\.datetime\("updated_at",\s*\{\s*precision:\s*0,\s*null:\s*false\s*\}\)/,
+      );
+    },
+  );
+});

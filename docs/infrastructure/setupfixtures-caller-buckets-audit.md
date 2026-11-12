@@ -6,10 +6,10 @@
 > `useHandlerTransactionalFixtures` were burned down by RFC 0062, `fixtures.ts`
 > / `use-fixtures.ts` became `test-fixtures.ts`, and `setupHandlerSuite()` is
 > now `skipGlobalResetForFile()` in
-> `packages/activerecord/src/support/skip-global-reset.ts` — the bootstrap half
+> `packages/activerecord/test/support/skip-global-reset.ts` — the bootstrap half
 > of that helper went away when the worker pool became permanent, leaving only
 > the between-test reset shield. `fixtures()`
-> (`packages/activerecord/src/test-fixtures.ts`) still composes that shield plus
+> (`packages/activerecord/lib/test-fixtures.ts`) still composes that shield plus
 > `withTransactionalFixtures` plus the fixture engine, so the wiring identity
 > below holds under the new names. For current work start from
 > `test-fixtures.ts` and `skip-global-reset.ts`, not from this file.
@@ -22,7 +22,7 @@ callers have different correct destinations, enumerated below.
 Counts are from `main` as of 2026-07-04, gathered with:
 
 ```sh
-cd packages/activerecord/src
+cd packages/activerecord/test
 git grep -l 'setupFixtures'                       -- '*.test.ts' | grep -v test-helpers/   # 125
 git grep -l 'useHandlerTransactionalFixtures'     -- '*.test.ts' | grep -v test-helpers/   #  66
 git grep -l -E '(^|[^A-Za-z])fixtures\('          -- '*.test.ts' | grep -v test-helpers/   # 183

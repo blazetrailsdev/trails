@@ -1,0 +1,57 @@
+import { describe, it, expect, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
+import { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { ArgumentError } from "@blazetrails/activemodel";
+
+describe("SQLite3Adapter hash-only constructor", () => {
+  let adapter: SQLite3Adapter | undefined;
+  let tmpDir: string | undefined;
+
+  afterEach(async () => {
+    await adapter?.disconnectBang();
+    adapter = undefined;
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
+    tmpDir = undefined;
+  });
+
+  it("opens the database named by the config hash's database key", async () => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-hash-"));
+    const file = path.join(tmpDir, "db.sqlite3");
+    adapter = new BetterSQLite3Adapter({ database: file });
+
+    await adapter.execute("CREATE TABLE items (id INTEGER PRIMARY KEY, name TEXT)");
+    await adapter.execute("INSERT INTO items (name) VALUES ('apple')");
+    const rows = (await adapter.execute("SELECT name FROM items"))!;
+    expect(rows.map((r) => r.name)).toEqual(["apple"]);
+    expect(fs.existsSync(file)).toBe(true);
+  });
+
+  it("accepts a :memory: database via the config hash", async () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+
+    await adapter.execute("CREATE TABLE items (id INTEGER PRIMARY KEY)");
+    const rows = (await adapter.execute("SELECT count(*) AS c FROM items"))!;
+    expect(Number(rows[0].c)).toBe(0);
+  });
+
+  it("threads adapter options from the config hash", () => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:", strict: true, statementLimit: 7 });
+    expect(adapter._strictStrings).toBe(true);
+    const pool = adapter.buildStatementPool();
+    expect((pool as unknown as { _statementLimit: number })._statementLimit).toBe(7);
+  });
+
+  it("raises ArgumentError when the config hash has no database", () => {
+    expect(() => new BetterSQLite3Adapter({})).toThrow(ArgumentError);
+    expect(() => new BetterSQLite3Adapter({})).toThrow(
+      "No database file specified. Missing argument: database",
+    );
+  });
+
+  it("raises ArgumentError when the config hash's database is empty", () => {
+    expect(() => new BetterSQLite3Adapter({ database: "" })).toThrow(ArgumentError);
+  });
+});

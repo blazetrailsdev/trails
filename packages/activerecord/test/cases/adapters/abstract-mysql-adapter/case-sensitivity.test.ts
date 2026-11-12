@@ -1,0 +1,103 @@
+import { describe, it, beforeEach, expect } from "vitest";
+import { assertNotPredicate, assertPredicate } from "@blazetrails/activesupport/testing/assertions";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { Base } from "../../../../lib/index.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+
+describeIfMysqlAdapter("Mysql2Adapter", () => {
+  const { self } = fixtures({});
+  let adapter: Mysql2Adapter;
+  beforeEach(async () => {
+    adapter = await leaseMysqlAdapter();
+  });
+
+  describe("CaseSensitivityTest", () => {
+    function collationTestModel(): typeof Base {
+      class CollationTest extends Base {
+        static _tableName = "collation_tests";
+      }
+      CollationTest.attribute("string_cs_column", "string");
+      CollationTest.attribute("string_ci_column", "string");
+      CollationTest.attribute("binary_column", "binary");
+      return CollationTest;
+    }
+
+    it("columns include collation different from table", async () => {
+      const columns = await adapter.columns("collation_tests");
+      const byName = (n: string) => columns.find((c) => c.name === n)!;
+      expect(byName("string_cs_column").collation).toBe("utf8mb4_bin");
+      expect(byName("string_ci_column").collation).toBe("utf8mb4_general_ci");
+    });
+
+    it("case sensitive", async () => {
+      const columns = await adapter.columns("collation_tests");
+      const byName = (n: string) => columns.find((c) => c.name === n)! as any;
+      assertNotPredicate(byName("string_ci_column"), (c) => c.isCaseSensitive());
+      assertPredicate(byName("string_cs_column"), (c) => c.isCaseSensitive());
+    });
+
+    it("case insensitive comparison for ci column", async () => {
+      const CollationTest = collationTestModel();
+      CollationTest.validatesUniquenessOf("string_ci_column", { caseSensitive: false });
+      await CollationTest.create({ string_ci_column: "A" });
+      const invalid = new CollationTest({ string_ci_column: "a" });
+      const queries = await self().captureSql({}, async () => {
+        await invalid.save();
+      });
+      const ciUniquenessQuery = queries.find((q) => /string_ci_column/.test(q))!;
+      expect(ciUniquenessQuery).not.toMatch(/lower/i);
+    });
+
+    it("case insensitive comparison for cs column", async () => {
+      const CollationTest = collationTestModel();
+      CollationTest.validatesUniquenessOf("string_cs_column", { caseSensitive: false });
+      await CollationTest.create({ string_cs_column: "A" });
+      const invalid = new CollationTest({ string_cs_column: "a" });
+      const queries = await self().captureSql({}, async () => {
+        await invalid.save();
+      });
+      const csUniquenessQuery = queries.find((q) => /string_cs_column/.test(q))!;
+      expect(csUniquenessQuery).toMatch(/lower/i);
+    });
+
+    it("case sensitive comparison for ci column", async () => {
+      const CollationTest = collationTestModel();
+      CollationTest.validatesUniquenessOf("string_ci_column", { caseSensitive: true });
+      await CollationTest.create({ string_ci_column: "A" });
+      const invalid = new CollationTest({ string_ci_column: "A" });
+      const queries = await self().captureSql({}, async () => {
+        await invalid.save();
+      });
+      const ciUniquenessQuery = queries.find((q) => /string_ci_column/.test(q))!;
+      expect(ciUniquenessQuery).toMatch(/binary/i);
+    });
+
+    it("case sensitive comparison for cs column", async () => {
+      const CollationTest = collationTestModel();
+      CollationTest.validatesUniquenessOf("string_cs_column", { caseSensitive: true });
+      await CollationTest.create({ string_cs_column: "A" });
+      const invalid = new CollationTest({ string_cs_column: "A" });
+      const queries = await self().captureSql({}, async () => {
+        await invalid.save();
+      });
+      const csUniquenessQuery = queries.find((q) => /string_cs_column/.test(q))!;
+      expect(csUniquenessQuery).not.toMatch(/binary/i);
+    });
+
+    it("case sensitive comparison for binary column", async () => {
+      const CollationTest = collationTestModel();
+      CollationTest.validatesUniquenessOf("binary_column", { caseSensitive: true });
+      await CollationTest.create({ binary_column: "A" });
+      const invalid = new CollationTest({ binary_column: "A" });
+      const queries = await self().captureSql({}, async () => {
+        await invalid.save();
+      });
+      const binUniquenessQuery = queries.find((q) => /binary_column/.test(q))!;
+      expect(binUniquenessQuery).not.toMatch(/\bBINARY\b/);
+    });
+  });
+});

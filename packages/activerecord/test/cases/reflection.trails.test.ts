@@ -1,0 +1,350 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { Admin } from "../models/admin.js";
+import { describe, it, expect } from "vitest";
+import { RuntimeError, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { DelegationError } from "@blazetrails/activesupport";
+import { Base, reflectOnAssociation } from "../../lib/index.js";
+import {
+  configureEncryption,
+  snapshotEncryptionConfig,
+  restoreEncryptionConfig,
+} from "../../lib/encryption/test-helpers.js";
+import { EncryptedBookWithSerializedFirstBinary } from "../models/book-encrypted.js";
+import { EncryptedAttributeType } from "../../lib/encryption/encrypted-attribute-type.js";
+import { Associations } from "../../lib/associations.js";
+import { AggregateReflection, ThroughReflection, create } from "../../lib/reflection.js";
+import { NameError } from "../../lib/errors.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { Post } from "../../lib/test-helpers/models/post.js";
+import { Tagging } from "../models/tagging.js";
+import { Reply, WebReply } from "../models/reply.js";
+import { Topic } from "../models/topic.js";
+
+fixtures({});
+
+describe("ReflectionTest", () => {
+  it("plain function for source type does not raise (only ES classes are rejected)", () => {
+    class NsTagB extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class NsPostB extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    constSet(TopLevel, "NsTagB", NsTagB);
+    DescendantsTracker.registerSubclass(Base, NsTagB);
+    constSet(TopLevel, "NsPostB", NsPostB);
+    DescendantsTracker.registerSubclass(Base, NsPostB);
+    const fn = function namedFactory() {
+      return "NsPostB";
+    };
+    expect(() =>
+      Associations.hasMany.call(NsTagB, "taggedPostsB", {
+        through: "taggings",
+        source: "taggable",
+        // @ts-expect-error sourceType typed as string; here we exercise the runtime guard
+        sourceType: fn,
+      }),
+    ).not.toThrow();
+  });
+
+  it("plain function for class name does not raise (only ES classes are rejected)", () => {
+    class HostA extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class TargetA extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    constSet(TopLevel, "HostA", HostA);
+    DescendantsTracker.registerSubclass(Base, HostA);
+    constSet(TopLevel, "TargetA", TargetA);
+    DescendantsTracker.registerSubclass(Base, TargetA);
+    const fn = function namedFactory() {
+      return "TargetA";
+    };
+    expect(() =>
+      // @ts-expect-error className typed as string; here we exercise the runtime guard
+      Associations.hasMany.call(HostA, "targetAs", { className: fn }),
+    ).not.toThrow();
+  });
+
+  it("reflection klass demodulize top-level-first resolution", async () => {
+    class TopUser extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class NsAdminUser extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasOne("user", {});
+        this.hasOne("adminUser", { className: "Admin::User" });
+      }
+    }
+    constSet(TopLevel, "User", TopUser);
+    DescendantsTracker.registerSubclass(Base, TopUser);
+    constSet(Admin, "User", NsAdminUser);
+    const ref = reflectOnAssociation(NsAdminUser, "user");
+    expect(ref!.klass).toBe(TopUser);
+    const nsRef = reflectOnAssociation(NsAdminUser, "adminUser");
+    expect(nsRef!.klass).toBe(NsAdminUser);
+  });
+
+  it("re-registering the same class under the same name keeps the klass memo", () => {
+    class ShStableTarget extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ShStableOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("shStableTargets", { className: "ShStableTarget" });
+      }
+    }
+    constSet(TopLevel, "ShStableOwner", ShStableOwner);
+    DescendantsTracker.registerSubclass(Base, ShStableOwner);
+    constSet(TopLevel, "ShStableTarget", ShStableTarget);
+    DescendantsTracker.registerSubclass(Base, ShStableTarget);
+
+    const ref = reflectOnAssociation(ShStableOwner, "shStableTargets")!;
+    expect(ref.klass).toBe(ShStableTarget);
+    constSet(TopLevel, "ShStableTarget", ShStableTarget);
+    DescendantsTracker.registerSubclass(Base, ShStableTarget);
+    expect(ref.klass).toBe(ShStableTarget);
+  });
+
+  it("counter cache column reads the normalized option on both arms", () => {
+    expect(reflectOnAssociation(Reply, "topic")!.counterCacheColumn()).toBe("replies_count");
+    expect(reflectOnAssociation(Reply, "topicWithPrimaryKey")!.counterCacheColumn()).toBe(
+      "replies_count",
+    );
+    expect(reflectOnAssociation(WebReply, "topic")!.counterCacheColumn()).toBe("replies_count");
+    expect(reflectOnAssociation(Post, "author")!.counterCacheColumn()).toBeNull();
+    expect(reflectOnAssociation(Post, "taggings")!.counterCacheColumn()).toBe("tags_count");
+    expect(reflectOnAssociation(Post, "comments")!.counterCacheColumn()).toBe("comments_count");
+    expect(reflectOnAssociation(Topic, "replies")!.counterCacheColumn()).toBe("replies_count");
+  });
+
+  it("create accepts a nil name without a cast", () => {
+    class NilNameOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    constSet(TopLevel, "NilNameOwner", NilNameOwner);
+    DescendantsTracker.registerSubclass(Base, NilNameOwner);
+    const reflection = create("hasMany", null, null, {}, NilNameOwner);
+    expect(reflection.name).toBeNull();
+    expect(reflection.pluralName).toBe("");
+  });
+
+  it("nil name derivations coerce like Ruby to_s, not to the string null", () => {
+    class NilDerivOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    constSet(TopLevel, "NilDerivOwner", NilDerivOwner);
+    DescendantsTracker.registerSubclass(Base, NilDerivOwner);
+
+    const hasMany = create("hasMany", null, null, {}, NilDerivOwner);
+    expect(hasMany.className).toBe("");
+
+    const belongsTo = create("belongsTo", null, null, {}, NilDerivOwner);
+    expect(belongsTo.className).toBe("");
+    expect(belongsTo.foreignKey()).toBe("_id");
+
+    const poly = create("belongsTo", null, null, { polymorphic: true }, NilDerivOwner);
+    expect(poly.foreignType).toBe("_type");
+  });
+
+  it("nil name through-source inference coerces like Ruby to_s", () => {
+    class NilThroughOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    constSet(TopLevel, "NilThroughOwner", NilThroughOwner);
+    DescendantsTracker.registerSubclass(Base, NilThroughOwner);
+
+    const through = create(
+      "hasMany",
+      null,
+      null,
+      { through: "nilThroughs" },
+      NilThroughOwner,
+    ) as ThroughReflection;
+    expect(through.sourceReflectionNames()).toEqual(["", null]);
+  });
+
+  it("plural_name honors pluralize_table_names", () => {
+    class PluralOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SingularOwner extends Base {
+      static pluralizeTableNames = false;
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    constSet(TopLevel, "PluralOwner", PluralOwner);
+    DescendantsTracker.registerSubclass(Base, PluralOwner);
+    constSet(TopLevel, "SingularOwner", SingularOwner);
+    DescendantsTracker.registerSubclass(Base, SingularOwner);
+    expect(create("hasMany", "comment", null, {}, PluralOwner).pluralName).toBe("comments");
+    expect(create("hasMany", "comment", null, {}, SingularOwner).pluralName).toBe("comment");
+  });
+
+  it("columns reports the column's own type, not the decorated cast type", async () => {
+    const configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+    try {
+      await EncryptedBookWithSerializedFirstBinary.loadSchema();
+      const logo = EncryptedBookWithSerializedFirstBinary.columns().find(
+        (c: { name: string }) => c.name === "logo",
+      );
+      expect(logo?.type).toBe("binary");
+      expect(EncryptedBookWithSerializedFirstBinary.typeForAttribute("logo")).toBeInstanceOf(
+        EncryptedAttributeType,
+      );
+    } finally {
+      restoreEncryptionConfig(configSnapshot);
+    }
+  });
+
+  it("source_reflection_name lets a missing model class NameError propagate", () => {
+    class NeMember extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("neMemberships", {});
+        this.hasMany("neClubs", { through: "neMemberships" });
+      }
+    }
+    constSet(TopLevel, "NeMember", NeMember);
+    DescendantsTracker.registerSubclass(Base, NeMember);
+
+    const ref = reflectOnAssociation(NeMember, "neClubs") as ThroughReflection;
+    expect(() => ref.sourceReflectionName()).toThrow(
+      "Missing model class NeMembership for the NeMember#neMemberships association.",
+    );
+  });
+
+  it("aggregate reflection computes class raises NameError for missing class", () => {
+    class Buyer extends Base {
+      declare balance: number | null;
+
+      static {
+        this.attribute("balance", "integer");
+      }
+    }
+    const ref = new AggregateReflection("balance", null, { className: "NoSuchMoney" }, Buyer);
+    expect(() => ref.klass).toThrow(NameError);
+    expect(() => ref.klass).toThrow(/uninitialized constant NoSuchMoney/);
+  });
+});
+
+describe("Reflection.create", () => {
+  it("raises Unsupported Macro for a macro reflection_class_for has no case for", () => {
+    class Widget extends Base {}
+    constSet(TopLevel, "Widget", Widget);
+    DescendantsTracker.registerSubclass(Base, Widget);
+
+    expect(() => create("hasAndBelongsToMany" as never, "gadgets", null, {}, Widget)).toThrow(
+      new RuntimeError("Unsupported Macro: hasAndBelongsToMany"),
+    );
+  });
+});
+
+describe("ThroughReflection delegation to a nil source_reflection", () => {
+  it("raises DelegationError from foreignKey, foreignType and type", () => {
+    class NsrPost extends Base {
+      static {
+        this.hasMany("nsrTaggings", {});
+        this.hasMany("nsrTags", { through: "nsrTaggings" });
+      }
+    }
+    constSet(TopLevel, "NsrPost", NsrPost);
+    DescendantsTracker.registerSubclass(Base, NsrPost);
+    const ref = reflectOnAssociation(NsrPost, "nsrTags") as ThroughReflection;
+    Object.defineProperty(ref, "sourceReflection", { value: null });
+
+    expect(() => ref.foreignKey()).toThrow(
+      new DelegationError(
+        "foreign_key delegated to source_reflection, but source_reflection is nil",
+      ),
+    );
+    expect(() => ref.foreignType).toThrow(DelegationError);
+    expect(() => ref.type).toThrow(
+      "type delegated to source_reflection, but source_reflection is nil",
+    );
+  });
+
+  it("raises DelegationError from the remaining source_reflection delegators", () => {
+    class NsrAuthor extends Base {
+      static {
+        this.hasMany("nsrPosts", {});
+        this.hasMany("nsrComments", { through: "nsrPosts" });
+      }
+    }
+    constSet(TopLevel, "NsrAuthor", NsrAuthor);
+    DescendantsTracker.registerSubclass(Base, NsrAuthor);
+    const ref = reflectOnAssociation(NsrAuthor, "nsrComments") as ThroughReflection;
+    Object.defineProperty(ref, "sourceReflection", { value: null });
+
+    expect(() => ref.associationForeignKey).toThrow(
+      "association_foreign_key delegated to source_reflection, but source_reflection is nil",
+    );
+    expect(() => ref.joinIdFor(new NsrAuthor())).toThrow(
+      "join_id_for delegated to source_reflection, but source_reflection is nil",
+    );
+    expect(() => ref.activeRecordPrimaryKey).toThrow(
+      "active_record_primary_key delegated to source_reflection, but source_reflection is nil",
+    );
+    expect(() => ref.joinForeignKey).toThrow(
+      "join_foreign_key delegated to source_reflection, but source_reflection is nil",
+    );
+  });
+});
+
+describe("AssociationReflection#associationScopeCache", () => {
+  function redefineAuthor(): typeof Base {
+    return class Author extends Base {
+      static {
+        this.hasMany("posts");
+      }
+    };
+  }
+
+  it("keys the statement cache on the reflection, not its owner and association names", async () => {
+    const first = redefineAuthor();
+    const second = redefineAuthor();
+    const block = () => Post.all();
+    const cacheOf = (klass: typeof Base) =>
+      reflectOnAssociation(klass, "posts")!.associationScopeCache(Post, new klass(), block);
+
+    const firstCache = await cacheOf(first);
+    expect(await cacheOf(first)).toBe(firstCache);
+    expect(await cacheOf(second)).not.toBe(firstCache);
+  });
+
+  it("suffixes a polymorphic key with the owner's foreign type, compared by eql?", async () => {
+    const reflection = reflectOnAssociation(Tagging, "taggable")!;
+    const block = () => Post.all();
+    const cacheFor = (taggableType: string) =>
+      reflection.associationScopeCache(Post, new Tagging({ taggable_type: taggableType }), block);
+
+    const postCache = await cacheFor("Post");
+    expect(await cacheFor("Post")).toBe(postCache);
+    expect(await cacheFor("Author")).not.toBe(postCache);
+  });
+});

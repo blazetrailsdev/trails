@@ -35,7 +35,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 /** The one declaration site of the guarded set, read below. */
-const DECLARATION_SITE = "packages/activerecord/src/support/stubbed-ddl-methods.ts";
+const DECLARATION_SITE = "packages/activerecord/test/support/stubbed-ddl-methods.ts";
 
 /**
  * The adapter members whose interception makes the canonical half unsafe, read

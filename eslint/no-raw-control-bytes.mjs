@@ -6,7 +6,7 @@
  * `rg -n` prints only "binary file matches". Audits, ratchets, and agents that
  * grep for a symbol then get a *wrong* answer about that file — silently,
  * because tooling reading via `readFile(..., "utf8")` is unaffected.
- * `packages/activerecord/src/support/canonical-table-rebuild.ts` carried a raw
+ * `packages/activerecord/lib/support/canonical-table-rebuild.ts` carried a raw
  * NUL for exactly this reason and hid its own exports from every grep.
  *
  * Intended control characters must be written as escapes (`\0`, `\t` in a

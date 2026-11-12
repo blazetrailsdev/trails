@@ -1,0 +1,135 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import { assertEmpty } from "@blazetrails/activesupport/testing/assertions";
+import { sql as arelSql } from "@blazetrails/arel";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Book } from "../../models/book.js";
+import { Author } from "../../models/author.js";
+
+describe("FieldOrderedValuesTest", () => {
+  fixtures(["posts"]);
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Book", Book);
+
+  it("in order of", async () => {
+    const order = [3, 4, 1];
+    const posts = Post.inOrderOf("id", order);
+
+    expect((await posts).map((p: any) => Number(p.id))).toEqual(order);
+  });
+
+  it("in order of empty", async () => {
+    const posts = Post.inOrderOf("id", []);
+
+    assertEmpty(await posts);
+  });
+
+  it("in order of with enums values", async () => {
+    await Book.destroyAll();
+    await Book.create({ status: "proposed" });
+    await Book.create({ status: "written" });
+    await Book.create({ status: "published" });
+
+    const order = ["written", "published", "proposed"];
+    let books = Book.inOrderOf("status", order);
+    expect((await books).map((b: any) => b.status)).toEqual(order);
+
+    books = Book.inOrderOf("status", order);
+    expect((await books).map((b: any) => b.status)).toEqual(order);
+  });
+
+  it("in order of with enums keys", async () => {
+    await Book.destroyAll();
+    await Book.create({ status: "proposed" });
+    await Book.create({ status: "written" });
+    await Book.create({ status: "published" });
+
+    const statuses = (Book as any).statuses;
+    const order = [statuses.get("written"), statuses.get("published"), statuses.get("proposed")];
+    const books = Book.inOrderOf("status", order);
+
+    expect((await books).map((book: any) => statuses.get(book.status))).toEqual(order);
+  });
+
+  it("in order of expression", async () => {
+    const order = [3, 4, 1];
+    const posts = Post.inOrderOf(
+      arelSql("id * 2"),
+      order.map((id) => id * 2),
+    );
+
+    expect((await posts).map((p: any) => Number(p.id))).toEqual(order);
+  });
+
+  it("in order of with string column", async () => {
+    await Book.destroyAll();
+    await Book.create({ format: "paperback" });
+    await Book.create({ format: "ebook" });
+    await Book.create({ format: "hardcover" });
+
+    const order = ["hardcover", "paperback", "ebook"];
+    let books = Book.inOrderOf("format", order);
+    expect((await books).map((b: any) => b.format)).toEqual(order);
+
+    books = Book.inOrderOf("format", order);
+    expect((await books).map((b: any) => b.format)).toEqual(order);
+  });
+
+  it("in order of after regular order", async () => {
+    const order = [3, 4, 1];
+    let posts = Post.where({ type: "Post" }).order("type").inOrderOf("id", order);
+    expect((await posts).map((p: any) => Number(p.id))).toEqual(order);
+
+    posts = Post.where({ type: "Post" }).order("type").inOrderOf("id", order);
+    expect((await posts).map((p: any) => Number(p.id))).toEqual(order);
+  });
+
+  it("in order of with nil", async () => {
+    await Book.destroyAll();
+    await Book.create({ format: "paperback" });
+    await Book.create({ format: "ebook" });
+    await Book.create({ format: null });
+
+    const order = ["ebook", null, "paperback"];
+    let books = Book.inOrderOf("format", order);
+    expect((await books).map((b: any) => b.format)).toEqual(order);
+
+    books = Book.inOrderOf("format", order);
+    expect((await books).map((b: any) => b.format)).toEqual(order);
+  });
+
+  it("in order of with associations", async () => {
+    await Author.destroyAll();
+    await Book.destroyAll();
+    const john = (await Author.create({ name: "John" })) as any;
+    const bob = (await Author.create({ name: "Bob" })) as any;
+    const anna = (await Author.create({ name: "Anna" })) as any;
+
+    await john.books.create();
+    await bob.books.create();
+    await anna.books.create();
+
+    const authorNames = async (rel: any) =>
+      Promise.all(
+        (await rel.toArray()).map(
+          async (book: any) => (await book.association("author").loadTarget()).name,
+        ),
+      );
+
+    const order = ["Bob", "Anna", "John"];
+    let books = Book.joins(":author").inOrderOf("authors.name", order);
+    expect(await authorNames(books)).toEqual(order);
+
+    books = Book.joins(":author").inOrderOf("authors.name", order);
+    expect(await authorNames(books)).toEqual(order);
+  });
+
+  it("in order of with filter false", async () => {
+    const order = [3, 4, 1];
+    const posts = Post.inOrderOf("id", order, false);
+
+    expect((await posts.limit(3)).map((p: any) => Number(p.id))).toEqual(order);
+    expect(await posts.count()).toBe(11);
+  });
+});

@@ -1,0 +1,401 @@
+import { quotingHost } from "../../../support/quoting-host.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Rational, TypeError } from "@blazetrails/ruby-compat";
+import { BinaryData } from "@blazetrails/activemodel";
+import { Base } from "../../../../lib/base.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
+import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
+import { DateTime as ARDateTimeType } from "../../../../lib/type/date-time.js";
+import { TypeMap } from "../../../../lib/type/type-map.js";
+import {
+  lookupCastType,
+  quotedDate,
+} from "../../../../lib/connection-adapters/abstract/quoting.js";
+import { Date as DateType } from "../../../../lib/type/date.js";
+import { Time as TimeType, Value as TimeValue } from "../../../../lib/type/time.js";
+import {
+  columnNameMatcher,
+  columnNameWithOrderMatcher,
+  quote as quoteFn,
+  quotedBinary,
+  quoteDefaultExpression,
+  quotedTime,
+  quotedTrue,
+  quotedFalse,
+  unquotedTrue,
+  unquotedFalse,
+  typeCast as typeCastFn,
+} from "../../../../lib/connection-adapters/sqlite3/quoting.js";
+
+const TYPE_MAP = new TypeMap();
+SQLite3Adapter.initializeTypeMap(TYPE_MAP);
+
+const HOST = quotingHost({
+  lookupCastType(sqlType: string | null) {
+    return lookupCastType.call({ typeMap: TYPE_MAP }, sqlType);
+  },
+  quotedDate,
+  quotedTime,
+  quotedBinary,
+  quotedTrue,
+  quotedFalse,
+  unquotedTrue,
+  unquotedFalse,
+});
+const quote = (value: unknown): string => quoteFn.call(HOST, value);
+const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
+
+fixtures([], { useTransactionalTests: false });
+
+describe("SQLite3::Quoting", () => {
+  describe("columnNameMatcher", () => {
+    const matcher = columnNameMatcher();
+
+    it("matches simple column names", () => {
+      expect(matcher.test("name")).toBe(true);
+      expect(matcher.test("age")).toBe(true);
+    });
+
+    it("matches quoted column names", () => {
+      expect(matcher.test('"name"')).toBe(true);
+    });
+
+    it("matches quoted identifiers with escaped quotes", () => {
+      expect(matcher.test('"a""b"')).toBe(true);
+      expect(matcher.test('"table"."col""name"')).toBe(true);
+    });
+
+    it("matches table-qualified columns", () => {
+      expect(matcher.test("users.name")).toBe(true);
+      expect(matcher.test('"users".name')).toBe(true);
+    });
+
+    it("matches column with AS alias", () => {
+      expect(matcher.test("name AS n")).toBe(true);
+      expect(matcher.test('name AS "full_name"')).toBe(true);
+    });
+
+    it("matches column with alias without AS keyword", () => {
+      expect(matcher.test("name full_name")).toBe(true);
+      expect(matcher.test('name "alias"')).toBe(true);
+    });
+
+    it("matches comma-separated columns", () => {
+      expect(matcher.test("name, age")).toBe(true);
+      expect(matcher.test("name, age, email")).toBe(true);
+    });
+
+    it("matches function calls", () => {
+      expect(matcher.test("COUNT(id)")).toBe(true);
+      expect(matcher.test("MAX(age)")).toBe(true);
+    });
+
+    it("matches function calls with multiple arguments", () => {
+      expect(matcher.test("COALESCE(a, b)")).toBe(true);
+      expect(matcher.test("IFNULL(name, 'unknown')")).toBe(true);
+    });
+
+    it("matches nested function calls", () => {
+      expect(matcher.test("COUNT(DISTINCT name)")).toBe(true);
+      expect(matcher.test("COALESCE(NULLIF(a, 0), b)")).toBe(true);
+    });
+
+    it("matches deeply nested function calls", () => {
+      expect(matcher.test("outer(inner(deep(x)))")).toBe(true);
+      expect(matcher.test("COALESCE(NULLIF(TRIM(name), ''), 'default')")).toBe(true);
+    });
+
+    it("matches mixed columns and functions", () => {
+      expect(matcher.test("COALESCE(a, b) AS val, name")).toBe(true);
+      expect(matcher.test("id, COUNT(name) AS cnt")).toBe(true);
+    });
+
+    it("rejects SQL injection attempts", () => {
+      expect(matcher.test("DROP TABLE users")).toBe(false);
+      expect(matcher.test("1; DROP TABLE users")).toBe(false);
+      expect(matcher.test("name; DELETE FROM users")).toBe(false);
+      expect(matcher.test("")).toBe(false);
+      expect(matcher.test("name UNION SELECT * FROM users")).toBe(false);
+      expect(matcher.test("name -- comment")).toBe(false);
+      expect(matcher.test("name OR 1=1")).toBe(false);
+      expect(matcher.test("* FROM users WHERE 1=1")).toBe(false);
+      expect(matcher.test("name, (SELECT password FROM users)")).toBe(false);
+      expect(matcher.test("COALESCE((SELECT password FROM users), 1)")).toBe(false);
+      expect(matcher.test("func(1 UNION SELECT secret)")).toBe(false);
+      expect(matcher.test("func(DROP TABLE users)")).toBe(false);
+    });
+
+    it("allows SQL keywords inside string literals in function args", () => {
+      expect(matcher.test("IFNULL(name, 'from')")).toBe(true);
+      expect(matcher.test("COALESCE(x, 'select')")).toBe(true);
+      expect(matcher.test("name/**/UNION/**/SELECT")).toBe(false);
+    });
+
+    it("rejects unbalanced parentheses", () => {
+      expect(matcher.test("COUNT(")).toBe(false);
+      expect(matcher.test("func(a(b)")).toBe(false);
+      expect(matcher.test(")")).toBe(false);
+    });
+  });
+
+  describe("columnNameWithOrderMatcher", () => {
+    const matcher = columnNameWithOrderMatcher();
+
+    it("matches column with order", () => {
+      expect(matcher.test("name ASC")).toBe(true);
+      expect(matcher.test("name DESC")).toBe(true);
+    });
+
+    it("matches column with COLLATE", () => {
+      expect(matcher.test("name COLLATE NOCASE")).toBe(true);
+      expect(matcher.test("name COLLATE NOCASE DESC")).toBe(true);
+    });
+
+    it("matches column with NULLS FIRST/LAST", () => {
+      expect(matcher.test("name DESC NULLS FIRST")).toBe(true);
+      expect(matcher.test("age ASC NULLS LAST")).toBe(true);
+    });
+
+    it("matches comma-separated ordered columns", () => {
+      expect(matcher.test("name DESC, age ASC")).toBe(true);
+      expect(matcher.test("name DESC NULLS FIRST, age")).toBe(true);
+    });
+
+    it("matches function calls with order", () => {
+      expect(matcher.test("LOWER(name) ASC")).toBe(true);
+      expect(matcher.test("COALESCE(a, b) DESC")).toBe(true);
+    });
+
+    it("rejects SQL injection", () => {
+      expect(matcher.test("name; DROP TABLE users")).toBe(false);
+    });
+  });
+
+  describe("quote", () => {
+    it("quotes strings", () => {
+      expect(quote("hello")).toBe("'hello'");
+      expect(quote("it's")).toBe("'it''s'");
+    });
+
+    it("quotes numbers", () => {
+      expect(quote(42)).toBe("42");
+      expect(quote(3.14)).toBe("3.14");
+    });
+
+    it("quotes non-finite numbers as strings", () => {
+      expect(quote(Infinity)).toBe("'Infinity'");
+      expect(quote(-Infinity)).toBe("'-Infinity'");
+      expect(quote(NaN)).toBe("'NaN'");
+    });
+
+    it("quotes booleans as 1/0", () => {
+      expect(quote(true)).toBe("1");
+      expect(quote(false)).toBe("0");
+    });
+
+    it("quotes null/undefined as NULL", () => {
+      expect(quote(null)).toBe("NULL");
+      expect(quote(undefined)).toBe("NULL");
+    });
+
+    it("throws on unsupported types", () => {
+      expect(() => quote({})).toThrow(TypeError);
+      expect(() => quote([])).toThrow(TypeError);
+    });
+
+    it("dispatches Time::Value through the host quotedTime override", () => {
+      const host = quotingHost({ quotedTime: () => "DISPATCHED" });
+      expect(quoteFn.call(host, new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55)))).toBe(
+        "'DISPATCHED'",
+      );
+    });
+  });
+
+  describe("quotedBinary", () => {
+    it("formats as hex literal", () => {
+      expect(quotedBinary(new BinaryData(new Uint8Array([0xde, 0xad, 0xbe, 0xef])))).toBe(
+        "x'deadbeef'",
+      );
+    });
+
+    it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
+      expect(quotedBinary(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
+    });
+
+    it("quote(BinaryData) unwraps to bytes via quotedBinary", () => {
+      expect(quote(new BinaryData(new Uint8Array([0xde, 0xad, 0xbe, 0xef])))).toBe("x'deadbeef'");
+    });
+  });
+
+  describe("quoteDefaultExpression", () => {
+    it("returns NULL for null", () => {
+      expect(quoteDefaultExpression.call(HOST, null, {})).toBe("NULL");
+    });
+
+    it("wraps function results in parens", () => {
+      expect(quoteDefaultExpression.call(HOST, () => "NOW()", {})).toBe("(NOW())");
+    });
+
+    it("returns non-function results as raw SQL", () => {
+      expect(quoteDefaultExpression.call(HOST, () => "CURRENT_TIMESTAMP", {})).toBe(
+        "CURRENT_TIMESTAMP",
+      );
+    });
+
+    it("serializes a non-Proc default through the column's cast type", () => {
+      expect(quoteDefaultExpression.call(HOST, {}, { sqlType: "json" })).toBe("'{}'");
+      expect(quoteDefaultExpression.call(HOST, { a: 1 }, { sqlType: "json" })).toBe("'{\"a\":1}'");
+    });
+
+    it("quotes a binary default through SQLite's quotedBinary", () => {
+      expect(
+        quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0xde, 0xad])), {}),
+      ).toBe("x'dead'");
+      expect(() =>
+        quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]).buffer, {}),
+      ).toThrow(/can't quote ArrayBuffer/);
+    });
+  });
+
+  describe("typeCast", () => {
+    it("converts booleans to 1/0", () => {
+      expect(typeCast(true)).toBe(1);
+      expect(typeCast(false)).toBe(0);
+    });
+
+    it("passes through strings and floats", () => {
+      expect(typeCast("hello")).toBe("hello");
+      expect(typeCast(4.2)).toBe(4.2);
+      expect(typeCast(Infinity)).toBe(Infinity);
+    });
+
+    it("throws on unsupported types", () => {
+      expect(() => typeCast({})).toThrow(TypeError);
+    });
+
+    it("casts a Date as a Time", () => {
+      expect(typeCast(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("2020-01-02 03:04:05");
+    });
+  });
+
+  describe("quote(Date)", () => {
+    it("quotes it as a Time", () => {
+      expect(quote(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("'2020-01-02 03:04:05'");
+    });
+  });
+
+  describe("quote(Temporal.*) — unit", () => {
+    it("quotes Temporal.Instant as offset-less :db format with microseconds", () => {
+      const ts = Temporal.Instant.from("2026-04-18T12:34:56.123456Z");
+      expect(quote(ts)).toBe("'2026-04-18 12:34:56.123456'");
+    });
+
+    it("quotes Temporal.Instant with whole seconds (no trailing fraction)", () => {
+      const ts = Temporal.Instant.from("2026-04-18T12:34:56Z");
+      expect(quote(ts)).toBe("'2026-04-18 12:34:56'");
+    });
+
+    it("quotes Temporal.PlainDateTime with microseconds", () => {
+      const dt = Temporal.PlainDateTime.from("2026-04-18T12:34:56.123456");
+      expect(quote(dt)).toBe("'2026-04-18 12:34:56.123456'");
+    });
+
+    it("quotes Temporal.PlainDate as YYYY-MM-DD", () => {
+      const d = Temporal.PlainDate.from("2026-04-18");
+      expect(quote(d)).toBe("'2026-04-18'");
+    });
+
+    it("quotes Time::Value prefixed with 2000-01-01 sentinel date", () => {
+      const t = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
+      expect(quote(t)).toBe("'2000-01-01 14:23:55.654321'");
+    });
+  });
+
+  describe("typeCast(Temporal.*) — unit", () => {
+    it("typeCast Temporal.Instant returns unquoted :db string", () => {
+      const ts = Temporal.Instant.from("2026-04-18T12:34:56.123456Z");
+      expect(typeCast(ts)).toBe("2026-04-18 12:34:56.123456");
+    });
+
+    it("typeCast Temporal.PlainDateTime returns unquoted string", () => {
+      const dt = Temporal.PlainDateTime.from("2026-04-18T12:34:56.123456");
+      expect(typeCast(dt)).toBe("2026-04-18 12:34:56.123456");
+    });
+
+    it("typeCast Temporal.PlainDate returns YYYY-MM-DD string", () => {
+      const d = Temporal.PlainDate.from("2026-04-18");
+      expect(typeCast(d)).toBe("2026-04-18");
+    });
+
+    it("typeCast Time::Value returns prefixed time string", () => {
+      const t = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
+      expect(typeCast(t)).toBe("2000-01-01 14:23:55.654321");
+    });
+  });
+
+  describeIfSqlite("SQLite microsecond round-trip — integration", () => {
+    let adapter: SQLite3Adapter;
+
+    beforeEach(async () => {
+      adapter = (await Base.leaseConnection()) as SQLite3Adapter;
+      await adapter.execute(`DROP TABLE IF EXISTS "quoting_events"`);
+      await adapter.execute(`CREATE TABLE "quoting_events" (
+        "id" INTEGER PRIMARY KEY AUTOINCREMENT,
+        "ts"  DATETIME,
+        "dt"  DATETIME,
+        "d"   DATE,
+        "t"   TIME
+      )`);
+    });
+
+    afterEach(async () => {
+      await adapter.execute(`DROP TABLE IF EXISTS "quoting_events"`);
+    });
+
+    it("Temporal.Instant with microsecond precision survives INSERT → SELECT as Instant", async () => {
+      const instant = Temporal.Instant.from("2026-04-18T12:34:56.123456Z");
+      await adapter.execute(`INSERT INTO "quoting_events" ("ts") VALUES (${quote(instant)})`);
+      const rows = (await adapter.execute(`SELECT "ts" FROM "quoting_events" LIMIT 1`))!;
+      const raw = rows[0].ts as string;
+      const cast = new ARDateTimeType().cast(raw);
+      expect(cast).toBeInstanceOf(RubyTime);
+      expect(
+        (cast as RubyTime).toR().cmp(new Rational(instant.epochNanoseconds, 1_000_000_000n)),
+      ).toBe(0);
+    });
+
+    it("Temporal.PlainDateTime with microseconds survives INSERT → SELECT as Instant", async () => {
+      const dt = Temporal.PlainDateTime.from("2026-04-18T12:34:56.654321");
+      await adapter.execute(`INSERT INTO "quoting_events" ("dt") VALUES (${quote(dt)})`);
+      const rows = (await adapter.execute(`SELECT "dt" FROM "quoting_events" LIMIT 1`))!;
+      const raw = rows[0].dt as string;
+      const cast = new ARDateTimeType().cast(raw) as RubyTime;
+      expect(cast).toBeInstanceOf(RubyTime);
+      expect(cast.usec).toBe(654321);
+    });
+
+    it("Temporal.PlainDate survives INSERT → SELECT", async () => {
+      const date = Temporal.PlainDate.from("2026-04-18");
+      await adapter.execute(`INSERT INTO "quoting_events" ("d") VALUES (${quote(date)})`);
+      const rows = (await adapter.execute(`SELECT "d" FROM "quoting_events" LIMIT 1`))!;
+      const raw = rows[0].d as string;
+      const cast = new DateType().cast(raw);
+      expect(cast).toBeInstanceOf(Temporal.PlainDate);
+      const pd = cast as Temporal.PlainDate;
+      expect(pd.year).toBe(2026);
+      expect(pd.month).toBe(4);
+      expect(pd.day).toBe(18);
+    });
+
+    it("Time::Value with microseconds survives INSERT → SELECT", async () => {
+      const time = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 654321));
+      await adapter.execute(`INSERT INTO "quoting_events" ("t") VALUES (${quote(time)})`);
+      const rows = (await adapter.execute(`SELECT "t" FROM "quoting_events" LIMIT 1`))!;
+      const raw = rows[0].t as string;
+      const cast = new TimeType().cast(raw) as RubyTime;
+      expect(cast.getutc().xmlschema(6)).toBe("2000-01-01T14:23:55.654321Z");
+    });
+  });
+});

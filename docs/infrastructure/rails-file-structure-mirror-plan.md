@@ -78,15 +78,15 @@ off-by-one counts due to trailing-newline handling):
 
 | file                                                         |  LOC |
 | ------------------------------------------------------------ | ---: |
-| `activerecord/src/connection-adapters/postgresql-adapter.ts` | 5373 |
-| `activerecord/src/relation.ts`                               | 5154 |
-| `activerecord/src/base.ts`                                   | 3464 |
-| `activerecord/src/migration.ts`                              | 2976 |
-| `activerecord/src/connection-adapters/sqlite3-adapter.ts`    | 2330 |
+| `activerecord/lib/connection-adapters/postgresql-adapter.ts` | 5373 |
+| `activerecord/lib/relation.ts`                               | 5154 |
+| `activerecord/lib/base.ts`                                   | 3464 |
+| `activerecord/lib/migration.ts`                              | 2976 |
+| `activerecord/lib/connection-adapters/sqlite3-adapter.ts`    | 2330 |
 | `activemodel/lib/model.ts`                                   | 2316 |
-| `activerecord/src/relation/query-methods.ts`                 | 2292 |
-| `activerecord/src/associations.ts`                           | 2256 |
-| `activerecord/src/associations/collection-proxy.ts`          | 2243 |
+| `activerecord/lib/relation/query-methods.ts`                 | 2292 |
+| `activerecord/lib/associations.ts`                           | 2256 |
+| `activerecord/lib/associations/collection-proxy.ts`          | 2243 |
 | `arel/lib/visitors/to-sql.ts`                                | 1902 |
 
 Eyeball survey — judgments below come from a quick read of `persistence.ts`
@@ -295,7 +295,7 @@ The index file:
 ```jsonc
 {
   // keyed by TS-relative path, value is the entry to load lazily.
-  "packages/activerecord/src/persistence.ts": "active_record/persistence.rb",
+  "packages/activerecord/lib/persistence.ts": "active_record/persistence.rb",
 }
 ```
 
@@ -447,7 +447,7 @@ module ActiveRecord::Callbacks
 end
 ```
 
-**TS side** (`activerecord/src/callbacks.ts`):
+**TS side** (`activerecord/lib/callbacks.ts`):
 
 ```ts
 export type CallbackOptions<…>          // type, order 1 (zero-cost; §4 row 2)
@@ -525,7 +525,7 @@ blazetrails/rails-file-structure */` works as usual. Also support a
 | check               |                                                         autofix?                                                         | notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | ------------------- | :----------------------------------------------------------------------------------------------------------------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | method-order        | **yes**, but **opt-in** via `--fix` only when no `// @rails-order-skip-next` comment is present near the affected member | safe for pure method moves; never moves across an `include()` because of prototype-chain order risk (§7)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| include-position    |                                                 yes, with snapshot regen                                                 | **Runtime-safe but emit-changing**: `findIncludeCalls()` in `packages/activerecord/src/type-virtualization/virtualize.ts:144–196` walks `include()` calls in source order, then emits `interface Foo extends Included<typeof A>, Included<typeof B> {}` heritage clauses in that same encounter order. Reordering includes changes the emitted text (and `.d.ts` snapshots) even though declaration-merge resolution is order-agnostic. Autofix must regenerate snapshots in the same commit; PR 4's CI step runs `pnpm build` after the lint fix. Prototype-chain order at runtime is preserved because the autofix moves whole `include()` statements as units, never re-orders multiple modules inside one call. |
+| include-position    |                                                 yes, with snapshot regen                                                 | **Runtime-safe but emit-changing**: `findIncludeCalls()` in `packages/activerecord/lib/type-virtualization/virtualize.ts:144–196` walks `include()` calls in source order, then emits `interface Foo extends Included<typeof A>, Included<typeof B> {}` heritage clauses in that same encounter order. Reordering includes changes the emitted text (and `.d.ts` snapshots) even though declaration-merge resolution is order-agnostic. Autofix must regenerate snapshots in the same commit; PR 4's CI step runs `pnpm build` after the lint fix. Prototype-chain order at runtime is preserved because the autofix moves whole `include()` statements as units, never re-orders multiple modules inside one call. |
 | visibility-grouping |                                                            no                                                            | grouping is semantic; require manual edits                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 | module-nesting      |                                                            no                                                            | requires structural decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 

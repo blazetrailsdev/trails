@@ -1,0 +1,728 @@
+import { describe, it, expect } from "vitest";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { isBlank } from "@blazetrails/activesupport";
+import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
+import { isEmpty, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base, Range, RecordNotFound } from "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import {
+  Developer,
+  DeveloperFilteredOnJoins,
+  DeveloperOrderedBySalary,
+} from "../../models/developer.js";
+import {
+  Post,
+  FirstPost,
+  SpecialPostWithDefaultScope,
+} from "../../../lib/test-helpers/models/post.js";
+import {
+  Comment,
+  SpecialComment,
+  SubSpecialComment,
+  VerySpecialComment,
+} from "../../models/comment.js";
+import { Category } from "../../models/category.js";
+import { Author } from "../../models/author.js";
+import { Person } from "../../models/person.js";
+import { BadReference } from "../../models/reference.js";
+
+constSet(TopLevel, "DeveloperOrderedBySalary", DeveloperOrderedBySalary);
+constSet(TopLevel, "DeveloperFilteredOnJoins", DeveloperFilteredOnJoins);
+constSet(TopLevel, "SpecialComment", SpecialComment);
+constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+constSet(TopLevel, "BadReference", BadReference);
+constSet(TopLevel, "FirstPost", FirstPost);
+constSet(TopLevel, "SpecialPostWithDefaultScope", SpecialPostWithDefaultScope);
+
+const { self, developers, people, references, authors, comments } = fixtures([
+  "developers",
+  "projects",
+  "developersProjects",
+  "authors",
+  "authorAddresses",
+  "posts",
+  "comments",
+  "people",
+  "references",
+  "categories",
+  "categoriesPosts",
+]);
+
+describe("RelationScopingTest", () => {
+  it("unscoped breaks caching", async () => {
+    const author = authors("mary");
+    expect(await author.firstPost).toBeNull();
+    const post = await FirstPost.unscoped(async () => {
+      await author.reload();
+      return author.firstPost;
+    });
+    expect(post).toBeTruthy();
+  });
+
+  it("scope breaks caching on collections", async () => {
+    let author = authors("david");
+    await author.reload();
+    const ids = (await author.specialPostsWithDefaultScope).map((p: any) => p.id);
+    expect(ids.map(Number).sort((a, b) => a - b)).toEqual([1, 5, 6]);
+    const scopedPosts = await SpecialPostWithDefaultScope.unscoped(async () => {
+      author = authors("david");
+      await author.reload();
+      return author.specialPostsWithDefaultScope.toArray();
+    });
+    const expected = (await author.posts)
+      .map((p: any) => p.id)
+      .sort((a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0));
+    expect(
+      scopedPosts
+        .map((p: any) => p.id)
+        .sort((a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0)),
+    ).toEqual(expected);
+  });
+
+  it("reverse order", async () => {
+    const forward = await Developer.order("id DESC");
+    const reversed = await Developer.order("id DESC").reverseOrder();
+    expect(reversed.map((d: any) => d.id)).toEqual(forward.map((d: any) => d.id).reverse());
+  });
+
+  it("reverse order with arel attribute", async () => {
+    const expected = await Developer.order("id DESC");
+    const actual = await Developer.order(Developer.arelTable.get("id").desc()).reverseOrder();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
+  });
+
+  it("reverse order with arel attribute as hash", async () => {
+    const expected = await Developer.order("id DESC");
+    const actual = await Developer.order(
+      new Map([[Developer.arelTable.get("id"), "desc" as const]]),
+    ).reverseOrder();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
+  });
+
+  it("reverse order with arel node as hash", async () => {
+    const node = Developer.arelTable.get("id").add(0);
+    const expected = await Developer.order("id DESC");
+    const actual = await Developer.order(new Map([[node, "desc" as const]])).reverseOrder();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
+  });
+
+  it("reverse order with multiple arel attributes", async () => {
+    const expected = await Developer.order("id DESC").order("name DESC");
+    const actual = await Developer.order(Developer.arelTable.get("id").desc())
+      .order(Developer.arelTable.get("name").desc())
+      .reverseOrder();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
+  });
+
+  it("reverse order with arel attributes and strings", async () => {
+    const expected = await Developer.order("id DESC").order("name DESC");
+    const actual = await Developer.order("id DESC")
+      .order(Developer.arelTable.get("name").desc())
+      .reverseOrder();
+    expect(actual.map((d: any) => d.id)).toEqual(expected.map((d: any) => d.id).reverse());
+  });
+
+  it("double reverse order produces original order", () => {
+    const original = Developer.order("name DESC").toSql();
+    const doubled = Developer.order("name DESC").reverseOrder().reverseOrder().toSql();
+    expect(original).toBe(doubled);
+  });
+
+  it("scoped find", async () => {
+    await Developer.where("name = 'David'").scoping(async () => {
+      await expect(Developer.find(1)).resolves.not.toThrow();
+    });
+  });
+
+  it("scoped find first", async () => {
+    const developer = (await Developer.find(10)) as Base;
+    await Developer.where("salary = 100000").scoping(async () => {
+      const first = (await Developer.order("name").first()) as Base;
+      expect(first.id).toBe(developer.id);
+    });
+  });
+
+  it("scoped find last", async () => {
+    const highestSalary = (await Developer.order("salary DESC").first()) as Base;
+    await Developer.order("salary").scoping(async () => {
+      expect(((await Developer.last()) as Base).id).toBe(highestSalary.id);
+    });
+  });
+
+  it("scoped find last preserves scope", async () => {
+    const lowestSalary = (await Developer.order("salary ASC").first()) as Base;
+    const highestSalary = (await Developer.order("salary DESC").first()) as Base;
+    await Developer.order("salary").scoping(async () => {
+      expect(((await Developer.last()) as Base).id).toBe(highestSalary.id);
+      expect(((await Developer.first()) as Base).id).toBe(lowestSalary.id);
+    });
+  });
+
+  it("scoped find combines and sanitizes conditions", async () => {
+    await Developer.where("salary = 9000").scoping(async () => {
+      const found = (await Developer.where("name = 'Jamis'").first()) as Base;
+      expect(found.id).toBe(developers("poor_jamis").id);
+    });
+  });
+
+  it("scoped unscoped", async () => {
+    await DeveloperOrderedBySalary.where("salary = 9000").scoping(async () => {
+      expect(Number(((await DeveloperOrderedBySalary.first()) as Base).id)).toBe(11);
+      expect(Number(((await DeveloperOrderedBySalary.unscoped().first()) as Base).id)).toBe(1);
+    });
+  });
+
+  it("scoped default scoped", async () => {
+    await DeveloperOrderedBySalary.where("salary = 9000").scoping(async () => {
+      expect(Number(((await DeveloperOrderedBySalary.first()) as Base).id)).toBe(11);
+      expect(Number(((await DeveloperOrderedBySalary.defaultScoped().first()) as Base).id)).toBe(2);
+    });
+  });
+
+  it("scoped find all", async () => {
+    await Developer.where("name = 'David'").scoping(async () => {
+      expect((await Developer.all()).map((d: any) => d.id)).toEqual([developers("david").id]);
+    });
+  });
+
+  it("scoped find select", async () => {
+    await Developer.select("id, name").scoping(async () => {
+      const developer = (await Developer.where("name = 'David'").first()) as Developer;
+      expect(developer.name).toBe("David");
+      expect(developer.hasAttribute("salary")).toBeFalsy();
+    });
+  });
+
+  it("scope select concatenates", async () => {
+    await Developer.select("id, name").scoping(async () => {
+      const developer = (await Developer.select("salary")
+        .where("name = 'David'")
+        .first()) as Developer;
+      expect(developer.salary).toBe(80000);
+      expect(developer.hasAttribute("id")).toBeTruthy();
+      expect(developer.hasAttribute("name")).toBeTruthy();
+      expect(developer.hasAttribute("salary")).toBeTruthy();
+    });
+  });
+
+  it("scoped count", async () => {
+    await Developer.where("name = 'David'").scoping(async () => {
+      expect(await Developer.count()).toBe(1);
+    });
+    await Developer.where("salary = 100000").scoping(async () => {
+      expect(await Developer.count()).toBe(8);
+      expect(await Developer.where("name LIKE 'fixture_1%'").count()).toBe(1);
+    });
+  });
+
+  it("scoped find with annotation", async () => {
+    await Developer.annotate("scoped").scoping(async () => {
+      let developer: Developer | null = null;
+      await self().assertQueriesMatch(/\/\* scoped \*\//, {}, async () => {
+        developer = (await Developer.where("name = 'David'").first()) as Developer;
+      });
+      expect(developer!.name).toBe("David");
+    });
+  });
+
+  it("find with annotation unscoped", async () => {
+    await Developer.annotate("scoped")
+      .unscoped()
+      .scoping(async () => {
+        let developer: Developer | null = null;
+        const log = await self().captureSql({}, async () => {
+          developer = (await Developer.where("name = 'David'").first()) as Developer;
+        });
+
+        expect(isEmpty(log)).toBeFalsy();
+        expect(isEmpty(log.filter((query) => /\/\* scoped \*\//.test(query)))).toBeTruthy();
+
+        expect(developer!.name).toBe("David");
+      });
+  });
+
+  it("find with annotation unscope", async () => {
+    let developer: Developer | null = null;
+    const log = await self().captureSql({}, async () => {
+      developer = (await Developer.annotate("unscope")
+        .where("name = 'David'")
+        .unscope(":annotate")
+        .first()) as Developer;
+    });
+
+    expect(isEmpty(log)).toBeFalsy();
+    expect(isEmpty(log.filter((query) => /\/\* unscope \*\//.test(query)))).toBeTruthy();
+
+    expect(developer!.name).toBe("David");
+  });
+
+  it("scoped find include", async () => {
+    const scopedDevelopers = (await Developer.includes(":projects").scoping(async () =>
+      Developer.where({ "projects.id": 2 }).toArray(),
+    )) as Base[];
+    expect(scopedDevelopers.map((d: any) => d.id)).toContain(developers("david").id);
+    expect(scopedDevelopers.map((d: any) => d.id)).not.toContain(developers("jamis").id);
+    expect(scopedDevelopers.length).toBe(1);
+  });
+
+  it("scoped find joins", async () => {
+    const scopedDevelopers = (await Developer.joins(
+      "JOIN developers_projects ON id = developer_id",
+    ).scoping(async () =>
+      Developer.where({ "developers_projects.project_id": 2 }).toArray(),
+    )) as Base[];
+    expect(scopedDevelopers.map((d: any) => d.id)).toContain(developers("david").id);
+    expect(scopedDevelopers.map((d: any) => d.id)).not.toContain(developers("jamis").id);
+    expect(scopedDevelopers.length).toBe(1);
+    expect((await Developer.find(developers("david").id)).attributes).toEqual(
+      scopedDevelopers[0].attributes,
+    );
+  });
+
+  it("scoped create with where", async () => {
+    const newComment = await VerySpecialComment.where({ post_id: 1 }).scoping(async () =>
+      VerySpecialComment.create({ body: "Wonderful world" }),
+    );
+    expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
+  });
+
+  it("scoped create with where with array", async () => {
+    const newComment = await VerySpecialComment.where({ label: [0, 1], post_id: 1 }).scoping(
+      async () => VerySpecialComment.create({ body: "Wonderful world" }),
+    );
+    expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
+    expect(newComment.label).toBe("default");
+  });
+
+  it("scoped create with where with range", async () => {
+    const newComment = await VerySpecialComment.where({
+      label: new Range(0, 1),
+      post_id: 1,
+    }).scoping(async () => VerySpecialComment.create({ body: "Wonderful world" }));
+    expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
+    expect(newComment.label).toBe("default");
+  });
+
+  it("scoped create with create with", async () => {
+    const newComment = await VerySpecialComment.createWith({ post_id: 1 }).scoping(async () =>
+      VerySpecialComment.create({ body: "Wonderful world" }),
+    );
+    expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
+  });
+
+  it("scoped create with create with has higher priority", async () => {
+    const newComment = await VerySpecialComment.where({ post_id: 2 })
+      .createWith({ post_id: 1 })
+      .scoping(async () => VerySpecialComment.create({ body: "Wonderful world" }));
+    expect(newComment.post_id).toBe(1);
+    const welcome = (await Post.find(1)) as Base;
+    const commentIds = (await (welcome as any).comments.toArray()).map((c: any) => c.id);
+    expect(commentIds).toContain(newComment.id);
+  });
+
+  it("ensure that method scoping is correctly restored", async () => {
+    try {
+      await Developer.where("name = 'Jamis'").scoping(async () => {
+        throw new Error("an exception");
+      });
+    } catch {}
+    expect(Developer.all().toSql().includes("name = 'Jamis'")).toBeFalsy();
+  });
+
+  it("default scope filters on joins", async () => {
+    expect(await DeveloperFilteredOnJoins.all().count()).toBe(1);
+    const first = (await DeveloperFilteredOnJoins.all().first()) as Base;
+    expect(first.id).toBe(developers("david").id);
+  });
+
+  it("update all default scope filters on joins", async () => {
+    await DeveloperFilteredOnJoins.updateAll({ salary: 65000 });
+    const david = await Developer.find(developers("david").id);
+    expect(david.salary).toBe(65000);
+    const jamis = await Developer.find(developers("jamis").id);
+    expect(jamis.salary).not.toBe(65000);
+  });
+
+  it("delete all default scope filters on joins", async () => {
+    expect(await DeveloperFilteredOnJoins.all()).not.toEqual([]);
+    await DeveloperFilteredOnJoins.deleteAll();
+    expect(await DeveloperFilteredOnJoins.all()).toEqual([]);
+    expect(await Developer.all()).not.toEqual([]);
+  });
+
+  it("current scope does not pollute sibling subclasses", async () => {
+    await Comment.none().scoping(async () => {
+      expect(await SpecialComment.all().isAny()).toBeFalsy();
+      expect(await VerySpecialComment.all().isAny()).toBeFalsy();
+      expect(await SubSpecialComment.all().isAny()).toBeFalsy();
+    });
+    await SpecialComment.none().scoping(async () => {
+      expect(await Comment.all().isAny()).toBeTruthy();
+      expect(await VerySpecialComment.all().isAny()).toBeTruthy();
+      expect(await SubSpecialComment.all().isAny()).toBeFalsy();
+    });
+    await SubSpecialComment.none().scoping(async () => {
+      expect(await Comment.all().isAny()).toBeTruthy();
+      expect(await VerySpecialComment.all().isAny()).toBeTruthy();
+      expect(await SpecialComment.all().isAny()).toBeTruthy();
+    });
+  });
+
+  it("scoping is correctly restored", async () => {
+    await Comment.unscoped(async () => {
+      await SpecialComment.unscoped(async () => {
+        await SpecialComment.created();
+      });
+    });
+    expect(Comment.currentScope()).toBeNull();
+    expect(SpecialComment.currentScope()).toBeNull();
+  });
+
+  it("scoping respects current class", async () => {
+    await Comment.unscoped(async () => {
+      expect((Comment.all() as any).whatAreYou()).toBe("a comment...");
+      expect((SpecialComment.all() as any).whatAreYou()).toBe("a special comment...");
+    });
+  });
+
+  it("scoping respects sti constraint", async () => {
+    await Comment.unscoped(async () => {
+      const comment = (await Comment.find(1)) as Base;
+      expect(Number(comment.id)).toBe(Number(comments("greetings").id));
+      await expect(SpecialComment.find(1)).rejects.toThrow(RecordNotFound);
+    });
+  });
+
+  it("scoping with klass method works in the scope block", async () => {
+    const expected = await SpecialPostWithDefaultScope.unscoped();
+    const actual = (await SpecialPostWithDefaultScope.unscopedAll()) as Base[];
+    expect(actual.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
+  });
+
+  it("scoping with query method works in the scope block", async () => {
+    const expected = await SpecialPostWithDefaultScope.unscoped().where({ author_id: 0 });
+    const actual = (await SpecialPostWithDefaultScope.authorless()) as Base[];
+    expect(actual.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
+  });
+
+  it("circular joins with scoping does not crash", async () => {
+    const posts = (await Post.joins({ ":comments": ":post" }).scoping(async () =>
+      Post.first(10),
+    )) as Base[];
+    const expected = (await Post.joins({ ":comments": ":post" }).first(10)) as Base[];
+    expect(posts.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
+  });
+
+  it("circular left joins with scoping does not crash", async () => {
+    const posts = (await Post.leftJoins({ ":comments": ":post" }).scoping(async () =>
+      Post.first(10),
+    )) as Base[];
+    const expected = (await Post.leftJoins({ ":comments": ":post" }).first(10)) as Base[];
+    expect(posts.map((p: any) => p.id)).toEqual(expected.map((p: any) => p.id));
+  });
+
+  it("scoping applies to update with all queries", async () => {
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    const dev = (await Author.where({ organization_id: "agency_1" }).first()) as Author;
+
+    await Author.where({ organization_id: "agency_1" }).scoping(async () => {
+      const updateSql = (
+        await self().captureSql({}, () => (dev as any).update({ name: "Eileen" }))
+      )[0];
+      expect(updateSql).not.toMatch(/organization_id/);
+    });
+
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      const updateScopedSql = (
+        await self().captureSql({}, () => (dev as any).update({ name: "Not Eileen" }))
+      )[1];
+      expect(updateScopedSql).toMatch(/organization_id/);
+    });
+  });
+
+  it("scoping applies to delete with all queries", async () => {
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    const dev1 = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
+    const dev2 = (await Author.where({ organization_id: "agency_1" }).last()) as Base;
+    await Author.where({ organization_id: "agency_1" }).scoping(async () => {
+      const deleteSql = (await self().captureSql({}, () => (dev1 as any).delete()))[0];
+      expect(deleteSql).not.toMatch(/organization_id/);
+    });
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      const deleteScopedSql = (await self().captureSql({}, () => (dev2 as any).delete()))[0];
+      expect(deleteScopedSql).toMatch(/organization_id/);
+    });
+  });
+
+  it("scoping applies to reload with all queries", async () => {
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    const dev1 = (await Author.where({ organization_id: "agency_1" }).first()) as Base;
+    await Author.where({ organization_id: "agency_1" }).scoping(async () => {
+      const reloadSql = (await self().captureSql({}, () => (dev1 as any).reload()))[0];
+      expect(reloadSql).not.toMatch(/organization_id/);
+    });
+
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      const scopedReloadSql = (await self().captureSql({}, () => (dev1 as any).reload()))[0];
+      expect(scopedReloadSql).toMatch(/organization_id/);
+    });
+  });
+
+  it("nested scoping applies with all queries set", async () => {
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      const selectSql = (
+        await self().captureSql({}, async () => {
+          await Author.first();
+        })
+      )[0];
+      expect(selectSql).toMatch(/organization_id/);
+
+      await Author.where({ owned_essay_id: null }).scoping(async () => {
+        const secondSelectSql = (
+          await self().captureSql({}, async () => {
+            await Author.first();
+          })
+        )[0];
+        expect(secondSelectSql).toMatch(/organization_id/);
+        expect(secondSelectSql).toMatch(/owned_essay_id/);
+      });
+
+      const thirdSelectSql = (
+        await self().captureSql({}, async () => {
+          await Author.first();
+        })
+      )[0];
+      expect(thirdSelectSql).toMatch(/organization_id/);
+      expect(thirdSelectSql).not.toMatch(/owned_essay_id/);
+    });
+  });
+
+  it("raises error if all queries is set to false while nested", async () => {
+    await Author.all().limit(5).updateAll({ organization_id: "agency_1" });
+    await Author.where({ organization_id: "agency_1" }).scoping({ allQueries: true }, async () => {
+      const selectSql = (
+        await self().captureSql({}, async () => {
+          await Author.first();
+        })
+      )[0];
+      expect(selectSql).toMatch(/organization_id/);
+
+      const error = await assertRaises([ArgumentError], {}, () =>
+        Author.where({ organization_id: "agency_1" }).scoping({ allQueries: false }, () => {}),
+      );
+
+      expect(error.message).toBe(
+        "Scoping is set to apply to all queries and cannot be unset in a nested block.",
+      );
+    });
+  });
+});
+
+describe("NestedRelationScopingTest", () => {
+  it("merge options", async () => {
+    await Developer.where("salary = 80000").scoping(async () => {
+      await Developer.limit(10).scoping(async () => {
+        const sql = Developer.all().toSql();
+        expect(sql).toMatch("(salary = 80000)");
+        expect(sql).toMatch(/LIMIT 10|ROWNUM <= 10|FETCH FIRST 10 ROWS ONLY/);
+      });
+    });
+  });
+
+  it("merge inner scope has priority", async () => {
+    await Developer.limit(5).scoping(async () => {
+      await Developer.limit(10).scoping(async () => {
+        expect((await Developer.all()).length).toBe(10);
+      });
+    });
+  });
+
+  it("replace options", async () => {
+    await Developer.where({ name: "David" }).scoping(async () => {
+      await Developer.unscoped(async () => {
+        expect(((await Developer.where({ name: "Jamis" }).first()) as Developer).name).toBe(
+          "Jamis",
+        );
+      });
+      expect(((await Developer.first()) as Developer).name).toBe("David");
+    });
+  });
+
+  it("three level nested exclusive scoped find", async () => {
+    await Developer.where("name = 'Jamis'").scoping(async () => {
+      expect(((await Developer.first()) as any).name).toBe("Jamis");
+
+      await Developer.unscoped()
+        .where("name = 'David'")
+        .scoping(async () => {
+          expect(((await Developer.first()) as any).name).toBe("David");
+
+          await Developer.unscoped()
+            .where("name = 'Maiha'")
+            .scoping(async () => {
+              expect(await Developer.first()).toBeNull();
+            });
+
+          expect(((await Developer.first()) as any).name).toBe("David");
+        });
+
+      expect(((await Developer.first()) as any).name).toBe("Jamis");
+    });
+  });
+
+  it("nested scoped create", async () => {
+    const comment = await Comment.createWith({ post_id: 1 }).scoping(async () =>
+      Comment.createWith({ post_id: 2 }).scoping(async () =>
+        Comment.create({ body: "Hey guys, nested scopes are broken. Please fix!" }),
+      ),
+    );
+    expect(comment.post_id).toBe(2);
+  });
+
+  it("nested exclusive scope for create", async () => {
+    const comment = await Comment.createWith({
+      body: "Hey guys, nested scopes are broken. Please fix!",
+    }).scoping(async () =>
+      Comment.unscoped()
+        .createWith({ post_id: 1 })
+        .scoping(async () => {
+          const blank = Comment.all().build({}) as any;
+          expect(isBlank(blank.body)).toBeTruthy();
+          return Comment.create({ body: "Hey guys" });
+        }),
+    );
+    expect(comment.post_id).toBe(1);
+    expect(comment.body).toBe("Hey guys");
+  });
+});
+
+describe("HasManyScopingTest", () => {
+  it("should maintain default scope on associations", async () => {
+    const magician = (await BadReference.find(1)) as Base;
+    const michael = (await Person.find(people("michael").id)) as Base;
+    const refs = await (michael as any).badReferences.toArray();
+    expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
+  });
+
+  it("forwarding of static methods", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    expect((Comment as any).whatAreYou()).toBe("a comment...");
+    expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+  });
+
+  it("forwarding to scoped", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    expect(await (Comment as any).searchByType("Comment").size()).toBe(5);
+    expect(await (welcome as any).comments.searchByType("Comment").size()).toBe(2);
+  });
+
+  it("nested scope finder", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await Comment.where("1=0").scoping(async () => {
+      expect(await (welcome as any).comments.count()).toBe(2);
+      expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+    });
+    await Comment.where("1=1").scoping(async () => {
+      expect(await (welcome as any).comments.count()).toBe(2);
+      expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+    });
+  });
+
+  it("none scoping", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await Comment.none().scoping(async () => {
+      expect(await (welcome as any).comments.count()).toBe(2);
+      expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+    });
+    await Comment.where("1=1").scoping(async () => {
+      expect(await (welcome as any).comments.count()).toBe(2);
+      expect(await (welcome as any).comments.whatAreYou()).toBe("a comment...");
+    });
+  });
+
+  it("should default scope on associations is overridden by association conditions", async () => {
+    const michael = (await Person.find(people("michael").id)) as Base;
+    const refs = await (michael as any).fixedBadReferences.toArray();
+    expect(refs.map((r: any) => r.id)).toEqual([references("michael_unicyclist").id]);
+  });
+
+  it("should maintain default scope on eager loaded associations", async () => {
+    const michael = people("michael");
+    const loaded = (await Person.where({ id: michael.id })
+      .includes(":badReferences")
+      .first()) as Base;
+    const magician = (await BadReference.find(1)) as Base;
+    const refs = await (loaded as any).badReferences.toArray();
+    expect(refs.map((r: any) => r.id)).toEqual([magician.id]);
+  });
+
+  it("scoping applies to all queries on has many when set", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await (welcome as any).comments.updateAll({ author_id: 1 });
+
+    const commentsSql = (await self().captureSql({}, () => (welcome as any).comments.toArray())).at(
+      -1,
+    );
+    expect(commentsSql).not.toMatch(/author_id/);
+
+    await Comment.where({ author_id: 1 }).scoping({ allQueries: true }, async () => {
+      const scopedCommentsSql = (
+        await self().captureSql({}, async () =>
+          (await (welcome as any).comments.reload()).toArray(),
+        )
+      ).at(-1);
+      expect(scopedCommentsSql).toMatch(/author_id/);
+    });
+
+    const unscopedCommentsSql = (
+      await self().captureSql({}, async () => (await (welcome as any).comments.reload()).toArray())
+    ).at(-1);
+    expect(unscopedCommentsSql).not.toMatch(/author_id/);
+  });
+});
+
+describe("HasAndBelongsToManyScopingTest", () => {
+  it("forwarding of static methods", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    expect((Category as any).whatAreYou()).toBe("a category...");
+    expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
+  });
+
+  it("nested scope finder", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await Category.where("1=0").scoping(async () => {
+      expect(await (welcome as any).categories.count()).toBe(2);
+      expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
+    });
+    await Category.where("1=1").scoping(async () => {
+      expect(await (welcome as any).categories.count()).toBe(2);
+      expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
+    });
+  });
+
+  it("none scoping", async () => {
+    const welcome = (await Post.find(1)) as Base;
+    await Category.none().scoping(async () => {
+      expect(await (welcome as any).categories.count()).toBe(2);
+      expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
+    });
+    await Category.where("1=1").scoping(async () => {
+      expect(await (welcome as any).categories.count()).toBe(2);
+      expect(await (welcome as any).categories.whatAreYou()).toBe("a category...");
+    });
+  });
+});

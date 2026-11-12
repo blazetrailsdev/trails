@@ -1,0 +1,22 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { Guitar } from "./guitar.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class TuningPeg extends Base {
+  declare guitar_id: number;
+  declare pitch: number;
+
+  static {
+    this.belongsTo("guitar");
+    this.validatesNumericalityOf("pitch");
+  }
+}
+constSet(TopLevel, "TuningPeg", TuningPeg);
+DescendantsTracker.registerSubclass(Base, TuningPeg);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface TuningPeg {
+  get guitar(): Guitar | null | Promise<Guitar | null>;
+  set guitar(value: Guitar | null);
+}

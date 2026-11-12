@@ -95,7 +95,7 @@ members of the same `Batch`, so their middle loaders can never reach the same
 ### 3. trails co-groups all three siblings in one pass
 
 trails' driver does **not** fan out per entry. `Relation#_preloadAssociationsForRecords`
-(`packages/activerecord/src/relation.ts:6169-6181`) passes the **whole list** to a
+(`packages/activerecord/lib/relation.ts:6169-6181`) passes the **whole list** to a
 **single** `Preloader`:
 
 ```ts

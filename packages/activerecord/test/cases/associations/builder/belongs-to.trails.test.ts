@@ -1,0 +1,31 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Time as RubyTime } from "@blazetrails/date";
+import { describe, it, expect } from "vitest";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { Invoice } from "../../../models/invoice.js";
+import { LineItem } from "../../../models/line-item.js";
+
+constSet(TopLevel, "Invoice", Invoice);
+constSet(TopLevel, "LineItem", LineItem);
+
+describe("Builder::BelongsTo.add_touch_callbacks", () => {
+  fixtures([]);
+
+  it("touches the old parent through changes_to_save when destroyed with an unsaved foreign key change", async () => {
+    const lineItem = await LineItem.create({});
+    const oldInvoice = await Invoice.create({ lineItems: [lineItem] });
+    const newInvoice = await Invoice.create({});
+    const past = RubyTime.utc(2000, 1, 1);
+    await oldInvoice.updateColumns({ updated_at: past });
+    await newInvoice.updateColumns({ updated_at: past });
+
+    await oldInvoice.reload();
+    const before = oldInvoice.updated_at;
+
+    lineItem.invoice_id = newInvoice.id as number;
+    await lineItem.destroy();
+
+    await oldInvoice.reload();
+    expect(oldInvoice.updated_at).not.toEqual(before);
+  });
+});

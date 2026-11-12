@@ -3,7 +3,7 @@ import { extractTestsFromSource } from "./extract-ts-core.js";
 
 /** The extracted test names, in order, paired with their `dynamic` flag. */
 function titles(source: string) {
-  const info = extractTestsFromSource(source, "packages/activerecord/src/x.test.ts");
+  const info = extractTestsFromSource(source, "packages/activerecord/test/cases/x.test.ts");
   return info.testCases.map((tc) => [tc.description, !!tc.dynamic] as const);
 }
 
@@ -272,7 +272,7 @@ describe("statically expanded loop-generated it() titles", () => {
 
 /** The extracted tests' full paths, in order. */
 function paths(source: string) {
-  const info = extractTestsFromSource(source, "packages/activerecord/src/x.test.ts");
+  const info = extractTestsFromSource(source, "packages/activerecord/test/cases/x.test.ts");
   return info.testCases.map((tc) => tc.path);
 }
 

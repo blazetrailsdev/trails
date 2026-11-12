@@ -45,13 +45,13 @@ process.on("exit", () => {
 // ESM hoisting of this import is harmless.
 const { default: rule } = await import("./rails-arel-tosql.mjs");
 
-const relationFile = path.join(REPO_ROOT, "packages/activerecord/src/relation.ts");
-const builderFile = path.join(REPO_ROOT, "packages/activerecord/src/sql-builder.ts");
+const relationFile = path.join(REPO_ROOT, "packages/activerecord/lib/relation.ts");
+const builderFile = path.join(REPO_ROOT, "packages/activerecord/lib/sql-builder.ts");
 const nodeFile = path.join(REPO_ROOT, "packages/arel/lib/nodes/node.ts");
 const managerFile = path.join(REPO_ROOT, "packages/arel/lib/tree-manager.ts");
 const dbStmtFile = path.join(
   REPO_ROOT,
-  "packages/activerecord/src/connection-adapters/abstract/database-statements.ts",
+  "packages/activerecord/lib/connection-adapters/abstract/database-statements.ts",
 );
 
 const tester = new RuleTester({
@@ -127,7 +127,7 @@ tester.run("rails-arel-tosql", rule, {
     // Cross-package non-leakage: `Node` is allowed in arel but NOT in
     // activerecord, so a bespoke `Node.toSql` in activerecord is flagged.
     {
-      filename: path.join(REPO_ROOT, "packages/activerecord/src/node.ts"),
+      filename: path.join(REPO_ROOT, "packages/activerecord/lib/node.ts"),
       code: `export class Node { toSql() { return "x"; } }\n`,
       errors: [{ messageId: "bespokeToSql" }],
     },

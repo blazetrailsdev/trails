@@ -1,0 +1,260 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import { UnknownAttributeReference } from "../../lib/index.js";
+import { assertRaises, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
+import { sql as arelSql } from "@blazetrails/arel";
+import { adapterType } from "../../lib/test-adapter.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { Post } from "../../lib/test-helpers/models/post.js";
+import { Comment } from "../models/comment.js";
+
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+
+describe("UnsafeRawSqlTest", () => {
+  const { self } = fixtures(["posts", "comments"]);
+
+  it("order: allows string column name", async () => {
+    const idsExpected = await Post.order(arelSql("title")).pluck("id");
+    const ids = await Post.order("title").pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows symbol column name", async () => {
+    const idsExpected = await Post.order(arelSql("title")).pluck("id");
+    const ids = await Post.order("title").pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows downcase symbol direction", async () => {
+    const idsExpected = await Post.order(arelSql("title asc")).pluck("id");
+    const ids = await Post.order({ title: "asc" }).pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows upcase symbol direction", async () => {
+    const idsExpected = await Post.order(arelSql("title ASC")).pluck("id");
+    const ids = await Post.order({ title: "ASC" }).pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows string direction", async () => {
+    const idsExpected = await Post.order(arelSql("title asc")).pluck("id");
+    const ids = await Post.order({ title: "asc" }).pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows multiple columns", async () => {
+    const idsExpected = await Post.order(arelSql("author_id"), arelSql("title")).pluck("id");
+    const ids = await Post.order("author_id", "title").pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows mixed", async () => {
+    const idsExpected = await Post.order(arelSql("author_id"), arelSql("title asc")).pluck("id");
+    const ids = await Post.order("author_id", { title: "asc" }).pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows table and column names", async () => {
+    const idsExpected = await Post.order(arelSql("title")).pluck("id");
+    const ids = await Post.order("posts.title").pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows quoted table and column names", async () => {
+    const idsExpected = await Post.order(arelSql("title")).pluck("id");
+    const ids = await Post.order(self().quoteTableName("posts.title")).pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows column name and direction in string", async () => {
+    const idsExpected = await Post.order(arelSql("title desc")).pluck("id");
+    const ids = await Post.order("title desc").pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows table name, column name and direction in string", async () => {
+    const idsExpected = await Post.order(arelSql("title desc")).pluck("id");
+    const ids = await Post.order("posts.title desc").pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it.skipIf(adapterType !== "postgres")(
+    "order: allows NULLS FIRST and NULLS LAST too",
+    async () => {
+      const first = await Post.order("id").first();
+      const last = await Post.order("id").last();
+      await first!.updateColumn("type", null);
+      await last!.updateColumn("type", "Programming");
+
+      for (const direction of ["asc", "desc", ""]) {
+        for (const position of ["first", "last"]) {
+          const idsExpected = await Post.order(
+            arelSql(`type::text ${direction} nulls ${position}`),
+          ).pluck("id");
+          const ids = await Post.order(`type::text ${direction} nulls ${position}`).pluck("id");
+          expect(ids).toEqual(idsExpected);
+        }
+      }
+    },
+  );
+
+  it("order: disallows invalid column name", async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.order("REPLACE(title, 'misc', 'zzzz') asc").pluck("id");
+    });
+  });
+
+  it("order: disallows invalid direction", async () => {
+    await expect(async () => {
+      await Post.order({ title: "foo" } as any).pluck("id");
+    }).rejects.toThrow();
+  });
+
+  it("order: disallows invalid column with direction", async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.order({ "REPLACE(title, 'misc', 'zzzz')": "asc" }).pluck("id");
+    });
+  });
+
+  it("order: always allows Arel", async () => {
+    const titles = await Post.order(arelSql("length(title)")).pluck("title");
+    assertNotEmpty(titles);
+  });
+
+  it("order: allows Arel.sql with binds", async () => {
+    const idsExpected = await Post.order(arelSql("REPLACE(title, 'misc', 'zzzz'), id")).pluck("id");
+    const ids = await Post.order([arelSql("REPLACE(title, ?, ?), id"), "misc", "zzzz"]).pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: disallows invalid bind statement", async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.order(["REPLACE(title, ?, ?), id", "misc", "zzzz"]).pluck("id");
+    });
+  });
+
+  it("order: disallows invalid Array arguments", async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.order(["author_id", "REPLACE(title, 'misc', 'zzzz')"]).pluck("id");
+    });
+  });
+
+  it("order: allows valid Array arguments", async () => {
+    const idsExpected = await Post.order(arelSql("author_id, length(title)")).pluck("id");
+    const ids = await Post.order(["author_id", "length(title)"]).pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows valid arguments with COLLATE", async () => {
+    const collationName = { postgres: "C", mysql: "utf8mb4_bin", sqlite: "binary" }[adapterType];
+    const idsExpected = await Post.order(
+      arelSql(`author_id, title COLLATE "${collationName}" DESC`),
+    ).pluck("id");
+    const ids = await Post.order(["author_id", `title COLLATE "${collationName}" DESC`]).pluck(
+      "id",
+    );
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: allows nested functions", async () => {
+    const idsExpected = await Post.order(arelSql("author_id, length(trim(title))")).pluck("id");
+    const ids = await Post.order("author_id, length(trim(title))").pluck("id");
+    expect(ids).toEqual(idsExpected);
+  });
+
+  it("order: disallows dangerous query method", async () => {
+    const e = await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.order("REPLACE(title, 'misc', 'zzzz')").pluck("id");
+    });
+    expect(e.message).toMatch(/Dangerous query method.*called with non-attribute argument\(s\):/);
+  });
+
+  it("pluck: allows string column name", async () => {
+    const titlesExpected = await Post.pluck(arelSql("title"));
+    const titles = await Post.pluck("title");
+    expect(titles).toEqual(titlesExpected);
+  });
+
+  it("pluck: allows string column name with function and alias", async () => {
+    const titlesExpected = await Post.pluck(arelSql("UPPER(title)"));
+    const titles = await Post.pluck("UPPER(title) AS title");
+    expect(titles).toEqual(titlesExpected);
+  });
+
+  it("pluck: allows symbol column name", async () => {
+    const titlesExpected = await Post.pluck(arelSql("title"));
+    const titles = await Post.pluck("title");
+    expect(new Set(titles)).toEqual(new Set(titlesExpected));
+  });
+
+  it("pluck: allows multiple column names", async () => {
+    const valuesExpected = await Post.pluck(arelSql("title"), arelSql("id"));
+    const values = await Post.pluck("title", "id");
+    expect(values).toEqual(valuesExpected);
+  });
+
+  it("pluck: allows column names with includes", async () => {
+    const valuesExpected = await Post.includes(":comments").pluck(arelSql("title"), arelSql("id"));
+    const values = await Post.includes(":comments").pluck("title", "id");
+    expect(values).toEqual(valuesExpected);
+  });
+
+  it("pluck: allows auto-generated attributes", async () => {
+    const valuesExpected = await Post.pluck(arelSql("tags_count"));
+    const values = await Post.pluck("tags_count");
+    expect(values).toEqual(valuesExpected);
+  });
+
+  it("pluck: allows table and column names", async () => {
+    const titlesExpected = await Post.pluck(arelSql("title"));
+    const titles = await Post.pluck("posts.title");
+    expect(titles).toEqual(titlesExpected);
+  });
+
+  it("pluck: allows quoted table and column names", async () => {
+    const titlesExpected = await Post.pluck(arelSql("title"));
+    const titles = await Post.pluck(self().quoteTableName("posts.title"));
+    expect(titles).toEqual(titlesExpected);
+  });
+
+  it("pluck: allows nested functions", async () => {
+    const titleLengthsExpected = await Post.pluck(arelSql("length(trim(title))"));
+    const titleLengths = await Post.pluck("length(trim(title))");
+    expect(titleLengths).toEqual(titleLengthsExpected);
+  });
+
+  it("pluck: disallows invalid column name", async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.pluck("REPLACE(title, 'misc', 'zzzz')");
+    });
+  });
+
+  it("pluck: disallows invalid column name amongst valid names", async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.pluck("title", "REPLACE(title, 'misc', 'zzzz')");
+    });
+  });
+
+  it("pluck: disallows invalid column names with includes", async () => {
+    await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.includes(":comments").pluck("title", "REPLACE(title, 'misc', 'zzzz')");
+    });
+  });
+
+  it("pluck: always allows Arel", async () => {
+    const expectedValues = (await Post.includes(":comments").pluck("title")).map(
+      (title: unknown) => [title, (title as string).length],
+    );
+    const values = await Post.includes(":comments").pluck("title", arelSql("length(title)"));
+    expect(values).toEqual(expectedValues);
+  });
+
+  it("pluck: disallows dangerous query method", async () => {
+    const e = await assertRaises([UnknownAttributeReference], {}, async () => {
+      await Post.pluck("title", "REPLACE(title, 'misc', 'zzzz')");
+    });
+    expect(e.message).toMatch(/Dangerous query method.*called with non-attribute argument\(s\):/);
+  });
+});

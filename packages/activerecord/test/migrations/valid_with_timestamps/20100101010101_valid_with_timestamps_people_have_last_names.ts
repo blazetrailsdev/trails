@@ -1,0 +1,11 @@
+import { Migration } from "../../../lib/migration.js";
+
+export class ValidWithTimestampsPeopleHaveLastNames extends Migration.Current {
+  async up(): Promise<void> {
+    await this.addColumn("people", "last_name", "string");
+  }
+
+  async down(): Promise<void> {
+    await this.removeColumn("people", "last_name");
+  }
+}

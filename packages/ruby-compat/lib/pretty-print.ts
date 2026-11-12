@@ -16,7 +16,7 @@ export interface PrettyPrintOutput {
 /**
  * Ruby's `PrettyPrint` (stdlib `vendor/ruby/v3.3.11/lib/prettyprint.rb:34`), Oppen's
  * pretty-printing algorithm. Rails defines none of it and calls it through
- * `PP` from `Core#pretty_print` (`activerecord/src/core.ts`).
+ * `PP` from `Core#pretty_print` (`activerecord/lib/core.ts`).
  *
  * `Text`, `Breakable`, `Group` and `GroupQueue` are the classes nested at
  * `prettyprint.rb:301,339,396,442`.

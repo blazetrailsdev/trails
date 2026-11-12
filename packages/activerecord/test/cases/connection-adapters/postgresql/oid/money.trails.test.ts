@@ -1,0 +1,15 @@
+import { describe, expect, it } from "vitest";
+import { BigDecimal } from "@blazetrails/activesupport";
+
+import { Money } from "../../../../../lib/connection-adapters/postgresql/oid/money.js";
+
+describe("PostgreSQL::OID::Money", () => {
+  it("scale is always 2 (Rails: def scale; 2; end)", () => {
+    expect(new Money().scale).toBe(2);
+  });
+
+  it("castValue is the public Rails-named hook", () => {
+    expect((new Money().castValue("$1,234.56") as BigDecimal).toString("F")).toBe("1234.56");
+    expect((new Money().cast("$1,234.56") as BigDecimal).toString("F")).toBe("1234.56");
+  });
+});

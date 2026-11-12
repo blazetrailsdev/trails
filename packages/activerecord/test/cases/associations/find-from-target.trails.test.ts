@@ -1,0 +1,95 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeAll } from "vitest";
+import { Author } from "../../models/author.js";
+import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Developer, AuditLog } from "../../models/developer.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+
+interface AssociationLike {
+  isFindFromTarget(): boolean;
+  isLoaded(): boolean;
+  target: Post[];
+  concat(records: Post[]): Promise<unknown>;
+}
+
+interface ProxyLike {
+  isFindFromTarget(): boolean;
+  loaded: boolean;
+  target: Post[];
+  concat(record: Post): Promise<unknown>;
+  load(): Promise<unknown>;
+}
+
+const associationOf = (owner: Author): AssociationLike =>
+  (owner as unknown as { association(n: string): AssociationLike }).association("posts");
+
+const proxyOf = (owner: Author): ProxyLike => (owner as unknown as { posts: ProxyLike }).posts;
+
+describe("FindFromTarget", () => {
+  fixtures(["authors", "posts", "developers"]);
+
+  beforeAll(() => {
+    constSet(TopLevel, "Author", Author);
+    constSet(TopLevel, "Post", Post);
+    constSet(TopLevel, "Developer", Developer);
+    constSet(TopLevel, "AuditLog", AuditLog);
+  });
+
+  it("is false for an unloaded association with an untouched target", async () => {
+    const author = (await Author.first())!;
+    const assoc = associationOf(author);
+    await assoc.concat([(await Post.last())!]);
+
+    expect(assoc.isLoaded()).toBe(false);
+    expect(assoc.target).toHaveLength(1);
+    expect(assoc.isFindFromTarget()).toBe(false);
+  });
+
+  it("is true once a target record is changed", async () => {
+    const author = (await Author.first())!;
+    const assoc = associationOf(author);
+    await assoc.concat([(await Post.last())!]);
+
+    assoc.target[0].title = "a different title";
+
+    expect(assoc.isLoaded()).toBe(false);
+    expect(assoc.isFindFromTarget()).toBe(true);
+  });
+
+  it("is true for a new target record", async () => {
+    const author = (await Author.first())!;
+    const assoc = associationOf(author);
+    assoc.target.push(new Post({ title: "t", body: "b" }));
+
+    expect(assoc.isFindFromTarget()).toBe(true);
+  });
+
+  it("is true for a new owner", () => {
+    expect(proxyOf(new Author({ name: "Bill" })).isFindFromTarget()).toBe(true);
+  });
+
+  it("is true for a strict_loading reflection", async () => {
+    const developer = (await Developer.first())!;
+    const proxy = (developer as unknown as { strictLoadingOptAuditLogs: ProxyLike })
+      .strictLoadingOptAuditLogs;
+
+    expect(proxy.loaded).toBe(false);
+    expect(proxy.isFindFromTarget()).toBe(true);
+  });
+
+  it("the proxy shares the association's body", async () => {
+    const author = (await Author.first())!;
+    const proxy = proxyOf(author);
+    await proxy.concat((await Post.last())!);
+
+    expect(proxy.loaded).toBe(false);
+    expect(proxy.isFindFromTarget()).toBe(false);
+
+    proxy.target[0].title = "a different title";
+    expect(proxy.isFindFromTarget()).toBe(true);
+
+    await proxy.load();
+    expect(proxy.loaded).toBe(true);
+    expect(proxy.isFindFromTarget()).toBe(true);
+  });
+});

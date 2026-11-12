@@ -74,7 +74,10 @@ beforeAll(() => {
       },
     }),
   );
-  fs.writeFileSync(TMP_EXCLUDE, JSON.stringify(["packages/activerecord/src/excluded.test.ts"]));
+  fs.writeFileSync(
+    TMP_EXCLUDE,
+    JSON.stringify(["packages/activerecord/test/cases/excluded.test.ts"]),
+  );
 });
 afterAll(() => {
   fs.rmSync(TMP_DIR, { recursive: true, force: true });
@@ -82,11 +85,13 @@ afterAll(() => {
 
 describe("trailsToRailsRel", () => {
   it("maps kebab-case basenames to snake_case rails paths", () => {
-    expect(trailsToRailsRel("/x/packages/activerecord/src/aggregations.test.ts")).toBe(
+    expect(trailsToRailsRel("/x/packages/activerecord/test/cases/aggregations.test.ts")).toBe(
       "aggregations_test.rb",
     );
     expect(
-      trailsToRailsRel("/x/packages/activerecord/src/associations/has-many-associations.test.ts"),
+      trailsToRailsRel(
+        "/x/packages/activerecord/test/cases/associations/has-many-associations.test.ts",
+      ),
     ).toBe("associations/has_many_associations_test.rb");
   });
   it("returns null for non-activerecord paths", () => {
@@ -190,42 +195,45 @@ function runCases(tester) {
     valid: [
       {
         name: "matching useFixtures call (string + identifier keys)",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `const fx = useFixtures({ customers: [C, {}], "warehouse-things": [W, {}] });\n`,
       },
       {
         name: "extra keys allowed",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `const fx = useFixtures({ customers: [C, {}], "warehouse-things": [W, {}], extras: [E, {}] });\n`,
       },
       {
         name: "useFixtures inside describe block",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `describe("X", () => { const fx = useFixtures({ customers: [C, {}], "warehouse-things": [W, {}] }); });\n`,
       },
       {
         name: "multiple useFixtures calls union their keys",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `describe("A", () => { useFixtures({ customers: [C, {}] }); });\ndescribe("B", () => { useFixtures({ "warehouse-things": [W, {}] }); });\n`,
       },
       {
         name: "rails file with no fixtures → no-op",
-        filename: path.join(ROOT, "packages/activerecord/src/no-fixtures.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/no-fixtures.test.ts"),
         code: `// nothing\n`,
       },
       {
         name: "rails declares fixtures but no test references records → no-op",
-        filename: path.join(ROOT, "packages/activerecord/src/declared-but-unreferenced.test.ts"),
+        filename: path.join(
+          ROOT,
+          "packages/activerecord/test/cases/declared-but-unreferenced.test.ts",
+        ),
         code: `// nothing — Rails scaffolding-only, no enforcement\n`,
       },
       {
         name: "partial-reference: only the dereferenced set is required",
-        filename: path.join(ROOT, "packages/activerecord/src/partial-reference.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/partial-reference.test.ts"),
         code: `const fx = useFixtures({ posts: [P, {}] });\n`,
       },
       {
         name: "excluded files are skipped",
-        filename: path.join(ROOT, "packages/activerecord/src/excluded.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/excluded.test.ts"),
         code: `// no useFixtures call but excluded\n`,
       },
       {
@@ -235,51 +243,51 @@ function runCases(tester) {
       },
       {
         name: "useHandlerFixtures object form satisfies required keys",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `useHandlerFixtures({ customers: [C, {}], "warehouse-things": [W, {}] });\n`,
       },
       {
         name: "useHandlerFixtures array form satisfies required keys",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `useHandlerFixtures(["customers", "warehouse-things"]);\n`,
       },
       {
         name: "useHandlerFixtures array form with extra keys allowed",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `useHandlerFixtures(["customers", "warehouse-things", "extras"]);\n`,
       },
       {
         name: "useHandlerFixtures mixed with useFixtures unions keys",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `useHandlerFixtures(["customers"]); useFixtures({ "warehouse-things": [W, {}] });\n`,
       },
       {
         name: "fixtures array form under `as const` satisfies required keys",
-        filename: path.join(ROOT, "packages/activerecord/src/partial-reference.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/partial-reference.test.ts"),
         code: `fixtures(["posts"] as const);\n`,
       },
       {
         name: "fixtures argument under `satisfies` and `!` satisfies required keys",
-        filename: path.join(ROOT, "packages/activerecord/src/partial-reference.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/partial-reference.test.ts"),
         code: `fixtures((["posts"] satisfies string[])!);\n`,
       },
     ],
     invalid: [
       {
         name: "missing useFixtures entirely",
-        filename: path.join(ROOT, "packages/activerecord/src/aggregations.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/aggregations.test.ts"),
         code: `// no fixtures here\n`,
         errors: [{ messageId: "missing" }],
       },
       {
         name: "useFixtures present but missing a key",
-        filename: path.join(ROOT, "packages/activerecord/src/associations/eager.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/associations/eager.test.ts"),
         code: `const fx = useFixtures({ posts: [P, {}] });\n`,
         errors: [{ messageId: "incomplete" }],
       },
       {
         name: "useHandlerFixtures array form missing a key",
-        filename: path.join(ROOT, "packages/activerecord/src/associations/eager.test.ts"),
+        filename: path.join(ROOT, "packages/activerecord/test/cases/associations/eager.test.ts"),
         code: `useHandlerFixtures(["posts"]);\n`,
         errors: [{ messageId: "incomplete" }],
       },

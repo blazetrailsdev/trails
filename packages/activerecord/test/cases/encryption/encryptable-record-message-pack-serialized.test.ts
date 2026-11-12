@@ -1,0 +1,53 @@
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import {
+  freshAdapter,
+  configureEncryption,
+  snapshotEncryptionConfig,
+  restoreEncryptionConfig,
+  makeEncryptedBookWithBinaryMessagePackSerialized,
+  makeMsgPackTextBook,
+  assertEncryptedAttribute,
+} from "../../../lib/encryption/test-helpers.js";
+import { type TestDatabaseAdapter } from "../../../lib/test-adapter.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Encoding } from "../../../lib/encryption/errors.js";
+
+describe("ActiveRecord::Encryption::EncryptableRecordMessagePackSerializedTest", () => {
+  let adapter: TestDatabaseAdapter;
+  let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
+
+  beforeAll(async () => {
+    adapter = await freshAdapter();
+  });
+
+  fixtures([]);
+
+  beforeEach(() => {
+    configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+  });
+
+  afterEach(() => {
+    restoreEncryptionConfig(configSnapshot);
+  });
+
+  it("binary data can be serialized with message pack", async () => {
+    const Book = makeEncryptedBookWithBinaryMessagePackSerialized();
+    const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
+    const book = await Book.create({ logo: allBytes });
+    await assertEncryptedAttribute(book, "logo", allBytes);
+  });
+
+  it("binary data can be encrypted uncompressed and serialized with message pack", async () => {
+    const Book = makeEncryptedBookWithBinaryMessagePackSerialized();
+    const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);
+    const highBytes = Uint8Array.from({ length: 128 }, (_, i) => i + 128);
+    await assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);
+    await assertEncryptedAttribute(await Book.create({ logo: highBytes }), "logo", highBytes);
+  });
+
+  it("text columns cannot be serialized with message pack", async () => {
+    const MsgPackTextBook = makeMsgPackTextBook();
+    await expect(MsgPackTextBook.create({ name: "Dune" })).rejects.toThrow(Encoding);
+  });
+});

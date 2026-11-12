@@ -43,7 +43,7 @@ describe("main", () => {
   it("compares the working tree against the merge-base", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "cast-count-"));
     const git = (...args: string[]) => run("git", args, { cwd: dir });
-    const src = path.join(dir, "packages/activerecord/src");
+    const src = path.join(dir, "packages/activerecord/lib");
     await fs.mkdir(path.join(src, "sub"), { recursive: true });
     await fs.writeFile(path.join(src, "sub/a.ts"), "x as any\ny as any\n");
     await fs.writeFile(path.join(src, "a.test.ts"), "x as any\n");
@@ -68,7 +68,7 @@ describe("activerecord", () => {
   it("totals what the RFC's grep -rcE counts", async () => {
     const { stdout } = await run(
       "grep",
-      ["-rcE", CAST_PATTERN, "--include=*.ts", "--exclude=*.test.ts", "packages/activerecord/src"],
+      ["-rcE", CAST_PATTERN, "--include=*.ts", "--exclude=*.test.ts", "packages/activerecord/lib"],
       { cwd: ROOT_DIR, maxBuffer: 1 << 24 },
     );
     const grepTotal = stdout
@@ -79,7 +79,7 @@ describe("activerecord", () => {
   });
 
   it("reads the same counts at HEAD through git grep", async () => {
-    const { stdout } = await run("git", ["status", "--porcelain", "packages/activerecord/src"], {
+    const { stdout } = await run("git", ["status", "--porcelain", "packages/activerecord/lib"], {
       cwd: ROOT_DIR,
     });
     if (stdout !== "") return;

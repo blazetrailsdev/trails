@@ -1,0 +1,17 @@
+import { Migration } from "../../lib/migration.js";
+
+export function anonymousMigration(
+  name?: string,
+  version?: number,
+  up: (m: Migration) => Promise<void> = async () => {},
+  down: (m: Migration) => Promise<void> = async () => {},
+): Migration {
+  return new (class extends Migration.Current {
+    override async up(): Promise<void> {
+      await up(this);
+    }
+    override async down(): Promise<void> {
+      await down(this);
+    }
+  })(name, version);
+}

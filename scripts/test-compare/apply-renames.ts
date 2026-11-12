@@ -745,378 +745,402 @@ const RENAMES: [string, string, string][] = [
   // ==========================================================================
   // Base / table name
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "infers table name from class name",
     "table name guesses",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "allows overriding table name",
     "switching between table name",
   ],
 
   // Record state
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "new record starts as new_record",
     "new record returns boolean",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "is persisted after save",
     "persisted returns boolean",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "is destroyed after destroy",
     "destroyed returns boolean",
   ],
 
   // Persistence
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "save inserts a new record",
     "save valid record",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "save returns false on validation failure",
     "save invalid record",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "create saves and returns the record",
     "create",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "update changes attributes and saves",
     "update object",
   ],
-  ["packages/activerecord/src/activerecord.test.ts", "destroy removes the record", "destroy"],
+  [
+    "packages/activerecord/test/cases/activerecord.test.ts",
+    "destroy removes the record",
+    "destroy",
+  ],
 
   // Finders
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "find throws when not found",
     "find raises record not found exception",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "findBy returns first match",
     "find_by with hash conditions returns the first matching record",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "findBy returns null when no match",
     "find_by returns nil if the record is missing",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "findByBang throws when no match",
     "find_by! raises RecordNotFound if the record is missing",
   ],
 
   // Reload
-  ["packages/activerecord/src/activerecord.test.ts", "reloads attributes from database", "reload"],
+  [
+    "packages/activerecord/test/cases/activerecord.test.ts",
+    "reloads attributes from database",
+    "reload",
+  ],
 
   // Callbacks
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "before_save returning false halts save",
     "before save throwing abort",
   ],
 
   // Relation
-  ["packages/activerecord/src/activerecord.test.ts", "none returns empty results", "none"],
+  ["packages/activerecord/test/cases/activerecord.test.ts", "none returns empty results", "none"],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "updateAll updates all matching records",
     "update all",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "deleteAll removes all matching records",
     "delete all",
   ],
 
   // updateColumn
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "updates a single column without callbacks",
     "update column",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "updates multiple columns without validations",
     "update columns",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "throws on new record",
     "update column should raise exception if new record",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "resets dirty tracking",
     "update column should not leave the object dirty",
   ],
 
   // Aggregations
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "sum returns the sum of a column",
     "should sum field",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "average returns the average of a column",
     "should average field",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "minimum returns the min value",
     "should get minimum of field",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "maximum returns the max value",
     "should get maximum of field",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "sum with where clause",
     "should sum field with conditions",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "sum on none relation returns 0",
     "no queries for empty relation on sum",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "average on none relation returns null",
     "no queries for empty relation on average",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "count with column name ignores nulls",
     "count with column parameter",
   ],
 
   // Touch
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "updates updated_at timestamp",
     "touching a record updates its timestamp",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "touch with named timestamp",
     "touching an attribute updates it",
   ],
 
   // Increment/decrement
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "increment modifies attribute in memory",
     "increment attribute",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "increment with custom amount",
     "increment attribute by",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "decrement modifies attribute in memory",
     "decrement attribute",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "decrement with custom amount",
     "decrement attribute by",
   ],
 
   // Timestamps
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "auto-sets updated_at on update but not created_at",
     "saving a changed record updates its timestamp",
   ],
 
   // Persistence edge cases
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "save on unchanged record is a no-op",
     "update does not run sql if record has not changed",
   ],
 
   // Callbacks (extended)
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "runs before_update only on existing records",
     "update",
   ],
-  ["packages/activerecord/src/activerecord.test.ts", "after_destroy runs on destroy", "destroy"],
+  [
+    "packages/activerecord/test/cases/activerecord.test.ts",
+    "after_destroy runs on destroy",
+    "destroy",
+  ],
 
   // Base (extended)
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "save on destroyed record throws",
     "save destroyed object",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "instance delete skips callbacks",
     "delete doesnt run callbacks",
   ],
-  ["packages/activerecord/src/activerecord.test.ts", "static delete by ID", "class level delete"],
+  [
+    "packages/activerecord/test/cases/activerecord.test.ts",
+    "static delete by ID",
+    "class level delete",
+  ],
 
   // Optimistic locking
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "increments lock_version on update",
     "lock existing",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "raises StaleObjectError on version mismatch",
     "lock exception record",
   ],
 
   // Counter cache
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "increments counter on create and decrements on destroy",
     "increment counter",
   ],
 
   // STI
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "auto-sets the type column on save",
     "inheritance save",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "subclass queries filter by type",
     "inheritance condition",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "instantiates the correct subclass from base queries",
     "inheritance find",
   ],
 
   // UniquenessValidator
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "validates uniqueness of an attribute",
     "validate uniqueness",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "validates with scope",
     "validate uniqueness with scope",
   ],
 
   // Validation contexts
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "on: create only runs for new records",
     "valid uses create context when new",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "on: update only runs for existing records",
     "valid uses update context when persisted",
   ],
 
   // Enum
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "defines scopes for each enum value",
     "find via scope",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "defines predicate methods",
     "query state by predicate",
   ],
-  ["packages/activerecord/src/activerecord.test.ts", "defines setter methods", "update by setter"],
+  [
+    "packages/activerecord/test/cases/activerecord.test.ts",
+    "defines setter methods",
+    "update by setter",
+  ],
 
   // Store
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "reads and writes individual store accessors",
     "reading store attributes through accessors",
   ],
 
   // Batches
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "findInBatches yields batches of records",
     "find in batches should return batches",
   ],
 
   // Transactions
-  ["packages/activerecord/src/activerecord.test.ts", "commits on success", "successful"],
-  ["packages/activerecord/src/activerecord.test.ts", "rolls back on error", "failing on exception"],
+  ["packages/activerecord/test/cases/activerecord.test.ts", "commits on success", "successful"],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
+    "rolls back on error",
+    "failing on exception",
+  ],
+  [
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "nested savepoint catches inner errors",
     "force savepoint in nested transaction",
   ],
 
   // afterCommit
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "fires afterCommit inside transaction on commit",
     "call after commit after transaction commits",
   ],
 
   // insertAll
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "inserts multiple records in bulk",
     "insert all",
   ],
 
   // readonly
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "prevents saving a readonly record",
     "cant save readonly record",
   ],
 
   // table_name_prefix
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "applies prefix to inferred table name",
     "table name guesses with prefixes and suffixes",
   ],
 
   // Aggregation edge cases
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "minimum on empty table returns null",
     "no queries for empty relation on minimum",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "maximum on empty table returns null",
     "no queries for empty relation on maximum",
   ],
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "sum with where condition",
     "should sum scoped field with conditions",
   ],
 
   // Bulk operations edge cases
   [
-    "packages/activerecord/src/activerecord.test.ts",
+    "packages/activerecord/test/cases/activerecord.test.ts",
     "updateAll does not auto-update updated_at",
     "update column should not modify updated at",
   ],
@@ -1125,275 +1149,283 @@ const RENAMES: [string, string, string][] = [
   // ActiveRecord - Rails-guided tests
   // ==========================================================================
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "save on destroyed record raises error",
     "save destroyed object",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "create returns record even if validation fails",
     "returns object even if validations failed",
   ],
-  ["packages/activerecord/src/rails-guided.test.ts", "destroy returns self", "destroy"],
+  ["packages/activerecord/test/cases/rails-guided.test.ts", "destroy returns self", "destroy"],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "delete removes the record without running callbacks",
     "delete doesnt run callbacks",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "class-level delete removes by ID without callbacks",
     "class level delete",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "reload throws when record no longer exists",
     "find via reload",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "deleteAll returns count of deleted records",
     "delete all",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "updateAll returns count of updated records",
     "update all",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "before_save returning false halts create",
     "before save throwing abort",
   ],
-  ["packages/activerecord/src/rails-guided.test.ts", "delete bypasses all callbacks", "delete"],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
+    "delete bypasses all callbacks",
+    "delete",
+  ],
+  [
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "successful transaction commits",
     "successful",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "exception causes rollback",
     "failing on exception",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "afterCommit fires only on successful commit",
     "call after commit after transaction commits",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "nested savepoint: inner error does not abort outer",
     "force savepoint in nested transaction",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "update_column updates a single attribute",
     "update column",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "update_column does not run callbacks",
     "update column should not use setter method",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "update_columns updates multiple attributes at once",
     "update columns",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "update_columns on a new record raises",
     "update columns should raise exception if new record",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "update_column clears dirty tracking",
     "update column should not leave the object dirty",
   ],
-  ["packages/activerecord/src/rails-guided.test.ts", "sum computes the total", "should sum field"],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
+    "sum computes the total",
+    "should sum field",
+  ],
+  [
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "average computes the mean",
     "should average field",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "minimum returns the smallest value",
     "should get minimum of field",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "maximum returns the largest value",
     "should get maximum of field",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "find_in_batches yields correct number of batches",
     "find in batches should return batches",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "touch updates updated_at",
     "touching a record updates its timestamp",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "touch with extra attributes",
     "touching an attribute updates it",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "scope returns matching records",
     "scopes with options limit finds to those matching the criteria specified",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "scopes can be chained",
     "scopes are composable",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "increments lock_version on each update",
     "lock existing",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "raises StaleObjectError when lock_version is stale",
     "lock exception record",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "raises on save for readonly records",
     "cant save readonly record",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "increments the counter cache on create",
     "increment counter",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "automatically sets the type column on create",
     "inheritance save",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "subclass queries auto-filter by type",
     "inheritance condition",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "returns instances of the correct subclass from base queries",
     "inheritance find",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "provides scopes for each value",
     "find via scope",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "provides predicate methods",
     "query state by predicate",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "provides setter methods that change the value",
     "update by setter",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "reads stored attributes through accessors",
     "reading store attributes through accessors",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "writes stored attributes through accessors",
     "writing store attributes through accessors",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "insert_all inserts multiple records without callbacks",
     "insert all",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "runs create-only validations only on new records",
     "valid uses create context when new",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "runs update-only validations only on persisted records",
     "valid uses update context when persisted",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "returning false from before_save halts the chain",
     "before save throwing abort",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "find with nonexistent id raises",
     "find raises record not found exception",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "findByBang raises when no match",
     "find_by! raises RecordNotFound if the record is missing",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "findBy returns null when no match",
     "find_by returns nil if the record is missing",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "updateAll updates matching records in bulk",
     "update all",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "deleteAll removes records without callbacks",
     "delete all",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "save on unchanged record is a no-op",
     "update does not run sql if record has not changed",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "created_at is not changed on subsequent saves",
     "saving a unchanged record doesnt update its timestamp",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "increment changes attribute in memory by 1",
     "increment attribute",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "decrement changes attribute in memory by -1",
     "decrement attribute",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "validates uniqueness prevents duplicate",
     "validate uniqueness",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "validates uniqueness with scope",
     "validate uniqueness with scope",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "columnNames returns array of attribute name strings",
     "read attribute names",
   ],
   [
-    "packages/activerecord/src/rails-guided.test.ts",
+    "packages/activerecord/test/cases/rails-guided.test.ts",
     "columns returns metadata about all attributes",
     "columns",
   ],

@@ -35,8 +35,8 @@ function prettierCheck(file: string): boolean {
 // stringify puts every element on its own line, prettier collapses them.
 const SAMPLE = {
   files: {
-    "packages/activerecord/src/base.ts": ["a", "b"],
-    "packages/activerecord/src/relation.ts": ["c"],
+    "packages/activerecord/lib/base.ts": ["a", "b"],
+    "packages/activerecord/lib/relation.ts": ["c"],
   },
 };
 

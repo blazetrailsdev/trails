@@ -1,0 +1,267 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach } from "vitest";
+import { Base } from "../../../lib/index.js";
+import { Associations } from "../../../lib/associations.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { JoinDependency } from "../../../lib/associations/join-dependency.js";
+import type { JoinPart } from "../../../lib/associations/join-dependency/join-part.js";
+import { JoinAssociation } from "../../../lib/associations/join-dependency/join-association.js";
+import { Nodes, Table } from "@blazetrails/arel";
+import {
+  nodeAt,
+  nodePaths,
+  sqlNameOf,
+  aliasTrackerFor,
+} from "../../support/join-dependency-paths.js";
+import "../../models/company.js";
+
+function joinFor(joins: Nodes.Join[], node: JoinPart): Nodes.Join {
+  return joins.find((join) => {
+    const rel = join.left as Table | Nodes.TableAlias;
+    return String(rel.tableAlias ?? rel.name) === sqlNameOf(node);
+  })!;
+}
+
+describe("JoinDependency Arel node construction", () => {
+  fixtures({});
+
+  class Owner extends Base {
+    static {
+      this.primaryKey = "owner_id";
+      this.attribute("owner_id", "integer");
+      this.attribute("name", "string");
+    }
+  }
+  class Asset extends Base {
+    static {
+      this.attribute("owner_id", "integer");
+      this.attribute("owner_type", "string");
+    }
+  }
+
+  beforeEach(() => {
+    (Owner as any)._reflections = {};
+    (Asset as any)._reflections = {};
+    constSet(TopLevel, "Owner", Owner);
+    DescendantsTracker.registerSubclass(Base, Owner);
+    constSet(TopLevel, "Asset", Asset);
+    DescendantsTracker.registerSubclass(Base, Asset);
+  });
+
+  it("emits OuterJoin with polymorphic :as type predicate as Nodes.And", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", as: "owner" });
+
+    const jd = new JoinDependency(Owner, Owner.arelTable, "assets", Nodes.OuterJoin);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
+    const node = nodeAt(jd, "assets");
+    expect(node).not.toBeNull();
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
+
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    expect(on).toBeInstanceOf(Nodes.On);
+
+    const and = on.expr as Nodes.And;
+    expect(and).toBeInstanceOf(Nodes.And);
+    expect(and.children).toHaveLength(2);
+
+    const typeEq = and.children[0] as Nodes.Equality;
+    expect(typeEq).toBeInstanceOf(Nodes.Equality);
+    expect((typeEq.left as any).name).toBe("owner_type");
+    const typeVal = typeEq.right as any;
+    const resolvedType = typeVal.value();
+    expect(resolvedType).toBe("Owner");
+
+    const eq = and.children[1] as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
+  });
+
+  it("emits polymorphic :as type predicate using base class polymorphic_name for STI subclass owner", () => {
+    class StiOwner extends Base {
+      static {
+        this.attribute("type", "string");
+        this.attribute("name", "string");
+      }
+    }
+    class StiSubOwner extends StiOwner {}
+    StiOwner.inheritanceColumn = "type";
+    constSet(TopLevel, "StiSubOwner", StiSubOwner);
+    DescendantsTracker.registerSubclass(StiOwner, StiSubOwner);
+    (StiOwner as any)._reflections = {};
+    (StiSubOwner as any)._reflections = {};
+    constSet(TopLevel, "StiOwner", StiOwner);
+    DescendantsTracker.registerSubclass(Base, StiOwner);
+    constSet(TopLevel, "StiSubOwner", StiSubOwner);
+    DescendantsTracker.registerSubclass(StiOwner, StiSubOwner);
+
+    Associations.hasMany.call(StiSubOwner, "assets", { className: "Asset", as: "owner" });
+
+    const jd = new JoinDependency(StiSubOwner, StiSubOwner.arelTable, "assets", Nodes.OuterJoin);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
+    const node = nodeAt(jd, "assets");
+    expect(node).not.toBeNull();
+
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const and = on.expr as Nodes.And;
+    expect(and).toBeInstanceOf(Nodes.And);
+
+    const typeEq = and.children[0] as Nodes.Equality;
+    expect((typeEq.left as any).name).toBe("owner_type");
+    const typeVal = typeEq.right as any;
+    const resolvedType = typeVal.value();
+    expect(resolvedType).toBe("StiOwner");
+  });
+
+  it("emits OuterJoin with STI subclass IN-list predicate", () => {
+    class ClientOwner extends Base {
+      static {
+        this._tableName = "owners";
+        this.primaryKey = "owner_id";
+        this.hasMany("clients", { className: "Client", foreignKey: "owner_id" });
+      }
+    }
+    constSet(TopLevel, "ClientOwner", ClientOwner);
+    DescendantsTracker.registerSubclass(Base, ClientOwner);
+
+    const jd = new JoinDependency(ClientOwner, ClientOwner.arelTable, "clients", Nodes.OuterJoin);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
+    const node = nodeAt(jd, "clients");
+    expect(node).not.toBeNull();
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
+
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const and = on.expr as Nodes.And;
+    expect(and).toBeInstanceOf(Nodes.And);
+    expect(and.children).toHaveLength(2);
+
+    const eq = and.children[0] as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
+
+    const inNode = and.children[1] as Nodes.HomogeneousIn;
+    expect(inNode).toBeInstanceOf(Nodes.HomogeneousIn);
+    expect((inNode.left as any).name).toBe("type");
+
+    expect((inNode.left as any).relation).toBe((eq.left as any).relation);
+  });
+
+  it("emits simple OuterJoin for hasMany without polymorphic/STI", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner, Owner.arelTable, "assets", Nodes.OuterJoin);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
+    const node = nodeAt(jd, "assets");
+    expect(node).not.toBeNull();
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
+
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const eq = on.expr as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
+    expect((eq.left as any).relation.name).toBe("assets");
+    expect((eq.right as any).name).toBe("owner_id");
+    expect((eq.right as any).relation.name).toBe("owners");
+  });
+
+  it("emits OuterJoin for belongsTo with correct key direction", () => {
+    Associations.belongsTo.call(Asset, "owner", { className: "Owner", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Asset, Asset.arelTable, "owner", Nodes.OuterJoin);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
+    const node = nodeAt(jd, "owner");
+    expect(node).not.toBeNull();
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.OuterJoin);
+
+    const outerJoin = joinFor(joins, node) as Nodes.OuterJoin;
+    const on = outerJoin.right as Nodes.On;
+    const eq = on.expr as Nodes.Equality;
+    expect(eq).toBeInstanceOf(Nodes.Equality);
+    expect((eq.left as any).name).toBe("owner_id");
+    expect((eq.left as any).relation.name).toBe("owners");
+    expect((eq.right as any).name).toBe("owner_id");
+    expect((eq.right as any).relation.name).toBe("assets");
+  });
+
+  it("builds joinRoot tree with children for each association", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner, Owner.arelTable, "assets", Nodes.OuterJoin);
+    jd.joinConstraints([], aliasTrackerFor(jd), []);
+
+    expect(jd.joinRoot.baseKlass).toBe(Owner);
+    expect(jd.joinRoot.children).toHaveLength(1);
+    expect(nodePaths(jd)).toEqual(["assets"]);
+    expect(jd.joinRoot.children[0].baseKlass).toBe(Asset);
+  });
+
+  it("builds nested tree for nested association paths", () => {
+    class Comment extends Base {
+      static {
+        this.attribute("asset_id", "integer");
+        this.attribute("body", "string");
+      }
+    }
+    (Comment as any)._reflections = {};
+    constSet(TopLevel, "Comment", Comment);
+    DescendantsTracker.registerSubclass(Base, Comment);
+
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+    Associations.hasMany.call(Asset, "comments", { className: "Comment", foreignKey: "asset_id" });
+
+    const jd = new JoinDependency(Owner, Owner.arelTable, { assets: "comments" }, Nodes.OuterJoin);
+    jd.joinConstraints([], aliasTrackerFor(jd), []);
+
+    expect(jd.joinRoot.children).toHaveLength(1);
+    const assetsNode = jd.joinRoot.children[0];
+    expect(assetsNode).toBe(nodeAt(jd, "assets"));
+    expect(assetsNode.children).toHaveLength(1);
+    const commentsNode = assetsNode.children[0];
+    expect(commentsNode).toBe(nodeAt(jd, "assets.comments"));
+    expect(commentsNode.baseKlass).toBe(Comment);
+  });
+
+  it("uses table alias when name collides", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+    Associations.belongsTo.call(Asset, "owner", { className: "Owner", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Asset, Asset.arelTable, { owner: "assets" }, Nodes.OuterJoin);
+    const node1 = nodeAt(jd, "owner");
+    const node2 = nodeAt(jd, "owner.assets");
+
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
+    expect(sqlNameOf(node1)).toBe("owners");
+
+    const table1 = (joinFor(joins, node1) as Nodes.OuterJoin).left;
+    expect((table1 as any).tableAlias).toBeNull();
+    expect(sqlNameOf(node2)).toBe("assets_owners");
+    const table2 = (joinFor(joins, node2) as Nodes.OuterJoin).left;
+    expect((table2 as any).tableAlias).toBe("assets_owners");
+  });
+
+  it("respects joinType constructor arg (InnerJoin)", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner, Owner.arelTable, "assets", Nodes.InnerJoin);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
+    const node = nodeAt(jd, "assets");
+    expect(node).not.toBeNull();
+    expect(joinFor(joins, node)).toBeInstanceOf(Nodes.InnerJoin);
+  });
+
+  it("pushes JoinAssociation into tree when reflection is available", () => {
+    Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
+
+    const jd = new JoinDependency(Owner, Owner.arelTable, "assets", Nodes.OuterJoin);
+    jd.joinConstraints([], aliasTrackerFor(jd), []);
+
+    const child = jd.joinRoot.children[0];
+    expect(child).toBeInstanceOf(JoinAssociation);
+    expect(child.reflection).toBeDefined();
+    expect(child).toBe(nodeAt(jd, "assets"));
+  });
+});

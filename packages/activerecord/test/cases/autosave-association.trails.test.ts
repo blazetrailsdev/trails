@@ -1,0 +1,632 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { kernelThrow, constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import { describe, it, expect, beforeAll, vi } from "vitest";
+import { Base } from "../../lib/index.js";
+import { Associations } from "../../lib/associations.js";
+import { queryConstraints } from "../../lib/persistence.js";
+import type { CallbackChain } from "@blazetrails/activesupport";
+import { Company as CanonicalCompany, Firm, Client } from "../models/company.js";
+import { Pirate as CanonicalPirate } from "../models/pirate.js";
+import { Bird as CanonicalBird } from "../models/bird.js";
+import { Ship } from "../models/ship.js";
+import { Developer } from "../models/developer.js";
+import { Eye, Iris, IrisWithReadOnlyForeignKey } from "../models/eye.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import {
+  aroundSaveCollectionAssociation,
+  build,
+  computePrimaryKey,
+  _isRecordChanged,
+} from "../../lib/autosave-association.js";
+import { MissingAttributeError } from "@blazetrails/activemodel";
+import { Prisoner } from "../models/ship.js";
+
+function cacheAssoc(record: Base, name: string, value: unknown) {
+  const association = record.association(name) as any;
+  if (typeof association.isUpdated === "function") association.writer(value as any);
+  else association.setTarget(value as any);
+}
+
+describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
+  fixtures([]);
+  beforeAll(() => {
+    constSet(TopLevel, "Eye", Eye);
+    constSet(TopLevel, "Iris", Iris);
+    constSet(TopLevel, "IrisWithReadOnlyForeignKey", IrisWithReadOnlyForeignKey);
+  });
+
+  it("callbacks read a cold has_one cache", async () => {
+    const created = await Eye.create({ iris_attributes: { color: "honey" } });
+    const eye = await Eye.find(created.id);
+    expect(eye.association("iris").isLoaded()).toBe(false);
+
+    await eye.save();
+
+    expect(eye.association("iris").isLoaded()).toBe(true);
+    expect(eye.afterSaveCallbacksStack).toEqual([false, false]);
+  });
+
+  it("an autosaved has_one whose save is cancelled rolls the owner back", async () => {
+    class CancellingFace extends Base {
+      declare description: string | null;
+      declare human_id: number | null;
+
+      static {
+        this._tableName = "faces";
+        this.beforeSave(function () {
+          kernelThrow(":abort");
+        });
+      }
+    }
+    constSet(TopLevel, "CancellingFace", CancellingFace);
+    DescendantsTracker.registerSubclass(Base, CancellingFace);
+
+    class HumanWithCancellingFace extends Base {
+      declare name: string | null;
+      declare cancellingFace: InstanceType<typeof CancellingFace> | null;
+
+      static {
+        this._tableName = "humans";
+        this.hasOne("cancellingFace", {
+          className: "CancellingFace",
+          autosave: true,
+          foreignKey: "human_id",
+        });
+      }
+    }
+    constSet(TopLevel, "HumanWithCancellingFace", HumanWithCancellingFace);
+    DescendantsTracker.registerSubclass(Base, HumanWithCancellingFace);
+
+    const human = new HumanWithCancellingFace({ name: "Steve" });
+    cacheAssoc(human, "cancellingFace", new CancellingFace({ description: "wide eyed" }));
+
+    expect(await human.save()).toBeFalsy();
+    expect(await HumanWithCancellingFace.where({ name: "Steve" }).count()).toBe(0);
+
+    const human2 = new HumanWithCancellingFace({ name: "Steve" });
+    cacheAssoc(human2, "cancellingFace", new CancellingFace({ description: "wide eyed" }));
+    expect(await human2.saveBang()).toBeUndefined();
+    expect(await HumanWithCancellingFace.where({ name: "Steve" }).count()).toBe(0);
+  });
+});
+
+describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
+  fixtures(["companies"]);
+  beforeAll(() => {
+    constSet(TopLevel, "Company", CanonicalCompany);
+    constSet(TopLevel, "Firm", Firm);
+    constSet(TopLevel, "Client", Client);
+  });
+
+  it("collection-proxy build without load autosaves built children (Slot B)", async () => {
+    const firm = new Firm({ name: "Acme" });
+    const built = firm.clientsOfFirm.build({ name: "ProxyBuilt" });
+    expect(built.isNewRecord()).toBe(true);
+    await firm.save();
+    expect(firm.isNewRecord()).toBe(false);
+    expect(built.isNewRecord()).toBe(false);
+  });
+});
+
+describe("TestAutosaveAssociationsInGeneral", () => {
+  fixtures([]);
+
+  it("custom validation context is applied to unchanged persisted children", async () => {
+    class Widget extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
+      static {
+        this._tableName = "books";
+        this.attribute("name", "string");
+        this.attribute("author_id", "integer");
+        this.validates("name", { presence: true, on: "publish" } as any);
+      }
+    }
+    class WidgetOwner extends Base {
+      declare name: string | null;
+      declare widgets: AssociationProxy<Widget>;
+
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+        this.hasMany("widgets", { autosave: true, foreignKey: "author_id" });
+      }
+    }
+    constSet(TopLevel, "Widget", Widget);
+    DescendantsTracker.registerSubclass(Base, Widget);
+    constSet(TopLevel, "WidgetOwner", WidgetOwner);
+    DescendantsTracker.registerSubclass(Base, WidgetOwner);
+
+    const owner = await WidgetOwner.create({ name: "Alice" });
+    const widget = await Widget.create({ name: "", author_id: owner.id });
+    cacheAssoc(owner, "widgets", [widget]);
+
+    const defaultValid = await owner.isValid();
+    expect(defaultValid).toBe(true);
+
+    const publishValid = await owner.isValid("publish" as any);
+    expect(publishValid).toBe(false);
+  });
+
+  it("default belongs_to saves new associated record and propagates the FK", async () => {
+    class Author extends Base {
+      declare name: string | null;
+
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+      }
+    }
+    class Post extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
+      static {
+        this._tableName = "books";
+        this.attribute("name", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    constSet(TopLevel, "DefaultBelongsToAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "DefaultBelongsToPost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    Associations.belongsTo.call(Post, "author", {
+      foreignKey: "author_id",
+      className: "DefaultBelongsToAuthor",
+    });
+
+    const author = new Author({ name: "New Author" });
+    const post = new Post({ name: "Default autosave" });
+    cacheAssoc(post, "author", author);
+    await post.save();
+    expect(author.isNewRecord()).toBe(false);
+    expect(post.author_id).toBe(author.id);
+  });
+
+  it("belongs_to autosave with mismatched composite FK/PK uses zip semantics", async () => {
+    class Parent extends Base {
+      declare name: string | null;
+
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+      }
+    }
+    class Child extends Base {
+      declare parent_id: number | null;
+      declare group: string | null;
+      declare title: string | null;
+
+      static {
+        this._tableName = "topics";
+        this.attribute("parent_id", "integer");
+        this.attribute("group", "string");
+        this.attribute("title", "string");
+      }
+    }
+    constSet(TopLevel, "ZipParent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "ZipChild", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
+    Associations.belongsTo.call(Child, "parent", {
+      primaryKey: "id",
+      foreignKey: ["parent_id", "group"],
+      className: "ZipParent",
+      autosave: true,
+    });
+
+    const parent = new Parent({ name: "P" });
+    const child = new Child({ title: "c" });
+    cacheAssoc(child, "parent", parent);
+    child.group = "us-west";
+    await child.save();
+    expect(parent.isNewRecord()).toBe(false);
+    expect(child.parent_id).toBe(parent.id);
+    expect(child.group).toBe("us-west");
+  });
+
+  it("default belongs_to runs validations on the new target via validate: !autosave", async () => {
+    class Author extends Base {
+      declare name: string | null;
+
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+        this.validates("name", { presence: true });
+      }
+    }
+    class Post extends Base {
+      declare name: string | null;
+      declare author_id: number | null;
+
+      static {
+        this._tableName = "books";
+        this.attribute("name", "string");
+        this.attribute("author_id", "integer");
+      }
+    }
+    constSet(TopLevel, "DefaultAutosaveAuthor", Author);
+    DescendantsTracker.registerSubclass(Base, Author);
+    constSet(TopLevel, "DefaultAutosavePost", Post);
+    DescendantsTracker.registerSubclass(Base, Post);
+    Associations.belongsTo.call(Post, "author", {
+      foreignKey: "author_id",
+      className: "DefaultAutosaveAuthor",
+    });
+
+    const author = new Author({});
+    const post = new Post({ name: "ok" });
+    cacheAssoc(post, "author", author);
+    const saved = await post.save();
+    expect(saved).toBe(true);
+    expect(post.isNewRecord()).toBe(false);
+    expect(author.isNewRecord()).toBe(true);
+    expect(post.errors.size).toBe(0);
+  });
+  it("belongs_to autosave with PK longer than FK raises on the unpaired PK position", async () => {
+    class Parent extends Base {
+      declare name: string | null;
+
+      static {
+        this._tableName = "authors";
+        this.attribute("name", "string");
+      }
+    }
+    class Child extends Base {
+      declare author_id: number | null;
+      declare name: string | null;
+
+      static {
+        this._tableName = "books";
+        this.attribute("author_id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    constSet(TopLevel, "LongPkParent", Parent);
+    DescendantsTracker.registerSubclass(Base, Parent);
+    constSet(TopLevel, "LongPkChild", Child);
+    DescendantsTracker.registerSubclass(Base, Child);
+    Associations.belongsTo.call(Child, "parent", {
+      primaryKey: ["id", "name"],
+      foreignKey: "author_id",
+      className: "LongPkParent",
+      autosave: true,
+    });
+
+    const parent = new Parent({ name: "P" });
+    const child = new Child({ name: "c" });
+    cacheAssoc(child, "parent", parent);
+    await expect(child.save()).rejects.toThrow(MissingAttributeError);
+  });
+
+  it("around_save_collection_association restores new_record_before_save once the block settles", async () => {
+    const host = { _newRecordBeforeSave: false, isNewRecord: () => true } as any;
+    let during: boolean | undefined;
+    await aroundSaveCollectionAssociation.call(host, async () => {
+      await Promise.resolve();
+      during = host._newRecordBeforeSave;
+    });
+    expect(during).toBe(true);
+    expect(host._newRecordBeforeSave).toBe(false);
+
+    await expect(
+      aroundSaveCollectionAssociation.call(host, async () => {
+        await Promise.resolve();
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    expect(host._newRecordBeforeSave).toBe(false);
+  });
+
+  it("_record_changed? sees a composite foreign key change through association_foreign_key_changed?", () => {
+    const reflection = {
+      isThroughReflection: () => false,
+      foreignKey: () => ["shop_id", "order_id"],
+      inverseOf: () => null,
+    };
+    const values: Record<string, unknown> = { shop_id: 1, order_id: 2 };
+    const record = {
+      isNewRecord: () => false,
+      _hasAttribute: (key: string) => key in values,
+      _readAttribute: (key: string) => values[key],
+      isWillSaveChangeToAttribute: () => false,
+    };
+    expect(_isRecordChanged(reflection, record, [1, 2])).toBe(false);
+    expect(_isRecordChanged(reflection, record, [1, 3])).toBe(true);
+  });
+});
+
+describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
+  fixtures([]);
+
+  function makeModels() {
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
+    return { Pirate: CanonicalPirate, Bird: CanonicalBird };
+  }
+
+  it("errors details should be set for invalid nested", async () => {
+    const { Pirate, Bird } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const invalidBird = new Bird({ name: "" });
+    pirate.association("birds").setTarget([invalidBird] as any);
+    const saved = await pirate.save();
+    expect(saved).toBe(false);
+  });
+
+  it("valid nested attributes create children", async () => {
+    const { Pirate, Bird } = makeModels();
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    await (pirate as any).setBirdsAttributes([{ name: "Polly" }]);
+    await pirate.save();
+    const birds = await Bird.where({ pirate_id: pirate.id });
+    expect(birds.length).toBe(1);
+  });
+});
+
+describe("TestAutosaveAssociationsInGeneral changed_for_autosave?", () => {
+  fixtures([]);
+
+  it("changed_for_autosave? dispatches through marked_for_destruction?", async () => {
+    class Gadget extends Base {
+      declare name: string | null;
+
+      static {
+        this._tableName = "books";
+        this.attribute("name", "string");
+      }
+
+      override markedForDestruction = (): boolean => true;
+    }
+    constSet(TopLevel, "ChangedForAutosaveGadget", Gadget);
+    DescendantsTracker.registerSubclass(Base, Gadget);
+
+    const gadget = await Gadget.create({ name: "widget" });
+
+    expect(gadget.changedForAutosave()).toBe(true);
+  });
+});
+
+describe("TestAutosaveAssociationsInGeneral association_valid?", () => {
+  fixtures([]);
+
+  it("association_valid? dispatches through marked_for_destruction?", async () => {
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
+    class DoomedBird extends CanonicalBird {
+      override markedForDestruction = (): boolean => true;
+    }
+    constSet(TopLevel, "AssociationValidDoomedBird", DoomedBird);
+
+    const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
+    const doomed = new DoomedBird({ name: "" });
+    pirate.association("birds").setTarget([doomed] as any);
+
+    expect(await pirate.save()).toBe(true);
+  });
+});
+
+describe("TestAutosaveAssociationOnAHasManyAssociation marked_for_destruction?", () => {
+  fixtures([]);
+
+  it("save_collection_association selects the records to destroy through marked_for_destruction?", async () => {
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Bird", CanonicalBird);
+    let doomed = false;
+    class DoomedBird extends CanonicalBird {
+      override markedForDestruction = (): boolean => doomed;
+    }
+    constSet(TopLevel, "CollectionDoomedBird", DoomedBird);
+
+    const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
+    const bird = new DoomedBird({ name: "polly", pirate_id: pirate.id });
+    await bird.save();
+    doomed = true;
+    pirate.association("birds").setTarget([bird] as any);
+
+    expect(await pirate.save()).toBe(true);
+    expect(await CanonicalBird.where({ id: bird.id }).count()).toBe(0);
+  });
+});
+
+describe("TestAutosaveAssociationOnAHasOneAssociation marked_for_destruction?", () => {
+  fixtures([]);
+
+  it("save_has_one_association destroys the record through marked_for_destruction?", async () => {
+    constSet(TopLevel, "Pirate", CanonicalPirate);
+    constSet(TopLevel, "Ship", Ship);
+    constSet(TopLevel, "Developer", Developer);
+    let doomed = false;
+    class DoomedShip extends Ship {
+      override markedForDestruction = (): boolean => doomed;
+    }
+    constSet(TopLevel, "HasOneDoomedShip", DoomedShip);
+
+    const pirate = await CanonicalPirate.create({ catchphrase: "Yarr" });
+    const ship = new DoomedShip({ name: "Black Pearl", pirate_id: pirate.id });
+    await ship.save();
+    doomed = true;
+    pirate.association("ship").setTarget(ship as any);
+
+    await pirate.save();
+    expect(await Ship.where({ id: ship.id }).count()).toBe(0);
+  });
+});
+
+describe("AutosaveAssociation::AssociationBuilderExtension.build", () => {
+  const callbacks = (model: typeof Base) =>
+    Object.values<CallbackChain>((model as any).__callbacks).flatMap((chain) => chain.entries);
+
+  it("leaves the reflection's validate option unwritten", () => {
+    const reflection = Prisoner.reflectOnAssociation("ship")!;
+
+    expect("validate" in reflection.options).toBe(false);
+    expect(reflection.isValidate()).toBe(true);
+  });
+
+  it("adds the autosave callbacks to the model", () => {
+    class Convict extends Base {
+      static {
+        this._tableName = "prisoners";
+      }
+    }
+    const before = callbacks(Convict).length;
+
+    build(Convict, Prisoner.reflectOnAssociation("ship"));
+
+    expect(callbacks(Convict).length).toBeGreaterThan(before);
+  });
+
+  it("runs from the extensions loop, ahead of the builder's own touch callbacks", () => {
+    class Convict extends Base {
+      static {
+        this._tableName = "prisoners";
+      }
+    }
+    const beforeSave = vi.spyOn(Convict, "beforeSave");
+    const afterCreate = vi.spyOn(Convict, "afterCreate");
+
+    Convict.belongsTo("ship", {
+      autosave: true,
+      touch: true,
+      className: "ShipWithoutNestedAttributes",
+    });
+
+    expect(beforeSave.mock.invocationCallOrder[0]).toBeLessThan(
+      afterCreate.mock.invocationCallOrder[0],
+    );
+  });
+});
+
+describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
+  fixtures([], { useTransactionalTests: true });
+  it("pairs queryConstraintsList PK with explicit composite FK on QC owner", async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    class QcOwner extends Base {
+      declare tree_id: number | null;
+      declare name: string | null;
+
+      static {
+        this._tableName = "nodes";
+        this.attribute("tree_id", "integer");
+        this.attribute("id", "integer");
+        this.attribute("name", "string");
+        queryConstraints.call(this, "tree_id", "id");
+        this.hasOne("qcChild", {
+          className: "QcChild",
+          foreignKey: ["tree_id", "parent_id"],
+          autosave: true,
+        });
+      }
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+    interface QcOwner {
+      get qcChild(): QcChild | null | Promise<QcChild | null>;
+      set qcChild(value: QcChild | null);
+    }
+    class QcChild extends Base {
+      declare tree_id: number | null;
+      declare parent_id: number | null;
+      declare name: string | null;
+
+      static {
+        this._tableName = "nodes";
+        this.attribute("tree_id", "integer");
+        this.attribute("parent_id", "integer");
+        this.attribute("name", "string");
+      }
+    }
+    constSet(TopLevel, "QcOwner", QcOwner);
+    DescendantsTracker.registerSubclass(Base, QcOwner);
+    constSet(TopLevel, "QcChild", QcChild);
+    DescendantsTracker.registerSubclass(Base, QcChild);
+    const owner = new QcOwner({ tree_id: 5, id: 11, name: "Corp" });
+    const child = new QcChild({ name: "Doc" });
+    owner.association("qcChild").setTarget(child);
+    const saved = await owner.save();
+    expect(saved).toBe(true);
+    expect(child.isNewRecord()).toBe(false);
+    expect(child.tree_id).toBe(5);
+    expect(child.parent_id).toBe(11);
+  });
+});
+
+describe("computePrimaryKey", () => {
+  function makeRecord(opts: {
+    primaryKey?: string | string[];
+    queryConstraintsList?: string[];
+    hasQueryConstraints?: boolean;
+  }) {
+    return {
+      constructor: {
+        primaryKey: opts.primaryKey ?? "id",
+        _primaryKey: opts.primaryKey ?? "id",
+        isCompositePrimaryKey: () => Array.isArray(opts.primaryKey),
+        _queryConstraintsList: opts.queryConstraintsList ?? null,
+        _hasQueryConstraints: opts.hasQueryConstraints ?? false,
+      },
+    };
+  }
+
+  it("returns explicit reflection primaryKey option as-is", () => {
+    const record = makeRecord({ primaryKey: "id" });
+    const result = computePrimaryKey({ options: { primaryKey: "custom_id" } }, record);
+    expect(result).toBe("custom_id");
+  });
+
+  it("returns class-level queryConstraintsList when reflection has queryConstraints option", () => {
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["tenant_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey({ options: { queryConstraints: true } }, record);
+    expect(result).toEqual(["tenant_id", "id"]);
+  });
+
+  it("returns queryConstraintsList when record class has_query_constraints? and no FK option", () => {
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["shop_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey({ options: {} }, record);
+    expect(result).toEqual(["shop_id", "id"]);
+  });
+
+  it("does not use queryConstraintsList when reflection has explicit foreignKey option", () => {
+    const record = makeRecord({
+      primaryKey: "id",
+      queryConstraintsList: ["shop_id", "id"],
+      hasQueryConstraints: true,
+    });
+    const result = computePrimaryKey(
+      {
+        options: { foreignKey: "order_id" },
+      },
+      record,
+    );
+    expect(result).toBe("id");
+  });
+
+  it("collapses CPK to 'id' when composite PK includes id and no queryConstraints", () => {
+    const record = makeRecord({ primaryKey: ["shop_id", "id"] });
+    const result = computePrimaryKey({ options: {} }, record);
+    expect(result).toBe("id");
+  });
+
+  it("returns full composite PK when CPK has no 'id' column", () => {
+    const record = makeRecord({ primaryKey: ["shop_id", "status"] });
+    const result = computePrimaryKey({ options: {} }, record);
+    expect(result).toEqual(["shop_id", "status"]);
+  });
+
+  it("returns class primary key for non-composite, non-constrained record", () => {
+    const record = makeRecord({ primaryKey: "id" });
+    const result = computePrimaryKey({ options: {} }, record);
+    expect(result).toBe("id");
+  });
+});

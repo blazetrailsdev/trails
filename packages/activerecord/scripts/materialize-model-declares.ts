@@ -18,10 +18,10 @@ import {
   type ModelAssociationLookup,
 } from "../../activerecord-cli/lib/type-virtualization/resolve-target.js";
 import type { SchemaColumnValue } from "../../activerecord-cli/lib/type-virtualization/synthesize.js";
-import type { TableSchema, WrappedTableSchema } from "../src/support/schema-types.js";
+import type { TableSchema, WrappedTableSchema } from "../test/support/schema-types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MODELS_DIR = path.resolve(__dirname, "../src/test-helpers/models");
+const MODELS_DIR = path.resolve(__dirname, "../test/models");
 
 const PILOT = ["topic.ts", "developer.ts"];
 
@@ -536,8 +536,8 @@ async function main(): Promise<void> {
   const modelsDirPrefix = MODELS_DIR + path.sep;
   let schemaColumnsByTable: SchemaColumnsByTable = {};
   if (targets.some((f) => f.startsWith(modelsDirPrefix))) {
-    const { TEST_SCHEMA, ARUNIT2_SCHEMA } = await import("../src/test-helpers/test-schema.js");
-    const { isWrappedSchema } = await import("../src/support/schema-types.js");
+    const { TEST_SCHEMA, ARUNIT2_SCHEMA } = await import("../test/schema/test-schema.js");
+    const { isWrappedSchema } = await import("../test/support/schema-types.js");
     schemaColumnsByTable = normalizeSchema({ ...TEST_SCHEMA, ...ARUNIT2_SCHEMA }, isWrappedSchema);
   }
   const associationLookup = buildModelAssociationLookup(registry);

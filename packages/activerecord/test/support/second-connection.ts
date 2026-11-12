@@ -1,0 +1,34 @@
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
+import { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
+import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/connection-handler.js";
+import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
+import { UrlConfig } from "../../lib/database-configurations/url-config.js";
+
+export async function withSecondAdapter<T>(
+  url: string,
+  fn: (adapter: PostgreSQLAdapter) => T | Promise<T>,
+): Promise<T> {
+  const dbConfig = new UrlConfig("arunit", "primary", url, {
+    adapter: "postgresql",
+    pool: 1,
+  });
+  dbConfig.validateBang();
+  const poolConfig = new PoolConfig(
+    new ConnectionDescriptor("primary"),
+    dbConfig,
+    "writing",
+    "default",
+  );
+  const pool = new ConnectionPool(poolConfig);
+  try {
+    const adapter = (await pool.checkout()) as unknown as PostgreSQLAdapter;
+    try {
+      return await fn(adapter);
+    } finally {
+      pool.checkin(adapter as unknown as DatabaseAdapter);
+    }
+  } finally {
+    await pool.disconnect(false).catch(() => {});
+  }
+}

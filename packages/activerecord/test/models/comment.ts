@@ -1,0 +1,262 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Relation } from "../../lib/relation.js";
+import type { ScopeOn } from "../../lib/scoping/named.js";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Author } from "./author.js";
+import type { Company } from "./company.js";
+import type { Developer } from "./developer.js";
+import type { FirstPost } from "../../lib/test-helpers/models/post.js";
+import type { Post } from "../../lib/test-helpers/models/post.js";
+import type { Rating } from "./rating.js";
+import type { SpecialPostWithDefaultScope } from "../../lib/test-helpers/models/post.js";
+import { Base } from "../../lib/base.js";
+
+declare module "../../lib/relation.js" {
+  interface RelationScopes<T extends Base> {
+    orderedByPostId: ScopeOn<T, Comment | Post>;
+    forFirstAuthor: ScopeOn<T, Comment>;
+  }
+}
+
+export class OopsError extends Error {}
+constSet(TopLevel, "OopsError", OopsError);
+
+const OopsExtension = {
+  destroyAll(): never {
+    throw new OopsError("oops");
+  },
+};
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Comment extends Base {
+  declare static limitBy: (l: number) => Relation<Comment>;
+  declare static containingTheLetterE: () => Relation<Comment>;
+  declare static notAgain: () => Relation<Comment>;
+  declare static forFirstPost: () => Relation<Comment>;
+  declare static forFirstAuthor: () => Relation<Comment>;
+  declare static created: () => Relation<Comment>;
+  declare static orderedByPostId: () => Relation<Comment>;
+  declare static allAsScope: () => Relation<Comment>;
+  declare static oopsComments: () => Relation<Comment>;
+  declare ratings: AssociationProxy<Rating>;
+  declare children: AssociationProxy<Comment>;
+  declare isDefault: () => boolean;
+  declare defaultBang: () => Promise<true | undefined>;
+  declare static default: () => Relation<Comment>;
+  declare static notDefault: () => Relation<Comment>;
+  declare isChild: () => boolean;
+  declare childBang: () => Promise<true | undefined>;
+  declare static child: () => Relation<Comment>;
+  declare static notChild: () => Relation<Comment>;
+  declare body: string;
+  declare children_count: number | null;
+  declare comments: number;
+  declare deleted_at: RubyTime | Temporal.PlainDateTime;
+  declare developer_id: number;
+  declare label: "default" | "child" | null;
+  declare origin_id: number;
+  declare origin_type: string;
+  declare parent_id: number;
+  declare post_id: number;
+  declare resource_id: string;
+  declare resource_type: string;
+  declare tags_count: number | null;
+  declare "type": string;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
+
+  declare author_id: number | null;
+  declare author_type: string | null;
+
+  static {
+    this.scope("limitBy", function (l: number) {
+      return this.limit(l);
+    });
+    this.scope("containingTheLetterE", function () {
+      return this.where("comments.body LIKE '%e%'");
+    });
+    this.scope("notAgain", function () {
+      return this.where("comments.body NOT LIKE '%again%'");
+    });
+    this.scope("forFirstPost", function () {
+      return this.where({ post_id: 1 });
+    });
+    this.scope("forFirstAuthor", function () {
+      return this.joins(":post").where({ "posts.author_id": 1 });
+    });
+    this.scope("created", function () {
+      return this.all();
+    });
+    this.scope("orderedByPostId", function () {
+      return this.order("comments.post_id DESC");
+    });
+    this.scope("allAsScope", function () {
+      return this.all();
+    });
+    this.scope(
+      "oopsComments",
+      function () {
+        return this.all();
+      },
+      OopsExtension,
+    );
+    this.defaultScope(function () {
+      return this.extending(OopsExtension);
+    });
+
+    this.belongsTo("post", { counterCache: true });
+    this.belongsTo("author", { polymorphic: true });
+    this.belongsTo("resource", { polymorphic: true });
+    this.belongsTo("origin", { polymorphic: true });
+    this.belongsTo("company", { foreignKey: "company" });
+    this.hasMany("ratings");
+    this.belongsTo("firstPost", { foreignKey: "post_id" });
+    this.belongsTo("specialPostWithDefaultScope", { foreignKey: "post_id" });
+
+    this.hasOne(
+      "postWithInverse",
+      function (comment: any) {
+        return this.where({ id: comment.post_id });
+      },
+      {
+        className: "FirstPost",
+        inverseOf: "commentWithInverse",
+      },
+    );
+    this.hasMany("children", { className: "Comment", inverseOf: "parent" });
+    this.belongsTo("parent", {
+      className: "Comment",
+      counterCache: "children_count",
+      inverseOf: "children",
+    });
+    this.enum("label", ["default", "child"]);
+  }
+
+  static allAsMethod() {
+    return this.all();
+  }
+
+  static whatAreYou() {
+    return "a comment...";
+  }
+
+  static searchByType(q: string) {
+    return this.all().where({ type: q });
+  }
+
+  toString() {
+    return this.readAttribute("body") as string;
+  }
+}
+constSet(TopLevel, "Comment", Comment);
+DescendantsTracker.registerSubclass(Base, Comment);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Comment {
+  get specialPostWithDefaultScope():
+    | SpecialPostWithDefaultScope
+    | null
+    | Promise<SpecialPostWithDefaultScope | null>;
+  set specialPostWithDefaultScope(value: SpecialPostWithDefaultScope | null);
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Comment {
+  get post(): Post | null | Promise<Post | null>;
+  set post(value: Post | null);
+  get resource(): Base | null | Promise<Base | null>;
+  set resource(value: Base | null);
+  get origin(): Base | null | Promise<Base | null>;
+  set origin(value: Base | null);
+  get company(): Company | null | Promise<Company | null>;
+  set company(value: Company | null);
+  get firstPost(): FirstPost | null | Promise<FirstPost | null>;
+  get postWithInverse(): FirstPost | null | Promise<FirstPost | null>;
+  set postWithInverse(value: FirstPost | null);
+  set firstPost(value: FirstPost | null);
+  get parent(): Comment | null | Promise<Comment | null>;
+  set parent(value: Comment | null);
+  get author(): Base | null | Promise<Base | null>;
+  set author(value: Base | null);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class SpecialComment extends Comment {
+  static {
+    this.belongsTo("ordinaryPost", { foreignKey: "post_id", className: "Post" });
+    this.hasOne("author", { through: "post" });
+    this.defaultScope(function () {
+      return this.where({ deleted_at: null });
+    });
+  }
+
+  static whatAreYou() {
+    return "a special comment...";
+  }
+}
+constSet(TopLevel, "SpecialComment", SpecialComment);
+DescendantsTracker.registerSubclass(Comment, SpecialComment);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface SpecialComment {
+  get ordinaryPost(): Post | null | Promise<Post | null>;
+  set ordinaryPost(value: Post | null);
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+}
+
+export class SubSpecialComment extends SpecialComment {}
+constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+DescendantsTracker.registerSubclass(SpecialComment, SubSpecialComment);
+
+export class VerySpecialComment extends Comment {}
+constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+DescendantsTracker.registerSubclass(Comment, VerySpecialComment);
+
+export class CommentThatAutomaticallyAltersPostBody extends Comment {
+  static {
+    this.belongsTo("post", {
+      className: "PostThatLoadsCommentsInAnAfterSaveHook",
+      foreignKey: "post_id",
+    });
+    this.afterSave(async function (this: CommentThatAutomaticallyAltersPostBody) {
+      const post = await this.post;
+      if (post) await post.update({ body: "Automatically altered" });
+    });
+  }
+}
+constSet(
+  TopLevel,
+  "CommentThatAutomaticallyAltersPostBody",
+  CommentThatAutomaticallyAltersPostBody,
+);
+DescendantsTracker.registerSubclass(Comment, CommentThatAutomaticallyAltersPostBody);
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class CommentWithDefaultScopeReferencesAssociation extends Comment {
+  static {
+    this.defaultScope(function () {
+      return this.includes(":developer").order("developers.name").references(":developer");
+    });
+    this.belongsTo("developer");
+  }
+}
+constSet(
+  TopLevel,
+  "CommentWithDefaultScopeReferencesAssociation",
+  CommentWithDefaultScopeReferencesAssociation,
+);
+DescendantsTracker.registerSubclass(Comment, CommentWithDefaultScopeReferencesAssociation);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface CommentWithDefaultScopeReferencesAssociation {
+  get developer(): Developer | null | Promise<Developer | null>;
+  set developer(value: Developer | null);
+}
+
+export class CommentWithAfterCreateUpdate extends Comment {
+  static {
+    this.afterCreate(async function (this: CommentWithAfterCreateUpdate) {
+      await this.update({ body: "bar" });
+    });
+  }
+}
+constSet(TopLevel, "CommentWithAfterCreateUpdate", CommentWithAfterCreateUpdate);
+DescendantsTracker.registerSubclass(Comment, CommentWithAfterCreateUpdate);

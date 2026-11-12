@@ -12,7 +12,7 @@ const tester = new RuleTester({
 const API = "ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84";
 const NEW =
   "ActiveRecord::Inheritance::ClassMethods#new rails/v8.0.2/activerecord/lib/active_record/inheritance.rb:56-78";
-const BASE = "/repo/packages/activerecord/src/base.ts";
+const BASE = "/repo/packages/activerecord/lib/base.ts";
 
 const CONTENT_TAG =
   "ActionView::Helpers::ActiveModelInstanceTag#content_tag rails/v8.0.2/actionview/lib/action_view/helpers/active_model_helper.rb:20-22";

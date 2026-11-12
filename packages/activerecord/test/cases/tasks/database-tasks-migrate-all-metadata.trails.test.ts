@@ -1,0 +1,95 @@
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { mkdtemp, rm } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
+import { DatabaseTasks } from "../../../lib/tasks/database-tasks.js";
+import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
+import { Base } from "../../../lib/base.js";
+import {
+  dumpSchemaAfterMigration,
+  setDumpSchemaAfterMigration,
+} from "../../../lib/active-record.js";
+import { MIGRATIONS_ROOT } from "../../../lib/config.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { restoreWorkerConnection } from "../../../lib/support/connection.js";
+
+describe("DatabaseTasksMigrateAllMetadataTest", () => {
+  fixtures({}, { useTransactionalTests: false });
+  const dirs: string[] = [];
+  let prevConfigs: ReturnType<typeof Base.configurations>;
+
+  beforeEach(() => {
+    prevConfigs = Base.configurations();
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    await Base.removeConnection();
+    Base.configurations(prevConfigs);
+    await restoreWorkerConnection();
+    for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
+  });
+
+  async function setupConfigs(): Promise<void> {
+    const dir = await mkdtemp(join(tmpdir(), "trails-migrate-all-meta-"));
+    dirs.push(dir);
+    const env = DEFAULT_ENV();
+    vi.spyOn(DatabaseTasks, "env", "get").mockReturnValue(DEFAULT_ENV());
+    vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue("db");
+    Base.configurations({
+      [env]: {
+        primary: {
+          adapter: "sqlite3",
+          database: join(dir, "primary.sqlite3"),
+          pool: 1,
+          useMetadataTable: false,
+          migrationsPaths: `${MIGRATIONS_ROOT}/10_urban`,
+        },
+        animals: {
+          adapter: "sqlite3",
+          database: join(dir, "animals.sqlite3"),
+          pool: 1,
+          useMetadataTable: false,
+          migrationsPaths: `${MIGRATIONS_ROOT}/10_urban`,
+        },
+      },
+    });
+    await Base.establishConnection({
+      adapter: "sqlite3",
+      database: join(dir, "primary.sqlite3"),
+      pool: 1,
+      useMetadataTable: false,
+    });
+  }
+
+  async function metadataTablesExist(): Promise<Array<boolean | null>> {
+    const results: Array<boolean | null> = [];
+    for (const config of DatabaseTasks.configsFor({ envName: DEFAULT_ENV() })) {
+      await DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
+        results.push(await adapter.tableExists("ar_internal_metadata"));
+      });
+    }
+    return results;
+  }
+
+  it("migrate_all does not create ar_internal_metadata when use_metadata_table is false", async () => {
+    await setupConfigs();
+    await DatabaseTasks.migrateAll();
+    expect(await metadataTablesExist()).toEqual([false, false]);
+  });
+
+  it("prepare_all does not create ar_internal_metadata when use_metadata_table is false", async () => {
+    await setupConfigs();
+    const dumpWas = dumpSchemaAfterMigration();
+    const seedLoaderWas = (DatabaseTasks as unknown as { _seedLoader: unknown })._seedLoader;
+    setDumpSchemaAfterMigration(false);
+    DatabaseTasks.seedLoader = { loadSeed() {} };
+    try {
+      await DatabaseTasks.prepareAll();
+    } finally {
+      setDumpSchemaAfterMigration(dumpWas);
+      DatabaseTasks.seedLoader = seedLoaderWas as typeof DatabaseTasks.seedLoader;
+    }
+    expect(await metadataTablesExist()).toEqual([false, false]);
+  });
+});

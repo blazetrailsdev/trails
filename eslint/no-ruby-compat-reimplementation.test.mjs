@@ -9,7 +9,7 @@ const tester = new RuleTester({
   },
 });
 
-const FLAGGED = "packages/activerecord/src/support/new-helper.ts";
+const FLAGGED = "packages/activerecord/lib/new-helper.ts";
 /** A seeded row in eslint/no-ruby-compat-reimplementation-exclude.json. */
 const ALLOWLISTED = "packages/actionpack/lib/action-dispatch/middleware/cookies.ts";
 const IN_RUBY_COMPAT = "packages/ruby-compat/lib/core-ext/regexp.ts";
@@ -46,7 +46,7 @@ class Parameters { dig(...keys: string[]): unknown { return keys; } }`,
       code: `function fetch(url: string): unknown { return url; }`,
     },
     {
-      filename: "packages/activerecord/src/support/new-helper.test.ts",
+      filename: "packages/activerecord/test/support/new-helper.test.ts",
       code: `function escapeRegExp(s: string): string { return s; }`,
     },
   ],

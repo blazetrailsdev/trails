@@ -1,0 +1,461 @@
+import { describe, it, expect, vi } from "vitest";
+import {
+  find,
+  findOne,
+  findWithIds,
+  findSome,
+  findSomeOrdered,
+  findTake,
+  findTakeWithLimit,
+  raiseRecordNotFoundExceptionBang,
+  _orderColumns,
+} from "../../../lib/relation/finder-methods.js";
+import { NoMethodError } from "@blazetrails/ruby-compat";
+import { RecordNotFound } from "../../../lib/errors.js";
+
+describe("findWithIds — composite primary key", () => {
+  const rel: any = { primaryKey: ["shop_id", "id"], model: { isCompositePrimaryKey: () => true } };
+
+  it("raises NoMethodError from ids.first.first when the first id is not a tuple", async () => {
+    await expect(findWithIds.call(rel, 1)).rejects.toThrow(
+      new NoMethodError("undefined method 'first' for an instance of Integer"),
+    );
+    await expect(findWithIds.call(rel)).rejects.toThrow(
+      new NoMethodError("undefined method 'first' for nil"),
+    );
+  });
+
+  it("compacts and uniqs tuples before dispatching to find_some", async () => {
+    const findSome = vi.fn(async (ids: unknown[]) => ids);
+    const r = { ...rel, findSome };
+    await findWithIds.call(r, [[1, 2], null, [1, 2], [1n, 3], [1, 3]]);
+    expect(findSome).toHaveBeenCalledWith([
+      [1, 2],
+      [1n, 3],
+    ]);
+  });
+});
+
+describe("find — with a block", () => {
+  const rel: any = {
+    each: (fn: (i: number) => void) => Promise.resolve([1, 2, 3].forEach((i) => fn(i))),
+  };
+
+  it("is Enumerable#find over each", async () => {
+    await expect(find.call(rel, (i: number) => i > 1)).resolves.toBe(2);
+    await expect(find.call(rel, (i: number) => i > 3)).resolves.toBeNull();
+    await expect(
+      find.call(
+        rel,
+        () => "none",
+        (i: number) => i > 3,
+      ),
+    ).resolves.toBe("none");
+  });
+});
+
+const postModelStub = {
+  primaryKey: "id",
+  name: "Post",
+  typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
+  arelTable: { get: (col: string) => col },
+};
+
+const carModelStub = { name: "Car", primaryKey: "id" };
+
+const mercedesModelStub = {
+  name: "MercedesCar",
+  primaryKey: "name",
+  typeForAttribute: (_col: string) => ({ cast: (v: unknown) => v }),
+  arelTable: { get: (col: string) => col },
+};
+
+function makeFindSomeRel(
+  records: any[],
+  opts: { limit?: number; offset?: number; ordered?: boolean } = {},
+): any {
+  return {
+    _model: postModelStub,
+    model: postModelStub,
+    table: postModelStub.arelTable,
+    primaryKey: postModelStub.primaryKey,
+    limitValue: opts.limit ?? null,
+    offsetValue: opts.offset ?? null,
+    orderValues: opts.ordered !== false ? ["id ASC"] : [],
+    selectValues: [],
+    raiseRecordNotFoundExceptionBang,
+    whereClause: { isEmpty: () => true },
+    findSomeOrdered(ids: unknown[]) {
+      return findSomeOrdered.call(this, ids);
+    },
+    except(..._skips: string[]) {
+      return this;
+    },
+    where(_cond: any) {
+      const rel: any = {
+        toArray: async () => records,
+        records: async () => records,
+        select: () => rel,
+      };
+      return rel;
+    },
+  };
+}
+
+describe("findSome — expected_size respects limit and offset", () => {
+  it("succeeds when result count equals ids.length with no limit/offset", async () => {
+    const rel = makeFindSomeRel([{ id: 1 }, { id: 2 }]);
+    const result = await findSome.call(rel, [1, 2]);
+    expect(result).toHaveLength(2);
+  });
+
+  it("succeeds when limit clips expected_size and result matches limit", async () => {
+    const rows = [{ id: 1 }, { id: 2 }, { id: 3 }];
+    const rel = makeFindSomeRel(rows, { limit: 3 });
+    const result = await findSome.call(rel, [1, 2, 3, 4, 5]);
+    expect(result).toHaveLength(3);
+  });
+
+  it("succeeds when offset + limit produce expected_size=2 from 11 ids", async () => {
+    const rows = [{ id: 10 }, { id: 11 }];
+    const rel = makeFindSomeRel(rows, { limit: 3, offset: 9 });
+    const result = await findSome.call(rel, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
+    expect(result).toHaveLength(2);
+  });
+
+  it("throws when result count mismatches expected_size", async () => {
+    const rel = makeFindSomeRel([{ id: 1 }]);
+    await expect(findSome.call(rel, [1, 2])).rejects.toBeInstanceOf(RecordNotFound);
+  });
+});
+
+describe("findSome — narrows to pk column when select_values non-empty (ordered path)", () => {
+  it("calls .select(pk) when the relation has select values", async () => {
+    let selectedCol: string | undefined;
+    const rel: any = {
+      _model: postModelStub,
+      model: postModelStub,
+      table: postModelStub.arelTable,
+      primaryKey: postModelStub.primaryKey,
+      limitValue: null,
+      offsetValue: null,
+      orderValues: ["id ASC"],
+      selectValues: ["title"],
+      where(_cond: any) {
+        const inner: any = {
+          toArray: async () => [{ id: 1 }],
+          select(col: string) {
+            selectedCol = col;
+            return inner;
+          },
+        };
+        return inner;
+      },
+    };
+    await findSome.call(rel, [1]);
+    expect(selectedCol).toBe("id");
+  });
+});
+
+describe("findSome — dispatches to findSomeOrdered when relation has no order values", () => {
+  it("returns records in requested id order for an unordered relation", async () => {
+    const dbRows = [{ id: 3 }, { id: 5 }, { id: 1 }];
+    const rel = makeFindSomeRel(dbRows, { ordered: false });
+    const result = await findSome.call(rel, [5, 1, 3]);
+    expect(result.map((r: any) => r.id)).toEqual([5, 1, 3]);
+  });
+});
+
+function makeFindSomeOrderedRel(
+  records: any[],
+  opts: { limit?: number; offset?: number } = {},
+): any {
+  return {
+    _model: postModelStub,
+    model: postModelStub,
+    table: postModelStub.arelTable,
+    primaryKey: postModelStub.primaryKey,
+    limitValue: opts.limit ?? null,
+    offsetValue: opts.offset ?? null,
+    orderValues: [],
+    selectValues: [],
+    raiseRecordNotFoundExceptionBang,
+    whereClause: { isEmpty: () => true },
+    except(..._skips: string[]) {
+      return this;
+    },
+    where(_cond: any) {
+      const rel: any = {
+        toArray: async () => records,
+        records: async () => records,
+        select: () => rel,
+      };
+      return rel;
+    },
+  };
+}
+
+describe("findSomeOrdered — slices ids by offset and limit before querying", () => {
+  it("returns records in requested id order with no limit/offset", async () => {
+    const dbRows = [{ id: 3 }, { id: 1 }, { id: 5 }];
+    const rel = makeFindSomeOrderedRel(dbRows);
+    const result = await findSomeOrdered.call(rel, [5, 1, 3]);
+    expect(result.map((r: any) => r.id)).toEqual([5, 1, 3]);
+  });
+
+  it("slices to first limit ids when limit is set", async () => {
+    const ids = Array.from({ length: 50 }, (_, i) => i + 1);
+    const dbRows = ids.slice(0, 10).map((id) => ({ id }));
+    let queriedIds: unknown[] | undefined;
+    const rel = {
+      ...makeFindSomeOrderedRel(dbRows, { limit: 10 }),
+      where(cond: any) {
+        queriedIds = cond.get("id");
+        const r: any = {
+          toArray: async () => dbRows,
+          records: async () => dbRows,
+          select: () => r,
+        };
+        return r;
+      },
+    };
+    const result = await findSomeOrdered.call(rel, ids);
+    expect(queriedIds).toEqual(Array.from({ length: 10 }, (_, i) => i + 1));
+    expect(result).toHaveLength(10);
+    expect(result[0].id).toBe(1);
+  });
+
+  it("slices ids by offset and limit (11 ids, limit 3, offset 9 → 2 records)", async () => {
+    const ids = Array.from({ length: 11 }, (_, i) => i + 1);
+    const dbRows = [{ id: 11 }, { id: 10 }];
+    let queriedIds: unknown[] | undefined;
+    const rel = {
+      ...makeFindSomeOrderedRel(dbRows, { limit: 3, offset: 9 }),
+      where(cond: any) {
+        queriedIds = cond.get("id");
+        const r: any = {
+          toArray: async () => dbRows,
+          records: async () => dbRows,
+          select: () => r,
+        };
+        return r;
+      },
+    };
+    const result = await findSomeOrdered.call(rel, ids);
+    expect(queriedIds).toEqual([10, 11]);
+    expect(result.map((r: any) => r.id)).toEqual([10, 11]);
+  });
+
+  it("throws when DB returns fewer records than sliced ids", async () => {
+    const rel = makeFindSomeOrderedRel([{ id: 1 }], { limit: 3 });
+    await expect(findSomeOrdered.call(rel, [1, 2, 3])).rejects.toBeInstanceOf(RecordNotFound);
+  });
+
+  it("adds PK to select when selectValues are present", async () => {
+    const dbRows = [{ id: 2 }, { id: 1 }];
+    let selectArg: unknown;
+    const rel = {
+      ...makeFindSomeOrderedRel(dbRows),
+      selectValues: ["name"],
+      where(_cond: any) {
+        const inner: any = {
+          toArray: async () => dbRows,
+          records: async () => dbRows,
+          select(col: unknown) {
+            selectArg = col;
+            return inner;
+          },
+        };
+        return inner;
+      },
+    };
+    const result = await findSomeOrdered.call(rel, [1, 2]);
+    expect(selectArg).toBe("id");
+    expect(result.map((r: any) => r.id)).toEqual([1, 2]);
+  });
+});
+
+function makeLoadedRel(records: any[]): any {
+  return {
+    isLoaded: true,
+    records: async () => records,
+    limit: (_n: number) => ({
+      records: async () => records.slice(0, _n),
+      toArray: async () => records.slice(0, _n),
+    }),
+  };
+}
+
+describe("findTake — returns first record from loaded relation without querying", () => {
+  it("returns first record when loaded", async () => {
+    const rel = makeLoadedRel([{ id: 1 }, { id: 2 }]);
+    const spy = vi.spyOn(rel, "limit");
+    const result = await findTake.call(rel);
+    expect(result).toEqual({ id: 1 });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("returns null from empty loaded relation", async () => {
+    const rel = makeLoadedRel([]);
+    const result = await findTake.call(rel);
+    expect(result).toBeNull();
+  });
+});
+
+describe("findTakeWithLimit — slices loaded relation without querying", () => {
+  it("returns first N records when loaded", async () => {
+    const rel = makeLoadedRel([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    const spy = vi.spyOn(rel, "limit");
+    const result = await findTakeWithLimit.call(rel, 2);
+    expect(result).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(spy).not.toHaveBeenCalled();
+  });
+});
+
+function makeRelForOrder(mc: {
+  primaryKey?: string | string[];
+  implicitOrderColumn?: string | null;
+  _queryConstraintsList?: string[] | null;
+}): any {
+  const model = { queryConstraintsList: () => mc._queryConstraintsList ?? null, ...mc };
+  return { _model: model, model, primaryKey: mc.primaryKey };
+}
+
+describe("_orderColumns — Rails _order_columns precedence", () => {
+  it("returns [pk] when no implicit_order_column or query_constraints_list", () => {
+    const rel = makeRelForOrder({ primaryKey: "id" });
+    expect(_orderColumns.call(rel)).toEqual(["id"]);
+  });
+
+  it("puts implicit_order_column first, then pk", () => {
+    const rel = makeRelForOrder({ primaryKey: "id", implicitOrderColumn: "created_at" });
+    expect(_orderColumns.call(rel)).toEqual(["created_at", "id"]);
+  });
+
+  it("deduplicates when implicit_order_column equals pk", () => {
+    const rel = makeRelForOrder({ primaryKey: "id", implicitOrderColumn: "id" });
+    expect(_orderColumns.call(rel)).toEqual(["id"]);
+  });
+
+  it("uses _queryConstraintsList instead of pk when set", () => {
+    const rel = makeRelForOrder({ primaryKey: "id", _queryConstraintsList: ["shop_id", "id"] });
+    expect(_orderColumns.call(rel)).toEqual(["shop_id", "id"]);
+  });
+
+  it("puts implicit_order_column before _queryConstraintsList", () => {
+    const rel = makeRelForOrder({
+      primaryKey: "id",
+      implicitOrderColumn: "created_at",
+      _queryConstraintsList: ["shop_id", "id"],
+    });
+    expect(_orderColumns.call(rel)).toEqual(["created_at", "shop_id", "id"]);
+  });
+});
+
+describe("finder not-found message fidelity", () => {
+  it("test_find_one_message_on_primary_key", async () => {
+    const rel: any = {
+      _model: carModelStub,
+      model: carModelStub,
+      primaryKey: carModelStub.primaryKey,
+      raiseRecordNotFoundExceptionBang,
+      whereClause: { isEmpty: () => true },
+      where: () => ({ take: async () => null }),
+    };
+    try {
+      await findOne.call(rel, 0);
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err).toBeInstanceOf(RecordNotFound);
+      expect(err.message).toBe("Couldn't find Car with 'id'=0");
+      expect(err.id).toBe(0);
+      expect(err.primaryKey).toBe("id");
+      expect(err.model).toBe("Car");
+    }
+  });
+
+  it("test_find_some_message_with_custom_primary_key", async () => {
+    const rel: any = {
+      _model: mercedesModelStub,
+      model: mercedesModelStub,
+      primaryKey: mercedesModelStub.primaryKey,
+      limitValue: null,
+      offsetValue: null,
+      selectValues: [],
+      raiseRecordNotFoundExceptionBang,
+      whereClause: { isEmpty: () => true },
+      except(..._skips: string[]) {
+        return this;
+      },
+      where(_cond: any) {
+        const inner: any = {
+          toArray: async () => [],
+          records: async () => [],
+          select: () => inner,
+        };
+        return inner;
+      },
+    };
+    try {
+      await findSomeOrdered.call(rel, ["Hello", "World!"]);
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err).toBeInstanceOf(RecordNotFound);
+      expect(err.message).toBe(
+        "Couldn't find all MercedesCars with 'name': (Hello, World!) (found 0 results, but was looking for 2).",
+      );
+      expect(err.model).toBe("MercedesCar");
+      expect(err.primaryKey).toBe("name");
+    }
+  });
+});
+
+describe("raise_record_not_found_exception! — composite key id rendering", () => {
+  const orderModelStub = { name: "Order", primaryKey: ["shop_id", "id"] };
+
+  it("renders composite ids the way Ruby's Array#join does — flattened", () => {
+    const rel: any = {
+      _model: orderModelStub,
+      model: orderModelStub,
+      primaryKey: orderModelStub.primaryKey,
+      raiseRecordNotFoundExceptionBang,
+      whereClause: { isEmpty: () => true },
+    };
+    try {
+      rel.raiseRecordNotFoundExceptionBang(
+        [
+          [1, 2],
+          [3, 4],
+        ],
+        0,
+        2,
+      );
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err.message).toBe(
+        `Couldn't find all Orders with '["shop_id", "id"]': (1, 2, 3, 4) (found 0 results, but was looking for 2).`,
+      );
+    }
+  });
+
+  it("renders a composite key the way Ruby's Array#to_s does — inspected", () => {
+    const rel: any = {
+      _model: orderModelStub,
+      model: orderModelStub,
+      primaryKey: orderModelStub.primaryKey,
+      raiseRecordNotFoundExceptionBang,
+      whereClause: { isEmpty: () => true },
+    };
+    try {
+      rel.raiseRecordNotFoundExceptionBang([[1, 2]], 0, 1);
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err.message).toBe(`Couldn't find Order with '["shop_id", "id"]'=[[1, 2]]`);
+      expect(err.primaryKey).toEqual(["shop_id", "id"]);
+    }
+  });
+});

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fixtures } from "../../activerecord/src/test-helpers/use-fixtures.js";
+import { fixtures } from "../../activerecord/lib/test-helpers/use-fixtures.js";
 import { isPresent } from "@blazetrails/activesupport";
 import { FileUtils } from "@blazetrails/ruby-compat";
 import "./support/database/setup.js";

@@ -2,7 +2,7 @@
  * ESLint rule: rails-callback-invocations. Firing lifecycle callbacks is
  * observable behavior, so a ported ActiveRecord method whose Rails counterpart
  * runs callbacks (`_run_<event>_callbacks` / `run_callbacks(:event)`) must keep
- * firing them. Scoped (via eslint.config.mjs) to `packages/activerecord/src/**`
+ * firing them. Scoped (via eslint.config.mjs) to `packages/activerecord/{lib,test}/**`
  * excluding `*.test.ts`.
  *
  * Manifest entries are file-qualified (`<repo-rel path>#<method>`): a callback
@@ -55,10 +55,10 @@ function loadManifest() {
   return loadJson(manifestPath(), { methods: {} }).methods ?? {};
 }
 
-/** Repo-relative POSIX path when in scope (packages/activerecord/src/**.ts); else null. */
+/** Repo-relative POSIX path when in scope (packages/activerecord/{lib,test}/**.ts); else null. */
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)(packages\/activerecord\/src\/.+\.ts)$/);
+  const m = norm.match(/(?:^|\/)(packages\/activerecord\/(?:lib|test)\/.+\.ts)$/);
   return m ? m[1] : null;
 }
 

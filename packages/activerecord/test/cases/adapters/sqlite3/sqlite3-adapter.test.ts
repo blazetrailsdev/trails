@@ -1,0 +1,1337 @@
+import { StandardError } from "@blazetrails/ruby-compat";
+import { it, expect, beforeEach, afterEach, vi } from "vitest";
+import "../../../../lib/index.js";
+import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
+import { Base } from "../../../../lib/base.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { Owner } from "../../../models/owner.js";
+import { ARUnit2Model } from "../../../models/arunit2-model.js";
+import { inMemoryDb } from "../../../../lib/support/adapter-helper.js";
+import { itIfSupports } from "../../../support/supports.js";
+import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";
+import { NodeSQLiteAdapter } from "../../../../lib/connection-adapters/node-sqlite-adapter.js";
+import { Notifications, indexBy } from "@blazetrails/activesupport";
+import type { Database } from "better-sqlite3";
+
+import { QueryAttribute } from "../../../../lib/relation/query-attribute.js";
+import { ValueType, IntegerType } from "@blazetrails/activemodel";
+import { assertLogged } from "../../../../lib/adapters/sqlite3/test-helper.js";
+import type { Column as SQLite3Column } from "../../../../lib/connection-adapters/sqlite3/column.js";
+import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
+import {
+  assertNothingRaised,
+  assertRaises,
+  assertRespondTo,
+} from "@blazetrails/activesupport/testing/assertions";
+import { capture } from "@blazetrails/activesupport/testing/stream";
+import { newSqlitePool } from "../../../support/pooled-sqlite-adapter.js";
+import * as DdlHelper from "../../../support/ddl-helper.js";
+import { NullPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
+import { StatementInvalid, StatementTimeout } from "../../../../lib/errors.js";
+import { BusyException } from "../../../../lib/sqlite/errors.js";
+import type { ConnectionPool } from "../../../../lib/connection-adapters/abstract/connection-pool.js";
+
+let adapter: SQLite3Adapter;
+let pool: ConnectionPool;
+
+beforeEach(async () => {
+  pool = newSqlitePool();
+  adapter = (await pool.checkout()) as unknown as SQLite3Adapter;
+});
+
+async function withMemoryConnection(
+  options: Record<string, unknown>,
+  fn: (conn: BetterSQLite3Adapter) => Promise<void>,
+): Promise<void> {
+  const conn = new BetterSQLite3Adapter({ ...options, database: ":memory:" });
+  try {
+    await conn.connectBang();
+    await fn(conn);
+  } finally {
+    await conn.disconnectBang();
+  }
+}
+
+async function withFileConnection(
+  options: Record<string, unknown>,
+  fn: (conn: BetterSQLite3Adapter) => Promise<void>,
+): Promise<void> {
+  options = { ...options };
+  const dbConfig = ARUnit2Model.connectionDbConfig();
+  options["database"] ||= dbConfig.database;
+  const conn = new BetterSQLite3Adapter(options);
+
+  try {
+    await fn(conn);
+  } finally {
+    await conn.disconnectBang();
+  }
+}
+
+async function rawConnectionOf(conn: BetterSQLite3Adapter): Promise<Database> {
+  return (await conn.rawConnection())!.raw as Database;
+}
+
+async function withStrictStringsByDefault(fn: () => Promise<void>): Promise<void> {
+  SQLite3Adapter.strictStringsByDefault = true;
+  try {
+    await fn();
+  } finally {
+    SQLite3Adapter.strictStringsByDefault = false;
+  }
+}
+
+async function withExampleTable(
+  definition: string | null | undefined,
+  tableName = "ex",
+  block: () => Promise<void>,
+): Promise<void> {
+  definition ||= "id integer PRIMARY KEY AUTOINCREMENT,\nnumber integer\n";
+  await DdlHelper.withExampleTable(adapter, tableName, definition, block);
+}
+
+afterEach(async () => {
+  await pool.disconnect();
+  Notifications.unsubscribeAll();
+});
+
+class Barcode extends Base {
+  static {
+    this._tableName = "barcodes";
+  }
+}
+
+class BarcodeCustomPk extends Base {
+  static {
+    this._tableName = "barcode_custom_pks";
+    this.primaryKey = "code";
+  }
+}
+
+class BarcodeCpk extends Base {
+  declare region: string;
+  declare code: string;
+
+  static {
+    this._tableName = "barcode_cpks";
+    this.primaryKey = ["region", "code"];
+  }
+}
+
+class DualEncoding extends Base {
+  declare data: Uint8Array;
+}
+
+describeIfSqlite("SQLite3AdapterTest", () => {
+  fixtures(["owners"], { useTransactionalTests: false });
+
+  it("database should get created when missing parent directories for database path", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const dir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "sqlite3-adapter-"));
+    const dbPath = path.join(dir, "_not_exist/-cinco-dog.sqlite3");
+    await assertNothingRaised(async () => {
+      const connection = new BetterSQLite3Adapter({ database: dbPath });
+      await connection.dropTable("ex", { ifExists: true });
+    });
+    expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
+    await fs.promises.rm(dir, { recursive: true, force: true });
+  });
+
+  it("database exists returns false when the database does not exist", async () => {
+    expect(await BetterSQLite3Adapter.databaseExists({ database: "non_extant_db" })).toBeFalsy();
+  });
+
+  it("database exists returns true when database exists", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const os = await import("os");
+    const dbPath = path.join(os.tmpdir(), `sqlite-exists-${Date.now()}.db`);
+    const a = new BetterSQLite3Adapter({ database: dbPath });
+    try {
+      await a.connectBang();
+      expect(await BetterSQLite3Adapter.databaseExists({ database: dbPath })).toBeTruthy();
+    } finally {
+      await a.disconnectBang();
+      fs.rmSync(dbPath, { force: true });
+    }
+  });
+
+  it("database exists returns true for an in memory db", async () => {
+    expect(await BetterSQLite3Adapter.databaseExists({ database: ":memory:" })).toBeTruthy();
+  });
+
+  it("connect with url", async () => {
+    const a = new BetterSQLite3Adapter({ database: ":memory:" });
+    await a.connectBang();
+    expect(a.isActive()).toBeTruthy();
+    await a.disconnectBang();
+  });
+
+  it("connect memory with url", async () => {
+    const a = new BetterSQLite3Adapter({ database: ":memory:" });
+    await a.connectBang();
+    expect(a.isActive()).toBeTruthy();
+    await a.disconnectBang();
+  });
+
+  it("column types", async () => {
+    const owner = await Owner.createBang({ name: "hello" });
+    try {
+      await owner.reload();
+      const select = Owner.columns()
+        .map((c: { name: string }) => `typeof(${c.name})`)
+        .join(", ");
+      const result = await (
+        await Owner.leaseConnection()
+      ).execQuery(`
+        SELECT ${select}
+        FROM   ${Owner.tableName}
+        WHERE  ${Owner.primaryKey} = ${owner.id}
+      `);
+
+      expect(result.rows[0].includes("blob")).toBeFalsy();
+    } finally {
+      await owner.delete();
+    }
+  });
+
+  it("exec insert", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const vals = [new QueryAttribute("number", 10, new ValueType())];
+      await adapter.execInsert("insert into ex (number) VALUES (?)", "SQL", vals);
+
+      const result = await adapter.execQuery("select number from ex where number = ?", "SQL", vals);
+
+      expect(result.rows.length).toEqual(1);
+      expect(result.rows[0][0]).toEqual(10);
+    });
+  });
+
+  it("exec insert with quote", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const vals = [new QueryAttribute("number", 10, new ValueType())];
+      await adapter.execInsert('insert into "ex" (number) VALUES (?)', "SQL", vals);
+
+      const result = await adapter.execQuery(
+        'select number from "ex" where number = ?',
+        "SQL",
+        vals,
+      );
+
+      expect(result.rows.length).toEqual(1);
+      expect(result.rows[0][0]).toEqual(10);
+    });
+  });
+
+  it("primary key returns nil for no pk", async () => {
+    await withExampleTable("id int, data string", undefined, async () => {
+      expect(await adapter.primaryKey("ex")).toBeNull();
+    });
+  });
+
+  it("connection no db", async () => {
+    const os = await import("os");
+    const path = await import("path");
+    const a = new BetterSQLite3Adapter({
+      database: path.join(os.tmpdir(), "nonexistent-path-12345", "no.db"),
+      readonly: true,
+    });
+    await expect(a.connectBang()).rejects.toThrow();
+  });
+
+  it("bad timeout", async () => {
+    const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: "usa" });
+    const exception: any = await assertRaises([StatementInvalid], {}, async () => {
+      await a.connectBang();
+    });
+    expect(exception.message).toMatch("TypeError");
+    expect(exception.connectionPool).toBeInstanceOf(NullPool);
+  });
+
+  it("nil timeout", async () => {
+    const a = new BetterSQLite3Adapter({ database: ":memory:", timeout: undefined });
+    await a.connectBang();
+    expect(a).toBeTruthy();
+    await a.disconnectBang();
+  });
+
+  it("connect", async () => {
+    const a = new BetterSQLite3Adapter({ database: ":memory:" });
+    expect(a).toBeTruthy();
+    await a.disconnectBang();
+  });
+
+  it("encoding", async () => {
+    const rows = (await adapter.execute(`PRAGMA encoding`))!;
+    expect(rows[0].encoding).toBe("UTF-8");
+  });
+
+  it("default pragmas", async () => {
+    if (inMemoryDb()) {
+      expect(await adapter.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 1 }]);
+      expect(await adapter.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "memory" }]);
+      expect(await adapter.execute("PRAGMA synchronous")).toEqual([{ synchronous: 1 }]);
+      expect(await adapter.execute("PRAGMA journal_size_limit")).toEqual([
+        { journal_size_limit: 67108864 },
+      ]);
+      expect(await adapter.execute("PRAGMA mmap_size")).toEqual([]);
+      expect(await adapter.execute("PRAGMA cache_size")).toEqual([{ cache_size: 2000 }]);
+    } else {
+      await withFileConnection({}, async (conn) => {
+        expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 1 }]);
+        expect(await conn.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "wal" }]);
+        expect(await conn.execute("PRAGMA synchronous")).toEqual([{ synchronous: 1 }]);
+        expect(await conn.execute("PRAGMA journal_size_limit")).toEqual([
+          { journal_size_limit: 67108864 },
+        ]);
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([{ mmap_size: 134217728 }]);
+        expect(await conn.execute("PRAGMA cache_size")).toEqual([{ cache_size: 2000 }]);
+      });
+    }
+  });
+
+  it("overriding default foreign keys pragma", async () => {
+    const methodName = inMemoryDb() ? withMemoryConnection : withFileConnection;
+
+    await methodName({ pragmas: { foreign_keys: false } }, async (conn) => {
+      expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 0 }]);
+    });
+
+    await methodName({ pragmas: { foreign_keys: 0 } }, async (conn) => {
+      expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 0 }]);
+    });
+
+    await methodName({ pragmas: { foreign_keys: "false" } }, async (conn) => {
+      expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 0 }]);
+    });
+
+    const error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { foreign_keys: ":false" } }, async (conn) => {
+        await conn.execute("PRAGMA foreign_keys");
+      });
+    });
+    expect(error.message).toMatch(/unrecognized pragma parameter :false/);
+  });
+
+  it("overriding default journal mode pragma", async () => {
+    if (inMemoryDb()) {
+      await withMemoryConnection({ pragmas: { journal_mode: "delete" } }, async (conn) => {
+        expect(await conn.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "memory" }]);
+      });
+
+      await withMemoryConnection({ pragmas: { journal_mode: ":delete" } }, async (conn) => {
+        expect(await conn.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "memory" }]);
+      });
+
+      let error = await assertRaises([StatementInvalid], {}, async () => {
+        await withMemoryConnection({ pragmas: { journal_mode: 0 } }, async (conn) => {
+          await conn.execute("PRAGMA journal_mode");
+        });
+      });
+      expect(error.message).toMatch(/nrecognized journal_mode 0/);
+
+      error = await assertRaises([StatementInvalid], {}, async () => {
+        await withMemoryConnection({ pragmas: { journal_mode: false } }, async (conn) => {
+          await conn.execute("PRAGMA journal_mode");
+        });
+      });
+      expect(error.message).toMatch(/nrecognized journal_mode false/);
+    } else {
+      const fs = await import("fs");
+      const path = await import("path");
+      const os = await import("os");
+      const tmpdir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "sqlite3-journal-"));
+      try {
+        const databaseFile = path.join(tmpdir, "journal_mode_test.sqlite3");
+
+        await withFileConnection(
+          { database: databaseFile, pragmas: { journal_mode: "delete" } },
+          async (conn) => {
+            expect(await conn.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "delete" }]);
+          },
+        );
+
+        await withFileConnection(
+          { database: databaseFile, pragmas: { journal_mode: ":delete" } },
+          async (conn) => {
+            expect(await conn.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "delete" }]);
+          },
+        );
+
+        let error = await assertRaises([StatementInvalid], {}, async () => {
+          await withFileConnection(
+            { database: databaseFile, pragmas: { journal_mode: 0 } },
+            async (conn) => {
+              await conn.execute("PRAGMA journal_mode");
+            },
+          );
+        });
+        expect(error.message).toMatch(/unrecognized journal_mode 0/);
+
+        error = await assertRaises([StatementInvalid], {}, async () => {
+          await withFileConnection(
+            { database: databaseFile, pragmas: { journal_mode: false } },
+            async (conn) => {
+              await conn.execute("PRAGMA journal_mode");
+            },
+          );
+        });
+        expect(error.message).toMatch(/unrecognized journal_mode false/);
+      } finally {
+        await fs.promises.rm(tmpdir, { recursive: true, force: true });
+      }
+    }
+  });
+
+  it("overriding default synchronous pragma", async () => {
+    const methodName = inMemoryDb() ? withMemoryConnection : withFileConnection;
+
+    await methodName({ pragmas: { synchronous: ":full" } }, async (conn) => {
+      expect(await conn.execute("PRAGMA synchronous")).toEqual([{ synchronous: 2 }]);
+    });
+
+    await methodName({ pragmas: { synchronous: 2 } }, async (conn) => {
+      expect(await conn.execute("PRAGMA synchronous")).toEqual([{ synchronous: 2 }]);
+    });
+
+    await methodName({ pragmas: { synchronous: "full" } }, async (conn) => {
+      expect(await conn.execute("PRAGMA synchronous")).toEqual([{ synchronous: 2 }]);
+    });
+
+    const error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { synchronous: false } }, async (conn) => {
+        await conn.execute("PRAGMA synchronous");
+      });
+    });
+    expect(error.message).toMatch(/unrecognized synchronous false/);
+  });
+
+  it("overriding default journal size limit pragma", async () => {
+    const methodName = inMemoryDb() ? withMemoryConnection : withFileConnection;
+
+    await methodName({ pragmas: { journal_size_limit: 100 } }, async (conn) => {
+      expect(await conn.execute("PRAGMA journal_size_limit")).toEqual([
+        { journal_size_limit: 100 },
+      ]);
+    });
+
+    await methodName({ pragmas: { journal_size_limit: "200" } }, async (conn) => {
+      expect(await conn.execute("PRAGMA journal_size_limit")).toEqual([
+        { journal_size_limit: 200 },
+      ]);
+    });
+
+    let error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { journal_size_limit: false } }, async (conn) => {
+        await conn.execute("PRAGMA journal_size_limit");
+      });
+    });
+    expect(error.message).toMatch(/undefined method [`']to_i'/);
+
+    error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { journal_size_limit: ":false" } }, async (conn) => {
+        await conn.execute("PRAGMA journal_size_limit");
+      });
+    });
+    expect(error.message).toMatch(/undefined method [`']to_i'/);
+  });
+
+  it("overriding default mmap size pragma", async () => {
+    if (inMemoryDb()) {
+      await withMemoryConnection({ pragmas: { mmap_size: 100 } }, async (conn) => {
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([]);
+      });
+
+      await withMemoryConnection({ pragmas: { mmap_size: "200" } }, async (conn) => {
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([]);
+      });
+
+      let error = await assertRaises([StatementInvalid], {}, async () => {
+        await withMemoryConnection({ pragmas: { mmap_size: false } }, async (conn) => {
+          await conn.execute("PRAGMA mmap_size");
+        });
+      });
+      expect(error.message).toMatch(/undefined method [`']to_i'/);
+
+      error = await assertRaises([StatementInvalid], {}, async () => {
+        await withMemoryConnection({ pragmas: { mmap_size: ":false" } }, async (conn) => {
+          await conn.execute("PRAGMA mmap_size");
+        });
+      });
+      expect(error.message).toMatch(/undefined method [`']to_i'/);
+    } else {
+      await withFileConnection({ pragmas: { mmap_size: 100 } }, async (conn) => {
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([{ mmap_size: 100 }]);
+      });
+
+      await withFileConnection({ pragmas: { mmap_size: "200" } }, async (conn) => {
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([{ mmap_size: 200 }]);
+      });
+
+      let error = await assertRaises([StatementInvalid], {}, async () => {
+        await withFileConnection({ pragmas: { mmap_size: false } }, async (conn) => {
+          await conn.execute("PRAGMA mmap_size");
+        });
+      });
+      expect(error.message).toMatch(/undefined method [`']to_i'/);
+
+      error = await assertRaises([StatementInvalid], {}, async () => {
+        await withFileConnection({ pragmas: { mmap_size: ":false" } }, async (conn) => {
+          await conn.execute("PRAGMA mmap_size");
+        });
+      });
+      expect(error.message).toMatch(/undefined method [`']to_i'/);
+    }
+  });
+
+  it("overriding default cache size pragma", async () => {
+    const methodName = inMemoryDb() ? withMemoryConnection : withFileConnection;
+
+    await methodName({ pragmas: { cache_size: 100 } }, async (conn) => {
+      expect(await conn.execute("PRAGMA cache_size")).toEqual([{ cache_size: 100 }]);
+    });
+
+    await methodName({ pragmas: { cache_size: "200" } }, async (conn) => {
+      expect(await conn.execute("PRAGMA cache_size")).toEqual([{ cache_size: 200 }]);
+    });
+
+    let error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { cache_size: false } }, async (conn) => {
+        await conn.execute("PRAGMA cache_size");
+      });
+    });
+    expect(error.message).toMatch(/undefined method [`']to_i'/);
+
+    error = await assertRaises([StatementInvalid], {}, async () => {
+      await methodName({ pragmas: { cache_size: ":false" } }, async (conn) => {
+        await conn.execute("PRAGMA cache_size");
+      });
+    });
+    expect(error.message).toMatch(/undefined method [`']to_i'/);
+  });
+
+  it("setting new pragma", async () => {
+    if (inMemoryDb()) {
+      await withMemoryConnection({ pragmas: { temp_store: ":memory" } }, async (conn) => {
+        expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 1 }]);
+        expect(await conn.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "memory" }]);
+        expect(await conn.execute("PRAGMA synchronous")).toEqual([{ synchronous: 1 }]);
+        expect(await conn.execute("PRAGMA journal_size_limit")).toEqual([
+          { journal_size_limit: 67108864 },
+        ]);
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([]);
+        expect(await conn.execute("PRAGMA cache_size")).toEqual([{ cache_size: 2000 }]);
+        expect(await conn.execute("PRAGMA temp_store")).toEqual([{ temp_store: 2 }]);
+      });
+    } else {
+      await withFileConnection({ pragmas: { temp_store: ":memory" } }, async (conn) => {
+        expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 1 }]);
+        expect(await conn.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "wal" }]);
+        expect(await conn.execute("PRAGMA synchronous")).toEqual([{ synchronous: 1 }]);
+        expect(await conn.execute("PRAGMA journal_size_limit")).toEqual([
+          { journal_size_limit: 67108864 },
+        ]);
+        expect(await conn.execute("PRAGMA mmap_size")).toEqual([{ mmap_size: 134217728 }]);
+        expect(await conn.execute("PRAGMA cache_size")).toEqual([{ cache_size: 2000 }]);
+        expect(await conn.execute("PRAGMA temp_store")).toEqual([{ temp_store: 2 }]);
+      });
+    }
+  });
+
+  it("setting invalid pragma", async () => {
+    if (inMemoryDb()) {
+      const warning = await capture(":stderr", async () => {
+        await withMemoryConnection({ pragmas: { invalid: true } }, async (conn) => {
+          await conn.execute("PRAGMA foreign_keys");
+        });
+      });
+      expect(warning).toMatch(/Unknown SQLite pragma: invalid/);
+    } else {
+      const warning = await capture(":stderr", async () => {
+        await withFileConnection({ pragmas: { invalid: true } }, async (conn) => {
+          await conn.execute("PRAGMA foreign_keys");
+        });
+      });
+      expect(warning).toMatch(/Unknown SQLite pragma: invalid/);
+    }
+  });
+
+  it("exec no binds", async () => {
+    await withExampleTable("id int, data string", undefined, async () => {
+      let result = await adapter.execQuery("SELECT id, data FROM ex");
+      expect(result.rows.length).toEqual(0);
+      expect(result.columns.length).toEqual(2);
+      expect(result.columns).toEqual(["id", "data"]);
+
+      await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+      result = await adapter.execQuery("SELECT id, data FROM ex");
+      expect(result.rows.length).toEqual(1);
+      expect(result.columns.length).toEqual(2);
+
+      expect(result.rows).toEqual([[1, "foo"]]);
+    });
+  });
+
+  it("exec query with binds", async () => {
+    await withExampleTable("id int, data string", undefined, async () => {
+      await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+      const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
+        new QueryAttribute(null, 1, new ValueType()),
+      ]);
+
+      expect(result.rows.length).toEqual(1);
+      expect(result.columns.length).toEqual(2);
+
+      expect(result.rows).toEqual([[1, "foo"]]);
+    });
+  });
+
+  it("exec query typecasts bind vals", async () => {
+    await withExampleTable("id int, data string", undefined, async () => {
+      await adapter.execQuery("INSERT INTO ex (id, data) VALUES (1, 'foo')");
+
+      const result = await adapter.execQuery("SELECT id, data FROM ex WHERE id = ?", null, [
+        new QueryAttribute("id", "1-fuu", new IntegerType()),
+      ]);
+
+      expect(result.rows.length).toEqual(1);
+      expect(result.columns.length).toEqual(2);
+
+      expect(result.rows).toEqual([[1, "foo"]]);
+    });
+  });
+
+  it("quote binary column escapes it", async () => {
+    try {
+      await (
+        await DualEncoding.leaseConnection()
+      ).execute(`
+        CREATE TABLE IF NOT EXISTS dual_encodings (
+          id integer PRIMARY KEY AUTOINCREMENT,
+          name varchar(255),
+          data binary
+        )
+      `);
+      await DualEncoding.loadSchema();
+      const str = new Uint8Array([0x80]);
+      const binary = new DualEncoding({ name: "いただきます！", data: str });
+      await binary.saveBang();
+      expect(binary.data).toEqual(str);
+    } finally {
+      await (await DualEncoding.leaseConnection()).dropTable("dual_encodings", { ifExists: true });
+    }
+  });
+
+  it("type cast should not mutate encoding", async () => {
+    try {
+      const name = "hello";
+      await Owner.create({ name: name });
+    } finally {
+      await Owner.deleteAll();
+    }
+  });
+
+  it("execute", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute("INSERT INTO ex (number) VALUES (10)");
+      const records = (await adapter.execute("SELECT * FROM ex"))!;
+      expect(records.length).toEqual(1);
+
+      const record = records[0];
+      expect(record["number"]).toEqual(10);
+      expect(record["id"]).toEqual(1);
+    });
+  });
+
+  it("insert logged", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const sql = "INSERT INTO ex (number) VALUES (10)";
+      const name = "foo";
+
+      const pragmaQuery: [string, string, unknown[]] = [`PRAGMA table_xinfo("ex")`, "SCHEMA", []];
+      const schemaQuery: [string, string, unknown[]] = [
+        "SELECT sql FROM (SELECT * FROM sqlite_master UNION ALL SELECT * FROM sqlite_temp_master) WHERE type = 'table' AND name = 'ex'",
+        "SCHEMA",
+        [],
+      ];
+      const modifiedInsertQuery: [string, string, unknown[]] = [`${sql} RETURNING "id"`, name, []];
+      await assertLogged([pragmaQuery, schemaQuery, modifiedInsertQuery], async () => {
+        await adapter.insert(sql, name);
+      });
+    });
+  });
+
+  it("insert id value returned", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const sql = "INSERT INTO ex (number) VALUES (10)";
+      const idval = "vuvuzela";
+      const id = await adapter.insert(sql, null, null, idval);
+      expect(id).toEqual(idval);
+    });
+  });
+
+  it("exec insert with returning disabled", async () => {
+    const originalConn = adapter;
+    adapter = new BetterSQLite3Adapter({
+      database: ":memory:",
+      insertReturning: false,
+    }) as unknown as SQLite3Adapter;
+    await withExampleTable(undefined, undefined, async () => {
+      const result = await adapter.execInsert(
+        "insert into ex (number) VALUES ('foo')",
+        null,
+        [],
+        "id",
+      );
+      const expected = (await adapter.query("select max(id) from ex"))[0][0];
+      expect(result.rows[0][0]).toEqual(Number(expected));
+    });
+    adapter = originalConn;
+  });
+
+  it("exec insert default values with returning disabled", async () => {
+    const originalConn = adapter;
+    adapter = new BetterSQLite3Adapter({
+      database: ":memory:",
+      insertReturning: false,
+    }) as unknown as SQLite3Adapter;
+    await withExampleTable(undefined, undefined, async () => {
+      const result = await adapter.execInsert("insert into ex DEFAULT VALUES", null, [], "id");
+      const expected = (await adapter.query("select max(id) from ex"))[0][0];
+      expect(result.rows[0][0]).toEqual(Number(expected));
+    });
+    adapter = originalConn;
+  });
+
+  it("select rows", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      for (let i = 0; i < 2; i++) {
+        await adapter.create(`INSERT INTO ex (number) VALUES (${i})`);
+      }
+      const rows = await adapter.selectRows("select number, id from ex");
+      expect(rows).toEqual([
+        [0, 1],
+        [1, 2],
+      ]);
+    });
+  });
+
+  it("select rows logged", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const sql = "select * from ex";
+      const name = "foo";
+      await assertLogged([[sql, name, []]], async () => {
+        await adapter.selectRows(sql, name);
+      });
+    });
+  });
+
+  it("transaction", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const countSql = "select count(*) from ex";
+
+      await adapter.beginDbTransaction();
+      await adapter.create("INSERT INTO ex (number) VALUES (10)");
+
+      expect((await adapter.selectRows(countSql))[0][0]).toEqual(1);
+      await adapter.rollbackDbTransaction();
+      expect((await adapter.selectRows(countSql))[0][0]).toEqual(0);
+    });
+  });
+
+  it("tables", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      expect(await adapter.tables()).toEqual(["ex"]);
+      await withExampleTable(
+        "id integer PRIMARY KEY AUTOINCREMENT, number integer",
+        "people",
+        async () => {
+          expect((await adapter.tables()).sort()).toEqual(["ex", "people"].sort());
+        },
+      );
+    });
+  });
+
+  it("columns", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const columns = (await adapter.columns("ex")).sort((a, b) => a.name.localeCompare(b.name));
+      expect(columns.length).toEqual(2);
+      expect(columns.map((c) => c.name)).toEqual(["id", "number"]);
+      expect(columns.map((c) => c.default)).toEqual([null, null]);
+      expect(columns.map((c) => c.null)).toEqual([true, true]);
+    });
+  });
+
+  it("columns with default", async () => {
+    await withExampleTable(
+      "id integer PRIMARY KEY AUTOINCREMENT, number integer default 10",
+      undefined,
+      async () => {
+        const column = (await adapter.columns("ex")).find((x) => x.name === "number")!;
+        expect(column.default).toBe("10");
+      },
+    );
+  });
+
+  it("columns with not null", async () => {
+    await withExampleTable(
+      "id integer PRIMARY KEY AUTOINCREMENT, number integer not null",
+      undefined,
+      async () => {
+        const column = (await adapter.columns("ex")).find((x) => x.name === "number")!;
+        expect(column.null).toBeFalsy();
+      },
+    );
+  });
+
+  it("add column with not null", async () => {
+    await withExampleTable(
+      "id integer PRIMARY KEY AUTOINCREMENT, number integer not null",
+      undefined,
+      async () => {
+        await assertNothingRaised(async () => {
+          await adapter.addColumn("ex", "name", "string", { null: false });
+        });
+        const column = (await adapter.columns("ex")).find((x) => x.name === "name")!;
+        expect(column.null).toBeFalsy();
+      },
+    );
+  });
+
+  it("index", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", "id", { unique: true, name: "fun" });
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "fun")!;
+
+      expect(index.table).toEqual("ex");
+      expect(index.unique).toBeTruthy();
+      expect(index.columns).toEqual(["id"]);
+    });
+  });
+
+  it("index with if not exists", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", "id");
+
+      await assertNothingRaised(async () => {
+        await adapter.addIndex("ex", "id", { ifNotExists: true });
+      });
+    });
+  });
+
+  it("non unique index", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", "id", { name: "fun" });
+      const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
+      expect(index.unique).toBeFalsy();
+    });
+  });
+
+  it("compound index", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", ["id", "number"], { name: "fun" });
+      const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
+      expect([...index.columns].sort()).toEqual(["id", "number"].sort());
+    });
+  });
+
+  it("partial index with comment", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.addIndex("ex", "id", { name: "fun", where: "number > 0 /*tag:test*/" });
+      const index = (await adapter.indexes("ex")).find((idx) => idx.name === "fun")!;
+      expect(index.columns).toEqual(["id"]);
+      expect(index.where).toBe("number > 0");
+    });
+  });
+
+  itIfSupports("expression_index", "expression index", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(`CREATE INDEX "expression" ON "ex" (max(id, number))`);
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("max(id, number)");
+    });
+  });
+
+  itIfSupports("expression_index", "expression index with trailing comment", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(`CREATE INDEX expression on ex (number % 10) /* comment */`);
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("number % 10");
+    });
+  });
+
+  itIfSupports("expression_index", "expression index with where", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(
+        `CREATE INDEX "expression" ON "ex" (id % 10, max(id, number)) WHERE id > 1000`,
+      );
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("id % 10, max(id, number)");
+      expect(index.where).toBe("id > 1000");
+    });
+  });
+
+  itIfSupports("expression_index", "complicated expression", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(
+        `CREATE INDEX expression ON ex (id % 10, (CASE WHEN number > 0 THEN max(id, number) END))WHERE(id > 1000)`,
+      );
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("id % 10, (CASE WHEN number > 0 THEN max(id, number) END)");
+      expect(index.where).toBe("(id > 1000)");
+    });
+  });
+
+  itIfSupports("expression_index", "not everything an expression", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await adapter.execute(`CREATE INDEX "expression" ON "ex" (id, max(id, number))`);
+      const indexes = await adapter.indexes("ex");
+      const index = indexes.find((idx) => idx.name === "expression")!;
+      expect(index.columns).toBe("id, max(id, number)");
+    });
+  });
+
+  it("primary key", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      expect(await adapter.primaryKey("ex")).toEqual("id");
+      await withExampleTable(
+        "internet integer PRIMARY KEY AUTOINCREMENT, number integer not null",
+        "foos",
+        async () => {
+          expect(await adapter.primaryKey("foos")).toEqual("internet");
+        },
+      );
+    });
+  });
+
+  it("no primary key", async () => {
+    await withExampleTable("number integer not null", undefined, async () => {
+      expect(await adapter.primaryKey("ex")).toBeNull();
+    });
+  });
+
+  it("copy table with existing records have custom primary key", async () => {
+    const connection = await BarcodeCustomPk.leaseConnection();
+    try {
+      await connection.createTable(
+        "barcode_custom_pks",
+        { primaryKey: "code", id: { type: "string", limit: 42 }, force: true },
+        (t) => {
+          t.text("other_attr");
+        },
+      );
+      const code = "214fe0c2-dd47-46df-b53b-66090b3c1d40";
+      await BarcodeCustomPk.createBang({ code, other_attr: "xxx" });
+
+      await connection.removeColumn("barcode_custom_pks", "other_attr");
+
+      expect((await BarcodeCustomPk.first())!.id).toEqual(code);
+    } finally {
+      await BarcodeCustomPk.resetColumnInformation();
+      await connection.dropTable("barcode_custom_pks", { ifExists: true });
+    }
+  });
+
+  it("copy table with composite primary keys", async () => {
+    const connection = (await BarcodeCpk.leaseConnection()) as SQLite3Adapter;
+    try {
+      await connection.createTable(
+        "barcode_cpks",
+        { primaryKey: ["region", "code"], force: true },
+        (t) => {
+          t.string("region");
+          t.string("code");
+          t.text("other_attr");
+        },
+      );
+      const region = "US";
+      const code = "214fe0c2-dd47-46df-b53b-66090b3c1d40";
+      await BarcodeCpk.createBang({ region, code, other_attr: "xxx" });
+
+      await connection.removeColumn("barcode_cpks", "other_attr");
+
+      expect(await connection.primaryKeys("barcode_cpks")).toEqual(["region", "code"]);
+
+      const barcode = (await BarcodeCpk.first())!;
+      expect(barcode.region).toEqual(region);
+      expect(barcode.code).toEqual(code);
+    } finally {
+      await BarcodeCpk.resetColumnInformation();
+      await connection.dropTable("barcode_cpks", { ifExists: true });
+    }
+  });
+
+  it("custom primary key in create table", async () => {
+    const connection = await Barcode.leaseConnection();
+    try {
+      await connection.createTable("barcodes", { id: false, force: true }, (t) => {
+        t.primaryKey("id", "string");
+      });
+
+      expect(await connection.primaryKey("barcodes")).toEqual("id");
+
+      await Barcode.loadSchema();
+      const customPk = Barcode.columnsHash()["id"];
+
+      expect(customPk.type).toEqual("string");
+      expect(customPk.null).toBeFalsy();
+    } finally {
+      await Barcode.resetColumnInformation();
+      await connection.dropTable("barcodes", { ifExists: true });
+    }
+  });
+
+  it("custom primary key in change table", async () => {
+    const connection = await Barcode.leaseConnection();
+    try {
+      await connection.createTable("barcodes", { id: false, force: true }, (t) => {
+        t.integer("dummy");
+      });
+      await connection.changeTable("barcodes", {}, async (t) => {
+        await t.primaryKey("id", "string");
+      });
+
+      expect(await connection.primaryKey("barcodes")).toEqual("id");
+
+      await Barcode.loadSchema();
+      const customPk = Barcode.columnsHash()["id"];
+
+      expect(customPk.type).toEqual("string");
+      expect(customPk.null).toBeFalsy();
+    } finally {
+      await Barcode.resetColumnInformation();
+      await connection.dropTable("barcodes", { ifExists: true });
+    }
+  });
+
+  it("add column with custom primary key", async () => {
+    const connection = await Barcode.leaseConnection();
+    try {
+      await connection.createTable("barcodes", { id: false, force: true }, (t) => {
+        t.integer("dummy");
+      });
+      await connection.addColumn("barcodes", "id", "string", { primaryKey: true });
+
+      expect(await connection.primaryKey("barcodes")).toEqual("id");
+
+      await Barcode.loadSchema();
+      const customPk = Barcode.columnsHash()["id"];
+
+      expect(customPk.type).toEqual("string");
+      expect(customPk.null).toBeFalsy();
+    } finally {
+      await Barcode.resetColumnInformation();
+      await connection.dropTable("barcodes", { ifExists: true });
+    }
+  });
+
+  it("remove column preserves index options", async () => {
+    const connection = await Barcode.leaseConnection();
+    try {
+      await connection.createTable("barcodes", { force: true }, (t) => {
+        t.string("code");
+        t.string("region");
+        t.boolean("bool_attr");
+
+        t.index("code", { unique: true, name: "unique" });
+        t.index("code", { where: "bool_attr", name: "partial" });
+        t.index("code", { name: "ordered", order: { code: "desc" } });
+      });
+      await connection.removeColumn("barcodes", "region");
+
+      const indexes = await connection.indexes("barcodes");
+
+      const partialIndex = indexes.find((idx) => idx.name === "partial");
+      expect(partialIndex!.where).toEqual("bool_attr");
+
+      const uniqueIndex = indexes.find((idx) => idx.name === "unique");
+      expect(uniqueIndex!.unique).toBeTruthy();
+
+      const orderedIndex = indexes.find((idx) => idx.name === "ordered");
+      expect(orderedIndex!.orders).toEqual("desc");
+    } finally {
+      await Barcode.resetColumnInformation();
+      await connection.dropTable("barcodes", { ifExists: true });
+    }
+  });
+
+  it("auto increment preserved on table changes", async () => {
+    const connection = await Barcode.leaseConnection();
+    try {
+      await connection.createTable("barcodes", { force: true }, (t) => {
+        t.string("code");
+      });
+
+      let pkColumn = (await connection.columns("barcodes")).find(
+        (col) => col.name === "id",
+      ) as SQLite3Column;
+      let sql = (
+        await connection.execQuery("SELECT sql FROM sqlite_master WHERE tbl_name='barcodes'")
+      ).rows[0][0] as string;
+
+      expect(pkColumn.isAutoIncrement).toBeTruthy();
+      expect(sql.match("PRIMARY KEY AUTOINCREMENT")).toBeTruthy();
+
+      await connection.changeColumn("barcodes", "code", "integer");
+
+      pkColumn = (await connection.columns("barcodes")).find(
+        (col) => col.name === "id",
+      ) as SQLite3Column;
+      sql = (await connection.execQuery("SELECT sql FROM sqlite_master WHERE tbl_name='barcodes'"))
+        .rows[0][0] as string;
+
+      expect(pkColumn.isAutoIncrement).toBeTruthy();
+      expect(sql.match("PRIMARY KEY AUTOINCREMENT")).toBeTruthy();
+    } finally {
+      await Barcode.resetColumnInformation();
+      await connection.dropTable("barcodes", { ifExists: true });
+    }
+  });
+
+  it("supports extensions", () => {
+    expect(adapter.supportsExtensions(), "does not support extensions").toBeFalsy();
+  });
+
+  it("respond to enable extension", () => {
+    assertRespondTo(adapter, "enableExtension");
+  });
+
+  it("respond to disable extension", () => {
+    assertRespondTo(adapter, "disableExtension");
+  });
+
+  it("statement closed", async () => {
+    await adapter.connectBang();
+
+    const rawConnection = (await adapter.rawConnection())!;
+    const statement = await rawConnection.prepare(
+      "CREATE TABLE statement_test (number integer not null)",
+    );
+    const step = () => {
+      throw new BusyException("busy");
+    };
+    const all = vi.spyOn(statement, "all").mockImplementation(step);
+    const run = vi.spyOn(statement, "run").mockImplementation(step);
+    try {
+      await assertCalled(statement, "close", null, {}, async () => {
+        const prepare = vi.spyOn(rawConnection, "prepare").mockImplementation(() => statement);
+        try {
+          const error: any = await assertRaises([StatementTimeout], {}, async () => {
+            await adapter.execQuery("select * from statement_test");
+          });
+          expect(error.connectionPool).toEqual(adapter.pool);
+        } finally {
+          prepare.mockRestore();
+        }
+      });
+    } finally {
+      all.mockRestore();
+      run.mockRestore();
+    }
+  });
+
+  it("db is not readonly when readonly option is false", async () => {
+    const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: false });
+    await conn.connectBang();
+
+    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
+    await conn.disconnectBang();
+  });
+
+  it("db is not readonly when readonly option is unspecified", async () => {
+    const conn = new BetterSQLite3Adapter({ database: ":memory:" });
+    await conn.connectBang();
+
+    expect((await rawConnectionOf(conn)).readonly).toBeFalsy();
+    await conn.disconnectBang();
+  });
+
+  it("db is readonly when readonly option is true", async () => {
+    const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
+    await conn.connectBang();
+
+    expect((await rawConnectionOf(conn)).readonly).toBeTruthy();
+    await conn.disconnectBang();
+  });
+
+  it("writes are not permitted to readonly databases", async () => {
+    const conn = new BetterSQLite3Adapter({ database: ":memory:", readonly: true });
+    await conn.connectBang();
+
+    const exception: any = await assertRaises([StatementInvalid], {}, async () => {
+      await conn.execute("CREATE TABLE test(id integer)");
+    });
+    expect(exception.message).toMatch("SQLite3::ReadOnlyException");
+    expect(exception.connectionPool).toEqual(conn.pool);
+    await conn.disconnectBang();
+  });
+
+  it("strict strings by default", async () => {
+    let conn = new NodeSQLiteAdapter({ database: ":memory:" });
+    await conn.createTable("testings");
+
+    await assertNothingRaised(async () => {
+      await conn.addIndex("testings", "non_existent");
+    });
+    await conn.disconnectBang();
+
+    await withStrictStringsByDefault(async () => {
+      conn = new NodeSQLiteAdapter({ database: ":memory:" });
+      await conn.createTable("testings");
+
+      const error: any = await assertRaises([StandardError], {}, async () => {
+        await conn.addIndex("testings", "non_existent2");
+      });
+      expect(error.message).toMatch(/no such column: "?non_existent2"?/);
+      expect(error.connectionPool).toEqual(conn.pool);
+      await conn.disconnectBang();
+    });
+  });
+
+  it("strict strings by default and true in database yml", async () => {
+    let conn = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
+    await conn.createTable("testings");
+
+    let error: any = await assertRaises([StandardError], {}, async () => {
+      await conn.addIndex("testings", "non_existent");
+    });
+    expect(error.message).toMatch(/no such column: "?non_existent"?/);
+    expect(error.connectionPool).toEqual(conn.pool);
+    await conn.disconnectBang();
+
+    await withStrictStringsByDefault(async () => {
+      conn = new BetterSQLite3Adapter({ database: ":memory:", strict: true });
+      await conn.createTable("testings");
+
+      error = await assertRaises([StandardError], {}, async () => {
+        await conn.addIndex("testings", "non_existent2");
+      });
+      expect(error.message).toMatch(/no such column: "?non_existent2"?/);
+      expect(error.connectionPool).toEqual(conn.pool);
+      await conn.disconnectBang();
+    });
+  });
+
+  it("strict strings by default and false in database yml", async () => {
+    let conn = new NodeSQLiteAdapter({ database: ":memory:", strict: false });
+    await conn.createTable("testings");
+
+    await assertNothingRaised(async () => {
+      await conn.addIndex("testings", "non_existent");
+    });
+    await conn.disconnectBang();
+
+    await withStrictStringsByDefault(async () => {
+      conn = new NodeSQLiteAdapter({ database: ":memory:", strict: false });
+      await conn.createTable("testings");
+
+      await assertNothingRaised(async () => {
+        await conn.addIndex("testings", "non_existent");
+      });
+      await conn.disconnectBang();
+    });
+  });
+
+  it("rowid column", async () => {
+    await withExampleTable("id_uppercase INTEGER PRIMARY KEY", undefined, async () => {
+      expect(
+        indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+          "id_uppercase"
+        ].rowid,
+      ).toBeTruthy();
+    });
+  });
+
+  it("lowercase rowid column", async () => {
+    await withExampleTable("id_lowercase integer PRIMARY KEY", undefined, async () => {
+      expect(
+        indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+          "id_lowercase"
+        ].rowid,
+      ).toBeTruthy();
+    });
+  });
+
+  it("non integer column returns false for rowid", async () => {
+    await withExampleTable("id_int_short int PRIMARY KEY", undefined, async () => {
+      expect(
+        indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+          "id_int_short"
+        ].rowid,
+      ).toBeFalsy();
+    });
+  });
+
+  it("mixed case integer colum returns true for rowid", async () => {
+    await withExampleTable("id_mixed_case InTeGeR PRIMARY KEY", undefined, async () => {
+      expect(
+        indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+          "id_mixed_case"
+        ].rowid,
+      ).toBeTruthy();
+    });
+  });
+
+  it("rowid column with autoincrement returns true for rowid", async () => {
+    await withExampleTable(
+      "id_autoincrement integer PRIMARY KEY AUTOINCREMENT",
+      undefined,
+      async () => {
+        expect(
+          indexBy((await adapter.columns("ex")) as SQLite3Column[], (c: SQLite3Column) => c.name)[
+            "id_autoincrement"
+          ].rowid,
+        ).toBeTruthy();
+      },
+    );
+  });
+
+  it("integer cpk column returns false for rowid", async () => {
+    await withExampleTable(
+      "id integer, shop_id integer, PRIMARY KEY (shop_id, id)",
+      "cpk_table",
+      async () => {
+        expect(
+          ((await adapter.columns("cpk_table")) as SQLite3Column[]).some((c) => c.rowid),
+        ).toBeFalsy();
+      },
+    );
+  });
+
+  it("tables logs name", async () => {
+    const sql =
+      "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')";
+    await adapter.connectBang();
+    await assertLogged([[sql, "SCHEMA", []]], () => adapter.tables());
+  });
+
+  it("table exists logs name", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      const sql =
+        "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = 'ex' AND type IN ('table')";
+      await assertLogged([[sql, "SCHEMA", []]], async () => {
+        expect(await adapter.tableExists("ex")).toBeTruthy();
+      });
+    });
+  });
+
+  it("indexes logs", async () => {
+    await withExampleTable(undefined, undefined, async () => {
+      await assertLogged([[`PRAGMA index_list("ex")`, "SCHEMA", []]], async () => {
+        await adapter.indexes("ex");
+      });
+    });
+  });
+
+  it("no indexes", async () => {
+    expect(await adapter.indexes("items")).toEqual([]);
+  });
+});

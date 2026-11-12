@@ -1,0 +1,44 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeAll } from "vitest";
+import { MemberDetail } from "../../models/member-detail.js";
+import { Member } from "../../models/member.js";
+import { Organization } from "../../models/organization.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+
+describe("ThroughAssociation#build_record seeds the source inverse foreign key", () => {
+  const { memberDetails, organizations } = fixtures(["members", "memberDetails", "organizations"]);
+
+  beforeAll(() => {
+    constSet(TopLevel, "Member", Member);
+    constSet(TopLevel, "MemberDetail", MemberDetail);
+    constSet(TopLevel, "Organization", Organization);
+  });
+
+  it("assigns the through target's id under the source inverse foreign key", async () => {
+    const memberDetail = await MemberDetail.find(memberDetails("groucho").id);
+    await memberDetail.organization;
+
+    const attributes: Record<string, unknown> = {};
+    (
+      memberDetail.association("organizationMemberDetails") as unknown as {
+        buildRecord(attributes: Record<string, unknown>): unknown;
+      }
+    ).buildRecord(attributes);
+
+    expect(attributes).toEqual({ organization_id: organizations("nsa").id });
+  });
+
+  it("assigns nothing when the through target has no id yet", async () => {
+    const memberDetail = new MemberDetail({});
+    memberDetail.organization = new Organization({ name: "Discordians" });
+
+    const attributes: Record<string, unknown> = {};
+    (
+      memberDetail.association("organizationMemberDetails") as unknown as {
+        buildRecord(attributes: Record<string, unknown>): unknown;
+      }
+    ).buildRecord(attributes);
+
+    expect(attributes).toEqual({});
+  });
+});

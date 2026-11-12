@@ -1,0 +1,39 @@
+import { describe, it, expect, beforeAll } from "vitest";
+import { StringType } from "@blazetrails/activemodel";
+import { Table } from "@blazetrails/arel";
+import { Base } from "../../lib/index.js";
+import { TableMetadata } from "../../lib/table-metadata.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+
+class AuditLog extends Base {
+  static override _tableName = "audit_logs";
+  static {
+    this.attribute("message", "string");
+    this.attribute("developer_id", "integer");
+  }
+}
+
+class AuditRequiredDeveloper extends Base {
+  static override _tableName = "developers";
+  static {
+    this.attribute("name", "string");
+  }
+}
+
+describe("TableMetadataTest", () => {
+  fixtures({});
+  beforeAll(async () => {
+    await AuditLog.loadSchema();
+    await AuditRequiredDeveloper.loadSchema();
+  });
+
+  it("#associated_table creates the right type caster for joined table with different association name", () => {
+    const baseTableMetadata = new TableMetadata(AuditRequiredDeveloper, new Table("developers"));
+
+    const associatedTableMetadata = baseTableMetadata.associatedTable("audit_logs");
+
+    expect(associatedTableMetadata.arelTable.typeForAttribute("message").constructor).toEqual(
+      StringType,
+    );
+  });
+});

@@ -66,7 +66,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
-export const TEST_ROOT = path.join("packages", "activerecord", "src");
+export const TEST_ROOT = path.join("packages", "activerecord", "test");
 
 const SKIP_DIRS = new Set(["node_modules", "dist", "__snapshots__", "__fixtures__"]);
 
@@ -386,7 +386,7 @@ async function collectTestFiles(dir: string, out: string[]): Promise<void> {
   }
 }
 
-/** Every `*.test.ts` under `packages/activerecord/src` that writes rows unwrapped. */
+/** Every `*.test.ts` under `packages/activerecord/test` that writes rows unwrapped. */
 export async function findOffenders(root: string = TEST_ROOT): Promise<string[]> {
   const files: string[] = [];
   await collectTestFiles(root, files);

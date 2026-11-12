@@ -1,0 +1,18 @@
+import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/activesupport";
+import { Base } from "../../../lib/index.js";
+import { Dirty } from "../../../lib/attribute-methods/dirty.js";
+import * as Timestamp from "../../../lib/timestamp.js";
+
+describe("including Dirty after Timestamp", () => {
+  it("raises 'You cannot include Dirty after Timestamp'", () => {
+    class Model {}
+    include(Model, Timestamp.Timestamp);
+    expect(() => include(Model, Dirty)).toThrow("You cannot include Dirty after Timestamp");
+  });
+
+  it("does not raise for Base, which includes Dirty first", () => {
+    expect(Base.partialUpdates).toBe(true);
+    expect(Base.partialInserts).toBe(true);
+  });
+});

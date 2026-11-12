@@ -4,7 +4,7 @@
 > `test-helpers/setup-handler-suite.ts` and `use-handler-transactional-fixtures.ts`
 > no longer exist; the reset shield they wrapped is now
 > `skipGlobalResetForFile()` in
-> `packages/activerecord/src/support/skip-global-reset.ts`, and the
+> `packages/activerecord/test/support/skip-global-reset.ts`, and the
 > transactional wrapper is `test-fixtures/with-transactional-fixtures.ts`. The
 > measured breakdown and reset strategy still stand.
 
@@ -41,23 +41,23 @@ removed and multiplies connection/DB-create overhead.
 
 TS source read:
 
-- `packages/activerecord/src/test-setup-dy.ts` (per-file reset driver)
-- `packages/activerecord/src/test-helpers/drop-all-tables.ts` (`dropAllTables`)
-- `packages/activerecord/src/test-helpers/define-schema.ts` (`defineSchema`,
+- `packages/activerecord/lib/test-setup-dy.ts` (per-file reset driver)
+- `packages/activerecord/lib/support/drop-all-tables.ts` (`dropAllTables`)
+- `packages/activerecord/test/support/define-schema.ts` (`defineSchema`,
   `dropExisting`, signature-cache fast path — lines 630–710)
-- `packages/activerecord/src/test-helpers/schema-repair.ts` (`repairWorkerSchema`,
+- `packages/activerecord/test/support/schema-repair.ts` (`repairWorkerSchema`,
   `driftedTables`)
-- `packages/activerecord/src/test-helpers/schema-file-generator.ts`
+- `packages/activerecord/test/support/schema-file-generator.ts`
   (`force:"cascade"` emission — lines 123–169)
-- `packages/activerecord/src/tasks/database-tasks.ts`
+- `packages/activerecord/lib/tasks/database-tasks.ts`
   (`reconstructFromSchema` 1290–1320, `loadSchema` 839–884, `truncateTables`,
   `schemaUpToDate`)
-- `packages/activerecord/src/test-helpers/ddl-profile.ts` (instrumentation
+- `packages/activerecord/lib/support/ddl-profile.ts` (instrumentation
   reused from PR #3904 — records `byOp`/`byTable`/`byFile`)
-- `packages/activerecord/src/test-helpers/setup-handler-suite.ts`,
+- `packages/activerecord/test/support/setup-handler-suite.ts`,
   `use-handler-transactional-fixtures.ts` (afterAll no longer drops — D-Z)
 
-Static call-graph census (from `git grep` over `packages/activerecord/src`):
+Static call-graph census (from `git grep` over `packages/activerecord/lib` and `packages/activerecord/test`):
 
 | Signal                                                                               | Count                                                  |
 | ------------------------------------------------------------------------------------ | ------------------------------------------------------ |

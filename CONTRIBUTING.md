@@ -309,7 +309,7 @@ The two worked examples:
 - **Not admissible** — the `fixtures.rb` / `fixture_set` / `test_fixtures.rb`
   rows (`scripts/parity/unported-files/unscoped.ts:77-99`, 172 AR tests), whose
   reason is that "Trails users won't ship YAML fixtures". The surface exists:
-  `packages/activerecord/src/fixtures.ts` ships, and [CLAUDE.md](CLAUDE.md)
+  `packages/activerecord/lib/fixtures.ts` ships, and [CLAUDE.md](CLAUDE.md)
   names `fixtures({ … })` the canonical test surface. The row went stale and the
   tests stayed out of the denominator anyway. That is the failure mode this
   section exists to prevent — the registry grew from 18 entries in May 2026 to

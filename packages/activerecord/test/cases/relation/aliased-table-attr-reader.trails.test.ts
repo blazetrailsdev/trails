@@ -1,0 +1,79 @@
+import { beforeEach, describe, it, expect } from "vitest";
+import { Relation } from "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Post } from "../../../lib/test-helpers/models/post.js";
+import { Comment } from "../../models/comment.js";
+import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
+
+constSet(TopLevel, "Post", Post);
+constSet(TopLevel, "Comment", Comment);
+
+let aliasQ: string;
+let baseQ: string;
+let idQ: string;
+
+describe("Relation on an aliased table", () => {
+  const { self } = fixtures(["posts", "comments"]);
+
+  beforeEach(() => {
+    aliasQ = self().quoteTableName("omg_posts");
+    baseQ = self().quoteTableName("posts");
+    idQ = self().quoteTableName("id");
+  });
+
+  const aliased = () => new Relation(Post, { table: Post.arelTable.alias("omg_posts") });
+
+  it("qualifies the star projection against the alias", () => {
+    expect(aliased().toSql()).toContain(`${aliasQ}.*`);
+  });
+
+  it("qualifies select columns against the alias", () => {
+    const sql = aliased().select("id").toSql();
+    expect(sql).toContain(`${aliasQ}.${idQ}`);
+    expect(sql).not.toMatch(new RegExp(`SELECT ${regexpEscape(`${baseQ}.${idQ}`)}`));
+  });
+
+  it("qualifies the default reverse order against the alias", () => {
+    const sql = aliased().reverseOrder().toSql();
+    expect(sql).toContain(`${aliasQ}.${idQ} DESC`);
+    expect(sql).not.toContain(`${baseQ}.${idQ} DESC`);
+  });
+
+  it("qualifies where columns against the alias", () => {
+    expect(aliased().where({ id: 1 }).toSql()).toContain(`${aliasQ}.${idQ}`);
+  });
+
+  it("roots the join dependency on the alias", () => {
+    const sql = aliased().joins(":comments").toSql();
+    expect(sql).toContain(`${aliasQ}.${idQ}`);
+    expect(sql).not.toContain(`= ${baseQ}.${idQ}`);
+  });
+
+  it("qualifies plucked columns against the alias", async () => {
+    await self().assertQueriesMatch(new RegExp(regexpEscape(`${aliasQ}.${idQ}`)), {}, async () => {
+      await aliased().pluck("id");
+    });
+  });
+
+  it("roots the limited-id subquery on the alias", () => {
+    const sql = aliased().eagerLoad(":comments").limit(1).toSql();
+    expect(sql).toContain(`${aliasQ}.${idQ}`);
+    expect(sql).not.toMatch(new RegExp(`SELECT DISTINCT ${regexpEscape(`${baseQ}.${idQ}`)}`));
+  });
+
+  it("roots the materialized limited-id query on the alias", async () => {
+    await self().assertQueriesMatch(
+      new RegExp(`SELECT DISTINCT ${regexpEscape(`${aliasQ}.${idQ}`)}`),
+      {},
+      async () => {
+        await aliased().eagerLoad(":comments").limit(1);
+      },
+    );
+  });
+
+  it("projects the eager load's base columns off the alias", async () => {
+    const posts = await aliased().eagerLoad(":comments").limit(1);
+    expect(posts.length).toBe(1);
+    expect(posts[0].id).toBeDefined();
+  });
+});

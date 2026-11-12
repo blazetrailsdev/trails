@@ -1,0 +1,29 @@
+import { beforeEach, afterEach, it, expect } from "vitest";
+import { Base } from "../../lib/base.js";
+import { describeIfMysqlAdapter } from "../../lib/support/describe-if-mysql-adapter.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+
+describeIfMysqlAdapter("TestAdapterWithInvalidConnection", () => {
+  fixtures({}, { useTransactionalTests: false });
+  class Bird extends Base {}
+
+  beforeEach(async () => {
+    await Bird.establishConnection({
+      adapter: "mysql2",
+      database: "i_do_not_exist",
+      host: "127.0.0.1",
+      port: 12,
+      username: "invalid",
+    });
+  });
+
+  afterEach(async () => {
+    await Bird.removeConnection();
+  });
+
+  it("inspect on Model class does not raise", () => {
+    expect(Bird.inspect()).toBe(
+      `${Bird.name} (call '${Bird.name}.load_schema' to load schema informations)`,
+    );
+  });
+});

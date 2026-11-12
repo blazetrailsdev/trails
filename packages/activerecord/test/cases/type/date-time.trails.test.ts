@@ -1,0 +1,109 @@
+import { describe, it, expect, afterEach } from "vitest";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
+import { TimeZoneConverter } from "../../../lib/attribute-methods/time-zone-conversion.js";
+import { RangeType } from "../../../lib/connection-adapters/postgresql/oid/range.js";
+import { DateTime } from "../../../lib/type/date-time.js";
+import { Range } from "@blazetrails/ruby-compat";
+import { setDefaultTimezone } from "../../../lib/active-record.js";
+
+afterEach(() => {
+  setDefaultTimezone("utc");
+  setZone(null);
+});
+
+describe("ActiveRecord::Type::DateTime serialize_cast_value normalization", () => {
+  it("leaves an already-UTC value alone when is_utc?", () => {
+    const type = new DateTime();
+    const value = type.cast("1999-12-31 12:34:56") as RubyTime;
+    expect(type.serializeCastValue(value)).toBe(value);
+  });
+
+  it("getlocal's the value when default_timezone is :local", () => {
+    setDefaultTimezone("local");
+    const type = new DateTime();
+    const value = type.cast("1999-12-31 12:34:56") as RubyTime;
+    const serialized = type.serializeCastValue(value) as RubyTime;
+    expect(serialized).toBeInstanceOf(RubyTime);
+    expect(serialized.isUtc()).toBe(false);
+    expect(serialized.strftime("%Y-%m-%d %H:%M:%S")).toBe("1999-12-31 12:34:56");
+  });
+});
+
+describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
+  it("is_utc? follows ActiveRecord.default_timezone", () => {
+    setDefaultTimezone("local");
+    expect(new DateTime().isUtc).toBe(false);
+    setDefaultTimezone("utc");
+    expect(new DateTime().isUtc).toBe(true);
+  });
+
+  it("is_utc? follows the per-type timezone override", () => {
+    setDefaultTimezone("utc");
+    expect(new DateTime({ timezone: "local" }).isUtc).toBe(false);
+    setDefaultTimezone("local");
+    expect(new DateTime({ timezone: "utc" }).isUtc).toBe(true);
+  });
+
+  it("default_timezone follows the per-type timezone override", () => {
+    setDefaultTimezone("utc");
+    expect(new DateTime({ timezone: "local" }).defaultTimezone).toBe("local");
+    expect(new DateTime().defaultTimezone).toBe("utc");
+  });
+
+  it("casts bare strings in the zone chosen by is_utc?", () => {
+    const bare = "2024-01-02T12:00:00";
+    const utc = RubyTime.utc(2024, 1, 2, 12, 0, 0);
+    const local = RubyTime.local(2024, 1, 2, 12, 0, 0);
+
+    setDefaultTimezone("utc");
+    expect((new DateTime().cast(bare) as RubyTime).toI()).toBe(utc.toI());
+
+    setDefaultTimezone("local");
+    expect((new DateTime().cast(bare) as RubyTime).toI()).toBe(local.toI());
+
+    expect((new DateTime({ timezone: "utc" }).cast(bare) as RubyTime).toI()).toBe(utc.toI());
+  });
+
+  it("preserves wall clock through the time zone aware wrapper", () => {
+    setZone(TimeZone.find("America/New_York"));
+    const converter = new TimeZoneConverter(new DateTime({ timezone: "local" }));
+
+    const casted = converter.cast("2024-01-02 12:00:00");
+
+    expect(casted).toBeInstanceOf(TimeWithZone);
+    expect((casted as TimeWithZone).hour).toBe(12);
+    expect((casted as TimeWithZone).day).toBe(2);
+  });
+
+  it("reads a zoneless date-time as UTC through the time zone aware wrapper", () => {
+    setZone(TimeZone.find("America/New_York"));
+    const converter = new TimeZoneConverter(new DateTime({ timezone: "local" }));
+
+    const casted = converter.cast(Temporal.PlainDateTime.from("2024-01-02T12:00:00"));
+
+    expect(casted).toBeInstanceOf(TimeWithZone);
+    expect((casted as TimeWithZone).hour).toBe(7);
+    expect((casted as TimeWithZone).day).toBe(2);
+  });
+
+  it("resolves is_utc? through a wrapping range subtype", () => {
+    setZone(TimeZone.find("America/New_York"));
+    const converter = new TimeZoneConverter(
+      new RangeType(new DateTime({ timezone: "local" }), "tsrange"),
+    );
+
+    const casted = converter.cast(
+      new Range(
+        new RubyTime(2024, 1, 2, 12, 0, 0, "-05:00"),
+        new RubyTime(2024, 1, 3, 12, 0, 0, "-05:00"),
+        false,
+      ),
+    );
+
+    const begin = (casted as { begin: TimeWithZone }).begin;
+    expect(begin).toBeInstanceOf(TimeWithZone);
+    expect(begin.hour).toBe(12);
+    expect(begin.day).toBe(2);
+  });
+});

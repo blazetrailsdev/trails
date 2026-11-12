@@ -1,0 +1,228 @@
+import { quotingHost } from "../../../support/quoting-host.js";
+import { describe, expect, it } from "vitest";
+import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Value as TimeValue } from "../../../../lib/type/time.js";
+import {
+  quote as quoteFn,
+  quotedDate as quotedDateFn,
+  quotedTime as quotedTimeFn,
+  typeCast as typeCastFn,
+} from "../../../../lib/connection-adapters/abstract/quoting.js";
+import { quotedTime as sqliteQuotedTime } from "../../../../lib/connection-adapters/sqlite3/quoting.js";
+
+const quote = (value: unknown): string => quoteFn.call(quotingHost(), value);
+const typeCast = (value: unknown): unknown => typeCastFn.call(quotingHost(), value);
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call(quotingHost(), value);
+const quotedTime = (value: Temporal.PlainTime): string =>
+  quotedTimeFn.call(
+    quotingHost(),
+    RubyTime.utc(
+      2026,
+      4,
+      26,
+      value.hour,
+      value.minute,
+      value.second,
+      value.millisecond * 1_000 + value.microsecond + value.nanosecond / 1_000,
+    ),
+  );
+
+describe("quotedDate", () => {
+  it("formats a whole-second instant", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55Z");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("pads millisecond precision to a fixed 6-digit microsecond field", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55.123Z");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55.123000");
+  });
+
+  it("preserves microsecond precision", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55.123456");
+  });
+
+  it("caps fractional seconds at microseconds (drops nanoseconds)", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55.123456");
+  });
+
+  it("preserves the smallest possible non-zero value (1 µs)", () => {
+    const v = Temporal.Instant.from("2024-01-01T00:00:00.000001Z");
+    expect(quotedDate(v)).toBe("2024-01-01 00:00:00.000001");
+  });
+
+  it("converts a non-UTC instant to UTC when default_timezone is utc (the default)", () => {
+    const v = Temporal.Instant.from("2026-04-26T16:23:55+02:00");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+});
+
+describe("quotedDate of a PlainDateTime", () => {
+  it("formats a whole-second datetime", () => {
+    const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("preserves microsecond precision", () => {
+    const v = Temporal.PlainDateTime.from("2024-12-31T23:59:59.999999");
+    expect(quotedDate(v)).toBe("2024-12-31 23:59:59.999999");
+  });
+
+  it("caps fractional seconds at microseconds, omitting a sub-µs-only value", () => {
+    const v = Temporal.PlainDateTime.from("2024-01-01T00:00:00.000000001");
+    expect(quotedDate(v)).toBe("2024-01-01 00:00:00");
+  });
+});
+
+describe("quotedDate of a PlainDate", () => {
+  it("formats a date", () => {
+    expect(quotedDate(Temporal.PlainDate.from("2026-04-26"))).toBe("2026-04-26");
+  });
+
+  it("zero-pads month and day", () => {
+    expect(quotedDate(Temporal.PlainDate.from("2026-01-05"))).toBe("2026-01-05");
+  });
+
+  it("formats a negative (BCE) year the way the date gem's %Y does", () => {
+    expect(quotedDate(Temporal.PlainDate.from({ year: -43, month: 3, day: 15 }))).toBe(
+      "-0043-03-15",
+    );
+  });
+});
+
+describe("quotedTime", () => {
+  it("formats a whole-second time", () => {
+    expect(quotedTime(Temporal.PlainTime.from("14:23:55"))).toBe("14:23:55");
+  });
+
+  it("preserves microseconds", () => {
+    expect(quotedTime(Temporal.PlainTime.from("14:23:55.123456"))).toBe("14:23:55.123456");
+  });
+
+  it("caps fractional seconds at microseconds, omitting a sub-µs-only value", () => {
+    expect(quotedTime(Temporal.PlainTime.from("00:00:00.000000001"))).toBe("00:00:00");
+  });
+
+  it("pads to a fixed 6-digit microsecond field", () => {
+    expect(quotedTime(Temporal.PlainTime.from("12:00:00.100"))).toBe("12:00:00.100000");
+  });
+});
+
+describe("typeCast of Temporal bind values", () => {
+  const bind = (v: unknown) => typeCast(v);
+
+  it("converts Instant to UTC string", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");
+    expect(bind(v)).toBe("2026-04-26 14:23:55.123456");
+  });
+
+  it("converts PlainDateTime to string", () => {
+    const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55.000001");
+    expect(bind(v)).toBe("2026-04-26 14:23:55.000001");
+  });
+
+  it("converts PlainDate to string", () => {
+    expect(bind(Temporal.PlainDate.from("2026-04-26"))).toBe("2026-04-26");
+  });
+
+  it("converts Time::Value to string", () => {
+    expect(bind(new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456)))).toBe(
+      "14:23:55.123456",
+    );
+  });
+
+  it("converts ZonedDateTime to UTC instant string", () => {
+    const v = Temporal.ZonedDateTime.from("2026-04-26T16:23:55+02:00[Europe/Paris]");
+    expect(bind(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("passes non-Temporal values through unchanged", () => {
+    expect(bind(42)).toBe(42);
+    expect(bind("hello")).toBe("hello");
+    expect(bind(null)).toBe(null);
+  });
+});
+
+describe("MySQL-safe formatters (clamped to 6 fractional digits)", () => {
+  it("formatPlainTimeForSqlMysql drops nanoseconds", () => {
+    const v = Temporal.PlainTime.from("14:23:55.000000001");
+    expect(quotedTime(v)).toBe("14:23:55");
+  });
+
+  it("formatPlainTimeForSqlMysql preserves microseconds", () => {
+    const v = Temporal.PlainTime.from("14:23:55.000001");
+    expect(quotedTime(v)).toBe("14:23:55.000001");
+  });
+});
+
+describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
+  it("emits a fixed 6-digit field for a half-second (.5 → .500000)", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55.5Z");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55.500000");
+  });
+
+  it("omits the fractional part when usec == 0", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55Z");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("omits the fractional part for a whole-second PlainTime (.000 → omitted)", () => {
+    const v = Temporal.PlainTime.from("14:23:55.000");
+    expect(quotedTime(v)).toBe("14:23:55");
+  });
+});
+
+describe("typeCast on a SQLite receiver uses 2000-01-01 prefix for Time::Value", () => {
+  it("wraps Time::Value in 2000-01-01 for sqlite", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456));
+    expect(typeCastFn.call(quotingHost({ quotedTime: sqliteQuotedTime }), v)).toBe(
+      "2000-01-01 14:23:55.123456",
+    );
+  });
+
+  it("returns bare time string for postgres", () => {
+    const v = new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456));
+    expect(typeCast(v)).toBe("14:23:55.123456");
+  });
+});
+
+describe("abstract quote() with Temporal (Postgres path)", () => {
+  it("quotes an Instant", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");
+    expect(quote(v)).toBe("'2026-04-26 14:23:55.123456'");
+  });
+
+  it("quotes a PlainDateTime", () => {
+    const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55.000001");
+    expect(quote(v)).toBe("'2026-04-26 14:23:55.000001'");
+  });
+
+  it("quotes a PlainDate", () => {
+    expect(quote(Temporal.PlainDate.from("2026-04-26"))).toBe("'2026-04-26'");
+  });
+
+  it("quotes a Time::Value", () => {
+    expect(quote(new TimeValue(RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456)))).toBe(
+      "'14:23:55.123456'",
+    );
+  });
+
+  it("quotes a ZonedDateTime as its UTC instant", () => {
+    const v = Temporal.ZonedDateTime.from("2026-04-26T16:23:55+02:00[Europe/Paris]");
+    expect(quote(v)).toBe("'2026-04-26 14:23:55'");
+  });
+});
+
+describe("abstract typeCast() with Temporal (Postgres path)", () => {
+  it("casts an Instant to its UTC string", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");
+    expect(typeCast(v)).toBe("2026-04-26 14:23:55.123456");
+  });
+
+  it("casts a PlainDate to string", () => {
+    expect(typeCast(Temporal.PlainDate.from("2026-04-26"))).toBe("2026-04-26");
+  });
+});

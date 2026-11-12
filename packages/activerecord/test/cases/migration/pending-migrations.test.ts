@@ -1,0 +1,178 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import * as fs from "node:fs";
+import * as path from "node:path";
+import * as os from "node:os";
+import { Base } from "../../../lib/base.js";
+import {
+  CheckPending,
+  Migration,
+  MigrationContext,
+  PendingMigrationError,
+} from "../../../lib/migration.js";
+import { SchemaMigration } from "../../../lib/schema-migration.js";
+import { InternalMetadata } from "../../../lib/internal-metadata.js";
+import {
+  DatabaseConfigurations,
+  type RawConfigurations,
+} from "../../../lib/database-configurations.js";
+import { camelize, Logger } from "@blazetrails/activesupport";
+import { currentAdapter, inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+
+const MIGRATION_MODULE = new URL("../migration.js", import.meta.url).pathname;
+
+const skip = !currentAdapter("SQLite3Adapter") || inMemoryDb();
+
+describe.skipIf(skip)("Migration", () => {
+  describe("PendingMigrationsTest", () => {
+    fixtures({}, { useTransactionalTests: false });
+    let tmpDir: string;
+    let originalConfigurations: DatabaseConfigurations;
+
+    const databasePathFor = (databaseName: string): string =>
+      path.join(tmpDir, `${databaseName}.sqlite3`);
+
+    const migrationsPathFor = (databaseName: string): string =>
+      path.join(tmpDir, `${databaseName}-migrations`);
+
+    const baseConfig = (): RawConfigurations => ({
+      [DEFAULT_ENV()]: {
+        primary: {
+          adapter: "sqlite3",
+          database: databasePathFor("primary"),
+          migrationsPaths: migrationsPathFor("primary"),
+        },
+        secondary: {
+          adapter: "sqlite3",
+          database: databasePathFor("secondary"),
+          migrationsPaths: migrationsPathFor("secondary"),
+        },
+      },
+    });
+
+    const createMigration = (number: string, name: string, database = "primary"): void => {
+      const migrationDir = migrationsPathFor(database);
+      fs.mkdirSync(migrationDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(migrationDir, `${number}_${name}.ts`),
+        `import { Migration } from ${JSON.stringify(MIGRATION_MODULE)};\n` +
+          `export class ${camelize(name)} extends Migration.Current {}\n`,
+      );
+    };
+
+    const runMigrations = async (): Promise<void> => {
+      const wasVerbose = Migration.verbose;
+      Migration.verbose = false;
+      const pool = Base.connectionPool();
+      const connection = await pool.leaseConnection();
+      await new MigrationContext(
+        pool.migrationsPaths,
+        new SchemaMigration(connection.pool),
+        new InternalMetadata(connection.pool),
+      ).migrate();
+      Migration.verbose = wasVerbose;
+    };
+
+    const assertPendingMigrations = async (...expectedMigrations: string[]): Promise<void> => {
+      for (let i = 0; i < 2; i++) {
+        const error = await Migration.checkAllPendingBang().then(
+          () => null,
+          (e: unknown) => e,
+        );
+        expect(error).toBeInstanceOf(PendingMigrationError);
+
+        const checkPendingError = await new CheckPending(async () => {
+          throw new Error("flunk");
+        })
+          .call({})
+          .then(
+            () => null,
+            (e: unknown) => e,
+          );
+        expect(checkPendingError).toBeInstanceOf(PendingMigrationError);
+
+        for (const message of [(error as Error).message, (checkPendingError as Error).message]) {
+          expect(message).toContain("Migrations are pending.");
+          for (const migration of expectedMigrations) expect(message).toContain(migration);
+        }
+      }
+    };
+
+    const assertNoPendingMigrations = async (): Promise<void> => {
+      const calls: Record<string, unknown>[] = [];
+      const app = async (env: Record<string, unknown>): Promise<unknown> => {
+        calls.push(env);
+        return null;
+      };
+      const checkPending = new CheckPending(app);
+
+      for (let i = 0; i < 2; i++) {
+        await expect(Migration.checkAllPendingBang()).resolves.toBeUndefined();
+
+        await checkPending.call({});
+        expect(calls.length).toBe(i + 1);
+      }
+    };
+
+    beforeEach(async () => {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pending_migrations_test-"));
+      originalConfigurations = Base.configurations();
+      Base.configurations(baseConfig());
+      await Base.establishConnection(":primary");
+    });
+
+    afterEach(async () => {
+      Base.configurations(originalConfigurations);
+      await Base.establishConnection(":arunit");
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it("errors if pending", async () => {
+      createMigration("01", "create_foo");
+      await assertPendingMigrations("01_create_foo.ts");
+    });
+
+    it("checks if supported", async () => {
+      await runMigrations();
+      await assertNoPendingMigrations();
+    });
+
+    it("okay with no migrations", async () => {
+      await assertNoPendingMigrations();
+    });
+
+    it("understands migrations created out of order", async () => {
+      createMigration("05", "create_bar");
+      await runMigrations();
+      await assertNoPendingMigrations();
+
+      createMigration("01", "create_foo");
+      await assertPendingMigrations("01_create_foo.ts");
+    });
+
+    it("with stdlib logger", async () => {
+      const old = Base.logger;
+      Base.logger = new Logger() as unknown as typeof Base.logger;
+      try {
+        await expect(new CheckPending(async () => {}).call({})).resolves.not.toThrow();
+      } finally {
+        Base.logger = old;
+      }
+    });
+
+    it("with multiple database", async () => {
+      createMigration("01", "create_bar", "primary");
+      createMigration("02", "create_foo", "secondary");
+      await assertPendingMigrations("01_create_bar.ts", "02_create_foo.ts");
+
+      await Base.establishConnection(":secondary");
+      await runMigrations();
+
+      await Base.establishConnection(":primary");
+      await runMigrations();
+
+      await assertNoPendingMigrations();
+    });
+  });
+});

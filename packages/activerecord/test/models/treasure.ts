@@ -1,0 +1,42 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Parrot } from "./parrot.js";
+import type { PriceEstimate } from "./price-estimate.js";
+import type { RichPerson } from "./person.js";
+import type { Ship } from "./ship.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Treasure extends Base {
+  declare parrots: AssociationProxy<Parrot>;
+  declare priceEstimates: AssociationProxy<PriceEstimate>;
+  declare richPeople: AssociationProxy<RichPerson>;
+  declare looter_id: number;
+  declare looter_type: string;
+  declare name: string;
+  declare ship_id: number;
+  declare "type": string;
+
+  static {
+    this.hasAndBelongsToMany("parrots");
+    this.belongsTo("looter", { polymorphic: true });
+    this.belongsTo("ship");
+    this.hasMany("priceEstimates", { as: "estimateOf", autosave: true });
+    this.hasAndBelongsToMany("richPeople", { joinTable: "peoples_treasures", validate: false });
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Treasure {
+  get looter(): Base | null | Promise<Base | null>;
+  set looter(value: Base | null);
+  get ship(): Ship | null | Promise<Ship | null>;
+  set ship(value: Ship | null);
+}
+
+export class HiddenTreasure extends Treasure {}
+
+constSet(TopLevel, "Treasure", Treasure);
+DescendantsTracker.registerSubclass(Base, Treasure);
+constSet(TopLevel, "HiddenTreasure", HiddenTreasure);
+DescendantsTracker.registerSubclass(Treasure, HiddenTreasure);

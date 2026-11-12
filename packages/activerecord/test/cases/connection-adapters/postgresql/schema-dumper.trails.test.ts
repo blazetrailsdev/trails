@@ -1,0 +1,468 @@
+import { StringIO } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import { ValueType } from "@blazetrails/activemodel";
+import { SchemaDumper } from "../../../../lib/connection-adapters/postgresql/schema-dumper.js";
+import { Column } from "../../../../lib/connection-adapters/postgresql/column.js";
+import { AbstractAdapter } from "../../../../lib/connection-adapters/abstract-adapter.js";
+import { TypeMetadata } from "../../../../lib/connection-adapters/postgresql/type-metadata.js";
+import { SqlTypeMetadata } from "../../../../lib/connection-adapters/sql-type-metadata.js";
+
+const emptySource: any = {
+  supportsVirtualColumns: async () => false,
+  tables: async () => [],
+  columns: async () => [],
+  indexes: async () => [],
+  lookupCastTypeFromColumn: () => new ValueType(),
+};
+
+function makeColumn(
+  options: {
+    name?: string;
+    type?: string;
+    sqlType?: string;
+    serial?: boolean;
+    array?: boolean;
+    bigint?: boolean;
+    generated?: string | null;
+  } = {},
+): Column {
+  return new Column(
+    options.name ?? "id",
+    null,
+    new TypeMetadata(
+      new SqlTypeMetadata({
+        sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
+        type: options.type ?? "integer",
+      }),
+    ),
+    true,
+    null,
+    { serial: options.serial, generated: options.generated },
+  );
+}
+
+describe("PostgreSQL::SchemaDumper", () => {
+  it("create returns a PG SchemaDumper instance", () => {
+    const dumper = SchemaDumper.create(emptySource);
+    expect(dumper).toBeInstanceOf(SchemaDumper);
+  });
+
+  describe("schemaType", () => {
+    it("returns bigserial for a serial bigint column", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "bigint", type: "integer", serial: true });
+      expect(dumper.schemaType(col)).toBe(":bigserial");
+    });
+
+    it("returns serial for a serial non-bigint column", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
+      expect(dumper.schemaType(col)).toBe(":serial");
+    });
+
+    it("returns bigint for bigint array columns (strips [] before returning)", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "bigint[]", type: "integer", array: true });
+      expect(dumper.schemaType(col)).toBe(":bigint");
+    });
+
+    it("returns semantic type for non-serial non-bigint columns", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "character varying", type: "string" });
+      expect(dumper.schemaType(col)).toBe(":string");
+    });
+  });
+
+  describe("isDefaultPrimaryKey", () => {
+    it("returns true when schemaType is bigserial", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "bigint", type: "integer", serial: true });
+      expect(dumper.isDefaultPrimaryKey(col)).toBe(true);
+    });
+
+    it("returns false for serial (only bigserial is the default PK)", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
+      expect(dumper.isDefaultPrimaryKey(col)).toBe(false);
+    });
+  });
+
+  describe("isExplicitPrimaryKeyDefault", () => {
+    it("returns true for uuid type", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ type: "uuid", sqlType: "uuid" });
+      expect(dumper.isExplicitPrimaryKeyDefault(col)).toBe(true);
+    });
+
+    it("returns true for integer without serial", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ type: "integer", sqlType: "integer", serial: false });
+      expect(dumper.isExplicitPrimaryKeyDefault(col)).toBe(true);
+    });
+
+    it("returns false for serial integer", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ type: "integer", sqlType: "integer", serial: true });
+      expect(dumper.isExplicitPrimaryKeyDefault(col)).toBe(false);
+    });
+  });
+
+  describe("schemaExpression", () => {
+    it("returns undefined for serial columns (suppresses default)", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ type: "integer", serial: true });
+      expect(dumper.schemaExpression(col)).toBeUndefined();
+    });
+  });
+
+  describe("prepareColumnOptions", () => {
+    it("adds array: true for array columns", async () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ type: "string", sqlType: "character varying[]", array: true });
+      const spec = await dumper.prepareColumnOptions(col);
+      expect(spec["array"]).toBe(true);
+    });
+
+    it("does not add array for non-array columns", async () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ type: "string", sqlType: "character varying" });
+      const spec = await dumper.prepareColumnOptions(col);
+      expect(spec["array"]).toBeUndefined();
+    });
+
+    it("adds virtual column options when adapter supports virtual columns", async () => {
+      const mockAdapter = {
+        tables: async () => [],
+        columns: async () => [],
+        indexes: async () => [],
+        supportsVirtualColumns: () => true,
+      };
+      const dumper = new (SchemaDumper as any)(mockAdapter);
+      const col = new Column(
+        "computed",
+        null,
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
+        true,
+        "(a + b)",
+        {
+          generated: "s",
+        },
+      );
+      const spec = await dumper.prepareColumnOptions(col);
+      expect(spec["as"]).toBe(JSON.stringify("(a + b)"));
+      expect(spec["stored"]).toBe(true);
+      expect(spec["type"]).toBe('"integer"');
+    });
+
+    it("adds enum_type even for virtual enum columns (Rails continues after virtual block)", async () => {
+      const mockAdapter = {
+        tables: async () => [],
+        columns: async () => [],
+        indexes: async () => [],
+        supportsVirtualColumns: () => true,
+      };
+      const dumper = new (SchemaDumper as any)(mockAdapter);
+      const col = new Column(
+        "status",
+        null,
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "mood", type: "enum" })),
+        true,
+        "('happy'::mood)",
+        {
+          generated: "s",
+        },
+      );
+      const spec = await dumper.prepareColumnOptions(col);
+      expect(spec["stored"]).toBe(true);
+      expect(spec["enumType"]).toBe(JSON.stringify("mood"));
+    });
+
+    it("keeps the bit_varying type key for a virtual column's type option", async () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      dumper.connection = { ...emptySource, supportsVirtualColumns: async () => true };
+      const col = new Column(
+        "flags",
+        null,
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "bit varying", type: "bit_varying" })),
+        true,
+        "(a)",
+        { generated: "s" },
+      );
+      expect(dumper.schemaType(col)).toBe(":bit_varying");
+      expect((await dumper.prepareColumnOptions(col))["type"]).toBe('"bit_varying"');
+    });
+
+    it("skips virtual options when adapter does not support virtual columns", async () => {
+      const mockAdapter = {
+        tables: async () => [],
+        columns: async () => [],
+        indexes: async () => [],
+        supportsVirtualColumns: () => false,
+      };
+      const dumper = new (SchemaDumper as any)(mockAdapter);
+      const col = new Column(
+        "computed",
+        null,
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
+        true,
+        "(a + b)",
+        {
+          generated: "s",
+        },
+      );
+      const spec = await dumper.prepareColumnOptions(col);
+      expect(spec["as"]).toBeUndefined();
+    });
+
+    it("adds enum_type for enum columns", async () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = new Column(
+        "status",
+        null,
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "mood", type: "enum" })),
+        true,
+        null,
+      );
+      const spec = await dumper.prepareColumnOptions(col);
+      expect(spec["enumType"]).toBe(JSON.stringify("mood"));
+    });
+  });
+
+  describe("schemaTypeWithVirtual", () => {
+    it("returns virtual for generated (stored) PG columns", async () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      dumper.connection = { ...emptySource, supportsVirtualColumns: async () => true };
+      const col = new Column(
+        "computed",
+        null,
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
+        true,
+        null,
+        {
+          generated: "s",
+        },
+      );
+      expect(await dumper.schemaTypeWithVirtual(col)).toBe(":virtual");
+    });
+
+    it("returns schemaType for non-virtual columns", async () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
+      expect(await dumper.schemaTypeWithVirtual(col)).toBe(":serial");
+    });
+  });
+
+  describe("extractExpressionForVirtualColumn", () => {
+    it("returns JSON-stringified defaultFunction", () => {
+      const dumper = SchemaDumper.create(emptySource) as any;
+      const col = new Column(
+        "full_name",
+        null,
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "text", type: "string" })),
+        true,
+        "concat(first_name, ' ', last_name)",
+        {
+          generated: "s",
+        },
+      );
+      expect(dumper.extractExpressionForVirtualColumn(col)).toBe(
+        JSON.stringify("concat(first_name, ' ', last_name)"),
+      );
+    });
+  });
+
+  describe("table", () => {
+    it("emits the camelCase column method for a bit_varying column", async () => {
+      const source = {
+        ...emptySource,
+        columns: async () => [
+          new Column(
+            "flags",
+            null,
+            new TypeMetadata(new SqlTypeMetadata({ sqlType: "bit varying", type: "bit_varying" })),
+            true,
+          ),
+        ],
+        primaryKey: async () => null,
+        nativeDatabaseTypes: () => ({ bit_varying: { name: "bit varying" } }),
+        tableOptions: async () => ({}),
+      };
+      const dumper = new (SchemaDumper as any)(
+        Object.assign(Object.create(AbstractAdapter.prototype), source),
+      );
+      const io = new StringIO();
+      await dumper.table("widgets", io);
+      expect(io.string()).toContain('t.bitVarying("flags")');
+    });
+  });
+
+  describe("extensions", () => {
+    it("emits enable_extension lines sorted with header and trailing blank", async () => {
+      const adapter = {
+        ...emptySource,
+        extensions: async () => ["plpgsql", "hstore"],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.extensions(io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines[0]).toContain("extensions that must be enabled");
+      expect(lines[1]).toBe(`  await ctx.enableExtension("hstore");`);
+      expect(lines[2]).toBe(`  await ctx.enableExtension("plpgsql");`);
+      expect(lines[3]).toBe("");
+    });
+
+    it("emits nothing when extensions list is empty", async () => {
+      const adapter = { ...emptySource, extensions: async () => [] };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.extensions(io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines).toHaveLength(0);
+    });
+  });
+
+  describe("types", () => {
+    it("emits create_enum lines sorted with header and trailing blank", async () => {
+      const adapter = {
+        ...emptySource,
+        enumTypes: async () =>
+          [
+            ["status", ["active", "inactive"]],
+            ["mood", ["happy", "sad"]],
+          ] as [string, string[]][],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.types(io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines[0]).toBe("  // Custom types defined in this database.");
+      expect(lines[2]).toBe(`  await ctx.createEnum("mood", ["happy","sad"]);`);
+      expect(lines[3]).toBe(`  await ctx.createEnum("status", ["active","inactive"]);`);
+      expect(lines[4]).toBe("");
+    });
+
+    it("emits nothing when enum types list is empty", async () => {
+      const adapter = { ...emptySource, enumTypes: async () => [] };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.types(io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines).toHaveLength(0);
+    });
+  });
+
+  describe("schemas", () => {
+    it("emits create_schema lines sorted, excluding public, with trailing blank", async () => {
+      const adapter = {
+        ...emptySource,
+        schemaNames: async () => ["public", "myschema", "analytics"],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.schemas(io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines).toEqual([
+        `  await ctx.createSchema("analytics");`,
+        `  await ctx.createSchema("myschema");`,
+        "",
+      ]);
+    });
+  });
+
+  describe("exclusionConstraintsInCreate", () => {
+    it("emits sorted t.exclusionConstraint lines with options", async () => {
+      const { ExclusionConstraintDefinition } =
+        await import("../../../../lib/connection-adapters/postgresql/schema-definitions.js");
+      const adapter = {
+        ...emptySource,
+        exclusionConstraints: async () => [
+          new ExclusionConstraintDefinition("rooms", "price WITH =", {
+            using: "gist",
+            where: "(price > 0)",
+            name: "excl_rooms_price",
+          }),
+        ],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.exclusionConstraintsInCreate("rooms", io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines[0]).toContain(`t.exclusionConstraint("price WITH ="`);
+      expect(lines[0]).toContain(`where: "(price > 0)"`);
+      expect(lines[0]).toContain(`using: "gist"`);
+      expect(lines[0]).toContain(`name: "excl_rooms_price"`);
+    });
+
+    it("omits name for auto-generated names matching exclIgnorePattern", async () => {
+      const { ExclusionConstraintDefinition } =
+        await import("../../../../lib/connection-adapters/postgresql/schema-definitions.js");
+      const adapter = {
+        ...emptySource,
+        exclusionConstraints: async () => [
+          new ExclusionConstraintDefinition("rooms", "price WITH =", {
+            using: "gist",
+            name: "excl_rails_74c9160f55",
+          }),
+        ],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.exclusionConstraintsInCreate("rooms", io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines[0]).toContain(`t.exclusionConstraint("price WITH ="`);
+      expect(lines[0]).not.toContain("name:");
+    });
+  });
+
+  describe("uniqueConstraintsInCreate", () => {
+    it("emits sorted t.uniqueConstraint lines with options", async () => {
+      const { UniqueConstraintDefinition } =
+        await import("../../../../lib/connection-adapters/postgresql/schema-definitions.js");
+      const adapter = {
+        ...emptySource,
+        uniqueConstraints: async () => [
+          new UniqueConstraintDefinition("users", ["email"], {
+            nullsNotDistinct: true,
+            name: "uniq_users_email",
+          }),
+        ],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.uniqueConstraintsInCreate("users", io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines[0]).toContain(`t.uniqueConstraint(["email"]`);
+      expect(lines[0]).toContain(`nullsNotDistinct: true`);
+      expect(lines[0]).toContain(`name: "uniq_users_email"`);
+    });
+
+    it("omits name for auto-generated names matching uniqueIgnorePattern", async () => {
+      const { UniqueConstraintDefinition } =
+        await import("../../../../lib/connection-adapters/postgresql/schema-definitions.js");
+      const adapter = {
+        ...emptySource,
+        uniqueConstraints: async () => [
+          new UniqueConstraintDefinition("users", ["email"], {
+            name: "uniq_rails_1e07660b77",
+          }),
+        ],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.uniqueConstraintsInCreate("users", io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines[0]).toContain(`t.uniqueConstraint(["email"]`);
+      expect(lines[0]).not.toContain("name:");
+    });
+
+    it("emits nothing when no unique constraints", async () => {
+      const adapter = { ...emptySource, uniqueConstraints: async () => [] };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const io = new StringIO();
+      await dumper.uniqueConstraintsInCreate("users", io);
+      const lines = io.string().split("\n").slice(0, -1);
+      expect(lines).toHaveLength(0);
+    });
+  });
+});

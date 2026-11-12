@@ -1,0 +1,62 @@
+import { expect, it } from "vitest";
+import { Deadlocked } from "../../../lib/errors.js";
+import { describeIfPg, PG_TEST_URL } from "../../../lib/support/describe-if-pg.js";
+import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
+
+const PQTRANS_IDLE = 0;
+const PQTRANS_INTRANS = 2;
+const PQTRANS_INERROR = 3;
+
+function transactionStatus(adapter: PostgreSQLAdapter): number {
+  return (
+    adapter as unknown as { _rawConnection: { transactionStatus(): number } }
+  )._rawConnection.transactionStatus();
+}
+
+describeIfPg("PostgreSQLAdapter transaction_status", () => {
+  it("is unknown before a connection is opened", async () => {
+    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    try {
+      expect(adapter._rawConnection).toBeNull();
+    } finally {
+      await adapter.disconnectBang();
+    }
+  });
+
+  it("moves idle → in transaction → in failed transaction", async () => {
+    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    try {
+      await adapter.execute("SELECT 1");
+      expect(transactionStatus(adapter)).toBe(PQTRANS_IDLE);
+
+      await adapter.beginDbTransaction();
+      expect(transactionStatus(adapter)).toBe(PQTRANS_INTRANS);
+
+      await expect(adapter.execute("SELECT * FROM no_such_table_here")).rejects.toThrow();
+      expect(transactionStatus(adapter)).toBe(PQTRANS_INERROR);
+
+      await adapter.rollbackDbTransaction();
+      expect(transactionStatus(adapter)).toBe(PQTRANS_IDLE);
+    } finally {
+      await adapter.disconnectBang();
+    }
+  });
+
+  it("retryable_query_error? is false inside a broken transaction", async () => {
+    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+    try {
+      await adapter.execute("SELECT 1");
+      expect(adapter.isRetryableQueryError(new Deadlocked("deadlock detected"))).toBe(true);
+
+      await adapter.beginDbTransaction();
+      await expect(adapter.execute("SELECT * FROM no_such_table_here")).rejects.toThrow();
+      expect(transactionStatus(adapter)).toBe(PQTRANS_INERROR);
+      expect(adapter.isRetryableQueryError(new Deadlocked("deadlock detected"))).toBe(false);
+
+      await adapter.rollbackDbTransaction();
+      expect(adapter.isRetryableQueryError(new Deadlocked("deadlock detected"))).toBe(true);
+    } finally {
+      await adapter.disconnectBang();
+    }
+  });
+});

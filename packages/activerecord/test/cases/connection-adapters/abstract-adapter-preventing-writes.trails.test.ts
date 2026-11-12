@@ -1,0 +1,34 @@
+import { it, expect, beforeEach, afterEach } from "vitest";
+import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
+import { Base } from "../../../lib/base.js";
+import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
+
+let adapter: BetterSQLite3Adapter;
+
+describeIfSqlite("AbstractAdapter#isPreventingWrites with no connection descriptor", () => {
+  beforeEach(() => {
+    adapter = new BetterSQLite3Adapter({ database: ":memory:" });
+  });
+
+  afterEach(async () => {
+    await adapter.disconnectBang();
+  });
+
+  it("is not preventing writes inside an ambient Base scope", async () => {
+    expect(adapter.connectionDescriptor).toBeUndefined();
+
+    await Base.whilePreventingWrites(async () => {
+      expect(adapter.isPreventingWrites()).toBe(false);
+    });
+  });
+
+  it("still reports preventing writes for a standalone replica", async () => {
+    const replica = new BetterSQLite3Adapter({ database: ":memory:", replica: true } as never);
+    try {
+      expect(replica.connectionDescriptor).toBeUndefined();
+      expect(replica.isPreventingWrites()).toBe(true);
+    } finally {
+      await replica.disconnectBang();
+    }
+  });
+});

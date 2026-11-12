@@ -1,0 +1,13 @@
+import { Migration } from "../../../lib/migration.js";
+
+export class AddExpressions extends Migration.Current {
+  async up(): Promise<void> {
+    await this.createTable("expressions", (t) => {
+      t.string("expression");
+    });
+  }
+
+  async down(): Promise<void> {
+    await this.dropTable("expressions");
+  }
+}

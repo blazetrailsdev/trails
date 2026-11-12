@@ -1,0 +1,15 @@
+import { describe, it, expect } from "vitest";
+import { ReadOnlyNullEncryptor } from "../../../lib/encryption/read-only-null-encryptor.js";
+import { Encryption } from "../../../lib/encryption/errors.js";
+
+describe("ActiveRecord::Encryption::ReadOnlyNullEncryptorTest", () => {
+  it("decrypt returns the encrypted message", () => {
+    const enc = new ReadOnlyNullEncryptor();
+    expect(enc.decrypt("some text")).toBe("some text");
+  });
+
+  it("encrypt raises an Encryption", () => {
+    const enc = new ReadOnlyNullEncryptor();
+    expect(() => enc.encrypt("some text")).toThrow(Encryption);
+  });
+});

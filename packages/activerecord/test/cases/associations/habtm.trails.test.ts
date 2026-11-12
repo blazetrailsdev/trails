@@ -1,0 +1,37 @@
+import type { AssociationProxy } from "../../../lib/associations/collection-proxy.js";
+import type { CollectionAssociation } from "../../../lib/associations/collection-association.js";
+import { describe, it, expect } from "vitest";
+import { constantize } from "@blazetrails/activesupport";
+import { rbModName } from "@blazetrails/ruby-compat";
+import "../../../lib/index.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import "../../support/canonical-model-index.js";
+import { Developer as CanonicalDeveloper } from "../../models/developer.js";
+import { Project as CanonicalProject } from "../../models/project.js";
+
+describe("has_and_belongs_to_many", () => {
+  const { developers, projects } = fixtures(["developers", "projects", "developersProjects"]);
+
+  it("reaches a join model under its qualified name", () => {
+    const joinModel = (CanonicalDeveloper as unknown as Record<string, object>).HABTM_Projects;
+    expect(rbModName(joinModel)).toBe("Developer::HABTM_Projects");
+    expect(constantize("Developer::HABTM_Projects")).toBe(joinModel);
+  });
+
+  it("loads associated records through a join table", async () => {
+    const david = developers("david");
+    const projectList = await ((david.association("projects") as CollectionAssociation)
+      .reader as unknown as AssociationProxy<CanonicalProject>);
+    expect(projectList).toHaveLength(2);
+    const names = projectList.map((p) => p.name).sort();
+    expect(names).toEqual(["Active Controller", "Active Record"]);
+  });
+
+  it("uses default join table name (alphabetical)", async () => {
+    const activeRecord = projects("active_record");
+    const devs = await ((activeRecord.association("developers") as CollectionAssociation)
+      .reader as unknown as AssociationProxy<CanonicalDeveloper>);
+    expect(devs.length).toBeGreaterThan(0);
+    expect(devs.map((d) => d.name)).toContain("David");
+  });
+});

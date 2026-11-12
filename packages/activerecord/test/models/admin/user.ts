@@ -1,0 +1,82 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { Admin } from "../admin.js";
+import { constSet } from "@blazetrails/ruby-compat";
+import {
+  ActiveSupportJSON,
+  isPresent,
+  type HashWithIndifferentAccess,
+} from "@blazetrails/activesupport";
+import { Base } from "../../../lib/base.js";
+import { YAMLColumn } from "../../../lib/coders/yaml-column.js";
+
+class Coder {
+  #default: Record<string, unknown>;
+
+  constructor(defaultVal: Record<string, unknown> = {}) {
+    this.#default = defaultVal;
+  }
+
+  dump(o: unknown): string {
+    return ActiveSupportJSON.encode(o != null && o !== false ? o : this.#default);
+  }
+
+  load(s: string | null | undefined): Record<string, unknown> {
+    return isPresent(s)
+      ? (ActiveSupportJSON.decode(s as string) as Record<string, unknown>)
+      : { ...this.#default };
+  }
+}
+
+export class AdminUser extends Base {
+  declare configs: HashWithIndifferentAccess<unknown>;
+  declare params: HashWithIndifferentAccess<unknown>;
+  declare settings: HashWithIndifferentAccess<unknown>;
+  declare spouse: HashWithIndifferentAccess<unknown>;
+  static {
+    constSet(Admin, "User", this);
+    DescendantsTracker.registerSubclass(Base, this);
+    constSet(this, "Coder", Coder);
+  }
+
+  static {
+    this.belongsTo("account");
+
+    this.store("params", { accessors: ["token"], coder: YAMLColumn });
+    this.store("settings", { accessors: ["color", "homepage"] });
+    this.storeAccessor("settings", "favoriteFood");
+    this.store("parent", { accessors: ["birthday", "name"], prefix: true });
+    this.store("spouse", { accessors: ["birthday"], prefix: "partner" });
+    this.storeAccessor("spouse", "name", { prefix: "partner" });
+    this.store("configs", { accessors: ["secretQuestion"] });
+    this.store("configs", { accessors: ["twoFactorAuth"], suffix: true });
+    this.storeAccessor("configs", "loginRetry", { suffix: "config" });
+    this.store("preferences", { accessors: ["rememberLogin"] });
+    this.store("json_data", { accessors: ["height", "weight"], coder: new Coder() });
+    this.store("json_data_empty", { accessors: ["isAGoodGuy"], coder: new Coder() });
+    this.storeAccessor("json_options", "enableFriendRequests");
+  }
+
+  get color(): unknown {
+    return this.readStoreAttribute("settings", "color") ?? "red";
+  }
+
+  set color(value: string) {
+    const allowed = ["black", "red", "green", "blue"];
+    this.writeStoreAttribute("settings", "color", allowed.includes(value) ? value : "blue");
+  }
+
+  get phoneNumber(): string {
+    return String(this.readStoreAttribute("settings", "phoneNumber") ?? "").replace(
+      /(\d{3})(\d{3})(\d{4})/,
+      "($1) $2-$3",
+    );
+  }
+
+  set phoneNumber(value: string | null | undefined) {
+    this.writeStoreAttribute(
+      "settings",
+      "phoneNumber",
+      value ? value.replace(/[^\d]/g, "") : value,
+    );
+  }
+}

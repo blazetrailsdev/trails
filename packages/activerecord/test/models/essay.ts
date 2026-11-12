@@ -1,0 +1,45 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { Author } from "./author.js";
+import type { Category } from "./category.js";
+import type { Owner } from "./owner.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Essay extends Base {
+  declare author_id: string;
+  declare book_id: number;
+  declare category_id: string;
+  declare name: string;
+  declare "type": string;
+  declare writer_id: string;
+  declare writer_type: string;
+
+  static {
+    this.belongsTo("author", { primaryKey: "name" });
+    this.belongsTo("writer", { primaryKey: "name", polymorphic: true });
+    this.belongsTo("category", { primaryKey: "name" });
+    this.hasOne("owner", { primaryKey: "name" });
+  }
+}
+constSet(TopLevel, "Essay", Essay);
+DescendantsTracker.registerSubclass(Base, Essay);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Essay {
+  get author(): Author | null | Promise<Author | null>;
+  set author(value: Author | null);
+  get writer(): Base | null | Promise<Base | null>;
+  set writer(value: Base | null);
+  get category(): Category | null | Promise<Category | null>;
+  set category(value: Category | null);
+  get owner(): Owner | null | Promise<Owner | null>;
+  set owner(value: Owner | null);
+}
+
+export class EssaySpecial extends Essay {}
+constSet(TopLevel, "EssaySpecial", EssaySpecial);
+DescendantsTracker.registerSubclass(Essay, EssaySpecial);
+
+export class TypedEssay extends Essay {}
+constSet(TopLevel, "TypedEssay", TypedEssay);
+DescendantsTracker.registerSubclass(Essay, TypedEssay);

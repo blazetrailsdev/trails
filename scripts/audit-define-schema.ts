@@ -13,8 +13,8 @@
 import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 
-const root = "packages/activerecord/src";
-// Scan every .ts file under src/. In trails, nothing in production code
+const root = "packages/activerecord/test";
+// Scan every .ts file under test/. In trails, nothing in production code
 // extends `Base` directly (Base IS the library class), so any file that
 // matches the `extends Base` pattern is by definition test or test-helper
 // infrastructure that participates in the schema lifecycle. The shared

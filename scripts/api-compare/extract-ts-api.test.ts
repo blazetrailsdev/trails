@@ -3728,7 +3728,7 @@ describe("extractFromProgram — include() detection", () => {
   });
 
   it("captures shorthand-property and callable-RHS object members", () => {
-    // Mirrors packages/activerecord/src/locking/pessimistic.ts — bug
+    // Mirrors packages/activerecord/lib/locking/pessimistic.ts — bug
     // flagged in PR #961 review.
     const info = extractFromFiles("/p", {
       "pessimistic.ts": `
@@ -7520,7 +7520,7 @@ describe("callArgs", () => {
 });
 
 describe("declaringFile (RFC 0126)", () => {
-  const SRC = "/repo/packages/activerecord/src";
+  const SRC = "/repo/packages/activerecord/lib";
 
   // Only `getSourceFile().fileName` and which declaration is picked matter, so
   // a stub says exactly what the checker would hand back.

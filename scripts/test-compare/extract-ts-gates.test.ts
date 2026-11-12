@@ -4,7 +4,7 @@ import { gateFromGuardExpr, gateFromWrapper, mergeGate } from "./gates.js";
 import type { TestGate } from "./types.js";
 
 /** Index a file's extracted tests by description → gate (or undefined). */
-function tsGates(source: string, relPath = "packages/activerecord/src/x.test.ts") {
+function tsGates(source: string, relPath = "packages/activerecord/test/cases/x.test.ts") {
   const info = extractTestsFromSource(source, relPath);
   const out: Record<string, TestGate | undefined> = {};
   for (const tc of info.testCases) out[tc.description] = tc.gate;
@@ -44,8 +44,8 @@ describe("gates.ts pure helpers", () => {
         it("runs", () => {});
       });
     `;
-    expect(() => tsGates(source, "packages/activerecord/src/oracle.test.ts")).toThrow(
-      /`describeIfOracle` \(used in packages\/activerecord\/src\/oracle\.test\.ts\)/,
+    expect(() => tsGates(source, "packages/activerecord/test/cases/oracle.test.ts")).toThrow(
+      /`describeIfOracle` \(used in packages\/activerecord\/test\/cases\/oracle\.test\.ts\)/,
     );
   });
 
@@ -447,7 +447,7 @@ describe("TS extractor gate detection", () => {
   it("handles describeIfSupports.skipIf without losing the suite title/gate", () => {
     const info = extractTestsFromSource(
       `describeIfSupports.skipIf(adapterType === "mysql")("json", "S", () => { it("k", () => {}); });`,
-      "packages/activerecord/src/x.test.ts",
+      "packages/activerecord/test/cases/x.test.ts",
     );
     const k = info.testCases.find((t) => t.description === "k")!;
     // title "S" is preserved in the path; gate = feature(json) ∩ guard(!mysql).
@@ -462,7 +462,7 @@ describe("TS extractor gate detection", () => {
   it("keeps it.skip as pending without a gate (the TODO signal)", () => {
     const info = extractTestsFromSource(
       `it.skip("h", () => {}); it("i", () => {});`,
-      "packages/activerecord/src/x.test.ts",
+      "packages/activerecord/test/cases/x.test.ts",
     );
     const h = info.testCases.find((t) => t.description === "h")!;
     const i = info.testCases.find((t) => t.description === "i")!;
@@ -498,7 +498,7 @@ describe("dynamically-named tests", () => {
         'it.skipIf(adapterType !== "postgres")(`casts ${type}`, () => {});',
         "test(`${a} and ${b}`, () => {});",
       ].join("\n"),
-      "packages/activerecord/src/x.test.ts",
+      "packages/activerecord/test/cases/x.test.ts",
     );
     expect(info.testCases.map((tc) => tc.description)).toEqual([
       "raises for <expr>",
@@ -560,7 +560,7 @@ describe("gate stack across a same-file shared-cases helper", () => {
           sharedCases();
         });
       `,
-      "packages/activerecord/src/x.test.ts",
+      "packages/activerecord/test/cases/x.test.ts",
     );
     expect(info.testCases.map((tc) => tc.path)).toEqual(["default"]);
   });
@@ -575,7 +575,7 @@ describe("gate stack across a same-file shared-cases helper", () => {
           sharedCases();
         });
       `,
-      "packages/activerecord/src/x.test.ts",
+      "packages/activerecord/test/cases/x.test.ts",
     );
     expect(info.testCases.map((tc) => tc.path)).toEqual(["Outer > default"]);
     expect(info.testCases[0].gate).toEqual({ adapters: ["postgresql"], source: ["wrapper"] });

@@ -90,7 +90,7 @@ that supports it lives. Because the chain awaits, `isValid()` runs
 DB-backed validators before returning and `save()` sees the same result;
 there is no separate async-validator queue for callers to drain.
 
-See `packages/activerecord/src/validations/uniqueness.ts` for the
+See `packages/activerecord/lib/validations/uniqueness.ts` for the
 pattern; ActiveModel contributes the validator registration and error
 accumulation.
 

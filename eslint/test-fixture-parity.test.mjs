@@ -42,9 +42,9 @@ beforeAll(() => {
   fs.writeFileSync(
     TMP_EXCLUDE,
     JSON.stringify([
-      "packages/activerecord/src/excluded.test.ts",
+      "packages/activerecord/test/cases/excluded.test.ts",
       {
-        file: "packages/activerecord/src/associations/eager.test.ts",
+        file: "packages/activerecord/test/cases/associations/eager.test.ts",
         tests: ["EagerTest > excluded eager test"],
       },
     ]),
@@ -59,7 +59,7 @@ afterAll(() => {
   else process.env.TEST_FIXTURE_PARITY_EXCLUDE_PATH = _prevExcludePath;
 });
 
-const AR = (rel) => path.join(ROOT, "packages/activerecord/src", rel);
+const AR = (rel) => path.join(ROOT, "packages/activerecord/test/cases", rel);
 
 describe("test-fixture-parity rule", () => {
   it("runs RuleTester cases", async () => {

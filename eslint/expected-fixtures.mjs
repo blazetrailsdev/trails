@@ -17,7 +17,7 @@
  *     that currently fail; ratcheted down as porters migrate to useFixtures.
  *
  * Path mapping (trails ↔ Rails):
- *   packages/activerecord/src/<dir>/<name>.test.ts
+ *   packages/activerecord/lib/<dir>/<name>.test.ts
  *     ↔ vendor/rails/v8.0.2/activerecord/test/cases/<dir>/<name>_test.rb
  *   kebab-case basenames (and dirs) round-trip to snake_case Rails paths.
  *
@@ -72,7 +72,7 @@ function loadExclude() {
  */
 export function trailsToRailsRel(absOrRelPath) {
   const norm = absOrRelPath.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)packages\/activerecord\/src\/(.+)\.test\.ts$/);
+  const m = norm.match(/(?:^|\/)packages\/activerecord\/(?:lib|test\/cases)\/(.+)\.test\.ts$/);
   if (!m) return null;
   return m[1].replace(/-/g, "_") + "_test.rb";
 }
@@ -125,7 +125,7 @@ export function requiredFixtureSets(entry) {
  */
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
-  const m = norm.match(/(?:^|\/)(packages\/activerecord\/src\/.+\.test\.ts)$/);
+  const m = norm.match(/(?:^|\/)(packages\/activerecord\/(?:lib|test\/cases)\/.+\.test\.ts)$/);
   return m ? m[1] : null;
 }
 

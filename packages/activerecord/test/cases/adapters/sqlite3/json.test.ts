@@ -1,0 +1,41 @@
+import { it, expect, beforeEach } from "vitest";
+import "../../../../lib/index.js";
+import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
+import { Base } from "../../../../lib/base.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import {
+  jsonSharedTestCases,
+  JsonDataType as klass,
+} from "../../../../lib/cases/json-shared-test-cases.js";
+import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
+
+const columnType = "json";
+
+describeIfSqlite("SQLite3JSONTest", () => {
+  fixtures([]);
+
+  let connection: SQLite3Adapter;
+
+  beforeEach(async () => {
+    connection = (await Base.leaseConnection()) as unknown as SQLite3Adapter;
+    // eslint-disable-next-line blazetrails/require-table-teardown
+    await connection.createTable("json_data_type", {}, (t: any) => {
+      t.json("payload", { default: {} });
+      t.json("settings");
+    });
+  });
+
+  jsonSharedTestCases({ columnType });
+
+  it("default", async () => {
+    const defaultVal = { users: "read", posts: ["read", "write"] };
+    await connection.addColumn("json_data_type", "permissions", columnType, {
+      default: defaultVal,
+    });
+    await klass.resetColumnInformation();
+    await klass.loadSchema();
+
+    expect(klass.columnDefaults["permissions"]).toEqual(defaultVal);
+    expect((new klass() as any).permissions).toEqual(defaultVal);
+  });
+});

@@ -8,9 +8,9 @@ import { ROOT_DIR, exceedances, main, measure, measureAt } from "./eslint-count.
 
 const run = promisify(execFile);
 const ANY = "@typescript-eslint/no-explicit-any";
-const STRIPPED = "packages/activerecord/src/associations.ts";
-const MOVED = "packages/activerecord/src/aggregations.ts";
-const MOVED_TO = "packages/activerecord/src/aggregations-moved.ts";
+const STRIPPED = "packages/activerecord/lib/associations.ts";
+const MOVED = "packages/activerecord/lib/aggregations.ts";
+const MOVED_TO = "packages/activerecord/lib/aggregations-moved.ts";
 
 describe("exceedances", () => {
   it("flags a file above its base count and a file new at a non-zero count", () => {

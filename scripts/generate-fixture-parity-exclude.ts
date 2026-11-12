@@ -32,7 +32,7 @@ const RULE_ID = "blazetrails/test-fixture-parity";
 async function main(): Promise<void> {
   const { ESLint } = await import("eslint");
   const eslint = new ESLint({ cwd: ROOT });
-  const results = await eslint.lintFiles(["packages/activerecord/src/**/*.test.ts"]);
+  const results = await eslint.lintFiles(["packages/activerecord/test/**/*.test.ts"]);
 
   const previous: unknown[] = fs.existsSync(OUT_PATH)
     ? JSON.parse(fs.readFileSync(OUT_PATH, "utf8"))

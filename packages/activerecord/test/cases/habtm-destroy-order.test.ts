@@ -1,0 +1,71 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect } from "vitest";
+import {
+  assertNoDifference,
+  assertNotEmpty,
+  assertRaises,
+  assertNothingRaised,
+} from "@blazetrails/activesupport/testing/assertions";
+import { Rollback } from "../../lib/index.js";
+import "../support/canonical-model-index.js";
+import { Lesson, LessonError } from "../models/lesson.js";
+import { Student } from "../models/student.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+
+const { self } = fixtures([]);
+
+describe("HabtmDestroyOrderTest", () => {
+  constSet(TopLevel, "Lesson", Lesson);
+  constSet(TopLevel, "Student", Student);
+
+  it("may not delete a lesson with students", async () => {
+    const sicp = await Lesson.create({ name: "SICP" });
+    const ben = await Student.create({ name: "Ben Bitdiddle" });
+    await sicp.students.push(ben);
+
+    await assertRaises([LessonError], {}, async () => {
+      await assertNoDifference(
+        async () => Number(await Lesson.count()),
+        null,
+        async () => {
+          await sicp.destroy();
+        },
+      );
+    });
+    expect(sicp.isDestroyed()).toBeFalsy();
+  });
+
+  it("should not raise error if have foreign key in the join table", async () => {
+    const student = await Student.create({ name: "Ben Bitdiddle" });
+    const lesson = await Lesson.create({ name: "SICP" });
+    await lesson.students.push(student);
+    await assertNothingRaised(async () => {
+      await student.destroy();
+    });
+  });
+
+  it("not destroying a student with lessons leaves student<=>lesson association intact", async () => {
+    await self().resetCallbacks(Student, "destroy", async () => {
+      Student.beforeDestroy(async (r: any) => {
+        if (!(await r.association("lessons").reader.isEmpty())) throw new Rollback();
+      });
+      const sicp = await Lesson.create({ name: "SICP" });
+      const ben = await Student.create({ name: "Ben Bitdiddle" });
+      await ben.lessons.push(sicp);
+
+      await ben.destroy();
+      await ben.reload();
+      assertNotEmpty(await ben.lessons);
+    });
+  });
+
+  it("not destroying a lesson with students leaves student<=>lesson association intact", async () => {
+    const sicp = await Lesson.create({ name: "SICP" });
+    const ben = await Student.create({ name: "Ben Bitdiddle" });
+    await sicp.students.push(ben);
+
+    await expect(sicp.destroy()).rejects.toThrow(LessonError);
+    await sicp.reload();
+    assertNotEmpty(await sicp.students);
+  });
+});

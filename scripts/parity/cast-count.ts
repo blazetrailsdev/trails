@@ -1,7 +1,7 @@
 /**
  * The activerecord cast-count ratchet (RFC 0198, § "The ratchet").
  *
- * Counts, per non-test `.ts` file under `packages/activerecord/src`, the lines
+ * Counts, per non-test `.ts` file under `packages/activerecord/lib`, the lines
  * matching {@link CAST_RE} — the RFC's exact regex, with `grep -cE` semantics
  * (matching LINES, not matches) — and fails when any file's count is above
  * its count at the merge-base with `origin/main`. RFC 0037's
@@ -24,7 +24,7 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-export const SRC = "packages/activerecord/src";
+export const SRC = "packages/activerecord/lib";
 
 /** The RFC's `grep -rcE` pattern, verbatim. */
 export const CAST_PATTERN = String.raw`this: any\b|\(this as (any|unknown)|\bas any\b|as unknown as`;

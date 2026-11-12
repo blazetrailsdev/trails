@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 import os from "os";
-import { resolveForkCount } from "./packages/activerecord/src/support/ar-db-forks-default.js";
+import { resolveForkCount } from "./packages/activerecord/test/support/ar-db-forks-default.js";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) requests a vitest worker
 // count; TEST_FORKS below is the effective one — the request clamped to the
@@ -66,18 +66,18 @@ const SYSTEM_SCREENSHOT_DIRECTORY = "tmp/screenshots";
 const ARCONN = process.env.ARCONN ?? "sqlite3";
 
 const PG_ADAPTER_DIRS = [
-  "packages/activerecord/src/adapters/postgresql/**",
-  "packages/activerecord/src/tasks/postgresql-*.test.ts",
+  "packages/activerecord/test/cases/adapters/postgresql/**",
+  "packages/activerecord/test/cases/tasks/postgresql-*.test.ts",
 ];
 const MYSQL_ADAPTER_DIRS = [
-  "packages/activerecord/src/adapters/abstract-mysql-adapter/**",
-  "packages/activerecord/src/adapters/mysql2/**",
-  "packages/activerecord/src/connection-adapters/mysql2-*.test.ts",
-  "packages/activerecord/src/tasks/mysql-*.test.ts",
+  "packages/activerecord/test/cases/adapters/abstract-mysql-adapter/**",
+  "packages/activerecord/test/cases/adapters/mysql2/**",
+  "packages/activerecord/test/cases/connection-adapters/mysql2-*.test.ts",
+  "packages/activerecord/test/cases/tasks/mysql-*.test.ts",
 ];
 const SQLITE_ADAPTER_DIRS = [
-  "packages/activerecord/src/adapters/sqlite3/**",
-  "packages/activerecord/src/tasks/sqlite-*.test.ts",
+  "packages/activerecord/test/cases/adapters/sqlite3/**",
+  "packages/activerecord/test/cases/tasks/sqlite-*.test.ts",
 ];
 
 const ADAPTER_SPECIFIC_EXCLUDE =
@@ -92,8 +92,8 @@ const ADAPTER_SPECIFIC_EXCLUDE =
 // load cases/helper.ts, whose connection bootstrap opens a DB at module load.
 // Run them in their own setup-free project.
 const SQLITE_DRIVER_TESTS = [
-  "packages/activerecord/src/sqlite/**/*.test.ts",
-  "packages/activerecord/src/sqlite-adapter.trails.test.ts",
+  "packages/activerecord/test/cases/sqlite/**/*.test.ts",
+  "packages/activerecord/test/cases/sqlite-adapter.trails.test.ts",
 ];
 
 // Clamp to vitest's own host-derived ceiling (numCpus - 1): while the root
@@ -234,97 +234,97 @@ const alias = {
   "@blazetrails/activemodel": path.resolve(__dirname, "packages/activemodel/lib/index.ts"),
   "@blazetrails/activerecord/destroy-association-async-job": path.resolve(
     __dirname,
-    "packages/activerecord/src/destroy-association-async-job.ts",
+    "packages/activerecord/lib/destroy-association-async-job.ts",
   ),
   "@blazetrails/activerecord/message-pack": path.resolve(
     __dirname,
-    "packages/activerecord/src/message-pack.ts",
+    "packages/activerecord/lib/message-pack.ts",
   ),
   "@blazetrails/activerecord/fixtures.js": path.resolve(
     __dirname,
-    "packages/activerecord/src/fixtures.ts",
+    "packages/activerecord/lib/fixtures.ts",
   ),
   "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js": path.resolve(
     __dirname,
-    "packages/activerecord/src/connection-adapters/sqlite3-adapter.ts",
+    "packages/activerecord/lib/connection-adapters/sqlite3-adapter.ts",
   ),
   "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js": path.resolve(
     __dirname,
-    "packages/activerecord/src/connection-adapters/better-sqlite3-adapter.ts",
+    "packages/activerecord/lib/connection-adapters/better-sqlite3-adapter.ts",
   ),
   "@blazetrails/activerecord/connection-adapters/node-sqlite-adapter.js": path.resolve(
     __dirname,
-    "packages/activerecord/src/connection-adapters/node-sqlite-adapter.ts",
+    "packages/activerecord/lib/connection-adapters/node-sqlite-adapter.ts",
   ),
   "@blazetrails/activerecord/connection-adapters/expo-sqlite-adapter.js": path.resolve(
     __dirname,
-    "packages/activerecord/src/connection-adapters/expo-sqlite-adapter.ts",
+    "packages/activerecord/lib/connection-adapters/expo-sqlite-adapter.ts",
   ),
   "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js": path.resolve(
     __dirname,
-    "packages/activerecord/src/connection-adapters/postgresql-adapter.ts",
+    "packages/activerecord/lib/connection-adapters/postgresql-adapter.ts",
   ),
   "@blazetrails/activerecord/adapters/postgresql-adapter.js": path.resolve(
     __dirname,
-    "packages/activerecord/src/adapters/postgresql-adapter.ts",
+    "packages/activerecord/lib/adapters/postgresql-adapter.ts",
   ),
   "@blazetrails/activerecord/adapters/mysql2-adapter.js": path.resolve(
     __dirname,
-    "packages/activerecord/src/adapters/mysql2-adapter.ts",
+    "packages/activerecord/lib/adapters/mysql2-adapter.ts",
   ),
   "@blazetrails/activerecord/fixtures": path.resolve(
     __dirname,
-    "packages/activerecord/src/fixtures.ts",
+    "packages/activerecord/lib/fixtures.ts",
   ),
   "@blazetrails/activerecord/active-record": path.resolve(
     __dirname,
-    "packages/activerecord/src/active-record.ts",
+    "packages/activerecord/lib/active-record.ts",
   ),
   "@blazetrails/activerecord/test-databases": path.resolve(
     __dirname,
-    "packages/activerecord/src/test-databases.ts",
+    "packages/activerecord/lib/test-databases.ts",
   ),
   "@blazetrails/activerecord/test-fixtures": path.resolve(
     __dirname,
-    "packages/activerecord/src/test-fixtures.ts",
+    "packages/activerecord/lib/test-fixtures.ts",
   ),
   "@blazetrails/activerecord/testing/query-assertions": path.resolve(
     __dirname,
-    "packages/activerecord/src/testing/query-assertions.ts",
+    "packages/activerecord/lib/testing/query-assertions.ts",
   ),
   "@blazetrails/activerecord/coders/json": path.resolve(
     __dirname,
-    "packages/activerecord/src/coders/json.ts",
+    "packages/activerecord/lib/coders/json.ts",
   ),
   "@blazetrails/activerecord/migration": path.resolve(
     __dirname,
-    "packages/activerecord/src/migration.ts",
+    "packages/activerecord/lib/migration.ts",
   ),
   "@blazetrails/activerecord/sqlite-adapter": path.resolve(
     __dirname,
-    "packages/activerecord/src/sqlite-adapter.ts",
+    "packages/activerecord/lib/sqlite-adapter.ts",
   ),
   "@blazetrails/activerecord/sqlite/better-sqlite3": path.resolve(
     __dirname,
-    "packages/activerecord/src/sqlite/better-sqlite3.ts",
+    "packages/activerecord/lib/sqlite/better-sqlite3.ts",
   ),
   "@blazetrails/activerecord/sqlite/node-sqlite": path.resolve(
     __dirname,
-    "packages/activerecord/src/sqlite/node-sqlite.ts",
+    "packages/activerecord/lib/sqlite/node-sqlite.ts",
   ),
   "@blazetrails/activerecord/sqlite/expo-sqlite": path.resolve(
     __dirname,
-    "packages/activerecord/src/sqlite/expo-sqlite.ts",
+    "packages/activerecord/lib/sqlite/expo-sqlite.ts",
   ),
   "@blazetrails/activerecord/encryption": path.resolve(
     __dirname,
-    "packages/activerecord/src/encryption/index.ts",
+    "packages/activerecord/lib/encryption/index.ts",
   ),
   "@blazetrails/activerecord-cli": path.resolve(
     __dirname,
     "packages/activerecord-cli/lib/index.ts",
   ),
-  "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/src/index.ts"),
+  "@blazetrails/activerecord": path.resolve(__dirname, "packages/activerecord/lib/index.ts"),
   "@blazetrails/rack-session/": path.resolve(__dirname, "packages/rack-session/lib") + "/",
   "@blazetrails/rack-session": path.resolve(__dirname, "packages/rack-session/lib/index.ts"),
   "@blazetrails/rack-test/": path.resolve(__dirname, "packages/rack-test/lib") + "/",
@@ -460,7 +460,7 @@ const AR_CLI_COVERAGE = process.env.AR_CLI_COVERAGE === "1";
 // 0% skew).
 const TRAILS_TSC_COVERAGE = process.env.TRAILS_TSC_COVERAGE === "1";
 const COVERAGE_INCLUDE = AR_COVERAGE
-  ? ["packages/activerecord/src/**/*.ts", "packages/activerecord/src/**/*.mts"]
+  ? ["packages/activerecord/lib/**/*.ts", "packages/activerecord/lib/**/*.mts"]
   : AR_CLI_COVERAGE
     ? ["packages/activerecord-cli/lib/**/*.ts", "packages/activerecord-cli/lib/**/*.mts"]
     : TRAILS_TSC_COVERAGE
@@ -473,7 +473,7 @@ const COVERAGE_EXCLUDE = [
   "**/dist/**",
   "**/__snapshots__/**",
   "**/test-helpers/**",
-  "packages/activerecord/src/support/**",
+  "packages/activerecord/lib/support/**",
   "**/test-support/**",
   "**/*.config.ts",
   "packages/website/**",
@@ -599,7 +599,7 @@ export default defineConfig({
         test: {
           name: "activerecord",
           include: [
-            "packages/activerecord/src/**/*.test.ts",
+            "packages/activerecord/test/**/*.test.ts",
             "packages/activerecord/scripts/**/*.test.ts",
             "packages/solid-queue/test/**/*.test.ts",
             "packages/solid-cable/test/**/*.test.ts",
@@ -619,27 +619,27 @@ export default defineConfig({
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
           // instead of re-issuing the DDL per file. No-op on PG/MySQL runs.
-          globalSetup: ["./packages/activerecord/src/support/template-global-setup.ts"],
+          globalSetup: ["./packages/activerecord/test/support/template-global-setup.ts"],
           setupFiles: [
-            "./packages/activerecord/src/test-setup-worker-db.ts",
+            "./packages/activerecord/lib/test-setup-worker-db.ts",
             "./packages/vitest-matchers/lib/setup.ts",
             // `ActiveSupport::TestCase`'s include list (test_case.rb:144-153),
             // which helper.rb picks up by requiring active_support/test_case.
             "./packages/activesupport/lib/testing/autorun.ts",
-            "./packages/activerecord/src/cases/helper.ts",
+            "./packages/activerecord/lib/cases/helper.ts",
             "./packages/bcrypt/lib/index.ts",
             "./packages/actionview/test/support/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
-              ? ["./packages/activerecord/src/test-setup-mysql.ts"]
+              ? ["./packages/activerecord/lib/test-setup-mysql.ts"]
               : []),
             ...(process.env.ARCONN === "postgresql"
-              ? ["./packages/activerecord/src/test-setup-pg-cancel-trace.ts"]
+              ? ["./packages/activerecord/lib/test-setup-pg-cancel-trace.ts"]
               : []),
-            "./packages/activerecord/src/test-setup-dy.ts",
+            "./packages/activerecord/lib/test-setup-dy.ts",
             "./packages/ruby-compat/test-setup/class-paths.ts",
             // Opt-in DDL timing profiler, gated on DDL_PROFILE=1 (dormant/no-op when off).
             ...(process.env.DDL_PROFILE === "1"
-              ? ["./packages/activerecord/src/test-setup-ddl-profile.ts"]
+              ? ["./packages/activerecord/lib/test-setup-ddl-profile.ts"]
               : []),
           ],
           retry: 0,

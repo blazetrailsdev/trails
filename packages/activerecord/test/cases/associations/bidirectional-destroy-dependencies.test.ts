@@ -1,0 +1,52 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { describe, it, expect, beforeEach } from "vitest";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import {
+  Content,
+  ContentPosition,
+  ContentWhichRequiresTwoDestroyCalls,
+} from "../../models/content.js";
+
+describe("BidirectionalDestroyDependenciesTest", () => {
+  fixtures(["content", "contentPositions"]);
+
+  constSet(TopLevel, "Content", Content);
+  constSet(TopLevel, "ContentPosition", ContentPosition);
+  constSet(TopLevel, "ContentWhichRequiresTwoDestroyCalls", ContentWhichRequiresTwoDestroyCalls);
+
+  beforeEach(() => {
+    Content.destroyedIds.length = 0;
+    ContentPosition.destroyedIds.length = 0;
+  });
+
+  it("bidirectional dependence when destroying item with belongs to association", async () => {
+    const contentPosition = await ContentPosition.find(1);
+    const content = await contentPosition.association("content").loadTarget();
+    expect(content).not.toBeNull();
+
+    await contentPosition.destroy();
+
+    expect(ContentPosition.destroyedIds).toEqual([contentPosition.id]);
+    expect(Content.destroyedIds).toEqual([(content as Content).id]);
+  });
+
+  it("bidirectional dependence when destroying item with has one association", async () => {
+    const content = await Content.find(1);
+    const contentPosition = await content.association("contentPosition").loadTarget();
+    expect(contentPosition).not.toBeNull();
+
+    await content.destroy();
+
+    expect(Content.destroyedIds).toEqual([content.id]);
+    expect(ContentPosition.destroyedIds).toEqual([(contentPosition as ContentPosition).id]);
+  });
+
+  it("bidirectional dependence when destroying item with has one association fails first time", async () => {
+    const content = await ContentWhichRequiresTwoDestroyCalls.find(1);
+
+    await content.destroy();
+    await content.destroy();
+
+    expect(content.isDestroyed()).toBe(true);
+  });
+});

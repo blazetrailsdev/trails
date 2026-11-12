@@ -9,8 +9,8 @@ const tester = new RuleTester({
   },
 });
 
-const IN = "packages/activerecord/src/relation.ts";
-const ADAPTER = "packages/activerecord/src/connection-adapters/sqlite.ts";
+const IN = "packages/activerecord/lib/relation.ts";
+const ADAPTER = "packages/activerecord/lib/connection-adapters/sqlite.ts";
 
 tester.run("no-raw-sql", rule, {
   valid: [
@@ -25,27 +25,27 @@ tester.run("no-raw-sql", rule, {
     // Same allowed in the adapters/ layer.
     {
       code: 'connection.execute("DROP TABLE posts");',
-      filename: "packages/activerecord/src/adapters/abstract.ts",
+      filename: "packages/activerecord/lib/adapters/abstract.ts",
     },
     // schema-*.ts (DDL dumper/migration) legitimately renders SQL.
     {
       code: 'connection.execute("CREATE TABLE posts (id integer)");',
-      filename: "packages/activerecord/src/schema-dumper.ts",
+      filename: "packages/activerecord/lib/schema-dumper.ts",
     },
     // Test files are out of scope.
     {
       code: 'connection.execute("SELECT * FROM posts");',
-      filename: "packages/activerecord/src/relation.test.ts",
+      filename: "packages/activerecord/test/cases/relation.test.ts",
     },
     // test-helpers/ DDL infra renders SQL by design (never migrating to arel).
     {
       code: 'connection.execute("CREATE TABLE posts (id integer)");',
-      filename: "packages/activerecord/src/fixtures.ts",
+      filename: "packages/activerecord/lib/fixtures.ts",
     },
     // test-setup-*.ts worker-db bootstrap is likewise scoped out.
     {
       code: 'connection.execute("DROP TABLE posts");',
-      filename: "packages/activerecord/src/test-setup-worker-db.ts",
+      filename: "packages/activerecord/lib/test-setup-worker-db.ts",
     },
     // Surgery on a variable that isn't named `sql`.
     { code: 'query.replace(/LIMIT \\d+/, "");', filename: IN },
@@ -72,10 +72,10 @@ tester.run("no-raw-sql", rule, {
       errors: [{ messageId: "noRawSql", data: { sink: "execute" } }],
     },
     // The fixture-machinery exemption is anchored to the exact ported files, so
-    // a same-named module elsewhere under activerecord/src is still scanned.
+    // a same-named module elsewhere under activerecord/lib is still scanned.
     {
       code: 'connection.execute("SELECT * FROM posts");',
-      filename: "packages/activerecord/src/relation/fixtures.ts",
+      filename: "packages/activerecord/lib/relation/fixtures.ts",
       errors: [{ messageId: "noRawSql", data: { sink: "execute" } }],
     },
     // Template literal with interpolation, anchored on the first quasi.

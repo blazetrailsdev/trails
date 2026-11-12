@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const SRC = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
-  "../packages/activerecord/src",
+  "../packages/activerecord/test",
 );
 
 /**
@@ -14,7 +14,10 @@ const SRC = path.resolve(
  * `blazetrails/require-canonical-rebuild` cannot see the transaction. A new
  * directive is a canonical table some file leaves dropped: fix the drop.
  */
-const ALLOWED = ["migration/exclusion-constraint.test.ts", "migration/unique-constraint.test.ts"];
+const ALLOWED = [
+  "cases/migration/exclusion-constraint.test.ts",
+  "cases/migration/unique-constraint.test.ts",
+];
 
 describe("require-canonical-rebuild inline disables", () => {
   it("are the two transactional constraint-test teardowns and nothing else", async () => {

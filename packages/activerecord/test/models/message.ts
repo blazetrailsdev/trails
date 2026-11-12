@@ -1,0 +1,26 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Temporal, Time as RubyTime } from "@blazetrails/date";
+import type { Entry } from "./entry.js";
+import type { Recipient } from "./recipient.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class Message extends Base {
+  declare recipients: AssociationProxy<Recipient>;
+  declare subject: string;
+  declare updated_at: RubyTime | Temporal.PlainDateTime;
+
+  static {
+    this.hasOne("entry", { as: "entryable", touch: true });
+    this.hasMany("recipients");
+  }
+}
+constSet(TopLevel, "Message", Message);
+DescendantsTracker.registerSubclass(Base, Message);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Message {
+  get entry(): Entry | null | Promise<Entry | null>;
+  set entry(value: Entry | null);
+}

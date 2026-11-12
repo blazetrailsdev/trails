@@ -1,0 +1,45 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import type { AssociationProxy } from "../../lib/associations/collection-proxy.js";
+import type { Discount } from "./discount.js";
+import type { Invoice } from "./invoice.js";
+import { Base } from "../../lib/base.js";
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class LineItem extends Base {
+  declare discountApplications: AssociationProxy<LineItemDiscountApplication>;
+  declare amount: number;
+  declare invoice_id: number;
+
+  static {
+    this.belongsTo("invoice", { touch: true });
+    this.hasMany("discountApplications", { className: "LineItemDiscountApplication" });
+  }
+}
+constSet(TopLevel, "LineItem", LineItem);
+DescendantsTracker.registerSubclass(Base, LineItem);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface LineItem {
+  get invoice(): Invoice | null | Promise<Invoice | null>;
+  set invoice(value: Invoice | null);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export class LineItemDiscountApplication extends Base {
+  declare discount_id: number;
+  declare line_item_id: number;
+
+  static {
+    this.belongsTo("lineItem");
+    this.belongsTo("discount");
+  }
+}
+constSet(TopLevel, "LineItemDiscountApplication", LineItemDiscountApplication);
+DescendantsTracker.registerSubclass(Base, LineItemDiscountApplication);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface LineItemDiscountApplication {
+  get lineItem(): LineItem | null | Promise<LineItem | null>;
+  set lineItem(value: LineItem | null);
+  get discount(): Discount | null | Promise<Discount | null>;
+  set discount(value: Discount | null);
+}

@@ -13,34 +13,34 @@ const FIXTURE = {
     // include-graph resolution (Rails Base extends Inheritance::ClassMethods
     // through the Concern `included` hook). Both rules just do a file-scoped
     // lookup.
-    "packages/activerecord/src/inheritance.ts": ["computeType"],
-    "packages/activerecord/src/base.ts": ["computeType"],
+    "packages/activerecord/lib/inheritance.ts": ["computeType"],
+    "packages/activerecord/lib/base.ts": ["computeType"],
     "packages/activemodel/lib/attributes.ts": [],
-    "packages/activerecord/src/associations/preloader/association.ts": [],
+    "packages/activerecord/lib/associations/preloader/association.ts": [],
   },
   // `attribute` folds out of the file-wide union: private on the instance half
   // (activemodel/lib/active_model/attributes.rb:161), public on
   // `Attributes::ClassMethods` (attributes.rb:59).
   instanceFiles: {
     "packages/activemodel/lib/attributes.ts": ["attribute"],
-    "packages/activerecord/src/associations/preloader/association.ts": [],
+    "packages/activerecord/lib/associations/preloader/association.ts": [],
   },
   // `loadRecords` folds out of both file-wide unions: private on the nested
   // `LoaderRecords` (activerecord/lib/active_record/associations/preloader/
   // association.rb:91), public on `Association` (:197).
   entityInstanceFiles: {
-    "packages/activerecord/src/associations/preloader/association.ts": {
+    "packages/activerecord/lib/associations/preloader/association.ts": {
       LoaderRecords: ["loadRecords", "loaderQuery"],
     },
   },
 };
 setManifestForTests(FIXTURE);
-const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/src/inheritance.ts");
-const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
+const inheritanceFile = path.join(REPO_ROOT, "packages/activerecord/lib/inheritance.ts");
+const baseFile = path.join(REPO_ROOT, "packages/activerecord/lib/base.ts");
 const attributesFile = path.join(REPO_ROOT, "packages/activemodel/lib/attributes.ts");
 const preloaderAssociationFile = path.join(
   REPO_ROOT,
-  "packages/activerecord/src/associations/preloader/association.ts",
+  "packages/activerecord/lib/associations/preloader/association.ts",
 );
 
 const tester = new RuleTester({

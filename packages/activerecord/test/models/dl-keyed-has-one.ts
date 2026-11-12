@@ -1,0 +1,15 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import { Base } from "../../lib/base.js";
+
+export class DlKeyedHasOne extends Base {
+  declare destroy_async_parent_id: number;
+  declare destroy_async_parent_soft_delete_id: number;
+  declare has_one_key: number;
+
+  static {
+    this.primaryKey = "has_one_key";
+  }
+}
+constSet(TopLevel, "DlKeyedHasOne", DlKeyedHasOne);
+DescendantsTracker.registerSubclass(Base, DlKeyedHasOne);

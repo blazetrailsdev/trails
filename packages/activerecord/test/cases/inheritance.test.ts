@@ -1,0 +1,798 @@
+import { DescendantsTracker } from "@blazetrails/activesupport";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { StringType } from "@blazetrails/activemodel";
+import {
+  assert,
+  assertNot,
+  assertNothingRaised,
+  assertPredicate,
+  assertNotPredicate,
+  assertRaise,
+  assertRaises,
+} from "@blazetrails/activesupport/testing/assertions";
+import {
+  include,
+  constSet,
+  regexpEscape,
+  TopLevel,
+  rbObjClone,
+  rbModRemoveConst,
+} from "@blazetrails/ruby-compat";
+import { Nodes } from "@blazetrails/arel";
+import { classify, underscore } from "@blazetrails/activesupport";
+import { Base } from "../../lib/index.js";
+import * as Type from "../../lib/type.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import { Inheritance, stiName, isBaseClass, baseClass } from "../../lib/inheritance.js";
+import {
+  ActiveRecordError,
+  SubclassNotFound,
+  RecordNotFound,
+  NotImplementedError,
+  NameError,
+} from "../../lib/errors.js";
+import {
+  AbstractCompany,
+  Company,
+  Firm,
+  Client,
+  NamespacedCompany,
+  SpecialCo,
+  SpecialClient,
+  VerySpecialClient,
+} from "../models/company.js";
+import {
+  Vegetable,
+  Cucumber,
+  Cabbage,
+  GreenCabbage,
+  KingCole,
+  RedCabbage,
+  YellingVegetable,
+} from "../models/vegetables.js";
+import { Subscriber, SpecialSubscriber } from "../models/subscriber.js";
+import { SelectedMembership } from "../models/membership.js";
+import {
+  Post,
+  SpecialPost,
+  StiPost,
+  SubStiPost,
+  AbstractStiPost,
+  SubAbstractStiPost,
+} from "../../lib/test-helpers/models/post.js";
+import { LoosePerson, LooseDescendant, TightPerson, TightDescendant } from "../models/person.js";
+import { Account } from "../models/account.js";
+import { Author } from "../models/author.js";
+import { ShopProduct, ShopProductType } from "../models/shop.js";
+
+describe("InheritanceTest", () => {
+  const { self, companies } = fixtures([
+    "companies",
+    "projects",
+    "subscribers",
+    "accounts",
+    "vegetables",
+    "memberships",
+  ]);
+
+  let _prevStoreFullStiClass: boolean;
+  beforeEach(() => {
+    _prevStoreFullStiClass = Base.storeFullStiClass;
+  });
+  afterEach(() => {
+    Base.storeFullStiClass = _prevStoreFullStiClass;
+  });
+
+  it("class with store full sti class returns full name", () => {
+    Base.storeFullStiClass = true;
+    expect(stiName(NamespacedCompany)).toBe("Namespaced::Company");
+  });
+
+  it("class with blank sti name", async () => {
+    let company = await Company.first();
+    company = company!.dup() as typeof company;
+    await company!.update({ type: "  " });
+    company = await Company.find(company!.id);
+    expect((company as any).type).toBe("  ");
+  });
+
+  it("class without store full sti class returns demodulized name", () => {
+    Base.storeFullStiClass = false;
+    expect(stiName(NamespacedCompany)).toBe("Company");
+  });
+
+  it("compute type success", () => {
+    constSet(TopLevel, "Author", Author);
+    expect(Company.computeType("Author")).toBe(Author);
+  });
+
+  it("compute type nonexistent constant", async () => {
+    const e = await assertRaises([NameError], {}, () => {
+      Company.computeType("NonexistentModel");
+    });
+    expect(e.message).toMatch("uninitialized constant Company::NonexistentModel");
+    expect(e.constantName).toBe("Company::NonexistentModel");
+  });
+
+  it.skip("compute type no method error", () => {
+    // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  });
+
+  it.skip("compute type on undefined method", () => {
+    // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  });
+
+  it.skip("compute type argument error", () => {
+    // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  });
+
+  it("should store demodulized class name with store full sti class option disabled", () => {
+    Base.storeFullStiClass = false;
+    const item = new NamespacedCompany();
+    expect((item as any)._readAttribute("type")).toBe("Company");
+  });
+
+  it("should store full class name with store full sti class option enabled", () => {
+    Base.storeFullStiClass = true;
+    const item = new NamespacedCompany();
+    expect((item as any)._readAttribute("type")).toBe("Namespaced::Company");
+  });
+
+  it("different namespace subclass should load correctly with store full sti class option", async () => {
+    Base.storeFullStiClass = true;
+    const item = await NamespacedCompany.create({ name: "Wolverine 2" });
+    expect(await Company.find(item.id)).not.toBeNull();
+    expect(await NamespacedCompany.find(item.id)).not.toBeNull();
+  });
+
+  it("descends from active record", async () => {
+    assertNotPredicate(Base, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(LoosePerson, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(LooseDescendant, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(TightPerson, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(TightDescendant, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(Post, (k) => k.isDescendsFromActiveRecord());
+    await Post.loadSchema();
+    assertNotPredicate(StiPost, (k) => k.isDescendsFromActiveRecord());
+    assertNotPredicate(SubStiPost, (k) => k.isDescendsFromActiveRecord());
+    assertNotPredicate(AbstractStiPost, (k) => k.isDescendsFromActiveRecord());
+    assertNotPredicate(SubAbstractStiPost, (k) => k.isDescendsFromActiveRecord());
+  });
+
+  it("company descends from active record", async () => {
+    assertNotPredicate(Base, (k) => k.isDescendsFromActiveRecord());
+    assertPredicate(
+      AbstractCompany,
+      (k) => k.isDescendsFromActiveRecord(),
+      "AbstractCompany should descend from ActiveRecord::Base",
+    );
+    assertPredicate(
+      Company,
+      (k) => k.isDescendsFromActiveRecord(),
+      "Company should descend from ActiveRecord::Base",
+    );
+    await Company.loadSchema();
+    class LocalCompanySubclass extends Company {}
+    assertNot(
+      LocalCompanySubclass.isDescendsFromActiveRecord(),
+      "Company subclass should not descend from ActiveRecord::Base",
+    );
+  });
+
+  it("abstract class", () => {
+    assertNotPredicate(Base, (k) => k.abstractClass);
+    assertPredicate(LoosePerson, (k) => k.abstractClass);
+    assertNotPredicate(LooseDescendant, (k) => k.abstractClass);
+  });
+
+  it("inheritance base class", () => {
+    expect(baseClass.call(Post)).toBe(Post);
+    assertPredicate(Post, (k) => isBaseClass(k));
+    expect(baseClass.call(SpecialPost)).toBe(Post);
+    assertNotPredicate(SpecialPost, (k) => isBaseClass(k));
+    expect(baseClass.call(StiPost)).toBe(Post);
+    assertNotPredicate(StiPost, (k) => isBaseClass(k));
+    expect(baseClass.call(SubStiPost)).toBe(Post);
+    assertNotPredicate(SubStiPost, (k) => isBaseClass(k));
+    expect(baseClass.call(SubAbstractStiPost)).toBe(SubAbstractStiPost);
+    assertPredicate(SubAbstractStiPost, (k) => isBaseClass(k));
+  });
+
+  it("abstract inheritance base class", () => {
+    expect(baseClass.call(LoosePerson)).toBe(LoosePerson);
+    assertPredicate(LoosePerson, (k) => isBaseClass(k));
+    expect(baseClass.call(LooseDescendant)).toBe(LooseDescendant);
+    assertPredicate(LooseDescendant, (k) => isBaseClass(k));
+    expect(baseClass.call(TightPerson)).toBe(TightPerson);
+    assertPredicate(TightPerson, (k) => isBaseClass(k));
+    expect(baseClass.call(TightDescendant)).toBe(TightPerson);
+    assertNotPredicate(TightDescendant, (k) => isBaseClass(k));
+  });
+
+  it("base class activerecord error", async () => {
+    await assertRaise([ActiveRecordError], {}, () => {
+      include(class {}, Inheritance);
+    });
+  });
+
+  it("a bad type column", async () => {
+    const firmRow = companies("first_firm");
+    await Company.where({ id: firmRow.id }).updateAll("type = 'bad_class!'");
+    await expect(Company.find(firmRow.id)).rejects.toThrow(SubclassNotFound);
+  });
+
+  it("inheritance find", async () => {
+    expect(await Company.find(1)).toBeInstanceOf(Firm);
+    expect(await Firm.find(1)).toBeInstanceOf(Firm);
+    expect(await Company.find(2)).toBeInstanceOf(Client);
+    expect(await Client.find(2)).toBeInstanceOf(Client);
+  });
+
+  it("alt inheritance find", async () => {
+    expect(await Vegetable.find(1)).toBeInstanceOf(Cucumber);
+    expect(await Cucumber.find(1)).toBeInstanceOf(Cucumber);
+    expect(await Vegetable.find(2)).toBeInstanceOf(Cabbage);
+    expect(await Cabbage.find(2)).toBeInstanceOf(Cabbage);
+  });
+
+  it("alt becomes works with sti", async () => {
+    const vegetable = await Vegetable.find(1);
+    expect(vegetable).toBeInstanceOf(Vegetable);
+    const cabbage = vegetable.becomes(Cabbage);
+    expect(cabbage).toBeInstanceOf(Cabbage);
+  });
+
+  it("becomes sets variables before initialization callbacks", async () => {
+    const vegetable = await Vegetable.createBang({ name: "yelling carrot" });
+    expect(vegetable).toBeInstanceOf(Vegetable);
+    expect(vegetable.name).toBe("yelling carrot");
+
+    const yellingVeggie = vegetable.becomes(YellingVegetable);
+    expect(yellingVeggie.name).toBe("YELLING CARROT");
+    expect(vegetable.name).toBe("YELLING CARROT");
+  });
+
+  it("becomes and change tracking for inheritance columns", async () => {
+    const cucumber = await Vegetable.find(1);
+    const cabbage = cucumber.becomesBang(Cabbage);
+    expect((cabbage as any).attributeChange("custom_type")).toEqual(["Cucumber", "Cabbage"]);
+  });
+
+  it("alt becomes bang resets inheritance type column", async () => {
+    const vegetable = await Vegetable.createBang({ name: "Red Pepper" });
+    expect(vegetable.custom_type).toBeNull();
+
+    const cabbage = vegetable.becomesBang(Cabbage);
+    expect(cabbage.custom_type).toBe("Cabbage");
+
+    cabbage.becomesBang(Vegetable);
+    expect(cabbage.custom_type).toBeNull();
+  });
+
+  it("inheritance find all", async () => {
+    const companies = await Company.all().order("id");
+    expect(companies[0]).toBeInstanceOf(Firm);
+    expect(companies[1]).toBeInstanceOf(Client);
+  });
+
+  it("alt inheritance find all", async () => {
+    const veggies = await Vegetable.all().order("id");
+    expect(veggies[0]).toBeInstanceOf(Cucumber);
+    expect(veggies[1]).toBeInstanceOf(Cabbage);
+  });
+
+  it("inheritance save", async () => {
+    const firm = new Firm();
+    (firm as any).name = "Next Angle";
+    await firm.save();
+
+    const nextAngle = await Company.find(firm.id);
+    expect(nextAngle).toBeInstanceOf(Firm);
+  });
+
+  it("alt inheritance save", async () => {
+    const cabbage = new Cabbage({ name: "Savoy" });
+    await cabbage.save();
+
+    const savoy = await Vegetable.find(cabbage.id);
+    expect(savoy).toBeInstanceOf(Cabbage);
+  });
+
+  it("inheritance new with default class", () => {
+    const company = new Company();
+    expect(company.constructor).toBe(Company);
+  });
+
+  it("inheritance new with base class", () => {
+    const company = new Company({ type: "Company" });
+    expect(company.constructor).toBe(Company);
+  });
+
+  it("inheritance new with subclass", () => {
+    const firm = new Company({ type: "Firm" });
+    expect(firm.constructor).toBe(Firm);
+  });
+
+  it("where new with subclass", async () => {
+    const firm = await Company.where({ type: "Firm" }).new();
+    expect(firm.constructor).toBe(Firm);
+  });
+
+  it("where create with subclass", async () => {
+    const firm = await Company.where({ type: "Firm" }).create({ name: "Basecamp" });
+    expect(firm.constructor).toBe(Firm);
+  });
+
+  it("where create bang with subclass", async () => {
+    const firm = await Company.where({ type: "Firm" }).createBang({ name: "Basecamp" });
+    expect(firm.constructor).toBe(Firm);
+  });
+
+  it("new with abstract class", async () => {
+    const e = await assertRaises([NotImplementedError], {}, () => {
+      new AbstractCompany();
+    });
+    expect(e.message).toBe("AbstractCompany is an abstract class and cannot be instantiated.");
+  });
+
+  it("new with ar base", async () => {
+    const e = await assertRaises([NotImplementedError], {}, () => {
+      new Base();
+    });
+    expect(e.message).toBe("ActiveRecord::Base is an abstract class and cannot be instantiated.");
+  });
+
+  it("new with invalid type", () => {
+    expect(() => new Company({ type: "InvalidType" })).toThrow(SubclassNotFound);
+  });
+
+  it("new with unrelated type", () => {
+    expect(() => new Company({ type: "Account" })).toThrow(SubclassNotFound);
+  });
+
+  it("where new with invalid type", () => {
+    expect(() => Company.where({ type: "InvalidType" }).new()).toThrow(SubclassNotFound);
+  });
+
+  it("where new with unrelated type", () => {
+    expect(() => Company.where({ type: "Account" }).new()).toThrow(SubclassNotFound);
+  });
+
+  it("where create with invalid type", async () => {
+    await expect(Company.where({ type: "InvalidType" }).create()).rejects.toThrow(SubclassNotFound);
+  });
+
+  it("where create with unrelated type", async () => {
+    await expect(Company.where({ type: "Account" }).create()).rejects.toThrow(SubclassNotFound);
+  });
+
+  it("where create bang with invalid type", async () => {
+    await expect(Company.where({ type: "InvalidType" }).createBang()).rejects.toThrow(
+      SubclassNotFound,
+    );
+  });
+
+  it("where create bang with unrelated type", async () => {
+    await expect(Company.where({ type: "Account" }).createBang()).rejects.toThrow(SubclassNotFound);
+  });
+
+  it("new with unrelated namespaced type", async () => {
+    Base.storeFullStiClass = false;
+    const e = await assertRaises([SubclassNotFound], {}, () => {
+      new NamespacedCompany({ type: "Firm" });
+    });
+
+    expect(e.message).toBe(
+      "Invalid single-table inheritance type: Namespaced::Firm is not a subclass of Namespaced::Company",
+    );
+  });
+
+  it("new with complex inheritance", async () => {
+    await assertNothingRaised(() => {
+      new Client({ type: "VerySpecialClient" });
+    });
+  });
+
+  it("new without storing full sti class", () => {
+    Base.storeFullStiClass = false;
+    const item = new Company({ type: "SpecialCo" });
+    expect(item).toBeInstanceOf(SpecialCo);
+  });
+
+  it.skip("new with autoload paths", () => {
+    // PERMANENT-SKIP: Ruby-only (scripts/api-compare/unported-files.ts) — ruby-module-semantics
+  });
+
+  it("inheritance condition", async () => {
+    expect(await Company.count()).toBe(12);
+    expect(await Firm.count()).toBe(3);
+    expect(await Client.count()).toBe(5);
+  });
+
+  it("alt inheritance condition", async () => {
+    expect(await Vegetable.count()).toBe(4);
+    expect(await Cucumber.count()).toBe(1);
+    expect(await Cabbage.count()).toBe(3);
+  });
+
+  it("finding incorrect type data", async () => {
+    await expect(Firm.find(2)).rejects.toThrow(RecordNotFound);
+    await assertNothingRaised(async () => {
+      await Firm.find(1);
+    });
+  });
+
+  it("alt finding incorrect type data", async () => {
+    await expect(Cucumber.find(2)).rejects.toThrow(RecordNotFound);
+    await assertNothingRaised(async () => {
+      await Cucumber.find(1);
+    });
+  });
+
+  it("update all within inheritance", async () => {
+    await Client.updateAll({ name: "I am a client" });
+    expect(((await Client.first()) as any).name).toBe("I am a client");
+    expect(((await Firm.all().order("id"))[0] as any).name).toBe("37signals");
+  });
+
+  it("alt update all within inheritance", async () => {
+    await Cabbage.updateAll({ name: "the cabbage" });
+    expect(((await Cabbage.first()) as any).name).toBe("the cabbage");
+    const cucumberNames = (await Cucumber.all()).map((v: any) => v.name);
+    expect([...new Set(cucumberNames)]).toEqual(["my cucumber"]);
+  });
+
+  it("destroy all within inheritance", async () => {
+    await Client.destroyAll();
+    expect(await Client.count()).toBe(0);
+    expect(await Firm.count()).toBe(3);
+  });
+
+  it("alt destroy all within inheritance", async () => {
+    await Cabbage.destroyAll();
+    expect(await Cabbage.count()).toBe(0);
+    expect(await Cucumber.count()).toBe(1);
+  });
+
+  it("find first within inheritance", async () => {
+    expect(await Company.where({ name: "37signals" }).first()).toBeInstanceOf(Firm);
+    expect(await Firm.where({ name: "37signals" }).first()).toBeInstanceOf(Firm);
+    expect(await Client.where({ name: "37signals" }).first()).toBeNull();
+  });
+
+  it("alt find first within inheritance", async () => {
+    expect(await Vegetable.where({ name: "his cabbage" }).first()).toBeInstanceOf(Cabbage);
+    expect(await Cabbage.where({ name: "his cabbage" }).first()).toBeInstanceOf(Cabbage);
+    expect(await Cucumber.where({ name: "his cabbage" }).first()).toBeNull();
+  });
+
+  it("complex inheritance", async () => {
+    const verySpecialClient = await VerySpecialClient.create({ name: "veryspecial" });
+    expect((await VerySpecialClient.where({ name: "veryspecial" }).first())?.id).toBe(
+      verySpecialClient.id,
+    );
+    expect((await SpecialClient.where({ name: "veryspecial" }).first())?.id).toBe(
+      verySpecialClient.id,
+    );
+    expect((await Company.where({ name: "veryspecial" }).first())?.id).toBe(verySpecialClient.id);
+    expect((await Client.where({ name: "veryspecial" }).first())?.id).toBe(verySpecialClient.id);
+    expect((await Client.where({ name: "Summit" })).length).toBe(1);
+    expect((await Client.find(verySpecialClient.id))?.id).toBe(verySpecialClient.id);
+  });
+
+  it("alt complex inheritance", async () => {
+    const kingCole = await KingCole.create({ name: "uniform heads" });
+    expect((await KingCole.where({ name: "uniform heads" }).first())?.id).toBe(kingCole.id);
+    expect((await GreenCabbage.where({ name: "uniform heads" }).first())?.id).toBe(kingCole.id);
+    expect((await Cabbage.where({ name: "uniform heads" }).first())?.id).toBe(kingCole.id);
+    expect((await Vegetable.where({ name: "uniform heads" }).first())?.id).toBe(kingCole.id);
+    expect((await Cabbage.where({ name: "his cabbage" })).length).toBe(1);
+    expect((await Cabbage.find(kingCole.id))?.id).toBe(kingCole.id);
+  });
+
+  it("eager load belongs to something inherited", async () => {
+    const account = await Account.includes(":firm").find(1);
+    assertPredicate(
+      account.association("firm"),
+      (a) => a.loaded,
+      "association was not eager loaded",
+    );
+  });
+
+  it("alt eager loading", async () => {
+    const cabbage = await RedCabbage.includes(":seller").find(4);
+    assertPredicate(
+      cabbage.association("seller"),
+      (a) => a.loaded,
+      "association was not eager loaded",
+    );
+  });
+
+  it("eager load belongs to primary key quoting", async () => {
+    const bindParam = new Nodes.BindParam(null);
+    await self().assertQueriesMatch(
+      new RegExp(
+        `${regexpEscape((await Base.leaseConnection()).quoteTableName("companies.id"))} = (?:${regexpEscape(bindParam.toSql())}|1)`,
+        "i",
+      ),
+      {},
+      async () => {
+        await Account.includes(":firm").find(1);
+      },
+    );
+  });
+
+  it("inherits custom primary key", () => {
+    expect(Subscriber.primaryKey).toBe(SpecialSubscriber.primaryKey);
+  });
+
+  it("inheritance without mapping", async () => {
+    expect(await SpecialSubscriber.find("webster132")).toBeInstanceOf(SpecialSubscriber);
+    await assertNothingRaised(async () => {
+      const s = new SpecialSubscriber({ name: "And breaaaaathe!" });
+      (s as any).id = "roger";
+      await s.save();
+    });
+  });
+
+  it("scope inherited properly", async () => {
+    await assertNothingRaised(async () => {
+      await Company.ofFirstFirm();
+    });
+    await assertNothingRaised(async () => {
+      await Client.ofFirstFirm();
+    });
+  });
+
+  it("inheritance with default scope", async () => {
+    expect(await SelectedMembership.count(":all")).toBe(1);
+  });
+});
+
+describe("InheritanceComputeTypeTest", () => {
+  fixtures(["companies"]);
+
+  it("instantiation doesnt try to require corresponding file", async () => {
+    const InheritanceComputeTypeTest = {};
+    const prev = Base.storeFullStiClass;
+    try {
+      Base.storeFullStiClass = false;
+      const foo = rbObjClone((await Firm.first()) as Firm);
+      (foo as Firm & { type: string }).type = "FirmOnTheFly";
+      await foo.saveBang();
+
+      await expect(Firm.find(foo.id)).rejects.toThrow(RecordNotFound);
+      await expect(Firm.findByBang({ id: foo.id })).rejects.toThrow(RecordNotFound);
+
+      const testFirmOnTheFly = constSet(
+        InheritanceComputeTypeTest,
+        "FirmOnTheFly",
+        class FirmOnTheFly extends Firm {},
+      );
+      DescendantsTracker.registerSubclass(Firm, testFirmOnTheFly);
+      await expect(Firm.find(foo.id)).rejects.toThrow(SubclassNotFound);
+      await expect(Firm.findByBang({ id: foo.id })).rejects.toThrow(SubclassNotFound);
+
+      const firmOnTheFly = constSet(Firm, "FirmOnTheFly", class FirmOnTheFly extends Firm {});
+      DescendantsTracker.registerSubclass(Firm, firmOnTheFly);
+
+      await assertNothingRaised(async () => {
+        expect(await Firm.find(foo.id)).toBeInstanceOf(firmOnTheFly);
+      });
+      await assertNothingRaised(async () => {
+        expect(await Firm.findByBang({ id: foo.id })).toBeInstanceOf(firmOnTheFly);
+      });
+    } finally {
+      Base.storeFullStiClass = prev;
+      try {
+        rbModRemoveConst(InheritanceComputeTypeTest, "FirmOnTheFly");
+      } catch {}
+      try {
+        rbModRemoveConst(Firm, "FirmOnTheFly");
+      } catch {}
+    }
+  });
+
+  it("sti type from attributes disabled in non sti class", async () => {
+    const phone = new ShopProductType({ name: "Phone" });
+    const product = new ShopProduct({ type: phone } as Record<string, unknown>);
+    assert(await product.save());
+  });
+
+  it("inheritance new with subclass as default", async () => {
+    await Company.loadSchema();
+    const originalType = (Company as any).columnsHash()["type"].default;
+    try {
+      await (await Base.leaseConnection()).changeColumnDefault("companies", "type", "Firm");
+      void (Company as any).resetColumnInformation();
+      await Company.loadSchema();
+
+      let firm = new Company();
+      expect((firm as any).type).toBe("Firm");
+      expect(firm).toBeInstanceOf(Firm);
+
+      firm = new Company({ firm_name: "Shri Hans Plastic" });
+      expect((firm as any).type).toBe("Firm");
+      expect(firm).toBeInstanceOf(Firm);
+
+      const client = new Client();
+      expect((client as any).type).toBe("Client");
+      expect(client).toBeInstanceOf(Client);
+
+      firm = new Company({ type: "Client" });
+      expect((firm as any).type).toBe("Client");
+      expect(firm).toBeInstanceOf(Client);
+    } finally {
+      await (await Base.leaseConnection()).changeColumnDefault("companies", "type", originalType);
+      void (Company as any).resetColumnInformation();
+      await Company.loadSchema();
+    }
+  });
+});
+
+describe("InheritanceAttributeTest", () => {
+  const InheritanceAttributeTest = {};
+  constSet(TopLevel, "InheritanceAttributeTest", InheritanceAttributeTest);
+  fixtures(["companies"]);
+
+  class AttrTestCompany extends Base {
+    static {
+      constSet(InheritanceAttributeTest, "Company", this);
+    }
+    static {
+      this.tableName = "companies";
+      this.attribute("type", "string", { default: "InheritanceAttributeTest::Startup" });
+    }
+  }
+  class AttrTestStartup extends AttrTestCompany {
+    static {
+      constSet(InheritanceAttributeTest, "Startup", this);
+    }
+  }
+  class AttrTestEmpire extends AttrTestCompany {
+    static {
+      constSet(InheritanceAttributeTest, "Empire", this);
+    }
+  }
+
+  constSet(TopLevel, "AttrTestCompany", AttrTestCompany);
+  DescendantsTracker.registerSubclass(Base, AttrTestCompany);
+  constSet(TopLevel, "AttrTestStartup", AttrTestStartup);
+  DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestStartup);
+  constSet(TopLevel, "AttrTestEmpire", AttrTestEmpire);
+  DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestEmpire);
+  constSet(TopLevel, "AttrTestStartup", AttrTestStartup);
+  DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestStartup);
+  constSet(TopLevel, "AttrTestEmpire", AttrTestEmpire);
+  DescendantsTracker.registerSubclass(AttrTestCompany, AttrTestEmpire);
+
+  it("inheritance new with subclass as default", () => {
+    const startup = new AttrTestCompany();
+    expect((startup as any).type).toBe("InheritanceAttributeTest::Startup");
+    expect(startup).toBeInstanceOf(AttrTestStartup);
+
+    const empire = new AttrTestCompany({ type: "InheritanceAttributeTest::Empire" });
+    expect((empire as any).type).toBe("InheritanceAttributeTest::Empire");
+    expect(empire).toBeInstanceOf(AttrTestEmpire);
+  });
+});
+
+describe("InheritanceAttributeMappingTest", () => {
+  const InheritanceAttributeMappingTest = {};
+  constSet(TopLevel, "InheritanceAttributeMappingTest", InheritanceAttributeMappingTest);
+  fixtures(["companies", "sponsors"]);
+
+  class OmgStiType extends StringType {
+    protected override castValue(value: unknown): string | null {
+      if (typeof value === "string") {
+        const m = value.match(/^omg_(.+)$/);
+        if (m) return classify(m[1]);
+      }
+      return super.castValue(value);
+    }
+
+    override serialize(value: unknown): unknown {
+      if (value && typeof value === "string") {
+        return `omg_${underscore(value)}`;
+      }
+      return null;
+    }
+  }
+  Type.register("omg_sti", OmgStiType);
+
+  class IamtCompany extends Base {
+    static {
+      constSet(InheritanceAttributeMappingTest, "Company", this);
+    }
+    static {
+      this.tableName = "companies";
+      this.attribute("type", "omg_sti");
+    }
+  }
+  class IamtStartup extends IamtCompany {
+    static {
+      constSet(InheritanceAttributeMappingTest, "Startup", this);
+    }
+  }
+  class IamtEmpire extends IamtCompany {
+    static {
+      constSet(InheritanceAttributeMappingTest, "Empire", this);
+    }
+  }
+
+  constSet(TopLevel, "IamtCompany", IamtCompany);
+  DescendantsTracker.registerSubclass(Base, IamtCompany);
+  constSet(TopLevel, "IamtStartup", IamtStartup);
+  DescendantsTracker.registerSubclass(IamtCompany, IamtStartup);
+  constSet(TopLevel, "IamtEmpire", IamtEmpire);
+  DescendantsTracker.registerSubclass(IamtCompany, IamtEmpire);
+  constSet(TopLevel, "IamtStartup", IamtStartup);
+  DescendantsTracker.registerSubclass(IamtCompany, IamtStartup);
+  constSet(TopLevel, "IamtEmpire", IamtEmpire);
+  DescendantsTracker.registerSubclass(IamtCompany, IamtEmpire);
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  class IamtSponsor extends Base {
+    static {
+      this.tableName = "sponsors";
+      this.attribute("sponsorable_type", "omg_sti");
+      this.belongsTo("sponsorable", { polymorphic: true });
+    }
+  }
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+  interface IamtSponsor {
+    get sponsorable(): Base | null | Promise<Base | null>;
+    set sponsorable(value: Base | null);
+  }
+  constSet(TopLevel, "IamtSponsor", IamtSponsor);
+  DescendantsTracker.registerSubclass(Base, IamtSponsor);
+
+  beforeEach(async () => {
+    await IamtCompany.deleteAll();
+    await IamtSponsor.deleteAll();
+  });
+
+  it("sti with custom type", async () => {
+    await IamtStartup.create({ name: "a Startup" });
+    await IamtEmpire.create({ name: "an Empire" });
+
+    expect(
+      (await (await Base.leaseConnection()).selectRows("SELECT name, type FROM companies")).sort(),
+    ).toEqual([
+      ["a Startup", "omg_inheritance_attribute_mapping_test/startup"],
+      ["an Empire", "omg_inheritance_attribute_mapping_test/empire"],
+    ]);
+    expect((await IamtCompany.all()).map((a: any) => [a.name, a.type]).sort()).toEqual([
+      ["a Startup", "InheritanceAttributeMappingTest::Startup"],
+      ["an Empire", "InheritanceAttributeMappingTest::Empire"],
+    ]);
+
+    const startup = await IamtStartup.first();
+    startup!.becomesBang(IamtEmpire);
+    await startup!.save();
+
+    expect(
+      (await (await Base.leaseConnection()).selectRows("SELECT name, type FROM companies")).sort(),
+    ).toEqual([
+      ["a Startup", "omg_inheritance_attribute_mapping_test/empire"],
+      ["an Empire", "omg_inheritance_attribute_mapping_test/empire"],
+    ]);
+
+    expect((await IamtCompany.all()).map((a: any) => [a.name, a.type]).sort()).toEqual([
+      ["a Startup", "InheritanceAttributeMappingTest::Empire"],
+      ["an Empire", "InheritanceAttributeMappingTest::Empire"],
+    ]);
+  });
+
+  it("polymorphic associations custom type", async () => {
+    const startup = await IamtStartup.create({ name: "a Startup" });
+    const sponsor = await IamtSponsor.create({ sponsorable: startup });
+
+    expect(
+      await (await Base.leaseConnection()).selectValues("SELECT sponsorable_type FROM sponsors"),
+    ).toEqual(["omg_inheritance_attribute_mapping_test/company"]);
+
+    const reloaded = await IamtSponsor.includes(":sponsorable").find(sponsor.id);
+    expect((reloaded as any).sponsorable?.id).toBe(startup.id);
+  });
+});

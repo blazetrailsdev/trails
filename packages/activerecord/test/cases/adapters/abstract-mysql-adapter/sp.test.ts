@@ -1,0 +1,33 @@
+import { describe, it, expect } from "vitest";
+import {
+  describeIfMysqlAdapter,
+  Mysql2Adapter,
+} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { Base } from "../../../../lib/base.js";
+import { Topic } from "../../../models/topic.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+
+describeIfMysqlAdapter("Mysql2Adapter", () => {
+  describe("StoredProcedureTest", () => {
+    const { topics } = fixtures(["topics"]);
+
+    it("multi results", async () => {
+      const rows = await (await Base.leaseConnection()).selectRows("CALL ten();");
+      expect(Number(rows[0][0])).toBe(10);
+      expect(await ((await Base.leaseConnection()) as Mysql2Adapter).active()).toBeTruthy();
+    });
+
+    it("multi results from select one", async () => {
+      const row = await (await Base.leaseConnection()).selectOne("CALL topics(1);");
+      expect(row?.["author_name"]).toBe(topics("first").author_name);
+      expect(await ((await Base.leaseConnection()) as Mysql2Adapter).active()).toBeTruthy();
+    });
+
+    it("multi results from find by sql", async () => {
+      void topics("first");
+      const result = await Topic.findBySql("CALL topics(3);");
+      expect(result.length).toBe(3);
+      expect(await ((await Base.leaseConnection()) as Mysql2Adapter).active()).toBeTruthy();
+    });
+  });
+});

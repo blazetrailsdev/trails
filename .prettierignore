@@ -16,7 +16,7 @@ vendor/*/*/
 # rest would drift the fixtures away from the gem's.
 packages/i18n/test/test-data/locales/
 # Byte-for-byte copies of files in vendor/rails/v8.0.2/activerecord/test/support/yaml_compatibility_fixtures.
-packages/activerecord/src/test-helpers/support/yaml_compatibility_fixtures/
+packages/activerecord/test/support/yaml_compatibility_fixtures/
 
 # Generated parity baselines with their own canonical serializer
 # (scripts/api-compare/baseline-json.ts#serializeBaseline, which the gates
@@ -33,7 +33,7 @@ packages/actionpack/lib/action-dispatch/journey/visualizer/
 # read by fixture-set/file.test.ts. developers.yml is a TSE template, not YAML —
 # prettier cannot parse it — and reformatting the others would drift them away
 # from Rails'.
-packages/activerecord/src/fixture-set/test-data/
+packages/activerecord/test/cases/fixture-set/test-data/
 
 # Copies of vendor/rails/v8.0.2/actionpack/test/fixtures, read through
 # FIXTURE_LOAD_PATH. Templates like localized/*.html carry no trailing newline,

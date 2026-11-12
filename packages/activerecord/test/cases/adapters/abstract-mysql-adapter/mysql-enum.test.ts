@@ -1,0 +1,59 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
+import {
+  describeIfMysqlAdapter,
+  leaseMysqlAdapter,
+  Mysql2Adapter,
+} from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
+import { Base } from "../../../../lib/base.js";
+import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
+import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+
+describeIfMysqlAdapter("Mysql2Adapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+  let adapter: Mysql2Adapter;
+  beforeEach(async () => {
+    adapter = await leaseMysqlAdapter();
+    await adapter.createTable("enum_tests", { id: false, force: true }, (t: any) => {
+      t.column("enum_column", "enum('text','blob','tiny','medium','long','unsigned','bigint')");
+      t.column("state", "TINYINT(1)");
+    });
+  });
+  afterEach(async () => {
+    await adapter.dropTable("enum_tests", { ifExists: true });
+  });
+
+  describe("MysqlEnumTest", () => {
+    it("should not be unsigned", async () => {
+      const columns = await adapter.columns("enum_tests");
+      const column = columns.find((c) => c.name === "enum_column");
+      assertNotPredicate(column, (c) => (c as any).isUnsigned());
+    });
+
+    it("should not be bigint", async () => {
+      const columns = await adapter.columns("enum_tests");
+      const column = columns.find((c) => c.name === "enum_column");
+      assertNotPredicate(column, (c) => (c as any).isBigint());
+    });
+
+    it("schema dumping", async () => {
+      const schema = await dumpTableSchema("enum_tests");
+      expect(schema).toMatch(
+        /t\.column\("enum_column", "enum\('text','blob','tiny','medium','long','unsigned','bigint'\)"\)/,
+      );
+    });
+
+    it("enum with attribute", async () => {
+      class EnumTest extends Base {
+        static _tableName = "enum_tests";
+        static {
+          this.attribute("state", "integer");
+          this.enum("state", { start: 0, middle: 1, finish: 2 });
+        }
+      }
+
+      const enumTest = await EnumTest.create({ state: "middle" });
+      expect((enumTest as any).state).toBe("middle");
+    });
+  });
+});

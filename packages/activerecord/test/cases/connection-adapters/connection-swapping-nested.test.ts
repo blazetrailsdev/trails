@@ -1,0 +1,515 @@
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
+import { Base } from "../../../lib/base.js";
+import { DatabaseConfigurations } from "../../../lib/database-configurations.js";
+import { currentRole, currentPreventingWrites } from "../../../lib/core.js";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+
+describe("ConnectionSwappingNestedTest", () => {
+  fixtures({}, { useTransactionalTests: false });
+  class PrimaryBase extends Base {
+    static override abstractClass = true;
+  }
+
+  class SecondaryBase extends Base {
+    static override abstractClass = true;
+  }
+
+  class TertiaryBase extends Base {
+    static override abstractClass = true;
+  }
+
+  class NonConnectionAbstractClass extends SecondaryBase {
+    static override abstractClass = true;
+  }
+
+  class ModelInheritingFromNonConnectionAbstractClass extends NonConnectionAbstractClass {}
+
+  let prevConfigs: DatabaseConfigurations;
+
+  const DB_NAMES = [
+    "primary",
+    "primary_shard_one",
+    "primary_shard_two",
+    "secondary",
+    "secondary_replica",
+    "secondary_shard_one",
+    "secondary_shard_two",
+    "tertiary",
+    "tertiary_shard_one",
+    "tertiary_shard_two",
+    "arunit",
+  ] as const;
+
+  type DbName = (typeof DB_NAMES)[number];
+
+  async function asyncFs() {
+    const fs = getFs();
+    const { mkdtemp, writeFile, readdir, unlink, rmdir } = fs;
+    if (!mkdtemp || !writeFile || !readdir || !unlink || !rmdir) {
+      throw new Error("fs adapter is missing the async APIs this test requires");
+    }
+    return { mkdtemp, writeFile, readdir, unlink, rmdir };
+  }
+
+  let dbDir: string;
+  let dbPaths: Record<DbName, string>;
+
+  const sqliteDb = (name: DbName, extra: { replica?: boolean } = {}) => ({
+    adapter: "sqlite3",
+    database: dbPaths[name],
+    ...extra,
+  });
+
+  let baselinePools: Set<unknown>;
+  let baseConfig: Record<string, unknown>;
+
+  beforeEach(async () => {
+    baselinePools = new Set(Base.connectionHandler.connectionPoolList("all"));
+    baseConfig = Base.connectionPool().dbConfig.configurationHash;
+    const fs = await asyncFs();
+    const path = getPath();
+    const os = await getOsAsync();
+
+    dbDir = await fs.mkdtemp(path.join(os.tmpdir(), "trails-conn-swap-"));
+    dbPaths = {} as Record<DbName, string>;
+    for (const name of DB_NAMES) {
+      dbPaths[name] = path.join(dbDir, `${name}.sqlite3`);
+      await fs.writeFile(dbPaths[name], "");
+    }
+
+    prevConfigs = Base.configurations();
+    vi.stubEnv("TRAILS_ENV", "default_env");
+  });
+
+  afterEach(async () => {
+    await Base.connectionHandler.clearAllConnectionsBang();
+    for (const pool of Base.connectionHandler.connectionPoolList("all")) {
+      if (baselinePools.has(pool)) continue;
+      await Base.connectionHandler.removeConnectionPool(String(pool.connectionDescriptor.name), {
+        role: pool.role,
+        shard: pool.shard,
+      });
+    }
+    Base.configurations(prevConfigs);
+    if (!Base.connectionHandler.retrieveConnectionPool("ActiveRecord::Base")) {
+      await Base.establishConnection(baseConfig);
+    }
+    (PrimaryBase as any).connectionClass = false;
+    (SecondaryBase as any).connectionClass = false;
+    (TertiaryBase as any).connectionClass = false;
+    vi.unstubAllEnvs();
+
+    const fs = await asyncFs();
+    const path = getPath();
+    for (const entry of await fs.readdir(dbDir)) {
+      await fs.unlink(path.join(dbDir, entry));
+    }
+    await fs.rmdir(dbDir);
+  });
+
+  it("roles can be swapped granularly", async () => {
+    Base.configurations({
+      default_env: {
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary", { replica: true }),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary_replica", { replica: true }),
+      },
+    });
+
+    await PrimaryBase.connectsTo({
+      database: { writing: ":primary", reading: ":primary_replica" },
+    });
+    await SecondaryBase.connectsTo({
+      database: { writing: ":secondary", reading: ":secondary_replica" },
+    });
+
+    Base.connectedTo({ role: "writing" }, () => {
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+      expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+
+      PrimaryBase.connectedTo({ role: "reading" }, () => {
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_replica");
+        expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+
+        Base.connectedTo({ role: "reading" }, () => {
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_replica");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_replica");
+
+          SecondaryBase.connectedTo({ role: "writing" }, () => {
+            expect(currentRole.call(ModelInheritingFromNonConnectionAbstractClass as any)).toBe(
+              "writing",
+            );
+            expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_replica");
+            expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+          });
+
+          SecondaryBase.connectedTo({ role: "reading" }, () => {
+            expect(currentRole.call(ModelInheritingFromNonConnectionAbstractClass as any)).toBe(
+              "reading",
+            );
+            expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_replica");
+            expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_replica");
+          });
+
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_replica");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_replica");
+        });
+
+        Base.connectedTo({ role: "writing" }, () => {
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+        });
+
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_replica");
+        expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+      });
+
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+      expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+    });
+  });
+
+  it("shards can be swapped granularly", async () => {
+    Base.configurations({
+      default_env: {
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary", { replica: true }),
+        primary_shard_one: sqliteDb("primary_shard_one"),
+        primary_shard_one_replica: sqliteDb("primary_shard_one", { replica: true }),
+        primary_shard_two: sqliteDb("primary_shard_two"),
+        primary_shard_two_replica: sqliteDb("primary_shard_two", { replica: true }),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary", { replica: true }),
+        secondary_shard_one: sqliteDb("secondary_shard_one"),
+        secondary_shard_one_replica: sqliteDb("secondary_shard_one", { replica: true }),
+        secondary_shard_two: sqliteDb("secondary_shard_two"),
+        secondary_shard_two_replica: sqliteDb("secondary_shard_two", { replica: true }),
+      },
+    });
+
+    await PrimaryBase.connectsTo({
+      shards: {
+        default: { writing: ":primary", reading: ":primary_replica" },
+        shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
+      },
+    });
+
+    await SecondaryBase.connectsTo({
+      shards: {
+        default: { writing: ":secondary", reading: ":secondary_replica" },
+        shard_one: { writing: ":secondary_shard_one", reading: ":secondary_shard_one_replica" },
+        shard_two: { writing: ":secondary_shard_two", reading: ":secondary_shard_two_replica" },
+      },
+    });
+
+    const globalRole = "writing";
+
+    Base.connectedTo({ role: globalRole, shard: "default" }, () => {
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+      expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+
+      PrimaryBase.connectedTo({ shard: "shard_one" }, () => {
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+        expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+
+        Base.connectedTo({ shard: "shard_one" }, () => {
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_shard_one");
+
+          SecondaryBase.connectedTo({ shard: "shard_two" }, () => {
+            expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+            expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_shard_two");
+          });
+
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_shard_one");
+
+          Base.connectedTo({ role: globalRole }, () => {
+            expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+            expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_shard_one");
+          });
+        });
+
+        Base.connectedTo({ shard: "default" }, () => {
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+        });
+
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+        expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+      });
+
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+      expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+    });
+  });
+
+  it("roles and shards can be swapped granularly", async () => {
+    Base.configurations({
+      default_env: {
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary", { replica: true }),
+        primary_shard_one: sqliteDb("primary_shard_one"),
+        primary_shard_one_replica: sqliteDb("primary_shard_one", { replica: true }),
+        primary_shard_two: sqliteDb("primary_shard_two"),
+        primary_shard_two_replica: sqliteDb("primary_shard_two", { replica: true }),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary", { replica: true }),
+        secondary_shard_one: sqliteDb("secondary_shard_one"),
+        secondary_shard_one_replica: sqliteDb("secondary_shard_one", { replica: true }),
+        secondary_shard_two: sqliteDb("secondary_shard_two"),
+        secondary_shard_two_replica: sqliteDb("secondary_shard_two", { replica: true }),
+      },
+    });
+
+    await PrimaryBase.connectsTo({
+      shards: {
+        default: { writing: ":primary", reading: ":primary_replica" },
+        shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
+      },
+    });
+
+    await SecondaryBase.connectsTo({
+      shards: {
+        default: { writing: ":secondary", reading: ":secondary_replica" },
+        shard_one: { writing: ":secondary_shard_one", reading: ":secondary_shard_one_replica" },
+        shard_two: { writing: ":secondary_shard_two", reading: ":secondary_shard_two_replica" },
+      },
+    });
+
+    Base.connectedTo({ role: "writing", shard: "default" }, () => {
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+      expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+
+      PrimaryBase.connectedTo({ role: "reading", shard: "shard_one" }, () => {
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+        expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+
+        Base.connectedTo({ role: "reading", shard: "shard_one" }, () => {
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_shard_one_replica");
+
+          SecondaryBase.connectedTo({ role: "writing", shard: "shard_two" }, () => {
+            expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+            expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_shard_two");
+          });
+
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_shard_one_replica");
+
+          Base.connectedTo({ role: "writing" }, () => {
+            expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one");
+            expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_shard_one");
+          });
+        });
+
+        Base.connectedTo({ role: "writing", shard: "default" }, () => {
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+        });
+
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary_shard_one_replica");
+        expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+      });
+
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+      expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+    });
+  });
+
+  it("connected to many", async () => {
+    Base.configurations({
+      default_env: {
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary", { replica: true }),
+        primary_shard_one: sqliteDb("primary_shard_one"),
+        primary_shard_one_replica: sqliteDb("primary_shard_one", { replica: true }),
+        primary_shard_two: sqliteDb("primary_shard_two"),
+        primary_shard_two_replica: sqliteDb("primary_shard_two", { replica: true }),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary", { replica: true }),
+        secondary_shard_one: sqliteDb("secondary_shard_one"),
+        secondary_shard_one_replica: sqliteDb("secondary_shard_one", { replica: true }),
+        secondary_shard_two: sqliteDb("secondary_shard_two"),
+        secondary_shard_two_replica: sqliteDb("secondary_shard_two", { replica: true }),
+        tertiary: sqliteDb("tertiary"),
+        tertiary_replica: sqliteDb("tertiary", { replica: true }),
+        tertiary_shard_one: sqliteDb("tertiary_shard_one"),
+        tertiary_shard_one_replica: sqliteDb("tertiary_shard_one", { replica: true }),
+        tertiary_shard_two: sqliteDb("tertiary_shard_two"),
+        tertiary_shard_two_replica: sqliteDb("tertiary_shard_two", { replica: true }),
+      },
+    });
+
+    await PrimaryBase.connectsTo({
+      shards: {
+        default: { writing: ":primary", reading: ":primary_replica" },
+        shard_one: { writing: ":primary_shard_one", reading: ":primary_shard_one_replica" },
+      },
+    });
+
+    await SecondaryBase.connectsTo({
+      shards: {
+        default: { writing: ":secondary", reading: ":secondary_replica" },
+        shard_one: { writing: ":secondary_shard_one", reading: ":secondary_shard_one_replica" },
+        shard_two: { writing: ":secondary_shard_two", reading: ":secondary_shard_two_replica" },
+      },
+    });
+
+    await TertiaryBase.connectsTo({
+      shards: {
+        default: { writing: ":tertiary", reading: ":tertiary_replica" },
+        shard_one: { writing: ":tertiary_shard_one", reading: ":tertiary_shard_one_replica" },
+        shard_two: { writing: ":tertiary_shard_two", reading: ":tertiary_shard_two_replica" },
+      },
+    });
+
+    Base.connectedTo({ role: "writing", shard: "default" }, () => {
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+      expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+      expect(TertiaryBase.connectionPool().dbConfig.name).toBe("tertiary");
+
+      Base.connectedToMany([SecondaryBase, TertiaryBase], { role: "reading" }, () => {
+        expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+        expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_replica");
+        expect(TertiaryBase.connectionPool().dbConfig.name).toBe("tertiary_replica");
+
+        Base.connectedToMany([TertiaryBase], { role: "writing" }, () => {
+          expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+          expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary_replica");
+          expect(TertiaryBase.connectionPool().dbConfig.name).toBe("tertiary");
+        });
+      });
+
+      expect(PrimaryBase.connectionPool().dbConfig.name).toBe("primary");
+      expect(SecondaryBase.connectionPool().dbConfig.name).toBe("secondary");
+      expect(TertiaryBase.connectionPool().dbConfig.name).toBe("tertiary");
+    });
+  });
+
+  it("prevent writes can be changed granularly", async () => {
+    Base.configurations({
+      default_env: {
+        primary: sqliteDb("primary"),
+        primary_replica: sqliteDb("primary"),
+        secondary: sqliteDb("secondary"),
+        secondary_replica: sqliteDb("secondary_replica"),
+      },
+    });
+
+    await PrimaryBase.connectsTo({
+      database: { writing: ":primary", reading: ":primary_replica" },
+    });
+    await SecondaryBase.connectsTo({
+      database: { writing: ":secondary", reading: ":secondary_replica" },
+    });
+
+    Base.connectedTo({ role: "writing" }, () => {
+      expect(currentPreventingWrites.call(Base as any)).toBeFalsy();
+      expect(currentPreventingWrites.call(PrimaryBase as any)).toBeFalsy();
+      expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
+
+      PrimaryBase.connectedTo({ role: "reading" }, () => {
+        expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+        expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
+
+        Base.connectedTo({ role: "reading" }, () => {
+          expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+          expect(currentPreventingWrites.call(SecondaryBase as any)).toBeTruthy();
+
+          SecondaryBase.connectedTo({ role: "writing" }, () => {
+            expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+            expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
+          });
+
+          expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+          expect(currentPreventingWrites.call(SecondaryBase as any)).toBeTruthy();
+        });
+
+        Base.connectedTo({ role: "writing" }, () => {
+          expect(currentPreventingWrites.call(PrimaryBase as any)).toBeFalsy();
+          expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
+        });
+
+        expect(currentPreventingWrites.call(PrimaryBase as any)).toBeTruthy();
+        expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
+      });
+
+      expect(currentPreventingWrites.call(PrimaryBase as any)).toBeFalsy();
+      expect(currentPreventingWrites.call(SecondaryBase as any)).toBeFalsy();
+    });
+  });
+
+  it("application record prevent writes can be changed", async () => {
+    class AppRecord extends Base {
+      static override abstractClass = true;
+    }
+
+    const prevAppRecord = (globalThis as any).ApplicationRecord;
+    (globalThis as any).ApplicationRecord = AppRecord;
+
+    Base.configurations({
+      default_env: {
+        arunit: sqliteDb("arunit"),
+      },
+    });
+
+    try {
+      await AppRecord.connectsTo({ database: { writing: ":arunit", reading: ":arunit" } });
+
+      Base.connectedTo({ role: "writing" }, () => {
+        expect(currentPreventingWrites.call(Base as any)).toBeFalsy();
+        expect(currentPreventingWrites.call(AppRecord as any)).toBeFalsy();
+
+        AppRecord.connectedTo({ role: "reading" }, () => {
+          expect(currentPreventingWrites.call(AppRecord as any)).toBeTruthy();
+        });
+
+        AppRecord.connectedTo({ role: "writing", preventWrites: true }, () => {
+          expect(currentPreventingWrites.call(AppRecord as any)).toBeTruthy();
+        });
+      });
+    } finally {
+      (globalThis as any).ApplicationRecord = prevAppRecord;
+    }
+  });
+
+  it("prevent writes handles class reloading", async () => {
+    Base.configurations({
+      default_env: {
+        arunit: sqliteDb("arunit"),
+      },
+    });
+
+    class ReloadedRecordV1 extends Base {
+      static override abstractClass = true;
+    }
+    Object.defineProperty(ReloadedRecordV1, "name", { value: "ReloadedRecord" });
+
+    await ReloadedRecordV1.connectsTo({ database: { writing: ":arunit", reading: ":arunit" } });
+
+    Base.connectedTo({ role: "reading", preventWrites: true }, () => {
+      ReloadedRecordV1.connectedTo({ role: "writing", preventWrites: false }, () => {
+        expect(currentPreventingWrites.call(ReloadedRecordV1 as any)).toBeFalsy();
+      });
+    });
+
+    await Base.connectionHandler.clearAllConnectionsBang();
+    (ReloadedRecordV1 as any).connectionClass = false;
+
+    class ReloadedRecordV2 extends Base {
+      static override abstractClass = true;
+    }
+    Object.defineProperty(ReloadedRecordV2, "name", { value: "ReloadedRecord" });
+
+    await ReloadedRecordV2.connectsTo({ database: { writing: ":arunit", reading: ":arunit" } });
+
+    Base.connectedTo({ role: "reading", preventWrites: true }, () => {
+      ReloadedRecordV2.connectedTo({ role: "writing", preventWrites: false }, () => {
+        expect(currentPreventingWrites.call(ReloadedRecordV2 as any)).toBeFalsy();
+      });
+    });
+  });
+});

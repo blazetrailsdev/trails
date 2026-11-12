@@ -1,0 +1,209 @@
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  assertNothingRaised,
+  assertEmpty,
+  assertNotEmpty,
+  assertRespondTo,
+} from "@blazetrails/activesupport/testing/assertions";
+import { describe, it, expect } from "vitest";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+import { Table } from "@blazetrails/arel";
+import { Author } from "../../models/author.js";
+import { Post } from "../../../lib/test-helpers/models/post.js";
+import {
+  Comment,
+  SpecialComment,
+  SubSpecialComment,
+  VerySpecialComment,
+} from "../../models/comment.js";
+import { Rating } from "../../models/rating.js";
+import { Essay } from "../../models/essay.js";
+import { Categorization, SpecialCategorization } from "../../models/categorization.js";
+import { Category } from "../../models/category.js";
+import { Person } from "../../models/person.js";
+import { Friendship } from "../../models/friendship.js";
+import { Reference } from "../../models/reference.js";
+import { Job } from "../../models/job.js";
+
+describe("LeftOuterJoinAssociationTest", () => {
+  const { self, authors, posts } = fixtures([
+    "authors",
+    "authorAddresses",
+    "essays",
+    "posts",
+    "comments",
+    "ratings",
+    "categorizations",
+    "people",
+  ]);
+
+  constSet(TopLevel, "Author", Author);
+  constSet(TopLevel, "Post", Post);
+  constSet(TopLevel, "Comment", Comment);
+  constSet(TopLevel, "SpecialComment", SpecialComment);
+  constSet(TopLevel, "SubSpecialComment", SubSpecialComment);
+  constSet(TopLevel, "VerySpecialComment", VerySpecialComment);
+  constSet(TopLevel, "Rating", Rating);
+  constSet(TopLevel, "Essay", Essay);
+  constSet(TopLevel, "Categorization", Categorization);
+  constSet(TopLevel, "SpecialCategorization", SpecialCategorization);
+  constSet(TopLevel, "Category", Category);
+  constSet(TopLevel, "Person", Person);
+  constSet(TopLevel, "Friendship", Friendship);
+  constSet(TopLevel, "Reference", Reference);
+  constSet(TopLevel, "Job", Job);
+
+  it("merging multiple left joins from different associations", async () => {
+    const count = await Author.joins(":posts")
+      .merge(Post.leftJoins(":comments").merge(Comment.leftJoins(":ratings")))
+      .count();
+    expect(count).toBe(17);
+
+    const outerCount = await Author.leftJoins(":posts")
+      .merge(Post.leftJoins(":comments").merge(Comment.leftJoins(":ratings")))
+      .count();
+    expect(outerCount).toBe(17);
+  });
+
+  it("construct finder sql applies aliases tables on association conditions", async () => {
+    const result = await Author.leftOuterJoins(":thinkingPosts", ":welcomePosts").first();
+    expect((result as any)?.id).toBe((authors("david") as any).id);
+  });
+
+  it("construct finder sql does not table name collide on duplicate associations", async () => {
+    await assertNothingRaised(async () => {
+      const queries = await self().captureSql({}, async () => {
+        await Person.leftOuterJoins({ ":agents": { ":agents": ":agents" } }).leftOuterJoins({
+          ":agents": { ":agents": { ":primaryContact": ":agents" } },
+        });
+      });
+      expect(queries.some((sql) => /agents_people_4/i.test(sql))).toBeTruthy();
+    });
+  });
+
+  it("left outer joins count is same as size of loaded results", async () => {
+    expect((await Post.leftOuterJoins(":comments")).length).toBe(18);
+    expect(await Post.leftOuterJoins(":comments").count()).toBe(18);
+  });
+
+  it("merging left joins should be left joins", async () => {
+    expect(
+      await Author.leftJoins(":posts")
+        .merge((Post as any).noComments())
+        .count(),
+    ).toBe(5);
+  });
+
+  it("left joins aliases left outer joins", () => {
+    expect(Post.leftOuterJoins(":comments").toSql()).toBe(Post.leftJoins(":comments").toSql());
+  });
+
+  it("left outer joins return has value for every comment", async () => {
+    const allPostIds = (await Post.pluck("id")) as number[];
+    const joined = (await Post.leftOuterJoins(":comments").pluck("id")) as number[];
+    const intersection = allPostIds.filter((id) => joined.includes(id));
+    expect(intersection).toEqual(allPostIds);
+  });
+
+  it("left outer joins actually does a left outer join", async () => {
+    const queries = await self().captureSql({}, async () => {
+      await Author.leftOuterJoins(":posts");
+    });
+    expect(queries.some((sql) => /LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
+  });
+
+  it("left outer joins is deduped when same association is joined", async () => {
+    const queries = await self().captureSql({}, async () => {
+      await Author.joins(":posts").leftOuterJoins(":posts");
+    });
+    expect(queries.some((sql) => /INNER JOIN/i.test(sql))).toBeTruthy();
+    expect(queries.every((sql) => !/LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
+  });
+
+  it("construct finder sql ignores empty left outer joins hash", async () => {
+    const queries = await self().captureSql({}, async () => {
+      await Author.leftOuterJoins({});
+    });
+    expect(queries.every((sql) => !/LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
+  });
+
+  it("construct finder sql ignores empty left outer joins array", async () => {
+    const queries = await self().captureSql({}, async () => {
+      await Author.leftOuterJoins([]);
+    });
+    expect(queries.every((sql) => !/LEFT OUTER JOIN/i.test(sql))).toBeTruthy();
+  });
+
+  it("left outer joins forbids to use string as argument", async () => {
+    await expect(
+      Author.leftOuterJoins(
+        'LEFT OUTER JOIN "posts" ON "posts"."user_id" = "users"."id"',
+      ).toArray(),
+    ).rejects.toThrow("only Hash, Symbol and Array are allowed");
+  });
+
+  it("left outer joins with string join", async () => {
+    expect(
+      await Author.leftOuterJoins(":posts")
+        .joins("LEFT OUTER JOIN comments ON comments.post_id = posts.id")
+        .count(),
+    ).toBe(17);
+  });
+
+  it("left outer joins with arel join", async () => {
+    const comments = new Table("comments");
+    const postsTable = new Table("posts");
+    const constraint = comments.get("post_id").eq(postsTable.get("id"));
+    const arelJoin = comments.outerJoin(comments).on(constraint).joinSources()[0];
+
+    expect(await Author.leftOuterJoins(":posts").joins(arelJoin).count()).toBe(17);
+  });
+
+  it("join conditions added to join clause", async () => {
+    const queries = await self().captureSql({}, async () => {
+      await Author.leftOuterJoins(":essays");
+    });
+    expect(queries.some((sql) => /writer_type.*?=.*?(Author|\?|\$1|:a1)/i.test(sql))).toBeTruthy();
+    expect(queries.every((sql) => !/WHERE/i.test(sql))).toBeTruthy();
+  });
+
+  it("find with sti join", async () => {
+    const scope = Post.leftOuterJoins(":specialComments").where({
+      id: (posts("sti_comments") as any).id,
+    });
+
+    assertEmpty(await scope.where({ "comments.type": "Comment" }));
+    assertNotEmpty(await scope.where({ "comments.type": "SpecialComment" }));
+    assertNotEmpty(await scope.where({ "comments.type": "SubSpecialComment" }));
+  });
+
+  it("does not override select", async () => {
+    const selected = Author.select(
+      "authors.name, (authors.author_address_id || ' ' || authors.author_address_extra_id) as addr_id",
+    ).leftOuterJoins(":posts");
+    expect(await selected.isExists()).toBeTruthy();
+    const first = await selected.first();
+    assertRespondTo(first, "addr_id");
+  });
+
+  it("the default scope of the target is applied when joining associations", async () => {
+    const author = await Author.create({ name: "Jon" });
+    await (author as any).association("categorizations").create({});
+    await (author as any).association("categorizations").create({ special: true });
+
+    const result = await Author.where({ id: author.id }).leftOuterJoins(":specialCategorizations");
+    expect(result.map((a) => a.id)).toEqual([author.id]);
+  });
+
+  it("left outer joins includes all nested associations", async () => {
+    const queries = await self().captureSql({}, async () => {
+      await Friendship.leftOuterJoins([
+        ":friendFavoriteReferenceJob",
+        ":followerFavoriteReferenceJob",
+      ]);
+    });
+    const [sql] = queries;
+    expect(sql).toMatch(/["`]friendships["`]\.["`]friend_id["`]/);
+    expect(sql).toMatch(/["`]friendships["`]\.["`]follower_id["`]/);
+  });
+});

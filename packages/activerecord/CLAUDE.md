@@ -528,7 +528,7 @@ against this section, and there is no story to convert the fixtures to `.yml`.
 ## Call-time constant resolution (activerecord)
 
 The activerecord inventory for root CLAUDE.md § "Call-time constant
-resolution". `activerecord/src/namespaces.ts` holds the `ActiveRecord`,
+resolution". `activerecord/lib/namespaces.ts` holds the `ActiveRecord`,
 `ActiveRecord::Associations`, `ActiveRecord::ConnectionAdapters`,
 `ActiveRecord::Encryption` and `ActiveRecord::Tasks` namespace objects, extended with
 `ActiveSupport::Autoload` like arel's, mirroring `active_record.rb:43-112`,
@@ -775,7 +775,7 @@ JS builds an object with the `new` expression, and that is the only spelling
 trails has. **There is no static `Klass.new`.** `new Klass(attributes, block)`
 is Rails' `Klass.new(attributes, &block)`, so the body of
 `Inheritance::ClassMethods#new` runs in `Base`'s constructor
-(`packages/activerecord/src/base.ts`): the abstract raise, then the three
+(`packages/activerecord/lib/base.ts`): the abstract raise, then the three
 `subclass_from_attributes` arms in Rails' order, then
 `new subclass(attributes, block)` or the rest of the constructor, which is
 `Class#new`. A static `new` beside the constructor was rejected by the operator (trails#8659): it leaves two spellings for one operation, and either the

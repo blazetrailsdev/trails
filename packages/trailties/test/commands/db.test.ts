@@ -110,7 +110,7 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
         block(() => Actions.bootApplicationBang()),
       );
       await rbFLoad(
-        path.resolve(import.meta.dirname, "../../../activerecord/src/trailties/databases.ts"),
+        path.resolve(import.meta.dirname, "../../../activerecord/lib/trailties/databases.ts"),
       );
       await rake.invokeTask(task);
     });

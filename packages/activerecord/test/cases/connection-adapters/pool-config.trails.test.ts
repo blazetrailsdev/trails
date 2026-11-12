@@ -1,0 +1,301 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { PoolConfig } from "../../../lib/connection-adapters/pool-config.js";
+import { ConnectionDescriptor } from "../../../lib/connection-adapters/abstract/connection-handler.js";
+import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
+import { SchemaReflection } from "../../../lib/connection-adapters/schema-cache.js";
+import { Monitor } from "@blazetrails/activesupport";
+import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
+
+function makeDbConfig(name = "primary") {
+  return new HashConfig("default", name, {
+    adapter: "sqlite3",
+    database: ":memory:",
+  });
+}
+
+function makeDescriptor(name = "primary") {
+  return new ConnectionDescriptor(name);
+}
+
+describe("PoolConfig", () => {
+  fixtures({}, { useTransactionalTests: false });
+  let config: PoolConfig;
+
+  beforeEach(() => {
+    config = new PoolConfig(makeDescriptor(), makeDbConfig());
+  });
+
+  describe("constructor", () => {
+    it("stores role, shard, and dbConfig", () => {
+      expect(config.role).toBe("writing");
+      expect(config.shard).toBe("default");
+      expect(config.dbConfig.adapter).toBe("sqlite3");
+    });
+
+    it("sets connectionDescriptor from constructor arg", () => {
+      expect(config.connectionDescriptor).toBeInstanceOf(ConnectionDescriptor);
+      expect(config.connectionDescriptor.name).toBe("primary");
+    });
+
+    it("accepts a ConnectionOwner as first arg", () => {
+      const owner = { name: "MyModel", isPrimaryClass: () => false };
+      const pc = new PoolConfig(owner, makeDbConfig());
+      expect(pc.connectionDescriptor).toBeInstanceOf(ConnectionDescriptor);
+      expect(pc.connectionDescriptor.name).toBe("MyModel");
+    });
+  });
+
+  describe("connectionDescriptor", () => {
+    it("can be set to a ConnectionDescriptor", () => {
+      const desc = new ConnectionDescriptor("other");
+      config.connectionDescriptor = desc;
+      expect(config.connectionDescriptor).toBe(desc);
+    });
+
+    it("wraps ConnectionOwner objects into ConnectionDescriptor", () => {
+      config.connectionDescriptor = { name: "MyModel", isPrimaryClass: () => false };
+      expect(config.connectionDescriptor).toBeInstanceOf(ConnectionDescriptor);
+      expect(config.connectionDescriptor.name).toBe("MyModel");
+    });
+
+    it("wraps primary class owners correctly", () => {
+      config.connectionDescriptor = { name: "Base", isPrimaryClass: () => true };
+      expect(config.connectionDescriptor.isPrimaryClass()).toBe(true);
+      expect(config.connectionDescriptor.name).toBe("ActiveRecord::Base");
+    });
+  });
+
+  describe("pool", () => {
+    it("lazily creates a ConnectionPool on first access", () => {
+      expect(config["_pool"]).toBeNull();
+      const pool = config.pool;
+      expect(pool).toBeTruthy();
+      expect(config["_pool"]).not.toBeNull();
+    });
+
+    it("returns the same pool on subsequent accesses", () => {
+      const pool1 = config.pool;
+      const pool2 = config.pool;
+      expect(pool1).toBe(pool2);
+    });
+
+    it("keeps the pool critical section suspension-free", () => {
+      const getter = Object.getOwnPropertyDescriptor(PoolConfig.prototype, "pool")?.get;
+      expect(getter).toBeTypeOf("function");
+      const source = getter!.toString();
+      expect(source).not.toMatch(/^\s*async\b/);
+      expect(source).not.toMatch(/\bawait\b/);
+      expect(source).not.toMatch(/\byield\b/);
+    });
+  });
+
+  describe("disconnectBang", () => {
+    it("is a no-op when pool is not initialized", async () => {
+      await expect(config.disconnectBang()).resolves.toBeUndefined();
+    });
+
+    it("disconnects the pool when initialized", async () => {
+      const pool = config.pool;
+      const spy = vi.spyOn(pool, "disconnect");
+      await config.disconnectBang();
+      expect(spy).toHaveBeenCalled();
+    });
+
+    it("serializes concurrent calls with different automaticReconnect values", async () => {
+      const pool = config.pool;
+      const seen: boolean[] = [];
+      let overlapped = false;
+      let inFlight = false;
+      vi.spyOn(pool, "disconnectBang").mockImplementation(async () => {
+        if (inFlight) overlapped = true;
+        inFlight = true;
+        seen.push(pool.automaticReconnect);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        seen.push(pool.automaticReconnect);
+        inFlight = false;
+      });
+
+      await Promise.all([
+        config.disconnectBang({ automaticReconnect: true }),
+        config.disconnectBang({ automaticReconnect: false }),
+      ]);
+
+      expect(overlapped).toBe(false);
+      expect(seen).toEqual([true, true, false, false]);
+    });
+
+    it("excludes a concurrent discardPoolBang while the disconnect is in flight", async () => {
+      const pool = config.pool;
+      let discardedDuringDisconnect = false;
+      const discardSpy = vi.spyOn(pool, "discardBang").mockResolvedValue(undefined);
+      vi.spyOn(pool, "disconnectBang").mockImplementation(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        discardedDuringDisconnect = discardSpy.mock.calls.length > 0;
+      });
+
+      await Promise.all([config.disconnectBang(), config.discardPoolBang()]);
+
+      expect(discardedDuringDisconnect).toBe(false);
+      expect(discardSpy).toHaveBeenCalledTimes(1);
+      expect(config["_pool"]).toBeNull();
+    });
+
+    it("defaults automaticReconnect to false", async () => {
+      const pool = config.pool;
+      pool.automaticReconnect = true;
+      vi.spyOn(pool, "disconnectBang").mockResolvedValue(undefined);
+      await config.disconnectBang();
+      expect(pool.automaticReconnect).toBe(false);
+    });
+  });
+
+  describe("discardPoolBang", () => {
+    it("is a no-op when pool is not initialized", async () => {
+      await expect(config.discardPoolBang()).resolves.toBeUndefined();
+      expect(config["_pool"]).toBeNull();
+    });
+
+    it("discards and nulls the pool", async () => {
+      const pool = config.pool;
+      expect(config["_pool"]).not.toBeNull();
+      const spy = vi.spyOn(pool, "discardBang");
+      await config.discardPoolBang();
+      expect(spy).toHaveBeenCalled();
+      expect(config["_pool"]).toBeNull();
+    });
+
+    it("creates a new pool after discard", async () => {
+      const pool1 = config.pool;
+      await config.discardPoolBang();
+      const pool2 = config.pool;
+      expect(pool2).not.toBe(pool1);
+    });
+
+    it("retains the pool when the synchronous discard fails", async () => {
+      const pool = config.pool;
+      const spy = vi.spyOn(pool, "discardBang").mockRejectedValue(new Error("discard failed"));
+      await expect(config.discardPoolBang()).rejects.toThrow("discard failed");
+      expect(config["_pool"]).not.toBeNull();
+      spy.mockRestore();
+    });
+  });
+
+  describe("schemaReflection", () => {
+    it("lazily creates a SchemaReflection", () => {
+      const ref = config.schemaReflection;
+      expect(ref).toBeInstanceOf(SchemaReflection);
+    });
+
+    it("can be set", () => {
+      const custom = new SchemaReflection(null);
+      config.schemaReflection = custom;
+      expect(config.schemaReflection).toBe(custom);
+    });
+  });
+
+  describe("serverVersion", () => {
+    it("returns a function that caches the version from a connection", async () => {
+      const mockConn = {
+        lock: new Monitor(),
+        getDatabaseVersion: vi.fn().mockReturnValue("3.39.0"),
+      };
+      const version = await config.serverVersion(mockConn as any);
+      expect(version).toBe("3.39.0");
+      expect(mockConn.getDatabaseVersion).toHaveBeenCalledTimes(1);
+
+      await config.serverVersion(mockConn as any);
+      expect(mockConn.getDatabaseVersion).toHaveBeenCalledTimes(1);
+    });
+
+    it("can be set directly via the setter", async () => {
+      config.setServerVersion("15.0");
+      const mockConn = { lock: new Monitor(), getDatabaseVersion: vi.fn() };
+      const version = await config.serverVersion(mockConn as any);
+      expect(version).toBe("15.0");
+      expect(mockConn.getDatabaseVersion).not.toHaveBeenCalled();
+    });
+
+    it("two concurrent first callers settle on one memoized version", async () => {
+      let fetches = 0;
+      const mockConn = {
+        lock: new Monitor(),
+        async getDatabaseVersion() {
+          fetches += 1;
+          await new Promise<void>((r) => setTimeout(r, 10));
+          return "15.0";
+        },
+      };
+      const [a, b] = await Promise.all([
+        config.serverVersion(mockConn as any),
+        config.serverVersion(mockConn as any),
+      ]);
+      expect([a, b]).toEqual(["15.0", "15.0"]);
+      expect(fetches).toBe(1);
+      expect(await config.serverVersion(mockConn as any)).toBe("15.0");
+    });
+
+    it("a first probe holding the connection lock completes while disconnect! holds the monitor", async () => {
+      const lock = new Monitor();
+      const mockConn = {
+        lock,
+        async getDatabaseVersion() {
+          await new Promise<void>((r) => setTimeout(r, 10));
+          return "15.0";
+        },
+      };
+      vi.spyOn(config.pool, "disconnectBang").mockImplementation(() =>
+        lock.synchronize(async () => undefined),
+      );
+      const probe = lock.synchronize(async () => {
+        await Promise.resolve();
+        return config.serverVersion(mockConn as any);
+      });
+      const disconnect = config.disconnectBang();
+      expect(await probe).toBe("15.0");
+      await disconnect;
+    }, 5000);
+
+    it("a read re-entered from inside the fetch resolves rather than deadlocking", async () => {
+      let fetches = 0;
+      const mockConn = {
+        lock: new Monitor(),
+        async getDatabaseVersion(): Promise<string> {
+          fetches += 1;
+          await Promise.resolve();
+          if (fetches === 1) await config.serverVersion(mockConn as any);
+          return "15.0";
+        },
+      };
+      expect(await config.serverVersion(mockConn as any)).toBe("15.0");
+      expect(fetches).toBe(2);
+    }, 5000);
+  });
+
+  describe("static discardPoolsBang", () => {
+    it("discards pools on all tracked instances", async () => {
+      const c1 = new PoolConfig(makeDescriptor("a"), makeDbConfig("a"));
+      const c2 = new PoolConfig(makeDescriptor("b"), makeDbConfig("b"));
+      void c1.pool;
+      void c2.pool;
+      expect(c1["_pool"]).not.toBeNull();
+      expect(c2["_pool"]).not.toBeNull();
+      await PoolConfig.discardPoolsBang();
+      expect(c1["_pool"]).toBeNull();
+      expect(c2["_pool"]).toBeNull();
+    });
+  });
+
+  describe("static disconnectAllBang", () => {
+    it("disconnects all tracked instances", async () => {
+      const c1 = new PoolConfig(makeDescriptor("a"), makeDbConfig("a"));
+      const c2 = new PoolConfig(makeDescriptor("b"), makeDbConfig("b"));
+      const pool1 = c1.pool;
+      const pool2 = c2.pool;
+      const spy1 = vi.spyOn(pool1, "disconnect");
+      const spy2 = vi.spyOn(pool2, "disconnect");
+      await expect(PoolConfig.disconnectAllBang()).resolves.toBeUndefined();
+      expect(spy1).toHaveBeenCalled();
+      expect(spy2).toHaveBeenCalled();
+    });
+  });
+});

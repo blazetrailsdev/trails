@@ -1,5 +1,5 @@
 // parity:fixtures — diff Rails activerecord/test/fixtures/*.yml against
-// packages/activerecord/src/test-helpers/fixtures/<kebab-name>.ts. Soft
+// packages/activerecord/test/fixtures/<kebab-name>.ts. Soft
 // failure only per the fixtures port plan (Decision 4); PR 7 flips
 // to hard-fail. ERB stubs adapter_name to "SQLite"; loops render through TSE.
 import { readdirSync, readFileSync, existsSync } from "node:fs";
@@ -18,19 +18,19 @@ import {
   ARUNIT2_SCHEMA,
   POSTGRESQL_SPECIFIC_SCHEMA,
   TEST_SCHEMA,
-} from "../../packages/activerecord/src/test-helpers/test-schema.js";
-import type { Schema, TableSchema } from "../../packages/activerecord/src/support/schema-types.js";
+} from "../../packages/activerecord/test/support/test-schema.js";
+import type { Schema, TableSchema } from "../../packages/activerecord/test/support/schema-types.js";
 import {
   isWrappedSchema,
   columnsOf,
-} from "../../packages/activerecord/src/support/schema-types.js";
+} from "../../packages/activerecord/test/support/schema-types.js";
 import { resolveSourcePath } from "../../vendor/sources.js";
 import { parseSchemaRb } from "../schema-compare/parse-schema-rb.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
 const YML_DIR = resolveSourcePath("rails", "activerecord/test/fixtures");
-const TS_DIR = path.join(ROOT, "packages/activerecord/src/test-helpers/fixtures");
+const TS_DIR = path.join(ROOT, "packages/activerecord/test/fixtures");
 const SCHEMA_DIR = resolveSourcePath("rails", "activerecord/test/schema");
 
 type Row = Record<string, unknown>;
@@ -1192,7 +1192,7 @@ async function main(): Promise<void> {
 // Rails shorthand validation macros that map to named TS helpers rather than
 // the generic this.validates(). Helpers are implemented in:
 //   packages/activemodel/lib/model.ts       — all *Of helpers + acceptance/confirmation/comparison
-//   packages/activerecord/src/validations.ts — uniqueness (validatesUniqueness, no "Of")
+//   packages/activerecord/lib/validations.ts — uniqueness (validatesUniqueness, no "Of")
 //                                              + validatesAssociated
 const VALIDATION_KIND_TO_TS: Record<string, string> = {
   validates_presence_of: "validatesPresenceOf",
@@ -1211,7 +1211,7 @@ const VALIDATION_KIND_TO_TS: Record<string, string> = {
 };
 
 const MODELS_TS_DIRS: Record<string, string> = {
-  activerecord: path.join(ROOT, "packages/activerecord/src/test-helpers/models"),
+  activerecord: path.join(ROOT, "packages/activerecord/test/models"),
   activemodel: path.join(ROOT, "packages/activemodel/test/models"),
 };
 const RUBY_EXTRACTOR = path.join(HERE, "extract-ruby-models.rb");

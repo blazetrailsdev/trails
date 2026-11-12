@@ -1,0 +1,398 @@
+import { describe, expect, it } from "vitest";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { CommandRecorder } from "../../../lib/migration/command-recorder.js";
+import { IrreversibleMigration } from "../../../lib/migration.js";
+import { Table } from "../../../lib/connection-adapters/abstract/schema-definitions.js";
+import { Table as PgTable } from "../../../lib/connection-adapters/postgresql/schema-definitions.js";
+import { Table as MysqlTable } from "../../../lib/connection-adapters/mysql/schema-definitions.js";
+
+const abstractDelegate = {
+  supportsBulkAlter: () => false,
+  updateTableDefinition: (tableName: string, base: unknown) => new Table(tableName, base as never),
+};
+const pgDelegate = {
+  supportsBulkAlter: () => false,
+  updateTableDefinition: (tableName: string, base: unknown) =>
+    new PgTable(tableName, base as never),
+};
+const mysqlDelegate = {
+  supportsBulkAlter: () => false,
+  updateTableDefinition: (tableName: string, base: unknown) =>
+    new MysqlTable(tableName, base as never),
+};
+
+const columnMethods = (t: Table): Record<string, (name: string) => Promise<void>> =>
+  t as unknown as Record<string, (name: string) => Promise<void>>;
+
+describe("CommandRecorder", () => {
+  it("forwards a non-function delegate member the way public_send does", () => {
+    const recorder = new CommandRecorder({ encoding: "utf8", america: () => "hi" }) as unknown as {
+      encoding: string;
+      america: () => string;
+    };
+    expect(recorder.encoding).toBe("utf8");
+    expect(recorder.america()).toBe("hi");
+  });
+
+  it("record returns the commands it appended to", async () => {
+    const recorder = new CommandRecorder(abstractDelegate);
+    const commands = await recorder.record("addColumn", ["users", "name", "string"]);
+    expect(commands).toBe(recorder.commands);
+    expect(commands).toEqual([["addColumn", ["users", "name", "string"], undefined]]);
+  });
+
+  it("runs a reverted transaction's block to completion before recording the command", async () => {
+    const recorder = new CommandRecorder(abstractDelegate);
+    const recordable = recorder as unknown as {
+      transaction(fn: () => Promise<void>): Promise<void>;
+      addColumn(...a: unknown[]): void;
+    };
+    let ran = 0;
+    await recorder.revert(async () => {
+      await recordable.transaction(async () => {
+        await Promise.resolve();
+        ran += 1;
+        recordable.addColumn("fruits", "colour", "string");
+      });
+    });
+    expect(ran).toBe(1);
+    expect(recorder.commands.map((c) => c[0])).toEqual(["transaction", "removeColumn"]);
+  });
+
+  it("propagates a throw from a reverted transaction's block", async () => {
+    const recorder = new CommandRecorder(abstractDelegate);
+    const recordable = recorder as unknown as {
+      transaction(fn: () => Promise<void>): Promise<void>;
+    };
+    await expect(
+      recorder.revert(async () => {
+        await recordable.transaction(async () => {
+          throw new TypeError("boom");
+        });
+      }),
+    ).rejects.toThrow("boom");
+  });
+
+  it("does not forward a private delegate member, the way public_send does not", () => {
+    const recorder = new CommandRecorder({ _secret: () => "no", visible: () => "yes" });
+    expect(rbObjRespondTo(recorder, "_secret")).toBe(false);
+    expect(rbObjRespondTo(recorder, "visible")).toBe(true);
+    expect(() => (recorder as unknown as { _secret(): string })._secret()).toThrow(
+      /undefined method '_secret'/,
+    );
+  });
+
+  it("a name no delegate answers raises NoMethodError only when called", () => {
+    const recorder = new CommandRecorder({}) as unknown as Record<string, () => void>;
+    expect(typeof recorder["nope"]).toBe("function");
+    expect(() => recorder["nope"]()).toThrow(/undefined method 'nope'/);
+  });
+
+  it("invertCreateTable strips ifNotExists even when fn is last arg", () => {
+    const fn = () => {};
+    const [cmd, args, block] = new CommandRecorder().invertCreateTable(
+      ["users", { ifNotExists: true }],
+      fn,
+    );
+    expect(cmd).toBe("dropTable");
+    expect((args[1] as Record<string, unknown>)["ifNotExists"]).toBeUndefined();
+    expect(block).toBe(fn);
+  });
+
+  it("invertRemoveIndex handles array column list without treating it as options", () => {
+    const [cmd, args] = new CommandRecorder().invertRemoveIndex(["users", ["email", "name"]]);
+    expect(cmd).toBe("addIndex");
+    expect(args[1]).toEqual(["email", "name"]);
+  });
+
+  describe("invertAddExclusionConstraint / invertRemoveExclusionConstraint", () => {
+    it("invertAddExclusionConstraint returns removeExclusionConstraint", async () => {
+      const [cmd] = await new CommandRecorder().inverseOf("addExclusionConstraint", [
+        "rooms",
+        "during WITH &&",
+      ]);
+      expect(cmd).toBe("removeExclusionConstraint");
+    });
+
+    it("invertRemoveExclusionConstraint throws without expression", () => {
+      expect(() => new CommandRecorder().invertRemoveExclusionConstraint(["rooms"])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+  });
+
+  describe("invertRemoveColumns", () => {
+    it("throws without type option", () => {
+      expect(() => new CommandRecorder().invertRemoveColumns(["users", "name", "age"])).toThrow(
+        IrreversibleMigration,
+      );
+    });
+
+    it("returns addColumns when type given", () => {
+      const [cmd] = new CommandRecorder().invertRemoveColumns([
+        "users",
+        "name",
+        { type: "string" },
+      ]);
+      expect(cmd).toBe("addColumns");
+    });
+  });
+
+  describe("StraightReversions", () => {
+    it("generates both directions of an inverse-table entry", async () => {
+      const recorder = new CommandRecorder();
+      const fn = () => {};
+      expect(await recorder.inverseOf("createJoinTable", ["a", "b"], fn)).toEqual([
+        "dropJoinTable",
+        ["a", "b"],
+        fn,
+      ]);
+      expect((await recorder.inverseOf("dropSchema", ["s"]))[0]).toBe("createSchema");
+      expect((await recorder.inverseOf("executeBlock", []))[0]).toBe("executeBlock");
+      expect((await recorder.inverseOf("removeBelongsTo", ["t", "r"]))[0]).toBe("addReference");
+    });
+
+    it("has no inverse for a command outside the table", async () => {
+      await expect(
+        new CommandRecorder().inverseOf("addColumns", ["users", "name"]),
+      ).rejects.toThrow(/This migration uses addColumns, which is not automatically reversible\./);
+      await expect(
+        new CommandRecorder().inverseOf("changeColumn", ["users", "name"]),
+      ).rejects.toThrow(
+        /This migration uses changeColumn, which is not automatically reversible\./,
+      );
+    });
+  });
+
+  describe("joinTableName / findJoinTableName", () => {
+    it("joinTableName returns sorted joined name", () => {
+      expect(new CommandRecorder().joinTableName("cats", "dogs")).toBe("cats_dogs");
+      expect(new CommandRecorder().joinTableName("dogs", "cats")).toBe("cats_dogs");
+    });
+
+    it("findJoinTableName uses tableName option when given", () => {
+      expect(new CommandRecorder().findJoinTableName("cats", "dogs", { tableName: "pets" })).toBe(
+        "pets",
+      );
+    });
+  });
+
+  describe("invert change table (non-bulk)", () => {
+    it("accepts (tableName, fn) without explicit options", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await t.string("name");
+      });
+      expect(recorder.commands[0][0]).toBe("addColumn");
+    });
+
+    it("forwarders record no trailing options hash when the splat is empty", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await t.remove("name");
+        await t.index("kind");
+        await t.timestamps();
+        await t.removeTimestamps();
+        await t.removeIndex("kind");
+        await t.references("supplier");
+        await t.removeReferences("supplier");
+        await t.foreignKey("suppliers");
+        await t.removeForeignKey();
+        await t.checkConstraint("qty > 0");
+        await t.removeCheckConstraint();
+      });
+      expect(recorder.commands).toEqual([
+        ["removeColumns", ["fruits", "name"], undefined],
+        ["addIndex", ["fruits", "kind"], undefined],
+        ["addTimestamps", ["fruits"], undefined],
+        ["removeTimestamps", ["fruits"], undefined],
+        ["removeIndex", ["fruits", "kind"], undefined],
+        ["addReference", ["fruits", "supplier"], undefined],
+        ["removeReference", ["fruits", "supplier"], undefined],
+        ["addForeignKey", ["fruits", "suppliers"], undefined],
+        ["removeForeignKey", ["fruits"], undefined],
+        ["addCheckConstraint", ["fruits", "qty > 0"], undefined],
+        ["removeCheckConstraint", ["fruits"], undefined],
+      ]);
+    });
+
+    it("removeCheckConstraint records the expression alongside the options", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await t.removeCheckConstraint("qty > 0", { name: "chk" });
+        await t.removeCheckConstraint("qty > 0");
+        await t.removeCheckConstraint(undefined, { name: "chk" });
+      });
+      expect(recorder.commands).toEqual([
+        ["removeCheckConstraint", ["fruits", "qty > 0", { name: "chk" }], undefined],
+        ["removeCheckConstraint", ["fruits", "qty > 0"], undefined],
+        ["removeCheckConstraint", ["fruits", undefined, { name: "chk" }], undefined],
+      ]);
+    });
+
+    it("remove with multiple columns records a single removeColumns", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await t.remove("name", "kind", { type: "string" });
+      });
+      expect(recorder.commands).toEqual([
+        ["removeColumns", ["fruits", "name", "kind", { type: "string" }], undefined],
+      ]);
+    });
+
+    it("removeIndex with an options hash records a nil column, not the hash", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await t.removeIndex({ name: "index_fruits_on_kind" });
+      });
+      expect(recorder.commands).toEqual([
+        ["removeIndex", ["fruits", undefined, { name: "index_fruits_on_kind" }], undefined],
+      ]);
+    });
+
+    it("removeIndex with an explicit nil column keeps the second-argument options", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await t.removeIndex(undefined, { name: "index_fruits_on_kind" });
+      });
+      expect(recorder.commands).toEqual([
+        ["removeIndex", ["fruits", undefined, { name: "index_fruits_on_kind" }], undefined],
+      ]);
+    });
+
+    it("removeIndex with a column inverts back to addIndex", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", {}, async (t) => {
+          await t.removeIndex("kind");
+        });
+      });
+      expect(recorder.commands).toEqual([["addIndex", ["fruits", "kind"]]]);
+    });
+
+    it("raises IrreversibleMigration when removeIndex lacks a column", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await expect(
+        recorder.revert(async () => {
+          await recorder.changeTable("fruits", {}, async (t) => {
+            await t.removeIndex({ name: "index_fruits_on_kind" });
+          });
+        }),
+      ).rejects.toThrow(IrreversibleMigration);
+    });
+
+    it("raises IrreversibleMigration when remove lacks type", async () => {
+      const recorder = new CommandRecorder(abstractDelegate);
+      await expect(
+        recorder.revert(async () => {
+          await recorder.changeTable("fruits", {}, async (t) => {
+            await t.remove("kind");
+          });
+        }),
+      ).rejects.toThrow(IrreversibleMigration);
+    });
+  });
+
+  describe("change_table surfaces adapter ColumnMethods shorthands (serial/bigserial)", () => {
+    const pgLike = pgDelegate;
+
+    it("records addColumn for t.serial and t.bigserial (up adds)", async () => {
+      const recorder = new CommandRecorder(pgLike);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await columnMethods(t).serial("seq");
+        await columnMethods(t).bigserial("big_seq");
+      });
+      expect(recorder.commands).toEqual([
+        ["addColumn", ["fruits", "seq", "serial"], undefined],
+        ["addColumn", ["fruits", "big_seq", "bigserial"], undefined],
+      ]);
+    });
+
+    it("reverts t.serial / t.bigserial to removeColumn (down removes)", async () => {
+      const recorder = new CommandRecorder(pgLike);
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", {}, async (t) => {
+          await columnMethods(t).serial("seq");
+          await columnMethods(t).bigserial("big_seq");
+        });
+      });
+      expect(recorder.commands).toEqual([
+        ["removeColumn", ["fruits", "big_seq", "bigserial"], undefined],
+        ["removeColumn", ["fruits", "seq", "serial"], undefined],
+      ]);
+    });
+
+    it("never exposes primary_key as a generic column shorthand", async () => {
+      const recorder = new CommandRecorder(pgDelegate);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        expect((t as unknown as Record<string, unknown>)["primary_key"]).toBeUndefined();
+        await t.primaryKey("token", "uuid");
+      });
+      expect(recorder.commands).toEqual([
+        [
+          "addColumn",
+          ["fruits", "token", "uuid", { default: "gen_random_uuid()", primaryKey: true }],
+          undefined,
+        ],
+      ]);
+    });
+
+    it("records the snake_case type for PG bitVarying (multi-word shorthand)", async () => {
+      const recorder = new CommandRecorder(pgDelegate);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await columnMethods(t).bitVarying("mask");
+      });
+      expect(recorder.commands).toEqual([
+        ["addColumn", ["fruits", "mask", "bit_varying"], undefined],
+      ]);
+    });
+  });
+
+  describe("change_table surfaces adapter ColumnMethods shorthands (MySQL unsigned/blob)", () => {
+    const mysqlLike = mysqlDelegate;
+
+    it("records addColumn for MySQL shorthands (up adds)", async () => {
+      const recorder = new CommandRecorder(mysqlLike);
+      await recorder.changeTable("fruits", {}, async (t) => {
+        await columnMethods(t).unsignedInteger("qty");
+        await columnMethods(t).mediumtext("notes");
+        await columnMethods(t).longblob("payload");
+      });
+      expect(recorder.commands).toEqual([
+        ["addColumn", ["fruits", "qty", "unsigned_integer"], undefined],
+        ["addColumn", ["fruits", "notes", "mediumtext"], undefined],
+        ["addColumn", ["fruits", "payload", "longblob"], undefined],
+      ]);
+    });
+
+    it("reverts MySQL shorthands to removeColumn (down removes)", async () => {
+      const recorder = new CommandRecorder(mysqlLike);
+      await recorder.revert(async () => {
+        await recorder.changeTable("fruits", {}, async (t) => {
+          await columnMethods(t).unsignedInteger("qty");
+          await columnMethods(t).mediumtext("notes");
+        });
+      });
+      expect(recorder.commands).toEqual([
+        ["removeColumn", ["fruits", "notes", "mediumtext"], undefined],
+        ["removeColumn", ["fruits", "qty", "unsigned_integer"], undefined],
+      ]);
+    });
+  });
+});
+
+describe("prototype-chain method_missing", () => {
+  it("a subclass with a #private field still answers the dynamic names", () => {
+    class Sub extends CommandRecorder {
+      #secret = 1;
+      secret(): number {
+        return this.#secret;
+      }
+    }
+    const sub = new Sub({ visible: () => "yes" }) as Sub & { visible(): string };
+    expect(sub.secret()).toBe(1);
+    expect(sub.visible()).toBe("yes");
+    expect(sub instanceof CommandRecorder).toBe(true);
+    expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
+  });
+});

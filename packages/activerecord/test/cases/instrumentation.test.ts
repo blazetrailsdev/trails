@@ -1,0 +1,246 @@
+import { describe, it, expect, afterEach } from "vitest";
+
+import { Notifications } from "@blazetrails/activesupport";
+import { Base } from "../../lib/index.js";
+import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
+import "../support/canonical-model-index.js";
+import { Book } from "../models/book.js";
+import { Author } from "../models/author.js";
+import { ClothingItem } from "../models/clothing-item.js";
+
+describe("InstrumentationTest", () => {
+  fixtures(["books", "authors"]);
+
+  afterEach(() => {
+    Notifications.unsubscribeAll();
+  });
+
+  it("payload name on load", async () => {
+    await Book.create({ name: "test book" });
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/SELECT/)) {
+        expect(event.payload.name).toBe("Book Load");
+      }
+    });
+    await Book.first();
+  });
+
+  it("payload name on create", async () => {
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/INSERT/)) {
+        expect(event.payload.name).toBe("Book Create");
+      }
+    });
+    await Book.create({ name: "test book" });
+  });
+
+  it("payload name on update", async () => {
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/UPDATE/)) {
+        expect(event.payload.name).toBe("Book Update");
+      }
+    });
+    const book = await Book.create({ name: "test book", format: "paperback" });
+    await book.updateAttribute("format", "ebook");
+  });
+
+  it("payload name on update all", async () => {
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/UPDATE/)) {
+        expect(event.payload.name).toBe("Book Update All");
+      }
+    });
+    await Book.updateAll({ format: "ebook" });
+  });
+
+  it("payload name on destroy", async () => {
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/DELETE/)) {
+        expect(event.payload.name).toBe("Book Destroy");
+      }
+    });
+    const book = await Book.create({ name: "test book" });
+    await book.destroy();
+  });
+
+  it("payload name on delete all", async () => {
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/DELETE/)) {
+        expect(event.payload.name).toBe("Book Delete All");
+      }
+    });
+    await Book.deleteAll();
+  });
+
+  it("payload name on pluck", async () => {
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/SELECT/)) {
+        expect(event.payload.name).toBe("Book Pluck");
+      }
+    });
+    await Book.pluck("name");
+  });
+
+  it("payload name on count", async () => {
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/SELECT/)) {
+        expect(event.payload.name).toBe("Book Count");
+      }
+    });
+    await Book.count();
+  });
+
+  it("payload name on grouped count", async () => {
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/SELECT/)) {
+        expect(event.payload.name).toBe("Book Count");
+      }
+    });
+    await Book.group("status").count();
+  });
+
+  it("payload row count on select all", async () => {
+    for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 1" });
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/SELECT/)) {
+        expect(event.payload.row_count).toBe(10);
+      }
+    });
+    await Book.where({ name: "row count book 1" });
+  });
+
+  it("payload row count on pluck", async () => {
+    for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 2" });
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/SELECT/)) {
+        expect(event.payload.row_count).toBe(10);
+      }
+    });
+    await Book.where({ name: "row count book 2" }).pluck("name");
+  });
+
+  it("payload row count on raw sql", async () => {
+    for (let i = 0; i < 10; i++) await Book.create({ name: "row count book 3" });
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (String(event.payload.sql).match(/SELECT/)) {
+        expect(event.payload.row_count).toBe(10);
+      }
+    });
+    await (
+      await Base.leaseConnection()
+    ).execute("SELECT * FROM books WHERE name='row count book 3';");
+  });
+
+  it("payload row count on cache", async () => {
+    const events: any[] = [];
+    const callback = (event: any) => {
+      const payload = event.payload;
+      if (String(payload.sql).includes("SELECT")) events.push(payload);
+    };
+
+    await Book.create({ name: "row count book" });
+    Notifications.subscribe("sql.active_record", callback);
+    await ((await Base.leaseConnection()) as any).cache(async () => {
+      await Book.first();
+      await Book.first();
+    });
+
+    expect(events.length).toBe(2);
+    expect(events[0].cached).toBeFalsy();
+    expect(events[1].cached).toBeTruthy();
+
+    expect(events[0].row_count).toBe(1);
+    expect(events[1].row_count).toBe(1);
+  });
+
+  it("payload connection with query cache disabled", async () => {
+    const connection = await ClothingItem.leaseConnection();
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      expect(event.payload.connection).toBe(connection);
+    });
+    await Book.first();
+  });
+
+  it("payload connection with query cache enabled", async () => {
+    const connection = await ClothingItem.leaseConnection();
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      expect(event.payload.connection).toBe(connection);
+    });
+    await ((await Book.leaseConnection()) as any).cache(async () => {
+      await Book.first();
+      await Book.first();
+    });
+  });
+
+  it("no instantiation notification when no records", async () => {
+    const author = await Author.create({ id: 100, name: "David" });
+
+    let called = false;
+    Notifications.subscribe("instantiation.active_record", () => {
+      called = true;
+    });
+
+    await Author.where({ id: 0 });
+    await author.books;
+
+    expect(called).toBe(false);
+  });
+});
+
+function transactionInSqlActiveRecordPayloadTests(): void {
+  it("payload without an open transaction", async () => {
+    let asserted = false;
+
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event.payload.name === "Book Count") {
+        expect(event.payload.transaction ?? null).toBeNull();
+        asserted = true;
+      }
+    });
+
+    await Book.count();
+
+    expect(asserted).toBeTruthy();
+  });
+
+  it("payload with an open transaction", async () => {
+    let asserted = false;
+    let expectedTransaction: unknown = null;
+
+    Notifications.subscribe("sql.active_record", (event: any) => {
+      if (event.payload.name === "Book Count") {
+        expect(event.payload.transaction).toBe(expectedTransaction);
+        asserted = true;
+      }
+    });
+
+    await Book.transaction(async (transaction) => {
+      expectedTransaction = transaction;
+      await Book.count();
+    });
+
+    expect(asserted).toBeTruthy();
+  });
+}
+
+describe("TransactionInSqlActiveRecordPayloadTest", () => {
+  fixtures(["books"]);
+
+  afterEach(() => {
+    Notifications.unsubscribeAll();
+  });
+
+  transactionInSqlActiveRecordPayloadTests();
+});
+
+describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
+  fixtures(["books"], {
+    usesTransaction: ["payload without an open transaction", "payload with an open transaction"],
+  });
+
+  afterEach(() => {
+    Notifications.unsubscribeAll();
+  });
+
+  transactionInSqlActiveRecordPayloadTests();
+});

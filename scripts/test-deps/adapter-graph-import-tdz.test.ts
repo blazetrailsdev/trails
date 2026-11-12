@@ -15,7 +15,7 @@
 // this file fails at collection time.
 //
 // The import below is deliberately the first thing this module touches.
-import { SchemaStatements } from "../../packages/activerecord/src/connection-adapters/abstract/schema-statements.js";
+import { SchemaStatements } from "../../packages/activerecord/lib/connection-adapters/abstract/schema-statements.js";
 import { describe, it, expect } from "vitest";
 
 describe("adapter-graph circular-init", () => {
