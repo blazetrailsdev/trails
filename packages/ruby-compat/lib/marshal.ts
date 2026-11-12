@@ -122,6 +122,8 @@ interface DumpArg {
   numEntries: number;
   compatTbl: Map<object, object> | null;
   userdefs: Set<object> | null;
+  /** @noRailsEquivalent PERMANENT */
+  markPlainObjects: boolean;
 }
 
 /** `struct load_arg` (`vendor/ruby/v3.3.11/marshal.c:1267`). */
@@ -454,15 +456,29 @@ function wEncoding(encname: Encname, arg: DumpArg, limit: number): number {
   return 1;
 }
 
+/** @noRailsEquivalent PERMANENT */
+const PLAIN_OBJECT_IVAR = "@__trails_object";
+
+/** @noRailsEquivalent PERMANENT */
+function isPlainObjectHash(obj: unknown, arg: DumpArg): obj is object {
+  return (
+    arg.markPlainObjects &&
+    !(obj instanceof Map) &&
+    rbObjIsKindOf(obj, Hash) &&
+    !(obj instanceof String)
+  );
+}
+
 /**
  * `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`). Only a boxed `String` (the
  * ASCII-8BIT String a `_dump` answers) holds ivars, as its own non-index properties.
  *
  * @inventedArm if — PERMANENT
  */
-function hasIvars(obj: unknown, encname: Encname): number {
+function hasIvars(obj: unknown, encname: Encname, arg: DumpArg): number {
   let num = encname !== null ? 1 : 0;
   if (obj instanceof String) num += Object.keys(obj).length - obj.length;
+  else if (isPlainObjectHash(obj, arg)) num += 1;
   return num;
 }
 
@@ -478,6 +494,11 @@ function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void 
       wSymbol(`:${id}`, arg);
       wObject((obj as unknown as Record<string, unknown>)[id], arg, limit);
     }
+    return;
+  }
+  if (isPlainObjectHash(obj, arg)) {
+    wSymbol(`:${PLAIN_OBJECT_IVAR}`, arg);
+    wObject(true, arg, limit);
     return;
   }
   for (const id of rbObjInstanceVariables(obj)) {
@@ -607,9 +628,9 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       if (!(typeof v === "string" || v instanceof String)) {
         throw new TypeError("_dump() must return string");
       }
-      hasiv = hasIvars(obj, (encname = encodingName(obj)));
+      hasiv = hasIvars(obj, (encname = encodingName(obj)), arg);
       const encname2 = encodingName(v);
-      const hasiv2 = hasIvars(v, encname2);
+      const hasiv2 = hasIvars(v, encname2, arg);
       if (hasiv2) {
         hasiv = hasiv2;
         ivobj = v as object;
@@ -634,7 +655,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
 
     wRemember(key, arg);
 
-    hasiv = hasIvars(obj, (encname = encodingName(obj)));
+    hasiv = hasIvars(obj, (encname = encodingName(obj)), arg);
     {
       const allocator = rbGetAllocFunc(rbObjClass(obj));
       const compat = allocator === undefined ? undefined : compatAllocatorTbl.get(allocator);
@@ -743,12 +764,12 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     }
   }
   if (hasiv) {
-    wIvar(hasiv, undefined, encname, arg, limit);
+    wIvar(hasiv, isPlainObjectHash(obj, arg) ? obj : undefined, encname, arg, limit);
   }
 }
 
 /** `rb_marshal_dump_limited` (`vendor/ruby/v3.3.11/marshal.c:1228`). */
-function rbMarshalDumpLimited(obj: unknown, limit: number): Uint8Array {
+function rbMarshalDumpLimited(obj: unknown, limit: number, markPlainObjects: boolean): Uint8Array {
   const arg: DumpArg = {
     str: [],
     symbols: new Map(),
@@ -756,6 +777,7 @@ function rbMarshalDumpLimited(obj: unknown, limit: number): Uint8Array {
     numEntries: 0,
     compatTbl: null,
     userdefs: null,
+    markPlainObjects,
   };
 
   wByte(MARSHAL_MAJOR, arg);
@@ -1034,7 +1056,12 @@ function rEncname(obj: { value: string | Uint8Array }, arg: LoadArg): number {
  *
  * @inventedArm if — PERMANENT
  */
-function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadArg): unknown {
+function rIvar(
+  obj: unknown,
+  hasEncoding: { value: boolean } | null,
+  arg: LoadArg,
+  idx = -1,
+): unknown {
   let len = rLong(arg);
   if (len > 0) {
     do {
@@ -1045,10 +1072,14 @@ function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadAr
         if (hasEncoding) hasEncoding.value = true;
         obj = str;
       } else if (sym === "K") {
-        if (!(obj instanceof Map || rbObjIsKindOf(obj, Hash))) {
+        if (!(obj instanceof Map)) {
           throw new ArgumentError(
             `ruby2_keywords flag is given but ${rbObjAsString(obj)} is not a Hash`,
           );
+        }
+      } else if (sym === PLAIN_OBJECT_IVAR && obj instanceof Hash) {
+        if (!arg.links.has(idx) && [...obj.keys()].every((key) => typeof key === "string")) {
+          obj = Object.fromEntries(obj);
         }
       } else if (obj instanceof String) {
         (obj as unknown as Record<string, unknown>)[sym] = val;
@@ -1169,14 +1200,12 @@ function rObject0(arg: LoadArg, ivp: { value: boolean } | null, extmod: Module[]
  * arm.
  *
  * @inventedArm rEntry0 — PERMANENT
- * @inventedArm if — PERMANENT
  */
 function rObjectFor(
   arg: LoadArg,
   ivp: { value: boolean } | null,
   extmod: Module[] | null,
   type: number,
-  uclass = false,
 ): unknown {
   let v: unknown;
   let hashNewWithSize = (): Hash<unknown, unknown> => new Hash();
@@ -1198,7 +1227,7 @@ function rObjectFor(
         const idx = arg.data.size;
         v = rObject0(arg, ivar, extmod);
         if (ivar.value) {
-          const obj = rIvar(v, null, arg);
+          const obj = rIvar(v, null, arg, idx);
           if (obj !== v && arg.data.get(idx) === v) v = rEntry0(obj, idx, arg);
         }
         break;
@@ -1247,7 +1276,7 @@ function rObjectFor(
           hashNewWithSize = () => new Hash().compareByIdentity();
           continue;
         }
-        v = rObjectFor(arg, null, extmod, type, true);
+        v = rObjectFor(arg, null, extmod, type);
         if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v as unknown)) {
           throw new ArgumentError("dump format error (user class)");
         }
@@ -1358,7 +1387,6 @@ function rObjectFor(
         let len = rLong(arg);
         const hash = hashNewWithSize();
 
-        const idx = arg.data.size;
         v = rEntry(hash, arg);
         while (len--) {
           const key = rObject(arg);
@@ -1367,13 +1395,6 @@ function rObjectFor(
         }
         if (type === TYPE_HASH_DEF) {
           hash.setDefault(rObject(arg));
-        } else if (
-          !uclass &&
-          !hash.isCompareByIdentity() &&
-          [...hash.keys()].every((key) => typeof key === "string") &&
-          !arg.links.has(idx)
-        ) {
-          v = rEntry0(Object.fromEntries(hash), idx, arg);
         }
         v = rLeave(v, arg);
         break;
@@ -1602,12 +1623,15 @@ export const Marshal = {
    * `_dump` (`TYPE_USERDEF`, `marshal.c:918`) answers a String, or a boxed `String`
    * for an ASCII-8BIT one carrying ivars, as `Time#_dump` does.
    *
+   * `markPlainObjects` gives each plain-object Hash the `@__trails_object` ivar,
+   * so `Marshal.load` answers a plain object for it; Ruby's own dumps never set it.
+   *
    * Not ported: the `anIO` argument; and the Regexp arm, which nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
-  dump(obj: unknown, limit: number = -1): Uint8Array {
-    return rbMarshalDumpLimited(obj, limit);
+  dump(obj: unknown, limit: number = -1, markPlainObjects: boolean = false): Uint8Array {
+    return rbMarshalDumpLimited(obj, limit, markPlainObjects);
   },
 
   /**
@@ -1618,10 +1642,7 @@ export const Marshal = {
    *
    * @boundary: a String with no `E` / `encoding` ivar loads as its bytes, one
    *  character per byte, and one with the ivar is re-read through
-   *  `forceEncoding`. A Hash loads as ruby-compat's `Hash` where it needs one of
-   *  its features (a default, identity comparison, a user class, a non-String
-   *  key), and as a plain object otherwise (README § "When a Ruby Hash is a
-   *  `Hash` and when it is an object"), a whole-valued
+   *  `forceEncoding`. A Hash loads as ruby-compat's `Hash`, a whole-valued
    *  Float loads boxed (`rbDbl2num`), and a Bignum goes through `rbBigNorm`.
    *  `rb_obj_alloc` runs the class's allocator (`rbDefineAllocFunc`), else it
    *  is `Object.create(klass.prototype)`, so no constructor runs. A class

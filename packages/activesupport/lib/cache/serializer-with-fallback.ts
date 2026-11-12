@@ -105,11 +105,14 @@ extend(passthroughWithFallback, passthroughWithFallback);
 
 const marshal70WithFallback = {
   dump(entry: Entry | unknown): Uint8Array {
-    return rbStrPlus(b(MARK_UNCOMPRESSED), Marshal.dump((entry as Entry).pack())) as Uint8Array;
+    return rbStrPlus(
+      b(MARK_UNCOMPRESSED),
+      Marshal.dump((entry as Entry).pack(), -1, true),
+    ) as Uint8Array;
   },
 
   dumpCompressed(entry: Entry, threshold: number): Uint8Array {
-    const dumped = Marshal.dump(entry.pack());
+    const dumped = Marshal.dump(entry.pack(), -1, true);
 
     if (dumped.length >= threshold) {
       const compressed = deflate(dumped);
@@ -139,7 +142,7 @@ extend(marshal70WithFallback, marshal70WithFallback);
 
 const marshal71WithFallback = {
   dump(value: Entry | unknown): Uint8Array {
-    return Marshal.dump(value);
+    return Marshal.dump(value, -1, true);
   },
 
   _load(this: Serializer, dumped: string | Uint8Array | Entry): unknown {
