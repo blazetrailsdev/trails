@@ -15,6 +15,7 @@ import { rbInspect, rbModName } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
 import { Attachable } from "./attachable.js";
 import { Attachment } from "./attachment.js";
+import { ContentHelper } from "./content-helper.js";
 import { AttachmentGallery } from "./attachment-gallery.js";
 import { Fragment } from "./fragment.js";
 import { Rendering, type RenderingClassMethods } from "./rendering.js";
@@ -23,10 +24,9 @@ interface ContentOptions {
   canonicalize?: boolean;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rendering` (content.rb:25); the class/interface merge is how `include()` surfaces on the type side.
-export interface Content extends Included<typeof Rendering> {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rendering, Serialization, ContentHelper` (content.rb:25); the class/interface merge is how `include()` surfaces on the type side.
+export interface Content extends Included<typeof Rendering>, ContentHelper {
   render(...args: unknown[]): unknown;
-  sanitizeContentAttachment?(contentAttachment: string): string;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
@@ -38,6 +38,7 @@ export class Content {
 
   static {
     include(this, Rendering);
+    include(this, ContentHelper);
   }
 
   static async fragmentByCanonicalizingContent(content: unknown): Promise<Fragment> {
@@ -131,7 +132,7 @@ export class Content {
     const nodes: Html5Node[] = [];
     const content = this.fragment.replace(Attachment.tagName, (node) => {
       if (node.isKey("content")) {
-        const sanitizedContent = this.sanitizeContentAttachment!(
+        const sanitizedContent = this.sanitizeContentAttachment(
           String(node.removeAttribute("content")),
         );
         if (isPresent(sanitizedContent)) node.set("content", sanitizedContent);
@@ -178,7 +179,7 @@ export class Content {
     return this.render({
       layout: "action_text/contents/content",
       partial: this.toPartialPath(),
-      formats: "html",
+      formats: ":html",
       locals: { content: this },
     });
   }

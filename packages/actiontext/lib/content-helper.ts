@@ -71,20 +71,23 @@ export class ContentHelper {
         return null;
       })
     ).renderAttachmentGalleries(async (attachmentGallery: AttachmentGallery) => {
-      const attachments = await attachmentGallery.attachments();
-      const html: string[] = [];
-      for (const attachment of attachments) {
-        attachment!.node.setInnerHtml(
-          await this.renderActionTextAttachment(attachment!, { locals: { inGallery: true } }),
-        );
-        html.push(attachment!.toHtml());
-      }
       return chomp(
         String(
           await this.render(
             { layout: attachmentGallery, object: attachmentGallery },
             undefined,
-            () => htmlSafe(html.join("")),
+            async () => {
+              const html: string[] = [];
+              for (const attachment of await attachmentGallery.attachments()) {
+                attachment!.node.setInnerHtml(
+                  await this.renderActionTextAttachment(attachment!, {
+                    locals: { inGallery: true },
+                  }),
+                );
+                html.push(attachment!.toHtml());
+              }
+              return htmlSafe(html.join(""));
+            },
           ),
         ),
       );

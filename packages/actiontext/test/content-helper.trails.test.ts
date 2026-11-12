@@ -38,6 +38,9 @@ describe("ContentHelper rendering", () => {
   const VIEWS = [
     "action-text/attachables/_remote_image.html.tse",
     "action-text/attachment-galleries/_attachment_gallery.html.tse",
+    "action-text/attachables/_content_attachment.html.tse",
+    "action-text/attachables/_missing_attachable.html.tse",
+    "action_text/contents/_content.html.tse",
   ];
 
   const renderContent = async (html: string): Promise<string> => {
@@ -68,5 +71,33 @@ describe("ContentHelper rendering", () => {
     expect(html.match(/attachment--preview/g)).toHaveLength(3);
     expect(html).toContain('src="http://example.com/1.jpg"');
     expect(html).toContain('src="http://example.com/3.jpg"');
+  });
+
+  it("renders a missing attachment through its partial", async () => {
+    const html = await renderContent(
+      '<div><action-text-attachment sgid="missing"></action-text-attachment></div>',
+    );
+    expect(html).toContain("☒");
+  });
+
+  it("renders the content partial through renderActionTextContent", async () => {
+    const View = Base.withEmptyTemplateCache();
+    include(View, ContentHelper);
+    const lookupContext = new LookupContext(null, {}, []);
+    const files: Record<string, string> = {};
+    for (const path of VIEWS) {
+      files[path] = await File.read(File.expandPath(`../app/views/${path}`, import.meta.dirname));
+    }
+    lookupContext.appendViewPaths([new FixtureResolver(files)]);
+    const view = new View(lookupContext, {}, null);
+    const content = await new Content("<p>hello</p>").canonicalized;
+    const html = String(
+      await view.render({
+        partial: content.toPartialPath(),
+        formats: ":html",
+        locals: { content },
+      }),
+    );
+    expect(html).toBe("<p>hello</p>\n");
   });
 });
