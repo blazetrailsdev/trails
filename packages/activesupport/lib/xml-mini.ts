@@ -59,7 +59,9 @@ const FORMATTING: Record<string, (value: unknown) => string> = {
   time: (value) => (value instanceof Temporal.PlainTime ? value.toString() : String(value)),
   dateTime: formatDateTime,
   duration: (value) => (value instanceof Temporal.Duration ? value.toString() : String(value)),
-  binary: (binary) => Base64.encode64(binary as string | Uint8Array),
+  binary(binary: string | Uint8Array) {
+    return Base64.encode64(binary);
+  },
 };
 
 function formatDateTime(value: unknown): string {

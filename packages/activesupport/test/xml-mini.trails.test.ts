@@ -6,11 +6,19 @@ import {
   _parseHexBinary,
   castBackendNameToModule,
   FileLike,
+  toTag,
+  XmlStringBuilder,
 } from "../lib/xml-mini.js";
 import * as XmlMini_REXML from "../lib/xml-mini/rexml.js";
 import * as XmlMini_Nokogiri from "../lib/xml-mini/nokogiri.js";
 
 describe("XmlMini", () => {
+  it("formats an ASCII-8BIT binary value through Base64.encode64 byte for byte", () => {
+    const builder = new XmlStringBuilder();
+    toTag("b", new Uint8Array([0xff, 0xef]), { skipInstruct: true, builder, type: "binary" });
+    expect(builder.target()).toBe('<b type="binary" encoding="base64">/+8=\n</b>');
+  });
+
   it("_parse_hex_binary decodes hex to bytes", () => {
     expect(_parseHexBinary("48656C6C6F2C20576F726C6421")).toBe("Hello, World!");
   });
