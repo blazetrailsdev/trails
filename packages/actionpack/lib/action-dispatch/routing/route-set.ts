@@ -23,6 +23,7 @@ import {
   rbAnyToS,
   rbInspect,
   rbObjClone,
+  rbDeclareIvar,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
@@ -339,6 +340,11 @@ export const MountedHelpers = class {
   static readonly [included] = (base: unknown): void => {
     if (typeof base === "function") {
       mountedHelpersIncluders.add(new WeakRef((base as { prototype: object }).prototype));
+      for (const key of Object.getOwnPropertyNames(MountedHelpers.prototype)) {
+        if (key.startsWith("_") && Object.hasOwn(MountedHelpers.prototype, key.slice(1))) {
+          rbDeclareIvar(base as { prototype: object }, `@${key}`, `_${key}`);
+        }
+      }
     }
   };
 };
@@ -1100,12 +1106,14 @@ export class RouteSet {
       },
     });
 
+    rbDeclareIvar(MountedHelpers, `@_${name}`, `__${name}`);
     for (const includer of mountedHelpersIncluders) {
       const proto = includer.deref();
       if (!proto) {
         mountedHelpersIncluders.delete(includer);
         continue;
       }
+      rbDeclareIvar({ prototype: proto }, `@_${name}`, `__${name}`);
       for (const key of [`_${name}`, name]) {
         if (Object.hasOwn(proto, key)) continue;
         Object.defineProperty(

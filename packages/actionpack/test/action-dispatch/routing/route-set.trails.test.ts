@@ -1,6 +1,6 @@
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { describe, it, expect, vi } from "vitest";
-import { include, rbModMethodDefined } from "@blazetrails/ruby-compat";
+import { include, rbModMethodDefined, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import {
   RouteSet,
   StaticDispatcher,
@@ -291,6 +291,24 @@ describe("ActionDispatch::Routing::RouteSet#define_mounted_helper", () => {
     routes.defineMountedHelper("trails_late_app");
     const host = new Host() as { trailsLateApp: RoutesProxyInstance };
     expect(host.trailsLateApp.scope).toBe(host);
+  });
+
+  it("memoizes the helper in @_name without shadowing the _name factory", () => {
+    for (const late of [false, true]) {
+      const routes = new RouteSet();
+      class Host {}
+      if (!late) routes.defineMountedHelper("trails_memo_app");
+      include(Host, routes.mountedHelpers());
+      if (late) routes.defineMountedHelper("trails_memo_app");
+      const host = new Host() as {
+        trailsMemoApp: RoutesProxyInstance;
+        _trailsMemoApp(): RoutesProxyInstance;
+      };
+      const proxy = host.trailsMemoApp;
+      expect(host.trailsMemoApp).toBe(proxy);
+      expect(rbObjIvarGet(host, "@_trailsMemoApp")).toBe(proxy);
+      expect(host._trailsMemoApp()).not.toBe(proxy);
+    }
   });
 });
 
