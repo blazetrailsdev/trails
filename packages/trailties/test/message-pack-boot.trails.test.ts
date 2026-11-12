@@ -24,7 +24,6 @@ import { Trailtie as ActiveSupportTrailtie } from "../lib/trailties/active-suppo
 
 const baseConfig = (): BootstrapConfig => ({
   root: null,
-  _autoloadLibIgnoredAbspaths: { once: [] },
   activeSupport: {},
   logLevel: "debug",
   logFormatter: null,

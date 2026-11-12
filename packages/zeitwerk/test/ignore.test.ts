@@ -37,7 +37,7 @@ describe("TestIgnore", () => {
     const files: Files = [["x.ts", "export const X = true"]];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.ignore(".");
+      loader.ignore(".");
       await loader.setup();
 
       expect(!autoload("X")).toBeTruthy();
@@ -53,7 +53,7 @@ describe("TestIgnore", () => {
     await withFiles(files, async () => {
       await loader.pushDir(".");
       await loader.pushDir("nested");
-      await loader.ignore(".");
+      loader.ignore(".");
       await loader.setup();
 
       expect(!autoload("X")).toBeTruthy();
@@ -69,7 +69,7 @@ describe("TestIgnore", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.ignore("y.ts");
+      loader.ignore("y.ts");
       await loader.setup();
 
       expect(autoload("X")).toBeTruthy();
@@ -83,7 +83,7 @@ describe("TestIgnore", () => {
   it("ignored directories are ignored", async () => {
     await withFiles(M_FILES, async () => {
       await loader.pushDir(".");
-      await loader.ignore("m");
+      loader.ignore("m");
       await loader.setup();
 
       expect(autoload("X")).toBeTruthy();
@@ -101,7 +101,7 @@ describe("TestIgnore", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.ignore("y.ts");
+      loader.ignore("y.ts");
       await loader.setup();
       await loader.eagerLoad();
 
@@ -113,7 +113,7 @@ describe("TestIgnore", () => {
   it("ignored directories are not eager loaded", async () => {
     await withFiles(M_FILES, async () => {
       await loader.pushDir(".");
-      await loader.ignore("m");
+      loader.ignore("m");
       await loader.setup();
       await loader.eagerLoad();
 
@@ -125,14 +125,14 @@ describe("TestIgnore", () => {
   it("supports several arguments", async () => {
     const a = `${Dir.pwd()}/a.rb`;
     const b = `${Dir.pwd()}/b.rb`;
-    await loader.ignore(a, b);
+    loader.ignore(a, b);
     expect(loader.ignoredGlobPatterns).toEqual(new Set([a, b]));
   });
 
   it("supports an array", async () => {
     const a = `${Dir.pwd()}/a.rb`;
     const b = `${Dir.pwd()}/b.rb`;
-    await loader.ignore([a, b]);
+    loader.ignore([a, b]);
     expect(loader.ignoredGlobPatterns).toEqual(new Set([a, b]));
   });
 
@@ -143,7 +143,7 @@ describe("TestIgnore", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.ignore("**/*_test.ts");
+      loader.ignore("**/*_test.ts");
       await loader.setup();
 
       expect(await cget("Admin::User")).toBeTruthy();
@@ -158,7 +158,7 @@ describe("TestIgnore", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.ignore("*_test.ts");
+      loader.ignore("*_test.ts");
       await loader.setup();
 
       expect(await cget("User")).toBeTruthy();
@@ -175,32 +175,32 @@ describe("TestIgnore", () => {
   });
 
   it("returns true if a directory is ignored as is", async () => {
-    await loader.ignore(thisDir);
+    loader.ignore(thisDir);
     expect(loader.isIgnores(thisDir)).toBeTruthy();
   });
 
   it("returns true if a file is ignored as is", async () => {
-    await loader.ignore(thisFile);
+    loader.ignore(thisFile);
     expect(loader.isIgnores(thisFile)).toBeTruthy();
   });
 
   it("returns true for a descendant of an ignored directory", async () => {
-    await loader.ignore(ascendant);
+    loader.ignore(ascendant);
     expect(loader.isIgnores(thisDir)).toBeTruthy();
   });
 
   it("returns true for a file in a descendant of an ignored directory", async () => {
-    await loader.ignore(ascendant);
+    loader.ignore(ascendant);
     expect(loader.isIgnores(thisFile)).toBeTruthy();
   });
 
   it("returns false for the directory of an ignored file", async () => {
-    await loader.ignore(thisFile);
+    loader.ignore(thisFile);
     expect(!loader.isIgnores(thisDir)).toBeTruthy();
   });
 
   it("returns false for an ascendant directory of an ignored directory", async () => {
-    await loader.ignore(thisDir);
+    loader.ignore(thisDir);
     expect(!loader.isIgnores(ascendant)).toBeTruthy();
   });
 

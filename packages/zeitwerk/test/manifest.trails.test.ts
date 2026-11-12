@@ -137,7 +137,7 @@ describe("autoload artifacts", () => {
       const manifest: Manifest = await buildManifest(loader);
 
       const reader = await fresh();
-      await reader.collapse("admin");
+      reader.collapse("admin");
       reader.manifest = manifest;
       await expect(reader.setup()).rejects.toBeInstanceOf(ZeitwerkError);
     });
@@ -255,7 +255,7 @@ describe("autoload artifacts", () => {
         reader.manifest = manifest;
         reader.imports = imports;
         await reader.pushDir(".");
-        await reader.collapse("nothing");
+        reader.collapse("nothing");
         reader.manifest = { ...manifest, digest: configurationDigest(reader) };
         await reader.setup();
         reader.doNotEagerLoad("skipped");
@@ -286,7 +286,7 @@ describe("autoload artifacts", () => {
     const seats = TopLevel as Record<string, Record<string, Record<string, unknown>> | undefined>;
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.collapse("app/flat");
+      loader.collapse("app/flat");
       const dir = await writeArtifacts(loader);
       const manifest = JSON.parse(await getFs().readFile(`${dir}/manifest.json`, "utf8"));
       const { imports } = await import(`${dir}/imports.generated.js`);
@@ -299,7 +299,7 @@ describe("autoload artifacts", () => {
         reader.manifest = manifest;
         reader.imports = imports;
         await reader.pushDir(".");
-        await reader.collapse("app/flat");
+        reader.collapse("app/flat");
         await reader.setup();
 
         const cpaths = await reader.allExpectedCpaths();
@@ -342,7 +342,7 @@ describe("autoload artifacts", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.ignore("skip.js");
+      loader.ignore("skip.js");
       const manifest = await buildManifest(loader);
       expect(manifest.ignored).toEqual(["skip.js"]);
       Registry.unregisterLoader(loader);
@@ -352,7 +352,7 @@ describe("autoload artifacts", () => {
         const reader = await newLoader({ setup: false, enableReloading: false });
         reader.manifest = manifest;
         await reader.pushDir(".");
-        await reader.ignore("skip.js");
+        reader.ignore("skip.js");
         await reader.setup();
 
         await expect(reader.loadFile("skip.js")).rejects.toThrow(/is ignored/);
@@ -373,7 +373,7 @@ describe("autoload artifacts", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.ignore("ignored_dir");
+      loader.ignore("ignored_dir");
       const manifest = await buildManifest(loader);
       Registry.unregisterLoader(loader);
 
@@ -382,7 +382,7 @@ describe("autoload artifacts", () => {
         const reader = await newLoader({ setup: false, enableReloading: false });
         reader.manifest = manifest;
         await reader.pushDir(".");
-        await reader.ignore("ignored_dir");
+        reader.ignore("ignored_dir");
         await reader.setup();
 
         await expect(reader.loadFile("ignored_dir/x.js")).rejects.toThrow(/is ignored/);

@@ -105,11 +105,11 @@ export async function withSetup(
 
     for (const [file] of files) {
       const ignored = /^(ignored|.+\/ignored)\//.exec(file);
-      if (File.basename(file) === "ignored.ts") await loader.ignore(file);
-      else if (ignored != null) await loader.ignore(ignored[1]);
+      if (File.basename(file) === "ignored.ts") loader.ignore(file);
+      else if (ignored != null) loader.ignore(ignored[1]);
 
       const collapsed = /^(collapsed|.+\/collapsed)\//.exec(file);
-      if (collapsed != null) await loader.collapse(collapsed[1]);
+      if (collapsed != null) loader.collapse(collapsed[1]);
     }
 
     await loader.setup();

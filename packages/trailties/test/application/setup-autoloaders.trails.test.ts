@@ -7,8 +7,6 @@ import { EngineConfiguration } from "../../lib/engine/configuration.js";
 import { Root } from "../../lib/paths.js";
 import { Bootstrap } from "../../lib/application/bootstrap.js";
 import { Finisher } from "../../lib/application/finisher.js";
-import { Application } from "../../lib/application.js";
-import { Trails } from "../../lib/trails.js";
 
 describe("setup_once_autoloader and setup_main_autoloader", () => {
   let root: string;
@@ -20,18 +18,10 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
     return path;
   };
 
-  const run = async (
-    klass: typeof Bootstrap | typeof Finisher,
-    name: string,
-    config: object = {
-      root,
-      isReloadingEnabled: () => false,
-      _autoloadLibIgnoredAbspaths: { main: [], once: [] },
-    },
-  ): Promise<void> => {
+  const run = async (klass: typeof Bootstrap | typeof Finisher, name: string): Promise<void> => {
     const host = {
       autoloaders,
-      config,
+      config: { root, isReloadingEnabled: () => false },
       paths: () => new Root(root),
     };
     const initializer = klass._ownInitializers().find((i) => i.name === name)!;
@@ -65,38 +55,6 @@ describe("setup_once_autoloader and setup_main_autoloader", () => {
     expect(eagerLoad).not.toContain(File.join(root, "app/views"));
     expect(eagerLoad).toContain(File.join(root, "app/views/concerns"));
   });
-
-  for (const [method, paths, loader, klass, name] of [
-    ["autoloadLibOnce", "autoloadOncePaths", "once", Bootstrap, "setup_once_autoloader"],
-    ["autoloadLib", "autoloadPaths", "main", Finisher, "setup_main_autoloader"],
-  ] as const) {
-    it(`${method} from an unregistered Application's static block reaches ${name}`, async () => {
-      const appClass = Application.appClass;
-      Application.appClass = null;
-      Trails.application = null;
-      try {
-        const appRoot = root;
-        class StaticBlockApp extends Application {
-          static {
-            this.config.setRoot(appRoot);
-            this.config[method]({ ignore: ["assets", "tasks"] });
-          }
-        }
-        const config = StaticBlockApp.config;
-        const lib = File.join(root, "lib");
-        expect(config[paths]).toContain(lib);
-        expect(config.eagerLoadPaths).toContain(lib);
-
-        await run(klass, name, config);
-
-        expect(autoloaders[loader].ignoredGlobPatterns.has(File.join(lib, "assets"))).toBe(true);
-        expect(autoloaders[loader].ignoredGlobPatterns.has(File.join(lib, "tasks"))).toBe(true);
-      } finally {
-        Application.appClass = appClass;
-        Trails.application = null;
-      }
-    });
-  }
 
   for (const [paths, loader, klass, name] of [
     ["autoloadOncePaths", "once", Bootstrap, "setup_once_autoloader"],

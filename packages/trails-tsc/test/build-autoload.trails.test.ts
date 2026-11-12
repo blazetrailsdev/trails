@@ -7,6 +7,7 @@ import {
   registerCompiledFiles,
 } from "@blazetrails/ruby-compat";
 import { Loader, Registry } from "@blazetrails/zeitwerk";
+import { setTrailsRoot, trailsRoot } from "@blazetrails/activesupport";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildAutoload } from "../lib/build-autoload.js";
 
@@ -18,6 +19,7 @@ describe("buildAutoload", () => {
     Dir.chdir(pwd);
     delete seats.Trails;
     Registry.loaders.length = 0;
+    setTrailsRoot(null);
   });
 
   it("boots through setup_main_autoloader and writes the walk it set up", async () => {
@@ -66,6 +68,40 @@ describe("buildAutoload", () => {
       );
       expect(Object.hasOwn(main, "setup")).toBe(false);
       expect(Object.hasOwn(main, "eagerLoad")).toBe(false);
+    } finally {
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("seats the application root for initializers run from another directory", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    const root = File.join(tmp, "app-root");
+    FileUtils.mkdirP(root);
+    Dir.chdir(tmp);
+    try {
+      let seen: string | null = null;
+      seats.Trails = {
+        application: {
+          config: { root },
+          autoloaders: {},
+          initializers: {
+            tsort: () => [
+              {
+                name: "setup_main_autoloader",
+                belongsTo: () => true,
+                run: () => {
+                  seen = trailsRoot();
+                },
+              },
+            ],
+          },
+        },
+      };
+
+      await buildAutoload({ cwd: root });
+
+      expect(seen).toEqual(root);
     } finally {
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);

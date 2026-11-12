@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { join } from "node:path";
 import { setAppPath } from "@blazetrails/trailties/app-path";
 

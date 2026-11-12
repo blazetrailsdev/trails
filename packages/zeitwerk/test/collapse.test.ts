@@ -53,7 +53,7 @@ describe("TestCollapse", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.collapse("foo");
+      loader.collapse("foo");
       await loader.setup();
 
       expect(await cget("Foo::X")).toBeTruthy();
@@ -67,7 +67,7 @@ describe("TestCollapse", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.collapse(["foo", "foo/bar"]);
+      loader.collapse(["foo", "foo/bar"]);
       await loader.setup();
 
       expect(await cget("Foo::X")).toBeTruthy();
@@ -81,7 +81,7 @@ describe("TestCollapse", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.collapse("foo/bar", "zoo/bar");
+      loader.collapse("foo/bar", "zoo/bar");
       await loader.setup();
 
       expect(await cget("Foo::X")).toBeTruthy();
@@ -96,7 +96,7 @@ describe("TestCollapse", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.collapse(["foo/bar", "zoo/bar"]);
+      loader.collapse(["foo/bar", "zoo/bar"]);
       await loader.setup();
 
       expect(await cget("Foo::X")).toBeTruthy();
@@ -111,7 +111,7 @@ describe("TestCollapse", () => {
     ];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.collapse("*/bar");
+      loader.collapse("*/bar");
       await loader.setup();
 
       expect(await cget("Foo::X")).toBeTruthy();
@@ -123,7 +123,7 @@ describe("TestCollapse", () => {
     const files: Files = [["foo/bar/x.ts", "export const X = true"]];
     await withFiles(files, async () => {
       await loader.pushDir(".");
-      await loader.collapse("*/bar");
+      loader.collapse("*/bar");
       await loader.setup();
 
       expect(await cget("Foo::X")).toBeTruthy();

@@ -421,12 +421,6 @@ export class Configuration extends EngineConfiguration {
     this._loadedConfigVersion = targetVersion;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  readonly _autoloadLibIgnoredAbspaths: { main: string[]; once: string[] } = { main: [], once: [] };
-
   autoloadLib({ ignore }: { ignore: string | string[] }): void {
     const lib = File.join(this.root as string, "lib");
 
@@ -434,8 +428,7 @@ export class Configuration extends EngineConfiguration {
     this.eagerLoadPaths.push(lib);
 
     const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
-    /** @missingRailsCall ignore — PERMANENT */
-    this._autoloadLibIgnoredAbspaths.main.push(...ignoredAbspaths);
+    Trails.autoloaders.main.ignore(ignoredAbspaths);
   }
 
   autoloadLibOnce({ ignore }: { ignore: string | string[] }): void {
@@ -445,8 +438,7 @@ export class Configuration extends EngineConfiguration {
     this.eagerLoadPaths.push(lib);
 
     const ignoredAbspaths = wrap(ignore).map((path) => File.join(lib, path));
-    /** @missingRailsCall ignore — PERMANENT */
-    this._autoloadLibIgnoredAbspaths.once.push(...ignoredAbspaths);
+    Trails.autoloaders.once.ignore(ignoredAbspaths);
   }
 
   get colorizeLogging(): boolean {

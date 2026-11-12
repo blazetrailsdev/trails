@@ -313,9 +313,7 @@ export class Trailtie extends BaseTrailtie {
       onLoad("active_record", (base: typeof Base) => {
         initializeDatabase = (async () => {
           base.configurations(
-            (await databaseConfiguration(Trails.root() ?? undefined)) as Parameters<
-              typeof base.configurations
-            >[0],
+            (await databaseConfiguration()) as Parameters<typeof base.configurations>[0],
           );
 
           const pool = await base.establishConnection();

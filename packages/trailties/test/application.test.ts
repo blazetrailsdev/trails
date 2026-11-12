@@ -715,6 +715,11 @@ describe("Application::Configuration", () => {
   });
 
   it("config.autoload_lib adds lib to the expected paths (array ignore)", () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
     const c = new Configuration("/app");
     c.setRoot("/app");
     c.autoloadLib({ ignore: ["tasks", "generators"] });
@@ -724,6 +729,11 @@ describe("Application::Configuration", () => {
   });
 
   it("config.autoload_lib adds lib to the expected paths (empty array ignore)", () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
     const c = new Configuration("/app");
     c.setRoot("/app");
     c.autoloadLib({ ignore: [] });
@@ -733,6 +743,11 @@ describe("Application::Configuration", () => {
   });
 
   it("config.autoload_lib adds lib to the expected paths (scalar ignore)", () => {
+    class AutoloadLibApp extends Application {}
+    Trails.application = AutoloadLibApp.instance();
+    onTestFinished(() => {
+      Trails.application = null;
+    });
     const c = new Configuration("/app");
     c.setRoot("/app");
     c.autoloadLib({ ignore: "tasks" });
@@ -742,13 +757,19 @@ describe("Application::Configuration", () => {
   });
 
   it("config.autoload_lib_once adds lib to the once paths and ignores through the once loader", () => {
+    class AutoloadLibOnceApp extends Application {}
+    const app = AutoloadLibOnceApp.instance();
+    Trails.application = app;
+    onTestFinished(() => {
+      Trails.application = null;
+    });
     const c = new Configuration("/app");
     c.setRoot("/app");
     c.autoloadLibOnce({ ignore: "tasks" });
 
     expect(c.autoloadOncePaths).toContain("/app/lib");
     expect(c.eagerLoadPaths).toContain("/app/lib");
-    expect(c._autoloadLibIgnoredAbspaths.once).toEqual(["/app/lib/tasks"]);
+    expect(app.autoloaders.once.ignoredGlobPatterns.has("/app/lib/tasks")).toBe(true);
   });
 
   it("setting priority for engines with config.railties_order", () => {

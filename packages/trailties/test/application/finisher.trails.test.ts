@@ -56,7 +56,6 @@ class TestApp extends Finisher {
   };
   config: FinisherConfig = {
     root: null,
-    _autoloadLibIgnoredAbspaths: { main: [] },
     allowConcurrency: null,
     toPrepareBlocks: [],
     eagerLoad: null,

@@ -26,7 +26,6 @@ import { _registerAutoloaded } from "./finisher.js";
 
 export interface BootstrapConfig {
   root: string | null;
-  readonly _autoloadLibIgnoredAbspaths: { once: string[] };
   logger?: Logger | null;
   logLevel: LogLevel | number | string;
   logFormatter: Logger["formatter"];
@@ -133,14 +132,12 @@ Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async
   }
 });
 
-/** @inventedArm ignore — PERMANENT */
 Bootstrap.initializer<BootstrapHost>(
   "setup_once_autoloader",
   { after: "set_eager_load_paths", before: "bootstrap_hook" },
   async function () {
     const autoloader = this.autoloaders.once;
     autoloader.manifestRoot ??= this.config.root;
-    await autoloader.ignore(this.config._autoloadLibIgnoredAbspaths.once);
 
     const alreadyConfiguredDirs = new Set(autoloader.dirs() as readonly string[]);
 

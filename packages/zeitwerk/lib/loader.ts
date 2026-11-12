@@ -241,8 +241,8 @@ export class Loader {
     this._manifestConstants = null;
     this._manifestChildren = null;
     this._manifestRows = {};
-    await this.recomputeIgnoredPaths();
-    await this.recomputeCollapseDirs();
+    this.recomputeIgnoredPaths();
+    this.recomputeCollapseDirs();
     await this.setup();
   }
 

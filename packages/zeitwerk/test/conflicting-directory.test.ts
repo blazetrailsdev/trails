@@ -60,33 +60,33 @@ describe("TestConflictingDirectory", () => {
 
   it("does not raise if an existing loader ignores the directory (dir)", async () => {
     await existingLoader.pushDir(parent);
-    await existingLoader.ignore(dir);
+    existingLoader.ignore(dir);
     expect(await loader.pushDir(dir)).toBeTruthy();
   });
 
   it("does not raise if a second existing loader ignores the directory (dir)", async () => {
     const secondExistingLoader = await newLoader({ setup: false });
     await secondExistingLoader.pushDir(parent);
-    await secondExistingLoader.ignore(dir);
+    secondExistingLoader.ignore(dir);
 
     expect(await loader.pushDir(dir)).toBeTruthy();
   });
 
   it("does not raise if an existing loader ignores the directory (glob pattern)", async () => {
     await existingLoader.pushDir(parent);
-    await existingLoader.ignore(`${parent}/*`);
+    existingLoader.ignore(`${parent}/*`);
     expect(await loader.pushDir(dir)).toBeTruthy();
   });
 
   it("does not raise if the loader ignores a directory managed by an existing loader (dir)", async () => {
     await existingLoader.pushDir(dir);
-    await loader.ignore(dir);
+    loader.ignore(dir);
     expect(await loader.pushDir(parent)).toBeTruthy();
   });
 
   it("does not raise if the loader ignores a directory managed by an existing loader (glob pattern)", async () => {
     await existingLoader.pushDir(dir);
-    await loader.ignore(`${parent}/*`);
+    loader.ignore(`${parent}/*`);
     expect(await loader.pushDir(parent)).toBeTruthy();
   });
 
@@ -96,7 +96,7 @@ describe("TestConflictingDirectory", () => {
       const conflictingDir = File.expandPath("foobar");
 
       await existingLoader.pushDir(".");
-      await existingLoader.ignore(ignored);
+      existingLoader.ignore(ignored);
 
       await checkConflict(conflictingDir);
     });
