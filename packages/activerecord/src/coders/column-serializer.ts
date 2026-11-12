@@ -10,7 +10,7 @@ import {
 import { SerializationTypeMismatch } from "../errors.js";
 
 type CoderLike = { dump(obj: unknown): string | null; load(payload: unknown): unknown };
-type ClassLike = new (...args: unknown[]) => unknown;
+type ClassLike = new (...args: never[]) => unknown;
 
 export class ColumnSerializer {
   private _attrName: string;
@@ -25,11 +25,7 @@ export class ColumnSerializer {
     return this._coder;
   }
 
-  constructor(
-    attrName: string,
-    coder: CoderLike,
-    objectClass: ClassLike = Object as unknown as ClassLike,
-  ) {
+  constructor(attrName: string, coder: CoderLike, objectClass: ClassLike = Object) {
     this._attrName = attrName;
     this._objectClass = objectClass;
     this._coder = coder;

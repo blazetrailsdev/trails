@@ -221,13 +221,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       'state to raise on. PERMANENT: CLAUDE.md § "Ruby Strings are JS string primitives".',
   },
   {
-    testFile: "query_cache_test.rb",
-    tests: ["query serialized active record", "query serialized string"],
-    reason:
-      "Ruby YAML `serialize` coder round-trip of an AR record (use_yaml_unsafe_load); " +
-      "no JS YAML AR-record (un)safe-load equivalent.",
-  },
-  {
     testFile: "inherited_test.rb",
     tests: ["super before filter attributes", "super after filter attributes"],
     reason:
@@ -237,55 +230,15 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       'memo guards".',
   },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
-  {
-    testFile: "serialized_attribute_test.rb",
-    tests: [
-      "serialized class attribute",
-      "serialized class does not become frozen",
-      "serialized attribute should raise exception on assignment with wrong type",
-      "classes without no arg constructors are not supported",
-      "is not changed when stored blob",
-      "is not changed when stored in blob frozen payload",
-      "decorated type with type for attribute",
-      "decorated type with decorator block",
-      "serialized attribute works under concurrent initial access",
-      "supports permitted classes for default column serializer",
-    ],
-    reason:
-      "YAML/Psych column serialization and class-constrained serializers — Ruby-only format with no Node.js equivalent.",
-  },
   // `SerializedAttributeTestWithYamlSafeLoad < SerializedAttributeTest`
   // (serialized_attribute_test.rb:579) re-runs the whole suite under Psych
   // safe_load. Only the safe_load arm is out of reach — the base class's
   // versions of these are ported live in the `SerializedAttributeTest`
   // describe — so the exclusion is scoped to the subclass rather than
   // silently subtracting the ported test too (RFC 0126).
-  {
-    testFile: "serialized_attribute_test.rb",
-    className: "SerializedAttributeTestWithYamlSafeLoad",
-    tests: [
-      "serialized attribute with class constraint",
-      "where by serialized attribute with array",
-      "where by serialized attribute with hash",
-      "where by serialized attribute with hash in array",
-      "serialize attribute can be serialized in an integer column",
-      "serialized time attribute",
-    ],
-    reason:
-      "Psych safe_load re-run of tests the base class ports live; only the " +
-      "permitted-classes YAML arm has no Node.js equivalent.",
-  },
   // The mirror case: the base class's version is the one out of reach (it
   // needs `with_timezone_config aware_attributes:` over a Ruby MyObject
   // serializer), while the subclass's Hash-typed rewrite is ported live.
-  {
-    testFile: "serialized_attribute_test.rb",
-    className: "SerializedAttributeTest",
-    tests: ["serialize attribute via select method when time zone available"],
-    reason:
-      "Serializes a Ruby MyObject through Psych under aware_attributes; the " +
-      "subclass's Hash-typed rewrite of the same test is ported.",
-  },
   {
     testFile: "base_test.rb",
     tests: [
@@ -370,16 +323,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "`public_send` refused by a private writer so mass assignment raises " +
       "UnknownAttributeError (attribute_methods_test.rb:998-1033). trails carries no method " +
       "visibility at run time (see CLAUDE.md, 'Method visibility is compile-time only').",
-  },
-  {
-    testFile: "attribute_methods_test.rb",
-    className: "AttributeMethodsTest",
-    tests: ["YAML dumping a record with time zone-aware attribute"],
-    reason:
-      "Round-trips an Active Record object through `YAML.dump` / `YAML.unsafe_load` " +
-      "(Psych), which reconstitutes the instance from a `!ruby/object:Topic` node " +
-      "carrying its instance variables. No Node.js equivalent: JS has no object " +
-      "graph serializer that rebuilds a class instance from a tag.",
   },
   {
     // Scoped to activerecord's binary_test.rb: "cases/binary_test.rb" does not
@@ -506,26 +449,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "unreproducible in principle, not merely unported.",
   },
   // --- Cross-version Psych/YAML schema-cache deserialization ---
-  {
-    testFile: "connection_adapters/schema_cache_test.rb",
-    tests: ["yaml loads 5 1 dump", "yaml loads 5 1 dump without indexes still queries for indexes"],
-    reason:
-      "Loads the fixed Rails-5.1-era schema-cache dump asset " +
-      "(test/assets/schema_dump_5_1.yml) and deserializes it via Psych " +
-      "(schema_cache_test.rb:124-142). Note this is NOT covered by our YAML " +
-      "syntax support (the `yaml` package backing coders/yaml-column.ts): the " +
-      "asset is a Psych object graph of `!ruby/object:ActiveRecord::" +
-      "ConnectionAdapters::{SchemaCache,Column,SqlTypeMetadata}` tags with Ruby " +
-      "symbol values and anchors. Loading it requires (a) unsafe-load " +
-      "reconstruction of Ruby class instances from `!ruby/object:` tags — the " +
-      "same Psych machinery already documented as having no JS analog in the " +
-      "coders/yaml_column.rb and attribute_set/yaml_encoder.rb entries — and " +
-      "(b) the 5.1→current legacy-format migration handled by " +
-      "legacy_yaml_adapter.rb. Our `yaml` parser yields " +
-      "plain tagged nodes, not SchemaCache instances. The live schema-cache " +
-      "round-trip is exercised by the portable tests in the same file " +
-      "(test_yaml_dump_and_load[_with_gzip], which use our own dump path).",
-  },
   // --- Thread.new / Thread.kill / GVL concurrency ---
   {
     testFile: "transactions_test.rb",

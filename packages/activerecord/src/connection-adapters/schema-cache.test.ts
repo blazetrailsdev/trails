@@ -11,6 +11,7 @@ import { StatementInvalid } from "../errors.js";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { File, FileUtils, Marshal, Tempfile, sort, toH } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import { ASSETS_ROOT } from "../config.js";
 import { fixtures } from "../test-helpers/use-fixtures.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
@@ -38,6 +39,9 @@ describe("SchemaCacheTest", () => {
     boundPool: Pool = pool,
   ): Promise<BoundSchemaReflection> {
     return new BoundSchemaReflection(new SchemaReflection(filename), boundPool).loadBang();
+  }
+  function schemaDumpPath(): string {
+    return `${ASSETS_ROOT}/schema_dump_5_1.yml`;
   }
 
   beforeEach(async () => {
@@ -130,11 +134,23 @@ describe("SchemaCacheTest", () => {
       expect((await cache.indexes("courses")).length).toBe(1);
     });
   });
-  it.skip("yaml loads 5 1 dump", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
+  it("yaml loads 5 1 dump", async () => {
+    const cache = await loadBoundReflection(schemaDumpPath());
+
+    await assertNoQueries(false, async () => {
+      expect((await cache.columns("posts")).length).toBe(11);
+      expect(Object.keys(await cache.columnsHash("posts")).length).toBe(11);
+      expect(await cache.dataSourceExists("posts")).toBeTruthy();
+      expect(await cache.primaryKeys("posts")).toBe("id");
+    });
   });
-  it.skip("yaml loads 5 1 dump without indexes still queries for indexes", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
+
+  it("yaml loads 5 1 dump without indexes still queries for indexes", async () => {
+    const cache = await loadBoundReflection(schemaDumpPath());
+
+    await assertQueriesCount(undefined, true, async () => {
+      expect((await cache.indexes("courses")).length).toBe(1);
+    });
   });
 
   it("primary key for existent table", async () => {

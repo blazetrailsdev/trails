@@ -4,7 +4,7 @@ import { constSet } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
 import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../active-record.js";
 
-type ClassLike = new (...args: unknown[]) => unknown;
+type ClassLike = new (...args: never[]) => unknown;
 
 /** @internal */
 class SafeCoder {
@@ -46,7 +46,7 @@ class SafeCoder {
 export class YAMLColumn extends ColumnSerializer {
   constructor(
     attrName: string,
-    objectClass: ClassLike = Object as unknown as ClassLike,
+    objectClass: ClassLike = Object,
     { permittedClasses = [], unsafeLoad = null }: YamlColumnOptions = {},
   ) {
     super(

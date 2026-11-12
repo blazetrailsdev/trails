@@ -30,6 +30,7 @@ import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./in
 
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 import { inTimeZone } from "./cases/helper.js";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { deprecator } from "./deprecator.js";
 import { fixtures } from "./test-helpers/use-fixtures.js";
 import { adapterType } from "./test-adapter.js";
@@ -627,6 +628,18 @@ describe("AttributeMethodsTest", () => {
         record.written_on.time.sec,
       ]).toEqual([2007, 12, 31, 16, 0, 0]);
     });
+  });
+  it("YAML dumping a record with time zone-aware attribute", async () => {
+    try {
+      await inTimeZone("Pacific Time (US & Canada)", () => {
+        const record = new CanonicalTopic({ id: 1 });
+        record.written_on = "Jan 01 00:00:00 2014";
+        const payload = YAML.dump(record);
+        expect(record.equals(YAML.unsafeLoad(payload))).toBe(true);
+      });
+    } finally {
+      CanonicalTopic.resetColumnInformation();
+    }
   });
   it("setting a time zone-aware time in the current time zone", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
