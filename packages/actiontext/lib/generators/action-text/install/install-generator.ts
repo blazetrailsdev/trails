@@ -29,6 +29,7 @@ export class InstallGenerator extends Base {
   /** @internal */
   private _usingNode?: boolean;
 
+  /** @missingRailsArgs run — PERMANENT */
   async installJavascriptDependencies(): Promise<void> {
     this.say("Installing JavaScript dependencies", "green");
     if (await this.isUsingBun()) {
