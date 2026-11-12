@@ -635,7 +635,7 @@ describe("AttributeMethodsTest", () => {
         const record = new CanonicalTopic({ id: 1 }) as any;
         record.written_on = "Jan 01 00:00:00 2014";
         const payload = YAML.dump(record);
-        expect(YAML.unsafeLoad(payload)).toEqual(record);
+        expect(record.equals(YAML.unsafeLoad(payload))).toBe(true);
       });
     } finally {
       CanonicalTopic.resetColumnInformation();

@@ -793,7 +793,9 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     await assertRaises([SerializationTypeMismatch], {}, () => found.content);
   });
 
-  it.skip("serialized time attribute", () => {});
+  it("serialized time attribute", (ctx) => {
+    ctx.skip("Time is a DisallowedClass in Psych safe_load().");
+  });
 
   it("supports permitted classes for default column serializer", async () => {
     Topic.serialize("content", { yaml: { permittedClasses: [RubyTime] } });

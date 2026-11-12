@@ -841,7 +841,8 @@ describe("QuerySerializedParamTest", () => {
       this.serialize("payload");
     }
   }
-  constSet(TopLevel, "YAMLObj", YAMLObj);
+  const QuerySerializedParamTest = constSet(TopLevel, "QuerySerializedParamTest", {});
+  constSet(QuerySerializedParamTest, "YAMLObj", YAMLObj);
 
   let useYamlUnsafeLoadWas: boolean;
 
@@ -872,11 +873,11 @@ describe("QuerySerializedParamTest", () => {
 
     const obj = await YAMLObj.createBang({ payload: { topic: topic } });
 
-    expect(await YAMLObj.where({ payload: { topic: topic } }).first()).toEqual(obj);
+    expect((await YAMLObj.where({ payload: { topic: topic } }).first())!.equals(obj)).toBe(true);
 
     const relation = YAMLObj.where({ payload: { topic: topic } });
     topic.title = "New Title";
-    expect(await relation.first()).toEqual(obj);
+    expect((await relation.first())!.equals(obj)).toBe(true);
 
     expect(await YAMLObj.where({ payload: { topic: topic } }).first()).toBeNull();
   });
@@ -885,7 +886,7 @@ describe("QuerySerializedParamTest", () => {
     setUseYamlUnsafeLoad(false);
 
     const obj = await YAMLObj.createBang({ payload: "payload" });
-    expect(await YAMLObj.findByBang({ payload: "payload" })).toEqual(obj);
+    expect((await YAMLObj.findByBang({ payload: "payload" })).equals(obj)).toBe(true);
   });
 });
 
