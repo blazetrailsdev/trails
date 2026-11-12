@@ -1,0 +1,8 @@
+<figure class="attachment attachment--preview">
+  <%= imageTag(remoteImage.url, { width: remoteImage.width, height: remoteImage.height }) %>
+  <% const caption = remoteImage.caption; if (caption != null) { %>
+    <figcaption class="attachment__caption">
+      <%= caption %>
+    </figcaption>
+  <% } %>
+</figure>

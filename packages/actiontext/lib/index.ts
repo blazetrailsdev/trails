@@ -15,3 +15,4 @@ export { Attachable } from "./attachable.js";
 export { ContentAttachment } from "./attachables/content-attachment.js";
 export { MissingAttachable } from "./attachables/missing-attachable.js";
 export { RemoteImage } from "./attachables/remote-image.js";
+export { ContentHelper } from "./content-helper.js";

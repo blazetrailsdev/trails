@@ -1,0 +1,3 @@
+<figure class="attachment attachment--content">
+  <%= contentAttachment.attachable %>
+</figure>

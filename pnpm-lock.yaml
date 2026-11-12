@@ -378,6 +378,9 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
     devDependencies:
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties
