@@ -17,6 +17,12 @@ export const Deprecate = {
    * replacement for `":none"`) and the year and month it goes
    * away, unless `Gem::Deprecate.skip`.
    *
+   * `is_a? Module` is a class, or a plain object marked as a module or seated
+   * as a constant: only `const_set` and the generated constant tables give an
+   * object a class path, and neither seats an instance. The block rides at the
+   * end of `args`, and `ruby2_keywords` (`:117`) has no JS analogue, since a
+   * JS call has no keyword arguments to flag.
+   *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem::Deprecate#deprecate`.
    */
   deprecate(this: object, name: string, repl: string, year: number, month: number): void {

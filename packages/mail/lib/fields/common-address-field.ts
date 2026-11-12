@@ -137,9 +137,8 @@ export class CommonAddressField extends NamedStructuredField {
       return val;
     } else if (rbObjEncoding(val) === Encoding.UTF_8) {
       return val;
-    } else {
-      const utf8 = forceEncoding(rbObjDup(val) as string, Encoding.UTF_8);
-      if (isValidEncoding(val, Encoding.UTF_8)) return utf8;
+    } else if (isValidEncoding(val, Encoding.UTF_8)) {
+      return forceEncoding(rbObjDup(val) as string, Encoding.UTF_8);
     }
     return null;
   }
