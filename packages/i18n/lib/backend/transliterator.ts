@@ -5,7 +5,7 @@ import type { Base } from "./base.js";
 
 export const DEFAULT_REPLACEMENT_CHAR = "?";
 
-export function transliterate(
+function transliterate(
   this: Base,
   locale: Locale,
   string: string,
@@ -18,7 +18,7 @@ export function transliterate(
   return this.transliterators[locale].transliterate(string, replacement);
 }
 
-export function get(rule: unknown = null): HashTransliterator | ProcTransliterator {
+function get(rule: unknown = null): HashTransliterator | ProcTransliterator {
   if (rule == null || rule === false || isHash(rule)) {
     return new HashTransliterator(rule as Record<string, unknown> | null);
   } else if (typeof rule === "function") {
@@ -273,3 +273,19 @@ export class HashTransliterator {
     }
   }
 }
+
+export const Transliterator = Object.defineProperties(
+  { transliterate },
+  {
+    get: { value: get },
+    DEFAULT_REPLACEMENT_CHAR: { value: DEFAULT_REPLACEMENT_CHAR },
+    ProcTransliterator: { value: ProcTransliterator },
+    HashTransliterator: { value: HashTransliterator },
+  },
+) as {
+  transliterate: typeof transliterate;
+  get: typeof get;
+  DEFAULT_REPLACEMENT_CHAR: typeof DEFAULT_REPLACEMENT_CHAR;
+  ProcTransliterator: typeof ProcTransliterator;
+  HashTransliterator: typeof HashTransliterator;
+};
