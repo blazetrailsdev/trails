@@ -105,7 +105,10 @@ export function exceedances(base: CastCounts, current: CastCounts): Exceedance[]
 
 export async function main(baseBranch = "origin/main", cwd = ROOT_DIR): Promise<string> {
   const ref = (await git(["merge-base", baseBranch, "HEAD"], cwd)).trim();
-  const base = await measureAt(ref, cwd);
+  const base = {
+    ...(await measureAt(ref, cwd, "packages/activerecord/src")),
+    ...(await measureAt(ref, cwd)),
+  };
   const current = await measure(path.join(cwd, SRC));
   const grew = exceedances(base, current);
   if (grew.length > 0) {
