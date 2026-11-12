@@ -352,7 +352,6 @@
       "record-identifier.ts::RecordIdentifier",
       "rendering.ts::ClassMethods",
       "rendering.ts::Rendering",
-      "routing-url-for.ts::RoutingUrlFor",
       "template/sources.ts::Sources",
       "test-case.ts::Behavior"
     ],
