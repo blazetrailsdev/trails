@@ -69,6 +69,8 @@
     { "path": "packages/solid-queue/tsconfig.test.json" },
     { "path": "packages/solid-cable" },
     { "path": "packages/solid-cable/tsconfig.test.json" },
+    { "path": "packages/solid-cache" },
+    { "path": "packages/solid-cache/tsconfig.test.json" },
     { "path": "packages/actionmailbox" },
     { "path": "packages/activestorage" },
     { "path": "packages/activestorage/tsconfig.test.json" },

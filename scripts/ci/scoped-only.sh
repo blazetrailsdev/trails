@@ -14,7 +14,7 @@ scoped_only thor_only "$THOR_ONLY_RE"
 scoped_only actioncable_only "$ACTIONCABLE_ONLY_RE"
 infra="${2:-}"
 ar_re="${3:-}"
-AR_SCOPE_RE='^packages/(activestorage|solid-queue|solid-cable|activerecord-cli|trails-tsc)/'
+AR_SCOPE_RE='^packages/(activestorage|solid-queue|solid-cable|solid-cache|activerecord-cli|trails-tsc)/'
 AR_FOUNDATION_RE='^packages/(ruby-compat|i18n|msgpack|tzinfo|nokogiri)/'
 UNIT_RE='^packages/(arel|activejob|activemodel|activesupport|bcrypt|builder|chronic|date|did-you-mean|et-orbi|fugit|globalid|html-sanitizer|i18n|mail|marcel|image-processing|mini-magick|mini-mime|msgpack|net-smtp|nokogiri|raabro|rake|ruby-compat|tzinfo|vitest-matchers|zeitwerk)$'
 ar_scope=""
