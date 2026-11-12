@@ -8352,6 +8352,52 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(seats("flash")).toEqual([]);
   });
 
+  it("credits a top-level delegate on a plain-object module", () => {
+    const info = extractFromFiles("/p", {
+      "through-association.ts": `
+        import { delegate } from "@blazetrails/activesupport";
+        export const ThroughAssociation = { transaction() {} };
+        delegate.call(ThroughAssociation, "sourceReflection", { to: "reflection" });
+      `,
+    });
+    const mod = info.modules["through-association.ts:ThroughAssociation"];
+    expect(mod.instanceMethods.map((m) => m.name)).toContain("sourceReflection");
+  });
+
+  it("does not credit a delegate on a class or an imported receiver as a plain-object module", () => {
+    const info = extractFromFiles("/p", {
+      "host.ts": `
+        import { delegate } from "@blazetrails/activesupport";
+        import { Other as Local } from "./other.js";
+        export class Klass {}
+        delegate.call(Klass, "fromClass", { to: "target" });
+        delegate.call(Local, "fromImport", { to: "target" });
+      `,
+    });
+    const names = Object.values(info.modules)
+      .concat(Object.values(info.classes))
+      .flatMap((e) => e.instanceMethods.map((m) => m.name));
+    expect(names).not.toContain("fromClass");
+    expect(names).not.toContain("fromImport");
+  });
+
+  it("credits a nested module's alias seated in a class static block", () => {
+    const info = extractFromFiles("/p", {
+      "compatibility.ts": `
+        export class V6_0 {
+          static TableDefinition: Record<string, unknown> = {
+            references(this: object, ...args: unknown[]) { return args; },
+          };
+          static {
+            V6_0.TableDefinition.belongsTo = V6_0.TableDefinition.references;
+          }
+        }
+      `,
+    });
+    const mod = info.modules["compatibility.ts:V6_0.TableDefinition"];
+    expect(mod.instanceMethods.find((m) => m.name === "belongsTo")?.aliasOf).toBe("references");
+  });
+
   it("seats a cattrAccessor inside an onLoad block on the hook's module", () => {
     const info = extractFromFiles("/p", {
       "form-helper.ts": `

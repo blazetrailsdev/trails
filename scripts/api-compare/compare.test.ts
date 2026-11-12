@@ -2247,6 +2247,22 @@ describe("buildModuleIncluderFqns", () => {
     expect([...(graph.get("Comparable") ?? [])]).toEqual(["Rack::Request"]);
     expect(graph.has("Rack::Response::Helpers")).toBe(false);
   });
+
+  it("registers a boot-time prepend as an include edge", () => {
+    const fixture = {
+      ...entity("ActiveRecord::Fixture"),
+      bootMixins: [
+        { kind: "prepend" as const, names: ["ActiveRecord::Encryption::EncryptedFixtures"] },
+      ],
+    };
+    const graph = buildModuleIncluderFqns(
+      [{ fqn: "ActiveRecord::Fixture", info: fixture }],
+      byShort,
+    );
+    expect([...(graph.get("ActiveRecord::Encryption::EncryptedFixtures") ?? [])]).toEqual([
+      "ActiveRecord::Fixture",
+    ]);
+  });
 });
 
 describe("dedupeRubyMethodInto", () => {
