@@ -20,12 +20,8 @@ class BasicController extends Base {
 
   async pathname(): Promise<void> {
     await this.render({
-      file: new Pathname(
-        File.join(
-          import.meta.dirname,
-          ...["..", "..", "..", "fixtures", "test", "dot.directory"],
-          "render_file_with_ivar.tse",
-        ),
+      file: new Pathname(import.meta.dirname).join(
+        ...["..", "..", "..", "fixtures", "test", "dot.directory", "render_file_with_ivar.tse"],
       ),
     });
   }
