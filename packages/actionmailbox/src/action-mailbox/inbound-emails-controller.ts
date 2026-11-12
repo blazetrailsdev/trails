@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import type { UploadedFile } from "@blazetrails/actionpack";
+import type { Parameters, UploadedFile } from "@blazetrails/actionpack";
 import { Mail, type Message } from "@blazetrails/mail";
 import { Trails } from "@blazetrails/trailties";
 import { ActionMailbox } from "../action-mailbox.js";
@@ -9,7 +9,9 @@ import "../base-controller.js";
 type MainApp = Record<string, (...args: unknown[]) => string>;
 
 export class InboundEmailsController extends Trails.Conductor.BaseController {
+  /** @internal */
   declare inboundEmails: InboundEmail[];
+  /** @internal */
   declare inboundEmail: InboundEmail;
 
   async index(): Promise<void> {
@@ -46,10 +48,7 @@ export class InboundEmailsController extends Trails.Conductor.BaseController {
   }
 
   /** @internal */
-  private mailParams(): ReturnType<this["params"]["require"]> & {
-    except(...keys: string[]): { toH(): object };
-    get(key: string): unknown;
-  } {
+  private mailParams(): Parameters {
     return this.params.expect({
       mail: [
         "from",
@@ -62,7 +61,7 @@ export class InboundEmailsController extends Trails.Conductor.BaseController {
         "body",
         { attachments: [] },
       ],
-    }) as never;
+    }) as Parameters;
   }
 
   /** @internal */
