@@ -833,7 +833,7 @@ describe("QuerySerializedParamTest", () => {
   fixtures(["topics"], { useTransactionalTests: false });
 
   class YAMLObj extends Base {
-    declare payload: any;
+    declare payload: unknown;
 
     static {
       this.tableName = "yaml_objs";

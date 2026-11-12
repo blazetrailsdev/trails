@@ -295,7 +295,7 @@ describe("SerializedAttributeTest", () => {
 
     const topic = await (await ClassifiedTopic.create({ important: rbCSymbol })).reload();
     expect(topic.important).toEqual(rbCSymbol);
-    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
+    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toBeEmpty();
   });
 
   it("serialized class does not become frozen", async () => {
@@ -303,7 +303,7 @@ describe("SerializedAttributeTest", () => {
 
     expect(Object.isFrozen(rbCSymbol)).toBeFalsy();
     await ClassifiedTopic.create({ important: rbCSymbol });
-    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
+    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toBeEmpty();
     expect(Object.isFrozen(rbCSymbol)).toBeFalsy();
   });
 
@@ -1062,7 +1062,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
     const topic = await (await ClassifiedTopic.create({ important: rbCSymbol })).reload();
     expect(topic.important).toEqual(rbCSymbol);
-    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
+    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toBeEmpty();
   });
 
   it("serialized class does not become frozen", async () => {
@@ -1070,7 +1070,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
     expect(Object.isFrozen(rbCSymbol)).toBeFalsy();
     await ClassifiedTopic.create({ important: rbCSymbol });
-    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toHaveLength(0);
+    expect(await ClassifiedTopic.where({ important: rbCSymbol })).not.toBeEmpty();
     expect(Object.isFrozen(rbCSymbol)).toBeFalsy();
   });
 
@@ -1160,7 +1160,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
       Type.register("encrypted", EncryptedType);
 
       const klass = class extends Base {
-        declare content: any;
+        declare content: unknown;
 
         static {
           this.tableName = Topic.tableName;
@@ -1179,7 +1179,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   it("decorated type with decorator block", async () => {
     const klass = class extends Base {
-      declare content: any;
+      declare content: unknown;
 
       static {
         this.tableName = Topic.tableName;
