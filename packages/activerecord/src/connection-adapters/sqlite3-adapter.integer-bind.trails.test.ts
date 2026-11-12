@@ -14,7 +14,7 @@ describe("SQLite3Adapter integer bind serialization", () => {
   beforeEach(async () => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-sqlite-intbind-"));
     adapter = new BetterSQLite3Adapter({ database: path.join(tmpDir, "db.sqlite3") });
-    await adapter.verifyBang();
+    await adapter.connectBang();
   });
 
   afterEach(async () => {
