@@ -1167,8 +1167,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
-    // One monorepo, two gems. The `vite_ruby@3.11.1` tag postdates
-    // `vite_rails@3.11.1` and leaves `vite_rails/lib` unchanged, so it pins both.
     name: "vite_ruby",
     origin: {
       type: "git",
