@@ -38,7 +38,7 @@ class Topic extends Base {
 
 await Base.connectionPool().withConnection((conn) =>
   conn.createTable("topics", (t) => {
-    t.string("title");
+    t.string("title", { limit: 250 });
     t.text("content");
   }),
 );
