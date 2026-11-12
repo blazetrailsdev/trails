@@ -10,7 +10,7 @@ import { TableDefinition } from "../../../../lib/connection-adapters/postgresql/
 import { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
 import "../../../../lib/connection-adapters/postgresql/oid/point.js";
 import { ActiveRecord } from "../../../../lib/namespaces.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
   fixtures({}, { useTransactionalTests: false });

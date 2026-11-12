@@ -6,7 +6,7 @@ import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Owner } from "../../../models/owner.js";
 import { ARUnit2Model } from "../../../models/arunit2-model.js";
-import { inMemoryDb } from "../../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../../support/adapter-helper.js";
 import { itIfSupports } from "../../../support/supports.js";
 import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../../../lib/connection-adapters/better-sqlite3-adapter.js";

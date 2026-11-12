@@ -1,8 +1,8 @@
 /** @internal */
 import { getEnv } from "@blazetrails/activesupport";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { InternalMetadata } from "../internal-metadata.js";
-import { TEST_SCHEMA } from "../../test/support/test-schema.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { InternalMetadata } from "../../lib/internal-metadata.js";
+import { TEST_SCHEMA } from "./test-schema.js";
 import { RUN_TOKEN_ENV } from "./run-token.js";
 
 function stampFor(runToken: string): string {

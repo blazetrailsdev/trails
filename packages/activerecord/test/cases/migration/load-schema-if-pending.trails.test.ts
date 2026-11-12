@@ -3,7 +3,7 @@ import { Base } from "../../../lib/base.js";
 import { Migration } from "../../../lib/migration.js";
 import { DatabaseConfigurations } from "../../../lib/database-configurations.js";
 import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";
-import { currentAdapter } from "../../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { DatabaseTasks } from "../../../lib/tasks/database-tasks.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
 

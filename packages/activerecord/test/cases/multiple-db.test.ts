@@ -4,7 +4,7 @@ import { Base } from "../../lib/base.js";
 import { assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { StatementInvalid } from "../../lib/errors.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { withSecondPool } from "../../lib/support/setup-second-pool.js";
+import { withSecondPool } from "../support/setup-second-pool.js";
 import { ARUnit2Model } from "../models/arunit2-model.js";
 import { Course } from "../models/course.js";
 import { College } from "../models/college.js";

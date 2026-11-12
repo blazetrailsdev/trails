@@ -6,8 +6,8 @@ import {
   connect,
   restoreWorkerConnection,
   testConfigurationHashes,
-} from "../../../lib/support/connection.js";
-import { SQLITE_FIXTURE_DATABASE, SQLITE_FIXTURE_DATABASE_2 } from "../../../lib/support/config.js";
+} from "../../support/connection.js";
+import { SQLITE_FIXTURE_DATABASE, SQLITE_FIXTURE_DATABASE_2 } from "../../support/config.js";
 
 describe("connect", () => {
   const originalConfigurations = Base.configurations();

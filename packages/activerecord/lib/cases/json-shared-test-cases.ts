@@ -9,7 +9,7 @@ import { ColumnNotSerializableError } from "../attribute-methods/serialization.j
 import { PP } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
-import { dumpTableSchema } from "../support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../test/support/schema-dumping-helper.js";
 
 export interface JSONSharedTestCasesHost {
   columnType: string;

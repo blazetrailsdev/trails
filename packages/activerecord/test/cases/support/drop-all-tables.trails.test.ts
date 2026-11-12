@@ -4,8 +4,8 @@ import {
   dropAllTables,
   purgeToCanonicalTables,
   resetTestTables,
-} from "../../../lib/support/drop-all-tables.js";
-import { provisionSecondDatabase } from "../../../lib/support/setup-second-pool.js";
+} from "../../support/drop-all-tables.js";
+import { provisionSecondDatabase } from "../../support/setup-second-pool.js";
 import { ARUnit2Model } from "../../models/arunit2-model.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { typeRegistryKeyFor } from "../../support/type-registry-key.js";
@@ -201,12 +201,12 @@ describe("dropAllTables (shared worker database)", () => {
 
 describe("purge-only pre-snapshot path", () => {
   async function freshModules(): Promise<{
-    dropAllTablesModule: typeof import("../../../lib/support/drop-all-tables.js");
-    loadSchemaHelper: typeof import("../../../lib/support/load-schema-helper.js");
+    dropAllTablesModule: typeof import("../../support/drop-all-tables.js");
+    loadSchemaHelper: typeof import("../../support/load-schema-helper.js");
   }> {
     vi.resetModules();
-    const dropAllTablesModule = await import("../../../lib/support/drop-all-tables.js");
-    const loadSchemaHelper = await import("../../../lib/support/load-schema-helper.js");
+    const dropAllTablesModule = await import("../../support/drop-all-tables.js");
+    const loadSchemaHelper = await import("../../support/load-schema-helper.js");
     return { dropAllTablesModule, loadSchemaHelper };
   }
 

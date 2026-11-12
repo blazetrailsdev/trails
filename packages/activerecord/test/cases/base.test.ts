@@ -10,7 +10,7 @@ import {
 } from "../../lib/errors.js";
 
 import { adapterType } from "../../lib/test-adapter.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { connectedToStack } from "../../lib/core.js";
 import { Logger, TimeWithZone } from "@blazetrails/activesupport";
 import {

@@ -10,7 +10,7 @@ import { assertEmpty, assertNot, assertSame } from "@blazetrails/activesupport/t
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { topicFixtureData } from "../fixtures/topics.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 
 describe("TransactionInstrumentationTest", () => {
   const { topics } = fixtures(

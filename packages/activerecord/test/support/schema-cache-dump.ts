@@ -14,9 +14,9 @@ import {
   SchemaReflection,
   type Pool,
 } from "../../lib/connection-adapters/schema-cache.js";
-import { BOOKKEEPING_TABLE_NAMES } from "../../lib/support/drop-all-tables.js";
+import { BOOKKEEPING_TABLE_NAMES } from "./drop-all-tables.js";
 import { supportsExpressionIndex } from "./schema-types.js";
-import { TEMP_DB_PREFIX } from "../../lib/support/sqlite-template.js";
+import { TEMP_DB_PREFIX } from "./sqlite-template.js";
 import { typeRegistryKeyFor } from "./type-registry-key.js";
 
 export const SCHEMA_CACHE_DUMP_ENV = "AR_TEST_SCHEMA_CACHE_DUMP";

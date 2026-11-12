@@ -9,8 +9,8 @@ import type { Column as MysqlColumn } from "../../../lib/connection-adapters/mys
 import { ActiveRecordError, StatementInvalid, NotNullViolation } from "../../../lib/errors.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { adapterType } from "../../../lib/test-adapter.js";
-import { isMariaDb, serverVersion } from "../../../lib/support/mysql-server-version.js";
-import { supportsDefaultExpression } from "../../../lib/support/adapter-helper.js";
+import { isMariaDb, serverVersion } from "../../support/mysql-server-version.js";
+import { supportsDefaultExpression } from "../../support/adapter-helper.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertDifference, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";

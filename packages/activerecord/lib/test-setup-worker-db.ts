@@ -2,11 +2,20 @@ import pg from "pg";
 import mysql from "mysql2/promise";
 import { RuntimeError } from "@blazetrails/ruby-compat";
 import "./sqlite/better-sqlite3.js";
-import { WORKER_DB_ENV, ensureWorkerClone } from "./support/sqlite-template.js";
-import { slotPoolSize, workerForkCount } from "./support/ar-db-slots.js";
-import { SLOT_ENV, mysqlSettings, ownsSlotDatabase, postgresSettings } from "./support/config.js";
-import { RUN_TOKEN_ENV, mysqlAdvisoryLockName, pgAdvisoryLockKey } from "./support/run-token.js";
-import { activeLane } from "./support/connection.js";
+import { WORKER_DB_ENV, ensureWorkerClone } from "../test/support/sqlite-template.js";
+import { slotPoolSize, workerForkCount } from "../test/support/ar-db-slots.js";
+import {
+  SLOT_ENV,
+  mysqlSettings,
+  ownsSlotDatabase,
+  postgresSettings,
+} from "../test/support/config.js";
+import {
+  RUN_TOKEN_ENV,
+  mysqlAdvisoryLockName,
+  pgAdvisoryLockKey,
+} from "../test/support/run-token.js";
+import { activeLane } from "../test/support/connection.js";
 
 function runToken(): string {
   return process.env[RUN_TOKEN_ENV] ?? "";

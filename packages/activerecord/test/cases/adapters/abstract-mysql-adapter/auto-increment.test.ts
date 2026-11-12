@@ -5,7 +5,7 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
 } from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

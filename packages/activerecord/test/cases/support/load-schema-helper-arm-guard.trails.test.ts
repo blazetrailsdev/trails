@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import "../../../lib/sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
-import { loadSchema } from "../../../lib/support/load-schema-helper.js";
+import { loadSchema } from "../../support/load-schema-helper.js";
 
 async function withAdapter(fn: (adapter: BetterSQLite3Adapter) => Promise<void>): Promise<void> {
   const adapter = new BetterSQLite3Adapter({ database: ":memory:" });

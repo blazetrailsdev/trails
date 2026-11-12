@@ -20,7 +20,7 @@ import { MixedCaseMonkey } from "../models/mixed-case-monkey.js";
 import { Dashboard } from "../models/dashboard.js";
 import { NonPrimaryKey } from "../models/non-primary-key.js";
 import { CpkBook, CpkOrder } from "../models/cpk.js";
-import { dumpTableSchema } from "../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 describe("PrimaryKeysTest", () => {
   const { topics, subscribers, mixedCaseMonkeys } = fixtures([

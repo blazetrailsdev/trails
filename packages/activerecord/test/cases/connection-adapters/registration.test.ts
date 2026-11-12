@@ -13,7 +13,7 @@ describe("RegistrationTest", () => {
     vi.resetModules();
     ConnectionAdapters = await import("../../../lib/connection-adapters.js");
     ({ AdapterNotFound } = await import("../../../lib/errors.js"));
-    fakeAdapterPath = new URL("../support/fake-adapter.ts", import.meta.url).href;
+    fakeAdapterPath = new URL("../../support/fake-adapter.ts", import.meta.url).href;
   });
 
   afterEach(() => {
@@ -82,7 +82,7 @@ describe("RegistrationIsolatedTest", () => {
     ConnectionAdapters.register(
       "fake",
       "FakeActiveRecordAdapter",
-      new URL("../support/fake-adapter.js", import.meta.url).href,
+      new URL("../../support/fake-adapter.js", import.meta.url).href,
     );
   });
 

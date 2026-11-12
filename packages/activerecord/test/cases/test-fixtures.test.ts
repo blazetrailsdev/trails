@@ -14,7 +14,7 @@ import "../../lib/relation.js";
 import { TestFixtures } from "../../lib/test-fixtures.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { ConnectionHandler } from "../../lib/connection-adapters/abstract/connection-handler.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { Zine } from "../models/zine.js";
 
 constSet(TopLevel, "Zine", Zine);

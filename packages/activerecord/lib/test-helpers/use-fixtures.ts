@@ -18,7 +18,7 @@ import {
   type RegistryData,
   type IsJoinTableName,
 } from "../../test/support/fixtures-registry.js";
-import { ensureCanonicalTables } from "../support/canonical-table-rebuild.js";
+import { ensureCanonicalTables } from "../../test/support/canonical-table-rebuild.js";
 export type { FixtureName } from "../../test/support/fixtures-registry.js";
 import { Base } from "../base.js";
 import type { TestCase as ActiveRecordTestCase } from "../cases/test-case.js";

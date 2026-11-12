@@ -21,7 +21,7 @@ import {
   currentPreventingWrites,
 } from "../../lib/core.js";
 import { adapterType } from "../../lib/test-adapter.js";
-import { restoreWorkerConnection } from "../../lib/support/connection.js";
+import { restoreWorkerConnection } from "../support/connection.js";
 import { DEFAULT_ENV } from "../../lib/connection-handling.js";
 import { DatabaseConfigurations } from "../../lib/database-configurations.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";

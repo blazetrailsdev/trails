@@ -13,7 +13,7 @@ import {
   assertNotPredicate,
 } from "@blazetrails/activesupport/testing/assertions";
 import { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 class ByteaDataType extends Base {
   static {

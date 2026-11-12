@@ -3,8 +3,8 @@ import pg from "pg";
 import { DatabaseTasks, initializeDatabase } from "../../../lib/tasks/database-tasks.js";
 import { UrlConfig } from "../../../lib/database-configurations/url-config.js";
 import { Base } from "../../../lib/base.js";
-import { describeIfPg, PG_TEST_URL } from "../../../lib/support/describe-if-pg.js";
-import { restoreWorkerConnection } from "../../../lib/support/connection.js";
+import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
+import { restoreWorkerConnection } from "../../support/connection.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 
 async function adminQuery(sql: string): Promise<pg.QueryResult> {

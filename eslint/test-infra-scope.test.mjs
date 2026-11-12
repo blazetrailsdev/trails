@@ -27,7 +27,6 @@ describe("test-infra lint scope", () => {
       `${TEST}/cases/test-fixtures.test.ts`,
       `${TEST}/cases/test-fixtures/**`,
       `${SRC}/test-helpers/**`,
-      `${SRC}/support/**`,
       `${SRC}/test-fixtures/**`,
     ]);
   });

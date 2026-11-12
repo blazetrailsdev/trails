@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import { Base, TransactionIsolationError } from "../../lib/index.js";
 import { adapterType, ambientPoolConfiguration } from "../../lib/test-adapter.js";
-import { currentAdapter } from "../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { adapterSupports } from "../support/supports.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { transactionIsolationLevels } from "../../lib/connection-adapters/abstract/database-statements.js";

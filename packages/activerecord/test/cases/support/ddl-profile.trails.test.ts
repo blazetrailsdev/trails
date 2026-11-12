@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyDdl, classifyStatements } from "../../../lib/support/ddl-profile.js";
+import { classifyDdl, classifyStatements } from "../../support/ddl-profile.js";
 
 describe("classifyDdl", () => {
   it("classifies CREATE TABLE and extracts the table name", () => {

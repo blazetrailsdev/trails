@@ -23,7 +23,7 @@ import {
 import { Rating as CanonRating } from "../models/rating.js";
 import { Author as CanonAuthor } from "../models/author.js";
 import { Categorization as CanonCategorization } from "../models/categorization.js";
-import { currentAdapter } from "../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
 
 class EnsureRoundTripTypeCasting extends ValueType {

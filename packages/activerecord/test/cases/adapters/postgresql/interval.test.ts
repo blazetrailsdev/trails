@@ -7,7 +7,7 @@ import {
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
 import { Column as PostgreSQLColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute member is an accessor pair (read.rb:35 / write.rb:36 cast asymmetry); the class/interface merge is how it surfaces on the type side.
 class IntervalDataType extends Base {

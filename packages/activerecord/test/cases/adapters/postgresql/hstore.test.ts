@@ -11,7 +11,7 @@ import {
   stringify as yamlStringify,
   parse as yamlParse,
 } from "@blazetrails/ruby-compat/psych-adapter";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 class TagCollection {
   constructor(private readonly hash: Record<string, string | null>) {}

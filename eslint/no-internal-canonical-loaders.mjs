@@ -8,7 +8,7 @@
  * The lower-level canonical loaders in
  * `packages/activerecord/test/support/canonical-schema.ts`
  * (`loadCanonicalSchema`) and
- * `packages/activerecord/lib/support/canonical-table-rebuild.ts`
+ * `packages/activerecord/test/support/canonical-table-rebuild.ts`
  * (`ensureCanonicalTables`) are internal plumbing that
  * `fixtures()` and a couple of internal setup paths (the boot/template global
  * setup, the adapter-suite setup, `encryption/test-helpers.ts`) call. They are

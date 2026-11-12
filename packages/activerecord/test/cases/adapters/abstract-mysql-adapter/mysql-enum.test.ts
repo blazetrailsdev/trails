@@ -7,7 +7,7 @@ import {
 } from "../../../../lib/adapters/abstract-mysql-adapter/test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   fixtures({}, { useTransactionalTests: false });

@@ -16,11 +16,11 @@ import {
   type RawConfigurations,
 } from "../../../lib/database-configurations.js";
 import { camelize, Logger } from "@blazetrails/activesupport";
-import { currentAdapter, inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { currentAdapter, inMemoryDb } from "../../support/adapter-helper.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 
-const MIGRATION_MODULE = new URL("../migration.js", import.meta.url).pathname;
+const MIGRATION_MODULE = new URL("../../../lib/migration.js", import.meta.url).pathname;
 
 const skip = !currentAdapter("SQLite3Adapter") || inMemoryDb();
 

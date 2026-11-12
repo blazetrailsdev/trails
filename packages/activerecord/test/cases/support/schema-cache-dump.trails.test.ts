@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/base.js";
-import { activeLane } from "../../../lib/support/connection.js";
+import { activeLane } from "../../support/connection.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { itIfSupports } from "../../support/supports.js";
 import {

@@ -19,7 +19,7 @@ import {
   AssociationTypeMismatch,
 } from "../../../lib/index.js";
 import { assertNoQueries, assertQueriesCount } from "../../../lib/testing/query-assertions.js";
-import { currentAdapter } from "../../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { Treasure } from "../../models/treasure.js";
 import "../../models/parrot.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";

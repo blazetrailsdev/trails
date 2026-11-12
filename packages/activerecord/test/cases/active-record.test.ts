@@ -3,7 +3,7 @@ import { assertPredicate, assertNotPredicate } from "@blazetrails/activesupport/
 import { Base } from "../../lib/index.js";
 import { disconnectAllBang } from "../../lib/active-record.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 
 describe("ActiveRecordTest", () => {
   fixtures({}, { useTransactionalTests: false });

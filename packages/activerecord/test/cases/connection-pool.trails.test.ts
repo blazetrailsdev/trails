@@ -21,7 +21,7 @@ import {
 } from "../../lib/connection-adapters/schema-cache.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
 import { rawTestAdapterConfiguration } from "../../lib/test-adapter.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import type { LeasedTestAdapter } from "../../lib/test-adapter.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { AbstractAdapter } from "../../lib/connection-adapters/abstract-adapter.js";

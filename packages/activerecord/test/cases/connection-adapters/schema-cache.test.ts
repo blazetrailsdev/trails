@@ -18,7 +18,7 @@ import { File, FileUtils, Marshal, Tempfile, sort, toH } from "@blazetrails/ruby
 import { Base } from "../../../lib/base.js";
 import { ASSETS_ROOT } from "../../../lib/config.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { withSecondPool } from "../../../lib/support/setup-second-pool.js";
+import { withSecondPool } from "../../support/setup-second-pool.js";
 import { ARUnit2Model } from "../../models/arunit2-model.js";
 import { assertNoQueries, assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import type { ConnectionPool } from "../../../lib/connection-adapters/abstract/connection-pool.js";

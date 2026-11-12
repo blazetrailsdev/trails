@@ -477,9 +477,9 @@ function collectNamesInScope(sf: ts.SourceFile): Set<string> {
 
 export const INLINE_IMPORT_RE = /import\("([^"]+)"\)\.([A-Za-z_$][\w$]*)(?![\w$]|\s*\()/g;
 const BUILTIN_IMPORT_FROM_MODELS_DIR: Record<string, string> = {
-  AssociationProxy: "../../associations/collection-proxy.js",
-  Relation: "../../relation.js",
-  PrimaryKeyValue: "../../base.js",
+  AssociationProxy: "../../lib/associations/collection-proxy.js",
+  Relation: "../../lib/relation.js",
+  PrimaryKeyValue: "../../lib/base.js",
 };
 
 function builtinSpecifierFor(sym: string, fileDir: string): string | undefined {
@@ -536,7 +536,7 @@ async function main(): Promise<void> {
   const modelsDirPrefix = MODELS_DIR + path.sep;
   let schemaColumnsByTable: SchemaColumnsByTable = {};
   if (targets.some((f) => f.startsWith(modelsDirPrefix))) {
-    const { TEST_SCHEMA, ARUNIT2_SCHEMA } = await import("../test/schema/test-schema.js");
+    const { TEST_SCHEMA, ARUNIT2_SCHEMA } = await import("../test/support/test-schema.js");
     const { isWrappedSchema } = await import("../test/support/schema-types.js");
     schemaColumnsByTable = normalizeSchema({ ...TEST_SCHEMA, ...ARUNIT2_SCHEMA }, isWrappedSchema);
   }

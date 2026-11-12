@@ -3,8 +3,8 @@ import "../../../lib/sqlite/better-sqlite3.js";
 import { Base } from "../../../lib/base.js";
 import { BetterSQLite3Adapter } from "../../../lib/connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
-import { recordBootLaidTables, resetTestTables } from "../../../lib/support/drop-all-tables.js";
-import { loadAdapterSpecificSchema, loadSchema } from "../../../lib/support/load-schema-helper.js";
+import { recordBootLaidTables, resetTestTables } from "../../support/drop-all-tables.js";
+import { loadAdapterSpecificSchema, loadSchema } from "../../support/load-schema-helper.js";
 
 describe("boot-laid table snapshot", () => {
   it("survives the reset for every table the adapter-specific arm lays", async () => {

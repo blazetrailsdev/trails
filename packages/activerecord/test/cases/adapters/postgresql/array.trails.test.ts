@@ -7,7 +7,7 @@ import {
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

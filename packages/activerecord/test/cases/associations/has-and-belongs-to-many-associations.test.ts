@@ -42,7 +42,7 @@ import { PublisherArticle } from "../../models/publisher/article.js";
 import { PublisherMagazine } from "../../models/publisher/magazine.js";
 import { Professor } from "../../models/professor.js";
 import { Course } from "../../models/course.js";
-import { withSecondPool } from "../../../lib/support/setup-second-pool.js";
+import { withSecondPool } from "../../support/setup-second-pool.js";
 import "../../models/mentor.js";
 import "../../models/tagging.js";
 import "../../models/author.js";
@@ -1191,7 +1191,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("habtm with reflection using class name and fixtures", async () => {
     expect((Developer as any)._reflectOnAssociation("sharedComputers")).not.toBeNull();
     const fixtureSource = await readFile(
-      fileURLToPath(new URL("../test-helpers/fixtures/developers.ts", import.meta.url)),
+      fileURLToPath(new URL("../../fixtures/developers.ts", import.meta.url)),
       "utf-8",
     );
     const index = fixtureSource.includes("sharedComputers")

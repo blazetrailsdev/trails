@@ -26,7 +26,7 @@ import {
 import { Result } from "../../lib/result.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { adapterType } from "../../lib/test-adapter.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { itIfSupports } from "../support/supports.js";
 import { runWithoutConnection } from "../support/connection-helper.js";
 import "../support/canonical-model-index.js";

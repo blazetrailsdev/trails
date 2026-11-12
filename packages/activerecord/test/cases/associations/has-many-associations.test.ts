@@ -101,7 +101,7 @@ import {
   CpkNonCpkBook,
 } from "../../models/cpk.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
-import { currentAdapter } from "../../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { CompositePrimaryKeyMismatchError } from "../../../lib/associations/errors.js";
 import { TypedEssay } from "../../models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../../models/person.js";

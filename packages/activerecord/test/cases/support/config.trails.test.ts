@@ -10,8 +10,8 @@ import {
   postgresUrl,
   sqliteSiblingDatabase,
   withDatabase,
-} from "../../../lib/support/config.js";
-import { activeLane, connectionName } from "../../../lib/support/connection.js";
+} from "../../support/config.js";
+import { activeLane, connectionName } from "../../support/connection.js";
 
 function reader(env: Record<string, string | undefined>): (key: string) => string | undefined {
   return (key) => env[key];

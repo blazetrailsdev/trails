@@ -18,7 +18,7 @@ import {
   ForeignKeyDefinition,
   IndexDefinition,
 } from "../../lib/connection-adapters/abstract/schema-definitions.js";
-import { dumpTableSchema, FULL_DUMP_TIMEOUT_MS } from "../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema, FULL_DUMP_TIMEOUT_MS } from "../support/schema-dumping-helper.js";
 import { adapterType } from "../../lib/test-adapter.js";
 import type { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
 

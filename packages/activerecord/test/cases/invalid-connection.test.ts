@@ -1,6 +1,6 @@
 import { beforeEach, afterEach, it, expect } from "vitest";
 import { Base } from "../../lib/base.js";
-import { describeIfMysqlAdapter } from "../../lib/support/describe-if-mysql-adapter.js";
+import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 
 describeIfMysqlAdapter("TestAdapterWithInvalidConnection", () => {

@@ -11,7 +11,7 @@ import { RangeError as ActiveRecordRangeError } from "../../../../lib/errors.js"
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { deprecator } from "../../../../lib/deprecator.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   fixtures({}, { useTransactionalTests: false });

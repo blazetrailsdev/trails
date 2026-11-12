@@ -14,7 +14,7 @@ import { SchemaMigration } from "../../lib/schema-migration.js";
 import type { MigrationProxy } from "../../lib/migration.js";
 import { CheckPending, ConcurrentMigrationError, MigrationContext } from "../../lib/migration.js";
 import { adapterType } from "../../lib/test-adapter.js";
-import { currentAdapter } from "../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { quoteDefaultExpression } from "../../lib/connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
@@ -56,7 +56,7 @@ import {
   fetch,
 } from "@blazetrails/ruby-compat";
 import { Mysql2Adapter } from "../../lib/connection-adapters/mysql2-adapter.js";
-import { describeIfMysqlAdapter } from "../../lib/support/describe-if-mysql-adapter.js";
+import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { leaseMysqlAdapter } from "../../lib/adapters/abstract-mysql-adapter/test-helper.js";
 import { anonymousMigration } from "../support/anonymous-migration.js";
 import { InternalMetadata } from "../../lib/internal-metadata.js";
@@ -641,7 +641,7 @@ describe("MigrationTest", () => {
     const { dirname, join } = await import("node:path");
     const migrationsPath = join(
       dirname(fileURLToPath(import.meta.url)),
-      "test-helpers",
+      "..",
       "migrations",
       "valid",
     );
@@ -1945,7 +1945,7 @@ AND query LIKE '%${lockId}%'`;
       Dir.mkdir(magicPath);
       File.write(
         `${magicPath}/1_currencies_have_symbols.ts`,
-        '// @ts-nocheck\n// @ts-check\n\nimport { Migration } from "../../../../migration.js";\n\nexport class CurrenciesHaveSymbols extends Migration.Current {}\n',
+        '// @ts-nocheck\n// @ts-check\n\nimport { Migration } from "../../../lib/migration.js";\n\nexport class CurrenciesHaveSymbols extends Migration.Current {}\n',
       );
 
       try {
@@ -2120,7 +2120,7 @@ AND query LIKE '%${lockId}%'`;
 
             File.write(
               path,
-              `import { Migration } from "../../../../migration.js";\n\nexport class ${migrationClassName(filename)} extends Migration.Current {\n  async change() {}\n}\n`,
+              `import { Migration } from "../../../lib/migration.js";\n\nexport class ${migrationClassName(filename)} extends Migration.Current {\n  async change() {}\n}\n`,
             );
           }
 

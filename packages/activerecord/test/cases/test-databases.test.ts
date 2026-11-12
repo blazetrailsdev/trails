@@ -6,7 +6,7 @@ import { TestDatabases } from "../../lib/test-databases.js";
 import { Base } from "../../lib/index.js";
 import type { HashConfig } from "../../lib/database-configurations/hash-config.js";
 import { DatabaseTasks } from "../../lib/tasks/database-tasks.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 
 describe("TestDatabasesTest", () => {

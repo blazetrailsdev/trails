@@ -14,7 +14,7 @@ import { Decimal } from "../../../../lib/connection-adapters/postgresql/oid/deci
 import { Timestamp } from "../../../../lib/connection-adapters/postgresql/oid/timestamp.js";
 import { TimestampWithTimeZone } from "../../../../lib/connection-adapters/postgresql/oid/timestamp-with-time-zone.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

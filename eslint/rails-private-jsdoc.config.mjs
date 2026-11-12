@@ -48,7 +48,7 @@ export default [
       "packages/actionview/lib/**/*.ts",
       "packages/actioncable/lib/**/*.ts",
       "packages/activejob/lib/**/*.ts",
-      "packages/activerecord/lib/**/*.ts",
+      "packages/activerecord/{lib,test}/**/*.ts",
       "packages/rack/lib/**/*.ts",
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",

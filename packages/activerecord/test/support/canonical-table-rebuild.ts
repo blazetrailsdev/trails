@@ -1,9 +1,5 @@
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import {
-  buildCanonicalRegistry,
-  prepareSchema,
-  runTable,
-} from "../../test/support/canonical-schema.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { buildCanonicalRegistry, prepareSchema, runTable } from "./canonical-schema.js";
 
 export async function ensureCanonicalTables(
   adapter: DatabaseAdapter,
@@ -14,7 +10,6 @@ export async function ensureCanonicalTables(
   const known = new Set(registry.map((d) => d.name));
   const unknown = [...wanted].filter((n) => !known.has(n));
   if (unknown.length > 0) {
-    // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(`ensureCanonicalTables: unknown canonical table(s): ${unknown.join(", ")}`);
   }
   const defs = registry.filter((d) => wanted.has(d.name));

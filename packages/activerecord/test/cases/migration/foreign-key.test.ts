@@ -18,11 +18,11 @@ import {
   withRocketTables,
 } from "../../support/rocket-tables.js";
 import { adapterType } from "../../../lib/test-adapter.js";
-import { currentAdapter } from "../../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../../support/supports.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import type { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
-import { dumpTableSchema } from "../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import { Base } from "../../../lib/base.js";
 import type { CollectionProxy } from "../../../lib/associations/collection-proxy.js";
 import { Migration } from "../../../lib/migration.js";

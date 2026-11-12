@@ -28,7 +28,6 @@ function intSetting(read: EnvReader, key: string, fallback: number): number {
   if (raw === undefined) return fallback;
   const parsed = Number(raw);
   if (!Number.isInteger(parsed)) {
-    // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(`${key} must be an integer, got ${JSON.stringify(raw)}`);
   }
   return parsed;
@@ -48,7 +47,6 @@ export const SLOT_ENV = "AR_DB_SLOT";
 function slotNumber(read: EnvReader): number {
   const slot = intSetting(read, SLOT_ENV, 1);
   if (slot < 1) {
-    // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(`${SLOT_ENV} must be >= 1, got ${slot}`);
   }
   return slot;
@@ -136,7 +134,6 @@ export function settingsUrl(scheme: "postgres" | "mysql", settings: ServerSettin
       return `postgres://${auth}/${database}?${params.toString()}`;
     }
     if (socket !== undefined) {
-      // eslint-disable-next-line blazetrails/rails-error-parity
       throw new Error(
         `Postgres has no socket sub-setting; spell a socket connection as ` +
           `PGHOST=${socket} so libpq resolves it as a socket directory.`,

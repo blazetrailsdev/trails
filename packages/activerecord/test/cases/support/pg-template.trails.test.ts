@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import pg from "pg";
-import { canonicalSchemaStamp } from "../../../lib/support/canonical-schema-stamp.js";
-import { RUN_TOKEN_ENV } from "../../../lib/support/run-token.js";
+import { canonicalSchemaStamp } from "../../support/canonical-schema-stamp.js";
+import { RUN_TOKEN_ENV } from "../../support/run-token.js";
 import { PG_TEMPLATE_ENV } from "../../support/template-global-setup.js";
-import { postgresSettings, settingsUrl, withDatabase } from "../../../lib/support/config.js";
-import { activeLane } from "../../../lib/support/connection.js";
+import { postgresSettings, settingsUrl, withDatabase } from "../../support/config.js";
+import { activeLane } from "../../support/connection.js";
 
 const pgActive = activeLane() === "postgres";
 

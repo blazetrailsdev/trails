@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { arunitDatabaseNames } from "../../../lib/support/arunit2-config.js";
+import { arunitDatabaseNames } from "../../support/arunit2-config.js";
 import {
   STALE_DB_AGE_MS,
   mysqlAdvisoryLockName,
@@ -10,7 +10,7 @@ import {
   runTokenOfDatabase,
   runTokenStartedAt,
   staleRunDatabases,
-} from "../../../lib/support/run-token.js";
+} from "../../support/run-token.js";
 
 const BASE = "activerecord_unittest";
 

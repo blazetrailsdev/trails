@@ -9,7 +9,7 @@ import { TimeZone, setZone, change as timeChange } from "@blazetrails/activesupp
 import { Time as RubyTime } from "@blazetrails/date";
 import { Array as OidArray } from "../../../../lib/connection-adapters/postgresql/oid/array.js";
 import { ValueType, StringType } from "@blazetrails/activemodel";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 const textArray = new OidArray(new ValueType());
 

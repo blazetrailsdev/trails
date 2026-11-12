@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { Base } from "../../lib/base.js";
 import { ambientPoolConfiguration, checkoutRawTestAdapter } from "../../lib/test-adapter.js";
-import { currentAdapter, inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { currentAdapter, inMemoryDb } from "../support/adapter-helper.js";
 
 describe("ambientPoolConfiguration", () => {
   test("matches the primary pool's configuration hash key-for-key", () => {

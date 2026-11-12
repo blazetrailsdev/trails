@@ -171,9 +171,9 @@ export async function install(): Promise<void> {
   installed = true;
 
   const [{ PostgreSQLAdapter }, { Mysql2Adapter }, { SQLite3Adapter }] = await Promise.all([
-    import("../connection-adapters/postgresql-adapter.js"),
-    import("../connection-adapters/mysql2-adapter.js"),
-    import("../connection-adapters/sqlite3-adapter.js"),
+    import("../../lib/connection-adapters/postgresql-adapter.js"),
+    import("../../lib/connection-adapters/mysql2-adapter.js"),
+    import("../../lib/connection-adapters/sqlite3-adapter.js"),
   ]);
 
   for (const klass of [PostgreSQLAdapter, Mysql2Adapter, SQLite3Adapter]) {

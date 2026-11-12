@@ -4,7 +4,7 @@ import { currentRole } from "../../../lib/core.js";
 import { ConnectionNotDefined } from "../../../lib/errors.js";
 import { ArgumentError, setEnv } from "@blazetrails/ruby-compat";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
 import { Person } from "../../models/person.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";

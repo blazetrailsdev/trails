@@ -6,7 +6,7 @@ import { NotNullViolation, StatementInvalid } from "../../../lib/errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { ambientConnection } from "../../support/rocket-tables.js";
-import { currentAdapter } from "../../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { adapterType } from "../../../lib/test-adapter.js";
 import { describeIfSupports } from "../../support/supports.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";

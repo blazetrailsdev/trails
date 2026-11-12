@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
-import { describeIfPg, PG_TEST_URL } from "../../../lib/support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
-import { loadAdapterSpecificSchema } from "../../../lib/support/load-schema-helper.js";
+import { loadAdapterSpecificSchema } from "../../support/load-schema-helper.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 
 class StopLoad extends Error {}

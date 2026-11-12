@@ -52,7 +52,7 @@ import {
 } from "../../../lib/test-helpers/models/post.js";
 import { Project } from "../../models/project.js";
 import { Lion } from "../../models/cat.js";
-import { inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
 
 constSet(TopLevel, "Developer", Developer);
 constSet(TopLevel, "Project", Project);

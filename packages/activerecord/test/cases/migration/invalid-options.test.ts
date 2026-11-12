@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ambientConnection } from "../../support/rocket-tables.js";
-import { currentAdapter } from "../../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { adapterType } from "../../../lib/test-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 

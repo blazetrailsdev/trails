@@ -11,7 +11,7 @@ import {
   UniqueConstraintDefinition,
 } from "../../../../lib/connection-adapters/postgresql/schema-definitions.js";
 import { Name } from "../../../../lib/connection-adapters/postgresql/utils.js";
-import { describeIfPg, PG_TEST_URL } from "../../../../lib/support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_URL } from "../../../support/describe-if-pg.js";
 import { resultFromRowHashes } from "../../../support/result-from-row-hashes.js";
 
 const SCHEMA_NAME = "test_schema_stmts";

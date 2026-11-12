@@ -1,6 +1,6 @@
 import { it, expect, beforeEach } from "vitest";
 import { Mysql2Adapter } from "../../../lib/connection-adapters/mysql2-adapter.js";
-import { describeIfMysqlAdapter } from "../../../lib/support/describe-if-mysql-adapter.js";
+import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 
 class TestMysqlAdapter extends Mysql2Adapter {
   constructor() {

@@ -1,7 +1,7 @@
 import { expect } from "vitest";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
-import { ensureCanonicalTables } from "../support/canonical-table-rebuild.js";
+import { ensureCanonicalTables } from "../../test/support/canonical-table-rebuild.js";
 import { Base } from "../index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 

@@ -8,8 +8,8 @@ import { ConnectionDescriptor } from "../../lib/connection-adapters/abstract/con
 import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
 import { ConnectionAdapters } from "../../lib/namespaces.js";
-import { loadSchema } from "../../lib/support/load-schema-helper.js";
-import { stampCanonicalSchema } from "../../lib/support/canonical-schema-stamp.js";
+import { loadSchema } from "./load-schema-helper.js";
+import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
 import {
   SCHEMA_CACHE_DUMP_ENV,
   SCHEMA_CACHE_FINGERPRINT_ENV,
@@ -21,25 +21,25 @@ import {
   sweepRunDbFiles,
   sweepStaleDbFiles,
   templatePathFor,
-} from "../../lib/support/sqlite-template.js";
+} from "./sqlite-template.js";
 import {
   RUN_TOKEN_ENV,
   newRunToken,
   ownRunDatabases,
   runDatabasePrefix,
   staleRunDatabases,
-} from "../../lib/support/run-token.js";
+} from "./run-token.js";
 import { quoteTableName as quoteMysqlTableName } from "../../lib/connection-adapters/mysql/quoting.js";
 import { quoteTableName as quotePgTableName } from "../../lib/connection-adapters/postgresql/quoting.js";
-import { slotPoolSize, workerForkCount } from "../../lib/support/ar-db-slots.js";
+import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 import {
   driverConfig,
   mysqlSettings,
   postgresSettings,
   settingsUrl,
   withDatabase,
-} from "../../lib/support/config.js";
-import { activeLane } from "../../lib/support/connection.js";
+} from "./config.js";
+import { activeLane } from "./connection.js";
 
 function slotCount(): number {
   return workerForkCount() <= 1 ? 1 : slotPoolSize();

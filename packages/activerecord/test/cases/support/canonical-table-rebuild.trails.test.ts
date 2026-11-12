@@ -3,7 +3,7 @@ import "../../../lib/sqlite/better-sqlite3.js";
 import type { AbstractAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 import { loadCanonicalSchema } from "../../support/canonical-schema.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
-import { ensureCanonicalTables } from "../../../lib/support/canonical-table-rebuild.js";
+import { ensureCanonicalTables } from "../../support/canonical-table-rebuild.js";
 
 async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
   const res = await adapter.selectAll(

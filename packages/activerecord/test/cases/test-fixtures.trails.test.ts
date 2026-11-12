@@ -16,7 +16,7 @@ import { Visitors } from "@blazetrails/arel";
 import { Base } from "../../lib/base.js";
 import { Fixture, FixtureSet } from "../../lib/fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "../support/fixtures-registry.js";
-import { withSecondPool } from "../../lib/support/setup-second-pool.js";
+import { withSecondPool } from "../support/setup-second-pool.js";
 import { College } from "../models/college.js";
 import { LiveParrot, DeadParrot } from "../models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "../models/vegetables.js";

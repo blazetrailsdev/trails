@@ -18,7 +18,7 @@ import {
 import { TableDefinition as MyTd } from "../../../../lib/connection-adapters/mysql/schema-definitions.js";
 import { Column } from "../../../../lib/connection-adapters/mysql/column.js";
 import { Base } from "../../../../lib/base.js";
-import { describeIfMysqlAdapter } from "../../../../lib/support/describe-if-mysql-adapter.js";
+import { describeIfMysqlAdapter } from "../../../support/describe-if-mysql-adapter.js";
 
 let leased: VisitorHostAdapter;
 

@@ -30,7 +30,7 @@ import {
   assertNoChanges,
 } from "@blazetrails/activesupport/testing/assertions";
 import type { ConnectionPool } from "../../lib/connection-adapters/abstract/connection-pool.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { setUseYamlUnsafeLoad, useYamlUnsafeLoad } from "../../lib/active-record.js";
 import { typeRegistryKeyFor } from "../support/type-registry-key.js";
 

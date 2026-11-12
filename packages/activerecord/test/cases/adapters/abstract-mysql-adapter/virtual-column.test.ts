@@ -9,7 +9,7 @@ import { describeIfSupports } from "../../../support/supports.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Base } from "../../../../lib/base.js";
 import type { Column as MySQLColumn } from "../../../../lib/connection-adapters/mysql/column.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 class VirtualColumn extends Base {}
 

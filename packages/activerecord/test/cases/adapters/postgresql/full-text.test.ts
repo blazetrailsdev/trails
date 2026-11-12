@@ -5,7 +5,7 @@ import {
 } from "../../../../lib/adapters/postgresql/test-helper.js";
 import { Base } from "../../../../lib/base.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 import type { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
 
 describeIfPg("PostgreSQLAdapter", () => {

@@ -4,7 +4,7 @@ import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-ada
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { adapterType } from "../../lib/test-adapter.js";
 import { describeIfSupports, itIfSupports } from "../support/supports.js";
-import { dumpTableSchema } from "../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 async function conn(): Promise<AbstractAdapter> {
   return (await Base.leaseConnection()) as unknown as AbstractAdapter;

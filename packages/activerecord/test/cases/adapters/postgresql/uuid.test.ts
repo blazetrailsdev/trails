@@ -10,7 +10,7 @@ import { itIfSupports } from "../../../support/supports.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Base, Migration, Migrator } from "../../../../lib/index.js";
 import type { MigrationProxy } from "../../../../lib/migration.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 import { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
 import { isPresent } from "@blazetrails/activesupport";
 import {

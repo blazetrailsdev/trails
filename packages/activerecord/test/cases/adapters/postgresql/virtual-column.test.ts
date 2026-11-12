@@ -10,7 +10,7 @@ import { FixtureSet } from "../../../../lib/fixtures.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { virtualColumnFixtureData } from "../../../fixtures/virtual-columns.js";
 import { Base } from "../../../../lib/index.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

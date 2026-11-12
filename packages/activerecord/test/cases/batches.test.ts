@@ -5,7 +5,7 @@ import { BatchEnumerator } from "../../lib/relation/batches/batch-enumerator.js"
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";
 import { StringIO, regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
-import { currentAdapter } from "../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { Logger, isPresent } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { Time as RubyTime } from "@blazetrails/date";

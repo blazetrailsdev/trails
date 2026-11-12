@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { Deadlocked } from "../../../lib/errors.js";
-import { describeIfPg, PG_TEST_URL } from "../../../lib/support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 
 const PQTRANS_IDLE = 0;

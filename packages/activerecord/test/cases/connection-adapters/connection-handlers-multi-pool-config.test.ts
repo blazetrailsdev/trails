@@ -3,7 +3,7 @@ import { assertNot } from "@blazetrails/activesupport/testing/assertions";
 import { ConnectionHandler } from "../../../lib/connection-adapters/abstract/connection-handler.js";
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { ambientPoolConfiguration } from "../../../lib/test-adapter.js";
-import { inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
 
 describe.skipIf(inMemoryDb())("ConnectionHandlersMultiPoolConfigTest", () => {
   let handler: ConnectionHandler;

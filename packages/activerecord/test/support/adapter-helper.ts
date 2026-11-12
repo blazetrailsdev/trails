@@ -1,5 +1,5 @@
-import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
-import { Base } from "../base.js";
+import { adapterType, ambientPoolConfiguration } from "../../lib/test-adapter.js";
+import { Base } from "../../lib/base.js";
 
 export type AdapterClassName =
   | "SQLite3Adapter"

@@ -1,7 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
 import { Base } from "../../../lib/base.js";
 import { writingPoolsLeakedSinceBaseline } from "../../../lib/cases/helper.js";
-import { restoreWorkerConnection } from "../../../lib/support/connection.js";
+import { restoreWorkerConnection } from "../../support/connection.js";
 
 class CensusLeakModel extends Base {}
 await CensusLeakModel.establishConnection({

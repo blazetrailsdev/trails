@@ -1,5 +1,5 @@
 import { it, expect, vi } from "vitest";
-import { describeIfMysqlAdapter } from "../../../../lib/support/describe-if-mysql-adapter.js";
+import { describeIfMysqlAdapter } from "../../../support/describe-if-mysql-adapter.js";
 import { Mysql2Adapter } from "../../../../lib/connection-adapters/mysql2-adapter.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import type { DatabaseConfigOptions } from "../../../../lib/database-configurations/database-config.js";

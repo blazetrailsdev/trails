@@ -6,7 +6,7 @@ import {
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Base, StatementInvalid } from "../../../../lib/index.js";
 import { assert, assertNotPredicate } from "@blazetrails/activesupport/testing/assertions";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 import type { Column as PgColumn } from "../../../../lib/connection-adapters/postgresql/column.js";
 
 describeIfPg("PostgreSQLAdapter", () => {

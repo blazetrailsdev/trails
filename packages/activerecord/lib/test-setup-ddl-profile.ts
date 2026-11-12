@@ -1,5 +1,10 @@
 import { afterAll, beforeEach, expect } from "vitest";
-import { install, flush, setCurrentFile, setTestPathResolver } from "./support/ddl-profile.js";
+import {
+  install,
+  flush,
+  setCurrentFile,
+  setTestPathResolver,
+} from "../test/support/ddl-profile.js";
 
 await install();
 

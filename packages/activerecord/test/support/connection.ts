@@ -1,13 +1,13 @@
 import { getEnv } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base } from "../base.js";
-import { setAsyncQueryExecutor } from "../active-record.js";
-import { ARUnit2Model } from "../../test/models/arunit2-model.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
-import { DatabaseTasks } from "../tasks/database-tasks.js";
-import { HashConfig } from "../database-configurations/hash-config.js";
-import { UrlConfig } from "../database-configurations/url-config.js";
+import { Base } from "../../lib/base.js";
+import { setAsyncQueryExecutor } from "../../lib/active-record.js";
+import { ARUnit2Model } from "../models/arunit2-model.js";
+import { DatabaseConfigurations } from "../../lib/database-configurations.js";
+import { DatabaseTasks } from "../../lib/tasks/database-tasks.js";
+import { HashConfig } from "../../lib/database-configurations/hash-config.js";
+import { UrlConfig } from "../../lib/database-configurations/url-config.js";
 import { arunitDatabaseNames } from "./arunit2-config.js";
 import { loadAdapterSpecificSchema, loadSchema } from "./load-schema-helper.js";
 import { stampCanonicalSchema } from "./canonical-schema-stamp.js";
@@ -142,7 +142,6 @@ export async function testConfigurationHashes(): Promise<{
   const connections: Partial<Record<string, NamedConnection>> = CONNECTIONS;
   const connection = connections[name];
   if (!connection) {
-    // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(
       `Connection "${name}" not found. Available connections: ` +
         `${Object.keys(CONNECTIONS).join(", ")}`,
@@ -181,15 +180,15 @@ export async function connect(): Promise<TestDatabaseConfig> {
 
   switch (adapter) {
     case "sqlite": {
-      await import("../tasks/sqlite-database-tasks.js");
+      await import("../../lib/tasks/sqlite-database-tasks.js");
       break;
     }
     case "postgres": {
-      await import("../tasks/postgresql-database-tasks.js");
+      await import("../../lib/tasks/postgresql-database-tasks.js");
       break;
     }
     case "mysql": {
-      await import("../tasks/mysql-database-tasks.js");
+      await import("../../lib/tasks/mysql-database-tasks.js");
       break;
     }
   }

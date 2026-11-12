@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { describeIfPg, PG_TEST_URL } from "../../../lib/support/describe-if-pg.js";
+import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
 import { PostgreSQLAdapter } from "../../../lib/connection-adapters/postgresql-adapter.js";
 
 async function inTransaction(adapter: PostgreSQLAdapter): Promise<boolean> {

@@ -473,7 +473,6 @@ const COVERAGE_EXCLUDE = [
   "**/dist/**",
   "**/__snapshots__/**",
   "**/test-helpers/**",
-  "packages/activerecord/lib/support/**",
   "**/test-support/**",
   "**/*.config.ts",
   "packages/website/**",

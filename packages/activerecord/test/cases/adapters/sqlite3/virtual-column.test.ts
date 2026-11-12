@@ -9,7 +9,7 @@ import { virtualColumnFixtureData } from "../../../fixtures/virtual-columns.js";
 import { itIfSupports } from "../../../support/supports.js";
 import type { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../../../lib/connection-adapters/sqlite3/column.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");

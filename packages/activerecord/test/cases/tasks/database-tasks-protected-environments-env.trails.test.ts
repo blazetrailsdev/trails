@@ -18,7 +18,7 @@ import {
 } from "../../../lib/migration.js";
 import type { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { adapterType } from "../../../lib/test-adapter.js";
-import { inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
 import { resetRegisteredTasks } from "../../support/registered-tasks.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 

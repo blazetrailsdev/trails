@@ -80,7 +80,7 @@ describe("MigrationProxy", () => {
 
   it("loadMigration raises NameError when the file has no export named after the migration", async () => {
     const filename = new URL(
-      "./test-helpers/migrations/valid/1_valid_people_have_last_names.ts",
+      "../migrations/valid/1_valid_people_have_last_names.ts",
       import.meta.url,
     ).pathname;
     const proxy = new MigrationProxy("NoSuchMigration", 1, filename, "");
@@ -90,7 +90,7 @@ describe("MigrationProxy", () => {
 
   it("loadMigration instantiates the export named after the migration", async () => {
     const filename = new URL(
-      "./test-helpers/migrations/valid/1_valid_people_have_last_names.ts",
+      "../migrations/valid/1_valid_people_have_last_names.ts",
       import.meta.url,
     ).pathname;
     const proxy = new MigrationProxy("ValidPeopleHaveLastNames", 1, filename, "");

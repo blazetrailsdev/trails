@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { StatementPool } from "../../../lib/connection-adapters/statement-pool.js";
-import { isSqliteRun } from "../../../lib/support/sqlite-template.js";
+import { isSqliteRun } from "../../support/sqlite-template.js";
 import { checkoutRawTestAdapter } from "../../../lib/test-adapter.js";
 
 class EvictingPool extends StatementPool<string> {

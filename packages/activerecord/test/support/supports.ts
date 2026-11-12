@@ -7,14 +7,14 @@ import {
   supportsNonUniqueConstraintName,
   supportsSqlStandardDropConstraint,
   supportsTextColumnWithDefault,
-} from "../../lib/support/adapter-helper.js";
+} from "./adapter-helper.js";
 
 const ALL = ["postgres", "mysql", "sqlite"] as const;
 type Backend = (typeof ALL)[number];
 
 const mysql =
   adapterType === "mysql"
-    ? await import("../../lib/support/mysql-server-version.js")
+    ? await import("./mysql-server-version.js")
     : {
         supportsExpressionIndex: false,
         supportsJson: false,
@@ -25,9 +25,7 @@ const mysql =
       };
 
 const pg =
-  adapterType === "postgres"
-    ? await import("../../lib/support/describe-if-pg.js")
-    : { pgServerVersion: 0 };
+  adapterType === "postgres" ? await import("./describe-if-pg.js") : { pgServerVersion: 0 };
 
 function withMysql(base: readonly Backend[], supported: boolean): readonly Backend[] {
   return supported ? [...base, "mysql"] : base;

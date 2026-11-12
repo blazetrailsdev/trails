@@ -9,7 +9,7 @@ import {
   sweepRunDbFiles,
   sweepStaleDbFiles,
   unlinkDbFiles,
-} from "../../../lib/support/sqlite-template.js";
+} from "../../support/sqlite-template.js";
 
 const SIDECARS = ["", "-wal", "-shm"];
 

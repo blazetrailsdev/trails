@@ -10,7 +10,7 @@ import { DatabaseTasks } from "../../../../lib/tasks/database-tasks.js";
 import "../../../../lib/tasks/postgresql-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";
 import { SchemaDumper } from "../../../../lib/schema-dumper.js";
-import { ARUNIT_DATABASE } from "../../../../lib/support/config.js";
+import { ARUNIT_DATABASE } from "../../../support/config.js";
 import { DatabaseAlreadyExists } from "../../../../lib/errors.js";
 import { Base } from "../../../../lib/base.js";
 import { dumpSchemas, setDumpSchemas } from "../../../../lib/active-record.js";

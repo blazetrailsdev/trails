@@ -18,7 +18,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { StatementInvalid } from "../../../../lib/errors.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 class PostgresqlEnum extends Base {
   static {

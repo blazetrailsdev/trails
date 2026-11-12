@@ -11,7 +11,7 @@ import {
 } from "../../../lib/active-record.js";
 import { MIGRATIONS_ROOT } from "../../../lib/config.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { restoreWorkerConnection } from "../../../lib/support/connection.js";
+import { restoreWorkerConnection } from "../../support/connection.js";
 
 describe("DatabaseTasksMigrateAllMetadataTest", () => {
   fixtures({}, { useTransactionalTests: false });

@@ -42,7 +42,7 @@ removed and multiplies connection/DB-create overhead.
 TS source read:
 
 - `packages/activerecord/lib/test-setup-dy.ts` (per-file reset driver)
-- `packages/activerecord/lib/support/drop-all-tables.ts` (`dropAllTables`)
+- `packages/activerecord/test/support/drop-all-tables.ts` (`dropAllTables`)
 - `packages/activerecord/test/support/define-schema.ts` (`defineSchema`,
   `dropExisting`, signature-cache fast path — lines 630–710)
 - `packages/activerecord/test/support/schema-repair.ts` (`repairWorkerSchema`,
@@ -52,7 +52,7 @@ TS source read:
 - `packages/activerecord/lib/tasks/database-tasks.ts`
   (`reconstructFromSchema` 1290–1320, `loadSchema` 839–884, `truncateTables`,
   `schemaUpToDate`)
-- `packages/activerecord/lib/support/ddl-profile.ts` (instrumentation
+- `packages/activerecord/test/support/ddl-profile.ts` (instrumentation
   reused from PR #3904 — records `byOp`/`byTable`/`byFile`)
 - `packages/activerecord/test/support/setup-handler-suite.ts`,
   `use-handler-transactional-fixtures.ts` (afterAll no longer drops — D-Z)

@@ -1,5 +1,5 @@
 import { getOs } from "@blazetrails/ruby-compat";
-import { DEFAULT_FORKS, resolveForkCount } from "../../test/support/ar-db-forks-default.js";
+import { DEFAULT_FORKS, resolveForkCount } from "./ar-db-forks-default.js";
 
 const SLOT_HEADROOM = 2;
 

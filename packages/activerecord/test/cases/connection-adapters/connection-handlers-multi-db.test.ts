@@ -7,7 +7,7 @@ import { ConnectionNotDefined } from "../../../lib/errors.js";
 import { ConnectionHandler } from "../../../lib/connection-adapters/abstract/connection-handler.js";
 import { Base } from "../../../lib/base.js";
 import { currentRole } from "../../../lib/core.js";
-import { inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
 import { Person } from "../../models/person.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import {

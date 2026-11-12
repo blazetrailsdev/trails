@@ -1,4 +1,4 @@
-import { connect } from "./support/connection.js";
+import { connect } from "../test/support/connection.js";
 import { getEnv } from "@blazetrails/activesupport";
 import { RuntimeError, getOs } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
@@ -13,11 +13,12 @@ const ownsDatabase =
   (adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive || mysqlExclusive;
 
 const { recordBootLaidTables, dropAllTables, purgeToCanonicalTables } =
-  await import("./support/drop-all-tables.js");
-const { loadSchema, loadAdapterSpecificSchema } = await import("./support/load-schema-helper.js");
+  await import("../test/support/drop-all-tables.js");
+const { loadSchema, loadAdapterSpecificSchema } =
+  await import("../test/support/load-schema-helper.js");
 const { canonicalSchemaUpToDate, stampCanonicalSchema, adapterSpecificTables } =
-  await import("./support/canonical-schema-stamp.js");
-const { recordBootOutcome } = await import("./support/boot-outcome.js");
+  await import("../test/support/canonical-schema-stamp.js");
+const { recordBootOutcome } = await import("../test/support/boot-outcome.js");
 
 if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   const conn = await Base.leaseConnection();
@@ -59,7 +60,7 @@ if (missingTables.length > 0) {
 
 await recordBootLaidTables(await Base.leaseConnection());
 
-const { provisionSecondDatabase } = await import("./support/setup-second-pool.js");
+const { provisionSecondDatabase } = await import("../test/support/setup-second-pool.js");
 await provisionSecondDatabase();
 
 const { captureWritingPoolBaseline } = await import("./cases/helper.js");

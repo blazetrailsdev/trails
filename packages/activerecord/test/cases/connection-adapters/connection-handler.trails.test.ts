@@ -4,7 +4,7 @@ import { ConnectionHandler } from "../../../lib/connection-adapters/abstract/con
 import { HashConfig } from "../../../lib/database-configurations/hash-config.js";
 import { Base } from "../../../lib/base.js";
 import { ambientPoolConfiguration } from "../../../lib/test-adapter.js";
-import { restoreWorkerConnection } from "../../../lib/support/connection.js";
+import { restoreWorkerConnection } from "../../support/connection.js";
 
 describe("ConnectionHandler selector defaults (trails)", () => {
   let handler: ConnectionHandler;

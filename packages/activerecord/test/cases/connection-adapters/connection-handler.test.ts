@@ -10,7 +10,7 @@ import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertio
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { deprecator } from "../../../lib/deprecator.js";
-import { restoreWorkerConnection } from "../../../lib/support/connection.js";
+import { restoreWorkerConnection } from "../../support/connection.js";
 import { DEFAULT_ENV } from "../../../lib/connection-handling.js";
 import { readingRole, setWritingRole, writingRole } from "../../../lib/active-record.js";
 

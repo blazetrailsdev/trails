@@ -7,7 +7,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-ad
 import { adapterType } from "../../lib/test-adapter.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
-import { dumpTableSchema } from "../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 import { inTimeZone } from "../../lib/cases/helper.js";
 import { zone } from "@blazetrails/activesupport";
 import { inTimeZone as dateInTimeZone } from "@blazetrails/activesupport/core-ext/date-and-time/zones";

@@ -9,8 +9,8 @@ import { ambientConnection } from "../../support/rocket-tables.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "../../support/supports.js";
 import { adapterType } from "../../../lib/test-adapter.js";
-import { isMariaDb, serverVersion } from "../../../lib/support/mysql-server-version.js";
-import { dumpTableSchema } from "../../../lib/support/schema-dumping-helper.js";
+import { isMariaDb, serverVersion } from "../../support/mysql-server-version.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import { rbInspect } from "@blazetrails/ruby-compat";
 
 const supportsJsonSchemaValid = !isMariaDb && (serverVersion?.compare("8.0.17") ?? -1) >= 0;

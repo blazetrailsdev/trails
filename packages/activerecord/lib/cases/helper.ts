@@ -32,7 +32,7 @@ register(
 register(
   "fake",
   "FakeActiveRecordAdapter",
-  new URL("../support/fake-adapter.js", import.meta.url).href,
+  new URL("../../test/support/fake-adapter.js", import.meta.url).href,
 );
 
 expect.addEqualityTesters([

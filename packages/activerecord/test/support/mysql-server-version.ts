@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { Version } from "../connection-adapters/abstract-adapter.js";
+import { Version } from "../../lib/connection-adapters/abstract-adapter.js";
 import { mysqlUrl } from "./config.js";
 
 export const MYSQL_TEST_URL = mysqlUrl();

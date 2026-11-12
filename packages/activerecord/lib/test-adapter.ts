@@ -2,7 +2,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
 import type { SQLite3Config } from "./connection-adapters/pool-config.js";
-import { activeLane, testConfigurationHashes } from "./support/connection.js";
+import { activeLane, testConfigurationHashes } from "../test/support/connection.js";
 
 export const adapterType: "sqlite" | "postgres" | "mysql" = activeLane();
 

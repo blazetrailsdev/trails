@@ -15,7 +15,7 @@ import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import "../support/canonical-model-index.js";
 import { StringIO } from "@blazetrails/ruby-compat";
 import { adapterSupports, itIfSupports } from "../support/supports.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { Base } from "../../lib/base.js";
 import { Result } from "../../lib/result.js";
 import { Author } from "../models/author.js";

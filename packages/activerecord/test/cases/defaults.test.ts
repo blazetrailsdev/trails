@@ -4,14 +4,14 @@ import { Base } from "../../lib/index.js";
 import { NotNullViolation } from "../../lib/errors.js";
 import { adapterType } from "../../lib/test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
-import { describeIfMysqlAdapter } from "../../lib/support/describe-if-mysql-adapter.js";
-import { isMariaDb } from "../../lib/support/mysql-server-version.js";
+import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
+import { isMariaDb } from "../support/mysql-server-version.js";
 import { describeIfPostgresqlAdapter } from "../support/describe-if-postgresql-adapter.js";
 import { describeIfSqlite } from "../support/describe-if-sqlite.js";
 import { describeIfSupports, itIfSupports } from "../support/supports.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { Entrant } from "../models/entrant.js";
-import { dumpTableSchema } from "../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 fixtures({}, { useTransactionalTests: false });
 

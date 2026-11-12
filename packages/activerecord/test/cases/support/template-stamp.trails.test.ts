@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import "../../../lib/sqlite/better-sqlite3.js";
 import { Base } from "../../../lib/base.js";
-import { bootOutcome } from "../../../lib/support/boot-outcome.js";
+import { bootOutcome } from "../../support/boot-outcome.js";
 import { InternalMetadata } from "../../../lib/internal-metadata.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import {
@@ -9,11 +9,11 @@ import {
   canonicalSchemaUpToDate,
   adapterSpecificTables,
   stampCanonicalSchema,
-} from "../../../lib/support/canonical-schema-stamp.js";
-import { resetTestTables } from "../../../lib/support/drop-all-tables.js";
-import { loadAdapterSpecificSchema } from "../../../lib/support/load-schema-helper.js";
-import { RUN_TOKEN_ENV } from "../../../lib/support/run-token.js";
-import { TEMPLATE_PATH_ENV, isSqliteRun } from "../../../lib/support/sqlite-template.js";
+} from "../../support/canonical-schema-stamp.js";
+import { resetTestTables } from "../../support/drop-all-tables.js";
+import { loadAdapterSpecificSchema } from "../../support/load-schema-helper.js";
+import { RUN_TOKEN_ENV } from "../../support/run-token.js";
+import { TEMPLATE_PATH_ENV, isSqliteRun } from "../../support/sqlite-template.js";
 
 const runToken = process.env[RUN_TOKEN_ENV] ?? "";
 const templatePath = process.env[TEMPLATE_PATH_ENV] ?? "";

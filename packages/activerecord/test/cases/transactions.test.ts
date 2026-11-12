@@ -15,7 +15,7 @@ import { deprecator } from "../../lib/deprecator.js";
 
 import { adapterType } from "../../lib/test-adapter.js";
 import { itIfSupports } from "../support/supports.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { Topic as CanonicalTopic } from "../models/topic.js";
 import { Movie } from "../models/movie.js";

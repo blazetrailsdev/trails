@@ -1,8 +1,8 @@
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { ActiveRecordError, ConnectionFailed, ConnectionNotEstablished } from "../errors.js";
-import { canonicalForeignKeyDependents } from "../../test/support/canonical-schema.js";
-import { TEST_SCHEMA } from "../../test/support/test-schema.js";
-import { typeRegistryKeyFor } from "../../test/support/type-registry-key.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { ActiveRecordError, ConnectionFailed, ConnectionNotEstablished } from "../../lib/errors.js";
+import { canonicalForeignKeyDependents } from "./canonical-schema.js";
+import { TEST_SCHEMA } from "./test-schema.js";
+import { typeRegistryKeyFor } from "./type-registry-key.js";
 
 export const BOOKKEEPING_TABLE_NAMES: ReadonlySet<string> = new Set([
   "schema_migrations",

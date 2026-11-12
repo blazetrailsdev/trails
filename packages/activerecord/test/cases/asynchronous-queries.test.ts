@@ -17,7 +17,7 @@ import { HashConfig } from "../../lib/database-configurations/hash-config.js";
 import { AsynchronousQueryInsideTransactionError, StatementInvalid } from "../../lib/errors.js";
 import { FutureResult } from "../../lib/future-result.js";
 import { Result } from "../../lib/result.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { ARUnit2Model } from "../models/arunit2-model.js";
 

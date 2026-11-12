@@ -1,13 +1,13 @@
 import { osAdapterConfig, registerOsAdapter, getFs } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, resolveForkCount } from "../../support/ar-db-forks-default.js";
-import { workerForkCount } from "../../../lib/support/ar-db-slots.js";
+import { workerForkCount } from "../../support/ar-db-slots.js";
 
 const sourcePath = (relative: string): string =>
   decodeURIComponent(new URL(relative, import.meta.url).pathname);
 
-const CONFIG_PATH = sourcePath("../../../../vitest.config.ts");
-const HELPER_PATH = sourcePath("./ar-db-forks-default.ts");
+const CONFIG_PATH = sourcePath("../../../../../vitest.config.ts");
+const HELPER_PATH = sourcePath("../../support/ar-db-forks-default.ts");
 
 async function readSource(path: string): Promise<string> {
   const fs = getFs();

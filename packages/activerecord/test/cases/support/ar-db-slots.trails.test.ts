@@ -1,6 +1,6 @@
 import { osAdapterConfig, registerOsAdapter } from "@blazetrails/ruby-compat";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "../../../lib/support/ar-db-slots.js";
+import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "../../support/ar-db-slots.js";
 
 let cores = 64;
 const HOST_CORES = 64;

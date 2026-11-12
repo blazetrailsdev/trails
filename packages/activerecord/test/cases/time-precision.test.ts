@@ -7,7 +7,7 @@ import { adapterType } from "../../lib/test-adapter.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
 import { Rational } from "@blazetrails/ruby-compat";
-import { dumpTableSchema } from "../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../support/schema-dumping-helper.js";
 
 function nsecTime(v: RubyTime): number {
   return v.nsec;

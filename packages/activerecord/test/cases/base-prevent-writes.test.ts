@@ -7,7 +7,7 @@ import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { ARUnit2Model } from "../models/arunit2-model.js";
 import { Bird } from "../models/bird.js";
 import { Professor } from "../models/professor.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import { assertQueriesCount } from "../../lib/testing/query-assertions.js";
 
 describe.skipIf(inMemoryDb())("BasePreventWritesTest", () => {

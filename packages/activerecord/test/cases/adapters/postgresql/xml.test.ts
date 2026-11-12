@@ -5,7 +5,7 @@ import {
 } from "../../../../lib/adapters/postgresql/test-helper.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 class XmlDataType extends Base {
   static {

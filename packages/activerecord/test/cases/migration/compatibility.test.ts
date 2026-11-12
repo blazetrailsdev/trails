@@ -21,10 +21,10 @@ import {
   currentAdapter,
   disableExtensionBang,
   enableExtensionBang,
-} from "../../../lib/support/adapter-helper.js";
+} from "../../support/adapter-helper.js";
 import { itIfSupports } from "../../support/supports.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { dumpTableSchema } from "../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class TestModel extends Base {}
 class Testing extends Base {

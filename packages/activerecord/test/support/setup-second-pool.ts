@@ -1,13 +1,13 @@
 import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { beforeAll } from "vitest";
-import { Base } from "../base.js";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { loadCanonicalArunit2Schema } from "../../test/support/canonical-schema.js";
-import { ARUnit2Model } from "../../test/models/arunit2-model.js";
-import { Course } from "../../test/models/course.js";
-import { College } from "../../test/models/college.js";
-import { Entrant } from "../../test/models/entrant.js";
-import { Professor } from "../../test/models/professor.js";
+import { Base } from "../../lib/base.js";
+import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
+import { loadCanonicalArunit2Schema } from "./canonical-schema.js";
+import { ARUnit2Model } from "../models/arunit2-model.js";
+import { Course } from "../models/course.js";
+import { College } from "../models/college.js";
+import { Entrant } from "../models/entrant.js";
+import { Professor } from "../models/professor.js";
 import { activeLane } from "./connection.js";
 import { canonicalSchemaUpToDate, stampCanonicalSchema } from "./canonical-schema-stamp.js";
 

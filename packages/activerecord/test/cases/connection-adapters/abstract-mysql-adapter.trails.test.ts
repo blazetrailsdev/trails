@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { NullLock } from "@blazetrails/activesupport";
 import { Base } from "../../../lib/base.js";
-import { describeIfMysqlAdapter } from "../../../lib/support/describe-if-mysql-adapter.js";
+import { describeIfMysqlAdapter } from "../../support/describe-if-mysql-adapter.js";
 import { Column } from "../../../lib/connection-adapters/mysql/column.js";
 import { TypeMetadata } from "../../../lib/connection-adapters/mysql/type-metadata.js";
 import { SqlTypeMetadata } from "../../../lib/connection-adapters/sql-type-metadata.js";

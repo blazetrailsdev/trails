@@ -11,10 +11,7 @@ import { StatementInvalid } from "../../../../lib/errors.js";
 import { Name } from "../../../../lib/connection-adapters/postgresql/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
-import {
-  dumpAllTableSchema,
-  dumpTableSchema,
-} from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpAllTableSchema, dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 import type { AssociationProxy } from "../../../../lib/associations/collection-proxy.js";
 import { Base } from "../../../../lib/index.js";
 import { Default } from "../../../models/default.js";

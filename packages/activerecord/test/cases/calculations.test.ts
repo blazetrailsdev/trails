@@ -16,7 +16,7 @@ import {
 import { assertNotDeprecated } from "@blazetrails/activesupport/testing/deprecation";
 import { ArgumentError, ForbiddenAttributesError } from "@blazetrails/activemodel";
 import { adapterType } from "../../lib/test-adapter.js";
-import { currentAdapter } from "../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../support/adapter-helper.js";
 import { StatementInvalid } from "../../lib/errors.js";
 import { deprecator } from "../../lib/deprecator.js";
 import { assertNoQueries, assertQueriesCount } from "../../lib/testing/query-assertions.js";

@@ -36,7 +36,7 @@ import { PoolConfig } from "../../lib/connection-adapters/pool-config.js";
 import { SchemaReflection } from "../../lib/connection-adapters/schema-cache.js";
 import { HashConfig } from "../../lib/database-configurations/hash-config.js";
 import { ambientPoolConfiguration, rawTestAdapterConfiguration } from "../../lib/test-adapter.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
 import { Base } from "../../lib/base.js";
 import { assertNoQueries } from "../../lib/testing/query-assertions.js";

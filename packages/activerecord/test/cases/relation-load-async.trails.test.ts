@@ -7,7 +7,7 @@ import { Topic } from "../models/topic.js";
 import { Reply } from "../models/reply.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { itIfSupports } from "../support/supports.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 
 fixtures({ topics: [Topic, {}] });
 

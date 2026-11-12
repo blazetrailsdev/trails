@@ -1,5 +1,5 @@
 import { Dir, File, FileUtils, getOsAsync } from "@blazetrails/ruby-compat";
-import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
+import { betterSqlite3Driver } from "../../lib/sqlite/better-sqlite3.js";
 import { RUN_TOKEN_ENV, STALE_DB_AGE_MS } from "./run-token.js";
 import { activeLane } from "./connection.js";
 

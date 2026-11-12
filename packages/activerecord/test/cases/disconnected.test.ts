@@ -3,7 +3,7 @@ import type { AbstractAdapter } from "../../lib/connection-adapters/abstract-ada
 import { Base } from "../../lib/index.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
 import { adapterType } from "../../lib/test-adapter.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 
 describe.skipIf(inMemoryDb())("TestDisconnectedAdapter", () => {
   fixtures([], {

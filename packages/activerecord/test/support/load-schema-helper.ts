@@ -1,14 +1,14 @@
 import type {
   AbstractAdapter as DatabaseAdapter,
   AdapterName,
-} from "../connection-adapters/abstract-adapter.js";
-import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
-import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import { ActiveRecordError } from "../errors.js";
-import { loadCanonicalSchema } from "../../test/support/canonical-schema.js";
+} from "../../lib/connection-adapters/abstract-adapter.js";
+import type { AbstractMysqlAdapter } from "../../lib/connection-adapters/abstract-mysql-adapter.js";
+import type { PostgreSQLAdapter } from "../../lib/connection-adapters/postgresql-adapter.js";
+import { ActiveRecordError } from "../../lib/errors.js";
+import { loadCanonicalSchema } from "./canonical-schema.js";
 import { noteAdapterSpecificSchemaLoaded } from "./drop-all-tables.js";
-import { STUBBED_DDL_METHODS } from "../../test/support/stubbed-ddl-methods.js";
-import { typeRegistryKeyFor } from "../../test/support/type-registry-key.js";
+import { STUBBED_DDL_METHODS } from "./stubbed-ddl-methods.js";
+import { typeRegistryKeyFor } from "./type-registry-key.js";
 
 export async function createTestExclusionConstraintsTable(
   adapter: PostgreSQLAdapter,

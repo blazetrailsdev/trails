@@ -6,7 +6,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { adapterType, ambientPoolConfiguration } from "../../lib/test-adapter.js";
-import { inMemoryDb } from "../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../support/adapter-helper.js";
 import type { TestDatabaseAdapter } from "../../lib/test-adapter.js";
 import { itIfSupports, adapterSupports } from "../support/supports.js";
 import { fixtures } from "../../lib/test-helpers/use-fixtures.js";
@@ -18,7 +18,7 @@ import {
   dumpAllTableSchema,
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
-} from "../../lib/support/schema-dumping-helper.js";
+} from "../support/schema-dumping-helper.js";
 
 function assertNoLineUp(lines: string[], pattern: RegExp): void {
   if (lines.length === 0) return expect(true).toBeTruthy();

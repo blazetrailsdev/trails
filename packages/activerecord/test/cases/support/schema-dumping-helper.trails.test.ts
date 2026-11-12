@@ -5,7 +5,7 @@ import {
   dumpAllTableSchema,
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
-} from "../../../lib/support/schema-dumping-helper.js";
+} from "../../support/schema-dumping-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../../../lib/connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;

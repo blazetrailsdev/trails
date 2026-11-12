@@ -8,7 +8,7 @@ import {
 } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 import { Base } from "../../../../lib/base.js";
 import { describeIfSqlite } from "../../../support/describe-if-sqlite.js";
-import { currentAdapter } from "../../../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../../../support/adapter-helper.js";
 import { describeIfPostgresqlAdapter } from "../../../support/describe-if-postgresql-adapter.js";
 import type { TableDefinitionConn } from "../../../../lib/connection-adapters/abstract/schema-definitions.js";
 import type { SchemaCreationConn } from "../../../../lib/connection-adapters/abstract/schema-creation.js";

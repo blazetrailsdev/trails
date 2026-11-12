@@ -5,7 +5,7 @@ import { SchemaMigration } from "../../../../lib/schema-migration.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 
 const migrationsDir = (name: string) =>
-  new URL(`../../test-helpers/migrations/${name}`, import.meta.url).pathname;
+  new URL(`../../../migrations/${name}`, import.meta.url).pathname;
 
 const VALID = migrationsDir("valid");
 const OLD_AND_NEW_VERSIONS = migrationsDir("old_and_new_versions");

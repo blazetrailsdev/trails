@@ -45,7 +45,7 @@ import { adapterType } from "../../../lib/test-adapter.js";
 import { Backup } from "../../../lib/sqlite/backup.js";
 import { betterSqlite3Driver } from "../../../lib/sqlite/better-sqlite3.js";
 import type { SQLite3Adapter } from "../../../lib/connection-adapters/sqlite3-adapter.js";
-import { inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
 import { resetRegisteredTasks } from "../../support/registered-tasks.js";
 import { ARUnit2Model } from "../../models/arunit2-model.js";

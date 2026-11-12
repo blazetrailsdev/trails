@@ -8,7 +8,7 @@ import {
 import { DateTime as OidDateTime } from "../../../../lib/connection-adapters/postgresql/oid/date-time.js";
 import { fixtures } from "../../../../lib/test-helpers/use-fixtures.js";
 import { Base } from "../../../../lib/index.js";
-import { dumpTableSchema } from "../../../../lib/support/schema-dumping-helper.js";
+import { dumpTableSchema } from "../../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter OID::DateTime", () => {
   let adapter: PostgreSQLAdapter;

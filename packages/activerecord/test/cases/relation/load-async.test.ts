@@ -6,7 +6,7 @@ import { Rollback } from "../../../lib/errors.js";
 import type { Relation } from "../../../lib/relation.js";
 import { Post } from "../../../lib/test-helpers/models/post.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { inMemoryDb } from "../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../support/adapter-helper.js";
 import { waitForAsyncQuery } from "../../../lib/cases/helper.js";
 import { Base } from "../../../lib/base.js";
 import { ARUnit2Model } from "../../models/arunit2-model.js";

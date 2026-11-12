@@ -4,7 +4,7 @@ import { adapterSupports, describeIfSupports, itIfSupports } from "../../support
 
 const mysqlProbe =
   adapterType === "mysql"
-    ? await import("../../../lib/support/mysql-server-version.js")
+    ? await import("../../support/mysql-server-version.js")
     : { supportsExpressionIndex: false, supportsJson: false };
 
 describe("adapterSupports", () => {

@@ -5,9 +5,9 @@ import { LoadError } from "@blazetrails/ruby-compat";
 import { AdapterNotFound } from "../../../lib/errors.js";
 import "../../../lib/connection-handling.js";
 
-const adaptersPath = new URL("../support/trails-test-adapters.ts", import.meta.url).href;
-const deplessPath = new URL("../support/trails-depless-adapter.ts", import.meta.url).href;
-const brokenPath = new URL("../support/trails-broken-adapter.ts", import.meta.url).href;
+const adaptersPath = new URL("../../support/trails-test-adapters.ts", import.meta.url).href;
+const deplessPath = new URL("../../support/trails-depless-adapter.ts", import.meta.url).href;
+const brokenPath = new URL("../../support/trails-broken-adapter.ts", import.meta.url).href;
 
 describe("DatabaseConfigurations", () => {
   describe("HashConfigTrailsTest", () => {
@@ -51,7 +51,7 @@ describe("DatabaseConfigurations", () => {
       register(
         "trails_nameless_adapter",
         "NoSuchAdapter",
-        new URL("./hash-config.ts", import.meta.url).href,
+        new URL("../../../lib/database-configurations/hash-config.ts", import.meta.url).href,
       );
       await load("trails_nameless_adapter");
       expect(() => resolve("trails_nameless_adapter")).toThrow(AdapterNotFound);

@@ -5,7 +5,7 @@ import {
   stdout,
   stderr,
 } from "@blazetrails/ruby-compat";
-import { describeIfMysqlAdapter } from "../../../../lib/support/describe-if-mysql-adapter.js";
+import { describeIfMysqlAdapter } from "../../../support/describe-if-mysql-adapter.js";
 import { DatabaseTasks } from "../../../../lib/tasks/database-tasks.js";
 import "../../../../lib/tasks/mysql-database-tasks.js";
 import { HashConfig } from "../../../../lib/database-configurations/hash-config.js";

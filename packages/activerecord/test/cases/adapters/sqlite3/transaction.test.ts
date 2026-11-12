@@ -5,7 +5,7 @@ import { SQLite3Adapter } from "../../../../lib/connection-adapters/sqlite3-adap
 import { SQLite3Constants } from "../../../../lib/sqlite-adapter.js";
 import { NodeSQLiteAdapter } from "../../../../lib/connection-adapters/node-sqlite-adapter.js";
 import { Rollback, TransactionIsolationError } from "../../../../lib/errors.js";
-import { inMemoryDb } from "../../../../lib/support/adapter-helper.js";
+import { inMemoryDb } from "../../../support/adapter-helper.js";
 import { ambientPoolConfiguration } from "../../../../lib/test-adapter.js";
 
 function sharedCacheFlags(): number {

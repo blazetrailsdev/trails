@@ -8,7 +8,7 @@ import { SchemaMigration } from "../../../lib/schema-migration.js";
 import { Base } from "../../../lib/base.js";
 import { UnknownMigrationVersionError } from "../../../lib/migration.js";
 import { fixtures } from "../../../lib/test-helpers/use-fixtures.js";
-import { restoreWorkerConnection } from "../../../lib/support/connection.js";
+import { restoreWorkerConnection } from "../../support/connection.js";
 
 const REVERT_LOG = "__trailsRollbackReverted";
 
@@ -19,7 +19,7 @@ async function writeMigration(dir: string, version: number, name: string): Promi
   const fileName = name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
   await writeFile(
     join(dir, `${version}_${fileName}.ts`),
-    `import { Migration } from "${new URL("../migration.js", import.meta.url).pathname}";
+    `import { Migration } from "${new URL("../../../lib/migration.js", import.meta.url).pathname}";
 export class ${name} extends Migration.Current {
   async up() {}
   async down() {

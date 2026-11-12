@@ -8,7 +8,7 @@ import { itIfSupports } from "../../support/supports.js";
 import { assertQueriesCount } from "../../../lib/testing/query-assertions.js";
 import { regexpEscape, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
-import { currentAdapter } from "../../../lib/support/adapter-helper.js";
+import { currentAdapter } from "../../support/adapter-helper.js";
 import { Author } from "../../models/author.js";
 import { Developer } from "../../models/developer.js";
 import { Comment, CommentThatAutomaticallyAltersPostBody } from "../../models/comment.js";

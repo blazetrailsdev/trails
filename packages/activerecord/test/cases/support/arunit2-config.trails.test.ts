@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { arunitDatabaseNames } from "../../../lib/support/arunit2-config.js";
+import { arunitDatabaseNames } from "../../support/arunit2-config.js";
 
 describe("arunit2-config", () => {
   it("arunitDatabaseNames spells the two databases as expand_config does", () => {
