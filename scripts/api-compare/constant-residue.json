@@ -82,7 +82,7 @@
     }
   },
   "actionpack": {
-    "rows": 325,
+    "rows": 331,
     "excluded": [
       "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
@@ -194,6 +194,12 @@
       "action-controller/metal/exceptions.ts::UnknownFormat": "ActionController::UnknownFormat",
       "action-controller/metal/exceptions.ts::UnknownHttpMethod": "ActionController::UnknownHttpMethod",
       "action-controller/metal/exceptions.ts::UrlGenerationError": "ActionController::UrlGenerationError",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic": "ActionController::HttpAuthentication::Basic",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic.ControllerMethods": "ActionController::HttpAuthentication::Basic::ControllerMethods",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest": "ActionController::HttpAuthentication::Digest",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest.ControllerMethods": "ActionController::HttpAuthentication::Digest::ControllerMethods",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token": "ActionController::HttpAuthentication::Token",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Token.ControllerMethods": "ActionController::HttpAuthentication::Token::ControllerMethods",
       "action-controller/metal/mime-responds.ts::VariantCollector": "ActionController::MimeResponds::Collector::VariantCollector",
       "action-controller/metal/renderers.ts::MissingRenderer": "ActionController::MissingRenderer",
       "action-controller/metal/request-forgery-protection.ts::Exception": "ActionController::RequestForgeryProtection::ProtectionMethods::Exception",

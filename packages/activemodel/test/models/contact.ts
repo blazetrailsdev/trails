@@ -1,5 +1,11 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (contact.rb:3-7); the class/interface merge is how `include()` surfaces those members on the type side. */
-import { InstanceVariablesObject, exceptBang, extend, include } from "@blazetrails/activesupport";
+import {
+  InstanceVariablesObject,
+  camelize,
+  exceptBang,
+  extend,
+  include,
+} from "@blazetrails/activesupport";
 import { Conversion } from "../../lib/conversion.js";
 import { Naming } from "../../lib/naming.js";
 import type { ModelName } from "../../lib/naming.js";
@@ -143,7 +149,7 @@ export class Contact {
 function instanceValues(contact: Contact): Record<string, unknown> {
   return Object.fromEntries(
     Object.entries(InstanceVariablesObject.instanceValues(contact)).map(([ivar, value]) => [
-      ivar.replace(/^_/, ""),
+      camelize(ivar.replace(/^_/, ""), false),
       value,
     ]),
   );
