@@ -6,6 +6,7 @@ import { childNodes, Node } from "./node.js";
 import { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
+import "../xml/xpath-context.js";
 
 type Parse5Document = DefaultTreeAdapterMap["document"];
 

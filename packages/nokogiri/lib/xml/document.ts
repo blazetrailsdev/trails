@@ -10,6 +10,7 @@ import { ParseOptions } from "./parse-options.js";
 import { type Readable, readSource } from "../readable.js";
 import { SyntaxError } from "./syntax-error.js";
 import { XPathVisitor } from "../css/xpath-visitor.js";
+import "./xpath-context.js";
 
 export class XmlDocument {
   declare css: (...args: unknown[]) => NodeSet;

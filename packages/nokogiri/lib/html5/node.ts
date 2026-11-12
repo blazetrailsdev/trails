@@ -21,6 +21,7 @@ import {
 import type { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
 import * as Searchable from "../xml/searchable.js";
+import "../xml/xpath-context.js";
 import { SaveOptions } from "../xml/node/save-options.js";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];

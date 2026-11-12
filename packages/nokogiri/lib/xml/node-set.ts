@@ -5,7 +5,9 @@ import { Namespace } from "./namespace.js";
 
 import type { Node } from "../html5/node.js";
 import * as Searchable from "./searchable.js";
+import { registerNodeSetCtor } from "./node-set-ctor.js";
 import type { SearchableHost } from "./searchable.js";
+import "./xpath-context.js";
 
 export class NodeSet implements Iterable<Node> {
   declare atCss: (...args: unknown[]) => Node | undefined;
@@ -130,3 +132,4 @@ export class NodeSet implements Iterable<Node> {
 include(NodeSet, Enumerable);
 include(NodeSet, Searchable);
 constSet(XML, "NodeSet", NodeSet);
+registerNodeSetCtor(NodeSet);
