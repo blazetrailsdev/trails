@@ -24,7 +24,8 @@ import {
 import { ApplicationJob } from "../support/application-job.js";
 import { ExpectedTestError } from "../support/expected-test-error.js";
 import { JobResult } from "../support/job-result.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { Range, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { loadAppSchema } from "../support/queue-schema.js";
 import { SequentialUpdateResultJob } from "../support/sequential-update-result-job.js";
 import { ThrottledUpdateResultJob } from "../support/throttled-update-result-job.js";
@@ -49,6 +50,13 @@ async function assertStoredSequence(result: JobResult, ...sequences: string[][])
     expect(expected).toContain((await result.reload()).status);
   });
 }
+
+class ConcurrencyControlsTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+constSet(TopLevel, "ConcurrencyControlsTest", ConcurrencyControlsTest);
 
 describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   let result: JobResult;
