@@ -1,4 +1,4 @@
-import { ArgumentError, rbFArray, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { ArgumentError, Gem, rbFArray, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mail } from "./mail.js";
 import type { Message } from "./message.js";
 import { SmtpEnvelope } from "./smtp-envelope.js";
@@ -51,5 +51,19 @@ export const CheckDeliveryParams = {
     return message;
   },
 };
+
+const { deprecate } = Gem.Deprecate;
+deprecate.call(
+  CheckDeliveryParams,
+  "check",
+  "Mail::SmtpEnvelope.new created in commit c106bebea066782a72e4f24dd37b532d95773df7",
+  2023,
+  6,
+);
+deprecate.call(CheckDeliveryParams, "checkFrom", "none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "checkTo", "none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "checkAddr", "none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "validateSmtpAddr", "none", 2023, 6);
+deprecate.call(CheckDeliveryParams, "checkMessage", "none", 2023, 6);
 
 Mail.CheckDeliveryParams = CheckDeliveryParams;

@@ -907,7 +907,7 @@ export class Message {
     return this.addPart(newPart);
   }
 
-  async addFile(values: string | { filename: string }): Promise<unknown> {
+  async addFile(values: string | { filename: string; [key: string]: unknown }): Promise<unknown> {
     if (!(this.isMultipart() || Utilities.isBlank(this.body().decoded()))) {
       this.convertToMultipart();
     }

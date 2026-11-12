@@ -109,6 +109,27 @@ describe("Mail::UnstructuredField", () => {
         "Subject: This is a subject header message that is absolutely 79 characters\r\n long\r\n";
       expect(field.encoded()).toEqual(result);
     });
+    it("should fold itself if it is 997 chracters long", () => {
+      const value =
+        "This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. This is a subject header message that is going to be 997 characters long. And this makes it 997....";
+      field = new UnstructuredField("Subject", value);
+      const lines = (field.encoded() as string).split("\r\n ");
+      for (const line of lines) expect(line.length).toBeLessThan(78);
+    });
+    it("should fold itself if it is 998 characters long", () => {
+      const value =
+        "This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. This is a subject header message that is going to be 998 characters long. And this makes it 998 long";
+      field = new UnstructuredField("Subject", value);
+      const lines = (field.encoded() as string).split("\r\n ");
+      for (const line of lines) expect(line.length).toBeLessThan(78);
+    });
+    it("should fold itself if it is 999 characters long", () => {
+      const value =
+        "This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. This is a subject header message that is going to be 999 characters long. And this makes it 999 long.";
+      field = new UnstructuredField("Subject", value);
+      const lines = (field.encoded() as string).split("\r\n ");
+      for (const line of lines) expect(line.length).toBeLessThan(78);
+    });
     it("should fold itself if it is non us-ascii", () => {
       const string =
         "This is あ really long string This is あ really long string This is あ really long string This is あ really long string This is あ really long string";

@@ -2,6 +2,8 @@ import "@blazetrails/vitest-matchers";
 import { describe, expect, it } from "vitest";
 import { Encoding, unpack1 } from "@blazetrails/ruby-compat";
 import { Encodings } from "../lib/encodings.js";
+import type { Field } from "../lib/field.js";
+import { Mail } from "../lib/mail.js";
 import { Base64 } from "../lib/encodings/base64.js";
 import { QuotedPrintable } from "../lib/encodings/quoted-printable.js";
 import "../lib/index.js";
@@ -861,4 +863,50 @@ describe(".collapse_adjacent_encodings", () => {
       ).toEqual(["=?iso-2022-jp?B?X=?=", "=?utf-8?Q?Y=?="]);
     }
   });
+});
+describe("Q encodings", () => {
+  it("should not fold a long string that has no spaces", () => {
+    const original = "ВосстановлениеВосстановлениеВашегопароля";
+    const result =
+      "Subject: =?UTF-8?Q?=D0=92=D0=BE=D1=81=D1=81=D1=82=D0=B0=D0=BD=D0=BE=D0=B2=D0=BB=D0=B5=D0=BD=D0=B8=D0=B5=D0=92=D0=BE=D1=81=D1=81=D1=82=D0=B0=D0=BD=D0=BE=D0=B2=D0=BB=D0=B5=D0=BD=D0=B8=D0=B5=D0=92=D0=B0=D1=88=D0=B5=D0=B3=D0=BE=D0=BF=D0=B0=D1=80=D0=BE=D0=BB=D1=8F?=\r\n";
+    const mail = Mail.new();
+    mail.setSubject(original);
+    expect((mail.get("subject") as Field).decoded()).toEqual(original);
+    expect((mail.get("subject") as Field).encoded()).toEqual(result);
+  });
+});
+describe("Q encodings", () => {
+  it("should round trip a complex string properly", () => {
+    const original =
+      "ВосстановлениеВосстановлениеВашегопароля This is a NUT?????Z__string that== could (break) anything";
+    const result =
+      "Subject: =?UTF-8?Q?=D0=92=D0=BE=D1=81=D1=81=D1=82=D0=B0=D0=BD=D0=BE=D0=B2=D0=BB=D0=B5=D0=BD=D0=B8=D0=B5=D0=92=D0=BE=D1=81=D1=81=D1=82=D0=B0=D0=BD=D0=BE=D0=B2=D0=BB=D0=B5=D0=BD=D0=B8=D0=B5=D0=92=D0=B0=D1=88=D0=B5=D0=B3=D0=BE=D0=BF=D0=B0=D1=80=D0=BE=D0=BB=D1=8F?=\r\n =?UTF-8?Q?_This_is_a_NUT=3F=3F=3F=3F=3FZ=5F=5Fstring_that=3D=3D_could?=\r\n =?UTF-8?Q?_=28break=29_anything?=\r\n";
+    let mail = Mail.new();
+    mail.setSubject(original);
+    expect((mail.get("subject") as Field).decoded()).toEqual(original);
+    expect((mail.get("subject") as Field).encoded()).toEqual(result);
+    mail = Mail.new(mail.encoded());
+    expect((mail.get("subject") as Field).decoded()).toEqual(original);
+    expect((mail.get("subject") as Field).encoded()).toEqual(result);
+    mail = Mail.new(mail.encoded());
+    expect((mail.get("subject") as Field).decoded()).toEqual(original);
+    expect((mail.get("subject") as Field).encoded()).toEqual(result);
+  });
+});
+describe("Q encodings", () => {
+  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either"
+  it.skip("should round trip another complex string (koi-8)", () => {
+    const original = "Слово 9999 и число";
+    const mail = Mail.new();
+    mail.setSubject(original);
+    (mail.get("subject") as Field).field.charset = "koi8-r";
+    const wrapped = (
+      (mail.get("subject") as Field).field as unknown as { wrappedValue(): string }
+    ).wrappedValue();
+    const unwrapped = Encodings.valueDecode(wrapped);
+    expect(unwrapped.replace("Subject: ", "")).toEqual(original);
+  });
+});
+describe("decoding a string and detecting the encoding type", () => {
+  it.skip("should handle a very long string efficiently", () => {});
 });

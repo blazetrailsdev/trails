@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { TypeError } from "./type-error.js";
 
 const ROWS: readonly [name: string, decoderLabel: string | null, aliases: string[]][] = [
   ["ASCII-8BIT", null, ["BINARY"]],
@@ -252,6 +253,7 @@ export class Encoding {
    */
   static find(enc: string | Encoding): Encoding | null {
     if (enc instanceof Encoding) return enc;
+    if (enc == null) throw new TypeError("no implicit conversion of nil into String");
     const key = String(enc).toLowerCase();
     if (!Encoding.#registry.has(key)) {
       throw new ArgumentError(`unknown encoding name - ${String(enc)}`);
