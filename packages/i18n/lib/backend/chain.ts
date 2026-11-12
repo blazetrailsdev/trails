@@ -1,4 +1,11 @@
-import { Hash, hashAref, kernelCatch, kernelThrow, rbObjDup } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  hashAref,
+  include,
+  kernelCatch,
+  kernelThrow,
+  rbObjDup,
+} from "@blazetrails/ruby-compat";
 import { MissingTranslation } from "../exceptions.js";
 import { EMPTY_HASH, type Locale, type TranslationKey } from "../i18n.js";
 import { deepMergeBang, except, type TranslationData } from "../utils.js";
@@ -139,15 +146,4 @@ export class Chain {
   }
 }
 
-class _ChainProbe extends Base {}
-for (const source of [Base.prototype, new _ChainProbe()]) {
-  for (const key of Object.getOwnPropertyNames(source)) {
-    if (key === "constructor") continue;
-    if (Object.hasOwn(Chain.prototype, key)) continue;
-    Object.defineProperty(
-      Chain.prototype,
-      key,
-      Object.getOwnPropertyDescriptor(source, key) as PropertyDescriptor,
-    );
-  }
-}
+include(Chain, Base);

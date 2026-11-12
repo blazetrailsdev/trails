@@ -2,6 +2,7 @@ import {
   Hash,
   TypeError,
   hashAref,
+  include,
   isModuleObject,
   isSymbol,
   rbInspect,
@@ -186,18 +187,7 @@ export class KeyValue {
   }
 }
 
-class _KeyValueProbe extends Base {}
-for (const source of [Base.prototype, new _KeyValueProbe()]) {
-  for (const key of Object.getOwnPropertyNames(source)) {
-    if (key === "constructor") continue;
-    if (Object.hasOwn(KeyValue.prototype, key)) continue;
-    Object.defineProperty(
-      KeyValue.prototype,
-      key,
-      Object.getOwnPropertyDescriptor(source, key) as PropertyDescriptor,
-    );
-  }
-}
+include(KeyValue, Base);
 
 export class SubtreeProxy {
   #masterKey: string;
