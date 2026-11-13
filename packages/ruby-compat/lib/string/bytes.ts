@@ -63,7 +63,7 @@ export function sequenceLength(b: ArrayLike<number>, i: number): number {
  * describes.
  *
  * @noRailsEquivalent PERMANENT
- * @perf 20x — PERMANENT
+ * @perf 10x — PERMANENT
  */
 export function strNew(b: number[] | Uint8Array): string {
   if (b instanceof Uint8Array) {

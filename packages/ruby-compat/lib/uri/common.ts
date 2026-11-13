@@ -290,7 +290,7 @@ export class URI {
    * `force_encoding` is its UTF-8 arm (CLAUDE.md, "A String has no encoding tag
    * either"), so a byte that is not well-formed UTF-8 is carried, not raised on.
    *
-   * @perf 30x — PERMANENT
+   * @perf 4x — PERMANENT
    */
   private static _decodeUriComponent(regexp: RegExp, str: string, _enc: Encoding): string {
     if (/%(?![0-9a-fA-F]{2})/.test(str)) throw new ArgumentError(`invalid %-encoding (${str})`);

@@ -16,7 +16,7 @@ import { bytes } from "./bytes.js";
  * @noRailsEquivalent PERMANENT — Ruby core `String#b`
  * (`vendor/ruby/v3.3.11/string.c:10955` `rb_str_b`).
  *
- * @perf 10x — PERMANENT
+ * @perf 18x — PERMANENT
  */
 export function b(str: string | Uint8Array): Uint8Array {
   if (Array.isArray(str)) throw new NoMethodError("undefined method 'b' for an instance of Array");
