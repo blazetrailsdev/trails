@@ -11,7 +11,23 @@ import { Timeout } from "../timeout.js";
 import type { HTTP as URIHTTP } from "../uri/http.js";
 import { Net, OpenTimeout, ReadTimeout } from "./protocol.js";
 import type { HTTPRequest } from "./http/request.js";
-import { Post } from "./http/requests.js";
+import {
+  Get,
+  Head,
+  Post,
+  Put,
+  Delete,
+  Options,
+  Trace,
+  Patch,
+  Propfind,
+  Proppatch,
+  Mkcol,
+  Copy,
+  Move,
+  Lock,
+  Unlock,
+} from "./http/requests.js";
 import { HTTPResponse } from "./http/response.js";
 import { HTTPInformation } from "./http/responses.js";
 
@@ -24,7 +40,35 @@ import { HTTPInformation } from "./http/responses.js";
  */
 export class HTTP {
   /** @noRailsEquivalent PERMANENT */
+  static Get = Get;
+  /** @noRailsEquivalent PERMANENT */
+  static Head = Head;
+  /** @noRailsEquivalent PERMANENT */
   static Post = Post;
+  /** @noRailsEquivalent PERMANENT */
+  static Put = Put;
+  /** @noRailsEquivalent PERMANENT */
+  static Delete = Delete;
+  /** @noRailsEquivalent PERMANENT */
+  static Options = Options;
+  /** @noRailsEquivalent PERMANENT */
+  static Trace = Trace;
+  /** @noRailsEquivalent PERMANENT */
+  static Patch = Patch;
+  /** @noRailsEquivalent PERMANENT */
+  static Propfind = Propfind;
+  /** @noRailsEquivalent PERMANENT */
+  static Proppatch = Proppatch;
+  /** @noRailsEquivalent PERMANENT */
+  static Mkcol = Mkcol;
+  /** @noRailsEquivalent PERMANENT */
+  static Copy = Copy;
+  /** @noRailsEquivalent PERMANENT */
+  static Move = Move;
+  /** @noRailsEquivalent PERMANENT */
+  static Lock = Lock;
+  /** @noRailsEquivalent PERMANENT */
+  static Unlock = Unlock;
 
   /** @noRailsEquivalent PERMANENT */
   static readonly HTTPVersion = "1.1";
@@ -180,6 +224,29 @@ export class HTTP {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  async get(
+    path: string | URIHTTP,
+    initheader: Record<string, string> | null = null,
+    dest: unknown = null,
+  ): Promise<HTTPResponse> {
+    let res: HTTPResponse | null = null;
+
+    await this.request(new Get(path, initheader), null, (r) => {
+      r.readBody(dest);
+      res = r;
+    });
+    return res!;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async head(
+    path: string | URIHTTP,
+    initheader: Record<string, string> | null = null,
+  ): Promise<HTTPResponse> {
+    return this.request(new Head(path, initheader));
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   async post(
     path: string | URIHTTP,
     data: string | Uint8Array,
@@ -187,6 +254,24 @@ export class HTTP {
     dest: unknown = null,
   ): Promise<HTTPResponse> {
     return this.sendEntity(path, data, initheader, dest, Post);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async requestGet(
+    path: string | URIHTTP,
+    initheader: Record<string, string> | null = null,
+    block?: (res: HTTPResponse) => unknown,
+  ): Promise<HTTPResponse> {
+    return this.request(new Get(path, initheader), null, block);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async requestHead(
+    path: string | URIHTTP,
+    initheader: Record<string, string> | null = null,
+    block?: (res: HTTPResponse) => unknown,
+  ): Promise<HTTPResponse> {
+    return this.request(new Head(path, initheader), null, block);
   }
 
   /** @noRailsEquivalent PERMANENT */

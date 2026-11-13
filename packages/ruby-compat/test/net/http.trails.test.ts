@@ -199,4 +199,31 @@ describe("Net::HTTP", () => {
     expect(error).toBeInstanceOf(Net.ReadTimeout);
     expect((error as Error).message).toBe("Net::ReadTimeout");
   });
+  it("retries an idempotent GET once on a dropped connection and not a POST", async () => {
+    let connections = 0;
+    const port = await listen(
+      createNetServer((socket) => {
+        connections += 1;
+        socket.once("data", () => {
+          if (connections === 1 || connections === 3) socket.destroy();
+          else socket.end("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\nok");
+        });
+      }),
+    );
+    const response = await new Net.HTTP("127.0.0.1", port).get("/");
+    expect(connections).toBe(2);
+    expect(response.code).toBe("200");
+    expect(new TextDecoder().decode(response.body!)).toBe("ok");
+
+    const error = await new Net.HTTP("127.0.0.1", port).post("/", "").catch((e: unknown) => e);
+    expect(connections).toBe(3);
+    expect(error).toBeInstanceOf(Error);
+  });
+
+  it("head answers a response without a body", async () => {
+    const port = await listen(createServer((_req, res) => res.end("ignored")));
+    const response = await new Net.HTTP("127.0.0.1", port).head("/");
+    expect(response.code).toBe("200");
+    expect(response.body).toBeNull();
+  });
 });
