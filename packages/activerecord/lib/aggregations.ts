@@ -27,7 +27,7 @@ function clearAggregationCache(this: AggregationsHost): void {
 type ComposedOfOptions = {
   className?: string;
   mapping?: [string, string][] | [string, string];
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- an own `constructor` key must accept what `Object.prototype.constructor` types as `Function`
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
   constructor?: Function | string;
   converter?: ((value: unknown) => unknown) | string;
   allowNil?: boolean;
