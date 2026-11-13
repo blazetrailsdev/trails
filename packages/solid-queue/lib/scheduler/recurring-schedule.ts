@@ -37,6 +37,7 @@ export class RecurringSchedule {
     }
   }
 
+  /** @missingRailsArgs schedule — CONVERGEABLE solid-queue-recurring-schedule-v1-7-2 */
   scheduleTask(task: RecurringTask, { runAt = task.nextTime() }: { runAt?: Time } = {}): void {
     this.scheduledTasks.set(task.key, this.schedule(task, { runAt }));
   }
