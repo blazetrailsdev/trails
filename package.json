@@ -139,6 +139,7 @@
     "test:assertions:ratchet": "pnpm parity:test:assertions",
     "test:stubs": "pnpm parity:test:stubs",
     "vendor:fetch": "pnpm tsx vendor/fetch.ts",
+    "vendor:mirrors": "pnpm tsx scripts/vendor-mirrors.ts",
     "vendor:recite": "pnpm tsx scripts/vendor-recite.ts"
   },
   "devDependencies": {

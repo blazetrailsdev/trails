@@ -21,5 +21,12 @@
   },
   "devDependencies": {
     "@types/node": "25.3.5"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "rack-session",
+      "ref": "v2.1.0",
+      "sha": "8a021430d2238cc7a0a3b5dfcc8fe44c43b984ce"
+    }
+  ]
 }

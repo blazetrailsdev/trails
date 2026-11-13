@@ -53,5 +53,12 @@
     "@blazetrails/vitest-matchers": "workspace:*",
     "@rails/actioncable": "8.0.200",
     "ioredis": "^6.0.0"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "rails",
+      "ref": "v8.0.2",
+      "sha": "3235827585d87661942c91bc81f64f56d710f0b2"
+    }
+  ]
 }

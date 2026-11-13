@@ -44,5 +44,12 @@
     "@blazetrails/vitest-matchers": "workspace:*",
     "@types/smtp-server": "^3.5.13",
     "smtp-server": "^3.21.2"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "mail",
+      "ref": "2.8.1",
+      "sha": "b6b6cb737d47a85ddc720fda0e6b991e99224848"
+    }
+  ]
 }

@@ -30,5 +30,22 @@
   },
   "engines": {
     "node": ">=26"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "crass",
+      "ref": "v1.0.6",
+      "sha": "87f642e80670dc1093eddf4d3a93cbd40a9551c6"
+    },
+    {
+      "source": "loofah",
+      "ref": "v2.24.0",
+      "sha": "85990602c6fdb40489138e80080ca508200c7137"
+    },
+    {
+      "source": "rails-html-sanitizer",
+      "ref": "v1.6.2",
+      "sha": "9160d49020b57828ea536ffedc9cac8fef98ee59"
+    }
+  ]
 }

@@ -123,5 +123,27 @@
   },
   "engines": {
     "node": ">=26"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "mysql2",
+      "ref": "0.5.6",
+      "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
+    },
+    {
+      "source": "pg",
+      "ref": "v1.5.9",
+      "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"
+    },
+    {
+      "source": "rails",
+      "ref": "v8.0.2",
+      "sha": "3235827585d87661942c91bc81f64f56d710f0b2"
+    },
+    {
+      "source": "sqlite3",
+      "ref": "v2.6.0",
+      "sha": "2724f7bd84db6b4f403b15e8a49cba39fa99b59a"
+    }
+  ]
 }

@@ -37,5 +37,12 @@
     "@types/nodemailer": "^8.0.2",
     "@types/smtp-server": "^3.5.13",
     "smtp-server": "^3.21.2"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "net-smtp",
+      "ref": "v0.5.1",
+      "sha": "a0075eb8a74910bd05566f0a208589263bce7597"
+    }
+  ]
 }

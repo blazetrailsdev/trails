@@ -23,5 +23,12 @@
   },
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "erubi",
+      "ref": "1.13.1",
+      "sha": "f1a0fb5bfb2a2604c0cf850d3c960bfc458421b6"
+    }
+  ]
 }

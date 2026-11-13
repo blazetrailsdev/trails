@@ -709,6 +709,14 @@ jobs:
           pnpm install --frozen-lockfile --prefer-offline
           pnpm vitest run scripts/vendor-citations.test.ts
 
+      - name: Package mirrors fields
+        id: vendor-mirrors
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm tsx scripts/vendor-mirrors.ts --check
+
       - name: ActiveRecord cast count
         id: ar-cast-count
         if: ${{ !cancelled() }}

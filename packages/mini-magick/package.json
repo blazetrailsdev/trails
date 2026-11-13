@@ -33,5 +33,12 @@
   },
   "devDependencies": {
     "@blazetrails/vitest-matchers": "workspace:*"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "mini_magick",
+      "ref": "v5.2.0",
+      "sha": "34433dc21cd4df544b33e67c111ff0ea36312d34"
+    }
+  ]
 }

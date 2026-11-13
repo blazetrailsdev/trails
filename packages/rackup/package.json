@@ -26,5 +26,12 @@
   "devDependencies": {
     "@blazetrails/vitest-matchers": "workspace:*",
     "@types/node": "25.3.5"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "rackup",
+      "ref": "v2.2.1",
+      "sha": "e9814d3b5a55fd0134369ddfdefd90f1a9a0e6b9"
+    }
+  ]
 }

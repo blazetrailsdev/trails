@@ -25,5 +25,12 @@
   },
   "engines": {
     "node": ">=26"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "msgpack",
+      "ref": "v1.8.0",
+      "sha": "e4305b4b8a2506422bc78b6fab624907eb7e74a5"
+    }
+  ]
 }
