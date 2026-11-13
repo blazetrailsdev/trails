@@ -68,10 +68,7 @@ export class RecurringSchedule {
     this.configuredTasks = await RecurringTask.where({ key: this.taskKeys() }).toArray();
   }
 
-  /**
-   * @internal
-   * @inventedArm runAt — CONVERGEABLE solid-queue-recurring-schedule-v1-7-2
-   */
+  /** @internal */
   schedule(task: RecurringTask, runAt: Time = task.nextTime()): ScheduledTask {
     const delay = Math.max(Number(runAt.minus(Time.current() as Time)), 0.1);
 

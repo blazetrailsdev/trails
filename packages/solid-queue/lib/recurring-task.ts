@@ -97,7 +97,7 @@ export class RecurringTask extends Record {
     return Math.max(Number(this.nextTime().minus(Time.current() as Time)), 0);
   }
 
-  /** @inventedArm nextTimeAfter — CONVERGEABLE solid-queue-recurring-schedule-v1-7-2 */
+  /** @noRailsEquivalent CONVERGEABLE solid-queue-recurring-schedule-v1-7-2 */
   nextTimeAfter(time: Time): Time {
     return (this.parsedSchedule() as Cron).nextTime(time).utc();
   }
