@@ -197,6 +197,13 @@ export class Thread<R = unknown> {
   constructor(...argsAndBlock: [...args: unknown[], block: (...args: never[]) => R]) {
     const block = argsAndBlock.pop() as (...args: unknown[]) => R;
     const args = argsAndBlock;
+    const report = (error: unknown): void => {
+      if (!this.reportOnException) return;
+      stderr.write(
+        `${this.toString()} terminated with exception (report_on_exception is true):\n` +
+          `${error instanceof Error ? (error.stack ?? String(error)) : String(error)}\n`,
+      );
+    };
     this.id = ++_threadIdCounter;
     _threads.add(this as Thread);
     this.status = "run";
@@ -207,7 +214,7 @@ export class Thread<R = unknown> {
       this.#error = { raised: error };
       this.status = "dead";
       _threads.delete(this as Thread);
-      this.#report(error);
+      report(error);
       if (this.abortOnException) this.#abort(error);
       return;
     }
@@ -219,21 +226,13 @@ export class Thread<R = unknown> {
       };
       (value as PromiseLike<unknown>).then(die, (error) => {
         die();
-        this.#report(error);
+        report(error);
         if (this.abortOnException) this.#abort(error);
       });
     } else {
       this.status = "dead";
       _threads.delete(this as Thread);
     }
-  }
-
-  #report(error: unknown): void {
-    if (!this.reportOnException) return;
-    stderr.write(
-      `${this.toString()} terminated with exception (report_on_exception is true):\n` +
-        `${error instanceof Error ? (error.stack ?? String(error)) : String(error)}\n`,
-    );
   }
 
   #abort(error: unknown): void {
