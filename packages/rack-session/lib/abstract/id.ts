@@ -13,6 +13,7 @@ import {
   rbProcCall,
   hashAref,
 } from "@blazetrails/ruby-compat";
+import { Time } from "@blazetrails/date";
 import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
 import { RACK_ERRORS, Request, Raw } from "@blazetrails/rack";
 import { RACK_SESSION, RACK_SESSION_OPTIONS } from "../constants.js";
@@ -531,15 +532,9 @@ export class Persisted {
       const cookie: Record<string, unknown> = {};
       cookie["value"] = this.cookieValue(data);
       const expireAfter = hashAref(options, "expireAfter");
-      if (isTruthy(expireAfter)) {
-        // boundary: `Time.now + options[:expire_after]` is an ABSOLUTE expiry
-        cookie["expires"] = new Date(Date.now() + (expireAfter as number) * 1000);
-      }
+      if (isTruthy(expireAfter)) cookie["expires"] = Time.now().plus(expireAfter as number);
       const maxAge = hashAref(options, "maxAge");
-      if (isTruthy(maxAge)) {
-        // boundary: as above (`abstract/id.rb:404`).
-        cookie["expires"] = new Date(Date.now() + (maxAge as number) * 1000);
-      }
+      if (isTruthy(maxAge)) cookie["expires"] = Time.now().plus(maxAge as number);
 
       cookie["sameSite"] =
         typeof this.sameSite === "function"

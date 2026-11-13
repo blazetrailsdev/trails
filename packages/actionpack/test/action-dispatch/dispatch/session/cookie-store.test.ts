@@ -421,8 +421,7 @@ describe("CookieStoreTest", () => {
     });
   });
 
-  // BLOCKED: rack-session-commit-session-expiry-reads-time-now
-  it.skip("session store with expire after", async ({ testCase }) => {
+  it("session store with expire after", async ({ testCase }) => {
     const t = testCase as CookieStoreTest;
     t.cookieOptions({ expireAfter: Duration.hours(5) });
 
@@ -456,10 +455,7 @@ describe("CookieStoreTest", () => {
     });
   });
 
-  // BLOCKED: rack-session-commit-session-expiry-reads-time-now
-  it.skip("session store with expire after does not accept expired session", async ({
-    testCase,
-  }) => {
+  it("session store with expire after does not accept expired session", async ({ testCase }) => {
     const t = testCase as CookieStoreTest;
     t.cookieOptions({ expireAfter: Duration.hours(5) });
 
