@@ -176,13 +176,13 @@ describe("TCDataSource", () => {
     const linkedIdentifiers = ["Test/Bbb"];
     const ds = new GetTimezoneIdentifiersTestDataSource(dataIdentifiers, linkedIdentifiers);
     const result = ds.timezoneIdentifiers();
-    expect(Array.isArray(result)).toBe(true);
+    expect(result).toBeInstanceOf(Array);
     expect(result).toEqual(["Test/Aaa", "Test/Bbb", "Test/Ccc"]);
     expect(result[0]).toBe(dataIdentifiers[0]);
     expect(result[1]).toBe(linkedIdentifiers[0]);
     expect(result[2]).toBe(dataIdentifiers[1]);
-    expect(Object.isFrozen(result)).toBe(true);
-    expect(result.every((i) => Object.isFrozen(i))).toBe(true);
+    expect(Object.isFrozen(result)).toBeTruthy();
+    expect(result.every((i) => Object.isFrozen(i))).toBeTruthy();
     expect(ds.dataTimezoneIdentifiersCalled).toBe(1);
     expect(ds.linkedTimezoneIdentifiersCalled).toBe(1);
   });

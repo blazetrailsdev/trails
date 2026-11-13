@@ -36,7 +36,7 @@ describe("TCLinkedTimezoneInfo", () => {
   it("link to identifier", () => {
     const lti = new LinkedTimezoneInfo("Test/Zone", "Test/Linked");
     expect(lti.linkToIdentifier).toBe("Test/Linked");
-    expect(Object.isFrozen(lti.linkToIdentifier)).toBe(true);
+    expect(Object.isFrozen(lti.linkToIdentifier)).toBeTruthy();
   });
 
   // PERMANENT-SKIP: CLAUDE.md § "Ruby Strings are JS string primitives (no mutable String carrier)"

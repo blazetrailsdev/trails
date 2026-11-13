@@ -18,7 +18,7 @@ describe("TCConstantOffsetDataTimezoneInfo", () => {
 
     expect(i.identifier).toBe(identifier);
     expect(i.constantOffset).toBe(offset);
-    expect(Object.isFrozen(identifier)).toBe(true);
+    expect(Object.isFrozen(identifier)).toBeTruthy();
   });
 
   it("initialize nil identifier", () => {

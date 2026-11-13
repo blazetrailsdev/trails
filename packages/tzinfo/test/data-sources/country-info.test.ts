@@ -60,7 +60,7 @@ describe("TCCountryInfo", () => {
     const value = ci.zones;
     expect(value).toEqual([]);
     expect(value).toBe(zones);
-    expect(Object.isFrozen(value)).toBe(true);
+    expect(Object.isFrozen(value)).toBeTruthy();
   });
 
   // BLOCKED: tzinfo-country-and-country-timezone

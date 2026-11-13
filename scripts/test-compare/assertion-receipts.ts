@@ -26,6 +26,7 @@ import { rake } from "./assertion-receipts/rake.js";
 import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
 import { solidQueue } from "./assertion-receipts/solid-queue.js";
 import { trailties } from "./assertion-receipts/trailties.js";
+import { tzinfo } from "./assertion-receipts/tzinfo.js";
 import { zeitwerk } from "./assertion-receipts/zeitwerk.js";
 
 /** One Rails assertion the port cannot make. */
@@ -69,6 +70,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   "ruby-compat": rubyCompat,
   "solid-queue": solidQueue,
   trailties,
+  tzinfo,
   zeitwerk,
 };
 
