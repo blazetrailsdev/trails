@@ -48,7 +48,6 @@ export class Entry extends Record {
     return (await this.readMulti([key])).get(key);
   }
 
-  /** @inventedArm decode — CONVERGEABLE solid-cache-store-keys-are-binary */
   static async readMulti(keys: string[]): Promise<Map<string, unknown>> {
     return await this.withoutQueryCache(async () => {
       const results = new Map<string, unknown>();
@@ -79,7 +78,6 @@ export class Entry extends Record {
     return await this.withoutQueryCache(() => this.inBatches().deleteAll());
   }
 
-  /** @inventedArm decode — CONVERGEABLE solid-cache-store-keys-are-binary */
   static async lockAndWrite(
     key: string,
     block: (value: unknown) => unknown | Promise<unknown>,
