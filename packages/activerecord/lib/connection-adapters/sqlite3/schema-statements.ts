@@ -25,6 +25,8 @@ import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
 import { quoteTableName } from "./quoting.js";
 import { Base } from "../../base.js";
+import { ConnectionAdapters } from "../../namespaces.js";
+import * as SchemaStatements from "./schema-statements.js";
 
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
   /** @internal */
@@ -383,3 +385,5 @@ export function extractGeneratedType(
       return undefined;
   }
 }
+
+ConnectionAdapters.SQLite3.SchemaStatements = SchemaStatements;

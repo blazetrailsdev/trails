@@ -12,6 +12,7 @@ import * as m8 from "./locale.js";
 import * as m9 from "./locale/fallbacks.js";
 import * as m10 from "./locale/tag/rfc4646.js";
 import * as m11 from "./locale/tag/simple.js";
+import * as m12 from "./utils.js";
 
 defineConstants([
   [() => m7.ArgumentError, "I18n::ArgumentError"],
@@ -42,4 +43,5 @@ defineConstants([
   [() => m7.ReservedInterpolationKey, "I18n::ReservedInterpolationKey"],
   [() => m7.UnknownFileType, "I18n::UnknownFileType"],
   [() => m7.UnsupportedMethod, "I18n::UnsupportedMethod"],
+  [() => m12, "I18n::Utils"],
 ]);

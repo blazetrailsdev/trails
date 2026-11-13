@@ -3,6 +3,8 @@ import {
   Notifications,
   type NotificationEvent,
 } from "@blazetrails/activesupport";
+import { ActiveRecord } from "./namespaces.js";
+import * as RuntimeRegistry from "./runtime-registry.js";
 
 export function sqlRuntime(): number {
   return (
@@ -87,3 +89,5 @@ Notifications.monotonicSubscribe("sql.active_record", (event: NotificationEvent)
   }
   setSqlRuntime(sqlRuntime() + runtime);
 });
+
+ActiveRecord.RuntimeRegistry = RuntimeRegistry;

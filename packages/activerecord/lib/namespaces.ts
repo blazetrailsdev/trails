@@ -271,6 +271,11 @@ export const ActiveRecord = {
   Sanitization: typeof import("./sanitization.js");
   SecureToken: typeof import("./secure-token.js");
   Store: typeof import("./store.js");
+  Querying: typeof import("./querying.js");
+  RuntimeRegistry: typeof import("./runtime-registry.js");
+  SecurePassword: typeof import("./secure-password.js");
+  Serialization: typeof import("./serialization.js");
+  Suppressor: typeof import("./suppressor.js");
   Trailties: { name: string };
   Railtie?: unknown;
   Validations: typeof Validations;
@@ -516,7 +521,13 @@ export const ConnectionAdapters = {
       Xml: typeof OIDXml;
     };
   };
-  SQLite3: { name: string; Column: typeof SQLite3Column };
+  SQLite3: {
+    name: string;
+    Column: typeof SQLite3Column;
+    DatabaseStatements: typeof import("./connection-adapters/sqlite3/database-statements.js");
+    Quoting: typeof import("./connection-adapters/sqlite3/quoting.js");
+    SchemaStatements: typeof import("./connection-adapters/sqlite3/schema-statements.js");
+  };
   AbstractAdapter: typeof AbstractAdapter;
   BetterSQLite3Adapter: typeof BetterSQLite3Adapter;
   SQLite3Adapter: typeof SQLite3Adapter;

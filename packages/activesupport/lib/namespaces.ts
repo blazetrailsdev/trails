@@ -52,6 +52,7 @@ export const ActiveSupport = {
     SetupAndTeardown?: typeof import("./testing/setup-and-teardown.js");
   };
   XmlMini: typeof import("./xml-mini.js");
+  LazyLoadHooks: typeof import("./lazy-load-hooks.js");
   BroadcastLogger: typeof BroadcastLogger;
   Duration: typeof Duration;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;

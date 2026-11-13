@@ -83,6 +83,7 @@ export { Fallbacks as LocaleFallbacks, Tag } from "./locale.js";
 export type { FallbackMappings } from "./locale.js";
 export { deepMerge, deepMergeBang, deepSymbolizeKeys, except } from "./utils.js";
 export type { TranslationData } from "./utils.js";
+export * as Utils from "./utils.js";
 
 import "./constants.generated.js";
 

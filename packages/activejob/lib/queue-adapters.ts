@@ -13,6 +13,8 @@ QueueAdapters.autoload("TestAdapter");
 
 const ADAPTER = "Adapter";
 
+export { QueueAdapters };
+
 export function lookup(name: string): unknown {
   return constGet(QueueAdapters, camelize(String(name)) + ADAPTER);
 }

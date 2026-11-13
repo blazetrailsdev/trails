@@ -53,171 +53,180 @@ import * as m50 from "./callbacks.js";
 import * as m51 from "./coders/column-serializer.js";
 import * as m52 from "./coders/json.js";
 import * as m53 from "./coders/yaml-column.js";
-import * as m54 from "./connection-adapters/abstract-adapter.js";
-import * as m55 from "./connection-adapters/abstract/connection-handler.js";
-import * as m56 from "./connection-adapters/abstract/connection-pool.js";
-import * as m57 from "./connection-adapters/abstract/connection-pool/queue.js";
-import * as m58 from "./connection-adapters/abstract/connection-pool/reaper.js";
-import * as m59 from "./connection-adapters/abstract/database-statements.js";
-import * as m60 from "./connection-adapters/abstract/query-cache.js";
-import * as m61 from "./connection-adapters/abstract/quoting.js";
-import * as m62 from "./connection-adapters/abstract/savepoints.js";
-import * as m63 from "./connection-adapters/abstract/schema-creation.js";
-import * as m64 from "./connection-adapters/abstract/schema-definitions.js";
-import * as m65 from "./connection-adapters/abstract/schema-dumper.js";
-import * as m66 from "./connection-adapters/abstract/schema-statements.js";
-import * as m67 from "./connection-adapters/abstract/transaction.js";
-import * as m68 from "./connection-adapters/column.js";
-import * as m69 from "./connection-adapters/deduplicable.js";
-import * as m70 from "./connection-adapters/pool-config.js";
-import * as m71 from "./connection-adapters/pool-manager.js";
-import * as m72 from "./connection-adapters/postgresql/oid/range.js";
-import * as m73 from "./connection-adapters/schema-cache.js";
-import * as m74 from "./connection-adapters/sql-type-metadata.js";
-import * as m75 from "./connection-adapters/statement-pool.js";
-import * as m76 from "./connection-handling.js";
-import * as m77 from "./core.js";
-import * as m78 from "./counter-cache.js";
-import * as m79 from "./database-configurations.js";
-import * as m80 from "./database-configurations/connection-url-resolver.js";
-import * as m81 from "./database-configurations/database-config.js";
-import * as m82 from "./database-configurations/hash-config.js";
-import * as m83 from "./database-configurations/url-config.js";
-import * as m84 from "./disable-joins-association-relation.js";
-import * as m85 from "./dynamic-matchers.js";
-import * as m86 from "./encryption.js";
-import * as m87 from "./encryption/auto-filtered-parameters.js";
-import * as m88 from "./encryption/cipher.js";
-import * as m89 from "./encryption/cipher/aes256-gcm.js";
-import * as m90 from "./encryption/config.js";
-import * as m91 from "./encryption/configurable.js";
-import * as m92 from "./encryption/context.js";
-import * as m93 from "./encryption/contexts.js";
-import * as m94 from "./encryption/derived-secret-key-provider.js";
-import * as m95 from "./encryption/deterministic-key-provider.js";
-import * as m96 from "./encryption/encryptable-record.js";
-import * as m97 from "./encryption/encrypted-attribute-type.js";
-import * as m98 from "./encryption/encrypting-only-encryptor.js";
-import * as m99 from "./encryption/encryptor.js";
-import * as m100 from "./encryption/errors.js";
-import * as m101 from "./encryption/extended-deterministic-uniqueness-validator.js";
-import * as m102 from "./encryption/key-generator.js";
-import * as m103 from "./encryption/key-provider.js";
-import * as m104 from "./encryption/key.js";
-import * as m105 from "./encryption/message-serializer.js";
-import * as m106 from "./encryption/message.js";
-import * as m107 from "./encryption/null-encryptor.js";
-import * as m108 from "./encryption/properties.js";
-import * as m109 from "./encryption/scheme.js";
-import * as m110 from "./enum.js";
-import * as m111 from "./errors.js";
-import * as m112 from "./explain-registry.js";
-import * as m113 from "./explain-subscriber.js";
-import * as m114 from "./explain.js";
-import * as m115 from "./future-result.js";
-import * as m116 from "./gem-version.js";
-import * as m117 from "./inheritance.js";
-import * as m118 from "./insert-all.js";
-import * as m119 from "./integration.js";
-import * as m120 from "./internal-metadata.js";
-import * as m121 from "./legacy-yaml-adapter.js";
-import * as m122 from "./locking/optimistic.js";
-import * as m123 from "./locking/pessimistic.js";
-import * as m124 from "./log-subscriber.js";
-import * as m125 from "./marshalling.js";
-import * as m126 from "./middleware/database-selector.js";
-import * as m127 from "./middleware/database-selector/resolver.js";
-import * as m128 from "./middleware/database-selector/resolver/session.js";
-import * as m129 from "./middleware/shard-selector.js";
-import * as m130 from "./migration.js";
-import * as m131 from "./migration/command-recorder.js";
-import * as m132 from "./migration/compatibility.js";
-import * as m133 from "./migration/default-strategy.js";
-import * as m134 from "./migration/execution-strategy.js";
-import * as m135 from "./migration/pending-migration-connection.js";
-import * as m136 from "./model-schema.js";
-import * as m137 from "./nested-attributes.js";
-import * as m138 from "./no-touching.js";
-import * as m139 from "./normalization.js";
-import * as m140 from "./persistence.js";
-import * as m141 from "./query-cache.js";
-import * as m142 from "./query-logs-formatter.js";
-import * as m143 from "./query-logs.js";
-import * as m144 from "./readonly-attributes.js";
-import * as m145 from "./reflection.js";
-import * as m146 from "./relation.js";
-import * as m147 from "./relation/batches.js";
-import * as m148 from "./relation/batches/batch-enumerator.js";
-import * as m149 from "./relation/calculations.js";
-import * as m150 from "./relation/delegation.js";
-import * as m151 from "./relation/finder-methods.js";
-import * as m152 from "./relation/from-clause.js";
-import * as m153 from "./relation/merger.js";
-import * as m154 from "./relation/predicate-builder.js";
-import * as m155 from "./relation/predicate-builder/array-handler.js";
-import * as m156 from "./relation/predicate-builder/association-query-value.js";
-import * as m157 from "./relation/predicate-builder/basic-object-handler.js";
-import * as m158 from "./relation/predicate-builder/polymorphic-array-value.js";
-import * as m159 from "./relation/predicate-builder/range-handler.js";
-import * as m160 from "./relation/predicate-builder/relation-handler.js";
-import * as m161 from "./relation/query-attribute.js";
-import * as m162 from "./relation/query-methods.js";
-import * as m163 from "./relation/spawn-methods.js";
-import * as m164 from "./relation/where-clause.js";
-import * as m165 from "./result.js";
-import * as m166 from "./sanitization.js";
-import * as m167 from "./schema-dumper.js";
-import * as m168 from "./schema-migration.js";
-import * as m169 from "./schema.js";
-import * as m170 from "./scoping.js";
-import * as m171 from "./scoping/default.js";
-import * as m172 from "./scoping/named.js";
-import * as m173 from "./secure-token.js";
-import * as m174 from "./signed-id.js";
-import * as m175 from "./statement-cache.js";
-import * as m176 from "./store.js";
-import * as m177 from "./table-metadata.js";
-import * as m178 from "./tasks/database-tasks.js";
-import * as m179 from "./tasks/mysql-database-tasks.js";
-import * as m180 from "./tasks/postgresql-database-tasks.js";
-import * as m181 from "./tasks/sqlite-database-tasks.js";
-import * as m182 from "./timestamp.js";
-import * as m183 from "./token-for.js";
-import * as m184 from "./touch-later.js";
-import * as m185 from "./trailties/controller-runtime.js";
-import * as m186 from "./trailties/job-runtime.js";
-import * as m187 from "./transaction.js";
-import * as m188 from "./transactions.js";
-import * as m189 from "./translation.js";
-import * as m190 from "./type-caster/connection.js";
-import * as m191 from "./type-caster/map.js";
-import * as m192 from "./type.js";
-import * as m193 from "./type/adapter-specific-registry.js";
-import * as m194 from "./type/date-time.js";
-import * as m195 from "./type/date.js";
-import * as m196 from "./type/decimal-without-scale.js";
-import * as m197 from "./type/hash-lookup-type-map.js";
-import * as m198 from "./type/internal/timezone.js";
-import * as m199 from "./type/json.js";
-import * as m200 from "./type/serialized.js";
-import * as m201 from "./type/text.js";
-import * as m202 from "./type/time.js";
-import * as m203 from "./type/type-map.js";
-import * as m204 from "./type/unsigned-integer.js";
-import * as m205 from "./validations.js";
-import * as m206 from "./validations/absence.js";
-import * as m207 from "./validations/associated.js";
-import * as m208 from "./validations/length.js";
-import * as m209 from "./validations/numericality.js";
-import * as m210 from "./validations/presence.js";
-import * as m211 from "./validations/uniqueness.js";
+import * as m54 from "./connection-adapters.js";
+import * as m55 from "./connection-adapters/abstract-adapter.js";
+import * as m56 from "./connection-adapters/abstract/connection-handler.js";
+import * as m57 from "./connection-adapters/abstract/connection-pool.js";
+import * as m58 from "./connection-adapters/abstract/connection-pool/queue.js";
+import * as m59 from "./connection-adapters/abstract/connection-pool/reaper.js";
+import * as m60 from "./connection-adapters/abstract/database-statements.js";
+import * as m61 from "./connection-adapters/abstract/query-cache.js";
+import * as m62 from "./connection-adapters/abstract/quoting.js";
+import * as m63 from "./connection-adapters/abstract/savepoints.js";
+import * as m64 from "./connection-adapters/abstract/schema-creation.js";
+import * as m65 from "./connection-adapters/abstract/schema-definitions.js";
+import * as m66 from "./connection-adapters/abstract/schema-dumper.js";
+import * as m67 from "./connection-adapters/abstract/schema-statements.js";
+import * as m68 from "./connection-adapters/abstract/transaction.js";
+import * as m69 from "./connection-adapters/column.js";
+import * as m70 from "./connection-adapters/deduplicable.js";
+import * as m71 from "./connection-adapters/pool-config.js";
+import * as m72 from "./connection-adapters/pool-manager.js";
+import * as m73 from "./connection-adapters/postgresql/oid/range.js";
+import * as m74 from "./connection-adapters/schema-cache.js";
+import * as m75 from "./connection-adapters/sql-type-metadata.js";
+import * as m76 from "./connection-adapters/sqlite3/database-statements.js";
+import * as m77 from "./connection-adapters/sqlite3/quoting.js";
+import * as m78 from "./connection-adapters/sqlite3/schema-statements.js";
+import * as m79 from "./connection-adapters/statement-pool.js";
+import * as m80 from "./connection-handling.js";
+import * as m81 from "./core.js";
+import * as m82 from "./counter-cache.js";
+import * as m83 from "./database-configurations.js";
+import * as m84 from "./database-configurations/connection-url-resolver.js";
+import * as m85 from "./database-configurations/database-config.js";
+import * as m86 from "./database-configurations/hash-config.js";
+import * as m87 from "./database-configurations/url-config.js";
+import * as m88 from "./disable-joins-association-relation.js";
+import * as m89 from "./dynamic-matchers.js";
+import * as m90 from "./encryption.js";
+import * as m91 from "./encryption/auto-filtered-parameters.js";
+import * as m92 from "./encryption/cipher.js";
+import * as m93 from "./encryption/cipher/aes256-gcm.js";
+import * as m94 from "./encryption/config.js";
+import * as m95 from "./encryption/configurable.js";
+import * as m96 from "./encryption/context.js";
+import * as m97 from "./encryption/contexts.js";
+import * as m98 from "./encryption/derived-secret-key-provider.js";
+import * as m99 from "./encryption/deterministic-key-provider.js";
+import * as m100 from "./encryption/encryptable-record.js";
+import * as m101 from "./encryption/encrypted-attribute-type.js";
+import * as m102 from "./encryption/encrypting-only-encryptor.js";
+import * as m103 from "./encryption/encryptor.js";
+import * as m104 from "./encryption/errors.js";
+import * as m105 from "./encryption/extended-deterministic-uniqueness-validator.js";
+import * as m106 from "./encryption/key-generator.js";
+import * as m107 from "./encryption/key-provider.js";
+import * as m108 from "./encryption/key.js";
+import * as m109 from "./encryption/message-serializer.js";
+import * as m110 from "./encryption/message.js";
+import * as m111 from "./encryption/null-encryptor.js";
+import * as m112 from "./encryption/properties.js";
+import * as m113 from "./encryption/scheme.js";
+import * as m114 from "./enum.js";
+import * as m115 from "./errors.js";
+import * as m116 from "./explain-registry.js";
+import * as m117 from "./explain-subscriber.js";
+import * as m118 from "./explain.js";
+import * as m119 from "./future-result.js";
+import * as m120 from "./gem-version.js";
+import * as m121 from "./inheritance.js";
+import * as m122 from "./insert-all.js";
+import * as m123 from "./integration.js";
+import * as m124 from "./internal-metadata.js";
+import * as m125 from "./legacy-yaml-adapter.js";
+import * as m126 from "./locking/optimistic.js";
+import * as m127 from "./locking/pessimistic.js";
+import * as m128 from "./log-subscriber.js";
+import * as m129 from "./marshalling.js";
+import * as m130 from "./middleware/database-selector.js";
+import * as m131 from "./middleware/database-selector/resolver.js";
+import * as m132 from "./middleware/database-selector/resolver/session.js";
+import * as m133 from "./middleware/shard-selector.js";
+import * as m134 from "./migration.js";
+import * as m135 from "./migration/command-recorder.js";
+import * as m136 from "./migration/compatibility.js";
+import * as m137 from "./migration/default-strategy.js";
+import * as m138 from "./migration/execution-strategy.js";
+import * as m139 from "./migration/pending-migration-connection.js";
+import * as m140 from "./model-schema.js";
+import * as m141 from "./nested-attributes.js";
+import * as m142 from "./no-touching.js";
+import * as m143 from "./normalization.js";
+import * as m144 from "./persistence.js";
+import * as m145 from "./query-cache.js";
+import * as m146 from "./query-logs-formatter.js";
+import * as m147 from "./query-logs.js";
+import * as m148 from "./querying.js";
+import * as m149 from "./readonly-attributes.js";
+import * as m150 from "./reflection.js";
+import * as m151 from "./relation.js";
+import * as m152 from "./relation/batches.js";
+import * as m153 from "./relation/batches/batch-enumerator.js";
+import * as m154 from "./relation/calculations.js";
+import * as m155 from "./relation/delegation.js";
+import * as m156 from "./relation/finder-methods.js";
+import * as m157 from "./relation/from-clause.js";
+import * as m158 from "./relation/merger.js";
+import * as m159 from "./relation/predicate-builder.js";
+import * as m160 from "./relation/predicate-builder/array-handler.js";
+import * as m161 from "./relation/predicate-builder/association-query-value.js";
+import * as m162 from "./relation/predicate-builder/basic-object-handler.js";
+import * as m163 from "./relation/predicate-builder/polymorphic-array-value.js";
+import * as m164 from "./relation/predicate-builder/range-handler.js";
+import * as m165 from "./relation/predicate-builder/relation-handler.js";
+import * as m166 from "./relation/query-attribute.js";
+import * as m167 from "./relation/query-methods.js";
+import * as m168 from "./relation/spawn-methods.js";
+import * as m169 from "./relation/where-clause.js";
+import * as m170 from "./result.js";
+import * as m171 from "./runtime-registry.js";
+import * as m172 from "./sanitization.js";
+import * as m173 from "./schema-dumper.js";
+import * as m174 from "./schema-migration.js";
+import * as m175 from "./schema.js";
+import * as m176 from "./scoping.js";
+import * as m177 from "./scoping/default.js";
+import * as m178 from "./scoping/named.js";
+import * as m179 from "./secure-password.js";
+import * as m180 from "./secure-token.js";
+import * as m181 from "./serialization.js";
+import * as m182 from "./signed-id.js";
+import * as m183 from "./statement-cache.js";
+import * as m184 from "./store.js";
+import * as m185 from "./suppressor.js";
+import * as m186 from "./table-metadata.js";
+import * as m187 from "./tasks/database-tasks.js";
+import * as m188 from "./tasks/mysql-database-tasks.js";
+import * as m189 from "./tasks/postgresql-database-tasks.js";
+import * as m190 from "./tasks/sqlite-database-tasks.js";
+import * as m191 from "./timestamp.js";
+import * as m192 from "./token-for.js";
+import * as m193 from "./touch-later.js";
+import * as m194 from "./trailties/controller-runtime.js";
+import * as m195 from "./trailties/job-runtime.js";
+import * as m196 from "./transaction.js";
+import * as m197 from "./transactions.js";
+import * as m198 from "./translation.js";
+import * as m199 from "./type-caster/connection.js";
+import * as m200 from "./type-caster/map.js";
+import * as m201 from "./type.js";
+import * as m202 from "./type/adapter-specific-registry.js";
+import * as m203 from "./type/date-time.js";
+import * as m204 from "./type/date.js";
+import * as m205 from "./type/decimal-without-scale.js";
+import * as m206 from "./type/hash-lookup-type-map.js";
+import * as m207 from "./type/internal/timezone.js";
+import * as m208 from "./type/json.js";
+import * as m209 from "./type/serialized.js";
+import * as m210 from "./type/text.js";
+import * as m211 from "./type/time.js";
+import * as m212 from "./type/type-map.js";
+import * as m213 from "./type/unsigned-integer.js";
+import * as m214 from "./validations.js";
+import * as m215 from "./validations/absence.js";
+import * as m216 from "./validations/associated.js";
+import * as m217 from "./validations/length.js";
+import * as m218 from "./validations/numericality.js";
+import * as m219 from "./validations/presence.js";
+import * as m220 from "./validations/uniqueness.js";
 
 defineConstants([
-  [() => m111.ActiveRecordError, "ActiveRecord::ActiveRecordError"],
-  [() => m111.AdapterError, "ActiveRecord::AdapterError"],
-  [() => m111.AdapterNotFound, "ActiveRecord::AdapterNotFound"],
-  [() => m111.AdapterNotSpecified, "ActiveRecord::AdapterNotSpecified"],
-  [() => m111.AdapterTimeout, "ActiveRecord::AdapterTimeout"],
+  [() => m115.ActiveRecordError, "ActiveRecord::ActiveRecordError"],
+  [() => m115.AdapterError, "ActiveRecord::AdapterError"],
+  [() => m115.AdapterNotFound, "ActiveRecord::AdapterNotFound"],
+  [() => m115.AdapterNotSpecified, "ActiveRecord::AdapterNotSpecified"],
+  [() => m115.AdapterTimeout, "ActiveRecord::AdapterTimeout"],
   [() => m0.Aggregations, "ActiveRecord::Aggregations"],
   [() => m0.ClassMethods, "ActiveRecord::Aggregations::ClassMethods"],
   [
@@ -271,15 +280,15 @@ defineConstants([
   [() => m33.ThroughAssociation, "ActiveRecord::Associations::Preloader::ThroughAssociation"],
   [() => m34.SingularAssociation, "ActiveRecord::Associations::SingularAssociation"],
   [() => m35.ThroughAssociation, "ActiveRecord::Associations::ThroughAssociation"],
-  [() => m111.AssociationTypeMismatch, "ActiveRecord::AssociationTypeMismatch"],
+  [() => m115.AssociationTypeMismatch, "ActiveRecord::AssociationTypeMismatch"],
   [() => m36.AsynchronousQueriesTracker, "ActiveRecord::AsynchronousQueriesTracker"],
   [() => m36.Session, "ActiveRecord::AsynchronousQueriesTracker::Session"],
   [
-    () => m111.AsynchronousQueryInsideTransactionError,
+    () => m115.AsynchronousQueryInsideTransactionError,
     "ActiveRecord::AsynchronousQueryInsideTransactionError",
   ],
   [() => m37.AttributeAssignment, "ActiveRecord::AttributeAssignment"],
-  [() => m111.AttributeAssignmentError, "ActiveRecord::AttributeAssignmentError"],
+  [() => m115.AttributeAssignmentError, "ActiveRecord::AttributeAssignmentError"],
   [() => m39.BeforeTypeCast, "ActiveRecord::AttributeMethods::BeforeTypeCast"],
   [() => m38.ClassMethods, "ActiveRecord::AttributeMethods::ClassMethods"],
   [() => m40.CompositePrimaryKey, "ActiveRecord::AttributeMethods::CompositePrimaryKey"],
@@ -305,207 +314,211 @@ defineConstants([
   [() => m47.Write, "ActiveRecord::AttributeMethods::Write"],
   [() => m48.AutosaveAssociation, "ActiveRecord::AutosaveAssociation"],
   [() => m49.Base, "ActiveRecord::Base"],
-  [() => m147.Batches, "ActiveRecord::Batches"],
-  [() => m148.BatchEnumerator, "ActiveRecord::Batches::BatchEnumerator"],
-  [() => m149.Calculations, "ActiveRecord::Calculations"],
-  [() => m149.ColumnAliasTracker, "ActiveRecord::Calculations::ColumnAliasTracker"],
+  [() => m152.Batches, "ActiveRecord::Batches"],
+  [() => m153.BatchEnumerator, "ActiveRecord::Batches::BatchEnumerator"],
+  [() => m154.Calculations, "ActiveRecord::Calculations"],
+  [() => m154.ColumnAliasTracker, "ActiveRecord::Calculations::ColumnAliasTracker"],
   [() => m50.Callbacks, "ActiveRecord::Callbacks"],
   [() => m51.ColumnSerializer, "ActiveRecord::Coders::ColumnSerializer"],
   [() => m52.JSON, "ActiveRecord::Coders::JSON"],
   [() => m53.YAMLColumn, "ActiveRecord::Coders::YAMLColumn"],
   [() => m18.CompositePrimaryKeyMismatchError, "ActiveRecord::CompositePrimaryKeyMismatchError"],
-  [() => m130.ConcurrentMigrationError, "ActiveRecord::ConcurrentMigrationError"],
-  [() => m111.ConfigurationError, "ActiveRecord::ConfigurationError"],
-  [() => m54.AbstractAdapter, "ActiveRecord::ConnectionAdapters::AbstractAdapter"],
-  [() => m54.Version, "ActiveRecord::ConnectionAdapters::AbstractAdapter::Version"],
-  [() => m64.AddColumnDefinition, "ActiveRecord::ConnectionAdapters::AddColumnDefinition"],
-  [() => m64.AlterTable, "ActiveRecord::ConnectionAdapters::AlterTable"],
-  [() => m73.BoundSchemaReflection, "ActiveRecord::ConnectionAdapters::BoundSchemaReflection"],
-  [() => m73.FakePool, "ActiveRecord::ConnectionAdapters::BoundSchemaReflection::FakePool"],
+  [() => m134.ConcurrentMigrationError, "ActiveRecord::ConcurrentMigrationError"],
+  [() => m115.ConfigurationError, "ActiveRecord::ConfigurationError"],
+  [() => m54.ConnectionAdapters, "ActiveRecord::ConnectionAdapters"],
+  [() => m55.AbstractAdapter, "ActiveRecord::ConnectionAdapters::AbstractAdapter"],
+  [() => m55.Version, "ActiveRecord::ConnectionAdapters::AbstractAdapter::Version"],
+  [() => m65.AddColumnDefinition, "ActiveRecord::ConnectionAdapters::AddColumnDefinition"],
+  [() => m65.AlterTable, "ActiveRecord::ConnectionAdapters::AlterTable"],
+  [() => m74.BoundSchemaReflection, "ActiveRecord::ConnectionAdapters::BoundSchemaReflection"],
+  [() => m74.FakePool, "ActiveRecord::ConnectionAdapters::BoundSchemaReflection::FakePool"],
   [
-    () => m64.ChangeColumnDefaultDefinition,
+    () => m65.ChangeColumnDefaultDefinition,
     "ActiveRecord::ConnectionAdapters::ChangeColumnDefaultDefinition",
   ],
-  [() => m64.ChangeColumnDefinition, "ActiveRecord::ConnectionAdapters::ChangeColumnDefinition"],
+  [() => m65.ChangeColumnDefinition, "ActiveRecord::ConnectionAdapters::ChangeColumnDefinition"],
   [
-    () => m64.CheckConstraintDefinition,
+    () => m65.CheckConstraintDefinition,
     "ActiveRecord::ConnectionAdapters::CheckConstraintDefinition",
   ],
-  [() => m68.Column, "ActiveRecord::ConnectionAdapters::Column"],
-  [() => m64.ColumnDefinition, "ActiveRecord::ConnectionAdapters::ColumnDefinition"],
-  [() => m64.ColumnMethods, "ActiveRecord::ConnectionAdapters::ColumnMethods"],
-  [() => m55.ConnectionHandler, "ActiveRecord::ConnectionAdapters::ConnectionHandler"],
+  [() => m69.Column, "ActiveRecord::ConnectionAdapters::Column"],
+  [() => m65.ColumnDefinition, "ActiveRecord::ConnectionAdapters::ColumnDefinition"],
+  [() => m65.ColumnMethods, "ActiveRecord::ConnectionAdapters::ColumnMethods"],
+  [() => m56.ConnectionHandler, "ActiveRecord::ConnectionAdapters::ConnectionHandler"],
   [
-    () => m55.ConnectionDescriptor,
+    () => m56.ConnectionDescriptor,
     "ActiveRecord::ConnectionAdapters::ConnectionHandler::ConnectionDescriptor",
   ],
-  [() => m56.ConnectionPool, "ActiveRecord::ConnectionAdapters::ConnectionPool"],
-  [() => m57.BiasableQueue, "ActiveRecord::ConnectionAdapters::ConnectionPool::BiasableQueue"],
+  [() => m57.ConnectionPool, "ActiveRecord::ConnectionAdapters::ConnectionPool"],
+  [() => m58.BiasableQueue, "ActiveRecord::ConnectionAdapters::ConnectionPool::BiasableQueue"],
   [
-    () => m57.BiasedConditionVariable,
+    () => m58.BiasedConditionVariable,
     "ActiveRecord::ConnectionAdapters::ConnectionPool::BiasableQueue::BiasedConditionVariable",
   ],
   [
-    () => m57.ConnectionLeasingQueue,
+    () => m58.ConnectionLeasingQueue,
     "ActiveRecord::ConnectionAdapters::ConnectionPool::ConnectionLeasingQueue",
   ],
-  [() => m56.ExecutorHooks, "ActiveRecord::ConnectionAdapters::ConnectionPool::ExecutorHooks"],
-  [() => m56.Lease, "ActiveRecord::ConnectionAdapters::ConnectionPool::Lease"],
-  [() => m56.LeaseRegistry, "ActiveRecord::ConnectionAdapters::ConnectionPool::LeaseRegistry"],
-  [() => m57.Queue, "ActiveRecord::ConnectionAdapters::ConnectionPool::Queue"],
-  [() => m58.Reaper, "ActiveRecord::ConnectionAdapters::ConnectionPool::Reaper"],
+  [() => m57.ExecutorHooks, "ActiveRecord::ConnectionAdapters::ConnectionPool::ExecutorHooks"],
+  [() => m57.Lease, "ActiveRecord::ConnectionAdapters::ConnectionPool::Lease"],
+  [() => m57.LeaseRegistry, "ActiveRecord::ConnectionAdapters::ConnectionPool::LeaseRegistry"],
+  [() => m58.Queue, "ActiveRecord::ConnectionAdapters::ConnectionPool::Queue"],
+  [() => m59.Reaper, "ActiveRecord::ConnectionAdapters::ConnectionPool::Reaper"],
   [
-    () => m56.WeakThreadKeyMap,
+    () => m57.WeakThreadKeyMap,
     "ActiveRecord::ConnectionAdapters::ConnectionPool::WeakThreadKeyMap",
   ],
-  [() => m64.CreateIndexDefinition, "ActiveRecord::ConnectionAdapters::CreateIndexDefinition"],
-  [() => m59.DatabaseStatements, "ActiveRecord::ConnectionAdapters::DatabaseStatements"],
-  [() => m69.Deduplicable, "ActiveRecord::ConnectionAdapters::Deduplicable"],
-  [() => m69.ClassMethods, "ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods"],
-  [() => m64.ForeignKeyDefinition, "ActiveRecord::ConnectionAdapters::ForeignKeyDefinition"],
-  [() => m64.IndexDefinition, "ActiveRecord::ConnectionAdapters::IndexDefinition"],
-  [() => m68.NullColumn, "ActiveRecord::ConnectionAdapters::NullColumn"],
-  [() => m56.NullPool, "ActiveRecord::ConnectionAdapters::NullPool"],
-  [() => m56.NullConfig, "ActiveRecord::ConnectionAdapters::NullPool::NullConfig"],
-  [() => m67.NullTransaction, "ActiveRecord::ConnectionAdapters::NullTransaction"],
-  [() => m70.PoolConfig, "ActiveRecord::ConnectionAdapters::PoolConfig"],
-  [() => m71.PoolManager, "ActiveRecord::ConnectionAdapters::PoolManager"],
-  [() => m72.RangeType, "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range"],
-  [() => m64.PrimaryKeyDefinition, "ActiveRecord::ConnectionAdapters::PrimaryKeyDefinition"],
-  [() => m60.QueryCache, "ActiveRecord::ConnectionAdapters::QueryCache"],
+  [() => m65.CreateIndexDefinition, "ActiveRecord::ConnectionAdapters::CreateIndexDefinition"],
+  [() => m60.DatabaseStatements, "ActiveRecord::ConnectionAdapters::DatabaseStatements"],
+  [() => m70.Deduplicable, "ActiveRecord::ConnectionAdapters::Deduplicable"],
+  [() => m70.ClassMethods, "ActiveRecord::ConnectionAdapters::Deduplicable::ClassMethods"],
+  [() => m65.ForeignKeyDefinition, "ActiveRecord::ConnectionAdapters::ForeignKeyDefinition"],
+  [() => m65.IndexDefinition, "ActiveRecord::ConnectionAdapters::IndexDefinition"],
+  [() => m69.NullColumn, "ActiveRecord::ConnectionAdapters::NullColumn"],
+  [() => m57.NullPool, "ActiveRecord::ConnectionAdapters::NullPool"],
+  [() => m57.NullConfig, "ActiveRecord::ConnectionAdapters::NullPool::NullConfig"],
+  [() => m68.NullTransaction, "ActiveRecord::ConnectionAdapters::NullTransaction"],
+  [() => m71.PoolConfig, "ActiveRecord::ConnectionAdapters::PoolConfig"],
+  [() => m72.PoolManager, "ActiveRecord::ConnectionAdapters::PoolManager"],
+  [() => m73.RangeType, "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range"],
+  [() => m65.PrimaryKeyDefinition, "ActiveRecord::ConnectionAdapters::PrimaryKeyDefinition"],
+  [() => m61.QueryCache, "ActiveRecord::ConnectionAdapters::QueryCache"],
   [
-    () => m60.ConnectionPoolConfiguration,
+    () => m61.ConnectionPoolConfiguration,
     "ActiveRecord::ConnectionAdapters::QueryCache::ConnectionPoolConfiguration",
   ],
   [
-    () => m60.QueryCacheRegistry,
+    () => m61.QueryCacheRegistry,
     "ActiveRecord::ConnectionAdapters::QueryCache::QueryCacheRegistry",
   ],
-  [() => m60.Store, "ActiveRecord::ConnectionAdapters::QueryCache::Store"],
-  [() => m61.Quoting, "ActiveRecord::ConnectionAdapters::Quoting"],
-  [() => m61.ClassMethods, "ActiveRecord::ConnectionAdapters::Quoting::ClassMethods"],
-  [() => m67.RealTransaction, "ActiveRecord::ConnectionAdapters::RealTransaction"],
-  [() => m64.ReferenceDefinition, "ActiveRecord::ConnectionAdapters::ReferenceDefinition"],
+  [() => m61.Store, "ActiveRecord::ConnectionAdapters::QueryCache::Store"],
+  [() => m62.Quoting, "ActiveRecord::ConnectionAdapters::Quoting"],
+  [() => m62.ClassMethods, "ActiveRecord::ConnectionAdapters::Quoting::ClassMethods"],
+  [() => m68.RealTransaction, "ActiveRecord::ConnectionAdapters::RealTransaction"],
+  [() => m65.ReferenceDefinition, "ActiveRecord::ConnectionAdapters::ReferenceDefinition"],
   [
-    () => m67.RestartParentTransaction,
+    () => m68.RestartParentTransaction,
     "ActiveRecord::ConnectionAdapters::RestartParentTransaction",
   ],
-  [() => m62.Savepoints, "ActiveRecord::ConnectionAdapters::Savepoints"],
-  [() => m67.SavepointTransaction, "ActiveRecord::ConnectionAdapters::SavepointTransaction"],
-  [() => m73.SchemaCache, "ActiveRecord::ConnectionAdapters::SchemaCache"],
-  [() => m63.SchemaCreation, "ActiveRecord::ConnectionAdapters::SchemaCreation"],
-  [() => m65.SchemaDumper, "ActiveRecord::ConnectionAdapters::SchemaDumper"],
-  [() => m73.SchemaReflection, "ActiveRecord::ConnectionAdapters::SchemaReflection"],
-  [() => m66.SchemaStatements, "ActiveRecord::ConnectionAdapters::SchemaStatements"],
-  [() => m74.SqlTypeMetadata, "ActiveRecord::ConnectionAdapters::SqlTypeMetadata"],
-  [() => m75.StatementPool, "ActiveRecord::ConnectionAdapters::StatementPool"],
-  [() => m64.Table, "ActiveRecord::ConnectionAdapters::Table"],
-  [() => m64.TableDefinition, "ActiveRecord::ConnectionAdapters::TableDefinition"],
-  [() => m67.Transaction, "ActiveRecord::ConnectionAdapters::Transaction"],
-  [() => m67.Callback, "ActiveRecord::ConnectionAdapters::Transaction::Callback"],
-  [() => m67.TransactionInstrumenter, "ActiveRecord::ConnectionAdapters::TransactionInstrumenter"],
+  [() => m63.Savepoints, "ActiveRecord::ConnectionAdapters::Savepoints"],
+  [() => m68.SavepointTransaction, "ActiveRecord::ConnectionAdapters::SavepointTransaction"],
+  [() => m74.SchemaCache, "ActiveRecord::ConnectionAdapters::SchemaCache"],
+  [() => m64.SchemaCreation, "ActiveRecord::ConnectionAdapters::SchemaCreation"],
+  [() => m66.SchemaDumper, "ActiveRecord::ConnectionAdapters::SchemaDumper"],
+  [() => m74.SchemaReflection, "ActiveRecord::ConnectionAdapters::SchemaReflection"],
+  [() => m67.SchemaStatements, "ActiveRecord::ConnectionAdapters::SchemaStatements"],
+  [() => m76, "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements"],
+  [() => m77, "ActiveRecord::ConnectionAdapters::SQLite3::Quoting"],
+  [() => m78, "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements"],
+  [() => m75.SqlTypeMetadata, "ActiveRecord::ConnectionAdapters::SqlTypeMetadata"],
+  [() => m79.StatementPool, "ActiveRecord::ConnectionAdapters::StatementPool"],
+  [() => m65.Table, "ActiveRecord::ConnectionAdapters::Table"],
+  [() => m65.TableDefinition, "ActiveRecord::ConnectionAdapters::TableDefinition"],
+  [() => m68.Transaction, "ActiveRecord::ConnectionAdapters::Transaction"],
+  [() => m68.Callback, "ActiveRecord::ConnectionAdapters::Transaction::Callback"],
+  [() => m68.TransactionInstrumenter, "ActiveRecord::ConnectionAdapters::TransactionInstrumenter"],
   [
-    () => m67.InstrumentationAlreadyStartedError,
+    () => m68.InstrumentationAlreadyStartedError,
     "ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationAlreadyStartedError",
   ],
   [
-    () => m67.InstrumentationNotStartedError,
+    () => m68.InstrumentationNotStartedError,
     "ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationNotStartedError",
   ],
-  [() => m67.TransactionManager, "ActiveRecord::ConnectionAdapters::TransactionManager"],
-  [() => m67.TransactionState, "ActiveRecord::ConnectionAdapters::TransactionState"],
-  [() => m111.ConnectionFailed, "ActiveRecord::ConnectionFailed"],
-  [() => m76.ConnectionHandling, "ActiveRecord::ConnectionHandling"],
-  [() => m111.ConnectionNotDefined, "ActiveRecord::ConnectionNotDefined"],
-  [() => m111.ConnectionNotEstablished, "ActiveRecord::ConnectionNotEstablished"],
-  [() => m111.ConnectionTimeoutError, "ActiveRecord::ConnectionTimeoutError"],
-  [() => m77.Core, "ActiveRecord::Core"],
-  [() => m77.ClassMethods, "ActiveRecord::Core::ClassMethods"],
-  [() => m77.InspectionMask, "ActiveRecord::Core::InspectionMask"],
-  [() => m78.CounterCache, "ActiveRecord::CounterCache"],
-  [() => m78.ClassMethods, "ActiveRecord::CounterCache::ClassMethods"],
-  [() => m111.DangerousAttributeError, "ActiveRecord::DangerousAttributeError"],
-  [() => m111.DatabaseAlreadyExists, "ActiveRecord::DatabaseAlreadyExists"],
-  [() => m79.DatabaseConfigurations, "ActiveRecord::DatabaseConfigurations"],
-  [() => m80.ConnectionUrlResolver, "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver"],
-  [() => m81.DatabaseConfig, "ActiveRecord::DatabaseConfigurations::DatabaseConfig"],
-  [() => m82.HashConfig, "ActiveRecord::DatabaseConfigurations::HashConfig"],
+  [() => m68.TransactionManager, "ActiveRecord::ConnectionAdapters::TransactionManager"],
+  [() => m68.TransactionState, "ActiveRecord::ConnectionAdapters::TransactionState"],
+  [() => m115.ConnectionFailed, "ActiveRecord::ConnectionFailed"],
+  [() => m80.ConnectionHandling, "ActiveRecord::ConnectionHandling"],
+  [() => m115.ConnectionNotDefined, "ActiveRecord::ConnectionNotDefined"],
+  [() => m115.ConnectionNotEstablished, "ActiveRecord::ConnectionNotEstablished"],
+  [() => m115.ConnectionTimeoutError, "ActiveRecord::ConnectionTimeoutError"],
+  [() => m81.Core, "ActiveRecord::Core"],
+  [() => m81.ClassMethods, "ActiveRecord::Core::ClassMethods"],
+  [() => m81.InspectionMask, "ActiveRecord::Core::InspectionMask"],
+  [() => m82.CounterCache, "ActiveRecord::CounterCache"],
+  [() => m82.ClassMethods, "ActiveRecord::CounterCache::ClassMethods"],
+  [() => m115.DangerousAttributeError, "ActiveRecord::DangerousAttributeError"],
+  [() => m115.DatabaseAlreadyExists, "ActiveRecord::DatabaseAlreadyExists"],
+  [() => m83.DatabaseConfigurations, "ActiveRecord::DatabaseConfigurations"],
+  [() => m84.ConnectionUrlResolver, "ActiveRecord::DatabaseConfigurations::ConnectionUrlResolver"],
+  [() => m85.DatabaseConfig, "ActiveRecord::DatabaseConfigurations::DatabaseConfig"],
+  [() => m86.HashConfig, "ActiveRecord::DatabaseConfigurations::HashConfig"],
   [
-    () => m79.InvalidConfigurationError,
+    () => m83.InvalidConfigurationError,
     "ActiveRecord::DatabaseConfigurations::InvalidConfigurationError",
   ],
-  [() => m83.UrlConfig, "ActiveRecord::DatabaseConfigurations::UrlConfig"],
-  [() => m111.DatabaseConnectionError, "ActiveRecord::DatabaseConnectionError"],
-  [() => m111.DatabaseVersionError, "ActiveRecord::DatabaseVersionError"],
-  [() => m111.Deadlocked, "ActiveRecord::Deadlocked"],
-  [() => m150.Delegation, "ActiveRecord::Delegation"],
-  [() => m150.ClassSpecificRelation, "ActiveRecord::Delegation::ClassSpecificRelation"],
-  [() => m150.DelegateCache, "ActiveRecord::Delegation::DelegateCache"],
-  [() => m150.GeneratedRelationMethods, "ActiveRecord::Delegation::GeneratedRelationMethods"],
+  [() => m87.UrlConfig, "ActiveRecord::DatabaseConfigurations::UrlConfig"],
+  [() => m115.DatabaseConnectionError, "ActiveRecord::DatabaseConnectionError"],
+  [() => m115.DatabaseVersionError, "ActiveRecord::DatabaseVersionError"],
+  [() => m115.Deadlocked, "ActiveRecord::Deadlocked"],
+  [() => m155.Delegation, "ActiveRecord::Delegation"],
+  [() => m155.ClassSpecificRelation, "ActiveRecord::Delegation::ClassSpecificRelation"],
+  [() => m155.DelegateCache, "ActiveRecord::Delegation::DelegateCache"],
+  [() => m155.GeneratedRelationMethods, "ActiveRecord::Delegation::GeneratedRelationMethods"],
   [() => m18.DeleteRestrictionError, "ActiveRecord::DeleteRestrictionError"],
-  [() => m84.DisableJoinsAssociationRelation, "ActiveRecord::DisableJoinsAssociationRelation"],
-  [() => m130.DuplicateMigrationNameError, "ActiveRecord::DuplicateMigrationNameError"],
-  [() => m130.DuplicateMigrationVersionError, "ActiveRecord::DuplicateMigrationVersionError"],
-  [() => m85.DynamicMatchers, "ActiveRecord::DynamicMatchers"],
-  [() => m85.FindBy, "ActiveRecord::DynamicMatchers::FindBy"],
-  [() => m85.FindByBang, "ActiveRecord::DynamicMatchers::FindByBang"],
-  [() => m85.Method, "ActiveRecord::DynamicMatchers::Method"],
+  [() => m88.DisableJoinsAssociationRelation, "ActiveRecord::DisableJoinsAssociationRelation"],
+  [() => m134.DuplicateMigrationNameError, "ActiveRecord::DuplicateMigrationNameError"],
+  [() => m134.DuplicateMigrationVersionError, "ActiveRecord::DuplicateMigrationVersionError"],
+  [() => m89.DynamicMatchers, "ActiveRecord::DynamicMatchers"],
+  [() => m89.FindBy, "ActiveRecord::DynamicMatchers::FindBy"],
+  [() => m89.FindByBang, "ActiveRecord::DynamicMatchers::FindByBang"],
+  [() => m89.Method, "ActiveRecord::DynamicMatchers::Method"],
   [() => m18.EagerLoadPolymorphicError, "ActiveRecord::EagerLoadPolymorphicError"],
-  [() => m86.Encryption, "ActiveRecord::Encryption"],
-  [() => m87.AutoFilteredParameters, "ActiveRecord::Encryption::AutoFilteredParameters"],
-  [() => m88.Cipher, "ActiveRecord::Encryption::Cipher"],
-  [() => m89.Aes256Gcm, "ActiveRecord::Encryption::Cipher::Aes256Gcm"],
-  [() => m90.Config, "ActiveRecord::Encryption::Config"],
-  [() => m91.Configurable, "ActiveRecord::Encryption::Configurable"],
-  [() => m92.Context, "ActiveRecord::Encryption::Context"],
-  [() => m93.Contexts, "ActiveRecord::Encryption::Contexts"],
-  [() => m94.DerivedSecretKeyProvider, "ActiveRecord::Encryption::DerivedSecretKeyProvider"],
-  [() => m95.DeterministicKeyProvider, "ActiveRecord::Encryption::DeterministicKeyProvider"],
-  [() => m96.EncryptableRecord, "ActiveRecord::Encryption::EncryptableRecord"],
-  [() => m97.EncryptedAttributeType, "ActiveRecord::Encryption::EncryptedAttributeType"],
-  [() => m98.EncryptingOnlyEncryptor, "ActiveRecord::Encryption::EncryptingOnlyEncryptor"],
-  [() => m99.Encryptor, "ActiveRecord::Encryption::Encryptor"],
-  [() => m100, "ActiveRecord::Encryption::Errors"],
-  [() => m100.Base, "ActiveRecord::Encryption::Errors::Base"],
-  [() => m100.Configuration, "ActiveRecord::Encryption::Errors::Configuration"],
-  [() => m100.Decryption, "ActiveRecord::Encryption::Errors::Decryption"],
-  [() => m100.Encoding, "ActiveRecord::Encryption::Errors::Encoding"],
+  [() => m90.Encryption, "ActiveRecord::Encryption"],
+  [() => m91.AutoFilteredParameters, "ActiveRecord::Encryption::AutoFilteredParameters"],
+  [() => m92.Cipher, "ActiveRecord::Encryption::Cipher"],
+  [() => m93.Aes256Gcm, "ActiveRecord::Encryption::Cipher::Aes256Gcm"],
+  [() => m94.Config, "ActiveRecord::Encryption::Config"],
+  [() => m95.Configurable, "ActiveRecord::Encryption::Configurable"],
+  [() => m96.Context, "ActiveRecord::Encryption::Context"],
+  [() => m97.Contexts, "ActiveRecord::Encryption::Contexts"],
+  [() => m98.DerivedSecretKeyProvider, "ActiveRecord::Encryption::DerivedSecretKeyProvider"],
+  [() => m99.DeterministicKeyProvider, "ActiveRecord::Encryption::DeterministicKeyProvider"],
+  [() => m100.EncryptableRecord, "ActiveRecord::Encryption::EncryptableRecord"],
+  [() => m101.EncryptedAttributeType, "ActiveRecord::Encryption::EncryptedAttributeType"],
+  [() => m102.EncryptingOnlyEncryptor, "ActiveRecord::Encryption::EncryptingOnlyEncryptor"],
+  [() => m103.Encryptor, "ActiveRecord::Encryption::Encryptor"],
+  [() => m104, "ActiveRecord::Encryption::Errors"],
+  [() => m104.Base, "ActiveRecord::Encryption::Errors::Base"],
+  [() => m104.Configuration, "ActiveRecord::Encryption::Errors::Configuration"],
+  [() => m104.Decryption, "ActiveRecord::Encryption::Errors::Decryption"],
+  [() => m104.Encoding, "ActiveRecord::Encryption::Errors::Encoding"],
   [
-    () => m100.EncryptedContentIntegrity,
+    () => m104.EncryptedContentIntegrity,
     "ActiveRecord::Encryption::Errors::EncryptedContentIntegrity",
   ],
-  [() => m100.Encryption, "ActiveRecord::Encryption::Errors::Encryption"],
-  [() => m100.ForbiddenClass, "ActiveRecord::Encryption::Errors::ForbiddenClass"],
+  [() => m104.Encryption, "ActiveRecord::Encryption::Errors::Encryption"],
+  [() => m104.ForbiddenClass, "ActiveRecord::Encryption::Errors::ForbiddenClass"],
   [
-    () => m101.ExtendedDeterministicUniquenessValidator,
+    () => m105.ExtendedDeterministicUniquenessValidator,
     "ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator",
   ],
   [
-    () => m101.EncryptedUniquenessValidator,
+    () => m105.EncryptedUniquenessValidator,
     "ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator::EncryptedUniquenessValidator",
   ],
-  [() => m104.Key, "ActiveRecord::Encryption::Key"],
-  [() => m102.KeyGenerator, "ActiveRecord::Encryption::KeyGenerator"],
-  [() => m103.KeyProvider, "ActiveRecord::Encryption::KeyProvider"],
-  [() => m106.Message, "ActiveRecord::Encryption::Message"],
-  [() => m105.MessageSerializer, "ActiveRecord::Encryption::MessageSerializer"],
-  [() => m107.NullEncryptor, "ActiveRecord::Encryption::NullEncryptor"],
-  [() => m108.Properties, "ActiveRecord::Encryption::Properties"],
-  [() => m109.Scheme, "ActiveRecord::Encryption::Scheme"],
-  [() => m110.EnumMethods, "ActiveRecord::Enum::EnumMethods"],
-  [() => m110.EnumType, "ActiveRecord::Enum::EnumType"],
-  [() => m130.EnvironmentMismatchError, "ActiveRecord::EnvironmentMismatchError"],
-  [() => m130.EnvironmentStorageError, "ActiveRecord::EnvironmentStorageError"],
-  [() => m111.ExclusiveConnectionTimeoutError, "ActiveRecord::ExclusiveConnectionTimeoutError"],
-  [() => m114.Explain, "ActiveRecord::Explain"],
-  [() => m112.ExplainRegistry, "ActiveRecord::ExplainRegistry"],
-  [() => m113.ExplainSubscriber, "ActiveRecord::ExplainSubscriber"],
-  [() => m151.FinderMethods, "ActiveRecord::FinderMethods"],
-  [() => m115.FutureResult, "ActiveRecord::FutureResult"],
-  [() => m115.Canceled, "ActiveRecord::FutureResult::Canceled"],
-  [() => m115.Complete, "ActiveRecord::FutureResult::Complete"],
-  [() => m115.EventBuffer, "ActiveRecord::FutureResult::EventBuffer"],
-  [() => m115.SelectAll, "ActiveRecord::FutureResult::SelectAll"],
+  [() => m108.Key, "ActiveRecord::Encryption::Key"],
+  [() => m106.KeyGenerator, "ActiveRecord::Encryption::KeyGenerator"],
+  [() => m107.KeyProvider, "ActiveRecord::Encryption::KeyProvider"],
+  [() => m110.Message, "ActiveRecord::Encryption::Message"],
+  [() => m109.MessageSerializer, "ActiveRecord::Encryption::MessageSerializer"],
+  [() => m111.NullEncryptor, "ActiveRecord::Encryption::NullEncryptor"],
+  [() => m112.Properties, "ActiveRecord::Encryption::Properties"],
+  [() => m113.Scheme, "ActiveRecord::Encryption::Scheme"],
+  [() => m114.EnumMethods, "ActiveRecord::Enum::EnumMethods"],
+  [() => m114.EnumType, "ActiveRecord::Enum::EnumType"],
+  [() => m134.EnvironmentMismatchError, "ActiveRecord::EnvironmentMismatchError"],
+  [() => m134.EnvironmentStorageError, "ActiveRecord::EnvironmentStorageError"],
+  [() => m115.ExclusiveConnectionTimeoutError, "ActiveRecord::ExclusiveConnectionTimeoutError"],
+  [() => m118.Explain, "ActiveRecord::Explain"],
+  [() => m116.ExplainRegistry, "ActiveRecord::ExplainRegistry"],
+  [() => m117.ExplainSubscriber, "ActiveRecord::ExplainSubscriber"],
+  [() => m156.FinderMethods, "ActiveRecord::FinderMethods"],
+  [() => m119.FutureResult, "ActiveRecord::FutureResult"],
+  [() => m119.Canceled, "ActiveRecord::FutureResult::Canceled"],
+  [() => m119.Complete, "ActiveRecord::FutureResult::Complete"],
+  [() => m119.EventBuffer, "ActiveRecord::FutureResult::EventBuffer"],
+  [() => m119.SelectAll, "ActiveRecord::FutureResult::SelectAll"],
   [
     () => m18.HasManyThroughAssociationNotFoundError,
     "ActiveRecord::HasManyThroughAssociationNotFoundError",
@@ -551,198 +564,203 @@ defineConstants([
     () => m18.HasOneThroughNestedAssociationsAreReadonly,
     "ActiveRecord::HasOneThroughNestedAssociationsAreReadonly",
   ],
-  [() => m130.IllegalMigrationNameError, "ActiveRecord::IllegalMigrationNameError"],
-  [() => m117.Inheritance, "ActiveRecord::Inheritance"],
-  [() => m117.ClassMethods, "ActiveRecord::Inheritance::ClassMethods"],
-  [() => m118.InsertAll, "ActiveRecord::InsertAll"],
-  [() => m118.Builder, "ActiveRecord::InsertAll::Builder"],
-  [() => m119.Integration, "ActiveRecord::Integration"],
-  [() => m119.ClassMethods, "ActiveRecord::Integration::ClassMethods"],
-  [() => m120.InternalMetadata, "ActiveRecord::InternalMetadata"],
-  [() => m120.NullInternalMetadata, "ActiveRecord::InternalMetadata::NullInternalMetadata"],
-  [() => m111.InvalidForeignKey, "ActiveRecord::InvalidForeignKey"],
-  [() => m130.InvalidMigrationTimestampError, "ActiveRecord::InvalidMigrationTimestampError"],
+  [() => m134.IllegalMigrationNameError, "ActiveRecord::IllegalMigrationNameError"],
+  [() => m121.Inheritance, "ActiveRecord::Inheritance"],
+  [() => m121.ClassMethods, "ActiveRecord::Inheritance::ClassMethods"],
+  [() => m122.InsertAll, "ActiveRecord::InsertAll"],
+  [() => m122.Builder, "ActiveRecord::InsertAll::Builder"],
+  [() => m123.Integration, "ActiveRecord::Integration"],
+  [() => m123.ClassMethods, "ActiveRecord::Integration::ClassMethods"],
+  [() => m124.InternalMetadata, "ActiveRecord::InternalMetadata"],
+  [() => m124.NullInternalMetadata, "ActiveRecord::InternalMetadata::NullInternalMetadata"],
+  [() => m115.InvalidForeignKey, "ActiveRecord::InvalidForeignKey"],
+  [() => m134.InvalidMigrationTimestampError, "ActiveRecord::InvalidMigrationTimestampError"],
   [() => m18.InverseOfAssociationNotFoundError, "ActiveRecord::InverseOfAssociationNotFoundError"],
   [
     () => m18.InverseOfAssociationRecursiveError,
     "ActiveRecord::InverseOfAssociationRecursiveError",
   ],
-  [() => m130.IrreversibleMigration, "ActiveRecord::IrreversibleMigration"],
-  [() => m111.IrreversibleOrderError, "ActiveRecord::IrreversibleOrderError"],
-  [() => m121.LegacyYamlAdapter, "ActiveRecord::LegacyYamlAdapter"],
-  [() => m122.LockingType, "ActiveRecord::Locking::LockingType"],
-  [() => m122.Optimistic, "ActiveRecord::Locking::Optimistic"],
-  [() => m122.ClassMethods, "ActiveRecord::Locking::Optimistic::ClassMethods"],
-  [() => m123.Pessimistic, "ActiveRecord::Locking::Pessimistic"],
-  [() => m111.LockWaitTimeout, "ActiveRecord::LockWaitTimeout"],
-  [() => m124.LogSubscriber, "ActiveRecord::LogSubscriber"],
-  [() => m125, "ActiveRecord::Marshalling"],
-  [() => m125.Methods, "ActiveRecord::Marshalling::Methods"],
-  [() => m126.DatabaseSelector, "ActiveRecord::Middleware::DatabaseSelector"],
-  [() => m127.Resolver, "ActiveRecord::Middleware::DatabaseSelector::Resolver"],
-  [() => m128.Session, "ActiveRecord::Middleware::DatabaseSelector::Resolver::Session"],
-  [() => m129.ShardSelector, "ActiveRecord::Middleware::ShardSelector"],
-  [() => m130.Migration, "ActiveRecord::Migration"],
-  [() => m130.CheckPending, "ActiveRecord::Migration::CheckPending"],
-  [() => m131.CommandRecorder, "ActiveRecord::Migration::CommandRecorder"],
-  [() => m132, "ActiveRecord::Migration::Compatibility"],
-  [() => m132.V4_2, "ActiveRecord::Migration::Compatibility::V4_2"],
-  [() => m132.V5_0, "ActiveRecord::Migration::Compatibility::V5_0"],
-  [() => m132.V5_1, "ActiveRecord::Migration::Compatibility::V5_1"],
-  [() => m132.V5_2, "ActiveRecord::Migration::Compatibility::V5_2"],
-  [() => m132.V6_0, "ActiveRecord::Migration::Compatibility::V6_0"],
+  [() => m134.IrreversibleMigration, "ActiveRecord::IrreversibleMigration"],
+  [() => m115.IrreversibleOrderError, "ActiveRecord::IrreversibleOrderError"],
+  [() => m125.LegacyYamlAdapter, "ActiveRecord::LegacyYamlAdapter"],
+  [() => m126.LockingType, "ActiveRecord::Locking::LockingType"],
+  [() => m126.Optimistic, "ActiveRecord::Locking::Optimistic"],
+  [() => m126.ClassMethods, "ActiveRecord::Locking::Optimistic::ClassMethods"],
+  [() => m127.Pessimistic, "ActiveRecord::Locking::Pessimistic"],
+  [() => m115.LockWaitTimeout, "ActiveRecord::LockWaitTimeout"],
+  [() => m128.LogSubscriber, "ActiveRecord::LogSubscriber"],
+  [() => m129, "ActiveRecord::Marshalling"],
+  [() => m129.Methods, "ActiveRecord::Marshalling::Methods"],
+  [() => m130.DatabaseSelector, "ActiveRecord::Middleware::DatabaseSelector"],
+  [() => m131.Resolver, "ActiveRecord::Middleware::DatabaseSelector::Resolver"],
+  [() => m132.Session, "ActiveRecord::Middleware::DatabaseSelector::Resolver::Session"],
+  [() => m133.ShardSelector, "ActiveRecord::Middleware::ShardSelector"],
+  [() => m134.Migration, "ActiveRecord::Migration"],
+  [() => m134.CheckPending, "ActiveRecord::Migration::CheckPending"],
+  [() => m135.CommandRecorder, "ActiveRecord::Migration::CommandRecorder"],
+  [() => m136, "ActiveRecord::Migration::Compatibility"],
+  [() => m136.V4_2, "ActiveRecord::Migration::Compatibility::V4_2"],
+  [() => m136.V5_0, "ActiveRecord::Migration::Compatibility::V5_0"],
+  [() => m136.V5_1, "ActiveRecord::Migration::Compatibility::V5_1"],
+  [() => m136.V5_2, "ActiveRecord::Migration::Compatibility::V5_2"],
+  [() => m136.V6_0, "ActiveRecord::Migration::Compatibility::V6_0"],
   [
-    () => m132.V6_0.ReferenceDefinition,
+    () => m136.V6_0.ReferenceDefinition,
     "ActiveRecord::Migration::Compatibility::V6_0::ReferenceDefinition",
   ],
-  [() => m132.V6_1, "ActiveRecord::Migration::Compatibility::V6_1"],
+  [() => m136.V6_1, "ActiveRecord::Migration::Compatibility::V6_1"],
   [
-    () => m132.V6_1.PostgreSQLCompat,
+    () => m136.V6_1.PostgreSQLCompat,
     "ActiveRecord::Migration::Compatibility::V6_1::PostgreSQLCompat",
   ],
-  [() => m132.V7_0, "ActiveRecord::Migration::Compatibility::V7_0"],
+  [() => m136.V7_0, "ActiveRecord::Migration::Compatibility::V7_0"],
   [
-    () => m132.V7_0.LegacyIndexName,
+    () => m136.V7_0.LegacyIndexName,
     "ActiveRecord::Migration::Compatibility::V7_0::LegacyIndexName",
   ],
-  [() => m132.V7_1, "ActiveRecord::Migration::Compatibility::V7_1"],
-  [() => m132.V7_2, "ActiveRecord::Migration::Compatibility::V7_2"],
-  [() => m130.Current, "ActiveRecord::Migration::Current"],
-  [() => m133.DefaultStrategy, "ActiveRecord::Migration::DefaultStrategy"],
-  [() => m134.ExecutionStrategy, "ActiveRecord::Migration::ExecutionStrategy"],
-  [() => m130.ReversibleBlockHelper, "ActiveRecord::Migration::ReversibleBlockHelper"],
-  [() => m130.MigrationContext, "ActiveRecord::MigrationContext"],
-  [() => m130.MigrationError, "ActiveRecord::MigrationError"],
-  [() => m130.MigrationProxy, "ActiveRecord::MigrationProxy"],
-  [() => m130.Migrator, "ActiveRecord::Migrator"],
-  [() => m111.MismatchedForeignKey, "ActiveRecord::MismatchedForeignKey"],
-  [() => m136.ModelSchema, "ActiveRecord::ModelSchema"],
-  [() => m136.ClassMethods, "ActiveRecord::ModelSchema::ClassMethods"],
-  [() => m111.MultiparameterAssignmentErrors, "ActiveRecord::MultiparameterAssignmentErrors"],
-  [() => m137.NestedAttributes, "ActiveRecord::NestedAttributes"],
-  [() => m137.TooManyRecords, "ActiveRecord::NestedAttributes::TooManyRecords"],
-  [() => m111.NoDatabaseError, "ActiveRecord::NoDatabaseError"],
-  [() => m130.NoEnvironmentInSchemaError, "ActiveRecord::NoEnvironmentInSchemaError"],
-  [() => m139.Normalization, "ActiveRecord::Normalization"],
-  [() => m139.ClassMethods, "ActiveRecord::Normalization::ClassMethods"],
-  [() => m139.NormalizedValueType, "ActiveRecord::Normalization::NormalizedValueType"],
-  [() => m111.NotNullViolation, "ActiveRecord::NotNullViolation"],
-  [() => m138.NoTouching, "ActiveRecord::NoTouching"],
-  [() => m135.PendingMigrationConnection, "ActiveRecord::PendingMigrationConnection"],
-  [() => m130.PendingMigrationError, "ActiveRecord::PendingMigrationError"],
-  [() => m140.Persistence, "ActiveRecord::Persistence"],
-  [() => m140.ClassMethods, "ActiveRecord::Persistence::ClassMethods"],
-  [() => m154.PredicateBuilder, "ActiveRecord::PredicateBuilder"],
-  [() => m155.ArrayHandler, "ActiveRecord::PredicateBuilder::ArrayHandler"],
-  [() => m155.NullPredicate, "ActiveRecord::PredicateBuilder::ArrayHandler::NullPredicate"],
-  [() => m156.AssociationQueryValue, "ActiveRecord::PredicateBuilder::AssociationQueryValue"],
-  [() => m157.BasicObjectHandler, "ActiveRecord::PredicateBuilder::BasicObjectHandler"],
-  [() => m158.PolymorphicArrayValue, "ActiveRecord::PredicateBuilder::PolymorphicArrayValue"],
-  [() => m159.RangeHandler, "ActiveRecord::PredicateBuilder::RangeHandler"],
-  [() => m159.RangeWithBinds, "ActiveRecord::PredicateBuilder::RangeHandler::RangeWithBinds"],
-  [() => m160.RelationHandler, "ActiveRecord::PredicateBuilder::RelationHandler"],
-  [() => m111.PreparedStatementCacheExpired, "ActiveRecord::PreparedStatementCacheExpired"],
-  [() => m111.PreparedStatementInvalid, "ActiveRecord::PreparedStatementInvalid"],
-  [() => m130.ProtectedEnvironmentError, "ActiveRecord::ProtectedEnvironmentError"],
-  [() => m111.QueryAborted, "ActiveRecord::QueryAborted"],
-  [() => m141.QueryCache, "ActiveRecord::QueryCache"],
-  [() => m141.ClassMethods, "ActiveRecord::QueryCache::ClassMethods"],
-  [() => m111.QueryCanceled, "ActiveRecord::QueryCanceled"],
-  [() => m143.QueryLogs, "ActiveRecord::QueryLogs"],
-  [() => m143.GetKeyHandler, "ActiveRecord::QueryLogs::GetKeyHandler"],
-  [() => m143.IdentityHandler, "ActiveRecord::QueryLogs::IdentityHandler"],
-  [() => m142.LegacyFormatter, "ActiveRecord::QueryLogs::LegacyFormatter"],
-  [() => m142.SQLCommenter, "ActiveRecord::QueryLogs::SQLCommenter"],
-  [() => m143.ZeroArityHandler, "ActiveRecord::QueryLogs::ZeroArityHandler"],
-  [() => m162.QueryMethods, "ActiveRecord::QueryMethods"],
-  [() => m162.CTEJoin, "ActiveRecord::QueryMethods::CTEJoin"],
-  [() => m162.WhereChain, "ActiveRecord::QueryMethods::WhereChain"],
-  [() => m111.RangeError, "ActiveRecord::RangeError"],
-  [() => m144.ReadonlyAttributeError, "ActiveRecord::ReadonlyAttributeError"],
-  [() => m144.ReadonlyAttributes, "ActiveRecord::ReadonlyAttributes"],
-  [() => m144.ClassMethods, "ActiveRecord::ReadonlyAttributes::ClassMethods"],
-  [() => m144.HasReadonlyAttributes, "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
-  [() => m111.ReadOnlyError, "ActiveRecord::ReadOnlyError"],
-  [() => m111.ReadOnlyRecord, "ActiveRecord::ReadOnlyRecord"],
-  [() => m205.RecordInvalid, "ActiveRecord::RecordInvalid"],
-  [() => m111.RecordNotDestroyed, "ActiveRecord::RecordNotDestroyed"],
-  [() => m111.RecordNotFound, "ActiveRecord::RecordNotFound"],
-  [() => m111.RecordNotSaved, "ActiveRecord::RecordNotSaved"],
-  [() => m111.RecordNotUnique, "ActiveRecord::RecordNotUnique"],
-  [() => m145.Reflection, "ActiveRecord::Reflection"],
-  [() => m145.AbstractReflection, "ActiveRecord::Reflection::AbstractReflection"],
-  [() => m145.AggregateReflection, "ActiveRecord::Reflection::AggregateReflection"],
-  [() => m145.AssociationReflection, "ActiveRecord::Reflection::AssociationReflection"],
-  [() => m145.BelongsToReflection, "ActiveRecord::Reflection::BelongsToReflection"],
-  [() => m145.ClassMethods, "ActiveRecord::Reflection::ClassMethods"],
+  [() => m136.V7_1, "ActiveRecord::Migration::Compatibility::V7_1"],
+  [() => m136.V7_2, "ActiveRecord::Migration::Compatibility::V7_2"],
+  [() => m134.Current, "ActiveRecord::Migration::Current"],
+  [() => m137.DefaultStrategy, "ActiveRecord::Migration::DefaultStrategy"],
+  [() => m138.ExecutionStrategy, "ActiveRecord::Migration::ExecutionStrategy"],
+  [() => m134.ReversibleBlockHelper, "ActiveRecord::Migration::ReversibleBlockHelper"],
+  [() => m134.MigrationContext, "ActiveRecord::MigrationContext"],
+  [() => m134.MigrationError, "ActiveRecord::MigrationError"],
+  [() => m134.MigrationProxy, "ActiveRecord::MigrationProxy"],
+  [() => m134.Migrator, "ActiveRecord::Migrator"],
+  [() => m115.MismatchedForeignKey, "ActiveRecord::MismatchedForeignKey"],
+  [() => m140.ModelSchema, "ActiveRecord::ModelSchema"],
+  [() => m140.ClassMethods, "ActiveRecord::ModelSchema::ClassMethods"],
+  [() => m115.MultiparameterAssignmentErrors, "ActiveRecord::MultiparameterAssignmentErrors"],
+  [() => m141.NestedAttributes, "ActiveRecord::NestedAttributes"],
+  [() => m141.TooManyRecords, "ActiveRecord::NestedAttributes::TooManyRecords"],
+  [() => m115.NoDatabaseError, "ActiveRecord::NoDatabaseError"],
+  [() => m134.NoEnvironmentInSchemaError, "ActiveRecord::NoEnvironmentInSchemaError"],
+  [() => m143.Normalization, "ActiveRecord::Normalization"],
+  [() => m143.ClassMethods, "ActiveRecord::Normalization::ClassMethods"],
+  [() => m143.NormalizedValueType, "ActiveRecord::Normalization::NormalizedValueType"],
+  [() => m115.NotNullViolation, "ActiveRecord::NotNullViolation"],
+  [() => m142.NoTouching, "ActiveRecord::NoTouching"],
+  [() => m139.PendingMigrationConnection, "ActiveRecord::PendingMigrationConnection"],
+  [() => m134.PendingMigrationError, "ActiveRecord::PendingMigrationError"],
+  [() => m144.Persistence, "ActiveRecord::Persistence"],
+  [() => m144.ClassMethods, "ActiveRecord::Persistence::ClassMethods"],
+  [() => m159.PredicateBuilder, "ActiveRecord::PredicateBuilder"],
+  [() => m160.ArrayHandler, "ActiveRecord::PredicateBuilder::ArrayHandler"],
+  [() => m160.NullPredicate, "ActiveRecord::PredicateBuilder::ArrayHandler::NullPredicate"],
+  [() => m161.AssociationQueryValue, "ActiveRecord::PredicateBuilder::AssociationQueryValue"],
+  [() => m162.BasicObjectHandler, "ActiveRecord::PredicateBuilder::BasicObjectHandler"],
+  [() => m163.PolymorphicArrayValue, "ActiveRecord::PredicateBuilder::PolymorphicArrayValue"],
+  [() => m164.RangeHandler, "ActiveRecord::PredicateBuilder::RangeHandler"],
+  [() => m164.RangeWithBinds, "ActiveRecord::PredicateBuilder::RangeHandler::RangeWithBinds"],
+  [() => m165.RelationHandler, "ActiveRecord::PredicateBuilder::RelationHandler"],
+  [() => m115.PreparedStatementCacheExpired, "ActiveRecord::PreparedStatementCacheExpired"],
+  [() => m115.PreparedStatementInvalid, "ActiveRecord::PreparedStatementInvalid"],
+  [() => m134.ProtectedEnvironmentError, "ActiveRecord::ProtectedEnvironmentError"],
+  [() => m115.QueryAborted, "ActiveRecord::QueryAborted"],
+  [() => m145.QueryCache, "ActiveRecord::QueryCache"],
+  [() => m145.ClassMethods, "ActiveRecord::QueryCache::ClassMethods"],
+  [() => m115.QueryCanceled, "ActiveRecord::QueryCanceled"],
+  [() => m148, "ActiveRecord::Querying"],
+  [() => m147.QueryLogs, "ActiveRecord::QueryLogs"],
+  [() => m147.GetKeyHandler, "ActiveRecord::QueryLogs::GetKeyHandler"],
+  [() => m147.IdentityHandler, "ActiveRecord::QueryLogs::IdentityHandler"],
+  [() => m146.LegacyFormatter, "ActiveRecord::QueryLogs::LegacyFormatter"],
+  [() => m146.SQLCommenter, "ActiveRecord::QueryLogs::SQLCommenter"],
+  [() => m147.ZeroArityHandler, "ActiveRecord::QueryLogs::ZeroArityHandler"],
+  [() => m167.QueryMethods, "ActiveRecord::QueryMethods"],
+  [() => m167.CTEJoin, "ActiveRecord::QueryMethods::CTEJoin"],
+  [() => m167.WhereChain, "ActiveRecord::QueryMethods::WhereChain"],
+  [() => m115.RangeError, "ActiveRecord::RangeError"],
+  [() => m149.ReadonlyAttributeError, "ActiveRecord::ReadonlyAttributeError"],
+  [() => m149.ReadonlyAttributes, "ActiveRecord::ReadonlyAttributes"],
+  [() => m149.ClassMethods, "ActiveRecord::ReadonlyAttributes::ClassMethods"],
+  [() => m149.HasReadonlyAttributes, "ActiveRecord::ReadonlyAttributes::HasReadonlyAttributes"],
+  [() => m115.ReadOnlyError, "ActiveRecord::ReadOnlyError"],
+  [() => m115.ReadOnlyRecord, "ActiveRecord::ReadOnlyRecord"],
+  [() => m214.RecordInvalid, "ActiveRecord::RecordInvalid"],
+  [() => m115.RecordNotDestroyed, "ActiveRecord::RecordNotDestroyed"],
+  [() => m115.RecordNotFound, "ActiveRecord::RecordNotFound"],
+  [() => m115.RecordNotSaved, "ActiveRecord::RecordNotSaved"],
+  [() => m115.RecordNotUnique, "ActiveRecord::RecordNotUnique"],
+  [() => m150.Reflection, "ActiveRecord::Reflection"],
+  [() => m150.AbstractReflection, "ActiveRecord::Reflection::AbstractReflection"],
+  [() => m150.AggregateReflection, "ActiveRecord::Reflection::AggregateReflection"],
+  [() => m150.AssociationReflection, "ActiveRecord::Reflection::AssociationReflection"],
+  [() => m150.BelongsToReflection, "ActiveRecord::Reflection::BelongsToReflection"],
+  [() => m150.ClassMethods, "ActiveRecord::Reflection::ClassMethods"],
   [
-    () => m145.HasAndBelongsToManyReflection,
+    () => m150.HasAndBelongsToManyReflection,
     "ActiveRecord::Reflection::HasAndBelongsToManyReflection",
   ],
-  [() => m145.HasManyReflection, "ActiveRecord::Reflection::HasManyReflection"],
-  [() => m145.HasOneReflection, "ActiveRecord::Reflection::HasOneReflection"],
-  [() => m145.MacroReflection, "ActiveRecord::Reflection::MacroReflection"],
-  [() => m145.PolymorphicReflection, "ActiveRecord::Reflection::PolymorphicReflection"],
-  [() => m145.RuntimeReflection, "ActiveRecord::Reflection::RuntimeReflection"],
-  [() => m145.ThroughReflection, "ActiveRecord::Reflection::ThroughReflection"],
-  [() => m146.Relation, "ActiveRecord::Relation"],
-  [() => m146.ExplainProxy, "ActiveRecord::Relation::ExplainProxy"],
-  [() => m152.FromClause, "ActiveRecord::Relation::FromClause"],
-  [() => m153.HashMerger, "ActiveRecord::Relation::HashMerger"],
-  [() => m153.Merger, "ActiveRecord::Relation::Merger"],
-  [() => m161.QueryAttribute, "ActiveRecord::Relation::QueryAttribute"],
-  [() => m146.Relation.StrictLoadingScope, "ActiveRecord::Relation::StrictLoadingScope"],
-  [() => m164.WhereClause, "ActiveRecord::Relation::WhereClause"],
-  [() => m165.Result, "ActiveRecord::Result"],
-  [() => m165.IndexedRow, "ActiveRecord::Result::IndexedRow"],
-  [() => m111.Rollback, "ActiveRecord::Rollback"],
-  [() => m166, "ActiveRecord::Sanitization"],
-  [() => m166.ClassMethods, "ActiveRecord::Sanitization::ClassMethods"],
-  [() => m169.Schema, "ActiveRecord::Schema"],
-  [() => m169.Definition, "ActiveRecord::Schema::Definition"],
-  [() => m167.SchemaDumper, "ActiveRecord::SchemaDumper"],
-  [() => m168.SchemaMigration, "ActiveRecord::SchemaMigration"],
-  [() => m168.NullSchemaMigration, "ActiveRecord::SchemaMigration::NullSchemaMigration"],
-  [() => m171.Default, "ActiveRecord::Scoping::Default"],
-  [() => m171.DefaultScope, "ActiveRecord::Scoping::DefaultScope"],
-  [() => m172, "ActiveRecord::Scoping::Named"],
-  [() => m172.ClassMethods, "ActiveRecord::Scoping::Named::ClassMethods"],
-  [() => m170.ScopeRegistry, "ActiveRecord::Scoping::ScopeRegistry"],
-  [() => m173, "ActiveRecord::SecureToken"],
-  [() => m173.MinimumLengthError, "ActiveRecord::SecureToken::MinimumLengthError"],
-  [() => m111.SerializationFailure, "ActiveRecord::SerializationFailure"],
-  [() => m111.SerializationTypeMismatch, "ActiveRecord::SerializationTypeMismatch"],
-  [() => m174.SignedId, "ActiveRecord::SignedId"],
-  [() => m174.ClassMethods, "ActiveRecord::SignedId::ClassMethods"],
-  [() => m174.RelationMethods, "ActiveRecord::SignedId::RelationMethods"],
-  [() => m111.SoleRecordExceeded, "ActiveRecord::SoleRecordExceeded"],
-  [() => m163.SpawnMethods, "ActiveRecord::SpawnMethods"],
-  [() => m111.SQLWarning, "ActiveRecord::SQLWarning"],
-  [() => m111.StaleObjectError, "ActiveRecord::StaleObjectError"],
-  [() => m175.StatementCache, "ActiveRecord::StatementCache"],
-  [() => m175.BindMap, "ActiveRecord::StatementCache::BindMap"],
-  [() => m175.Params, "ActiveRecord::StatementCache::Params"],
-  [() => m175.PartialQuery, "ActiveRecord::StatementCache::PartialQuery"],
-  [() => m175.PartialQueryCollector, "ActiveRecord::StatementCache::PartialQueryCollector"],
-  [() => m175.Query, "ActiveRecord::StatementCache::Query"],
-  [() => m175.Substitute, "ActiveRecord::StatementCache::Substitute"],
-  [() => m111.StatementInvalid, "ActiveRecord::StatementInvalid"],
-  [() => m111.StatementTimeout, "ActiveRecord::StatementTimeout"],
-  [() => m176, "ActiveRecord::Store"],
-  [() => m176.ClassMethods, "ActiveRecord::Store::ClassMethods"],
-  [() => m176.HashAccessor, "ActiveRecord::Store::HashAccessor"],
-  [() => m176.IndifferentCoder, "ActiveRecord::Store::IndifferentCoder"],
-  [() => m176.IndifferentHashAccessor, "ActiveRecord::Store::IndifferentHashAccessor"],
-  [() => m176.StringKeyedHashAccessor, "ActiveRecord::Store::StringKeyedHashAccessor"],
-  [() => m111.StrictLoadingViolationError, "ActiveRecord::StrictLoadingViolationError"],
-  [() => m111.SubclassNotFound, "ActiveRecord::SubclassNotFound"],
-  [() => m177.TableMetadata, "ActiveRecord::TableMetadata"],
-  [() => m111.TableNotSpecified, "ActiveRecord::TableNotSpecified"],
-  [() => m178.DatabaseNotSupported, "ActiveRecord::Tasks::DatabaseNotSupported"],
-  [() => m178.DatabaseTasks, "ActiveRecord::Tasks::DatabaseTasks"],
-  [() => m179.MySQLDatabaseTasks, "ActiveRecord::Tasks::MySQLDatabaseTasks"],
-  [() => m180.PostgreSQLDatabaseTasks, "ActiveRecord::Tasks::PostgreSQLDatabaseTasks"],
-  [() => m181.SQLiteDatabaseTasks, "ActiveRecord::Tasks::SQLiteDatabaseTasks"],
+  [() => m150.HasManyReflection, "ActiveRecord::Reflection::HasManyReflection"],
+  [() => m150.HasOneReflection, "ActiveRecord::Reflection::HasOneReflection"],
+  [() => m150.MacroReflection, "ActiveRecord::Reflection::MacroReflection"],
+  [() => m150.PolymorphicReflection, "ActiveRecord::Reflection::PolymorphicReflection"],
+  [() => m150.RuntimeReflection, "ActiveRecord::Reflection::RuntimeReflection"],
+  [() => m150.ThroughReflection, "ActiveRecord::Reflection::ThroughReflection"],
+  [() => m151.Relation, "ActiveRecord::Relation"],
+  [() => m151.ExplainProxy, "ActiveRecord::Relation::ExplainProxy"],
+  [() => m157.FromClause, "ActiveRecord::Relation::FromClause"],
+  [() => m158.HashMerger, "ActiveRecord::Relation::HashMerger"],
+  [() => m158.Merger, "ActiveRecord::Relation::Merger"],
+  [() => m166.QueryAttribute, "ActiveRecord::Relation::QueryAttribute"],
+  [() => m151.Relation.StrictLoadingScope, "ActiveRecord::Relation::StrictLoadingScope"],
+  [() => m169.WhereClause, "ActiveRecord::Relation::WhereClause"],
+  [() => m170.Result, "ActiveRecord::Result"],
+  [() => m170.IndexedRow, "ActiveRecord::Result::IndexedRow"],
+  [() => m115.Rollback, "ActiveRecord::Rollback"],
+  [() => m171, "ActiveRecord::RuntimeRegistry"],
+  [() => m172, "ActiveRecord::Sanitization"],
+  [() => m172.ClassMethods, "ActiveRecord::Sanitization::ClassMethods"],
+  [() => m175.Schema, "ActiveRecord::Schema"],
+  [() => m175.Definition, "ActiveRecord::Schema::Definition"],
+  [() => m173.SchemaDumper, "ActiveRecord::SchemaDumper"],
+  [() => m174.SchemaMigration, "ActiveRecord::SchemaMigration"],
+  [() => m174.NullSchemaMigration, "ActiveRecord::SchemaMigration::NullSchemaMigration"],
+  [() => m177.Default, "ActiveRecord::Scoping::Default"],
+  [() => m177.DefaultScope, "ActiveRecord::Scoping::DefaultScope"],
+  [() => m178, "ActiveRecord::Scoping::Named"],
+  [() => m178.ClassMethods, "ActiveRecord::Scoping::Named::ClassMethods"],
+  [() => m176.ScopeRegistry, "ActiveRecord::Scoping::ScopeRegistry"],
+  [() => m179, "ActiveRecord::SecurePassword"],
+  [() => m180, "ActiveRecord::SecureToken"],
+  [() => m180.MinimumLengthError, "ActiveRecord::SecureToken::MinimumLengthError"],
+  [() => m181, "ActiveRecord::Serialization"],
+  [() => m115.SerializationFailure, "ActiveRecord::SerializationFailure"],
+  [() => m115.SerializationTypeMismatch, "ActiveRecord::SerializationTypeMismatch"],
+  [() => m182.SignedId, "ActiveRecord::SignedId"],
+  [() => m182.ClassMethods, "ActiveRecord::SignedId::ClassMethods"],
+  [() => m182.RelationMethods, "ActiveRecord::SignedId::RelationMethods"],
+  [() => m115.SoleRecordExceeded, "ActiveRecord::SoleRecordExceeded"],
+  [() => m168.SpawnMethods, "ActiveRecord::SpawnMethods"],
+  [() => m115.SQLWarning, "ActiveRecord::SQLWarning"],
+  [() => m115.StaleObjectError, "ActiveRecord::StaleObjectError"],
+  [() => m183.StatementCache, "ActiveRecord::StatementCache"],
+  [() => m183.BindMap, "ActiveRecord::StatementCache::BindMap"],
+  [() => m183.Params, "ActiveRecord::StatementCache::Params"],
+  [() => m183.PartialQuery, "ActiveRecord::StatementCache::PartialQuery"],
+  [() => m183.PartialQueryCollector, "ActiveRecord::StatementCache::PartialQueryCollector"],
+  [() => m183.Query, "ActiveRecord::StatementCache::Query"],
+  [() => m183.Substitute, "ActiveRecord::StatementCache::Substitute"],
+  [() => m115.StatementInvalid, "ActiveRecord::StatementInvalid"],
+  [() => m115.StatementTimeout, "ActiveRecord::StatementTimeout"],
+  [() => m184, "ActiveRecord::Store"],
+  [() => m184.ClassMethods, "ActiveRecord::Store::ClassMethods"],
+  [() => m184.HashAccessor, "ActiveRecord::Store::HashAccessor"],
+  [() => m184.IndifferentCoder, "ActiveRecord::Store::IndifferentCoder"],
+  [() => m184.IndifferentHashAccessor, "ActiveRecord::Store::IndifferentHashAccessor"],
+  [() => m184.StringKeyedHashAccessor, "ActiveRecord::Store::StringKeyedHashAccessor"],
+  [() => m115.StrictLoadingViolationError, "ActiveRecord::StrictLoadingViolationError"],
+  [() => m115.SubclassNotFound, "ActiveRecord::SubclassNotFound"],
+  [() => m185, "ActiveRecord::Suppressor"],
+  [() => m186.TableMetadata, "ActiveRecord::TableMetadata"],
+  [() => m115.TableNotSpecified, "ActiveRecord::TableNotSpecified"],
+  [() => m187.DatabaseNotSupported, "ActiveRecord::Tasks::DatabaseNotSupported"],
+  [() => m187.DatabaseTasks, "ActiveRecord::Tasks::DatabaseTasks"],
+  [() => m188.MySQLDatabaseTasks, "ActiveRecord::Tasks::MySQLDatabaseTasks"],
+  [() => m189.PostgreSQLDatabaseTasks, "ActiveRecord::Tasks::PostgreSQLDatabaseTasks"],
+  [() => m190.SQLiteDatabaseTasks, "ActiveRecord::Tasks::SQLiteDatabaseTasks"],
   [
     () => m18.ThroughCantAssociateThroughHasOneOrManyReflection,
     "ActiveRecord::ThroughCantAssociateThroughHasOneOrManyReflection",
@@ -751,51 +769,51 @@ defineConstants([
     () => m18.ThroughNestedAssociationsAreReadonly,
     "ActiveRecord::ThroughNestedAssociationsAreReadonly",
   ],
-  [() => m182.Timestamp, "ActiveRecord::Timestamp"],
-  [() => m183.TokenFor, "ActiveRecord::TokenFor"],
-  [() => m183.RelationMethods, "ActiveRecord::TokenFor::RelationMethods"],
-  [() => m183.TokenDefinition, "ActiveRecord::TokenFor::TokenDefinition"],
-  [() => m184.TouchLater, "ActiveRecord::TouchLater"],
-  [() => m185.ControllerRuntime, "ActiveRecord::Trailties::ControllerRuntime"],
-  [() => m185.ClassMethods, "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
-  [() => m186.JobRuntime, "ActiveRecord::Trailties::JobRuntime"],
-  [() => m187.Transaction, "ActiveRecord::Transaction"],
-  [() => m111.TransactionIsolationError, "ActiveRecord::TransactionIsolationError"],
-  [() => m111.TransactionRollbackError, "ActiveRecord::TransactionRollbackError"],
-  [() => m188.Transactions, "ActiveRecord::Transactions"],
-  [() => m189.Translation, "ActiveRecord::Translation"],
-  [() => m192, "ActiveRecord::Type"],
-  [() => m193.AdapterSpecificRegistry, "ActiveRecord::Type::AdapterSpecificRegistry"],
-  [() => m195.Date, "ActiveRecord::Type::Date"],
-  [() => m194.DateTime, "ActiveRecord::Type::DateTime"],
-  [() => m196.DecimalWithoutScale, "ActiveRecord::Type::DecimalWithoutScale"],
-  [() => m193.DecorationRegistration, "ActiveRecord::Type::DecorationRegistration"],
-  [() => m197.HashLookupTypeMap, "ActiveRecord::Type::HashLookupTypeMap"],
-  [() => m198.Timezone, "ActiveRecord::Type::Internal::Timezone"],
-  [() => m199.Json, "ActiveRecord::Type::Json"],
-  [() => m193.Registration, "ActiveRecord::Type::Registration"],
-  [() => m200.Serialized, "ActiveRecord::Type::Serialized"],
-  [() => m201.Text, "ActiveRecord::Type::Text"],
-  [() => m202.Time, "ActiveRecord::Type::Time"],
-  [() => m202.Value, "ActiveRecord::Type::Time::Value"],
-  [() => m203.TypeMap, "ActiveRecord::Type::TypeMap"],
-  [() => m204.UnsignedInteger, "ActiveRecord::Type::UnsignedInteger"],
-  [() => m190.Connection, "ActiveRecord::TypeCaster::Connection"],
-  [() => m191.Map, "ActiveRecord::TypeCaster::Map"],
-  [() => m193.TypeConflictError, "ActiveRecord::TypeConflictError"],
-  [() => m111.UnknownAttributeReference, "ActiveRecord::UnknownAttributeReference"],
-  [() => m130.UnknownMigrationVersionError, "ActiveRecord::UnknownMigrationVersionError"],
-  [() => m111.UnknownPrimaryKey, "ActiveRecord::UnknownPrimaryKey"],
-  [() => m111.UnmodifiableRelation, "ActiveRecord::UnmodifiableRelation"],
-  [() => m205.Validations, "ActiveRecord::Validations"],
-  [() => m206.AbsenceValidator, "ActiveRecord::Validations::AbsenceValidator"],
-  [() => m207.AssociatedValidator, "ActiveRecord::Validations::AssociatedValidator"],
-  [() => m206.ClassMethods, "ActiveRecord::Validations::ClassMethods"],
-  [() => m208.LengthValidator, "ActiveRecord::Validations::LengthValidator"],
-  [() => m209.NumericalityValidator, "ActiveRecord::Validations::NumericalityValidator"],
-  [() => m210.PresenceValidator, "ActiveRecord::Validations::PresenceValidator"],
-  [() => m211.UniquenessValidator, "ActiveRecord::Validations::UniquenessValidator"],
-  [() => m111.ValueTooLong, "ActiveRecord::ValueTooLong"],
-  [() => m116.VERSION, "ActiveRecord::VERSION"],
-  [() => m111.WrappedDatabaseException, "ActiveRecord::WrappedDatabaseException"],
+  [() => m191.Timestamp, "ActiveRecord::Timestamp"],
+  [() => m192.TokenFor, "ActiveRecord::TokenFor"],
+  [() => m192.RelationMethods, "ActiveRecord::TokenFor::RelationMethods"],
+  [() => m192.TokenDefinition, "ActiveRecord::TokenFor::TokenDefinition"],
+  [() => m193.TouchLater, "ActiveRecord::TouchLater"],
+  [() => m194.ControllerRuntime, "ActiveRecord::Trailties::ControllerRuntime"],
+  [() => m194.ClassMethods, "ActiveRecord::Trailties::ControllerRuntime::ClassMethods"],
+  [() => m195.JobRuntime, "ActiveRecord::Trailties::JobRuntime"],
+  [() => m196.Transaction, "ActiveRecord::Transaction"],
+  [() => m115.TransactionIsolationError, "ActiveRecord::TransactionIsolationError"],
+  [() => m115.TransactionRollbackError, "ActiveRecord::TransactionRollbackError"],
+  [() => m197.Transactions, "ActiveRecord::Transactions"],
+  [() => m198.Translation, "ActiveRecord::Translation"],
+  [() => m201, "ActiveRecord::Type"],
+  [() => m202.AdapterSpecificRegistry, "ActiveRecord::Type::AdapterSpecificRegistry"],
+  [() => m204.Date, "ActiveRecord::Type::Date"],
+  [() => m203.DateTime, "ActiveRecord::Type::DateTime"],
+  [() => m205.DecimalWithoutScale, "ActiveRecord::Type::DecimalWithoutScale"],
+  [() => m202.DecorationRegistration, "ActiveRecord::Type::DecorationRegistration"],
+  [() => m206.HashLookupTypeMap, "ActiveRecord::Type::HashLookupTypeMap"],
+  [() => m207.Timezone, "ActiveRecord::Type::Internal::Timezone"],
+  [() => m208.Json, "ActiveRecord::Type::Json"],
+  [() => m202.Registration, "ActiveRecord::Type::Registration"],
+  [() => m209.Serialized, "ActiveRecord::Type::Serialized"],
+  [() => m210.Text, "ActiveRecord::Type::Text"],
+  [() => m211.Time, "ActiveRecord::Type::Time"],
+  [() => m211.Value, "ActiveRecord::Type::Time::Value"],
+  [() => m212.TypeMap, "ActiveRecord::Type::TypeMap"],
+  [() => m213.UnsignedInteger, "ActiveRecord::Type::UnsignedInteger"],
+  [() => m199.Connection, "ActiveRecord::TypeCaster::Connection"],
+  [() => m200.Map, "ActiveRecord::TypeCaster::Map"],
+  [() => m202.TypeConflictError, "ActiveRecord::TypeConflictError"],
+  [() => m115.UnknownAttributeReference, "ActiveRecord::UnknownAttributeReference"],
+  [() => m134.UnknownMigrationVersionError, "ActiveRecord::UnknownMigrationVersionError"],
+  [() => m115.UnknownPrimaryKey, "ActiveRecord::UnknownPrimaryKey"],
+  [() => m115.UnmodifiableRelation, "ActiveRecord::UnmodifiableRelation"],
+  [() => m214.Validations, "ActiveRecord::Validations"],
+  [() => m215.AbsenceValidator, "ActiveRecord::Validations::AbsenceValidator"],
+  [() => m216.AssociatedValidator, "ActiveRecord::Validations::AssociatedValidator"],
+  [() => m215.ClassMethods, "ActiveRecord::Validations::ClassMethods"],
+  [() => m217.LengthValidator, "ActiveRecord::Validations::LengthValidator"],
+  [() => m218.NumericalityValidator, "ActiveRecord::Validations::NumericalityValidator"],
+  [() => m219.PresenceValidator, "ActiveRecord::Validations::PresenceValidator"],
+  [() => m220.UniquenessValidator, "ActiveRecord::Validations::UniquenessValidator"],
+  [() => m115.ValueTooLong, "ActiveRecord::ValueTooLong"],
+  [() => m120.VERSION, "ActiveRecord::VERSION"],
+  [() => m115.WrappedDatabaseException, "ActiveRecord::WrappedDatabaseException"],
 ]);

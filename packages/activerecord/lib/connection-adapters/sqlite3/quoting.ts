@@ -20,6 +20,8 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { Database } from "../../sqlite/database.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { isFinite, Rational, toF, toS } from "@blazetrails/ruby-compat";
+import { ConnectionAdapters } from "../../namespaces.js";
+import * as Quoting from "./quoting.js";
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" || value instanceof BigDecimal) {
@@ -264,3 +266,5 @@ function matchColumnList(s: string, allowOrder: boolean): boolean {
     i = skipWhitespace(s, i + 1);
   }
 }
+
+ConnectionAdapters.SQLite3.Quoting = Quoting;

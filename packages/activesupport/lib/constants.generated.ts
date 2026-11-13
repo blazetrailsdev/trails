@@ -20,82 +20,84 @@ import * as m17 from "./concurrency/share-lock.js";
 import * as m18 from "./configurable.js";
 import * as m19 from "./core-ext/big-decimal/conversions.js";
 import * as m20 from "./core-ext/date-and-time/calculations.js";
-import * as m21 from "./core-ext/date-and-time/zones.js";
-import * as m22 from "./core-ext/enumerable.js";
-import * as m23 from "./core-ext/hash/conversions.js";
-import * as m24 from "./core-ext/object/json.js";
-import * as m25 from "./core-ext/object/try.js";
-import * as m26 from "./core-ext/string/output-safety.js";
-import * as m27 from "./core-ext/tse/util.js";
-import * as m28 from "./current-attributes.js";
-import * as m29 from "./deep-mergeable.js";
-import * as m30 from "./delegation.js";
-import * as m31 from "./dependencies.js";
-import * as m32 from "./dependencies/interlock.js";
-import * as m33 from "./deprecation.js";
-import * as m34 from "./deprecation/deprecators.js";
-import * as m35 from "./deprecation/proxy-wrappers.js";
-import * as m36 from "./descendants-tracker.js";
-import * as m37 from "./digest.js";
-import * as m38 from "./duration.js";
-import * as m39 from "./duration/iso8601-parser.js";
-import * as m40 from "./duration/iso8601-serializer.js";
-import * as m41 from "./encrypted-configuration.js";
-import * as m42 from "./encrypted-file.js";
-import * as m43 from "./environment-inquirer.js";
-import * as m44 from "./error-reporter.js";
-import * as m45 from "./execution-context.js";
-import * as m46 from "./execution-wrapper.js";
-import * as m47 from "./executor.js";
-import * as m48 from "./executor/test-helper.js";
-import * as m49 from "./file-update-checker.js";
-import * as m50 from "./gem-version.js";
-import * as m51 from "./gzip.js";
-import * as m52 from "./hash-with-indifferent-access.js";
-import * as m53 from "./html-safe-translation.js";
-import * as m54 from "./inflector/inflections.js";
-import * as m55 from "./isolated-execution-state.js";
-import * as m56 from "./json/encoding.js";
-import * as m57 from "./log-subscriber.js";
-import * as m58 from "./logger-thread-safe-level.js";
-import * as m59 from "./logger.js";
-import * as m60 from "./message-encryptor.js";
-import * as m61 from "./message-verifier.js";
-import * as m62 from "./message-verifiers.js";
-import * as m63 from "./messages/codec.js";
-import * as m64 from "./messages/metadata.js";
-import * as m65 from "./messages/rotation-coordinator.js";
-import * as m66 from "./messages/serializer-with-fallback.js";
-import * as m67 from "./multibyte.js";
-import * as m68 from "./multibyte/chars.js";
-import * as m69 from "./multibyte/unicode.js";
-import * as m70 from "./notifications.js";
-import * as m71 from "./notifications/fanout.js";
-import * as m72 from "./notifications/instrumenter.js";
-import * as m73 from "./number-helper.js";
-import * as m74 from "./number-helper/number-converter.js";
-import * as m75 from "./number-helper/number-to-currency-converter.js";
-import * as m76 from "./number-helper/number-to-delimited-converter.js";
-import * as m77 from "./number-helper/number-to-human-converter.js";
-import * as m78 from "./number-helper/number-to-human-size-converter.js";
-import * as m79 from "./number-helper/number-to-percentage-converter.js";
-import * as m80 from "./number-helper/number-to-phone-converter.js";
-import * as m81 from "./number-helper/number-to-rounded-converter.js";
-import * as m82 from "./number-helper/rounding-helper.js";
-import * as m83 from "./option-merger.js";
-import * as m84 from "./ordered-hash.js";
-import * as m85 from "./ordered-options.js";
-import * as m86 from "./parameter-filter.js";
-import * as m87 from "./reloader.js";
-import * as m88 from "./rescuable.js";
-import * as m89 from "./security-utils.js";
-import * as m90 from "./string-inquirer.js";
-import * as m91 from "./subscriber.js";
-import * as m92 from "./syntax-error-proxy.js";
-import * as m93 from "./tagged-logging.js";
-import * as m94 from "./time-with-zone.js";
-import * as m95 from "./values/time-zone.js";
-import * as m96 from "./xml-mini.js";
+import * as m21 from "./core-ext/date-and-time/compatibility.js";
+import * as m22 from "./core-ext/date-and-time/zones.js";
+import * as m23 from "./core-ext/enumerable.js";
+import * as m24 from "./core-ext/hash/conversions.js";
+import * as m25 from "./core-ext/object/json.js";
+import * as m26 from "./core-ext/object/try.js";
+import * as m27 from "./core-ext/string/output-safety.js";
+import * as m28 from "./core-ext/tse/util.js";
+import * as m29 from "./current-attributes.js";
+import * as m30 from "./deep-mergeable.js";
+import * as m31 from "./delegation.js";
+import * as m32 from "./dependencies.js";
+import * as m33 from "./dependencies/interlock.js";
+import * as m34 from "./deprecation.js";
+import * as m35 from "./deprecation/deprecators.js";
+import * as m36 from "./deprecation/proxy-wrappers.js";
+import * as m37 from "./descendants-tracker.js";
+import * as m38 from "./digest.js";
+import * as m39 from "./duration.js";
+import * as m40 from "./duration/iso8601-parser.js";
+import * as m41 from "./duration/iso8601-serializer.js";
+import * as m42 from "./encrypted-configuration.js";
+import * as m43 from "./encrypted-file.js";
+import * as m44 from "./environment-inquirer.js";
+import * as m45 from "./error-reporter.js";
+import * as m46 from "./execution-context.js";
+import * as m47 from "./execution-wrapper.js";
+import * as m48 from "./executor.js";
+import * as m49 from "./executor/test-helper.js";
+import * as m50 from "./file-update-checker.js";
+import * as m51 from "./gem-version.js";
+import * as m52 from "./gzip.js";
+import * as m53 from "./hash-with-indifferent-access.js";
+import * as m54 from "./html-safe-translation.js";
+import * as m55 from "./inflector/inflections.js";
+import * as m56 from "./isolated-execution-state.js";
+import * as m57 from "./json/encoding.js";
+import * as m58 from "./lazy-load-hooks.js";
+import * as m59 from "./log-subscriber.js";
+import * as m60 from "./logger-thread-safe-level.js";
+import * as m61 from "./logger.js";
+import * as m62 from "./message-encryptor.js";
+import * as m63 from "./message-verifier.js";
+import * as m64 from "./message-verifiers.js";
+import * as m65 from "./messages/codec.js";
+import * as m66 from "./messages/metadata.js";
+import * as m67 from "./messages/rotation-coordinator.js";
+import * as m68 from "./messages/serializer-with-fallback.js";
+import * as m69 from "./multibyte.js";
+import * as m70 from "./multibyte/chars.js";
+import * as m71 from "./multibyte/unicode.js";
+import * as m72 from "./notifications.js";
+import * as m73 from "./notifications/fanout.js";
+import * as m74 from "./notifications/instrumenter.js";
+import * as m75 from "./number-helper.js";
+import * as m76 from "./number-helper/number-converter.js";
+import * as m77 from "./number-helper/number-to-currency-converter.js";
+import * as m78 from "./number-helper/number-to-delimited-converter.js";
+import * as m79 from "./number-helper/number-to-human-converter.js";
+import * as m80 from "./number-helper/number-to-human-size-converter.js";
+import * as m81 from "./number-helper/number-to-percentage-converter.js";
+import * as m82 from "./number-helper/number-to-phone-converter.js";
+import * as m83 from "./number-helper/number-to-rounded-converter.js";
+import * as m84 from "./number-helper/rounding-helper.js";
+import * as m85 from "./option-merger.js";
+import * as m86 from "./ordered-hash.js";
+import * as m87 from "./ordered-options.js";
+import * as m88 from "./parameter-filter.js";
+import * as m89 from "./reloader.js";
+import * as m90 from "./rescuable.js";
+import * as m91 from "./security-utils.js";
+import * as m92 from "./string-inquirer.js";
+import * as m93 from "./subscriber.js";
+import * as m94 from "./syntax-error-proxy.js";
+import * as m95 from "./tagged-logging.js";
+import * as m96 from "./time-with-zone.js";
+import * as m97 from "./values/time-zone.js";
+import * as m98 from "./xml-mini.js";
 
 defineConstants([
   [() => m0.ActionableError, "ActiveSupport::ActionableError"],
@@ -167,164 +169,166 @@ defineConstants([
   [() => m18.Configurable, "ActiveSupport::Configurable"],
   [() => m18.Configurable.ClassMethods, "ActiveSupport::Configurable::ClassMethods"],
   [() => m18.Configuration, "ActiveSupport::Configurable::Configuration"],
-  [() => m28.CurrentAttributes, "ActiveSupport::CurrentAttributes"],
-  [() => m29.DeepMergeable, "ActiveSupport::DeepMergeable"],
-  [() => m30.Delegation, "ActiveSupport::Delegation"],
-  [() => m30.DelegationError, "ActiveSupport::DelegationError"],
-  [() => m31.Dependencies, "ActiveSupport::Dependencies"],
-  [() => m32.Interlock, "ActiveSupport::Dependencies::Interlock"],
-  [() => m33.Deprecation, "ActiveSupport::Deprecation"],
-  [() => m35.DeprecatedConstantProxy, "ActiveSupport::Deprecation::DeprecatedConstantProxy"],
+  [() => m29.CurrentAttributes, "ActiveSupport::CurrentAttributes"],
+  [() => m30.DeepMergeable, "ActiveSupport::DeepMergeable"],
+  [() => m31.Delegation, "ActiveSupport::Delegation"],
+  [() => m31.DelegationError, "ActiveSupport::DelegationError"],
+  [() => m32.Dependencies, "ActiveSupport::Dependencies"],
+  [() => m33.Interlock, "ActiveSupport::Dependencies::Interlock"],
+  [() => m34.Deprecation, "ActiveSupport::Deprecation"],
+  [() => m36.DeprecatedConstantProxy, "ActiveSupport::Deprecation::DeprecatedConstantProxy"],
   [
-    () => m35.DeprecatedInstanceVariableProxy,
+    () => m36.DeprecatedInstanceVariableProxy,
     "ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy",
   ],
-  [() => m35.DeprecatedObjectProxy, "ActiveSupport::Deprecation::DeprecatedObjectProxy"],
-  [() => m35.DeprecationProxy, "ActiveSupport::Deprecation::DeprecationProxy"],
-  [() => m34.Deprecators, "ActiveSupport::Deprecation::Deprecators"],
-  [() => m36.DescendantsTracker, "ActiveSupport::DescendantsTracker"],
+  [() => m36.DeprecatedObjectProxy, "ActiveSupport::Deprecation::DeprecatedObjectProxy"],
+  [() => m36.DeprecationProxy, "ActiveSupport::Deprecation::DeprecationProxy"],
+  [() => m35.Deprecators, "ActiveSupport::Deprecation::Deprecators"],
+  [() => m37.DescendantsTracker, "ActiveSupport::DescendantsTracker"],
   [
-    () => m36.ReloadedClassesFiltering,
+    () => m37.ReloadedClassesFiltering,
     "ActiveSupport::DescendantsTracker::ReloadedClassesFiltering",
   ],
-  [() => m36.WeakSet, "ActiveSupport::DescendantsTracker::WeakSet"],
-  [() => m37.Digest, "ActiveSupport::Digest"],
-  [() => m38.Duration, "ActiveSupport::Duration"],
-  [() => m39.ISO8601Parser, "ActiveSupport::Duration::ISO8601Parser"],
-  [() => m39.ParsingError, "ActiveSupport::Duration::ISO8601Parser::ParsingError"],
-  [() => m40.ISO8601Serializer, "ActiveSupport::Duration::ISO8601Serializer"],
-  [() => m38.Scalar, "ActiveSupport::Duration::Scalar"],
-  [() => m41.EncryptedConfiguration, "ActiveSupport::EncryptedConfiguration"],
-  [() => m41.InvalidContentError, "ActiveSupport::EncryptedConfiguration::InvalidContentError"],
-  [() => m41.InvalidKeyError, "ActiveSupport::EncryptedConfiguration::InvalidKeyError"],
-  [() => m42.EncryptedFile, "ActiveSupport::EncryptedFile"],
-  [() => m42.InvalidKeyLengthError, "ActiveSupport::EncryptedFile::InvalidKeyLengthError"],
-  [() => m42.MissingContentError, "ActiveSupport::EncryptedFile::MissingContentError"],
-  [() => m42.MissingKeyError, "ActiveSupport::EncryptedFile::MissingKeyError"],
-  [() => m43.EnvironmentInquirer, "ActiveSupport::EnvironmentInquirer"],
-  [() => m44.ErrorReporter, "ActiveSupport::ErrorReporter"],
-  [() => m44.ErrorReporter.UnexpectedError, "ActiveSupport::ErrorReporter::UnexpectedError"],
-  [() => m45.ExecutionContext, "ActiveSupport::ExecutionContext"],
-  [() => m46.ExecutionWrapper, "ActiveSupport::ExecutionWrapper"],
-  [() => m46.CompleteHook, "ActiveSupport::ExecutionWrapper::CompleteHook"],
-  [() => m46.RunHook, "ActiveSupport::ExecutionWrapper::RunHook"],
-  [() => m47.Executor, "ActiveSupport::Executor"],
-  [() => m48.TestHelper, "ActiveSupport::Executor::TestHelper"],
-  [() => m49.FileUpdateChecker, "ActiveSupport::FileUpdateChecker"],
-  [() => m51.Gzip, "ActiveSupport::Gzip"],
-  [() => m51.Stream, "ActiveSupport::Gzip::Stream"],
-  [() => m52.HashWithIndifferentAccess, "ActiveSupport::HashWithIndifferentAccess"],
-  [() => m53.HtmlSafeTranslation, "ActiveSupport::HtmlSafeTranslation"],
-  [() => m54.Inflections, "ActiveSupport::Inflector::Inflections"],
-  [() => m54.Uncountables, "ActiveSupport::Inflector::Inflections::Uncountables"],
-  [() => m85.InheritableOptions, "ActiveSupport::InheritableOptions"],
-  [() => m55.IsolatedExecutionState, "ActiveSupport::IsolatedExecutionState"],
-  [() => m56.Encoding, "ActiveSupport::JSON::Encoding"],
-  [() => m56.JSONGemEncoder, "ActiveSupport::JSON::Encoding::JSONGemEncoder"],
-  [() => m59.Logger, "ActiveSupport::Logger"],
-  [() => m59.SimpleFormatter, "ActiveSupport::Logger::SimpleFormatter"],
-  [() => m58.LoggerThreadSafeLevel, "ActiveSupport::LoggerThreadSafeLevel"],
-  [() => m57.LogSubscriber, "ActiveSupport::LogSubscriber"],
-  [() => m60.MessageEncryptor, "ActiveSupport::MessageEncryptor"],
-  [() => m60.InvalidMessage, "ActiveSupport::MessageEncryptor::InvalidMessage"],
-  [() => m60.NullSerializer, "ActiveSupport::MessageEncryptor::NullSerializer"],
-  [() => m63.Codec, "ActiveSupport::Messages::Codec"],
-  [() => m64.Metadata, "ActiveSupport::Messages::Metadata"],
-  [() => m65.RotationCoordinator, "ActiveSupport::Messages::RotationCoordinator"],
-  [() => m66.SerializerWithFallback, "ActiveSupport::Messages::SerializerWithFallback"],
-  [() => m66.AllowMarshal, "ActiveSupport::Messages::SerializerWithFallback::AllowMarshal"],
-  [() => m66.JsonWithFallback, "ActiveSupport::Messages::SerializerWithFallback::JsonWithFallback"],
+  [() => m37.WeakSet, "ActiveSupport::DescendantsTracker::WeakSet"],
+  [() => m38.Digest, "ActiveSupport::Digest"],
+  [() => m39.Duration, "ActiveSupport::Duration"],
+  [() => m40.ISO8601Parser, "ActiveSupport::Duration::ISO8601Parser"],
+  [() => m40.ParsingError, "ActiveSupport::Duration::ISO8601Parser::ParsingError"],
+  [() => m41.ISO8601Serializer, "ActiveSupport::Duration::ISO8601Serializer"],
+  [() => m39.Scalar, "ActiveSupport::Duration::Scalar"],
+  [() => m42.EncryptedConfiguration, "ActiveSupport::EncryptedConfiguration"],
+  [() => m42.InvalidContentError, "ActiveSupport::EncryptedConfiguration::InvalidContentError"],
+  [() => m42.InvalidKeyError, "ActiveSupport::EncryptedConfiguration::InvalidKeyError"],
+  [() => m43.EncryptedFile, "ActiveSupport::EncryptedFile"],
+  [() => m43.InvalidKeyLengthError, "ActiveSupport::EncryptedFile::InvalidKeyLengthError"],
+  [() => m43.MissingContentError, "ActiveSupport::EncryptedFile::MissingContentError"],
+  [() => m43.MissingKeyError, "ActiveSupport::EncryptedFile::MissingKeyError"],
+  [() => m44.EnvironmentInquirer, "ActiveSupport::EnvironmentInquirer"],
+  [() => m45.ErrorReporter, "ActiveSupport::ErrorReporter"],
+  [() => m45.ErrorReporter.UnexpectedError, "ActiveSupport::ErrorReporter::UnexpectedError"],
+  [() => m46.ExecutionContext, "ActiveSupport::ExecutionContext"],
+  [() => m47.ExecutionWrapper, "ActiveSupport::ExecutionWrapper"],
+  [() => m47.CompleteHook, "ActiveSupport::ExecutionWrapper::CompleteHook"],
+  [() => m47.RunHook, "ActiveSupport::ExecutionWrapper::RunHook"],
+  [() => m48.Executor, "ActiveSupport::Executor"],
+  [() => m49.TestHelper, "ActiveSupport::Executor::TestHelper"],
+  [() => m50.FileUpdateChecker, "ActiveSupport::FileUpdateChecker"],
+  [() => m52.Gzip, "ActiveSupport::Gzip"],
+  [() => m52.Stream, "ActiveSupport::Gzip::Stream"],
+  [() => m53.HashWithIndifferentAccess, "ActiveSupport::HashWithIndifferentAccess"],
+  [() => m54.HtmlSafeTranslation, "ActiveSupport::HtmlSafeTranslation"],
+  [() => m55.Inflections, "ActiveSupport::Inflector::Inflections"],
+  [() => m55.Uncountables, "ActiveSupport::Inflector::Inflections::Uncountables"],
+  [() => m87.InheritableOptions, "ActiveSupport::InheritableOptions"],
+  [() => m56.IsolatedExecutionState, "ActiveSupport::IsolatedExecutionState"],
+  [() => m57.Encoding, "ActiveSupport::JSON::Encoding"],
+  [() => m57.JSONGemEncoder, "ActiveSupport::JSON::Encoding::JSONGemEncoder"],
+  [() => m58, "ActiveSupport::LazyLoadHooks"],
+  [() => m61.Logger, "ActiveSupport::Logger"],
+  [() => m61.SimpleFormatter, "ActiveSupport::Logger::SimpleFormatter"],
+  [() => m60.LoggerThreadSafeLevel, "ActiveSupport::LoggerThreadSafeLevel"],
+  [() => m59.LogSubscriber, "ActiveSupport::LogSubscriber"],
+  [() => m62.MessageEncryptor, "ActiveSupport::MessageEncryptor"],
+  [() => m62.InvalidMessage, "ActiveSupport::MessageEncryptor::InvalidMessage"],
+  [() => m62.NullSerializer, "ActiveSupport::MessageEncryptor::NullSerializer"],
+  [() => m65.Codec, "ActiveSupport::Messages::Codec"],
+  [() => m66.Metadata, "ActiveSupport::Messages::Metadata"],
+  [() => m67.RotationCoordinator, "ActiveSupport::Messages::RotationCoordinator"],
+  [() => m68.SerializerWithFallback, "ActiveSupport::Messages::SerializerWithFallback"],
+  [() => m68.AllowMarshal, "ActiveSupport::Messages::SerializerWithFallback::AllowMarshal"],
+  [() => m68.JsonWithFallback, "ActiveSupport::Messages::SerializerWithFallback::JsonWithFallback"],
   [
-    () => m66.JsonWithFallbackAllowMarshal,
+    () => m68.JsonWithFallbackAllowMarshal,
     "ActiveSupport::Messages::SerializerWithFallback::JsonWithFallbackAllowMarshal",
   ],
   [
-    () => m66.MarshalWithFallback,
+    () => m68.MarshalWithFallback,
     "ActiveSupport::Messages::SerializerWithFallback::MarshalWithFallback",
   ],
   [
-    () => m66.MessagePackWithFallback,
+    () => m68.MessagePackWithFallback,
     "ActiveSupport::Messages::SerializerWithFallback::MessagePackWithFallback",
   ],
   [
-    () => m66.MessagePackWithFallbackAllowMarshal,
+    () => m68.MessagePackWithFallbackAllowMarshal,
     "ActiveSupport::Messages::SerializerWithFallback::MessagePackWithFallbackAllowMarshal",
   ],
-  [() => m61.MessageVerifier, "ActiveSupport::MessageVerifier"],
-  [() => m61.InvalidSignature, "ActiveSupport::MessageVerifier::InvalidSignature"],
-  [() => m62.MessageVerifiers, "ActiveSupport::MessageVerifiers"],
-  [() => m67.Multibyte, "ActiveSupport::Multibyte"],
-  [() => m68.Chars, "ActiveSupport::Multibyte::Chars"],
-  [() => m69.Unicode, "ActiveSupport::Multibyte::Unicode"],
-  [() => m70.Notifications, "ActiveSupport::Notifications"],
-  [() => m72.Event, "ActiveSupport::Notifications::Event"],
-  [() => m71.Fanout, "ActiveSupport::Notifications::Fanout"],
-  [() => m71.BaseGroup, "ActiveSupport::Notifications::Fanout::BaseGroup"],
-  [() => m71.BaseTimeGroup, "ActiveSupport::Notifications::Fanout::BaseTimeGroup"],
-  [() => m71.EventedGroup, "ActiveSupport::Notifications::Fanout::EventedGroup"],
-  [() => m71.EventObjectGroup, "ActiveSupport::Notifications::Fanout::EventObjectGroup"],
-  [() => m71.Handle, "ActiveSupport::Notifications::Fanout::Handle"],
-  [() => m71.MonotonicTimedGroup, "ActiveSupport::Notifications::Fanout::MonotonicTimedGroup"],
-  [() => m71.Subscribers, "ActiveSupport::Notifications::Fanout::Subscribers"],
-  [() => m71.Evented, "ActiveSupport::Notifications::Fanout::Subscribers::Evented"],
-  [() => m71.EventObject, "ActiveSupport::Notifications::Fanout::Subscribers::EventObject"],
-  [() => m71.Matcher, "ActiveSupport::Notifications::Fanout::Subscribers::Matcher"],
+  [() => m63.MessageVerifier, "ActiveSupport::MessageVerifier"],
+  [() => m63.InvalidSignature, "ActiveSupport::MessageVerifier::InvalidSignature"],
+  [() => m64.MessageVerifiers, "ActiveSupport::MessageVerifiers"],
+  [() => m69.Multibyte, "ActiveSupport::Multibyte"],
+  [() => m70.Chars, "ActiveSupport::Multibyte::Chars"],
+  [() => m71.Unicode, "ActiveSupport::Multibyte::Unicode"],
+  [() => m72.Notifications, "ActiveSupport::Notifications"],
+  [() => m74.Event, "ActiveSupport::Notifications::Event"],
+  [() => m73.Fanout, "ActiveSupport::Notifications::Fanout"],
+  [() => m73.BaseGroup, "ActiveSupport::Notifications::Fanout::BaseGroup"],
+  [() => m73.BaseTimeGroup, "ActiveSupport::Notifications::Fanout::BaseTimeGroup"],
+  [() => m73.EventedGroup, "ActiveSupport::Notifications::Fanout::EventedGroup"],
+  [() => m73.EventObjectGroup, "ActiveSupport::Notifications::Fanout::EventObjectGroup"],
+  [() => m73.Handle, "ActiveSupport::Notifications::Fanout::Handle"],
+  [() => m73.MonotonicTimedGroup, "ActiveSupport::Notifications::Fanout::MonotonicTimedGroup"],
+  [() => m73.Subscribers, "ActiveSupport::Notifications::Fanout::Subscribers"],
+  [() => m73.Evented, "ActiveSupport::Notifications::Fanout::Subscribers::Evented"],
+  [() => m73.EventObject, "ActiveSupport::Notifications::Fanout::Subscribers::EventObject"],
+  [() => m73.Matcher, "ActiveSupport::Notifications::Fanout::Subscribers::Matcher"],
   [
-    () => m71.AllMessages,
+    () => m73.AllMessages,
     "ActiveSupport::Notifications::Fanout::Subscribers::Matcher::AllMessages",
   ],
-  [() => m71.MonotonicTimed, "ActiveSupport::Notifications::Fanout::Subscribers::MonotonicTimed"],
-  [() => m71.Timed, "ActiveSupport::Notifications::Fanout::Subscribers::Timed"],
-  [() => m71.TimedGroup, "ActiveSupport::Notifications::Fanout::TimedGroup"],
+  [() => m73.MonotonicTimed, "ActiveSupport::Notifications::Fanout::Subscribers::MonotonicTimed"],
+  [() => m73.Timed, "ActiveSupport::Notifications::Fanout::Subscribers::Timed"],
+  [() => m73.TimedGroup, "ActiveSupport::Notifications::Fanout::TimedGroup"],
   [
-    () => m71.InstrumentationSubscriberError,
+    () => m73.InstrumentationSubscriberError,
     "ActiveSupport::Notifications::InstrumentationSubscriberError",
   ],
-  [() => m72.Instrumenter, "ActiveSupport::Notifications::Instrumenter"],
-  [() => m72.LegacyHandle, "ActiveSupport::Notifications::Instrumenter::LegacyHandle"],
-  [() => m72.Wrapper, "ActiveSupport::Notifications::Instrumenter::LegacyHandle::Wrapper"],
-  [() => m73.NumberHelper, "ActiveSupport::NumberHelper"],
-  [() => m74.NumberConverter, "ActiveSupport::NumberHelper::NumberConverter"],
-  [() => m75.NumberToCurrencyConverter, "ActiveSupport::NumberHelper::NumberToCurrencyConverter"],
-  [() => m76.NumberToDelimitedConverter, "ActiveSupport::NumberHelper::NumberToDelimitedConverter"],
-  [() => m77.NumberToHumanConverter, "ActiveSupport::NumberHelper::NumberToHumanConverter"],
-  [() => m78.NumberToHumanSizeConverter, "ActiveSupport::NumberHelper::NumberToHumanSizeConverter"],
+  [() => m74.Instrumenter, "ActiveSupport::Notifications::Instrumenter"],
+  [() => m74.LegacyHandle, "ActiveSupport::Notifications::Instrumenter::LegacyHandle"],
+  [() => m74.Wrapper, "ActiveSupport::Notifications::Instrumenter::LegacyHandle::Wrapper"],
+  [() => m75.NumberHelper, "ActiveSupport::NumberHelper"],
+  [() => m76.NumberConverter, "ActiveSupport::NumberHelper::NumberConverter"],
+  [() => m77.NumberToCurrencyConverter, "ActiveSupport::NumberHelper::NumberToCurrencyConverter"],
+  [() => m78.NumberToDelimitedConverter, "ActiveSupport::NumberHelper::NumberToDelimitedConverter"],
+  [() => m79.NumberToHumanConverter, "ActiveSupport::NumberHelper::NumberToHumanConverter"],
+  [() => m80.NumberToHumanSizeConverter, "ActiveSupport::NumberHelper::NumberToHumanSizeConverter"],
   [
-    () => m79.NumberToPercentageConverter,
+    () => m81.NumberToPercentageConverter,
     "ActiveSupport::NumberHelper::NumberToPercentageConverter",
   ],
-  [() => m80.NumberToPhoneConverter, "ActiveSupport::NumberHelper::NumberToPhoneConverter"],
-  [() => m81.NumberToRoundedConverter, "ActiveSupport::NumberHelper::NumberToRoundedConverter"],
-  [() => m82.RoundingHelper, "ActiveSupport::NumberHelper::RoundingHelper"],
-  [() => m83.OptionMerger, "ActiveSupport::OptionMerger"],
-  [() => m84.OrderedHash, "ActiveSupport::OrderedHash"],
-  [() => m85.OrderedOptions, "ActiveSupport::OrderedOptions"],
-  [() => m86.ParameterFilter, "ActiveSupport::ParameterFilter"],
-  [() => m87.Reloader, "ActiveSupport::Reloader"],
-  [() => m88.Rescuable, "ActiveSupport::Rescuable"],
-  [() => m88.ClassMethods, "ActiveSupport::Rescuable::ClassMethods"],
-  [() => m26.SafeBuffer, "ActiveSupport::SafeBuffer"],
-  [() => m26.SafeConcatError, "ActiveSupport::SafeBuffer::SafeConcatError"],
-  [() => m89.SecurityUtils, "ActiveSupport::SecurityUtils"],
-  [() => m90.StringInquirer, "ActiveSupport::StringInquirer"],
-  [() => m91.Subscriber, "ActiveSupport::Subscriber"],
-  [() => m92.SyntaxErrorProxy, "ActiveSupport::SyntaxErrorProxy"],
-  [() => m93.TaggedLogging, "ActiveSupport::TaggedLogging"],
-  [() => m93.Formatter, "ActiveSupport::TaggedLogging::Formatter"],
-  [() => m93.LocalTagStorage, "ActiveSupport::TaggedLogging::LocalTagStorage"],
-  [() => m93.TagStack, "ActiveSupport::TaggedLogging::TagStack"],
-  [() => m94.TimeWithZone, "ActiveSupport::TimeWithZone"],
-  [() => m95.TimeZone, "ActiveSupport::TimeZone"],
-  [() => m24.ToJsonWithActiveSupportEncoder, "ActiveSupport::ToJsonWithActiveSupportEncoder"],
-  [() => m25.Tryable, "ActiveSupport::Tryable"],
-  [() => m50.VERSION, "ActiveSupport::VERSION"],
-  [() => m23.XMLConverter, "ActiveSupport::XMLConverter"],
-  [() => m23.DisallowedType, "ActiveSupport::XMLConverter::DisallowedType"],
-  [() => m96, "ActiveSupport::XmlMini"],
-  [() => m96.FileLike, "ActiveSupport::XmlMini::FileLike"],
+  [() => m82.NumberToPhoneConverter, "ActiveSupport::NumberHelper::NumberToPhoneConverter"],
+  [() => m83.NumberToRoundedConverter, "ActiveSupport::NumberHelper::NumberToRoundedConverter"],
+  [() => m84.RoundingHelper, "ActiveSupport::NumberHelper::RoundingHelper"],
+  [() => m85.OptionMerger, "ActiveSupport::OptionMerger"],
+  [() => m86.OrderedHash, "ActiveSupport::OrderedHash"],
+  [() => m87.OrderedOptions, "ActiveSupport::OrderedOptions"],
+  [() => m88.ParameterFilter, "ActiveSupport::ParameterFilter"],
+  [() => m89.Reloader, "ActiveSupport::Reloader"],
+  [() => m90.Rescuable, "ActiveSupport::Rescuable"],
+  [() => m90.ClassMethods, "ActiveSupport::Rescuable::ClassMethods"],
+  [() => m27.SafeBuffer, "ActiveSupport::SafeBuffer"],
+  [() => m27.SafeConcatError, "ActiveSupport::SafeBuffer::SafeConcatError"],
+  [() => m91.SecurityUtils, "ActiveSupport::SecurityUtils"],
+  [() => m92.StringInquirer, "ActiveSupport::StringInquirer"],
+  [() => m93.Subscriber, "ActiveSupport::Subscriber"],
+  [() => m94.SyntaxErrorProxy, "ActiveSupport::SyntaxErrorProxy"],
+  [() => m95.TaggedLogging, "ActiveSupport::TaggedLogging"],
+  [() => m95.Formatter, "ActiveSupport::TaggedLogging::Formatter"],
+  [() => m95.LocalTagStorage, "ActiveSupport::TaggedLogging::LocalTagStorage"],
+  [() => m95.TagStack, "ActiveSupport::TaggedLogging::TagStack"],
+  [() => m96.TimeWithZone, "ActiveSupport::TimeWithZone"],
+  [() => m97.TimeZone, "ActiveSupport::TimeZone"],
+  [() => m25.ToJsonWithActiveSupportEncoder, "ActiveSupport::ToJsonWithActiveSupportEncoder"],
+  [() => m26.Tryable, "ActiveSupport::Tryable"],
+  [() => m51.VERSION, "ActiveSupport::VERSION"],
+  [() => m24.XMLConverter, "ActiveSupport::XMLConverter"],
+  [() => m24.DisallowedType, "ActiveSupport::XMLConverter::DisallowedType"],
+  [() => m98, "ActiveSupport::XmlMini"],
+  [() => m98.FileLike, "ActiveSupport::XmlMini::FileLike"],
   [() => m20, "DateAndTime::Calculations"],
-  [() => m21.Zones, "DateAndTime::Zones"],
-  [() => m22.SoleItemExpectedError, "Enumerable::SoleItemExpectedError"],
-  [() => m27.Util, "TSE::Util"],
-  [() => m24.Generic, "URI::Generic"],
+  [() => m21, "DateAndTime::Compatibility"],
+  [() => m22.Zones, "DateAndTime::Zones"],
+  [() => m23.SoleItemExpectedError, "Enumerable::SoleItemExpectedError"],
+  [() => m28.Util, "TSE::Util"],
+  [() => m25.Generic, "URI::Generic"],
 ]);
