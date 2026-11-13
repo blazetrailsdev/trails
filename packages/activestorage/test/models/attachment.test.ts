@@ -67,7 +67,7 @@ describe("ActiveStorage::AttachmentTest", () => {
 
   afterEach(async () => {
     travelBack();
-    t.afterTeardown();
+    await t.afterTeardown();
     for (const blob of await Blob.all().toArray()) await blob.delete();
   });
 
