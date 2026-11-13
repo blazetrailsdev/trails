@@ -5,15 +5,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InstallGenerator } from "../../../../lib/generators/action-text/install/install-generator.js";
 
 class Generator extends InstallGenerator {
-  static {
-    void this.sourceRoot(InstallGenerator._sourceRoot);
-  }
-
   override trailsCommand: InstallGenerator["trailsCommand"] = async (command, options) => {
     commands.push(`trails ${command} ${JSON.stringify(options)}`);
     return undefined;
   };
 }
+
+await Generator.sourceRoot(InstallGenerator._sourceRoot);
 
 let commands: string[];
 
