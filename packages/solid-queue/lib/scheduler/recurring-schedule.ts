@@ -2,6 +2,7 @@ import { include } from "@blazetrails/activesupport";
 import { CancelledOperationError, ScheduledTask, rbFArray } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { RecurringTask } from "../recurring-task.js";
+import { Time } from "@blazetrails/date";
 
 type TaskConfiguration = Parameters<typeof RecurringTask.wrap>[0];
 
@@ -36,8 +37,9 @@ export class RecurringSchedule {
     }
   }
 
-  scheduleTask(task: RecurringTask): void {
-    this.scheduledTasks.set(task.key, this.schedule(task));
+  /** @missingRailsArgs schedule — CONVERGEABLE solid-queue-recurring-schedule-v1-7-2 */
+  scheduleTask(task: RecurringTask, { runAt = task.nextTime() }: { runAt?: Time } = {}): void {
+    this.scheduledTasks.set(task.key, this.schedule(task, { runAt }));
   }
 
   unscheduleTasks(): void {
@@ -68,12 +70,14 @@ export class RecurringSchedule {
   }
 
   /** @internal */
-  schedule(task: RecurringTask): ScheduledTask {
+  schedule(task: RecurringTask, { runAt = task.nextTime() }: { runAt?: Time } = {}): ScheduledTask {
+    const delay = Math.max(Number(runAt.minus(Time.current() as Time)), 0.1);
+
     const scheduledTask = new ScheduledTask(
-      task.delayFromNow(),
-      { args: [this, task, task.nextTime()] as const },
-      async (threadSchedule, threadTask, threadTaskRunAt) => {
-        threadSchedule.scheduleTask(threadTask);
+      delay,
+      { args: [task, runAt] as const },
+      async (threadTask, threadTaskRunAt) => {
+        this.scheduleNextRun(threadTask, { runAt: threadTask.nextTimeAfter(threadTaskRunAt) });
 
         await this.wrapInAppExecutor(() => threadTask.enqueue({ at: threadTaskRunAt }));
       },
@@ -85,6 +89,14 @@ export class RecurringSchedule {
 
     scheduledTask.execute();
     return scheduledTask;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE solid-queue-recurring-schedule-v1-7-2
+   */
+  scheduleNextRun(task: RecurringTask, { runAt }: { runAt: Time }): void {
+    if (this.scheduledTasks.has(task.key)) this.scheduleTask(task, { runAt });
   }
 }
 
