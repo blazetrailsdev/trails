@@ -13,3 +13,9 @@ describe("kernelURI", () => {
     expect(() => kernelURI(1)).toThrow(ArgumentError);
   });
 });
+
+describe("kernelURI String.try_convert arm", () => {
+  it("parses an object answering to_str", () => {
+    expect(kernelURI({ toStr: () => "http://example.com/" })).toBeInstanceOf(Generic);
+  });
+});

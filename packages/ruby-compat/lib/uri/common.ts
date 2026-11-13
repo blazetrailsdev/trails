@@ -394,6 +394,8 @@ export function kernelURI(uri: unknown): Generic {
     return uri;
   } else if (typeof uri === "string") {
     return URI.parse(uri);
+  } else if (uri != null && typeof (uri as { toStr?: unknown }).toStr === "function") {
+    return URI.parse((uri as { toStr(): string }).toStr());
   } else {
     throw new ArgumentError("bad argument (expected URI object or URI string)");
   }

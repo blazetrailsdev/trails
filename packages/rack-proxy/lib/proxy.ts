@@ -26,7 +26,7 @@ export class Proxy {
   static extractHttpRequestHeaders(env: RackEnv): Headers {
     const headers = this.buildHeaderHash(
       Object.entries(env)
-        .filter(([k, v]) => !(!/^HTTP_[A-Z0-9_.]+$/.test(k) || v == null))
+        .filter(([k, v]) => /^HTTP_[A-Z0-9_.]+$/m.test(k) && v != null)
         .map(([k, v]): [string, unknown] => [this.reconstructHeaderName(k), v]),
     );
 
@@ -36,7 +36,7 @@ export class Proxy {
     ).map((s) => s.trim());
     for (const key of headers.keys() as string[]) {
       if (
-        Proxy.HOP_BY_HOP_HEADERS[key.toLowerCase()] ||
+        Object.hasOwn(Proxy.HOP_BY_HOP_HEADERS, key.toLowerCase()) ||
         connectionNamed.includes(key.toLowerCase())
       ) {
         headers.delete(key);
@@ -85,13 +85,12 @@ export class Proxy {
 
   /** @internal */
   protected static reconstructHeaderName(name: string): string {
-    return this.titleize(name.replace(/^HTTP_/, "").replaceAll("_", "-"));
+    return this.titleize(name.replace(/^HTTP_/m, "").replaceAll("_", "-"));
   }
 
   /** @internal */
   protected static titleize(str: string): string {
-    return str
-      .split("-")
+    return stringSplit(str, "-")
       .map((s) => capitalize(s, []))
       .join("-");
   }
