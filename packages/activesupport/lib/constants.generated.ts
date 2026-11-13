@@ -232,6 +232,7 @@ defineConstants([
   [() => m64.Metadata, "ActiveSupport::Messages::Metadata"],
   [() => m65.RotationCoordinator, "ActiveSupport::Messages::RotationCoordinator"],
   [() => m66.SerializerWithFallback, "ActiveSupport::Messages::SerializerWithFallback"],
+  [() => m66.AllowMarshal, "ActiveSupport::Messages::SerializerWithFallback::AllowMarshal"],
   [() => m66.JsonWithFallback, "ActiveSupport::Messages::SerializerWithFallback::JsonWithFallback"],
   [
     () => m66.JsonWithFallbackAllowMarshal,

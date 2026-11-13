@@ -7,6 +7,7 @@ import {
   RuntimeError,
   extend,
   include,
+  rbCallSuper,
   rbRegMatchP,
   rbStrStartWith,
 } from "@blazetrails/ruby-compat";
@@ -50,6 +51,8 @@ export interface Serializer {
   detectFormat(dumped: string | Uint8Array): Format | undefined;
   /** @internal */
   fallback(format: Format): boolean;
+  /** @internal */
+  isAvailable?(): boolean;
 }
 
 /** @internal */
@@ -97,12 +100,22 @@ export const SerializerWithFallback = {
   fallback(format: Format): boolean;
   SERIALIZERS: Hash<Format, Serializer>;
   get(format: string): Serializer;
+  AllowMarshal: { fallback(format: Format): boolean };
   MarshalWithFallback: Serializer;
   JsonWithFallback: Serializer;
   JsonWithFallbackAllowMarshal: Serializer;
   MessagePackWithFallback: Serializer;
   MessagePackWithFallbackAllowMarshal: Serializer;
 };
+
+/** @internal */
+export const AllowMarshal = {
+  /** @internal */
+  fallback(this: Serializer, format: Format): boolean {
+    return (rbCallSuper(this, AllowMarshal.fallback, format) as boolean) || format === "marshal";
+  },
+};
+SerializerWithFallback.AllowMarshal = AllowMarshal;
 
 const MARSHAL_SIGNATURE = "\x04\x08";
 
@@ -163,13 +176,9 @@ include(JsonWithFallback, SerializerWithFallback);
 extend(JsonWithFallback, JsonWithFallback);
 SerializerWithFallback.JsonWithFallback = JsonWithFallback;
 
-export const JsonWithFallbackAllowMarshal = {
-  /** @internal */
-  fallback(format: Format): boolean {
-    return format !== "marshal" || format === "marshal";
-  },
-} as unknown as Serializer;
+export const JsonWithFallbackAllowMarshal = {} as Serializer;
 include(JsonWithFallbackAllowMarshal, JsonWithFallback);
+include(JsonWithFallbackAllowMarshal, AllowMarshal);
 extend(JsonWithFallbackAllowMarshal, JsonWithFallbackAllowMarshal);
 SerializerWithFallback.JsonWithFallbackAllowMarshal = JsonWithFallbackAllowMarshal;
 
@@ -186,8 +195,8 @@ export const MessagePackWithFallback = {
     return ActiveSupport.MessagePack!.load(dumped);
   },
 
-  dumped(this: Serializer & { isAvailable(): boolean }, dumped: string | Uint8Array): boolean {
-    return this.isAvailable() && ActiveSupport.MessagePack!.isSignature(dumped);
+  dumped(this: Serializer, dumped: string | Uint8Array): boolean {
+    return this.isAvailable!() && ActiveSupport.MessagePack!.isSignature(dumped);
   },
 
   /**
@@ -197,18 +206,14 @@ export const MessagePackWithFallback = {
   isAvailable(): boolean {
     return ActiveSupport.MessagePack !== undefined;
   },
-} as unknown as Serializer;
+} as Serializer;
 include(MessagePackWithFallback, SerializerWithFallback);
 extend(MessagePackWithFallback, MessagePackWithFallback);
 SerializerWithFallback.MessagePackWithFallback = MessagePackWithFallback;
 
-export const MessagePackWithFallbackAllowMarshal = {
-  /** @internal */
-  fallback(format: Format): boolean {
-    return format !== "marshal" || format === "marshal";
-  },
-} as unknown as Serializer;
+export const MessagePackWithFallbackAllowMarshal = {} as Serializer;
 include(MessagePackWithFallbackAllowMarshal, MessagePackWithFallback);
+include(MessagePackWithFallbackAllowMarshal, AllowMarshal);
 extend(MessagePackWithFallbackAllowMarshal, MessagePackWithFallbackAllowMarshal);
 SerializerWithFallback.MessagePackWithFallbackAllowMarshal = MessagePackWithFallbackAllowMarshal;
 

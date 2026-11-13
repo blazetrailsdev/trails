@@ -830,7 +830,7 @@
     }
   },
   "activesupport": {
-    "rows": 183,
+    "rows": 184,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -905,6 +905,7 @@
       "html-safe-translation.ts::HtmlSafeTranslation",
       "isolated-execution-state.ts::IsolatedExecutionState",
       "message-encryptor.ts::NullSerializer",
+      "messages/serializer-with-fallback.ts::AllowMarshal",
       "messages/serializer-with-fallback.ts::JsonWithFallback",
       "messages/serializer-with-fallback.ts::JsonWithFallbackAllowMarshal",
       "messages/serializer-with-fallback.ts::MarshalWithFallback",
