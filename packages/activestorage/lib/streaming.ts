@@ -95,8 +95,8 @@ async function sendBlobStream(
     },
     async (stream: ActionController.LiveBuffer) => {
       try {
-        await blob.download((chunk) => {
-          stream.write(chunk);
+        await blob.download(async (chunk) => {
+          await stream.write(chunk);
         });
       } catch (error) {
         if (error instanceof FileNotFoundError) {
