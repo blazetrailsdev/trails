@@ -1,9 +1,9 @@
-/* eslint-disable unused-imports/no-unused-vars */
 import {
   ArgumentError,
   Encoding,
   StandardError,
   TopLevel,
+  rbAryBsearch,
   rbModName,
 } from "@blazetrails/ruby-compat";
 import { InvalidCountryCode } from "./country.js";
@@ -15,14 +15,15 @@ export class InvalidDataSource extends StandardError {}
 
 export class DataSourceNotFound extends StandardError {}
 
-let instance: DataSource | null = null;
-
 export class DataSource {
+  /** @internal */
+  private static instance: DataSource | null = null;
+
   static get(): DataSource {
-    if (!instance) {
-      if (!instance) this.set(this.createDefaultDataSource());
+    if (!DataSource.instance) {
+      if (!DataSource.instance) this.set(this.createDefaultDataSource());
     }
-    return instance!;
+    return DataSource.instance!;
   }
 
   static set(dataSourceOrType: DataSource | "ruby" | "zoneinfo", ...args: unknown[]): DataSource {
@@ -33,17 +34,17 @@ export class DataSource {
       };
     };
     if (dataSourceOrType instanceof DataSource) {
-      instance = dataSourceOrType;
+      DataSource.instance = dataSourceOrType;
     } else if (dataSourceOrType === "ruby") {
-      instance = new DataSources.RubyDataSource();
+      DataSource.instance = new DataSources.RubyDataSource();
     } else if (dataSourceOrType === "zoneinfo") {
-      instance = new DataSources.ZoneinfoDataSource(...args);
+      DataSource.instance = new DataSources.ZoneinfoDataSource(...args);
     } else {
       throw new ArgumentError(
         "data_source_or_type must be a DataSource instance or a data source type (:ruby or :zoneinfo)",
       );
     }
-    return instance;
+    return DataSource.instance;
   }
 
   /** @internal */
@@ -127,11 +128,13 @@ export class DataSource {
   }
 
   /** @internal */
+  // eslint-disable-next-line unused-imports/no-unused-vars
   protected loadTimezoneInfo(identifier: string): TimezoneInfo {
     this.raiseInvalidDataSource("load_timezone_info");
   }
 
   /** @internal */
+  // eslint-disable-next-line unused-imports/no-unused-vars
   protected loadCountryInfo(code: string): CountryInfo {
     this.raiseInvalidDataSource("load_country_info");
   }
@@ -190,31 +193,11 @@ export class DataSource {
 
   /** @internal */
   private findTimezoneIdentifier(identifier: string): string | null {
-    const identifiers = this.timezoneIdentifiers();
-    let low = 0;
-    let high = identifiers.length;
-
-    while (low < high) {
-      const mid = Math.floor((low + high) / 2);
-      const midIdentifier = identifiers[mid];
-      const cmp = midIdentifier < identifier ? -1 : midIdentifier > identifier ? 1 : 0;
-
-      if (cmp === 0) return midIdentifier;
-
-      if (cmp > 0) {
-        high = mid;
-      } else {
-        low = mid + 1;
-      }
-    }
-
-    return null;
+    const result = rbAryBsearch(this.timezoneIdentifiers(), (i) => i >= identifier);
+    return result === identifier ? result : null;
   }
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
+  /** @internal */
   private tryWithEncoding<T>(
     string: string,
     encoding: Encoding,
@@ -222,7 +205,6 @@ export class DataSource {
   ): T | null {
     const result = block(string);
     if (result != null) return result;
-    if (encoding !== Encoding.UTF_8) return block(string);
     return null;
   }
 }

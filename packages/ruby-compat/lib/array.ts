@@ -356,6 +356,55 @@ export function rbAryFetch<T>(ary: readonly T[], pos: number): T {
 }
 
 /**
+ * `rb_ary_bsearch_index` (`vendor/ruby/v3.3.11/array.c:3513`): the find-minimum
+ * mode for a `true`/`false`/`nil` block, and the find-any mode for a numeric one.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#bsearch_index`.
+ */
+export function rbAryBsearchIndex<T>(ary: readonly T[], block: (val: T) => unknown): number | null {
+  let low = 0;
+  let high = ary.length;
+  let smaller: boolean;
+  let satisfied = false;
+
+  while (low < high) {
+    const mid = low + Math.floor((high - low) / 2);
+    const v = block(ary[mid]);
+    if (typeof v === "number") {
+      if (v === 0) return mid;
+      smaller = v < 0;
+    } else if (v === true) {
+      satisfied = true;
+      smaller = true;
+    } else if (v == null || v === false) {
+      smaller = false;
+    } else {
+      throw new TypeError(
+        `wrong argument type ${(v as object).constructor.name} (must be numeric, true, false or nil)`,
+      );
+    }
+    if (smaller) {
+      high = mid;
+    } else {
+      low = mid + 1;
+    }
+  }
+  if (!satisfied) return null;
+  return low;
+}
+
+/**
+ * `rb_ary_bsearch` (`vendor/ruby/v3.3.11/array.c:3493`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Array#bsearch`.
+ */
+export function rbAryBsearch<T>(ary: readonly T[], block: (val: T) => unknown): T | null {
+  const indexResult = rbAryBsearchIndex(ary, block);
+  if (indexResult != null) return ary[indexResult];
+  return null;
+}
+
+/**
  * `rb_ary_replace` (`vendor/ruby/v3.3.11/array.c:4531`): `copy`'s contents
  * become `orig`'s, in place, and `copy` is returned.
  *

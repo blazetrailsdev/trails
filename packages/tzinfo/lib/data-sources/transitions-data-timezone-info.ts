@@ -1,4 +1,4 @@
-import { ArgumentError, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbAryBsearchIndex, rbEqual } from "@blazetrails/ruby-compat";
 import type { Timestamp } from "../timestamp.js";
 import type { TimezoneTransition } from "../timezone-transition.js";
 import { TransitionsTimezonePeriod } from "../transitions-timezone-period.js";
@@ -128,21 +128,7 @@ export class TransitionsDataTimezoneInfo extends DataTimezoneInfo {
 
   /** @internal */
   private findMinimumTransition(block: (t: TimezoneTransition) => boolean): number | null {
-    let low = 0;
-    let high = this.transitions.length;
-    let satisfied = false;
-
-    while (low < high) {
-      const mid = Math.floor((low + high) / 2);
-      if (block(this.transitions[mid])) {
-        satisfied = true;
-        high = mid;
-      } else {
-        low = mid + 1;
-      }
-    }
-
-    return satisfied ? low : null;
+    return rbAryBsearchIndex(this.transitions, block);
   }
 
   /** @internal */
