@@ -2,10 +2,12 @@ import { beforeAll, describe, expect, it } from "vitest";
 import "./test-helper.js";
 import { Base, Reflection } from "@blazetrails/activerecord";
 import { ActiveRecordExtensions, ReflectionExtension } from "@blazetrails/activestorage/reflection";
-import { ActiveStorage, Model } from "@blazetrails/activestorage";
-import { include, prepend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { ActiveStorage, Model, Registry } from "@blazetrails/activestorage";
+import { Dir, include, prepend, rbObjSingletonClass, StringIO } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 import { ActionText } from "../lib/action-text.js";
+import { Attachable } from "../lib/attachable.js";
+import { Attachment } from "../lib/attachment.js";
 import { Attribute } from "../lib/attribute.js";
 import { Content } from "../lib/content.js";
 import { Message } from "./dummy/app/models/message.js";
@@ -45,6 +47,11 @@ beforeAll(async () => {
   await Message.loadSchema();
   await RichText.loadSchema();
   await ActiveStorage.Blob!.loadSchema();
+  await (ActiveStorage.Attachment as unknown as typeof Base).loadSchema();
+  const blob = ActiveStorage.Blob as unknown as { services: Registry; service: unknown };
+  blob.services = new Registry({ local: { service: "Disk", root: Dir.mktmpdir("action_text") } });
+  blob.service = blob.services.fetch("local");
+  include(ActiveStorage.Blob!, Attachable);
 });
 
 describe("ActionText::Serialization (trails)", () => {
@@ -92,10 +99,6 @@ describe("ActionText::Attribute (trails)", () => {
       subject: "Greetings",
       content: "<p>content</p>",
     })) as unknown as RichTextMessage;
-    expect(() => {
-      message.content = "" as never;
-    }).toThrow(/to_plain_text is not loaded/);
-    await message.content.toPlainText();
     message.content = "" as never;
     expect(message.content.markedForDestruction()).toBe(true);
     const before = await RichText.count();
@@ -121,6 +124,30 @@ describe("ActionText::Attribute (trails)", () => {
     const before = await RichText.count();
     await message.destroy();
     expect(await RichText.count()).toBe(before - 1);
+  });
+
+  it("extracts deduplicated blob embeds before save", async () => {
+    const blob = await (
+      ActiveStorage.Blob as unknown as {
+        createAndUploadBang(options: object): Promise<{ id: unknown }>;
+      }
+    ).createAndUploadBang({
+      io: new StringIO("racecar"),
+      filename: "racecar.jpg",
+      contentType: "image/jpeg",
+    });
+    const content = new Content(
+      `Hello world${Attachment.fromAttachables([blob, blob])
+        .map((attachment) => attachment.toHtml())
+        .join("")}`,
+    );
+    const message = (await Message.create({
+      subject: "Greetings",
+      content: content,
+    })) as unknown as RichTextMessage;
+    const embeds = (await (message.content as unknown as { embeds: { blobs: unknown } }).embeds
+      .blobs) as Array<{ id: unknown }>;
+    expect(embeds.map((b) => b.id)).toEqual([blob.id]);
   });
 
   it("lists rich text association names", () => {

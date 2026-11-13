@@ -14,7 +14,7 @@ export class RichText extends Record {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  private _plainText?: [Content | null, string];
+  private _plainText?: [string | undefined, string];
 
   static {
     this.serialize("body", { coder: Content });
@@ -23,10 +23,14 @@ export class RichText extends Record {
 
     (this as unknown as { hasManyAttached(name: string): void }).hasManyAttached("embeds");
 
-    /** @inventedArm canonicalized — PERMANENT */
+    /**
+     * @inventedArm canonicalized — PERMANENT
+     * @inventedArm toPlainText — PERMANENT
+     */
     this.beforeSave(async (record: RichText) => {
       if (record.body != null && record.body.isPresent()) {
         const body = await record.body.canonicalized;
+        await record.toPlainText();
         await (record as unknown as { setEmbeds(attachables: unknown): Promise<void> }).setEmbeds(
           uniq(
             (await body.attachables()).filter(
@@ -49,7 +53,7 @@ export class RichText extends Record {
   async toPlainText(): Promise<string> {
     const body = this.body;
     const plainText = String((await body?.toPlainText()) ?? "");
-    this._plainText = [body, plainText];
+    this._plainText = [body?.toHtml(), plainText];
     return plainText;
   }
 
@@ -67,7 +71,8 @@ export class RichText extends Record {
    */
   loadedPlainText(): string {
     if (this.body == null) return "";
-    if (this._plainText?.[0] === this.body) return this._plainText[1];
+    if (this._plainText != null && this._plainText[0] === this.body.toHtml())
+      return this._plainText[1];
     throw new RuntimeError("to_plain_text is not loaded; `await richText.toPlainText()` first.");
   }
 }
