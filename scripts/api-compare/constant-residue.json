@@ -37,7 +37,7 @@
     }
   },
   "actionmailbox": {
-    "rows": 25,
+    "rows": 27,
     "excluded": ["base-controller.ts::BaseController"],
     "unwalked": [
       "callbacks.ts::Callbacks",
