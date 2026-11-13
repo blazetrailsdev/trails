@@ -309,14 +309,7 @@ export async function saveBelongsToAssociation(this: AutosaveAssociationHost, re
   }
 }
 
-/** @internal */
-export function initInternals(this: AutosaveAssociationHost): void {
-  rbCallSuper(this, initInternals);
-  this._alreadyCalled = null;
-}
-
 Object.assign(AutosaveAssociation, {
-  initInternals,
   reload,
 });
 

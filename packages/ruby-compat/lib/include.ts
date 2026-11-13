@@ -71,6 +71,8 @@ import {
   reopened,
   rbSeatSuper,
   superSlots,
+  superSlotFor,
+  _superSlot,
   type TopLevelConstants,
 } from "./object.js";
 import { isSymbol } from "./symbol.js";
@@ -1657,12 +1659,6 @@ export function rbModAppendFeatures(
 
 const prependedMethods = new WeakMap<object, Set<unknown>>();
 
-function superSlotFor(method: AnyFunction, key: string): { slot: symbol; key: string } {
-  let entry = superSlots.get(method);
-  if (entry === undefined) superSlots.set(method, (entry = { slot: Symbol(`super:${key}`), key }));
-  return entry;
-}
-
 /**
  * The super slot of the lowest method prepended over `key` on `proto`, where
  * Ruby's `include` inserts a module (`include_modules_at`,
@@ -1691,12 +1687,13 @@ function prependOrigin(proto: object, key: string): { slot: symbol } | undefined
  * @noRailsEquivalent PERMANENT
  */
 export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unknown[]): unknown {
-  const entry = superSlots.get(method);
-  const slot = entry?.slot;
-  let next = slot === undefined ? undefined : (Reflect.get(receiver, slot) as unknown);
-  const name = entry?.key ?? method.name;
-  if (next === undefined && Object.hasOwn(Kernel, name)) {
-    next = Reflect.get(Kernel, name);
+  let slot = (method as { [_superSlot]?: symbol })[_superSlot];
+  let entry;
+  if (slot === undefined) slot = (entry = superSlots.get(method))?.slot;
+  let next = slot === undefined ? undefined : (receiver as Record<symbol, unknown>)[slot];
+  if (next === undefined) {
+    const name = (entry ?? superSlots.get(method))?.key ?? method.name;
+    if (Object.hasOwn(Kernel, name)) next = Reflect.get(Kernel, name);
   }
   if (typeof next !== "function") {
     throw new NoMethodError(

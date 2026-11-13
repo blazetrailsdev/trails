@@ -34,6 +34,37 @@ export const superSlots = new WeakMap<
   { slot: symbol; key: string }
 >();
 
+/**
+ * A method's own copy of its {@link superSlots} slot (MRI
+ * `vm_search_super_method`, `vendor/ruby/v3.3.11/vm_insnhelper.c:4680`).
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ * @perf 10ns — PERMANENT
+ */
+export const _superSlot = Symbol("superSlot");
+
+/**
+ * `method`'s entry in {@link superSlots}, made on first use under the `key`
+ * it is being installed as, the `original_id` MRI's `vm_search_super_method`
+ * (`vendor/ruby/v3.3.11/vm_insnhelper.c:4680`) searches by.
+ *
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function superSlotFor(
+  method: (...args: never[]) => unknown,
+  key: string,
+): { slot: symbol; key: string } {
+  let entry = superSlots.get(method);
+  if (entry === undefined) {
+    superSlots.set(method, (entry = { slot: Symbol(`super:${key}`), key }));
+    if (Object.isExtensible(method))
+      Object.defineProperty(method, _superSlot, { value: entry.slot });
+  }
+  return entry;
+}
+
 type Klass = abstract new (...args: never) => unknown;
 
 /**
@@ -979,13 +1010,7 @@ export function rbSeatSuper(
     }
   }
   if (typeof shadowed !== "function" || shadowed === method) return;
-  let entry = superSlots.get(method as (...args: never[]) => unknown);
-  if (entry === undefined) {
-    superSlots.set(
-      method as (...args: never[]) => unknown,
-      (entry = { slot: Symbol(`super:${key}`), key }),
-    );
-  }
+  const entry = superSlotFor(method as (...args: never[]) => unknown, key);
   if (Object.hasOwn(descriptors, entry.slot)) return;
   descriptors[entry.slot] = { value: shadowed, configurable: true };
 }

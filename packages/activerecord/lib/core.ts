@@ -750,38 +750,7 @@ const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
 
-/** @internal */
-export function initInternals(
-  this: Base & {
-    _attributes: import("@blazetrails/activemodel").AttributeSet;
-    _newRecord: boolean;
-    _readonly: boolean;
-    _previouslyNewRecord: boolean;
-    _destroyed: boolean;
-    _markedForDestruction: boolean;
-    _destroyedByAssociation: unknown;
-    _startTransactionState: unknown;
-    _strictLoading: boolean;
-    _strictLoadingMode?: StrictLoadingMode;
-    _primaryKey?: string | string[] | null;
-  },
-): void {
-  this._readonly = false;
-  this._previouslyNewRecord = false;
-  this._destroyed = false;
-  this._markedForDestruction = false;
-  this._destroyedByAssociation = null;
-  this._startTransactionState = null;
-  const klass = this.constructor;
-  this._primaryKey = klass.primaryKey;
-  this._strictLoading = klass.strictLoadingByDefault ?? false;
-  this._strictLoadingMode = klass.strictLoadingMode;
-
-  klass.defineAttributeMethods();
-}
-
 const SuperMethods = {
-  initInternals,
   initializeDup,
   initializeInternalsCallback,
 };

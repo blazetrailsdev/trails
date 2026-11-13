@@ -267,19 +267,12 @@ export function association(this: Base, name: string): AssociationInstance {
   return instance;
 }
 
-/** @internal */
-export function initInternals(this: Base): void {
-  rbCallSuper(this, initInternals);
-  this._associationCache = new Map();
-}
-
 export function initializeDup(this: Base, other: unknown): void {
   this._associationCache = new Map();
   rbCallSuper(this, initializeDup, other);
 }
 
 Object.assign(AssociationsNamespace, {
-  initInternals,
   initializeDup,
 });
 

@@ -26,7 +26,8 @@ import { runAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
 type TransactionAction = "create" | "update" | "destroy";
 
-interface TransactionRecordState {
+/** @internal */
+export interface TransactionRecordState {
   id: unknown;
   newRecord: boolean;
   previouslyNewRecord: boolean;
@@ -394,14 +395,6 @@ export function _triggerDestroyCallback(this: TransactionsRecord): boolean | nul
 }
 
 /** @internal */
-export function initInternals(this: TransactionsRecord): void {
-  rbCallSuper(this, initInternals);
-  this._startTransactionState = null;
-  this._committedAlreadyCalled = null;
-  this._newRecordBeforeLastCommit = null;
-}
-
-/** @internal */
 export function clearTransactionRecordState(this: TransactionsRecord): void {
   if (!this._startTransactionState) return;
   this._startTransactionState.level -= 1;
@@ -493,5 +486,4 @@ function assertValidTransactionAction(actions: string[]): void {
 Object.assign(Transactions, {
   beforeCommittedBang,
   touch,
-  initInternals,
 });

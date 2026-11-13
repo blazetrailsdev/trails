@@ -116,12 +116,6 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
   return UPDATED_ATTRS.map((name) => aliases[name] ?? name);
 }
 
-/** @internal */
-export function initInternals(this: TimestampInstanceHost): void {
-  rbCallSuper(this, initInternals);
-  this._touchRecord = null;
-}
-
 export function initializeDup(this: TimestampInstanceHost, other: unknown): void {
   rbCallSuper(this, initializeDup, other);
   clearTimestampAttributes.call(this);
@@ -238,6 +232,5 @@ Object.assign(Timestamp, {
   },
   maxUpdatedColumnTimestamp,
   clearTimestampAttributes,
-  initInternals,
   initializeDup,
 });

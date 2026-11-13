@@ -143,15 +143,6 @@ export async function reload<T extends DirtyPrivateHost>(this: T, ...args: unkno
 }
 
 /** @internal */
-export function initInternals(this: DirtyPrivateHost): void {
-  rbCallSuper(this, initInternals);
-  this._mutationsBeforeLastSave = null;
-  this._mutationsFromDatabase = null;
-  this._touchAttrNames = null;
-  this._skipDirtyTracking = null;
-}
-
-/** @internal */
 export async function _touchRow(
   this: DirtyPrivateHost,
   attributeNames: string[],
@@ -238,7 +229,6 @@ export function attributeNamesForPartialInserts(this: DirtyPrivateHost): string[
 }
 
 Object.assign(Dirty, {
-  initInternals,
   reload,
 });
 
