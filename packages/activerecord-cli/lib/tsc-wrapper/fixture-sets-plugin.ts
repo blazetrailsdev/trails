@@ -16,7 +16,7 @@ interface FixtureSetFacts {
   modelClass: string | null;
 }
 
-const FIXTURES_CALL_PATTERN = /\.fixtures\(([^)]*)\)/;
+const FIXTURES_CALL_PATTERN = /\.fixtures\(([^)]*)\)/g;
 const STRING_ARGUMENT_PATTERN = /"([^"]*)"|'([^']*)'/g;
 const SET_FIXTURE_CLASS_PATTERN = /\.setFixtureClass\(\s*\{([^}]*)\}/g;
 const OVERRIDE_ENTRY_PATTERN =
@@ -85,10 +85,9 @@ export function createFixtureSetsPlugin(opts: FixtureSetsPluginOptions): TscPlug
     name: "fixture-sets",
     extensions: [".ts", ".mts", ".cts"],
     virtualize(filePath, source): VirtualizeOutput | null {
-      const call = FIXTURES_CALL_PATTERN.exec(source);
-      if (fixtureFiles.length === 0 || !call) return null;
-      const fixtureSetNames = [...call[1].matchAll(STRING_ARGUMENT_PATTERN)].map(
-        (m) => m[1] ?? m[2],
+      if (fixtureFiles.length === 0) return null;
+      const fixtureSetNames = [...source.matchAll(FIXTURES_CALL_PATTERN)].flatMap((call) =>
+        [...call[1].matchAll(STRING_ARGUMENT_PATTERN)].map((m) => m[1] ?? m[2]),
       );
       if (fixtureSetNames.length === 0) return null;
       const overrides = fixtureClassOverrides(source);
@@ -97,7 +96,7 @@ export function createFixtureSetsPlugin(opts: FixtureSetsPluginOptions): TscPlug
       for (const file of fixtureFiles) {
         if (file.path.startsWith("files/")) continue;
         const fsName = file.path.replace(/\.[^./]+$/, "");
-        if (fixtureSetNames[0] !== ":all" && !fixtureSetNames.includes(fsName)) continue;
+        if (!fixtureSetNames.includes(":all") && !fixtureSetNames.includes(fsName)) continue;
         const key = fsName.includes("/") ? fsName.replaceAll("/", "_") : fsName;
         if (seen.has(key)) continue;
         seen.add(key);
