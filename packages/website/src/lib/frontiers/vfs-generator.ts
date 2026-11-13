@@ -258,7 +258,7 @@ function applyVfsOverrides(instance: MigrationGenerator | ModelGenerator | AppGe
 
 export class VfsMigrationGenerator extends MigrationGenerator {
   static {
-    void this.sourceRoot(MIGRATION_SOURCE_ROOT);
+    this.sourceRoot(MIGRATION_SOURCE_ROOT);
   }
 
   constructor(args: unknown[], localOptions: unknown, config: VfsGeneratorConfig) {

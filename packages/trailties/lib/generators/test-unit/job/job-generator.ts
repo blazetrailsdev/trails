@@ -7,7 +7,7 @@ const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathnam
 
 export class JobGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourceRoot(File.expandPath("templates", __dir__));
     this.checkClassCollision({ suffix: "JobTest" });
     this.methodAdded("createTestFile");
   }

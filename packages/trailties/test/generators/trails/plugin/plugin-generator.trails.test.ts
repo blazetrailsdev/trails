@@ -11,9 +11,7 @@ const __dir__ = import.meta.dirname;
 
 class Host extends AppBase {
   static {
-    void this.sourceRoot(
-      File.expandPath("../../../../lib/generators/trails/plugin/templates", __dir__),
-    );
+    this.sourceRoot(File.expandPath("../../../../lib/generators/trails/plugin/templates", __dir__));
     this.addSharedOptionsFor("plugin");
     this.methodAdded("getBuilderClass");
     this.methodAdded("name");

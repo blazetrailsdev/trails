@@ -178,12 +178,16 @@ export abstract class Base extends (Group as unknown as (abstract new (
     return false;
   }
 
-  static async sourceRoot(path: string | null = null): Promise<string | null | undefined> {
+  static sourceRoot(path: string): string;
+  static sourceRoot(
+    path?: string | null,
+  ): string | null | undefined | Promise<string | null | undefined>;
+  static sourceRoot(
+    path: string | null = null,
+  ): string | null | undefined | Promise<string | null | undefined> {
     if (path != null) this._sourceRoot = path;
-    if (!Object.hasOwn(this, "_sourceRoot") || this._sourceRoot == null) {
-      this._sourceRoot = await this.defaultSourceRoot();
-    }
-    return this._sourceRoot;
+    if (Object.hasOwn(this, "_sourceRoot") && this._sourceRoot != null) return this._sourceRoot;
+    return this.defaultSourceRoot().then((root) => (this._sourceRoot = root));
   }
 
   static async desc(description: string | null = null): Promise<string | null> {

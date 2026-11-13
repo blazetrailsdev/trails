@@ -7,7 +7,7 @@ const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathnam
 
 export class ControllerGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("actions", { type: "array", default: [], banner: "action action" });
     this.classOption("skipRoutes", { type: "boolean" });
 

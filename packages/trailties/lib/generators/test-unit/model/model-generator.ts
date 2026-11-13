@@ -24,7 +24,7 @@ export class ModelGenerator extends Base {
   ];
 
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("attributes", { type: "array", default: [], banner: "field:type field:type" });
 
     this.checkClassCollision({ suffix: "Test" });

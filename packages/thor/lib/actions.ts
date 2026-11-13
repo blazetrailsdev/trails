@@ -66,7 +66,7 @@ export interface ActionsClassHost {
   _sourcePaths?: string[];
   _sourceRoot?: string | null;
   sourcePaths(): string[];
-  sourceRoot(path?: string): Promise<string | null | undefined>;
+  sourceRoot(path?: string | null): string | null | undefined | Promise<string | null | undefined>;
   classOption(name: string, options?: Record<string, unknown>): unknown;
 }
 
@@ -107,7 +107,7 @@ export const ClassMethods = {
     return (this._sourcePaths = (rbObjIvarGet(this, "@_source_paths") as string[] | null) || []);
   },
 
-  async sourceRoot(this: ActionsClassHost, path: string | null = null): Promise<string | null> {
+  sourceRoot(this: ActionsClassHost, path: string | null = null): string | null {
     if (path != null) this._sourceRoot = path;
     return (this._sourceRoot = (rbObjIvarGet(this, "@_source_root") as string | null) ?? null);
   },

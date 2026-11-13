@@ -12,7 +12,7 @@ export interface UpdateGenerator extends Included<typeof Migration> {}
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class UpdateGenerator extends Base {
   static {
-    void this.sourceRoot(
+    this.sourceRoot(
       File.expandPath("templates", decodeURIComponent(new URL(".", import.meta.url).pathname)),
     );
     this.methodAdded("copyFiles");
