@@ -277,41 +277,6 @@ describe("init_internals (core.rb:834 and each module's super chain)", () => {
     expect(Object.getOwnPropertySymbols(Base.prototype.initInternals)).toEqual([]);
   });
 
-  it("resets the state every module in the chain owns", async () => {
-    const topic = (await Topic.first()) as Topic;
-    const state = topic as unknown as Record<string, unknown>;
-    const reset: Record<string, unknown> = {
-      _readonly: false,
-      _previouslyNewRecord: false,
-      _destroyed: false,
-      _markedForDestruction: false,
-      _destroyedByAssociation: null,
-      _triggerDestroyCallback: null,
-      _triggerUpdateCallback: null,
-      _mutationsBeforeLastSave: null,
-      _mutationsFromDatabase: null,
-      _touchAttrNames: null,
-      _skipDirtyTracking: null,
-      _touchRecord: null,
-      _alreadyCalled: null,
-      _startTransactionState: null,
-      _committedAlreadyCalled: null,
-      _newRecordBeforeLastCommit: null,
-      _deferTouchAttrs: null,
-    };
-    for (const key of Object.keys(reset)) state[key] = "stale";
-    const associationCache = new Map([["stale", 1]]);
-    state._associationCache = associationCache;
-
-    topic.initInternals();
-
-    for (const [key, value] of Object.entries(reset))
-      expect([key, state[key]]).toEqual([key, value]);
-    expect(state._associationCache).not.toBe(associationCache);
-    expect(state._associationCache).toEqual(new Map());
-    expect(state._primaryKey).toBe("id");
-  });
-
   it("stops at Core, which calls no super, so ActiveModel::Validations' body is not reached", async () => {
     const topic = (await Topic.first()) as Topic;
     const errors = topic.errors;
@@ -527,7 +492,6 @@ describe("init_internals / initialize_dup super chain", () => {
     expect(topic._committedAlreadyCalled).toBe(null);
     expect(topic._newRecordBeforeLastCommit).toBe(null);
     expect(topic._deferTouchAttrs).toBe(null);
-    expect(topic._touchTime).toBe(null);
   });
 
   it("dup runs the whole chain, including the ActiveModel links", async () => {

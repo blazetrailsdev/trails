@@ -1430,7 +1430,7 @@ export class Base extends Model {
     const klass = this.constructor;
 
     this._primaryKey = klass.primaryKey;
-    this._strictLoading = klass.strictLoadingByDefault ?? false;
+    this._strictLoading = klass.strictLoadingByDefault;
     this._strictLoadingMode = klass.strictLoadingMode;
 
     klass.defineAttributeMethods();
@@ -1457,7 +1457,6 @@ export class Base extends Model {
     this._newRecordBeforeLastCommit = null;
 
     this._deferTouchAttrs = null;
-    this._touchTime = null;
   }
   declare initializeInternalsCallback: () => void;
   /** @internal */
@@ -1896,8 +1895,6 @@ export interface Base
   _newRecordBeforeLastCommit?: boolean | null;
   /** @internal */
   _deferTouchAttrs?: readonly string[] | null;
-  /** @internal */
-  _touchTime?: unknown;
   /** @internal */
   strictLoadedAssociations: OmitThisParameter<typeof _Persistence.strictLoadedAssociations>;
   /** @internal */
