@@ -6,17 +6,6 @@ import { fileURLToPath } from "node:url";
 import * as apiCompareConfigModule from "./api-compare/config.js";
 import { SOURCES } from "../vendor/sources.js";
 
-/**
- * Writes the `mirrors` field of each package's `package.json` from
- * `vendor/sources.lock.json`, and with `--check` reports every package whose
- * field differs instead (RFC 0191 § 6).
- *
- * `mirrors` lists the upstream sources a package is ported from, each with the
- * `ref` and commit `sha` the parity gates measure that package against. It says
- * nothing about how far the port has got: a package can name a `ref` while the
- * bump ledger for that source still has open rows.
- */
-
 export const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 export interface Mirror {
@@ -34,12 +23,20 @@ function cjs<T extends object>(ns: T): T {
 }
 const { PACKAGE_DIR_OVERRIDES } = cjs(apiCompareConfigModule);
 
-/** The `packages/<dir>` each source entry is ported in. */
 function portedIn(name: string, portedBy: string | undefined): string {
   return portedBy ?? PACKAGE_DIR_OVERRIDES[name] ?? name;
 }
 
-/** Expected `mirrors` for every package directory; `null` where no source maps to it. */
+/**
+ * Expected `mirrors` field for every package directory, from
+ * `vendor/sources.lock.json`; `null` where no source maps to the package
+ * (RFC 0191 § 6). `pnpm vendor:mirrors` writes it and `--check` reports drift.
+ *
+ * `mirrors` lists the upstream sources a package is ported from, each with the
+ * `ref` and commit `sha` the parity gates measure that package against. It says
+ * nothing about how far the port has got: a package can name a `ref` while the
+ * bump ledger for that source still has open rows.
+ */
 export async function expectedMirrors(root = REPO_ROOT): Promise<Map<string, Mirror[] | null>> {
   const lock = JSON.parse(
     await readFile(join(root, "vendor/sources.lock.json"), "utf8"),
