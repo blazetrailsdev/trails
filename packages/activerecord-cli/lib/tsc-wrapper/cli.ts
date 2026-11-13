@@ -27,6 +27,7 @@ import {
 } from "./ar-program.js";
 import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
 import { parseSchemaTs } from "./schema-ts-parser.js";
+import type { FixtureFile } from "./fixture-sets-plugin.js";
 import { buildViews, decodeLineMappings } from "@blazetrails/trails-tsc";
 import type { TseSourceMap } from "./ar-program.js";
 
@@ -101,6 +102,21 @@ export function loadSchemaColumns(args: string[]): SchemaColumns | undefined {
     }
   }
   return merged;
+}
+
+export async function loadFixtureFiles(appRoot: string): Promise<FixtureFile[]> {
+  const dir = path.join(appRoot, "test", "fixtures");
+  const entries = await fs.promises.readdir(dir, { recursive: true }).catch(() => [] as string[]);
+  const files = entries
+    .map((entry) => entry.split(path.sep).join("/"))
+    .filter((entry) => /\.(yml|ts)$/.test(entry) && !entry.endsWith(".d.ts"))
+    .sort();
+  return Promise.all(
+    files.map(async (file) => ({
+      path: file,
+      text: await fs.promises.readFile(path.join(dir, file), "utf8"),
+    })),
+  );
 }
 
 export async function loadTimeZoneAwareAttributes(appRoot: string): Promise<boolean | undefined> {
@@ -417,17 +433,21 @@ async function handleBuildMode(args: string[]): Promise<void> {
     const isDir = fs.existsSync(root) && fs.statSync(root).isDirectory();
     await buildConfiguredViews(isDir ? path.join(root, "tsconfig.json") : root);
   }
-  const firstRoot = rootConfigs[0];
-  const timeZoneAwareAttributes = await loadTimeZoneAwareAttributes(
-    (await fs.promises.stat(firstRoot).catch(() => null))?.isDirectory()
-      ? firstRoot
-      : path.dirname(firstRoot),
+  const appRoots = await Promise.all(
+    rootConfigs.map(async (root) =>
+      (await fs.promises.stat(root).catch(() => null))?.isDirectory() ? root : path.dirname(root),
+    ),
+  );
+  const timeZoneAwareAttributes = await loadTimeZoneAwareAttributes(appRoots[0]);
+  const fixtureFilesByAppRoot = new Map(
+    await Promise.all(appRoots.map(async (root) => [root, await loadFixtureFiles(root)] as const)),
   );
   const builder = createArSolutionBuilder(rootConfigs, {
     verbose,
     schemaColumnsByTable,
     schemaScopes,
     timeZoneAwareAttributes,
+    fixtureFilesByAppRoot,
     onModel: reporter.onModel,
     onDiagnostic: (d) => {
       const out = pretty
@@ -526,6 +546,7 @@ export async function main(): Promise<void> {
     schemaColumnsByTable,
     schemaScopes,
     timeZoneAwareAttributes: await loadTimeZoneAwareAttributes(path.dirname(configPath)),
+    fixtureFiles: await loadFixtureFiles(path.dirname(configPath)),
     onModel: reporter.onModel,
   });
   reporter.flush();
