@@ -11,6 +11,7 @@ import { Base } from "@blazetrails/actionview/helpers/tags/base.js";
 import { Placeholderable } from "@blazetrails/actionview/helpers/tags/placeholderable.js";
 import { Translator } from "@blazetrails/actionview/helpers/tags/translator.js";
 import { Tags } from "@blazetrails/actionview/namespaces.js";
+import { ActionText as ActionTextNamespace } from "./action-text.js";
 import { block, classModule, except, fetch, hashDelete, include } from "@blazetrails/ruby-compat";
 
 type Options = Record<string, unknown>;
@@ -81,6 +82,8 @@ export class TagHelper {
 }
 
 TagHelper.prototype.richTextAreaTag = TagHelper.prototype.richTextareaTag;
+
+ActionTextNamespace.TagHelper = TagHelper;
 
 export class ActionText extends Base {
   declare domId: (recordOrClass: unknown, prefix?: string | null) => string;

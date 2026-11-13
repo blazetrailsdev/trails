@@ -19,6 +19,7 @@ import type { Fragment } from "./fragment.js";
 import type { HtmlConversion } from "./html-conversion.js";
 import type { PlainTextConversion } from "./plain-text-conversion.js";
 import type { ContentHelper } from "./content-helper.js";
+import type { TagHelper } from "./tag-helper.js";
 import type { Rendering } from "./rendering.js";
 import type { TrixAttachment } from "./trix-attachment.js";
 
@@ -90,6 +91,7 @@ export const ActionText = {
   Rendering?: typeof Rendering;
   RichText?: typeof RichText;
   Serialization?: typeof Serialization;
+  TagHelper?: typeof TagHelper;
   TrixAttachment?: typeof TrixAttachment;
 };
 extend(ActionText, Autoload);
