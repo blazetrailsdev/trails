@@ -301,7 +301,7 @@
     }
   },
   "actiontext": {
-    "rows": 22,
+    "rows": 23,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -317,6 +317,7 @@
       "attribute.ts::Attribute": "ActionText::Attribute",
       "content-helper.ts::ContentHelper": "ActionText::ContentHelper",
       "content.ts::Content": "ActionText::Content",
+      "encrypted-rich-text.ts::EncryptedRichText": "ActionText::EncryptedRichText",
       "fragment.ts::Fragment": "ActionText::Fragment",
       "gem-version.ts::VERSION": "ActionText::VERSION",
       "html-conversion.ts::HtmlConversion": "ActionText::HtmlConversion",

@@ -19,6 +19,7 @@ import {
   eachPair,
   Hash,
   hashAref,
+  isNil,
   rbInspect,
 } from "@blazetrails/ruby-compat";
 import { CaptureHelper, capture, type CaptureHelperHost } from "./capture-helper.js";
@@ -668,13 +669,13 @@ export class TagBuilder {
       const type = hashAref(TAG_TYPES, key);
       if (type === "data" && (isPlainObject(value) || value instanceof Hash)) {
         eachPair(value, (k: string, v: unknown) => {
-          if (v == null) return;
+          if (isNil(v)) return;
           output += sep;
           output += this.prefixTagOption(key, k, v, escape);
         });
       } else if (type === "aria" && (isPlainObject(value) || value instanceof Hash)) {
         eachPair(value, (k: string, v: unknown) => {
-          if (v == null) return;
+          if (isNil(v)) return;
 
           if (Array.isArray(v) || isPlainObject(v) || v instanceof Hash) {
             const tokens = buildTagValues(v);
@@ -693,7 +694,7 @@ export class TagBuilder {
           output += sep;
           output += this.booleanTagOption(key);
         }
-      } else if (value != null) {
+      } else if (!isNil(value)) {
         output += sep;
         output += this.tagOption(key, value, escape);
       }

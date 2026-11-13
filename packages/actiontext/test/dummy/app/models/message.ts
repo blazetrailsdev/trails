@@ -7,6 +7,11 @@ export class Message extends ApplicationRecord {
   declare review: Review | null | Promise<Review | null>;
 
   static {
+    (this as unknown as { hasRichText(name: string, options?: object): void }).hasRichText(
+      "content",
+    );
+    (this as unknown as { hasRichText(name: string, options?: object): void }).hasRichText("body");
+
     this.hasOne("review");
     this.acceptsNestedAttributesFor("review");
   }

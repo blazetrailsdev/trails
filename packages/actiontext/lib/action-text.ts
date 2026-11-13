@@ -7,6 +7,9 @@ import type { MissingAttachable } from "./attachables/missing-attachable.js";
 import type { RemoteImage } from "./attachables/remote-image.js";
 import type { Attachment } from "./attachment.js";
 import type { Attribute } from "./attribute.js";
+import type { EncryptedRichText } from "./encrypted-rich-text.js";
+import type { Encryption } from "./encryption.js";
+import type { FixtureSet } from "./fixture-set.js";
 import type { Record as ActionTextRecord } from "./record.js";
 import type { RichText } from "./rich-text.js";
 import type { Serialization } from "./serialization.js";
@@ -37,6 +40,8 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_text/attachments/minification": () => import("./attachments/minification.js"),
   "action_text/attachments/trix_conversion": () => import("./attachments/trix-conversion.js"),
   "action_text/content": () => import("./content.js"),
+  "action_text/encryption": () => import("./encryption.js"),
+  "action_text/fixture_set": () => import("./fixture-set.js"),
   "action_text/fragment": () => import("./fragment.js"),
   "action_text/html_conversion": () => import("./html-conversion.js"),
   "action_text/plain_text_conversion": () => import("./plain-text-conversion.js"),
@@ -83,6 +88,9 @@ export const ActionText = {
   Attachments: typeof Attachments;
   Attribute?: typeof Attribute;
   Content?: typeof Content;
+  EncryptedRichText?: typeof EncryptedRichText;
+  Encryption?: typeof Encryption;
+  FixtureSet?: typeof FixtureSet;
   ContentHelper?: typeof ContentHelper;
   Fragment?: typeof Fragment;
   HtmlConversion?: typeof HtmlConversion;
@@ -102,6 +110,8 @@ ActionText.autoload("Attachment");
 ActionText.autoload("AttachmentGallery");
 ActionText.autoload("Attribute");
 ActionText.autoload("Content");
+ActionText.autoload("Encryption");
+ActionText.autoload("FixtureSet");
 ActionText.autoload("Fragment");
 ActionText.autoload("HtmlConversion");
 ActionText.autoload("PlainTextConversion");
