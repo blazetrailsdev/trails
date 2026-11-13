@@ -258,6 +258,8 @@ export {
   uniqBang,
   unpack,
   unpack1,
+  rbAryBsearch,
+  rbAryBsearchIndex,
   rbAryFetch,
   rbAryReplace,
   sortByBang,
