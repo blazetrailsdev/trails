@@ -373,6 +373,7 @@ export class Timezone {
       .map((id) => new Timezone(id));
   }
 
+  /** @missingRailsCall get_timezone_info — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   static get(identifier: string): Timezone {
     if (!loadedTimezoneIdentifiers.has(identifier)) {
       try {
@@ -453,14 +454,20 @@ export class Timezone {
     return result;
   }
 
-  /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
+  /**
+   * @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info
+   * @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info
+   */
   observedUtcOffset(time: Date | Temporal.Instant): number {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
       return this.info.constantOffset.observedUtcOffset;
     return getZoneInfo(this.identifier, toDate(time)).utcOffsetSeconds;
   }
 
-  /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
+  /**
+   * @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info
+   * @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info
+   */
   isDst(time: Date | Temporal.Instant | Time): boolean {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
       return this.info.constantOffset.stdOffset !== 0;
@@ -471,7 +478,10 @@ export class Timezone {
     return this.identifier;
   }
 
-  /** @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info */
+  /**
+   * @inventedArm if — CONVERGEABLE data-timezone-delegates-periods-to-info
+   * @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info
+   */
   periodForUtc(time: Time): TimezonePeriod {
     if (this.info instanceof ConstantOffsetDataTimezoneInfo)
       return new OffsetTimezonePeriod(this.info.constantOffset);
@@ -568,6 +578,7 @@ export class Timezone {
     );
   }
 
+  /** @missingRailsCall period_for — CONVERGEABLE data-timezone-delegates-periods-to-info */
   currentPeriod(): TimezonePeriod {
     return this.periodForUtc(Time.now());
   }
