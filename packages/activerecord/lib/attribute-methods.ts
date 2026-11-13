@@ -23,7 +23,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
-  AttributeMethods,
   type AttributeMethodPattern,
   type InstanceHost as AttributeMethodsInstanceHost,
   type DirtyOptions,
@@ -274,7 +273,7 @@ export function generatedAttributeMethods(this: AttributeMethodsHost): Module {
 }
 
 export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
-  AttributeMethods.ClassMethods.aliasAttribute.call(this as never, newName, oldName);
+  AMAttributeMethods.ClassMethods.aliasAttribute.call(this as never, newName, oldName);
 
   if (Object.hasOwn(this, "_aliasAttributesMassGenerated") && this._aliasAttributesMassGenerated) {
     CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
@@ -345,7 +344,7 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
 
     if (!this.isAbstractClass()) {
       loadSchema.call(this as never);
-      AttributeMethods.ClassMethods.defineAttributeMethods.call(
+      AMAttributeMethods.ClassMethods.defineAttributeMethods.call(
         this as never,
         ...this.attributeNames(),
       );
@@ -367,7 +366,7 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
     return;
   }
   CodeGenerator.batch(this.generatedAttributeMethods(), __FILE__, __LINE__, (codeGenerator) => {
-    for (const [oldName, newNames] of AttributeMethods.ClassMethods.aliasesByAttributeName.call(
+    for (const [oldName, newNames] of AMAttributeMethods.ClassMethods.aliasesByAttributeName.call(
       this as never,
     )) {
       for (const newName of newNames) {
@@ -381,7 +380,7 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
 export function undefineAttributeMethods(this: AttributeMethodsHost): void {
   GeneratedAttributeMethods.LOCK.synchronize(() => {
     if (Object.hasOwn(this, "_attributeMethodsGenerated") && this._attributeMethodsGenerated) {
-      AttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
+      AMAttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
     }
     this._attributeMethodsGenerated = false;
     this._aliasAttributesMassGenerated = false;
@@ -413,7 +412,7 @@ function instanceMethodOwner(klass: any, name: string): unknown {
 
 export function isInstanceMethodAlreadyImplemented(
   this: AttributeMethodsHost &
-    ThisParameterType<typeof AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented>,
+    ThisParameterType<typeof AMAttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented>,
   methodName: string,
 ): boolean {
   if (this.isDangerousAttributeMethod(methodName)) {
@@ -424,14 +423,17 @@ export function isInstanceMethodAlreadyImplemented(
 
   const superclass: object | null = rbClassSuperclass(this);
   if (superclass === ActiveRecord.Base) {
-    return AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(this, methodName);
+    return AMAttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(
+      this,
+      methodName,
+    );
   } else {
     const defined =
       isMethodDefinedWithin.call(this, methodName, superclass, ActiveRecord.Base) &&
       !isOwnedByGeneratedAttributeMethods(superclass, methodName);
     return (
       defined ||
-      AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(this, methodName)
+      AMAttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(this, methodName)
     );
   }
 }
@@ -610,7 +612,7 @@ export function attributeForInspect(
 
 export function get(this: InstanceMethodHost, attrName: string): unknown {
   return this.readAttribute(attrName, (n) =>
-    AttributeMethods.AttributeMethods.missingAttribute.call(
+    AMAttributeMethods.AttributeMethods.missingAttribute.call(
       this as unknown as AttributeMethodsInstanceHost,
       n,
       rbFCaller(),
@@ -758,3 +760,5 @@ export function attributeNamesForPartialInserts(
 }
 
 ActiveRecord.AttributeMethods = AttributeMethodsNamespace;
+
+export const AttributeMethods = AttributeMethodsNamespace;

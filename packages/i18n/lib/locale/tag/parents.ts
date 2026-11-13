@@ -23,3 +23,5 @@ export function parents(this: Parents): Parents[] {
   const parent = this.parent();
   return parent ? [parent].concat(parent.parents()) : [];
 }
+
+export const Parents = { parent, selfAndParents, parents };

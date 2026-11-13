@@ -10,9 +10,10 @@ import * as m6 from "./config.js";
 import * as m7 from "./exceptions.js";
 import * as m8 from "./locale.js";
 import * as m9 from "./locale/fallbacks.js";
-import * as m10 from "./locale/tag/rfc4646.js";
-import * as m11 from "./locale/tag/simple.js";
-import * as m12 from "./utils.js";
+import * as m10 from "./locale/tag/parents.js";
+import * as m11 from "./locale/tag/rfc4646.js";
+import * as m12 from "./locale/tag/simple.js";
+import * as m13 from "./utils.js";
 
 defineConstants([
   [() => m7.ArgumentError, "I18n::ArgumentError"],
@@ -33,9 +34,10 @@ defineConstants([
   [() => m7.InvalidPluralizationData, "I18n::InvalidPluralizationData"],
   [() => m8.Locale, "I18n::Locale"],
   [() => m9.Fallbacks, "I18n::Locale::Fallbacks"],
-  [() => m10.Rfc4646, "I18n::Locale::Tag::Rfc4646"],
-  [() => m10.Parser, "I18n::Locale::Tag::Rfc4646::Parser"],
-  [() => m11.Simple, "I18n::Locale::Tag::Simple"],
+  [() => m10.Parents, "I18n::Locale::Tag::Parents"],
+  [() => m11.Rfc4646, "I18n::Locale::Tag::Rfc4646"],
+  [() => m11.Parser, "I18n::Locale::Tag::Rfc4646::Parser"],
+  [() => m12.Simple, "I18n::Locale::Tag::Simple"],
   [() => m7.MissingInterpolationArgument, "I18n::MissingInterpolationArgument"],
   [() => m7.MissingTranslation, "I18n::MissingTranslation"],
   [() => m7.Base, "I18n::MissingTranslation::Base"],
@@ -43,5 +45,5 @@ defineConstants([
   [() => m7.ReservedInterpolationKey, "I18n::ReservedInterpolationKey"],
   [() => m7.UnknownFileType, "I18n::UnknownFileType"],
   [() => m7.UnsupportedMethod, "I18n::UnsupportedMethod"],
-  [() => m12, "I18n::Utils"],
+  [() => m13, "I18n::Utils"],
 ]);

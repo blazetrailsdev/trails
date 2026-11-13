@@ -16,3 +16,5 @@ export function match(value: string, matcher: string): boolean {
   const [m1, m2] = matcher.split("/", 2);
   return (m1 === "*" || v1 === m1) && (m2 === undefined || m2 === "*" || m2 === v2);
 }
+
+export const Mime = { MIME_TYPES, mimeType, match };

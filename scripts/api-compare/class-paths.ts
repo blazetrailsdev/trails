@@ -229,11 +229,23 @@ function isSelfNamespace(source: string, file: string, tsName: string): boolean 
   ).test(source);
 }
 
+/** The `export namespace` blocks enclosing `index`, outermost first, by indentation (`HttpAuthentication.Basic.ControllerMethods`). */
+function enclosingNamespaces(source: string, index: number): string | undefined {
+  const depth = index - (source.lastIndexOf("\n", index - 1) + 1);
+  const stack: { depth: number; name: string }[] = [];
+  for (const m of source.slice(0, index).matchAll(/^([ \t]*)export\s+namespace\s+(\w+)\s*\{/gm)) {
+    while (stack.length > 0 && stack.at(-1)!.depth >= m[1].length) stack.pop();
+    stack.push({ depth: m[1].length, name: m[2] });
+  }
+  const names = stack.filter((n) => n.depth < depth).map((n) => n.name);
+  return names.length > 0 ? names.join(".") : undefined;
+}
+
 /** Paired classes a table cannot import, which `--check` reports. */
 const unexported: string[] = [];
 /** Walked exports paired with several Ruby classes, none seated; reported, not gated. */
 const ambiguousUnseated = new Set<string>();
-/** Paired Ruby modules with no exported binding; reported, not gated. */
+/** Paired Ruby modules with no exported binding, which `--check` reports. */
 const unexportedModules: string[] = [];
 
 /**
@@ -388,7 +400,7 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       const source = await read(entry.file);
       if (isExported(source, entry.tsName)) return entry.tsName;
       const member = new RegExp(
-        `^\\s*(?:public\\s+)?static\\s+(?:readonly\\s+)?${entry.tsName}\\b|^\\s+export\\s+(?:class|namespace)\\s+${entry.tsName}\\b`,
+        `^\\s*(?:public\\s+)?static\\s+(?:override\\s+)?(?:readonly\\s+)?${entry.tsName}\\b|^\\s+export\\s+(?:class|namespace)\\s+${entry.tsName}\\b`,
         "m",
       ).exec(source);
       if (!member) return null;
@@ -396,7 +408,9 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       const enclosing = [
         ...source.slice(0, member.index).matchAll(/^export\s+(?:abstract\s+)?class\s+(\w+)/gm),
       ].at(-1)?.[1];
-      const ownerPath = owner ? await tsPath(owner) : (enclosing ?? null);
+      const ownerPath = owner
+        ? await tsPath(owner)
+        : (enclosingNamespaces(source, member.index + member[0].search(/\S/)) ?? enclosing ?? null);
       return ownerPath === null ? null : `${ownerPath}.${entry.tsName}`;
     };
     for (const [key, candidate] of paired) {
@@ -903,9 +917,10 @@ async function main(): Promise<void> {
     else await fs.writeFile(target, next);
   }
   if (check && unexportedModules.length > 0) {
-    console.warn(
-      `Modules paired with a Ruby module but with no exported binding (not gated):\n  ${unexportedModules.join("\n  ")}`,
+    console.error(
+      `Modules paired with a Ruby module but with no exported binding, so no table can name them:\n  ${unexportedModules.join("\n  ")}`,
     );
+    process.exitCode = 1;
   }
   if (check && unexported.length > 0) {
     console.error(

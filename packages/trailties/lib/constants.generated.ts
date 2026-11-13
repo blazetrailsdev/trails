@@ -26,9 +26,10 @@ import * as m23 from "./rack/logger.js";
 import * as m24 from "./rack/silence-request.js";
 import * as m25 from "./source-annotation-extractor.js";
 import * as m26 from "./trailtie.js";
-import * as m27 from "./trailtie/configuration.js";
-import * as m28 from "./welcome-controller.js";
-import * as m29 from "./zeitwerk-checker.js";
+import * as m27 from "./trailtie/configurable.js";
+import * as m28 from "./trailtie/configuration.js";
+import * as m29 from "./welcome-controller.js";
+import * as m30 from "./zeitwerk-checker.js";
 
 defineConstants([
   [() => m1.Application, "Trails::Application"],
@@ -68,8 +69,9 @@ defineConstants([
   [() => m25.Parser, "Trails::SourceAnnotationExtractor::ParserExtractor::Parser"],
   [() => m25.PatternExtractor, "Trails::SourceAnnotationExtractor::PatternExtractor"],
   [() => m26.Trailtie, "Trails::Trailtie"],
-  [() => m27.Configuration, "Trails::Trailtie::Configuration"],
+  [() => m27.Configurable, "Trails::Trailtie::Configurable"],
+  [() => m28.Configuration, "Trails::Trailtie::Configuration"],
   [() => m15.VERSION, "Trails::VERSION"],
-  [() => m28.WelcomeController, "Trails::WelcomeController"],
-  [() => m29.ZeitwerkChecker, "Trails::ZeitwerkChecker"],
+  [() => m29.WelcomeController, "Trails::WelcomeController"],
+  [() => m30.ZeitwerkChecker, "Trails::ZeitwerkChecker"],
 ]);

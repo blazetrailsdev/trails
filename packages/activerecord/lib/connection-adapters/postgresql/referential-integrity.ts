@@ -1,3 +1,4 @@
+import "../../constants.postgresql-referential-integrity.generated.js";
 import { ActiveRecordError, InvalidForeignKey } from "../../errors.js";
 
 export interface ReferentialIntegrity {
@@ -91,3 +92,5 @@ $$;
     { requiresNew: true },
   );
 }
+
+export const ReferentialIntegrity = { disableReferentialIntegrity, checkAllForeignKeysValidBang };
