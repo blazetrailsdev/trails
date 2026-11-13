@@ -223,11 +223,9 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.
   //
-  // `LoggerSilence` and `LoggerThreadSafeLevel` are both mixed into
-  // `ActiveSupport::Logger`; trails carries `silence` and `localLevel` on the
-  // Logger class itself rather than in two mixin files.
+  // `LoggerSilence` is mixed into `ActiveSupport::Logger`; trails carries
+  // `silence` on the Logger class itself rather than in a mixin file.
   "activesupport:logger_silence.rb": "logger.ts",
-  "activesupport:logger_thread_safe_level.rb": "logger.ts",
   // `Deprecation::Disallowed` is one of the modules `Deprecation` includes;
   // trails carries `disallowedWarnings` / `disallowedBehavior` on Deprecation.
   "activesupport:deprecation/disallowed.rb": "deprecation.ts",
