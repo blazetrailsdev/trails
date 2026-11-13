@@ -96,14 +96,18 @@ describe("LengthValidator (trails)", () => {
     expect(await new Person({ title: "a" }).isValid()).toBe(true);
   });
 
-  it("measures a Proc value by its to_s, not its arity", () => {
+  it("measures a Proc value by its to_s, not its arity", async () => {
     const value = (a: unknown, b: unknown) => [a, b];
     const person = new Person();
-    new LengthValidator({ attributes: ["title"], is: 2 }).validateEach(person, "title", value);
+    await new LengthValidator({ attributes: ["title"], is: 2 }).validateEach(
+      person,
+      "title",
+      value,
+    );
     expect(person.errors.details.get(":title")).toEqual([{ error: ":wrong_length", count: 2 }]);
 
     person.errors.clear();
-    new LengthValidator({ attributes: ["title"], is: String(value).length }).validateEach(
+    await new LengthValidator({ attributes: ["title"], is: String(value).length }).validateEach(
       person,
       "title",
       value,

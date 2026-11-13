@@ -91,10 +91,10 @@ export class LengthValidator extends EachValidator {
     }
   }
 
-  validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
+  async validateEach(record: ValidatableRecord, attribute: string, value: unknown): Promise<void> {
     const valueLength = rbObjRespondTo(value, "length")
       ? (value as { length: number }).length
-      : String(value ?? "").length;
+      : String(value == null ? "" : await (value as object).toString()).length;
     const errorsOptions = except(this.options, ...RESERVED_OPTIONS);
 
     for (const [key, validityCheck] of Object.entries(CHECKS) as Array<
