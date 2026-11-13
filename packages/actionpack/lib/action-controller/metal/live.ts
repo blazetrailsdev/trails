@@ -237,7 +237,7 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
       if (resp.committed) {
         try {
           if (this.request.format().symbol === ":html") {
-            (resp.stream as Buffer).write(ActionViewBase.streamingCompletionOnException);
+            await (resp.stream as Buffer).write(ActionViewBase.streamingCompletionOnException);
           }
           (resp.stream as Buffer).callOnError();
         } catch (exception) {
