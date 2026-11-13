@@ -27,8 +27,7 @@ function clearAggregationCache(this: AggregationsHost): void {
 type ComposedOfOptions = {
   className?: string;
   mapping?: [string, string][] | [string, string];
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  constructor?: Function | string;
+  constructor?: CallableFunction | string;
   converter?: ((value: unknown) => unknown) | string;
   allowNil?: boolean;
 };
@@ -64,8 +63,7 @@ function readerMethod(
   className: string,
   mapping: [string, string][],
   allowNil: boolean,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-  constructor: Function | string,
+  constructor: CallableFunction | string,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
   Object.defineProperty(this.prototype, name, {
@@ -106,14 +104,12 @@ function writerMethod(
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
     set(this: AggregationsHost, part: unknown): void {
-      const klass = constantize(className) as new (...args: any[]) => any;
+      const klass = constantize(className) as (new (...args: any[]) => any) &
+        Record<string, (v: unknown) => unknown>;
       const cache = this._aggregationCache;
 
       if (!(part instanceof klass || converter == null || part == null)) {
-        part =
-          typeof converter === "function"
-            ? converter(part)
-            : (klass as unknown as Record<string, (v: unknown) => unknown>)[converter](part);
+        part = typeof converter === "function" ? converter(part) : klass[converter](part);
       }
 
       const hashFromMultiparameterAssignment =
