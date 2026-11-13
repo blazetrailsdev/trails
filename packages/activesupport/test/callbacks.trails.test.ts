@@ -632,7 +632,7 @@ describe("Callbacks", () => {
       const result = target.runCallbacks("save", () => {
         target.log.push("block");
       });
-      expect(result).toBeUndefined();
+      expect(result).toBeNull();
       expect(target.log).toEqual(["around"]);
     });
 
