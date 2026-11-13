@@ -2,7 +2,6 @@ import { Base } from "@blazetrails/activerecord";
 import { runLoadHooks } from "@blazetrails/activesupport";
 import { ActionText } from "./action-text.js";
 
-/** @internal */
 export class Record extends Base {
   static {
     this.abstractClass = true;

@@ -9,6 +9,7 @@ import { ActionText } from "../lib/action-text.js";
 import { Attribute } from "../lib/attribute.js";
 import { Content } from "../lib/content.js";
 import { Message } from "./dummy/app/models/message.js";
+import { MessageWithoutBlanks } from "./dummy/app/models/message-without-blanks.js";
 
 type RichTextMessage = Message & {
   content: import("../lib/rich-text.js").RichText;
@@ -36,6 +37,11 @@ beforeAll(async () => {
   include(Base, Attribute);
   ({ RichText } = await import("../lib/rich-text.js"));
   (Message as unknown as { hasRichText(name: string): void }).hasRichText("content");
+  (
+    MessageWithoutBlanks as unknown as {
+      hasRichText(name: string, options: { storeIfBlank: boolean }): void;
+    }
+  ).hasRichText("content", { storeIfBlank: false });
   await Message.loadSchema();
   await RichText.loadSchema();
   await ActiveStorage.Blob!.loadSchema();
@@ -79,6 +85,42 @@ describe("ActionText::Attribute (trails)", () => {
     await message.content.toPlainText();
     expect(message.content.isPresent()).toBe(true);
     expect(message.content.isEmpty()).toBe(false);
+  });
+
+  it("marks a loaded blank rich text for destruction when store_if_blank is false", async () => {
+    const message = (await MessageWithoutBlanks.create({
+      subject: "Greetings",
+      content: "<p>content</p>",
+    })) as unknown as RichTextMessage;
+    expect(() => {
+      message.content = "" as never;
+    }).toThrow(/to_plain_text is not loaded/);
+    await message.content.toPlainText();
+    message.content = "" as never;
+    expect(message.content.markedForDestruction()).toBe(true);
+    const before = await RichText.count();
+    await message.save();
+    expect(await RichText.count()).toBe(before - 1);
+  });
+
+  it("eager loads through the with_rich_text scopes and destroys with the record", async () => {
+    const message = (await Message.create({
+      subject: "Greetings",
+      content: "<p>eager</p>",
+    })) as unknown as RichTextMessage;
+    const scoped = Message as unknown as {
+      withRichTextContent(): { find(id: unknown): Promise<RichTextMessage> };
+      withAllRichText(): { find(id: unknown): Promise<RichTextMessage> };
+    };
+    expect((await scoped.withRichTextContent().find(message.id)).content.body!.toHtml()).toBe(
+      "<p>eager</p>",
+    );
+    expect((await scoped.withAllRichText().find(message.id)).content.body!.toHtml()).toBe(
+      "<p>eager</p>",
+    );
+    const before = await RichText.count();
+    await message.destroy();
+    expect(await RichText.count()).toBe(before - 1);
   });
 
   it("lists rich text association names", () => {

@@ -39,7 +39,7 @@ export class RichText extends Record {
   }
 
   override toString(): string {
-    return this.body?.toString() as string;
+    return this.body == null ? "" : (this.body.toString() as string);
   }
 
   isNil(): boolean {

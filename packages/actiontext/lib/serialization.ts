@@ -15,7 +15,7 @@ function dump(this: SerializationHost, content: unknown): string | null {
     return null;
   } else if (content instanceof this) {
     return content.toHtml();
-  } else if (ActionText.RichText !== undefined && content instanceof ActionText.RichText) {
+  } else if (content instanceof ActionText.RichText!) {
     return content.body!.toHtml();
   } else {
     return new this(content).toHtml();

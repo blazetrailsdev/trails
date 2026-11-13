@@ -12,6 +12,7 @@ type HasRichTextOptions = {
   storeIfBlank?: boolean;
 };
 
+/** @noRailsEquivalent PERMANENT */
 function loadedRichText(record: RichTextHost, associationName: string): RichText | null {
   const richText = record[associationName] as RichText | null | Promise<RichText | null>;
   if (!(richText instanceof Promise)) return richText;
@@ -99,13 +100,13 @@ function hasRichText(
 }
 
 function withAllRichText(this: typeof Base): Relation<Base> {
-  return this.includes(...richTextAssociationNames.call(this));
+  return this.includes(richTextAssociationNames.call(this));
 }
 
 function richTextAssociationNames(this: typeof Base): string[] {
   return this.reflectOnAllAssociations("hasOne")
     .map((reflection) => reflection.name)
-    .filter((n) => n.startsWith("richText"));
+    .filter((n) => /^richText[A-Z]/.test(n));
 }
 
 const ClassMethods = { hasRichText, withAllRichText, richTextAssociationNames };
