@@ -1,6 +1,8 @@
 import { type Result } from "@blazetrails/activerecord";
+import { include, runLoadHooks } from "@blazetrails/activesupport";
+import { Encryption } from "./entry/encryption.js";
 import { sql } from "@blazetrails/arel";
-import { constSet, Range, Digest, eachSlice, toS, unpack1 } from "@blazetrails/ruby-compat";
+import { constSet, Range, Digest, eachSlice, toS, unpack } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidCache } from "./solid-cache.js";
 
@@ -23,6 +25,7 @@ export class Entry extends Record {
 
   static {
     constSet(SolidCache, "Entry", this);
+    include(this, Encryption);
   }
 
   static async write(key: unknown, value: unknown): Promise<void> {
@@ -132,9 +135,9 @@ export class Entry extends Record {
     return selectSql;
   }
 
-  /** @missingRailsArgs unpack — PERMANENT */
+  /** @internal */
   private static keyHashFor(key: unknown): number | bigint {
-    return unpack1(Digest.SHA256.digest(toS(key)), "q>") as number | bigint;
+    return unpack(Digest.SHA256.digest(toS(key)), "q>")[0] as number | bigint;
   }
 
   /** @internal */
@@ -165,3 +168,5 @@ export class Entry extends Record {
     return Promise.resolve(this.uncached(block, { dirties: false }));
   }
 }
+
+runLoadHooks("solid_cache_entry", Entry);

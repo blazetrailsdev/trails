@@ -1,3 +1,4 @@
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat";
 import { MaglevHash } from "../maglev-hash.js";
 import { Record } from "../record.js";
 
@@ -11,8 +12,12 @@ export class Sharded {
     this.consistentHash = new MaglevHash(names);
   }
 
-  async withEach(block: () => unknown): Promise<void> {
-    for (const name of this.names) await this.with(name, block);
+  withEach(block?: () => unknown): Promise<void> | Enumerator {
+    if (!block) return toEnum(this, "withEach");
+
+    return (async () => {
+      for (const name of this.names) await this.with(name, block);
+    })();
   }
 
   with<T>(name: string, block: () => T): T {

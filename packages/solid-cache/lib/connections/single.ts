@@ -1,3 +1,4 @@
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat";
 import { Record } from "../record.js";
 
 export class Single {
@@ -7,7 +8,9 @@ export class Single {
     this.name = name;
   }
 
-  withEach<T>(block: () => T): T {
+  withEach<T>(block?: () => T): T | Enumerator {
+    if (!block) return toEnum(this, "withEach");
+
     return this.with(this.name, block);
   }
 

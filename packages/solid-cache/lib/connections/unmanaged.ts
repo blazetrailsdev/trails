@@ -1,5 +1,9 @@
+import { toEnum, type Enumerator } from "@blazetrails/ruby-compat";
+
 export class Unmanaged {
-  withEach<T>(block: () => T): T {
+  withEach<T>(block?: () => T): T | Enumerator {
+    if (!block) return toEnum(this, "withEach");
+
     return block();
   }
 

@@ -85,8 +85,8 @@ export class Store extends CacheStore {
   declare protected deleteEntry: (key: string, options: StoreOptions) => Promise<boolean>;
 
   readonly maxKeyBytesize: number;
-  shardOptions: string[] | null;
-  readonly clearWith: string;
+  readonly shardOptions: string[] | null;
+  readonly clearWith: string | null;
   /** @internal */
   readonly errorHandler: ErrorHandler | null;
   /** @internal */
@@ -134,9 +134,9 @@ export class Store extends CacheStore {
       : TopLevel.Trails!.env["test?"]()
         ? "delete"
         : "truncate";
-    this.clearWith = clearWith == null ? (clearWith as null)! : String(clearWith);
+    this.clearWith = clearWith == null ? null : String(clearWith);
 
-    if (!["truncate", "delete"].includes(this.clearWith)) {
+    if (!["truncate", "delete"].includes(this.clearWith!)) {
       throw new ArgumentError("`clear_with` must be either ``:truncate`` or ``:delete`");
     }
 

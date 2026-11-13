@@ -7,7 +7,7 @@ import {
   StatementTimeout,
 } from "@blazetrails/activerecord";
 import { ActiveSupport } from "@blazetrails/activesupport";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect, rbModName } from "@blazetrails/ruby-compat";
 import { SolidCache } from "../solid-cache.js";
 import type { StoreHost } from "../store.js";
 
@@ -29,7 +29,7 @@ const TRANSIENT_ACTIVE_RECORD_ERRORS = [
 const DEFAULT_ERROR_HANDLER: ErrorHandler = ({ method, returning, exception }) => {
   if (SolidCache.Store!.logger) {
     SolidCache.Store!.logger.error?.(
-      `SolidCacheStore: ${method} failed, returned ${rbInspect(returning)}: ${exception.name}: ${exception.message}`,
+      `SolidCacheStore: ${method} failed, returned ${rbInspect(returning)}: ${rbModName(exception.constructor)}: ${exception.message}`,
     );
   }
 };

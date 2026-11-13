@@ -189,7 +189,10 @@ export const Api = {
     )!;
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsCall b — CONVERGEABLE solid-cache-store-keys-are-binary
+   */
   truncateKey(this: StoreHost, key: string | null): string | null {
     if (key != null && encoder.encode(key).length > this.maxKeyBytesize) {
       const suffix = `:hash:${ActiveSupportDigest.hexdigest(key)}`;

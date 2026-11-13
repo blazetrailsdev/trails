@@ -1,5 +1,6 @@
 import { Base } from "@blazetrails/activerecord";
-import { constSet } from "@blazetrails/ruby-compat";
+import { runLoadHooks } from "@blazetrails/activesupport";
+import { constSet, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
 import { SolidCache } from "./solid-cache.js";
 
 export class Record extends Base {
@@ -15,15 +16,23 @@ export class Record extends Base {
     }
   }
 
-  static async eachShard(block: () => unknown): Promise<void> {
-    if (SolidCache.configuration.isSharded()) {
-      for (const shard of SolidCache.configuration.shardKeys()) {
-        await Record.withShard(shard, block);
+  static eachShard(): Enumerator;
+  static eachShard(block: () => unknown): Promise<void>;
+  static eachShard(block?: () => unknown): Promise<void> | Enumerator {
+    if (!block) return toEnum(this, "eachShard");
+
+    return (async () => {
+      if (SolidCache.configuration.isSharded()) {
+        for (const shard of SolidCache.configuration.shardKeys()) {
+          await Record.withShard(shard, block);
+        }
+      } else {
+        await block();
       }
-    } else {
-      await block();
-    }
+    })();
   }
 }
 
 constSet(SolidCache, "Record", Record);
+
+runLoadHooks("solid_cache", Record);

@@ -1,3 +1,4 @@
+import { toEnum } from "@blazetrails/ruby-compat";
 import { Connections as SolidCacheConnections } from "../connections.js";
 import type { StoreHost } from "../store.js";
 
@@ -5,8 +6,14 @@ type Failsafe = { failsafe: string; failsafeReturning?: unknown };
 
 export const Connections = {
   /** @missingRailsCall execute — CONVERGEABLE port-solid-cache-store-execution-and-expiry */
-  async withEachConnection(this: StoreHost, block: () => unknown): Promise<unknown> {
-    return await this.connections().withEach(block);
+  withEachConnection(
+    this: StoreHost,
+    { async: _async = false }: { async?: boolean } = {},
+    block?: () => unknown,
+  ): unknown {
+    if (!block) return toEnum(this, "withEachConnection");
+
+    return this.connections().withEach(() => block());
   },
 
   connections(this: StoreHost): ReturnType<typeof SolidCacheConnections.fromConfig> {
@@ -22,16 +29,26 @@ export const Connections = {
    * @internal
    * @missingRailsCall execute — CONVERGEABLE port-solid-cache-store-execution-and-expiry
    */
-  withConnectionFor<T>(this: StoreHost, key: unknown, block: () => T): T {
-    return this.connections().withConnectionFor(key, block);
+  withConnectionFor<T>(
+    this: StoreHost,
+    key: unknown,
+    { async: _async = false }: { async?: boolean } = {},
+    block: () => T,
+  ): T {
+    return this.connections().withConnectionFor(key, () => block());
   },
 
   /**
    * @internal
    * @missingRailsCall execute — CONVERGEABLE port-solid-cache-store-execution-and-expiry
    */
-  withConnection<T>(this: StoreHost, name: string, block: () => T): T {
-    return this.connections().with(name, block);
+  withConnection<T>(
+    this: StoreHost,
+    name: string,
+    { async: _async = false }: { async?: boolean } = {},
+    block: () => T,
+  ): T {
+    return this.connections().with(name, () => block());
   },
 
   /** @internal */
@@ -52,7 +69,7 @@ export const Connections = {
     block: () => unknown,
   ): Promise<unknown> {
     return await this.failsafe(failsafe, { returning: failsafeReturning }, () =>
-      this.withConnectionFor(key, block),
+      this.withConnectionFor(key, undefined, block),
     );
   },
 
@@ -67,7 +84,7 @@ export const Connections = {
     for (const [connection, groupedKeys] of this.groupByConnection(keys)) {
       results.push(
         await this.failsafe(failsafe, { returning: failsafeReturning }, () =>
-          this.withConnection(connection, () => block(groupedKeys)),
+          this.withConnection(connection, undefined, () => block(groupedKeys)),
         ),
       );
     }
@@ -82,7 +99,7 @@ export const Connections = {
     block: () => unknown,
   ): Promise<unknown> {
     return await this.failsafe(failsafe, { returning: failsafeReturning }, () =>
-      this.withConnectionFor(key, block),
+      this.withConnectionFor(key, undefined, block),
     );
   },
 
@@ -97,7 +114,7 @@ export const Connections = {
     for (const [connection, groupedEntries] of this.groupByConnection(entries)) {
       results.push(
         await this.failsafe(failsafe, { returning: failsafeReturning }, () =>
-          this.withConnection(connection, () => block(groupedEntries)),
+          this.withConnection(connection, undefined, () => block(groupedEntries)),
         ),
       );
     }
@@ -114,7 +131,7 @@ export const Connections = {
     for (const connection of this.connectionNames()) {
       results.push(
         await this.failsafe(failsafe, { returning: failsafeReturning }, () =>
-          this.withConnection(connection, block),
+          this.withConnection(connection, undefined, block),
         ),
       );
     }
