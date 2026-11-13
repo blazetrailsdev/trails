@@ -24,28 +24,28 @@ import { strNew } from "./string/bytes.js";
  * `_parse_file` and `Rack::MockRequest` hand callers an IO.
  */
 export class StringIO<S extends string | Uint8Array = string> {
-  #_string: Uint8Array;
-  #_binary: boolean;
-  #_pos = 0;
-  #_readable = true;
-  #_writable = true;
+  #string: Uint8Array;
+  #binary: boolean;
+  #pos = 0;
+  #readable = true;
+  #writable = true;
   /** `ptr->enc` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1823`). */
   #enc: Encoding | null = null;
 
   constructor(string: S = "" as S) {
-    this.#_string = new Uint8Array(0);
-    this.#_binary = string instanceof Uint8Array;
+    this.#string = new Uint8Array(0);
+    this.#binary = string instanceof Uint8Array;
     this.write(string);
-    this.#_pos = 0;
+    this.#pos = 0;
   }
 
   string(): S {
-    const bytes = this.#_string.slice();
-    return (this.#_binary ? bytes : strNew(Array.from(bytes))) as S;
+    const bytes = this.#string.slice();
+    return (this.#binary ? bytes : strNew(Array.from(bytes))) as S;
   }
 
   size(): number {
-    return this.#_string.length;
+    return this.#string.length;
   }
 
   /**
@@ -64,30 +64,30 @@ export class StringIO<S extends string | Uint8Array = string> {
   read(length: number, str?: Uint8Array | null): Uint8Array | null;
   read(length?: number, str?: Uint8Array | null): S | Uint8Array | null {
     if (length == null) {
-      const rest = this.#_string.slice(this.#_pos);
-      this.#_pos = this.#_string.length;
-      return (this.#_binary ? rest : strNew(Array.from(rest))) as S;
+      const rest = this.#string.slice(this.#pos);
+      this.#pos = this.#string.length;
+      return (this.#binary ? rest : strNew(Array.from(rest))) as S;
     }
     if (this.isEof()) {
       if (str) str.fill(0);
       return length === 0 ? new Uint8Array(0) : null;
     }
-    const chunk = this.#_string.slice(this.#_pos, this.#_pos + length);
-    this.#_pos += chunk.length;
+    const chunk = this.#string.slice(this.#pos, this.#pos + length);
+    this.#pos += chunk.length;
     if (str) str.set(chunk.subarray(0, str.length));
     return chunk;
   }
 
   write(string: string | Uint8Array): number {
     const bytes = typeof string === "string" ? b(string) : string;
-    const end = this.#_pos + bytes.length;
-    if (end > this.#_string.length) {
+    const end = this.#pos + bytes.length;
+    if (end > this.#string.length) {
       const grown = new Uint8Array(end);
-      grown.set(this.#_string);
-      this.#_string = grown;
+      grown.set(this.#string);
+      this.#string = grown;
     }
-    this.#_string.set(bytes, this.#_pos);
-    this.#_pos = end;
+    this.#string.set(bytes, this.#pos);
+    this.#pos = end;
     return bytes.length;
   }
 
@@ -137,11 +137,11 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:940`).
    */
   get pos(): number {
-    return this.#_pos;
+    return this.#pos;
   }
 
   rewind(): number {
-    this.#_pos = 0;
+    this.#pos = 0;
     return 0;
   }
 
@@ -156,7 +156,7 @@ export class StringIO<S extends string | Uint8Array = string> {
    */
   binmode(): this {
     this.#enc = Encoding.ASCII_8BIT;
-    this.#_binary = true;
+    this.#binary = true;
     return this;
   }
 
@@ -185,7 +185,7 @@ export class StringIO<S extends string | Uint8Array = string> {
    */
   setEncoding(extEnc: Encoding | string): this {
     this.#enc = Encoding.find(extEnc) ?? Encoding.BINARY;
-    this.#_binary = this.#enc === Encoding.BINARY;
+    this.#binary = this.#enc === Encoding.BINARY;
     return this;
   }
 
@@ -215,11 +215,11 @@ export class StringIO<S extends string | Uint8Array = string> {
    */
   gets(): S | null {
     if (this.isEof()) return null;
-    const newline = this.#_string.indexOf(0x0a, this.#_pos);
-    const end = newline === -1 ? this.#_string.length : newline + 1;
-    const bytes = this.#_string.slice(this.#_pos, end);
-    this.#_pos = end;
-    return (this.#_binary ? bytes : strNew(Array.from(bytes))) as S;
+    const newline = this.#string.indexOf(0x0a, this.#pos);
+    const end = newline === -1 ? this.#string.length : newline + 1;
+    const bytes = this.#string.slice(this.#pos, end);
+    this.#pos = end;
+    return (this.#binary ? bytes : strNew(Array.from(bytes))) as S;
   }
 
   /**
@@ -234,12 +234,12 @@ export class StringIO<S extends string | Uint8Array = string> {
   }
 
   isEof(): boolean {
-    return this.#_pos >= this.#_string.length;
+    return this.#pos >= this.#string.length;
   }
 
   close(): void {
-    this.#_readable = false;
-    this.#_writable = false;
+    this.#readable = false;
+    this.#writable = false;
   }
 
   /**
@@ -247,8 +247,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:520`).
    */
   closeRead(): null {
-    if (!this.#_readable) throw new IOError("closing non-duplex IO for reading");
-    this.#_readable = false;
+    if (!this.#readable) throw new IOError("closing non-duplex IO for reading");
+    this.#readable = false;
     return null;
   }
 
@@ -257,8 +257,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:541`).
    */
   closeWrite(): null {
-    if (!this.#_writable) throw new IOError("closing non-duplex IO for writing");
-    this.#_writable = false;
+    if (!this.#writable) throw new IOError("closing non-duplex IO for writing");
+    this.#writable = false;
     return null;
   }
 
@@ -267,7 +267,7 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:559`).
    */
   isClosed(): boolean {
-    return !this.#_readable && !this.#_writable;
+    return !this.#readable && !this.#writable;
   }
 }
 
