@@ -71,6 +71,16 @@ describe("ActionText::Attribute (trails)", () => {
     expect(reloaded.content.body!.toHtml()).toBe("<h1>Hello world</h1>");
   });
 
+  it("answers blank? and present? from a loaded plain text", async () => {
+    const message = new Message({ subject: "Greetings" }) as RichTextMessage;
+    expect(message.content.isBlank()).toBe(true);
+    message.content = "<h1>Hello</h1>" as never;
+    expect(() => message.content.isPresent()).toThrow(/to_plain_text is not loaded/);
+    await message.content.toPlainText();
+    expect(message.content.isPresent()).toBe(true);
+    expect(message.content.isEmpty()).toBe(false);
+  });
+
   it("lists rich text association names", () => {
     expect(
       (Message as unknown as { richTextAssociationNames(): string[] }).richTextAssociationNames(),

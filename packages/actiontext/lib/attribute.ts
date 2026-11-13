@@ -42,7 +42,8 @@ function hasRichText(
 
   mixin.defineMethod(`is${camelize(name)}`, async function (this: RichTextHost) {
     const richText = (await this[associationName]) as RichText | null;
-    return richText != null && isPresent(await richText.toPlainText());
+    await richText?.toPlainText();
+    return isPresent(richText);
   } as never);
 
   let writer: (this: RichTextHost, body: unknown) => void;
@@ -56,7 +57,7 @@ function hasRichText(
         reader.call(this).body = body as never;
       } else {
         const richText = loadedRichText(this, associationName);
-        if (richText != null && isPresent(richText.body?.toHtml())) {
+        if (isPresent(richText)) {
           reader.call(this).body = body as never;
           reader.call(this).markForDestruction();
         }
