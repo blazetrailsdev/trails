@@ -1,5 +1,5 @@
 import type { TscPlugin, VirtualizeOutput } from "@blazetrails/trails-tsc";
-import { camelize, singularize } from "@blazetrails/activesupport";
+import { camelize, singularize, underscore } from "@blazetrails/activesupport";
 
 export interface FixtureFile {
   path: string;
@@ -16,7 +16,8 @@ interface FixtureSetFacts {
   modelClass: string | null;
 }
 
-const FIXTURES_ALL_PATTERN = /\.fixtures\(\s*["']:all["']\s*\)/;
+const FIXTURES_CALL_PATTERN = /\.fixtures\(([^)]*)\)/;
+const STRING_ARGUMENT_PATTERN = /"([^"]*)"|'([^']*)'/g;
 const SET_FIXTURE_CLASS_PATTERN = /\.setFixtureClass\(\s*\{([^}]*)\}/g;
 const OVERRIDE_ENTRY_PATTERN =
   /(?:"([^"]+)"|'([^']+)'|([\w$]+))\s*:\s*(?:"([^"]+)"|'([^']+)'|([\w$.]+))/g;
@@ -30,7 +31,8 @@ function readFixtureSet(file: FixtureFile): FixtureSetFacts {
   let inFixture = false;
   let inIgnore = false;
   for (const line of file.text.split(/\r?\n/)) {
-    if (line.startsWith("<%")) return { labels: null, modelClass };
+    if (line.trimStart().startsWith("<%") || (/^\S/.test(line) && line.includes("<%")))
+      return { labels: null, modelClass };
     const key = TOP_LEVEL_KEY_PATTERN.exec(line);
     if (key) {
       const label = key[1] ?? key[2] ?? key[3];
@@ -83,13 +85,19 @@ export function createFixtureSetsPlugin(opts: FixtureSetsPluginOptions): TscPlug
     name: "fixture-sets",
     extensions: [".ts", ".mts", ".cts"],
     virtualize(filePath, source): VirtualizeOutput | null {
-      if (fixtureFiles.length === 0 || !FIXTURES_ALL_PATTERN.test(source)) return null;
+      const call = FIXTURES_CALL_PATTERN.exec(source);
+      if (fixtureFiles.length === 0 || !call) return null;
+      const fixtureSetNames = [...call[1].matchAll(STRING_ARGUMENT_PATTERN)].map(
+        (m) => m[1] ?? m[2],
+      );
+      if (fixtureSetNames.length === 0) return null;
       const overrides = fixtureClassOverrides(source);
       const members: string[] = [];
       const seen = new Set<string>();
       for (const file of fixtureFiles) {
         if (file.path.startsWith("files/")) continue;
         const fsName = file.path.replace(/\.[^./]+$/, "");
+        if (fixtureSetNames[0] !== ":all" && !fixtureSetNames.includes(fsName)) continue;
         const key = fsName.includes("/") ? fsName.replaceAll("/", "_") : fsName;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -101,7 +109,8 @@ export function createFixtureSetsPlugin(opts: FixtureSetsPluginOptions): TscPlug
           camelize(singularize(fsName));
         const shortName = className.split(/::|\./).pop()!;
         const modelFile = modelRegistry.get(shortName);
-        const modelType = modelFile
+        const modelPath = `/models/${underscore(className.replaceAll(".", "::"))}.ts`;
+        const modelType = modelFile?.endsWith(modelPath)
           ? `import(${JSON.stringify(relativeSpecifier(filePath, modelFile))}).${shortName}`
           : "unknown";
         const labelType = labels

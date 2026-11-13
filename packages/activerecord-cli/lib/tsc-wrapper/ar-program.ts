@@ -1,5 +1,6 @@
 import {
   createTrailsSolutionBuilder,
+  type TscPlugin,
   remapLine,
   type LineDelta,
   type TrailsBuildOptions,
@@ -60,10 +61,7 @@ export function createArTrailsProgram(
     onModel: opts.onModel,
     timeZoneAwareAttributes: opts.timeZoneAwareAttributes,
   });
-  const plugins = [
-    createFixtureSetsPlugin({ fixtureFiles: opts.fixtureFiles ?? [], modelRegistry }),
-    plugin,
-  ];
+  const plugins = [withFixtureSets(plugin, opts.fixtureFiles ?? [], modelRegistry)];
 
   const deltaMap = new Map<string, readonly LineDelta[]>();
   const originalTextMap = new Map<string, string>();
@@ -75,8 +73,7 @@ export function createArTrailsProgram(
       if (!plugin.extensions.some((ext) => fileName.endsWith(ext))) continue;
       const sf = program.getSourceFile(fileName);
       if (!sf || sf.isDeclarationFile) continue;
-      let result = null;
-      for (const p of plugins) if ((result = p.virtualize(fileName, sf.text))) break;
+      const result = plugins[0].virtualize(fileName, sf.text);
       if (!result) continue;
       layer.push([fileName, result.ts]);
       originalTextMap.set(fileName, sf.text);
@@ -97,6 +94,23 @@ export function createArTrailsProgram(
       getOriginalText: (fileName) => originalTextMap.get(fileName),
     },
     configDiagnostics: [],
+  };
+}
+
+function withFixtureSets(
+  models: TscPlugin,
+  fixtureFiles: readonly FixtureFile[],
+  modelRegistry: ReadonlyMap<string, string>,
+): TscPlugin {
+  const fixtureSets = createFixtureSetsPlugin({ fixtureFiles, modelRegistry });
+  return {
+    name: models.name,
+    extensions: models.extensions,
+    virtualize(filePath, source) {
+      const modeled = models.virtualize(filePath, source);
+      const augmented = fixtureSets.virtualize(filePath, modeled?.ts ?? source);
+      return augmented ? { ts: augmented.ts, deltas: modeled?.deltas } : modeled;
+    },
   };
 }
 
@@ -266,7 +280,7 @@ export interface CreateArSolutionBuilderOptions {
   schemaScopes?: ArModelsPluginOptions["schemaScopes"];
   onModel?: ArModelsPluginOptions["onModel"];
   timeZoneAwareAttributes?: boolean;
-  fixtureFiles?: readonly FixtureFile[];
+  fixtureFilesByAppRoot?: ReadonlyMap<string, readonly FixtureFile[]>;
 }
 
 type Ts5Diagnostic = Parameters<NonNullable<TrailsBuildOptions["onDiagnostic"]>>[0];
@@ -285,17 +299,22 @@ export function createArSolutionBuilder(
       const { baseNames, modelRegistry, superKeys } = collectBaseDescendants(
         options.configFilePath as string,
       );
+      const configFilePath = options.configFilePath as string;
+      const configDir = configFilePath.slice(0, configFilePath.lastIndexOf("/"));
       return [
-        createFixtureSetsPlugin({ fixtureFiles: opts.fixtureFiles ?? [], modelRegistry }),
-        createArModelsPlugin({
-          baseNames: [...baseNames],
+        withFixtureSets(
+          createArModelsPlugin({
+            baseNames: [...baseNames],
+            modelRegistry,
+            schemaColumnsByTable: opts.schemaColumnsByTable,
+            schemaScopes: opts.schemaScopes,
+            modelSuperKeys: superKeys,
+            onModel: opts.onModel,
+            timeZoneAwareAttributes: opts.timeZoneAwareAttributes,
+          }),
+          opts.fixtureFilesByAppRoot?.get(configDir) ?? [],
           modelRegistry,
-          schemaColumnsByTable: opts.schemaColumnsByTable,
-          schemaScopes: opts.schemaScopes,
-          modelSuperKeys: superKeys,
-          onModel: opts.onModel,
-          timeZoneAwareAttributes: opts.timeZoneAwareAttributes,
-        }),
+        ),
       ];
     },
   });

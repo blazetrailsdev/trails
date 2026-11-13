@@ -46,6 +46,7 @@ async function diagnosticsFor(testBody: string): Promise<string[]> {
       "test/fixtures/admin/posts.yml",
       "_fixture:\n  model_class: Comment\n\nfirst:\n  body: b\n",
     );
+    write("test/fixtures/admin/comments.yml", "first:\n  body: b\n");
     write("test/fixtures/tags.yml", "<% 3.times do |i| %>\ntag_<%= i %>:\n  name: n\n<% end %>\n");
     write(
       "test/test-helper.ts",
@@ -103,5 +104,11 @@ describe("trails-tsc fixture set accessors", () => {
       'await this.posts("DEFAULTS");\nawait this.admin_posts("nope");',
     );
     expect(errors).toEqual(["No overload matches this call.", "No overload matches this call."]);
+  });
+
+  it("does not resolve a namespaced set to a top-level model of the same short name", async () => {
+    expect(
+      await diagnosticsFor('const comment: Comment = await this.admin_comments("first");'),
+    ).toEqual(["Type 'unknown' is not assignable to type 'Comment'."]);
   });
 });
