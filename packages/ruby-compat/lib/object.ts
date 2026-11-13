@@ -1781,6 +1781,10 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (isSymbol(value)) return symInspect(value);
   if (typeof value === "string") return stringInspect(value);
   if (value instanceof Uint8Array) {
+    const binaryInspect = (ascii: string) =>
+      stringInspect(ascii)
+        .slice(1, -1)
+        .replace(/(?<!\\)((?:\\\\)*)\\u00([0-7][0-9A-F])/g, "$1\\x$2");
     let ascii = "";
     let result = "";
     for (const byte of value) {
@@ -1788,10 +1792,10 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
         ascii += String.fromCharCode(byte);
         continue;
       }
-      result += stringInspect(ascii).slice(1, -1) + `\\x${byte.toString(16).toUpperCase()}`;
+      result += binaryInspect(ascii) + `\\x${byte.toString(16).toUpperCase()}`;
       ascii = "";
     }
-    return `"${result}${stringInspect(ascii).slice(1, -1)}"`;
+    return `"${result}${binaryInspect(ascii)}"`;
   }
   if (Array.isArray(value)) return inspectAry(value, recursing);
   if (isPlainHash(value) && classpaths.has(value)) {
