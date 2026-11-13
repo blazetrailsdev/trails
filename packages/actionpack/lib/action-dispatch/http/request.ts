@@ -17,9 +17,9 @@ import {
   toI,
   excSetupMessage,
   rbObjDup,
-  constSet,
   rbModName,
 } from "@blazetrails/ruby-compat";
+import { MissingController } from "../../action-dispatch.js";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -885,9 +885,6 @@ Request.prototype.parameterFilterFor = _parameterFilterFor as (
 /** @internal */
 export async function* emptyRackBody(): RackBody {}
 
-/** @noRailsEquivalent PERMANENT */
-export class MissingController extends NameError {}
-
 export class PASS_NOT_FOUND {
   /** @internal */
   static action(_: unknown): typeof PASS_NOT_FOUND {
@@ -905,6 +902,5 @@ export class PASS_NOT_FOUND {
 
 ActionDispatch.Request = Request;
 Request.Utils = Utils;
-constSet(ActionDispatch, "MissingController", MissingController);
 
 runLoadHooks("action_dispatch_request", Request);

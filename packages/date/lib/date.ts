@@ -6847,5 +6847,6 @@ for (const seat of ["Temporal.Instant", "Date"]) {
 }
 
 constSet(TopLevel, "Date", Date);
+constSet(Date, "Error", DateError);
 constSet(TopLevel, "DateTime", DateTime);
 rbSetClassPathString(DateInfinity, Date, "Infinity");

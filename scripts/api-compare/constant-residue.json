@@ -90,7 +90,7 @@
   "actionpack": {
     "rows": 333,
     "excluded": [
-      "action-dispatch/http/request.ts::MissingController",
+      "action-dispatch.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
       "action-dispatch/middleware/cookies.ts::CookieOverflow"
     ],

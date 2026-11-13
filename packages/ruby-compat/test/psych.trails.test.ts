@@ -662,3 +662,20 @@ describe("Psych YAMLTree / ToRuby numeric, encoding and exception arms", () => {
     expect(loaded.message).toBe("boom");
   });
 });
+
+describe("Psych exception class paths", () => {
+  it("answers each exception's Ruby path", async () => {
+    const { Psych } = await import("../lib/psych.js");
+    const { rbModName } = await import("../lib/object.js");
+    for (const name of [
+      "Exception",
+      "BadAlias",
+      "AliasesNotEnabled",
+      "AnchorNotDefined",
+      "DisallowedClass",
+      "SyntaxError",
+    ] as const) {
+      expect(rbModName(Psych[name])).toBe(`Psych::${name}`);
+    }
+  });
+});

@@ -22,7 +22,8 @@ import type { TemplateAssertions } from "./action-controller/template-assertions
 import type { Testing } from "./action-controller/metal/testing.js";
 import type { UrlFor } from "./action-dispatch/routing/url-for.js";
 import type { TestCase, TestRequest } from "./action-controller/test-case.js";
-import type { MissingController, Request } from "./action-dispatch/http/request.js";
+import type { Request } from "./action-dispatch/http/request.js";
+import type { MissingController } from "./action-dispatch.js";
 import type { Assertions } from "./action-dispatch/testing/assertions.js";
 import type { TestProcess } from "./action-dispatch/testing/test-process.js";
 import type { TestResponse } from "./action-dispatch/testing/test-response.js";
