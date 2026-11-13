@@ -59,11 +59,11 @@ describe("ActionText::ModelTest", () => {
     await assertDifference(new Map([[richTextCount, 0]]), null, async () => {
       const message = await Messages.createBang({ subject: "Greetings" });
       await message.richTextContent;
-      expect(message.content.isNil()).toBe(true);
-      expect(message.content.isBlank()).toBe(true);
-      expect(message.content.isEmpty()).toBe(true);
-      expect(await message.isContent()).toBe(false);
-      expect(message.content.isPresent()).toBe(false);
+      expect(message.content.isNil()).toBeTruthy();
+      expect(message.content.isBlank()).toBeTruthy();
+      expect(message.content.isEmpty()).toBeTruthy();
+      expect(await message.isContent()).toBeFalsy();
+      expect(message.content.isPresent()).toBeFalsy();
     });
   });
 
@@ -71,11 +71,11 @@ describe("ActionText::ModelTest", () => {
     await assertDifference(new Map([[richTextCount, 1]]), null, async () => {
       const message = await Messages.createBang({ subject: "Greetings", content: "" });
       await message.content.toPlainText();
-      expect(message.content.isNil()).toBe(false);
-      expect(message.content.isBlank()).toBe(true);
-      expect(message.content.isEmpty()).toBe(true);
-      expect(await message.isContent()).toBe(false);
-      expect(message.content.isPresent()).toBe(false);
+      expect(message.content.isNil()).toBeFalsy();
+      expect(message.content.isBlank()).toBeTruthy();
+      expect(message.content.isEmpty()).toBeTruthy();
+      expect(await message.isContent()).toBeFalsy();
+      expect(message.content.isPresent()).toBeFalsy();
     });
   });
 
@@ -204,11 +204,11 @@ describe("ActionText::ModelTest", () => {
         subject: "Greetings",
         content: "",
       });
-      expect(message.content.isNil()).toBe(true);
-      expect(message.content.isBlank()).toBe(true);
-      expect(message.content.isEmpty()).toBe(true);
-      expect(await message.isContent()).toBe(false);
-      expect(message.content.isPresent()).toBe(false);
+      expect(message.content.isNil()).toBeTruthy();
+      expect(message.content.isBlank()).toBeTruthy();
+      expect(message.content.isEmpty()).toBeTruthy();
+      expect(await message.isContent()).toBeFalsy();
+      expect(message.content.isPresent()).toBeFalsy();
     });
   });
 
@@ -235,19 +235,19 @@ describe("ActionText::ModelTest", () => {
       content: "",
     });
     await message1.content.toPlainText();
-    expect(await message1.isValid()).toBe(false);
+    expect(await message1.isValid()).toBeFalsy();
     message1.content = "content" as never;
     await message1.content.toPlainText();
-    expect(await message1.isValid()).toBe(true);
+    expect(await message1.isValid()).toBeTruthy();
 
     const message2 = new MessagesWithoutBlanksWithContentValidation({
       subject: "Greetings",
       content: "content",
     });
     await message2.content.toPlainText();
-    expect(await message2.isValid()).toBe(true);
+    expect(await message2.isValid()).toBeTruthy();
     message2.content = "" as never;
     await message2.content.toPlainText();
-    expect(await message2.isValid()).toBe(false);
+    expect(await message2.isValid()).toBeFalsy();
   });
 });
