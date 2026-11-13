@@ -372,7 +372,7 @@ describe("UpdateAllTest", () => {
     expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
 
     const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
-    const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
+    const expected = (await pplScope.pluck("lock_version")).map((v) => v + 1);
     await pplScope.updateAll({ updated_at: now });
 
     const updatedAts = await pplScope.pluck("updated_at");
@@ -389,7 +389,7 @@ describe("UpdateAllTest", () => {
     expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
 
     const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
-    const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
+    const expected = (await pplScope.pluck("lock_version")).map((v) => v + 1);
     await pplScope.updateCounters({ touch: { time: now } } as any);
 
     const updatedAts = await pplScope.pluck("updated_at");
@@ -406,7 +406,7 @@ describe("UpdateAllTest", () => {
     expect(epochMs(david.updated_at)).not.toBe(epochMs(now));
 
     const pplScope = Person.where({ id: [people("michael").id, david.id, people("susan").id] });
-    const expected = ((await pplScope.pluck("lock_version")) as number[]).map((v) => v + 1);
+    const expected = (await pplScope.pluck("lock_version")).map((v) => v + 1);
 
     vi.useFakeTimers({ now: epochMs(now) });
     await pplScope.touchAll();

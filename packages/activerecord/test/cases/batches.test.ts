@@ -904,8 +904,8 @@ describe("EachTest", () => {
     for await (const relation of Post.inBatches({ of: 2, load: true })) {
       const records = await relation.toArray();
       for (const post of records) {
-        expect(seenIds.has((post as any).id)).toBeFalsy();
-        seenIds.add((post as any).id);
+        expect(seenIds.has(post.id)).toBeFalsy();
+        seenIds.add(post.id);
       }
     }
   });
