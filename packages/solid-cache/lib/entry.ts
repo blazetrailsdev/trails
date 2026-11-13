@@ -1,6 +1,6 @@
 import { type Result } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
-import { constSet, Digest, eachSlice, toS, unpack1 } from "@blazetrails/ruby-compat";
+import { constSet, Range, Digest, eachSlice, toS, unpack1 } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidCache } from "./solid-cache.js";
 
@@ -14,7 +14,7 @@ export class Entry extends Record {
 
   static readonly ESTIMATED_ENCRYPTION_OVERHEAD = 170;
 
-  static readonly KEY_HASH_ID_RANGE = [-(2n ** 63n), 2n ** 63n - 1n] as const;
+  static readonly KEY_HASH_ID_RANGE = new Range(-(2n ** 63n), 2n ** 63n - 1n);
 
   static readonly MULTI_BATCH_SIZE = 1000;
 

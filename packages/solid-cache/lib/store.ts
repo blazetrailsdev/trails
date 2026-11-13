@@ -123,7 +123,7 @@ export class Store extends CacheStore {
       this.shardOptions = Object.hasOwn(options, "shards") ? (options.shards as string[]) : null;
     }
 
-    if (![Array.isArray(this.shardOptions), this.shardOptions == null].some((x) => x)) {
+    if (!(Array.isArray(this.shardOptions) || this.shardOptions == null)) {
       throw new ArgumentError(
         `\`shards\` is a \`${rbModName((this.shardOptions as object).constructor)}\`, it should be Array or nil`,
       );
