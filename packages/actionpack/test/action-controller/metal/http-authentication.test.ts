@@ -73,7 +73,7 @@ describe("HttpAuthentication::Basic", () => {
     authenticationRequest(c, 'Evil"Realm', null);
     expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="EvilRealm"');
     expect(c.status).toBe(401);
-    expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
+    expect(c.response.body).toBe("HTTP Basic: Access denied.\n");
   });
 });
 
@@ -98,7 +98,7 @@ describe("HttpAuthentication::Basic::ControllerMethods", () => {
     const c = ctrl();
     requestHttpBasicAuthentication.call(c, "Zone", "nope");
     expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="Zone"');
-    expect(c.responseBody).toBe("nope");
+    expect(c.response.body).toBe("nope");
   });
 
   it("httpBasicAuthenticateOrRequestWith succeeds only on matching credentials", () => {
@@ -244,13 +244,13 @@ describe("HttpAuthentication::Digest", () => {
     Digest.authenticationRequest(c, "SuperSecret", null);
     expect(c.status).toBe(401);
     expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
-    expect(c.responseBody).toBe("HTTP Digest: Access denied.\n");
+    expect(c.response.body).toBe("HTTP Digest: Access denied.\n");
   });
 
   it("authentication_request uses provided message", () => {
     const c = makeDigestCtrl();
     Digest.authenticationRequest(c, "SuperSecret", "Authentication Failed");
-    expect(c.responseBody).toBe("Authentication Failed");
+    expect(c.response.body).toBe("Authentication Failed");
   });
 });
 
@@ -260,7 +260,7 @@ describe("HttpAuthentication::Digest::ControllerMethods", () => {
     requestHttpDigestAuthentication.call(c, "SuperSecret", "Auth Failed");
     expect(c.status).toBe(401);
     expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
-    expect(c.responseBody).toBe("Auth Failed");
+    expect(c.response.body).toBe("Auth Failed");
   });
 });
 
@@ -283,7 +283,7 @@ describe("HttpAuthentication::Token::ControllerMethods", () => {
     );
     expect(c.status).toBe(401);
     expect(c.headers.get("WWW-Authenticate")).toBe('Token realm="SuperSecret"');
-    expect(c.responseBody).toBe("Authentication Failed\n");
+    expect(c.response.body).toBe("Authentication Failed\n");
   });
 
   it("encodeCredentials inspects the token and each option", () => {

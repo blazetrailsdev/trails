@@ -54,7 +54,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     this.ignoreDisconnect = false;
   }
 
-  override write(string: string | Uint8Array): void {
+  override async write(string: string | Uint8Array): Promise<void> {
     if (!this._response!.committed) {
       if (this._response!.headers.get("Cache-Control") === undefined) {
         this._response!.headers.set("Cache-Control", "no-cache");
@@ -62,7 +62,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
       this._response!.deleteHeader("Content-Length");
     }
 
-    super.write(string);
+    await super.write(string);
 
     if (!this.isConnected) {
       this._buf.clear();
@@ -73,8 +73,8 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     }
   }
 
-  writeln(string: string): void {
-    this.write(string.endsWith("\n") ? string : `${string}\n`);
+  writeln(string: string): Promise<void> {
+    return this.write(string.endsWith("\n") ? string : `${string}\n`);
   }
 
   override close(): void {
@@ -143,11 +143,11 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
 export class SSE {
   static readonly PERMITTED_OPTIONS = ["retry", "event", "id"] as const;
 
-  private _stream: { write(s: string): void; close(): void };
+  private _stream: { write(s: string): unknown; close(): void };
   private _options: { retry?: number | string; event?: string; id?: number | string };
 
   constructor(
-    stream: { write(s: string): void; close(): void },
+    stream: { write(s: string): unknown; close(): void },
     options: { retry?: number | string; event?: string; id?: number | string } = {},
   ) {
     this._stream = stream;
@@ -161,11 +161,11 @@ export class SSE {
   write(
     object: unknown,
     options: { retry?: number | string; event?: string; id?: number | string } = {},
-  ): void {
+  ): Promise<void> {
     if (typeof object === "string") {
-      this.performWrite(object, options);
+      return this.performWrite(object, options);
     } else {
-      this.performWrite(JSON.stringify(object) ?? "null", options);
+      return this.performWrite(JSON.stringify(object) ?? "null", options);
     }
   }
 
@@ -173,10 +173,10 @@ export class SSE {
    * @internal
    * @missingRailsName options — PERMANENT
    */
-  private performWrite(
+  private async performWrite(
     json: string,
     options: { retry?: number | string; event?: string; id?: number | string },
-  ): void {
+  ): Promise<void> {
     const currentOptions: Record<string, string | number | undefined> = {
       ...this._options,
       ...options,
@@ -185,12 +185,12 @@ export class SSE {
     for (const name of SSE.PERMITTED_OPTIONS) {
       const optionValue = currentOptions[name];
       if (optionValue !== undefined && optionValue !== null) {
-        this._stream.write(`${name}: ${optionValue}\n`);
+        await this._stream.write(`${name}: ${optionValue}\n`);
       }
     }
 
     const message = json.replace(/\n/g, "\ndata: ");
-    this._stream.write(`data: ${message}\n\n`);
+    await this._stream.write(`data: ${message}\n\n`);
   }
 }
 

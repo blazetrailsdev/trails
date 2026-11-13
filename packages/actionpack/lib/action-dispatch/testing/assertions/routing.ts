@@ -457,6 +457,7 @@ export const RoutingAssertions = new Module((mod) => {
   (
     mod as unknown as { included(base: null, block: (this: { prototype: object }) => void): void }
   ).included(null, function (this: { prototype: object }) {
+    if (this.prototype === undefined) return;
     spliceMethodMissing(Object.getPrototypeOf(this.prototype) as object);
   });
 });

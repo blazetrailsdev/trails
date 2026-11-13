@@ -286,7 +286,7 @@ describe("ActionView::Rendering#_process_format", () => {
 
     expect(controller.lookupContext.formats).toEqual([":json"]);
     expect(controller.response.mediaType).toBe("application/json");
-    expect(controller.responseBody).toBe("JSON");
+    expect(controller.response.body).toBe("JSON");
   });
 });
 

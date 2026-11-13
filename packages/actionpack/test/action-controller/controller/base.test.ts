@@ -247,7 +247,7 @@ describe("PerformActionTest", () => {
     }
     const c = new ActionMissingController();
     await c.dispatch("arbitrary_action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("Response for arbitrary_action");
+    expect(c.response.body).toBe("Response for arbitrary_action");
   });
 
   // BLOCKED: port-did-you-mean-correctable-onto-name-error

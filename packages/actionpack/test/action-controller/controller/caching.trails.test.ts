@@ -147,7 +147,7 @@ describe("conditional GET", () => {
     const c = new C();
     await c.dispatch("show", makeRequest(), makeResponse());
     expect(result).toBe(true);
-    expect(c.responseBody).toBe("content");
+    expect(c.response.body).toBe("content");
   });
 
   it("stale? returns false when ETag matches", async () => {

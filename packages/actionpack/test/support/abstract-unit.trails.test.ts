@@ -37,7 +37,7 @@ async function dispatch(action: string): Promise<unknown> {
   const controller = new FixtureLoadPathController();
   const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" };
   await controller.dispatch(action, new Request(env), new Response());
-  return controller.responseBody;
+  return controller.response.body;
 }
 
 describe("FIXTURE_LOAD_PATH", () => {

@@ -60,19 +60,19 @@ describe("ActionController::Base render partial:", () => {
   it("resolves a qualified partial name from a controller whose path is unrelated", async () => {
     const c = new BadgeController();
     await c.dispatch("show", makeRequest(), new Response());
-    expect(c.responseBody).toBe("badge");
+    expect(c.response.body).toBe("badge");
   });
 
   it("resolves an unqualified partial against the controller's prefix", async () => {
     const c = new BadgeController();
     await c.dispatch("row", makeRequest(), new Response());
-    expect(c.responseBody).toBe("row");
+    expect(c.response.body).toBe("row");
   });
 
   it("reaches a partial in app/views/application from a subclass", async () => {
     const c = new BadgeController();
     await c.dispatch("footer", makeRequest(), new Response());
-    expect(c.responseBody).toBe("footer");
+    expect(c.response.body).toBe("footer");
   });
 });
 
@@ -177,7 +177,7 @@ describe("ActionController::Streaming#_render_template", () => {
     const renderBody = vi.spyOn(controller.viewRenderer(), "renderBody");
     await controller.dispatch("show", makeRequest(), new Response());
     expect(renderBody).toHaveBeenCalledOnce();
-    expect(controller.responseBody).toBe("streamed row");
+    expect(controller.response.body).toBe("streamed row");
     expect(controller.response.getHeader("cache-control")).toBe("no-cache");
   });
 });
@@ -218,7 +218,7 @@ describe("ActionView::ViewPaths.local_prefixes (view_paths.rb:73-77)", () => {
   it("renders from the prefix an overriding controller names", async () => {
     const c = new RfcPagesController();
     await c.dispatch("show", makeRequest(), new Response());
-    expect(c.responseBody).toBe("from rfc-pages");
+    expect(c.response.body).toBe("from rfc-pages");
   });
 
   it("stops the prefix chain at ActionController::Base, which is abstract (base.rb:208)", () => {

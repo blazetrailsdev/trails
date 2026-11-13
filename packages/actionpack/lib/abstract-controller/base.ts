@@ -70,12 +70,12 @@ export class Base {
     this._actionName = value;
   }
 
-  protected _responseBody: string | Buffer | true | null = null;
+  protected _responseBody: unknown = null;
 
-  get responseBody(): string | Buffer | true | null {
+  get responseBody(): unknown {
     return this._responseBody;
   }
-  set responseBody(value: string | Buffer | null) {
+  set responseBody(value: unknown) {
     this._responseBody = value;
   }
 

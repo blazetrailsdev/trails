@@ -28,9 +28,9 @@ describe("ActionDispatch::Assertions", () => {
       }
       expect(klass.prototype.assertResponse).toBe(assertResponse);
       expect(klass.prototype.assertRouting).toBe(assertRouting);
-      expect(Object.getOwnPropertyDescriptor(klass.prototype, "htmlDocument")?.get).toBe(
-        htmlDocument,
-      );
+      let owner: object | null = klass.prototype;
+      while (owner && !Object.hasOwn(owner, "htmlDocument")) owner = Object.getPrototypeOf(owner);
+      expect(Object.getOwnPropertyDescriptor(owner!, "htmlDocument")?.get).toBe(htmlDocument);
     }
     expect(isModuleIncluded(TestCase, TemplateAssertions)).toBe(true);
   });

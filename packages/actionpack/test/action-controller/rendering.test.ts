@@ -36,7 +36,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(JSON.parse(c.responseBody as string)).toEqual({ a: 1 });
+      expect(JSON.parse(c.response.body)).toEqual({ a: 1 });
       expect(c.contentType).toBe("application/json; charset=utf-8");
     });
 
@@ -48,7 +48,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(JSON.parse(c.responseBody as string)).toEqual([1, 2, 3]);
+      expect(JSON.parse(c.response.body)).toEqual([1, 2, 3]);
     });
 
     it("renders JSON string directly", async () => {
@@ -59,7 +59,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe('{"custom":true}');
+      expect(c.response.body).toBe('{"custom":true}');
     });
 
     it("renders null as JSON", async () => {
@@ -70,7 +70,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("null");
+      expect(c.response.body).toBe("null");
     });
 
     it("renders with custom status", async () => {
@@ -105,7 +105,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("hello world");
+      expect(c.response.body).toBe("hello world");
       expect(c.contentType).toBe("text/plain; charset=utf-8");
     });
 
@@ -117,7 +117,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("");
+      expect(c.response.body).toBe("");
     });
   });
 
@@ -130,7 +130,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("<b>bold</b>");
+      expect(c.response.body).toBe("<b>bold</b>");
       expect(c.contentType).toBe("text/html; charset=utf-8");
     });
   });
@@ -144,7 +144,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("raw");
+      expect(c.response.body).toBe("raw");
       expect(c.contentType).toBe("text/plain; charset=utf-8");
     });
   });
@@ -212,7 +212,7 @@ describe("ActionController rendering", () => {
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.status).toBe(204);
-      expect(c.responseBody).toBe("");
+      expect(c.response.body).toBe("");
     });
 
     it("head with symbol status", async () => {
@@ -261,7 +261,7 @@ describe("ActionController rendering", () => {
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.preview).toBe('{"preview":true}');
-      expect(c.responseBody).toBe('{"final":true}');
+      expect(c.response.body).toBe('{"final":true}');
     });
 
     it("renderToString with plain text", async () => {
@@ -275,7 +275,7 @@ describe("ActionController rendering", () => {
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.preview).toBe("preview");
-      expect(c.responseBody).toBe("final");
+      expect(c.response.body).toBe("final");
     });
   });
 
@@ -344,7 +344,7 @@ describe("ActionController rendering", () => {
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
       expect(c.contentType).toBe("text/html; charset=utf-8");
-      expect(c.responseBody).toBe("");
+      expect(c.response.body).toBe("");
     });
 
     it("uses template resolver when available", async () => {
@@ -358,7 +358,7 @@ describe("ActionController rendering", () => {
       );
       const c = new TemplateController();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("<div>index</div>");
+      expect(c.response.body).toBe("<div>index</div>");
     });
   });
 
@@ -371,7 +371,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(JSON.parse(c.responseBody as string)).toEqual({ api: true });
+      expect(JSON.parse(c.response.body)).toEqual({ api: true });
     });
 
     it("renders plain text", async () => {
@@ -382,7 +382,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("api text");
+      expect(c.response.body).toBe("api text");
     });
 
     it("renders with status", async () => {
@@ -404,7 +404,7 @@ describe("ActionController rendering", () => {
       }
       const c = new C();
       await c.dispatch("index", makeRequest(), makeResponse());
-      expect(c.responseBody).toBe("raw");
+      expect(c.response.body).toBe("raw");
     });
   });
 });
@@ -418,7 +418,7 @@ describe("ActionController sendData", () => {
     }
     const c = new C();
     await c.dispatch("download", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("hello");
+    expect(c.response.body).toBe("hello");
     expect(c.contentType).toBe("text/plain");
   });
 
@@ -513,7 +513,7 @@ describe("ActionController render edge cases", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("null");
+    expect(c.response.body).toBe("null");
   });
 
   it("render json array", async () => {
@@ -524,7 +524,7 @@ describe("ActionController render edge cases", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(JSON.parse(c.responseBody as string)).toEqual([1, 2, 3]);
+    expect(JSON.parse(c.response.body)).toEqual([1, 2, 3]);
   });
 
   it("render json string is used as-is", async () => {
@@ -535,7 +535,7 @@ describe("ActionController render edge cases", () => {
     }
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe('{"raw":true}');
+    expect(c.response.body).toBe('{"raw":true}');
   });
 
   it("render with status number", async () => {
@@ -580,7 +580,7 @@ describe("ActionController render edge cases", () => {
     const c = new C();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.status).toBe(404);
-    expect(c.responseBody).toBe("");
+    expect(c.response.body).toBe("");
   });
 
   it("head with status number", async () => {

@@ -52,51 +52,51 @@ describe("SSETest", () => {
       include(this, Live);
     }
 
-    basicSse(): void {
+    async basicSse(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write('{"name":"John"}');
-        sse.write({ name: "Ryan" });
+        await sse.write('{"name":"John"}');
+        await sse.write({ name: "Ryan" });
       } finally {
         sse.close();
       }
     }
 
-    sseWithEvent(): void {
+    async sseWithEvent(): Promise<void> {
       const sse = new SSE(this.response.stream as Buffer, { event: "send-name" });
       try {
-        sse.write('{"name":"John"}');
-        sse.write({ name: "Ryan" });
+        await sse.write('{"name":"John"}');
+        await sse.write({ name: "Ryan" });
       } finally {
         sse.close();
       }
     }
 
-    sseWithRetry(): void {
+    async sseWithRetry(): Promise<void> {
       const sse = new SSE(this.response.stream as Buffer, { retry: 1000 });
       try {
-        sse.write('{"name":"John"}');
-        sse.write({ name: "Ryan" }, { retry: 1500 });
+        await sse.write('{"name":"John"}');
+        await sse.write({ name: "Ryan" }, { retry: 1500 });
       } finally {
         sse.close();
       }
     }
 
-    sseWithId(): void {
+    async sseWithId(): Promise<void> {
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write('{"name":"John"}', { id: 1 });
-        sse.write({ name: "Ryan" }, { id: 2 });
+        await sse.write('{"name":"John"}', { id: 1 });
+        await sse.write({ name: "Ryan" }, { id: 2 });
       } finally {
         sse.close();
       }
     }
 
-    sseWithMultipleLineMessage(): void {
+    async sseWithMultipleLineMessage(): Promise<void> {
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write("first line.\nsecond line.");
+        await sse.write("first line.\nsecond line.");
       } finally {
         sse.close();
       }
@@ -216,9 +216,9 @@ describe("LiveStreamTest", () => {
       await this.render({ plain: "zomg" });
     }
 
-    writeLines(): void {
-      (this.response.stream as Buffer).writeln("hello\n");
-      (this.response.stream as Buffer).writeln("world");
+    async writeLines(): Promise<void> {
+      await (this.response.stream as Buffer).writeln("hello\n");
+      await (this.response.stream as Buffer).writeln("world");
       (this.response.stream as Buffer).close();
     }
 
@@ -236,38 +236,38 @@ describe("LiveStreamTest", () => {
     }
 
     async basicSendStream(): Promise<void> {
-      await this.sendStream({ filename: "my.csv" }, (stream) => {
-        stream.write("name,age\ndavid,41");
+      await this.sendStream({ filename: "my.csv" }, async (stream) => {
+        await stream.write("name,age\ndavid,41");
       });
     }
 
     async sendStreamWithOptions(): Promise<void> {
       await this.sendStream(
         { filename: "export", disposition: "inline", type: ":json" },
-        (stream) => {
-          stream.write('{ name: "David", age: 41 }');
+        async (stream) => {
+          await stream.write('{ name: "David", age: 41 }');
         },
       );
     }
 
     async sendStreamWithInferredContentType(): Promise<void> {
-      await this.sendStream({ filename: "sample.csv" }, (stream) => {
-        stream.writeln("fruit,quantity");
-        stream.writeln("apple,5");
+      await this.sendStream({ filename: "sample.csv" }, async (stream) => {
+        await stream.writeln("fruit,quantity");
+        await stream.writeln("apple,5");
       });
     }
 
     async sendStreamWithImplicitContentType(): Promise<void> {
-      await this.sendStream({ filename: "sample.csv", type: ":csv" }, (stream) => {
-        stream.writeln("fruit,quantity");
-        stream.writeln("apple,5");
+      await this.sendStream({ filename: "sample.csv", type: ":csv" }, async (stream) => {
+        await stream.writeln("fruit,quantity");
+        await stream.writeln("apple,5");
       });
     }
 
     async sendStreamWithExplicitContentType(): Promise<void> {
-      await this.sendStream({ filename: "sample.csv", type: "text/csv" }, (stream) => {
-        stream.writeln("fruit,quantity");
-        stream.writeln("apple,5");
+      await this.sendStream({ filename: "sample.csv", type: "text/csv" }, async (stream) => {
+        await stream.writeln("fruit,quantity");
+        await stream.writeln("apple,5");
       });
     }
 
@@ -354,7 +354,7 @@ describe("LiveStreamTest", () => {
       );
     }
 
-    overfillBufferAndDie(): void {
+    async overfillBufferAndDie(): Promise<void> {
       const logger = Base.logger || new Logger(STDOUT);
       (this.response.stream as Buffer).onError(() => {
         logger.warn("Error while streaming.");
@@ -362,16 +362,16 @@ describe("LiveStreamTest", () => {
       });
 
       for (let i = 0; i < 10; i++) {
-        (this.response.stream as Buffer).write(".");
+        await (this.response.stream as Buffer).write(".");
       }
-      (this.response.stream as Buffer).write(".");
+      await (this.response.stream as Buffer).write(".");
 
       this.latch.countDown();
 
-      (this.response.stream as Buffer).write("x");
+      await (this.response.stream as Buffer).write("x");
 
       for (let i = 0; i < 20; i++) {
-        (this.response.stream as Buffer).write(".");
+        await (this.response.stream as Buffer).write(".");
       }
     }
 
@@ -552,8 +552,7 @@ describe("LiveStreamTest", () => {
     assertEqual("abcdefghijklmnopqrstuvwxyz", (tc.response.stream as Buffer).body);
   });
 
-  // BLOCKED: live-buffer-write-does-not-wait-on-a-full-queue
-  it.skip("abort with full buffer", async () => {
+  it("abort with full buffer", async () => {
     const oldQueueSize = Buffer.queueSize;
     Buffer.queueSize = 10;
 
@@ -800,12 +799,12 @@ describe("LiveStreamRouterTest", () => {
       include(this, Live);
     }
 
-    index(): void {
+    async index(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write('{"name":"John"}');
-        sse.write({ name: "Ryan" });
+        await sse.write('{"name":"John"}');
+        await sse.write({ name: "Ryan" });
       } finally {
         sse.close();
       }
