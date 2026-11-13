@@ -6,9 +6,17 @@ import { TopLevel } from "@blazetrails/activesupport";
     "/trails/action_mailbox",
     { module: "action_mailbox/ingresses" },
     function (this: Mapper) {
+      this.post("/postmark/inbound_emails", {
+        to: "postmark/inbound_emails#create",
+        as: "trails_postmark_inbound_emails",
+      });
       this.post("/relay/inbound_emails", {
         to: "relay/inbound_emails#create",
         as: "trails_relay_inbound_emails",
+      });
+      this.post("/sendgrid/inbound_emails", {
+        to: "sendgrid/inbound_emails#create",
+        as: "trails_sendgrid_inbound_emails",
       });
 
       this.get("/mandrill/inbound_emails", {
