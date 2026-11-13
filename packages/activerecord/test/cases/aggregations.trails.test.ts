@@ -81,6 +81,21 @@ describe("lazy composed_of inclusion", () => {
     expect(Priced.prototype.reload).not.toBe(persistenceReload);
   });
 
+  it("init_internals reaches Base's chain through super (aggregations.rb:21-24)", () => {
+    expect(own(CustomerModel, "initInternals")).toBe(true);
+    expect(CustomerModel.prototype.initInternals).not.toBe(Base.prototype.initInternals);
+    const customer = new CustomerModel() as unknown as Record<string, unknown>;
+    expect(customer._aggregationCache).toEqual(new Map());
+    expect(customer._readonly).toBe(false);
+    expect(customer._associationCache).toEqual(new Map());
+    expect(customer._triggerUpdateCallback).toBe(null);
+    expect(customer._touchAttrNames).toBe(null);
+    expect(customer._touchRecord).toBe(null);
+    expect(customer._alreadyCalled).toBe(null);
+    expect(customer._committedAlreadyCalled).toBe(null);
+    expect(customer._deferTouchAttrs).toBe(null);
+  });
+
   it("does not re-wrap a subclass whose superclass already declared composed_of", () => {
     class Priced extends Base {
       static {
