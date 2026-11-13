@@ -136,7 +136,8 @@ export class Store extends CacheStore {
         : "truncate";
     this.clearWith = clearWith == null ? null : String(clearWith);
 
-    if (!(["truncate", "delete"] as (string | null)[]).includes(this.clearWith)) {
+    const clearWiths: (string | null)[] = ["truncate", "delete"];
+    if (!clearWiths.includes(this.clearWith)) {
       throw new ArgumentError("`clear_with` must be either ``:truncate`` or ``:delete`");
     }
 
