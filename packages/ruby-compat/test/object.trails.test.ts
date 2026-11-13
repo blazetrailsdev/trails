@@ -180,6 +180,22 @@ describe("Object#inspect", () => {
   });
 });
 
+describe("rbInspect of an ASCII-8BIT String", () => {
+  it("escapes control and high bytes as \\xHH, keeping the named escapes", () => {
+    expect(inspect(new Uint8Array([0x00, 0x07, 0x1b, 0x0a, 0x7f, 0x80, 0xff]))).toBe(
+      '"\\x00\\a\\e\\n\\x7F\\x80\\xFF"',
+    );
+  });
+
+  it("escapes an interpolation opener only within one ASCII run", () => {
+    expect(inspect(new Uint8Array([0x23, 0x7b, 0x23, 0x80, 0x7b]))).toBe('"\\#{#\\x80{"');
+  });
+
+  it("keeps a literal backslash before u00 text", () => {
+    expect(inspect(new Uint8Array([0x5c, 0x75, 0x30, 0x30, 0x30, 0x30]))).toBe('"\\\\u0000"');
+  });
+});
+
 describe("Object#to_s", () => {
   it("answers rb_any_to_s for an instance with no to_s of its own", () => {
     class Foo {

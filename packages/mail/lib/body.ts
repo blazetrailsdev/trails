@@ -179,8 +179,9 @@ export class Body {
     return this.parts.length > 0 ? true : null;
   }
 
-  push(val: PartsListPart): unknown {
-    return this._parts.push(val);
+  push(val: PartsListPart): PartsList {
+    this._parts.push(val);
+    return this._parts;
   }
 
   splitBang(boundary: string | null): this {
