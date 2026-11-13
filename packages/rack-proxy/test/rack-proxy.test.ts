@@ -1,5 +1,12 @@
-import { constDefined, constSet, OpenSSL, rbObjIvarGet, TopLevel } from "@blazetrails/ruby-compat";
-import { Headers, Rack } from "@blazetrails/rack";
+import {
+  constDefined,
+  constGet,
+  constSet,
+  OpenSSL,
+  rbObjIvarGet,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
+import { Rack } from "@blazetrails/rack";
 import { describe, expect, it } from "vitest";
 
 import { Proxy } from "../lib/index.js";
@@ -10,7 +17,9 @@ describe("RackProxyTest", () => {
     const headers = { header_array: ["first_entry"], header_non_array: "entry" };
 
     const normalizedHeaders = proxyClass.normalizeHeaders(headers);
-    const expectedClass = constDefined(Rack, "Headers") ? Headers : null;
+    const expectedClass = constDefined(Rack, "Headers")
+      ? constGet(Rack, "Headers")
+      : constGet(Rack, "Utils::HeaderHash");
     expect(normalizedHeaders.constructor === expectedClass).toBeTruthy();
     expect(normalizedHeaders.get("header_array") === "first_entry").toBeTruthy();
     expect(normalizedHeaders.get("header_non_array") === "entry").toBeTruthy();
