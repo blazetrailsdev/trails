@@ -268,6 +268,23 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
   });
 });
 
+describe("init_internals (core.rb:834 and each module's super chain)", () => {
+  fixtures(["topics"]);
+
+  it("is Base's own method, which no included module's copy replaces", () => {
+    expect(Object.hasOwn(Base.prototype, "initInternals")).toBe(true);
+    expect(Topic.prototype.initInternals).toBe(Base.prototype.initInternals);
+    expect(Object.getOwnPropertySymbols(Base.prototype.initInternals)).toEqual([]);
+  });
+
+  it("stops at Core, which calls no super, so ActiveModel::Validations' body is not reached", async () => {
+    const topic = (await Topic.first()) as Topic;
+    const errors = topic.errors;
+    topic.initInternals();
+    expect(topic.errors).toBe(errors);
+  });
+});
+
 describe("DatabaseConfigurations.new given a DatabaseConfigurations", () => {
   it("takes the other instance's configurations (database_configurations.rb:201)", () => {
     const configs = new DatabaseConfigurations({
@@ -475,7 +492,6 @@ describe("init_internals / initialize_dup super chain", () => {
     expect(topic._committedAlreadyCalled).toBe(null);
     expect(topic._newRecordBeforeLastCommit).toBe(null);
     expect(topic._deferTouchAttrs).toBe(null);
-    expect(topic._touchTime).toBe(null);
   });
 
   it("dup runs the whole chain, including the ActiveModel links", async () => {

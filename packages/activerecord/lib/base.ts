@@ -1407,8 +1407,57 @@ export class Base extends Model {
     }
   }
 
-  /** @internal */
-  declare initInternals: () => void;
+  /**
+   * @internal
+   * @inlinedFrom ActiveRecord::TouchLater#init_internals rails/v8.0.2/activerecord/lib/active_record/touch_later.rb:49-52
+   * @inlinedFrom ActiveRecord::Transactions#init_internals rails/v8.0.2/activerecord/lib/active_record/transactions.rb:432-437
+   * @inlinedFrom ActiveRecord::AutosaveAssociation#init_internals rails/v8.0.2/activerecord/lib/active_record/autosave_association.rb:290-293
+   * @inlinedFrom ActiveRecord::Associations#init_internals rails/v8.0.2/activerecord/lib/active_record/associations.rb:75-78
+   * @inlinedFrom ActiveRecord::Timestamp#init_internals rails/v8.0.2/activerecord/lib/active_record/timestamp.rb:102-105
+   * @inlinedFrom ActiveRecord::AttributeMethods::Dirty#init_internals rails/v8.0.2/activerecord/lib/active_record/attribute_methods/dirty.rb:196-202
+   * @inlinedFrom ActiveModel::Dirty#init_internals rails/v8.0.2/activemodel/lib/active_model/dirty.rb:372-376
+   * @inlinedFrom ActiveRecord::Persistence#init_internals rails/v8.0.2/activerecord/lib/active_record/persistence.rb:814-818
+   * @inlinedFrom ActiveRecord::Core#init_internals rails/v8.0.2/activerecord/lib/active_record/core.rb:834-849
+   */
+  initInternals(): void {
+    this._readonly = false;
+    this._previouslyNewRecord = false;
+    this._destroyed = false;
+    this._markedForDestruction = false;
+    this._destroyedByAssociation = null;
+    this._startTransactionState = null;
+
+    const klass = this.constructor;
+
+    this._primaryKey = klass.primaryKey;
+    this._strictLoading = klass.strictLoadingByDefault;
+    this._strictLoadingMode = klass.strictLoadingMode;
+
+    klass.defineAttributeMethods();
+
+    this._triggerDestroyCallback = this._triggerUpdateCallback = null;
+    this._previouslyNewRecord = false;
+
+    this._mutationsBeforeLastSave = null;
+    this._mutationsFromDatabase = null;
+
+    this._mutationsBeforeLastSave = null;
+    this._mutationsFromDatabase = null;
+    this._touchAttrNames = null;
+    this._skipDirtyTracking = null;
+
+    this._touchRecord = null;
+
+    this._associationCache = new Map();
+
+    this._alreadyCalled = null;
+
+    this._startTransactionState = null;
+    this._committedAlreadyCalled = null;
+    this._newRecordBeforeLastCommit = null;
+
+    this._deferTouchAttrs = null;
+  }
   declare initializeInternalsCallback: () => void;
   /** @internal */
   declare _runInitializeCallbacks: (block?: () => unknown) => unknown;
@@ -1830,10 +1879,22 @@ export interface Base
     AutosaveAssociation,
     JSONSerializer,
     AMDirty,
-    Pick<ThisParameterType<typeof Timestamp.initInternals>, "allTimestampAttributesInModel"> {
+    Pick<ThisParameterType<typeof Timestamp.initializeDup>, "allTimestampAttributesInModel"> {
   constructor: typeof Base;
   _touchAttrNames: Set<string> | null;
   _skipDirtyTracking: boolean | null;
+  /** @internal */
+  _markedForDestruction: boolean;
+  /** @internal */
+  _destroyedByAssociation: unknown;
+  /** @internal */
+  _startTransactionState?: _Transactions.TransactionRecordState | null;
+  /** @internal */
+  _committedAlreadyCalled?: boolean | null;
+  /** @internal */
+  _newRecordBeforeLastCommit?: boolean | null;
+  /** @internal */
+  _deferTouchAttrs?: readonly string[] | null;
   /** @internal */
   strictLoadedAssociations: OmitThisParameter<typeof _Persistence.strictLoadedAssociations>;
   /** @internal */

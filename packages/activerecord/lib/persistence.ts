@@ -11,7 +11,6 @@ import {
   rtest,
   eachWithObject,
   eachWithIndex,
-  rbCallSuper,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
@@ -711,13 +710,6 @@ export function becomesBang<
 }
 
 /** @internal */
-export function initInternals(this: Base): void {
-  rbCallSuper(this, initInternals);
-  this._triggerDestroyCallback = this._triggerUpdateCallback = null;
-  this._previouslyNewRecord = false;
-}
-
-/** @internal */
 export function strictLoadedAssociations(this: Base): string[] {
   return [...(this._associationCache ?? [])]
     .filter(
@@ -874,7 +866,6 @@ export const Persistence = {
     return affectedRows;
   },
   _createRecord,
-  initInternals,
   incrementBang,
   reload,
 };

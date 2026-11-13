@@ -1090,6 +1090,20 @@ describe("rbCallSuper", () => {
     expect(new SubB().tag()).toBe("m(B)");
   });
 
+  it("reaches the shadowed method from a frozen function", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    class Child extends Parent {}
+    const greet = Object.freeze(function greet(this: Child): string {
+      return `mod+${rbCallSuper(this, greet) as string}`;
+    });
+    include(Child, { greet });
+    expect(new Child().greet()).toBe("mod+parent");
+  });
+
   it("falls through to Kernel, else raises NoMethodError", () => {
     class Host {}
     function nothingAbove(this: Host): unknown {

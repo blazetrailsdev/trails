@@ -100,13 +100,6 @@ export async function touchDeferredAttributes(this: TouchLaterHost): Promise<voi
 }
 
 /** @internal */
-export function initInternals(this: TouchLaterHost): void {
-  rbCallSuper(this, initInternals);
-  this._deferTouchAttrs = null;
-  this._touchTime = null;
-}
-
-/** @internal */
 export function hasDeferTouchAttrs(record: TouchLaterHost): boolean {
   const attrs = record._deferTouchAttrs;
   return Array.isArray(attrs) && attrs.length > 0;
@@ -116,5 +109,4 @@ Object.assign(TouchLater, {
   beforeCommittedBang,
   touchLater,
   touch,
-  initInternals,
 });
