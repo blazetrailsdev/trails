@@ -50,11 +50,10 @@ async function hasEncryptedRichTexts(this: EncryptionHost): Promise<boolean> {
 async function encryptableRichTexts(this: EncryptionHost): Promise<EncryptedRichText[]> {
   if (this._encryptableRichTexts != null) return this._encryptableRichTexts;
   const klass = this.constructor as typeof Base & { richTextAssociationNames(): string[] };
-  const records = await Promise.all(
-    klass.richTextAssociationNames().map(async (attributeName) => {
-      return await (this as unknown as Record<string, unknown>)[attributeName];
-    }),
-  );
+  const records: unknown[] = [];
+  for (const attributeName of klass.richTextAssociationNames()) {
+    records.push(await (this as unknown as Record<string, unknown>)[attributeName]);
+  }
   return (this._encryptableRichTexts = filterMap(records, (record) => record).filter(
     (record) => record instanceof ActionText.EncryptedRichText!,
   ));
