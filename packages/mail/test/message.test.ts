@@ -2,6 +2,7 @@ import type {} from "@blazetrails/vitest-matchers";
 import { DateTime } from "@blazetrails/date";
 import {
   binaryBytes,
+  Dir,
   constSet,
   IO,
   NoMethodError,
@@ -38,6 +39,7 @@ const fixturePath = (...path: string[]) =>
   new URL(`./fixtures/${path.join("/")}`, import.meta.url).pathname;
 const readRawFixture = async (...path: string[]) =>
   await IO.binreadAsync(decodeURIComponent(fixturePath(...path)));
+const fixtureEmls = await Dir.globAsync(decodeURIComponent(fixturePath("emails/**/*.eml")));
 const readFixture = (...path: string[]) => Mail.read(decodeURIComponent(fixturePath(...path)));
 
 describe("Mail::Message", () => {
@@ -161,14 +163,11 @@ describe("Mail::Message", () => {
       await readFixture("emails", "error_emails", "must_supply_encoding.eml");
     });
 
-    // @ts-expect-error -- Property 'glob' does not exist on type 'ImportMeta'
-    for (const path of Object.keys(import.meta.glob("./fixtures/emails/**/*.eml"))) {
+    for (const path of fixtureEmls) {
       it(`parses ${path} fixture`, async () => {
         const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
         try {
-          await expect(
-            Mail.read(decodeURIComponent(new URL(path, import.meta.url).pathname)),
-          ).resolves.not.toThrow();
+          await expect(Mail.read(path)).resolves.not.toThrow();
         } finally {
           write.mockRestore();
         }
