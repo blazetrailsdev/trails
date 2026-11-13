@@ -1021,8 +1021,8 @@ describe("EnumTest", () => {
       }
     }
     const computer = (Klass as any)["Etc/GMT+1"]().build();
-    expect(computer["isEtc::Gmt+1"]()).toBeTruthy();
-    expect(computer["isEtc::Gmt-1"]()).toBeFalsy();
+    expect(computer["isEtc/GMT+1"]()).toBeTruthy();
+    expect(computer["isEtc/GMT-1"]()).toBeFalsy();
   });
 
   it("deserialize enum value to original hash key", async () => {

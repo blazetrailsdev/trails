@@ -109,13 +109,16 @@ export class EnumType extends ValueType<string> {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 function enumMethodNamesFor(valueMethodName: string): {
   predicateName: string;
   bangName: string;
   scopeName: string;
   notScopeName: string;
 } {
-  const scopeName = camelize(valueMethodName, false);
+  const scopeName = /^[A-Za-z_$][\w$]*$/.test(valueMethodName)
+    ? camelize(valueMethodName, false)
+    : valueMethodName;
   return {
     predicateName: `is${upcaseFirst(scopeName)}`,
     bangName: `${scopeName}Bang`,
@@ -165,12 +168,6 @@ export class EnumMethods extends Module {
       klass.scope(scopeName, function () {
         return this.where({ [name]: value });
       });
-      if (valueMethodName !== scopeName && !/^[A-Za-z_$][\w$]*$/.test(valueMethodName)) {
-        klass.detectEnumConflictBang(name, valueMethodName, true);
-        klass.scope(valueMethodName, function () {
-          return this.where({ [name]: value });
-        });
-      }
 
       klass.detectEnumConflictBang(name, notScopeName, true);
       klass.scope(notScopeName, function () {

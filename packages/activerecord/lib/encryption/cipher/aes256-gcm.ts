@@ -1,6 +1,7 @@
 import {
   ArgumentError,
   Cipher,
+  NoMethodError,
   OpenSSL,
   rbDefineInspectCustom,
   rbModName,
@@ -58,7 +59,7 @@ export class Aes256Gcm {
 
   decrypt(encryptedMessage: Message): Bytes {
     try {
-      const encryptedData = toBytes(encryptedMessage.payload!);
+      const encryptedData = encryptedMessage.payload;
       const iv = encryptedMessage.headers.iv;
       const authTag = encryptedMessage.headers.authTag;
 
@@ -75,8 +76,9 @@ export class Aes256Gcm {
       cipher.authTag = toBytes(authTag);
       cipher.authData = "";
 
+      if (encryptedData === null) throw new NoMethodError("undefined method 'empty?' for nil");
       const decryptedData =
-        encryptedData.length === 0 ? encryptedData : cipher.update(encryptedData);
+        encryptedData.length === 0 ? toBytes(encryptedData) : cipher.update(toBytes(encryptedData));
       return Buffer.concat([decryptedData, cipher.final()]);
     } catch (e) {
       if (

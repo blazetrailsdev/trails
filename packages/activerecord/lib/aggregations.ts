@@ -79,7 +79,7 @@ function readerMethod(
         const attrs = mapping.map(([key]) => this.readAttribute(key));
         const object =
           typeof constructor === "function"
-            ? (constructor as (...args: unknown[]) => unknown)(...attrs)
+            ? constructor(...attrs)
             : constructor === "new"
               ? new (constantize(className) as new (...args: any[]) => any)(...attrs)
               : (constantize(className) as any)[constructor](...attrs);
