@@ -38,8 +38,8 @@ defineConstants([
   [() => m15.PlainTextConversion, "ActionText::PlainTextConversion"],
   [() => m16.Rendering, "ActionText::Rendering"],
   [() => m17.Serialization, "ActionText::Serialization"],
+  [() => m18.TagHelper, "ActionText::TagHelper"],
   [() => m19.TrixAttachment, "ActionText::TrixAttachment"],
   [() => m13.VERSION, "ActionText::VERSION"],
-  [() => m18.TagHelper, "TagHelper"],
-  [() => m18.ActionText, "TagHelper::ActionText"],
+  [() => m18.ActionText, "ActionView::Helpers::Tags::ActionText"],
 ]);

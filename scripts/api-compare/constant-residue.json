@@ -301,7 +301,7 @@
     }
   },
   "actiontext": {
-    "rows": 20,
+    "rows": 22,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -324,6 +324,8 @@
       "rendering.ts::Rendering": "ActionText::Rendering",
       "rich-text.ts::RichText": "ActionText::RichText",
       "serialization.ts::Serialization": "ActionText::Serialization",
+      "tag-helper.ts::ActionText": "ActionView::Helpers::Tags::ActionText",
+      "tag-helper.ts::TagHelper": "ActionText::TagHelper",
       "trix-attachment.ts::TrixAttachment": "ActionText::TrixAttachment"
     }
   },
