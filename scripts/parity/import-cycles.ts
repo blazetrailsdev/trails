@@ -13,8 +13,10 @@
  * itself included, an edge is a hazard only where an imported binding is read
  * while the importing module body runs: an `extends` clause, a static field
  * initializer or static block, a decorator, a computed member name, or any
- * top-level expression. A module assigning its own namespace object to a
- * seat (`Seat.X = XModule`) reads no binding and is not counted. A read inside a function, method, accessor,
+ * top-level expression. Assigning a namespace object (`Seat.X = XModule`)
+ * reads no binding, since ESM creates it before any module body runs, and is
+ * not counted; nor is a read of a module's own namespace placed after its last
+ * runtime declaration, when every member it can read is initialized. A read inside a function, method, accessor,
  * constructor or instance field initializer is deferred and is not counted:
  * ESM import bindings are live, so being in a cycle is harmless there.
  * A module-eval reference to an exported `function` declaration that does not
@@ -409,12 +411,25 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
     }
   };
 
+  const lastDeclarationEnd = Math.max(
+    0,
+    ...sf.statements
+      .filter(
+        (s) =>
+          (ts.isFunctionDeclaration(s) ||
+            ts.isClassDeclaration(s) ||
+            ts.isVariableStatement(s) ||
+            ts.isEnumDeclaration(s)) &&
+          !ts.getModifiers(s)?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword),
+      )
+      .map((s) => s.end),
+  );
   const isOwnNamespaceSeat = (name: string, node: ts.Node) =>
-    locals.get(name) === file &&
     namespaces.has(name) &&
-    ts.isBinaryExpression(node.parent) &&
-    node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-    node.parent.right === node;
+    ((ts.isBinaryExpression(node.parent) &&
+      node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      node.parent.right === node) ||
+      (locals.get(name) === file && node.getStart(sf) > lastDeclarationEnd));
 
   for (const stmt of sf.statements) {
     if (ts.isImportDeclaration(stmt) && ts.isStringLiteral(stmt.moduleSpecifier)) {

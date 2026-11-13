@@ -1,10 +1,7 @@
 {
-  "story": "converge-module-eval-import-cycle-edges",
+  "story": "relation-include-spawn-methods-calculations-import-cycle",
   "edges": [
     "packages/activerecord/lib/relation.ts -> packages/activerecord/lib/relation/calculations.ts [Calculations]",
-    "packages/activerecord/lib/relation.ts -> packages/activerecord/lib/relation/spawn-methods.ts [SpawnMethods]",
-    "packages/activesupport/lib/core-ext/date-and-time/calculations.ts -> packages/activesupport/lib/core-ext/date-and-time/calculations.ts [DateAndTimeCalculations]",
-    "packages/activesupport/lib/inflector.ts -> packages/activesupport/lib/inflector.ts [Inflector]",
-    "packages/activesupport/lib/xml-mini.ts -> packages/activesupport/lib/xml-mini/rexml.ts [XmlMini_REXML]"
+    "packages/activerecord/lib/relation.ts -> packages/activerecord/lib/relation/spawn-methods.ts [SpawnMethods]"
   ]
 }

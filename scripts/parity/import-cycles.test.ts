@@ -176,6 +176,30 @@ describe("import-cycles makeResolver", () => {
   });
 });
 
+describe("import-cycles namespace reads", () => {
+  it("does not count assigning a namespace import, which ESM creates before any body runs", () => {
+    const [e] = scanA([`import * as B from "./b.js";`, "let x;", "x = B;"]);
+    expect([...e.evalNames]).toEqual([]);
+  });
+
+  it("counts a member read of a namespace import", () => {
+    const [e] = scanA([`import * as B from "./b.js";`, "const x = B.y;"]);
+    expect([...e.evalNames]).toEqual(["B"]);
+  });
+
+  it("does not count a read of its own namespace after its last runtime declaration", () => {
+    const text = [`import * as A from "./a.js";`, "export function f() {}", "use(A);"].join("\n");
+    const [e] = scanFile("/p/a.ts", text, resolve);
+    expect([...e.evalNames]).toEqual([]);
+  });
+
+  it("counts a read of its own namespace above a runtime declaration", () => {
+    const text = [`import * as A from "./a.js";`, "use(A);", "export const k = 1;"].join("\n");
+    const [e] = scanFile("/p/a.ts", text, resolve);
+    expect([...e.evalNames]).toEqual(["A"]);
+  });
+});
+
 describe("import-cycles hoisted function exports", () => {
   it("lists exported function declarations only", () => {
     const text = [
