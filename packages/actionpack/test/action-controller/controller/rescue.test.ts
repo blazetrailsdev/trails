@@ -365,7 +365,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("RescueController::InvalidRequest");
+    expect(c.response.body).toBe("RescueController::InvalidRequest");
   });
 
   it("proc rescue handle with argument as string", async () => {
@@ -386,7 +386,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("RescueController::InvalidRequestToRescueAsString");
+    expect(c.response.body).toBe("RescueController::InvalidRequestToRescueAsString");
   });
 
   it("block rescue handler", async () => {
@@ -441,7 +441,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("RescueController::ResourceUnavailable");
+    expect(c.response.body).toBe("RescueController::ResourceUnavailable");
   });
 
   it("block rescue handler with argument as string", async () => {
@@ -462,7 +462,7 @@ describe("RescueControllerTest", () => {
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("RescueController::ResourceUnavailableToRescueAsString");
+    expect(c.response.body).toBe("RescueController::ResourceUnavailableToRescueAsString");
   });
 
   it("rescue when wrapper has more specific handler than cause", async () => {
@@ -548,7 +548,7 @@ describe("RescueControllerTest", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     assertResponse.call(c, ":bad_request");
-    expect(c.responseBody).toBe("parse error");
+    expect(c.response.body).toBe("parse error");
   });
 });
 
@@ -673,7 +673,7 @@ describe("RescueTest", () => {
     }
     const c = new C();
     await c.dispatch("foo", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("foo");
+    expect(c.response.body).toBe("foo");
   });
 
   it("rescue exceptions inside controller", async () => {
@@ -694,6 +694,6 @@ describe("RescueTest", () => {
     });
     const c = new C();
     await c.dispatch("invalid", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("invalid");
+    expect(c.response.body).toBe("invalid");
   });
 });

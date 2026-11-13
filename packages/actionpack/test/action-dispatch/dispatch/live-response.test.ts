@@ -47,7 +47,7 @@ describe("ActionController", () => {
         const latch = new Concurrent.CountDownLatch();
 
         const t = new Thread(async () => {
-          (response.stream as LiveBuffer).write("foo");
+          await (response.stream as LiveBuffer).write("foo");
           await latch.wait();
           (response.stream as LiveBuffer).close();
         });
@@ -66,38 +66,38 @@ describe("ActionController", () => {
         assertEqual(["omg"], response.bodyParts());
       });
 
-      it("cache control is set by default", () => {
-        (response.stream as LiveBuffer).write("omg");
+      it("cache control is set by default", async () => {
+        await (response.stream as LiveBuffer).write("omg");
         assertEqual("no-cache", response.headers.get("Cache-Control"));
       });
 
-      it("cache control is set manually", () => {
+      it("cache control is set manually", async () => {
         response.setHeader("Cache-Control", "public");
-        (response.stream as LiveBuffer).write("omg");
+        await (response.stream as LiveBuffer).write("omg");
         assertEqual("public", response.headers.get("Cache-Control"));
       });
 
-      it("cache control no store default standalone", () => {
+      it("cache control no store default standalone", async () => {
         response.setHeader("Cache-Control", "no-store");
-        (response.stream as LiveBuffer).write("omg");
+        await (response.stream as LiveBuffer).write("omg");
         assertEqual("no-store", response.headers.get("Cache-Control"));
       });
 
-      it("cache control no store is respected", () => {
+      it("cache control no store is respected", async () => {
         response.setHeader("Cache-Control", "public, no-store");
-        (response.stream as LiveBuffer).write("omg");
+        await (response.stream as LiveBuffer).write("omg");
         assertEqual("no-store", response.headers.get("Cache-Control"));
       });
 
-      it("cache control no store private", () => {
+      it("cache control no store private", async () => {
         response.setHeader("Cache-Control", "private, no-store");
-        (response.stream as LiveBuffer).write("omg");
+        await (response.stream as LiveBuffer).write("omg");
         assertEqual("private, no-store", response.headers.get("Cache-Control"));
       });
 
-      it("content length is removed", () => {
+      it("content length is removed", async () => {
         response.headers.set("Content-Length", "1234");
-        (response.stream as LiveBuffer).write("omg");
+        await (response.stream as LiveBuffer).write("omg");
         assertNil(response.headers.get("Content-Length"));
       });
     });

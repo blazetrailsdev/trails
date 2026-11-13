@@ -289,6 +289,16 @@ export class MimeType {
   }
 
   /** @internal */
+  private toAry(): null {
+    return null;
+  }
+
+  /** @internal */
+  private toA(): null {
+    return null;
+  }
+
+  /** @internal */
   methodMissing(method: string, ..._args: unknown[]): unknown {
     if (method.endsWith("?")) {
       return stringToSym(method.slice(0, -1).toLowerCase()) === this.toSym();

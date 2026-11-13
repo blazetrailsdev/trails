@@ -5,6 +5,7 @@ import {
   StringIO,
   TCPSocket,
   Thread,
+  rbObjAsString,
   rbProcCall,
 } from "@blazetrails/ruby-compat";
 import type { HttpRequest, HttpResponse, HttpServer, HttpSocket } from "@blazetrails/ruby-compat";
@@ -132,7 +133,7 @@ export class Node {
           res.writeHead(status, sentHeaders(headers));
           for await (const chunk of body) {
             if (hijacked) return;
-            res.write(chunk);
+            res.write(rbObjAsString(chunk));
           }
           res.end();
         } finally {
@@ -245,7 +246,7 @@ export class Node {
           socket.write(responseHead(status, sentHeaders(headers)));
           for await (const chunk of body) {
             if (hijacked) return;
-            socket.write(chunk);
+            socket.write(rbObjAsString(chunk));
           }
           socket.end();
         } finally {

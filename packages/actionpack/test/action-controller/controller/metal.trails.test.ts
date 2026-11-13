@@ -58,7 +58,7 @@ describe("Metal#response_body= / #status=", () => {
     const c = new (class extends Metal {})();
     c.setResponseBang(makeResponse());
     c.responseBody = ["a", "b"];
-    expect(c.responseBody).toBe("ab");
+    expect(c.response.body).toBe("ab");
   });
 
   it("a nil body resets the response's", () => {

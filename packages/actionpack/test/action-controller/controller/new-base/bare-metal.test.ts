@@ -65,8 +65,7 @@ describe("BareTest", () => {
     assertEqual("Hello world", string);
   });
 
-  // BLOCKED: metal-response-body-setter-flattens-instead-of-wrapping
-  it.skip("response_body value is wrapped in an array when the value is a String", () => {
+  it("response_body value is wrapped in an array when the value is a String", () => {
     const controller = new BareController();
     controller.setRequestBang(Request.empty());
     controller.setResponseBang(BareController.makeResponseBang(controller.request));
@@ -101,8 +100,7 @@ describe("BareTest", () => {
     );
   });
 
-  // BLOCKED: metal-response-body-setter-flattens-instead-of-wrapping
-  it.skip("can assign response body streamable object as part of the controller execution", () => {
+  it("can assign response body streamable object as part of the controller execution", () => {
     const controller = new BareController();
     controller.setRequestBang(Request.empty());
     controller.setResponseBang(BareController.makeResponseBang(controller.request));

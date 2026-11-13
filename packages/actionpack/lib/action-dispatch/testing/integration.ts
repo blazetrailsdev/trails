@@ -574,8 +574,8 @@ export interface Runner {
   beforeSetup(): unknown;
 }
 
-/** @missingRailsCall include — CONVERGEABLE integration-runner-includes-assertions */
 export const Runner = new Module((mod) => {
+  mod.include(Assertions);
   mod.attrReader("app");
   mod.attrReader("rootSession");
   mod.attrWriter("rootSession");
@@ -850,9 +850,9 @@ export interface IntegrationTest
     Runner {}
 
 include(IntegrationTest, FixtureFile);
-include(IntegrationTest, Assertions);
 include(IntegrationTest, routingAssertions.WithIntegrationRouting);
 include(IntegrationTest, Runner);
+routingAssertions.spliceMethodMissing(Object.getPrototypeOf(IntegrationTest.prototype) as object);
 
 const proto = IntegrationTest.prototype as unknown as Record<string, unknown>;
 proto.urlFor = urlForMod.urlFor;

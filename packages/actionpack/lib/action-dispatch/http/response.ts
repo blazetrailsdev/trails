@@ -108,12 +108,12 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     return this._strBody;
   }
 
-  write(string: string | Uint8Array): void {
+  write(string: string | Uint8Array): unknown {
     if (this.isClosed) throw new IOError("closed stream");
 
     this._strBody = null;
     this._response!.commitBang();
-    this._buf.push(string);
+    return this._buf.push(string);
   }
 
   each(block?: (chunk: unknown) => unknown): unknown {
@@ -393,8 +393,8 @@ export class Response {
     return parseInt(cl, 10);
   }
 
-  write(string: string): void {
-    (this.stream as { write(string: string): void }).write(string);
+  write(string: string): unknown {
+    return (this.stream as { write(string: string): unknown }).write(string);
   }
 
   close(): void {

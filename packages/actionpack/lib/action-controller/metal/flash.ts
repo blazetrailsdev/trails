@@ -76,7 +76,7 @@ export function actionMethods(this: FlashClassHost): ReadonlySet<string> {
 
 export const ClassMethods = { addFlashTypes, actionMethods };
 
-/** @missingRailsCall delegate — CONVERGEABLE base-included-modules-dispatch-privates-through-self */
+/** @missingRailsCall delegate — CONVERGEABLE flash-reader-is-a-hand-written-getter-not-a-delegate-call */
 export const Flash = { ClassMethods, redirectTo };
 extend(Flash, Concern);
 (

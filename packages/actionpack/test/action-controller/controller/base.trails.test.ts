@@ -30,7 +30,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new JsonController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe('{"hello":"world"}');
+    expect(c.response.body).toBe('{"hello":"world"}');
     expect(c.contentType).toBe("application/json; charset=utf-8");
   });
 
@@ -42,7 +42,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new JsonStringController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe('{"raw":true}');
+    expect(c.response.body).toBe('{"raw":true}');
   });
 
   it("render plain", async () => {
@@ -53,7 +53,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new PlainController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("hello");
+    expect(c.response.body).toBe("hello");
     expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
 
@@ -65,7 +65,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new HtmlController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("<h1>Hi</h1>");
+    expect(c.response.body).toBe("<h1>Hi</h1>");
     expect(c.contentType).toBe("text/html; charset=utf-8");
   });
 
@@ -77,7 +77,7 @@ describe("ControllerInstanceTests", () => {
     }
     const c = new BodyController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("raw body");
+    expect(c.response.body).toBe("raw body");
     expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
 
@@ -140,7 +140,7 @@ describe("ControllerInstanceTests", () => {
 
     const c = new TemplateController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("<p>template#index</p>");
+    expect(c.response.body).toBe("<p>template#index</p>");
   });
 
   it("double render throws DoubleRenderError", async () => {
@@ -167,7 +167,7 @@ describe("ControllerInstanceTests", () => {
     const c = new RtsController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.result).toBe("preview");
-    expect(c.responseBody).toBe("final");
+    expect(c.response.body).toBe("final");
   });
 });
 
@@ -407,7 +407,7 @@ describe("ActionController::Base sendData", () => {
     c.setRequestBang(makeRequest());
     c.setResponseBang(makeResponse());
     await c.sendData("csv,data", { filename: "export.csv", type: "text/csv" });
-    expect(c.responseBody).toBe("csv,data");
+    expect(c.response.body).toBe("csv,data");
     expect(c.contentType).toBe("text/csv");
     expect(c.headers.get("content-disposition")).toBe(
       "attachment; filename=\"export.csv\"; filename*=UTF-8''export.csv",
@@ -430,7 +430,7 @@ describe("ActionController::Base sendData", () => {
     c.setRequestBang(makeRequest());
     c.setResponseBang(makeResponse());
     await c.sendData("raw");
-    expect(c.responseBody).toBe("raw");
+    expect(c.response.body).toBe("raw");
     expect(c.contentType).toBe("application/octet-stream");
   });
 });
@@ -444,7 +444,7 @@ describe("ActionController::API", () => {
     }
     const c = new ApiController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe('{"status":"ok"}');
+    expect(c.response.body).toBe('{"status":"ok"}');
     expect(c.contentType).toBe("application/json; charset=utf-8");
   });
 
@@ -456,7 +456,7 @@ describe("ActionController::API", () => {
     }
     const c = new ApiPlainController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("hello api");
+    expect(c.response.body).toBe("hello api");
   });
 
   it("renders body", async () => {
@@ -467,7 +467,7 @@ describe("ActionController::API", () => {
     }
     const c = new ApiBodyController();
     await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("raw");
+    expect(c.response.body).toBe("raw");
   });
 
   it("render with status", async () => {
@@ -504,7 +504,7 @@ describe("ActionController::API", () => {
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.status).toBe(302);
     expect(c.headers.get("location")).toBe("http://localhost/api/v2");
-    expect(c.responseBody).toBe("");
+    expect(c.response.body).toBe("");
   });
 
   it("redirectTo with custom status", async () => {

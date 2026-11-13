@@ -52,51 +52,51 @@ describe("SSETest", () => {
       include(this, Live);
     }
 
-    basicSse(): void {
+    async basicSse(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write('{"name":"John"}');
-        sse.write({ name: "Ryan" });
+        await sse.write('{"name":"John"}');
+        await sse.write({ name: "Ryan" });
       } finally {
         sse.close();
       }
     }
 
-    sseWithEvent(): void {
+    async sseWithEvent(): Promise<void> {
       const sse = new SSE(this.response.stream as Buffer, { event: "send-name" });
       try {
-        sse.write('{"name":"John"}');
-        sse.write({ name: "Ryan" });
+        await sse.write('{"name":"John"}');
+        await sse.write({ name: "Ryan" });
       } finally {
         sse.close();
       }
     }
 
-    sseWithRetry(): void {
+    async sseWithRetry(): Promise<void> {
       const sse = new SSE(this.response.stream as Buffer, { retry: 1000 });
       try {
-        sse.write('{"name":"John"}');
-        sse.write({ name: "Ryan" }, { retry: 1500 });
+        await sse.write('{"name":"John"}');
+        await sse.write({ name: "Ryan" }, { retry: 1500 });
       } finally {
         sse.close();
       }
     }
 
-    sseWithId(): void {
+    async sseWithId(): Promise<void> {
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write('{"name":"John"}', { id: 1 });
-        sse.write({ name: "Ryan" }, { id: 2 });
+        await sse.write('{"name":"John"}', { id: 1 });
+        await sse.write({ name: "Ryan" }, { id: 2 });
       } finally {
         sse.close();
       }
     }
 
-    sseWithMultipleLineMessage(): void {
+    async sseWithMultipleLineMessage(): Promise<void> {
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write("first line.\nsecond line.");
+        await sse.write("first line.\nsecond line.");
       } finally {
         sse.close();
       }
@@ -206,9 +206,9 @@ describe("LiveStreamTest", () => {
       return "test";
     }
 
-    setCookie(): void {
+    async setCookie(): Promise<void> {
       this.cookies().set("hello", "world");
-      (this.response.stream as Buffer).write("hello world");
+      await (this.response.stream as Buffer).write("hello world");
       this.response.close();
     }
 
@@ -216,86 +216,86 @@ describe("LiveStreamTest", () => {
       await this.render({ plain: "zomg" });
     }
 
-    writeLines(): void {
-      (this.response.stream as Buffer).writeln("hello\n");
-      (this.response.stream as Buffer).writeln("world");
+    async writeLines(): Promise<void> {
+      await (this.response.stream as Buffer).writeln("hello\n");
+      await (this.response.stream as Buffer).writeln("world");
       (this.response.stream as Buffer).close();
     }
 
-    defaultHeader(): void {
-      (this.response.stream as Buffer).write("<html><body>hi</body></html>");
+    async defaultHeader(): Promise<void> {
+      await (this.response.stream as Buffer).write("<html><body>hi</body></html>");
       (this.response.stream as Buffer).close();
     }
 
-    basicStream(): void {
+    async basicStream(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
       }
       (this.response.stream as Buffer).close();
     }
 
     async basicSendStream(): Promise<void> {
-      await this.sendStream({ filename: "my.csv" }, (stream) => {
-        stream.write("name,age\ndavid,41");
+      await this.sendStream({ filename: "my.csv" }, async (stream) => {
+        await stream.write("name,age\ndavid,41");
       });
     }
 
     async sendStreamWithOptions(): Promise<void> {
       await this.sendStream(
         { filename: "export", disposition: "inline", type: ":json" },
-        (stream) => {
-          stream.write('{ name: "David", age: 41 }');
+        async (stream) => {
+          await stream.write('{ name: "David", age: 41 }');
         },
       );
     }
 
     async sendStreamWithInferredContentType(): Promise<void> {
-      await this.sendStream({ filename: "sample.csv" }, (stream) => {
-        stream.writeln("fruit,quantity");
-        stream.writeln("apple,5");
+      await this.sendStream({ filename: "sample.csv" }, async (stream) => {
+        await stream.writeln("fruit,quantity");
+        await stream.writeln("apple,5");
       });
     }
 
     async sendStreamWithImplicitContentType(): Promise<void> {
-      await this.sendStream({ filename: "sample.csv", type: ":csv" }, (stream) => {
-        stream.writeln("fruit,quantity");
-        stream.writeln("apple,5");
+      await this.sendStream({ filename: "sample.csv", type: ":csv" }, async (stream) => {
+        await stream.writeln("fruit,quantity");
+        await stream.writeln("apple,5");
       });
     }
 
     async sendStreamWithExplicitContentType(): Promise<void> {
-      await this.sendStream({ filename: "sample.csv", type: "text/csv" }, (stream) => {
-        stream.writeln("fruit,quantity");
-        stream.writeln("apple,5");
+      await this.sendStream({ filename: "sample.csv", type: "text/csv" }, async (stream) => {
+        await stream.writeln("fruit,quantity");
+        await stream.writeln("apple,5");
       });
     }
 
     async blockingStream(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
         await this.latch.wait();
       }
       (this.response.stream as Buffer).close();
     }
 
-    threadLocals(): void {
+    async threadLocals(): Promise<void> {
       assertEqual("aaron", Thread.current().get("setting"));
 
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
       }
       (this.response.stream as Buffer).close();
     }
 
-    noThreadLocals(): void {
+    async noThreadLocals(): Promise<void> {
       assertNil(Thread.current().get("setting"));
 
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
       }
       (this.response.stream as Buffer).close();
     }
@@ -319,19 +319,19 @@ describe("LiveStreamTest", () => {
     }
 
     async exceptionInViewAfterCommit(): Promise<void> {
-      (this.response.stream as Buffer).write("");
+      await (this.response.stream as Buffer).write("");
       await this.render("doesntexist");
     }
 
-    exceptionWithCallback(): void {
+    async exceptionWithCallback(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
 
-      (this.response.stream as Buffer).onError(() => {
-        (this.response.stream as Buffer).write('data: "500 Internal Server Error"\n\n');
+      (this.response.stream as Buffer).onError(async () => {
+        await (this.response.stream as Buffer).write('data: "500 Internal Server Error"\n\n');
         (this.response.stream as Buffer).close();
       });
 
-      (this.response.stream as Buffer).write("");
+      await (this.response.stream as Buffer).write("");
       throw new RuntimeError("An exception occurred...");
     }
 
@@ -343,18 +343,18 @@ describe("LiveStreamTest", () => {
       throw new BadRequest();
     }
 
-    exceptionInExceptionCallback(): void {
+    async exceptionInExceptionCallback(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       (this.response.stream as Buffer).onError(() => {
         throw new RuntimeError("We need to go deeper.");
       });
-      (this.response.stream as Buffer).write("");
-      (this.response.stream as Buffer).write(
+      await (this.response.stream as Buffer).write("");
+      await (this.response.stream as Buffer).write(
         (this.params.get("widget") as Parameters).get("didnt_check_for_nil") as string,
       );
     }
 
-    overfillBufferAndDie(): void {
+    async overfillBufferAndDie(): Promise<void> {
       const logger = Base.logger || new Logger(STDOUT);
       (this.response.stream as Buffer).onError(() => {
         logger.warn("Error while streaming.");
@@ -362,33 +362,35 @@ describe("LiveStreamTest", () => {
       });
 
       for (let i = 0; i < 10; i++) {
-        (this.response.stream as Buffer).write(".");
+        await (this.response.stream as Buffer).write(".");
       }
-      (this.response.stream as Buffer).write(".");
+      await (this.response.stream as Buffer).write(".");
 
       this.latch.countDown();
 
-      (this.response.stream as Buffer).write("x");
+      await (this.response.stream as Buffer).write("x");
 
       for (let i = 0; i < 20; i++) {
-        (this.response.stream as Buffer).write(".");
+        await (this.response.stream as Buffer).write(".");
       }
     }
 
-    overfillDefaultBuffer(): void {
+    async overfillDefaultBuffer(): Promise<void> {
+      const writes = [];
       for (const char of "abcdefghijklmnopqrstuvwxyz") {
-        (this.response.stream as Buffer).write(char);
+        writes.push((this.response.stream as Buffer).write(char));
       }
       (this.response.stream as Buffer).close();
+      await Promise.all(writes);
     }
 
-    ignoreClientDisconnect(): void {
+    async ignoreClientDisconnect(): Promise<void> {
       (this.response.stream as Buffer).ignoreDisconnect = true;
 
-      (this.response.stream as Buffer).write("");
+      await (this.response.stream as Buffer).write("");
 
       for (let i = 0; i < 15; i++) {
-        (this.response.stream as Buffer).write("x");
+        await (this.response.stream as Buffer).write("x");
       }
 
       this.logger.info("Work complete");
@@ -552,8 +554,7 @@ describe("LiveStreamTest", () => {
     assertEqual("abcdefghijklmnopqrstuvwxyz", (tc.response.stream as Buffer).body);
   });
 
-  // BLOCKED: live-buffer-write-does-not-wait-on-a-full-queue
-  it.skip("abort with full buffer", async () => {
+  it("abort with full buffer", async () => {
     const oldQueueSize = Buffer.queueSize;
     Buffer.queueSize = 10;
 
@@ -756,10 +757,10 @@ describe("LiveControllerThreadTest", () => {
       include(this, Live);
     }
 
-    greet(): void {
+    async greet(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
       }
       (this.response.stream as Buffer).close();
     }
@@ -800,12 +801,12 @@ describe("LiveStreamRouterTest", () => {
       include(this, Live);
     }
 
-    index(): void {
+    async index(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write('{"name":"John"}');
-        sse.write({ name: "Ryan" });
+        await sse.write('{"name":"John"}');
+        await sse.write({ name: "Ryan" });
       } finally {
         sse.close();
       }

@@ -384,7 +384,7 @@ describe("Engine", () => {
     controller.setRequestBang(new Request(MockRequest.envFor("/posts")));
     controller.setResponseBang(new Response());
     await controller.render({ action: "index" });
-    expect(controller.responseBody).toBe("posts#index\n");
+    expect(controller.response.body).toBe("posts#index\n");
     resetLoadHooks();
   });
 

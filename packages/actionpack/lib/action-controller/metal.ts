@@ -302,22 +302,18 @@ export class Metal extends AbstractControllerBase {
     return this.response.mediaType;
   }
 
-  override set responseBody(body: string | SafeBuffer | string[] | Buffer | null | undefined) {
-    if (body === null || body === undefined) {
+  override set responseBody(body: unknown) {
+    if (body != null && body !== false) {
+      if (typeof body === "string" || body instanceof SafeBuffer) body = [body];
+      this.response.body = body;
+      super.responseBody = body;
+    } else {
       this.response.resetBodyBang();
-      return;
     }
-    const str = Array.isArray(body)
-      ? body.join("")
-      : body instanceof SafeBuffer
-        ? body.toString()
-        : body;
-    this._responseBody = str;
-    if (this.response) this.response.body = str;
   }
 
-  override get responseBody(): string | Buffer | true | null {
-    return this._responseBody;
+  override get responseBody(): unknown {
+    return super.responseBody;
   }
 
   override get performed(): boolean {

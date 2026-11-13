@@ -20,7 +20,7 @@ class BareController extends Base {
 async function dispatch(c: Base, action: string): Promise<unknown> {
   const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" };
   await c.dispatch(action, new Request(env), new Response());
-  return c.responseBody;
+  return c.response.body;
 }
 
 beforeAll(() => {

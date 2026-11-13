@@ -58,7 +58,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody as string)).toEqual({ id: "42" });
+    expect(JSON.parse(c.response.body)).toEqual({ id: "42" });
   });
 
   it("accesses query parameters via params", async () => {
@@ -80,7 +80,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody as string)).toEqual({ page: "3" });
+    expect(JSON.parse(c.response.body)).toEqual({ page: "3" });
   });
 
   it("parses JSON request body into params", async () => {
@@ -105,7 +105,7 @@ describe("Controller JSON rendering integration", () => {
     );
 
     expect(c.status).toBe(201);
-    expect(JSON.parse(c.responseBody as string)).toEqual({ title: "New Post" });
+    expect(JSON.parse(c.response.body)).toEqual({ title: "New Post" });
   });
 
   it("works end-to-end with RouteSet dispatch", async () => {
@@ -161,7 +161,7 @@ describe("Controller JSON rendering integration", () => {
     await c.dispatch("index", new Request(), new Response());
 
     expect(c.status).toBe(200);
-    expect(JSON.parse(c.responseBody as string)).toEqual([{ id: 1 }, { id: 2 }]);
+    expect(JSON.parse(c.response.body)).toEqual([{ id: 1 }, { id: 2 }]);
   });
 
   it("renders with custom status codes", async () => {
@@ -181,7 +181,7 @@ describe("Controller JSON rendering integration", () => {
     const c2 = new PostsController();
     await c2.dispatch("destroy", new Request(), new Response());
     expect(c2.status).toBe(204);
-    expect(c2.responseBody).toBe("");
+    expect(c2.response.body).toBe("");
   });
 
   it("merges path params, query params, and body params", async () => {
@@ -216,7 +216,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody as string)).toEqual({
+    expect(JSON.parse(c.response.body)).toEqual({
       id: "5",
       title: "Updated",
       page: "2",
@@ -246,7 +246,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody as string)).toEqual({ id: "5" });
+    expect(JSON.parse(c.response.body)).toEqual({ id: "5" });
   });
 
   it("parses nested query parameters", async () => {
@@ -268,7 +268,7 @@ describe("Controller JSON rendering integration", () => {
       new Response(),
     );
 
-    expect(JSON.parse(c.responseBody as string)).toEqual({
+    expect(JSON.parse(c.response.body)).toEqual({
       user: { name: "dean", role: "admin" },
     });
   });
