@@ -27,8 +27,8 @@ import { rbDefineAllocFunc } from "./include.js";
 export class StringIO<S extends string | Uint8Array = string> {
   /** `DATA_PTR`, the `struct StringIO` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:36-43`). */
   #ptr: { string: Uint8Array; binary: boolean; pos: number; enc: Encoding | null };
-  #readable = true;
-  #writable = true;
+  #_readable = true;
+  #_writable = true;
 
   constructor(string: S = "" as S) {
     this.#ptr = {
@@ -51,8 +51,8 @@ export class StringIO<S extends string | Uint8Array = string> {
   initializeCopy(orig: StringIO<S>): this {
     if ((this as StringIO<S>) === orig) return this;
     this.#ptr = orig.#ptr;
-    this.#readable = orig.#readable;
-    this.#writable = orig.#writable;
+    this.#_readable = orig.#_readable;
+    this.#_writable = orig.#_writable;
     return this;
   }
 
@@ -255,8 +255,8 @@ export class StringIO<S extends string | Uint8Array = string> {
   }
 
   close(): void {
-    this.#readable = false;
-    this.#writable = false;
+    this.#_readable = false;
+    this.#_writable = false;
   }
 
   /**
@@ -264,8 +264,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:520`).
    */
   closeRead(): null {
-    if (!this.#readable) throw new IOError("closing non-duplex IO for reading");
-    this.#readable = false;
+    if (!this.#_readable) throw new IOError("closing non-duplex IO for reading");
+    this.#_readable = false;
     return null;
   }
 
@@ -274,8 +274,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:541`).
    */
   closeWrite(): null {
-    if (!this.#writable) throw new IOError("closing non-duplex IO for writing");
-    this.#writable = false;
+    if (!this.#_writable) throw new IOError("closing non-duplex IO for writing");
+    this.#_writable = false;
     return null;
   }
 
@@ -284,7 +284,7 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:559`).
    */
   isClosed(): boolean {
-    return !this.#readable && !this.#writable;
+    return !this.#_readable && !this.#_writable;
   }
 }
 
