@@ -11,7 +11,7 @@ export class CpkAuthor extends Base {
   declare books: AssociationProxy<CpkBook>;
   declare name: string;
 
-  static _tableName = "cpk_authors";
+  static tableName = "cpk_authors";
   static {
     constSet(Cpk, "Author", this);
     DescendantsTracker.registerSubclass(Base, this);
@@ -35,7 +35,7 @@ export class CpkBook extends Base {
   declare shop_id: number;
   declare title: string;
 
-  static _tableName = "cpk_books";
+  static tableName = "cpk_books";
   static {
     constSet(Cpk, "Book", this);
     DescendantsTracker.registerSubclass(Base, this);
@@ -179,7 +179,7 @@ export class CpkBookDestroyAsync extends Base {
     constSet(Cpk, "BookDestroyAsync", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_books";
+  static tableName = "cpk_books";
 
   static {
     this.hasMany("chapters", {
@@ -200,7 +200,7 @@ export class CpkChapter extends Base {
     constSet(Cpk, "Chapter", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_chapters";
+  static tableName = "cpk_chapters";
 
   static {
     this.primaryKey = ["author_id", "id"];
@@ -219,7 +219,7 @@ export class CpkChapterDestroyAsync extends Base {
     constSet(Cpk, "ChapterDestroyAsync", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_chapters";
+  static tableName = "cpk_chapters";
 
   static {
     this.primaryKey = ["author_id", "id"];
@@ -245,7 +245,7 @@ export class CpkOrder extends Base {
   declare shop_id: number;
   declare status: string;
 
-  static _tableName = "cpk_orders";
+  static tableName = "cpk_orders";
   static {
     constSet(Cpk, "Order", this);
     DescendantsTracker.registerSubclass(Base, this);
@@ -391,7 +391,7 @@ export class CpkOrderAgreement extends Base {
     constSet(Cpk, "OrderAgreement", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_order_agreements";
+  static tableName = "cpk_order_agreements";
 
   static {
     this.belongsTo("order");
@@ -414,7 +414,7 @@ export class CpkOrderTag extends Base {
     constSet(Cpk, "OrderTag", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_order_tags";
+  static tableName = "cpk_order_tags";
   static {
     this.primaryKey = ["order_id", "tag_id"];
   }
@@ -441,7 +441,7 @@ export class CpkTag extends Base {
     constSet(Cpk, "Tag", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_tags";
+  static tableName = "cpk_tags";
 
   static {
     this.hasMany("orderTags", { foreignKey: "tag_id" });
@@ -458,7 +458,7 @@ export class CpkPost extends Base {
     constSet(Cpk, "Post", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_posts";
+  static tableName = "cpk_posts";
 
   static {
     this.hasMany("comments", {
@@ -480,7 +480,7 @@ export class CpkComment extends Base {
     constSet(Cpk, "Comment", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_comments";
+  static tableName = "cpk_comments";
 
   static {
     this.belongsTo("commentable", {
@@ -513,7 +513,7 @@ export class CpkReview extends Base {
     constSet(Cpk, "Review", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "cpk_reviews";
+  static tableName = "cpk_reviews";
 
   static {
     this.belongsTo("book", {
@@ -533,7 +533,7 @@ export class CpkCar extends Base {
   declare make: string;
   declare model: string;
 
-  static _tableName = "cpk_cars";
+  static tableName = "cpk_cars";
   static {
     constSet(Cpk, "Car", this);
     DescendantsTracker.registerSubclass(Base, this);
@@ -553,7 +553,7 @@ export class CpkCarReview extends Base {
   declare comment: string;
   declare rating: number;
 
-  static _tableName = "cpk_car_reviews";
+  static tableName = "cpk_car_reviews";
   static {
     constSet(Cpk, "CarReview", this);
     DescendantsTracker.registerSubclass(Base, this);

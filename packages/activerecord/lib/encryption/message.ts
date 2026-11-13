@@ -4,7 +4,7 @@ import { Properties } from "./properties.js";
 import { ForbiddenClass } from "./errors.js";
 
 export class Message {
-  payload: string | Bytes;
+  payload: string | Bytes | null;
   headers: Properties;
 
   constructor({
@@ -15,13 +15,16 @@ export class Message {
     headers?: Record<string, unknown> | Properties;
   } = {}) {
     this.validatePayloadType(payload);
-    this.payload = payload ?? "";
+    this.payload = payload ?? null;
     this.headers = new Properties(headers);
   }
 
-  equals(otherMessage: { payload: string | Bytes; headers: Properties | object }): boolean {
+  equals(otherMessage: { payload: string | Bytes | null; headers: Properties | object }): boolean {
+    const otherPayload = otherMessage.payload;
     return (
-      Buffer.from(this.payload).equals(Buffer.from(otherMessage.payload)) &&
+      (this.payload === null || otherPayload === null
+        ? this.payload === otherPayload
+        : Buffer.from(this.payload).equals(Buffer.from(otherPayload))) &&
       this.headers.equals(otherMessage.headers)
     );
   }

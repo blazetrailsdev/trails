@@ -1087,7 +1087,12 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       ...pragmas,
     })) {
       const setter = `set${camelize(pragma)}`;
-      if (Object.hasOwn(Pragmas, setter)) {
+      if (
+        Object.hasOwn(Pragmas, setter) &&
+        setter !== "setBooleanPragma" &&
+        setter !== "setEnumPragma" &&
+        setter !== "setIntPragma"
+      ) {
         await retryBusy(this._rawConnection!, () =>
           (Pragmas[setter as keyof typeof Pragmas] as (value: unknown) => unknown).call(
             this._rawConnection!,

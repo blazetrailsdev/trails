@@ -5,7 +5,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../../../lib/base.js";
 
 class BigIntCpkBlogPost extends Base {
-  static _tableName = "bigint_cpk_blog_posts";
+  static tableName = "bigint_cpk_blog_posts";
   static {
     this.primaryKey = ["blog_id", "id"];
     this.attribute("blog_id", "integer");
@@ -14,7 +14,7 @@ class BigIntCpkBlogPost extends Base {
 }
 
 class BigIntCpkComment extends Base {
-  static _tableName = "bigint_cpk_comments";
+  static tableName = "bigint_cpk_comments";
   static {
     this.attribute("blog_id", "integer");
     this.attribute("blog_post_id", "integer");

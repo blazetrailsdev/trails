@@ -1087,7 +1087,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   static properTableName(
     name: string | { tableName?: unknown },
-    options: { tableNamePrefix?: string; tableNameSuffix?: string } = {},
+    options: { tableNamePrefix?: string | null; tableNameSuffix?: string | null } = {},
   ): string {
     if (
       name != null &&
@@ -1101,7 +1101,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return `${prefix}${String(name)}${suffix}`;
   }
 
-  static tableNameOptions(): { tableNamePrefix: string; tableNameSuffix: string } {
+  static tableNameOptions(): { tableNamePrefix: string | null; tableNameSuffix: string | null } {
     return {
       tableNamePrefix: ActiveRecord.Base.tableNamePrefix,
       tableNameSuffix: ActiveRecord.Base.tableNameSuffix,
@@ -1819,7 +1819,7 @@ export class Migrator {
 
     await this._internalMetadata.set(
       "environment",
-      (await this.connection).pool.dbConfig.envName as string,
+      (await this.connection).pool.dbConfig.envName ?? null,
     );
   }
 

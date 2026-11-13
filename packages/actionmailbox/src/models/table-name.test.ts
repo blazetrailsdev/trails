@@ -4,8 +4,8 @@ import "../test-helpers/database/setup.js";
 import { InboundEmail } from "../inbound-email.js";
 
 describe("ActionMailbox::TableNameTest", () => {
-  let oldPrefix: string;
-  let oldSuffix: string;
+  let oldPrefix: string | null;
+  let oldSuffix: string | null;
   let prefix: string;
   let suffix: string;
   let models: (typeof Base)[];

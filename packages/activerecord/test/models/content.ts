@@ -4,7 +4,7 @@ import { Base } from "../../lib/base.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Content extends Base {
-  static _tableName = "content";
+  static tableName = "content";
 
   static destroyedIds: number[] = [];
 
@@ -25,7 +25,7 @@ export interface Content {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ContentWhichRequiresTwoDestroyCalls extends Base {
-  static _tableName = "content";
+  static tableName = "content";
 
   private destroyCount: number = 0;
 

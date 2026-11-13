@@ -8,7 +8,7 @@ describe("SecureTokenTest", () => {
   fixtures([]);
 
   class OverridingUser extends Base {
-    static _tableName = "users";
+    static tableName = "users";
     static generateUniqueSecureToken({ length = 24 }: { length?: number } = {}): string {
       return "x".repeat(length);
     }
@@ -51,7 +51,7 @@ describe("SecureTokenTest", () => {
 
   it("has_secure_token without on: defaults to ActiveRecord.generate_secure_token_on", async () => {
     class InitializeTokenUser extends Base {
-      static _tableName = "users";
+      static tableName = "users";
     }
     await InitializeTokenUser.loadSchema();
     setGenerateSecureTokenOn("initialize");

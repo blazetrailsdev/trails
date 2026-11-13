@@ -881,7 +881,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("association enum works properly", async () => {
     class SpecialAuthor extends Base {
-      static _tableName = "authors";
+      static tableName = "authors";
 
       static {
         this.hasMany("books", { className: "SpecialBook", foreignKey: "author_id" });
@@ -890,7 +890,7 @@ describe("HasManyAssociationsTest", () => {
     class SpecialBook extends Base {
       declare last_read: "unread" | "reading" | "read" | "forgotten";
 
-      static _tableName = "books";
+      static tableName = "books";
 
       static {
         this.belongsTo("author");

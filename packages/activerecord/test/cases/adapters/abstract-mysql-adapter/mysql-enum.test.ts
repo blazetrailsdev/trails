@@ -41,7 +41,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("enum with attribute", async () => {
       class EnumTest extends Base {
-        static _tableName = "enum_tests";
+        static tableName = "enum_tests";
         static {
           this.attribute("state", "integer");
           this.enum("state", { start: 0, middle: 1, finish: 2 });

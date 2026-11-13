@@ -297,7 +297,7 @@ constSet(TopLevel, "Web", Web);
 export class WebTopic extends Base {
   declare replies: AssociationProxy<WebReply>;
 
-  static _tableName = "topics";
+  static tableName = "topics";
 
   static {
     constSet(Web, "Topic", this);

@@ -165,6 +165,12 @@ export class EnumMethods extends Module {
       klass.scope(scopeName, function () {
         return this.where({ [name]: value });
       });
+      if (valueMethodName !== scopeName && !/^[A-Za-z_$][\w$]*$/.test(valueMethodName)) {
+        klass.detectEnumConflictBang(name, valueMethodName, true);
+        klass.scope(valueMethodName, function () {
+          return this.where({ [name]: value });
+        });
+      }
 
       klass.detectEnumConflictBang(name, notScopeName, true);
       klass.scope(notScopeName, function () {

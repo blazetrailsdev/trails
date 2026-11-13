@@ -6,7 +6,7 @@ import { Base } from "../../lib/base.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class EssayDestroyAsync extends Base {
-  static _tableName = "essays";
+  static tableName = "essays";
 
   static {
     this.belongsTo("book", { dependent: "destroyAsync", className: "BookDestroyAsync" });

@@ -10,7 +10,7 @@ constSet(TopLevel, "MutableDerivedSecretKeyProvider", MutableDerivedSecretKeyPro
 
 export class EncryptedPost extends Base {
   declare title: string;
-  static _tableName = "posts";
+  static tableName = "posts";
 
   static {
     this.encrypts("title");

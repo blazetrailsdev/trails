@@ -188,6 +188,16 @@ describe("SQLite3Adapter pragmas option", () => {
     expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: bad-name!");
   });
 
+  it("warns on a pragma named after a set_*_pragma helper", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    adapter = new BetterSQLite3Adapter({
+      database: ":memory:",
+      pragmas: { boolean_pragma: 1 } as Record<string, number>,
+    });
+    await adapter.connectBang();
+    expect(console.warn).toHaveBeenCalledWith("Unknown SQLite pragma: boolean_pragma");
+  });
+
   it("warns and skips a string value with unsafe characters", async () => {
     const fs = await import("fs");
     const path = await import("path");

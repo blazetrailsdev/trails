@@ -8,7 +8,7 @@ export class PublisherArticle extends Base {
     constSet(Publisher, "Article", this);
     DescendantsTracker.registerSubclass(Base, this);
   }
-  static _tableName = "articles";
+  static tableName = "articles";
 
   static {
     this.hasAndBelongsToMany("magazines");

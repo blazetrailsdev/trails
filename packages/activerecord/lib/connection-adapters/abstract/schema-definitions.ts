@@ -949,7 +949,7 @@ export class TableDefinition {
   ): ForeignKeyDefinition {
     const prefix = this.conn.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
     const suffix = this.conn.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
-    toTable = `${prefix}${toTable}${suffix}`;
+    toTable = `${prefix ?? ""}${toTable}${suffix ?? ""}`;
     options = this.conn.foreignKeyOptions(this.name, toTable, {
       ...options,
     }) as Partial<AddForeignKeyOptions>;

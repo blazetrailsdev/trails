@@ -33,7 +33,7 @@ describe("isBlank / isPresent", () => {
 
   it("isBlank returns true when no records exist", async () => {
     class SampleRecord extends Base {
-      static _tableName = "developers";
+      static tableName = "developers";
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");
@@ -118,7 +118,7 @@ describe("RelationTest", () => {
 
   it("dotted string order passes through as raw SQL (Rails treats all string orders as SqlLiteral)", () => {
     class Post extends Base {
-      static _tableName = "posts";
+      static tableName = "posts";
       static {
         this.attribute("id", "integer");
       }
@@ -129,7 +129,7 @@ describe("RelationTest", () => {
 
   it("group by SQL expression passes through unqualified", () => {
     class Order extends Base {
-      static _tableName = "orders";
+      static tableName = "orders";
       static {
         this.attribute("created_at", "string");
       }
@@ -515,7 +515,7 @@ describe("Relation#arel build_arel convergence", () => {
   });
 
   class Widget extends Base {
-    static _tableName = "widgets";
+    static tableName = "widgets";
     static {
       this.attribute("id", "integer");
       this.attribute("name", "string");
@@ -526,7 +526,7 @@ describe("Relation#arel build_arel convergence", () => {
   }
 
   class Gadget extends Base {
-    static _tableName = "gadgets";
+    static tableName = "gadgets";
     static {
       this.attribute("id", "integer");
       this.attribute("widget_id", "integer");

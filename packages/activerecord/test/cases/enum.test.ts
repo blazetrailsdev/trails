@@ -359,7 +359,7 @@ describe("EnumTest", () => {
 
   it("validation with 'validate: true' option", async () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["proposed", "written"], { validate: true });
       }
@@ -380,7 +380,7 @@ describe("EnumTest", () => {
 
   it("validation with 'validate: hash' option", async () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["proposed", "written"], { validate: { allowNil: true } });
       }
@@ -494,7 +494,7 @@ describe("EnumTest", () => {
   it("invalid definition values raise an ArgumentError", async () => {
     const defineStatusEnum = (values: unknown) => {
       class K extends Base {
-        static _tableName = "books";
+        static tableName = "books";
       }
       (K as any).enum("status", values);
     };
@@ -527,7 +527,7 @@ describe("EnumTest", () => {
 
   it("reserved enum names", async () => {
     class Klass extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["proposed", "written", "published"]);
       }
@@ -545,7 +545,7 @@ describe("EnumTest", () => {
   });
   it("reserved enum values", async () => {
     class Klass extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["proposed", "written", "published"]);
       }
@@ -564,7 +564,7 @@ describe("EnumTest", () => {
     for (const value of relationMethodSamples) {
       const e = await assertRaises([ArgumentError], {}, () => {
         class Klass extends Base {
-          static _tableName = "books";
+          static tableName = "books";
         }
         (Klass as any).enum("category", ["other", value]);
       });
@@ -574,7 +574,7 @@ describe("EnumTest", () => {
   it("can use id as a value with a prefix or suffix", () => {
     expect(() => {
       class Klass extends Base {
-        static _tableName = "books";
+        static tableName = "books";
         static {
           this.enum("status_1", ["id"], { prefix: true });
           this.enum("status_2", ["id"], { suffix: true });
@@ -586,7 +586,7 @@ describe("EnumTest", () => {
   it("overriding enum method should not raise", () => {
     expect(() => {
       class Klass extends Base {
-        static _tableName = "books";
+        static tableName = "books";
         publishedBang() {
           return "do publish work...";
         }
@@ -603,7 +603,7 @@ describe("EnumTest", () => {
 
   it("validate uniqueness", async () => {
     class Klass extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["proposed", "written"]);
         this.validatesUniquenessOf("status");
@@ -621,7 +621,7 @@ describe("EnumTest", () => {
 
   it("validate inclusion of value in array", async () => {
     class Klass extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["proposed", "written"]);
         this.validatesInclusionOf("status", { in: ["written"] });
@@ -635,13 +635,13 @@ describe("EnumTest", () => {
 
   it("enums are distinct per class", async () => {
     class Klass1 extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["proposed", "written"]);
       }
     }
     class Klass2 extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["drafted", "uploaded"]);
       }
@@ -689,7 +689,7 @@ describe("EnumTest", () => {
 
   it("declare multiple enums with prefix: true", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.attribute("status", "integer");
         this.attribute("last_read", "integer");
@@ -704,7 +704,7 @@ describe("EnumTest", () => {
 
   it("declare multiple enums with suffix: true", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.attribute("status", "integer");
         this.attribute("last_read", "integer");
@@ -719,7 +719,7 @@ describe("EnumTest", () => {
 
   it("enum with alias_attribute", async () => {
     class Klass extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.aliasAttribute("aliased_status", "status");
         this.enum("aliased_status", ["proposed", "written", "published"]);
@@ -807,7 +807,7 @@ describe("EnumTest", () => {
 
   it("enum on custom attribute with default", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.attribute("status", "integer", { default: 2 });
         this.enum("status", ["proposed", "written", "published"]);
@@ -818,7 +818,7 @@ describe("EnumTest", () => {
 
   it("overloaded default by :default", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["proposed", "written", "published"], {
           default: "published",
@@ -831,7 +831,7 @@ describe("EnumTest", () => {
   it(":_default is invalid in the new API", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
-        static _tableName = "books";
+        static tableName = "books";
         static {
           this.enum("status", ["proposed", "written", "published"], {
             _default: "published",
@@ -846,7 +846,7 @@ describe("EnumTest", () => {
   it(":_prefix is invalid in the new API", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
-        static _tableName = "books";
+        static tableName = "books";
         static {
           this.enum("status", ["proposed", "written", "published"], { _prefix: true } as any);
         }
@@ -859,7 +859,7 @@ describe("EnumTest", () => {
   it(":_suffix is invalid in the new API", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
-        static _tableName = "books";
+        static tableName = "books";
         static {
           this.enum("status", ["proposed", "written", "published"], { _suffix: true } as any);
         }
@@ -872,7 +872,7 @@ describe("EnumTest", () => {
   it(":_scopes is invalid in the new API", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
-        static _tableName = "books";
+        static tableName = "books";
         static {
           this.enum("status", ["proposed", "written", "published"], { _scopes: false } as any);
         }
@@ -885,7 +885,7 @@ describe("EnumTest", () => {
   it(":_instance_methods is invalid in the new API", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
       class Klass extends Base {
-        static _tableName = "books";
+        static tableName = "books";
         static {
           this.enum("status", ["proposed", "written", "published"], {
             _instance_methods: false,
@@ -899,7 +899,7 @@ describe("EnumTest", () => {
 
   it("scopes can be disabled by :scopes", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.attribute("status", "integer");
         this.enum("status", ["proposed", "written"], { scopes: false });
@@ -910,7 +910,7 @@ describe("EnumTest", () => {
 
   it("default methods can be disabled by :instance_methods", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.attribute("status", "integer");
         this.enum("status", ["proposed", "written"], { instanceMethods: false });
@@ -923,7 +923,7 @@ describe("EnumTest", () => {
 
   it("query state by predicate with :prefix", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.attribute("status", "integer");
         this.attribute("last_read", "integer");
@@ -938,7 +938,7 @@ describe("EnumTest", () => {
 
   it("query state by predicate with :suffix", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.attribute("cover", "integer");
         this.attribute("difficulty", "integer");
@@ -953,7 +953,7 @@ describe("EnumTest", () => {
 
   it("enum labels as keyword arguments", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", { active: 0, archived: 1 });
       }
@@ -965,7 +965,7 @@ describe("EnumTest", () => {
 
   it("option names can be used as label", () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", { default: 0, scopes: 1, prefix: 2, suffix: 3 });
       }
@@ -979,7 +979,7 @@ describe("EnumTest", () => {
 
   it("scopes are named like methods", () => {
     class K extends Base {
-      static _tableName = "cats";
+      static tableName = "cats";
       static {
         this.attribute("breed", "string");
         this.enum("breed", { "American Bobtail": 0, "Balinese-Javanese": 1 });
@@ -991,7 +991,7 @@ describe("EnumTest", () => {
 
   it("capital characters for enum names", () => {
     class Klass extends Base {
-      static _tableName = "computers";
+      static tableName = "computers";
       static {
         this.enum("extendedWarranty", ["extendedSilver", "extendedGold"]);
       }
@@ -1003,7 +1003,7 @@ describe("EnumTest", () => {
 
   it("unicode characters for enum names", () => {
     class Klass extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("language", ["🇺🇸", "🇪🇸", "🇫🇷"]);
       }
@@ -1015,19 +1015,19 @@ describe("EnumTest", () => {
 
   it("mangling collision for enum names", () => {
     class Klass extends Base {
-      static _tableName = "computers";
+      static tableName = "computers";
       static {
         this.enum("timezone", ["Etc/GMT+1", "Etc/GMT-1"]);
       }
     }
-    const computer = (Klass as any)["etc::Gmt+1"]().build();
+    const computer = (Klass as any)["Etc/GMT+1"]().build();
     expect(computer["isEtc::Gmt+1"]()).toBeTruthy();
     expect(computer["isEtc::Gmt-1"]()).toBeFalsy();
   });
 
   it("deserialize enum value to original hash key", async () => {
     class K extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.attribute("status", "integer");
         this.enum("status", { proposed: 0, written: 1 });
@@ -1042,7 +1042,7 @@ describe("EnumTest", () => {
   });
   it("serializable? with large number label", async () => {
     class Klass extends Base {
-      static _tableName = "books";
+      static tableName = "books";
       static {
         this.enum("status", ["9223372036854775808", "-9223372036854775809"]);
       }

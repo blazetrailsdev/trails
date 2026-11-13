@@ -10,7 +10,7 @@ import type { ShardedTag } from "./tag.js";
 export class ShardedBlogPostDestroyAsync extends Base {
   declare tags: AssociationProxy<ShardedTag>;
 
-  static _tableName = "sharded_blog_posts";
+  static tableName = "sharded_blog_posts";
   static {
     constSet(Sharded, "BlogPostDestroyAsync", this);
     DescendantsTracker.registerSubclass(Base, this);

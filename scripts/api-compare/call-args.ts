@@ -299,9 +299,8 @@ function unescapeDescriptorText(text: string): string {
 }
 
 /** Keys go through options-keys.ts#normalizeRubyKey — the same pipeline the
- *  option-key diff uses, which is camelization PLUS the renames it cannot derive
- *  (Ruby's `:constructor` option is `constructorFn`, since `constructor` is
- *  reserved as a JS property name). Values recurse, so an opaque nested value
+ *  option-key diff uses, which is camelization PLUS any renames it cannot derive.
+ *  Values recurse, so an opaque nested value
  *  makes the whole descriptor uncomparable. Order is not
  *  significant — a Ruby hash literal and a TS object literal carry the same
  *  kwargs whatever order they are written in — so the pairs are sorted. A pair

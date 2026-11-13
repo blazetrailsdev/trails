@@ -119,7 +119,7 @@ describe("normalizes on Base", () => {
   it("normalizes attributes before persistence", async () => {
     class NormalizedUser extends Base {
       declare name: string;
-      static _tableName = "aircraft";
+      static tableName = "aircraft";
       static {
         this.normalizes("name", {
           with: (name: unknown) => (typeof name === "string" ? name.trim().toLowerCase() : name),

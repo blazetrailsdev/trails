@@ -143,6 +143,12 @@ Three things in that translation are easy to get wrong:
 - **Time values are `Temporal`, not `Date`.** A JS `Date` bind raises
   `TypeError: quote: JS Date is not accepted — use a Temporal type`.
   `@blazetrails/date` re-exports `Temporal`.
+- **A table name or primary key is a static field.** Rails'
+  `self.table_name = "pull_requests"` / `self.primary_key = "number"` is
+  `static tableName = "pull_requests"` / `static primaryKey = "number"`. The
+  field runs the `table_name=` / `primary_key=` writer, so a subclass resolves
+  its own table. `_tableName` / `_primaryKey` are the writers' backing fields;
+  do not assign them.
 - **An enum value and a scope with the same name collide.** The enum's scope
   replaces the earlier one, as in Rails. Hence `prefix: true` above.
 

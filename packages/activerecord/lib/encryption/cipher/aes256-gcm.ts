@@ -58,7 +58,7 @@ export class Aes256Gcm {
 
   decrypt(encryptedMessage: Message): Bytes {
     try {
-      const encryptedData = toBytes(encryptedMessage.payload);
+      const encryptedData = toBytes(encryptedMessage.payload!);
       const iv = encryptedMessage.headers.iv;
       const authTag = encryptedMessage.headers.authTag;
 

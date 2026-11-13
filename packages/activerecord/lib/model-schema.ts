@@ -50,10 +50,10 @@ function computeTableName(this: SchemaKlass): string | null {
   if (isBaseClass(this)) {
     const contained = containedTableNamePrefix.call(this);
     const pluralizes = this.pluralizeTableNames ?? true;
-    return `${fullTableNamePrefix.call(this)}${contained}${undecoratedTableName(
+    return `${fullTableNamePrefix.call(this) ?? ""}${contained}${undecoratedTableName(
       String(this.modelName),
       pluralizes,
-    )}${fullTableNameSuffix.call(this)}`;
+    )}${fullTableNameSuffix.call(this) ?? ""}`;
   }
   return baseClass.call(this).tableName;
 }
@@ -182,8 +182,8 @@ export interface SchemaHost {
   tableName: string | null;
   primaryKey: string | string[];
   _tableName: string | null;
-  tableNamePrefix: string;
-  tableNameSuffix: string;
+  tableNamePrefix: string | null;
+  tableNameSuffix: string | null;
   _sequenceName: string | null | Promise<string | null>;
   /** @internal */
   _explicitSequenceName?: boolean;
@@ -241,7 +241,7 @@ export function resetTableName(this: SchemaKlass): string | null {
   return this._tableName;
 }
 
-export function fullTableNamePrefix(this: SchemaKlass): string {
+export function fullTableNamePrefix(this: SchemaKlass): string | null {
   return (
     (moduleParents(this).find((p) => rbObjRespondTo(p, "tableNamePrefix")) as
       | SchemaHost
@@ -249,7 +249,7 @@ export function fullTableNamePrefix(this: SchemaKlass): string {
   ).tableNamePrefix;
 }
 
-export function fullTableNameSuffix(this: SchemaKlass): string {
+export function fullTableNameSuffix(this: SchemaKlass): string | null {
   return (
     (moduleParents(this).find((p) => rbObjRespondTo(p, "tableNameSuffix")) as
       | SchemaHost
@@ -660,8 +660,8 @@ export async function tableExists(this: SchemaKlass): Promise<boolean> {
 
 export interface ModelSchema {
   primaryKeyPrefixType: string | null | undefined;
-  tableNamePrefix: string;
-  tableNameSuffix: string;
+  tableNamePrefix: string | null;
+  tableNameSuffix: string | null;
   pluralizeTableNames: boolean;
 }
 

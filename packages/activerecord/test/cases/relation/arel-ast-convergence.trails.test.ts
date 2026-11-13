@@ -7,7 +7,7 @@ import { Post as CanonicalPost } from "../../models/post.js";
 fixtures({});
 
 class Post extends Base {
-  static _tableName = "posts";
+  static tableName = "posts";
 }
 Post.attribute("id", "integer");
 Post.attribute("author", "string");

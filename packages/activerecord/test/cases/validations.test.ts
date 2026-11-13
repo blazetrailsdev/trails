@@ -229,7 +229,7 @@ describe("ValidationsTest", () => {
 
   it("acceptance validator doesnt require db connection", async () => {
     class Klass extends Base {
-      static _tableName = "posts";
+      static tableName = "posts";
     }
     void Klass.resetColumnInformation();
 

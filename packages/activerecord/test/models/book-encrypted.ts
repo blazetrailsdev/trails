@@ -4,7 +4,7 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../lib/base.js";
 
 export class UnencryptedBook extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 }
 constSet(TopLevel, "UnencryptedBook", UnencryptedBook);
 DescendantsTracker.registerSubclass(Base, UnencryptedBook);
@@ -18,7 +18,7 @@ export class EncryptedBook extends Base {
   declare original_name: string;
   declare updated_at: RubyTime | Temporal.PlainDateTime;
 
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.encrypts("name", { deterministic: true });
@@ -28,7 +28,7 @@ constSet(TopLevel, "EncryptedBook", EncryptedBook);
 DescendantsTracker.registerSubclass(Base, EncryptedBook);
 
 export class EncryptedBookWithUniquenessValidation extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.validates("name", { uniqueness: true });
@@ -39,7 +39,7 @@ constSet(TopLevel, "EncryptedBookWithUniquenessValidation", EncryptedBookWithUni
 DescendantsTracker.registerSubclass(Base, EncryptedBookWithUniquenessValidation);
 
 export class EncryptedBookWithDowncaseName extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.validates("name", { uniqueness: true });
@@ -63,7 +63,7 @@ function _downcaseLikeRails(v: unknown): unknown {
 }
 
 export class EncryptedBookNormalizedFirst extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.normalizes("name", { with: _downcaseLikeRails });
@@ -76,7 +76,7 @@ constSet(TopLevel, "EncryptedBookNormalizedFirst", EncryptedBookNormalizedFirst)
 DescendantsTracker.registerSubclass(Base, EncryptedBookNormalizedFirst);
 
 export class EncryptedBookNormalizedSecond extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.encrypts("name");
@@ -91,7 +91,7 @@ DescendantsTracker.registerSubclass(Base, EncryptedBookNormalizedSecond);
 export class EncryptedBookAttribute extends Base {
   declare name: Temporal.PlainDate;
 
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.attribute("name", "date");
@@ -102,7 +102,7 @@ constSet(TopLevel, "EncryptedBookAttribute", EncryptedBookAttribute);
 DescendantsTracker.registerSubclass(Base, EncryptedBookAttribute);
 
 export class EncryptedBookThatIgnoresCase extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.encrypts("name", { deterministic: true, ignoreCase: true });
@@ -112,7 +112,7 @@ constSet(TopLevel, "EncryptedBookThatIgnoresCase", EncryptedBookThatIgnoresCase)
 DescendantsTracker.registerSubclass(Base, EncryptedBookThatIgnoresCase);
 
 export class EncryptedBookWithUnencryptedDataOptedOut extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.validates("name", { uniqueness: true });
@@ -127,7 +127,7 @@ constSet(
 DescendantsTracker.registerSubclass(Base, EncryptedBookWithUnencryptedDataOptedOut);
 
 export class EncryptedBookWithUnencryptedDataOptedIn extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.validates("name", { uniqueness: true });
@@ -143,7 +143,7 @@ DescendantsTracker.registerSubclass(Base, EncryptedBookWithUnencryptedDataOptedI
 
 export class EncryptedBookWithBinary extends Base {
   declare logo: Uint8Array | null;
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.encrypts("logo");
@@ -153,7 +153,7 @@ constSet(TopLevel, "EncryptedBookWithBinary", EncryptedBookWithBinary);
 DescendantsTracker.registerSubclass(Base, EncryptedBookWithBinary);
 
 export class EncryptedBookWithSerializedFirstBinary extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.serialize("logo", { coder: JSON });
@@ -168,7 +168,7 @@ constSet(
 DescendantsTracker.registerSubclass(Base, EncryptedBookWithSerializedFirstBinary);
 
 export class EncryptedBookWithSerializedSecondBinary extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.encrypts("logo");
@@ -184,7 +184,7 @@ DescendantsTracker.registerSubclass(Base, EncryptedBookWithSerializedSecondBinar
 
 export class EncryptedBookWithSerializedDeterministicName extends Base {
   declare name: unknown;
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.encrypts("name", { deterministic: true });
@@ -210,7 +210,7 @@ constSet(
 DescendantsTracker.registerSubclass(Base, EncryptedBookWithSerializedDeterministicName);
 
 export class EncryptedBookWithCustomCompressor extends Base {
-  static _tableName = "encrypted_books";
+  static tableName = "encrypted_books";
 
   static {
     this.encrypts("name", {

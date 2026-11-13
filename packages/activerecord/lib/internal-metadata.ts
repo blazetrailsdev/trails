@@ -42,7 +42,7 @@ export class InternalMetadata {
 
   get tableName(): string {
     const base = baseClass();
-    return `${base.tableNamePrefix}${base.internalMetadataTableName}${base.tableNameSuffix}`;
+    return `${base.tableNamePrefix ?? ""}${base.internalMetadataTableName}${base.tableNameSuffix ?? ""}`;
   }
 
   constructor(pool: ConnectionPool | NullPool) {

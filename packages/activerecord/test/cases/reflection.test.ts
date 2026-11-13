@@ -925,7 +925,7 @@ describe("ReflectionTest", () => {
       declare name: string | null;
       declare products: AssociationProxy<DjtProduct>;
 
-      static _tableName = "categories";
+      static tableName = "categories";
       static {
         this.attribute("name", "string");
         this.hasMany("products", { className: "DjtProduct" });
@@ -935,7 +935,7 @@ describe("ReflectionTest", () => {
       declare name: string | null;
       declare categories: AssociationProxy<DjtCategory>;
 
-      static _tableName = "products";
+      static tableName = "products";
       static {
         this.attribute("name", "string");
         this.hasMany("categories", { className: "DjtCategory" });

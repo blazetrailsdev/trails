@@ -14,7 +14,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("CaseSensitivityTest", () => {
     function collationTestModel(): typeof Base {
       class CollationTest extends Base {
-        static _tableName = "collation_tests";
+        static tableName = "collation_tests";
       }
       CollationTest.attribute("string_cs_column", "string");
       CollationTest.attribute("string_ci_column", "string");

@@ -27,13 +27,14 @@ function clearAggregationCache(this: AggregationsHost): void {
 type ComposedOfOptions = {
   className?: string;
   mapping?: [string, string][] | [string, string];
-  constructorFn?: ((...args: any[]) => any) | string;
-  converter?: (value: unknown) => unknown;
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type -- an own `constructor` key must accept what `Object.prototype.constructor` types as `Function`
+  constructor?: Function | string;
+  converter?: ((value: unknown) => unknown) | string;
   allowNil?: boolean;
 };
 
 export function composedOf(this: typeof Base, partId: string, options: ComposedOfOptions): void {
-  assertValidKeys(options, ["className", "mapping", "allowNil", "constructorFn", "converter"]);
+  assertValidKeys(options, ["className", "mapping", "allowNil", "constructor", "converter"]);
 
   if (!isModuleIncluded(this, Aggregations)) include(this, Aggregations);
 
@@ -42,7 +43,7 @@ export function composedOf(this: typeof Base, partId: string, options: ComposedO
   let mapping: [string, string][] | [string, string] = options.mapping ?? [name, name];
   if (!Array.isArray(mapping[0])) mapping = [mapping] as [string, string][];
   const allowNil = options.allowNil ?? false;
-  const constructor = options.constructorFn ?? "new";
+  const constructor = (Object.hasOwn(options, "constructor") ? options.constructor : null) ?? "new";
   const converter = options.converter;
 
   readerMethod.call(this, name, className, mapping as [string, string][], allowNil, constructor);
@@ -63,7 +64,8 @@ function readerMethod(
   className: string,
   mapping: [string, string][],
   allowNil: boolean,
-  constructor: ((...args: any[]) => any) | string,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  constructor: Function | string,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
   Object.defineProperty(this.prototype, name, {
@@ -77,7 +79,7 @@ function readerMethod(
         const attrs = mapping.map(([key]) => this.readAttribute(key));
         const object =
           typeof constructor === "function"
-            ? constructor(...attrs)
+            ? (constructor as (...args: unknown[]) => unknown)(...attrs)
             : constructor === "new"
               ? new (constantize(className) as new (...args: any[]) => any)(...attrs)
               : (constantize(className) as any)[constructor](...attrs);
@@ -97,7 +99,7 @@ function writerMethod(
   className: string,
   mapping: [string, string][],
   allowNil: boolean,
-  converter?: (value: unknown) => unknown,
+  converter?: ((value: unknown) => unknown) | string,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
   Object.defineProperty(this.prototype, name, {
@@ -108,7 +110,10 @@ function writerMethod(
       const cache = this._aggregationCache;
 
       if (!(part instanceof klass || converter == null || part == null)) {
-        part = converter(part);
+        part =
+          typeof converter === "function"
+            ? converter(part)
+            : (klass as unknown as Record<string, (v: unknown) => unknown>)[converter](part);
       }
 
       const hashFromMultiparameterAssignment =
