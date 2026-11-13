@@ -233,7 +233,6 @@ declare module "@blazetrails/date" {
     export function current(): Temporal.PlainDate;
     export function beginningOfWeek(): string;
     export function setBeginningOfWeek(weekStart: string): void;
-    export const DAYS_INTO_WEEK: Record<string, number>;
   }
   interface Date {
     change(options: { year?: number; month?: number; day?: number }): Date;

@@ -16,7 +16,8 @@
  * top-level expression. Assigning a namespace object (`Seat.X = XModule`)
  * reads no binding, since ESM creates it before any module body runs, and is
  * not counted; nor is a read of a module's own namespace placed after its last
- * runtime declaration, when every member it can read is initialized. A read inside a function, method, accessor,
+ * runtime declaration, when every member it declares is initialized; such a
+ * read counts instead as a read of every binding the module re-exports. A read inside a function, method, accessor,
  * constructor or instance field initializer is deferred and is not counted:
  * ESM import bindings are live, so being in a cycle is harmless there.
  * A module-eval reference to an exported `function` declaration that does not
@@ -361,6 +362,7 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
   const sf = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
   const locals = new Map<string, string>();
   const importedAs = new Map<string, string>();
+  const reExports: { to: string; names: string[] }[] = [];
   const namespaces = new Set<string>();
   const edges = new Map<string, ScannedEdge & { value: boolean }>();
   const edgeFor = (to: string) => {
@@ -380,8 +382,11 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
   const addEval = (name: string, node: ts.Node) => {
     const e = edgeFor(locals.get(name)!);
     e.evalNames.add(name);
+    const p = node.parent;
     const called =
-      ts.isCallExpression(node.parent) && node.parent.expression === node && ts.isIdentifier(node);
+      ts.isIdentifier(node) &&
+      (((ts.isCallExpression(p) || ts.isNewExpression(p)) && p.expression === node) ||
+        (ts.isTaggedTemplateExpression(p) && p.tag === node));
     const prev = e.evalRefs.get(name);
     e.evalRefs.set(name, {
       imported: importedAs.get(name) ?? "*",
@@ -392,7 +397,19 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
   const read = (name: string, node: ts.Node) => {
     const e = edgeFor(locals.get(name)!);
     e.value = true;
-    if (isOwnNamespaceSeat(name, node)) return;
+    if (isNamespaceAssignment(name, node)) return;
+    if (isTrailingOwnNamespace(name, node)) {
+      for (const r of reExports) {
+        const re = edgeFor(r.to);
+        for (const n of r.names) {
+          re.evalNames.add(n);
+          re.evalRefs.set(n, { imported: n, called: re.evalRefs.get(n)?.called ?? false });
+        }
+        if (!re.evalLine)
+          re.evalLine = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+      }
+      return;
+    }
     const boundary = deferringBoundary(node);
     if (boundary === null) addEval(name, node);
     else if (fnNodes.has(boundary)) {
@@ -419,17 +436,24 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
           (ts.isFunctionDeclaration(s) ||
             ts.isClassDeclaration(s) ||
             ts.isVariableStatement(s) ||
-            ts.isEnumDeclaration(s)) &&
+            ts.isEnumDeclaration(s) ||
+            ts.isExportAssignment(s)) &&
           !ts.getModifiers(s)?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword),
       )
       .map((s) => s.end),
   );
-  const isOwnNamespaceSeat = (name: string, node: ts.Node) =>
+  const isNamespaceAssignment = (name: string, node: ts.Node) =>
     namespaces.has(name) &&
-    ((ts.isBinaryExpression(node.parent) &&
-      node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
-      node.parent.right === node) ||
-      (locals.get(name) === file && node.getStart(sf) > lastDeclarationEnd));
+    ts.isBinaryExpression(node.parent) &&
+    node.parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    node.parent.right === node;
+  const isTrailingOwnNamespace = (name: string, node: ts.Node) =>
+    locals.get(name) === file &&
+    namespaces.has(name) &&
+    ts.isIdentifier(node) &&
+    !ts.isPropertyAccessExpression(node.parent) &&
+    !ts.isElementAccessExpression(node.parent) &&
+    node.getStart(sf) > lastDeclarationEnd;
 
   for (const stmt of sf.statements) {
     if (ts.isImportDeclaration(stmt) && ts.isStringLiteral(stmt.moduleSpecifier)) {
@@ -468,6 +492,15 @@ export function scanFile(file: string, text: string, resolve: Resolver): Scanned
       const named = stmt.exportClause;
       if (named && ts.isNamedExports(named) && named.elements.every((e) => e.isTypeOnly)) continue;
       edgeFor(to).value = true;
+      reExports.push({
+        to,
+        names:
+          named && ts.isNamedExports(named)
+            ? named.elements
+                .filter((e) => !e.isTypeOnly)
+                .map((e) => (e.propertyName ?? e.name).text)
+            : ["*"],
+      });
     }
   }
 

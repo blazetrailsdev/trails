@@ -193,6 +193,24 @@ describe("import-cycles namespace reads", () => {
     expect([...e.evalNames]).toEqual([]);
   });
 
+  it("counts a trailing own-namespace read as a read of what the module re-exports", () => {
+    const text = [
+      `import * as A from "./a.js";`,
+      `export { B as C } from "./b.js";`,
+      "export function f() {}",
+      "use(A);",
+    ].join("\n");
+    const edges = scanFile("/p/a.ts", text, resolve);
+    expect(edges.find((e) => e.to === "/p/a.ts")!.evalNames.size).toBe(0);
+    expect([...edges.find((e) => e.to === "/p/b.ts")!.evalNames]).toEqual(["B"]);
+  });
+
+  it("counts a trailing member read of its own namespace", () => {
+    const text = [`import * as A from "./a.js";`, "export const k = 1;", "use(A.k);"].join("\n");
+    const [e] = scanFile("/p/a.ts", text, resolve);
+    expect([...e.evalNames]).toEqual(["A"]);
+  });
+
   it("counts a read of its own namespace above a runtime declaration", () => {
     const text = [`import * as A from "./a.js";`, "use(A);", "export const k = 1;"].join("\n");
     const [e] = scanFile("/p/a.ts", text, resolve);
@@ -216,6 +234,14 @@ describe("import-cycles hoisted function exports", () => {
     const [e] = scanA([`import { B as X, D } from "./b.js";`, "const t = { X };", "D();"]);
     expect(Object.fromEntries(e.evalRefs)).toEqual({
       X: { imported: "B", called: false },
+      D: { imported: "D", called: true },
+    });
+  });
+
+  it("classes new and a tagged template as calls", () => {
+    const [e] = scanA([`import { B, D } from "./b.js";`, "new B();", "D`x`;"]);
+    expect(Object.fromEntries(e.evalRefs)).toEqual({
+      B: { imported: "B", called: true },
       D: { imported: "D", called: true },
     });
   });
