@@ -1,14 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import "./test-helper.js";
-import { Base, Reflection } from "@blazetrails/activerecord";
-import { ActiveRecordExtensions, ReflectionExtension } from "@blazetrails/activestorage/reflection";
-import { ActiveStorage, Model, Registry } from "@blazetrails/activestorage";
-import { Dir, include, prepend, rbObjSingletonClass, StringIO } from "@blazetrails/ruby-compat";
-import { Trails } from "@blazetrails/trailties";
-import { ActionText } from "../lib/action-text.js";
-import { Attachable } from "../lib/attachable.js";
+import type { Base } from "@blazetrails/activerecord";
+import { ActiveStorage } from "@blazetrails/activestorage";
+import { StringIO } from "@blazetrails/ruby-compat";
 import { Attachment } from "../lib/attachment.js";
-import { Attribute } from "../lib/attribute.js";
 import { Content } from "../lib/content.js";
 import { Message } from "./dummy/app/models/message.js";
 import { MessageWithoutBlanks } from "./dummy/app/models/message-without-blanks.js";
@@ -21,37 +16,11 @@ type RichTextMessage = Message & {
 let RichText: typeof import("../lib/rich-text.js").RichText;
 
 beforeAll(async () => {
-  Object.defineProperty(ActionText, "tableNamePrefix", {
-    value: "action_text_",
-    configurable: true,
-  });
-  Object.defineProperty(ActiveStorage, "tableNamePrefix", {
-    value: "active_storage_",
-    configurable: true,
-  });
-  include(Base, Model);
-  include(Base, ActiveRecordExtensions);
-  prepend(rbObjSingletonClass(Reflection), ReflectionExtension);
-  await import("@blazetrails/activestorage/blob");
-  (Trails.configuration as unknown as { activeStorage: unknown }).activeStorage = {
-    service: "local",
-  };
-  include(Base, Attribute);
   ({ RichText } = await import("../lib/rich-text.js"));
-  (Message as unknown as { hasRichText(name: string): void }).hasRichText("content");
-  (
-    MessageWithoutBlanks as unknown as {
-      hasRichText(name: string, options: { storeIfBlank: boolean }): void;
-    }
-  ).hasRichText("content", { storeIfBlank: false });
   await Message.loadSchema();
   await RichText.loadSchema();
   await ActiveStorage.Blob!.loadSchema();
   await (ActiveStorage.Attachment as unknown as typeof Base).loadSchema();
-  const blob = ActiveStorage.Blob as unknown as { services: Registry; service: unknown };
-  blob.services = new Registry({ local: { service: "Disk", root: Dir.mktmpdir("action_text") } });
-  blob.service = blob.services.fetch("local");
-  include(ActiveStorage.Blob!, Attachable);
 });
 
 describe("ActionText::Serialization (trails)", () => {
@@ -153,6 +122,6 @@ describe("ActionText::Attribute (trails)", () => {
   it("lists rich text association names", () => {
     expect(
       (Message as unknown as { richTextAssociationNames(): string[] }).richTextAssociationNames(),
-    ).toEqual(["richTextContent"]);
+    ).toEqual(["richTextContent", "richTextBody"]);
   });
 });
