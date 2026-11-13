@@ -113,7 +113,7 @@ export class Listener extends SubscriberMap {
   }
 
   async interruptible<T>(block: () => T | Promise<T>): Promise<T> {
-    return await Promise.race([block(), this._stopped]);
+    return await Promise.race([Promise.resolve().then(block), this._stopped]);
   }
 
   async shutdown(): Promise<void> {

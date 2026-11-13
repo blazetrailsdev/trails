@@ -1,11 +1,12 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import type { Thread } from "@blazetrails/ruby-compat";
+import { Thread, type Mutex } from "@blazetrails/ruby-compat";
 import { Reaper } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
 import type { ReapablePool } from "../../lib/connection-adapters/abstract/connection-pool/reaper.js";
 
 const FREQUENCY = 91.37;
 
 interface ReaperInternals {
+  mutex: Mutex;
   threads: Map<number, Thread>;
   pools: Map<number, WeakRef<ReapablePool>[]>;
 }
@@ -35,7 +36,7 @@ describe("Reaper", () => {
       flush: async () => {},
       isDiscarded: () => false,
     };
-    void new Reaper(flakyPool, FREQUENCY).run();
+    new Reaper(flakyPool, FREQUENCY).run();
     const thread = reaperInternals().threads.get(FREQUENCY)!;
     expect(thread.isAlive()).toBe(true);
     expect(thread.name).toBe("AR Pool Reaper");
@@ -44,7 +45,7 @@ describe("Reaper", () => {
     await vi.advanceTimersByTimeAsync(FREQUENCY * 1000);
     expect(thread.isAlive()).toBe(false);
 
-    void new Reaper(flakyPool, FREQUENCY).run();
+    new Reaper(flakyPool, FREQUENCY).run();
     expect(reaperInternals().threads.get(FREQUENCY)).not.toBe(thread);
 
     await vi.advanceTimersByTimeAsync(FREQUENCY * 1000);
@@ -83,5 +84,29 @@ describe("Reaper", () => {
     await vi.advanceTimersByTimeAsync(FREQUENCY * 1000);
     expect(reaperInternals().pools.has(FREQUENCY)).toBe(false);
     expect(reaperInternals().threads.has(FREQUENCY)).toBe(false);
+  });
+
+  it("run registers on a Thread when the reaper holds the lock", async () => {
+    const pool: ReapablePool = {
+      reap: async () => {},
+      flush: async () => {},
+      isDiscarded: () => false,
+    };
+    let release!: () => void;
+    const held = reaperInternals().mutex.synchronize(
+      () => new Promise<void>((resolve) => (release = resolve)),
+    );
+    const registered = new Reaper(pool, FREQUENCY).run();
+    expect(registered).toBeInstanceOf(Thread);
+    expect(reaperInternals().pools.get(FREQUENCY)).toBeUndefined();
+
+    release();
+    await held;
+    await (registered as Thread).join();
+    expect(
+      reaperInternals()
+        .pools.get(FREQUENCY)!
+        .map((ref) => ref.deref()),
+    ).toEqual([pool]);
   });
 });
