@@ -188,7 +188,7 @@ describe("DupTest", () => {
 
   it("dup without primary key", async () => {
     class ParrotsPirate extends Base {
-      static _tableName = "parrots_pirates";
+      static tableName = "parrots_pirates";
     }
     const record = await ParrotsPirate.create({});
 

@@ -51,7 +51,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     Encryption.config.validateColumnSize = true;
 
     class EncryptedBookValidatingColumnSize extends Base {
-      static _tableName = "encrypted_books";
+      static tableName = "encrypted_books";
       static {
         this.encrypts("name", { deterministic: true });
       }
@@ -324,7 +324,7 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
 
   async function makeModel(tableName: string) {
     const model = class extends Base {
-      static _tableName = tableName;
+      static tableName = tableName;
     };
     await model.loadSchema();
     return model;
@@ -354,7 +354,7 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
 
   it("does not raise while no columns are known (schema not loaded yet)", async () => {
     const modelClass = class extends Base {
-      static _tableName = "authors";
+      static tableName = "authors";
     };
     const conn = await modelClass.leaseConnection();
     await conn.schemaCache.clearDataSourceCacheBang("authors");
@@ -388,7 +388,7 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
   it("Base.encrypts ignoreCase raises ConfigurationError when original_<name> is missing", async () => {
     const adapter = await freshAdapter();
     const Model = class extends Base {
-      static _tableName = "authors";
+      static tableName = "authors";
     };
     await Model.loadSchema();
     expect(() => {
@@ -399,7 +399,7 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
   it("Base.encrypts ignoreCase does not raise after reflection when original_<name> is present", async () => {
     const adapter = await freshAdapter();
     const Model = class extends Base {
-      static _tableName = "encrypted_books";
+      static tableName = "encrypted_books";
       static {
         this.attribute("id", "integer");
         this.attribute("name", "string");

@@ -7,7 +7,7 @@ constSet(TopLevel, "ChatMessage", ChatMessage);
 DescendantsTracker.registerSubclass(Base, ChatMessage);
 
 export class ChatMessageCustomPk extends Base {
-  static _tableName = "chat_messages_custom_pk";
+  static tableName = "chat_messages_custom_pk";
 }
 constSet(TopLevel, "ChatMessageCustomPk", ChatMessageCustomPk);
 DescendantsTracker.registerSubclass(Base, ChatMessageCustomPk);

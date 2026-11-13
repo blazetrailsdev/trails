@@ -12,7 +12,7 @@ export class ShardedComment extends Base {
   declare blog_post_id: number;
   declare body: string;
 
-  static _tableName = "sharded_comments";
+  static tableName = "sharded_comments";
   static {
     constSet(Sharded, "Comment", this);
     DescendantsTracker.registerSubclass(Base, this);

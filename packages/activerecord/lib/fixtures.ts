@@ -64,7 +64,7 @@ export class FixtureSet {
   }
 
   static defaultFixtureTableName(fixtureSetName: string, config: typeof Base = Base): string {
-    return `${config.tableNamePrefix}${fixtureSetName.replaceAll("/", "_")}${config.tableNameSuffix}`;
+    return `${config.tableNamePrefix ?? ""}${fixtureSetName.replaceAll("/", "_")}${config.tableNameSuffix ?? ""}`;
   }
 
   static resetCache(): void {

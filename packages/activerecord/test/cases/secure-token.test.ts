@@ -18,7 +18,7 @@ describe("SecureTokenTest", () => {
   async function onInitializeModel() {
     class TokenUser extends Base {
       declare token: string;
-      static _tableName = "users";
+      static tableName = "users";
     }
     await TokenUser.loadSchema();
     TokenUser.defineAttributeMethods();
@@ -103,7 +103,7 @@ describe("SecureTokenTest", () => {
 
   it("token calls the setter method", async () => {
     class TokenUser extends Base {
-      static _tableName = "users";
+      static tableName = "users";
     }
     await TokenUser.loadSchema();
     TokenUser.defineAttributeMethods();

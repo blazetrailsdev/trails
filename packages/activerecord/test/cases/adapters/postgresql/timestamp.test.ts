@@ -36,7 +36,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await self().withTimezoneConfig({ default: "utc", awareAttributes: true }, async () => {
           await adapter.reconnectBang();
           class PostgresqlTimestampWithZone extends Base {
-            static _tableName = "postgresql_timestamp_with_zones";
+            static tableName = "postgresql_timestamp_with_zones";
           }
           await PostgresqlTimestampWithZone.loadSchema();
           const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
@@ -60,7 +60,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           await adapter.reconnectBang();
           await adapter.execute(`SET time zone 'America/Jamaica'`);
           class PostgresqlTimestampWithZone extends Base {
-            static _tableName = "postgresql_timestamp_with_zones";
+            static tableName = "postgresql_timestamp_with_zones";
           }
           await PostgresqlTimestampWithZone.loadSchema();
           const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
@@ -92,7 +92,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           async () => {
             await adapter.reconnectBang();
             class PostgresqlTimestampWithZone extends Base {
-              static _tableName = "postgresql_timestamp_with_zones";
+              static tableName = "postgresql_timestamp_with_zones";
             }
             await PostgresqlTimestampWithZone.loadSchema();
             const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
@@ -127,7 +127,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             async () => {
               await adapter.reconnectBang();
               class PostgresqlTimestampWithZone extends Base {
-                static _tableName = "postgresql_timestamp_with_zones";
+                static tableName = "postgresql_timestamp_with_zones";
               }
               await PostgresqlTimestampWithZone.loadSchema();
               const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {
@@ -159,7 +159,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             async () => {
               await adapter.reconnectBang();
               class PostgresqlTimestampWithZone extends Base {
-                static _tableName = "postgresql_timestamp_with_zones";
+                static tableName = "postgresql_timestamp_with_zones";
               }
               await PostgresqlTimestampWithZone.loadSchema();
               const record = (await (PostgresqlTimestampWithZone as any).find(1)) as {

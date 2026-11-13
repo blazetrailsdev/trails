@@ -38,7 +38,7 @@ class Wizard extends Base {
 }
 
 class IneptWizard extends Wizard {
-  static _tableName = "inept_wizards";
+  static tableName = "inept_wizards";
   static {
     this.validatesUniquenessOf("city");
   }
@@ -70,7 +70,7 @@ class TopicWithAfterCreate extends Topic {
 }
 
 class LessonWithUniqKeyboard extends Base {
-  static _tableName = "lessons";
+  static tableName = "lessons";
   static {
     this.belongsTo("keyboard", { primaryKey: "name", foreignKey: "name" });
     this.validatesUniquenessOf("keyboard");
@@ -78,7 +78,7 @@ class LessonWithUniqKeyboard extends Base {
 }
 
 class DashboardWithoutPrimaryKey extends Base {
-  static _tableName = "dashboards";
+  static tableName = "dashboards";
   static name = "Dashboard";
   static {
     this.validatesUniquenessOf("dashboard_id");
@@ -977,7 +977,7 @@ describe("UniquenessWithCompositeKey", () => {
 });
 
 class BigIntTest extends Base {
-  static _tableName = "cars";
+  static tableName = "cars";
   static {
     this.validates("engines_count", {
       uniqueness: true,
@@ -987,7 +987,7 @@ class BigIntTest extends Base {
 }
 
 class BigIntReverseTest extends Base {
-  static _tableName = "cars";
+  static tableName = "cars";
   static {
     this.validates("engines_count", { inclusion: { in: new Range(0, INT_MAX_VALUE) } });
     this.validates("engines_count", { uniqueness: true });

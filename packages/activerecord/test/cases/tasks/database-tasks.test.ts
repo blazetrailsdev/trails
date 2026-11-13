@@ -1432,7 +1432,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     });
 
     afterAll(() => {
-      Base.tableNamePrefix = "";
+      Base.tableNamePrefix = null;
     });
 
     it.skipIf(inMemoryDb())("truncate tables", async () => {
@@ -1446,7 +1446,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     });
 
     afterAll(() => {
-      Base.tableNameSuffix = "";
+      Base.tableNameSuffix = null;
     });
 
     it.skipIf(inMemoryDb())("truncate tables", async () => {

@@ -25,7 +25,7 @@ export class NumericData extends Base {
   declare temperature_with_limit: BigDecimal | null;
   declare unscaled_bank_balance: BigDecimal | null;
 
-  static _tableName = "numeric_data";
+  static tableName = "numeric_data";
 
   static {
     this.attribute("world_population", "big_integer");

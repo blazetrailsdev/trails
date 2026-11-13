@@ -19,7 +19,7 @@ const MINUTE = 60;
 
 describe("SignedIdTest", () => {
   class GetSignedIDInCallback extends Base {
-    static _tableName = "accounts";
+    static tableName = "accounts";
     signedIdFromCallback: string | null = null;
     static {
       this.afterCreate(function (record: GetSignedIDInCallback) {

@@ -81,7 +81,7 @@ describe("NumericalityValidationTest", () => {
     }
 
     class MyClass extends AbstractClass {
-      static _tableName = "numeric_data";
+      static tableName = "numeric_data";
       static name = "MyClass";
     }
     const subject = new MyClass({ bank_balance: 10_000_000.12 });

@@ -27,7 +27,7 @@ export class BookDestroyAsync extends Base {
   declare static published: () => Relation<BookDestroyAsync>;
   declare static notPublished: () => Relation<BookDestroyAsync>;
 
-  static _tableName = "books";
+  static tableName = "books";
 
   static {
     this.hasMany("taggings", { as: "taggable", className: "Tagging" });
@@ -54,7 +54,7 @@ export class BookDestroyAsyncWithScopedTags extends Base {
   declare taggings: AssociationProxy<Tagging>;
   declare tags: AssociationProxy<Tag>;
 
-  static _tableName = "books";
+  static tableName = "books";
 
   static {
     this.hasMany("taggings", { as: "taggable", className: "Tagging" });

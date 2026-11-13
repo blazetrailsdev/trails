@@ -15,7 +15,7 @@ import { fixtures } from "../../support/use-fixtures.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ArrowFieldAccount extends Base {
-  static _tableName = "accounts";
+  static tableName = "accounts";
   declare firm_id: number;
 
   static _seenFirmIsThenable: boolean | null = null;
@@ -42,7 +42,7 @@ interface ArrowFieldAccount {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ProtoHelperAccount extends Base {
-  static _tableName = "accounts";
+  static tableName = "accounts";
   declare firm_id: number;
 
   static _seenFirmIsThenable: boolean | null = null;
@@ -69,7 +69,7 @@ interface ProtoHelperAccount {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ReentrantDestroyAccount extends Base {
-  static _tableName = "accounts";
+  static tableName = "accounts";
   declare firm_id: number;
 
   static _reentrantResult: unknown = undefined;

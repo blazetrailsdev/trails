@@ -8,7 +8,7 @@ import type { ShardedBlogPostDestroyAsync } from "./blog-post-destroy-async.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedCommentDestroyAsync extends Base {
-  static _tableName = "sharded_comments";
+  static tableName = "sharded_comments";
   static {
     constSet(Sharded, "CommentDestroyAsync", this);
     DescendantsTracker.registerSubclass(Base, this);

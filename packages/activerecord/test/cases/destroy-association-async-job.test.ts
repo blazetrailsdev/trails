@@ -5,35 +5,35 @@ import { Base } from "../../lib/base.js";
 import { ConfigurationError } from "../../lib/errors.js";
 
 class UndefinedConstantAsync extends Base {
-  static _tableName = "essays";
+  static tableName = "essays";
   static {
     this.destroyAssociationAsyncJob = "UndefinedConstantJob";
   }
 }
 
 class UnloadableBaseAsync extends Base {
-  static _tableName = "essays";
+  static tableName = "essays";
   static {
     this.destroyAssociationAsyncJob = "UnloadableBaseJob";
   }
 }
 
 class UnusedBelongsToAsync extends Base {
-  static _tableName = "essays";
+  static tableName = "essays";
   static {
     this.destroyAssociationAsyncJob = null;
   }
 }
 
 class UnusedHasOneAsync extends Base {
-  static _tableName = "essays";
+  static tableName = "essays";
   static {
     this.destroyAssociationAsyncJob = null;
   }
 }
 
 class UnusedHasManyAsync extends Base {
-  static _tableName = "essays";
+  static tableName = "essays";
   static {
     this.destroyAssociationAsyncJob = null;
   }
@@ -42,7 +42,7 @@ class UnusedHasManyAsync extends Base {
 class ResolvableJob {}
 
 class ResolvableJobAsync extends Base {
-  static _tableName = "essays";
+  static tableName = "essays";
   static {
     this.destroyAssociationAsyncJob = "ResolvableJob";
   }

@@ -22,7 +22,7 @@ export class Doubloon extends AbstractDoubloon {
   declare pirate_id: number;
   declare weight: number;
 
-  static _tableName = "doubloons";
+  static tableName = "doubloons";
 }
 constSet(TopLevel, "Doubloon", Doubloon);
 DescendantsTracker.registerSubclass(AbstractDoubloon, Doubloon);

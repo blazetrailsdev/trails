@@ -353,7 +353,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   class AutoIncrement extends Base {
-    static _tableName = "auto_increments";
+    static tableName = "auto_increments";
   }
 
   let connection: any;
@@ -407,7 +407,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   class Barcode extends Base {
-    static _tableName = "barcodes";
+    static tableName = "barcodes";
     static {
       this.primaryKey = "code";
     }
@@ -660,7 +660,7 @@ describe("PrimaryKeyIntegerTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   class Widget extends Base {
-    static _tableName = "widgets";
+    static tableName = "widgets";
   }
 
   let connection: any;

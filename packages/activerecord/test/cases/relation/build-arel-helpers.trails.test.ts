@@ -8,7 +8,7 @@ import { fixtures } from "../../support/use-fixtures.js";
 fixtures({});
 
 class Post extends Base {
-  static _tableName = "posts";
+  static tableName = "posts";
 }
 Post.attribute("id", "integer");
 Post.attribute("title", "string");
@@ -197,7 +197,7 @@ describe("Relation#offset float truncation", () => {
 
 describe("where-hash key resolves to the referenced join alias", () => {
   class HaPet extends Base {
-    static _tableName = "da_pets";
+    static tableName = "da_pets";
     static {
       this.hasMany("toys", { className: "HaToy", foreignKey: "pet_id" });
     }
@@ -205,7 +205,7 @@ describe("where-hash key resolves to the referenced join alias", () => {
   HaPet.attribute("id", "integer");
   HaPet.attribute("name", "string");
   class HaToy extends Base {
-    static _tableName = "da_toys";
+    static tableName = "da_toys";
   }
   HaToy.attribute("id", "integer");
   HaToy.attribute("name", "string");

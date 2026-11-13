@@ -3,7 +3,7 @@ import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base } from "../../lib/base.js";
 
 export class PostWithPrefetchedPk extends Base {
-  static _tableName = "posts";
+  static tableName = "posts";
 
   static isPrefetchPrimaryKey(): boolean {
     return true;

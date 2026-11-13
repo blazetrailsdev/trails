@@ -130,7 +130,7 @@ interface WheelPolymorphicName {
 }
 
 class EssayDestroy extends Base {
-  static _tableName = "essays";
+  static tableName = "essays";
   static {
     this.belongsTo("book", { dependent: "destroy", className: "DestroyableBook" });
   }
@@ -139,7 +139,7 @@ constSet(TopLevel, "EssayDestroy", EssayDestroy);
 DescendantsTracker.registerSubclass(Base, EssayDestroy);
 
 class DestroyableBook extends Base {
-  static _tableName = "books";
+  static tableName = "books";
   static {
     this.belongsTo("author", { className: "UndestroyableAuthor", dependent: "destroy" });
   }
@@ -148,7 +148,7 @@ constSet(TopLevel, "DestroyableBook", DestroyableBook);
 DescendantsTracker.registerSubclass(Base, DestroyableBook);
 
 class UndestroyableAuthor extends Base {
-  static _tableName = "authors";
+  static tableName = "authors";
   static {
     this.hasOne("book", { className: "DestroyableBook", foreignKey: "author_id" });
     this.beforeDestroy(function () {
@@ -311,7 +311,7 @@ describe("BelongsToAssociationsTest", () => {
   it("optional relation can be set per model", async () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class FirstModel extends Base {
-      static _tableName = "accounts";
+      static tableName = "accounts";
       static {
         this.belongsToRequiredByDefault = false;
         this.belongsTo("company", { inverseOf: false });
@@ -324,7 +324,7 @@ describe("BelongsToAssociationsTest", () => {
     }
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class SecondModel extends Base {
-      static _tableName = "accounts";
+      static tableName = "accounts";
       static {
         this.belongsToRequiredByDefault = true;
         this.belongsTo("company", { inverseOf: false });
@@ -349,7 +349,7 @@ describe("BelongsToAssociationsTest", () => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempModel extends Base {
-        static _tableName = "accounts";
+        static tableName = "accounts";
         static {
           this.belongsTo("company", { optional: true, inverseOf: false });
         }
@@ -372,7 +372,7 @@ describe("BelongsToAssociationsTest", () => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempModel extends Base {
-        static _tableName = "accounts";
+        static tableName = "accounts";
         static {
           this.belongsTo("company", { optional: false, inverseOf: false });
         }
@@ -396,7 +396,7 @@ describe("BelongsToAssociationsTest", () => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempModel extends Base {
-        static _tableName = "accounts";
+        static tableName = "accounts";
         static {
           this.belongsTo("company", { inverseOf: false });
         }
@@ -420,7 +420,7 @@ describe("BelongsToAssociationsTest", () => {
 
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class TempDefault extends Base {
-      static _tableName = "ships";
+      static tableName = "ships";
       static {
         this.belongsTo("developer", { default: () => david, inverseOf: false });
       }
@@ -444,7 +444,7 @@ describe("BelongsToAssociationsTest", () => {
   it("default with lambda", async () => {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
     class TempDefault extends Base {
-      static _tableName = "ships";
+      static tableName = "ships";
       static {
         this.belongsTo("developer", {
           default: (owner) => (owner as any).defaultDeveloper(),
@@ -1930,7 +1930,7 @@ describe("BelongsToAssociationsTest", () => {
 
   it("destroying polymorphic child with unloaded parent and touch is possible with has many inversing", async () => {
     class SponsorWithTouchInverse extends Sponsor {
-      static override _tableName = "sponsors";
+      static tableName = "sponsors";
       static {
         this.belongsTo("sponsorable", { polymorphic: true, inverseOf: "sponsors", touch: true });
       }
@@ -1961,7 +1961,7 @@ describe("BelongsToAssociationsTest", () => {
     expect(() => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
       class TempPost extends Base {
-        static _tableName = "posts";
+        static tableName = "posts";
         static {
           this.belongsTo("category", { polymorphic: false } as any);
         }
@@ -2001,7 +2001,7 @@ describe("BelongsToAssociationsTest", () => {
     for (const name of ["errors", "save"]) {
       await assertRaises([ArgumentError], {}, () => {
         class TempModel extends Base {
-          static _tableName = "accounts";
+          static tableName = "accounts";
           static {
             this.belongsTo(name as any);
           }
@@ -2153,7 +2153,7 @@ describe("BelongsToAssociationsTest", () => {
     class ShipRequired extends Base {
       declare name: any;
 
-      static _tableName = "ships";
+      static tableName = "ships";
       static {
         this.belongsTo("developer", { required: true, inverseOf: false });
       }
@@ -2187,7 +2187,7 @@ describe("BelongsToAssociationsTest", () => {
     class ShipRequired extends Base {
       declare name: any;
 
-      static _tableName = "ships";
+      static tableName = "ships";
       static {
         this.belongsTo("developer", { required: true, inverseOf: false });
       }
@@ -2216,7 +2216,7 @@ describe("BelongsToAssociationsTest", () => {
       class TempShip extends Base {
         declare name: any;
 
-        static _tableName = "ships";
+        static tableName = "ships";
         static {
           this.belongsTo("developer", { required: true, inverseOf: false });
         }

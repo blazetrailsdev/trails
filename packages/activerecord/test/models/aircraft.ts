@@ -13,7 +13,7 @@ export class Aircraft extends Base {
   declare engines: AssociationProxy<Engine>;
   declare wheels: AssociationProxy<Wheel>;
 
-  static _tableName = "aircraft";
+  static tableName = "aircraft";
 
   static {
     this.hasMany("engines", { foreignKey: "car_id" });

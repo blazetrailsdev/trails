@@ -8,7 +8,7 @@ import { Post } from "../../models/post.js";
 import { fixtures } from "../../support/use-fixtures.js";
 
 class NamespacedPost extends Base {
-  static _tableName = "posts";
+  static tableName = "posts";
   static {
     constSet(Namespaced, "Post", this);
   }

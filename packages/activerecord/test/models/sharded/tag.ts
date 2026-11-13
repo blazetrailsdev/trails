@@ -13,7 +13,7 @@ export class ShardedTag extends Base {
   declare blog_id: number;
   declare name: string;
 
-  static _tableName = "sharded_tags";
+  static tableName = "sharded_tags";
   static {
     constSet(Sharded, "Tag", this);
     DescendantsTracker.registerSubclass(Base, this);

@@ -34,7 +34,7 @@ export class SchemaMigration {
 
   get tableName(): string {
     const base = baseClass();
-    return `${base.tableNamePrefix}${base.schemaMigrationsTableName}${base.tableNameSuffix}`;
+    return `${base.tableNamePrefix ?? ""}${base.schemaMigrationsTableName}${base.tableNameSuffix ?? ""}`;
   }
 
   async createTable(): Promise<unknown> {

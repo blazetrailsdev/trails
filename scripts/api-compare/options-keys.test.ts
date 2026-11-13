@@ -7,8 +7,8 @@ describe("normalizeRubyKey", () => {
     expect(normalizeRubyKey("through")).toBe("through");
   });
 
-  it("applies known non-derivable renames (:constructor → constructorFn)", () => {
-    expect(normalizeRubyKey("constructor")).toBe("constructorFn");
+  it("keeps :constructor as constructor", () => {
+    expect(normalizeRubyKey("constructor")).toBe("constructor");
   });
 });
 
@@ -49,13 +49,6 @@ describe("diffOptionKeys", () => {
   it("drops a positional-param name from the TS reads as well", () => {
     const diff = diffOptionKeys(["type"], ["type", "limit"], ["name", "type"], ["type"]);
     expect(diff).toEqual({ missingInTs: [], extraInTs: [] });
-  });
-
-  it("suppresses a known rename (:constructor) instead of flagging it missing", () => {
-    expect(diffOptionKeys(["constructor", "mapping"], ["constructorFn", "mapping"])).toEqual({
-      missingInTs: [],
-      extraInTs: [],
-    });
   });
 
   it("ignores leading-underscore internal keys on both sides", () => {

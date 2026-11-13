@@ -23,7 +23,7 @@ export class ShardedBlogPost extends Base {
   declare revision: number;
   declare title: string;
 
-  static _tableName = "sharded_blog_posts";
+  static tableName = "sharded_blog_posts";
   static {
     constSet(Sharded, "BlogPost", this);
     DescendantsTracker.registerSubclass(Base, this);

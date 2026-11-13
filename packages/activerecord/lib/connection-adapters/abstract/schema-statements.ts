@@ -1545,11 +1545,11 @@ export class SchemaStatements {
 
   /** @internal */
   stripTableNamePrefixAndSuffix(tableName: string): string {
-    const adapter = this as { tableNamePrefix?: string; tableNameSuffix?: string };
-    const prefix: string = adapter.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
-    const suffix: string = adapter.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
+    const adapter = this as { tableNamePrefix?: string | null; tableNameSuffix?: string | null };
+    const prefix: string | null = adapter.tableNamePrefix ?? ActiveRecord.Base.tableNamePrefix;
+    const suffix: string | null = adapter.tableNameSuffix ?? ActiveRecord.Base.tableNameSuffix;
     const str = String(tableName);
-    const m = str.match(new RegExp(`${prefix}(.+)${suffix}`));
+    const m = str.match(new RegExp(`${prefix ?? ""}(.+)${suffix ?? ""}`));
     return m ? m[1] : str;
   }
 

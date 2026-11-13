@@ -15,7 +15,7 @@ export class Human extends Base {
   declare polymorphicInterestsWithCallbacks: AssociationProxy<Interest>;
   declare secretInterests: AssociationProxy<Interest>;
 
-  static _tableName = "humans";
+  static tableName = "humans";
 
   declare addCallbackCalled: boolean;
 

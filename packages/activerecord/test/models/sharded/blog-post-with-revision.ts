@@ -9,7 +9,7 @@ import type { ShardedComment } from "./comment.js";
 export class ShardedBlogPostWithRevision extends Base {
   declare comments: AssociationProxy<ShardedComment>;
 
-  static _tableName = "sharded_blog_posts";
+  static tableName = "sharded_blog_posts";
   static {
     constSet(Sharded, "BlogPostWithRevision", this);
     DescendantsTracker.registerSubclass(Base, this);

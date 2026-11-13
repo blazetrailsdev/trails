@@ -12,7 +12,7 @@ constSet(TopLevel, "EncryptedTrafficLight", EncryptedTrafficLight);
 DescendantsTracker.registerSubclass(TrafficLight, EncryptedTrafficLight);
 
 export class EncryptedFirstTrafficLight extends Base {
-  static _tableName = "traffic_lights";
+  static tableName = "traffic_lights";
 
   static {
     this.serialize("state", { type: Array });

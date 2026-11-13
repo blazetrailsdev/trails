@@ -1796,7 +1796,7 @@ describe("QueryConstraintsTest", () => {
 
   it("query constraints list is nil if primary key is nil", async () => {
     class DevelopersProjects extends Base {
-      static _tableName = "developers_projects";
+      static tableName = "developers_projects";
     }
     await DevelopersProjects.loadSchema();
     expect(DevelopersProjects.primaryKey).toBeNull();
@@ -1827,7 +1827,7 @@ describe("QueryConstraintsTest", () => {
 
   it("query constraints raises an error when no columns provided", () => {
     class NoColumns extends Base {
-      static _tableName = "topics";
+      static tableName = "topics";
     }
     expect(() => queryConstraints.call(NoColumns as any)).toThrow(ArgumentError);
   });
@@ -1949,7 +1949,7 @@ describe("PersistenceTest", () => {
 
       if (await ((await Base.leaseConnection()) as PostgreSQLAdapter).supportsIdentityColumns()) {
         class IdentityTable extends Base {
-          static _tableName = "postgresql_identity_table";
+          static tableName = "postgresql_identity_table";
         }
         constSet(TopLevel, "IdentityTable", IdentityTable);
         DescendantsTracker.registerSubclass(Base, IdentityTable);

@@ -142,8 +142,8 @@ export class Customer extends Base {
     this.composedOf("fullname", {
       className: "Fullname",
       mapping: [["name", "toS"]],
-      constructorFn: (name: unknown) => Fullname.parse(name),
-      converter: (v: unknown) => Fullname.parse(v),
+      constructor: (name: unknown) => Fullname.parse(name),
+      converter: "parse",
     });
     this.composedOf("fullnameNoConverter", {
       className: "Fullname",

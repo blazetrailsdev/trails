@@ -7,7 +7,7 @@ import { Base } from "../../lib/base.js";
 export class Liquid extends Base {
   declare molecules: AssociationProxy<Molecule>;
 
-  static _tableName = "liquid";
+  static tableName = "liquid";
 
   static {
     this.hasMany("molecules", function () {

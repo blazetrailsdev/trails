@@ -438,7 +438,7 @@ describe("TransactionInstrumentationTest", () => {
       let afterCommitTriggered = false;
 
       class TopicModel extends Base {
-        static _tableName = "topics";
+        static tableName = "topics";
         static {
           this.attribute("id", "integer");
           this.attribute("title", "string");
@@ -474,7 +474,7 @@ describe("TransactionInstrumentationTest", () => {
       let afterRollbackTriggered = false;
 
       class TopicModel extends Base {
-        static _tableName = "topics";
+        static tableName = "topics";
         static {
           this.attribute("id", "integer");
           this.attribute("title", "string");

@@ -7,7 +7,7 @@ import { Base } from "../../../lib/base.js";
 import { CompositePrimaryKeyMismatchError } from "../../../lib/associations/errors.js";
 
 class CompositePkParent extends Base {
-  static _tableName = "cpk_seed_parents";
+  static tableName = "cpk_seed_parents";
   static {
     this.primaryKey = ["shop_id", "id"];
     this.attribute("shop_id", "integer");
@@ -16,7 +16,7 @@ class CompositePkParent extends Base {
 }
 
 class CpkSeedChild extends Base {
-  static _tableName = "cpk_seed_children";
+  static tableName = "cpk_seed_children";
   static {
     this.attribute("composite_pk_parent_id", "integer");
     this.belongsTo("compositePkParent", { className: "CompositePkParent" });
@@ -24,7 +24,7 @@ class CpkSeedChild extends Base {
 }
 
 class TenantPkParent extends Base {
-  static _tableName = "cpk_tenant_parents";
+  static tableName = "cpk_tenant_parents";
   static {
     this.primaryKey = ["shop_id", "tenant_id"];
     this.attribute("shop_id", "integer");
@@ -33,7 +33,7 @@ class TenantPkParent extends Base {
 }
 
 class CpkTenantChild extends Base {
-  static _tableName = "cpk_tenant_children";
+  static tableName = "cpk_tenant_children";
   static {
     this.attribute("tenant_pk_parent_id", "integer");
     this.belongsTo("tenantPkParent", { className: "TenantPkParent" });

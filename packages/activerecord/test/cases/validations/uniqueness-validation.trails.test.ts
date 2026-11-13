@@ -68,7 +68,7 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
   let restoreDirectSubscriber: () => Promise<void>;
 
   class DirectSubscriber extends Subscriber {
-    static _tableName = "direct_subscribers";
+    static tableName = "direct_subscribers";
   }
 
   beforeAll(async () => {

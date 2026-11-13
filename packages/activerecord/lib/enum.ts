@@ -109,13 +109,16 @@ export class EnumType extends ValueType<string> {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 function enumMethodNamesFor(valueMethodName: string): {
   predicateName: string;
   bangName: string;
   scopeName: string;
   notScopeName: string;
 } {
-  const scopeName = camelize(valueMethodName, false);
+  const scopeName = /^[A-Za-z_$][\w$]*$/.test(valueMethodName)
+    ? camelize(valueMethodName, false)
+    : valueMethodName;
   return {
     predicateName: `is${upcaseFirst(scopeName)}`,
     bangName: `${scopeName}Bang`,

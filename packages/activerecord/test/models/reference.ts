@@ -45,7 +45,7 @@ export interface Reference {
 }
 
 export class BadReference extends Base {
-  static _tableName = "references";
+  static tableName = "references";
 
   static {
     this.defaultScope(function () {

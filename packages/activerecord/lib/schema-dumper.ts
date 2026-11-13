@@ -46,8 +46,8 @@ function baseClass(): typeof Base {
 }
 
 export interface SchemaDumperConfig {
-  tableNamePrefix?: string;
-  tableNameSuffix?: string;
+  tableNamePrefix?: string | null;
+  tableNameSuffix?: string | null;
   schemaFormat?: "ts" | "js" | "sql";
 }
 

@@ -265,7 +265,7 @@ describe("PersistenceTest (trails)", () => {
     await Minimalistic.create({});
 
     class MinimalisticAircraft extends Minimalistic {
-      static _tableName = "aircraft";
+      static tableName = "aircraft";
       static {
         this.attribute("wingspan", "integer");
       }
@@ -314,7 +314,7 @@ describe("PersistenceTest (trails)", () => {
 
   it("prefetched pk is re-cast through the primary key's default attribute", async () => {
     class PostWithStringSequence extends (CanonicalPost as unknown as typeof Base) {
-      static _tableName = "posts";
+      static tableName = "posts";
       static isPrefetchPrimaryKey(): boolean {
         return true;
       }

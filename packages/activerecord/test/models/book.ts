@@ -204,7 +204,7 @@ export class PublishedBook extends Base {
   declare static hard: () => Relation<PublishedBook>;
   declare static soft: () => Relation<PublishedBook>;
 
-  static _tableName = "books";
+  static tableName = "books";
 
   static {
     this.enum("cover", { hard: "0", soft: "1" }, { default: "hard" });

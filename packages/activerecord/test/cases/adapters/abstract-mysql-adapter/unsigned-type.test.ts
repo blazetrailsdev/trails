@@ -28,7 +28,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
   async function unsignedTypeModel(): Promise<typeof Base> {
     class UnsignedType extends Base {
-      static _tableName = "unsigned_types";
+      static tableName = "unsigned_types";
     }
     await UnsignedType.loadSchema();
     return UnsignedType;

@@ -22,6 +22,12 @@ describe("MessageEqualityTrails", () => {
     expect(build().equals(new Message({ payload: "some payload" }))).toBe(false);
   });
 
+  it("keeps a nil payload nil and tells it apart from an empty string", () => {
+    expect(new Message().payload).toBeNull();
+    expect(new Message().equals(new Message({ payload: "" }))).toBe(false);
+    expect(new Message().equals(new Message())).toBe(true);
+  });
+
   it("compares string and Buffer payloads on bytes", () => {
     expect(
       new Message({ payload: "hello" }).equals(new Message({ payload: Buffer.from("hello") })),

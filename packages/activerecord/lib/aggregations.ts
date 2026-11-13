@@ -27,13 +27,13 @@ function clearAggregationCache(this: AggregationsHost): void {
 type ComposedOfOptions = {
   className?: string;
   mapping?: [string, string][] | [string, string];
-  constructorFn?: ((...args: any[]) => any) | string;
-  converter?: (value: unknown) => unknown;
+  constructor?: CallableFunction | string;
+  converter?: ((value: unknown) => unknown) | string;
   allowNil?: boolean;
 };
 
 export function composedOf(this: typeof Base, partId: string, options: ComposedOfOptions): void {
-  assertValidKeys(options, ["className", "mapping", "allowNil", "constructorFn", "converter"]);
+  assertValidKeys(options, ["className", "mapping", "allowNil", "constructor", "converter"]);
 
   if (!isModuleIncluded(this, Aggregations)) include(this, Aggregations);
 
@@ -42,7 +42,7 @@ export function composedOf(this: typeof Base, partId: string, options: ComposedO
   let mapping: [string, string][] | [string, string] = options.mapping ?? [name, name];
   if (!Array.isArray(mapping[0])) mapping = [mapping] as [string, string][];
   const allowNil = options.allowNil ?? false;
-  const constructor = options.constructorFn ?? "new";
+  const constructor = (Object.hasOwn(options, "constructor") ? options.constructor : null) ?? "new";
   const converter = options.converter;
 
   readerMethod.call(this, name, className, mapping as [string, string][], allowNil, constructor);
@@ -63,7 +63,7 @@ function readerMethod(
   className: string,
   mapping: [string, string][],
   allowNil: boolean,
-  constructor: ((...args: any[]) => any) | string,
+  constructor: CallableFunction | string,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
   Object.defineProperty(this.prototype, name, {
@@ -97,18 +97,19 @@ function writerMethod(
   className: string,
   mapping: [string, string][],
   allowNil: boolean,
-  converter?: (value: unknown) => unknown,
+  converter?: ((value: unknown) => unknown) | string,
 ): void {
   const existing = Object.getOwnPropertyDescriptor(this.prototype, name);
   Object.defineProperty(this.prototype, name, {
     enumerable: existing?.enumerable ?? false,
     get: existing?.get,
     set(this: AggregationsHost, part: unknown): void {
-      const klass = constantize(className) as new (...args: any[]) => any;
+      const klass = constantize(className) as (new (...args: any[]) => any) &
+        Record<string, (v: unknown) => unknown>;
       const cache = this._aggregationCache;
 
       if (!(part instanceof klass || converter == null || part == null)) {
-        part = converter(part);
+        part = typeof converter === "function" ? converter(part) : klass[converter](part);
       }
 
       const hashFromMultiparameterAssignment =

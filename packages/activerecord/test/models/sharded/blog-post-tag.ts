@@ -8,7 +8,7 @@ import type { ShardedTag } from "./tag.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPostTag extends Base {
-  static _tableName = "sharded_blog_posts_tags";
+  static tableName = "sharded_blog_posts_tags";
   static {
     constSet(Sharded, "BlogPostTag", this);
     DescendantsTracker.registerSubclass(Base, this);

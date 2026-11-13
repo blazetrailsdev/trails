@@ -530,10 +530,10 @@ export class Base extends Model {
     return Base;
   }
 
-  declare static tableNamePrefix: string;
+  declare static tableNamePrefix: string | null;
   declare static isTableNamePrefix: boolean;
 
-  declare static tableNameSuffix: string;
+  declare static tableNameSuffix: string | null;
   declare static isTableNameSuffix: boolean;
 
   static get tableName(): string | null {

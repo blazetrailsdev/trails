@@ -4,20 +4,10 @@
 // These helpers diff the two key sets for a name-matched pair.
 import { snakeToCamel } from "@blazetrails/parity/conventions";
 
-/** Known Ruby-option-symbol → TS-property renames the camelization can't derive.
- *  Keyed by the raw Ruby symbol. Keep this minimal and evidence-backed — each
- *  entry suppresses a confirmed false `missingInTs`, not a guess. */
-const OPTION_KEY_RENAMES: Record<string, string> = {
-  // `constructor` is reserved as a JS object-property name, so the port spells
-  // Ruby's `:constructor` option as `constructorFn` (see aggregations.ts).
-  constructor: "constructorFn",
-};
-
 /** Normalize a raw Ruby option symbol to its TS spelling (`inverse_of` →
- *  `inverseOf`) via the same rename pipeline method names flow through, then
- *  apply any known non-derivable rename. */
+ *  `inverseOf`) via the same rename pipeline method names flow through. */
 export function normalizeRubyKey(sym: string): string {
-  return OPTION_KEY_RENAMES[sym] ?? snakeToCamel(sym);
+  return snakeToCamel(sym);
 }
 
 /** Leading-underscore keys are implementation-internal on both sides (TS
