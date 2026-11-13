@@ -1608,6 +1608,73 @@ runs in a Node Vitest worker.
 Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#trilogy-is-out-of-scope-trilogy_adapterrb-adapterstrilogy); unchanged, heading kept for citations. The one-line rule: Trilogy is never ported, its unported-files rows
 are permanent, and a Trilogy-only test arm is dropped.
 
+## importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)
+
+A Rails 8 app serves JavaScript through importmap-rails and assets through
+propshaft (`railties/lib/rails/generators/app_base.rb`'s `javascript`
+default of `importmap`). trails ports neither gem. Vite fills both roles,
+through ports of the `vite_ruby` and `vite_rails` gems
+(`vendor/vite_ruby/v3.11.1/`): `ViteRuby::Config` reads
+`config/vite.json`, `ViteRuby::Manifest` resolves entries,
+`ViteRuby::DevServerProxy` proxies to the Vite dev server, and
+`ViteTrails::TagHelpers` renders the tags. The npm `vite`,
+`vite-plugin-ruby`, `@hotwired/turbo-rails` and `@hotwired/stimulus` are
+dependencies, not ports.
+
+- The app generator's `--javascript` default is `vite`, and `runJavascript`
+  calls `vite:install`. This is a deliberate deviation from
+  `app_base.rb`. `importmap` is not offered.
+- actionview's `AssetUrlHelper` and `AssetTagHelper` stay faithful and do not
+  know about any pipeline. Nothing in actionview names Vite. All Vite
+  knowledge lives in `@blazetrails/vite-assets` (the `vite_ruby` port) and
+  `@blazetrails/vite-trails`.
+- Both packages handle only the app's browser assets. trails' toolchain
+  uses of Vite (vitest, trailties' test-only `trailsPlugin`, the website
+  build) never import them, and they never import those. An ESLint
+  `no-restricted-imports` boundary enforces this.
+- `@blazetrails/turbo` and `@blazetrails/stimulus` (the turbo-rails and
+  stimulus-rails ports) stay Vite-free. Their `turbo:install` and
+  `stimulus:install` port only the non-importmap (jsbundling) branch, and that
+  branch targets the vite_rails entrypoint layout: the generated
+  `config/vite.json` sets `sourceCodeDir: "app/javascript"`, so the
+  templates write `app/javascript/entrypoints/application.js` (one changed
+  path segment, receipted).
+- trails apps use pnpm. The generated app is a pnpm project
+  (`pnpm-lock.yaml`), and the install templates' hard-coded `yarn add`
+  becomes `pnpm add`, a receipted one-token change. yarn is not used. The
+  templates hard-code pnpm, rather than reusing vite_ruby's lockfile
+  detection, so a trails app always gets pnpm and does not depend on which
+  lockfile is present. vite_ruby's detection is still ported as written for
+  `vite:install`, and it resolves to pnpm in a generated app. The bun arm
+  fires only in an app the user has moved to bun (`bun.lockb` present). It
+  is kept so the port stays faithful, and a generated app never takes it. `turbo:install` and
+  `stimulus:install` pick bun when `using_bun?` is true and node otherwise,
+  as upstream does with the importmap arm removed.
+- The npm package is `@hotwired/turbo-rails`, as `turbo_with_node.rb` adds
+  it. stimulus-rails' node branch is ported verbatim, `Stimulus::Manifest`
+  included, so `controllers/index.js` is a static manifest and not an
+  `import.meta.glob`.
+- `trails server` boots the Rack app, `DevServerProxy` forwards Vite
+  requests, and `bin/vite dev` runs Vite in its own process, as in
+  vite_rails. `trailsPlugin` (Rack-inside-Vite) remains only as test
+  infrastructure.
+- Package and identifier names follow the `rails` → `trails` token rename
+  in `docs/ruby-ts-conventions.md`, compound names included: `vite_rails`
+  is `@blazetrails/vite-trails` and `ViteRails::*` is `ViteTrails::*`.
+  turbo-rails and stimulus-rails drop the suffix and become
+  `@blazetrails/turbo` and `@blazetrails/stimulus`, as `bcrypt-ruby` is
+  `@blazetrails/bcrypt`. vite_ruby is `@blazetrails/vite-assets`. The Rails
+  spelling survives only where text quotes the Ruby side.
+- dry-cli is not ported. `bin/vite` (`ViteRuby::CLI`) is built on
+  `@blazetrails/thor`, with the gem's command class names and `call`
+  bodies unchanged and one receipt on the base class and option DSL.
+- importmap-rails' and propshaft's unported-files rows are permanent, as
+  Trilogy's are. A Rails test arm that exists only for importmap or propshaft
+  is dropped. `vite_hanami`, `vite_padrino` and `vite_plugin_legacy` are not
+  ported.
+
+Ruled by the operator on 2026-11-13.
+
 ## An adapter file is loaded by an awaited step (`ConnectionAdapters.resolve`'s `require`)
 
 Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#an-adapter-file-is-loaded-by-an-awaited-step-connectionadaptersresolves-require).
