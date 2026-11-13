@@ -19,7 +19,7 @@ import {
   rbObjDup,
   rbModName,
 } from "@blazetrails/ruby-compat";
-import { MissingController } from "../../action-dispatch.js";
+import { MissingController } from "../action-dispatch.js";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,

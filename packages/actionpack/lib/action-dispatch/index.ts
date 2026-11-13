@@ -26,7 +26,7 @@ export {
 } from "./routing/index.js";
 
 export { Request } from "./http/request.js";
-export { MissingController } from "../action-dispatch.js";
+export { MissingController } from "./action-dispatch.js";
 export { Response, type CookieOptions } from "./http/response.js";
 export {
   Parameters,
