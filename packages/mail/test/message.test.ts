@@ -2,7 +2,10 @@ import type {} from "@blazetrails/vitest-matchers";
 import { DateTime } from "@blazetrails/date";
 import {
   binaryBytes,
+  chomp,
   Dir,
+  Encoding,
+  rbObjEncoding,
   constSet,
   IO,
   NoMethodError,
@@ -26,6 +29,30 @@ import { Part } from "../lib/part.js";
 import { PartsList } from "../lib/parts-list.js";
 import { Utilities } from "../lib/utilities.js";
 import { YAML } from "../lib/yaml.js";
+
+const { headerNew, bodyNew } = vi.hoisted(() => ({ headerNew: vi.fn(), bodyNew: vi.fn() }));
+
+vi.mock("../lib/header.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../lib/header.js")>();
+  class Header extends original.Header {
+    constructor(...args: ConstructorParameters<typeof original.Header>) {
+      super(...args);
+      headerNew(...args);
+    }
+  }
+  return { ...original, Header };
+});
+
+vi.mock("../lib/body.js", async (importOriginal) => {
+  const original = await importOriginal<typeof import("../lib/body.js")>();
+  class Body extends original.Body {
+    constructor(...args: ConstructorParameters<typeof original.Body>) {
+      super(...args);
+      bodyNew(...args);
+    }
+  }
+  return { ...original, Body };
+});
 
 class DeliveryAgent {
   static deliverMail(_mail: Message, block: () => unknown): unknown {
@@ -151,8 +178,8 @@ describe("Mail::Message", () => {
       ).resolves.not.toThrow();
     });
 
-    it("should be able to parse an email with a funky date header", async () => {
-      await readFixture("emails", "error_emails", "bad_date_header2.eml");
+    it("should be able to parse an email with a funky date header", () => {
+      expect(() => readFixture("emails", "error_emails", "bad_date_header2.eml"));
     });
 
     it("should be able to invoke subject on a funky subject header", async () => {
@@ -193,8 +220,7 @@ describe("Mail::Message", () => {
       const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
       try {
         (await readFixture("emails", "plain_emails", "raw_email_incorrect_header.eml")).toString();
-        expect(write).toHaveBeenCalledOnce();
-        expect(write).toHaveBeenCalledWith(
+        expect(write).toHaveBeenCalledExactlyOnceWith(
           'WARNING: Ignoring unparsable header "quite Delivered-To: xxx@xxx.xxx": invalid header name syntax: "quite Delivered-To"\n',
         );
       } finally {
@@ -424,31 +450,37 @@ describe("Mail::Message", () => {
     });
 
     it("should give the header class the header to parse", () => {
-      const mail = new Message(basicEmail());
-      expect(mail.header().rawSource).toBe("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
-      expect(mail.header().charset).toBe("UTF-8");
+      headerNew.mockClear();
+      new Message(basicEmail());
+      expect(headerNew).toHaveBeenCalledWith("To: mikel\r\nFrom: bob\r\nSubject: Hello!", "UTF-8");
     });
 
     it("should give the header class the header to parse even if there is no body", () => {
-      const mail = new Message("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
-      expect(mail.header().rawSource).toBe("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
-      expect(mail.header().charset).toBe("UTF-8");
+      headerNew.mockClear();
+      new Message("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
+      expect(headerNew).toHaveBeenCalledWith("To: mikel\r\nFrom: bob\r\nSubject: Hello!", "UTF-8");
     });
 
     it("should give the body class the body to parse", () => {
+      bodyNew.mockClear();
       const mail = new Message(basicEmail());
-      expect(mail.body().rawSource).toBe("email message\r\n");
+      mail.body();
+      expect(bodyNew).toHaveBeenCalledWith("email message\r\n");
     });
 
     it("should still ask the body for a new instance even though these is nothing to parse, yet", () => {
-      const mail = new Message("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
-      expect(mail.body()).toBeInstanceOf(Body);
+      bodyNew.mockClear();
+      new Message("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
+      expect(bodyNew).toHaveBeenCalled();
     });
 
     it("should give the header the part before the line without spaces and the body the part without", () => {
+      headerNew.mockClear();
+      bodyNew.mockClear();
       const mail = new Message("To: mikel\r\n\r\nG'Day!");
-      expect(mail.header().rawSource).toBe("To: mikel");
-      expect(mail.body().rawSource).toBe("G'Day!");
+      mail.body();
+      expect(headerNew).toHaveBeenCalledWith("To: mikel", "UTF-8");
+      expect(bodyNew).toHaveBeenCalledWith("G'Day!");
     });
 
     it("should allow for whitespace at the start of the email", () => {
@@ -465,22 +497,33 @@ describe("Mail::Message", () => {
 
     it("should parse non-UTF8 sources", async () => {
       const rawMessage = await readRawFixture("emails", "multi_charset", "japanese_iso_2022.eml");
+      const originalEncoding = rbObjEncoding(rawMessage);
       const mail = Mail.new(rawMessage);
       expect([...(mail.to() as string[])]).toEqual(["raasdnil@gmail.com"]);
       expect(mail.decoded()).toBe("すみません。\n\n");
+      expect(rbObjEncoding(rawMessage)).toBe(originalEncoding);
     });
 
     it("should parse sources with charsets that we know but Ruby doesn't", async () => {
       const rawMessage = await readRawFixture("emails", "multi_charset", "ks_c_5601-1987.eml");
+      const originalEncoding = rbObjEncoding(rawMessage);
       const mail = Mail.new(rawMessage);
-      expect((mail.decoded() as string).replace(/\r?\n$/, "")).toBe("스티해");
+      expect(chomp(mail.decoded() as string)).toBe("스티해");
+      expect(rbObjEncoding(rawMessage)).toBe(originalEncoding);
     });
 
     it("should be able to normalize CRLFs on non-UTF8 encodings", async () => {
       const mail = Mail.new(
         await readRawFixture("emails", "multi_charset", "japanese_shift_jis.eml"),
       );
-      expect(mail.rawSource).toBeInstanceOf(Uint8Array);
+      expect(rbObjEncoding(mail.rawSource)).toBe(Encoding.BINARY);
+    });
+
+    it("should be able to normalize CRLFs on non-UTF8 encodings", async () => {
+      const mail = Mail.new(
+        await readRawFixture("emails", "multi_charset", "japanese_shift_jis.eml"),
+      );
+      expect(rbObjEncoding(mail.rawSource)).toBe(Encoding.BINARY);
     });
   });
 
@@ -2031,6 +2074,32 @@ describe("Mail::Message", () => {
     });
 
     describe("decoding bodies", () => {
+      it("should not change a body on decode if not given an encoding type to decode", () => {
+        const mail = Mail.new(function (this: Message) {
+          this.body("The=3Dbody");
+        });
+        expect(mail.body().decoded()).toBe("The=3Dbody");
+        expect(mail.body().encoded()).toBe("The=3Dbody");
+      });
+
+      it("should change a body on decode if given an encoding type to decode", () => {
+        const mail = Mail.new(function (this: Message) {
+          this.contentTransferEncoding("quoted-printable");
+          this.body("The=3Dbody");
+        });
+        expect(mail.body().decoded()).toEqual(binaryBytes("The=body"));
+        expect(mail.body().encoded()).toBe("The=3Dbody=\r\n");
+      });
+
+      it("should change a body on decode if given an encoding type to decode", () => {
+        const mail = Mail.new(function (this: Message) {
+          this.contentTransferEncoding("base64");
+          this.body("VGhlIGJvZHk=\n");
+        });
+        expect(mail.body().decoded()).toEqual(binaryBytes("The body"));
+        expect(mail.body().encoded()).toBe("VGhlIGJvZHk=\r\n");
+      });
+
       it("should not strip the raw mail source in case the trailing \\r\\n is meaningful", () => {
         expect(
           Mail.new(
