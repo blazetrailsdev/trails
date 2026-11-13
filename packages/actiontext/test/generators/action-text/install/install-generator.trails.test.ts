@@ -11,7 +11,7 @@ class Generator extends InstallGenerator {
   };
 }
 
-Generator.sourceRoot(InstallGenerator._sourceRoot);
+Generator.sourceRoot(InstallGenerator._sourceRoot!);
 
 let commands: string[];
 
