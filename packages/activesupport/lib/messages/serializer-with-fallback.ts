@@ -5,6 +5,9 @@ import {
   fetch,
   Marshal,
   RuntimeError,
+  extend,
+  include,
+  rbCallSuper,
   rbRegMatchP,
   rbStrStartWith,
 } from "@blazetrails/ruby-compat";
@@ -48,56 +51,75 @@ export interface Serializer {
   detectFormat(dumped: string | Uint8Array): Format | undefined;
   /** @internal */
   fallback(format: Format): boolean;
-}
-
-function load(this: Serializer, dumped: string | Uint8Array): unknown {
-  const format = this.detectFormat(dumped);
-
-  if (format === this.format()) {
-    return this._load(dumped);
-  } else if (format && this.fallback(format)) {
-    const payload: Record<string, unknown> = {
-      serializer: SERIALIZERS.key(this),
-      fallback: format,
-      serialized: dumped,
-    };
-    return Notifications.instrument(
-      "message_serializer_fallback.active_support",
-      payload,
-      (p) => (p.deserialized = SERIALIZERS.get(format)!._load(dumped)),
-    );
-  } else {
-    throw new RuntimeError("Unsupported serialization format");
-  }
+  /** @internal */
+  isAvailable?(): boolean;
 }
 
 /** @internal */
-function detectFormat(dumped: string | Uint8Array): Format | undefined {
-  if (messagePackWithFallback.dumped(dumped)) {
-    return "message_pack";
-  } else if (marshalWithFallback.dumped(dumped)) {
-    return "marshal";
-  } else if (jsonWithFallback.dumped(dumped)) {
-    return "json";
-  }
-  return undefined;
-}
+export const SerializerWithFallback = {
+  load(this: Serializer, dumped: string | Uint8Array): unknown {
+    const format = this.detectFormat(dumped);
+
+    if (format === this.format()) {
+      return this._load(dumped);
+    } else if (format && this.fallback(format)) {
+      const payload: Record<string, unknown> = {
+        serializer: SERIALIZERS.key(this),
+        fallback: format,
+        serialized: dumped,
+      };
+      return Notifications.instrument(
+        "message_serializer_fallback.active_support",
+        payload,
+        (p) => (p.deserialized = SERIALIZERS.get(format)!._load(dumped)),
+      );
+    } else {
+      throw new RuntimeError("Unsupported serialization format");
+    }
+  },
+
+  /** @internal */
+  detectFormat(dumped: string | Uint8Array): Format | undefined {
+    if (MessagePackWithFallback.dumped(dumped)) {
+      return "message_pack";
+    } else if (MarshalWithFallback.dumped(dumped)) {
+      return "marshal";
+    } else if (JsonWithFallback.dumped(dumped)) {
+      return "json";
+    }
+    return undefined;
+  },
+
+  /** @internal */
+  fallback(format: Format): boolean {
+    return format !== "marshal";
+  },
+} as {
+  load(dumped: string | Uint8Array): unknown;
+  detectFormat(dumped: string | Uint8Array): Format | undefined;
+  fallback(format: Format): boolean;
+  SERIALIZERS: Hash<Format, Serializer>;
+  get(format: string): Serializer;
+  AllowMarshal: { fallback(format: Format): boolean };
+  MarshalWithFallback: Serializer;
+  JsonWithFallback: Serializer;
+  JsonWithFallbackAllowMarshal: Serializer;
+  MessagePackWithFallback: Serializer;
+  MessagePackWithFallbackAllowMarshal: Serializer;
+};
 
 /** @internal */
-function fallback(format: Format): boolean {
-  return format !== "marshal";
-}
-
-function allowMarshalFallback(format: Format): boolean {
-  return fallback(format) || format === "marshal";
-}
-
-const serializerWithFallback = { load, detectFormat, fallback };
+export const AllowMarshal = {
+  /** @internal */
+  fallback(this: Serializer, format: Format): boolean {
+    return (rbCallSuper(this, AllowMarshal.fallback, format) as boolean) || format === "marshal";
+  },
+};
+SerializerWithFallback.AllowMarshal = AllowMarshal;
 
 const MARSHAL_SIGNATURE = "\x04\x08";
 
-const marshalWithFallback: Serializer = {
-  ...serializerWithFallback,
+export const MarshalWithFallback = {
   format(): Format {
     return "marshal";
   },
@@ -113,12 +135,14 @@ const marshalWithFallback: Serializer = {
   dumped(dumped: string | Uint8Array): boolean {
     return rbStrStartWith(dumped, MARSHAL_SIGNATURE);
   },
-};
+} as Serializer;
+include(MarshalWithFallback, SerializerWithFallback);
+extend(MarshalWithFallback, MarshalWithFallback);
+SerializerWithFallback.MarshalWithFallback = MarshalWithFallback;
 
 const JSON_START_WITH = /^(?:[{["]|-?\d|true|false|null)/;
 
-const jsonWithFallback: Serializer = {
-  ...serializerWithFallback,
+export const JsonWithFallback = {
   format(): Format {
     return "json";
   },
@@ -135,18 +159,30 @@ const jsonWithFallback: Serializer = {
     return rbRegMatchP(JSON_START_WITH, dumped);
   },
 
+  /** @internal */
   detectFormat(dumped: string | Uint8Array): Format | undefined {
-    return detectFormat(dumped) ?? "json";
+    let format: Format | undefined;
+    if (MessagePackWithFallback.dumped(dumped)) {
+      format = "message_pack";
+    } else if (MarshalWithFallback.dumped(dumped)) {
+      format = "marshal";
+    } else if (JsonWithFallback.dumped(dumped)) {
+      format = "json";
+    }
+    return format ?? "json";
   },
-};
+} as Serializer;
+include(JsonWithFallback, SerializerWithFallback);
+extend(JsonWithFallback, JsonWithFallback);
+SerializerWithFallback.JsonWithFallback = JsonWithFallback;
 
-const jsonWithFallbackAllowMarshal: Serializer = {
-  ...jsonWithFallback,
-  fallback: allowMarshalFallback,
-};
+export const JsonWithFallbackAllowMarshal = {} as Serializer;
+include(JsonWithFallbackAllowMarshal, JsonWithFallback);
+include(JsonWithFallbackAllowMarshal, AllowMarshal);
+extend(JsonWithFallbackAllowMarshal, JsonWithFallbackAllowMarshal);
+SerializerWithFallback.JsonWithFallbackAllowMarshal = JsonWithFallbackAllowMarshal;
 
-const messagePackWithFallback: Serializer = {
-  ...serializerWithFallback,
+export const MessagePackWithFallback = {
   format(): Format {
     return "message_pack";
   },
@@ -159,36 +195,38 @@ const messagePackWithFallback: Serializer = {
     return ActiveSupport.MessagePack!.load(dumped);
   },
 
-  dumped(dumped: string | Uint8Array): boolean {
-    return isAvailable() && ActiveSupport.MessagePack!.isSignature(dumped);
+  dumped(this: Serializer, dumped: string | Uint8Array): boolean {
+    return this.isAvailable!() && ActiveSupport.MessagePack!.isSignature(dumped);
   },
-};
 
-/**
- * @missingRailsCall require — PERMANENT
- * @internal
- */
-function isAvailable(): boolean {
-  return ActiveSupport.MessagePack !== undefined;
-}
+  /**
+   * @missingRailsCall silence_warnings — PERMANENT
+   * @internal
+   */
+  isAvailable(): boolean {
+    return ActiveSupport.MessagePack !== undefined;
+  },
+} as Serializer;
+include(MessagePackWithFallback, SerializerWithFallback);
+extend(MessagePackWithFallback, MessagePackWithFallback);
+SerializerWithFallback.MessagePackWithFallback = MessagePackWithFallback;
 
-const messagePackWithFallbackAllowMarshal: Serializer = {
-  ...messagePackWithFallback,
-  fallback: allowMarshalFallback,
-};
+export const MessagePackWithFallbackAllowMarshal = {} as Serializer;
+include(MessagePackWithFallbackAllowMarshal, MessagePackWithFallback);
+include(MessagePackWithFallbackAllowMarshal, AllowMarshal);
+extend(MessagePackWithFallbackAllowMarshal, MessagePackWithFallbackAllowMarshal);
+SerializerWithFallback.MessagePackWithFallbackAllowMarshal = MessagePackWithFallbackAllowMarshal;
 
 /** @internal */
 export const SERIALIZERS = new Hash<Format, Serializer>()
-  .set("marshal", marshalWithFallback)
-  .set("json", jsonWithFallback)
-  .set("json_allow_marshal", jsonWithFallbackAllowMarshal)
-  .set("message_pack", messagePackWithFallback)
-  .set("message_pack_allow_marshal", messagePackWithFallbackAllowMarshal);
+  .set("marshal", MarshalWithFallback)
+  .set("json", JsonWithFallback)
+  .set("json_allow_marshal", JsonWithFallbackAllowMarshal)
+  .set("message_pack", MessagePackWithFallback)
+  .set("message_pack_allow_marshal", MessagePackWithFallbackAllowMarshal);
 
-/** @internal */
-export const SerializerWithFallback = {
-  SERIALIZERS,
-
+SerializerWithFallback.SERIALIZERS = SERIALIZERS;
+extend(SerializerWithFallback, {
   /** @missingRailsCall require — PERMANENT */
   get(format: string): Serializer {
     if (format.includes("message_pack") && ActiveSupport.MessagePack === undefined) {
@@ -197,4 +235,4 @@ export const SerializerWithFallback = {
 
     return fetch(SERIALIZERS, format as Format) as Serializer;
   },
-};
+});

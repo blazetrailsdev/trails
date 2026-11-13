@@ -98,8 +98,10 @@ records for an adapter file, and the answer is the same: **the `require` is
 before the synchronous reader.** As a consequence:
 
 - `get` peeks `ActiveSupport.MessagePack` and raises `LoadError` while it is
-  unseated, and `isAvailable` answers whether it is seated. Their
-  `@missingRailsCall require` receipts are `PERMANENT`.
+  unseated, and `isAvailable` answers whether it is seated. `get`'s
+  `@missingRailsCall require` and `isAvailable`'s
+  `@missingRailsCall silence_warnings` (the block that wraps its `require`)
+  are `PERMANENT`.
 - A booted application awaits the load in trailties. `initialize_cache`, the
   first initializer to look a serializer up, makes `available?`'s silenced,
   rescued attempt once for every application (the seated constant is its

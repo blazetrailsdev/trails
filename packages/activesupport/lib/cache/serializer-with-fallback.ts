@@ -38,20 +38,20 @@ export interface Serializer {
 
 function load(dumped: unknown): unknown {
   if (typeof dumped === "string" || dumped instanceof Uint8Array) {
-    if (messagePackWithFallback.dumped(dumped)) {
-      return messagePackWithFallback._load(dumped);
-    } else if (marshal71WithFallback.dumped(dumped)) {
-      return marshal71WithFallback._load(dumped);
-    } else if (marshal70WithFallback.dumped(dumped)) {
-      return marshal70WithFallback._load(dumped);
+    if (MessagePackWithFallback.dumped(dumped)) {
+      return MessagePackWithFallback._load(dumped);
+    } else if (Marshal71WithFallback.dumped(dumped)) {
+      return Marshal71WithFallback._load(dumped);
+    } else if (Marshal70WithFallback.dumped(dumped)) {
+      return Marshal70WithFallback._load(dumped);
     } else {
       Store.logger?.warn(
         `Unrecognized payload prefix ${rbInspect(byteslice(b(dumped), 0))}; deserializing as nil`,
       );
       return null;
     }
-  } else if (passthroughWithFallback.dumped(dumped as Entry)) {
-    return passthroughWithFallback._load(dumped as Entry);
+  } else if (PassthroughWithFallback.dumped(dumped as Entry)) {
+    return PassthroughWithFallback._load(dumped as Entry);
   } else {
     Store.logger?.warn(
       `Unrecognized payload class ${rbModToS(rbObjClass(dumped))}; deserializing as nil`,
@@ -76,6 +76,10 @@ export const SerializerWithFallback = { load, marshalLoad } as {
   marshalLoad(payload: string | Uint8Array): unknown;
   SERIALIZERS: Hash<string, Serializer>;
   get(format: string): Serializer;
+  PassthroughWithFallback: Serializer;
+  Marshal70WithFallback: Serializer;
+  Marshal71WithFallback: Serializer;
+  MessagePackWithFallback: Serializer;
 };
 
 const MARK_UNCOMPRESSED = "\x00";
@@ -83,7 +87,7 @@ const MARK_COMPRESSED = "\x01";
 
 const MARSHAL_SIGNATURE = "\x04\x08";
 
-const passthroughWithFallback = {
+export const PassthroughWithFallback = {
   dump(entry: Entry | unknown): Entry {
     return entry as Entry;
   },
@@ -100,10 +104,11 @@ const passthroughWithFallback = {
     return dumped instanceof Entry;
   },
 } as Serializer;
-include(passthroughWithFallback, SerializerWithFallback);
-extend(passthroughWithFallback, passthroughWithFallback);
+include(PassthroughWithFallback, SerializerWithFallback);
+extend(PassthroughWithFallback, PassthroughWithFallback);
+SerializerWithFallback.PassthroughWithFallback = PassthroughWithFallback;
 
-const marshal70WithFallback = {
+export const Marshal70WithFallback = {
   dump(entry: Entry | unknown): Uint8Array {
     return rbStrPlus(
       b(MARK_UNCOMPRESSED),
@@ -137,10 +142,11 @@ const marshal70WithFallback = {
     );
   },
 } as Serializer;
-include(marshal70WithFallback, SerializerWithFallback);
-extend(marshal70WithFallback, marshal70WithFallback);
+include(Marshal70WithFallback, SerializerWithFallback);
+extend(Marshal70WithFallback, Marshal70WithFallback);
+SerializerWithFallback.Marshal70WithFallback = Marshal70WithFallback;
 
-const marshal71WithFallback = {
+export const Marshal71WithFallback = {
   dump(value: Entry | unknown): Uint8Array {
     return Marshal.dump(value, -1, true);
   },
@@ -153,10 +159,11 @@ const marshal71WithFallback = {
     return rbStrStartWith(dumped as string | Uint8Array, MARSHAL_SIGNATURE);
   },
 } as Serializer;
-include(marshal71WithFallback, SerializerWithFallback);
-extend(marshal71WithFallback, marshal71WithFallback);
+include(Marshal71WithFallback, SerializerWithFallback);
+extend(Marshal71WithFallback, Marshal71WithFallback);
+SerializerWithFallback.Marshal71WithFallback = Marshal71WithFallback;
 
-const messagePackWithFallback = {
+export const MessagePackWithFallback = {
   dump(value: Entry | unknown): Uint8Array {
     return ActiveSupport.MessagePack!.CacheSerializer.dump(value);
   },
@@ -172,19 +179,20 @@ const messagePackWithFallback = {
     );
   },
 
-  /** @missingRailsCall require — PERMANENT */
+  /** @missingRailsCall silence_warnings — PERMANENT */
   isAvailable(): boolean {
     return ActiveSupport.MessagePack !== undefined;
   },
 } as Serializer;
-include(messagePackWithFallback, SerializerWithFallback);
-extend(messagePackWithFallback, messagePackWithFallback);
+include(MessagePackWithFallback, SerializerWithFallback);
+extend(MessagePackWithFallback, MessagePackWithFallback);
+SerializerWithFallback.MessagePackWithFallback = MessagePackWithFallback;
 
 const SERIALIZERS = new Hash<string, Serializer>()
-  .set("passthrough", passthroughWithFallback)
-  .set("marshal_7_0", marshal70WithFallback)
-  .set("marshal_7_1", marshal71WithFallback)
-  .set("message_pack", messagePackWithFallback);
+  .set("passthrough", PassthroughWithFallback)
+  .set("marshal_7_0", Marshal70WithFallback)
+  .set("marshal_7_1", Marshal71WithFallback)
+  .set("message_pack", MessagePackWithFallback);
 
 SerializerWithFallback.SERIALIZERS = SERIALIZERS;
 extend(SerializerWithFallback, {

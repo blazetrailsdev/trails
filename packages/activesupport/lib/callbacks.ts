@@ -6,6 +6,7 @@ import {
   rbClassSuperclass,
   rbModSingletonP,
   RuntimeError,
+  Struct,
 } from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
@@ -339,12 +340,16 @@ export namespace CallTemplate {
   }
 }
 
-export interface FilterEnvironment {
-  target: object;
-  halted: boolean;
-  value: unknown;
+export class Environment extends Struct.new("target", "halted", "value") {
+  static toString(): string {
+    return "ActiveSupport::Callbacks::Filters::Environment";
+  }
+
+  declare target: object;
+  declare halted: boolean;
+  declare value: unknown;
   /** @noRailsEquivalent PERMANENT */
-  syncChain?: string;
+  declare syncChain?: string;
 }
 
 export class Before {
@@ -377,7 +382,7 @@ export class Before {
     this.name = name;
   }
 
-  call(env: FilterEnvironment): FilterEnvironment | Promise<FilterEnvironment> {
+  call(env: Environment): Environment | Promise<Environment> {
     const { target, value, halted, syncChain } = env;
     if (halted || !this.userConditions.every((c) => c(target, value))) return env;
 
@@ -458,7 +463,7 @@ export class Before {
     return env;
   }
 
-  private halt(env: FilterEnvironment): void {
+  private halt(env: Environment): void {
     env.halted = true;
     const hook = (env.target as { haltedCallbackHook?: (filter: unknown, name: string) => void })
       .haltedCallbackHook;
@@ -508,7 +513,7 @@ export class After {
     this.halting = chainConfig.skipAfterCallbacksIfTerminated ?? false;
   }
 
-  call(env: FilterEnvironment): FilterEnvironment | Promise<FilterEnvironment> {
+  call(env: Environment): Environment | Promise<Environment> {
     const { target, value, halted, syncChain } = env;
     if ((!halted || !this.halting) && this.userConditions.every((c) => c(target, value))) {
       const r = this.userCallback(target, value);
@@ -736,7 +741,7 @@ export class CallbackSequence {
     return sequence;
   }
 
-  isSkip(arg: FilterEnvironment): boolean {
+  isSkip(arg: Environment): boolean {
     if (arg.halted) return true;
     if (!this.userConditions) return false;
     return !this.userConditions.every((c) => c(arg.target, arg.value));
@@ -746,22 +751,22 @@ export class CallbackSequence {
     return !this.callTemplate;
   }
 
-  expandCallTemplate(arg: FilterEnvironment, block: (() => unknown) | null): unknown[] {
+  expandCallTemplate(arg: Environment, block: (() => unknown) | null): unknown[] {
     return this.callTemplate!.expand(arg.target, arg.value, block);
   }
 
-  invokeBefore(arg: FilterEnvironment): void | Promise<void> {
+  invokeBefore(arg: Environment): void | Promise<void> {
     return this._runFilters(this.beforeList, 0, arg);
   }
 
-  invokeAfter(arg: FilterEnvironment): void | Promise<void> {
+  invokeAfter(arg: Environment): void | Promise<void> {
     return this._runFilters(this.afterList, 0, arg);
   }
 
   private _runFilters(
     list: Array<Before | After> | null,
     start: number,
-    env: FilterEnvironment,
+    env: Environment,
   ): void | Promise<void> {
     if (!list) return;
     for (let i = start; i < list.length; i++) {
@@ -937,8 +942,9 @@ export namespace Conditionals {
   export const Value = _cond.Value;
 }
 
-const _filt = { Before, After, Around };
+const _filt = { Environment, Before, After, Around };
 export namespace Filters {
+  export const Environment = _filt.Environment;
   export const Before = _filt.Before;
   export const After = _filt.After;
   export const Around = _filt.Around;
@@ -995,7 +1001,7 @@ interface ProceedTracker {
   observed: boolean;
 }
 
-function assignYield(env: FilterEnvironment, y: unknown): void | Promise<void> {
+function assignYield(env: Environment, y: unknown): void | Promise<void> {
   if (!isThenable(y)) {
     env.value = y;
     return;
@@ -1014,7 +1020,7 @@ function assignYield(env: FilterEnvironment, y: unknown): void | Promise<void> {
 function observeProceed(
   tracker: ProceedTracker,
   r: PromiseLike<unknown>,
-  env: FilterEnvironment,
+  env: Environment,
 ): unknown {
   tracker.pending = Promise.resolve(r);
   const observed = tracker.pending.then(() => env.value);
@@ -1240,12 +1246,8 @@ function runCallbacks(
     }
     return r;
   }
-  const env: FilterEnvironment = {
-    target: this,
-    halted: false,
-    value: undefined,
-    syncChain: strict === "sync" ? callbacks.name : undefined,
-  };
+  const env = new Filters.Environment(this, false, null);
+  env.syncChain = strict === "sync" ? callbacks.name : undefined;
 
   let nextSequence = callbacks.compile(type);
   let resume: InvokeSequenceState | null = null;
