@@ -5,7 +5,6 @@ const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathnam
 
 export class InstallGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.methodAdded("createTestFiles");
   }
 
@@ -13,6 +12,8 @@ export class InstallGenerator extends Base {
     await this.template("fixtures.yml", "test/fixtures/action_text/rich_texts.yml");
   }
 }
+
+await InstallGenerator.sourceRoot(File.expandPath("templates", __dir__));
 
 Object.defineProperty(InstallGenerator, "name", {
   value: "TestUnit::Generators::InstallGenerator",

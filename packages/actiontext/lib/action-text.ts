@@ -6,6 +6,10 @@ import type { ContentAttachment } from "./attachables/content-attachment.js";
 import type { MissingAttachable } from "./attachables/missing-attachable.js";
 import type { RemoteImage } from "./attachables/remote-image.js";
 import type { Attachment } from "./attachment.js";
+import type { Attribute } from "./attribute.js";
+import type { Record as ActionTextRecord } from "./record.js";
+import type { RichText } from "./rich-text.js";
+import type { Serialization } from "./serialization.js";
 import type { AttachmentGallery } from "./attachment-gallery.js";
 import type { Caching } from "./attachments/caching.js";
 import type { Minification } from "./attachments/minification.js";
@@ -27,6 +31,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_text/attachables/remote_image": () => import("./attachables/remote-image.js"),
   "action_text/attachment": () => import("./attachment.js"),
   "action_text/attachment_gallery": () => import("./attachment-gallery.js"),
+  "action_text/attribute": () => import("./attribute.js"),
   "action_text/attachments/caching": () => import("./attachments/caching.js"),
   "action_text/attachments/minification": () => import("./attachments/minification.js"),
   "action_text/attachments/trix_conversion": () => import("./attachments/trix-conversion.js"),
@@ -35,6 +40,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_text/html_conversion": () => import("./html-conversion.js"),
   "action_text/plain_text_conversion": () => import("./plain-text-conversion.js"),
   "action_text/rendering": () => import("./rendering.js"),
+  "action_text/serialization": () => import("./serialization.js"),
   "action_text/trix_attachment": () => import("./trix-attachment.js"),
 };
 
@@ -74,12 +80,16 @@ export const ActionText = {
   Attachment?: typeof Attachment;
   AttachmentGallery?: typeof AttachmentGallery;
   Attachments: typeof Attachments;
+  Attribute?: typeof Attribute;
   Content?: typeof Content;
   ContentHelper?: typeof ContentHelper;
   Fragment?: typeof Fragment;
   HtmlConversion?: typeof HtmlConversion;
   PlainTextConversion?: typeof PlainTextConversion;
+  Record?: typeof ActionTextRecord;
   Rendering?: typeof Rendering;
+  RichText?: typeof RichText;
+  Serialization?: typeof Serialization;
   TrixAttachment?: typeof TrixAttachment;
 };
 extend(ActionText, Autoload);
@@ -88,11 +98,13 @@ constSet(TopLevel, "ActionText", ActionText);
 ActionText.autoload("Attachable");
 ActionText.autoload("Attachment");
 ActionText.autoload("AttachmentGallery");
+ActionText.autoload("Attribute");
 ActionText.autoload("Content");
 ActionText.autoload("Fragment");
 ActionText.autoload("HtmlConversion");
 ActionText.autoload("PlainTextConversion");
 ActionText.autoload("Rendering");
+ActionText.autoload("Serialization");
 ActionText.autoload("TrixAttachment");
 
 const Attachments = { name: "ActionText::Attachments", loadPath } as AutoloadModule & {

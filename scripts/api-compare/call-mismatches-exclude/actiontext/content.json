@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actiontext",
+    "tsFile": "content.ts",
+    "rubyName": "initialize",
+    "call": "order:wrap,fragmentByCanonicalizingContent",
+    "reason": "Operator ruling 2026-11-12 (RFC 0219): canonicalization is async, so the fragment is wrapped eagerly for the sync serialize coder and replaced when canonicalized resolves."
+  }
+]

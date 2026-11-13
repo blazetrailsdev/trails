@@ -6,7 +6,6 @@ const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathnam
 
 export class InstallGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
     this.methodAdded("installJavascriptDependencies");
     this.methodAdded("appendJavascriptDependencies");
     this.methodAdded("createActiontextFiles");
@@ -126,6 +125,8 @@ export class InstallGenerator extends Base {
     this.hookFor("testFramework");
   }
 }
+
+await InstallGenerator.sourceRoot(File.expandPath("templates", __dir__));
 
 Object.defineProperty(InstallGenerator, "name", {
   value: "ActionText::Generators::InstallGenerator",
