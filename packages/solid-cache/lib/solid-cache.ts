@@ -2,6 +2,7 @@ import { mattrAccessor } from "@blazetrails/activesupport";
 import { TopLevel } from "@blazetrails/ruby-compat";
 import type { Configuration } from "./configuration.js";
 import type { Connections } from "./connections.js";
+import type { Engine } from "./engine.js";
 import type { Entry } from "./entry.js";
 import type { MaglevHash } from "./maglev-hash.js";
 import type { Record } from "./record.js";
@@ -14,6 +15,7 @@ export const SolidCache = {
   executor: unknown;
   configuration: Configuration;
   Configuration?: typeof Configuration;
+  Engine?: typeof Engine;
   Connections?: typeof Connections;
   Entry?: typeof Entry;
   Record?: typeof Record;

@@ -25,6 +25,7 @@ export class Entry extends Record {
 
   static {
     constSet(SolidCache, "Entry", this);
+    constSet(this, "Encryption", Encryption);
     include(this, Encryption);
   }
 

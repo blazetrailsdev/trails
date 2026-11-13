@@ -74,6 +74,10 @@ export class Store extends CacheStore {
     include(this, Entries);
     include(this, Failsafe);
     constSet(SolidCache, "Store", this);
+    constSet(this, "Api", Api);
+    constSet(this, "Connections", Connections);
+    constSet(this, "Entries", Entries);
+    constSet(this, "Failsafe", Failsafe);
   }
 
   declare protected readEntry: (key: string, options: StoreOptions) => Promise<CacheEntry | null>;

@@ -1,4 +1,5 @@
 import { OrderedOptions, TopLevel } from "@blazetrails/activesupport";
+import { constSet } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Record } from "./record.js";
 import { SolidCache } from "./solid-cache.js";
@@ -20,6 +21,8 @@ declare module "@blazetrails/trailties/trailtie/configuration" {
  */
 export class Engine extends TrailsEngine {
   static {
+    constSet(SolidCache, "Engine", this);
+
     TrailsEngine.register(this, import.meta.dirname);
 
     this.isolateNamespace(SolidCache);

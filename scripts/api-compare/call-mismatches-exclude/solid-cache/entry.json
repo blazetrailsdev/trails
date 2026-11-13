@@ -1,0 +1,14 @@
+[
+  {
+    "package": "solid-cache",
+    "tsFile": "entry.ts",
+    "rubyName": "select_sql",
+    "call": "new",
+    "kind": "args",
+    "rubyArgs": [
+      "ref:count",
+      "str:?"
+    ],
+    "reason": "entry.rb:113 `Array.new(keys.count, \"?\")` builds a filled Array; JS's Array constructor has no fill argument, so the port writes `Array.from({ length: keys.length }, () => \"?\")`, the same n-element list of placeholders."
+  }
+]
