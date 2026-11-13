@@ -15,7 +15,8 @@ export class InboundEmailsController extends BaseController {
       return await ActionMailbox.InboundEmail.createAndExtractMessageIdBang(this.mail());
     } catch (error) {
       if (!(error instanceof ActionController.ParameterMissing)) throw error;
-      (this as unknown as { logger?: Logger }).logger?.error(`
+      (this as unknown as { logger?: Logger }).logger?.error(`${error.message}
+
 When configuring your Postmark inbound webhook, be sure to check the box
 labeled "Include raw email content in JSON payload".
 `);
