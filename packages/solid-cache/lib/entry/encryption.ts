@@ -8,10 +8,7 @@ export class Encryption {
 
   static [included](base: { encrypts(...args: Array<string | EncryptsOptions>): void }): void {
     if (SolidCache.configuration.isEncrypt()) {
-      base.encrypts(
-        "value",
-        SolidCache.configuration.encryptionContextProperties as EncryptsOptions,
-      );
+      base.encrypts("value", SolidCache.configuration.encryptionContextProperties!);
     }
   }
 }

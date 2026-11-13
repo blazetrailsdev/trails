@@ -13,7 +13,7 @@ export const Connections = {
   ): unknown {
     if (!block) return toEnum(this, "withEachConnection");
 
-    return this.connections().withEach(() => block());
+    return this.connections().withEach(block);
   },
 
   connections(this: StoreHost): ReturnType<typeof SolidCacheConnections.fromConfig> {

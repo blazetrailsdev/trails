@@ -1,4 +1,8 @@
-import { Encryptor, MessagePackMessageSerializer } from "@blazetrails/activerecord/encryption";
+import {
+  Encryptor,
+  MessagePackMessageSerializer,
+  type EncryptsOptions,
+} from "@blazetrails/activerecord/encryption";
 import { isPresent } from "@blazetrails/activesupport";
 import { ArgumentError, constSet } from "@blazetrails/ruby-compat";
 import { SolidCache } from "./solid-cache.js";
@@ -11,7 +15,7 @@ export class Configuration {
   readonly executor: unknown;
   readonly sizeEstimateSamples: number;
   readonly encrypt: unknown;
-  readonly encryptionContextProperties: Record<string, unknown> | null;
+  readonly encryptionContextProperties: EncryptsOptions | null;
 
   constructor({
     storeOptions = {},
@@ -29,7 +33,7 @@ export class Configuration {
     connectsTo?: ConnectsTo | null;
     executor?: unknown;
     encrypt?: unknown;
-    encryptionContextProperties?: Record<string, unknown> | null;
+    encryptionContextProperties?: EncryptsOptions | null;
     sizeEstimateSamples?: number;
   } = {}) {
     this.storeOptions = storeOptions;
@@ -83,7 +87,7 @@ export class Configuration {
   }
 
   /** @internal */
-  private defaultEncryptionContextProperties(): Record<string, unknown> {
+  private defaultEncryptionContextProperties(): EncryptsOptions {
     return {
       encryptor: new Encryptor({ compress: false }),
       messageSerializer: new MessagePackMessageSerializer(),
