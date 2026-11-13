@@ -186,8 +186,10 @@ export abstract class Base extends (Group as unknown as (abstract new (
     path: string | null = null,
   ): string | null | undefined | Promise<string | null | undefined> {
     if (path != null) this._sourceRoot = path;
-    if (Object.hasOwn(this, "_sourceRoot") && this._sourceRoot != null) return this._sourceRoot;
-    return this.defaultSourceRoot().then((root) => (this._sourceRoot = root));
+    if (!Object.hasOwn(this, "_sourceRoot") || this._sourceRoot == null) {
+      return this.defaultSourceRoot().then((root) => (this._sourceRoot = root));
+    }
+    return this._sourceRoot;
   }
 
   static async desc(description: string | null = null): Promise<string | null> {
