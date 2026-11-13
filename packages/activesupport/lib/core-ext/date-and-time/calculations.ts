@@ -482,10 +482,18 @@ declare module "@blazetrails/date" {
   interface Date extends Included<typeof DateAndTimeCalculations> {}
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
   interface Time extends Included<typeof DateAndTimeCalculations> {}
+  namespace Date {
+    export const DAYS_INTO_WEEK: Record<string, number>;
+  }
+  namespace Time {
+    export const DAYS_INTO_WEEK: Record<string, number>;
+  }
 }
 
 include(RubyTime, DateAndTimeCalculations);
 include(RubyDate, DateAndTimeCalculations);
+Object.assign(RubyTime, { DAYS_INTO_WEEK });
+Object.assign(RubyDate, { DAYS_INTO_WEEK });
 
 (TopLevel.DateAndTime ??= { name: "DateAndTime" }).Calculations = DateAndTimeCalculations;
 

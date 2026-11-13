@@ -233,14 +233,13 @@ declare module "@blazetrails/date" {
     export function current(): Temporal.PlainDate;
     export function beginningOfWeek(): string;
     export function setBeginningOfWeek(weekStart: string): void;
-    export const DAYS_INTO_WEEK: Record<string, number>;
   }
   interface Date {
     change(options: { year?: number; month?: number; day?: number }): Date;
   }
 }
 
-Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek, DAYS_INTO_WEEK });
+Object.assign(RubyDate, { current, beginningOfWeek, setBeginningOfWeek });
 
 Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { change });
 
