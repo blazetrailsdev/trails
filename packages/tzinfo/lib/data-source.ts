@@ -127,17 +127,17 @@ export class DataSource {
     return `#<${rbModName(this.constructor)}>`;
   }
 
+  /* eslint-disable unused-imports/no-unused-vars */
   /** @internal */
-  // eslint-disable-next-line unused-imports/no-unused-vars
   protected loadTimezoneInfo(identifier: string): TimezoneInfo {
     this.raiseInvalidDataSource("load_timezone_info");
   }
 
   /** @internal */
-  // eslint-disable-next-line unused-imports/no-unused-vars
   protected loadCountryInfo(code: string): CountryInfo {
     this.raiseInvalidDataSource("load_country_info");
   }
+  /* eslint-enable unused-imports/no-unused-vars */
 
   /** @internal */
   protected timezoneIdentifierEncoding(): Encoding {
