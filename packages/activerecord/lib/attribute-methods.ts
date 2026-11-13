@@ -761,4 +761,4 @@ export function attributeNamesForPartialInserts(
 
 ActiveRecord.AttributeMethods = AttributeMethodsNamespace;
 
-export const AttributeMethods = AttributeMethodsNamespace;
+export const AttributeMethods: typeof AttributeMethodsNamespace = AttributeMethodsNamespace;
