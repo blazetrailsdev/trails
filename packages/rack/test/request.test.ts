@@ -1874,20 +1874,22 @@ content-transfer-encoding: base64\r
     }
   });
 
-  it("handles ASCII NUL input of  bytes", () => {
-    const length = 2 ** 24;
-    const mr = MockRequest.envFor("/", {
-      REQUEST_METHOD: "POST",
-      ":input": "\0".repeat(length),
+  for (const exp of [24, 25, 26, 27]) {
+    const length = 2 ** exp;
+    it(`handles ASCII NUL input of ${length} bytes`, () => {
+      const mr = MockRequest.envFor("/", {
+        REQUEST_METHOD: "POST",
+        ":input": "\0".repeat(length),
+      });
+      const req = makeRequest(mr);
+      expect(req.queryString).toBe("");
+      expect(isEmpty(req.GET)).toBeTruthy();
+      const keys = Object.keys(req.POST);
+      expect(keys.length).toBe(1);
+      expect(keys[0].length).toBe(length - 1);
+      expect(keys[0]).toBe("\0".repeat(length - 1));
     });
-    const req = makeRequest(mr);
-    expect(req.queryString).toBe("");
-    expect(isEmpty(req.GET)).toBeTruthy();
-    const keys = Object.keys(req.POST);
-    expect(keys.length).toBe(1);
-    expect(keys[0].length).toBe(length - 1);
-    expect(keys[0]).toBe("\0".repeat(length - 1));
-  }, 60_000);
+  }
 
   it("Env sets @env on initialization", () => {
     const c = class {

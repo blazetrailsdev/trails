@@ -83,7 +83,7 @@ export class StringIO<S extends string | Uint8Array = string> {
     if (length == null) {
       const rest = this.#ptr.string.slice(this.#ptr.pos);
       this.#ptr.pos = this.#ptr.string.length;
-      return (this.#ptr.binary ? rest : strNew(Array.from(rest))) as S;
+      return (this.#ptr.binary ? rest : strNew(rest)) as S;
     }
     if (this.isEof()) {
       if (str) str.fill(0);
