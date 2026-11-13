@@ -7,7 +7,7 @@ function databaseName(): string {
   const database = String(arunit.database);
   if (database === ":memory:") {
     const worker = getEnv("VITEST_POOL_ID") ?? "1";
-    return `${import.meta.dirname}/../../../../tmp/test_actionmailbox_${worker}.sqlite3`;
+    return `${import.meta.dirname}/../storage/test_actionmailbox_${worker}.sqlite3`;
   }
   const dot = database.lastIndexOf(".");
   if (arunit.adapter !== "sqlite3" || dot < database.lastIndexOf("/")) {
