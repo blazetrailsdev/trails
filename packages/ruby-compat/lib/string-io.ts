@@ -4,6 +4,7 @@ import { IOError } from "./io-error.js";
 import { print as ioPrint, puts as ioPuts } from "./io.js";
 import { b } from "./string/b.js";
 import { strNew } from "./string/bytes.js";
+import { rbDefineAllocFunc } from "./include.js";
 
 /**
  * Ruby's `StringIO` (stdlib), the readable/writable in-memory IO that
@@ -24,28 +25,44 @@ import { strNew } from "./string/bytes.js";
  * `_parse_file` and `Rack::MockRequest` hand callers an IO.
  */
 export class StringIO<S extends string | Uint8Array = string> {
-  #string: Uint8Array;
-  #binary: boolean;
-  #pos = 0;
+  /** `DATA_PTR`, the `struct StringIO` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:36-43`). */
+  #ptr: { string: Uint8Array; binary: boolean; pos: number; enc: Encoding | null };
   #readable = true;
   #writable = true;
-  /** `ptr->enc` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1823`). */
-  #enc: Encoding | null = null;
 
   constructor(string: S = "" as S) {
-    this.#string = new Uint8Array(0);
-    this.#binary = string instanceof Uint8Array;
+    this.#ptr = {
+      string: new Uint8Array(0),
+      binary: string instanceof Uint8Array,
+      pos: 0,
+      enc: null,
+    };
     this.write(string);
-    this.#pos = 0;
+    this.#ptr.pos = 0;
+  }
+
+  /**
+   * `strio_copy` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:620`), bound to
+   * `initialize_copy` (`:1869`): the copy shares the original's struct, so
+   * both read and write one buffer and one position.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO#initialize_copy`.
+   */
+  initializeCopy(orig: StringIO<S>): this {
+    if ((this as StringIO<S>) === orig) return this;
+    this.#ptr = orig.#ptr;
+    this.#readable = orig.#readable;
+    this.#writable = orig.#writable;
+    return this;
   }
 
   string(): S {
-    const bytes = this.#string.slice();
-    return (this.#binary ? bytes : strNew(Array.from(bytes))) as S;
+    const bytes = this.#ptr.string.slice();
+    return (this.#ptr.binary ? bytes : strNew(Array.from(bytes))) as S;
   }
 
   size(): number {
-    return this.#string.length;
+    return this.#ptr.string.length;
   }
 
   /**
@@ -64,30 +81,30 @@ export class StringIO<S extends string | Uint8Array = string> {
   read(length: number, str?: Uint8Array | null): Uint8Array | null;
   read(length?: number, str?: Uint8Array | null): S | Uint8Array | null {
     if (length == null) {
-      const rest = this.#string.slice(this.#pos);
-      this.#pos = this.#string.length;
-      return (this.#binary ? rest : strNew(Array.from(rest))) as S;
+      const rest = this.#ptr.string.slice(this.#ptr.pos);
+      this.#ptr.pos = this.#ptr.string.length;
+      return (this.#ptr.binary ? rest : strNew(Array.from(rest))) as S;
     }
     if (this.isEof()) {
       if (str) str.fill(0);
       return length === 0 ? new Uint8Array(0) : null;
     }
-    const chunk = this.#string.slice(this.#pos, this.#pos + length);
-    this.#pos += chunk.length;
+    const chunk = this.#ptr.string.slice(this.#ptr.pos, this.#ptr.pos + length);
+    this.#ptr.pos += chunk.length;
     if (str) str.set(chunk.subarray(0, str.length));
     return chunk;
   }
 
   write(string: string | Uint8Array): number {
     const bytes = typeof string === "string" ? b(string) : string;
-    const end = this.#pos + bytes.length;
-    if (end > this.#string.length) {
+    const end = this.#ptr.pos + bytes.length;
+    if (end > this.#ptr.string.length) {
       const grown = new Uint8Array(end);
-      grown.set(this.#string);
-      this.#string = grown;
+      grown.set(this.#ptr.string);
+      this.#ptr.string = grown;
     }
-    this.#string.set(bytes, this.#pos);
-    this.#pos = end;
+    this.#ptr.string.set(bytes, this.#ptr.pos);
+    this.#ptr.pos = end;
     return bytes.length;
   }
 
@@ -137,11 +154,11 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:940`).
    */
   get pos(): number {
-    return this.#pos;
+    return this.#ptr.pos;
   }
 
   rewind(): number {
-    this.#pos = 0;
+    this.#ptr.pos = 0;
     return 0;
   }
 
@@ -155,8 +172,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1879`).
    */
   binmode(): this {
-    this.#enc = Encoding.ASCII_8BIT;
-    this.#binary = true;
+    this.#ptr.enc = Encoding.ASCII_8BIT;
+    this.#ptr.binary = true;
     return this;
   }
 
@@ -184,8 +201,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1801`).
    */
   setEncoding(extEnc: Encoding | string): this {
-    this.#enc = Encoding.find(extEnc) ?? Encoding.BINARY;
-    this.#binary = this.#enc === Encoding.BINARY;
+    this.#ptr.enc = Encoding.find(extEnc) ?? Encoding.BINARY;
+    this.#ptr.binary = this.#ptr.enc === Encoding.BINARY;
     return this;
   }
 
@@ -215,11 +232,11 @@ export class StringIO<S extends string | Uint8Array = string> {
    */
   gets(): S | null {
     if (this.isEof()) return null;
-    const newline = this.#string.indexOf(0x0a, this.#pos);
-    const end = newline === -1 ? this.#string.length : newline + 1;
-    const bytes = this.#string.slice(this.#pos, end);
-    this.#pos = end;
-    return (this.#binary ? bytes : strNew(Array.from(bytes))) as S;
+    const newline = this.#ptr.string.indexOf(0x0a, this.#ptr.pos);
+    const end = newline === -1 ? this.#ptr.string.length : newline + 1;
+    const bytes = this.#ptr.string.slice(this.#ptr.pos, end);
+    this.#ptr.pos = end;
+    return (this.#ptr.binary ? bytes : strNew(Array.from(bytes))) as S;
   }
 
   /**
@@ -234,7 +251,7 @@ export class StringIO<S extends string | Uint8Array = string> {
   }
 
   isEof(): boolean {
-    return this.#pos >= this.#string.length;
+    return this.#ptr.pos >= this.#ptr.string.length;
   }
 
   close(): void {
@@ -270,6 +287,8 @@ export class StringIO<S extends string | Uint8Array = string> {
     return !this.#readable && !this.#writable;
   }
 }
+
+rbDefineAllocFunc(StringIO, (klass) => new klass());
 
 StringIO.prototype.puts = ioPuts;
 StringIO.prototype.print = ioPrint;
