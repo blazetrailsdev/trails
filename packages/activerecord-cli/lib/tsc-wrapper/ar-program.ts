@@ -10,12 +10,14 @@ import type { Diagnostic, DiagnosticCategory, Program } from "typescript/unstabl
 import { tsApi } from "../type-virtualization/ts-api.js";
 import { collectBaseDescendants } from "../type-virtualization/transitive-extends-walker.js";
 import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-plugin.js";
+import { createFixtureSetsPlugin, type FixtureFile } from "./fixture-sets-plugin.js";
 
 export interface CreateArTrailsProgramOptions {
   schemaColumnsByTable?: ArModelsPluginOptions["schemaColumnsByTable"];
   schemaScopes?: ArModelsPluginOptions["schemaScopes"];
   onModel?: ArModelsPluginOptions["onModel"];
   timeZoneAwareAttributes?: boolean;
+  fixtureFiles?: readonly FixtureFile[];
 }
 
 export interface ArRemapHost {
@@ -58,6 +60,10 @@ export function createArTrailsProgram(
     onModel: opts.onModel,
     timeZoneAwareAttributes: opts.timeZoneAwareAttributes,
   });
+  const plugins = [
+    createFixtureSetsPlugin({ fixtureFiles: opts.fixtureFiles ?? [], modelRegistry }),
+    plugin,
+  ];
 
   const deltaMap = new Map<string, readonly LineDelta[]>();
   const originalTextMap = new Map<string, string>();
@@ -69,7 +75,8 @@ export function createArTrailsProgram(
       if (!plugin.extensions.some((ext) => fileName.endsWith(ext))) continue;
       const sf = program.getSourceFile(fileName);
       if (!sf || sf.isDeclarationFile) continue;
-      const result = plugin.virtualize(fileName, sf.text);
+      let result = null;
+      for (const p of plugins) if ((result = p.virtualize(fileName, sf.text))) break;
       if (!result) continue;
       layer.push([fileName, result.ts]);
       originalTextMap.set(fileName, sf.text);
@@ -259,6 +266,7 @@ export interface CreateArSolutionBuilderOptions {
   schemaScopes?: ArModelsPluginOptions["schemaScopes"];
   onModel?: ArModelsPluginOptions["onModel"];
   timeZoneAwareAttributes?: boolean;
+  fixtureFiles?: readonly FixtureFile[];
 }
 
 type Ts5Diagnostic = Parameters<NonNullable<TrailsBuildOptions["onDiagnostic"]>>[0];
@@ -278,6 +286,7 @@ export function createArSolutionBuilder(
         options.configFilePath as string,
       );
       return [
+        createFixtureSetsPlugin({ fixtureFiles: opts.fixtureFiles ?? [], modelRegistry }),
         createArModelsPlugin({
           baseNames: [...baseNames],
           modelRegistry,

@@ -114,9 +114,9 @@ export const ClassMethods = {
 
 type BaseClass = typeof Base;
 
-export type FixtureSetAccessor<T> = {
-  (fixtureName: string, forceReload?: true | ":reload"): T | Promise<T>;
-  (...fixtureNames: unknown[]): Array<T | Promise<T>>;
+export type FixtureSetAccessor<T, L extends string = string> = {
+  (fixtureName: L, forceReload?: true | ":reload"): T | Promise<T>;
+  (...fixtureNames: string extends L ? unknown[] : (L | true | ":reload")[]): Array<T | Promise<T>>;
 };
 
 const alreadyLoadedFixtures = new Map<unknown[], Record<string, FixtureSet>>();

@@ -13,7 +13,6 @@ function header(this: ScaffoldGenerator) {
   const root = "../".repeat(this.controllerClassPath().length + 1);
   const preamble = `import { describe, it } from "vitest";
 import { IntegrationTest } from "@blazetrails/actionpack";
-import type { FixtureSetAccessor } from "@blazetrails/activerecord/test-fixtures";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";
@@ -21,7 +20,6 @@ import "${root}test-helper.js";
 
 export class ${testClassName} extends IntegrationTest {
   declare "@${singular}": ${modelClassName};
-  declare ${fixtureName}: FixtureSetAccessor<${modelClassName}>;
 
   static {
     constSet(${owner}, "${testClassName}", this);
