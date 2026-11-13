@@ -60,7 +60,7 @@ export class QueueSelector {
 
   /** @internal */
   private async allQueues(): Promise<string[]> {
-    return (await this.relation.distinct().pluck("queue_name")) as string[];
+    return await this.relation.distinct().pluck("queue_name");
   }
 
   /** @internal */
@@ -72,13 +72,13 @@ export class QueueSelector {
   private async prefixedNames(): Promise<string[]> {
     if (this.prefixes().length === 0) return [];
     else {
-      return (await this.relation
+      return await this.relation
         .where(
           Array(this.prefixes().length).fill("queue_name LIKE ?").join(" OR "),
           ...this.prefixes(),
         )
         .distinct()
-        .pluck("queue_name")) as string[];
+        .pluck("queue_name");
     }
   }
 
@@ -101,7 +101,7 @@ export class QueueSelector {
 
   /** @internal */
   private async pausedQueues(): Promise<string[]> {
-    return (this._pausedQueues ??= (await Pause.all().pluck("queue_name")) as string[]);
+    return (this._pausedQueues ??= await Pause.all().pluck("queue_name"));
   }
 
   /** @internal */

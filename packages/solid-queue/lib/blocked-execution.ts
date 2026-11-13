@@ -30,10 +30,7 @@ export class BlockedExecution extends Execution {
 
   static async unblock(limit: number): Promise<unknown> {
     return await SolidQueue.instrument("release_many_blocked", { limit }, async (payload) => {
-      const concurrencyKeys = (await this.expired()
-        .distinct()
-        .limit(limit)
-        .pluck("concurrency_key")) as string[];
+      const concurrencyKeys = await this.expired().distinct().limit(limit).pluck("concurrency_key");
       return (payload["size"] = await this.releaseMany(await this.releasable(concurrencyKeys)));
     });
   }
@@ -63,7 +60,7 @@ export class BlockedExecution extends Execution {
   /** @internal */
   private static async releasable(concurrencyKeys: string[]): Promise<string[]> {
     const semaphores = Object.fromEntries(
-      (await Semaphore.where({ key: concurrencyKeys }).pluck("key", "value")) as [string, number][],
+      await Semaphore.where({ key: concurrencyKeys }).pluck("key", "value"),
     );
 
     const keys = [
