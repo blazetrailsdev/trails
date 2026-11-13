@@ -109,10 +109,7 @@ export class EnumType extends ValueType<string> {
   }
 }
 
-/**
- * @inventedArm if — PERMANENT
- * @noRailsEquivalent PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 function enumMethodNamesFor(valueMethodName: string): {
   predicateName: string;
   bangName: string;

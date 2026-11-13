@@ -1058,7 +1058,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /**
    * @internal
-   * @inventedArm if — PERMANENT
    * @missingRailsCall busy_handler — PERMANENT
    * @inventedArm setBusyTimeout — PERMANENT
    * @inventedArm retryBusy — PERMANENT
