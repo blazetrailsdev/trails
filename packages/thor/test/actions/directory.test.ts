@@ -14,7 +14,7 @@ class WhinyGenerator extends Group {
     include(this, Actions);
   }
 
-  static async sourceRoot(): Promise<string> {
+  static sourceRoot(): string {
     return File.expandPath(sourceRoot());
   }
 

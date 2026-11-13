@@ -17,7 +17,7 @@ const __FILE__ = decodeURIComponent(
 type ActionsGroupClass = GroupClass & {
   addRuntimeOptionsBang(): void;
   sourcePaths(): string[];
-  sourceRoot(path?: string | null): Promise<string | null>;
+  sourceRoot(path?: string | null): string | null;
 };
 
 type ActionsGroup = {
@@ -46,7 +46,7 @@ export class MyCounter extends Group {
 
   static {
     const klass = this as unknown as ActionsGroupClass;
-    void klass.sourceRoot(File.expandPath(File.dirname(__FILE__)));
+    klass.sourceRoot(File.expandPath(File.dirname(__FILE__)));
     klass.sourcePaths().push(File.expandPath("broken", File.dirname(__FILE__)));
 
     klass.argument("first", { type: "numeric" });
@@ -116,7 +116,7 @@ export class ClearCounter extends MyCounter {
     klass.removeClassOption("third");
   }
 
-  static async sourceRoot(): Promise<string> {
+  static sourceRoot(): string {
     return File.expandPath(File.join(File.dirname(__FILE__), "bundle"));
   }
 }
@@ -160,7 +160,7 @@ export class WhinyGenerator extends Group {
     include(this, Actions);
   }
 
-  static async sourceRoot(): Promise<string> {
+  static sourceRoot(): string {
     return File.expandPath(File.dirname(__FILE__));
   }
 
