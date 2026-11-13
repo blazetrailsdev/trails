@@ -5,6 +5,10 @@ import { ActionText } from "./action-text.js";
 import type { EncryptedRichText } from "./encrypted-rich-text.js";
 
 type EncryptionHost = Base & {
+  encryptRichTexts(): Promise<EncryptedRichText[]>;
+  decryptRichTexts(): Promise<EncryptedRichText[]>;
+  hasEncryptedRichTexts(): Promise<boolean>;
+  encryptableRichTexts(): Promise<EncryptedRichText[]>;
   /** @internal */
   _encryptableRichTexts?: EncryptedRichText[];
 };
@@ -12,34 +16,34 @@ type EncryptionHost = Base & {
 async function encrypt(this: EncryptionHost): Promise<unknown> {
   return await this.transaction(async () => {
     await rbCallSuper(this, encrypt);
-    if (await hasEncryptedRichTexts.call(this)) return await encryptRichTexts.call(this);
+    if (await this.hasEncryptedRichTexts()) return await this.encryptRichTexts();
   });
 }
 
 async function decrypt(this: EncryptionHost): Promise<unknown> {
   return await this.transaction(async () => {
     await rbCallSuper(this, decrypt);
-    if (await hasEncryptedRichTexts.call(this)) return await decryptRichTexts.call(this);
+    if (await this.hasEncryptedRichTexts()) return await this.decryptRichTexts();
   });
 }
 
 /** @internal */
 async function encryptRichTexts(this: EncryptionHost): Promise<EncryptedRichText[]> {
-  const richTexts = await encryptableRichTexts.call(this);
+  const richTexts = await this.encryptableRichTexts();
   for (const richText of richTexts) await richText.encrypt();
   return richTexts;
 }
 
 /** @internal */
 async function decryptRichTexts(this: EncryptionHost): Promise<EncryptedRichText[]> {
-  const richTexts = await encryptableRichTexts.call(this);
+  const richTexts = await this.encryptableRichTexts();
   for (const richText of richTexts) await richText.decrypt();
   return richTexts;
 }
 
 /** @internal */
 async function hasEncryptedRichTexts(this: EncryptionHost): Promise<boolean> {
-  return isPresent(await encryptableRichTexts.call(this));
+  return isPresent(await this.encryptableRichTexts());
 }
 
 /** @internal */
@@ -48,7 +52,7 @@ async function encryptableRichTexts(this: EncryptionHost): Promise<EncryptedRich
   const klass = this.constructor as typeof Base & { richTextAssociationNames(): string[] };
   const records = await Promise.all(
     klass.richTextAssociationNames().map(async (attributeName) => {
-      return await (this.association(attributeName) as unknown as { reader: unknown }).reader;
+      return await (this as unknown as Record<string, unknown>)[attributeName];
     }),
   );
   return (this._encryptableRichTexts = filterMap(records, (record) => record).filter(
