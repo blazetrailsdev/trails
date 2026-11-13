@@ -145,4 +145,9 @@ export class Store extends CacheStore {
   static isSupportsCacheVersioning(): boolean {
     return true;
   }
+
+  /** @inlinedFrom SolidCache::Store::Connections#setup! solid_cache/v1.0.7/lib/solid_cache/store/connections.rb:42-44 */
+  setupBang(): void {
+    this.connections();
+  }
 }

@@ -38,12 +38,13 @@ const CITATION = /^([\w.-]+)\/[\w.-]+\/(\S+)\.rb:\d+-\d+$/;
 
 const MODULE_METHOD = new RegExp(`^${OWNER}#([a-z_]\\w*[?!=]?)$`);
 
-/** The TS spellings of a Ruby method name: `content_tag` is `contentTag`, `valid?` `isValid`. */
+/** The TS spellings of a Ruby method name: `content_tag` is `contentTag`, `valid?` `isValid`, `setup!` `setupBang`. */
 function tsSpellings(rubyName) {
   const camel = rubyName.replace(/[?!=]$/, "").replace(/_+([a-z0-9])/g, (_, c) => c.toUpperCase());
   const capital = camel.charAt(0).toUpperCase() + camel.slice(1);
   if (rubyName.endsWith("?")) return [camel, `is${capital}`];
   if (rubyName.endsWith("=")) return [camel, `set${capital}`];
+  if (rubyName.endsWith("!")) return [`${camel}Bang`];
   return [camel];
 }
 

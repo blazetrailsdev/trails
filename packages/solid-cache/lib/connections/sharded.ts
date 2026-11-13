@@ -3,6 +3,7 @@ import { Record } from "../record.js";
 
 export class Sharded {
   readonly names: string[];
+  readonly nodes: string[] | null = null;
   readonly consistentHash: MaglevHash;
 
   constructor(names: string[]) {
