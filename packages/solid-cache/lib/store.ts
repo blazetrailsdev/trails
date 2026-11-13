@@ -8,6 +8,7 @@ import type { EventPayload } from "@blazetrails/activesupport/notifications/inst
 import {
   ArgumentError,
   constSet,
+  fetch,
   include,
   rbModName,
   TopLevel,
@@ -112,10 +113,12 @@ export class Store extends CacheStore {
       } else {
         deprecator().warn(":clusters is deprecated, use :shards instead.");
       }
-      this.shardOptions = clusters[0].shards ?? null;
+      this.shardOptions = fetch<{ shards?: string[] }[]>(options, "clusters")[0].shards ?? null;
     } else if (isPresent(options.cluster)) {
       deprecator().warn(":cluster is deprecated, use :shards instead.");
-      this.shardOptions = ((options.cluster ?? {}) as { shards?: string[] }).shards ?? null;
+      this.shardOptions =
+        ((Object.hasOwn(options, "cluster") ? options.cluster : {}) as { shards?: string[] })
+          .shards ?? null;
     } else {
       this.shardOptions = Object.hasOwn(options, "shards") ? (options.shards as string[]) : null;
     }
