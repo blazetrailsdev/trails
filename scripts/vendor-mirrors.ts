@@ -35,7 +35,9 @@ function portedIn(name: string, portedBy: string | undefined): string {
  * `mirrors` lists the upstream sources a package is ported from, each with the
  * `ref` and commit `sha` the parity gates measure that package against. It says
  * nothing about how far the port has got: a package can name a `ref` while the
- * bump ledger for that source still has open rows.
+ * bump ledger for that source still has open rows. `ref` is the upstream tag
+ * exactly as `vendor/sources.ts` pins it (`v8.0.2`, `1.13.1`, MRI's
+ * `v3_3_11`), not a semver; entries are compared key-order strict.
  */
 export async function expectedMirrors(root = REPO_ROOT): Promise<Map<string, Mirror[] | null>> {
   const lock = JSON.parse(
