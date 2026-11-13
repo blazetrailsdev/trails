@@ -5,6 +5,8 @@ import { Application, Trails } from "@blazetrails/trailties";
 import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
 import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailties/active-record";
 import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
+import { Trailtie as ActionViewRailtie } from "@blazetrails/trailties/trailties/action-view";
+import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trailties/action-controller";
 import { File } from "@blazetrails/ruby-compat";
 import { FixtureSet } from "@blazetrails/activestorage/fixture-set";
 import "./dummy/app/models/message.js";
@@ -24,11 +26,25 @@ app.config.loadDefaults("8.0");
 setTrailsRoot(TopLevel.Trails!.root()!);
 const configurations = Base.configurations();
 
-for (const railtie of [ActiveSupportRailtie, GlobalIDRailtie, ActiveRecordRailtie]) {
+for (const railtie of [
+  ActiveSupportRailtie,
+  GlobalIDRailtie,
+  ActiveRecordRailtie,
+  ActionViewRailtie,
+  ActionControllerRailtie,
+]) {
   for (const initializer of railtie.initializers) {
     await initializer.bind(railtie.instance()).run(app);
   }
 }
+const routes = app.routes();
+routes.clearBang();
+routes.disableClearAndFinalize = true;
+await import("./dummy/config/routes.js");
+await import("@blazetrails/activestorage/config/routes.js");
+routes.disableClearAndFinalize = false;
+routes.finalizeBang();
+app.routes().defineMountedHelper("main_app");
 runLoadHooks("after_initialize", app);
 
 DatabaseTasks.root = TopLevel.Trails!.root()!;

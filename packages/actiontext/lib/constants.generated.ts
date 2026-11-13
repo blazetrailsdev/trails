@@ -17,7 +17,8 @@ import * as m14 from "./html-conversion.js";
 import * as m15 from "./plain-text-conversion.js";
 import * as m16 from "./rendering.js";
 import * as m17 from "./serialization.js";
-import * as m18 from "./trix-attachment.js";
+import * as m18 from "./tag-helper.js";
+import * as m19 from "./trix-attachment.js";
 
 defineConstants([
   [() => m0.Attachable, "ActionText::Attachable"],
@@ -37,6 +38,8 @@ defineConstants([
   [() => m15.PlainTextConversion, "ActionText::PlainTextConversion"],
   [() => m16.Rendering, "ActionText::Rendering"],
   [() => m17.Serialization, "ActionText::Serialization"],
-  [() => m18.TrixAttachment, "ActionText::TrixAttachment"],
+  [() => m18.TagHelper, "ActionText::TagHelper"],
+  [() => m19.TrixAttachment, "ActionText::TrixAttachment"],
   [() => m13.VERSION, "ActionText::VERSION"],
+  [() => m18.ActionText, "ActionView::Helpers::Tags::ActionText"],
 ]);
