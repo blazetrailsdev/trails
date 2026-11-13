@@ -289,12 +289,12 @@ export class MimeType {
   }
 
   /** @internal */
-  toAry(): null {
+  private toAry(): null {
     return null;
   }
 
   /** @internal */
-  toA(): null {
+  private toA(): null {
     return null;
   }
 
