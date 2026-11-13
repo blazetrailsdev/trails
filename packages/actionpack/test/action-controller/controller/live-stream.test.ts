@@ -206,9 +206,9 @@ describe("LiveStreamTest", () => {
       return "test";
     }
 
-    setCookie(): void {
+    async setCookie(): Promise<void> {
       this.cookies().set("hello", "world");
-      (this.response.stream as Buffer).write("hello world");
+      await (this.response.stream as Buffer).write("hello world");
       this.response.close();
     }
 
@@ -222,15 +222,15 @@ describe("LiveStreamTest", () => {
       (this.response.stream as Buffer).close();
     }
 
-    defaultHeader(): void {
-      (this.response.stream as Buffer).write("<html><body>hi</body></html>");
+    async defaultHeader(): Promise<void> {
+      await (this.response.stream as Buffer).write("<html><body>hi</body></html>");
       (this.response.stream as Buffer).close();
     }
 
-    basicStream(): void {
+    async basicStream(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
       }
       (this.response.stream as Buffer).close();
     }
@@ -274,28 +274,28 @@ describe("LiveStreamTest", () => {
     async blockingStream(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
         await this.latch.wait();
       }
       (this.response.stream as Buffer).close();
     }
 
-    threadLocals(): void {
+    async threadLocals(): Promise<void> {
       assertEqual("aaron", Thread.current().get("setting"));
 
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
       }
       (this.response.stream as Buffer).close();
     }
 
-    noThreadLocals(): void {
+    async noThreadLocals(): Promise<void> {
       assertNil(Thread.current().get("setting"));
 
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
       }
       (this.response.stream as Buffer).close();
     }
@@ -319,19 +319,19 @@ describe("LiveStreamTest", () => {
     }
 
     async exceptionInViewAfterCommit(): Promise<void> {
-      (this.response.stream as Buffer).write("");
+      await (this.response.stream as Buffer).write("");
       await this.render("doesntexist");
     }
 
-    exceptionWithCallback(): void {
+    async exceptionWithCallback(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
 
-      (this.response.stream as Buffer).onError(() => {
-        (this.response.stream as Buffer).write('data: "500 Internal Server Error"\n\n');
+      (this.response.stream as Buffer).onError(async () => {
+        await (this.response.stream as Buffer).write('data: "500 Internal Server Error"\n\n');
         (this.response.stream as Buffer).close();
       });
 
-      (this.response.stream as Buffer).write("");
+      await (this.response.stream as Buffer).write("");
       throw new RuntimeError("An exception occurred...");
     }
 
@@ -343,13 +343,13 @@ describe("LiveStreamTest", () => {
       throw new BadRequest();
     }
 
-    exceptionInExceptionCallback(): void {
+    async exceptionInExceptionCallback(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       (this.response.stream as Buffer).onError(() => {
         throw new RuntimeError("We need to go deeper.");
       });
-      (this.response.stream as Buffer).write("");
-      (this.response.stream as Buffer).write(
+      await (this.response.stream as Buffer).write("");
+      await (this.response.stream as Buffer).write(
         (this.params.get("widget") as Parameters).get("didnt_check_for_nil") as string,
       );
     }
@@ -375,20 +375,22 @@ describe("LiveStreamTest", () => {
       }
     }
 
-    overfillDefaultBuffer(): void {
+    async overfillDefaultBuffer(): Promise<void> {
+      const writes = [];
       for (const char of "abcdefghijklmnopqrstuvwxyz") {
-        (this.response.stream as Buffer).write(char);
+        writes.push((this.response.stream as Buffer).write(char));
       }
       (this.response.stream as Buffer).close();
+      await Promise.all(writes);
     }
 
-    ignoreClientDisconnect(): void {
+    async ignoreClientDisconnect(): Promise<void> {
       (this.response.stream as Buffer).ignoreDisconnect = true;
 
-      (this.response.stream as Buffer).write("");
+      await (this.response.stream as Buffer).write("");
 
       for (let i = 0; i < 15; i++) {
-        (this.response.stream as Buffer).write("x");
+        await (this.response.stream as Buffer).write("x");
       }
 
       this.logger.info("Work complete");
@@ -755,10 +757,10 @@ describe("LiveControllerThreadTest", () => {
       include(this, Live);
     }
 
-    greet(): void {
+    async greet(): Promise<void> {
       this.response.headers.set("Content-Type", "text/event-stream");
       for (const word of ["hello", "world"]) {
-        (this.response.stream as Buffer).write(word);
+        await (this.response.stream as Buffer).write(word);
       }
       (this.response.stream as Buffer).close();
     }
