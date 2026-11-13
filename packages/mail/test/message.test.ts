@@ -1,8 +1,17 @@
 import type {} from "@blazetrails/vitest-matchers";
 import { DateTime } from "@blazetrails/date";
-import { rbObjDup, Socket, sort } from "@blazetrails/ruby-compat";
+import {
+  binaryBytes,
+  constSet,
+  IO,
+  NoMethodError,
+  rbObjDup,
+  Socket,
+  sort,
+  stderr,
+} from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { hashAref, hashAset, Hash } from "@blazetrails/ruby-compat";
+import { hashAref, hashAset, Hash, TopLevel } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import { Body } from "../lib/body.js";
 import { Field } from "../lib/field.js";
@@ -23,8 +32,12 @@ class DeliveryAgent {
   }
 }
 
+constSet(TopLevel, "DeliveryAgent", DeliveryAgent);
+
 const fixturePath = (...path: string[]) =>
   new URL(`./fixtures/${path.join("/")}`, import.meta.url).pathname;
+const readRawFixture = async (...path: string[]) =>
+  await IO.binreadAsync(decodeURIComponent(fixturePath(...path)));
 const readFixture = (...path: string[]) => Mail.read(decodeURIComponent(fixturePath(...path)));
 
 describe("Mail::Message", () => {
@@ -107,6 +120,106 @@ describe("Mail::Message", () => {
       expect(new Message().isBounced()).toBeFalsy();
     });
 
+    it("should be able to parse a basic email", async () => {
+      await expect(readFixture("emails", "plain_emails", "basic_email.eml")).resolves.not.toThrow();
+    });
+
+    it("should be able to parse a basic email with linefeeds", async () => {
+      await expect(
+        readFixture("emails", "plain_emails", "basic_email_lf.eml"),
+      ).resolves.not.toThrow();
+    });
+
+    it("should be able to parse an email with @ in display name", async () => {
+      const message = await readFixture(
+        "emails",
+        "plain_emails",
+        "raw_email_with_at_display_name.eml",
+      );
+      expect([...(message.to() as string[])]).toEqual([
+        "smith@gmail.com",
+        "raasdnil@gmail.com",
+        "tom@gmail.com",
+      ]);
+    });
+
+    it("should be able to parse an email with only blank lines as body", async () => {
+      await expect(
+        readFixture("emails", "error_emails", "missing_body.eml"),
+      ).resolves.not.toThrow();
+    });
+
+    it("should be able to parse an email with a funky date header", async () => {
+      await readFixture("emails", "error_emails", "bad_date_header2.eml");
+    });
+
+    it("should be able to invoke subject on a funky subject header", async () => {
+      (await readFixture("emails", "error_emails", "bad_subject.eml")).subject();
+    });
+
+    it("should be able to parse an email missing an encoding", async () => {
+      await readFixture("emails", "error_emails", "must_supply_encoding.eml");
+    });
+
+    // @ts-expect-error -- Property 'glob' does not exist on type 'ImportMeta'
+    for (const path of Object.keys(import.meta.glob("./fixtures/emails/**/*.eml"))) {
+      it(`parses ${path} fixture`, async () => {
+        const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
+        try {
+          await expect(
+            Mail.read(decodeURIComponent(new URL(path, import.meta.url).pathname)),
+          ).resolves.not.toThrow();
+        } finally {
+          write.mockRestore();
+        }
+      });
+    }
+
+    it("should be able to parse a large email without raising an exception", async () => {
+      const m = Mail.new();
+      await m.addFile({ filename: "attachment.data", content: "a".repeat(8 * 1024 * 1024) });
+      const rawEmail = `From jamis_buck@byu.edu Mon May  2 16:07:05 2005\r\n${m.toString()}`;
+
+      expect(() => new Message(rawEmail)).not.toThrow();
+      expect((new Message(rawEmail).part() as PartsList)[0].header().get("filename")).toBeNull();
+    });
+
+    it("should not raise a warning on having non US-ASCII characters in the header (should just handle it)", async () => {
+      await expect(() =>
+        readFixture("emails", "plain_emails", "raw_email_string_in_date_field.eml"),
+      ).not.toOutput(undefined, "stderr");
+    });
+
+    it("should raise a warning (and keep parsing) on having an incorrectly formatted header", async () => {
+      const write = vi.spyOn(stderr, "write").mockImplementation(() => true);
+      try {
+        (await readFixture("emails", "plain_emails", "raw_email_incorrect_header.eml")).toString();
+        expect(write).toHaveBeenCalledOnce();
+        expect(write).toHaveBeenCalledWith(
+          'WARNING: Ignoring unparsable header "quite Delivered-To: xxx@xxx.xxx": invalid header name syntax: "quite Delivered-To"\n',
+        );
+      } finally {
+        write.mockRestore();
+      }
+    });
+
+    it("should read in an email message and basically parse it", async () => {
+      const mail = await readFixture("emails", "plain_emails", "basic_email.eml");
+      expect([...(mail.to() as string[])]).toEqual(["raasdnil@gmail.com"]);
+    });
+
+    it("should not fail parsing message with caps in content_type", async () => {
+      const mail = await readFixture("emails", "plain_emails", "mix_caps_content_type.eml");
+      expect(mail.contentType()).toBe("text/plain; charset=iso-8859-1");
+      expect(mail.mainType()).toBe("text");
+      expect(mail.subType()).toBe("plain");
+    });
+
+    it("should be able to pass an empty reply-to header", async () => {
+      const mail = await readFixture("emails", "error_emails", "empty_in_reply_to.eml");
+      expect(Utilities.isBlank(mail.inReplyTo())).toBeTruthy();
+    });
+
     it("should use default charset", () => {
       const old = Message.defaultCharset;
       try {
@@ -169,6 +282,22 @@ describe("Mail::Message", () => {
         expect(hashAref(headers as object, "Bcc")).toEqual("someonesecret@somewhere.com");
         expect(hashAref(yamlOutput, "@body_raw")).toEqual("body");
         expect(Utilities.isBlank(hashAref(yamlOutput, "@delivery_method"))).toBeFalsy();
+      });
+
+      it("should deserialize after serializing", () => {
+        const deserialized = Message.fromYaml(yamlMail.toYaml());
+        expect(deserialized).toEqualRuby(yamlMail);
+        expect(
+          Object.fromEntries(
+            (deserialized.deliveryMethod() as { settings: Map<string, unknown> }).settings,
+          ),
+        ).toEqual(smtpSettings);
+      });
+
+      it("should load a serialized delivery handler", () => {
+        yamlMail.deliveryHandler = DeliveryAgent;
+        const deserialized = Message.fromYaml(yamlMail.toYaml());
+        expect(deserialized.deliveryHandler).toBe(DeliveryAgent);
       });
 
       it("should serialize a Message with a custom delivery_handler", () => {
@@ -295,10 +424,64 @@ describe("Mail::Message", () => {
       expect(mail.rawSource).toBe("");
     });
 
+    it("should give the header class the header to parse", () => {
+      const mail = new Message(basicEmail());
+      expect(mail.header().rawSource).toBe("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
+      expect(mail.header().charset).toBe("UTF-8");
+    });
+
+    it("should give the header class the header to parse even if there is no body", () => {
+      const mail = new Message("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
+      expect(mail.header().rawSource).toBe("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
+      expect(mail.header().charset).toBe("UTF-8");
+    });
+
+    it("should give the body class the body to parse", () => {
+      const mail = new Message(basicEmail());
+      expect(mail.body().rawSource).toBe("email message\r\n");
+    });
+
+    it("should still ask the body for a new instance even though these is nothing to parse, yet", () => {
+      const mail = new Message("To: mikel\r\nFrom: bob\r\nSubject: Hello!");
+      expect(mail.body()).toBeInstanceOf(Body);
+    });
+
+    it("should give the header the part before the line without spaces and the body the part without", () => {
+      const mail = new Message("To: mikel\r\n\r\nG'Day!");
+      expect(mail.header().rawSource).toBe("To: mikel");
+      expect(mail.body().rawSource).toBe("G'Day!");
+    });
+
     it("should allow for whitespace at the start of the email", () => {
       const mail = Mail.new("\r\n\r\nFrom: mikel\r\n\r\nThis is the body");
       expect(mail.body().toString()).toBe("This is the body");
       expect([...(mail.from() as string[])]).toEqual(["mikel"]);
+    });
+
+    it("should read in an email message with the word 'From' in it multiple times and parse it", async () => {
+      const mail = await readFixture("emails", "mime_emails", "two_from_in_message.eml");
+      expect(mail.to()).not.toBeNull();
+      expect([...(mail.to() as string[])]).toEqual(["tester2@test.com"]);
+    });
+
+    it("should parse non-UTF8 sources", async () => {
+      const rawMessage = await readRawFixture("emails", "multi_charset", "japanese_iso_2022.eml");
+      const mail = Mail.new(rawMessage);
+      expect([...(mail.to() as string[])]).toEqual(["raasdnil@gmail.com"]);
+      expect(mail.decoded()).toBe("すみません。\n\n");
+    });
+
+    it("should parse sources with charsets that we know but Ruby doesn't", async () => {
+      const rawMessage = await readRawFixture("emails", "multi_charset", "ks_c_5601-1987.eml");
+      const mail = Mail.new(rawMessage);
+      expect((mail.decoded() as string).replace(/\r?\n$/, "")).toBe("스티해");
+    });
+
+    it("should be able to normalize CRLFs on non-UTF8 encodings", async () => {
+      const mail = Mail.new(
+        await readRawFixture("emails", "multi_charset", "japanese_shift_jis.eml"),
+      );
+      expect(mail.rawSource).toBeInstanceOf(Uint8Array);
     });
   });
 
@@ -539,6 +722,268 @@ describe("Mail::Message", () => {
         message.setContentId("<1234@message_id.lindsaar.net>");
         message.setMimeVersion("1.0");
         message.setBody("This is a body of text");
+
+        expect([...(message.bcc() as string[])]).toEqual(["mikel@bcc.lindsaar.net"]);
+        expect([...(message.cc() as string[])]).toEqual(["mikel@cc.lindsaar.net"]);
+        expect(message.comments()).toBe("this is a comment");
+        expect(message.date()).toEqual(DateTime.parse("12 Aug 2009 00:00:01 GMT"));
+        expect([...(message.from() as string[])]).toEqual(["mikel@from.lindsaar.net"]);
+        expect(message.inReplyTo()).toBe("1234@in_reply_to.lindsaar.net");
+        expect(message.keywords()).toEqual(["test", "of the new mail", "system"]);
+        expect(message.messageId()).toBe("1234@message_id.lindsaar.net");
+        expect((message.received() as { dateTime(): unknown }).dateTime()).toEqual(
+          DateTime.parse("12 Aug 2009 00:00:02 GMT"),
+        );
+        expect(message.references()).toBe("1234@references.lindsaar.net");
+        expect([...(message.replyTo() as string[])]).toEqual(["mikel@reply-to.lindsaar.net"]);
+        expect([...(message.resentBcc() as string[])]).toEqual(["mikel@resent-bcc.lindsaar.net"]);
+        expect([...(message.resentCc() as string[])]).toEqual(["mikel@resent-cc.lindsaar.net"]);
+        expect(message.resentDate()).toEqual(DateTime.parse("12 Aug 2009 00:00:03 GMT"));
+        expect([...(message.resentFrom() as string[])]).toEqual(["mikel@resent-from.lindsaar.net"]);
+        expect(message.resentMessageId()).toBe("1234@resent_message_id.lindsaar.net");
+        expect([...(message.resentSender() as string[])]).toEqual([
+          "mikel@resent-sender.lindsaar.net",
+        ]);
+        expect([...(message.resentTo() as string[])]).toEqual(["mikel@resent-to.lindsaar.net"]);
+        expect(message.sender()).toBe("mikel@sender.lindsaar.net");
+        expect(message.subject()).toBe("Hello there Mikel");
+        expect([...(message.to() as string[])]).toEqual(["mikel@to.lindsaar.net"]);
+        expect(message.contentType()).toBe("text/plain; charset=UTF-8");
+        expect(message.contentTransferEncoding()).toBe("7bit");
+        expect(message.contentDescription()).toBe("This is a test");
+        expect(message.contentDisposition()).toBe("attachment; filename=File");
+        expect(message.contentId()).toBe("<1234@message_id.lindsaar.net>");
+        expect(message.mimeVersion()).toBe("1.0");
+        expect(message.body().toString()).toBe("This is a body of text");
+      });
+
+      it("should accept them in key, value form as symbols", () => {
+        const message = Mail.new();
+        message.set("bcc", "mikel@bcc.lindsaar.net");
+        message.set("cc", "mikel@cc.lindsaar.net");
+        message.set("comments", "this is a comment");
+        message.set("date", "12 Aug 2009 00:00:01 GMT");
+        message.set("from", "mikel@from.lindsaar.net");
+        message.set("inReplyTo", "<1234@in_reply_to.lindsaar.net>");
+        message.set("keywords", 'test, "of the new mail", system');
+        message.set("messageId", "<1234@message_id.lindsaar.net>");
+        message.set("received", "from machine.example by x.y.test; 12 Aug 2009 00:00:02 GMT");
+        message.set("references", "<1234@references.lindsaar.net>");
+        message.set("replyTo", "mikel@reply-to.lindsaar.net");
+        message.set("resentBcc", "mikel@resent-bcc.lindsaar.net");
+        message.set("resentCc", "mikel@resent-cc.lindsaar.net");
+        message.set("resentDate", "12 Aug 2009 00:00:03 GMT");
+        message.set("resentFrom", "mikel@resent-from.lindsaar.net");
+        message.set("resentMessageId", "<1234@resent_message_id.lindsaar.net>");
+        message.set("resentSender", "mikel@resent-sender.lindsaar.net");
+        message.set("resentTo", "mikel@resent-to.lindsaar.net");
+        message.set("sender", "mikel@sender.lindsaar.net");
+        message.set("subject", "Hello there Mikel");
+        message.set("to", "mikel@to.lindsaar.net");
+        message.set("contentType", "text/plain; charset=UTF-8");
+        message.set("contentTransferEncoding", "7bit");
+        message.set("contentDescription", "This is a test");
+        message.set("contentDisposition", "attachment; filename=File");
+        message.set("contentId", "<1234@message_id.lindsaar.net>");
+        message.set("mimeVersion", "1.0");
+        message.set("body", "This is a body of text");
+
+        expect([...(message.bcc() as string[])]).toEqual(["mikel@bcc.lindsaar.net"]);
+        expect([...(message.cc() as string[])]).toEqual(["mikel@cc.lindsaar.net"]);
+        expect(message.comments()).toBe("this is a comment");
+        expect(message.date()).toEqual(DateTime.parse("12 Aug 2009 00:00:01 GMT"));
+        expect([...(message.from() as string[])]).toEqual(["mikel@from.lindsaar.net"]);
+        expect(message.inReplyTo()).toBe("1234@in_reply_to.lindsaar.net");
+        expect(message.keywords()).toEqual(["test", "of the new mail", "system"]);
+        expect(message.messageId()).toBe("1234@message_id.lindsaar.net");
+        expect((message.received() as { dateTime(): unknown }).dateTime()).toEqual(
+          DateTime.parse("12 Aug 2009 00:00:02 GMT"),
+        );
+        expect(message.references()).toBe("1234@references.lindsaar.net");
+        expect([...(message.replyTo() as string[])]).toEqual(["mikel@reply-to.lindsaar.net"]);
+        expect([...(message.resentBcc() as string[])]).toEqual(["mikel@resent-bcc.lindsaar.net"]);
+        expect([...(message.resentCc() as string[])]).toEqual(["mikel@resent-cc.lindsaar.net"]);
+        expect(message.resentDate()).toEqual(DateTime.parse("12 Aug 2009 00:00:03 GMT"));
+        expect([...(message.resentFrom() as string[])]).toEqual(["mikel@resent-from.lindsaar.net"]);
+        expect(message.resentMessageId()).toBe("1234@resent_message_id.lindsaar.net");
+        expect([...(message.resentSender() as string[])]).toEqual([
+          "mikel@resent-sender.lindsaar.net",
+        ]);
+        expect([...(message.resentTo() as string[])]).toEqual(["mikel@resent-to.lindsaar.net"]);
+        expect(message.sender()).toBe("mikel@sender.lindsaar.net");
+        expect(message.subject()).toBe("Hello there Mikel");
+        expect([...(message.to() as string[])]).toEqual(["mikel@to.lindsaar.net"]);
+        expect(message.contentType()).toBe("text/plain; charset=UTF-8");
+        expect(message.contentTransferEncoding()).toBe("7bit");
+        expect(message.contentDescription()).toBe("This is a test");
+        expect(message.contentDisposition()).toBe("attachment; filename=File");
+        expect(message.contentId()).toBe("<1234@message_id.lindsaar.net>");
+        expect(message.mimeVersion()).toBe("1.0");
+        expect(message.body().toString()).toBe("This is a body of text");
+      });
+
+      it("should accept them in key, value form as strings", () => {
+        const message = Mail.new();
+        message.set("bcc", "mikel@bcc.lindsaar.net");
+        message.set("cc", "mikel@cc.lindsaar.net");
+        message.set("comments", "this is a comment");
+        message.set("date", "12 Aug 2009 00:00:01 GMT");
+        message.set("from", "mikel@from.lindsaar.net");
+        message.set("in_reply_to", "<1234@in_reply_to.lindsaar.net>");
+        message.set("keywords", 'test, "of the new mail", system');
+        message.set("message_id", "<1234@message_id.lindsaar.net>");
+        message.set("received", "from machine.example by x.y.test; 12 Aug 2009 00:00:02 GMT");
+        message.set("references", "<1234@references.lindsaar.net>");
+        message.set("reply_to", "mikel@reply-to.lindsaar.net");
+        message.set("resent_bcc", "mikel@resent-bcc.lindsaar.net");
+        message.set("resent_cc", "mikel@resent-cc.lindsaar.net");
+        message.set("resent_date", "12 Aug 2009 00:00:03 GMT");
+        message.set("resent_from", "mikel@resent-from.lindsaar.net");
+        message.set("resent_message_id", "<1234@resent_message_id.lindsaar.net>");
+        message.set("resent_sender", "mikel@resent-sender.lindsaar.net");
+        message.set("resent_to", "mikel@resent-to.lindsaar.net");
+        message.set("sender", "mikel@sender.lindsaar.net");
+        message.set("subject", "Hello there Mikel");
+        message.set("to", "mikel@to.lindsaar.net");
+        message.set("content_type", "text/plain; charset=UTF-8");
+        message.set("content_transfer_encoding", "7bit");
+        message.set("content_description", "This is a test");
+        message.set("content_disposition", "attachment; filename=File");
+        message.set("content_id", "<1234@message_id.lindsaar.net>");
+        message.set("mime_version", "1.0");
+        message.set("body", "This is a body of text");
+
+        expect([...(message.bcc() as string[])]).toEqual(["mikel@bcc.lindsaar.net"]);
+        expect([...(message.cc() as string[])]).toEqual(["mikel@cc.lindsaar.net"]);
+        expect(message.comments()).toBe("this is a comment");
+        expect(message.date()).toEqual(DateTime.parse("12 Aug 2009 00:00:01 GMT"));
+        expect([...(message.from() as string[])]).toEqual(["mikel@from.lindsaar.net"]);
+        expect(message.inReplyTo()).toBe("1234@in_reply_to.lindsaar.net");
+        expect(message.keywords()).toEqual(["test", "of the new mail", "system"]);
+        expect(message.messageId()).toBe("1234@message_id.lindsaar.net");
+        expect((message.received() as { dateTime(): unknown }).dateTime()).toEqual(
+          DateTime.parse("12 Aug 2009 00:00:02 GMT"),
+        );
+        expect(message.references()).toBe("1234@references.lindsaar.net");
+        expect([...(message.replyTo() as string[])]).toEqual(["mikel@reply-to.lindsaar.net"]);
+        expect([...(message.resentBcc() as string[])]).toEqual(["mikel@resent-bcc.lindsaar.net"]);
+        expect([...(message.resentCc() as string[])]).toEqual(["mikel@resent-cc.lindsaar.net"]);
+        expect(message.resentDate()).toEqual(DateTime.parse("12 Aug 2009 00:00:03 GMT"));
+        expect([...(message.resentFrom() as string[])]).toEqual(["mikel@resent-from.lindsaar.net"]);
+        expect(message.resentMessageId()).toBe("1234@resent_message_id.lindsaar.net");
+        expect([...(message.resentSender() as string[])]).toEqual([
+          "mikel@resent-sender.lindsaar.net",
+        ]);
+        expect([...(message.resentTo() as string[])]).toEqual(["mikel@resent-to.lindsaar.net"]);
+        expect(message.sender()).toBe("mikel@sender.lindsaar.net");
+        expect(message.subject()).toBe("Hello there Mikel");
+        expect([...(message.to() as string[])]).toEqual(["mikel@to.lindsaar.net"]);
+        expect(message.contentType()).toBe("text/plain; charset=UTF-8");
+        expect(message.contentTransferEncoding()).toBe("7bit");
+        expect(message.contentDescription()).toBe("This is a test");
+        expect(message.contentDisposition()).toBe("attachment; filename=File");
+        expect(message.contentId()).toBe("<1234@message_id.lindsaar.net>");
+        expect(message.mimeVersion()).toBe("1.0");
+        expect(message.body().toString()).toBe("This is a body of text");
+      });
+
+      it("should accept them as a hash with symbols", () => {
+        const message = Mail.new({
+          bcc: "mikel@bcc.lindsaar.net",
+          cc: "mikel@cc.lindsaar.net",
+          comments: "this is a comment",
+          date: "12 Aug 2009 00:00:01 GMT",
+          from: "mikel@from.lindsaar.net",
+          inReplyTo: "<1234@in_reply_to.lindsaar.net>",
+          keywords: 'test, "of the new mail", system',
+          messageId: "<1234@message_id.lindsaar.net>",
+          received: "from machine.example by x.y.test; 12 Aug 2009 00:00:02 GMT",
+          references: "<1234@references.lindsaar.net>",
+          replyTo: "mikel@reply-to.lindsaar.net",
+          resentBcc: "mikel@resent-bcc.lindsaar.net",
+          resentCc: "mikel@resent-cc.lindsaar.net",
+          resentDate: "12 Aug 2009 00:00:03 GMT",
+          resentFrom: "mikel@resent-from.lindsaar.net",
+          resentMessageId: "<1234@resent_message_id.lindsaar.net>",
+          resentSender: "mikel@resent-sender.lindsaar.net",
+          resentTo: "mikel@resent-to.lindsaar.net",
+          sender: "mikel@sender.lindsaar.net",
+          subject: "Hello there Mikel",
+          to: "mikel@to.lindsaar.net",
+          contentType: "text/plain; charset=UTF-8",
+          contentTransferEncoding: "7bit",
+          contentDescription: "This is a test",
+          contentDisposition: "attachment; filename=File",
+          contentId: "<1234@message_id.lindsaar.net>",
+          mimeVersion: "1.0",
+          body: "This is a body of text",
+        });
+
+        expect([...(message.bcc() as string[])]).toEqual(["mikel@bcc.lindsaar.net"]);
+        expect([...(message.cc() as string[])]).toEqual(["mikel@cc.lindsaar.net"]);
+        expect(message.comments()).toBe("this is a comment");
+        expect(message.date()).toEqual(DateTime.parse("12 Aug 2009 00:00:01 GMT"));
+        expect([...(message.from() as string[])]).toEqual(["mikel@from.lindsaar.net"]);
+        expect(message.inReplyTo()).toBe("1234@in_reply_to.lindsaar.net");
+        expect(message.keywords()).toEqual(["test", "of the new mail", "system"]);
+        expect(message.messageId()).toBe("1234@message_id.lindsaar.net");
+        expect((message.received() as { dateTime(): unknown }).dateTime()).toEqual(
+          DateTime.parse("12 Aug 2009 00:00:02 GMT"),
+        );
+        expect(message.references()).toBe("1234@references.lindsaar.net");
+        expect([...(message.replyTo() as string[])]).toEqual(["mikel@reply-to.lindsaar.net"]);
+        expect([...(message.resentBcc() as string[])]).toEqual(["mikel@resent-bcc.lindsaar.net"]);
+        expect([...(message.resentCc() as string[])]).toEqual(["mikel@resent-cc.lindsaar.net"]);
+        expect(message.resentDate()).toEqual(DateTime.parse("12 Aug 2009 00:00:03 GMT"));
+        expect([...(message.resentFrom() as string[])]).toEqual(["mikel@resent-from.lindsaar.net"]);
+        expect(message.resentMessageId()).toBe("1234@resent_message_id.lindsaar.net");
+        expect([...(message.resentSender() as string[])]).toEqual([
+          "mikel@resent-sender.lindsaar.net",
+        ]);
+        expect([...(message.resentTo() as string[])]).toEqual(["mikel@resent-to.lindsaar.net"]);
+        expect(message.sender()).toBe("mikel@sender.lindsaar.net");
+        expect(message.subject()).toBe("Hello there Mikel");
+        expect([...(message.to() as string[])]).toEqual(["mikel@to.lindsaar.net"]);
+        expect(message.contentType()).toBe("text/plain; charset=UTF-8");
+        expect(message.contentTransferEncoding()).toBe("7bit");
+        expect(message.contentDescription()).toBe("This is a test");
+        expect(message.contentDisposition()).toBe("attachment; filename=File");
+        expect(message.contentId()).toBe("<1234@message_id.lindsaar.net>");
+        expect(message.mimeVersion()).toBe("1.0");
+        expect(message.body().toString()).toBe("This is a body of text");
+      });
+
+      it("should accept them as a hash with strings", () => {
+        const message = Mail.new({
+          bcc: "mikel@bcc.lindsaar.net",
+          cc: "mikel@cc.lindsaar.net",
+          comments: "this is a comment",
+          date: "12 Aug 2009 00:00:01 GMT",
+          from: "mikel@from.lindsaar.net",
+          in_reply_to: "<1234@in_reply_to.lindsaar.net>",
+          keywords: 'test, "of the new mail", system',
+          message_id: "<1234@message_id.lindsaar.net>",
+          received: "from machine.example by x.y.test; 12 Aug 2009 00:00:02 GMT",
+          references: "<1234@references.lindsaar.net>",
+          reply_to: "mikel@reply-to.lindsaar.net",
+          resent_bcc: "mikel@resent-bcc.lindsaar.net",
+          resent_cc: "mikel@resent-cc.lindsaar.net",
+          resent_date: "12 Aug 2009 00:00:03 GMT",
+          resent_from: "mikel@resent-from.lindsaar.net",
+          resent_message_id: "<1234@resent_message_id.lindsaar.net>",
+          resent_sender: "mikel@resent-sender.lindsaar.net",
+          resent_to: "mikel@resent-to.lindsaar.net",
+          sender: "mikel@sender.lindsaar.net",
+          subject: "Hello there Mikel",
+          to: "mikel@to.lindsaar.net",
+          content_type: "text/plain; charset=UTF-8",
+          content_transfer_encoding: "7bit",
+          content_description: "This is a test",
+          content_disposition: "attachment; filename=File",
+          content_id: "<1234@message_id.lindsaar.net>",
+          mime_version: "1.0",
+          body: "This is a body of text",
+        });
 
         expect([...(message.bcc() as string[])]).toEqual(["mikel@bcc.lindsaar.net"]);
         expect([...(message.cc() as string[])]).toEqual(["mikel@cc.lindsaar.net"]);
@@ -1225,6 +1670,38 @@ describe("Mail::Message", () => {
         expect(() => Mail.new().equals(Mail.new())).not.toThrow();
       });
 
+      it("should ignore the message id value if both have a nil message id", () => {
+        const m1 = Mail.new("To: mikel@test.lindsaar.net\r\nSubject: Yo!\r\n\r\nHello there");
+        const m2 = Mail.new("To: mikel@test.lindsaar.net\r\nSubject: Yo!\r\n\r\nHello there");
+        expect(m1).toEqualRuby(m2);
+        expect(m1.get("message_id")).toBeNull();
+        expect(m2.get("message_id")).toBeNull();
+      });
+
+      it("should ignore the message id value if self has a nil message id", () => {
+        const m1 = Mail.new("To: mikel@test.lindsaar.net\r\nSubject: Yo!\r\n\r\nHello there");
+        const m2 = Mail.new(
+          "To: mikel@test.lindsaar.net\r\nMessage-ID: <1234@test.lindsaar.net>\r\nSubject: Yo!\r\n\r\nHello there",
+        );
+
+        expect(m1.get("message_id")).toBeNull();
+        expect((m2.get("message_id") as Field).value).toBe("<1234@test.lindsaar.net>");
+
+        expect(m1).toEqualRuby(m2);
+      });
+
+      it("should ignore the message id value if other has a nil message id", () => {
+        const m1 = Mail.new(
+          "To: mikel@test.lindsaar.net\r\nMessage-ID: <1234@test.lindsaar.net>\r\nSubject: Yo!\r\n\r\nHello there",
+        );
+        const m2 = Mail.new("To: mikel@test.lindsaar.net\r\nSubject: Yo!\r\n\r\nHello there");
+
+        expect((m1.get("message_id") as Field).value).toBe("<1234@test.lindsaar.net>");
+        expect(m2.get("message_id")).toBeNull();
+
+        expect(m1).toEqualRuby(m2);
+      });
+
       it("should not be == if both emails have different Message IDs", () => {
         const m1 = Mail.new(
           "To: mikel@test.lindsaar.net\r\nMessage-ID: <4321@test.lindsaar.net>\r\nSubject: Yo!\r\n\r\nHello there",
@@ -1509,6 +1986,60 @@ describe("Mail::Message", () => {
         });
       }
     }
+  });
+
+  describe("output", () => {
+    it("should make an email and allow you to call :to_s on it to get a string", () => {
+      const mail = Mail.new(function (this: Message) {
+        this.from("mikel@test.lindsaar.net");
+        this.to("you@test.lindsaar.net");
+        this.subject("This is a test email");
+        this.body("This is a body of the email");
+      });
+
+      expect(mail.toString()).toMatch(/From: mikel@test.lindsaar.net\r\n/);
+      expect(mail.toString()).toMatch(/To: you@test.lindsaar.net\r\n/);
+      expect(mail.toString()).toMatch(/Subject: This is a test email\r\n/);
+      expect(mail.toString()).toMatch(/This is a body of the email/);
+    });
+
+    it("should raise an error and message if you try and call decoded on a multipart email", () => {
+      const mail = Mail.new(function (this: Message) {
+        this.to("mikel@test.lindsaar.net");
+        this.from("bob@test.lindsaar.net");
+        this.subject("Multipart email");
+        this.textPart(function (this: Message) {
+          this.body("This is plain text");
+        });
+        this.htmlPart(function (this: Message) {
+          this.contentType("text/html; charset=UTF-8");
+          this.body("<h1>This is HTML</h1>");
+        });
+      });
+      expect(() => mail.decoded()).toThrow(
+        new NoMethodError(
+          "Can not decode an entire message, try calling #decoded on the various fields and body or parts if it is a multipart message.",
+        ),
+      );
+    });
+
+    it("should return the decoded body if you call decode and the message is not multipart", () => {
+      const mail = Mail.new(function (this: Message) {
+        this.contentTransferEncoding("base64");
+        this.body("VGhlIGJvZHk=\n");
+      });
+      expect(mail.decoded()).toEqual(binaryBytes("The body"));
+    });
+
+    describe("decoding bodies", () => {
+      it("should not strip the raw mail source in case the trailing \\r\\n is meaningful", () => {
+        expect(
+          Mail.new(
+            "Content-Transfer-Encoding: quoted-printable;\r\n\r\nfoo=\r\nbar=\r\nbaz=\r\n",
+          ).decoded(),
+        ).toEqual(binaryBytes("foobarbaz"));
+      });
+    });
   });
 
   describe("text messages", () => {

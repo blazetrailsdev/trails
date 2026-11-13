@@ -1607,8 +1607,9 @@ export function rbBuiltinClassName(x: unknown): string {
 
 /**
  * `rb_inspect` (`vendor/ruby/v3.3.11/object.c:704`) over the core classes a JS value
- * can be: `nil`, `true` / `false`, Integer and Float, Symbol, String, Array and
- * Hash. Anything else falls through to the receiver's own `inspect`.
+ * can be: `nil`, `true` / `false`, Integer and Float, Symbol, String (an
+ * ASCII-8BIT one is a `Uint8Array`, its high bytes `\xHH`), Array and Hash.
+ * Anything else falls through to the receiver's own `inspect`.
  *
  * The default arm is `to_s`, not Ruby's `#<Foo:0x… @a=1>` (`rb_obj_inspect`,
  * `vendor/ruby/v3.3.11/object.c:764`): reproducing that needs an object id JS does not
@@ -1779,6 +1780,19 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
   if (typeof value === "bigint") return String(value);
   if (isSymbol(value)) return symInspect(value);
   if (typeof value === "string") return stringInspect(value);
+  if (value instanceof Uint8Array) {
+    let ascii = "";
+    let result = "";
+    for (const byte of value) {
+      if (byte < 0x80) {
+        ascii += String.fromCharCode(byte);
+        continue;
+      }
+      result += stringInspect(ascii).slice(1, -1) + `\\x${byte.toString(16).toUpperCase()}`;
+      ascii = "";
+    }
+    return `"${result}${stringInspect(ascii).slice(1, -1)}"`;
+  }
   if (Array.isArray(value)) return inspectAry(value, recursing);
   if (isPlainHash(value) && classpaths.has(value)) {
     return rbModToS(value as unknown as abstract new (...args: never) => unknown);
