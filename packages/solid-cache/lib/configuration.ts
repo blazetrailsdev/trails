@@ -1,8 +1,5 @@
-import {
-  Encryptor,
-  MessagePackMessageSerializer,
-  type EncryptsOptions,
-} from "@blazetrails/activerecord/encryption";
+import { Encryptor, type EncryptsOptions } from "@blazetrails/activerecord/encryption";
+import { MessagePackMessageSerializer } from "@blazetrails/activerecord/encryption/message-pack-message-serializer";
 import { isPresent } from "@blazetrails/activesupport";
 import { ArgumentError, constSet } from "@blazetrails/ruby-compat";
 import { SolidCache } from "./solid-cache.js";

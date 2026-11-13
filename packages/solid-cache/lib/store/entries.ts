@@ -15,10 +15,7 @@ export const Entries = {
     });
   },
 
-  /**
-   * @internal
-   * @missingRailsCall track_writes — CONVERGEABLE port-solid-cache-store-execution-and-expiry
-   */
+  /** @internal */
   async entryLockAndWrite(
     this: StoreHost,
     key: string,
@@ -43,10 +40,7 @@ export const Entries = {
     )) as Map<string, unknown>[];
   },
 
-  /**
-   * @internal
-   * @missingRailsCall track_writes — CONVERGEABLE port-solid-cache-store-execution-and-expiry
-   */
+  /** @internal */
   async entryWrite(this: StoreHost, key: string, payload: unknown): Promise<boolean> {
     return (await this.writingKey(
       key,
@@ -58,10 +52,7 @@ export const Entries = {
     )) as boolean;
   },
 
-  /**
-   * @internal
-   * @missingRailsCall track_writes — CONVERGEABLE port-solid-cache-store-execution-and-expiry
-   */
+  /** @internal */
   async entryWriteMulti(this: StoreHost, entries: Payload[]): Promise<boolean[]> {
     return (await this.writingKeys(
       entries,

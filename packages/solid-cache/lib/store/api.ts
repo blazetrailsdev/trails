@@ -179,20 +179,14 @@ export const Api = {
     return rbCallSuper(this, Api.deserializeEntry, payload) as CacheEntry | null;
   },
 
-  /**
-   * @internal
-   * @missingRailsCall b — CONVERGEABLE solid-cache-store-keys-are-binary
-   */
+  /** @internal */
   async normalizeKey(this: StoreHost, key: unknown, options?: Options): Promise<string> {
     return this.truncateKey(
       (await (rbCallSuper(this, Api.normalizeKey, key, options) as Promise<string>)) ?? null,
     )!;
   },
 
-  /**
-   * @internal
-   * @missingRailsCall b — CONVERGEABLE solid-cache-store-keys-are-binary
-   */
+  /** @internal */
   truncateKey(this: StoreHost, key: string | null): string | null {
     if (key != null && encoder.encode(key).length > this.maxKeyBytesize) {
       const suffix = `:hash:${ActiveSupportDigest.hexdigest(key)}`;

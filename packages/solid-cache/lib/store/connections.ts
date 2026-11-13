@@ -5,7 +5,6 @@ import type { StoreHost } from "../store.js";
 type Failsafe = { failsafe: string; failsafeReturning?: unknown };
 
 export const Connections = {
-  /** @missingRailsCall execute — CONVERGEABLE port-solid-cache-store-execution-and-expiry */
   withEachConnection(
     this: StoreHost,
     { async: _async = false }: { async?: boolean } = {},
@@ -25,10 +24,7 @@ export const Connections = {
     this.connections();
   },
 
-  /**
-   * @internal
-   * @missingRailsCall execute — CONVERGEABLE port-solid-cache-store-execution-and-expiry
-   */
+  /** @internal */
   withConnectionFor<T>(
     this: StoreHost,
     key: unknown,
@@ -38,10 +34,7 @@ export const Connections = {
     return this.connections().withConnectionFor(key, () => block());
   },
 
-  /**
-   * @internal
-   * @missingRailsCall execute — CONVERGEABLE port-solid-cache-store-execution-and-expiry
-   */
+  /** @internal */
   withConnection<T>(
     this: StoreHost,
     name: string,
