@@ -28,6 +28,6 @@ describe("ActionView::Layouts implied layout name", () => {
     const controller = new StoryPagesController();
     const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "www.example.com" };
     await controller.dispatch("index", new Request(env), new Response());
-    expect(controller.responseBody).toBe("story pages layout: index");
+    expect(controller.response.body).toBe("story pages layout: index");
   });
 });
