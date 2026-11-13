@@ -715,7 +715,7 @@ jobs:
         run: |
           set -euo pipefail
           pnpm install --frozen-lockfile --prefer-offline
-          pnpm tsx scripts/vendor-mirrors.ts --check
+          pnpm vitest run scripts/vendor-mirrors.test.ts
 
       - name: ActiveRecord cast count
         id: ar-cast-count
