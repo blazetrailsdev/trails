@@ -6,6 +6,7 @@ export { KeyGenerator } from "./key-generator.js";
 export { Cipher } from "./cipher.js";
 export { Aes256Gcm } from "./cipher/aes256-gcm.js";
 export { MessageSerializer } from "./message-serializer.js";
+export { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 export { Encryptor } from "./encryptor.js";
 export type { EncryptorOptions, EncryptorLike, KeyProviderLike } from "./encryptor.js";
 export { NullEncryptor } from "./null-encryptor.js";

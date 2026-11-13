@@ -228,6 +228,8 @@ const alias = {
     __dirname,
     "packages/activesupport/lib/testing/temporal-helpers.ts",
   ),
+  "@blazetrails/activesupport/test/cache/behaviors/":
+    path.resolve(__dirname, "packages/activesupport/test/cache/behaviors") + "/",
   "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/lib/index.ts"),
   "@blazetrails/arel/test": path.resolve(__dirname, "packages/arel/test"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/lib/index.ts"),

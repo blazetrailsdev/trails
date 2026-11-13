@@ -9,6 +9,8 @@
   "references": [
     { "path": "../activerecord" },
     { "path": "../activesupport" },
-    { "path": "../ruby-compat" }
+    { "path": "../arel" },
+    { "path": "../ruby-compat" },
+    { "path": "../trailties" }
   ]
 }

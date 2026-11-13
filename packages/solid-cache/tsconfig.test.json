@@ -2,8 +2,13 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist-test",
-    "rootDir": "."
+    "rootDir": ".",
+    "paths": {
+      "@blazetrails/activesupport/test/cache/behaviors/*": [
+        "../activesupport/test/cache/behaviors/*.ts"
+      ]
+    }
   },
   "include": ["test"],
-  "references": [{ "path": "./tsconfig.json" }]
+  "references": [{ "path": "./tsconfig.json" }, { "path": "../activesupport/tsconfig.test.json" }]
 }
