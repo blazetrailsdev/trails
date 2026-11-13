@@ -68,6 +68,7 @@ Migrator.migrationsPaths = [File.expandPath("dummy/db/migrate", import.meta.dirn
 await Base.establishConnection();
 await Base.connectionPool().migrationContext.migrate();
 await Migration.maintainTestSchemaBang();
+await RichText.loadSchema();
 
 I18n.config().enforceAvailableLocales = false;
 
