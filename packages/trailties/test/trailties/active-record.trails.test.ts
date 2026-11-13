@@ -101,6 +101,15 @@ describe("RailtieTest (trails-only)", () => {
     }
   });
 
+  it("a fresh controller including ControllerRuntime starts with a nil db_runtime", async () => {
+    await runTrailtieInitializers(Trailtie, blogApp());
+    class FreshRuntimeController extends ActionController.Base {}
+    runLoadHooks("action_controller", FreshRuntimeController);
+
+    const controller = new FreshRuntimeController() as unknown as { dbRuntime: unknown };
+    expect(controller.dbRuntime).toBeNull();
+  });
+
   it("runInitializers includes ControllerRuntime into ActionController::Base", async () => {
     await runTrailtieInitializers(Trailtie, blogApp());
     class LogRuntimeController extends ActionController.Base {}

@@ -169,6 +169,54 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(includes["ActiveRecord::Railtie"]).toEqual([]);
   });
 
+  it("records an on_load block's include against the hook and the classes that run it", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hooks-rb-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "railtie.rb"),
+        `
+        module ActiveRecord
+          class Railtie
+            initializer "active_record.log_runtime" do
+              ActiveSupport.on_load(:action_controller) do
+                include ActiveRecord::Railties::ControllerRuntime
+              end
+            end
+          end
+        end
+      `,
+      );
+      fs.writeFileSync(
+        path.join(dir, "base.rb"),
+        `
+        module ActionController
+          class Base
+            ActiveSupport.run_load_hooks(:action_controller, self)
+          end
+        end
+      `,
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        %w[railtie.rb base.rb].each { |rel| ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)}) }
+        puts JSON.generate(mixins: ex.hook_mixins, targets: ex.load_hook_targets)
+      `;
+      expect(JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }))).toEqual({
+        mixins: [
+          {
+            hook: "action_controller",
+            statement: { kind: "include", names: ["ActiveRecord::Railties::ControllerRuntime"] },
+          },
+        ],
+        targets: { action_controller: ["ActionController::Base"] },
+      });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("still attributes a class-body include to the enclosing class", () => {
     const includes = rubyIncludes({
       "base.rb": `

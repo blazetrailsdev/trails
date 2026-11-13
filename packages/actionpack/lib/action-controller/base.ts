@@ -479,6 +479,8 @@ export class Base extends Metal {
   declare defaultRender: typeof defaultRender;
 
   /**
+   * @inventedArm if — PERMANENT
+   * @inlinedFrom ActiveRecord::Railties::ControllerRuntime#initialize rails/v8.0.2/activerecord/lib/active_record/railties/controller_runtime.rb:26-29
    * @inlinedFrom ActionController::Instrumentation#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/instrumentation.rb:23-26
    * @inlinedFrom ActionController::RequestForgeryProtection#initialize rails/v8.0.2/actionpack/lib/action_controller/metal/request_forgery_protection.rb:366-369
    * @inlinedFrom ActionView::Layouts#initialize rails/v8.0.2/actionview/lib/action_view/layouts.rb:361-364
