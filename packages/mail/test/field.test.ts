@@ -178,15 +178,15 @@ describe("Mail::Field", () => {
       expect(new Field("To", "mikel@test.lindsaar.net").isResponsibleFor("to")).toBeTruthy();
     });
     it('should say it is the "same" as another if their field types match', () => {
-      expect(new Field("To", "mikel").same(new Field("To", "bob"))).toBe(true);
+      expect(new Field("To", "mikel").same(new Field("To", "bob"))).toBeTruthy();
     });
 
     it('should say it is not the "same" as another if their field types don\'t match', () => {
-      expect(new Field("To", "mikel").same(new Field("From", "mikel"))).toBe(false);
+      expect(new Field("To", "mikel").same(new Field("From", "mikel"))).toBeFalsy();
     });
 
     it('should say it is not the "same" as nil', () => {
-      expect(new Field("To", "mikel").same(null)).toBe(false);
+      expect(new Field("To", "mikel").same(null)).toBeFalsy();
     });
 
     it("should say it is == to another if their field and names match", () => {
@@ -213,7 +213,7 @@ describe("Mail::Field", () => {
 
   describe("user defined fields", () => {
     it('should say it is the "same" as another if their field names match', () => {
-      expect(new Field("X-Foo", "mikel").same(new Field("X-Foo", "bob"))).toBe(true);
+      expect(new Field("X-Foo", "mikel").same(new Field("X-Foo", "bob"))).toBeTruthy();
     });
 
     it("should say it is not == to another if their field names do not match", () => {

@@ -132,6 +132,17 @@ describe("Ruby extractor receiver expect", () => {
     expect(Object.keys(named)).toEqual(["doesn't confuse sendmail"]);
   });
 
+  it("reads an escaped quote in a double-quoted name as the quote", () => {
+    const named = rubyTestCases(`
+      describe Foo do
+        it "should say it is the \\"same\\" as nil" do
+          expect(r).to eq 1
+        end
+      end
+    `);
+    expect(Object.keys(named)).toEqual(['should say it is the "same" as nil']);
+  });
+
   it("counts a receiver-less expect", () => {
     expect(cases["receiverless"].count).toBe(1);
   });

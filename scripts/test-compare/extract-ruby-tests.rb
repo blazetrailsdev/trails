@@ -2686,9 +2686,9 @@ class TestExtractor
   end
 
   def unescape_name_quotes(name)
-    return name unless name&.include?("\\'")
-    unescaped = name.gsub("\\'", "'")
-    @interpolated_names[unescaped] = @interpolated_names.delete(name).gsub("\\'", "'") if @interpolated_names&.key?(name)
+    return name unless name&.match?(/\\['"]/)
+    unescaped = name.gsub(/\\(['"])/, '\\1')
+    @interpolated_names[unescaped] = @interpolated_names.delete(name).gsub(/\\(['"])/, '\\1') if @interpolated_names&.key?(name)
     unescaped
   end
 

@@ -169,7 +169,7 @@ describe("Mail::ContentTypeField", () => {
       expect(c.subType()).toEqual("pdf");
       expect(params(c)).toEqual({});
     });
-    it("should handle 'application/pdf; name=\\\"broken.pdf\\\"'", () => {
+    it("should handle 'application/pdf; name=\"broken.pdf\"'", () => {
       const string = 'application/pdf; name="broken.pdf"';
       const c = new ContentTypeField(string);
       expect(c.contentType()).toEqual("application/pdf");
@@ -257,7 +257,7 @@ describe("Mail::ContentTypeField", () => {
       expect(c.subType()).toEqual("alternative");
       expect(params(c)).toEqual({});
     });
-    it("should handle 'multipart/alternative; boundary=\\\"----=_NextPart_000_0093_01C81419.EB75E850\\\"'", () => {
+    it("should handle 'multipart/alternative; boundary=\"----=_NextPart_000_0093_01C81419.EB75E850\"'", () => {
       const string = 'multipart/alternative; boundary="----=_NextPart_000_0093_01C81419.EB75E850"';
       const c = new ContentTypeField(string);
       expect(c.contentType()).toEqual("multipart/alternative");
@@ -455,7 +455,7 @@ describe("Mail::ContentTypeField", () => {
       expect(c.subType()).toEqual("x-ruby-script");
       expect(params(c)).toEqual({});
     });
-    it("should handle 'text/x-ruby-script; name=\\\"hello.rb\\\"'", () => {
+    it("should handle 'text/x-ruby-script; name=\"hello.rb\"'", () => {
       const string = 'text/x-ruby-script; name="hello.rb"';
       const c = new ContentTypeField(string);
       expect(c.contentType()).toEqual("text/x-ruby-script");
@@ -463,7 +463,7 @@ describe("Mail::ContentTypeField", () => {
       expect(c.subType()).toEqual("x-ruby-script");
       expect(params(c)).toEqual({ name: "hello.rb" });
     });
-    it('should handle \'multipart/mixed; boundary=\\"=_NextPart_Lycos_15031600484464_ID\\"', () => {
+    it('should handle \'multipart/mixed; boundary="=_NextPart_Lycos_15031600484464_ID"', () => {
       const string = 'multipart/mixed; boundary="=_NextPart_Lycos_15031600484464_ID"';
       const c = new ContentTypeField(string);
       expect(c.contentType()).toEqual("multipart/mixed");
@@ -471,7 +471,7 @@ describe("Mail::ContentTypeField", () => {
       expect(c.subType()).toEqual("mixed");
       expect(params(c)).toEqual({ boundary: "=_NextPart_Lycos_15031600484464_ID" });
     });
-    it('should handle \'multipart/mixed; boundary=\\"=_NextPart_2rfkindysadvnqw3nerasdf\\";windows-852', () => {
+    it('should handle \'multipart/mixed; boundary="=_NextPart_2rfkindysadvnqw3nerasdf";windows-852', () => {
       const string = 'multipart/mixed; boundary="=_NextPart_2rfkindysadvnqw3nerasdf";windows-852';
       const c = new ContentTypeField(string);
       expect(c.contentType()).toEqual("multipart/mixed");
@@ -490,7 +490,7 @@ describe("Mail::ContentTypeField", () => {
       expect(c.subType()).toEqual("alternative");
       expect(params(c)).toEqual({ boundary: "----=_=NextPart_000_0093_01C81419.EB75E850" });
     });
-    it('should handle \'multipart/alternative; boundary=\\"----=_=NextPart_000_0093_01C81419.EB75E850\\"', () => {
+    it('should handle \'multipart/alternative; boundary="----=_=NextPart_000_0093_01C81419.EB75E850"', () => {
       const string = 'multipart/alternative; boundary="----=_=NextPart_000_0093_01C81419.EB75E850"';
       const c = new ContentTypeField(string);
       expect(c.contentType()).toEqual("multipart/alternative");
@@ -498,7 +498,7 @@ describe("Mail::ContentTypeField", () => {
       expect(c.subType()).toEqual("alternative");
       expect(params(c)).toEqual({ boundary: "----=_=NextPart_000_0093_01C81419.EB75E850" });
     });
-    it('should handle \'multipart/related;boundary=1_4626B816_9F1690;Type=\\"application/smil\\";Start=\\"<mms.smil.txt>\\"\'', () => {
+    it('should handle \'multipart/related;boundary=1_4626B816_9F1690;Type="application/smil";Start="<mms.smil.txt>"\'', () => {
       const string =
         'multipart/related;boundary=1_4626B816_9F1690;Type="application/smil";Start="<mms.smil.txt>"';
       const c = new ContentTypeField(string);
@@ -511,7 +511,7 @@ describe("Mail::ContentTypeField", () => {
         Start: "<mms.smil.txt>",
       });
     });
-    it("should handle 'IMAGE/JPEG; name=\\\"IM 006.jpg\\\"'", () => {
+    it("should handle 'IMAGE/JPEG; name=\"IM 006.jpg\"'", () => {
       const string = 'IMAGE/JPEG; name="IM 006.jpg"';
       const c = new ContentTypeField(string);
       expect(c.contentType()).toEqual("image/jpeg");
@@ -613,7 +613,7 @@ describe("Mail::ContentTypeField", () => {
       expect(c.parameters().get("charset")).toEqual("iso-8559-1");
     });
 
-    it("should handle 'text/plain; charset = \\\"iso-8859-1\\\"'", () => {
+    it("should handle 'text/plain; charset = \"iso-8859-1\"'", () => {
       const c = new ContentTypeField('text/plain; charset = "iso-8859-1"');
       expect(c.string()).toEqual("text/plain");
       expect(c.parameters().get("charset")).toEqual("iso-8859-1");
