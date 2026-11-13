@@ -567,7 +567,6 @@ export type { MethodSource } from "./code-generator.js";
 export { prepend } from "@blazetrails/ruby-compat";
 export { ClassAttribute } from "./class-attribute.js";
 
-export { TestHelper as ExecutorTestHelper } from "./executor/test-helper.js";
 export { currentTime } from "./time-travel.js";
 export { currentTimeInstant } from "./time-travel.js";
 
