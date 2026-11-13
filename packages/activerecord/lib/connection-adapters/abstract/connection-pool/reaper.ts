@@ -75,8 +75,11 @@ export class Reaper {
     });
   }
 
-  run(): WeakRef<ReapablePool>[] | Promise<WeakRef<ReapablePool>[]> | undefined {
+  /** @inventedArm if — PERMANENT */
+  run(): WeakRef<ReapablePool>[] | Thread<Promise<WeakRef<ReapablePool>[]>> | undefined {
     if (!(this.frequency && this.frequency > 0)) return;
-    return Reaper.registerPool(this.pool, this.frequency);
+    const pools = Reaper.registerPool(this.pool, this.frequency);
+    if (pools instanceof Promise) return new Thread(() => pools);
+    return pools;
   }
 }

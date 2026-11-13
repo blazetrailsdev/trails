@@ -83,7 +83,6 @@ export class Listener extends SubscriberMap {
     super();
 
     this._eventLoop = eventLoop;
-    this._stopped.catch(() => {});
 
     this._thread = new Thread(() => this.listen());
   }
