@@ -11,7 +11,7 @@ import { Base } from "@blazetrails/actionview/helpers/tags/base.js";
 import { Placeholderable } from "@blazetrails/actionview/helpers/tags/placeholderable.js";
 import { Translator } from "@blazetrails/actionview/helpers/tags/translator.js";
 import { Tags } from "@blazetrails/actionview/namespaces.js";
-import { block, classModule, fetch, hashDelete, include } from "@blazetrails/ruby-compat";
+import { block, classModule, except, fetch, hashDelete, include } from "@blazetrails/ruby-compat";
 
 type Options = Record<string, unknown>;
 
@@ -129,7 +129,7 @@ export class ActionText extends Base {
         "value",
         block(() => this.value()),
       ),
-      (({ value: _value, ...except }) => except)(options),
+      except(options, "value"),
     );
     return this.errorWrapping(htmlTag);
   }
@@ -140,37 +140,38 @@ delegate.call(ActionText.prototype, "domId", { to: "::ActionView::RecordIdentifi
 
 (Tags as unknown as { ActionText: typeof ActionText }).ActionText = ActionText;
 
-function richTextarea(
-  this: unknown,
-  objectName: unknown,
-  method: unknown,
-  options: Options = {},
-): Promise<unknown> {
-  return new (Tags as unknown as { ActionText: typeof ActionText }).ActionText(
-    objectName,
-    method,
-    this,
-    options,
-  ).render();
-}
-
-Object.assign(FormHelper.prototype, { richTextarea, richTextArea: richTextarea });
-
 type FormBuilderHost = {
-  _template: { richTextarea: typeof richTextarea };
+  _template: {
+    richTextarea(objectName: unknown, method: unknown, options: Options): Promise<unknown>;
+  };
   objectName: unknown;
   objectifyOptions(options: Options): Options;
 };
 
-function formBuilderRichTextarea(
-  this: FormBuilderHost,
-  method: unknown,
-  options: Options = {},
-): Promise<unknown> {
-  return this._template.richTextarea(this.objectName, method, this.objectifyOptions(options));
-}
+const FormHelperRichTextarea = {
+  richTextarea(
+    this: unknown,
+    objectName: unknown,
+    method: unknown,
+    options: Options = {},
+  ): Promise<unknown> {
+    return new (Tags as unknown as { ActionText: typeof ActionText }).ActionText(
+      objectName,
+      method,
+      this,
+      options,
+    ).render();
+  },
+};
+Object.assign(FormHelper.prototype, FormHelperRichTextarea, {
+  richTextArea: FormHelperRichTextarea.richTextarea,
+});
 
-Object.assign(FormBuilder.prototype, {
-  richTextarea: formBuilderRichTextarea,
-  richTextArea: formBuilderRichTextarea,
+const FormBuilderRichTextarea = {
+  richTextarea(this: FormBuilderHost, method: unknown, options: Options = {}): Promise<unknown> {
+    return this._template.richTextarea(this.objectName, method, this.objectifyOptions(options));
+  },
+};
+Object.assign(FormBuilder.prototype, FormBuilderRichTextarea, {
+  richTextArea: FormBuilderRichTextarea.richTextarea,
 });

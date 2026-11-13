@@ -96,7 +96,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor id="message_content" input="message_content_trix_input_message" class="trix-content" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -111,7 +111,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor id="message_content" input="message_content_trix_input_message" class="custom-class" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -131,7 +131,7 @@ describe("ActionText::FormHelperTest", () => {
         "</trix-editor>" +
         "</div>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -146,7 +146,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor id="message_not_an_attribute" input="message_not_an_attribute_trix_input_message" class="trix-content" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -161,7 +161,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor id="message_content" input="trix_input_2" class="trix-content" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -176,7 +176,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor placeholder="Content" id="message_content" input="message_content_trix_input_message" class="trix-content" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -193,7 +193,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor placeholder="Story title" id="message_title" input="message_title_trix_input_message" class="trix-content" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -208,7 +208,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor id="message_title" input="message_title_trix_input_message" class="trix-content" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -223,7 +223,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor id="message_title" input="message_title_trix_input_message" class="trix-content" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -240,7 +240,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor id="message_content" input="message_content_trix_input_message" class="trix-content" data-direct-upload-url="http://test.host/direct_uploads" data-blob-url-template="http://test.host/trails/active_storage/blobs/redirect/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 
@@ -257,7 +257,7 @@ describe("ActionText::FormHelperTest", () => {
         '<trix-editor id="message_content" input="message_content_trix_input_message" class="trix-content" data-direct-upload-url="http://test.host/trails/active_storage/direct_uploads" data-blob-url-template="http://test.host/blobs/:signed_id/:filename">' +
         "</trix-editor>" +
         "</form>",
-      tc.outputBuffer,
+      tc.outputBuffer.toStr(),
     );
   });
 });
