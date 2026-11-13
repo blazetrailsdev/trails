@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Field } from "../../lib/field.js";
 import { SenderField } from "../../lib/fields/sender-field.js";
 
 describe("Mail::SenderField", () => {
@@ -10,6 +11,11 @@ describe("Mail::SenderField", () => {
       const t = new SenderField("Mikel Lindsaar <mikel@test.lindsaar.net>");
       expect(t.name).toEqual("Sender");
       expect(t.value).toEqual("Mikel Lindsaar <mikel@test.lindsaar.net>");
+    });
+    it.fails("should reject headers with multiple mailboxes", () => {
+      expect(
+        () => new SenderField('Mikel Lindsaar <mikel@test.lindsaar.net>, "Bob Smith" <bob@me.com>'),
+      ).toThrow(Field.ParseError);
     });
   });
   it("formats the sender", () => {

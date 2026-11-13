@@ -395,6 +395,10 @@ describe("Mail::Header", () => {
     it("should instantiate empty", () => {
       expect(() => new Header()).not.toThrow();
     });
+
+    it("should instantiate with a string passed in", () => {
+      expect(() => new Header("To: Mikel\r\nFrom: bob\r\n")).not.toThrow();
+    });
   });
 
   describe("instance methods", () => {
