@@ -784,16 +784,19 @@ describe("CI runs every tooling test suite", () => {
 
       const broken = yml
         .replace(
-          "run: pnpm vitest run packages/rack packages/rack-session packages/rack-test packages/rackup\n",
-          "run: pnpm vitest run packages/rack\n",
+          "run: pnpm vitest run packages/rack packages/rack-proxy packages/rack-session packages/rack-test packages/rackup\n",
+          "run: pnpm vitest run packages/rack packages/rack-proxy\n",
         )
-        .replace("RACK_PKGS_RE='^packages/(rack|rack-session|", "RACK_PKGS_RE='^packages/(rack|");
+        .replace(
+          "RACK_PKGS_RE='^packages/(rack|rack-proxy|rack-session|",
+          "RACK_PKGS_RE='^packages/(rack|rack-proxy|",
+        );
       expect(broken).not.toEqual(yml);
       expect((await packageCoverage(broken, dirs)).uncovered).toEqual(["packages/rack-session"]);
 
       const filterOnly = broken.replace(
-        "run: pnpm vitest run packages/rack\n",
-        "run: pnpm vitest run packages/rack packages/rack-session packages/rack-test packages/rackup\n",
+        "run: pnpm vitest run packages/rack packages/rack-proxy\n",
+        "run: pnpm vitest run packages/rack packages/rack-proxy packages/rack-session packages/rack-test packages/rackup\n",
       );
       expect(filterOnly).not.toEqual(broken);
       const halfFixed = await packageCoverage(filterOnly, dirs);
@@ -801,8 +804,8 @@ describe("CI runs every tooling test suite", () => {
       expect(halfFixed.ungated).toEqual(["packages/rack-session"]);
 
       const fixed = filterOnly.replace(
-        "RACK_PKGS_RE='^packages/(rack|",
-        "RACK_PKGS_RE='^packages/(rack|rack-session|",
+        "RACK_PKGS_RE='^packages/(rack|rack-proxy|",
+        "RACK_PKGS_RE='^packages/(rack|rack-proxy|rack-session|",
       );
       expect(fixed).not.toEqual(filterOnly);
       expect(await packageCoverage(fixed, dirs)).toEqual({ uncovered: [], ungated: [] });

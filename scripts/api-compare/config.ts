@@ -216,6 +216,7 @@ export const MANIFEST_PACKAGES = [
   "activestorage",
   "trailties",
   "rack",
+  "rack-proxy",
   "rack-session",
   "rack-test",
   "rackup",

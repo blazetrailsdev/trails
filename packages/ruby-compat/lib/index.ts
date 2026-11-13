@@ -575,6 +575,7 @@ export {
   HTTPS,
   InvalidComponentError,
   InvalidURIError,
+  kernelURI,
   RFC2396_PARSER,
   RFC2396Parser,
   RFC3986_PARSER,

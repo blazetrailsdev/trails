@@ -10,6 +10,7 @@ export {
   Error,
   InvalidComponentError,
   InvalidURIError,
+  kernelURI,
   Util,
 } from "./uri/common.js";
 export { DEFAULT_PARSER, RFC2396_PARSER, RFC3986_PARSER } from "./uri/common.js";

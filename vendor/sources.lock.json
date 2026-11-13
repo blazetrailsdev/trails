@@ -116,6 +116,10 @@
       "ref": "v3.2.8",
       "sha": "5f511d7d3d9d62becddcbd403dde813a67e10c81"
     },
+    "rack-proxy": {
+      "ref": "v2.0.1",
+      "sha": "1ca3d3dc9a2aaf730ed25aa9685924d3d12450f3"
+    },
     "rack-session": {
       "ref": "v2.1.0",
       "sha": "8a021430d2238cc7a0a3b5dfcc8fe44c43b984ce"

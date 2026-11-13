@@ -383,3 +383,18 @@ export class URI {
 constSet(TopLevel, "URI", URI);
 
 constSet(URI, "InvalidURIError", InvalidURIError);
+
+/**
+ * Mirrors: Ruby's `Kernel#URI`, `vendor/ruby/v3.3.11/lib/uri/common.rb:844`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function kernelURI(uri: unknown): Generic {
+  if (uri instanceof Generic) {
+    return uri;
+  } else if (typeof uri === "string") {
+    return URI.parse(uri);
+  } else {
+    throw new ArgumentError("bad argument (expected URI object or URI string)");
+  }
+}

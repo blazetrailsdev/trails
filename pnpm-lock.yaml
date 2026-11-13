@@ -941,6 +941,19 @@ importers:
         specifier: 25.3.5
         version: 25.3.5
 
+  packages/rack-proxy:
+    dependencies:
+      '@blazetrails/rack':
+        specifier: workspace:*
+        version: link:../rack
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
+
   packages/rack-session:
     dependencies:
       '@blazetrails/rack':

@@ -44,6 +44,8 @@
     { "path": "packages/activerecord/tsconfig.test.json" },
     { "path": "packages/rack" },
     { "path": "packages/rack/tsconfig.test.json" },
+    { "path": "packages/rack-proxy" },
+    { "path": "packages/rack-proxy/tsconfig.test.json" },
     { "path": "packages/rack-session" },
     { "path": "packages/rack-session/tsconfig.test.json" },
     { "path": "packages/rack-test" },
