@@ -6,7 +6,7 @@ describe("TCCountryTimezone", () => {
   it("identifier", () => {
     const ct = new CountryTimezone("Europe/London", rational(2059, 40), rational(-5, 16));
     expect(ct.identifier).toBe("Europe/London");
-    expect(Object.isFrozen(ct.identifier)).toBe(true);
+    expect(Object.isFrozen(ct.identifier)).toBeTruthy();
   });
 
   it("latitude", () => {
@@ -25,8 +25,11 @@ describe("TCCountryTimezone", () => {
   });
 
   it("nil description", () => {
+    const nilFrozen = Object.isFrozen(null);
     const ct = new CountryTimezone("Europe/London", rational(2059, 40), rational(-5, 16), null);
     expect(ct.description).toBeNull();
+
+    expect(Object.isFrozen(null)).toEqual(nilFrozen);
   });
 
   it("description", () => {
@@ -37,7 +40,7 @@ describe("TCCountryTimezone", () => {
       "Eastern Time",
     );
     expect(ct.description).toBe("Eastern Time");
-    expect(Object.isFrozen(ct.description)).toBe(true);
+    expect(Object.isFrozen(ct.description)).toBeTruthy();
   });
 
   it("equality 1", () => {

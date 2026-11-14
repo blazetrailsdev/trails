@@ -135,19 +135,19 @@ describe("TCCountryIndexDefiner", () => {
     });
 
     const countries = definer.countries;
-    expect(Object.keys(countries).every((k) => Object.isFrozen(k))).toBe(true);
+    expect(Object.keys(countries).every((k) => Object.isFrozen(k))).toBeTruthy();
 
     const countryTt = countries["TT"];
-    expect(Object.isFrozen(countryTt.code)).toBe(true);
-    expect(Object.isFrozen(countryTt.name)).toBe(true);
+    expect(Object.isFrozen(countryTt.code)).toBeTruthy();
+    expect(Object.isFrozen(countryTt.name)).toBeTruthy();
 
     const zone0 = countryTt.zones[0] as CountryTimezone;
-    expect(Object.isFrozen(zone0.identifier)).toBe(true);
-    expect(Object.isFrozen(zone0.description)).toBe(true);
+    expect(Object.isFrozen(zone0.identifier)).toBeTruthy();
+    expect(Object.isFrozen(zone0.description)).toBeTruthy();
 
     const zone1 = countryTt.zones[1] as CountryTimezone;
-    expect(Object.isFrozen(zone1.identifier)).toBe(true);
-    expect(Object.isFrozen(zone1.description)).toBe(true);
+    expect(Object.isFrozen(zone1.identifier)).toBeTruthy();
+    expect(Object.isFrozen(zone1.description)).toBeTruthy();
   });
 
   it("strings deduped", () => {

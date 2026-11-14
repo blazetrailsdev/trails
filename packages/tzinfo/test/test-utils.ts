@@ -28,3 +28,9 @@ export function assertRaises(
   expect(error).toBeInstanceOf(klass);
   return error as Error;
 }
+
+export function assertArraySameItems(expected: readonly unknown[], actual: readonly unknown[]) {
+  const condition =
+    expected.length === actual.length && expected.filter((x) => !actual.includes(x)).length === 0;
+  expect(condition).toBeTruthy();
+}

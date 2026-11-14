@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { TimezoneIndexDefiner } from "../../lib/format2/timezone-index-definer.js";
 import { StringDeduper } from "../../lib/string-deduper.js";
+import { assertArraySameItems } from "../test-utils.js";
 
 describe("TCTimezoneIndexDefiner", () => {
   let stringDeduper: StringDeduper;
@@ -18,16 +19,10 @@ describe("TCTimezoneIndexDefiner", () => {
     definer.dataTimezone("Another/Zone");
     definer.linkedTimezone("And/Yet/Another");
 
-    expect(definer.dataTimezones).toEqual(
-      expect.arrayContaining(["Another/Zone", "Test/One", "Test/Two"]),
-    );
-    expect(definer.dataTimezones).toHaveLength(3);
-    expect(definer.linkedTimezones).toEqual(
-      expect.arrayContaining(["And/Yet/Another", "Test/Three"]),
-    );
-    expect(definer.linkedTimezones).toHaveLength(2);
-    expect(definer.dataTimezones.every((s) => Object.isFrozen(s))).toBe(true);
-    expect(definer.linkedTimezones.every((s) => Object.isFrozen(s))).toBe(true);
+    assertArraySameItems(["Another/Zone", "Test/One", "Test/Two"], definer.dataTimezones);
+    assertArraySameItems(["And/Yet/Another", "Test/Three"], definer.linkedTimezones);
+    expect(definer.dataTimezones.every((s) => Object.isFrozen(s))).toBeTruthy();
+    expect(definer.linkedTimezones.every((s) => Object.isFrozen(s))).toBeTruthy();
   });
 
   it("data only", () => {
@@ -35,9 +30,9 @@ describe("TCTimezoneIndexDefiner", () => {
     definer.dataTimezone("Test/A/Two");
     definer.dataTimezone("Test/A/Three");
 
-    expect([...definer.dataTimezones].sort()).toEqual(["Test/A/One", "Test/A/Three", "Test/A/Two"]);
+    assertArraySameItems(["Test/A/One", "Test/A/Two", "Test/A/Three"], definer.dataTimezones);
     expect(definer.linkedTimezones).toEqual([]);
-    expect(definer.dataTimezones.every((s) => Object.isFrozen(s))).toBe(true);
+    expect(definer.dataTimezones.every((s) => Object.isFrozen(s))).toBeTruthy();
   });
 
   it("linked only", () => {
@@ -46,12 +41,8 @@ describe("TCTimezoneIndexDefiner", () => {
     definer.linkedTimezone("Test/B/Three");
 
     expect(definer.dataTimezones).toEqual([]);
-    expect([...definer.linkedTimezones].sort()).toEqual([
-      "Test/B/One",
-      "Test/B/Three",
-      "Test/B/Two",
-    ]);
-    expect(definer.linkedTimezones.every((s) => Object.isFrozen(s))).toBe(true);
+    assertArraySameItems(["Test/B/One", "Test/B/Three", "Test/B/Two"], definer.linkedTimezones);
+    expect(definer.linkedTimezones.every((s) => Object.isFrozen(s))).toBeTruthy();
   });
 
   it("none", () => {

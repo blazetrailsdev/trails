@@ -77,8 +77,8 @@ describe("TCCountryDefiner", () => {
     const cd = createCountryDefiner({});
     cd.timezone("Test/One", 1, 2, 3, 4, "Test 1");
     const timezone = cd.timezones[0];
-    expect(Object.isFrozen(timezone.identifier)).toBe(true);
-    expect(Object.isFrozen(timezone.description)).toBe(true);
+    expect(Object.isFrozen(timezone.identifier)).toBeTruthy();
+    expect(Object.isFrozen(timezone.description)).toBeTruthy();
   });
 
   it("strings deduped", () => {
