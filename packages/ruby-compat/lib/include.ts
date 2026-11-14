@@ -1696,8 +1696,8 @@ function prependOrigin(proto: object, key: string): { slot: symbol } | undefined
  * trails skips it, since one function's slot cannot answer from two ancestry
  * positions and an awaited body carries no frame to tell the copies apart.
  *
- * @noRailsEquivalent PERMANENT
  * @inventedArm skip — PERMANENT
+ * @noRailsEquivalent PERMANENT
  */
 export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unknown[]): unknown {
   let slot = (method as { [_superSlot]?: symbol })[_superSlot];
