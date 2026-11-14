@@ -1036,12 +1036,19 @@
       "error.ts::InvalidSecret": "BCrypt::Errors::InvalidSecret"
     }
   },
-  "builder": { "rows": 5, "excluded": [], "unwalked": ["xchar.ts::XChar"], "residue": {} },
+  "builder": {
+    "rows": 5,
+    "excluded": [],
+    "unwalked": ["xchar.ts::XChar"],
+    "residue": {}
+  },
   "chronic": {
     "rows": 61,
     "excluded": [],
     "unwalked": ["handlers.ts::Handlers"],
-    "residue": { "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick" }
+    "residue": {
+      "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick"
+    }
   },
   "date": {
     "rows": 1,
@@ -1054,21 +1061,32 @@
       "time.ts::Timezone"
     ],
     "unwalked": [],
-    "residue": { "date.ts::DateInfinity": "Date::Infinity" }
+    "residue": {
+      "date.ts::DateInfinity": "Date::Infinity"
+    }
   },
   "did-you-mean": {
     "rows": 7,
     "excluded": [],
     "unwalked": [],
-    "residue": { "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker" }
+    "residue": {
+      "spell-checkers/null-checker.ts::NullChecker": "DidYouMean::NullChecker"
+    }
   },
   "et-orbi": {
     "rows": 1,
     "excluded": [],
     "unwalked": [],
-    "residue": { "time.ts::EoTime": "EtOrbi::EoTime" }
+    "residue": {
+      "time.ts::EoTime": "EtOrbi::EoTime"
+    }
   },
-  "fugit": { "rows": 13, "excluded": [], "unwalked": [], "residue": {} },
+  "fugit": {
+    "rows": 13,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  },
   "globalid": {
     "rows": 12,
     "excluded": ["global-id.ts::GlobalID", "signed-global-id.ts::SignedGlobalID"],
@@ -1169,7 +1187,12 @@
       "yaml.ts::YAML": "Mail::YAML"
     }
   },
-  "marcel": { "rows": 2, "excluded": [], "unwalked": [], "residue": {} },
+  "marcel": {
+    "rows": 2,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {}
+  },
   "mini-magick": {
     "rows": 10,
     "excluded": [],
@@ -1193,7 +1216,9 @@
       "unpacker.ts::UnpackError"
     ],
     "unwalked": ["bigint.ts::Bigint", "core-ext.ts::CoreExt", "time.ts::Time"],
-    "residue": { "factory.ts::MemberPool": "MessagePack::Factory::Pool::MemberPool" }
+    "residue": {
+      "factory.ts::MemberPool": "MessagePack::Factory::Pool::MemberPool"
+    }
   },
   "net-smtp": {
     "rows": 15,
@@ -1255,7 +1280,12 @@
       "xml/xpath/syntax-error.ts::SyntaxError": "Nokogiri::XML::XPath::SyntaxError"
     }
   },
-  "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },
+  "raabro": {
+    "rows": 3,
+    "excluded": ["raabro.ts::Raabro"],
+    "unwalked": [],
+    "residue": {}
+  },
   "rack": {
     "rows": 61,
     "excluded": [],
@@ -1277,10 +1307,7 @@
   },
   "rack-proxy": {
     "rows": 2,
-    "excluded": [
-      "http-streaming-response.ts::ResponseTooLarge",
-      "http-streaming-response.ts::StreamAborted"
-    ],
+    "excluded": [],
     "unwalked": [],
     "residue": {}
   },
@@ -1306,7 +1333,9 @@
     "rows": 8,
     "excluded": [],
     "unwalked": ["methods.ts::Methods", "utils.ts::Utils"],
-    "residue": { "test.ts::Test": "Rack::Test" }
+    "residue": {
+      "test.ts::Test": "Rack::Test"
+    }
   },
   "rackup": {
     "rows": 6,
@@ -1330,7 +1359,9 @@
       "version.ts::Version",
       "win32.ts::Win32"
     ],
-    "residue": { "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError" }
+    "residue": {
+      "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError"
+    }
   },
   "solid-cable": {
     "rows": 4,

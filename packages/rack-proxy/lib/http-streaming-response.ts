@@ -18,13 +18,9 @@ type NetHTTP = InstanceType<typeof Net.HTTP>;
 type NetHTTPRequest = InstanceType<typeof Net.HTTP.Get>;
 type NetHTTPResponse = InstanceType<typeof Net.HTTPResponse>;
 
-export class ResponseTooLarge extends StandardError {}
-
-export class StreamAborted extends StandardError {}
-
 export class HttpStreamingResponse {
-  static ResponseTooLarge = ResponseTooLarge;
-  static StreamAborted = StreamAborted;
+  static readonly ResponseTooLarge = class ResponseTooLarge extends StandardError {};
+  static readonly StreamAborted = class StreamAborted extends StandardError {};
 
   static readonly STATUSES_WITH_NO_ENTITY_BODY: Readonly<Record<number, boolean>> = Object.freeze({
     204: true,
@@ -107,7 +103,7 @@ export class HttpStreamingResponse {
         if (this.maxResponseLength != null) {
           bytes += chunk.length;
           if (bytes > this.maxResponseLength) {
-            throw new ResponseTooLarge(
+            throw new HttpStreamingResponse.ResponseTooLarge(
               `backend response exceeded max_response_length=${this.maxResponseLength}`,
             );
           }
@@ -200,7 +196,7 @@ export class HttpStreamingResponse {
     if (this.fiber?.isAlive()) {
       try {
         await this.fiber.raise(
-          StreamAborted,
+          HttpStreamingResponse.StreamAborted,
           "backend stream closed before the response was fully read",
         );
       } catch (e) {
