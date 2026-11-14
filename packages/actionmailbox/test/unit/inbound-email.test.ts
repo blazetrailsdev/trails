@@ -3,7 +3,7 @@ import type { Service } from "@blazetrails/activestorage/service";
 import { assertNoDifference } from "@blazetrails/activesupport/testing/assertions";
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { Mail } from "@blazetrails/mail";
-import "../support/test-helper.js";
+import "../test-helper.js";
 import { Blob } from "@blazetrails/activestorage/blob";
 import { ActionMailbox } from "../../lib/action-mailbox.js";
 import { InboundEmail } from "../../lib/inbound-email.js";

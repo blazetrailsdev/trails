@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Base } from "@blazetrails/activerecord";
 import { TestAdapter } from "@blazetrails/activejob/queue-adapters/test-adapter";
-import "../support/test-helper.js";
+import "../test-helper.js";
 import { InboundEmail } from "../../lib/inbound-email.js";
 import { RoutingJob } from "../../lib/routing-job.js";
 

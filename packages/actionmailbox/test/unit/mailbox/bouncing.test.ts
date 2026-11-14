@@ -4,7 +4,7 @@ import type { MessageDelivery } from "@blazetrails/actionmailer/message-delivery
 import { TestHelper } from "@blazetrails/actionmailer/test-helper";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { constSet, include } from "@blazetrails/ruby-compat";
-import { BounceMailer } from "../../support/test-helper.js";
+import { BounceMailer } from "../../test-helper.js";
 import "../../../lib/inbound-email.js";
 import type { InboundEmail } from "../../../lib/inbound-email.js";
 import { Base } from "../../../lib/base.js";

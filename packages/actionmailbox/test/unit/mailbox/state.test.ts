@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { RuntimeError, block } from "@blazetrails/ruby-compat";
-import "../../support/test-helper.js";
+import "../../test-helper.js";
 import "../../../lib/inbound-email.js";
 import type { InboundEmail } from "../../../lib/inbound-email.js";
 import { Base } from "../../../lib/base.js";

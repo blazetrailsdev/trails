@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import "../support/database/setup.js";
 import "../../lib/inbound-email.js";
-import { ApplicationMailbox } from "../support/mailboxes/application-mailbox.js";
+import { ApplicationMailbox } from "../dummy/app/mailboxes/application-mailbox.js";
 import { TestCase } from "../../lib/test-case.js";
 
 class TestHelperTest extends TestCase {}

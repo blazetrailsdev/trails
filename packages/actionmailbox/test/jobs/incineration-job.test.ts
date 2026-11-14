@@ -3,7 +3,7 @@ import { TestCase as ActiveJobTestCase } from "@blazetrails/activejob/test-case"
 import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertions";
 import type { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { include } from "@blazetrails/ruby-compat";
-import "../support/test-helper.js";
+import "../test-helper.js";
 import type { InboundEmail } from "../../lib/inbound-email.js";
 import { IncinerationJob } from "../../lib/incineration-job.js";
 import { TestHelper } from "../../lib/test-helper.js";

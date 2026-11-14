@@ -30,8 +30,8 @@ await Blob.loadSchema();
 await Attachment.loadSchema();
 await InboundEmail.loadSchema();
 
-await import("../mailboxes/application-mailbox.js");
-await import("../mailboxes/messages-mailbox.js");
+await import("../../dummy/app/mailboxes/application-mailbox.js");
+await import("../../dummy/app/mailboxes/messages-mailbox.js");
 
 afterAll(async () => {
   Trails.env = previousEnv;

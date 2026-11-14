@@ -3,11 +3,11 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
 import { ActionController } from "@blazetrails/actionpack";
 import { File, constSet, env, setEnv } from "@blazetrails/ruby-compat";
-import "./database/setup.js";
+import "./support/database/setup.js";
 
 setEnv("RAILS_INBOUND_EMAIL_PASSWORD", "tbsy84uSV1Kt3ZJZELY2TmShPRs91E3yL4tzf96297vBCkDWgL");
 
-TestCase.fileFixturePath = File.expandPath("../fixtures/files", import.meta.dirname);
+TestCase.fileFixturePath = File.expandPath("fixtures/files", import.meta.dirname);
 
 export function credentials(): string {
   return ActionController.HttpAuthentication.Basic.encodeCredentials(

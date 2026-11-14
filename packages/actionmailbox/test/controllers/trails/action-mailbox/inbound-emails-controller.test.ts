@@ -6,7 +6,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import type { Message } from "@blazetrails/mail";
 import { Trails } from "@blazetrails/trailties";
-import "../../../support/test-helper.js";
+import "../../../test-helper.js";
 import { InboundEmail } from "../../../../lib/inbound-email.js";
 import "../../../../lib/action-mailbox/inbound-emails-controller.js";
 

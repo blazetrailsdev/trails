@@ -4,7 +4,7 @@ import { days } from "@blazetrails/activesupport";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { freezeTime, travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { include } from "@blazetrails/ruby-compat";
-import "../../support/test-helper.js";
+import "../../test-helper.js";
 import { ActionMailbox } from "../../../lib/action-mailbox.js";
 import { InboundEmail } from "../../../lib/inbound-email.js";
 import { IncinerationJob } from "../../../lib/incineration-job.js";

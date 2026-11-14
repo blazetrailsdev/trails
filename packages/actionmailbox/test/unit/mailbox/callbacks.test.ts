@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { MessageDelivery } from "@blazetrails/actionmailer/message-delivery";
-import { BounceMailer } from "../../support/test-helper.js";
+import { BounceMailer } from "../../test-helper.js";
 import "../../../lib/inbound-email.js";
 import type { InboundEmail } from "../../../lib/inbound-email.js";
 import { Base } from "../../../lib/base.js";

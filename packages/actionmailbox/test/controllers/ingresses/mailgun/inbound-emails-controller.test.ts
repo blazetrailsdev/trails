@@ -9,7 +9,7 @@ import {
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Mail, type Field } from "@blazetrails/mail";
 import { ArgumentError, File, env, setEnv } from "@blazetrails/ruby-compat";
-import "../../../support/test-helper.js";
+import "../../../test-helper.js";
 import { ActionMailbox } from "../../../../lib/action-mailbox.js";
 import { InboundEmail } from "../../../../lib/inbound-email.js";
 import "../../../../lib/ingresses/mailgun/inbound-emails-controller.js";

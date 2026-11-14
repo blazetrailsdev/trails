@@ -7,7 +7,7 @@ import {
   assertNoDifference,
 } from "@blazetrails/activesupport/testing/assertions";
 import { ArgumentError, env, setEnv } from "@blazetrails/ruby-compat";
-import "../../../support/test-helper.js";
+import "../../../test-helper.js";
 import { ActionMailbox } from "../../../../lib/action-mailbox.js";
 import { InboundEmail } from "../../../../lib/inbound-email.js";
 import "../../../../lib/ingresses/mandrill/inbound-emails-controller.js";
