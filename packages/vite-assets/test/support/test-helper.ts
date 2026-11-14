@@ -1,7 +1,11 @@
+import { setEnv } from "@blazetrails/ruby-compat";
 import { vi } from "vitest";
 import type { Config } from "../../lib/config.js";
-import type { LastBuild } from "../../lib/missing-entrypoint-error.js";
+import { Build } from "../../lib/build.js";
+import { Builder } from "../../lib/builder.js";
 import { ViteAssets } from "../../lib/vite-assets.js";
+
+setEnv("VITE_RUBY_SKIP_COMPATIBILITY_CHECK", "true");
 
 let railsEnv = "production";
 
@@ -38,25 +42,47 @@ export async function withDevServerRunning(block: () => unknown): Promise<void> 
   }
 }
 
+export class MockProcessStatus {
+  /** @internal */
+  private readonly _success: boolean;
+
+  constructor({ success = true }: { success?: boolean } = {}) {
+    this._success = success;
+  }
+
+  isSuccess(): boolean {
+    return this._success;
+  }
+}
+
 export async function stubBuilder(
   {
     buildErrors = "",
     buildSuccessful = buildErrors === "",
-  }: { buildErrors?: string; buildSuccessful?: boolean } = {},
+    stale = false,
+  }: { buildErrors?: string; buildSuccessful?: boolean; stale?: boolean } = {},
   block: () => unknown,
 ): Promise<void> {
-  const lastBuild: LastBuild = {
-    success: buildSuccessful,
-    errors: buildErrors,
-    toJson: () => JSON.stringify({ success: buildSuccessful, errors: buildErrors }),
-  };
-  const spy = vi.spyOn(ViteAssets.instance(), "builder").mockReturnValue({
-    build: async () => buildSuccessful,
-    lastBuildMetadata: async () => lastBuild,
-  });
+  const fromPrevious = Build.fromPrevious;
+  const spies = [
+    vi.spyOn(Build, "fromPrevious").mockImplementation(async (...args) => {
+      const build = await fromPrevious.apply(Build, args);
+      build.success = buildSuccessful;
+      build.errors = buildErrors;
+      build.isStale = () => stale;
+      return build;
+    }),
+    vi
+      .spyOn(Builder.prototype as unknown as { buildWithVite(): unknown }, "buildWithVite")
+      .mockResolvedValue([
+        "stdout",
+        buildErrors,
+        new MockProcessStatus({ success: buildSuccessful }),
+      ]),
+  ];
   try {
     await block();
   } finally {
-    spy.mockRestore();
+    for (const spy of spies) spy.mockRestore();
   }
 }

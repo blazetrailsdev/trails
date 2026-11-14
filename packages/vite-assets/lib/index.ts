@@ -1,7 +1,11 @@
 import "./constants.generated.js";
 export { ViteAssets } from "./vite-assets.js";
 export { Config, type ConfigOptions } from "./config.js";
-export { Manifest, type ManifestEntry, type EntryType, type ManifestBuilder } from "./manifest.js";
+export { Manifest, type ManifestEntry, type EntryType } from "./manifest.js";
 export { Error } from "./error.js";
 export { MissingEntrypointError, type LastBuild } from "./missing-entrypoint-error.js";
 export { MissingExecutableError } from "./missing-executable-error.js";
+export { Build, type BuildAttrs } from "./build.js";
+export { Builder } from "./builder.js";
+export { IO } from "./io.js";
+export { Runner } from "./runner.js";

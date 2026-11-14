@@ -15,6 +15,7 @@ type ExecargOpthash = {
   out?: string | IO;
   err?: string | IO;
   unsetenvOthers?: unknown;
+  chdir?: unknown;
   exception?: boolean;
 };
 

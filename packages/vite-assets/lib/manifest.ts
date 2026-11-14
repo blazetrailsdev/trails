@@ -1,6 +1,7 @@
 import { ArgumentError, File, fetch, Mutex } from "@blazetrails/ruby-compat";
 import type { Config } from "./config.js";
-import { MissingEntrypointError, type LastBuild } from "./missing-entrypoint-error.js";
+import type { Builder } from "./builder.js";
+import { MissingEntrypointError } from "./missing-entrypoint-error.js";
 import type { ViteAssets } from "./vite-assets.js";
 
 export interface ManifestEntry {
@@ -14,11 +15,6 @@ export interface ManifestEntry {
 }
 
 export type EntryType = "javascript" | "stylesheet" | "typescript" | "virtual" | string | null;
-
-export interface ManifestBuilder {
-  build(): Promise<boolean>;
-  lastBuildMetadata(): Promise<LastBuild>;
-}
 
 const FS_PREFIX = "/@fs/";
 
@@ -145,7 +141,7 @@ window.__vite_plugin_react_preamble_installed__ = true
   }
 
   /** @internal */
-  private builder(): ManifestBuilder {
+  private builder(): Builder {
     return this._viteAssets.builder();
   }
 
