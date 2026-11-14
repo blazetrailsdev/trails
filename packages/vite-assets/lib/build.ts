@@ -1,4 +1,5 @@
-import { Errno, File, type Pathname, TopLevel } from "@blazetrails/ruby-compat";
+import { Errno, File, type Pathname } from "@blazetrails/ruby-compat";
+import { ViteAssets } from "./vite-assets.js";
 
 export interface BuildAttrs {
   success?: boolean | null;
@@ -87,7 +88,7 @@ export class Build {
     return (
       this.digest !== this.currentDigest ||
       this.isRetryFailed() ||
-      this.viteRuby !== TopLevel.ViteAssets!.VERSION
+      this.viteRuby !== ViteAssets.VERSION
     );
   }
 
@@ -112,7 +113,7 @@ export class Build {
       timestamp:
         `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
         `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
-      viteRuby: TopLevel.ViteAssets!.VERSION,
+      viteRuby: ViteAssets.VERSION,
       digest: this.currentDigest,
       currentDigest: this.currentDigest,
       lastBuildPath: this.lastBuildPath,

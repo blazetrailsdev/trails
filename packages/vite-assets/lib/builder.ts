@@ -18,7 +18,7 @@ export class Builder {
   /** @internal */
   private readonly _viteRuby: ViteAssets;
   /** @internal */
-  private _fileDigests: Record<string, [Signature, string]> = {};
+  private _fileDigests: Record<string, [Signature, string]> = Object.create(null);
   /** @internal */
   private _lastDigest: string | undefined;
   /** @internal */
@@ -98,7 +98,7 @@ export class Builder {
     const config = await this.config();
     const root = File.expandPath(config.root.toString());
     const previousDigests = this._fileDigests;
-    this._fileDigests = {};
+    this._fileDigests = Object.create(null);
     const files: string[] = [];
     for (const pattern of config.watchedPaths()) {
       files.push(...(await Dir.globAsync(pattern, 0, { base: root })));
