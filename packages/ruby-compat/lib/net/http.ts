@@ -272,11 +272,12 @@ export class HTTP {
     path: string | URIHTTP,
     initheader: Record<string, string> | null = null,
     dest: unknown = null,
+    block: ((bodySegment: Uint8Array) => unknown) | null = null,
   ): Promise<HTTPResponse> {
     let res: HTTPResponse | null = null;
 
     await this.request(new Get(path, initheader), null, (r) => {
-      r.readBody(dest);
+      r.readBody(dest, block);
       res = r;
     });
     return res!;
@@ -296,8 +297,9 @@ export class HTTP {
     data: string | Uint8Array,
     initheader: Record<string, string> | null = null,
     dest: unknown = null,
+    block: ((bodySegment: Uint8Array) => unknown) | null = null,
   ): Promise<HTTPResponse> {
-    return this.sendEntity(path, data, initheader, dest, Post);
+    return this.sendEntity(path, data, initheader, dest, Post, block);
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -341,10 +343,11 @@ export class HTTP {
     initheader: Record<string, string> | null,
     dest: unknown,
     type: typeof Post,
+    block: ((bodySegment: Uint8Array) => unknown) | null = null,
   ): Promise<HTTPResponse> {
     let res: HTTPResponse | null = null;
     await this.request(new type(path, initheader), data, (r) => {
-      r.readBody(dest);
+      r.readBody(dest, block);
       res = r;
     });
     return res!;

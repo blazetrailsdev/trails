@@ -1033,6 +1033,45 @@ describe("rbCallSuper", () => {
     expect(new Parent().setup()).toEqual(["prepended", "mod", "base"]);
   });
 
+  it("skips a module already included into the superclass chain", () => {
+    class Base {
+      setup(): string[] {
+        return ["base"];
+      }
+    }
+    class Parent extends Base {}
+    function prependedSetup(this: Parent): string[] {
+      return ["prepended", ...(rbCallSuper(this, prependedSetup) as string[])];
+    }
+    prepend(Parent, { setup: prependedSetup });
+    class Child extends Parent {}
+    function setup(this: Parent): string[] {
+      return ["mod", ...(rbCallSuper(this, setup) as string[])];
+    }
+    const mod = { setup };
+    include(Parent, mod);
+    include(Child, mod);
+    expect(Object.hasOwn(Child.prototype, "setup")).toBe(false);
+    expect(new Child().setup()).toEqual(["prepended", "mod", "base"]);
+  });
+
+  it("seats a module included below a prepend beneath the class's own method", () => {
+    class Parent {
+      setup(): string[] {
+        return ["parent"];
+      }
+    }
+    function prependedSetup(this: Parent): string[] {
+      return ["prepended", ...(rbCallSuper(this, prependedSetup) as string[])];
+    }
+    prepend(Parent, { setup: prependedSetup });
+    function setup(this: Parent): string[] {
+      return ["mod", ...(rbCallSuper(this, setup) as string[])];
+    }
+    include(Parent, { setup });
+    expect(new Parent().setup()).toEqual(["prepended", "parent"]);
+  });
+
   it("keeps a module included into sibling classes and again into one of them", () => {
     class Base {
       setup(): string[] {
