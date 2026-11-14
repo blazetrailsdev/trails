@@ -34,12 +34,8 @@ describe("RecordTest", () => {
     verifyRoles(role);
   });
 
-  function solidCacheConfig(): string | undefined {
-    return env["SOLID_CACHE_CONFIG"] ?? "config/cache_no_database.yml";
-  }
-
   function verifyShards(shards: unknown[]): void {
-    const config = solidCacheConfig();
+    const config = env["SOLID_CACHE_CONFIG"];
     if (config === "config/cache_no_database.yml") {
       expect(shards).toEqual(["default"]);
     } else if (config === "config/cache_database.yml") {
@@ -59,7 +55,7 @@ describe("RecordTest", () => {
   }
 
   function verifyRoles(role: unknown[]): void {
-    const config = solidCacheConfig();
+    const config = env["SOLID_CACHE_CONFIG"];
     if (config === "config/cache_no_database.yml") {
       expect(role).toEqual(["reading"]);
     } else if (SINGLE_DB_CONFIGS.includes(config)) {
