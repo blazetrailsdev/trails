@@ -1,3 +1,4 @@
+import { EOFError } from "./eof-error.js";
 export interface HttpRequest {
   method?: string | undefined;
   url?: string | undefined;
@@ -56,7 +57,7 @@ export interface HttpClientResponse {
   statusCode: number;
   statusMessage: string;
   headers: Record<string, string | string[] | undefined>;
-  body: Uint8Array;
+  body: AsyncIterable<Uint8Array>;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -135,10 +136,23 @@ type NodeIncoming = {
   statusCode?: number;
   statusMessage?: string;
   headers: Record<string, string | string[] | undefined>;
-  on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
-  on(event: "end", listener: () => void): unknown;
-  on(event: "error", listener: (error: Error) => void): unknown;
+  [Symbol.asyncIterator](): AsyncIterator<Uint8Array>;
 };
+
+/**
+ * A response body Node aborts before it is complete raises Ruby's `EOFError`,
+ * as `Net::BufferedIO#rbuf_fill` does (`vendor/ruby/v3.3.11/lib/net/protocol.rb:218-240`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+async function* _nodeBody(res: NodeIncoming): AsyncGenerator<Uint8Array> {
+  try {
+    for await (const chunk of res) yield chunk;
+  } catch (e) {
+    if ((e as { code?: unknown }).code === "ECONNRESET") throw new EOFError("end of file reached");
+    throw e;
+  }
+}
 
 type NodeHttp = {
   createServer: (handler: (req: HttpRequest, res: HttpResponse) => void) => HttpServer;
@@ -172,24 +186,12 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
             const req = http.request(
               { method, path, headers, createConnection: () => socket },
               (res) => {
-                const chunks: Uint8Array[] = [];
-                res.on("data", (chunk) => chunks.push(chunk));
-                res.on("error", rejectResponse);
-                res.on("end", () => {
-                  const total = chunks.reduce((n, c) => n + c.length, 0);
-                  const bytes = new Uint8Array(total);
-                  let offset = 0;
-                  for (const c of chunks) {
-                    bytes.set(c, offset);
-                    offset += c.length;
-                  }
-                  resolveResponse({
-                    httpVersion: res.httpVersion,
-                    statusCode: res.statusCode!,
-                    statusMessage: res.statusMessage ?? "",
-                    headers: res.headers,
-                    body: bytes,
-                  });
+                resolveResponse({
+                  httpVersion: res.httpVersion,
+                  statusCode: res.statusCode!,
+                  statusMessage: res.statusMessage ?? "",
+                  headers: res.headers,
+                  body: _nodeBody(res),
                 });
               },
             );

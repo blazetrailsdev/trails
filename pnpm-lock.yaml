@@ -953,6 +953,9 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
     devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
       '@types/node':
         specifier: 25.3.5
         version: 25.3.5

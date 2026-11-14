@@ -75,4 +75,20 @@ describe("Fiber", () => {
     await expect(fiber.resume()).rejects.toThrow("boom");
     expect(fiber.isAlive()).toBe(false);
   });
+
+  it("raise resumes a suspended fiber with the exception at its yield", async () => {
+    const seen: unknown[] = [];
+    const fiber = new Fiber(async () => {
+      try {
+        await Fiber.yield(1);
+      } catch (e) {
+        seen.push((e as Error).message);
+        throw e;
+      }
+    });
+    expect(await fiber.resume()).toBe(1);
+    await expect(fiber.raise(new Error("stop"))).rejects.toThrow("stop");
+    expect(seen).toEqual(["stop"]);
+    expect(fiber.isAlive()).toBe(false);
+  });
 });

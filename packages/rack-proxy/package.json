@@ -20,6 +20,7 @@
     "node": ">=26"
   },
   "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*",
     "@types/node": "25.3.5"
   },
   "mirrors": [
