@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import { minutes } from "@blazetrails/activesupport";
 import {
@@ -11,6 +11,7 @@ import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-he
 import { Deadlocked, Rollback } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { performAllLater } from "@blazetrails/activejob";
+import { TestCase } from "@blazetrails/activesupport/test-case";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import {
   BlockedExecution,
@@ -57,17 +58,29 @@ class NonOverlappingGroupedJob2 extends NonOverlappingJob {
   }
 }
 
-const JobTest = constSet(constGet(Object, "SolidQueue") as object, "JobTest", {});
+class JobTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+constSet(constGet(Object, "SolidQueue") as object, "JobTest", JobTest);
 for (const klass of [NonOverlappingJob, NonOverlappingGroupedJob1, NonOverlappingGroupedJob2]) {
   constSet(JobTest, klass.name, klass);
 }
 
 describe("SolidQueue::JobTest", () => {
   let result: JobResult;
+  let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;
 
   beforeAll(async () => {
     await loadAppSchema();
     ApplicationJob.queueAdapter = new SolidQueueAdapter();
+    oldPermanentConnectionCheckout = permanentConnectionCheckout();
+    setPermanentConnectionCheckout(true);
+  });
+
+  afterAll(() => {
+    setPermanentConnectionCheckout(oldPermanentConnectionCheckout);
   });
 
   beforeEach(async () => {

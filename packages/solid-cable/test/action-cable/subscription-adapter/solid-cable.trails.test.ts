@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { Concurrent, Thread, rbFSleep } from "@blazetrails/ruby-compat";
 import { Listener } from "../../../lib/action-cable/subscription-adapter/solid-cable.js";
 
 interface SelfPipeListener {
@@ -38,5 +39,33 @@ describe("Listener self-pipe", () => {
     expect(l.selfPipe.reader.readNonblock(11, null, { exception: false })).toEqual(
       new Uint8Array([46]),
     );
+  });
+});
+
+describe("Listener shutdown", () => {
+  it("shutdown during interruptible raises Stop in the listener thread", async () => {
+    const l = Object.create(Listener.prototype) as {
+      _critical: InstanceType<typeof Concurrent.Semaphore>;
+      _thread: Thread<Promise<void>>;
+      interruptible<T>(block: () => Promise<T>): Promise<T>;
+      shutdown(): Promise<void>;
+    };
+    l._critical = new Concurrent.Semaphore(0);
+    let stopped = false;
+    l._thread = new Thread(async () => {
+      try {
+        for (;;) await l.interruptible(() => rbFSleep(10));
+      } catch (error) {
+        stopped = error instanceof Listener.Stop;
+      } finally {
+        l._critical.release();
+      }
+    });
+    await Thread.pass();
+    const start = Date.now();
+    await l.shutdown();
+    expect(stopped).toBe(true);
+    expect(Date.now() - start).toBeLessThan(1000);
+    expect(l._critical.availablePermits()).toBe(1);
   });
 });

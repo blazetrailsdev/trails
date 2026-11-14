@@ -20,6 +20,15 @@ import { ApplicationJob } from "../support/application-job.js";
 import { JobResult } from "../support/job-result.js";
 import { loadAppSchema } from "../support/queue-schema.js";
 import { runSupervisor, waitForRegisteredProcesses } from "../support/processes-test-helper.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+
+class LifecycleHooksTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+constSet(TopLevel, "LifecycleHooksTest", LifecycleHooksTest);
 
 describe("LifecycleHooksTest", () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;

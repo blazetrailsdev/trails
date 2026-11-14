@@ -7,6 +7,7 @@ import type { AtomicBoolean } from "./atomic-boolean.js";
 import type { ReadWriteLock } from "./read-write-lock.js";
 import type { AtomicFixnum } from "./atomic-fixnum.js";
 import type { TimerTask } from "./timer-task.js";
+import type { Semaphore } from "./semaphore.js";
 import type {
   CachedThreadPool,
   RejectedExecutionError,
@@ -28,6 +29,7 @@ export const Concurrent = { name: "Concurrent" } as {
   ReadWriteLock: typeof ReadWriteLock;
   AtomicFixnum: typeof AtomicFixnum;
   TimerTask: typeof TimerTask;
+  Semaphore: typeof Semaphore;
   ThreadPoolExecutor: typeof ThreadPoolExecutor;
   RejectedExecutionError: typeof RejectedExecutionError;
   globalIoExecutor: () => CachedThreadPool;

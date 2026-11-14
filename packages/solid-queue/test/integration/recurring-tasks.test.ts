@@ -22,6 +22,8 @@ import {
   waitForRegisteredProcesses,
 } from "../support/processes-test-helper.js";
 import { waitForJobsToBeEnqueued, waitForJobsToFinishFor } from "../support/jobs-test-helper.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 type TaskAttrs = { class?: string; schedule?: string; args?: unknown[] };
 
@@ -39,6 +41,13 @@ async function assertRecurringTasks(expectedTasks: { [key: string]: TaskAttrs })
     }
   });
 }
+
+class RecurringTasksTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+constSet(TopLevel, "RecurringTasksTest", RecurringTasksTest);
 
 describe.skip("RecurringTasksTest", { timeout: 15_000 }, () => {
   let run: ReturnType<typeof runSupervisor>;

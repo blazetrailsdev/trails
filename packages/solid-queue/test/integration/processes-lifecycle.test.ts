@@ -31,6 +31,8 @@ import {
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 async function enqueueStoreResultJob(
   value: string,
@@ -86,6 +88,13 @@ async function assertRegisteredWorkersFor(queues: string[], supervisorPid: numbe
     expect([...new Set(pids)]).toEqual([supervisorPid]);
   }
 }
+
+class ProcessesLifecycleTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+constSet(TopLevel, "ProcessesLifecycleTest", ProcessesLifecycleTest);
 
 describe("ProcessesLifecycleTest", () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;

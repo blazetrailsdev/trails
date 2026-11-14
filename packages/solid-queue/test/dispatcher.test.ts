@@ -26,6 +26,8 @@ import {
   assertMetadata,
   assertNoRegisteredProcesses,
 } from "./support/processes-test-helper.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 function assertCalledAtLeast(
   spy: { mock: { calls: unknown[][] } },
@@ -37,6 +39,13 @@ function assertCalledAtLeast(
     times,
   );
 }
+
+class DispatcherTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+constSet(TopLevel, "DispatcherTest", DispatcherTest);
 
 describe("DispatcherTest", () => {
   let dispatcher: Dispatcher;

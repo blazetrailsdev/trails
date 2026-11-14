@@ -46,6 +46,8 @@ function _creationFrame(): Error {
 
 const _wakeups = new WeakMap<object, (() => void) | true>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
+const _pendingInterrupts = new WeakMap<object, { raised: unknown }>();
+const _unblockingFunctions = new WeakMap<object, (error: unknown) => void>();
 const _variables = new WeakMap<object, Map<string, unknown>>();
 
 function currentSlot(): AsyncContext<Thread> {
@@ -303,6 +305,51 @@ export class Thread<R = unknown> {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#raise` (`thread_raise_m`,
+   * `vendor/ruby/v3.3.11/thread.c:2682-2695`; `rb_threadptr_raise`, `:2519-2545`),
+   * which queues the exception as a pending interrupt and wakes the target from
+   * a blocking region. JS cannot stop a running async body, so the exception is
+   * raised where the target next blocks (`Thread.blockingRegion`), or at once if
+   * it is blocked now.
+   */
+  raise(exception: unknown = new Error("unhandled exception")): null {
+    if (this.status === "dead") return null;
+    const ubf = _unblockingFunctions.get(this);
+    if (ubf) {
+      _unblockingFunctions.delete(this);
+      ubf(exception);
+    } else {
+      _pendingInterrupts.set(this, { raised: exception });
+    }
+    return null;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — MRI's `BLOCKING_REGION`
+   * (`vendor/ruby/v3.3.11/thread.c:195-210`) with `RUBY_VM_CHECK_INTS`: a pending
+   * interrupt is raised before the current thread blocks, and `Thread#raise`
+   * calls `ubf` to unblock it. `exec` starts the wait and returns its `ubf`.
+   */
+  static blockingRegion<T>(exec: (wake: (value: T) => void) => () => void): Promise<T> {
+    const th = Thread.current();
+    const pending = _pendingInterrupts.get(th);
+    if (pending) {
+      _pendingInterrupts.delete(th);
+      return Promise.reject(pending.raised);
+    }
+    return new Promise<T>((resolve, reject) => {
+      const ubf = exec((value) => {
+        _unblockingFunctions.delete(th);
+        resolve(value);
+      });
+      _unblockingFunctions.set(th, (error) => {
+        ubf();
+        reject(error);
+      });
+    });
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#exit` / `#kill`
    * (`vendor/ruby/v3.3.11/thread.c:2710`), which terminates the thread and returns it.
    * MRI interrupts the thread wherever it is. JS cannot stop a running async
@@ -409,4 +456,22 @@ export class Thread<R = unknown> {
     const cname = this.constructor.name;
     return `#<${cname}:0x${this.id.toString(16).padStart(16, "0")}${name}${location} ${this.status}>`;
   }
+}
+
+/**
+ * Ruby's `Kernel#sleep` (`rb_f_sleep`, `vendor/ruby/v3.3.11/process.c:5055-5078`):
+ * sleeps the current thread, forever with no argument, and answers the whole
+ * seconds slept. `Thread#raise` interrupts it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbFSleep(duration: number | null = null): Promise<number> {
+  const beg = Date.now();
+  return Thread.blockingRegion<number>((wake) => {
+    const timer =
+      duration == null
+        ? undefined
+        : setTimeout(() => wake(Math.round((Date.now() - beg) / 1000)), duration * 1000);
+    return () => clearTimeout(timer);
+  });
 }
