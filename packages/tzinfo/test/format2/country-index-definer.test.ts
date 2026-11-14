@@ -141,11 +141,11 @@ describe("TCCountryIndexDefiner", () => {
     expect(Object.isFrozen(countryTt.code)).toBeTruthy();
     expect(Object.isFrozen(countryTt.name)).toBeTruthy();
 
-    const zone0 = countryTt.zones[0] as CountryTimezone;
+    const zone0 = countryTt.zones[0];
     expect(Object.isFrozen(zone0.identifier)).toBeTruthy();
     expect(Object.isFrozen(zone0.description)).toBeTruthy();
 
-    const zone1 = countryTt.zones[1] as CountryTimezone;
+    const zone1 = countryTt.zones[1];
     expect(Object.isFrozen(zone1.identifier)).toBeTruthy();
     expect(Object.isFrozen(zone1.description)).toBeTruthy();
   });
