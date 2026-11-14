@@ -56,6 +56,20 @@ describe("SolidCache::ExpiryTest", () => {
     });
   }
 
+  async function write(keys: string[], ...pairs: [number, unknown][]): Promise<void> {
+    for (const [i, value] of pairs) await cache.write(keys[i], value);
+  }
+
+  function writeMulti(n: number): Promise<unknown> {
+    return cache.writeMulti(
+      Object.fromEntries(Array.from({ length: n }, (_, i) => [`key${i}`, i])),
+    );
+  }
+
+  async function drain(): Promise<void> {
+    await drain();
+  }
+
   async function entryCount(): Promise<number> {
     let count = 0;
     await Record.eachShard(async () => {
@@ -70,18 +84,14 @@ describe("SolidCache::ExpiryTest", () => {
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxAge: weeks(2).toI(), expiryMethod });
       const defaultShardKeys = await shardKeys(cache, firstShardKey);
-      await cache.write(defaultShardKeys[0], 1);
-      await cache.write(defaultShardKeys[1], 2);
+      await write(defaultShardKeys, [0, 1], [1, 2]);
       expect(await cache.read(defaultShardKeys[0])).toBe(1);
       expect(await cache.read(defaultShardKeys[1])).toBe(2);
 
       await sendEntriesBackInTime(weeks(3));
+      await write(defaultShardKeys, [2, 3], [3, 4]);
 
-      await cache.write(defaultShardKeys[2], 3);
-      await cache.write(defaultShardKeys[3], 4);
-
-      await waitForBackgroundTasks(cache);
-      await t.performEnqueuedJobs();
+      await drain();
 
       expect(await cache.read(defaultShardKeys[0])).toBeNull();
       expect(await cache.read(defaultShardKeys[1])).toBeNull();
@@ -94,16 +104,12 @@ describe("SolidCache::ExpiryTest", () => {
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxAge: null, maxEntries: 2, expiryMethod });
       const defaultShardKeys = await shardKeys(cache, firstShardKey);
-      await cache.write(defaultShardKeys[0], 1);
-      await cache.write(defaultShardKeys[1], 2);
+      await write(defaultShardKeys, [0, 1], [1, 2]);
 
       await waitForBackgroundTasks(cache);
+      await write(defaultShardKeys, [2, 3], [3, 4]);
 
-      await cache.write(defaultShardKeys[2], 3);
-      await cache.write(defaultShardKeys[3], 4);
-
-      await waitForBackgroundTasks(cache);
-      await t.performEnqueuedJobs();
+      await drain();
 
       expect(await entryCount()).toBe(1);
     });
@@ -113,17 +119,12 @@ describe("SolidCache::ExpiryTest", () => {
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxAge: null, maxSize: 1000, expiryMethod });
       const defaultShardKeys = await shardKeys(cache, firstShardKey);
-      await cache.write(defaultShardKeys[0], "a".repeat(350));
-      await cache.write(defaultShardKeys[1], "a".repeat(350));
+      await write(defaultShardKeys, [0, "a".repeat(350)], [1, "a".repeat(350)]);
 
-      await waitForBackgroundTasks(cache);
-      await t.performEnqueuedJobs();
+      await drain();
+      await write(defaultShardKeys, [2, "a".repeat(350)], [3, "a".repeat(350)]);
 
-      await cache.write(defaultShardKeys[2], "a".repeat(350));
-      await cache.write(defaultShardKeys[3], "a".repeat(350));
-
-      await waitForBackgroundTasks(cache);
-      await t.performEnqueuedJobs();
+      await drain();
 
       expect(await entryCount()).toBeLessThan(4);
     });
@@ -133,17 +134,12 @@ describe("SolidCache::ExpiryTest", () => {
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxEntries: 2, expiryMethod });
       const defaultShardKeys = await shardKeys(cache, firstShardKey);
-
-      await cache.write(defaultShardKeys[0], 1);
-      await cache.write(defaultShardKeys[1], 2);
+      await write(defaultShardKeys, [0, 1], [1, 2]);
 
       await waitForBackgroundTasks(cache);
+      await write(defaultShardKeys, [2, 3], [3, 4]);
 
-      await cache.write(defaultShardKeys[2], 3);
-      await cache.write(defaultShardKeys[3], 4);
-
-      await waitForBackgroundTasks(cache);
-      await t.performEnqueuedJobs();
+      await drain();
 
       expect(await entryCount()).toBe(1);
     });
@@ -153,12 +149,9 @@ describe("SolidCache::ExpiryTest", () => {
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxEntries: 1, expiryMethod });
       const defaultShardKeys = await shardKeys(cache, firstShardKey);
+      await write(defaultShardKeys, [0, 1], [1, 2]);
 
-      await cache.write(defaultShardKeys[0], 1);
-      await cache.write(defaultShardKeys[1], 2);
-
-      await waitForBackgroundTasks(cache);
-      await t.performEnqueuedJobs();
+      await drain();
 
       expect(await entryCount()).toBe(0);
     });
@@ -168,12 +161,9 @@ describe("SolidCache::ExpiryTest", () => {
 
       cache = host.lookupStore({ expiryBatchSize: 6, maxEntries: 1, expiryMethod });
       const defaultShardKeys = await shardKeys(cache, firstShardKey);
+      await write(defaultShardKeys, [0, 1], [1, 2]);
 
-      await cache.write(defaultShardKeys[0], 1);
-      await cache.write(defaultShardKeys[1], 2);
-
-      await waitForBackgroundTasks(cache);
-      await t.performEnqueuedJobs();
+      await drain();
 
       expect(await entryCount()).toBe(2);
     });
@@ -192,10 +182,7 @@ describe("SolidCache::ExpiryTest", () => {
     const defaultShardKeys = await shardKeys(cache, firstShardKey);
 
     await t.assertEnqueuedJobs(2, { only: ExpiryJob, queue: "cache_expiry" }, async () => {
-      await cache.write(defaultShardKeys[0], 1);
-      await cache.write(defaultShardKeys[1], 2);
-      await cache.write(defaultShardKeys[2], 3);
-      await cache.write(defaultShardKeys[2], 4);
+      await write(defaultShardKeys, [0, 1], [1, 2], [2, 3], [2, 4]);
     });
 
     await t.performEnqueuedJobs();
@@ -205,44 +192,21 @@ describe("SolidCache::ExpiryTest", () => {
   it("triggers multiple expiry tasks when there are many writes", async () => {
     cache = host.lookupStore({ expiryBatchSize: 20, maxEntries: 2, expiryQueue: "cache_expiry" });
     const background = cache._background;
-    const writeMulti = (n: number) =>
-      cache.writeMulti(Object.fromEntries(Array.from({ length: n }, (_, i) => [`key${i}`, i])));
-    const difference = async (block: () => Promise<void>) => {
+    const scheduled = async (n: number) => {
       const before = background.scheduledTaskCount;
-      await block();
+      await writeMulti(n);
+      await waitForBackgroundTasks(cache);
       return background.scheduledTaskCount - before;
     };
 
     stubRand(0.25, 0.24);
-    expect(
-      await difference(async () => {
-        await writeMulti(8);
-        await waitForBackgroundTasks(cache);
-      }),
-    ).toBe(1);
-
-    expect(
-      await difference(async () => {
-        await writeMulti(24);
-        await waitForBackgroundTasks(cache);
-      }),
-    ).toBe(3);
+    expect(await scheduled(8)).toBe(1);
+    expect(await scheduled(24)).toBe(3);
 
     vi.restoreAllMocks();
     stubRand(0.25, 0.24);
-    expect(
-      await difference(async () => {
-        await writeMulti(10);
-        await waitForBackgroundTasks(cache);
-      }),
-    ).toBe(1);
-
-    expect(
-      await difference(async () => {
-        await writeMulti(10);
-        await waitForBackgroundTasks(cache);
-      }),
-    ).toBe(1);
+    expect(await scheduled(10)).toBe(1);
+    expect(await scheduled(10)).toBe(1);
   });
 
   it("triggers multiple expiry jobs when there are many writes", async () => {
@@ -252,9 +216,6 @@ describe("SolidCache::ExpiryTest", () => {
       expiryQueue: "cache_expiry",
       expiryMethod: "job",
     });
-    const writeMulti = (n: number) =>
-      cache.writeMulti(Object.fromEntries(Array.from({ length: n }, (_, i) => [`key${i}`, i])));
-
     stubRand(0.25, 0.24);
     await t.assertEnqueuedJobs(2, { only: ExpiryJob }, () => writeMulti(8));
 
