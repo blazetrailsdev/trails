@@ -237,6 +237,7 @@ describe("AbstractMysqlAdapter#renameColumn wiring", () => {
     const { adapter, events } = await makeAdapter();
     await adapter.renameColumn("users", "old_name", "new_name");
     expect(events).toEqual([
+      "clear:users",
       "exec:ALTER TABLE `users` RENAME COLUMN `old_name` TO `new_name`",
       "indexes:users:old_name:new_name",
     ]);

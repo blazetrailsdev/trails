@@ -52,6 +52,9 @@ describe("promise-count gate", () => {
     expect(raisedMarks(base, { [FLOAT]: { rack: 1 }, [CTOR]: {} })).toEqual([]);
     expect(raisedMarks(base, { [FLOAT]: { rack: 3 }, [CTOR]: {} })).toHaveLength(1);
     expect(raisedMarks(base, { [FLOAT]: { rack: 2 }, [CTOR]: { rake: 1 } })).toHaveLength(1);
+    expect(raisedMarks(base, { [FLOAT]: { rack: 2 }, [CTOR]: {}, [SWALLOW]: { rack: 4 } })).toEqual(
+      [],
+    );
   });
 
   it("re-measures every package when a rule, the config or a tsconfig changes", () => {

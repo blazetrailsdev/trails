@@ -396,6 +396,9 @@ function clearAdapterDataSourceCache(host: SchemaKlass): void {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
+let _inSetTableName = false;
+
 /** @inventedArm columns — PERMANENT */
 async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
   let cache: { columns?: (t: string) => Promise<unknown> } | null | undefined;
@@ -415,6 +418,7 @@ async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
  * @inventedArm try — PERMANENT
  * @inventedArm rescue — PERMANENT
  * @inventedArm rewarmDataSourceCache — PERMANENT
+ * @inventedArm if — PERMANENT
  * @missingRailsCall undefineAttributeMethods — CONVERGEABLE reset-column-information-undefines-attribute-methods
  */
 export async function resetColumnInformation(this: SchemaKlass): Promise<void> {
@@ -422,13 +426,14 @@ export async function resetColumnInformation(this: SchemaKlass): Promise<void> {
   try {
     connection = this.connectionPool().activeConnection as typeof connection;
   } catch {}
+  const rewarm = !_inSetTableName;
   const cleared = connection?.clearCacheBang?.();
   clearAdapterDataSourceCache(this);
 
   this.reloadSchemaFromCache();
   this.initializeFindByCache();
   await cleared;
-  await rewarmDataSourceCache(this);
+  if (rewarm) await rewarmDataSourceCache(this);
 }
 
 /** @internal */
@@ -590,13 +595,23 @@ export function tableName(this: SchemaKlass): string | null {
   return this._tableName;
 }
 
-/** @inventedArm Thread — PERMANENT */
+/**
+ * @inventedArm Thread — PERMANENT
+ * @inventedArm try — PERMANENT
+ */
 export function setTableName(this: SchemaKlass, value: string | null): void {
   value = value == null ? null : String(value);
 
   if (Object.hasOwn(this, "_tableName")) {
     if (value === this._tableName) return;
-    if (isConnected.call(this)) new Thread(() => resetColumnInformation.call(this));
+    if (isConnected.call(this)) {
+      _inSetTableName = true;
+      try {
+        new Thread(() => resetColumnInformation.call(this));
+      } finally {
+        _inSetTableName = false;
+      }
+    }
   }
 
   this._tableName = value;
