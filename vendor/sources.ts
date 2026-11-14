@@ -1194,16 +1194,12 @@ export const SOURCES: readonly UpstreamSource[] = [
     },
     packages: [
       {
-        name: "vite-ruby",
+        name: "vite-assets",
         libPath: "vite_ruby/lib/vite_ruby",
         libEntryFile: "vite_ruby/lib/vite_ruby.rb",
         testPath: "test",
-        compareApi: false,
-        apiExcludedReason:
-          "packages/vite-ruby does not exist yet; story vite-ruby-core-package creates it and enrolls it.",
-        compareTests: false,
-        testsExcludedReason:
-          "The monorepo's one test/ dir covers both gems; story vite-ruby-core-package splits it per package and enrolls it.",
+        compareApi: true,
+        compareTests: true,
       },
       {
         name: "vite-rails",
@@ -1214,7 +1210,7 @@ export const SOURCES: readonly UpstreamSource[] = [
           "packages/vite-rails does not exist yet; story vite-rails-package-and-tag-helpers creates it and enrolls it.",
         compareTests: false,
         testsExcludedReason:
-          "The monorepo's one test/ dir covers both gems; story vite-ruby-core-package splits it per package and enrolls it.",
+          "helper_test.rb and engine_rake_tasks_test.rb in the monorepo's shared test/ dir are vite_rails'; story vite-rails-package-and-tag-helpers enrolls them.",
       },
     ],
   },

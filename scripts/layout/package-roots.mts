@@ -61,6 +61,7 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "trailties",
   "tse-compiler",
   "tzinfo",
+  "vite-assets",
   "vitest-matchers",
   "zeitwerk",
 ]);

@@ -1286,6 +1286,19 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
+  packages/vite-assets:
+    dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+    devDependencies:
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+
   packages/vitest-matchers:
     dependencies:
       '@blazetrails/ruby-compat':

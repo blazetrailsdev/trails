@@ -99,6 +99,8 @@
     { "path": "packages/raabro/tsconfig.test.json" },
     { "path": "packages/zeitwerk" },
     { "path": "packages/zeitwerk/tsconfig.test.json" },
+    { "path": "packages/vite-assets" },
+    { "path": "packages/vite-assets/tsconfig.test.json" },
     { "path": "packages/fugit" },
     { "path": "packages/fugit/tsconfig.test.json" },
     { "path": "packages/image-processing" },

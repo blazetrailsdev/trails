@@ -1,0 +1,39 @@
+{
+  "name": "@blazetrails/vite-assets",
+  "version": "0.1.0",
+  "description": "Vite asset resolution for Trails, mirroring the vite_ruby gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "default.vite.json"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/ruby-compat": "workspace:*"
+  },
+  "devDependencies": {
+    "@blazetrails/vitest-matchers": "workspace:*"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "mirrors": [
+    {
+      "source": "vite_ruby",
+      "ref": "vite_ruby@3.11.1",
+      "sha": "77de9ea2b94044d72622f72d44d392953843a1d7"
+    }
+  ]
+}

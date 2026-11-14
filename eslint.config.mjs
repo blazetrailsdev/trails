@@ -148,6 +148,7 @@ export default defineConfig(
       "**/dist/**",
       "**/*.tt.js",
       "packages/thor/test/fixtures/doc/*.rb.js",
+      "packages/vite-assets/test/test_app/**",
       // The Journey visualizer's shipped assets: fsm.js and fsm.css are
       // byte-for-byte copies of
       // vendor/rails/v8.0.2/actionpack/lib/action_dispatch/journey/visualizer/, and

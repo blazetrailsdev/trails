@@ -44,6 +44,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "et-orbi",
     "raabro",
     "zeitwerk",
+    "vite-assets",
     "fugit",
     "actionview",
     "actioncable",
