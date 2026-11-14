@@ -81,7 +81,7 @@ describe("MIME Emails", () => {
     describe("a multipart email (raw_email7.eml)", () => {
       const mail = () => readFixture("emails", "mime_emails", "raw_email7.eml");
       it("should recognize a multipart email", async () => {
-        expect((await mail()).isMultipart()).toBe(true);
+        expect((await mail()).isMultipart()).toBeRubyTruthy();
       });
 
       it("inspect_structure should return what is expected", async () => {
@@ -102,7 +102,7 @@ describe("MIME Emails", () => {
 
     it("should recognize a non multipart email", async () => {
       const mail = await readFixture("emails", "plain_emails", "basic_email.eml");
-      expect(mail.isMultipart()).toBe(false);
+      expect(mail.isMultipart()).toBeRubyFalsy();
     });
 
     it("should not report the email as :attachment?", async () => {
@@ -123,7 +123,7 @@ describe("MIME Emails", () => {
 
     it("should recognize an attachment part", async () => {
       const mail = await readFixture("emails", "attachment_emails", "attachment_pdf.eml");
-      expect(mail.isAttachment()).toBe(false);
+      expect(mail.isAttachment()).toBeRubyFalsy();
       expect(mail.parts[0].isAttachment()).toEqual(false);
       expect(mail.parts[1].isAttachment()).toEqual(true);
     });
@@ -151,7 +151,7 @@ describe("MIME Emails", () => {
 
     it("should report the mail :has_attachments?", async () => {
       const mail = await readFixture("emails", "attachment_emails", "attachment_pdf.eml");
-      expect(mail.hasAttachments()).toBe(true);
+      expect(mail.hasAttachments()).toBeRubyTruthy();
     });
 
     it("should only split on exact boundary matches", async () => {
@@ -203,7 +203,7 @@ describe("MIME Emails", () => {
       const mail = Mail.new();
       mail.setTextPart("This is text");
       const textPart = mail.textPart() as Message;
-      expect(textPart.body().equals("This is text")).toBe(true);
+      expect(textPart.body().decoded()).toEqual("This is text");
       expect(textPart.contentType()).toEqual("text/plain");
     });
 
@@ -224,7 +224,7 @@ describe("MIME Emails", () => {
       const mail = Mail.new();
       mail.setHtmlPart("<b>This is HTML</b>");
       const htmlPart = mail.htmlPart() as Message;
-      expect(htmlPart.body().equals("<b>This is HTML</b>")).toBe(true);
+      expect(htmlPart.body().decoded()).toEqual("<b>This is HTML</b>");
       expect(htmlPart.contentType()).toEqual("text/html");
     });
 
@@ -394,7 +394,7 @@ describe("MIME Emails", () => {
           this.body("<h1>This is HTML</h1>");
         });
       });
-      expect(mail.isMultipart()).toBe(true);
+      expect(mail.isMultipart()).toBeRubyTruthy();
       expect(mail.parts.length).toEqual(2);
       const textPart = mail.textPart() as Message;
       const htmlPart = mail.htmlPart() as Message;
@@ -650,7 +650,7 @@ describe("MIME Emails", () => {
       await m.addFile(fixturePath("attachments", "test.png"));
       expect(m.attachments().length).toEqual(1);
       expect(m.parts.length).toEqual(2);
-      expect(m.parts[0].body().equals("Attached")).toBe(true);
+      expect(m.parts[0].body().decoded()).toEqual("Attached");
       expect(m.parts[1].filename()).toEqual("test.png");
     });
 
