@@ -46,6 +46,7 @@ export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "nokogiri",
   "raabro",
   "rack",
+  "rack-proxy",
   "rack-session",
   "rack-test",
   "rackup",

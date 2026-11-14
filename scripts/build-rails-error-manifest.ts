@@ -98,6 +98,7 @@ const BARE_RAISE_LIBS: Record<string, [source: string, lib: string, ns: string]>
   globalid: ["globalid", "lib", "global_id/"],
   i18n: ["i18n", "lib", "i18n/"],
   msgpack: ["msgpack", "lib", "msgpack/"],
+  "rack-proxy": ["rack-proxy", "lib", "rack/"],
   "rack-session": ["rack-session", "lib", "rack/session/"],
   "rack-test": ["rack-test", "lib", "rack/test/"],
   mysql2: ["mysql2", "lib", "mysql2/"],

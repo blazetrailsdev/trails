@@ -270,6 +270,24 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rack-proxy",
+    origin: {
+      type: "git",
+      url: "https://github.com/ncr/rack-proxy.git",
+      // vendor/vite_ruby/v3.11.1/vite_ruby/vite_ruby.gemspec:25 declares
+      // `rack-proxy >= 0.6.1`; v2.0.1 is the latest release on rubygems.org.
+      ref: "v2.0.1",
+    },
+    packages: [
+      {
+        name: "rack-proxy",
+        libPath: "lib/rack",
+        libEntryFile: "lib/rack/proxy.rb",
+        testPath: "test",
+      },
+    ],
+  },
+  {
     name: "rack-test",
     origin: {
       type: "git",

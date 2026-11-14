@@ -543,6 +543,7 @@ export default defineConfig(
       "packages/globalid/{lib,test}/**/*.ts",
       "packages/i18n/lib/**/*.ts",
       "packages/msgpack/lib/**/*.ts",
+      "packages/rack-proxy/lib/**/*.ts",
       "packages/rack-session/lib/**/*.ts",
       "packages/rack-test/lib/**/*.ts",
     ],

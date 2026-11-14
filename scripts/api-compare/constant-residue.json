@@ -1245,6 +1245,12 @@
       "urlmap.ts::URLMap": "Rack::URLMap"
     }
   },
+  "rack-proxy": {
+    "rows": 1,
+    "excluded": [],
+    "unwalked": [],
+    "residue": { "proxy.ts::Proxy": "Rack::Proxy" }
+  },
   "rack-session": {
     "rows": 17,
     "excluded": [],
