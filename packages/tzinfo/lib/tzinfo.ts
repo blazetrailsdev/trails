@@ -6,7 +6,7 @@ import { CountryDefiner } from "./format2/country-definer.js";
 import { CountryIndexDefiner } from "./format2/country-index-definer.js";
 import { TimezoneDefiner } from "./format2/timezone-definer.js";
 import { TimezoneIndexDefiner } from "./format2/timezone-index-definer.js";
-import { StringDeduper } from "./string-deduper.js";
+import { StringDeduper, UnaryMinusGlobalStringDeduper } from "./string-deduper.js";
 import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
 import { CountryInfo } from "./data-sources/country-info.js";
 import { DataTimezoneInfo } from "./data-sources/data-timezone-info.js";
@@ -69,6 +69,7 @@ export const TZInfo = {
   DataSource,
   CountryTimezone,
   StringDeduper,
+  UnaryMinusGlobalStringDeduper,
   Format2: {
     CountryDefiner,
     CountryIndexDefiner,

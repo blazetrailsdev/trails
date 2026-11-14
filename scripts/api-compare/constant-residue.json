@@ -1516,10 +1516,11 @@
     }
   },
   "tzinfo": {
-    "rows": 22,
+    "rows": 29,
     "excluded": [],
     "unwalked": [],
     "residue": {
+      "country-timezone.ts::CountryTimezone": "TZInfo::CountryTimezone",
       "country.ts::InvalidCountryCode": "TZInfo::InvalidCountryCode",
       "data-source.ts::DataSource": "TZInfo::DataSource",
       "data-source.ts::DataSourceNotFound": "TZInfo::DataSourceNotFound",
@@ -1531,8 +1532,14 @@
       "data-sources/timezone-info.ts::TimezoneInfo": "TZInfo::DataSources::TimezoneInfo",
       "data-sources/transitions-data-timezone-info.ts::TransitionsDataTimezoneInfo": "TZInfo::DataSources::TransitionsDataTimezoneInfo",
       "data-timezone.ts::DataTimezone": "TZInfo::DataTimezone",
+      "format2/country-definer.ts::CountryDefiner": "TZInfo::Format2::CountryDefiner",
+      "format2/country-index-definer.ts::CountryIndexDefiner": "TZInfo::Format2::CountryIndexDefiner",
+      "format2/timezone-definer.ts::TimezoneDefiner": "TZInfo::Format2::TimezoneDefiner",
+      "format2/timezone-index-definer.ts::TimezoneIndexDefiner": "TZInfo::Format2::TimezoneIndexDefiner",
       "info-timezone.ts::InfoTimezone": "TZInfo::InfoTimezone",
       "offset-timezone-period.ts::OffsetTimezonePeriod": "TZInfo::OffsetTimezonePeriod",
+      "string-deduper.ts::StringDeduper": "TZInfo::StringDeduper",
+      "string-deduper.ts::UnaryMinusGlobalStringDeduper": "TZInfo::UnaryMinusGlobalStringDeduper",
       "timestamp.ts::Timestamp": "TZInfo::Timestamp",
       "timezone-offset.ts::TimezoneOffset": "TZInfo::TimezoneOffset",
       "timezone-period.ts::TimezonePeriod": "TZInfo::TimezonePeriod",
