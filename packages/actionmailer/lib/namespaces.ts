@@ -32,6 +32,8 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
   "action_mailer/preview": () => import("./preview.js"),
   "action_mailer/queued_delivery": () => import("./queued-delivery.js"),
   "action_mailer/form_builder": () => import("./form-builder.js"),
+  "action_mailer/test_case": () => import("@blazetrails/actionmailer/test-case"),
+  "action_mailer/test_helper": () => import("@blazetrails/actionmailer/test-helper"),
 };
 
 export const ActionMailer = { name: "ActionMailer", loadPath } as AutoloadModule & {
@@ -69,3 +71,5 @@ ActionMailer.autoload("QueuedDelivery");
 ActionMailer.autoload("FormBuilder");
 ActionMailer.autoload("Preview", "action_mailer/preview");
 ActionMailer.autoload("Previews", "action_mailer/preview");
+ActionMailer.autoload("TestCase");
+ActionMailer.autoload("TestHelper");

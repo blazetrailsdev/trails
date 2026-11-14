@@ -96,7 +96,7 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
-    this.initializer("active_job.set_configs", (app) => {
+    this.initializer("active_job.set_configs", async (app) => {
       let options: Record<string, unknown> = app.config.activeJob as unknown as Record<
         string,
         unknown
@@ -134,6 +134,7 @@ export class Trailtie extends BaseTrailtie {
         });
       });
 
+      await ActiveJob.loadPath["active_job/test_helper"]();
       onLoad("action_dispatch_integration_test", function (this: new () => object) {
         include(this, ActiveJob.TestHelper);
       });
