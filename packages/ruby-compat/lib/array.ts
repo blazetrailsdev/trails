@@ -890,35 +890,29 @@ export function deleteAt<T>(ary: T[], pos: number): T | null {
 }
 
 /**
+ * Ruby `Array#first(n)` (`ary_take_first_or_last_n`,
+ * `vendor/ruby/v3.3.11/array.c:1292`): at most `n` elements, and
+ * `ArgumentError` for a negative `n`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbAryFirst<T>(ary: readonly T[], n: number): T[] {
+  if (n < 0) throw new ArgumentError("negative array size");
+  return ary.slice(0, n);
+}
+
+/**
  * Ruby `Array#first` with no argument (`vendor/ruby/v3.3.11/array.c:1901` `ary_first`):
  * the first element, or `nil` for an empty array. Any other enumerable is
  * `Enumerable#first` (`vendor/ruby/v3.3.11/enum.c:1284` `enum_first`), whose
  * `first_i` (`enum.c:1245`) breaks out of `each` at the first element. A
  * receiver that is neither answers its own `first` (`rb_funcallv`,
  * `vendor/ruby/v3.3.11/vm_eval.c:1080`), a method called or a reader read, or raises `NoMethodError` (`rb_method_missing`,
- * `vendor/ruby/v3.3.11/vm_eval.c:869`). With `n` on an Array it is
- * `ary_take_first_or_last_n` (`vendor/ruby/v3.3.11/array.c:1292`): at most `n`
- * elements, and `ArgumentError` for a negative `n`.
+ * `vendor/ruby/v3.3.11/vm_eval.c:869`).
  *
  * @noRailsEquivalent PERMANENT
  */
-export function first<T>(ary: Iterable<T>): T | null;
-/**
- * `ary_take_first_or_last_n` (`vendor/ruby/v3.3.11/array.c:1292`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function first<T>(ary: readonly T[], n: number): T[];
-/**
- * `ary_take_first_or_last_n` (`vendor/ruby/v3.3.11/array.c:1292`).
- *
- * @noRailsEquivalent PERMANENT
- */
-export function first<T>(ary: Iterable<T>, n?: number): T | T[] | null {
-  if (n !== undefined && Array.isArray(ary)) {
-    if (n < 0) throw new ArgumentError("negative array size");
-    return ary.slice(0, n);
-  }
+export function first<T>(ary: Iterable<T>): T | null {
   if (Array.isArray(ary)) return ary.length === 0 ? null : ary[0];
   if (typeof (ary as Partial<Iterable<T>> | null)?.[Symbol.iterator] !== "function") {
     const member = (ary as { first?: unknown } | null)?.first;

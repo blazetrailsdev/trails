@@ -241,6 +241,7 @@ export {
   deleteAt,
   each,
   first,
+  rbAryFirst,
   flatten,
   rbFArray,
   rbCheckArrayType,
