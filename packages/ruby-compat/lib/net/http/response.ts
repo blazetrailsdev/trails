@@ -1,4 +1,5 @@
 import type { HttpClientResponse } from "../../http-adapter.js";
+import { ArgumentError } from "../../argument-error.js";
 import { IOError } from "../../io-error.js";
 import { rbObjDup } from "../../include.js";
 import type { HTTP as URIHTTP } from "../../uri/http.js";
@@ -137,13 +138,32 @@ export class HTTPResponse {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  readBody(dest: unknown = null): Uint8Array | null {
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#to_hash` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:477-479`). */
+  toHash(): Record<string, string[]> {
+    return { ...this._header };
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383`. The adapter has read the whole body
+   * before `read_body` runs, so a block is yielded it as one chunk and `@body` keeps the bytes
+   * where Ruby keeps the `Net::ReadAdapter` `procdest` builds.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  readBody(
+    dest: unknown = null,
+    block: ((chunk: Uint8Array) => unknown) | null = null,
+  ): Uint8Array | null {
     if (this._read) {
-      if (dest != null) throw new IOError(`${this.constructor.name}#read_body called twice`);
+      if (dest != null || block != null) {
+        throw new IOError(`${this.constructor.name}#read_body called twice`);
+      }
       return this._body;
     }
+    this.procdest(dest, block);
+    this.streamCheck();
     this._body = this._bodyExist ? this.readBody0() : null;
+    if (this._body != null && block != null) block(this._body);
     this._read = true;
     return this._body;
   }
@@ -188,6 +208,18 @@ export class HTTPResponse {
         return block(this._socket!.body);
       default:
         return block(this._socket!.body);
+    }
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:642-644`. */
+  private streamCheck(): void {
+    if (this._socket == null) throw new IOError("attempt to read body out of block");
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:646-654`. */
+  private procdest(dest: unknown, block: unknown): void {
+    if (dest != null && block != null) {
+      throw new ArgumentError("both arg and block given for HTTP method");
     }
   }
 
