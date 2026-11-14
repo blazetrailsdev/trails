@@ -2,6 +2,7 @@ import { createServer as createNetServer, type Server as NetServer } from "node:
 import { gunzipSync } from "node:zlib";
 import { EOFError, IOError, Net, StringIO, Thread } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import type {} from "@blazetrails/vitest-matchers";
 
 import { HttpStreamingResponse } from "../lib/index.js";
 import { GZIP_PLAINTEXT, startServer, type TestServer } from "./support/proxy-test-server.js";
@@ -52,7 +53,7 @@ describe("HttpStreamingResponseTest", () => {
 
     const headers = await response.headers();
 
-    expect(headers.size > 0).toBe(true);
+    expect(headers.size > 0).toBeTruthy();
 
     expect((headers.get("content-type") as unknown as string[])[0].toLowerCase()).toMatch(
       /text\/html/,
@@ -64,19 +65,21 @@ describe("HttpStreamingResponseTest", () => {
       chunks.push(chunk);
     });
 
-    expect(chunks.length > 0).toBe(true);
+    expect(chunks.length > 0).toBeTruthy();
     for (const chunk of chunks) {
-      expect(chunk instanceof Uint8Array).toBe(true);
+      expect(chunk instanceof Uint8Array).toBeTruthy();
     }
   });
 
   it("to s", async () => {
     const bodyString = await response.body.toS();
-    expect(bodyString.length > 0).toBe(true);
+    expect(bodyString.length > 0).toBeTruthy();
     const contentLength = (await response.headers()).get("Content-Length") as unknown as
       | string[]
       | null;
-    expect(contentLength == null || bodyString.length === Number(contentLength[0])).toBe(true);
+    expect(contentLength == null ? bodyString.length : Number(contentLength[0])).toBe(
+      bodyString.length,
+    );
   });
 
   it("to s called twice", async () => {
@@ -85,14 +88,14 @@ describe("HttpStreamingResponseTest", () => {
   });
 
   it("body responds to close", () => {
-    expect(typeof response.body.close).toBe("function");
+    expect(typeof response.body.close === "function").toBeTruthy();
   });
 
   it("close without reading opens no connection", async () => {
     const req = new Net.HTTP.Get("/");
     const response = new HttpStreamingResponse(req, "127.0.0.1", server.port);
     response.useSsl = false;
-    await expect(response.close()).resolves.toBeUndefined();
+    await expect(response.close()).resolves.not.toThrow();
     expect(sessionOf(response)).toBeNull();
   });
 
@@ -100,21 +103,21 @@ describe("HttpStreamingResponseTest", () => {
     await response.body.each(() => {});
     const session = sessionOf(response);
     expect(session).not.toBeNull();
-    expect(!session!.isStarted()).toBe(true);
-    await expect(response.close()).resolves.toBeUndefined();
+    expect(!session!.isStarted()).toBeTruthy();
+    await expect(response.close()).resolves.not.toThrow();
   });
 
   it("close after reading headers releases connection", async () => {
     expect(await response.status()).toBe(200);
-    await expect(response.close()).resolves.toBeUndefined();
+    await expect(response.close()).resolves.not.toThrow();
 
     const session = sessionOf(response);
     expect(session).not.toBeNull();
-    expect(!session!.isStarted()).toBe(true);
+    expect(!session!.isStarted()).toBeTruthy();
 
     const chunks: Uint8Array[] = [];
     await response.body.each((chunk) => chunks.push(chunk));
-    expect(chunks).toEqual([]);
+    expect(chunks).toBeEmpty();
   });
 
   it("early break mid stream closes connection", async () => {
@@ -131,8 +134,8 @@ describe("HttpStreamingResponseTest", () => {
     expect(yielded).toBe(1);
     const session = sessionOf(response);
     expect(session).not.toBeNull();
-    expect(!session!.isStarted()).toBe(true);
-    await expect(response.close()).resolves.toBeUndefined();
+    expect(!session!.isStarted()).toBeTruthy();
+    await expect(response.close()).resolves.not.toThrow();
   });
 
   it("code after close raises without dialing", async () => {
@@ -153,8 +156,8 @@ describe("HttpStreamingResponseTest", () => {
     expect(await response.status()).toBe(204);
     const session = sessionOf(response);
     expect(session).not.toBeNull();
-    expect(!session!.isStarted()).toBe(true);
-    expect((await response.headers()).size > 0).toBe(true);
+    expect(!session!.isStarted()).toBeTruthy();
+    expect((await response.headers()).size > 0).toBeTruthy();
   });
 
   it("gzip body passes through verbatim without configure block", async () => {
@@ -187,11 +190,11 @@ describe("HttpStreamingResponseTest", () => {
 
     const session = sessionOf(response);
     expect(session).not.toBeNull();
-    expect(!session!.isStarted()).toBe(true);
+    expect(!session!.isStarted()).toBeTruthy();
 
     const chunks: Uint8Array[] = [];
     await response.body.each((chunk) => chunks.push(chunk));
-    expect(chunks).toEqual([]);
+    expect(chunks).toBeEmpty();
   });
 
   it("http10 eof delimited body streams fully", async () => {
@@ -209,7 +212,7 @@ describe("HttpStreamingResponseTest", () => {
       await response.body.each((chunk) => (body += decoder.decode(chunk)));
       expect(body).toBe("eof-delimited body");
 
-      expect(!sessionOf(response)!.isStarted()).toBe(true);
+      expect(!sessionOf(response)!.isStarted()).toBeTruthy();
     } finally {
       raw.close();
     }
@@ -223,9 +226,9 @@ describe("HttpStreamingResponseTest", () => {
     expect(await response.status()).toBe(200);
     const chunks: Uint8Array[] = [];
     await response.body.each((chunk) => chunks.push(chunk));
-    expect(chunks).toEqual([]);
+    expect(chunks).toBeEmpty();
 
-    expect(!sessionOf(response)!.isStarted()).toBe(true);
+    expect(!sessionOf(response)!.isStarted()).toBeTruthy();
   });
 
   it("streaming session never retries", async () => {
@@ -253,7 +256,7 @@ describe("HttpStreamingResponseTest", () => {
       expect(chunks).toEqual(["hello"]);
       expect(sink.string()).toMatch(/streaming backend read failed/);
 
-      expect(!sessionOf(response)!.isStarted()).toBe(true);
+      expect(!sessionOf(response)!.isStarted()).toBeTruthy();
     } finally {
       raw.close();
     }
