@@ -587,6 +587,7 @@ export function tableName(this: SchemaKlass): string | null {
   return this._tableName;
 }
 
+/** @inventedArm Thread — PERMANENT */
 export function setTableName(this: SchemaKlass, value: string | null): void {
   value = value == null ? null : String(value);
 
