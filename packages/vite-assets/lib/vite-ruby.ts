@@ -7,13 +7,23 @@ import {
   stdout as $stdout,
   SystemCallError,
   Timeout,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Config, type ConfigOptions } from "./config.js";
+import { Error } from "./error.js";
 import { Manifest, type ManifestBuilder } from "./manifest.js";
+import { MissingEntrypointError } from "./missing-entrypoint-error.js";
+import { MissingExecutableError } from "./missing-executable-error.js";
 
 type ConfigAttrs = Partial<Record<keyof ConfigOptions, unknown>>;
 
 export class ViteRuby {
+  declare static Config: typeof Config;
+  declare static Error: typeof Error;
+  declare static Manifest: typeof Manifest;
+  declare static MissingEntrypointError: typeof MissingEntrypointError;
+  declare static MissingExecutableError: typeof MissingExecutableError;
+
   static readonly ENV_PREFIX = "VITE_RUBY";
 
   static readonly COMPANION_LIBRARIES: Readonly<Record<string, string>> = Object.freeze({
@@ -201,3 +211,17 @@ export class ViteRuby {
 }
 
 ViteRuby.prototype.isRunProxy = ViteRuby.prototype.isDevMode;
+
+ViteRuby.Config = Config;
+ViteRuby.Error = Error;
+ViteRuby.Manifest = Manifest;
+ViteRuby.MissingEntrypointError = MissingEntrypointError;
+ViteRuby.MissingExecutableError = MissingExecutableError;
+
+TopLevel.ViteRuby = ViteRuby;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ViteRuby?: typeof ViteRuby;
+  }
+}

@@ -1,3 +1,4 @@
+import "./constants.generated.js";
 export { ViteRuby } from "./vite-ruby.js";
 export { Config, type ConfigOptions } from "./config.js";
 export { Manifest, type ManifestEntry, type EntryType, type ManifestBuilder } from "./manifest.js";

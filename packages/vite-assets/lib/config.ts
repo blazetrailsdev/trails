@@ -6,9 +6,9 @@ import {
   File,
   Pathname,
   rbFLoad,
+  TopLevel,
   stderr as $stderr,
 } from "@blazetrails/ruby-compat";
-import { ViteRuby } from "./vite-ruby.js";
 
 export interface ConfigOptions {
   additionalEntrypoints: string[];
@@ -104,12 +104,12 @@ export class Config {
     if (await File.isExistAsync(rbConfigPath)) await rbFLoad(rbConfigPath);
   }
 
-  toEnv(envVars: Record<string, string> = ViteRuby.env()): Record<string, string> {
+  toEnv(envVars: Record<string, string> = TopLevel.ViteRuby!.env()): Record<string, string> {
     const env: Record<string, string> = {};
     for (const option of Config.CONFIGURABLE_WITH_ENV) {
       const value = this._config[option];
       if (value != null) {
-        env[`${ViteRuby.ENV_PREFIX}_${underscore(option).toUpperCase()}`] = String(value);
+        env[`${TopLevel.ViteRuby!.ENV_PREFIX}_${underscore(option).toUpperCase()}`] = String(value);
       }
     }
     return { ...env, ...envVars };
@@ -218,7 +218,9 @@ export class Config {
 
   /** @internal */
   private static optionFromEnv(name: string): string | undefined {
-    return ViteRuby.env()[`${ViteRuby.ENV_PREFIX}_${underscore(name).toUpperCase()}`];
+    return TopLevel.ViteRuby!.env()[
+      `${TopLevel.ViteRuby!.ENV_PREFIX}_${underscore(name).toUpperCase()}`
+    ];
   }
 
   /** @internal */

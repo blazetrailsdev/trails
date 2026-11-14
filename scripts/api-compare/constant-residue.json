@@ -1610,6 +1610,18 @@
       "transitions-timezone-period.ts::TransitionsTimezonePeriod": "TZInfo::TransitionsTimezonePeriod"
     }
   },
+  "vite-assets": {
+    "rows": 5,
+    "excluded": ["vite-ruby.ts::ViteRuby"],
+    "unwalked": [],
+    "residue": {
+      "config.ts::Config": "ViteRuby::Config",
+      "error.ts::Error": "ViteRuby::Error",
+      "manifest.ts::Manifest": "ViteRuby::Manifest",
+      "missing-entrypoint-error.ts::MissingEntrypointError": "ViteRuby::MissingEntrypointError",
+      "missing-executable-error.ts::MissingExecutableError": "ViteRuby::MissingExecutableError"
+    }
+  },
   "zeitwerk": {
     "rows": 18,
     "excluded": [],
