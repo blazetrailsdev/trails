@@ -22,7 +22,6 @@ export class DevServerProxy extends Proxy {
     this.viteRuby = viteRuby;
   }
 
-  /** @inventedArm streaming — PERMANENT */
   async performRequest(env: RackEnv): Promise<RackResponse> {
     if ((await this.isViteShouldHandle(env)) && (await this.isDevServerRunning())) {
       const config = await this.config();
