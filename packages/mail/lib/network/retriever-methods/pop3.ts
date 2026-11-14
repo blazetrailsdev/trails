@@ -1,4 +1,4 @@
-import { ArgumentError, OpenSSL, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError, OpenSSL, rbAryFirst, TopLevel } from "@blazetrails/ruby-compat";
 import { Configuration } from "../../configuration.js";
 import { Mail } from "../../mail.js";
 import type { Message } from "../../message.js";
@@ -53,7 +53,7 @@ export class POP3 extends Retriever {
       let mails = pop3.mails();
       pop3.reset();
       if (opts.what === "last") mails.sort((m1, m2) => m2.number - m1.number);
-      if (Number.isInteger(opts.count)) mails = mails.slice(0, opts.count as number);
+      if (Number.isInteger(opts.count)) mails = rbAryFirst(mails, opts.count as number);
 
       if (
         !(

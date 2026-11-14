@@ -1,7 +1,7 @@
 import { NoMethodError } from "@blazetrails/ruby-compat";
 import { Chars } from "../../lib/multibyte/chars.js";
 import { describe, expect, it } from "vitest";
-import { Unicode } from "../../lib/multibyte/unicode.js";
+import { Unicode, UnicodeDatabase } from "../../lib/multibyte/unicode.js";
 
 describe("Mail::Multibyte::Unicode.tidy_bytes", () => {
   it("recodes CP1252 bytes and cleans an interrupted sequence back to its lead", () => {
@@ -72,5 +72,15 @@ describe("Mail::Multibyte::Chars strip bangs", () => {
     expect(chars.toString()).toBe("héllo");
     expect(new Chars(" a ").lstripBang().toString()).toBe("a ");
     expect(new Chars(" a ").rstripBang().toString()).toBe(" a");
+  });
+});
+
+describe("Mail::Multibyte::Unicode::UnicodeDatabase (trails)", () => {
+  it("seats a Codepoint for every codepoint unicode_tables.dat holds", () => {
+    const { codepoints } = new UnicodeDatabase();
+    expect(codepoints.size).toBe(27268);
+    expect(codepoints.isInclude(0x4e00)).toBe(true);
+    expect(codepoints.get(0x4e00)!.code).toBe(0x4e00);
+    expect(codepoints.get(0x41)!.lowercaseMapping).toBe(0x61);
   });
 });
