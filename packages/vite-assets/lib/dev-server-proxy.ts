@@ -13,7 +13,7 @@ export class DevServerProxy extends Proxy {
   /** @internal */
   private viteRuby: ViteAssets;
   /** @internal */
-  private viteUrlPrefixMemo: string | undefined;
+  private _viteUrlPrefix: string | undefined;
 
   constructor(app: unknown = null, options: Record<string, unknown> = {}) {
     const viteRuby =
@@ -66,8 +66,8 @@ export class DevServerProxy extends Proxy {
 
   /** @internal */
   private async forwardToViteDevServer(env: RackEnv): Promise<void> {
-    const config = await this.config();
     this.rewriteUriForVite(env);
+    const config = await this.config();
     env["QUERY_STRING"] ??= "";
     env["rack.backend"] = kernelURI(config.origin());
     env["HTTP_HOST"] = env["HTTP_X_FORWARDED_HOST"] = config.host;
@@ -103,7 +103,7 @@ export class DevServerProxy extends Proxy {
   /** @internal */
   private async viteUrlPrefix(): Promise<string> {
     const config = await this.config();
-    return (this.viteUrlPrefixMemo ??=
+    return (this._viteUrlPrefix ??=
       config.publicOutputDir === ""
         ? DevServerProxy.VITE_DEPENDENCY_PREFIX
         : `/${config.publicOutputDir}/`);

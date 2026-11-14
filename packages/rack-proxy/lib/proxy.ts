@@ -11,7 +11,7 @@ import {
 
 type RackEnv = Record<string, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- `perform_request` lands with rack-proxy-perform-request; the merge seats its type for `call` and subclasses.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Proxy {
   /** @internal */
   performRequest(env: RackEnv): Promise<RackResponse>;
