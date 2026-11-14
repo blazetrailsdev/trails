@@ -525,9 +525,9 @@ describe("MIME Emails", () => {
     it("should give the part the right content type", async () => {
       const mail = Mail.new();
       await mail.addFile(fixturePath("attachments", "test.png"));
-      expect((mail.parts[0].get("content_type") as ContentTypeField).contentType()).toEqual(
-        "image/png",
-      );
+      expect(
+        (mail.parts[0].get("content_type") as unknown as ContentTypeField).contentType(),
+      ).toEqual("image/png");
     });
 
     it("should return attachment objects", async () => {
@@ -650,12 +650,12 @@ describe("MIME Emails", () => {
       await m.addFile(fixturePath("attachments", "test.png"));
       m.body("Attached");
       expect(m.parts.length).toEqual(2);
-      expect((m.parts[0].get("content_type") as ContentTypeField).contentType()).toEqual(
+      expect((m.parts[0].get("content_type") as unknown as ContentTypeField).contentType()).toEqual(
         "image/png",
       );
-      expect((m.parts.at(-1)!.get("content_type") as ContentTypeField).contentType()).toEqual(
-        "text/plain",
-      );
+      expect(
+        (m.parts.at(-1)!.get("content_type") as unknown as ContentTypeField).contentType(),
+      ).toEqual("text/plain");
     });
 
     it("should allow you to add a body as text part if you have added a file and not truncate after newlines - issue 208", async () => {
@@ -667,12 +667,12 @@ describe("MIME Emails", () => {
       await m.addFile(fixturePath("attachments", "test.png"));
       m.body("First Line\n\nSecond Line\n\nThird Line\n\n");
       expect(m.parts.length).toEqual(2);
-      expect((m.parts[0].get("content_type") as ContentTypeField).contentType()).toEqual(
+      expect((m.parts[0].get("content_type") as unknown as ContentTypeField).contentType()).toEqual(
         "image/png",
       );
-      expect((m.parts.at(-1)!.get("content_type") as ContentTypeField).contentType()).toEqual(
-        "text/plain",
-      );
+      expect(
+        (m.parts.at(-1)!.get("content_type") as unknown as ContentTypeField).contentType(),
+      ).toEqual("text/plain");
       expect(m.parts.at(-1)!.toString()).toMatch(
         /^First Line\r\n\r\nSecond Line\r\n\r\nThird Line/m,
       );
