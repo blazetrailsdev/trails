@@ -1,2 +1,2 @@
-/src/test-helpers/dummy/storage/*.sqlite3
-/src/test-helpers/dummy/storage/*.sqlite3-*
+/test/dummy/storage/*.sqlite3
+/test/dummy/storage/*.sqlite3-*
