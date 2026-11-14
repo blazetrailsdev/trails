@@ -18,9 +18,9 @@ type NetHTTP = InstanceType<typeof Net.HTTP>;
 type NetHTTPRequest = InstanceType<typeof Net.HTTP.Get>;
 type NetHTTPResponse = InstanceType<typeof Net.HTTPResponse>;
 
-class ResponseTooLarge extends StandardError {}
+export class ResponseTooLarge extends StandardError {}
 
-class StreamAborted extends StandardError {}
+export class StreamAborted extends StandardError {}
 
 export class HttpStreamingResponse {
   static ResponseTooLarge = ResponseTooLarge;
@@ -215,8 +215,5 @@ export class HttpStreamingResponse {
     }
   }
 }
-
-ResponseTooLarge.prototype.name = "Rack::HttpStreamingResponse::ResponseTooLarge";
-StreamAborted.prototype.name = "Rack::HttpStreamingResponse::StreamAborted";
 
 Rack.HttpStreamingResponse = HttpStreamingResponse;

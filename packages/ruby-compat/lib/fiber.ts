@@ -158,9 +158,9 @@ export class Fiber<R = unknown> {
    *
    * A suspended fiber is resumed with `exception` raised at its `Fiber.yield`
    * (`fiber_transfer_kw` / `fiber_resume_kw` with an exception). Any other
-   * fiber takes `fiber_resume_kw`: a terminated or resumed one raises
-   * `#resume`'s errors, and an unborn one terminates raising `exception`
-   * before its block runs. `resuming_fiber` has no arm: a JS fiber resumes no
+   * fiber takes `fiber_resume_kw` (`cont.c:2972-2985`): an unborn one raises
+   * `FiberError`, and a terminated or resumed one raises `#resume`'s errors.
+   * `resuming_fiber` has no arm: a JS fiber resumes no
    * nested fiber it could forward to.
    */
   raise(exception: Error | (new (message?: string) => Error), message?: string): R {
@@ -168,9 +168,10 @@ export class Fiber<R = unknown> {
     if (this === Fiber.current()) {
       throw exception;
     } else if (this.#status !== "suspended") {
-      if (this.#status !== "created" || this.#thread !== Thread.current()) return this.resume();
-      this.#status = "terminated";
-      throw exception;
+      if (this.#status === "created") {
+        throw new FiberError("cannot raise exception on unborn fiber");
+      }
+      return this.resume();
     }
     if (this.#thread !== Thread.current()) {
       throw new FiberError("fiber called across threads");
