@@ -158,8 +158,8 @@ export class Listener extends SubscriberMap {
     const originalClient = this.extractSubscribedClient(conn);
 
     return new Promise<void>((resolve, reject) => {
-      conn.on("subscribe", (chan: string, count: number) => {
-        this._subscriptionLock.synchronize(() => {
+      conn.on("subscribe", async (chan: string, count: number) => {
+        await this._subscriptionLock.synchronize(() => {
           if (count === 1) {
             this._reconnectAttempt = 0;
             this._subscribedClient = originalClient;
@@ -182,9 +182,9 @@ export class Listener extends SubscriberMap {
         this.broadcast(chan, message);
       });
 
-      conn.on("unsubscribe", (_chan: string, count: number) => {
+      conn.on("unsubscribe", async (_chan: string, count: number) => {
         if (count === 0) {
-          this._subscriptionLock.synchronize(() => {
+          await this._subscriptionLock.synchronize(() => {
             this._subscribedClient = null;
           });
           resolve();
@@ -213,8 +213,8 @@ export class Listener extends SubscriberMap {
     while (thread.isAlive()) await Thread.pass();
   }
 
-  override addChannel(channel: string, onSuccess: (() => unknown) | null): void {
-    this._subscriptionLock.synchronize(() => {
+  override async addChannel(channel: string, onSuccess: (() => unknown) | null): Promise<void> {
+    await this._subscriptionLock.synchronize(() => {
       this.ensureListenerRunning();
       const callbacks = this._subscribeCallbacks.get(channel) ?? [];
       this._subscribeCallbacks.set(channel, callbacks);
@@ -223,8 +223,8 @@ export class Listener extends SubscriberMap {
     });
   }
 
-  override removeChannel(channel: string): void {
-    this._subscriptionLock.synchronize(() => {
+  override async removeChannel(channel: string): Promise<void> {
+    await this._subscriptionLock.synchronize(() => {
       this.whenConnected(() => this._subscribedClient!.unsubscribe(channel));
     });
   }
@@ -244,7 +244,7 @@ export class Listener extends SubscriberMap {
           return await this.listen(conn);
         } catch (error) {
           if (!(error instanceof ConnectionError)) throw error;
-          this.reset();
+          await this.reset();
           if (!(await this.isRetryConnecting())) return;
           this.whenConnected(() => this.resubscribe());
         }
@@ -281,8 +281,8 @@ export class Listener extends SubscriberMap {
   }
 
   /** @internal */
-  private reset(): void {
-    this._subscriptionLock.synchronize(() => {
+  private async reset(): Promise<void> {
+    await this._subscriptionLock.synchronize(() => {
       this._subscribedClient = null;
       this._subscribeCallbacks.clear();
       this._whenConnected.length = 0;
