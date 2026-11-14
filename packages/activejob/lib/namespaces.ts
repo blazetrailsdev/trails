@@ -65,6 +65,8 @@ export const loadPath: Record<string, () => Promise<unknown>> = {
   "active_job/serializers/range_serializer": () => import("./serializers/range-serializer.js"),
   "active_job/serializers/big_decimal_serializer": () =>
     import("./serializers/big-decimal-serializer.js"),
+  "active_job/test_case": () => import("@blazetrails/activejob/test-case"),
+  "active_job/test_helper": () => import("@blazetrails/activejob/test-helper"),
 };
 
 export interface SerializerLike {
@@ -111,6 +113,8 @@ ActiveJob.eagerAutoload(() => {
   ActiveJob.autoload("Serializers");
   ActiveJob.autoload("ConfiguredJob");
 });
+ActiveJob.autoload("TestCase");
+ActiveJob.autoload("TestHelper");
 
 export interface QueueAdaptersNamespace {
   lookup: typeof QueueAdaptersModule.lookup;
