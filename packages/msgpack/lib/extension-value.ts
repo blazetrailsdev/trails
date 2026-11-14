@@ -1,4 +1,4 @@
-import { Struct, include, constSet } from "@blazetrails/ruby-compat";
+import { Struct, include } from "@blazetrails/ruby-compat";
 import { CoreExt } from "./core-ext.js";
 import { MessagePack } from "./namespaces.js";
 import type { Packer } from "./packer.js";
@@ -16,4 +16,4 @@ export class ExtensionValue extends Struct.new("type", "payload") {
 }
 
 include(ExtensionValue, CoreExt);
-constSet(MessagePack, "ExtensionValue", ExtensionValue);
+MessagePack.ExtensionValue = ExtensionValue;

@@ -1183,17 +1183,18 @@
     "residue": {}
   },
   "msgpack": {
-    "rows": 10,
-    "excluded": [
-      "extension-value.ts::ExtensionValue",
-      "unpacker.ts::MalformedFormatError",
-      "unpacker.ts::StackError",
-      "unpacker.ts::UnexpectedTypeError",
-      "unpacker.ts::UnknownExtTypeError",
-      "unpacker.ts::UnpackError"
-    ],
+    "rows": 17,
+    "excluded": [],
     "unwalked": ["bigint.ts::Bigint", "core-ext.ts::CoreExt", "time.ts::Time"],
-    "residue": { "factory.ts::MemberPool": "MessagePack::Factory::Pool::MemberPool" }
+    "residue": {
+      "factory.ts::MemberPool": "MessagePack::Factory::Pool::MemberPool",
+      "unpacker.ts::MalformedFormatError": "MessagePack::MalformedFormatError",
+      "unpacker.ts::StackError": "MessagePack::StackError",
+      "unpacker.ts::TypeError": "MessagePack::TypeError",
+      "unpacker.ts::UnexpectedTypeError": "MessagePack::UnexpectedTypeError",
+      "unpacker.ts::UnknownExtTypeError": "MessagePack::UnknownExtTypeError",
+      "unpacker.ts::UnpackError": "MessagePack::UnpackError"
+    }
   },
   "net-smtp": {
     "rows": 15,
