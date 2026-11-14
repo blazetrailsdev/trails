@@ -9,7 +9,7 @@ export class GeneratorGenerator extends Base {
   declare options: GeneratorGeneratorOptions;
 
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourceRoot(File.expandPath("templates", __dir__));
     this.checkClassCollision({ suffix: "GeneratorTest" });
 
     this.classOption("namespace", {

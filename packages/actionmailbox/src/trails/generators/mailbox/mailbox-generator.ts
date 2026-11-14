@@ -6,7 +6,7 @@ const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathnam
 
 export class MailboxGenerator extends NamedBase {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourceRoot(File.expandPath("templates", __dir__));
     this.checkClassCollision({ suffix: "Mailbox" });
     this.methodAdded("createMailboxFile");
     this.hookFor("testFramework");

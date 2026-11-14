@@ -126,7 +126,7 @@ export class InstallGenerator extends Base {
   }
 }
 
-await InstallGenerator.sourceRoot(File.expandPath("templates", __dir__));
+InstallGenerator.sourceRoot(File.expandPath("templates", __dir__));
 
 Object.defineProperty(InstallGenerator, "name", {
   value: "ActionText::Generators::InstallGenerator",

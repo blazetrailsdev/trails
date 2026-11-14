@@ -8,7 +8,7 @@ const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathnam
 
 export class SystemGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourceRoot(File.expandPath("templates", __dir__));
     this.checkClassCollision({ suffix: "Test" });
     this.methodAdded("createTestFiles");
   }

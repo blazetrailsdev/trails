@@ -37,7 +37,7 @@ type CounterInstance = ActionsHost & {
 type ActionsClass = Pick<GroupClass, "argument" | "removeArgument" | "classOptions"> & {
   addRuntimeOptionsBang(): void;
   sourcePaths(): string[];
-  sourceRoot(path?: string): Promise<string | null>;
+  sourceRoot(path?: string): string | null;
   sourcePathsForSearch(): Promise<string[]>;
 } & (new (...args: unknown[]) => CounterInstance);
 const MyCounter = MyCounterFixture as unknown as ActionsClass;

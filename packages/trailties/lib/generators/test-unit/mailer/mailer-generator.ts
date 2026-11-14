@@ -7,7 +7,7 @@ const __dir__ = File.dirname(decodeURIComponent(new URL(import.meta.url).pathnam
 
 export class MailerGenerator extends Base {
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourceRoot(File.expandPath("templates", __dir__));
     this.argument("actions", { type: "array", default: [], banner: "method method" });
     this.methodAdded("checkClassCollision");
     this.methodAdded("createTestFiles");

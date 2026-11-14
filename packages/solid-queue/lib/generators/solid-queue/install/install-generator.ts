@@ -4,7 +4,7 @@ import { Base } from "@blazetrails/trailties/generators";
 
 export class InstallGenerator extends Base {
   static {
-    void this.sourceRoot(
+    this.sourceRoot(
       File.expandPath("templates", decodeURIComponent(new URL(".", import.meta.url).pathname)),
     );
     this.methodAdded("copyFiles");

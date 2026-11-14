@@ -49,9 +49,7 @@ describe("Thor::Actions copy_file, link_file, get and template (trails)", () => 
   const run = (block: () => unknown): Promise<string> => capture(":stdout", block);
 
   beforeAll(async () => {
-    await (Script as unknown as { sourceRoot(path: string): Promise<unknown> }).sourceRoot(
-      sourceRoot(),
-    );
+    (Script as unknown as { sourceRoot(path: string): unknown }).sourceRoot(sourceRoot());
   });
   beforeEach(() => {
     root = Dir.mktmpdir("thor-template-");

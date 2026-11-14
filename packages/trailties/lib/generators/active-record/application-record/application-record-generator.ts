@@ -8,7 +8,7 @@ export class ApplicationRecordGenerator extends Base {
   private _applicationRecordFileName?: string;
 
   static {
-    void this.sourceRoot(File.expandPath("templates", __dir__));
+    this.sourceRoot(File.expandPath("templates", __dir__));
     this.methodAdded("createApplicationRecord");
   }
 

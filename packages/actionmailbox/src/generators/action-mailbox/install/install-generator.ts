@@ -3,7 +3,7 @@ import { MailboxGenerator } from "../../../trails/generators/mailbox/mailbox-gen
 
 export class InstallGenerator extends Base {
   static {
-    void this.sourceRoot(MailboxGenerator._sourceRoot);
+    this.sourceRoot(MailboxGenerator._sourceRoot);
     this.methodAdded("createActionMailboxFiles");
     this.methodAdded("addActionMailboxProductionEnvironmentConfig");
     this.methodAdded("createMigrations");
