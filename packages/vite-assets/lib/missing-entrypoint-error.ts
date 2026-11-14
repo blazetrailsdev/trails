@@ -14,10 +14,7 @@ export class MissingEntrypointError extends Error {
   readonly manifest: unknown;
   readonly config: Config;
 
-  /**
-   * @inventedArm manifestPaths — PERMANENT
-   * @inventedArm call — PERMANENT
-   */
+  /** @inventedArm call — PERMANENT */
   constructor({
     fileName,
     lastBuild,

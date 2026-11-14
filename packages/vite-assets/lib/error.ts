@@ -5,7 +5,6 @@ const TROUBLESHOOTING = `Visit the Troubleshooting guide for more information:
 `;
 
 export class Error extends StandardError {
-  /** @inventedArm constructor — PERMANENT */
   constructor(message?: string) {
     super(message?.replace(":troubleshooting:", TROUBLESHOOTING));
   }

@@ -30,7 +30,6 @@ export class Manifest {
   /** @internal */
   private _manifest: Record<string, ManifestEntry> | undefined;
 
-  /** @inventedArm buildMutex — PERMANENT */
   constructor(viteRuby: ViteRuby) {
     this._viteRuby = viteRuby;
     this._buildMutex = new Mutex();
