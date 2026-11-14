@@ -1,5 +1,3 @@
-import { constSet } from "@blazetrails/ruby-compat";
-
 import { parse5PointerId } from "../html5/node.js";
 import { XML } from "../namespaces.js";
 import { Namespace } from "./namespace.js";
@@ -69,4 +67,4 @@ export class Attr {
   }
 }
 
-constSet(XML, "Attr", Attr);
+XML.Attr = Attr;

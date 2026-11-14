@@ -1,5 +1,3 @@
-import { constSet } from "@blazetrails/ruby-compat";
-
 import { XML } from "../namespaces.js";
 
 export class Namespace {
@@ -29,4 +27,4 @@ export class Namespace {
   }
 }
 
-constSet(XML, "Namespace", Namespace);
+XML.Namespace = Namespace;
