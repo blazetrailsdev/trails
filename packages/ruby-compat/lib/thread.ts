@@ -1,5 +1,6 @@
 import { excBacktraceLocations, type Location } from "./backtrace-location.js";
 import { ThreadError } from "./thread-error.js";
+import { stderr } from "./process-adapter.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import {
   getAsyncContext,
@@ -177,6 +178,12 @@ export class Thread<R = unknown> {
    * is a throw outside every promise chain.
    */
   abortOnException = false;
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#report_on_exception=` (`vendor/ruby/v3.3.11/thread.c:3246`):
+   * an exception the thread dies of is written to `$stderr` (`thread_do_start`,
+   * `vendor/ruby/v3.3.11/thread.c:704-709`). Ruby's default is `true`.
+   */
+  reportOnException = true;
   #value!: R;
   #error: { raised: unknown } | null = null;
   #kill!: () => void;
@@ -190,6 +197,13 @@ export class Thread<R = unknown> {
   constructor(...argsAndBlock: [...args: unknown[], block: (...args: never[]) => R]) {
     const block = argsAndBlock.pop() as (...args: unknown[]) => R;
     const args = argsAndBlock;
+    const report = (error: unknown): void => {
+      if (!this.reportOnException) return;
+      stderr.write(
+        `${this.toString()} terminated with exception (report_on_exception is true):\n` +
+          `${error instanceof Error ? (error.stack ?? String(error)) : String(error)}\n`,
+      );
+    };
     this.id = ++_threadIdCounter;
     _threads.add(this as Thread);
     this.status = "run";
@@ -200,6 +214,7 @@ export class Thread<R = unknown> {
       this.#error = { raised: error };
       this.status = "dead";
       _threads.delete(this as Thread);
+      report(error);
       if (this.abortOnException) this.#abort(error);
       return;
     }
@@ -211,6 +226,7 @@ export class Thread<R = unknown> {
       };
       (value as PromiseLike<unknown>).then(die, (error) => {
         die();
+        report(error);
         if (this.abortOnException) this.#abort(error);
       });
     } else {
