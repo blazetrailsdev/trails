@@ -56,12 +56,38 @@ export class WriteTimeout extends Timeout.Error {
 WriteTimeout.prototype.name = "Net::WriteTimeout";
 
 /**
+ * `Net::ReadAdapter` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:516-537`), the
+ * `dest` `read_body` streams into when it is given a block.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
+ */
+export class ReadAdapter {
+  private readonly _block: ((str: Uint8Array) => unknown) | null;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(block: ((str: Uint8Array) => unknown) | null) {
+    this._block = block;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  inspect(): string {
+    return `#<${this.constructor.name}>`;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async append(str: Uint8Array): Promise<unknown> {
+    if (this._block) return this._block(str);
+    return null;
+  }
+}
+
+/**
  * Ruby's `Net` module (`vendor/ruby/v3.3.11/lib/net/protocol.rb:26`), each
  * constant seated by the file that defines it.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
  */
-export const Net = { name: "Net", OpenTimeout, ReadTimeout, WriteTimeout } as {
+export const Net = { name: "Net", OpenTimeout, ReadTimeout, WriteTimeout, ReadAdapter } as {
   /** @noRailsEquivalent PERMANENT */
   name: string;
   /** @noRailsEquivalent PERMANENT */
@@ -70,6 +96,8 @@ export const Net = { name: "Net", OpenTimeout, ReadTimeout, WriteTimeout } as {
   ReadTimeout: typeof ReadTimeout;
   /** @noRailsEquivalent PERMANENT */
   WriteTimeout: typeof WriteTimeout;
+  /** @noRailsEquivalent PERMANENT */
+  ReadAdapter: typeof ReadAdapter;
   /** @noRailsEquivalent PERMANENT */
   HTTP: typeof HTTP & { Post: typeof Post };
   /** @noRailsEquivalent PERMANENT */
