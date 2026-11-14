@@ -1024,6 +1024,8 @@ function rIvarEncoding(
       return forceEncoding(str, idx);
     } else if (typeof obj === "string") {
       return forceEncoding(obj, idx);
+    } else if (obj instanceof String) {
+      return new String(forceEncoding(obj.valueOf(), idx)) as unknown as string;
     } else {
       throw new ArgumentError(`${rbObjAsString(obj)} is not enc_capable`);
     }

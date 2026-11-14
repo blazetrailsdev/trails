@@ -409,6 +409,16 @@ describe("Marshal.load", () => {
     expect(a.version).toBe(1);
   });
 
+  it("hands TYPE_USERDEF's _load the encoding-tagged String a _dump answered", () => {
+    class Code {
+      static _load(data: typeof String.prototype): string {
+        return data.valueOf();
+      }
+    }
+    constSet(TopLevel, "Code", Code);
+    expect(Marshal.load("\x04\bIu:\tCode\x07US\x06:\x06ET")).toBe("US");
+  });
+
   it("raises TypeError for a TYPE_USRMARSHAL class with no marshal_load", () => {
     expect(() => Marshal.load("\x04\bU:\vColumn0")).toThrow(
       new TypeError("instance of Column needs to have method `marshal_load'"),

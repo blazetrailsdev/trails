@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { rational, rbHash } from "@blazetrails/ruby-compat";
-import { CountryTimezone } from "../lib/index.js";
+import { CountryTimezone, Timezone } from "../lib/index.js";
 
 describe("TCCountryTimezone", () => {
   it("identifier", () => {
@@ -41,6 +41,27 @@ describe("TCCountryTimezone", () => {
     );
     expect(ct.description).toBe("Eastern Time");
     expect(Object.isFrozen(ct.description)).toBeTruthy();
+  });
+
+  it("timezone", () => {
+    const ct = new CountryTimezone("Europe/London", rational(2059, 40), rational(-5, 16));
+    expect(ct.timezone()).toBeInstanceOf(Timezone);
+    expect(ct.timezone().identifier).toBe("Europe/London");
+  });
+
+  it("description or friendly idenfier no description", () => {
+    const ct = new CountryTimezone("Europe/London", rational(2059, 40), rational(-5, 16));
+    expect(ct.descriptionOrFriendlyIdentifier()).toBe("London");
+  });
+
+  it("description or friendly idenfier description", () => {
+    const ct = new CountryTimezone(
+      "America/New_York",
+      rational(48857, 1200),
+      rational(-266423, 3600),
+      "Eastern Time",
+    );
+    expect(ct.descriptionOrFriendlyIdentifier()).toBe("Eastern Time");
   });
 
   it("equality 1", () => {

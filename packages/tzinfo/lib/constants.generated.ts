@@ -25,6 +25,7 @@ import * as m22 from "./transitions-timezone-period.js";
 
 defineConstants([
   [() => m21.AmbiguousTime, "TZInfo::AmbiguousTime"],
+  [() => m1.Country, "TZInfo::Country"],
   [() => m0.CountryTimezone, "TZInfo::CountryTimezone"],
   [() => m2.DataSource, "TZInfo::DataSource"],
   [() => m2.DataSourceNotFound, "TZInfo::DataSourceNotFound"],

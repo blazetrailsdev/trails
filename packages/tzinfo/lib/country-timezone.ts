@@ -1,5 +1,6 @@
 import { rbEqual, rbHash } from "@blazetrails/ruby-compat";
 import type { Rational } from "@blazetrails/ruby-compat";
+import { Timezone } from "./timezone.js";
 
 export class CountryTimezone {
   readonly identifier: string;
@@ -20,6 +21,14 @@ export class CountryTimezone {
     this.latitude = latitude;
     this.longitude = longitude;
     this.description = description;
+  }
+
+  timezone(): Timezone {
+    return Timezone.get(this.identifier);
+  }
+
+  descriptionOrFriendlyIdentifier(): string {
+    return this.description ?? this.timezone().friendlyIdentifier(true);
   }
 
   equals(ct: unknown): boolean {

@@ -1,6 +1,6 @@
 import "./constants.generated.js";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
-import { InvalidCountryCode } from "./country.js";
+import { Country, InvalidCountryCode } from "./country.js";
 import { CountryTimezone } from "./country-timezone.js";
 import { CountryDefiner } from "./format2/country-definer.js";
 import { CountryIndexDefiner } from "./format2/country-index-definer.js";
@@ -27,6 +27,7 @@ import { TransitionsTimezonePeriod } from "./transitions-timezone-period.js";
 export {
   AmbiguousTime,
   ConstantOffsetDataTimezoneInfo,
+  Country,
   CountryInfo,
   CountryTimezone,
   DataSource,
@@ -67,6 +68,7 @@ export const TZInfo = {
   InvalidDataSource,
   DataSourceNotFound,
   DataSource,
+  Country,
   CountryTimezone,
   StringDeduper,
   UnaryMinusGlobalStringDeduper,
