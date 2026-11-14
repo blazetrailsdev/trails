@@ -6,6 +6,7 @@ import { rbObjDup } from "../../include.js";
 import { Base64 } from "../../base64.js";
 import { warn } from "../../kernel-warn.js";
 import { verbose } from "../../verbose.js";
+import { Net } from "../protocol.js";
 
 /**
  * `Net::HTTPRequest` (`vendor/ruby/v3.3.11/lib/net/http/request.rb:40`), with the
@@ -16,6 +17,10 @@ import { verbose } from "../../verbose.js";
  * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
  */
 export class HTTPRequest {
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/header.rb:182`. */
+  static readonly MAX_KEY_LENGTH = 1024;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/header.rb:183`. */
+  static readonly MAX_FIELD_LENGTH = 65536;
   /** @noRailsEquivalent PERMANENT */
   static readonly METHOD: string;
   /** @noRailsEquivalent PERMANENT */
@@ -86,11 +91,6 @@ export class HTTPRequest {
     if (host != null && this.get("Host") == null) this.set("Host", host);
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  static readonly MAX_KEY_LENGTH = 1024;
-  /** @noRailsEquivalent PERMANENT */
-  static readonly MAX_FIELD_LENGTH = 65536;
-
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#initialize_http_header` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:185-205`). */
   initializeHttpHeader(initheader: Record<string, string | null> | null): void {
     this._header = {};
@@ -128,13 +128,50 @@ export class HTTPRequest {
     return Object.hasOwn(this._header, key.toLowerCase());
   }
 
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#content_length` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:616-621`). */
+  get contentLength(): number | null {
+    if (!this.isKey("Content-Length")) return null;
+    const len = /\d+/.exec(this.get("Content-Length")!)?.[0];
+    if (len == null) throw new Net.HTTPHeaderSyntaxError("wrong Content-Length format");
+    return Number.parseInt(len, 10);
+  }
+
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#content_length=` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:637-643`). */
   set contentLength(len: number | string | null) {
     if (len == null) {
       delete this._header["content-length"];
       return;
     }
-    this._header["content-length"] = String(Number.parseInt(String(len), 10) || 0);
+    this._header["content-length"] = (
+      typeof len === "number" ? BigInt(Math.trunc(len)) : BigInt(/^\s*[-+]?\d+/.exec(len)?.[0] ?? 0)
+    ).toString();
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#content_type` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:701-711`). */
+  get contentType(): string | null {
+    const main = this.mainType();
+    if (main == null) return null;
+
+    const sub = this.subType();
+    if (sub != null) {
+      return `${main}/${sub}`;
+    } else {
+      return main;
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#main_type` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:723-726`). */
+  mainType(): string | null {
+    if (this._header["content-type"] == null) return null;
+    return (this.get("Content-Type")!.split(";")[0] ?? "").split("/")[0].trim();
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#sub_type` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:738-743`). */
+  subType(): string | null {
+    if (this._header["content-type"] == null) return null;
+    const [, sub] = (this.get("Content-Type")!.split(";")[0] ?? "").split("/");
+    if (sub == null) return null;
+    return sub.trim();
   }
 
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#set_content_type` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:772-774`). */

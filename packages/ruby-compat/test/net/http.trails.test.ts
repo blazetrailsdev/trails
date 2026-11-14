@@ -254,11 +254,15 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
     req.basicAuth("my_account", "my_password");
     expect(req.get("Authorization")).toBe("Basic bXlfYWNjb3VudDpteV9wYXNzd29yZA==");
     req.contentLength = "12";
-    expect(req.get("content-length")).toBe("12");
+    expect(req.contentLength).toBe(12);
+    req.contentLength = 1e21;
+    expect(req.get("content-length")).toBe("1000000000000000000000");
     req.contentLength = null;
     expect(req.get("content-length")).toBeNull();
     req.contentType = "text/plain";
-    expect(req.get("content-type")).toBe("text/plain");
+    expect(req.contentType).toBe("text/plain");
+    req.set("Content-Length", "x");
+    expect(() => req.contentLength).toThrow(Net.HTTPHeaderSyntaxError);
     req.setContentType("text/html", { charset: "utf-8" });
     expect(req.get("content-type")).toBe("text/html; charset=utf-8");
   });

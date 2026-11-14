@@ -1,4 +1,5 @@
 import { warn } from "../kernel-warn.js";
+import { StandardError } from "../standard-error.js";
 import { ArgumentError } from "../argument-error.js";
 import { EOFError } from "../eof-error.js";
 import { Errno } from "../errno.js";
@@ -31,6 +32,15 @@ import {
 } from "./http/requests.js";
 import { HTTPResponse } from "./http/response.js";
 import { HTTPInformation } from "./http/responses.js";
+
+/**
+ * `Net::HTTPHeaderSyntaxError` (`vendor/ruby/v3.3.11/lib/net/http.rb:32`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
+ */
+export class HTTPHeaderSyntaxError extends StandardError {}
+
+HTTPHeaderSyntaxError.prototype.name = "Net::HTTPHeaderSyntaxError";
 
 /**
  * `Net::HTTP` (`vendor/ruby/v3.3.11/lib/net/http.rb:722`), the client
@@ -158,7 +168,7 @@ export class HTTP {
     this._writeTimeout = sec;
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1188-1191`. */
+  /** @noRailsEquivalent CONVERGEABLE net-http-debug-output-writes */
   setDebugOutput(output: unknown): void {
     if (this.isStarted())
       warn("Net::HTTP#set_debug_output called after HTTP started", { uplevel: 1 });
@@ -475,3 +485,4 @@ function _rsockSysFail(e: unknown, host: string, port: number): Error {
 }
 
 Net.HTTP = HTTP;
+Net.HTTPHeaderSyntaxError = HTTPHeaderSyntaxError;
