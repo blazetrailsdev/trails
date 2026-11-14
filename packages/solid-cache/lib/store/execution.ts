@@ -1,3 +1,4 @@
+import { rbProcCall } from "@blazetrails/ruby-compat";
 import { Entry } from "../entry.js";
 import { Record } from "../record.js";
 import { SolidCache } from "../solid-cache.js";
@@ -13,7 +14,10 @@ export const Execution = {
           this.connections().with(currentShard, () => this.setupInstrumentation(block)),
         );
       } catch (exception) {
-        this.errorHandler?.({ method: "async", exception: exception as Error, returning: null });
+        const errorHandler = this.errorHandler;
+        if (errorHandler != null) {
+          rbProcCall(errorHandler, { method: "async", exception: exception, returning: null });
+        }
       }
     });
   },
