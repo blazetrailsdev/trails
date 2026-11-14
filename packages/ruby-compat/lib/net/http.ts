@@ -1,3 +1,4 @@
+import { warn } from "../kernel-warn.js";
 import { ArgumentError } from "../argument-error.js";
 import { EOFError } from "../eof-error.js";
 import { Errno } from "../errno.js";
@@ -99,6 +100,22 @@ export class HTTP {
   openTimeout: number | null = 60;
   /** @noRailsEquivalent PERMANENT */
   verifyMode: number | null = null;
+  /** @noRailsEquivalent PERMANENT — `attr_accessor :ca_file` (`vendor/ruby/v3.3.11/lib/net/http.rb:1479`). */
+  caFile: string | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1487`. */
+  cert: unknown = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1490`. */
+  certStore: unknown = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1501`. */
+  key: unknown = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1508`. */
+  sslVersion: string | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1512`. */
+  minVersion: string | number | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1516`. */
+  maxVersion: string | number | null = null;
+  private _writeTimeout: number | null = 60;
+  private _debugOutput: unknown = null;
   private _readTimeout: number | null = 60;
   private _maxRetries = 1;
   private _currHttpVersion = HTTP.HTTPVersion;
@@ -129,6 +146,23 @@ export class HTTP {
   /** @noRailsEquivalent PERMANENT */
   set readTimeout(sec: number | null) {
     this._readTimeout = sec;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1306`. */
+  get writeTimeout(): number | null {
+    return this._writeTimeout;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1367-1370`. */
+  set writeTimeout(sec: number | null) {
+    this._writeTimeout = sec;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1188-1191`. */
+  setDebugOutput(output: unknown): void {
+    if (this.isStarted())
+      warn("Net::HTTP#set_debug_output called after HTTP started", { uplevel: 1 });
+    this._debugOutput = output;
   }
 
   /** @noRailsEquivalent PERMANENT */

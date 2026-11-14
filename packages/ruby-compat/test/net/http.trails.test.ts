@@ -227,3 +227,99 @@ describe("Net::HTTP", () => {
     expect(response.body).toBeNull();
   });
 });
+
+describe("Net::HTTP surface rack-proxy reaches", () => {
+  it("resolves every request class by Net::HTTP const name", () => {
+    // vendor/ruby/v3.3.11/lib/net/http/requests.rb:31-259
+    const H = Net.HTTP as unknown as Record<string, { METHOD: string }>;
+    for (const m of ["Get", "Head", "Post", "Put", "Delete", "Options", "Trace", "Patch"]) {
+      expect(H[m].METHOD).toBe(m.toUpperCase());
+    }
+  });
+
+  it("initialize_http_header downcases keys, strips values and rejects CR/LF", () => {
+    // vendor/ruby/v3.3.11/lib/net/http/header.rb:185-205
+    const req = new Net.HTTP.Get("/", { "X-Foo": " bar ", "X-Nil": null });
+    expect(req.get("x-foo")).toBe("bar");
+    expect(req.get("x-nil")).toBeNull();
+    expect(() => new Net.HTTP.Get("/", { "X-Bad": "a\nb" })).toThrow(
+      'header X-Bad has field value "a\\nb", this cannot include CR/LF',
+    );
+  });
+
+  it("basic_auth, content_length= and content_type= write their headers", () => {
+    // vendor/ruby/v3.3.11/lib/net/http/header.rb:637-643, :772-776, :945-962
+    const req = new Net.HTTP.Post("/");
+    req.basicAuth("my_account", "my_password");
+    expect(req.get("Authorization")).toBe("Basic bXlfYWNjb3VudDpteV9wYXNzd29yZA==");
+    req.contentLength = "12";
+    expect(req.get("content-length")).toBe("12");
+    req.contentLength = null;
+    expect(req.get("content-length")).toBeNull();
+    req.contentType = "text/plain";
+    expect(req.get("content-type")).toBe("text/plain");
+    req.setContentType("text/html", { charset: "utf-8" });
+    expect(req.get("content-type")).toBe("text/html; charset=utf-8");
+  });
+
+  it("request_body_permitted?, response_body_permitted? and body_stream=", () => {
+    // vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:120-131, :179-190
+    expect(new Net.HTTP.Post("/").isRequestBodyPermitted()).toBe(true);
+    expect(new Net.HTTP.Get("/").isRequestBodyPermitted()).toBe(false);
+    expect(new Net.HTTP.Head("/").isResponseBodyPermitted()).toBe(false);
+    const req = new Net.HTTP.Put("/");
+    req.body = "x";
+    const io = {};
+    expect(req.setBodyStream(io)).toBe(io);
+    expect(req.body).toBeNull();
+    expect(req.bodyStream).toBe(io);
+    expect(() => req.setBodyInternal("y")).toThrow(
+      "both of body argument and HTTPRequest#body set",
+    );
+  });
+
+  it("HTTP's SSL and timeout accessors and set_debug_output", () => {
+    // vendor/ruby/v3.3.11/lib/net/http.rb:1188-1191, :1296, :1367-1370, :1479-1516
+    const http = new Net.HTTP("example.com", 443);
+    expect(http.writeTimeout).toBe(60);
+    http.openTimeout = 5;
+    http.writeTimeout = 7;
+    http.verifyMode = OpenSSL.SSL.VERIFY_NONE;
+    http.caFile = "/ca.pem";
+    http.certStore = {};
+    http.minVersion = "TLS1_2";
+    http.maxVersion = "TLS1_3";
+    http.sslVersion = "TLSv1_2";
+    http.cert = "cert";
+    http.key = "key";
+    http.setDebugOutput(null);
+    expect([http.openTimeout, http.writeTimeout, http.caFile, http.minVersion]).toEqual([
+      5,
+      7,
+      "/ca.pem",
+      "TLS1_2",
+    ]);
+  });
+
+  it("read_body yields the body to a block and to_hash answers the header lists", async () => {
+    // vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383, :646-654; header.rb:477-479
+    const port = await listen(
+      createServer((_req, res) => {
+        res.writeHead(200, { "X-A": "1" });
+        res.end("hello");
+      }),
+    );
+    const http = new Net.HTTP("127.0.0.1", port);
+    const chunks: string[] = [];
+    await http.start(async (h) => {
+      await h.request(new Net.HTTP.Get("/"), null, (res: InstanceType<typeof Net.HTTPResponse>) => {
+        expect(res.toHash()["x-a"]).toEqual(["1"]);
+        expect(() => res.readBody("", () => {})).toThrow(
+          "both arg and block given for HTTP method",
+        );
+        res.readBody(null, (c: Uint8Array) => chunks.push(new TextDecoder().decode(c)));
+      });
+    });
+    expect(chunks).toEqual(["hello"]);
+  });
+});

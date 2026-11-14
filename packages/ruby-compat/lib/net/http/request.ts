@@ -3,6 +3,7 @@ import { Generic } from "../../uri/generic.js";
 import { HTTPS as URIHTTPS } from "../../uri/https.js";
 import { HTTP as URIHTTP } from "../../uri/http.js";
 import { rbObjDup } from "../../include.js";
+import { Base64 } from "../../base64.js";
 
 /**
  * `Net::HTTPRequest` (`vendor/ruby/v3.3.11/lib/net/http/request.rb:40`), with the
@@ -30,13 +31,17 @@ export class HTTPRequest {
   readonly decodeContent: boolean;
   /** @noRailsEquivalent PERMANENT */
   body: string | Uint8Array | null = null;
-  private readonly _header: Record<string, string> = {};
+  /** @noRailsEquivalent PERMANENT */
+  bodyStream: unknown = null;
+  private _header: Record<string, string> = {};
+  private readonly _requestHasBody: boolean;
   private readonly _responseHasBody: boolean;
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(path: string | Generic, initheader: Record<string, string> | null = null) {
+  constructor(path: string | Generic, initheader: Record<string, string | null> | null = null) {
     const klass = this.constructor as typeof HTTPRequest;
     this.method = klass.METHOD;
+    this._requestHasBody = klass.REQUEST_HAS_BODY;
     this._responseHasBody = klass.RESPONSE_HAS_BODY;
 
     let host: string | null;
@@ -73,10 +78,73 @@ export class HTTPRequest {
     }
     this.decodeContent = decodeContent;
 
-    for (const [key, value] of Object.entries(initheader)) this.set(key, value);
+    this.initializeHttpHeader(initheader);
     if (this.get("Accept") == null) this.set("Accept", "*/*");
     if (this.get("User-Agent") == null) this.set("User-Agent", "Ruby");
     if (host != null && this.get("Host") == null) this.set("Host", host);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  static readonly MAX_KEY_LENGTH = 1024;
+  /** @noRailsEquivalent PERMANENT */
+  static readonly MAX_FIELD_LENGTH = 65536;
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#initialize_http_header` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:185-205`). */
+  initializeHttpHeader(initheader: Record<string, string | null> | null): void {
+    this._header = {};
+    if (initheader == null) return;
+    for (const [key, field] of Object.entries(initheader)) {
+      if (field == null) continue;
+      const value = field.trim();
+      const bytesize = (s: string) => new TextEncoder().encode(s).length;
+      if (bytesize(key) > HTTPRequest.MAX_KEY_LENGTH) {
+        throw new ArgumentError(
+          `too long (${bytesize(key)} bytes) header: ${JSON.stringify(key.slice(0, 30))}...`,
+        );
+      }
+      if (bytesize(value) > HTTPRequest.MAX_FIELD_LENGTH) {
+        throw new ArgumentError(`header ${key} has too long field value: ${bytesize(value)}`);
+      }
+      if (/[\r\n]/.test(value)) {
+        throw new ArgumentError(
+          `header ${key} has field value ${JSON.stringify(value)}, this cannot include CR/LF`,
+        );
+      }
+      this._header[key.toLowerCase()] = value;
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#content_length=` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:637-643`). */
+  set contentLength(len: number | string | null) {
+    if (len == null) {
+      delete this._header["content-length"];
+      return;
+    }
+    this._header["content-length"] = String(Number.parseInt(String(len), 10) || 0);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#set_content_type` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:772-774`). */
+  setContentType(type: string, params: Record<string, string> = {}): void {
+    this._header["content-type"] =
+      type +
+      Object.entries(params)
+        .map(([k, v]) => `; ${k}=${v}`)
+        .join("");
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#content_type=` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:776`). */
+  set contentType(type: string) {
+    this.setContentType(type);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#basic_auth` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:945-947`). */
+  basicAuth(account: string, password: string): void {
+    this._header["authorization"] = this.basicEncode(account, password);
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `HTTPHeader#basic_encode` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:960-962`). */
+  private basicEncode(account: string, password: string): string {
+    return "Basic " + Base64.strictEncode64(`${account}:${password}`);
   }
 
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#[]` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:224-227`). */
@@ -94,14 +162,26 @@ export class HTTPRequest {
     return Object.fromEntries(Object.entries(this._header).map(([k, v]) => [k, [v]]));
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:120-122`. */
+  isRequestBodyPermitted(): boolean {
+    return this._requestHasBody;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:129-131`. */
   isResponseBodyPermitted(): boolean {
     return this._responseHasBody;
   }
 
+  /** @noRailsEquivalent PERMANENT — `HTTPGenericRequest#body_stream=` (`vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:179-184`). */
+  setBodyStream(input: unknown): unknown {
+    this.body = null;
+    this.bodyStream = input;
+    return input;
+  }
+
   /** @noRailsEquivalent PERMANENT */
   setBodyInternal(str: string | Uint8Array | null): void {
-    if (str != null && this.body != null) {
+    if (str != null && (this.body != null || this.bodyStream != null)) {
       throw new ArgumentError("both of body argument and HTTPRequest#body set");
     }
     if (str != null) this.body = str;
