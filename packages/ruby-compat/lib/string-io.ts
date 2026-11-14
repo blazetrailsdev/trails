@@ -4,6 +4,7 @@ import { IOError } from "./io-error.js";
 import { print as ioPrint, puts as ioPuts } from "./io.js";
 import { b } from "./string/b.js";
 import { strNew } from "./string/bytes.js";
+import { rbDefineAllocFunc } from "./include.js";
 
 /**
  * Ruby's `StringIO` (stdlib), the readable/writable in-memory IO that
@@ -24,28 +25,44 @@ import { strNew } from "./string/bytes.js";
  * `_parse_file` and `Rack::MockRequest` hand callers an IO.
  */
 export class StringIO<S extends string | Uint8Array = string> {
-  private _string: Uint8Array;
-  private _binary: boolean;
-  private _pos = 0;
-  private _readable = true;
-  private _writable = true;
-  /** `ptr->enc` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1823`). */
-  private enc: Encoding | null = null;
+  /** `DATA_PTR`, the `struct StringIO` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:36-43`). */
+  #ptr: { string: Uint8Array; binary: boolean; pos: number; enc: Encoding | null };
+  #_readable = true;
+  #_writable = true;
 
   constructor(string: S = "" as S) {
-    this._string = new Uint8Array(0);
-    this._binary = string instanceof Uint8Array;
+    this.#ptr = {
+      string: new Uint8Array(0),
+      binary: string instanceof Uint8Array,
+      pos: 0,
+      enc: null,
+    };
     this.write(string);
-    this._pos = 0;
+    this.#ptr.pos = 0;
+  }
+
+  /**
+   * `strio_copy` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:620`), bound to
+   * `initialize_copy` (`:1869`): the copy shares the original's struct, so
+   * both read and write one buffer and one position.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `StringIO#initialize_copy`.
+   */
+  initializeCopy(orig: StringIO<S>): this {
+    if ((this as StringIO<S>) === orig) return this;
+    this.#ptr = orig.#ptr;
+    this.#_readable = orig.#_readable;
+    this.#_writable = orig.#_writable;
+    return this;
   }
 
   string(): S {
-    const bytes = this._string.slice();
-    return (this._binary ? bytes : strNew(Array.from(bytes))) as S;
+    const bytes = this.#ptr.string.slice();
+    return (this.#ptr.binary ? bytes : strNew(Array.from(bytes))) as S;
   }
 
   size(): number {
-    return this._string.length;
+    return this.#ptr.string.length;
   }
 
   /**
@@ -64,30 +81,30 @@ export class StringIO<S extends string | Uint8Array = string> {
   read(length: number, str?: Uint8Array | null): Uint8Array | null;
   read(length?: number, str?: Uint8Array | null): S | Uint8Array | null {
     if (length == null) {
-      const rest = this._string.slice(this._pos);
-      this._pos = this._string.length;
-      return (this._binary ? rest : strNew(Array.from(rest))) as S;
+      const rest = this.#ptr.string.slice(this.#ptr.pos);
+      this.#ptr.pos = this.#ptr.string.length;
+      return (this.#ptr.binary ? rest : strNew(Array.from(rest))) as S;
     }
     if (this.isEof()) {
       if (str) str.fill(0);
       return length === 0 ? new Uint8Array(0) : null;
     }
-    const chunk = this._string.slice(this._pos, this._pos + length);
-    this._pos += chunk.length;
+    const chunk = this.#ptr.string.slice(this.#ptr.pos, this.#ptr.pos + length);
+    this.#ptr.pos += chunk.length;
     if (str) str.set(chunk.subarray(0, str.length));
     return chunk;
   }
 
   write(string: string | Uint8Array): number {
     const bytes = typeof string === "string" ? b(string) : string;
-    const end = this._pos + bytes.length;
-    if (end > this._string.length) {
+    const end = this.#ptr.pos + bytes.length;
+    if (end > this.#ptr.string.length) {
       const grown = new Uint8Array(end);
-      grown.set(this._string);
-      this._string = grown;
+      grown.set(this.#ptr.string);
+      this.#ptr.string = grown;
     }
-    this._string.set(bytes, this._pos);
-    this._pos = end;
+    this.#ptr.string.set(bytes, this.#ptr.pos);
+    this.#ptr.pos = end;
     return bytes.length;
   }
 
@@ -111,14 +128,14 @@ export class StringIO<S extends string | Uint8Array = string> {
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
    * `IO::generic_writable#puts` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1530`).
    */
-  puts = ioPuts;
+  declare puts: typeof ioPuts;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails:
    * `IO::generic_writable#print` (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1956`
    * aliases it to `rb_io_print`, `vendor/ruby/v3.3.11/io.c:8715`).
    */
-  print = ioPrint;
+  declare print: typeof ioPrint;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `strio_flush`
@@ -137,11 +154,11 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:940`).
    */
   get pos(): number {
-    return this._pos;
+    return this.#ptr.pos;
   }
 
   rewind(): number {
-    this._pos = 0;
+    this.#ptr.pos = 0;
     return 0;
   }
 
@@ -155,8 +172,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1879`).
    */
   binmode(): this {
-    this.enc = Encoding.ASCII_8BIT;
-    this._binary = true;
+    this.#ptr.enc = Encoding.ASCII_8BIT;
+    this.#ptr.binary = true;
     return this;
   }
 
@@ -184,8 +201,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:1801`).
    */
   setEncoding(extEnc: Encoding | string): this {
-    this.enc = Encoding.find(extEnc) ?? Encoding.BINARY;
-    this._binary = this.enc === Encoding.BINARY;
+    this.#ptr.enc = Encoding.find(extEnc) ?? Encoding.BINARY;
+    this.#ptr.binary = this.#ptr.enc === Encoding.BINARY;
     return this;
   }
 
@@ -215,11 +232,11 @@ export class StringIO<S extends string | Uint8Array = string> {
    */
   gets(): S | null {
     if (this.isEof()) return null;
-    const newline = this._string.indexOf(0x0a, this._pos);
-    const end = newline === -1 ? this._string.length : newline + 1;
-    const bytes = this._string.slice(this._pos, end);
-    this._pos = end;
-    return (this._binary ? bytes : strNew(Array.from(bytes))) as S;
+    const newline = this.#ptr.string.indexOf(0x0a, this.#ptr.pos);
+    const end = newline === -1 ? this.#ptr.string.length : newline + 1;
+    const bytes = this.#ptr.string.slice(this.#ptr.pos, end);
+    this.#ptr.pos = end;
+    return (this.#ptr.binary ? bytes : strNew(Array.from(bytes))) as S;
   }
 
   /**
@@ -234,12 +251,12 @@ export class StringIO<S extends string | Uint8Array = string> {
   }
 
   isEof(): boolean {
-    return this._pos >= this._string.length;
+    return this.#ptr.pos >= this.#ptr.string.length;
   }
 
   close(): void {
-    this._readable = false;
-    this._writable = false;
+    this.#_readable = false;
+    this.#_writable = false;
   }
 
   /**
@@ -247,8 +264,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:520`).
    */
   closeRead(): null {
-    if (!this._readable) throw new IOError("closing non-duplex IO for reading");
-    this._readable = false;
+    if (!this.#_readable) throw new IOError("closing non-duplex IO for reading");
+    this.#_readable = false;
     return null;
   }
 
@@ -257,8 +274,8 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:541`).
    */
   closeWrite(): null {
-    if (!this._writable) throw new IOError("closing non-duplex IO for writing");
-    this._writable = false;
+    if (!this.#_writable) throw new IOError("closing non-duplex IO for writing");
+    this.#_writable = false;
     return null;
   }
 
@@ -267,6 +284,11 @@ export class StringIO<S extends string | Uint8Array = string> {
    * (`vendor/ruby/v3.3.11/ext/stringio/stringio.c:559`).
    */
   isClosed(): boolean {
-    return !this._readable && !this._writable;
+    return !this.#_readable && !this.#_writable;
   }
 }
+
+rbDefineAllocFunc(StringIO, (klass) => new klass());
+
+StringIO.prototype.puts = ioPuts;
+StringIO.prototype.print = ioPrint;

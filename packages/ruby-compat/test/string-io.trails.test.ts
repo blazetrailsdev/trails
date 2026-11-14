@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { Encoding } from "../lib/encoding.js";
 import { StringIO } from "../lib/string-io.js";
 import { b } from "../lib/string/b.js";
+import { rbObjDup } from "../lib/include.js";
+import { rbInspect } from "../lib/object.js";
 
 describe("StringIO", () => {
   it("reads the buffer forward and reports eof", () => {
@@ -106,5 +108,22 @@ describe("StringIO", () => {
     expect(() => io.setEncoding("no-such-encoding")).toThrow(
       "unknown encoding name - no-such-encoding",
     );
+  });
+});
+
+describe("StringIO#initialize_copy", () => {
+  it("shares the buffer and position with the original", () => {
+    const io = new StringIO("abc");
+    const dup = rbObjDup(io);
+    expect(dup.read(1)).toEqual(b("a"));
+    expect(io.read()).toBe("bc");
+    dup.write("d");
+    expect(io.string()).toBe("abcd");
+  });
+});
+
+describe("StringIO#inspect", () => {
+  it("lists no instance variables", () => {
+    expect(rbInspect(new StringIO("secret"))).toMatch(/^#<StringIO:0x[0-9a-f]+>$/);
   });
 });
