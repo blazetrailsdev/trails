@@ -1,4 +1,4 @@
-import { expect } from "vitest";
+import { expect, vi } from "vitest";
 import { DateTime, Time } from "@blazetrails/date";
 import { Timestamp } from "../lib/index.js";
 
@@ -33,4 +33,14 @@ export function assertArraySameItems(expected: readonly unknown[], actual: reado
   const condition =
     expected.length === actual.length && expected.filter((x) => !actual.includes(x)).length === 0;
   expect(condition).toBeTruthy();
+}
+
+export async function assertSubProcessReturns(
+  expectedLines: string[],
+  code: (puts: (line: unknown) => void) => Promise<void> | void,
+): Promise<void> {
+  vi.resetModules();
+  const actualLines: string[] = [];
+  await code((line) => actualLines.push(String(line)));
+  expect(actualLines).toEqual(expectedLines);
 }
