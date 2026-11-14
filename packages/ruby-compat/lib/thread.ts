@@ -1,5 +1,6 @@
 import { excBacktraceLocations, type Location } from "./backtrace-location.js";
 import { ThreadError } from "./thread-error.js";
+import { RuntimeError } from "./runtime-error.js";
 import { stderr } from "./process-adapter.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import {
@@ -312,7 +313,7 @@ export class Thread<R = unknown> {
    * raised where the target next blocks (`Thread.blockingRegion`), or at once if
    * it is blocked now.
    */
-  raise(exception: unknown = new Error("unhandled exception")): null {
+  raise(exception: unknown = new RuntimeError()): null {
     if (this.status === "dead") return null;
     const ubf = _unblockingFunctions.get(this);
     if (ubf) {
