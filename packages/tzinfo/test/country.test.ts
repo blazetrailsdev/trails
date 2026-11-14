@@ -134,7 +134,7 @@ describe("TCCountry", () => {
     expect(zoneIdentifiers).toEqual(
       DataSource.get()
         .getCountryInfo("US")
-        .zones.map((z) => (z as CountryTimezone).identifier),
+        .zones.map((z) => z.identifier),
     );
   });
 

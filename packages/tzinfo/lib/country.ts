@@ -71,7 +71,7 @@ export class Country implements Comparable {
   }
 
   zoneInfo(): readonly CountryTimezone[] {
-    return this.info.zones as readonly CountryTimezone[];
+    return this.info.zones;
   }
 
   compareTo(c: unknown): number | null {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { CountryInfo } from "../../lib/index.js";
+import { CountryInfo, CountryTimezone } from "../../lib/index.js";
 import { assertRaises } from "../test-utils.js";
 
 describe("TCCountryInfo", () => {
@@ -23,7 +23,7 @@ describe("TCCountryInfo", () => {
   it("initialize nil zones", () => {
     const error = assertRaises(
       ArgumentError,
-      () => new CountryInfo("ZZ", "Zzz", null as unknown as unknown[]),
+      () => new CountryInfo("ZZ", "Zzz", null as unknown as CountryTimezone[]),
     );
     expect(error.message).toMatch(/\bzones\b/);
   });
@@ -55,7 +55,7 @@ describe("TCCountryInfo", () => {
   });
 
   it("zones empty", () => {
-    const zones: unknown[] = [];
+    const zones: CountryTimezone[] = [];
     const ci = new CountryInfo("ZZ", "Zzz", zones);
     const value = ci.zones;
     expect(value).toEqual([]);
