@@ -399,9 +399,6 @@ export async function teardown(): Promise<void> {
 exports[`AppGenerator > snapshots emitted TypeScript sources > test-helper.ts 1`] = `
 "import { TestCase } from "@blazetrails/activesupport/test-case";
 import { env, setEnv } from "@blazetrails/ruby-compat";
-import "@blazetrails/actionmailer/test-case";
-import "@blazetrails/actionmailer/test-helper";
-import "@blazetrails/activejob/test-helper";
 
 if (env.TRAILS_ENV == null) setEnv("TRAILS_ENV", "test");
 await import("../config/environment.ts");
