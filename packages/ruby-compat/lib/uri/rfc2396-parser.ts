@@ -116,7 +116,11 @@ export class RFC2396Parser {
     return TopLevel.URI!.for(...this.split(uri), this);
   }
 
-  /** `make_regexp` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:262-268`). */
+  /**
+   * `make_regexp` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:262-268`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   makeRegexp(schemes: (string | RegExp)[] | null = null): RegExp {
     if (schemes == null) {
       return this.regexp.ABS_URI_REF;

@@ -1,6 +1,5 @@
 import { ActionController } from "../../namespaces.js";
 import { UAParser } from "ua-parser-js";
-import { Bots } from "ua-parser-js/extensions";
 import { isBot } from "ua-parser-js/bot-detection";
 import {
   Concern,
@@ -103,7 +102,7 @@ export class BrowserBlocker {
 
   /** @internal */
   parsedUserAgent(): UAParser {
-    this._parsed ??= new UAParser(this.request.userAgent ?? "", Bots);
+    this._parsed ??= new UAParser(this.request.userAgent ?? "");
     return this._parsed;
   }
 
@@ -126,7 +125,7 @@ export class BrowserBlocker {
 
   /** @internal */
   isBot(): boolean {
-    return isBot(this.parsedUserAgent().getResult());
+    return isBot(this.parsedUserAgent().getUA());
   }
 
   /** @internal */
