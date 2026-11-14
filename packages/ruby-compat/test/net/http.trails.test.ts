@@ -359,7 +359,7 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
     // vendor/ruby/v3.3.11/lib/net/protocol.rb:275, :301-312
     const port = await listen(
       createServer((_req, res) => {
-        res.writeHead(200, { "content-length": "2" });
+        res.writeHead(200, { "Content-Length": "2" });
         res.end("hi");
       }),
     );
@@ -370,6 +370,7 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
     expect(out).toContain(`opening connection to 127.0.0.1:${port}...\nopened\n`);
     expect(out).toMatch(/<- "GET \/x HTTP\/1\.1\\r\\n.*Connection: close\\r\\n/);
     expect(out).toContain('-> "HTTP/1.1 200 OK\\r\\n"\n');
+    expect(out).toContain('-> "Content-Length: 2\\r\\n"\n');
     expect(out).toContain('reading 2 bytes...\n-> "hi"\nread 2 bytes\n');
     expect(out).toContain("Conn close\n");
   });

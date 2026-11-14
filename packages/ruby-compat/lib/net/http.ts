@@ -263,6 +263,12 @@ export class HTTP {
       }
     });
     this.debug("opened");
+    if (this.isUseSsl()) {
+      this.debug(`starting SSL for ${connAddr}:${connPort}...`);
+      this.debug(
+        `SSL established, protocol: ${this._socket.sslVersion}, cipher: ${this._socket.cipher![0]}`,
+      );
+    }
     this._lastCommunicated = null;
   }
 

@@ -77,6 +77,8 @@ export interface HttpClientConnection {
   writeTimeout: number | null;
   /** `BufferedIO#debug_output` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:131`). */
   debugOutput: HttpDebugOutput | null;
+  readonly sslVersion: string | null;
+  readonly cipher: string[] | null;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -142,6 +144,9 @@ type NodeSocket = {
   destroy(): unknown;
   readonly destroyed: boolean;
   readonly readableEnded: boolean;
+  on(event: "drain", listener: () => void): unknown;
+  getProtocol?(): string | null;
+  getCipher?(): { name: string };
 };
 
 type NodeIncoming = {
@@ -149,6 +154,7 @@ type NodeIncoming = {
   statusCode?: number;
   statusMessage?: string;
   headers: Record<string, string | string[] | undefined>;
+  rawHeaders: string[];
   on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
   on(event: "end", listener: () => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
@@ -184,6 +190,8 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
       const conn: HttpClientConnection = {
         writeTimeout: options.writeTimeout,
         debugOutput: options.debugOutput,
+        sslVersion: socket.getProtocol?.() ?? null,
+        cipher: socket.getCipher !== undefined ? [socket.getCipher().name] : null,
         request: (method, path, headers, body) =>
           new Promise((resolveResponse, rejectResponse) => {
             const out = conn.debugOutput;
@@ -199,7 +207,7 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
               buf += "\r\n";
               out.write(`<- ${rbStrDump(buf)}\n`);
               if (body != null && body.length > 0) {
-                const text = typeof body === "string" ? body : String.fromCharCode(...body);
+                const text = typeof body === "string" ? body : new TextDecoder().decode(body);
                 out.write(`<- ${rbStrDump(text)}\n`);
               }
             }
@@ -223,12 +231,12 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
                   if (out != null) {
                     const line = (l: string) => out.write(`-> ${rbStrDump(`${l}\r\n`)}\n`);
                     line(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage ?? ""}`);
-                    for (const [k, v] of Object.entries(res.headers)) {
-                      for (const x of Array.isArray(v) ? v : [v]) line(`${k}: ${x}`);
+                    for (let i = 0; i < res.rawHeaders.length; i += 2) {
+                      line(`${res.rawHeaders[i]}: ${res.rawHeaders[i + 1]}`);
                     }
                     line("");
                     out.write(`reading ${total} bytes...\n`);
-                    out.write(`-> ${rbStrDump(String.fromCharCode(...bytes))}\n`);
+                    out.write(`-> ${rbStrDump(new TextDecoder().decode(bytes))}\n`);
                     out.write(`read ${total} bytes\n`);
                   }
                   resolveResponse({
@@ -244,13 +252,21 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
             req.on("error", rejectResponse);
             req.end(body);
             if (conn.writeTimeout != null) {
+              const sec = conn.writeTimeout;
+              const wait = () => {
+                if (timer !== null) clearTimeout(timer);
+                timer = setTimeout(() => {
+                  socket.removeListener("drain", wait);
+                  socket.destroy();
+                  rejectResponse(new WriteTimeout());
+                }, sec * 1000);
+              };
+              socket.on("drain", wait);
               req.once("finish", () => {
+                socket.removeListener("drain", wait);
                 if (timer !== null) clearTimeout(timer);
               });
-              timer = setTimeout(() => {
-                socket.destroy();
-                rejectResponse(new WriteTimeout());
-              }, conn.writeTimeout * 1000);
+              wait();
             }
           }),
         close: () => socket.destroy(),
