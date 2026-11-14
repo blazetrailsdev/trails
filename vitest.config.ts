@@ -228,6 +228,8 @@ const alias = {
     __dirname,
     "packages/activesupport/lib/testing/temporal-helpers.ts",
   ),
+  "@blazetrails/activesupport/test/cache/behaviors/":
+    path.resolve(__dirname, "packages/activesupport/test/cache/behaviors") + "/",
   "@blazetrails/activesupport": path.resolve(__dirname, "packages/activesupport/lib/index.ts"),
   "@blazetrails/arel/test": path.resolve(__dirname, "packages/arel/test"),
   "@blazetrails/arel": path.resolve(__dirname, "packages/arel/lib/index.ts"),
@@ -315,6 +317,10 @@ const alias = {
   "@blazetrails/activerecord/sqlite/expo-sqlite": path.resolve(
     __dirname,
     "packages/activerecord/lib/sqlite/expo-sqlite.ts",
+  ),
+  "@blazetrails/activerecord/encryption/message-pack-message-serializer": path.resolve(
+    __dirname,
+    "packages/activerecord/lib/encryption/message-pack-message-serializer.ts",
   ),
   "@blazetrails/activerecord/encryption": path.resolve(
     __dirname,

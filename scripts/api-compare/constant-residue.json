@@ -1308,7 +1308,18 @@
     "unwalked": [],
     "residue": {}
   },
-  "solid-cache": { "rows": 1, "excluded": [], "unwalked": [], "residue": {} },
+  "solid-cache": {
+    "rows": 15,
+    "excluded": [],
+    "unwalked": [
+      "connections.ts::Connections",
+      "store/api.ts::Api",
+      "store/connections.ts::Connections",
+      "store/entries.ts::Entries",
+      "store/failsafe.ts::Failsafe"
+    ],
+    "residue": {}
+  },
   "solid-queue": {
     "rows": 61,
     "excluded": [

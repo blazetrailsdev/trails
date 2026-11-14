@@ -1062,9 +1062,15 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/arel':
+        specifier: workspace:*
+        version: link:../arel
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
 
   packages/solid-queue:
     dependencies:

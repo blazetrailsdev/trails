@@ -904,6 +904,7 @@ export const SOURCES: readonly UpstreamSource[] = [
         name: "solid-cache",
         libPath: "lib/solid_cache",
         libEntryFile: "lib/solid_cache.rb",
+        extraLibPaths: ["app/models/solid_cache"],
         testPath: "test",
         compareApi: true,
         compareTests: true,

@@ -20,6 +20,7 @@ import { DeserializationError } from "./cache/deserialization-error.js";
 export { Store, ArgumentError, NotImplementedError, WriteOptions } from "./cache/store.js";
 export type { CacheLogger, StoreOptions } from "./cache/store.js";
 export { DeserializationError } from "./cache/deserialization-error.js";
+export { Entry } from "./cache/entry.js";
 
 export { formatVersion, setFormatVersion } from "./cache/store.js";
 

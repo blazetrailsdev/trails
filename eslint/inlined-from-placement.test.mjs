@@ -38,6 +38,13 @@ tester.run("inlined-from-placement", rule, {
       ),
       filename: TAGS_BASE,
     },
+    {
+      code: onMethod(
+        "setupBang",
+        "SolidCache::Store::Connections#setup! solid_cache/v1.0.7/lib/solid_cache/store/connections.rb:42-44",
+      ),
+      filename: "/repo/packages/solid-cache/lib/store.ts",
+    },
     { code: onConstructor(API), filename: BASE },
     { code: onConstructor(NEW, API), filename: BASE },
     {
