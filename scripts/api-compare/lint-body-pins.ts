@@ -10,6 +10,10 @@
  *   - DUPLICATE — two manifest entries share one (package, rubyFile, rubyName)
  *     key (the manifest must be a clean 1:1 record).
  *
+ * A DRIFT or STALE pair with a bump-ledger row (scripts/parity/bump-ledger/,
+ * RFC 0191 § 3) is reported as a ledger row and does not fail the gate;
+ * lint-bump-ledger.ts keeps the ledger honest.
+ *
  * Unpinned matched pairs are NOT a failure — pinning is opt-in (see
  * body-pins.ts for the lifecycle). This gate only enforces that the pins that
  * DO exist resolve and match, so it mirrors lint-call-mismatches.ts minus the
@@ -38,6 +42,7 @@ import {
   loadManifest,
   missingScope,
 } from "./body-pins.js";
+import { loadLedgered, partitionLedgered } from "./bump-ledger.js";
 
 async function main(scope: string | null): Promise<number> {
   const artifact = await loadArtifact();
@@ -70,7 +75,20 @@ async function main(scope: string | null): Promise<number> {
     return 1;
   }
 
-  const { drift, stale } = diffPins(artifact.hashes, pins);
+  const all = diffPins(artifact.hashes, pins);
+  const isLedgered = await loadLedgered();
+  const { ledgered: driftLedgered, red: drift } = partitionLedgered(all.drift, isLedgered);
+  const { ledgered: staleLedgered, red: stale } = partitionLedgered(all.stale, isLedgered);
+  const ledgered = [...driftLedgered, ...staleLedgered];
+  if (ledgered.length > 0) {
+    console.log(
+      `body-pins gate: ${ledgered.length} ledger row(s) — drifted or removed by a ref bump, ` +
+        "tracked in scripts/parity/bump-ledger/:",
+    );
+    for (const l of ledgered.sort((a, b) => keyOf(a).localeCompare(keyOf(b)))) {
+      console.log(`  ledger  ${l.package}  ${l.rubyFile}:${l.rubyName}`);
+    }
+  }
 
   if (drift.length === 0 && stale.length === 0) {
     console.log(`body-pins gate: OK (${pins.length} pinned)`);

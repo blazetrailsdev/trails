@@ -236,3 +236,10 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    constructor), and `pnpm parity:promises:tighten` writes each mark DOWN
    after a convergence. CI runs `pnpm parity:promises:ci` over the packages
    the PR changes.
+
+## Bump ledger (`parity:api:pins:ledger`)
+
+RFC 0191 § 3. `scripts/parity/bump-ledger/<source>.json` lists the pairs a
+`ref` bump drifted or removed. `parity:api:pins` passes a ledgered pair;
+`parity:api:pins:ledger` keeps the ledger only-shrink. See CONTRIBUTING.md
+§ "Body pins".

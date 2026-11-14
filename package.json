@@ -81,6 +81,7 @@
     "parity:api:inlined": "pnpm tsx scripts/api-compare/lint-inlined-from.ts",
     "parity:api:inlined:fix": "pnpm tsx scripts/api-compare/lint-inlined-from.ts --fix",
     "parity:api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",
+    "parity:api:pins:ledger": "pnpm tsx scripts/api-compare/lint-bump-ledger.ts",
     "parity:api:pins:all": "API_COMPARE_FORCE=1 pnpm parity:api && pnpm tsx scripts/api-compare/body-pins.ts --pin-all",
     "parity:api:moves": "pnpm tsx scripts/api-compare/moves.ts",
     "parity:skips:stories": "pnpm tsx scripts/api-compare/story-skip-conflicts.ts",

@@ -2208,6 +2208,8 @@ jobs:
         # or when a pin no longer resolves. Re-pin after re-verifying with
         # `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`.
         run: pnpm exec tsx scripts/api-compare/lint-body-pins.ts
+      - name: Bump-ledger gate
+        run: pnpm exec tsx scripts/api-compare/lint-bump-ledger.ts
       - name: API comparison (calls)
         # Writes the call-set artifact (output/call-mismatches.json) over
         # SIGNIFICANT_CALLS (all ported names except `super` and the
