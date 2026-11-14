@@ -31,7 +31,7 @@ describe("ActionText::Engine", () => {
     expect(tasks).toMatch(/\/tasks\/actiontext\.(ts|js)$/);
   });
 
-  it("runs its initializers in Rails' order", () => {
+  it("runs its ported initializers in Rails' order, system_test_helper excepted", () => {
     expect(
       Engine.initializers.map((i) => i.name).filter((name) => name.startsWith("action_text.")),
     ).toEqual([

@@ -40,8 +40,8 @@ describe("ActionText::Attachment", () => {
     expect(trixAttachment.attributes["caption"]).toBe("Captioned");
   });
 
-  it("minifies attachments and keys its cache on the node digest", () => {
-    const fragment = Attachment.fragmentByMinifyingAttachments(
+  it("minifies attachments and keys its cache on the node digest", async () => {
+    const fragment = await Attachment.fragmentByMinifyingAttachments(
       `<${Attachment.tagName} sgid="1">inner</${Attachment.tagName}>`,
     );
     expect(fragment.toHtml()).toBe('<action-text-attachment sgid="1"></action-text-attachment>');

@@ -6,7 +6,7 @@ export const Minification = {} as Extended<typeof Concern>;
 extend(Minification, Concern);
 
 Minification.classMethods((mod) => {
-  mod.fragmentByMinifyingAttachments = function (content: unknown): Fragment {
+  mod.fragmentByMinifyingAttachments = function (content: unknown): Promise<Fragment> {
     return Fragment.wrap(content).replace(ActionText.Attachment!.tagName, (node) => {
       node.setInnerHtml("");
       return node;

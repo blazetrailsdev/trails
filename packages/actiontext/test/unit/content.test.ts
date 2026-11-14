@@ -254,7 +254,7 @@ describe("ActionText::ContentTest", () => {
 `;
 
     const content = await contentFromHtml(html);
-    const replacedFragment = content.fragment.replace("p", (node) => {
+    const replacedFragment = await content.fragment.replace("p", (node) => {
       if (/replace me/.test(node.text)) {
         return "<p>replaced</p>";
       } else {

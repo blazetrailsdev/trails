@@ -121,7 +121,8 @@ interface DumpArg {
   data: Map<unknown, number>;
   numEntries: number;
   compatTbl: Map<object, object> | null;
-  userdefs: Set<object> | null;
+  /** `rb_init_identtable` (`vendor/ruby/v3.3.11/marshal.c:944`). */
+  userdefs: globalThis.Set<object> | null;
   /** @noRailsEquivalent PERMANENT */
   markPlainObjects: boolean;
 }
@@ -635,7 +636,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
         wBytes(bytes, bytes.length, arg);
       }
       if (hasiv) {
-        (arg.userdefs ??= new Set()).add(obj as object);
+        (arg.userdefs ??= new globalThis.Set()).add(obj as object);
         wIvar(hasiv, ivobj, encname, arg, limit);
         arg.userdefs.delete(obj as object);
       }

@@ -56,6 +56,10 @@ export class Engine extends TrailsEngine {
 
     this.config.set("actionText", new OrderedOptions());
     this.config.actionText.attachmentTagName = "action-text-attachment";
+    this.config.autoloadOncePaths = [
+      File.join(import.meta.dirname, "app", "helpers"),
+      File.join(import.meta.dirname, "app", "models"),
+    ];
 
     this.initializer("action_text.deprecator", { before: "load_environment_config" }, (app) => {
       app.deprecators.set("actionText", ActionText.deprecator());
@@ -89,7 +93,7 @@ export class Engine extends TrailsEngine {
       onLoad("active_storage_blob", function (this: { prototype: object }) {
         include(this, Attachable);
 
-        Object.assign(this.prototype, {
+        const methods = {
           isPreviewableAttachable(this: BlobHost): boolean {
             return this.isRepresentable();
           },
@@ -101,7 +105,15 @@ export class Engine extends TrailsEngine {
           toTrixContentAttachmentPartialPath(): null {
             return null;
           },
-        });
+        };
+        for (const [name, value] of Object.entries(methods)) {
+          Object.defineProperty(this.prototype, name, {
+            value,
+            writable: true,
+            configurable: true,
+            enumerable: false,
+          });
+        }
       });
     });
 
