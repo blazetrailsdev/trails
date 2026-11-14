@@ -56,10 +56,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return `${sql} COMMENT ${this.conn.quote(comment)}`;
   }
 
-  /**
-   * @internal
-   * @inventedArm databaseVersion — PERMANENT
-   */
+  /** @internal */
   protected async isMariadb(): Promise<boolean> {
     await this.conn.databaseVersion;
     return this.conn.isMariadb();
