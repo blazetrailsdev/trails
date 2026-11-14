@@ -435,6 +435,7 @@ const alias = {
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/lib/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/lib/raabro.ts"),
   "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/lib/zeitwerk.ts"),
+  "@blazetrails/vite-assets": path.resolve(__dirname, "packages/vite-assets/lib/index.ts"),
   "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/lib/fugit.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/lib/index.ts"),
   "@blazetrails/html-sanitizer": path.resolve(__dirname, "packages/html-sanitizer/lib/index.ts"),
@@ -721,6 +722,7 @@ export default defineConfig({
             "packages/et-orbi/**",
             "packages/raabro/**",
             "packages/zeitwerk/**",
+            "packages/vite-assets/**",
             "packages/fugit/**",
             ...(ARCONN === "postgresql"
               ? []
@@ -807,6 +809,19 @@ export default defineConfig({
           include: ["packages/zeitwerk/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
+        },
+      },
+      {
+        resolve: otherResolve,
+        test: {
+          name: "vite-assets",
+          globals: true,
+          include: ["packages/vite-assets/test/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: [
+            "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/vitest-matchers/lib/setup.ts",
+          ],
         },
       },
       {

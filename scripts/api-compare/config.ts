@@ -234,6 +234,7 @@ export const MANIFEST_PACKAGES = [
   "net-smtp",
   "rake",
   "zeitwerk",
+  "vite-assets",
 ] as const;
 
 /**

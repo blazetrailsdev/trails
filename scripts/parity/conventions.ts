@@ -79,6 +79,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
   rails: "trails",
   Rails: "Trails",
   RAILS: "TRAILS",
+  ViteRuby: "ViteAssets",
 };
 
 /**
@@ -99,6 +100,9 @@ export const TOKEN_RENAMES: Record<string, string> = {
  *   `railties` path segment already reads `trailties`.
  * - `Rails` → `Trails`: top-level `module Rails` (`railties/lib/rails.rb`)
  *   maps to the `Trails` global in `packages/trailties/lib/trails.ts`.
+ * - `ViteRuby` → `ViteAssets`: vite_ruby is ported as
+ *   `@blazetrails/vite-assets`, and no TS name spells Ruby (CLAUDE.md,
+ *   "importmap-rails and propshaft are out of scope").
  *
  * Both parity tools read this one table: `parity:api` resolves the Ruby class
  * to its TS declaration through it, and `parity:api:extra` admits the renamed
@@ -112,6 +116,7 @@ export const TS_CLASS_RENAMES: Record<string, string> = {
   Railties: "Trailties",
   Rails: "Trails",
   Registry: "TypeRegistry",
+  ViteRuby: "ViteAssets",
 };
 
 /**
@@ -149,7 +154,8 @@ const FILE_TOKEN_RENAME_PATTERN = new RegExp(
  * installs through a package manager, never Bundler: `run_bundle`
  * (generators/app_base.rb:705-707), `bundle_command` (:645), `bundle_install?`
  * (:671) and the `skip_bundle` option credit at the install spelling, while
- * `bundle` itself stays free for a JS bundle.
+ * `bundle` itself stays free for a JS bundle. vite_ruby is `vite-assets`, and
+ * `load_ruby_config` loads `config/vite.ts`, so neither spells Ruby.
  */
 export const PHRASE_RENAMES: Record<string, string> = {
   apply_rails_template: "apply_trails_template",
@@ -157,6 +163,8 @@ export const PHRASE_RENAMES: Record<string, string> = {
   bundle_command: "install_command",
   bundle_install: "install",
   skip_bundle: "skip_install",
+  load_ruby_config: "load_ts_config",
+  vite_ruby: "vite_assets",
 };
 
 const PHRASE_RENAME_PATTERN = new RegExp(
@@ -219,6 +227,7 @@ export const PATH_SEGMENT_ALIASES: Record<string, string> = {
  */
 export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:inflector/methods.rb": "inflector.ts",
+  "vite-assets:vite_ruby.rb": "vite-assets.ts",
   // Real ports that live under a different file name than the Ruby one, found
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.

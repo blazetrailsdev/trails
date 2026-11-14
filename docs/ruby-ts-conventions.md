@@ -155,6 +155,7 @@ trails:
 | `rails`    | `trails`     |
 | `Rails`    | `Trails`     |
 | `RAILS`    | `TRAILS`     |
+| `ViteRuby` | `ViteAssets` |
 
 Test names are not an exception. Rails'
 `test "ERB::Util.html_escape should escape unsafe characters"`

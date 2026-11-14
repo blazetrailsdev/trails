@@ -1760,6 +1760,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   raabro: "packages/raabro/test/",
   fugit: "packages/fugit/test/",
   zeitwerk: "packages/zeitwerk/test/",
+  "vite-assets": "packages/vite-assets/test/",
   actiondispatch: "packages/actionpack/test/action-dispatch/",
   actioncontroller: "packages/actionpack/test/action-controller/",
   abstractcontroller: "packages/actionpack/test/abstract-controller/",

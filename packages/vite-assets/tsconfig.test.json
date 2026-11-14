@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist-test",
+    "rootDir": "."
+  },
+  "exclude": ["test/test_app"],
+  "include": ["test"],
+  "references": [
+    {
+      "path": "./tsconfig.json"
+    }
+  ]
+}

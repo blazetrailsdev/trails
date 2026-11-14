@@ -135,6 +135,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "thor",
   "trailties",
   "tzinfo",
+  "vite-assets",
 ];
 
 /** One row as the gate prints it — the shard key plus the export the body

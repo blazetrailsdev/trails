@@ -753,7 +753,7 @@ async function topLevelRubyConstants(dir: string): Promise<Set<string>> {
     const subDir = path.relative(srcRoot, packageSrcDir(pkg));
     for (const [fqn, info] of Object.entries(rubyPkg.classes ?? {})) {
       if (fqn.includes("::") || !info.file) continue;
-      out.add(`${path.join(subDir, rubyFileToTs(info.file, pkg))}::${fqn}`);
+      out.add(`${path.join(subDir, rubyFileToTs(info.file, pkg))}::${renameTokens(fqn)}`);
     }
   }
   return out;
