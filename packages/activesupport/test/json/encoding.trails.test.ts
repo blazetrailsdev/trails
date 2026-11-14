@@ -35,3 +35,59 @@ describe("JSON Encoding default time precision (trails)", () => {
     }
   });
 });
+
+describe("JSONGemEncoder#jsonify copy-on-write (trails)", () => {
+  it("encodes nested plain objects and arrays of JSON-native leaves", () => {
+    const value = { a: 1, b: [1, "x", null, true], c: { d: { e: "f" } } };
+    expect(ActiveSupportJSON.encode(value)).toBe(
+      '{"a":1,"b":[1,"x",null,true],"c":{"d":{"e":"f"}}}',
+    );
+  });
+
+  it("encodes a Map nested inside a plain object", () => {
+    const value = {
+      a: 1,
+      m: new Map<unknown, unknown>([
+        [1, "one"],
+        ["k", [NaN]],
+      ]),
+    };
+    expect(ActiveSupportJSON.encode(value)).toBe('{"a":1,"m":{"1":"one","k":[null]}}');
+  });
+
+  it("encodes values with asJson after unchanged siblings", () => {
+    const record = new (class {
+      asJson() {
+        return { id: 7 };
+      }
+    })();
+    const value = { a: "x", b: [1, 2, record, 3], c: record };
+    expect(ActiveSupportJSON.encode(value)).toBe('{"a":"x","b":[1,2,{"id":7},3],"c":{"id":7}}');
+  });
+
+  it("does not mutate its input when a value changes", () => {
+    const value = { a: 1, b: NaN, c: [Infinity] };
+    expect(ActiveSupportJSON.encode(value)).toBe('{"a":1,"b":null,"c":[null]}');
+    expect(value.b).toBeNaN();
+    expect(value.c[0]).toBe(Infinity);
+  });
+
+  it("copies from the first key or element when it changes", () => {
+    expect(ActiveSupportJSON.encode({ a: NaN, b: 1 })).toBe('{"a":null,"b":1}');
+    expect(ActiveSupportJSON.encode([NaN, 1])).toBe("[null,1]");
+  });
+
+  it("keeps the unchanged prefix and key order when a middle value changes", () => {
+    expect(ActiveSupportJSON.encode({ d: 1, b: 2, c: NaN, a: 3 })).toBe(
+      '{"d":1,"b":2,"c":null,"a":3}',
+    );
+    expect(ActiveSupportJSON.encode([1, 2, NaN, 3])).toBe("[1,2,null,3]");
+  });
+
+  it("encodes sparse array holes as null whether or not the array is copied", () => {
+    // eslint-disable-next-line no-sparse-arrays
+    expect(ActiveSupportJSON.encode([1, , 3])).toBe("[1,null,3]");
+    // eslint-disable-next-line no-sparse-arrays
+    expect(ActiveSupportJSON.encode([1, , NaN])).toBe("[1,null,null]");
+  });
+});

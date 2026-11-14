@@ -51,18 +51,52 @@ export class JSONGemEncoder {
       return value;
     } else if (typeof value === "number" || value instanceof Number) {
       return Float.asJson(value as number);
-    } else if (value instanceof Map || isPlainObject(value as object)) {
+    } else if (value instanceof Map) {
       const result: Record<string, unknown> = {};
-      const entries = value instanceof Map ? value.entries() : Object.entries(value as object);
-      for (const [k, v] of entries) {
+      for (const [k, v] of value) {
         result[toS(k)] = this.jsonify(v);
       }
       return result;
+    } else if (isPlainObject(value as object)) {
+      return this._jsonifyPlainObject(value as Record<string, unknown>);
     } else if (Array.isArray(value)) {
-      return value.map((v) => this.jsonify(v));
+      return this._jsonifyArray(value);
     } else {
       return this.jsonify(asJson(value));
     }
+  }
+
+  /** @perf 72% — PERMANENT */
+  private _jsonifyPlainObject(value: Record<string, unknown>): unknown {
+    let result: Record<string, unknown> | null = null;
+    const keys = Object.keys(value);
+    for (let i = 0; i < keys.length; i++) {
+      const k = keys[i];
+      const v = value[k];
+      const jsonified = this.jsonify(v);
+      if (result === null) {
+        if (jsonified === v) continue;
+        result = {};
+        for (let j = 0; j < i; j++) result[keys[j]] = value[keys[j]];
+      }
+      result[k] = jsonified;
+    }
+    return result ?? value;
+  }
+
+  /** @perf 72% — PERMANENT */
+  private _jsonifyArray(value: unknown[]): unknown {
+    let result: unknown[] | null = null;
+    for (let i = 0; i < value.length; i++) {
+      const v = value[i];
+      const jsonified = this.jsonify(v);
+      if (result === null) {
+        if (jsonified === v) continue;
+        result = value.slice(0, i);
+      }
+      result.push(jsonified);
+    }
+    return result ?? value;
   }
 
   /** @missingRailsCall generate — PERMANENT */
