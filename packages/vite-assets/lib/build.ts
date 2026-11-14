@@ -96,10 +96,12 @@ export class Build {
   }
 
   isRetryFailed(): boolean {
+    if (this.success) return false;
+
     const time = new Date(String(this.timestamp).replace(" ", "T"));
     if (Number.isNaN(time.getTime())) return true;
 
-    return !this.success && time.getTime() + 3000 < Date.now();
+    return time.getTime() + 3000 < Date.now();
   }
 
   withResult(attrs: BuildAttrs): Build {
