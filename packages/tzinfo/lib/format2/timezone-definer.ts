@@ -3,14 +3,12 @@ import type { StringDeduper } from "../string-deduper.js";
 import { TimezoneOffset } from "../timezone-offset.js";
 import { TimezoneTransition } from "../timezone-transition.js";
 
-type Deduper = Pick<StringDeduper, "dedupe">;
-
 /** @internal */
 export class TimezoneDefiner {
   readonly transitions: TimezoneTransition[];
 
   /** @internal */
-  private readonly stringDeduper: Deduper;
+  private readonly stringDeduper: typeof StringDeduper.global;
 
   /** @internal */
   private readonly offsets: Record<string, TimezoneOffset>;
@@ -18,7 +16,7 @@ export class TimezoneDefiner {
   /** @internal */
   private previousOffset: TimezoneOffset | null = null;
 
-  constructor(stringDeduper: Deduper) {
+  constructor(stringDeduper: typeof StringDeduper.global) {
     this.stringDeduper = stringDeduper;
     this.offsets = {};
     this.transitions = [];

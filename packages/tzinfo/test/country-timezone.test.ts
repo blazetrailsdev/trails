@@ -40,12 +40,6 @@ describe("TCCountryTimezone", () => {
     expect(Object.isFrozen(ct.description)).toBe(true);
   });
 
-  it.skip("timezone", () => {});
-
-  it.skip("description or friendly idenfier no description", () => {});
-
-  it.skip("description or friendly idenfier description", () => {});
-
   it("equality 1", () => {
     const ct1 = new CountryTimezone("Europe/London", rational(2059, 40), rational(-5, 16));
     const ct2 = new CountryTimezone("Europe/London", rational(2059, 40), rational(-5, 16));

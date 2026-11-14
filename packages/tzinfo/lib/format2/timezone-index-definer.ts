@@ -1,7 +1,5 @@
 import type { StringDeduper } from "../string-deduper.js";
 
-type Deduper = Pick<StringDeduper, "dedupe">;
-
 /** @internal */
 export class TimezoneIndexDefiner {
   readonly dataTimezones: string[];
@@ -9,9 +7,9 @@ export class TimezoneIndexDefiner {
   readonly linkedTimezones: string[];
 
   /** @internal */
-  private readonly stringDeduper: Deduper;
+  private readonly stringDeduper: typeof StringDeduper.global;
 
-  constructor(stringDeduper: Deduper) {
+  constructor(stringDeduper: typeof StringDeduper.global) {
     this.stringDeduper = stringDeduper;
     this.dataTimezones = [];
     this.linkedTimezones = [];

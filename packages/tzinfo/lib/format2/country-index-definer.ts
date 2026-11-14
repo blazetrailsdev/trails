@@ -4,22 +4,23 @@ import { CountryInfo } from "../data-sources/country-info.js";
 import type { StringDeduper } from "../string-deduper.js";
 import { CountryDefiner } from "./country-definer.js";
 
-type Deduper = Pick<StringDeduper, "dedupe">;
-
 /** @internal */
 export class CountryIndexDefiner {
   readonly countries: Record<string, CountryInfo>;
 
   /** @internal */
-  private readonly identifierDeduper: Deduper;
+  private readonly identifierDeduper: typeof StringDeduper.global;
 
   /** @internal */
-  private readonly descriptionDeduper: Deduper;
+  private readonly descriptionDeduper: typeof StringDeduper.global;
 
   /** @internal */
   private readonly sharedTimezones: Record<string, CountryTimezone>;
 
-  constructor(identifierDeduper: Deduper, descriptionDeduper: Deduper) {
+  constructor(
+    identifierDeduper: typeof StringDeduper.global,
+    descriptionDeduper: typeof StringDeduper.global,
+  ) {
     this.identifierDeduper = identifierDeduper;
     this.descriptionDeduper = descriptionDeduper;
     this.sharedTimezones = {};

@@ -2,8 +2,6 @@ import { ArgumentError, rational } from "@blazetrails/ruby-compat";
 import { CountryTimezone } from "../country-timezone.js";
 import type { StringDeduper } from "../string-deduper.js";
 
-type Deduper = Pick<StringDeduper, "dedupe">;
-
 /** @internal */
 export class CountryDefiner {
   readonly timezones: CountryTimezone[];
@@ -12,15 +10,15 @@ export class CountryDefiner {
   private readonly sharedTimezones: Record<string, CountryTimezone> | null;
 
   /** @internal */
-  private readonly identifierDeduper: Deduper;
+  private readonly identifierDeduper: typeof StringDeduper.global;
 
   /** @internal */
-  private readonly descriptionDeduper: Deduper;
+  private readonly descriptionDeduper: typeof StringDeduper.global;
 
   constructor(
     sharedTimezones: Record<string, CountryTimezone> | null,
-    identifierDeduper: Deduper,
-    descriptionDeduper: Deduper,
+    identifierDeduper: typeof StringDeduper.global,
+    descriptionDeduper: typeof StringDeduper.global,
   ) {
     this.sharedTimezones = sharedTimezones;
     this.identifierDeduper = identifierDeduper;
