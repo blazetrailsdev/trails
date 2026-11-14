@@ -396,6 +396,7 @@ function clearAdapterDataSourceCache(host: SchemaKlass): void {
   }
 }
 
+/** @inventedArm columns — PERMANENT */
 async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
   let cache: { columns?: (t: string) => Promise<unknown> } | null | undefined;
   try {
