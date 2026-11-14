@@ -63,7 +63,7 @@ export class Entry extends Record {
   }
 
   static async read(key: string): Promise<unknown> {
-    return (await this.readMulti([key])).get(key);
+    return (await this.readMulti([key])).get(key) ?? null;
   }
 
   static async readMulti(keys: string[]): Promise<Map<string, unknown>> {

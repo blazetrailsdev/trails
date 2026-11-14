@@ -1,8 +1,7 @@
 import { Encryptor, type EncryptsOptions } from "@blazetrails/activerecord/encryption";
 import { MessagePackMessageSerializer } from "@blazetrails/activerecord/encryption/message-pack-message-serializer";
 import { isPresent } from "@blazetrails/activesupport";
-import { ArgumentError, constSet } from "@blazetrails/ruby-compat";
-import { SolidCache } from "./solid-cache.js";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 type ConnectsTo = { shards?: Record<string, Record<string, string>> } & Record<string, unknown>;
 
@@ -91,7 +90,3 @@ export class Configuration {
     };
   }
 }
-
-constSet(SolidCache, "Configuration", Configuration);
-
-SolidCache.configuration = new Configuration();

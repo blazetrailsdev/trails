@@ -1,6 +1,6 @@
 import { mattrAccessor } from "@blazetrails/activesupport";
 import { TopLevel } from "@blazetrails/ruby-compat";
-import type { Configuration } from "./configuration.js";
+import { Configuration } from "./configuration.js";
 import type { Connections } from "./connections.js";
 import type { Engine } from "./engine.js";
 import type { Entry } from "./entry.js";
@@ -26,7 +26,9 @@ export const SolidCache = {
 };
 
 mattrAccessor.call(SolidCache, "executor");
-mattrAccessor.call(SolidCache, "configuration");
+mattrAccessor.call(SolidCache, "configuration", { default: new Configuration() });
+
+SolidCache.Configuration = Configuration;
 
 TopLevel.SolidCache = SolidCache;
 
