@@ -168,7 +168,7 @@ type NodeHttp = {
     callback: (res: NodeIncoming) => void,
   ): {
     on(event: "error", listener: (error: Error) => void): unknown;
-    once(event: "finish", listener: () => void): unknown;
+    once(event: "finish" | "error", listener: () => void): unknown;
     end(chunk?: string | Uint8Array | null): unknown;
   };
 };
