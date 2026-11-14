@@ -1012,6 +1012,86 @@ describe("publicInstanceMethods", () => {
 });
 
 describe("rbCallSuper", () => {
+  it("does not cycle when a module is included into a subclass and then into its parent below a prepend", () => {
+    class Base {
+      setup(): string[] {
+        return ["base"];
+      }
+    }
+    class Parent extends Base {}
+    function prependedSetup(this: Parent): string[] {
+      return ["prepended", ...(rbCallSuper(this, prependedSetup) as string[])];
+    }
+    prepend(Parent, { setup: prependedSetup });
+    class Child extends Parent {}
+    function setup(this: Parent): string[] {
+      return ["mod", ...(rbCallSuper(this, setup) as string[])];
+    }
+    include(Child, { setup });
+    include(Parent, { setup });
+    expect(new Child().setup()).toEqual(["mod", "prepended", "base"]);
+    expect(new Parent().setup()).toEqual(["prepended", "mod", "base"]);
+  });
+
+  it("keeps a module included into sibling classes and again into one of them", () => {
+    class Base {
+      setup(): string[] {
+        return ["base"];
+      }
+    }
+    class S1 extends Base {}
+    class S2 extends Base {}
+    function setup(this: Base): string[] {
+      return ["mod", ...(rbCallSuper(this, setup) as string[])];
+    }
+    include(S1, { setup });
+    include(S2, { setup });
+    include(S1, { setup });
+    expect(new S1().setup()).toEqual(["mod", "base"]);
+    expect(new S2().setup()).toEqual(["mod", "base"]);
+  });
+
+  it("reaches a twice-seated module method seated at the same link as the caller", () => {
+    class Base {
+      setup(): string[] {
+        return ["base"];
+      }
+    }
+    class S1 extends Base {}
+    class S2 extends Base {}
+    function inner(this: Base): string[] {
+      return ["inner", ...(rbCallSuper(this, inner) as string[])];
+    }
+    include(S2, { setup: inner });
+    include(S1, { setup: inner });
+    function outer(this: Base): string[] {
+      return ["outer", ...(rbCallSuper(this, outer) as string[])];
+    }
+    include(S1, { setup: outer });
+    expect(new S1().setup()).toEqual(["outer", "inner", "base"]);
+    expect(new S2().setup()).toEqual(["inner", "base"]);
+  });
+
+  it("reaches the superclass method when a module is included into a subclass, its parent and a sibling", () => {
+    class Base {
+      setup(): string[] {
+        return ["base"];
+      }
+    }
+    class Parent extends Base {}
+    class Child extends Parent {}
+    class Sibling extends Base {}
+    function setup(this: Base): string[] {
+      return ["mod", ...(rbCallSuper(this, setup) as string[])];
+    }
+    include(Child, { setup });
+    include(Parent, { setup });
+    include(Sibling, { setup });
+    expect(new Child().setup()).toEqual(["mod", "base"]);
+    expect(new Parent().setup()).toEqual(["mod", "base"]);
+    expect(new Sibling().setup()).toEqual(["mod", "base"]);
+  });
+
   it("reaches the superclass method a plain module's copy shadows", () => {
     class Parent {
       greet(): string {

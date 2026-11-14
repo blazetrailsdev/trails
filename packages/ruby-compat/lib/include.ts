@@ -1635,7 +1635,10 @@ export function rbModAppendFeatures(
         if (origin) {
           const entry = superSlotFor(modDesc.value, String(key));
           const below = Reflect.get(klass.prototype, origin.slot) as unknown;
-          if (below !== undefined) descriptors[entry.slot] = { value: below, configurable: true };
+          if (below !== undefined) {
+            descriptors[entry.slot] = { value: below, configurable: true };
+            entry.seats = (entry.seats ?? 0) + 1;
+          }
           descriptors[origin.slot] = { value: modDesc.value, configurable: true };
           installed.add(key);
           continue;
@@ -1684,6 +1687,16 @@ function prependOrigin(proto: object, key: string): { slot: symbol } | undefined
  * when it copied `method` there, seated under `method`'s own slot. With none
  * seated, the search ends in `Kernel`, where every Ruby ancestry ends.
  *
+ * A function seated at two places in one ancestry (a module included into a
+ * class and then into its superclass below a prepend, both copies kept by
+ * `include_modules_at`, vendor/ruby/v3.3.11/class.c:1253) has one slot, so
+ * the lower copy's seat shadows the upper one's; the upper copy's seat is
+ * read off the link it was found at. MRI runs the upper copy a second time
+ * (`["mod", "prepended", "mod", "base"]` for the subclass in ruby 3.3.11);
+ * trails skips it, since one function's slot cannot answer from two ancestry
+ * positions and an awaited body carries no frame to tell the copies apart.
+ *
+ * @inventedArm skip — PERMANENT
  * @noRailsEquivalent PERMANENT
  */
 export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unknown[]): unknown {
@@ -1691,6 +1704,24 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
   let entry;
   if (slot === undefined) slot = (entry = superSlots.get(method))?.slot;
   let next = slot === undefined ? undefined : (receiver as Record<symbol, unknown>)[slot];
+  for (
+    let nextEntry;
+    slot !== undefined && typeof next === "function" && _superSlot in (next as object);
+  ) {
+    nextEntry = superSlots.get(next as AnyFunction);
+    if (nextEntry === undefined || (nextEntry.seats ?? 0) < 2) break;
+    let holder: object | null = receiver;
+    while (holder && !Object.hasOwn(holder, slot))
+      holder = Object.getPrototypeOf(holder) as object | null;
+    let own: object | null = receiver;
+    while (own && !Object.hasOwn(own, nextEntry.slot))
+      own = Object.getPrototypeOf(own) as object | null;
+    if (!holder || !own || own === holder || !Object.prototype.isPrototypeOf.call(holder, own))
+      break;
+    slot = nextEntry.slot;
+    entry = nextEntry;
+    next = Reflect.get(holder, slot, receiver) as unknown;
+  }
   if (next === undefined) {
     const name = (entry ?? superSlots.get(method))?.key ?? method.name;
     if (Object.hasOwn(Kernel, name)) next = Reflect.get(Kernel, name);
