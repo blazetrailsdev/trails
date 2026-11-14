@@ -19,6 +19,7 @@ import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import constructorCreatesNoPromise from "./eslint/constructor-creates-no-promise.mjs";
 import noSwallowedRejection from "./eslint/no-swallowed-rejection.mjs";
+import noFloatingMaybePromise from "./eslint/no-floating-maybe-promise.mjs";
 import inlinedFromPlacement from "./eslint/inlined-from-placement.mjs";
 import perfTagPlacement from "./eslint/perf-tag-placement.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
@@ -315,6 +316,7 @@ export default defineConfig(
           "inlined-from-placement": inlinedFromPlacement,
           "constructor-creates-no-promise": constructorCreatesNoPromise,
           "no-swallowed-rejection": noSwallowedRejection,
+          "no-floating-maybe-promise": noFloatingMaybePromise,
           "perf-tag-placement": perfTagPlacement,
           "no-native-date": noNativeDate,
           "no-conditional-in-test": noConditionalInTest,
@@ -1245,8 +1247,9 @@ export default defineConfig(
   },
   //  - no-floating-promises, over every package's sources and tests and
   //    `scripts/`, with `ignoreVoid: false` so `void <promise>` is a finding
-  //    (RFC 0234 § 1); no-swallowed-rejection (RFC 0234 § 1); and
-  //    constructor-creates-no-promise (RFC 0234 § 2). All three are `warn`: `pnpm parity:promises` holds each package to its
+  //    (RFC 0234 § 1); no-floating-maybe-promise, the thenable unions upstream
+  //    skips; no-swallowed-rejection (RFC 0234 § 1); and
+  //    constructor-creates-no-promise (RFC 0234 § 2). All four are `warn`: `pnpm parity:promises` holds each package to its
   //    only-shrink mark in `scripts/parity/promise-count-mark.json`, so a new
   //    finding reds CI there.
   {
@@ -1255,6 +1258,7 @@ export default defineConfig(
       "@typescript-eslint/no-floating-promises": ["warn", { ignoreVoid: false }],
       "blazetrails/constructor-creates-no-promise": "warn",
       "blazetrails/no-swallowed-rejection": "warn",
+      "blazetrails/no-floating-maybe-promise": "warn",
     },
   },
 );

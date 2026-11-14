@@ -227,8 +227,12 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    `pnpm parity:promises` (RFC 0234) counts, per package, the
    `@typescript-eslint/no-floating-promises` findings (repo-wide, sources and
    tests, `ignoreVoid: false`, so `void <promise>` is one) and the
-   `blazetrails/constructor-creates-no-promise` findings, against
-   `scripts/parity/promise-count-mark.json`. Both rules are `warn` in
+   `blazetrails/constructor-creates-no-promise`,
+   `blazetrails/no-swallowed-rejection` and
+   `blazetrails/no-floating-maybe-promise` findings (the last is a dropped
+   call typed with a thenable union member, such as `PromiseLike<void> | void`,
+   which upstream skips), against
+   `scripts/parity/promise-count-mark.json`. All four rules are `warn` in
    `eslint.config.mjs`; this gate is what reds. It is **only-shrink** with no
    reseed: a package absent from the mark is held at 0, a finding converges by
    awaiting, returning or handing the promise to a `Thread` (async

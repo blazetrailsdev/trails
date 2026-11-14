@@ -1,4 +1,4 @@
-import { Mutex } from "@blazetrails/ruby-compat";
+import { Mutex, ThreadError } from "@blazetrails/ruby-compat";
 import { Cref } from "../cref.js";
 
 export class Map<V = unknown> {
@@ -55,27 +55,48 @@ export class Map<V = unknown> {
     }) as V | null;
   }
 
+  /** @inventedArm if — PERMANENT */
   deleteByValue(value: V): void {
-    this._mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       for (const [mod, cnames] of this._map) {
         for (const [cname, v] of cnames) if (v === value) cnames.delete(cname);
         if (cnames.size === 0) this._map.delete(mod);
       }
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   }
 
+  /** @inventedArm if — PERMANENT */
   eachKey(block: (cref: Cref) => void): void {
-    this._mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       for (const [mod, cnames] of this._map) {
         for (const cname of cnames.keys()) block(new Cref(mod, cname));
       }
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   }
 
+  /** @inventedArm if — PERMANENT */
   clear(): void {
-    this._mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       this._map.clear();
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   }
 
   isEmpty(): boolean {

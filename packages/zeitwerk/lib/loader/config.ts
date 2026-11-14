@@ -1,7 +1,16 @@
 import { extend, type Extended } from "@blazetrails/ruby-compat";
 import { Internal } from "../internal.js";
 import { _generations } from "../core-ext/kernel.js";
-import { Dir, File, Pathname, TypeError, getFs, rbInspect, stdout } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  Pathname,
+  ThreadError,
+  TypeError,
+  getFs,
+  rbInspect,
+  stdout,
+} from "@blazetrails/ruby-compat";
 import { _isModule } from "../core-ext/module.js";
 import { Error as ZeitwerkError } from "../error.js";
 import type { Loader } from "../loader.js";
@@ -67,8 +76,11 @@ export const Config = {
     }
   },
 
+  /** @inventedArm if — PERMANENT */
   enableReloading(this: Loader): void {
-    this.mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this.mutex.synchronize(() => {
+      if (raised) return;
       if (this._reloadingEnabled) return;
 
       if (this._setup) {
@@ -77,34 +89,59 @@ export const Config = {
         this._reloadingEnabled = true;
       }
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   },
 
   isReloadingEnabled(this: Loader): boolean {
     return this._reloadingEnabled;
   },
 
+  /** @inventedArm if — PERMANENT */
   doNotEagerLoad(this: Loader, ...paths: GlobArg[]): void {
-    this.mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this.mutex.synchronize(() => {
+      if (raised) return;
       for (const path of this.expandPaths(paths)) this.eagerLoadExclusions.add(path);
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   },
 
+  /** @inventedArm if — PERMANENT */
   ignore(this: Loader, ...globPatterns: GlobArg[]): void {
     globPatterns = this.expandPaths(globPatterns);
-    this.mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this.mutex.synchronize(() => {
+      if (raised) return;
       for (const pattern of globPatterns as string[]) this.ignoredGlobPatterns.add(pattern);
       for (const path of this.expandGlobPatterns(globPatterns as string[]))
         this.ignoredPaths.add(path);
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   },
 
+  /** @inventedArm if — PERMANENT */
   collapse(this: Loader, ...globPatterns: GlobArg[]): void {
     globPatterns = this.expandPaths(globPatterns);
-    this.mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this.mutex.synchronize(() => {
+      if (raised) return;
       for (const pattern of globPatterns as string[]) this.collapseGlobPatterns.add(pattern);
       for (const path of this.expandGlobPatterns(globPatterns as string[]))
         this.collapseDirs.add(path);
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   },
 
   async onSetup(this: Loader, block: () => unknown): Promise<void> {
@@ -114,22 +151,36 @@ export const Config = {
     });
   },
 
+  /** @inventedArm if — PERMANENT */
   onLoad(this: Loader, cpath: string | LoadBlock = ":ANY", block?: LoadBlock): void {
     if (typeof cpath === "function" && block === undefined) [cpath, block] = [":ANY", cpath];
     if (typeof cpath !== "string") throw new TypeError("on_load only accepts strings");
 
-    this.mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this.mutex.synchronize(() => {
+      if (raised) return;
       (this.onLoadCallbacks[cpath] ??= []).push(block!);
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   },
 
+  /** @inventedArm if — PERMANENT */
   onUnload(this: Loader, cpath: string | LoadBlock = ":ANY", block?: LoadBlock): void {
     if (typeof cpath === "function" && block === undefined) [cpath, block] = [":ANY", cpath];
     if (typeof cpath !== "string") throw new TypeError("on_unload only accepts strings");
 
-    this.mutex.synchronize(() => {
+    let raised = false;
+    const synchronized = this.mutex.synchronize(() => {
+      if (raised) return;
       (this.onUnloadCallbacks[cpath] ??= []).push(block!);
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   },
 
   logBang(this: Loader): void {
