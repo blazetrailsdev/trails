@@ -36,7 +36,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
       pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => false;
-    expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: true }))).toBe(true);
+    expect(adapter.isReturnValueAfterInsert(makeColumn({ autoIncrement: true }))).toBe(true);
   });
 
   it("returns false for non-auto-increment column when INSERT RETURNING not supported", async () => {
@@ -47,7 +47,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
       pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => false;
-    expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: false }))).toBe(false);
+    expect(adapter.isReturnValueAfterInsert(makeColumn({ autoIncrement: false }))).toBe(false);
   });
 
   it("returns true for auto-populated column (default function) when INSERT RETURNING supported", async () => {
@@ -58,9 +58,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
       pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => true;
-    expect(await adapter.returnValueAfterInsert(makeColumn({ defaultFunction: "uuid()" }))).toBe(
-      true,
-    );
+    expect(adapter.isReturnValueAfterInsert(makeColumn({ defaultFunction: "uuid()" }))).toBe(true);
   });
 
   it("returns false for plain column when INSERT RETURNING supported", async () => {
@@ -71,7 +69,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
       pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => true;
-    expect(await adapter.returnValueAfterInsert(makeColumn())).toBe(false);
+    expect(adapter.isReturnValueAfterInsert(makeColumn())).toBe(false);
   });
 });
 
@@ -85,6 +83,7 @@ describe("AbstractMysqlAdapter#supportsInsertReturning", () => {
     const databaseVersion = new Version(fullVersionString.split("-")[0], fullVersionString);
     return Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       pool: { serverVersion: () => databaseVersion },
+      fullVersion: () => databaseVersion.fullVersionString,
       quoteColumnName: (c: string) => `\`${c}\``,
       sqlForInsert,
     });

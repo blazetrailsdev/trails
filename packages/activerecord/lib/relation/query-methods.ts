@@ -479,7 +479,6 @@ export type UnscopeType =
   | "having"
   | "optimizerHints"
   | "annotate"
-  | "createWith"
   | "with";
 
 export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeType>([
@@ -500,7 +499,6 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
   "having",
   "optimizerHints",
   "annotate",
-  "createWith",
   "with",
 ]);
 
@@ -508,6 +506,7 @@ export type UnscopeArg = `:${UnscopeType}` | ":leftJoins" | { ":where": string |
 
 export type ExceptKey =
   | UnscopeType
+  | "createWith"
   | "distinct"
   | "strictLoading"
   | "references"
@@ -519,6 +518,7 @@ export type ExceptKey =
 
 export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
   ...VALID_UNSCOPING_VALUES,
+  "createWith",
   "distinct",
   "strictLoading",
   "references",

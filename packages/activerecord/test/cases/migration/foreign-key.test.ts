@@ -714,7 +714,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
 
         if (adapterType === "mysql") {
           const mysqlConn = conn as unknown as {
-            isMariadb?: () => Promise<boolean>;
+            isMariadb?: () => boolean;
             databaseVersion: unknown;
           };
           if ((await mysqlConn.isMariadb?.()) === true) {

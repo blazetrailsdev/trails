@@ -43,6 +43,19 @@ describeIfPg("PG::Error#result (trails)", () => {
     expect(cause).not.toBeInstanceOf(PG.ConnectionBad);
   });
 
+  it("a server error's result is a PG::Result answering every diagnostic field", async () => {
+    const error = (await adapter
+      .execute("SELECT * FROM missing_error_result_table")
+      .catch((e: unknown) => e)) as StatementInvalid;
+    const result = (error.cause as PG.Error).result!;
+    expect(result).toBeInstanceOf(PG.Result);
+    expect(result.resultErrorField(PG.PG_DIAG_SEVERITY)).toBe("ERROR");
+    expect(result.errorField(PG.PG_DIAG_MESSAGE_PRIMARY)).toMatch(/missing_error_result_table/);
+    expect(result.errorField(PG.PG_DIAG_STATEMENT_POSITION)).toBe("15");
+    expect(result.errorField(PG.PG_DIAG_SOURCE_FILE)).toMatch(/\.c$/);
+    expect(result.errorField(PG.PG_DIAG_MESSAGE_HINT)).toBeNull();
+  });
+
   it("a server error from prepare is a PG::ServerError", async () => {
     const conn = await rawConnection();
     const error = (await conn

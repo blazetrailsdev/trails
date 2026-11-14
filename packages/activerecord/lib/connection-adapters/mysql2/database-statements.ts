@@ -95,7 +95,7 @@ export async function executeBatch(
 }
 
 /** @internal */
-export async function lastInsertedId(this: LastInsertedIdHost, result: Result): Promise<unknown> {
+export function lastInsertedId(this: LastInsertedIdHost, result: Result): unknown {
   if (this.supportsInsertReturning()) {
     return abstractLastInsertedId(result);
   }

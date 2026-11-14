@@ -1290,11 +1290,8 @@ export function lastInsertedId(result: Result): unknown {
 }
 
 /** @internal */
-export async function returningColumnValues(
-  this: DatabaseStatementsHost,
-  result: Result,
-): Promise<unknown[]> {
-  return [await this.lastInsertedId!(result)];
+export function returningColumnValues(this: DatabaseStatementsHost, result: Result): unknown[] {
+  return [this.lastInsertedId!(result)];
 }
 
 type FutureResultClass = new (

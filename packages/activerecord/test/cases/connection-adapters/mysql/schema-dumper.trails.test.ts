@@ -41,7 +41,7 @@ const stubConnection = (
   },
   quote: (v: unknown) => `'${String(v)}'`,
   quoteColumnName: (v: unknown) => `\`${String(v)}\``,
-  isMariadb: async () => false,
+  isMariadb: () => false,
   databaseVersion: new Version("8.0.0"),
   createTableInfo: async () => null,
 });

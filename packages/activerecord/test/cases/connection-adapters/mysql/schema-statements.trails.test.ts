@@ -48,7 +48,7 @@ const quoteHost = mysqlAdapterHost();
 function rowFormatHost(isMariadb: boolean, version: string, probeResult = 0) {
   const queries: string[] = [];
   return {
-    isMariadb: async () => isMariadb,
+    isMariadb: () => isMariadb,
     databaseVersion: Promise.resolve(new Version(version)),
     queryValue: async (sql: string) => {
       queries.push(sql);

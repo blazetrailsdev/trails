@@ -32,7 +32,7 @@ export function isWriteQuery(sql: string | null): boolean {
 }
 
 export interface BuildExplainClauseHost {
-  isMariadb(): Promise<boolean>;
+  isMariadb(): boolean;
   databaseVersion: Version | Promise<Version>;
 }
 
@@ -83,7 +83,8 @@ export async function buildExplainClause(
 
 /** @internal */
 export async function isAnalyzeWithoutExplain(this: BuildExplainClauseHost): Promise<boolean> {
-  return (await this.isMariadb()) && (await this.databaseVersion).compare("10.1.0") >= 0;
+  const databaseVersion = await this.databaseVersion;
+  return this.isMariadb() && databaseVersion.compare("10.1.0") >= 0;
 }
 
 export interface MaxAllowedPacketHost {
@@ -100,10 +101,10 @@ export function defaultInsertValue(column: AutoIncrementColumnHost): Nodes.SqlLi
 }
 
 /** @internal */
-export async function returningColumnValues(
+export function returningColumnValues(
   this: SupportsInsertReturningHost,
   result: Result,
-): Promise<unknown[] | null> {
+): unknown[] | null {
   if (this.supportsInsertReturning()) {
     return result.rows[0] ?? null;
   } else {

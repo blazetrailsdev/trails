@@ -33,7 +33,7 @@ export class Reply extends Topic {
     });
     this.hasMany("sillyUniqueReplies", { dependent: "destroy", foreignKey: "parent_id" });
 
-    this.scope("ordered", () => Reply.order("id"));
+    this.scope("ordered", () => Reply.order(":id"));
 
     this.aliasAttribute("new_content", "content");
     this.aliasAttribute("new_parent_id", "parent_id");
