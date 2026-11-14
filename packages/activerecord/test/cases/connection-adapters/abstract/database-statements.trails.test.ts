@@ -995,7 +995,7 @@ describe("returningColumnValues", () => {
       pool,
       typeCastedBinds,
       log,
-      lastInsertedId: async () => 7,
+      lastInsertedId: () => 7,
     };
     expect(await returningColumnValues.call(host, Result.empty())).toEqual([7]);
   });
