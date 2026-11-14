@@ -51,7 +51,8 @@ export class Open3 {
    * or bytes (an ASCII-8BIT String), as the `readpartial` / `IO.copy_stream`
    * arm (`open3.rb:667-668`) is not ported. `binmode` is taken out of the options (`open3.rb:656`) and has no
    * effect, since every stream is read as a String. The remaining options go
-   * to `spawn`, so `unsetenv_others: true` gives the child `env` alone. Several
+   * to `spawn`, so `unsetenv_others: true` gives the child `env` alone and
+   * `chdir:` the directory it starts in. Several
    * command Strings are a program and its argv, spawned with no shell.
    *
    * A command that cannot be spawned raises what the spawn failed with, as
@@ -79,13 +80,19 @@ export class Open3 {
     delete opts.stdinData;
     delete opts.binmode;
 
-    const [command, env, args] = rbExecargNew([...cmd, opts]);
+    const [command, env, args, opthash] = rbExecargNew([...cmd, opts]);
     const adapter = getChildProcess();
     if (adapter.capture3 === undefined) {
       throw new NotImplementedError("spawn() function is unimplemented on this machine");
     }
 
-    const [stdout, stderr, status] = await adapter.capture3(command, env, args, stdinData);
+    const [stdout, stderr, status] = await adapter.capture3(
+      command,
+      env,
+      args,
+      stdinData,
+      opthash.chdir == null ? undefined : String(opthash.chdir),
+    );
     if (status.error !== undefined) throw status.error;
     return [stdout, stderr, new Process.Status(status)];
   }
