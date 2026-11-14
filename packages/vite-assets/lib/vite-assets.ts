@@ -177,6 +177,8 @@ export class ViteAssets {
           useSsl: false,
           sslHostAddress: null,
           verifyPeer: false,
+          writeTimeout: null,
+          debugOutput: null,
         }),
       );
       connection.close();

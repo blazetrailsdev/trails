@@ -346,4 +346,44 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
     });
     expect(chunks).toEqual(["hello"]);
   });
+
+  it("content_length= reads a String the way String#to_i does", () => {
+    // vendor/ruby/v3.3.11/lib/net/http/header.rb:642
+    const req = new Net.HTTP.Get("/");
+    req.contentLength = "1_000";
+    expect(req.get("content-length")).toBe("1000");
+  });
+
+  it("set_debug_output receives the connection and wire traffic", async () => {
+    // vendor/ruby/v3.3.11/lib/net/http.rb:1600, :1610, :2408-2416, :2472-2476;
+    // vendor/ruby/v3.3.11/lib/net/protocol.rb:275, :301-312
+    const port = await listen(
+      createServer((_req, res) => {
+        res.writeHead(200, { "content-length": "2" });
+        res.end("hi");
+      }),
+    );
+    let out = "";
+    const http = new Net.HTTP("127.0.0.1", port);
+    http.setDebugOutput({ write: (s: string) => (out += s) });
+    await http.get("/x");
+    expect(out).toContain(`opening connection to 127.0.0.1:${port}...\nopened\n`);
+    expect(out).toMatch(/<- "GET \/x HTTP\/1\.1\\r\\n.*Connection: close\\r\\n/);
+    expect(out).toContain('-> "HTTP/1.1 200 OK\\r\\n"\n');
+    expect(out).toContain('reading 2 bytes...\n-> "hi"\nread 2 bytes\n');
+    expect(out).toContain("Conn close\n");
+  });
+
+  it("write_timeout= reaches the open socket and raises Net::WriteTimeout", async () => {
+    // vendor/ruby/v3.3.11/lib/net/http.rb:1367-1370, :1681-1684; lib/net/protocol.rb:335
+    const server = createNetServer((s) => s.pause());
+    const port = await listen(server);
+    const http = new Net.HTTP("127.0.0.1", port);
+    await http.start();
+    http.writeTimeout = 0.2;
+    expect((http as unknown as { _socket: { writeTimeout: number } })._socket.writeTimeout).toBe(
+      0.2,
+    );
+    await expect(http.post("/", "x".repeat(64 * 1024 * 1024))).rejects.toThrow(Net.WriteTimeout);
+  });
 });

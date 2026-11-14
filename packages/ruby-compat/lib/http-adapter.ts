@@ -1,3 +1,6 @@
+import { WriteTimeout } from "./net/protocol.js";
+import { rbStrDump } from "./string/convert.js";
+
 export interface HttpRequest {
   method?: string | undefined;
   url?: string | undefined;
@@ -70,6 +73,15 @@ export interface HttpClientConnection {
   close(): void;
   isClosed(): boolean;
   isEof(): boolean;
+  /** `BufferedIO#write_timeout` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:129`). */
+  writeTimeout: number | null;
+  /** `BufferedIO#debug_output` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:131`). */
+  debugOutput: HttpDebugOutput | null;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export interface HttpDebugOutput {
+  write(str: string): unknown;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -79,6 +91,8 @@ export interface HttpConnectOptions {
   useSsl: boolean;
   sslHostAddress: string | null;
   verifyPeer: boolean;
+  writeTimeout: number | null;
+  debugOutput: HttpDebugOutput | null;
 }
 
 export interface HttpAdapter {
@@ -147,6 +161,7 @@ type NodeHttp = {
     callback: (res: NodeIncoming) => void,
   ): {
     on(event: "error", listener: (error: Error) => void): unknown;
+    once(event: "finish", listener: () => void): unknown;
     end(chunk?: string | Uint8Array | null): unknown;
   };
 };
@@ -166,12 +181,30 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
     socket.once("error", reject);
     socket.once(options.useSsl ? "secureConnect" : "connect", () => {
       socket.removeListener("error", reject);
-      resolve({
+      const conn: HttpClientConnection = {
+        writeTimeout: options.writeTimeout,
+        debugOutput: options.debugOutput,
         request: (method, path, headers, body) =>
           new Promise((resolveResponse, rejectResponse) => {
+            const out = conn.debugOutput;
+            if (out != null) {
+              let buf = `${method} ${path} HTTP/1.1\r\n`;
+              for (const [k, vs] of Object.entries(headers)) {
+                const name = k.replace(/[^-]+/g, (w) => w[0].toUpperCase() + w.slice(1));
+                for (const v of vs) buf += `${name}: ${v}\r\n`;
+              }
+              buf += "\r\n";
+              out.write(`<- ${rbStrDump(buf)}\n`);
+              if (body != null && body.length > 0) {
+                const text = typeof body === "string" ? body : String.fromCharCode(...body);
+                out.write(`<- ${rbStrDump(text)}\n`);
+              }
+            }
+            let timer: ReturnType<typeof setTimeout> | null = null;
             const req = http.request(
               { method, path, headers, createConnection: () => socket },
               (res) => {
+                if (timer !== null) clearTimeout(timer);
                 const chunks: Uint8Array[] = [];
                 res.on("data", (chunk) => chunks.push(chunk));
                 res.on("error", rejectResponse);
@@ -182,6 +215,18 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
                   for (const c of chunks) {
                     bytes.set(c, offset);
                     offset += c.length;
+                  }
+                  const out = conn.debugOutput;
+                  if (out != null) {
+                    const line = (l: string) => out.write(`-> ${rbStrDump(`${l}\r\n`)}\n`);
+                    line(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage ?? ""}`);
+                    for (const [k, v] of Object.entries(res.headers)) {
+                      for (const x of Array.isArray(v) ? v : [v]) line(`${k}: ${x}`);
+                    }
+                    line("");
+                    out.write(`reading ${total} bytes...\n`);
+                    out.write(`-> ${rbStrDump(String.fromCharCode(...bytes))}\n`);
+                    out.write(`read ${total} bytes\n`);
                   }
                   resolveResponse({
                     httpVersion: res.httpVersion,
@@ -195,11 +240,21 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
             );
             req.on("error", rejectResponse);
             req.end(body);
+            if (conn.writeTimeout != null) {
+              req.once("finish", () => {
+                if (timer !== null) clearTimeout(timer);
+              });
+              timer = setTimeout(() => {
+                socket.destroy();
+                rejectResponse(new WriteTimeout());
+              }, conn.writeTimeout * 1000);
+            }
           }),
         close: () => socket.destroy(),
         isClosed: () => socket.destroyed,
         isEof: () => socket.readableEnded,
-      });
+      };
+      resolve(conn);
     });
   });
 }
