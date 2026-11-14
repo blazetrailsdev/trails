@@ -267,8 +267,10 @@ export async function saveManifest(pins: BodyPin[]): Promise<void> {
   await fs.writeFile(MANIFEST_PATH, serializeBaseline(sortPins(pins)));
 }
 
-// Delete the bump-ledger rows (RFC 0191 § 3) a re-pin or prune cleared: the
-// ledger only shrinks, and lint-bump-ledger.ts reds a row left behind.
+/**
+ * Delete the bump-ledger rows (RFC 0191 § 3) a re-pin or prune cleared: the
+ * ledger only shrinks, and lint-bump-ledger.ts reds a row left behind.
+ */
 async function clearLedgerRows(pins: BodyPin[], records: BodyHashRecord[]): Promise<void> {
   const { ledgerPath, liveRows, loadLedgers, saveLedgerFile } = await import("./bump-ledger.js");
   const current = currentDigests(records);
