@@ -11,6 +11,12 @@
       "path": "../activesupport"
     },
     {
+      "path": "../rack"
+    },
+    {
+      "path": "../rack-proxy"
+    },
+    {
       "path": "../ruby-compat"
     },
     {

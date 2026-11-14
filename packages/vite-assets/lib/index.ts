@@ -1,5 +1,6 @@
 import "./constants.generated.js";
 export { ViteAssets } from "./vite-assets.js";
+export { DevServerProxy } from "./dev-server-proxy.js";
 export { Config, type ConfigOptions } from "./config.js";
 export { Manifest, type ManifestEntry, type EntryType, type ManifestBuilder } from "./manifest.js";
 export { Error } from "./error.js";
