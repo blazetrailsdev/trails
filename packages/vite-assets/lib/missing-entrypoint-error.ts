@@ -14,7 +14,10 @@ export class MissingEntrypointError extends Error {
   readonly manifest: unknown;
   readonly config: Config;
 
-  /** @inventedArm manifestPaths — PERMANENT */
+  /**
+   * @inventedArm manifestPaths — PERMANENT
+   * @inventedArm call — PERMANENT
+   */
   constructor({
     fileName,
     lastBuild,
@@ -46,10 +49,10 @@ ${lastBuild.success ? `Last build in ${config.mode} mode:\n${lastBuild.toJson()}
 
   possibleCauses(this: { config: Config }, lastBuild: LastBuild): string {
     if (lastBuild.success === false) {
-      return MissingEntrypointError.FAILED_BUILD_CAUSES.replace(":mode:", this.config.mode).replace(
-        ":errors:",
-        String(lastBuild.errors ?? "").replace(/^(?!$)/gm, "  "),
-      );
+      return MissingEntrypointError.FAILED_BUILD_CAUSES.replace(
+        ":mode:",
+        () => this.config.mode,
+      ).replace(":errors:", () => String(lastBuild.errors ?? "").replace(/^(?!$)/gm, "  "));
     } else if (this.config.autoBuild) {
       return MissingEntrypointError.DEFAULT_CAUSES;
     } else {

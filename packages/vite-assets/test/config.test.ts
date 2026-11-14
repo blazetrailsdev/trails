@@ -4,6 +4,9 @@ import { Config } from "../lib/config.js";
 import { ViteRuby } from "../lib/vite-ruby.js";
 import { pathToTestApp, refreshConfig, withRailsEnv } from "./support/test-helper.js";
 
+const vendorCandidate = new URL("../../../vendor/vite_ruby/v3.11.1", import.meta.url).pathname;
+const vendorRoot = (await File.isExistAsync(vendorCandidate)) ? vendorCandidate : null;
+
 describe("ConfigTest", () => {
   const dir = new URL(".", import.meta.url).pathname;
   const expandPath = (path: string) => File.expandPath(File.join(dir, path));
@@ -25,7 +28,14 @@ describe("ConfigTest", () => {
     await refreshConfig();
   });
 
-  it.skip("matching default config json", () => {});
+  it.skipIf(!vendorRoot)("matching default config json", async () => {
+    expect(await File.readAsync(`${vendorRoot}/vite_ruby/default.vite.json`)).toBe(
+      await File.readAsync(`${vendorRoot}/vite-plugin-ruby/default.vite.json`),
+    );
+    expect(await File.readAsync(new URL("../default.vite.json", import.meta.url).pathname)).toBe(
+      await File.readAsync(`${vendorRoot}/vite_ruby/default.vite.json`),
+    );
+  });
 
   it("source code dir", () => {
     expect(config.sourceCodeDir).toBe("app/frontend");

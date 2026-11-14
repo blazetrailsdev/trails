@@ -96,6 +96,7 @@ export class Config {
     return this.root.join(this.sourceCodeDir);
   }
 
+  /** @inventedArm ts — PERMANENT */
   async loadRubyConfig(): Promise<void> {
     const rbConfigPath = File.expandPath(
       this.configPath.replace(/.json$/, ".ts"),
@@ -147,7 +148,8 @@ export class Config {
       "skipCompatibilityCheck",
       "skipProxy",
     );
-    config.packageManager ||= await this.detectPackageManager(root);
+    if (config.packageManager == null || config.packageManager === false)
+      config.packageManager = await this.detectPackageManager(root);
   }
 
   /** @internal */
@@ -207,7 +209,8 @@ export class Config {
   }
 
   /** @internal */
-  private static async loadJson(path: string): Promise<Record<string, Record<string, unknown>>> {
+  /** @internal */
+  static async loadJson(path: string): Promise<Record<string, Record<string, unknown>>> {
     return JSON.parse(await File.readAsync(File.expandPath(path)));
   }
 
@@ -273,7 +276,7 @@ export class Config {
 }
 
 Config.DEFAULT_CONFIG = Object.freeze(
-  await Config["loadJson"](new URL("../default.vite.json", import.meta.url).pathname),
+  await Config.loadJson(new URL("../default.vite.json", import.meta.url).pathname),
 );
 Config.CONFIGURABLE_WITH_ENV = Object.freeze(
   [...Object.keys(Config.DEFAULT_CONFIG), "mode", "root"].filter(

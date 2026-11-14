@@ -124,9 +124,7 @@ export class ViteRuby {
     }
   }
 
-  isRunProxy(): Promise<boolean> {
-    return this.isDevMode();
-  }
+  declare isRunProxy: () => Promise<boolean>;
 
   /** @missingRailsCall new — CONVERGEABLE vite-assets-builder-commands-runner */
   builder(): ManifestBuilder {
@@ -150,7 +148,10 @@ export class ViteRuby {
     return (this._manifest ??= new Manifest(this));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm timeout — PERMANENT
+   */
   private async isDevServerConnected(): Promise<boolean> {
     if (this._running !== undefined && Date.now() - this._runningCheckedAt < 1000) {
       return this._running;
@@ -179,14 +180,14 @@ export class ViteRuby {
 
   /** @internal */
   private async devServerMeta(): Promise<unknown> {
-    if (
-      this._devServerMetaCheckedAt !== undefined &&
-      Date.now() - this._devServerMetaCheckedAt < 1000
-    ) {
-      return this._devServerMeta;
-    }
-
     try {
+      if (
+        this._devServerMetaCheckedAt !== undefined &&
+        Date.now() - this._devServerMetaCheckedAt < 1000
+      ) {
+        return this._devServerMeta;
+      }
+
       const path = (await this.config()).devServerMetaPath();
       return (this._devServerMeta = (await File.isExistAsync(path.toString()))
         ? JSON.parse(await path.read())
@@ -199,3 +200,5 @@ export class ViteRuby {
     }
   }
 }
+
+ViteRuby.prototype.isRunProxy = ViteRuby.prototype.isDevMode;

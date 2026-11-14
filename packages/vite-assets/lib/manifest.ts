@@ -81,7 +81,7 @@ export class Manifest {
         : [
             ...new Set(
               [...entries, ...imports]
-                .flatMap((entry) => entry.css ?? [null])
+                .flatMap((entry) => entry.css ?? [])
                 .filter((css) => css != null),
             ),
           ],
@@ -101,7 +101,7 @@ export class Manifest {
   async reactRefreshPreamble(): Promise<string | null> {
     if (await this.isDevServerRunning()) {
       return `<script type="module">
-  ${(await this.reactPreambleCode())!.replace(/\n(?!$)/g, "\n  ")}
+  ${await this.reactPreambleCode()}
 </script>
 `;
     }
@@ -220,9 +220,8 @@ window.__vite_plugin_react_preamble_installed__ = true
         const paths = entry[key];
         if (paths) entry[key] = await Promise.all(paths.map((path) => this.prefixViteAsset(path)));
       }
-      entry.imports = (entry.imports as unknown as string[] | undefined)?.map((name) =>
-        fetch<ManifestEntry>(manifest, name),
-      );
+      const imports = entry.imports as unknown as string[] | undefined;
+      if (imports) entry.imports = imports.map((name) => fetch<ManifestEntry>(manifest, name));
     }
   }
 
