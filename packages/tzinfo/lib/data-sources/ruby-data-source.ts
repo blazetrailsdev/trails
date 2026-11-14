@@ -124,7 +124,7 @@ export class RubyDataSource extends DataSource {
 
       let m: unknown = (TopLevel.TZInfo! as unknown as TZInfoNamespace).Data.Definitions;
       splitIdentifier.forEach((part) => (m = constGet(m as object, part)));
-      return (m as { get(): TimezoneInfo }).get();
+      return (m as { get(): TimezoneInfo | null }).get()!;
     } catch (e) {
       if (!(e instanceof LoadError || e instanceof NameError)) throw e;
       throw new InvalidTimezoneIdentifier(`${e.message} (loading ${validIdentifier})`, {
