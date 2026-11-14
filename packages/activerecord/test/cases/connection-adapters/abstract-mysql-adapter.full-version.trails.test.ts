@@ -24,4 +24,13 @@ describe("Mysql2Adapter#full_version", () => {
     expect((await adapterWith(new Version("10.6.5"))).fullVersion()).toBeNull();
     expect((await adapterWith(new Version("10.6.5"))).isMariadb()).toBe(false);
   });
+
+  it("an async supports_* predicate warms the version before reading mariadb?", async () => {
+    const adapter = new Mysql2Adapter({ host: "localhost" });
+    (adapter as unknown as { getDatabaseVersion: () => Promise<Version> }).getDatabaseVersion =
+      async () => new Version("10.5.2", "5.5.5-10.5.2-MariaDB");
+    expect(await adapter.supportsRenameColumn()).toBe(true);
+    expect(adapter.isMariadb()).toBe(true);
+    expect(adapter.supportsInsertReturning()).toBe(true);
+  });
 });

@@ -6,6 +6,7 @@ import * as Constants from "./exceptions.js";
 
 type DatabaseErrorFields = Partial<Record<keyof pg.DatabaseError, unknown>>;
 
+/** @noRailsEquivalent PERMANENT */
 const _ERROR_FIELDS: Record<number, keyof pg.DatabaseError> = {
   [Constants.PG_DIAG_SEVERITY]: "severity",
   [Constants.PG_DIAG_SQLSTATE]: "code",
