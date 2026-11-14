@@ -258,6 +258,15 @@ const ENUMERABLE_DELEGATES = {
 /** @perf 11x — PERMANENT */
 const _placeholderFields: object = Object.create(null);
 
+/** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
+const _propertyIsEnumerable = Object.prototype.propertyIsEnumerable;
+/** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
+const _lookupGetter = (Object.prototype as { __lookupGetter__(key: string): unknown })
+  .__lookupGetter__;
+/** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
+const _lookupSetter = (Object.prototype as { __lookupSetter__(key: string): unknown })
+  .__lookupSetter__;
+
 /** @perf 11x — PERMANENT */
 function _isPlaceholderField(proto: object, key: string): boolean {
   for (let p = proto; p !== _placeholderFields; p = Object.getPrototypeOf(p)) {
@@ -1680,27 +1689,24 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this;
   }
 
-  /** @perf 2x — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
+  /** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
   clone(): Relation<T, G> {
     if (Object.isFrozen(this) || Object.getOwnPropertySymbols(this).length > 0) {
       return rbObjClone(this);
     }
     const proto = Object.getPrototypeOf(this);
     const copy = Object.create(proto);
-    const keys = Object.keys(this);
-    for (const key of keys) {
-      if (key.startsWith("_") && _isPlaceholderField(proto, key)) {
+    for (const key of Reflect.ownKeys(this) as string[]) {
+      if (
+        key.startsWith("_") &&
+        _isPlaceholderField(proto, key) &&
+        _propertyIsEnumerable.call(this, key) &&
+        _lookupGetter.call(this, key) === undefined &&
+        _lookupSetter.call(this, key) === undefined
+      ) {
         copy[key] = (this as any)[key];
       } else {
         Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(this, key)!);
-      }
-    }
-    const names = Object.getOwnPropertyNames(this);
-    if (names.length !== keys.length) {
-      for (const key of names) {
-        if (!Object.hasOwn(copy, key)) {
-          Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(this, key)!);
-        }
       }
     }
     const initializeClone = "initializeClone" in copy ? copy.initializeClone : copy.initializeCopy;
