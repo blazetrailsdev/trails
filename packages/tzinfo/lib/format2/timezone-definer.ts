@@ -11,36 +11,36 @@ export class TimezoneDefiner {
   private readonly stringDeduper: typeof StringDeduper.global;
 
   /** @internal */
-  private readonly offsets: Record<string, TimezoneOffset>;
+  private readonly offsets: Map<string, TimezoneOffset>;
 
   /** @internal */
   private previousOffset: TimezoneOffset | null = null;
 
   constructor(stringDeduper: typeof StringDeduper.global) {
     this.stringDeduper = stringDeduper;
-    this.offsets = {};
+    this.offsets = new Map();
     this.transitions = [];
   }
 
   firstOffset(): TimezoneOffset | null {
-    const first = Object.entries(this.offsets)[0];
+    const first = this.offsets.entries().next().value;
     return first ? first[1] : null;
   }
 
   offset(id: string, baseUtcOffset: number, stdOffset: number, abbreviation: string): void {
-    if (Object.hasOwn(this.offsets, id)) {
+    if (this.offsets.has(id)) {
       throw new ArgumentError("An offset has already been defined with the given id");
     }
 
     abbreviation = this.stringDeduper.dedupe(abbreviation);
 
     const offset = new TimezoneOffset(baseUtcOffset, stdOffset, abbreviation);
-    this.offsets[id] = offset;
+    this.offsets.set(id, offset);
     this.previousOffset ??= offset;
   }
 
   transition(offsetId: string, timestampValue: number): void {
-    const offset = Object.hasOwn(this.offsets, offsetId) ? this.offsets[offsetId] : null;
+    const offset = this.offsets.get(offsetId);
     if (!offset) throw new ArgumentError("offset_id has not been defined");
     if (
       this.transitions.length !== 0 &&
