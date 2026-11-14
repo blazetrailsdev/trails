@@ -1,6 +1,6 @@
 import type { RackResponse } from "@blazetrails/rack";
 import { Proxy } from "@blazetrails/rack-proxy";
-import { hashDelete, kernelURI, rbProcCall } from "@blazetrails/ruby-compat";
+import { hashDelete, kernelURI, rbProcCall, stringSplit } from "@blazetrails/ruby-compat";
 import type { Config } from "./config.js";
 import { ViteAssets } from "./vite-assets.js";
 
@@ -51,7 +51,8 @@ export class DevServerProxy extends Proxy {
       : [env["PATH_INFO"], env["QUERY_STRING"]]
           .filter((str) => String(str ?? "").trim() !== "")
           .join("?");
-    [env["PATH_INFO"], env["QUERY_STRING"]] = (env["REQUEST_URI"] = this.normalizeUri(uri)).split(
+    [env["PATH_INFO"], env["QUERY_STRING"]] = stringSplit(
+      (env["REQUEST_URI"] = this.normalizeUri(uri)),
       "?",
     );
   }
@@ -102,11 +103,10 @@ export class DevServerProxy extends Proxy {
 
   /** @internal */
   private async viteUrlPrefix(): Promise<string> {
-    const config = await this.config();
     return (this._viteUrlPrefix ??=
-      config.publicOutputDir === ""
+      (await this.config()).publicOutputDir === ""
         ? DevServerProxy.VITE_DEPENDENCY_PREFIX
-        : `/${config.publicOutputDir}/`);
+        : `/${(await this.config()).publicOutputDir}/`);
   }
 }
 
