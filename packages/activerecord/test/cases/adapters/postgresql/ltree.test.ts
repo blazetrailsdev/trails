@@ -27,13 +27,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       t.ltree("path");
     });
 
-    void Ltree.resetColumnInformation();
+    await Ltree.resetColumnInformation();
     await Ltree.loadSchema();
   });
 
   afterEach(async () => {
     await connection.dropTable("ltrees", { ifExists: true });
-    void Ltree.resetColumnInformation();
+    await Ltree.resetColumnInformation();
   });
 
   describe("PostgresqlLtreeTest", () => {

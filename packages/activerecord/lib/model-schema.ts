@@ -9,6 +9,7 @@ import {
   isClassPathPending,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
+import { Thread } from "@blazetrails/ruby-compat";
 import * as ModelSchemaModule from "./model-schema.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
@@ -395,44 +396,36 @@ function clearAdapterDataSourceCache(host: SchemaKlass): void {
   }
 }
 
-function rewarmDataSourceCache(host: SchemaKlass): PromiseLike<void> | void {
+async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
   let cache: { columns?: (t: string) => Promise<unknown> } | null | undefined;
   try {
-    cache = host.connectionPool().schemaCache as typeof cache;
+    const pool = host.connectionPool();
+    if (pool.schemaReflection.loadedCache == null) return;
+    cache = pool.schemaCache as typeof cache;
   } catch {
     return;
   }
   const table = host.tableName;
   if (!table || typeof cache?.columns !== "function") return;
-  let started: Promise<void> | undefined;
-  return {
-    then(onFulfilled, onRejected) {
-      started ??= cache.columns!(table).then(
-        () => {},
-        () => {},
-      );
-      return started.then(onFulfilled, onRejected);
-    },
-  };
+  await cache.columns(table).catch(() => null);
 }
 
 /**
  * @inventedArm try — PERMANENT
  * @inventedArm rescue — PERMANENT
  */
-export function resetColumnInformation(this: SchemaKlass): PromiseLike<void> | void {
+export async function resetColumnInformation(this: SchemaKlass): Promise<void> {
+  let connection: { clearCacheBang?: () => unknown } | null | undefined;
   try {
-    void (
-      this.connectionPool().activeConnection as {
-        clearCacheBang?: () => unknown;
-      } | null
-    )?.clearCacheBang?.();
+    connection = this.connectionPool().activeConnection as typeof connection;
   } catch {}
+  const cleared = connection?.clearCacheBang?.();
   clearAdapterDataSourceCache(this);
 
   this.reloadSchemaFromCache();
   this.initializeFindByCache();
-  return rewarmDataSourceCache(this);
+  await cleared;
+  await rewarmDataSourceCache(this);
 }
 
 /** @internal */
@@ -599,7 +592,7 @@ export function setTableName(this: SchemaKlass, value: string | null): void {
 
   if (Object.hasOwn(this, "_tableName")) {
     if (value === this._tableName) return;
-    if (isConnected.call(this)) void resetColumnInformation.call(this);
+    if (isConnected.call(this)) new Thread(() => resetColumnInformation.call(this));
   }
 
   this._tableName = value;

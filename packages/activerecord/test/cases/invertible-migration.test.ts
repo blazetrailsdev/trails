@@ -271,7 +271,7 @@ class RevertCheckConstraintWithInvalidOption extends SilentMigration {
 }
 
 async function resetHorse(): Promise<void> {
-  void Horse.resetColumnInformation();
+  await Horse.resetColumnInformation();
   await loadSchemaFromAdapter.call(Horse);
 }
 
@@ -285,7 +285,7 @@ describe("InvertibleMigrationTest", () => {
         await connection.dropTable(table);
       }
     }
-    void Horse.resetColumnInformation();
+    await Horse.resetColumnInformation();
   });
 
   it("no reverse", async () => {
@@ -580,7 +580,7 @@ describe("InvertibleMigrationTest", () => {
     await new InvertibleMigration().migrate("up");
     const horse1 = await Horse.create();
     await new UpOnlyMigration().migrate("up");
-    void Horse.resetColumnInformation();
+    await Horse.resetColumnInformation();
     await horse1.reload();
     const horse2 = await Horse.create();
 
@@ -590,7 +590,7 @@ describe("InvertibleMigrationTest", () => {
     await new UpOnlyMigration().migrate("down");
     const connection = await Base.leaseConnection();
     expect(await connection.columnExists("horses", "oldie")).toBeFalsy();
-    void Horse.resetColumnInformation();
+    await Horse.resetColumnInformation();
   });
 
   itIfSupports(

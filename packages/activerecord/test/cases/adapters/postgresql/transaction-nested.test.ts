@@ -95,8 +95,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
       });
 
-      Sample.resetColumnInformation();
-      Bit.resetColumnInformation();
+      await Sample.resetColumnInformation();
+      await Bit.resetColumnInformation();
     });
 
     afterEach(async () => {

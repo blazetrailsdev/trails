@@ -70,7 +70,7 @@ export const TestHelper = {
       t.timestamps({ null: true });
     });
 
-    void TestModel.resetColumnInformation();
+    await TestModel.resetColumnInformation();
   },
 
   async teardown(this: TestHelper): Promise<void> {

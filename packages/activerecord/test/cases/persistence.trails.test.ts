@@ -273,7 +273,7 @@ describe("PersistenceTest (trails)", () => {
     constSet(TopLevel, "MinimalisticAircraft", MinimalisticAircraft);
     DescendantsTracker.registerSubclass(Minimalistic, MinimalisticAircraft);
 
-    void Aircraft.resetColumnInformation();
+    await Aircraft.resetColumnInformation();
 
     const before = await Aircraft.count();
     const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as unknown as {

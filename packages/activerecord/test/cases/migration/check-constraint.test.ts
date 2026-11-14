@@ -66,7 +66,7 @@ describe("Migration", () => {
         });
       }
 
-      void Trade.resetColumnInformation();
+      await Trade.resetColumnInformation();
     });
 
     afterEach(async () => {
@@ -77,7 +77,7 @@ describe("Migration", () => {
         await connection.dropTable("constraint_test", { ifExists: true });
       }
 
-      void Trade.resetColumnInformation();
+      await Trade.resetColumnInformation();
     });
 
     it("check constraints", async () => {

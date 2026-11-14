@@ -12,7 +12,7 @@ describe("_returningColumnsForInsert memoization", () => {
       readonly databaseVersion: unknown;
       isReturnValueAfterInsert(column: { name: string }): boolean;
     }): Promise<string[]>;
-    resetColumnInformation(): void;
+    resetColumnInformation(): Promise<void>;
   };
 
   it("does not let a subclass reuse the base's memo", async () => {
@@ -71,7 +71,7 @@ describe("_returningColumnsForInsert memoization", () => {
     await schemaHost._returningColumnsForInsert(connection);
     const first = calls;
 
-    void schemaHost.resetColumnInformation();
+    await schemaHost.resetColumnInformation();
     await Topic.loadSchema();
 
     expect(await schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
@@ -82,7 +82,7 @@ describe("_returningColumnsForInsert memoization", () => {
     class Reply extends Topic {}
     const sub = Reply as unknown as typeof schemaHost;
 
-    void schemaHost.resetColumnInformation();
+    await schemaHost.resetColumnInformation();
     await Reply.loadSchema();
 
     let calls = 0;
@@ -101,7 +101,7 @@ describe("_returningColumnsForInsert memoization", () => {
     await sub._returningColumnsForInsert(connection);
     expect(calls).toBe(afterSubMemo);
 
-    void schemaHost.resetColumnInformation();
+    await schemaHost.resetColumnInformation();
     await Reply.loadSchema();
 
     const memoized = await sub._returningColumnsForInsert(connection);

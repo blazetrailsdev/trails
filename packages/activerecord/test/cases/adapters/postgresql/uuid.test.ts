@@ -60,7 +60,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      void UUIDType.resetColumnInformation();
+      await UUIDType.resetColumnInformation();
       await dropTable("uuid_data_type");
     });
 
@@ -69,7 +69,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         null: false,
         default: "gen_random_uuid()",
       });
-      void UUIDType.resetColumnInformation();
+      await UUIDType.resetColumnInformation();
       await UUIDType.loadSchema();
       const column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
       expect(column.defaultFunction).toBe("gen_random_uuid()");
@@ -81,7 +81,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           null: false,
           default: "uuid_generate_v1()",
         });
-        void UUIDType.resetColumnInformation();
+        await UUIDType.resetColumnInformation();
         await UUIDType.loadSchema();
         let column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
         expect(column.defaultFunction).toBe("uuid_generate_v1()");
@@ -90,19 +90,19 @@ describeIfPg("PostgreSQLAdapter", () => {
           null: false,
           default: "uuid_generate_v4()",
         });
-        void UUIDType.resetColumnInformation();
+        await UUIDType.resetColumnInformation();
         await UUIDType.loadSchema();
         column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
         expect(column.defaultFunction).toBe("uuid_generate_v4()");
       } finally {
-        void UUIDType.resetColumnInformation();
+        await UUIDType.resetColumnInformation();
       }
     });
 
     it("add column with null true and default nil", async () => {
       await adapter.addColumn("uuid_data_type", "thingy", "uuid", { null: true, default: null });
 
-      void UUIDType.resetColumnInformation();
+      await UUIDType.resetColumnInformation();
       await UUIDType.loadSchema();
       const column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
 
@@ -113,7 +113,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("add column with default array", async () => {
       await adapter.addColumn("uuid_data_type", "thingy", "uuid", { array: true, default: [] });
 
-      void UUIDType.resetColumnInformation();
+      await UUIDType.resetColumnInformation();
       await UUIDType.loadSchema();
       const column = UUIDType.columnsHash()["thingy"] as unknown as PgColumn;
 
@@ -283,7 +283,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createTable("pg_uuids_3", { id: "uuid", ...uuidDefault() }, (t) => {
         t.string("name");
       });
-      void UUID.resetColumnInformation();
+      await UUID.resetColumnInformation();
       await UUID.loadSchema();
     });
 
@@ -292,7 +292,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await dropTable("pg_uuids_2");
       await dropTable("pg_uuids_3");
       await adapter.execute("DROP FUNCTION IF EXISTS my_uuid_generator();");
-      void UUID.resetColumnInformation();
+      await UUID.resetColumnInformation();
     });
 
     it("id is uuid", () => {
@@ -472,8 +472,8 @@ describeIfPg("PostgreSQLAdapter", () => {
           t.string("content");
         });
       });
-      void UuidPost.resetColumnInformation();
-      void UuidComment.resetColumnInformation();
+      await UuidPost.resetColumnInformation();
+      await UuidComment.resetColumnInformation();
       await UuidPost.loadSchema();
       await UuidComment.loadSchema();
     });
@@ -562,7 +562,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
       });
       for (const klass of [UuidForum, UuidPost, UuidComment]) {
-        void klass.resetColumnInformation();
+        await klass.resetColumnInformation();
         await klass.loadSchema();
       }
     });

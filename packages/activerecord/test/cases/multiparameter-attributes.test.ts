@@ -253,7 +253,7 @@ describe("MultiParameterAttributeTest", () => {
       await self().withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
-          void Topic.resetColumnInformation();
+          await Topic.resetColumnInformation();
           await Topic.loadSchema();
           const attributes = {
             "written_on(1i)": "2004",
@@ -272,7 +272,7 @@ describe("MultiParameterAttributeTest", () => {
         },
       );
     } finally {
-      void Topic.resetColumnInformation();
+      await Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });
@@ -280,7 +280,7 @@ describe("MultiParameterAttributeTest", () => {
   it("multiparameter attributes on time with time zone aware attributes and invalid time params", async () => {
     try {
       await self().withTimezoneConfig({ awareAttributes: true }, async () => {
-        void Topic.resetColumnInformation();
+        await Topic.resetColumnInformation();
         await Topic.loadSchema();
         const topic = new Topic();
         await topic.assignAttributes({
@@ -291,7 +291,7 @@ describe("MultiParameterAttributeTest", () => {
         expect(topic.written_on).toBeNull();
       });
     } finally {
-      void Topic.resetColumnInformation();
+      await Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });
@@ -322,7 +322,7 @@ describe("MultiParameterAttributeTest", () => {
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
           Topic.skipTimeZoneConversionForAttributes = ["written_on"];
-          void Topic.resetColumnInformation();
+          await Topic.resetColumnInformation();
           await Topic.loadSchema();
           const attributes = {
             "written_on(1i)": "2004",
@@ -342,7 +342,7 @@ describe("MultiParameterAttributeTest", () => {
       );
     } finally {
       Topic.skipTimeZoneConversionForAttributes = [];
-      void Topic.resetColumnInformation();
+      await Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });
@@ -352,7 +352,7 @@ describe("MultiParameterAttributeTest", () => {
       await self().withTimezoneConfig(
         { default: "utc", awareAttributes: true, zone: "Pacific Time (US & Canada)" },
         async () => {
-          void Topic.resetColumnInformation();
+          await Topic.resetColumnInformation();
           await Topic.loadSchema();
           let attributes: Record<string, string> = {
             "bonus_time(1i)": "2000",
@@ -381,7 +381,7 @@ describe("MultiParameterAttributeTest", () => {
         },
       );
     } finally {
-      void Topic.resetColumnInformation();
+      await Topic.resetColumnInformation();
       await Topic.loadSchema();
     }
   });

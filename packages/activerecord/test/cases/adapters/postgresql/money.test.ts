@@ -27,13 +27,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       t.money("wealth");
       t.money("depth", { default: "150.55" });
     });
-    void PostgresqlMoney.resetColumnInformation();
+    await PostgresqlMoney.resetColumnInformation();
     await PostgresqlMoney.loadSchema();
   });
 
   afterEach(async () => {
     await connection.dropTable("postgresql_moneys", { ifExists: true });
-    void PostgresqlMoney.resetColumnInformation();
+    await PostgresqlMoney.resetColumnInformation();
   });
 
   describe("PostgresqlMoneyTest", () => {

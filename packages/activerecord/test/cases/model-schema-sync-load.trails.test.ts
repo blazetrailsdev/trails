@@ -176,7 +176,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     await establishConnectionTo(Shape, makeAdapter(cols) as never);
-    void Circle.resetColumnInformation();
+    await Circle.resetColumnInformation();
 
     expect(Object.keys(Circle.columnsHash())).toEqual(["guid"]);
   });
@@ -198,7 +198,7 @@ describe("sync loadSchema / columnsHash", () => {
 
     constSet(TopLevel, "Circle", Circle);
     DescendantsTracker.registerSubclass(Shape, Circle);
-    (resetColumnInformation as unknown as (this: typeof Base) => void).call(Shape);
+    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Shape);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 
@@ -251,7 +251,7 @@ describe("sync loadSchema / columnsHash", () => {
     for (const key of memoKeys)
       (Circle as unknown as Record<string, unknown>)[key] = { stale: true };
 
-    (resetColumnInformation as unknown as (this: typeof Base) => void).call(Shape);
+    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Shape);
 
     for (const key of memoKeys) {
       expect((Circle as unknown as Record<string, unknown>)[key], key).toBeFalsy();
@@ -277,7 +277,7 @@ describe("sync loadSchema / columnsHash", () => {
     SpecialPost.columnsHash();
     expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
 
-    (resetColumnInformation as unknown as (this: typeof Base) => void).call(Post);
+    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Post);
 
     expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
     expect((SpecialPost as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
@@ -296,7 +296,7 @@ describe("sync loadSchema / columnsHash", () => {
     await establishConnectionTo(Shape, makeAdapter(cols) as never);
     Shape.columnsHash();
 
-    (resetColumnInformation as unknown as (this: typeof Base) => void).call(Circle);
+    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Circle);
 
     expect(Object.keys(Shape.columnsHash())).toContain("guid");
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
@@ -316,7 +316,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Object.keys(Post.columnsHash())).toContain("guid");
     expect(Post.typeForAttribute("title")!.type()).toBe("string");
 
-    (resetColumnInformation as any).call(Post);
+    await (resetColumnInformation as any).call(Post);
 
     expect((Post as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
     expect(Post.typeForAttribute("title")!.type()).toBe("string");
@@ -354,7 +354,7 @@ describe("sync loadSchema / columnsHash", () => {
     Post.columnsHash();
 
     built.calls.clear = 0;
-    (resetColumnInformation as unknown as (this: typeof Base) => void).call(Post);
+    await (resetColumnInformation as unknown as (this: typeof Base) => Promise<void>).call(Post);
 
     expect(built.calls.clear).toBe(1);
     expect(built.isWarm()).toBe(false);

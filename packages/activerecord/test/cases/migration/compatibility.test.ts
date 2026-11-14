@@ -1332,7 +1332,7 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
     await Base.connectionPool()
       .schemaMigration.deleteAllVersions()
       .catch(() => null);
-    LegacyPrimaryKey.resetColumnInformation();
+    await LegacyPrimaryKey.resetColumnInformation();
   });
 
   const assertLegacyPrimaryKey = async () => {

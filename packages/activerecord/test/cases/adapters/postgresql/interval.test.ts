@@ -48,7 +48,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         legacy_term interval
       )
     `);
-    void IntervalDataType.resetColumnInformation();
+    await IntervalDataType.resetColumnInformation();
     await IntervalDataType.loadSchema();
     const hash = IntervalDataType.columnsHash() as unknown as Record<string, PostgreSQLColumn>;
     columnMax = hash["maximum_term"];
@@ -61,7 +61,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterEach(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS interval_data_types`);
-    void IntervalDataType.resetColumnInformation();
+    await IntervalDataType.resetColumnInformation();
   });
 
   describe("PostgresqlIntervalTest", () => {

@@ -530,11 +530,13 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     }
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async changeColumnDefault(
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const quotedTableName = this.quoteTableName(tableName);
     const fragment = await this.changeColumnDefaultForAlter(
       tableName,
@@ -556,12 +558,14 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return new ChangeColumnDefaultDefinition(column, default_);
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async changeColumnNull(
     tableName: string,
     columnName: string,
     null_: boolean,
     default_?: unknown,
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     this.validateChangeColumnNullArgumentBang(null_);
     if (!null_ && default_ != null) {
       await this.execute(
@@ -580,12 +584,14 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     await this.changeColumn(tableName, columnName, null, { comment });
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async changeColumn(
     tableName: string,
     columnName: string,
     type: ColumnType | null,
     options: ColumnOptions = {},
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const sql = `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnForAlter(tableName, columnName, type, options)}`;
     await this.execute(sql);
   }
@@ -626,7 +632,9 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return new ChangeColumnDefinition(cd, column.name);
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const quotedTableName = this.quoteTableName(tableName);
     const fragment = await this.renameColumnForAlter(tableName, columnName, newColumnName);
     await this.execute(`ALTER TABLE ${quotedTableName} ${fragment}`);

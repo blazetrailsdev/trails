@@ -34,7 +34,7 @@ describe("YamlSerializationTest", () => {
         },
       );
     } finally {
-      Topic.resetColumnInformation();
+      await Topic.resetColumnInformation();
     }
   });
 

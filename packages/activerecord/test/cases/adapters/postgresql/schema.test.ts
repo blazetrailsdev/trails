@@ -1006,13 +1006,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.string("string_col", { default: "some value" });
         t.decimal("decimal_col", { default: "3.14159265358979323846" });
       });
-      void Default.resetColumnInformation();
+      await Default.resetColumnInformation();
       await Default.loadSchema();
     });
     afterEach(async () => {
       await adapter.setSchemaSearchPath(oldSearchPath);
       await adapter.dropSchema("schema_1", { ifExists: true });
-      void Default.resetColumnInformation();
+      await Default.resetColumnInformation();
     });
 
     it("text defaults in new schema when overriding domain", async () => {
@@ -1036,7 +1036,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("bpchar defaults in new schema when overriding domain", async () => {
       await adapter.execute("ALTER TABLE defaults ADD bpchar_col bpchar DEFAULT 'some value'");
-      void Default.resetColumnInformation();
+      await Default.resetColumnInformation();
       await Default.loadSchema();
       expect(new Default().bpchar_col, "Default of bpchar column was not correctly parsed").toEqual(
         "some value",
@@ -1047,7 +1047,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         "ALTER TABLE defaults ALTER COLUMN text_col SET DEFAULT 'some text'::schema_1.text",
       );
-      void Default.resetColumnInformation();
+      await Default.resetColumnInformation();
       await Default.loadSchema();
       expect(
         new Default().text_col,
@@ -1059,7 +1059,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         "ALTER TABLE defaults ALTER COLUMN string_col SET DEFAULT 'foo''::bar'",
       );
-      void Default.resetColumnInformation();
+      await Default.resetColumnInformation();
       await Default.loadSchema();
       expect(new Default().string_col).toEqual("foo'::bar");
     });

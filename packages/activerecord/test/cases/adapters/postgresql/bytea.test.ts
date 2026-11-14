@@ -33,7 +33,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.binary("serialized");
       });
     });
-    void ByteaDataType.resetColumnInformation();
+    await ByteaDataType.resetColumnInformation();
     await ByteaDataType.loadSchema();
     column = ByteaDataType.columnsHash()["payload"] as unknown as PgColumn;
     type = ByteaDataType.typeForAttribute("payload");
@@ -41,7 +41,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   afterEach(async () => {
     await connection.dropTable("bytea_data_type", { ifExists: true });
-    void ByteaDataType.resetColumnInformation();
+    await ByteaDataType.resetColumnInformation();
   });
 
   describe("PostgresqlByteaTest", () => {
@@ -140,7 +140,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const coder = { load: (s: unknown) => s, dump: (s: unknown) => s };
       class ByteaSerialized extends ByteaDataType {}
       ByteaSerialized.serialize("serialized", { coder });
-      void ByteaSerialized.resetColumnInformation();
+      await ByteaSerialized.resetColumnInformation();
       await ByteaSerialized.loadSchema();
       const obj = new ByteaSerialized() as any;
       obj.serialized = "hello world";

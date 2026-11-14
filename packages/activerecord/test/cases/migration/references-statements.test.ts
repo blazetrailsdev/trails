@@ -17,7 +17,7 @@ describe("Migration", () => {
       await connection.createTable(tableName, { force: true }, (t) => {
         t.timestamps({ null: true });
       });
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
 
       await connection.addColumn(tableName, "supplier_id", "integer");
       await connection.addIndex(tableName, "supplier_id");
@@ -26,7 +26,7 @@ describe("Migration", () => {
     afterEach(async () => {
       const connection = await ambientConnection();
       await connection.dropTable(tableName, { ifExists: true });
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
     });
 
     async function withPolymorphicColumn(body: () => Promise<void>): Promise<void> {

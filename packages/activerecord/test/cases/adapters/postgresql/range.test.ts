@@ -62,7 +62,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         this.attribute("id", "integer");
       }
     }
-    void PostgresqlRangesCls.resetColumnInformation();
+    await PostgresqlRangesCls.resetColumnInformation();
     await PostgresqlRangesCls.loadSchema();
     PostgresqlRanges = PostgresqlRangesCls;
 
@@ -309,7 +309,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
         const timeString = (zone() as TimeZone).now().toString();
         const time = (zone() as TimeZone).parse(timeString)!;
@@ -330,7 +330,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
         const timeString = (zone() as TimeZone).now().toString();
         const time = (zone() as TimeZone).parse(timeString)!;
@@ -351,7 +351,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
         const timeString = (zone() as TimeZone).now().toString();
         const time = (zone() as TimeZone).parse(timeString)!;
@@ -372,7 +372,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
 
         const fromTimeString = (zone() as TimeZone).now().toString();
@@ -528,7 +528,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
         const timeString = (zone() as TimeZone).now().toString();
         const time = (zone() as TimeZone).parse(timeString)!;
@@ -549,7 +549,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
         const timeString = (zone() as TimeZone).now().toString();
         const time = (zone() as TimeZone).parse(timeString)!;
@@ -570,7 +570,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
         const timeString = (zone() as TimeZone).now().toString();
         const time = (zone() as TimeZone).parse(timeString)!;
@@ -591,7 +591,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
 
         const fromTimeString = (zone() as TimeZone).now().toString();
@@ -711,7 +711,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const tz = "Pacific Time (US & Canada)";
 
       await inTimeZone(tz, async () => {
-        void PostgresqlRangesTz.resetColumnInformation();
+        await PostgresqlRangesTz.resetColumnInformation();
         await PostgresqlRangesTz.loadSchema();
         const timeString = "2017-09-26 07:30:59.132451 -0700";
         const time = (zone() as TimeZone).parse(timeString)!;

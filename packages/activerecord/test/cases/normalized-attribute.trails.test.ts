@@ -40,7 +40,7 @@ describe("STI subclass normalizes", () => {
     });
     expect(ReloadedCompany.typeForAttribute("name")!.cast("  acme  ")).toBe("ACME");
 
-    void ReloadedCompany.resetColumnInformation();
+    await ReloadedCompany.resetColumnInformation();
     await Company.loadSchema();
     await ReloadedCompany.loadSchema();
 
@@ -56,7 +56,7 @@ describe("STI subclass normalizes", () => {
     const defsOf = (klass: typeof Company) => klass.columnsHash();
     expect(Object.keys(defsOf(Company)).every((k) => k in defsOf(RefreshedCompany))).toBe(true);
 
-    void Company.resetColumnInformation();
+    await Company.resetColumnInformation();
     await Company.loadSchema();
     await RefreshedCompany.loadSchema();
 

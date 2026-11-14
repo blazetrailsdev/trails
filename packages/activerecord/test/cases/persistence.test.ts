@@ -345,7 +345,7 @@ describe("PersistenceTest", () => {
       expect(topic).toBeInstanceOf(Topic);
     } finally {
       await adapter.changeColumnDefault("topics", "type", { from: "Reply", to: originalType });
-      void Topic.resetColumnInformation();
+      await Topic.resetColumnInformation();
     }
   });
 
@@ -364,7 +364,7 @@ describe("PersistenceTest", () => {
       expect((new Child({ foo: "bar" }) as any).foo).toBe("bar");
     } finally {
       await adapter.removeColumn("topics", "foo");
-      void Topic.resetColumnInformation();
+      await Topic.resetColumnInformation();
     }
   });
 

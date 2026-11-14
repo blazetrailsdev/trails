@@ -1679,11 +1679,11 @@ describe("TransactionTest", () => {
     const connection = await (Topic as any).leaseConnection();
     try {
       await assertNothingRaised(async () => {
-        void (Topic as any).resetColumnInformation();
+        await (Topic as any).resetColumnInformation();
         await connection.addColumn("topics", "stuff", "string");
         expect((await connection.columns("topics")).map((c: any) => c.name)).toContain("stuff");
 
-        void (Topic as any).resetColumnInformation();
+        await (Topic as any).resetColumnInformation();
         await connection.removeColumn("topics", "stuff");
         expect((await connection.columns("topics")).map((c: any) => c.name)).not.toContain("stuff");
       });
@@ -1706,7 +1706,7 @@ describe("TransactionTest", () => {
       try {
         await connection.removeColumn("topics", "stuff");
       } catch {}
-      void (Topic as any).resetColumnInformation();
+      await (Topic as any).resetColumnInformation();
     }
   });
 

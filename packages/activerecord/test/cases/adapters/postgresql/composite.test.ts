@@ -52,7 +52,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   async function teardownCompositeType(): Promise<void> {
     await connection.execute("DROP TABLE IF EXISTS postgresql_composites CASCADE");
     await connection.execute("DROP TYPE IF EXISTS full_address");
-    void PostgresqlComposite.resetColumnInformation();
+    await PostgresqlComposite.resetColumnInformation();
     await connection.reloadTypeMap();
   }
 
@@ -68,7 +68,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     beforeEach(async () => {
       connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await setupCompositeType();
-      void PostgresqlComposite.resetColumnInformation();
+      await PostgresqlComposite.resetColumnInformation();
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
         await PostgresqlComposite.loadSchema();
@@ -116,7 +116,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await setupCompositeType();
       connection.typeMap.registerType("full_address", new FullAddressType());
-      void PostgresqlComposite.resetColumnInformation();
+      await PostgresqlComposite.resetColumnInformation();
       await PostgresqlComposite.loadSchema();
     });
 

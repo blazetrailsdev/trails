@@ -120,7 +120,7 @@ async function migrateRemovingMissingColumn(migrator: Migrator): Promise<void> {
 }
 
 async function personColumnNames(): Promise<string[]> {
-  void (Person as any).resetColumnInformation();
+  await (Person as any).resetColumnInformation();
   await loadSchemaFromAdapter.call(Person as any);
   return Person.columnNames();
 }
@@ -145,7 +145,7 @@ afterEach(async () => {
   try {
     await adapter.dropTable("ar_internal_metadata", { ifExists: true });
   } catch {}
-  void (Person as any).resetColumnInformation();
+  await (Person as any).resetColumnInformation();
 });
 
 afterAll(async () => {
@@ -225,7 +225,7 @@ describe("MigrationTest", () => {
       await Thing.resetSequenceName();
       await WeNeedThings.migrate("up");
       expect(await Thing.tableExists()).toBeTruthy();
-      Thing.resetColumnInformation();
+      await Thing.resetColumnInformation();
 
       expect(await Thing.create({ content: "hello world" })).toBeTruthy();
       expect(((await Thing.first()) as any).content).toBe("hello world");
@@ -360,7 +360,7 @@ describe("MigrationTest", () => {
       expect(await BigNumber.tableExists()).toBeFalsy();
       await GiveMeBigNumbers.migrate("up");
       expect(await BigNumber.tableExists()).toBeTruthy();
-      BigNumber.resetColumnInformation();
+      await BigNumber.resetColumnInformation();
       await BigNumber.loadSchema();
 
       expect(
@@ -1206,7 +1206,7 @@ describe("MigrationTest", () => {
       await Reminder.resetSequenceName();
       await WeNeedReminders.migrate("up");
       expect(await Reminder.tableExists()).toBeTruthy();
-      Reminder.resetColumnInformation();
+      await Reminder.resetColumnInformation();
       expect(await Reminder.create({ content: "hello world", remind_at: Time.now() })).toBeTruthy();
       expect(((await Reminder.first()) as any).content).toBe("hello world");
 
@@ -1512,7 +1512,7 @@ AND query LIKE '%${lockId}%'`;
     beforeEach(async () => {
       connection = await Base.leaseConnection();
       await connection.createTable("delete_me", { force: true }, () => {});
-      Person.resetColumnInformation();
+      await Person.resetColumnInformation();
       await Person.resetSequenceName();
     });
 
@@ -1749,7 +1749,7 @@ AND query LIKE '%${lockId}%'`;
 
     beforeEach(async () => {
       connection = await Person.leaseConnection();
-      Person.resetColumnInformation();
+      await Person.resetColumnInformation();
       await Person.resetSequenceName();
     });
 

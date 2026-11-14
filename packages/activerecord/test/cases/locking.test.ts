@@ -58,8 +58,8 @@ describe("OptimisticLockingTest", () => {
     constSet(TopLevel, "FunkyBulb", FunkyBulb);
     constSet(TopLevel, "FailedBulb", FailedBulb);
     constSet(TopLevel, "Engine", Engine);
-    void Car.resetColumnInformation();
-    void Wheel.resetColumnInformation();
+    await Car.resetColumnInformation();
+    await Wheel.resetColumnInformation();
     await Car.loadSchema();
     await Wheel.loadSchema();
     constSet(TopLevel, "Treasure", Treasure);
@@ -610,11 +610,11 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
       null: false,
       default: 0,
     });
-    void model.resetColumnInformation();
+    await model.resetColumnInformation();
   }
   async function removeCounterColumnFrom(model: typeof Base, col = "test_count"): Promise<void> {
     await ((await Base.leaseConnection()) as any).removeColumn(model.tableName, col);
-    void model.resetColumnInformation();
+    await model.resetColumnInformation();
   }
 
   async function counterTest(
@@ -660,7 +660,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 
   it("destroy dependents", async () => {
     await addCounterColumnTo(Person, "personal_legacy_things_count");
-    void PersonalLegacyThing.resetColumnInformation();
+    await PersonalLegacyThing.resetColumnInformation();
     await Person.loadSchema();
     await PersonalLegacyThing.loadSchema();
 
@@ -677,7 +677,7 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
       await assertRaises([RecordNotFound], {}, () => PersonalLegacyThing.find(t.id));
     } finally {
       await removeCounterColumnFrom(Person, "personal_legacy_things_count");
-      void PersonalLegacyThing.resetColumnInformation();
+      await PersonalLegacyThing.resetColumnInformation();
     }
   });
 
