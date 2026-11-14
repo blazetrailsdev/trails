@@ -14,7 +14,8 @@ import {
   arySlice,
   Range,
   rbObjClassname,
-  methodMissingPrototype,
+  KERNEL_METHODS,
+  PROTOCOL_PROBES,
 } from "@blazetrails/ruby-compat";
 import { Multibyte } from "../multibyte.js";
 import { Unicode } from "./unicode.js";
@@ -299,7 +300,25 @@ export class Chars {
   }
 }
 
-methodMissingPrototype(Chars, { delegate: (receiver) => receiver.wrappedString });
+Object.setPrototypeOf(
+  Chars.prototype,
+  new Proxy(Object.create(Object.getPrototypeOf(Chars.prototype) as object) as object, {
+    get(target, prop, receiver: Chars) {
+      if (typeof prop === "symbol" || prop in target || receiver === Chars.prototype) {
+        return Reflect.get(target, prop, receiver);
+      }
+      if (PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) return undefined;
+      const member = (receiver.wrappedString as unknown as Record<string, unknown>)[prop];
+      if (typeof member !== "function") {
+        return receiver.isRespondTo(prop) ? receiver.methodMissing(prop) : undefined;
+      }
+      return (...args: unknown[]) => {
+        const result: unknown = member.apply(receiver.wrappedString, args);
+        return typeof result === "string" ? receiver["chars"](result) : result;
+      };
+    },
+  }),
+);
 
 const W = "[\\p{L}\\p{M}\\p{N}\\p{Pc}]";
 const WORD_BOUNDARY_TITLEIZE = new RegExp(`(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))('?\\S)`, "gu");
