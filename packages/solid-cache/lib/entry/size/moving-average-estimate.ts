@@ -1,5 +1,5 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { Entry } from "../../entry.js";
+import { SolidCache } from "../../solid-cache.js";
 import { Estimate } from "./estimate.js";
 
 const decoder = new TextDecoder();
@@ -33,7 +33,7 @@ export class MovingAverageEstimate {
 
   /** @internal */
   private async previousValues(): Promise<number[]> {
-    const read = await Entry.read(MovingAverageEstimate.ESTIMATES_KEY);
+    const read = await SolidCache.Entry!.read(MovingAverageEstimate.ESTIMATES_KEY);
     const value = read instanceof Uint8Array ? decoder.decode(read) : (read as string | null);
     return isPresent(value) ? value!.split("|").map((v) => parseInt(v, 10) || 0) : [];
   }
@@ -52,7 +52,7 @@ export class MovingAverageEstimate {
 
   /** @internal */
   private async writeValues(values: number[]): Promise<void> {
-    await Entry.write(MovingAverageEstimate.ESTIMATES_KEY, values.join("|"));
+    await SolidCache.Entry!.write(MovingAverageEstimate.ESTIMATES_KEY, values.join("|"));
   }
 
   /** @internal */

@@ -1,6 +1,6 @@
 import { sql } from "@blazetrails/arel";
 import { Kernel, Range } from "@blazetrails/ruby-compat";
-import { Entry } from "../../entry.js";
+import { SolidCache } from "../../solid-cache.js";
 
 export class Estimate {
   readonly samples: number;
@@ -17,7 +17,7 @@ export class Estimate {
 
   static async new({ samples }: { samples: number }): Promise<Estimate> {
     const estimate = new Estimate({ samples });
-    estimate.maxRecords ??= Number(await Entry.idRange());
+    estimate.maxRecords ??= Number(await SolidCache.Entry!.idRange());
     return estimate;
   }
 
@@ -47,8 +47,8 @@ export class Estimate {
   /** @internal */
   private outliersSizeCountAndCutoff(): Promise<[number, number, unknown]> {
     return (this._outlierSizeAndCutoff ??= Promise.resolve(
-      Entry.uncached(async () => {
-        const [sum, count, min] = (await Entry.largestByteSizes(this.samples).pick(
+      SolidCache.Entry!.uncached(async () => {
+        const [sum, count, min] = (await SolidCache.Entry!.largestByteSizes(this.samples).pick(
           sql("sum(byte_size), count(*), min(byte_size)"),
         )) as [unknown, unknown, unknown];
         return sum != null ? [Number(sum), Number(count), min] : [0, 0, null];
@@ -78,8 +78,12 @@ export class Estimate {
     const sampleRange = await this.sampleRange();
     const outliersCutoff = await this.outliersCutoff();
     return (this._sampledNonOutlierSize = Number(
-      await Entry.uncached(() =>
-        (Entry.inKeyHashRange(sampleRange) as unknown as typeof Entry)
+      await SolidCache.Entry!.uncached(() =>
+        (
+          SolidCache.Entry!.inKeyHashRange(sampleRange) as unknown as NonNullable<
+            typeof SolidCache.Entry
+          >
+        )
           .upToByteSize(outliersCutoff)
           .sum("byte_size"),
       ),
@@ -101,7 +105,7 @@ export class Estimate {
 
   /** @internal */
   private keyHashRange(): Range<bigint> {
-    return Entry.KEY_HASH_ID_RANGE;
+    return SolidCache.Entry!.KEY_HASH_ID_RANGE;
   }
 
   /** @internal */
