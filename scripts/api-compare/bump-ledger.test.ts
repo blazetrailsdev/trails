@@ -4,8 +4,15 @@ import { describe, expect, it } from "vitest";
 import type { BodyHashRecord, BodyPin } from "./body-pins.js";
 import {
   type LedgerRow,
+  type Lock,
   addedRows,
+  carrySeed,
   checkRows,
+  clearedRows,
+  forkedBeforeRef,
+  movedSources,
+  partitionLedgered,
+  resolveRevisions,
   ledgerPath,
   liveRows,
   loadLedgered,
@@ -91,6 +98,7 @@ describe("liveRows and seedDiff", () => {
 
 describe("loadLedgered", () => {
   it("reads every source's ledger, and an absent file ledgers nothing", async () => {
+    await fs.mkdir(path.join(import.meta.dirname, "output"), { recursive: true });
     const dir = await fs.mkdtemp(path.join(import.meta.dirname, "output", "ledger-"));
     try {
       expect((await loadLedgered(dir))(key)).toBe(false);
@@ -103,5 +111,90 @@ describe("loadLedgered", () => {
     } finally {
       await fs.rm(dir, { recursive: true, force: true });
     }
+  });
+});
+
+const lock = (ref: string): Lock => ({ sources: { rails: { ref }, arel: { ref: "1" } } });
+
+describe("movedSources and forkedBeforeRef", () => {
+  it("names the source whose ref moved", () => {
+    expect(movedSources(lock("v8.0.2"), lock("v8.0.5.2"))).toEqual(["rails"]);
+    expect(movedSources(lock("v8.0.2"), lock("v8.0.2"))).toEqual([]);
+  });
+
+  it("reds a body-pins edit forked before a ref move, and only then", () => {
+    expect(forkedBeforeRef(lock("v8.0.2"), lock("v8.0.5.2"), true)).toEqual(["rails"]);
+    expect(forkedBeforeRef(lock("v8.0.2"), lock("v8.0.5.2"), false)).toEqual([]);
+    expect(forkedBeforeRef(lock("v8.0.5.2"), lock("v8.0.5.2"), true)).toEqual([]);
+  });
+});
+
+describe("resolveRevisions", () => {
+  const fakeGit =
+    (answers: Record<string, string | null>) =>
+    async (args: string[]): Promise<string | null> =>
+      answers[args.join(" ")] ?? null;
+
+  it("diffs a merge checkout's parents", async () => {
+    const git = fakeGit({ "rev-parse --verify -q HEAD^2": "x", "merge-base HEAD^1 HEAD^2": "f\n" });
+    expect(await resolveRevisions(git, "origin/main")).toEqual({
+      base: "HEAD^1",
+      head: "HEAD^2",
+      fork: "f",
+    });
+  });
+
+  it("diffs a branch against its merge base with the base branch", async () => {
+    const git = fakeGit({ "merge-base origin/main HEAD": "f\n" });
+    expect(await resolveRevisions(git, "origin/main")).toEqual({
+      base: "f",
+      head: "HEAD",
+      fork: "f",
+    });
+  });
+
+  it("reds a merge base that will not resolve instead of skipping the history arms", async () => {
+    const merge = fakeGit({ "rev-parse --verify -q HEAD^2": "x" });
+    expect(await resolveRevisions(merge, "origin/main")).toHaveProperty("error");
+    expect(await resolveRevisions(fakeGit({}), "origin/main")).toHaveProperty("error");
+  });
+});
+
+describe("carrySeed", () => {
+  it("keeps a row ledgered at an earlier bump at its original from and story", () => {
+    const earlier = { ...row("drift"), story: "s" };
+    const seed = [{ ...row("drift"), from: "v8.0.5.2", to: "v8.1.4" }, row("drift", "touch")];
+    expect(carrySeed(seed, [earlier])).toEqual([
+      { ...row("drift"), to: "v8.1.4", story: "s" },
+      row("drift", "touch"),
+    ]);
+    expect(
+      seedDiff([{ ...earlier, to: "v8.1.4" }], carrySeed(seed.slice(0, 1), [earlier])),
+    ).toEqual([]);
+  });
+});
+
+describe("clearedRows", () => {
+  const current = new Map([[`${key.package} ${key.rubyFile} save`, "b"]]);
+
+  it("clears a re-pinned row and a pruned row", () => {
+    expect(clearedRows([row("drift")], [pin("a")], [pin("b")], current)).toEqual([row("drift")]);
+    const removed = row("removed", "touch");
+    expect(clearedRows([removed], [pin("t", "touch")], [], current)).toEqual([removed]);
+  });
+
+  it("leaves a row the run did not touch, and one that was already unmatched", () => {
+    expect(clearedRows([row("drift")], [pin("a")], [pin("a")], current)).toEqual([]);
+    expect(clearedRows([row("drift")], [], [pin("b")], current)).toEqual([]);
+  });
+});
+
+describe("partitionLedgered", () => {
+  it("passes a ledgered DRIFT or STALE pin and keeps an unledgered one red", () => {
+    const isLedgered = (k: { rubyName: string }) => k.rubyName === "save";
+    expect(partitionLedgered([pin("a"), pin("t", "touch")], isLedgered)).toEqual({
+      ledgered: [pin("a")],
+      red: [pin("t", "touch")],
+    });
   });
 });

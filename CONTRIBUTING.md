@@ -427,6 +427,16 @@ which pins newly matched pairs and re-pins every drifted one at once — use it
 only once the drift worklist is burnt down, never to silence the gate. Pins
 keep their `reason` across a re-pin.
 
+**A drift worklist too large for the bump PR goes in the bump ledger**
+(RFC 0191 § 3): `scripts/parity/bump-ledger/<source>.json`, one row per
+drifted or removed pair, seeded in the PR that moves the source's `ref`. The
+body-pins gate reports a ledgered pair and passes it; `pnpm
+parity:api:pins:ledger` (CI: `Bump-ledger gate`) reds a row that no longer
+names a live DRIFT or STALE pin, a row added without a `ref` move, a bump PR's
+ledger that differs from the recomputed seed, and a `body-pins.json` edit
+forked before a `ref` move. `--pin <ruby-file>` and `--prune` delete the rows
+they clear; the ledger only shrinks.
+
 When the gate fails:
 
 - **DRIFT** — the vendored body changed. Re-verify the port, then re-pin that

@@ -137,3 +137,100 @@ export function seedDiff(
   for (const [k, s] of want) if (!have.has(k)) problems.push({ row: s, problem: "seed" });
   return problems;
 }
+
+/** `vendor/sources.lock.json`'s shape, as far as the ledger reads it. */
+export interface Lock {
+  sources: Record<string, { ref: string }>;
+}
+
+/** The sources whose `ref` differs between two lockfiles. */
+export function movedSources(a: Lock, b: Lock): string[] {
+  const names = new Set([...Object.keys(a.sources), ...Object.keys(b.sources)]);
+  return [...names].filter((s) => a.sources[s]?.ref !== b.sources[s]?.ref).sort();
+}
+
+/**
+ * The revisions the gate diffs. `tested` is the tree CI checked out (the
+ * artifact, the pins and the ledger are read from it); `base` is main's tip
+ * and `head` the PR's tip; `fork` is their merge base. On a GitHub merge
+ * checkout `base` is `HEAD^1` and `head` is `HEAD^2`. Without a second parent
+ * (a push to main, or a local branch), `base` and `fork` are the merge base
+ * with `baseBranch` and `head` is `HEAD`; on a push to main that is `HEAD`
+ * itself, so nothing reads as added. A merge base that will not resolve is
+ * an error, never a skipped arm.
+ */
+export async function resolveRevisions(
+  git: (args: string[]) => Promise<string | null>,
+  baseBranch: string,
+): Promise<{ base: string; head: string; fork: string } | { error: string }> {
+  const merge = (await git(["rev-parse", "--verify", "-q", "HEAD^2"])) !== null;
+  const [base, head] = merge ? ["HEAD^1", "HEAD^2"] : [baseBranch, "HEAD"];
+  const fork = (await git(["merge-base", base, head]))?.trim();
+  if (!fork) {
+    return {
+      error:
+        `bump-ledger gate: no merge base between ${base} and ${head}. The checkout is too ` +
+        "shallow to judge which ledger rows and pins this PR adds: deepen the fetch or rebase.",
+    };
+  }
+  return merge ? { base, head, fork } : { base: fork, head, fork };
+}
+
+/**
+ * A PR forked before main moved a source's `ref` must not edit body-pins:
+ * its pins were taken at the old ref.
+ */
+export function forkedBeforeRef(forkLock: Lock, baseLock: Lock, editsPins: boolean): string[] {
+  return editsPins ? movedSources(forkLock, baseLock) : [];
+}
+
+/**
+ * The ledger a ref-moving PR must carry: the seed, with a pair already
+ * ledgered on the base keeping that row's `from` and `story`, so a second
+ * bump does not erase where the drift began.
+ */
+export function carrySeed(
+  seed: readonly Omit<LedgerRow, "story">[],
+  base: readonly LedgerRow[],
+): LedgerRow[] {
+  const prior = new Map(base.map((r) => [keyOf(r), r]));
+  return seed.map((s) => {
+    const p = prior.get(keyOf(s));
+    return p === undefined
+      ? { ...s }
+      : { ...s, from: p.from, ...(p.story ? { story: p.story } : {}) };
+  });
+}
+
+/**
+ * The rows a `--pin` or `--prune` cleared, and only those: a pair re-pinned
+ * to its current digest, or a pin the run removed. A row that was already
+ * unmatched before the run is left for lint-bump-ledger.ts to red.
+ */
+export function clearedRows(
+  rows: readonly LedgerRow[],
+  before: readonly BodyPin[],
+  after: readonly BodyPin[],
+  current: ReadonlyMap<string, string>,
+): LedgerRow[] {
+  const was = new Map(before.map((p) => [keyOf(p), p.digest]));
+  const now = new Map(after.map((p) => [keyOf(p), p.digest]));
+  return rows.filter((r) => {
+    const k = keyOf(r);
+    const prior = was.get(k);
+    if (prior === undefined) return false;
+    const next = now.get(k);
+    return next === undefined || (next !== prior && next === current.get(k));
+  });
+}
+
+/** Split DRIFT / STALE pins into the ledgered ones and the ones still red. */
+export function partitionLedgered<T extends PinKey>(
+  entries: readonly T[],
+  isLedgered: (k: PinKey) => boolean,
+): { ledgered: T[]; red: T[] } {
+  return {
+    ledgered: entries.filter((e) => isLedgered(e)),
+    red: entries.filter((e) => !isLedgered(e)),
+  };
+}

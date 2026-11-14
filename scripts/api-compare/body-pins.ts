@@ -271,14 +271,21 @@ export async function saveManifest(pins: BodyPin[]): Promise<void> {
  * Delete the bump-ledger rows (RFC 0191 § 3) a re-pin or prune cleared: the
  * ledger only shrinks, and lint-bump-ledger.ts reds a row left behind.
  */
-async function clearLedgerRows(pins: BodyPin[], records: BodyHashRecord[]): Promise<void> {
-  const { ledgerPath, liveRows, loadLedgers, saveLedgerFile } = await import("./bump-ledger.js");
+async function clearLedgerRows(
+  before: BodyPin[],
+  after: BodyPin[],
+  records: BodyHashRecord[],
+): Promise<void> {
+  const { clearedRows, ledgerPath, loadLedgers, saveLedgerFile } = await import("./bump-ledger.js");
   const current = currentDigests(records);
   for (const [source, rows] of await loadLedgers()) {
-    const live = liveRows(rows, pins, current);
-    if (live.length === rows.length) continue;
-    await saveLedgerFile(ledgerPath(source), live);
-    console.log(`Cleared ${rows.length - live.length} bump-ledger row(s) for ${source}`);
+    const cleared = new Set(clearedRows(rows, before, after, current));
+    if (cleared.size === 0) continue;
+    await saveLedgerFile(
+      ledgerPath(source),
+      rows.filter((r) => !cleared.has(r)),
+    );
+    console.log(`Cleared ${cleared.size} bump-ledger row(s) for ${source}`);
   }
 }
 
@@ -299,7 +306,7 @@ async function main(args: string[]): Promise<number> {
   if (args.includes("--prune")) {
     const next = prunePins(artifact.hashes, pins);
     await saveManifest(next);
-    await clearLedgerRows(next, artifact.hashes);
+    await clearLedgerRows(pins, next, artifact.hashes);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MANIFEST_PATH)}: dropped ${pins.length - next.length} ` +
         `stale pin(s), ${next.length} remaining`,
@@ -316,7 +323,7 @@ async function main(args: string[]): Promise<number> {
       ? pinPairs(artifact.hashes, pins, { all: true })
       : pinPairs(artifact.hashes, pins, { rubyFile: pinFile! });
     await saveManifest(next);
-    await clearLedgerRows(next, artifact.hashes);
+    await clearLedgerRows(pins, next, artifact.hashes);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MANIFEST_PATH)}: ${next.length} pinned pair(s)` +
         (pinFile ? ` (pinned/re-pinned ${pinFile})` : " (pinned all matched pairs)"),

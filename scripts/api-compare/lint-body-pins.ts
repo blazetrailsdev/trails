@@ -42,7 +42,7 @@ import {
   loadManifest,
   missingScope,
 } from "./body-pins.js";
-import { loadLedgered } from "./bump-ledger.js";
+import { loadLedgered, partitionLedgered } from "./bump-ledger.js";
 
 async function main(scope: string | null): Promise<number> {
   const artifact = await loadArtifact();
@@ -77,9 +77,9 @@ async function main(scope: string | null): Promise<number> {
 
   const all = diffPins(artifact.hashes, pins);
   const isLedgered = await loadLedgered();
-  const ledgered = [...all.drift, ...all.stale].filter(isLedgered);
-  const drift = all.drift.filter((d) => !isLedgered(d));
-  const stale = all.stale.filter((s) => !isLedgered(s));
+  const { ledgered: driftLedgered, red: drift } = partitionLedgered(all.drift, isLedgered);
+  const { ledgered: staleLedgered, red: stale } = partitionLedgered(all.stale, isLedgered);
+  const ledgered = [...driftLedgered, ...staleLedgered];
   if (ledgered.length > 0) {
     console.log(
       `body-pins gate: ${ledgered.length} ledger row(s) — drifted or removed by a ref bump, ` +
