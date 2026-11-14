@@ -19,6 +19,7 @@ import { Trailtie as ActionViewRailtie } from "@blazetrails/trailties/trailties/
 import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trailties/action-controller";
 import { File, Dir } from "@blazetrails/ruby-compat";
 import "../../../lib/constants.generated.js";
+import "../../../lib/fixture-set.js";
 import { ImageMagick } from "../../../lib/analyzer/image-analyzer/image-magick.js";
 import { Vips } from "../../../lib/analyzer/image-analyzer/vips.js";
 import { VideoAnalyzer } from "../../../lib/analyzer/video-analyzer.js";

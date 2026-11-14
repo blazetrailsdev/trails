@@ -11,12 +11,9 @@ import {
   type HelperMap,
 } from "./extract-ts-core.js";
 import { scopeOf } from "../api-compare/scope.js";
-import { testRoots } from "../layout/package-roots.mjs";
 
 function globInTestRoots(pkg: string, pattern: string): string[] {
-  return testRoots(pkg).flatMap((root) =>
-    globSync(`packages/${pkg}/${root}/${pattern}`, { cwd: ROOT_DIR }),
-  );
+  return globSync(`packages/${pkg}/test/${pattern}`, { cwd: ROOT_DIR });
 }
 
 export { extractTestsFromSource } from "./extract-ts-core.js";
@@ -82,13 +79,11 @@ export function getPackageTestFiles(): Record<string, string[]> {
   const result: Record<string, string[]> = {};
 
   for (const pkg of packages) {
-    const files = testRoots(pkg)
-      .flatMap((root) => [
-        ...globSync(`packages/${pkg}/${root}/**/*.test.ts`, { cwd: ROOT_DIR }),
-        // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
-        ...globSync(`packages/${pkg}/${root}/**/behaviors/*-behavior.ts`, { cwd: ROOT_DIR }),
-      ])
-      .sort();
+    const files = [
+      ...globSync(`packages/${pkg}/test/**/*.test.ts`, { cwd: ROOT_DIR }),
+      // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
+      ...globSync(`packages/${pkg}/test/**/behaviors/*-behavior.ts`, { cwd: ROOT_DIR }),
+    ].sort();
 
     result[pkg] = files;
   }

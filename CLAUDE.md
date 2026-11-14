@@ -398,7 +398,8 @@ and not added ones.
 ## Conventions
 
 - [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
-- Tests live next to source files as `*.test.ts`.
+- Tests live in `packages/<pkg>/test/`, laid out as the upstream gem's `test/`
+  tree.
 - Prefer small, focused modules.
 - **PR size ceiling: the LOC number stated in your task prompt's "Hard rules"
   block** — that block is the single source of truth (btwhooks fills it from

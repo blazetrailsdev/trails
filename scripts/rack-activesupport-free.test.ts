@@ -8,7 +8,6 @@ import {
   GUARDED_PACKAGES,
   namesPackage,
 } from "./rack-activesupport-free.js";
-import { libRoot } from "./layout/package-roots.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const packageDir = (name: string) => path.join(HERE, "..", "packages", name);
@@ -22,9 +21,7 @@ describe("rack activesupport-free guard", () => {
   });
 
   it.each(GUARDED_PACKAGES)("no %s source imports activesupport", async (name) => {
-    expect(
-      await forbiddenImports(packageDir(name), libRoot(name), ".ts", FORBIDDEN_PACKAGE),
-    ).toEqual([]);
+    expect(await forbiddenImports(packageDir(name), "lib", ".ts", FORBIDDEN_PACKAGE)).toEqual([]);
   });
 
   it.each(GUARDED_PACKAGES)("no built %s module imports activesupport", async (name) => {
