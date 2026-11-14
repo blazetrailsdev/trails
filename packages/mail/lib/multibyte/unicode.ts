@@ -184,13 +184,11 @@ export class UnicodeDatabase {
   }
 
   static dirname(): string {
-    return File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)) + "/";
+    return File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)) + "/../values/";
   }
 
   static filename(): string {
-    return File.expandPath(
-      File.join(UnicodeDatabase.dirname(), "simple-case-mappings.generated.js"),
-    );
+    return File.expandPath(File.join(UnicodeDatabase.dirname(), "unicode_tables.dat"));
   }
 }
 
