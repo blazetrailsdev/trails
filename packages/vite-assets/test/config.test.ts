@@ -2,7 +2,7 @@ import type {} from "@blazetrails/vitest-matchers";
 import { File } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Config } from "../lib/config.js";
-import { ViteRuby } from "../lib/vite-ruby.js";
+import { ViteAssets } from "../lib/vite-assets.js";
 import { pathToTestApp, refreshConfig, withRailsEnv } from "./support/test-helper.js";
 
 const vendorCandidate = new URL("../../../vendor/vite_ruby/v3.11.1", import.meta.url).pathname;
@@ -125,7 +125,7 @@ describe("ConfigTest", () => {
   it.skip("to env", () => {});
 
   it("environment vars", async () => {
-    const env = ViteRuby.env();
+    const env = ViteAssets.env();
     try {
       for (const key of Object.keys(env)) delete env[key];
       Object.assign(env, {

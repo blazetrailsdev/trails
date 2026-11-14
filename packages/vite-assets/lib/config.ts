@@ -96,7 +96,7 @@ export class Config {
     return this.root.join(this.sourceCodeDir);
   }
 
-  async loadRubyConfig(): Promise<void> {
+  async loadTsConfig(): Promise<void> {
     const rbConfigPath = File.expandPath(
       this.configPath.replace(/.json$/, ".ts"),
       this.root.toString(),
@@ -104,12 +104,13 @@ export class Config {
     if (await File.isExistAsync(rbConfigPath)) await rbFLoad(rbConfigPath);
   }
 
-  toEnv(envVars: Record<string, string> = TopLevel.ViteRuby!.env()): Record<string, string> {
+  toEnv(envVars: Record<string, string> = TopLevel.ViteAssets!.env()): Record<string, string> {
     const env: Record<string, string> = {};
     for (const option of Config.CONFIGURABLE_WITH_ENV) {
       const value = this._config[option];
       if (value != null) {
-        env[`${TopLevel.ViteRuby!.ENV_PREFIX}_${underscore(option).toUpperCase()}`] = String(value);
+        env[`${TopLevel.ViteAssets!.ENV_PREFIX}_${underscore(option).toUpperCase()}`] =
+          String(value);
       }
     }
     return { ...env, ...envVars };
@@ -218,8 +219,8 @@ export class Config {
 
   /** @internal */
   private static optionFromEnv(name: string): string | undefined {
-    return TopLevel.ViteRuby!.env()[
-      `${TopLevel.ViteRuby!.ENV_PREFIX}_${underscore(name).toUpperCase()}`
+    return TopLevel.ViteAssets!.env()[
+      `${TopLevel.ViteAssets!.ENV_PREFIX}_${underscore(name).toUpperCase()}`
     ];
   }
 

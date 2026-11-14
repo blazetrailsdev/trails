@@ -6,9 +6,9 @@ import * as m3 from "./missing-entrypoint-error.js";
 import * as m4 from "./missing-executable-error.js";
 
 defineConstants([
-  [() => m0.Config, "ViteRuby::Config"],
-  [() => m1.Error, "ViteRuby::Error"],
-  [() => m2.Manifest, "ViteRuby::Manifest"],
-  [() => m3.MissingEntrypointError, "ViteRuby::MissingEntrypointError"],
-  [() => m4.MissingExecutableError, "ViteRuby::MissingExecutableError"],
+  [() => m0.Config, "ViteAssets::Config"],
+  [() => m1.Error, "ViteAssets::Error"],
+  [() => m2.Manifest, "ViteAssets::Manifest"],
+  [() => m3.MissingEntrypointError, "ViteAssets::MissingEntrypointError"],
+  [() => m4.MissingExecutableError, "ViteAssets::MissingExecutableError"],
 ]);

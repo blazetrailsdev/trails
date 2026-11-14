@@ -1574,12 +1574,11 @@
     }
   },
   "tzinfo": {
-    "rows": 30,
-    "excluded": [],
+    "rows": 29,
+    "excluded": ["country.ts::Country"],
     "unwalked": [],
     "residue": {
       "country-timezone.ts::CountryTimezone": "TZInfo::CountryTimezone",
-      "country.ts::Country": "TZInfo::Country",
       "country.ts::InvalidCountryCode": "TZInfo::InvalidCountryCode",
       "data-source.ts::DataSource": "TZInfo::DataSource",
       "data-source.ts::DataSourceNotFound": "TZInfo::DataSourceNotFound",
@@ -1612,14 +1611,14 @@
   },
   "vite-assets": {
     "rows": 5,
-    "excluded": ["vite-ruby.ts::ViteRuby"],
+    "excluded": ["vite-assets.ts::ViteAssets"],
     "unwalked": [],
     "residue": {
-      "config.ts::Config": "ViteRuby::Config",
-      "error.ts::Error": "ViteRuby::Error",
-      "manifest.ts::Manifest": "ViteRuby::Manifest",
-      "missing-entrypoint-error.ts::MissingEntrypointError": "ViteRuby::MissingEntrypointError",
-      "missing-executable-error.ts::MissingExecutableError": "ViteRuby::MissingExecutableError"
+      "config.ts::Config": "ViteAssets::Config",
+      "error.ts::Error": "ViteAssets::Error",
+      "manifest.ts::Manifest": "ViteAssets::Manifest",
+      "missing-entrypoint-error.ts::MissingEntrypointError": "ViteAssets::MissingEntrypointError",
+      "missing-executable-error.ts::MissingExecutableError": "ViteAssets::MissingExecutableError"
     }
   },
   "zeitwerk": {

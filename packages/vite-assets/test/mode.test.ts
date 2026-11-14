@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { ViteRuby } from "../lib/vite-ruby.js";
+import { ViteAssets } from "../lib/vite-assets.js";
 import { railsEnvName, refreshConfig, withRailsEnv } from "./support/test-helper.js";
 
 describe("ModeTest", () => {
@@ -8,8 +8,8 @@ describe("ModeTest", () => {
   });
 
   it("mode", async () => {
-    expect((await ViteRuby.config()).mode).toBe(railsEnvName());
-    expect(await ViteRuby.mode()).toBe((await ViteRuby.config()).mode);
+    expect((await ViteAssets.config()).mode).toBe(railsEnvName());
+    expect(await ViteAssets.mode()).toBe((await ViteAssets.config()).mode);
   });
 
   it("mode with rails env", async () => {

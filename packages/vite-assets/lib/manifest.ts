@@ -1,7 +1,7 @@
 import { ArgumentError, File, fetch, Mutex } from "@blazetrails/ruby-compat";
 import type { Config } from "./config.js";
 import { MissingEntrypointError, type LastBuild } from "./missing-entrypoint-error.js";
-import type { ViteRuby } from "./vite-ruby.js";
+import type { ViteAssets } from "./vite-assets.js";
 
 export interface ManifestEntry {
   file: string;
@@ -24,14 +24,14 @@ const FS_PREFIX = "/@fs/";
 
 export class Manifest {
   /** @internal */
-  private readonly _viteRuby: ViteRuby;
+  private readonly _viteAssets: ViteAssets;
   /** @internal */
   private readonly _buildMutex: Mutex;
   /** @internal */
   private _manifest: Record<string, ManifestEntry> | undefined;
 
-  constructor(viteRuby: ViteRuby) {
-    this._viteRuby = viteRuby;
+  constructor(viteAssets: ViteAssets) {
+    this._viteAssets = viteAssets;
     this._buildMutex = new Mutex();
   }
 
@@ -141,17 +141,17 @@ window.__vite_plugin_react_preamble_installed__ = true
 
   /** @internal */
   private config(): Promise<Config> {
-    return this._viteRuby.config();
+    return this._viteAssets.config();
   }
 
   /** @internal */
   private builder(): ManifestBuilder {
-    return this._viteRuby.builder();
+    return this._viteAssets.builder();
   }
 
   /** @internal */
   private isDevServerRunning(): Promise<boolean> {
-    return this._viteRuby.isDevServerRunning();
+    return this._viteAssets.isDevServerRunning();
   }
 
   /** @internal */

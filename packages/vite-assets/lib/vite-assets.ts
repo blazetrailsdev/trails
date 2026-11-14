@@ -18,7 +18,7 @@ import { MissingExecutableError } from "./missing-executable-error.js";
 
 type ConfigAttrs = Partial<Record<keyof ConfigOptions, unknown>>;
 
-export class ViteRuby {
+export class ViteAssets {
   declare static Config: typeof Config;
   declare static Error: typeof Error;
   declare static Manifest: typeof Manifest;
@@ -37,9 +37,9 @@ export class ViteRuby {
   });
 
   /** @internal */
-  private static _instance: ViteRuby | undefined;
+  private static _instance: ViteAssets | undefined;
 
-  static instance(): ViteRuby {
+  static instance(): ViteAssets {
     return (this._instance ??= new this());
   }
 
@@ -67,7 +67,7 @@ export class ViteRuby {
     return this.instance().manifest().refresh();
   }
 
-  static reloadWith(configOptions: ConfigAttrs = {}): ViteRuby {
+  static reloadWith(configOptions: ConfigAttrs = {}): ViteAssets {
     return (this._instance = new this(configOptions));
   }
 
@@ -120,7 +120,7 @@ export class ViteRuby {
     return (this._env ??= Object.fromEntries(
       Object.entries(ENV).filter(
         (entry): entry is [string, string] =>
-          entry[1] !== undefined && entry[0].startsWith(ViteRuby.ENV_PREFIX),
+          entry[1] !== undefined && entry[0].startsWith(ViteAssets.ENV_PREFIX),
       ),
     ));
   }
@@ -138,13 +138,13 @@ export class ViteRuby {
   declare isRunProxy: () => Promise<boolean>;
 
   builder(): ManifestBuilder {
-    throw new NotImplementedError("ViteRuby::Builder is not ported yet");
+    throw new NotImplementedError("ViteAssets::Builder is not ported yet");
   }
 
   async config(): Promise<Config> {
     if (this._config === undefined) {
       await this.configure();
-      await this._config!.loadRubyConfig();
+      await this._config!.loadTsConfig();
     }
 
     return this._config!;
@@ -211,18 +211,18 @@ export class ViteRuby {
   }
 }
 
-ViteRuby.prototype.isRunProxy = ViteRuby.prototype.isDevMode;
+ViteAssets.prototype.isRunProxy = ViteAssets.prototype.isDevMode;
 
-ViteRuby.Config = Config;
-ViteRuby.Error = Error;
-ViteRuby.Manifest = Manifest;
-ViteRuby.MissingEntrypointError = MissingEntrypointError;
-ViteRuby.MissingExecutableError = MissingExecutableError;
+ViteAssets.Config = Config;
+ViteAssets.Error = Error;
+ViteAssets.Manifest = Manifest;
+ViteAssets.MissingEntrypointError = MissingEntrypointError;
+ViteAssets.MissingExecutableError = MissingExecutableError;
 
-TopLevel.ViteRuby = ViteRuby;
+TopLevel.ViteAssets = ViteAssets;
 
 declare module "@blazetrails/ruby-compat" {
   interface TopLevelConstants {
-    ViteRuby?: typeof ViteRuby;
+    ViteAssets?: typeof ViteAssets;
   }
 }

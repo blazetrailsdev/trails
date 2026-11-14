@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Config } from "../lib/config.js";
 import type { EntryType, ManifestEntry } from "../lib/manifest.js";
 import { MissingEntrypointError } from "../lib/missing-entrypoint-error.js";
-import { ViteRuby } from "../lib/vite-ruby.js";
+import { ViteAssets } from "../lib/vite-assets.js";
 import { refreshConfig, stubBuilder, withDevServerRunning } from "./support/test-helper.js";
 
 type Options = { type?: EntryType };
@@ -13,7 +13,7 @@ type Exposed = {
   resolveEntryName(name: string, options?: Options): Promise<string>;
   viteClientSrc(): Promise<string | null>;
 };
-const manifest = () => ViteRuby.instance().manifest() as unknown as Exposed;
+const manifest = () => ViteAssets.instance().manifest() as unknown as Exposed;
 const pathFor = (name: string, options?: Options) => manifest().pathFor(name, options);
 const lookup = (name: string, options?: Options) => manifest().lookup(name, options);
 const lookupBang = (name: string, options?: Options) => manifest().lookupBang(name, options);
@@ -25,7 +25,7 @@ async function assertRaisesManifestMissingEntryError(
   block: () => Promise<unknown>,
   { autoBuild = false } = {},
 ): Promise<MissingEntrypointError> {
-  const config: Config = await ViteRuby.config();
+  const config: Config = await ViteAssets.config();
   const spy = vi.spyOn(config, "autoBuild", "get").mockReturnValue(autoBuild);
   try {
     const error = await block().then(
@@ -84,7 +84,7 @@ describe("ManifestTest", () => {
     expect(await resolveEntryName("/app/assets/theme.css")).toBe("../assets/theme.css");
 
     await withDevServerRunning(async () => {
-      const root = (await ViteRuby.config()).root;
+      const root = (await ViteAssets.config()).root;
       expect(await resolveEntryName("logo.svg")).toBe("entrypoints/logo.svg");
       expect(await resolveEntryName("images/logo.svg")).toBe("images/logo.svg");
       expect(await resolveEntryName("~/images/logo.svg")).toBe("images/logo.svg");
@@ -208,7 +208,7 @@ describe("ManifestTest", () => {
   it("lookup success with dev server running!", async () => {
     await refreshConfig({ mode: "development" });
     await withDevServerRunning(async () => {
-      const root = (await ViteRuby.config()).root;
+      const root = (await ViteAssets.config()).root;
       const entry = { file: "/vite-dev/entrypoints/application.js" };
 
       expect(await lookupBang("application.js", { type: "javascript" })).toEqual(entry);
@@ -251,7 +251,7 @@ describe("ManifestTest", () => {
   it("lookup success with skip proxy and dev server running", async () => {
     await refreshConfig({ mode: "development", skipProxy: true });
     await withDevServerRunning(async () => {
-      const config = await ViteRuby.config();
+      const config = await ViteAssets.config();
       const origin = config.origin();
       const root = config.root;
 
@@ -285,7 +285,7 @@ describe("ManifestTest", () => {
 
     await withDevServerRunning(async () => {
       expect(await viteClientSrc()).toBe(
-        `${(await ViteRuby.config()).origin()}/vite-dev/@vite/client`,
+        `${(await ViteAssets.config()).origin()}/vite-dev/@vite/client`,
       );
     });
 
@@ -293,7 +293,7 @@ describe("ManifestTest", () => {
 
     await withDevServerRunning(async () => {
       expect(await viteClientSrc()).toBe(
-        `${(await ViteRuby.config()).origin()}/vite-dev/@vite/client`,
+        `${(await ViteAssets.config()).origin()}/vite-dev/@vite/client`,
       );
     });
   });
