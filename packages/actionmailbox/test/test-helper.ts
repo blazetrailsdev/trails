@@ -4,6 +4,7 @@ import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
 import { ActionController } from "@blazetrails/actionpack";
 import { File, constSet, env, setEnv } from "@blazetrails/ruby-compat";
 import "./support/database/setup.js";
+import "@blazetrails/trailties/test-help";
 
 setEnv("RAILS_INBOUND_EMAIL_PASSWORD", "tbsy84uSV1Kt3ZJZELY2TmShPRs91E3yL4tzf96297vBCkDWgL");
 

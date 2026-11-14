@@ -383,6 +383,10 @@ const alias = {
     "packages/trailties/lib/code-statistics.ts",
   ),
   "@blazetrails/trailties/all": path.resolve(__dirname, "packages/trailties/lib/all.ts"),
+  "@blazetrails/trailties/test-help": path.resolve(
+    __dirname,
+    "packages/trailties/lib/test-help.ts",
+  ),
   "@blazetrails/trailties/trailties/":
     path.resolve(__dirname, "packages/trailties/lib/trailties") + "/",
   "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/lib/engine.ts"),

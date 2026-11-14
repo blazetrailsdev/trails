@@ -31,7 +31,7 @@ import { methodCacheSerial, rbClearMethodCache } from "./method-cache.js";
  */
 export const superSlots = new WeakMap<
   (...args: never[]) => unknown,
-  { slot: symbol; key: string }
+  { slot: symbol; key: string; seats?: number }
 >();
 
 /**
@@ -55,7 +55,7 @@ export const _superSlot = Symbol("superSlot");
 export function superSlotFor(
   method: (...args: never[]) => unknown,
   key: string,
-): { slot: symbol; key: string } {
+): { slot: symbol; key: string; seats?: number } {
   let entry = superSlots.get(method);
   if (entry === undefined) {
     superSlots.set(method, (entry = { slot: Symbol(`super:${key}`), key }));
@@ -1013,6 +1013,7 @@ export function rbSeatSuper(
   const entry = superSlotFor(method as (...args: never[]) => unknown, key);
   if (Object.hasOwn(descriptors, entry.slot)) return;
   descriptors[entry.slot] = { value: shadowed, configurable: true };
+  entry.seats = (entry.seats ?? 0) + 1;
 }
 
 /**

@@ -1635,7 +1635,10 @@ export function rbModAppendFeatures(
         if (origin) {
           const entry = superSlotFor(modDesc.value, String(key));
           const below = Reflect.get(klass.prototype, origin.slot) as unknown;
-          if (below !== undefined) descriptors[entry.slot] = { value: below, configurable: true };
+          if (below !== undefined) {
+            descriptors[entry.slot] = { value: below, configurable: true };
+            entry.seats = (entry.seats ?? 0) + 1;
+          }
           descriptors[origin.slot] = { value: modDesc.value, configurable: true };
           installed.add(key);
           continue;
@@ -1691,6 +1694,17 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
   let entry;
   if (slot === undefined) slot = (entry = superSlots.get(method))?.slot;
   let next = slot === undefined ? undefined : (receiver as Record<symbol, unknown>)[slot];
+  for (let nextEntry; slot !== undefined && typeof next === "function"; ) {
+    nextEntry = superSlots.get(next as AnyFunction);
+    if (nextEntry === undefined || (nextEntry.seats ?? 0) < 2) break;
+    const holder = slotHolder(receiver, slot);
+    const own = slotHolder(receiver, nextEntry.slot);
+    if (!holder || !own || own === holder || !Object.prototype.isPrototypeOf.call(holder, own))
+      break;
+    slot = nextEntry.slot;
+    entry = nextEntry;
+    next = Reflect.get(holder, slot, receiver) as unknown;
+  }
   if (next === undefined) {
     const name = (entry ?? superSlots.get(method))?.key ?? method.name;
     if (Object.hasOwn(Kernel, name)) next = Reflect.get(Kernel, name);
@@ -1702,6 +1716,24 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
     );
   }
   return (next as (...a: unknown[]) => unknown).apply(receiver, args);
+}
+
+/**
+ * The link of `receiver`'s ancestry that owns `slot`. A function seated at two
+ * places in one ancestry (a module included into a class and then into its
+ * superclass below a prepend, both copies kept by `include_modules_at`,
+ * vendor/ruby/v3.3.11/class.c:1253) has one slot, so the lower copy's seat
+ * shadows the upper one's; {@link rbCallSuper} reads the upper copy's seat off
+ * the link it was found at.
+ */
+function slotHolder(receiver: object, slot: symbol): object | undefined {
+  for (
+    let link: object | null = receiver;
+    link;
+    link = Object.getPrototypeOf(link) as object | null
+  )
+    if (Object.hasOwn(link, slot)) return link;
+  return undefined;
 }
 
 export type Extended<M extends object> = CallableMethods<M>;

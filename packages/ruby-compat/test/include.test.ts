@@ -1012,6 +1012,26 @@ describe("publicInstanceMethods", () => {
 });
 
 describe("rbCallSuper", () => {
+  it("does not cycle when a module is included into a subclass and then into its parent below a prepend", () => {
+    class Parent {
+      setup(): string[] {
+        return ["parent"];
+      }
+    }
+    function prependedSetup(this: Parent): string[] {
+      return ["prepended", ...(rbCallSuper(this, prependedSetup) as string[])];
+    }
+    prepend(Parent, { setup: prependedSetup });
+    class Child extends Parent {}
+    function setup(this: Parent): string[] {
+      return ["mod", ...(rbCallSuper(this, setup) as string[])];
+    }
+    include(Child, { setup });
+    include(Parent, { setup });
+    expect(new Child().setup()).toEqual(["mod", "prepended", "parent"]);
+    expect(new Parent().setup()).toEqual(["prepended", "mod", "parent"]);
+  });
+
   it("reaches the superclass method a plain module's copy shadows", () => {
     class Parent {
       greet(): string {
