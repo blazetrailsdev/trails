@@ -1,4 +1,5 @@
 import { WriteTimeout } from "./net/protocol.js";
+import { strNew } from "./string/bytes.js";
 import { rbStrDump } from "./string/convert.js";
 
 export interface HttpRequest {
@@ -207,7 +208,7 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
               buf += "\r\n";
               out.write(`<- ${rbStrDump(buf)}\n`);
               if (body != null && body.length > 0) {
-                const text = typeof body === "string" ? body : new TextDecoder().decode(body);
+                const text = typeof body === "string" ? body : strNew(body);
                 out.write(`<- ${rbStrDump(text)}\n`);
               }
             }
@@ -236,7 +237,7 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
                     }
                     line("");
                     out.write(`reading ${total} bytes...\n`);
-                    out.write(`-> ${rbStrDump(new TextDecoder().decode(bytes))}\n`);
+                    out.write(`-> ${rbStrDump(strNew(bytes))}\n`);
                     out.write(`read ${total} bytes\n`);
                   }
                   resolveResponse({
@@ -249,7 +250,10 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
                 });
               },
             );
-            req.on("error", rejectResponse);
+            req.on("error", (error) => {
+              if (timer !== null) clearTimeout(timer);
+              rejectResponse(error);
+            });
             req.end(body);
             if (conn.writeTimeout != null) {
               const sec = conn.writeTimeout;
@@ -262,6 +266,7 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
                 }, sec * 1000);
               };
               socket.on("drain", wait);
+              req.once("error", () => socket.removeListener("drain", wait));
               req.once("finish", () => {
                 socket.removeListener("drain", wait);
                 if (timer !== null) clearTimeout(timer);
