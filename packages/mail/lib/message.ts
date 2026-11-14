@@ -901,7 +901,7 @@ export class Message {
     return this.body().push(part);
   }
 
-  part(params: Record<string, unknown> = {}, block?: (part: Part) => unknown): unknown {
+  part(params: string | Record<string, unknown> = {}, block?: (part: Part) => unknown): unknown {
     const newPart = new Mail.Part(params);
     if (block !== undefined) block(newPart);
     return this.addPart(newPart);

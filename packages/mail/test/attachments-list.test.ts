@@ -51,7 +51,7 @@ describe("Attachments", () => {
     });
 
     it("should assign mime-encoded multibyte filename", async () => {
-      await mail.attachments().set("てすと.txt", await readRawFixture("attachments", "tesuto.txt"));
+      await mail.attachments().set("てすと.txt", await readRawFixture("attachments", "てすと.txt"));
       expect(Utilities.isBlank(mail.attachments())).not.toEqual(true);
       expect(
         Encodings.decodeEncode(mail.attachments().get(0)!.filename() as string, "decode"),
