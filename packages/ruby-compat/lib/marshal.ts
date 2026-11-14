@@ -1024,6 +1024,15 @@ function rIvarEncoding(
       return forceEncoding(str, idx);
     } else if (typeof obj === "string") {
       return forceEncoding(obj, idx);
+    } else if (obj instanceof String) {
+      const str = new String(forceEncoding(obj.valueOf(), idx));
+      for (const key of Object.keys(obj)) {
+        if (!/^\d+$/.test(key))
+          (str as unknown as Record<string, unknown>)[key] = (
+            obj as unknown as Record<string, unknown>
+          )[key];
+      }
+      return str as unknown as string;
     } else {
       throw new ArgumentError(`${rbObjAsString(obj)} is not enc_capable`);
     }
