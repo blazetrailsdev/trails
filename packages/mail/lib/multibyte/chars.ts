@@ -301,8 +301,7 @@ export class Chars {
 
 methodMissingPrototype(Chars, {
   delegate: (receiver) => receiver.wrappedString,
-  wrap: (receiver, result) =>
-    typeof result === "string" ? new (receiver.constructor as typeof Chars)(result) : result,
+  wrap: (receiver, result) => (typeof result === "string" ? receiver["chars"](result) : result),
 });
 
 const W = "[\\p{L}\\p{M}\\p{N}\\p{Pc}]";
