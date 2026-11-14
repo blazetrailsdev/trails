@@ -1,6 +1,12 @@
 import "./constants.generated.js";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { InvalidCountryCode } from "./country.js";
+import { CountryTimezone } from "./country-timezone.js";
+import { CountryDefiner } from "./format2/country-definer.js";
+import { CountryIndexDefiner } from "./format2/country-index-definer.js";
+import { TimezoneDefiner } from "./format2/timezone-definer.js";
+import { TimezoneIndexDefiner } from "./format2/timezone-index-definer.js";
+import { StringDeduper, UnaryMinusGlobalStringDeduper } from "./string-deduper.js";
 import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
 import { CountryInfo } from "./data-sources/country-info.js";
 import { DataTimezoneInfo } from "./data-sources/data-timezone-info.js";
@@ -22,6 +28,7 @@ export {
   AmbiguousTime,
   ConstantOffsetDataTimezoneInfo,
   CountryInfo,
+  CountryTimezone,
   DataSource,
   DataSourceNotFound,
   DataTimezone,
@@ -60,6 +67,15 @@ export const TZInfo = {
   InvalidDataSource,
   DataSourceNotFound,
   DataSource,
+  CountryTimezone,
+  StringDeduper,
+  UnaryMinusGlobalStringDeduper,
+  Format2: {
+    CountryDefiner,
+    CountryIndexDefiner,
+    TimezoneDefiner,
+    TimezoneIndexDefiner,
+  },
   eagerLoadBang(): null {
     return DataSource.get().eagerLoadBang();
   },
