@@ -123,6 +123,7 @@ export const Utilities = {
     return str.replace(/\\([^\n])/g, "$1");
   },
 
+  /** @inventedArm if — CONVERGEABLE mail-utilities-slice-range-and-chars-forward-wrap */
   unparen(str: string): string {
     if (str.startsWith("(") && str.endsWith(")")) {
       return typeof str === "string"
@@ -133,6 +134,7 @@ export const Utilities = {
     }
   },
 
+  /** @inventedArm if — CONVERGEABLE mail-utilities-slice-range-and-chars-forward-wrap */
   unbracket(str: string): string {
     if (str.startsWith("<") && str.endsWith(">")) {
       return typeof str === "string"
