@@ -256,3 +256,13 @@ describe("URI.encode_www_form_component", () => {
     expect(URI.encodeWwwFormComponent("é€", Encoding.US_ASCII)).toBe("%26%23233%3B%26%238364%3B");
   });
 });
+
+describe("URI error class paths", () => {
+  it("answers each error's Ruby path", async () => {
+    const { rbObjClassname } = await import("../lib/object.js");
+    expect(rbObjClassname(new URIError("x"))).toBe("URI::Error");
+    expect(rbObjClassname(new InvalidURIError("x"))).toBe("URI::InvalidURIError");
+    expect(rbObjClassname(new InvalidComponentError("x"))).toBe("URI::InvalidComponentError");
+    expect(rbObjClassname(new BadURIError("x"))).toBe("URI::BadURIError");
+  });
+});

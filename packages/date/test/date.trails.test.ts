@@ -2047,3 +2047,10 @@ describe("Date::Infinity class path", () => {
     expect(rbObjClassname(new DateInfinity())).toBe("Date::Infinity");
   });
 });
+
+describe("Date::Error class path", () => {
+  it("answers Date::Error", async () => {
+    const { rbObjClassname } = await import("@blazetrails/ruby-compat");
+    expect(rbObjClassname(new RubyDate.Error("invalid date"))).toBe("Date::Error");
+  });
+});

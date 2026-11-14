@@ -441,3 +441,9 @@ export namespace Psych {
 }
 
 constSet(TopLevel, "Psych", Psych);
+constSet(Psych, "Exception", Psych.Exception);
+constSet(Psych, "BadAlias", Psych.BadAlias);
+constSet(Psych, "AliasesNotEnabled", Psych.AliasesNotEnabled);
+constSet(Psych, "AnchorNotDefined", Psych.AnchorNotDefined);
+constSet(Psych, "DisallowedClass", Psych.DisallowedClass);
+constSet(Psych, "SyntaxError", Psych.SyntaxError);

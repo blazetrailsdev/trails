@@ -88,9 +88,8 @@
     }
   },
   "actionpack": {
-    "rows": 333,
+    "rows": 334,
     "excluded": [
-      "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
       "action-dispatch/middleware/cookies.ts::CookieOverflow"
     ],
@@ -227,6 +226,7 @@
       "action-controller/test-case.ts::TestRequest": "ActionController::TestRequest",
       "action-controller/test-case.ts::TestRequest.ENCODER": "ActionController::TestRequest::ENCODER",
       "action-controller/test-case.ts::TestSession": "ActionController::TestSession",
+      "action-dispatch/action-dispatch.ts::MissingController": "ActionDispatch::MissingController",
       "action-dispatch/http/cache.ts::Request": "ActionDispatch::Http::Cache::Request",
       "action-dispatch/http/cache.ts::Response": "ActionDispatch::Http::Cache::Response",
       "action-dispatch/http/content-disposition.ts::ContentDisposition": "ActionDispatch::Http::ContentDisposition",

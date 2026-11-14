@@ -386,7 +386,10 @@ export class URI {
 
 constSet(TopLevel, "URI", URI);
 
+constSet(URI, "Error", Error);
 constSet(URI, "InvalidURIError", InvalidURIError);
+constSet(URI, "InvalidComponentError", InvalidComponentError);
+constSet(URI, "BadURIError", BadURIError);
 
 /**
  * Mirrors: Ruby's `Kernel#URI`, `vendor/ruby/v3.3.11/lib/uri/common.rb:844`.
