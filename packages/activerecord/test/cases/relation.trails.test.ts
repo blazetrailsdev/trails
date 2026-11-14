@@ -948,7 +948,7 @@ describe("Relation#clone own state", () => {
   fixtures([]);
 
   it("keeps own key order and descriptors of defined fields", () => {
-    const relation = CanonPost.all() as any;
+    const relation: Record<string, unknown> & { clone(): object } = CanonPost.all() as never;
     relation._plainField = 1;
     let reads = 0;
     Object.defineProperty(relation, "_accessorField", {
