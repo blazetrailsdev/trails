@@ -190,7 +190,10 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
             if (out != null) {
               let buf = `${method} ${path} HTTP/1.1\r\n`;
               for (const [k, vs] of Object.entries(headers)) {
-                const name = k.replace(/[^-]+/g, (w) => w[0].toUpperCase() + w.slice(1));
+                const name = k.replace(
+                  /[^-]+/g,
+                  (w) => w[0].toUpperCase() + w.slice(1).toLowerCase(),
+                );
                 for (const v of vs) buf += `${name}: ${v}\r\n`;
               }
               buf += "\r\n";
