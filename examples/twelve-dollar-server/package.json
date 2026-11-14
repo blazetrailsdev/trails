@@ -13,6 +13,7 @@
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rackup": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
     "better-sqlite3": "^13.0.3"

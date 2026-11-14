@@ -1687,18 +1687,20 @@ export class Relation<T extends Base, G extends boolean = false> {
     }
     const proto = Object.getPrototypeOf(this);
     const copy = Object.create(proto);
-    for (const key of Reflect.ownKeys(this) as string[]) {
-      const descriptor = Object.getOwnPropertyDescriptor(this, key)!;
-      if (
-        key.startsWith("_") &&
-        descriptor.writable &&
-        descriptor.enumerable &&
-        descriptor.configurable &&
-        _isPlaceholderField(proto, key)
-      ) {
-        copy[key] = descriptor.value;
+    const keys = Object.keys(this);
+    for (const key of keys) {
+      if (key.startsWith("_") && _isPlaceholderField(proto, key)) {
+        copy[key] = (this as any)[key];
       } else {
-        Object.defineProperty(copy, key, descriptor);
+        Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(this, key)!);
+      }
+    }
+    const names = Object.getOwnPropertyNames(this);
+    if (names.length !== keys.length) {
+      for (const key of names) {
+        if (!Object.hasOwn(copy, key)) {
+          Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(this, key)!);
+        }
       }
     }
     const initializeClone = "initializeClone" in copy ? copy.initializeClone : copy.initializeCopy;
