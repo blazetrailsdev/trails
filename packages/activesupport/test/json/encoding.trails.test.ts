@@ -35,3 +35,40 @@ describe("JSON Encoding default time precision (trails)", () => {
     }
   });
 });
+
+describe("JSONGemEncoder#jsonify copy-on-write (trails)", () => {
+  it("encodes nested plain objects and arrays of JSON-native leaves", () => {
+    const value = { a: 1, b: [1, "x", null, true], c: { d: { e: "f" } } };
+    expect(ActiveSupportJSON.encode(value)).toBe(
+      '{"a":1,"b":[1,"x",null,true],"c":{"d":{"e":"f"}}}',
+    );
+  });
+
+  it("encodes a Map nested inside a plain object", () => {
+    const value = {
+      a: 1,
+      m: new Map<unknown, unknown>([
+        [1, "one"],
+        ["k", [NaN]],
+      ]),
+    };
+    expect(ActiveSupportJSON.encode(value)).toBe('{"a":1,"m":{"1":"one","k":[null]}}');
+  });
+
+  it("encodes values with asJson after unchanged siblings", () => {
+    const record = new (class {
+      asJson() {
+        return { id: 7 };
+      }
+    })();
+    const value = { a: "x", b: [1, 2, record, 3], c: record };
+    expect(ActiveSupportJSON.encode(value)).toBe('{"a":"x","b":[1,2,{"id":7},3],"c":{"id":7}}');
+  });
+
+  it("does not mutate its input when a value changes", () => {
+    const value = { a: 1, b: NaN, c: [Infinity] };
+    expect(ActiveSupportJSON.encode(value)).toBe('{"a":1,"b":null,"c":[null]}');
+    expect(value.b).toBeNaN();
+    expect(value.c[0]).toBe(Infinity);
+  });
+});
