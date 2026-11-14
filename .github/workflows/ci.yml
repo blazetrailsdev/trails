@@ -712,6 +712,14 @@ jobs:
           pnpm install --frozen-lockfile --prefer-offline
           pnpm vitest run scripts/vendor-citations.test.ts
 
+      - name: Package layout (no src/)
+        id: layout-no-src
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile --prefer-offline
+          pnpm vitest run scripts/layout/no-src.test.ts
+
       - name: Package mirrors fields
         id: vendor-mirrors
         if: ${{ !cancelled() }}

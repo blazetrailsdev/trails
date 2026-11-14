@@ -1,15 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import {
-  SEND_PATTERN,
-  ROOT_DIR,
-  countLines,
-  exceedances,
-  followLibRoot,
-  measure,
-  total,
-} from "./send-count.js";
+import { SEND_PATTERN, ROOT_DIR, countLines, exceedances, measure, total } from "./send-count.js";
 
 const run = promisify(execFile);
 
@@ -97,14 +89,5 @@ describe("measure", () => {
   it("excludes test files", async () => {
     const counts = await measure();
     expect(Object.keys(counts).filter((f) => f.endsWith(".test.ts"))).toEqual([]);
-  });
-});
-
-describe("followLibRoot", () => {
-  it("re-keys a base count under src/ for a package now under lib/", () => {
-    expect(followLibRoot({ "ruby-compat/src/pp.ts": 1, "website/src/a.ts": 2 })).toEqual({
-      "ruby-compat/lib/pp.ts": 1,
-      "website/src/a.ts": 2,
-    });
   });
 });

@@ -30,7 +30,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { libRoot } from "../layout/package-roots.mjs";
 import ts from "typescript-5";
 import { lineLeadingTag } from "../../eslint/jsdoc-tag-line.mjs";
 import { SOURCES } from "../../vendor/sources.js";
@@ -484,7 +483,7 @@ export async function summarize(root = ROOT_DIR): Promise<Summary> {
     const tags = Object.fromEntries(
       TAGS.map((t) => [t, { PERMANENT: 0, CONVERGEABLE: 0, none: 0 }]),
     ) as PackageSummary["tags"];
-    for (const f of await listFiles(path.join(dir, libRoot(name)), isSource)) {
+    for (const f of await listFiles(path.join(dir, "lib"), isSource)) {
       const text = await fs.readFile(f, "utf-8");
       for (const site of tagSitesIn(name, rel(f), text, claudeSections)) {
         tags[site.tag][site.receipt ?? "none"]++;

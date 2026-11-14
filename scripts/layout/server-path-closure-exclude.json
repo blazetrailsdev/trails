@@ -1,5 +1,1 @@
-{
-  "activestorage-fixture-set-lazy-off-server-path": [
-    "packages/activesupport/dist/testing/file-fixtures.js"
-  ]
-}
+{}
