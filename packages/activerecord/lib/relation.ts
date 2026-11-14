@@ -1700,6 +1700,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       if (
         key.startsWith("_") &&
         _isPlaceholderField(proto, key) &&
+        Object.hasOwn(_placeholderFields, key) &&
         _propertyIsEnumerable.call(this, key) &&
         _lookupGetter.call(this, key) === undefined &&
         _lookupSetter.call(this, key) === undefined

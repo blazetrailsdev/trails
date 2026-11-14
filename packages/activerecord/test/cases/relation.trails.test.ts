@@ -957,6 +957,12 @@ describe("Relation#clone own state", () => {
       configurable: true,
     });
     Object.defineProperty(relation, "_hiddenField", { value: 2, writable: false });
+    Object.defineProperty(relation, "_frozenCloneField", {
+      value: 4,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
     relation._lastField = 3;
 
     const copy = relation.clone();
@@ -964,7 +970,13 @@ describe("Relation#clone own state", () => {
     const keys = Reflect.ownKeys(relation);
     expect(Reflect.ownKeys(copy).slice(0, keys.length)).toEqual(keys);
     expect(reads).toBe(0);
-    for (const key of ["_plainField", "_accessorField", "_hiddenField", "_lastField"]) {
+    for (const key of [
+      "_plainField",
+      "_accessorField",
+      "_hiddenField",
+      "_frozenCloneField",
+      "_lastField",
+    ]) {
       expect(Object.getOwnPropertyDescriptor(copy, key)).toEqual(
         Object.getOwnPropertyDescriptor(relation, key),
       );
