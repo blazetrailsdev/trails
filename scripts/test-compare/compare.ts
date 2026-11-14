@@ -85,7 +85,6 @@ import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/lib/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
-import { testRoots } from "../layout/package-roots.mjs";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -1740,7 +1739,7 @@ function formatGate(g?: TestGate): string {
 export const PKG_SRC_DIRS: Record<string, string> = {
   arel: "packages/arel/test/",
   activemodel: "packages/activemodel/test/",
-  activerecord: `packages/activerecord/${testRoots("activerecord")[0]}/`,
+  activerecord: "packages/activerecord/test/",
   activesupport: "packages/activesupport/test/",
   rack: "packages/rack/test/",
   "rack-proxy": "packages/rack-proxy/test/",
@@ -1770,7 +1769,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   actioncable: "packages/actioncable/test/",
   activejob: "packages/activejob/test/",
   actionmailer: "packages/actionmailer/test/",
-  actionmailbox: `packages/actionmailbox/${testRoots("actionmailbox")[0]}/`,
+  actionmailbox: "packages/actionmailbox/test/",
   actiontext: "packages/actiontext/test/",
   activestorage: "packages/activestorage/test/",
   trailties: "packages/trailties/test/",

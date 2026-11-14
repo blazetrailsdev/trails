@@ -478,7 +478,7 @@ const COVERAGE_INCLUDE = AR_COVERAGE
     ? ["packages/activerecord-cli/lib/**/*.ts", "packages/activerecord-cli/lib/**/*.mts"]
     : TRAILS_TSC_COVERAGE
       ? ["packages/trails-tsc/lib/**/*.ts", "packages/trails-tsc/lib/**/*.mts"]
-      : ["packages/*/{src,lib}/**/*.ts", "packages/*/{src,lib}/**/*.mts"];
+      : ["packages/*/lib/**/*.ts", "packages/*/lib/**/*.mts"];
 const COVERAGE_EXCLUDE = [
   "**/*.test.ts",
   "**/*.test.mts",
@@ -692,7 +692,6 @@ export default defineConfig({
           // cases and collects as "No test suite found in file".
           globals: true,
           include: [
-            "packages/*/src/**/*.test.ts",
             "packages/*/test/**/*.test.ts",
             "scripts/guides-typecheck/*.test.ts",
             "scripts/api-compare/*.test.ts",
@@ -745,7 +744,7 @@ export default defineConfig({
         test: {
           name: "system",
           globals: true,
-          include: ["packages/*/{src,test}/**/*.system.test.ts"],
+          include: ["packages/*/test/**/*.system.test.ts"],
           exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
           setupFiles: otherSetupFiles,
           pool: "forks",

@@ -17,7 +17,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { sourceRoots } from "../layout/package-roots.mjs";
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MARK_FILE = path.join(ROOT_DIR, "scripts/parity/module-count-mark.json");
@@ -66,7 +65,7 @@ export async function measure(root = ROOT_DIR): Promise<Marks> {
   for (const pkg of (await fs.readdir(packagesDir)).sort()) {
     if (pkg === "ruby-compat") continue;
     const counts: Counts = { newModule: 0, superMethod: 0, moduleImport: 0 };
-    for (const root of sourceRoots(pkg)) {
+    for (const root of ["lib", "test"]) {
       const src = path.join(packagesDir, pkg, root);
       if (!(await fs.stat(src).catch(() => null))?.isDirectory()) continue;
       for (const file of await listSources(src)) {

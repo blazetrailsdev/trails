@@ -43,7 +43,6 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import ts from "typescript-5";
-import { libRoot } from "../layout/package-roots.mjs";
 
 export const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 export const MARK_FILE = path.join(ROOT_DIR, "scripts/parity/import-cycles-mark.json");
@@ -152,10 +151,7 @@ export function makeResolver(
       matchExports(pkg.exports, subpath) ?? (subpath === "." ? (pkg.main ?? null) : null);
     if (!target) return null;
     const rest = target.replace(/^\.?\/?dist\//, "").replace(/\.d\.ts$|\.js$/, ".ts");
-    return firstExisting(
-      sourceCandidates(path.join(pkg.dir, libRoot(path.basename(pkg.dir)), rest)),
-      files,
-    );
+    return firstExisting(sourceCandidates(path.join(pkg.dir, "lib", rest)), files);
   };
 }
 
@@ -646,7 +642,7 @@ export async function measureEdges(root = ROOT_DIR): Promise<Edge[]> {
   const packages = await workspacePackages(root);
   const list: string[] = [];
   for (const pkg of packages.values()) {
-    const src = path.join(pkg.dir, libRoot(path.basename(pkg.dir)));
+    const src = path.join(pkg.dir, "lib");
     if ((await fs.stat(src).catch(() => null))?.isDirectory())
       list.push(...(await listSources(src)));
   }
