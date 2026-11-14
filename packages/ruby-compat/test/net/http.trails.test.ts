@@ -242,6 +242,7 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
     const req = new Net.HTTP.Get("/", { "X-Foo": " bar ", "X-Nil": null });
     expect(req.get("x-foo")).toBe("bar");
     expect(req.get("x-nil")).toBeNull();
+    expect(req.isKey("X-FOO")).toBe(true);
     expect(() => new Net.HTTP.Get("/", { "X-Bad": "a\nb" })).toThrow(
       'header X-Bad has field value "a\\nb", this cannot include CR/LF',
     );

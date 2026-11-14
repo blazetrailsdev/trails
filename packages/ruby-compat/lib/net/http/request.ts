@@ -4,6 +4,8 @@ import { HTTPS as URIHTTPS } from "../../uri/https.js";
 import { HTTP as URIHTTP } from "../../uri/http.js";
 import { rbObjDup } from "../../include.js";
 import { Base64 } from "../../base64.js";
+import { warn } from "../../kernel-warn.js";
+import { verbose } from "../../verbose.js";
 
 /**
  * `Net::HTTPRequest` (`vendor/ruby/v3.3.11/lib/net/http/request.rb:40`), with the
@@ -93,10 +95,17 @@ export class HTTPRequest {
   initializeHttpHeader(initheader: Record<string, string | null> | null): void {
     this._header = {};
     if (initheader == null) return;
+    const bytesize = (s: string) => new TextEncoder().encode(s).length;
     for (const [key, field] of Object.entries(initheader)) {
-      if (field == null) continue;
+      if (this.isKey(key) && verbose() != null && verbose() !== false) {
+        warn(`net/http: duplicated HTTP header: ${key}`, { uplevel: 3 });
+      }
+      if (field == null) {
+        if (verbose() != null && verbose() !== false)
+          warn(`net/http: nil HTTP header: ${key}`, { uplevel: 3 });
+        continue;
+      }
       const value = field.trim();
-      const bytesize = (s: string) => new TextEncoder().encode(s).length;
       if (bytesize(key) > HTTPRequest.MAX_KEY_LENGTH) {
         throw new ArgumentError(
           `too long (${bytesize(key)} bytes) header: ${JSON.stringify(key.slice(0, 30))}...`,
@@ -112,6 +121,11 @@ export class HTTPRequest {
       }
       this._header[key.toLowerCase()] = value;
     }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#key?` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:463-465`). */
+  isKey(key: string): boolean {
+    return Object.hasOwn(this._header, key.toLowerCase());
   }
 
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#content_length=` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:637-643`). */
