@@ -99,4 +99,25 @@ describe("kernelCatch", () => {
     expect(results[1].status).toBe("rejected");
     expect((results[1] as PromiseRejectedResult).reason).toBeInstanceOf(UncaughtThrowError);
   });
+
+  it("catches a throw from an awaited callback a sync block returns", async () => {
+    const callback = async () => {
+      await Promise.resolve();
+      kernelThrow(":abort", ":halted");
+    };
+    const res = kernelCatch(":abort", () => {
+      const cbResult = callback();
+      return Promise.resolve(cbResult).then(() => ":ran");
+    });
+    expect(await res).toBe(":halted");
+    expect(() => kernelThrow(":abort")).toThrow(UncaughtThrowError);
+  });
+
+  it("catches a throw from a nested sync catch inside an async block", async () => {
+    const res = kernelCatch(":outer", async () => {
+      await Promise.resolve();
+      return kernelCatch(":inner", () => kernelThrow(":outer", ":unwound"));
+    });
+    expect(await res).toBe(":unwound");
+  });
 });

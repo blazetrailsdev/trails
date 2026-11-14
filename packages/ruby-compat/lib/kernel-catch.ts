@@ -58,13 +58,15 @@ export interface UncaughtThrowError {
 
 interface RbVmTag {
   tag: unknown;
-  retval: unknown;
   prev: RbVmTag | undefined;
   popped: boolean;
 }
 
 class VmThrowData {
-  constructor(readonly tag: unknown) {}
+  constructor(
+    readonly tag: unknown,
+    readonly retval: unknown,
+  ) {}
 }
 
 /**
@@ -90,6 +92,12 @@ function ecTagSlot(): AsyncContext<RbVmTag> {
   return _ecTag;
 }
 
+/** @perf 4.6% — CONVERGEABLE kernel-catch-without-als-run-per-callback */
+let _syncTag: RbVmTag | undefined;
+/** @perf 4.6% — CONVERGEABLE kernel-catch-without-als-run-per-callback */
+const _unboundTags = new Map<unknown, number>();
+const AsyncFunction = (async () => {}).constructor;
+
 /**
  * `Kernel#throw` (`vendor/ruby/v3.3.11/vm_eval.c:2244-2251` `rb_f_throw`):
  * `rb_scan_args(argc, argv, "11", &tag, &value)`, then `rb_throw_obj`.
@@ -105,20 +113,17 @@ export function kernelThrow(tag: unknown, value: unknown = null): never {
 }
 
 function rbThrowObj(tag: unknown, value: unknown): never {
-  let tt = ecTagSlot().getStore();
+  let tt = _syncTag ?? ecTagSlot().getStore();
 
   while (tt) {
-    if (!tt.popped && tt.tag === tag) {
-      tt.retval = value;
-      break;
-    }
+    if (!tt.popped && tt.tag === tag) break;
     tt = tt.prev;
   }
-  if (!tt) {
+  if (!tt && !_unboundTags.has(tag)) {
     throw new UncaughtThrowError(tag, value, "uncaught throw %p");
   }
 
-  throw new VmThrowData(tag);
+  throw new VmThrowData(tag, value);
 }
 
 /**
@@ -156,27 +161,40 @@ export function kernelCatch(...argv: unknown[]): unknown {
 
 function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
   const context = ecTagSlot();
-  const tt: RbVmTag = { tag, retval: null, prev: context.getStore(), popped: false };
+  const outer = _syncTag;
+  const tt: RbVmTag = { tag, prev: outer ?? context.getStore(), popped: false };
   const rescue = (errinfo: unknown): unknown => {
-    if (errinfo instanceof VmThrowData && errinfo.tag === tag) return tt.retval;
+    if (errinfo instanceof VmThrowData && errinfo.tag === tag) return errinfo.retval;
     throw errinfo;
   };
-  return context.run(tt, () => {
-    let val: unknown;
-    try {
+  const bound = func instanceof AsyncFunction;
+  let val: unknown;
+  try {
+    if (bound) {
+      _syncTag = undefined;
+      val = context.run(tt, () => func(tag));
+    } else {
+      _syncTag = tt;
       val = func(tag);
-    } catch (errinfo) {
-      tt.popped = true;
-      return rescue(errinfo);
     }
-    if (val !== null && typeof (val as PromiseLike<unknown>)?.then === "function") {
-      return Promise.resolve(val as PromiseLike<unknown>)
-        .finally(() => {
-          tt.popped = true;
-        })
-        .then(undefined, rescue);
-    }
+  } catch (errinfo) {
     tt.popped = true;
-    return val;
-  });
+    return rescue(errinfo);
+  } finally {
+    _syncTag = outer;
+  }
+  if (val !== null && typeof (val as PromiseLike<unknown>)?.then === "function") {
+    if (!bound) _unboundTags.set(tag, (_unboundTags.get(tag) ?? 0) + 1);
+    return Promise.resolve(val as PromiseLike<unknown>)
+      .finally(() => {
+        tt.popped = true;
+        if (bound) return;
+        const count = _unboundTags.get(tag)! - 1;
+        if (count === 0) _unboundTags.delete(tag);
+        else _unboundTags.set(tag, count);
+      })
+      .then(undefined, rescue);
+  }
+  tt.popped = true;
+  return val;
 }
