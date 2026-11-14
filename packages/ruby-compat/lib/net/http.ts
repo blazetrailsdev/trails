@@ -3,7 +3,7 @@ import { StandardError } from "../standard-error.js";
 import { ArgumentError } from "../argument-error.js";
 import { EOFError } from "../eof-error.js";
 import { Errno } from "../errno.js";
-import { getHttpAsync, type HttpClientConnection } from "../http-adapter.js";
+import { getHttpAsync, type HttpClientConnection, type HttpDebugOutput } from "../http-adapter.js";
 import { IOError } from "../io-error.js";
 import { NotImplementedError } from "../not-implemented-error.js";
 import { OpenSSL } from "../openssl.js";
@@ -11,7 +11,7 @@ import { Resolv } from "../resolv.js";
 import { Socket } from "../socket.js";
 import { Timeout } from "../timeout.js";
 import type { HTTP as URIHTTP } from "../uri/http.js";
-import { Net, OpenTimeout, ReadTimeout } from "./protocol.js";
+import { Net, OpenTimeout, ReadTimeout, WriteTimeout } from "./protocol.js";
 import type { HTTPRequest } from "./http/request.js";
 import {
   Get,
@@ -125,7 +125,7 @@ export class HTTP {
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1516`. */
   maxVersion: string | number | null = null;
   private _writeTimeout: number | null = 60;
-  private _debugOutput: unknown = null;
+  private _debugOutput: HttpDebugOutput | null = null;
   private _readTimeout: number | null = 60;
   private _maxRetries = 1;
   private _currHttpVersion = HTTP.HTTPVersion;
@@ -165,11 +165,12 @@ export class HTTP {
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1367-1370`. */
   set writeTimeout(sec: number | null) {
+    if (this._socket) this._socket.writeTimeout = sec;
     this._writeTimeout = sec;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE net-http-debug-output-writes */
-  setDebugOutput(output: unknown): void {
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1188-1191`. */
+  setDebugOutput(output: HttpDebugOutput | null): void {
     if (this.isStarted())
       warn("Net::HTTP#set_debug_output called after HTTP started", { uplevel: 1 });
     this._debugOutput = output;
@@ -239,6 +240,7 @@ export class HTTP {
       sslHostAddress = connAddr;
     }
 
+    this.debug(`opening connection to ${connAddr}:${connPort}...`);
     const adapter = await getHttpAsync();
     if (adapter.connect === undefined) {
       throw new NotImplementedError("the HTTP adapter has no client connect");
@@ -251,6 +253,8 @@ export class HTTP {
           useSsl: this.isUseSsl(),
           sslHostAddress,
           verifyPeer: this.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
+          writeTimeout: this._writeTimeout,
+          debugOutput: this._debugOutput,
         });
       } catch (e) {
         const error = _rsockSysFail(e, connAddr, connPort);
@@ -258,6 +262,14 @@ export class HTTP {
         throw error;
       }
     });
+    this.debug("opened");
+    if (this.isUseSsl()) {
+      this.debug(`starting SSL for ${connAddr}:${connPort}...`);
+      this.debug(
+        `SSL established, protocol: ${this._socket.sslVersion}, cipher: ${this._socket.cipher![0]}`,
+      );
+    }
+    this._lastCommunicated = null;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -367,7 +379,9 @@ export class HTTP {
           const sock = await Timeout.timeout(this._readTimeout, null, null, () =>
             this._socket!.request(req.method, req.path, req.toHash(), req.body),
           ).catch((e: unknown) => {
-            throw e instanceof Timeout.Error ? new ReadTimeout() : e;
+            throw e instanceof Timeout.Error && !(e instanceof WriteTimeout)
+              ? new ReadTimeout()
+              : e;
           });
           do {
             res = HTTPResponse.readNew(sock);
@@ -396,8 +410,10 @@ export class HTTP {
             if (count < this.maxRetries && HTTP.IDEMPOTENT_METHODS_.includes(req.method)) {
               count += 1;
               this._socket?.close();
+              this.debug(`Conn close because of error ${(exception as Error).message}, and retry`);
               continue;
             }
+            this.debug(`Conn close because of error ${(exception as Error).message}`);
             this._socket?.close();
           }
           throw exception;
@@ -407,6 +423,7 @@ export class HTTP {
       this.endTransport(req, res);
       return res;
     } catch (exception) {
+      this.debug(`Conn close because of error ${(exception as Error).message}`);
       this._socket?.close();
       throw exception;
     }
@@ -418,9 +435,11 @@ export class HTTP {
       await this.connect();
     } else if (this._lastCommunicated != null) {
       if (this._lastCommunicated + this.keepAliveTimeout < performance.now() / 1000) {
+        this.debug("Conn close because of keep_alive_timeout");
         this._socket!.close();
         await this.connect();
       } else if (this._socket!.isEof()) {
+        this.debug("Conn close because of EOF");
         this._socket!.close();
         await this.connect();
       }
@@ -439,12 +458,15 @@ export class HTTP {
     this._currHttpVersion = res.httpVersion;
     this._lastCommunicated = null;
     if (this._socket!.isClosed()) {
-      return;
+      this.debug("Conn socket closed");
     } else if (res.body == null && this.closeOnEmptyResponse) {
+      this.debug("Conn close");
       this._socket!.close();
     } else if (this.isKeepAlive(req, res)) {
+      this.debug("Conn keep-alive");
       this._lastCommunicated = performance.now() / 1000;
     } else {
+      this.debug("Conn close");
       this._socket!.close();
     }
   }
@@ -465,6 +487,13 @@ export class HTTP {
     if (addr.includes(":")) addr = `[${addr}]`;
     const defaultPort = this.isUseSsl() ? HTTP.httpsDefaultPort() : HTTP.httpDefaultPort();
     return defaultPort === this.port ? addr : `${addr}:${this.port}`;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:2472-2476`. */
+  debug(msg: string): void {
+    if (this._debugOutput == null) return;
+    this._debugOutput.write(msg);
+    this._debugOutput.write("\n");
   }
 }
 

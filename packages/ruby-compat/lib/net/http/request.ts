@@ -1,4 +1,5 @@
 import { strip } from "../../string/method-table.js";
+import { rbStrToI } from "../../string/convert.js";
 import { ArgumentError } from "../../argument-error.js";
 import { Generic } from "../../uri/generic.js";
 import { HTTPS as URIHTTPS } from "../../uri/https.js";
@@ -144,7 +145,7 @@ export class HTTPRequest {
       return;
     }
     this._header["content-length"] = (
-      typeof len === "number" ? BigInt(Math.trunc(len)) : BigInt(/^\s*[-+]?\d+/.exec(len)?.[0] ?? 0)
+      typeof len === "number" ? BigInt(Math.trunc(len)) : BigInt(rbStrToI(len))
     ).toString();
   }
 
