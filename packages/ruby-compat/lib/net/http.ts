@@ -272,6 +272,12 @@ export class HTTP {
     this._lastCommunicated = null;
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1708-1711`. */
+  finish(): void {
+    if (!this.isStarted()) throw new IOError("HTTP session not yet started");
+    this.doFinish();
+  }
+
   /** @noRailsEquivalent PERMANENT */
   doFinish(): void {
     this._started = false;
@@ -283,13 +289,13 @@ export class HTTP {
   async get(
     path: string | URIHTTP,
     initheader: Record<string, string> | null = null,
-    dest: unknown = null,
+    dest: { append(str: Uint8Array): unknown } | null = null,
     block: ((bodySegment: Uint8Array) => unknown) | null = null,
   ): Promise<HTTPResponse> {
     let res: HTTPResponse | null = null;
 
-    await this.request(new Get(path, initheader), null, (r) => {
-      r.readBody(dest, block);
+    await this.request(new Get(path, initheader), null, async (r) => {
+      await r.readBody(dest, block);
       res = r;
     });
     return res!;
@@ -308,7 +314,7 @@ export class HTTP {
     path: string | URIHTTP,
     data: string | Uint8Array,
     initheader: Record<string, string> | null = null,
-    dest: unknown = null,
+    dest: { append(str: Uint8Array): unknown } | null = null,
     block: ((bodySegment: Uint8Array) => unknown) | null = null,
   ): Promise<HTTPResponse> {
     return this.sendEntity(path, data, initheader, dest, Post, block);
@@ -353,13 +359,13 @@ export class HTTP {
     path: string | URIHTTP,
     data: string | Uint8Array,
     initheader: Record<string, string> | null,
-    dest: unknown,
+    dest: { append(str: Uint8Array): unknown } | null,
     type: typeof Post,
     block: ((bodySegment: Uint8Array) => unknown) | null = null,
   ): Promise<HTTPResponse> {
     let res: HTTPResponse | null = null;
-    await this.request(new type(path, initheader), data, (r) => {
-      r.readBody(dest, block);
+    await this.request(new type(path, initheader), data, async (r) => {
+      await r.readBody(dest, block);
       res = r;
     });
     return res!;

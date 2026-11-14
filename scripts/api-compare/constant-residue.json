@@ -1277,10 +1277,13 @@
     }
   },
   "rack-proxy": {
-    "rows": 1,
+    "rows": 4,
     "excluded": [],
-    "unwalked": [],
-    "residue": { "proxy.ts::Proxy": "Rack::Proxy" }
+    "unwalked": [
+      "http-streaming-response.ts::HttpStreamingResponse.ResponseTooLarge",
+      "http-streaming-response.ts::HttpStreamingResponse.StreamAborted"
+    ],
+    "residue": {}
   },
   "rack-session": {
     "rows": 17,

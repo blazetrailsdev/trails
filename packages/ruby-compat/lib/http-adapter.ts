@@ -1,6 +1,7 @@
 import { WriteTimeout } from "./net/protocol.js";
 import { strNew } from "./string/bytes.js";
 import { rbStrDump } from "./string/convert.js";
+import { EOFError } from "./eof-error.js";
 
 export interface HttpRequest {
   method?: string | undefined;
@@ -60,7 +61,7 @@ export interface HttpClientResponse {
   statusCode: number;
   statusMessage: string;
   headers: Record<string, string | string[] | undefined>;
-  body: Uint8Array;
+  body: AsyncIterable<Uint8Array>;
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -156,10 +157,35 @@ type NodeIncoming = {
   statusMessage?: string;
   headers: Record<string, string | string[] | undefined>;
   rawHeaders: string[];
-  on(event: "data", listener: (chunk: Uint8Array) => void): unknown;
-  on(event: "end", listener: () => void): unknown;
-  on(event: "error", listener: (error: Error) => void): unknown;
+  [Symbol.asyncIterator](): AsyncIterator<Uint8Array>;
 };
+
+/**
+ * A response body Node aborts before it is complete raises Ruby's `EOFError`,
+ * as `Net::BufferedIO#rbuf_fill` does (`vendor/ruby/v3.3.11/lib/net/protocol.rb:218-240`),
+ * and `BufferedIO#read`'s `LOG` lines go to the debug output (`:155-192`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+async function* _nodeBody(
+  res: NodeIncoming,
+  out: HttpDebugOutput | null,
+): AsyncGenerator<Uint8Array> {
+  const len = res.headers["content-length"];
+  out?.write(len != null ? `reading ${String(len)} bytes...\n` : "reading all...\n");
+  let readBytes = 0;
+  try {
+    for await (const chunk of res) {
+      readBytes += chunk.length;
+      out?.write(`-> ${rbStrDump(strNew(chunk))}\n`);
+      yield chunk;
+    }
+    out?.write(`read ${readBytes} bytes\n`);
+  } catch (e) {
+    if ((e as { code?: unknown }).code === "ECONNRESET") throw new EOFError("end of file reached");
+    throw e;
+  }
+}
 
 type NodeHttp = {
   createServer: (handler: (req: HttpRequest, res: HttpResponse) => void) => HttpServer;
@@ -217,36 +243,21 @@ function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, h
               { method, path, headers, createConnection: () => socket },
               (res) => {
                 if (timer !== null) clearTimeout(timer);
-                const chunks: Uint8Array[] = [];
-                res.on("data", (chunk) => chunks.push(chunk));
-                res.on("error", rejectResponse);
-                res.on("end", () => {
-                  const total = chunks.reduce((n, c) => n + c.length, 0);
-                  const bytes = new Uint8Array(total);
-                  let offset = 0;
-                  for (const c of chunks) {
-                    bytes.set(c, offset);
-                    offset += c.length;
+                const out = conn.debugOutput;
+                if (out != null) {
+                  const line = (l: string) => out.write(`-> ${rbStrDump(`${l}\r\n`)}\n`);
+                  line(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage ?? ""}`);
+                  for (let i = 0; i < res.rawHeaders.length; i += 2) {
+                    line(`${res.rawHeaders[i]}: ${res.rawHeaders[i + 1]}`);
                   }
-                  const out = conn.debugOutput;
-                  if (out != null) {
-                    const line = (l: string) => out.write(`-> ${rbStrDump(`${l}\r\n`)}\n`);
-                    line(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage ?? ""}`);
-                    for (let i = 0; i < res.rawHeaders.length; i += 2) {
-                      line(`${res.rawHeaders[i]}: ${res.rawHeaders[i + 1]}`);
-                    }
-                    line("");
-                    out.write(`reading ${total} bytes...\n`);
-                    out.write(`-> ${rbStrDump(strNew(bytes))}\n`);
-                    out.write(`read ${total} bytes\n`);
-                  }
-                  resolveResponse({
-                    httpVersion: res.httpVersion,
-                    statusCode: res.statusCode!,
-                    statusMessage: res.statusMessage ?? "",
-                    headers: res.headers,
-                    body: bytes,
-                  });
+                  line("");
+                }
+                resolveResponse({
+                  httpVersion: res.httpVersion,
+                  statusCode: res.statusCode!,
+                  statusMessage: res.statusMessage ?? "",
+                  headers: res.headers,
+                  body: _nodeBody(res, out),
                 });
               },
             );
