@@ -170,7 +170,7 @@ describe("ActionText::ContentTest", () => {
 
     expect(rendered).toContain(html);
     expect(rendered).toMatch(new RegExp(`^${regexpEscape('<div class="trix-content">')}`));
-    expect("ApplicationController" in TopLevel).toBe(false);
+    expect("ApplicationController" in TopLevel).toBeFalsy();
   });
 
   it("does basic sanitization", async () => {
