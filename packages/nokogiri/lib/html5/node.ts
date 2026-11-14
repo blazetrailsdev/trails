@@ -15,7 +15,6 @@ import {
   StringIO,
   include,
   rbObjRespondTo,
-  constSet,
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
 import type { DocumentFragment } from "./document-fragment.js";
@@ -627,7 +626,7 @@ const _cdataTreeAdapter: typeof defaultTreeAdapter = {
       ? (_cdataRawTextParent as unknown as Parse5Parent)
       : defaultTreeAdapter.getParentNode(node),
 };
-constSet(HTML5, "Node", Node);
+HTML5.Node = Node;
 
 /** @noRailsEquivalent PERMANENT */
 export function childNodes(parent: Parse5Parent, document: unknown = null): Node[] {

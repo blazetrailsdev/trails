@@ -1,5 +1,5 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { ArgumentError, Rational, constSet } from "@blazetrails/ruby-compat";
+import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
 import { Timestamp } from "./timestamp.js";
 
@@ -28,4 +28,4 @@ const Packer = (time: RubyTime): Uint8Array => {
 
 export const Time = { name: "MessagePack::Time", TIME_AT_3_AVAILABLE, Unpacker, Packer };
 
-constSet(MessagePack, "Time", Time);
+MessagePack.Time = Time;

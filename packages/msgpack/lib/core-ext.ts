@@ -10,7 +10,6 @@ import {
   rbCSymbol,
   rbCTrueClass,
   rbFSend,
-  constSet,
   rbModDefineMethod,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
@@ -98,4 +97,4 @@ rbModDefineMethod(
   },
 );
 
-constSet(MessagePack, "CoreExt", CoreExt);
+MessagePack.CoreExt = CoreExt;

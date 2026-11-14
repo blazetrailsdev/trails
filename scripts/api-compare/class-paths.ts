@@ -393,6 +393,11 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
       }
     }
 
+    for (const [extDir, key, fqn] of GEM_EXT_CLASSES) {
+      if (extDir !== dir) continue;
+      const [file, tsName] = splitKey(key);
+      paired.set(key, { file, tsName, fqn });
+    }
     const place = await placement(dir);
     const entries = byDir.get(dir) ?? [];
     const byFqn = new Map([...paired.values()].map((e) => [`${e.file}::${e.fqn}`, e]));
@@ -585,6 +590,69 @@ export const CORE_CLASSES: readonly [string, string | null, string, string][] = 
 export const PACKAGE_CORE_CLASSES: readonly [string, string, string][] = [
   ["date", "time.ts::Time", "time.c:5832"],
 ];
+
+/**
+ * Gem classes and modules defined in a C extension, which `rails-api.json`
+ * (read from the gem's `.rb` files) cannot name: each row is
+ * `[package dir, key, Ruby path, vendored site]`, the key the walk's
+ * `file::tsName` and the site relative to `vendor/`.
+ */
+export const GEM_EXT_CLASSES: readonly [string, string, string, string][] = [
+  [
+    "msgpack",
+    "extension-value.ts::ExtensionValue",
+    "MessagePack::ExtensionValue",
+    "msgpack/v1.8.0/ext/msgpack/extension_value_class.c:33",
+  ],
+  [
+    "msgpack",
+    "unpacker.ts::TypeError",
+    "MessagePack::TypeError",
+    "msgpack/v1.8.0/ext/msgpack/unpacker_class.c:404",
+  ],
+  [
+    "msgpack",
+    "unpacker.ts::UnpackError",
+    "MessagePack::UnpackError",
+    "msgpack/v1.8.0/ext/msgpack/unpacker_class.c:408",
+  ],
+  [
+    "msgpack",
+    "unpacker.ts::MalformedFormatError",
+    "MessagePack::MalformedFormatError",
+    "msgpack/v1.8.0/ext/msgpack/unpacker_class.c:410",
+  ],
+  [
+    "msgpack",
+    "unpacker.ts::StackError",
+    "MessagePack::StackError",
+    "msgpack/v1.8.0/ext/msgpack/unpacker_class.c:412",
+  ],
+  [
+    "msgpack",
+    "unpacker.ts::UnexpectedTypeError",
+    "MessagePack::UnexpectedTypeError",
+    "msgpack/v1.8.0/ext/msgpack/unpacker_class.c:414",
+  ],
+  [
+    "msgpack",
+    "unpacker.ts::UnknownExtTypeError",
+    "MessagePack::UnknownExtTypeError",
+    "msgpack/v1.8.0/ext/msgpack/unpacker_class.c:417",
+  ],
+];
+
+/** Reds a `GEM_EXT_CLASSES` row whose vendored site does not name its constant. */
+async function checkGemExtSites(): Promise<string[]> {
+  const bad: string[] = [];
+  for (const [, , fqn, site] of GEM_EXT_CLASSES) {
+    const [file, line] = site.split(":");
+    const source = await fs.readFile(path.join(ROOT_DIR, "vendor", file), "utf8").catch(() => null);
+    const short = fqn.split("::").at(-1)!;
+    if (!source?.split("\n")[Number(line) - 1]?.includes(`"${short}"`)) bad.push(`${fqn} ${site}`);
+  }
+  return bad;
+}
 
 /** Reds a `CORE_CLASSES` or `PACKAGE_CORE_CLASSES` row whose MRI site does not name its class. */
 async function checkCoreSites(): Promise<string[]> {
@@ -884,6 +952,10 @@ async function main(): Promise<void> {
     }
     for (const row of await checkCoreSites()) {
       console.error(`CORE_CLASSES row's MRI site does not define the class: ${row}`);
+      process.exitCode = 1;
+    }
+    for (const row of await checkGemExtSites()) {
+      console.error(`GEM_EXT_CLASSES row's vendored site does not define the constant: ${row}`);
       process.exitCode = 1;
     }
   }

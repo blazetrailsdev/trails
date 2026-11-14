@@ -12,7 +12,6 @@ import {
   stringValue,
   toS,
   rbFSend,
-  constSet,
   rbObjRespondTo,
   warn,
 } from "@blazetrails/ruby-compat";
@@ -462,4 +461,4 @@ export class XPathContext {
   }
 }
 
-constSet(XML, "XPathContext", XPathContext);
+XML.XPathContext = XPathContext;

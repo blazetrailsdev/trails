@@ -6,7 +6,7 @@ import {
   XmlTreeNode,
 } from "libxml2-wasm";
 import { xmlAddChild, xmlUnlinkNode } from "libxml2-wasm/lib/libxml2.mjs";
-import { ArgumentError, include, constSet, rbObjClassname } from "@blazetrails/ruby-compat";
+import { ArgumentError, include, rbObjClassname } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
@@ -160,4 +160,4 @@ export class XmlNode {
 }
 
 include(XmlNode, Searchable);
-constSet(XML, "Node", XmlNode);
+XML.Node = XmlNode;

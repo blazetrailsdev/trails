@@ -9,7 +9,6 @@ import {
   RangeError,
   StandardError,
   rbDbl2num,
-  constSet,
   rbObjMethod,
   rbObjClass,
   rbObjIsKindOf,
@@ -385,10 +384,10 @@ export class Unpacker {
   }
 }
 
-constSet(MessagePack, "TypeError", TypeError);
+MessagePack.TypeError = TypeError;
 MessagePack.Unpacker = Unpacker;
-constSet(MessagePack, "UnpackError", UnpackError);
-constSet(MessagePack, "MalformedFormatError", MalformedFormatError);
-constSet(MessagePack, "StackError", StackError);
-constSet(MessagePack, "UnexpectedTypeError", UnexpectedTypeError);
-constSet(MessagePack, "UnknownExtTypeError", UnknownExtTypeError);
+MessagePack.UnpackError = UnpackError;
+MessagePack.MalformedFormatError = MalformedFormatError;
+MessagePack.StackError = StackError;
+MessagePack.UnexpectedTypeError = UnexpectedTypeError;
+MessagePack.UnknownExtTypeError = UnknownExtTypeError;
