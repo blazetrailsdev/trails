@@ -161,4 +161,7 @@ async function runAsScript(): Promise<void> {
   process.exit(await main(i >= 0 ? args[i + 1] : "origin/main"));
 }
 
-void runAsScript();
+runAsScript().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

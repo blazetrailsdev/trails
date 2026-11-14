@@ -558,6 +558,8 @@ const SCOPED_ONLY_CALL = "bash scripts/ci/scoped-only.sh";
  */
 const SCOPED_COMPARISON_SKIPS: Record<string, string> = {
   "scripts/api-compare/lint-deps.ts": "no dependency rule names a scoped package",
+  "scripts/api-compare/lint-bump-ledger.ts":
+    "reads the ledger against the whole surface and the PR's git history",
   "scripts/api-compare/receipt-audit.ts": "runs for --package activerecord only",
   "scripts/build-rails-file-structure-manifest.ts": "method order: arel and activemodel only",
   "scripts/build-rails-test-names-manifest.ts": "test names: no scoped package path is enrolled",
