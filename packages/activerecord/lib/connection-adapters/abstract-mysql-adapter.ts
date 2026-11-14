@@ -305,7 +305,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   override isReturnValueAfterInsert(column: Column): boolean {
     return this.supportsInsertReturning()
       ? column.isAutoPopulated()
-      : column.isAutoIncrementedByDb();
+      : (column as MysqlColumn).isAutoIncrement();
   }
 
   override async getAdvisoryLock(
