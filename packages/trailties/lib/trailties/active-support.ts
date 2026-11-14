@@ -3,7 +3,7 @@ import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import {
   CurrentAttributes,
   deprecator,
-  ExecutorTestHelper,
+  Executor,
   findZoneBang,
   include,
   onLoad,
@@ -60,7 +60,7 @@ export class Trailtie extends BaseTrailtie {
 
         onLoad("active_support_test_case", function (this: typeof TestCase) {
           if (app.config.activeSupport.executorAroundTestCase) {
-            include(this, ExecutorTestHelper);
+            include(this, Executor.TestHelper);
           }
         });
       },

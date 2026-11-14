@@ -1,3 +1,4 @@
+import "../constants.test-helper.generated.js";
 import { rbCallSuper, TopLevel } from "@blazetrails/ruby-compat";
 import type { Minitest } from "../testing/assertions.js";
 import { Executor } from "../executor.js";

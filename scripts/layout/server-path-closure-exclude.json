@@ -1,6 +1,5 @@
 {
-  "server-path-activesupport-test-case-and-behaviors": [
-    "packages/activesupport/dist/executor/test-helper.js",
+  "activestorage-fixture-set-lazy-off-server-path": [
     "packages/activesupport/dist/testing/file-fixtures.js"
   ]
 }

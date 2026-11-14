@@ -40,6 +40,7 @@ import {
   unfreezeTime,
 } from "./testing/time-helpers.js";
 import { FileFixtures } from "./testing/file-fixtures.js";
+import "./executor/test-helper.js";
 import { include, type Extended } from "@blazetrails/ruby-compat/include";
 import { prepend } from "@blazetrails/ruby-compat";
 
