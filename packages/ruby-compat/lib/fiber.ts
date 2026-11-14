@@ -71,8 +71,7 @@ export class Fiber<R = unknown> {
     fiber.#status = "suspended";
     fiber.#transfer = null;
     return new Promise<void>((resolve, reject) => {
-      fiber.#continue = resolve;
-      fiber.#fail = reject;
+      fiber.#continue = { resolve, reject };
       transfer.resolve(value);
     });
   }
@@ -82,8 +81,7 @@ export class Fiber<R = unknown> {
   #status: "created" | "resumed" | "suspended" | "terminated" = "created";
   #running = false;
   #transfer: Transfer | null = null;
-  #continue: (() => void) | null = null;
-  #fail: ((error: unknown) => void) | null = null;
+  #continue: { resolve(): void; reject(error: unknown): void } | null = null;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Fiber.new` (`vendor/ruby/v3.3.11/cont.c:3539`).
@@ -121,8 +119,7 @@ export class Fiber<R = unknown> {
       this.#status = "resumed";
       const resume = this.#continue!;
       this.#continue = null;
-      this.#fail = null;
-      resume();
+      resume.resolve();
       return transfer.promise as R;
     }
 
@@ -162,7 +159,8 @@ export class Fiber<R = unknown> {
    * A suspended fiber is resumed with `exception` raised at its `Fiber.yield`;
    * every other state takes `#resume`'s checks.
    */
-  raise(exception: Error): R {
+  raise(exception: Error | (new (message?: string) => Error), message?: string): R {
+    if (typeof exception === "function") exception = new exception(message);
     if (this === Fiber.current()) throw exception;
     if (this.#status !== "suspended") {
       if (this.#status === "created" && this.#thread === Thread.current()) {
@@ -176,10 +174,9 @@ export class Fiber<R = unknown> {
     }
     const transfer = (this.#transfer = newTransfer());
     this.#status = "resumed";
-    const fail = this.#fail!;
+    const fail = this.#continue!;
     this.#continue = null;
-    this.#fail = null;
-    fail(exception);
+    fail.reject(exception);
     return transfer.promise as R;
   }
 

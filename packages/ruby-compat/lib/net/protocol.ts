@@ -57,13 +57,8 @@ export class ReadAdapter {
 
   /** @noRailsEquivalent PERMANENT */
   async append(str: Uint8Array): Promise<unknown> {
-    if (this._block) return this.callBlock(str, this._block);
+    if (this._block) return this._block(str);
     return null;
-  }
-
-  /** @internal */
-  private async callBlock(str: Uint8Array, block: (str: Uint8Array) => unknown): Promise<unknown> {
-    return block(str);
   }
 }
 

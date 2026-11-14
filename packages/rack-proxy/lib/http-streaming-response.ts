@@ -199,7 +199,8 @@ export class HttpStreamingResponse {
     if (this.fiber?.isAlive()) {
       try {
         await this.fiber.raise(
-          new StreamAborted("backend stream closed before the response was fully read"),
+          StreamAborted,
+          "backend stream closed before the response was fully read",
         );
       } catch (e) {
         void e;
