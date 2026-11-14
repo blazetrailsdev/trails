@@ -148,7 +148,7 @@ describe("import-cycles scanFile", () => {
 });
 
 describe("import-cycles makeResolver", () => {
-  it("resolves a workspace specifier through exports to the lib file", () => {
+  it("resolves a workspace specifier through exports to the src file", () => {
     const dir = path.resolve("/w/packages/x");
     const files = new Set([path.join(dir, "lib/index.ts"), path.join(dir, "lib/sub/y.ts")]);
     const r = makeResolver(
