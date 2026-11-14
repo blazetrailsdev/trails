@@ -211,13 +211,13 @@ export class HTTPResponse {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:642-644`. */
-  streamCheck(): void {
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:642-644`. */
+  private streamCheck(): void {
     if (this._socket == null) throw new IOError("attempt to read body out of block");
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:646-654`. */
-  procdest(dest: unknown, block: unknown): void {
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:646-654`. */
+  private procdest(dest: unknown, block: unknown): void {
     if (dest != null && block != null) {
       throw new ArgumentError("both arg and block given for HTTP method");
     }
