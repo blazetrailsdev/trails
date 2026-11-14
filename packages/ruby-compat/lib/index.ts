@@ -170,6 +170,8 @@ export {
   transformValuesBang,
   update,
   valuesAt,
+  rbToHashType,
+  hashClear,
 } from "./hash.js";
 export type { Block, ConflictBlock } from "./hash.js";
 export type { DefaultProc } from "./hash.js";

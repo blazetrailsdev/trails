@@ -1,5 +1,6 @@
 import { ActionController } from "../../namespaces.js";
 import { UAParser } from "ua-parser-js";
+import { isBot } from "ua-parser-js/bot-detection";
 import {
   Concern,
   Notifications,
@@ -122,9 +123,12 @@ export class BrowserBlocker {
     return this.minimumBrowserVersionForBrowser() !== undefined;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs bot? — PERMANENT
+   */
   isBot(): boolean {
-    return /bot|crawl|spider|slurp/i.test(this.request.userAgent ?? "");
+    return isBot(this.parsedUserAgent().getUA());
   }
 
   /** @internal */

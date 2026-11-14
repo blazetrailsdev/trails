@@ -75,7 +75,7 @@ export function escape(s: string | { toString(): string } | null | undefined): s
   return URI.encodeWwwFormComponent(s);
 }
 
-const URI_PARSER = RFC2396_PARSER;
+export const URI_PARSER = RFC2396_PARSER;
 
 export function escapePath(s: string): string {
   return URI_PARSER.escape(s);

@@ -1,6 +1,6 @@
 import { strNew } from "../string/bytes.js";
 import { ArgumentError } from "../argument-error.js";
-import { regexpEscape } from "../regexp.js";
+import { regexpEscape, rbRegSUnion, rbRegToS } from "../regexp.js";
 import { b } from "../string/b.js";
 import { TopLevel } from "../object.js";
 import type { Generic } from "./generic.js";
@@ -114,6 +114,19 @@ export class RFC2396Parser {
   /** `parse` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:205`). */
   parse(uri: string): Generic {
     return TopLevel.URI!.for(...this.split(uri), this);
+  }
+
+  /**
+   * `make_regexp` (`vendor/ruby/v3.3.11/lib/uri/rfc2396_parser.rb:262-268`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  makeRegexp(schemes: (string | RegExp)[] | null = null): RegExp {
+    if (schemes == null) {
+      return this.regexp.ABS_URI_REF;
+    } else {
+      return new RegExp(`(?=${rbRegToS(rbRegSUnion(...schemes))}:)${this.pattern.X_ABS_URI}`);
+    }
   }
 
   /**

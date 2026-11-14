@@ -11,7 +11,7 @@ import {
   stringInspect,
   RuntimeError,
   rbObjAsString,
-  isPlainHash,
+  rbToHashType,
   Hash,
   eachPair,
   rbObjIsKindOf,
@@ -21,6 +21,7 @@ import {
   rbProcCall,
 } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
+import { URI_PARSER } from "./utils.js";
 import {
   REQUEST_METHOD,
   SERVER_NAME,
@@ -240,10 +241,7 @@ export class Wrapper {
     return this.env![key];
   }
 
-  /**
-   * @inventedArm isPlainHash — CONVERGEABLE ruby-compat-respond-to-answers-hash-store-fetch-delete-clear
-   * @missingRailsArgs frozen? — PERMANENT
-   */
+  /** @missingRailsArgs frozen? — PERMANENT */
   checkEnvironment(env: Record<string, any>): void {
     if (env === null || typeof env !== "object" || Array.isArray(env)) {
       throw new LintError(`env ${rbInspect(env)} is not a Hash, but ${rbObjClassname(env)}`);
@@ -374,7 +372,7 @@ export class Wrapper {
     }
 
     const session = env[RACK_SESSION];
-    if (session != null && session !== false && !isPlainHash(session)) {
+    if (session != null && session !== false) {
       if (!(rbObjRespondTo(session, "store") && rbObjRespondTo(session, "set"))) {
         throw new LintError(`session ${rbInspect(session)} must respond to store and []=`);
       }
@@ -390,8 +388,8 @@ export class Wrapper {
       if (
         !(
           rbObjRespondTo(session, "toHash") &&
-          isPlainHash(session.toHash()) &&
-          !Object.isFrozen(session.toHash())
+          rbObjIsKindOf(rbToHashType(session), Hash) &&
+          !Object.isFrozen(rbToHashType(session))
         )
       ) {
         throw new LintError(
@@ -817,8 +815,9 @@ export class Lint {
   static readonly HTTP_HOST_PATTERN = new RegExp(`^${_HOST_PATTERN}(:\\d*)?$`);
 
   static readonly REQUEST_PATH_ORIGIN_FORM = /^\/[^#]*$/;
-  /** @missingRailsCall make_regexp — CONVERGEABLE uri-rfc2396-parser-make-regexp-unported */
-  static readonly REQUEST_PATH_ABSOLUTE_FORM = /^[a-zA-Z][-+.a-zA-Z\d]*:[^\s]*$/;
+  static readonly REQUEST_PATH_ABSOLUTE_FORM = new RegExp(
+    `^(?:${URI_PARSER.makeRegexp().source})$`,
+  );
   static readonly REQUEST_PATH_AUTHORITY_FORM = /^[^/:]+:\d+$/;
   static readonly REQUEST_PATH_ASTERISK_FORM = "*";
 

@@ -305,8 +305,10 @@ type ToHash = { toHash(): object };
  * conversion `rb_hash_update_call` (`vendor/ruby/v3.3.11/hash.c:3960`) applies to
  * each argument: a Hash is itself, anything else is asked for `to_hash`, and
  * one that does not answer it raises `TypeError` (`rb_convert_type_with_id`).
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function rbToHashType<T>(
+export function rbToHashType<T>(
   hash: Record<string, T> | Map<string, T> | ToHash,
 ): Record<string, T> | Map<string, T> {
   if (hash instanceof Map || isPlainHash(hash)) return hash as Record<string, T> | Map<string, T>;
@@ -452,6 +454,21 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
   } else {
     return null;
   }
+}
+
+/**
+ * Ruby `Hash#clear` (`rb_hash_clear`, `vendor/ruby/v3.3.11/hash.c:2868`), which
+ * raises `FrozenError` through `rb_hash_modify_check` on a frozen receiver.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function hashClear<H extends object>(hash: H): H {
+  if (Object.isFrozen(hash)) {
+    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
+  }
+  if (hash instanceof Map) hash.clear();
+  else for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
+  return hash;
 }
 
 /**
