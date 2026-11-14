@@ -238,6 +238,26 @@ export class CachedThreadPool extends ThreadPoolExecutor {
   }
 }
 
+/**
+ * concurrent-ruby's `Concurrent::FixedThreadPool`, a `ThreadPoolExecutor`
+ * whose minimum and maximum are both `num_threads`.
+ * Each worker is a `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897` `thread_s_new`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class FixedThreadPool extends ThreadPoolExecutor {
+  /** @noRailsEquivalent PERMANENT */
+  constructor(
+    numThreads: number,
+    opts: { maxQueue?: number; fallbackPolicy?: FallbackPolicy; idletime?: number } = {},
+  ) {
+    if (Math.trunc(numThreads) < 1) {
+      throw new ArgumentError("number of threads must be greater than zero");
+    }
+    super({ maxQueue: 0, idletime: 60, ...opts, minThreads: numThreads, maxThreads: numThreads });
+  }
+}
+
 let _globalIoExecutor: CachedThreadPool | undefined;
 
 /**
@@ -253,4 +273,5 @@ export function globalIoExecutor(): CachedThreadPool {
 
 Concurrent.globalIoExecutor = globalIoExecutor;
 constSet(Concurrent, "ThreadPoolExecutor", ThreadPoolExecutor);
+constSet(Concurrent, "FixedThreadPool", FixedThreadPool);
 constSet(Concurrent, "RejectedExecutionError", RejectedExecutionError);

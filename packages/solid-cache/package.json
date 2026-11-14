@@ -26,9 +26,11 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/arel": "workspace:*",
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   },

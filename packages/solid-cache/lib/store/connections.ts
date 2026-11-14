@@ -7,12 +7,12 @@ type Failsafe = { failsafe: string; failsafeReturning?: unknown };
 export const Connections = {
   withEachConnection(
     this: StoreHost,
-    { async: _async = false }: { async?: boolean } = {},
+    { async = false }: { async?: boolean } = {},
     block?: () => unknown,
   ): unknown {
     if (!block) return toEnum(this, "withEachConnection");
 
-    return this.connections().withEach(block);
+    return this.connections().withEach(() => this.execute(async, block));
   },
 
   connections(this: StoreHost): ReturnType<typeof SolidCacheConnections.fromConfig> {
@@ -28,20 +28,20 @@ export const Connections = {
   withConnectionFor<T>(
     this: StoreHost,
     key: unknown,
-    { async: _async = false }: { async?: boolean } = {},
+    { async = false }: { async?: boolean } = {},
     block: () => T,
-  ): T {
-    return this.connections().withConnectionFor(key, () => block());
+  ): unknown {
+    return this.connections().withConnectionFor(key, () => this.execute(async, block));
   },
 
   /** @internal */
   withConnection<T>(
     this: StoreHost,
     name: string,
-    { async: _async = false }: { async?: boolean } = {},
+    { async = false }: { async?: boolean } = {},
     block: () => T,
-  ): T {
-    return this.connections().with(name, () => block());
+  ): unknown {
+    return this.connections().with(name, () => this.execute(async, block));
   },
 
   /** @internal */

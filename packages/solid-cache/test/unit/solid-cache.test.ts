@@ -34,6 +34,16 @@ describe("SolidCacheTest", () => {
     expect(new TextEncoder().encode(key).length).toBe(100);
   });
 
+  it("loads defaults from config/solid_cache.yml", () => {
+    const cache = host.lookupStore();
+    expect(cache.maxAge).toBe(3600);
+  });
+
+  it("cache options override defaults", () => {
+    const cache = host.lookupStore({ maxAge: 7200 });
+    expect(cache.maxAge).toBe(7200);
+  });
+
   it("write with unless exist", async () => {
     const cache = host.lookupStore({ expiresIn: 60 });
     expect(await cache.write("foo", 1)).toBe(true);

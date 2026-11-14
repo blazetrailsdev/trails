@@ -1,4 +1,4 @@
-import { isPresent, deprecator } from "@blazetrails/activesupport";
+import { isPresent, deprecator, weeks } from "@blazetrails/activesupport";
 import {
   Store as CacheStore,
   type Entry as CacheEntry,
@@ -9,6 +9,7 @@ import {
   ArgumentError,
   constSet,
   fetch,
+  FixedThreadPool,
   include,
   rbModName,
   TopLevel,
@@ -19,7 +20,10 @@ import { SolidCache } from "./solid-cache.js";
 import { Api } from "./store/api.js";
 import { Connections } from "./store/connections.js";
 import { Entries } from "./store/entries.js";
+import { Execution } from "./store/execution.js";
+import { Expiry } from "./store/expiry.js";
 import { Failsafe, type ErrorHandler } from "./store/failsafe.js";
+import { Stats } from "./store/stats.js";
 
 type Overridden =
   | "increment"
@@ -64,7 +68,10 @@ export interface Store
     Omit<Included<typeof Api>, Overridden>,
     Included<typeof Connections>,
     Included<typeof Entries>,
-    Included<typeof Failsafe> {}
+    Included<typeof Execution>,
+    Included<typeof Expiry>,
+    Included<typeof Failsafe>,
+    Included<typeof Stats> {}
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export class Store extends CacheStore {
@@ -72,12 +79,18 @@ export class Store extends CacheStore {
     include(this, Api);
     include(this, Connections);
     include(this, Entries);
+    include(this, Execution);
+    include(this, Expiry);
     include(this, Failsafe);
+    include(this, Stats);
     constSet(SolidCache, "Store", this);
     constSet(this, "Api", Api);
     constSet(this, "Connections", Connections);
     constSet(this, "Entries", Entries);
+    constSet(this, "Execution", Execution);
+    constSet(this, "Expiry", Expiry);
     constSet(this, "Failsafe", Failsafe);
+    constSet(this, "Stats", Stats);
   }
 
   declare protected readEntry: (key: string, options: StoreOptions) => Promise<CacheEntry | null>;
@@ -94,13 +107,27 @@ export class Store extends CacheStore {
   /** @internal */
   readonly errorHandler: ErrorHandler | null;
   /** @internal */
+  readonly _background: FixedThreadPool;
+  /** @internal */
+  readonly activeRecordInstrumentation: boolean;
+  readonly expiryBatchSize: number;
+  readonly expiryMethod: string;
+  readonly expiryQueue: string;
+  readonly expiresPerWrite: number;
+  readonly maxAge: number | null;
+  readonly maxEntries: number | null;
+  readonly maxSize: number | null;
+  /** @internal */
   _connections?: ReturnType<typeof SolidCacheConnections.fromConfig>;
 
   /**
    * @inlinedFrom SolidCache::Store::Api#initialize solid_cache/v1.0.7/lib/solid_cache/store/api.rb:11-15
    * @inlinedFrom SolidCache::Store::Connections#initialize solid_cache/v1.0.7/lib/solid_cache/store/connections.rb:8-27
    * @inlinedFrom SolidCache::Store::Entries#initialize solid_cache/v1.0.7/lib/solid_cache/store/entries.rb:8-17
+   * @inlinedFrom SolidCache::Store::Execution#initialize solid_cache/v1.0.7/lib/solid_cache/store/execution.rb:6-10
+   * @inlinedFrom SolidCache::Store::Expiry#initialize solid_cache/v1.0.7/lib/solid_cache/store/expiry.rb:12-23
    * @inlinedFrom SolidCache::Store::Failsafe#initialize solid_cache/v1.0.7/lib/solid_cache/store/failsafe.rb:21-25
+   * @inlinedFrom SolidCache::Store::Stats#initialize solid_cache/v1.0.7/lib/solid_cache/store/stats.rb:6-8
    */
   constructor(options: StoreOptions = {}) {
     options = { ...SolidCache.configuration.storeOptions, ...options };
@@ -143,6 +170,33 @@ export class Store extends CacheStore {
     const clearWiths: (string | null)[] = ["truncate", "delete"];
     if (!clearWiths.includes(this.clearWith)) {
       throw new ArgumentError("`clear_with` must be either ``:truncate`` or ``:delete`");
+    }
+
+    this._background = new FixedThreadPool(1, { maxQueue: 100, fallbackPolicy: "discard" });
+    this.activeRecordInstrumentation = Object.hasOwn(options, "activeRecordInstrumentation")
+      ? (options.activeRecordInstrumentation as boolean)
+      : true;
+
+    this.expiryBatchSize = Object.hasOwn(options, "expiryBatchSize")
+      ? (options.expiryBatchSize as number)
+      : 100;
+    this.expiryMethod = String(
+      Object.hasOwn(options, "expiryMethod") ? options.expiryMethod : "thread",
+    );
+    this.expiryQueue = String(
+      Object.hasOwn(options, "expiryQueue") ? options.expiryQueue : "default",
+    );
+    this.expiresPerWrite = (1 / this.expiryBatchSize) * Expiry.EXPIRY_MULTIPLIER;
+    this.maxAge = Object.hasOwn(options, "maxAge")
+      ? (options.maxAge as number | null)
+      : weeks(2).toI();
+    this.maxEntries = Object.hasOwn(options, "maxEntries")
+      ? (options.maxEntries as number | null)
+      : null;
+    this.maxSize = Object.hasOwn(options, "maxSize") ? (options.maxSize as number | null) : null;
+
+    if (!["thread", "job"].includes(this.expiryMethod)) {
+      throw new ArgumentError("Expiry method must be one of `:thread` or `:job`");
     }
 
     this.errorHandler = Object.hasOwn(options, "errorHandler")
