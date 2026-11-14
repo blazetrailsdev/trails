@@ -5,43 +5,12 @@ import "../lib/index.js";
 import { Mail } from "../lib/mail.js";
 import type { Message } from "../lib/message.js";
 import { Part } from "../lib/part.js";
+import type { ContentTypeField } from "../lib/fields/content-type-field.js";
 
 const fixturePath = (...path: string[]) =>
   decodeURIComponent(new URL(`./fixtures/${path.join("/")}`, import.meta.url).pathname);
 const readFixture = (...path: string[]) => Mail.read(fixturePath(...path));
 const readRawFixture = async (...path: string[]) => await IO.binreadAsync(fixturePath(...path));
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const field = (mail: Message, name: string): any => mail.get(name);
-
-async function addFourFiles(mail: Message): Promise<void> {
-  await mail.addFile(fixturePath("attachments", "test.png"));
-  await mail.addFile(fixturePath("attachments", "test.jpg"));
-  await mail.addFile(fixturePath("attachments", "test.pdf"));
-  await mail.addFile(fixturePath("attachments", "test.zip"));
-}
-
-function mikelHeaders(this: Message) {
-  this.from("mikel@from.lindsaar.net");
-  this.subject("Hello there Mikel");
-  this.to("mikel@to.lindsaar.net");
-}
-
-function textAndHtmlParts(mail: Message) {
-  mail.setTextPart(
-    new Mail.Part(function (this: Part) {
-      this.body("This is Text");
-    }),
-  );
-  mail.setHtmlPart(
-    new Mail.Part(function (this: Part) {
-      this.contentType("text/html; charset=US-ASCII");
-      this.body("<b>This is HTML</b>");
-    }),
-  );
-}
-
-const multipartAlternative = (mail: Message) =>
-  new RegExp(`Content-Type: multipart/alternative;\\s+boundary="${mail.boundary()}"`);
 
 describe("MIME Emails", () => {
   describe("general helper methods", () => {
@@ -285,7 +254,17 @@ describe("MIME Emails", () => {
 
     it("should add the html part and text part", () => {
       const mail = Mail.new();
-      textAndHtmlParts(mail);
+      mail.setTextPart(
+        new Mail.Part(function (this: Part) {
+          this.body("This is Text");
+        }),
+      );
+      mail.setHtmlPart(
+        new Mail.Part(function (this: Part) {
+          this.contentType("text/html; charset=US-ASCII");
+          this.body("<b>This is HTML</b>");
+        }),
+      );
       expect(mail.parts.length).toEqual(2);
       expect(mail.parts[0].constructor).toBe(Part);
       expect(mail.parts.at(-1)!.constructor).toBe(Part);
@@ -317,38 +296,76 @@ describe("MIME Emails", () => {
 
     it("should set the content type to multipart/alternative if you assign html and text parts", () => {
       const mail = Mail.new();
-      textAndHtmlParts(mail);
-      expect(mail.toString()).toMatch(multipartAlternative(mail));
+      mail.setTextPart(
+        new Mail.Part(function (this: Part) {
+          this.body("This is Text");
+        }),
+      );
+      mail.setHtmlPart(
+        new Mail.Part(function (this: Part) {
+          this.contentType("text/html; charset=US-ASCII");
+          this.body("<b>This is HTML</b>");
+        }),
+      );
+      expect(mail.toString()).toMatch(
+        new RegExp(`Content-Type: multipart/alternative;\\s+boundary="${mail.boundary()}"`),
+      );
     });
 
     it("should set the content type to multipart/alternative if you declare html and text parts", () => {
       const mail = Mail.new();
       mail.textPart(() => {});
       mail.htmlPart(() => {});
-      expect(mail.toString()).toMatch(multipartAlternative(mail));
+      expect(mail.toString()).toMatch(
+        new RegExp(`Content-Type: multipart/alternative;\\s+boundary="${mail.boundary()}"`),
+      );
     });
 
     it("should not set the content type to multipart/alternative if you declare an html part but not a text part", () => {
       const mail = Mail.new();
       mail.htmlPart(() => {});
-      expect(mail.toString()).not.toMatch(multipartAlternative(mail));
+      expect(mail.toString()).not.toMatch(
+        new RegExp(`Content-Type: multipart/alternative;\\s+boundary="${mail.boundary()}"`),
+      );
     });
 
     it("should not set the content type to multipart/alternative if you declare a text part but not an html part", () => {
       const mail = Mail.new();
       mail.textPart(() => {});
-      expect(mail.toString()).not.toMatch(multipartAlternative(mail));
+      expect(mail.toString()).not.toMatch(
+        new RegExp(`Content-Type: multipart/alternative;\\s+boundary="${mail.boundary()}"`),
+      );
     });
 
     it("should add the end boundary tag", () => {
       const mail = Mail.new();
-      textAndHtmlParts(mail);
+      mail.setTextPart(
+        new Mail.Part(function (this: Part) {
+          this.body("This is Text");
+        }),
+      );
+      mail.setHtmlPart(
+        new Mail.Part(function (this: Part) {
+          this.contentType("text/html; charset=US-ASCII");
+          this.body("<b>This is HTML</b>");
+        }),
+      );
       expect(mail.toString()).toMatch(new RegExp(`${mail.boundary()}--`));
     });
 
     it("should not put message-ids into parts", () => {
       const mail = Mail.new("Subject: FooBar");
-      textAndHtmlParts(mail);
+      mail.setTextPart(
+        new Mail.Part(function (this: Part) {
+          this.body("This is Text");
+        }),
+      );
+      mail.setHtmlPart(
+        new Mail.Part(function (this: Part) {
+          this.contentType("text/html; charset=US-ASCII");
+          this.body("<b>This is HTML</b>");
+        }),
+      );
       mail.toString();
       expect(mail.parts[0].messageId()).toBeNull();
       expect(mail.parts.at(-1)!.messageId()).toBeNull();
@@ -508,7 +525,9 @@ describe("MIME Emails", () => {
     it("should give the part the right content type", async () => {
       const mail = Mail.new();
       await mail.addFile(fixturePath("attachments", "test.png"));
-      expect(field(mail.parts[0], "content_type").contentType()).toEqual("image/png");
+      expect((mail.parts[0].get("content_type") as ContentTypeField).contentType()).toEqual(
+        "image/png",
+      );
     });
 
     it("should return attachment objects", async () => {
@@ -518,15 +537,29 @@ describe("MIME Emails", () => {
     });
 
     it("should be return an aray of attachments", async () => {
-      const mail = Mail.new(mikelHeaders);
-      await addFourFiles(mail);
+      const mail = Mail.new(function (this: Message) {
+        this.from("mikel@from.lindsaar.net");
+        this.subject("Hello there Mikel");
+        this.to("mikel@to.lindsaar.net");
+      });
+      await mail.addFile(fixturePath("attachments", "test.png"));
+      await mail.addFile(fixturePath("attachments", "test.jpg"));
+      await mail.addFile(fixturePath("attachments", "test.pdf"));
+      await mail.addFile(fixturePath("attachments", "test.zip"));
       expect(mail.attachments().length).toEqual(4);
       for (const a of mail.attachments()) expect(a.constructor).toBe(Part);
     });
 
     it("should return the filename of each attachment", async () => {
-      const mail = Mail.new(mikelHeaders);
-      await addFourFiles(mail);
+      const mail = Mail.new(function (this: Message) {
+        this.from("mikel@from.lindsaar.net");
+        this.subject("Hello there Mikel");
+        this.to("mikel@to.lindsaar.net");
+      });
+      await mail.addFile(fixturePath("attachments", "test.png"));
+      await mail.addFile(fixturePath("attachments", "test.jpg"));
+      await mail.addFile(fixturePath("attachments", "test.pdf"));
+      await mail.addFile(fixturePath("attachments", "test.zip"));
       expect(mail.attachments()[0].filename()).toEqual("test.png");
       expect(mail.attachments()[1].filename()).toEqual("test.jpg");
       expect(mail.attachments()[2].filename()).toEqual("test.pdf");
@@ -534,8 +567,15 @@ describe("MIME Emails", () => {
     });
 
     it("should return the type/subtype of each attachment", async () => {
-      const mail = Mail.new(mikelHeaders);
-      await addFourFiles(mail);
+      const mail = Mail.new(function (this: Message) {
+        this.from("mikel@from.lindsaar.net");
+        this.subject("Hello there Mikel");
+        this.to("mikel@to.lindsaar.net");
+      });
+      await mail.addFile(fixturePath("attachments", "test.png"));
+      await mail.addFile(fixturePath("attachments", "test.jpg"));
+      await mail.addFile(fixturePath("attachments", "test.pdf"));
+      await mail.addFile(fixturePath("attachments", "test.zip"));
       expect(mail.attachments()[0].mimeType()).toEqual("image/png");
       expect(mail.attachments()[1].mimeType()).toEqual("image/jpeg");
       expect(mail.attachments()[2].mimeType()).toEqual("application/pdf");
@@ -543,8 +583,15 @@ describe("MIME Emails", () => {
     });
 
     it("should return the content of each attachment", async () => {
-      const mail = Mail.new(mikelHeaders);
-      await addFourFiles(mail);
+      const mail = Mail.new(function (this: Message) {
+        this.from("mikel@from.lindsaar.net");
+        this.subject("Hello there Mikel");
+        this.to("mikel@to.lindsaar.net");
+      });
+      await mail.addFile(fixturePath("attachments", "test.png"));
+      await mail.addFile(fixturePath("attachments", "test.jpg"));
+      await mail.addFile(fixturePath("attachments", "test.pdf"));
+      await mail.addFile(fixturePath("attachments", "test.zip"));
 
       let tripped = mail.attachments()[0].decoded();
       let original = await readRawFixture("attachments", "test.png");
@@ -562,7 +609,11 @@ describe("MIME Emails", () => {
 
     it("should allow you to send in file data instead of having to read it", async () => {
       const fileData = await readRawFixture("attachments", "test.png");
-      const mail = Mail.new(mikelHeaders);
+      const mail = Mail.new(function (this: Message) {
+        this.from("mikel@from.lindsaar.net");
+        this.subject("Hello there Mikel");
+        this.to("mikel@to.lindsaar.net");
+      });
       await mail.addFile({ filename: "test.png", content: fileData });
 
       const tripped = mail.attachments()[0].decoded();
@@ -578,7 +629,9 @@ describe("MIME Emails", () => {
 
     it("should be able to add a body before adding a file", async () => {
       const m = Mail.new(function (this: Message) {
-        mikelHeaders.call(this);
+        this.from("mikel@from.lindsaar.net");
+        this.subject("Hello there Mikel");
+        this.to("mikel@to.lindsaar.net");
         this.body("Attached");
       });
       await m.addFile(fixturePath("attachments", "test.png"));
@@ -589,21 +642,37 @@ describe("MIME Emails", () => {
     });
 
     it("should allow you to add a body as text part if you have added a file", async () => {
-      const m = Mail.new(mikelHeaders);
+      const m = Mail.new(function (this: Message) {
+        this.from("mikel@from.lindsaar.net");
+        this.subject("Hello there Mikel");
+        this.to("mikel@to.lindsaar.net");
+      });
       await m.addFile(fixturePath("attachments", "test.png"));
       m.body("Attached");
       expect(m.parts.length).toEqual(2);
-      expect(field(m.parts[0], "content_type").contentType()).toEqual("image/png");
-      expect(field(m.parts.at(-1)!, "content_type").contentType()).toEqual("text/plain");
+      expect((m.parts[0].get("content_type") as ContentTypeField).contentType()).toEqual(
+        "image/png",
+      );
+      expect((m.parts.at(-1)!.get("content_type") as ContentTypeField).contentType()).toEqual(
+        "text/plain",
+      );
     });
 
     it("should allow you to add a body as text part if you have added a file and not truncate after newlines - issue 208", async () => {
-      const m = Mail.new(mikelHeaders);
+      const m = Mail.new(function (this: Message) {
+        this.from("mikel@from.lindsaar.net");
+        this.subject("Hello there Mikel");
+        this.to("mikel@to.lindsaar.net");
+      });
       await m.addFile(fixturePath("attachments", "test.png"));
       m.body("First Line\n\nSecond Line\n\nThird Line\n\n");
       expect(m.parts.length).toEqual(2);
-      expect(field(m.parts[0], "content_type").contentType()).toEqual("image/png");
-      expect(field(m.parts.at(-1)!, "content_type").contentType()).toEqual("text/plain");
+      expect((m.parts[0].get("content_type") as ContentTypeField).contentType()).toEqual(
+        "image/png",
+      );
+      expect((m.parts.at(-1)!.get("content_type") as ContentTypeField).contentType()).toEqual(
+        "text/plain",
+      );
       expect(m.parts.at(-1)!.toString()).toMatch(
         /^First Line\r\n\r\nSecond Line\r\n\r\nThird Line/m,
       );
