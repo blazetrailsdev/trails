@@ -419,7 +419,6 @@ async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
  * @inventedArm rescue — PERMANENT
  * @inventedArm rewarmDataSourceCache — PERMANENT
  * @inventedArm if — PERMANENT
- * @missingRailsCall undefineAttributeMethods — CONVERGEABLE reset-column-information-undefines-attribute-methods
  */
 export async function resetColumnInformation(this: SchemaKlass): Promise<void> {
   let connection: { clearCacheBang?: () => unknown } | null | undefined;
