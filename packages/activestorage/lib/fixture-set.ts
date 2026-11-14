@@ -4,7 +4,6 @@ import { Base } from "@blazetrails/activerecord";
 import { include, type Included, type Pathname } from "@blazetrails/ruby-compat";
 import { ActiveStorage } from "./active-storage.js";
 import type { Blob } from "./blob.js";
-import "./constants.fixture-set.generated.js";
 
 type Attributes = { [k: string]: unknown };
 

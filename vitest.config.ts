@@ -110,10 +110,6 @@ const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
 const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);
 
 const alias = {
-  "@blazetrails/activestorage/testing/fixture-set": path.resolve(
-    __dirname,
-    "packages/activestorage/lib/fixture-set.ts",
-  ),
   "@blazetrails/activemodel/testing/lint": path.resolve(
     __dirname,
     "packages/activemodel/lib/lint.ts",
