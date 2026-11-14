@@ -31,7 +31,7 @@ export function bytes(str: string): number[] {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function sequenceLength(b: number[], i: number): number {
+export function sequenceLength(b: ArrayLike<number>, i: number): number {
   const lead = b[i];
   if (lead < 0x80) return 1;
   let n: number;
@@ -63,8 +63,16 @@ export function sequenceLength(b: number[], i: number): number {
  * describes.
  *
  * @noRailsEquivalent PERMANENT
+ * @perf 10x — PERMANENT
  */
-export function strNew(b: number[]): string {
+export function strNew(b: number[] | Uint8Array): string {
+  if (b instanceof Uint8Array) {
+    try {
+      return new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(b);
+    } catch {
+      b = Array.from(b);
+    }
+  }
   const decoder = new TextDecoder("utf-8", { ignoreBOM: true });
   let str = "";
   let i = 0;

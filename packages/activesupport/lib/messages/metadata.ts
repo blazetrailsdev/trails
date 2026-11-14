@@ -6,7 +6,6 @@ import { onLoad } from "../lazy-load-hooks.js";
 import { ActiveSupport } from "../namespaces.js";
 import { Temporal, Time } from "@blazetrails/date";
 import { Rational, fetch, hasKey, hashAref, rbStrStartWith } from "@blazetrails/ruby-compat";
-import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { SERIALIZERS, Thrown } from "./serializer-with-fallback.js";
 
@@ -112,7 +111,7 @@ export abstract class Metadata {
 
     if (isPresent(hashAref(hash, "exp"))) {
       if (
-        Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))
+        Time.now()
           .utc()
           .compare(this.parseExpiry(hashAref(hash, "exp") as string | Time))! >= 0
       ) {
@@ -143,9 +142,7 @@ export abstract class Metadata {
     if (isPresent(expiresAt)) {
       expiry = Time.at(new Rational(expiresAt!.epochNanoseconds, 1_000_000_000n)).utc();
     } else if (isPresent(expiresIn)) {
-      expiry = Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n))
-        .utc()
-        .advance({ seconds: expiresIn! });
+      expiry = Time.now().utc().advance({ seconds: expiresIn! });
     }
 
     if (!Metadata.TIMESTAMP_SERIALIZERS.includes(this.serializer)) {

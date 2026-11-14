@@ -95,14 +95,8 @@ export class Builder {
       this._map = null;
       this._use.push((app) => this.generateMap(app, mapping));
     }
-    this._use.push((app) =>
-      typeof middleware === "function" && middleware.prototype && middleware.prototype.call
-        ? new (middleware as MiddlewareFactory)(app, ...args, ...(block ? [block] : []))
-        : (middleware as (app: RackApp, ...args: any[]) => RackApp)(
-            app,
-            ...args,
-            ...(block ? [block] : []),
-          ),
+    this._use.push(
+      (app) => new (middleware as MiddlewareFactory)(app, ...args, ...(block ? [block] : [])),
     );
 
     return null;

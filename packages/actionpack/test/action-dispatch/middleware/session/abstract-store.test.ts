@@ -1,3 +1,4 @@
+import { Time } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 
@@ -140,8 +141,8 @@ describe("ActionDispatch::Session::AbstractStore", () => {
 
       await (store as any).commitSession(req, { setCookie: () => {} });
 
-      expect(cookie.expires).toBeInstanceOf(Date);
-      const deltaMs = (cookie.expires as Date).getTime() - Date.now();
+      expect(cookie.expires).toBeInstanceOf(Time);
+      const deltaMs = (cookie.expires as Time).toF() * 1000 - Date.now();
       expect(deltaMs).toBeGreaterThan(55_000);
       expect(deltaMs).toBeLessThanOrEqual(60_000);
     });

@@ -5,7 +5,8 @@ import { Encoding } from "../json/encoding.js";
 import { NullSerializer } from "../message-encryptor.js";
 import { Temporal, Time } from "@blazetrails/date";
 import { Hash, b } from "@blazetrails/ruby-compat";
-import { currentTimeInstant, setFrozenInstant } from "../time-travel.js";
+import * as TimeHelpers from "../testing/time-helpers.js";
+import { currentTimeInstant } from "../time-travel.js";
 import type { MessageSerializer } from "./codec.js";
 import { Metadata, type ExpectedMetadataOptions, type MetadataOptions } from "./metadata.js";
 import type { Format } from "./serializer-with-fallback.js";
@@ -23,16 +24,13 @@ export function usingMessageSerializerForMetadata(value: boolean, block: () => v
 export function freezeTime(
   block: (travel: (duration: Temporal.DurationLike) => void) => void,
 ): void {
-  let now = currentTimeInstant();
-  setFrozenInstant(now);
-  try {
-    block((duration) => {
-      now = now.add(duration);
-      setFrozenInstant(now);
-    });
-  } finally {
-    setFrozenInstant(null);
-  }
+  TimeHelpers.freezeTime({ withUsec: true }, () =>
+    block((duration) =>
+      TimeHelpers.travel(Temporal.Duration.from(duration).total({ unit: "seconds" }), {
+        withUsec: true,
+      }),
+    ),
+  );
 }
 
 expect.addEqualityTesters([

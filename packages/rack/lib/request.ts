@@ -512,8 +512,7 @@ export abstract class Helpers {
           const input: string | Uint8Array | null = this.getHeader(RACK_INPUT).read(
             this.queryParser().bytesizeLimit + 2,
           );
-          let formVars =
-            input == null ? "" : typeof input === "string" ? input : strNew(Array.from(input));
+          let formVars = input == null ? "" : typeof input === "string" ? input : strNew(input);
 
           if (formVars.endsWith("\0")) formVars = formVars.slice(0, -1);
 
