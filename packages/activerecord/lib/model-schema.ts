@@ -398,7 +398,6 @@ function clearAdapterDataSourceCache(host: SchemaKlass): void {
 
 let _inSetTableName = false;
 
-/** @inventedArm columns — PERMANENT */
 async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
   let cache: { columns?: (t: string) => Promise<unknown> } | null | undefined;
   try {
@@ -593,10 +592,7 @@ export function tableName(this: SchemaKlass): string | null {
   return this._tableName;
 }
 
-/**
- * @inventedArm Thread — PERMANENT
- * @inventedArm try — PERMANENT
- */
+/** @inventedArm try — PERMANENT */
 export function setTableName(this: SchemaKlass, value: string | null): void {
   value = value == null ? null : String(value);
 
