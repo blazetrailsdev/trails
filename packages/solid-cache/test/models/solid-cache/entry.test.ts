@@ -92,7 +92,7 @@ describe("EntryTest", () => {
     });
   });
 
-  async function verifyByteSizes(byteSize: () => Promise<unknown>): Promise<void> {
+  async function verifyByteSizes(byteSize: () => unknown): Promise<void> {
     if (SolidCache.configuration.isEncrypt()) {
       await Entry.write("hello", "test");
       expect(await byteSize()).toBe(319);
