@@ -4,13 +4,15 @@ import "../../../lib/index.js";
 import { fixtures } from "../../support/use-fixtures.js";
 import { Post } from "../../models/post.js";
 import { Comment } from "../../models/comment.js";
+import { Author } from "../../models/author.js";
 import { DeferredIdsIn } from "../../../lib/relation/predicate-builder/deferred-distinct-pk-in.js";
 
 constSet(TopLevel, "Post", Post);
 constSet(TopLevel, "Comment", Comment);
+constSet(TopLevel, "Author", Author);
 
 describe("update_all / delete_all over an eager-loaded limited subquery (trails)", () => {
-  fixtures(["posts", "comments"]);
+  fixtures(["posts", "comments", "authors"]);
 
   it("update_all compiles the deferred subquery to a literal id list", async () => {
     const limited = Post.eagerLoad("comments").order("posts.id").limit(2);
@@ -33,5 +35,14 @@ describe("update_all / delete_all over an eager-loaded limited subquery (trails)
     expect(await relation.deleteAll()).toBe(expected);
     expect(relation.whereClause.predicates.some((p) => p instanceof DeferredIdsIn)).toBe(false);
     expect(await Comment.where({ post_id: ids }).count()).toBe(0);
+  });
+
+  it("a limited eager load over a joined collection is a subquery value, not a NotImplementedError", async () => {
+    const limited = Post.eagerLoad("author").joins(":comments").order("posts.id").limit(2);
+    const relation = Post.where({ id: limited });
+    expect(relation.whereClause.predicates.some((p) => p instanceof DeferredIdsIn)).toBe(true);
+
+    const ids = await limited.ids();
+    expect(await relation.ids()).toEqual(ids);
   });
 });

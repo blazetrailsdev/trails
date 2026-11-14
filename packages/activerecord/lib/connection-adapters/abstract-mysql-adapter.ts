@@ -163,7 +163,7 @@ const MYSQL_ESCAPE_MAP: Record<string, string> = {
 export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   protected abstract isTextType(type: string): boolean;
 
-  protected abstract fullVersion(): Promise<string | null>;
+  protected abstract fullVersion(): string | null | undefined;
 
   protected abstract getFullVersion(): Promise<string | null>;
 
@@ -212,9 +212,8 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return new Version(versionString, fullVersionString);
   }
 
-  async isMariadb(): Promise<boolean> {
-    const fullVersion = await this.fullVersion();
-    return fullVersion != null && /mariadb/i.test(fullVersion);
+  isMariadb(): boolean {
+    return /mariadb/i.test(this.fullVersion() ?? "");
   }
 
   supportsBulkAlter(): boolean {
@@ -222,12 +221,14 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsIndexSortOrder(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.8.1") >= 0;
-    return (await this.databaseVersion).compare("8.0.1") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    if (this.isMariadb()) return databaseVersion.compare("10.8.1") >= 0;
+    return databaseVersion.compare("8.0.1") >= 0;
   }
 
   async supportsExpressionIndex(): Promise<boolean> {
-    return !(await this.isMariadb()) && (await this.databaseVersion).compare("8.0.13") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    return !this.isMariadb() && databaseVersion.compare("8.0.13") >= 0;
   }
 
   supportsTransactionIsolation(): boolean {
@@ -251,14 +252,14 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsCheckConstraints(): Promise<boolean> {
-    if (await this.isMariadb()) {
+    const databaseVersion = await this.databaseVersion;
+    if (this.isMariadb()) {
       return (
-        (await this.databaseVersion).compare("10.3.10") >= 0 ||
-        ((await this.databaseVersion).compare("10.3") < 0 &&
-          (await this.databaseVersion).compare("10.2.22") >= 0)
+        databaseVersion.compare("10.3.10") >= 0 ||
+        (databaseVersion.compare("10.3") < 0 && databaseVersion.compare("10.2.22") >= 0)
       );
     }
-    return (await this.databaseVersion).compare("8.0.16") >= 0;
+    return databaseVersion.compare("8.0.16") >= 0;
   }
 
   supportsViews(): boolean {
@@ -270,16 +271,19 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsVirtualColumns(): Promise<boolean> {
-    return (await this.isMariadb()) || (await this.databaseVersion).compare("5.7.5") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    return this.isMariadb() || databaseVersion.compare("5.7.5") >= 0;
   }
 
   async supportsOptimizerHints(): Promise<boolean> {
-    return !(await this.isMariadb()) && (await this.databaseVersion).compare("5.7.7") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    return !this.isMariadb() && databaseVersion.compare("5.7.7") >= 0;
   }
 
   async supportsCommonTableExpressions(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.2.1") >= 0;
-    return (await this.databaseVersion).compare("8.0.1") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    if (this.isMariadb()) return databaseVersion.compare("10.2.1") >= 0;
+    return databaseVersion.compare("8.0.1") >= 0;
   }
 
   supportsAdvisoryLocks(): boolean {
@@ -294,17 +298,11 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
-  /** @inventedArm test — CONVERGEABLE mysql-mariadb-predicate-reads-version-memo-synchronously */
   supportsInsertReturning(): boolean {
-    const databaseVersion = this.databaseVersion as Version;
-    return (
-      /mariadb/i.test(databaseVersion.fullVersionString ?? "") &&
-      databaseVersion.compare("10.5.0") >= 0
-    );
+    return this.isMariadb() && (this.databaseVersion as Version).compare("10.5.0") >= 0;
   }
 
-  async returnValueAfterInsert(column: Column): Promise<boolean> {
-    await this.databaseVersion;
+  override isReturnValueAfterInsert(column: Column): boolean {
     return this.supportsInsertReturning()
       ? column.isAutoPopulated()
       : column.isAutoIncrementedByDb();
@@ -737,7 +735,7 @@ WHERE fk.referenced_column_name IS NOT NULL
       WHERE tc.table_schema = ${scope.schema}
         AND tc.table_name = ${scope.name}
         AND cc.constraint_schema = ${scope.schema}`;
-    if (await this.isMariadb()) sql += ` AND cc.table_name = ${scope.name}`;
+    if (this.isMariadb()) sql += ` AND cc.table_name = ${scope.name}`;
 
     const chkInfo = await this.internalExecQuery(sql, "SCHEMA");
 
@@ -749,7 +747,7 @@ WHERE fk.referenced_column_name IS NOT NULL
           expression = expression.slice(1, -1);
         }
         expression = this.stripWhitespaceCharacters(expression);
-        if (!(await this.isMariadb())) {
+        if (!this.isMariadb()) {
           expression = expression.replace(/\\'/g, "'");
         }
         return new CheckConstraintDefinition(tableName, expression, options);
@@ -1173,21 +1171,24 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   /** @internal */
   async supportsInsertRawAliasSyntax(): Promise<boolean> {
-    return !(await this.isMariadb()) && (await this.databaseVersion).compare("8.0.19") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    return !this.isMariadb() && databaseVersion.compare("8.0.19") >= 0;
   }
 
   /** @internal */
   async supportsRenameIndex(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
-    return (await this.databaseVersion).compare("5.7.6") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    if (this.isMariadb()) return databaseVersion.compare("10.5.2") >= 0;
+    return databaseVersion.compare("5.7.6") >= 0;
   }
 
   protected _escapeState: EscapeState = { noBackslashEscapes: false };
 
   /** @internal */
   async supportsRenameColumn(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.2") >= 0;
-    return (await this.databaseVersion).compare("8.0.3") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    if (this.isMariadb()) return databaseVersion.compare("10.5.2") >= 0;
+    return databaseVersion.compare("8.0.3") >= 0;
   }
 
   /** @internal */
@@ -1388,7 +1389,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /** @internal */
-  override returningColumnValues(result: Result): Promise<unknown[] | null> {
+  override returningColumnValues(result: Result): unknown[] | null {
     return mysqlReturningColumnValues.call(this, result);
   }
 

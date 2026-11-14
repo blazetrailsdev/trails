@@ -674,7 +674,7 @@ export interface AbstractAdapter
   truncate(tableName: string, name?: string | null): Promise<unknown>;
   truncateTables(...tableNames: string[]): Promise<void>;
   /** @internal */
-  returningColumnValues?(result: Result): unknown[] | null | Promise<unknown[] | null>;
+  returningColumnValues?(result: Result): unknown[] | null;
   /** @internal */
   buildTruncateStatement(tableName: string): string;
   /** @internal */
@@ -1333,11 +1333,7 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  isReturnValueAfterInsert(_column?: unknown): boolean {
-    return false;
-  }
-
-  async returnValueAfterInsert(column: Column): Promise<boolean> {
+  isReturnValueAfterInsert(column: Column): boolean {
     return column.isAutoPopulated();
   }
 

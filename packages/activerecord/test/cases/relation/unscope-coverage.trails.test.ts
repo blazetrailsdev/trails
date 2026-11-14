@@ -33,11 +33,11 @@ describe("Relation#unscope — full Rails key coverage", () => {
     });
   });
 
-  it("unscope('createWith') clears createWithValue", () => {
+  it("unscope('createWith') raises: create_with is not a valid unscoping value", () => {
     const rel = (UscAuthor as any).all().createWith({ name: "default" });
-    expect(rel.createWithValue).toEqual({ name: "default" });
-    const cleared = rel.unscope(":createWith");
-    expect(cleared.createWithValue).toEqual({});
+    expect(() => rel.unscope(":createWith")).toThrow(
+      "Called unscope() with invalid unscoping argument ':createWith'.",
+    );
   });
 
   it("unscope('preload') clears preload only — leaves includes / eagerLoad alone", () => {

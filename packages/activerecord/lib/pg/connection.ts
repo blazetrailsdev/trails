@@ -1,15 +1,6 @@
 import pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
-import {
-  ConnectionBad,
-  Error as PGError,
-  PG_DIAG_MESSAGE_PRIMARY,
-  PG_DIAG_SEVERITY,
-  PG_DIAG_SOURCE_FUNCTION,
-  PG_DIAG_SQLSTATE,
-  ServerError,
-  UnableToSend,
-} from "./exceptions.js";
+import { ConnectionBad, Error as PGError, ServerError, UnableToSend } from "./exceptions.js";
 import { PG } from "./pg.js";
 
 export type PGConnection = Connection;
@@ -94,20 +85,10 @@ export class Connection {
     await this.query(`SET client_encoding TO '${this.escapeString(encoding)}'`);
   }
 
-  setNoticeReceiver(
-    block: (result: { errorField(fieldcode: number): string | null }) => void,
-  ): void {
+  setNoticeReceiver(block: (result: PG.Result) => void): void {
     this.client.removeAllListeners("notice");
-    this.client.on("notice", (notice: { message?: string; code?: string; severity?: string }) => {
-      const errorField = (fieldcode: number): string | null =>
-        fieldcode === PG_DIAG_MESSAGE_PRIMARY
-          ? (notice.message ?? null)
-          : fieldcode === PG_DIAG_SQLSTATE
-            ? (notice.code ?? null)
-            : fieldcode === PG_DIAG_SEVERITY
-              ? (notice.severity ?? null)
-              : null;
-      block({ errorField });
+    this.client.on("notice", (notice) => {
+      block(new PG.Result({ command: "", rowCount: null, oid: 0, fields: [], rows: [] }, notice));
     });
   }
 
@@ -406,16 +387,9 @@ function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unkn
   if (klass != null) {
     wrapped = new klass(`${error.message}\n`, { connection: conn });
   } else if (error instanceof pg.DatabaseError) {
-    const { code, routine } = error;
-    const errorField = (fieldcode: number): string | null =>
-      fieldcode === PG_DIAG_SQLSTATE
-        ? (code ?? null)
-        : fieldcode === PG_DIAG_SOURCE_FUNCTION
-          ? (routine ?? null)
-          : null;
     wrapped = new ServerError(error.message, {
       connection: conn,
-      result: { errorField, resultErrorField: errorField },
+      result: new PG.Result({ command: "", rowCount: null, oid: 0, fields: [], rows: [] }, error),
     });
   } else if (conn.bad) {
     wrapped = new ConnectionBad("no connection to the server\n", { connection: conn });

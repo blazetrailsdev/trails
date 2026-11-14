@@ -263,16 +263,21 @@ export function realInheritanceColumn(this: SchemaKlass, value: string | null): 
 
 export const _inheritanceColumn = realInheritanceColumn;
 
+/** @inventedArm databaseVersion — PERMANENT */
 export async function _returningColumnsForInsert(
   this: SchemaKlass,
-  connection: { returnValueAfterInsert(column: { name: string }): Promise<boolean> },
+  connection: {
+    readonly databaseVersion: unknown;
+    isReturnValueAfterInsert(column: { name: string }): boolean;
+  },
 ): Promise<string[]> {
   const memo = ownSchemaMemo(this, "_returningColumnsForInsertCache");
   if (memo) return memo;
 
+  await connection.databaseVersion;
   const autoPopulatedColumns: string[] = [];
   for (const c of columns.call(this) as { name: string }[]) {
-    if (await connection.returnValueAfterInsert(c)) autoPopulatedColumns.push(c.name);
+    if (connection.isReturnValueAfterInsert(c)) autoPopulatedColumns.push(c.name);
   }
 
   return (this._returningColumnsForInsertCache =

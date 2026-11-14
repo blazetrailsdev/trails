@@ -36,7 +36,8 @@ type MysqlTableDef = TableDefinition & { charset?: string; collation?: string };
 export interface VisitorHostAdapter extends TableDefinitionConn, SchemaCreationConn {
   supportsCheckConstraints(): Promise<boolean>;
   supportsIndexesInCreate(): boolean;
-  isMariadb(): Promise<boolean>;
+  isMariadb(): boolean;
+  readonly databaseVersion: unknown;
   quote(value: unknown): string;
   addIndexOptions(
     tableName: string,
@@ -55,8 +56,12 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return `${sql} COMMENT ${this.conn.quote(comment)}`;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm databaseVersion — PERMANENT
+   */
   protected async isMariadb(): Promise<boolean> {
+    await this.conn.databaseVersion;
     return this.conn.isMariadb();
   }
 

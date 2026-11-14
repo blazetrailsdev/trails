@@ -432,7 +432,7 @@ export class DependentFirm extends Company {
     this.hasOne(
       "account",
       function () {
-        return this.order("id");
+        return this.order(":id");
       },
       {
         foreignKey: "firm_id",

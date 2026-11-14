@@ -51,6 +51,7 @@ interface ResolvedConnectionFacts {
   indexes: (tableName: string) => unknown[];
 }
 
+/** @inventedArm databaseVersion — PERMANENT */
 async function resolveConnectionFacts(
   model: ModelClass,
   connection: any,

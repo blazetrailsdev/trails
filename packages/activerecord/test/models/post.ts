@@ -871,7 +871,7 @@ export class PostWithDefaultScope extends Base {
     this.inheritanceColumn = "disabled";
     this._tableName = "posts";
     this.defaultScope(function () {
-      return this.order("title");
+      return this.order(":title");
     });
   }
 }

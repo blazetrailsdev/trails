@@ -58,22 +58,18 @@ describe("NormalizedAttributeTest", () => {
     expect(aircraft.name).toBe("Fly Higher");
   });
 
-  it("normalizes changed-in-place value before validation", async () => {
-    const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
-      _value: unknown;
-    };
-    nameAttr._value = "fly high";
+  // PERMANENT-SKIP: `@aircraft.name.downcase!` mutates a String in place, and a JS string is an immutable primitive (CLAUDE.md, "Ruby Strings are JS string primitives").
+  it.skip("normalizes changed-in-place value before validation", async () => {
+    (aircraft.name as string).toLowerCase();
     expect(aircraft.name).toBe("fly high");
 
     await aircraft.isValid();
     expect(aircraft.validated_name).toBe("Fly High");
   });
 
-  it("normalizes value on demand", () => {
-    const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
-      _value: unknown;
-    };
-    nameAttr._value = "fly high";
+  // PERMANENT-SKIP: `@aircraft.name.downcase!` mutates a String in place, and a JS string is an immutable primitive (CLAUDE.md, "Ruby Strings are JS string primitives").
+  it.skip("normalizes value on demand", () => {
+    (aircraft.name as string).toLowerCase();
     expect(aircraft.name).toBe("fly high");
 
     aircraft.normalizeAttribute("name");

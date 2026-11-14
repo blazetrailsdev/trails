@@ -9,7 +9,8 @@ describe("_returningColumnsForInsert memoization", () => {
 
   const schemaHost = Topic as unknown as {
     _returningColumnsForInsert(connection: {
-      returnValueAfterInsert(column: { name: string }): Promise<boolean>;
+      readonly databaseVersion: unknown;
+      isReturnValueAfterInsert(column: { name: string }): boolean;
     }): Promise<string[]>;
     resetColumnInformation(): void;
   };
@@ -25,7 +26,8 @@ describe("_returningColumnsForInsert memoization", () => {
     )._returningColumnsForInsertCache = sentinel;
 
     const connection = {
-      returnValueAfterInsert: async (column: { name: string }) => column.name === "id",
+      databaseVersion: null,
+      isReturnValueAfterInsert: (column: { name: string }) => column.name === "id",
     };
     const child = Child as unknown as typeof schemaHost;
 
@@ -40,7 +42,8 @@ describe("_returningColumnsForInsert memoization", () => {
     await Topic.loadSchema();
     let calls = 0;
     const connection = {
-      async returnValueAfterInsert(column: { name: string }) {
+      databaseVersion: null,
+      isReturnValueAfterInsert(column: { name: string }) {
         calls += 1;
         return column.name === "id";
       },
@@ -58,7 +61,8 @@ describe("_returningColumnsForInsert memoization", () => {
     await Topic.loadSchema();
     let calls = 0;
     const connection = {
-      async returnValueAfterInsert(column: { name: string }) {
+      databaseVersion: null,
+      isReturnValueAfterInsert(column: { name: string }) {
         calls += 1;
         return column.name === "id";
       },
@@ -83,7 +87,8 @@ describe("_returningColumnsForInsert memoization", () => {
 
     let calls = 0;
     const connection = {
-      async returnValueAfterInsert(column: { name: string }) {
+      databaseVersion: null,
+      isReturnValueAfterInsert(column: { name: string }) {
         calls += 1;
         return column.name === "id";
       },

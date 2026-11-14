@@ -101,10 +101,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected async extractExpressionForVirtualColumn(
     column: MysqlColumn,
   ): Promise<string | undefined> {
-    if (
-      (await this.connection.isMariadb()) &&
-      (await this.connection.databaseVersion).compare("10.2.5") < 0
-    ) {
+    const databaseVersion = await this.connection.databaseVersion;
+    if (this.connection.isMariadb() && databaseVersion.compare("10.2.5") < 0) {
       const createTableInfo = await this.connection.createTableInfo(this.tableName!);
       const columnName = this.connection.quoteColumnName(column.name);
       const m = new RegExp(

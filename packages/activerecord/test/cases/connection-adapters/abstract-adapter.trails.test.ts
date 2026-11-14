@@ -39,13 +39,13 @@ describe("AbstractAdapter#returnValueAfterInsert", () => {
       false,
       "gen_random_uuid()",
     );
-    expect(await adapter.returnValueAfterInsert(col)).toBe(true);
+    expect(adapter.isReturnValueAfterInsert(col)).toBe(true);
   });
 
   it("returns false when column is not auto-populated", async () => {
     const adapter = new TestAdapter({});
     const col = new Column("name", null, new SqlTypeMetadata({ sqlType: "varchar" }));
-    expect(await adapter.returnValueAfterInsert(col)).toBe(false);
+    expect(adapter.isReturnValueAfterInsert(col)).toBe(false);
   });
 });
 

@@ -6,7 +6,6 @@ import { ArgumentError, I18n } from "@blazetrails/activemodel";
 import {
   SubclassNotFound,
   Base,
-  CollectionProxy,
   RecordNotFound,
   RecordNotSaved,
   RecordNotDestroyed,
@@ -23,6 +22,7 @@ import {
   NamespacedClient,
   RestrictedWithExceptionFirm,
   RestrictedWithErrorFirm,
+  DependentFirm,
 } from "../../models/company.js";
 import { Account } from "../../models/account.js";
 import { Contract } from "../../models/contract.js";
@@ -475,40 +475,20 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("delete all on association is the same as not loaded", async () => {
-    class DelAllAuthor extends Base {
-      declare name: string | null;
-      declare del_all_posts: AssociationProxy<DelAllPost>;
+    const author = authors("david") as any;
+    await author.thinkingPosts.createBang({ body: "test" });
+    await author.reload();
+    const expectedSql = await self().captureSql({}, async () => {
+      await author.thinkingPosts.deleteAll();
+    });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("del_all_posts", {
-          className: "DelAllPost",
-          foreignKey: "author_id",
-          dependent: "deleteAll",
-        });
-      }
-    }
-    class DelAllPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    constSet(TopLevel, "DelAllAuthor", DelAllAuthor);
-    DescendantsTracker.registerSubclass(Base, DelAllAuthor);
-    constSet(TopLevel, "DelAllPost", DelAllPost);
-    DescendantsTracker.registerSubclass(Base, DelAllPost);
-    const author = await DelAllAuthor.create({ name: "Alice" });
-    await DelAllPost.create({ author_id: author.id, title: "A", body: "body" });
-    await DelAllPost.create({ author_id: author.id, title: "B", body: "body" });
-    await author.destroy();
-    const remaining = await author.del_all_posts;
-    expect(remaining.length).toBe(0);
+    await author.thinkingPosts.createBang({ body: "test" });
+    await author.reload();
+    await author.thinkingPosts.inspect();
+    const loadedSql = await self().captureSql({}, async () => {
+      await author.thinkingPosts.deleteAll();
+    });
+    expect(loadedSql).toEqual(expectedSql);
   });
 
   it("delete all on association with nil dependency is the same as not loaded", async () => {
@@ -537,244 +517,31 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("building the associated object with implicit sti base class", () => {
-    class StiCompany extends Base {
-      declare name: string | null;
-      declare "type": string | null;
-      declare firm_id: number | null;
-
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    StiCompany.inheritanceColumn = "type";
-    class StiFirm extends StiCompany {}
-    constSet(TopLevel, "StiFirm", StiFirm);
-    DescendantsTracker.registerSubclass(StiCompany, StiFirm);
-    class StiClient extends StiCompany {}
-    constSet(TopLevel, "StiClient", StiClient);
-    DescendantsTracker.registerSubclass(StiCompany, StiClient);
-    class StiAccount extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    constSet(TopLevel, "StiCompany", StiCompany);
-    DescendantsTracker.registerSubclass(Base, StiCompany);
-    constSet(TopLevel, "StiFirm", StiFirm);
-    DescendantsTracker.registerSubclass(StiCompany, StiFirm);
-    constSet(TopLevel, "StiClient", StiClient);
-    DescendantsTracker.registerSubclass(StiCompany, StiClient);
-    constSet(TopLevel, "StiAccount", StiAccount);
-    DescendantsTracker.registerSubclass(Base, StiAccount);
-
-    class DepFirm extends Base {
-      declare name: string | null;
-      declare stiCompanies: AssociationProxy<StiCompany>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("stiCompanies", {
-          className: "StiCompany",
-          foreignKey: "firm_id",
-        });
-      }
-    }
-    constSet(TopLevel, "DepFirm", DepFirm);
-    DescendantsTracker.registerSubclass(Base, DepFirm);
-
-    const firm = new DepFirm({ name: "Test" });
-    const proxy = CollectionProxy._create(
-      firm,
-      "stiCompanies",
-      (DepFirm as any)._reflectOnAssociation("stiCompanies"),
-    );
-    const company = proxy.build();
-    expect(company).toBeInstanceOf(StiCompany);
+    const firm = new DependentFirm();
+    const company = firm.companies.build();
+    expect(company).toBeInstanceOf(Company);
   });
 
   it("building the associated object with explicit sti base class", () => {
-    class StiCompany2 extends Base {
-      declare name: string | null;
-      declare "type": string | null;
-      declare firm_id: number | null;
-
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    StiCompany2.inheritanceColumn = "type";
-    class StiClient2 extends StiCompany2 {}
-    constSet(TopLevel, "StiClient2", StiClient2);
-    DescendantsTracker.registerSubclass(StiCompany2, StiClient2);
-    constSet(TopLevel, "StiCompany2", StiCompany2);
-    DescendantsTracker.registerSubclass(Base, StiCompany2);
-    constSet(TopLevel, "StiClient2", StiClient2);
-    DescendantsTracker.registerSubclass(StiCompany2, StiClient2);
-
-    class DepFirm2 extends Base {
-      declare name: string | null;
-      declare stiCompany2s: AssociationProxy<StiCompany2>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("stiCompany2s", {
-          className: "StiCompany2",
-          foreignKey: "firm_id",
-        });
-      }
-    }
-    constSet(TopLevel, "DepFirm2", DepFirm2);
-    DescendantsTracker.registerSubclass(Base, DepFirm2);
-
-    const firm = new DepFirm2({ name: "Test" });
-    const proxy = CollectionProxy._create(
-      firm,
-      "stiCompany2s",
-      (DepFirm2 as any)._reflectOnAssociation("stiCompany2s"),
-    );
-    const company = proxy.build({ type: "StiCompany2" });
-    expect(company).toBeInstanceOf(StiCompany2);
+    const firm = new DependentFirm();
+    const company = firm.companies.build({ type: "Company" });
+    expect(company).toBeInstanceOf(Company);
   });
 
   it("building the associated object with sti subclass", () => {
-    class StiCompany3 extends Base {
-      declare name: string | null;
-      declare "type": string | null;
-      declare firm_id: number | null;
-
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    StiCompany3.inheritanceColumn = "type";
-    class StiClient3 extends StiCompany3 {}
-    constSet(TopLevel, "StiClient3", StiClient3);
-    DescendantsTracker.registerSubclass(StiCompany3, StiClient3);
-    constSet(TopLevel, "StiCompany3", StiCompany3);
-    DescendantsTracker.registerSubclass(Base, StiCompany3);
-    constSet(TopLevel, "StiClient3", StiClient3);
-    DescendantsTracker.registerSubclass(StiCompany3, StiClient3);
-
-    class DepFirm3 extends Base {
-      declare name: string | null;
-      declare stiCompany3s: AssociationProxy<StiCompany3>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("stiCompany3s", {
-          className: "StiCompany3",
-          foreignKey: "firm_id",
-        });
-      }
-    }
-    constSet(TopLevel, "DepFirm3", DepFirm3);
-    DescendantsTracker.registerSubclass(Base, DepFirm3);
-
-    const firm = new DepFirm3({ name: "Test" });
-    const proxy = CollectionProxy._create(
-      firm,
-      "stiCompany3s",
-      (DepFirm3 as any)._reflectOnAssociation("stiCompany3s"),
-    );
-    const company = proxy.build({ type: "StiClient3" });
-    expect(company).toBeInstanceOf(StiClient3);
+    const firm = new DependentFirm();
+    const company = firm.companies.build({ type: "Client" });
+    expect(company).toBeInstanceOf(Client);
   });
 
   it("building the associated object with an invalid type", () => {
-    class StiCompany4 extends Base {
-      declare name: string | null;
-      declare "type": string | null;
-      declare firm_id: number | null;
-
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    StiCompany4.inheritanceColumn = "type";
-    constSet(TopLevel, "StiCompany4", StiCompany4);
-    DescendantsTracker.registerSubclass(Base, StiCompany4);
-
-    class DepFirm4 extends Base {
-      declare name: string | null;
-      declare stiCompany4s: AssociationProxy<StiCompany4>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("stiCompany4s", {
-          className: "StiCompany4",
-          foreignKey: "firm_id",
-        });
-      }
-    }
-    constSet(TopLevel, "DepFirm4", DepFirm4);
-    DescendantsTracker.registerSubclass(Base, DepFirm4);
-
-    const firm = new DepFirm4({ name: "Test" });
-    const proxy = CollectionProxy._create(
-      firm,
-      "stiCompany4s",
-      (DepFirm4 as any)._reflectOnAssociation("stiCompany4s"),
-    );
-    expect(() => proxy.build({ type: "Invalid" })).toThrow(SubclassNotFound);
+    const firm = new DependentFirm();
+    expect(() => firm.companies.build({ type: "Invalid" })).toThrow(SubclassNotFound);
   });
 
   it("building the associated object with an unrelated type", () => {
-    class StiCompany5 extends Base {
-      declare name: string | null;
-      declare "type": string | null;
-      declare firm_id: number | null;
-
-      static {
-        this.attribute("name", "string");
-        this.attribute("type", "string");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    StiCompany5.inheritanceColumn = "type";
-    class UnrelatedModel extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    constSet(TopLevel, "StiCompany5", StiCompany5);
-    DescendantsTracker.registerSubclass(Base, StiCompany5);
-    constSet(TopLevel, "UnrelatedModel", UnrelatedModel);
-    DescendantsTracker.registerSubclass(Base, UnrelatedModel);
-
-    class DepFirm5 extends Base {
-      declare name: string | null;
-      declare stiCompany5s: AssociationProxy<StiCompany5>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("stiCompany5s", {
-          className: "StiCompany5",
-          foreignKey: "firm_id",
-        });
-      }
-    }
-    constSet(TopLevel, "DepFirm5", DepFirm5);
-    DescendantsTracker.registerSubclass(Base, DepFirm5);
-
-    const firm = new DepFirm5({ name: "Test" });
-    const proxy = CollectionProxy._create(
-      firm,
-      "stiCompany5s",
-      (DepFirm5 as any)._reflectOnAssociation("stiCompany5s"),
-    );
-    expect(() => proxy.build({ type: "UnrelatedModel" })).toThrow(SubclassNotFound);
+    const firm = new DependentFirm();
+    expect(() => firm.companies.build({ type: "Account" })).toThrow(SubclassNotFound);
   });
 
   it("build the association with an array", async () => {
@@ -1224,70 +991,21 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("update all on association accessed before save", async () => {
-    class UpdAllAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class UpdAllPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    constSet(TopLevel, "UpdAllAuthor", UpdAllAuthor);
-    DescendantsTracker.registerSubclass(Base, UpdAllAuthor);
-    constSet(TopLevel, "UpdAllPost", UpdAllPost);
-    DescendantsTracker.registerSubclass(Base, UpdAllPost);
-    const author = await UpdAllAuthor.create({ name: "Alice" });
-    const post = await UpdAllPost.create({ author_id: author.id, title: "Old", body: "body" });
-    post.title = "New";
-    await post.save();
-    const reloaded = await UpdAllPost.find(post.id!);
-    expect((reloaded as any).title).toBe("New");
+    const firm = new HmFirm({ name: "Firm" }) as any;
+    await firm.clients.push(await Client.first());
+    await firm.saveBang();
+    expect(await firm.clients.updateAll({ description: "Great!" })).toBe(
+      await firm.clients.count(),
+    );
   });
 
   it("update all on association accessed before save with explicit foreign key", async () => {
-    class UpdAllFkAuthor extends Base {
-      declare upd_all_fk_posts: AssociationProxy<UpdAllFkPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("upd_all_fk_posts", {
-          className: "UpdAllFkPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class UpdAllFkPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    constSet(TopLevel, "UpdAllFkAuthor", UpdAllFkAuthor);
-    DescendantsTracker.registerSubclass(Base, UpdAllFkAuthor);
-    constSet(TopLevel, "UpdAllFkPost", UpdAllFkPost);
-    DescendantsTracker.registerSubclass(Base, UpdAllFkPost);
-    const author = await UpdAllFkAuthor.create({ name: "Alice" });
-    const post = await UpdAllFkPost.create({ author_id: author.id, title: "Old", body: "body" });
-    post.title = "Updated";
-    await post.save();
-    const posts = await author.upd_all_fk_posts;
-    expect((posts[0] as any).title).toBe("Updated");
+    const firm = new HmFirm({ name: "Firm", id: 100 }) as any;
+    await firm.clients.push(await Client.first());
+    await firm.saveBang();
+    expect(await firm.clients.updateAll({ description: "Great!" })).toBe(
+      await firm.clients.count(),
+    );
   });
 
   it("belongs to with new object", async () => {
@@ -3377,38 +3095,18 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("load target respects protected attributes", async () => {
-    class ProtAuthor extends Base {
-      declare prot_posts: AssociationProxy<ProtPost>;
-      declare name: string | null;
+    const topic = (await HmTopic.createBang()) as any;
+    const reply = await topic.replies.create({ title: "reply 1" });
+    reply.approved = false;
+    await reply.saveBang();
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("prot_posts", {
-          className: "ProtPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class ProtPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    const reply2 = (await HmReply.find(reply.id)) as any;
+    reply2.approved = true;
+    await reply2.saveBang();
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    constSet(TopLevel, "ProtAuthor", ProtAuthor);
-    DescendantsTracker.registerSubclass(Base, ProtAuthor);
-    constSet(TopLevel, "ProtPost", ProtPost);
-    DescendantsTracker.registerSubclass(Base, ProtPost);
-    const author = await ProtAuthor.create({ name: "Alice" });
-    await ProtPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await author.prot_posts;
-    expect(posts.length).toBe(1);
-    expect((posts[0] as any).title).toBe("A");
+    const first = (await topic.replies.toArray())[0];
+    expect(first.id).toBe(reply.id);
+    expect(first.approved).toBe(true);
   });
 
   it("to a should dup target", async () => {
@@ -3419,33 +3117,13 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("merging with custom attribute writer", async () => {
-    class MergeAuthor extends Base {
-      declare name: string | null;
+    const bulb = new HmBulb({ color: "red" }) as any;
+    expect(bulb.color).toBe("RED!");
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class MergePost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
+    const car = (await HmCar.createBang()) as any;
+    await car.bulbs.push(bulb);
 
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    constSet(TopLevel, "MergeAuthor", MergeAuthor);
-    DescendantsTracker.registerSubclass(Base, MergeAuthor);
-    constSet(TopLevel, "MergePost", MergePost);
-    DescendantsTracker.registerSubclass(Base, MergePost);
-    const author = await MergeAuthor.create({ name: "Alice" });
-    const post = new MergePost({ author_id: author.id });
-    post.title = "Merged";
-    expect((post as any).title).toBe("Merged");
-    expect((post as any).author_id).toBe(Number(author.id));
+    expect((await car.bulbs.toArray())[0].color).toBe("RED!");
   });
 
   it("abstract class with polymorphic has many", async () => {
@@ -3571,39 +3249,14 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("first_or_initialize adds the record to the association", async () => {
-    class FoiAuthor extends Base {
-      declare foi_posts: AssociationProxy<FoiPost>;
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("foi_posts", {
-          className: "FoiPost",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class FoiPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    constSet(TopLevel, "FoiAuthor", FoiAuthor);
-    DescendantsTracker.registerSubclass(Base, FoiAuthor);
-    constSet(TopLevel, "FoiPost", FoiPost);
-    DescendantsTracker.registerSubclass(Base, FoiPost);
-    const author = await FoiAuthor.create({ name: "Alice" });
-    const posts = await author.foi_posts;
-    expect(posts.length).toBe(0);
-    const post = new FoiPost({ author_id: author.id, title: "Initialized" });
-    expect(post.isNewRecord()).toBe(true);
-    expect((post as any).author_id).toBe(Number(author.id));
+    const firm = (await HmFirm.createBang({ name: "omg" })) as any;
+    const client = await firm.clientsOfFirm
+      .where({ name: "lol" })
+      .firstOrInitialize(undefined, async () => {
+        expect(Number(await Client.count())).toBe(5);
+      });
+    expect(client.name).toBe("lol");
+    expect((await firm.clientsOfFirm.toArray()).map(recordId)).toEqual([client].map(recordId));
   });
 
   it("first_or_create adds the record to the association", async () => {

@@ -111,7 +111,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   async supportsJson(): Promise<boolean> {
-    return !(await this.isMariadb()) && (await this.databaseVersion).compare("5.7.8") >= 0;
+    const databaseVersion = await this.databaseVersion;
+    return !this.isMariadb() && databaseVersion.compare("5.7.8") >= 0;
   }
 
   supportsComments(): boolean {
@@ -229,8 +230,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   executeBatch = mysql2ExecuteBatch;
 
   /** @internal */
-  override async fullVersion(): Promise<string | null> {
-    return (await this.databaseVersion).fullVersionString;
+  override fullVersion(): string | null | undefined {
+    return (this.databaseVersion as { fullVersionString?: string | null }).fullVersionString;
   }
 
   /** @internal */
@@ -307,7 +308,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  lastInsertedId(result: Result): Promise<unknown> {
+  lastInsertedId(result: Result): unknown {
     return mysql2LastInsertedId.call(this as never, result);
   }
 

@@ -2,8 +2,6 @@ import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 
-import { NotImplementedError } from "../../errors.js";
-
 import { DeferredIdsIn } from "./deferred-distinct-pk-in.js";
 import { isEmpty, rbInspect } from "@blazetrails/ruby-compat";
 
@@ -40,21 +38,9 @@ export class RelationHandler {
     if (typeof value?.applyJoinDependency !== "function") return value;
     if (value.isEagerLoading !== true) return value;
     let resolved: any;
-    const pending = value.applyJoinDependency({}, (relation: any) => {
+    value.applyJoinDependency({}, (relation: any) => {
       resolved = relation;
     });
-    if (resolved === undefined) {
-      pending.catch(() => {});
-      // @nie disposition=TODO
-      throw new NotImplementedError(
-        "Using an eager-loaded relation with a limit/offset over a collection " +
-          "association as a subquery value is not supported: Rails resolves this by " +
-          "executing a query to materialize the limited primary keys " +
-          "(distinct_relation_for_primary_key), which the synchronous predicate " +
-          "builder cannot do. Materialize the ids first, e.g. " +
-          "where(id: await rel.pluck(primaryKey)).",
-      );
-    }
     return resolved;
   }
 }

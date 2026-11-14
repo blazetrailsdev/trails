@@ -199,7 +199,7 @@ export class Author extends Base {
     this.hasMany(
       "postsSortedById",
       function () {
-        return this.order("id");
+        return this.order(":id");
       },
       { className: "Post" },
     );
@@ -840,14 +840,14 @@ export class Author extends Base {
     this.hasMany(
       "postsWithExtension",
       function () {
-        return this.order("title");
+        return this.order(":title");
       },
       { className: "Post" },
     );
     this.hasMany(
       "postsWithExtensionAndInstance",
       function (_record: any) {
-        return this.order("title");
+        return this.order(":title");
       },
       {
         className: "Post",

@@ -288,7 +288,7 @@ const CHARSETS_OF_4BYTES_MAXLEN = ["utf8mb4", "utf16", "utf16le", "utf32"];
 
 /** @internal */
 export interface RowFormatHost {
-  isMariadb(): Promise<boolean>;
+  isMariadb(): boolean;
   readonly databaseVersion: Version | number | Promise<Version | number>;
   queryValue(sql: string, name?: string): Promise<unknown>;
   _defaultRowFormat?: string | null;
@@ -300,9 +300,10 @@ export function tableAliasLength(): number {
 
 /** @internal */
 export async function isRowFormatDynamicByDefault(this: RowFormatHost): Promise<boolean> {
-  return (await this.isMariadb())
-    ? ((await this.databaseVersion) as Version).compare("10.2.2") >= 0
-    : ((await this.databaseVersion) as Version).compare("5.7.9") >= 0;
+  const databaseVersion = (await this.databaseVersion) as Version;
+  return this.isMariadb()
+    ? databaseVersion.compare("10.2.2") >= 0
+    : databaseVersion.compare("5.7.9") >= 0;
 }
 
 /** @internal */

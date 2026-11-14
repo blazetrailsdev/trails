@@ -8,7 +8,7 @@ import { adapterSupports, SUPPORTS_FEATURES } from "../../support/supports.js";
 const MYSQL_FAMILY = ["Mysql2Adapter", "TrilogyAdapter"] as const;
 
 type LiveConnection = {
-  isMariadb?(): Promise<boolean>;
+  isMariadb?(): boolean;
   databaseVersion: Version | number | Promise<Version | number>;
   getDatabaseVersion(): Promise<Version | number>;
 } & Record<string, unknown>;
