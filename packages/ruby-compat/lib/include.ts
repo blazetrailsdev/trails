@@ -1694,7 +1694,10 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
   let entry;
   if (slot === undefined) slot = (entry = superSlots.get(method))?.slot;
   let next = slot === undefined ? undefined : (receiver as Record<symbol, unknown>)[slot];
-  for (let nextEntry; slot !== undefined && typeof next === "function" && _superSlot in next; ) {
+  for (
+    let nextEntry;
+    slot !== undefined && typeof next === "function" && _superSlot in (next as object);
+  ) {
     nextEntry = superSlots.get(next as AnyFunction);
     if (nextEntry === undefined || (nextEntry.seats ?? 0) < 2) break;
     const holder = slotHolder(receiver, slot);
