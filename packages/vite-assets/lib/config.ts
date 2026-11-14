@@ -160,11 +160,14 @@ export class Config {
 
   /** @internal */
   private async detectPackageManager(root: Pathname): Promise<string> {
-    const exist = (name: string) => File.isExistAsync(root.join(name).toString());
-    if (await exist("package-lock.json")) return "npm";
-    if (await exist("pnpm-lock.yaml")) return "pnpm";
-    if ((await exist("bun.lockb")) || (await exist("bun.lock"))) return "bun";
-    if (await exist("yarn.lock")) return "yarn";
+    if (await File.isExistAsync(root.join("package-lock.json").toString())) return "npm";
+    if (await File.isExistAsync(root.join("pnpm-lock.yaml").toString())) return "pnpm";
+    if (
+      (await File.isExistAsync(root.join("bun.lockb").toString())) ||
+      (await File.isExistAsync(root.join("bun.lock").toString()))
+    )
+      return "bun";
+    if (await File.isExistAsync(root.join("yarn.lock").toString())) return "yarn";
 
     return "npm";
   }

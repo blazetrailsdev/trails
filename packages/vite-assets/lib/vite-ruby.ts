@@ -126,7 +126,6 @@ export class ViteRuby {
 
   declare isRunProxy: () => Promise<boolean>;
 
-  /** @missingRailsCall new — CONVERGEABLE vite-assets-builder-commands-runner */
   builder(): ManifestBuilder {
     throw new NotImplementedError("ViteRuby::Builder is not ported yet");
   }

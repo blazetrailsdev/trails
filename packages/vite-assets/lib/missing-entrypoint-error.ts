@@ -34,7 +34,7 @@ export class MissingEntrypointError extends Error {
     super(`Vite Ruby can't find ${fileName} in the manifests.
 
 Possible causes:
-${MissingEntrypointError.prototype.possibleCauses.call({ config }, lastBuild)}
+${MissingEntrypointError.prototype.possibleCauses.call({ config } as MissingEntrypointError, lastBuild)}
 :troubleshooting:
 ${lastBuild.success ? `Manifest files found:\n${manifestPaths.map((path) => `  ${path.relativePathFrom(config.root)}`).join("\n")}\n` : ""}
 ${lastBuild.success ? `Last build in ${config.mode} mode:\n${lastBuild.toJson()}\n` : ""}
@@ -47,7 +47,7 @@ ${lastBuild.success ? `Last build in ${config.mode} mode:\n${lastBuild.toJson()}
     ];
   }
 
-  possibleCauses(this: { config: Config }, lastBuild: LastBuild): string {
+  possibleCauses(lastBuild: LastBuild): string {
     if (lastBuild.success === false) {
       return MissingEntrypointError.FAILED_BUILD_CAUSES.replace(
         ":mode:",
