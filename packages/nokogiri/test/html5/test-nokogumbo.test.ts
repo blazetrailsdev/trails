@@ -24,7 +24,7 @@ function buffer(): string {
 }
 
 describe("TestHtml5Nokogumbo", () => {
-  it("fragment_body", () => {
+  it("fragment body", () => {
     const doc = DocumentFragment.parse(/<body>([\s\S]*?)<\/body>/.exec(buffer())![1]);
     expect(doc.xpath("main/span").toXml()).toBe("<span>content</span>");
     expect(doc.xpath("comment()").text).toBe(" test comment ");
