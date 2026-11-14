@@ -104,27 +104,27 @@ describe("ManifestTest", () => {
       let assetFile = "calendar.js";
       let error = await assertRaisesManifestMissingEntryError(() => pathFor(assetFile));
 
-      expect(error.message).toContain(
+      expect(error.message).toMatch(
         `Vite Ruby can't find entrypoints/${assetFile} in the manifests`,
       );
-      expect(error.message).toContain('"autoBuild" is set to `false`');
+      expect(error.message).toMatch('"autoBuild" is set to `false`');
 
       assetFile = "images/logo.gif";
       error = await assertRaisesManifestMissingEntryError(() => pathFor(assetFile));
 
-      expect(error.message).toContain(`Vite Ruby can't find ${assetFile} in the manifests`);
+      expect(error.message).toMatch(`Vite Ruby can't find ${assetFile} in the manifests`);
 
       assetFile = "/app/styles/theme.css";
       error = await assertRaisesManifestMissingEntryError(() => pathFor(assetFile));
 
-      expect(error.message).toContain("Vite Ruby can't find ../styles/theme.css in the manifests");
+      expect(error.message).toMatch("Vite Ruby can't find ../styles/theme.css in the manifests");
 
       assetFile = "~/favicon.ico";
       error = await assertRaisesManifestMissingEntryError(() => pathFor(assetFile));
 
-      expect(error.message).toContain("Vite Ruby can't find favicon.ico in the manifests");
+      expect(error.message).toMatch("Vite Ruby can't find favicon.ico in the manifests");
 
-      expect(error.message).toContain(`Manifest files found:\n  ${manifestPath}`);
+      expect(error.message).toMatch(`Manifest files found:\n  ${manifestPath}`);
     });
   });
 
@@ -136,10 +136,10 @@ describe("ManifestTest", () => {
         autoBuild: true,
       });
 
-      expect(error.message).toContain(
+      expect(error.message).toMatch(
         `Vite Ruby can't find entrypoints/${assetFile} in the manifests`,
       );
-      expect(error.message).toContain("The file path is incorrect.");
+      expect(error.message).toMatch("The file path is incorrect.");
     });
   });
 
@@ -150,12 +150,12 @@ describe("ManifestTest", () => {
 
       const error = await assertRaisesManifestMissingEntryError(() => pathFor(assetFile));
 
-      expect(error.message).toContain(
+      expect(error.message).toMatch(
         `Vite Ruby can't find entrypoints/${assetFile} in the manifests`,
       );
-      expect(error.message).toContain("The last build failed.");
-      expect(error.message).toContain(`  ${errorLines[0]}`);
-      expect(error.message).toContain(`  ${errorLines[1]}`);
+      expect(error.message).toMatch("The last build failed.");
+      expect(error.message).toMatch(`  ${errorLines[0]}`);
+      expect(error.message).toMatch(`  ${errorLines[1]}`);
     });
   });
 
@@ -167,7 +167,7 @@ describe("ManifestTest", () => {
         pathFor(assetFile, { type: "javascript" }),
       );
 
-      expect(error.message).toContain(
+      expect(error.message).toMatch(
         `Vite Ruby can't find entrypoints/${assetFile}.js in the manifests`,
       );
     });

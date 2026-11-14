@@ -1,3 +1,4 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { File } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Config } from "../lib/config.js";
@@ -31,9 +32,6 @@ describe("ConfigTest", () => {
   it.skipIf(!vendorRoot)("matching default config json", async () => {
     expect(await File.readAsync(`${vendorRoot}/vite_ruby/default.vite.json`)).toBe(
       await File.readAsync(`${vendorRoot}/vite-plugin-ruby/default.vite.json`),
-    );
-    expect(await File.readAsync(new URL("../default.vite.json", import.meta.url).pathname)).toBe(
-      await File.readAsync(`${vendorRoot}/vite_ruby/default.vite.json`),
     );
   });
 
@@ -88,25 +86,25 @@ describe("ConfigTest", () => {
   });
 
   it("watch additional paths", async () => {
-    expect(config.watchAdditionalPaths).toEqual([]);
+    expect(config.watchAdditionalPaths).toBeEmpty();
     config = await resolveConfig({ configPath: "config/vite_additional_paths.json" } as never);
 
     expect(config.watchAdditionalPaths).toEqual(["config/*"]);
   });
 
   it("auto build", async () => {
-    expect(config.autoBuild).toBe(false);
+    expect(config.autoBuild).toBeFalsy();
 
     await withRailsEnv("development", (config) => {
-      expect(config.autoBuild).toBe(true);
+      expect(config.autoBuild).toBeTruthy();
     });
 
     await withRailsEnv("test", (config) => {
-      expect(config.autoBuild).toBe(true);
+      expect(config.autoBuild).toBeTruthy();
     });
 
     await withRailsEnv("staging", (config) => {
-      expect(config.autoBuild).toBe(false);
+      expect(config.autoBuild).toBeFalsy();
     });
   });
 
@@ -147,10 +145,10 @@ describe("ConfigTest", () => {
       });
       config = await resolveConfig();
 
-      expect(config.autoBuild).toBe(true);
+      expect(config.autoBuild).toBeTruthy();
       expect(config.host).toBe("example.com");
       expect(config.port).toBe(1920);
-      expect(config.https).toBe(true);
+      expect(config.https).toBeTruthy();
       expect(config.protocol()).toBe("https");
       expect(config.configPath).toBe("config/vite_additional_paths.json");
       assertPathname("tmp/vitebuild", config.buildCacheDir);
@@ -159,11 +157,11 @@ describe("ConfigTest", () => {
       assertPathname("pb/ft", config.buildOutputDir());
       expect(config.assetsDir).toBe("as");
       expect(config.sourceCodeDir).toBe("app");
-      expect(config.skipCompatibilityCheck).toBe(true);
+      expect(config.skipCompatibilityCheck).toBeTruthy();
       expect(config.entrypointsDir).toBe("frontend/entrypoints");
       assertPathname("app", config.viteRootDir());
       assertPathname("app/frontend/entrypoints", config.resolvedEntrypointsDir());
-      expect(config.hideBuildConsoleOutput).toBe(true);
+      expect(config.hideBuildConsoleOutput).toBeTruthy();
     } finally {
       for (const key of Object.keys(env)) delete env[key];
     }

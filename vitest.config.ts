@@ -818,7 +818,10 @@ export default defineConfig({
           globals: true,
           include: ["packages/vite-assets/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
-          setupFiles: ["./packages/ruby-compat/test-setup/class-paths.ts"],
+          setupFiles: [
+            "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/vitest-matchers/lib/setup.ts",
+          ],
         },
       },
       {
