@@ -1,3 +1,4 @@
+import { strip } from "../../string/method-table.js";
 import { ArgumentError } from "../../argument-error.js";
 import { Generic } from "../../uri/generic.js";
 import { HTTPS as URIHTTPS } from "../../uri/https.js";
@@ -105,7 +106,7 @@ export class HTTPRequest {
           warn(`net/http: nil HTTP header: ${key}`, { uplevel: 3 });
         continue;
       }
-      const value = field.trim();
+      const value = strip(field);
       if (bytesize(key) > HTTPRequest.MAX_KEY_LENGTH) {
         throw new ArgumentError(
           `too long (${bytesize(key)} bytes) header: ${JSON.stringify(key.slice(0, 30))}...`,
