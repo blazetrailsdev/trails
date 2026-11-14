@@ -1,0 +1,6 @@
+<h1>Editing Message</h1>
+
+<%= await render('form', { message: this.message }) %>
+
+<%= linkTo('Show', this.message) %> |
+<%= linkTo('Back', messagesPath()) %>

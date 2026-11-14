@@ -1,0 +1,16 @@
+<% await this.message.richTextContent %><dl>
+  <dt>Subject</dt>
+  <dd>
+    <span id="subject"><%= this.message.subject %></span>
+  </dd>
+
+  <dt>Content (Plain Text)</dt>
+  <dd>
+    <pre id="content-plain"><%= await this.message.content.toPlainText() %></pre>
+  </dd>
+
+  <dt>Content (HTML)</dt>
+  <dd>
+    <div id="content-html"><%= await this.message.content.toString() %></div>
+  </dd>
+</dl>

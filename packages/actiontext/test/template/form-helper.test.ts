@@ -67,7 +67,7 @@ describe("ActionText::FormHelperTest", () => {
     );
   });
 
-  it.skip("#rich_textarea helper renders the :value argument into the hidden field", async () => {
+  it("#rich_textarea helper renders the :value argument into the hidden field", async () => {
     const message = new Message({ content: "<h1>hello world</h1>" } as any);
 
     tc.concat(
