@@ -3,7 +3,10 @@
   "compilerOptions": {
     "composite": true,
     "outDir": "dist",
-    "rootDir": "lib"
+    "rootDir": "lib",
+    "paths": {
+      "@blazetrails/activejob/*": ["./lib/*.ts"]
+    }
   },
   "include": ["lib"],
   "references": [

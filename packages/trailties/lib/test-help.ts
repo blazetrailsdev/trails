@@ -5,6 +5,8 @@ import { TestDatabases } from "@blazetrails/activerecord/test-databases";
 import { TestFixtures, type ClassMethods } from "@blazetrails/activerecord/test-fixtures";
 import { QueryAssertions } from "@blazetrails/activerecord/testing/query-assertions";
 import { abort, rbCallSuper, rbModDefineMethod } from "@blazetrails/ruby-compat";
+import { ActionMailer } from "@blazetrails/actionmailer/namespaces";
+import { ActiveJob } from "@blazetrails/activejob";
 import { Trails } from "./trails.js";
 
 declare module "@blazetrails/activesupport/test-case" {
@@ -28,6 +30,9 @@ if (Trails.env["production?"]()) {
 }
 
 await import("./testing/maintain-test-schema.js");
+await ActionMailer.loadPath["action_mailer/test_helper"]();
+await ActionMailer.loadPath["action_mailer/test_case"]();
+await ActiveJob.loadPath["active_job/test_helper"]();
 
 const root = Trails.root();
 
