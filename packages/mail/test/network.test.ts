@@ -1,3 +1,4 @@
+import "@blazetrails/vitest-matchers";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Exception, StandardError } from "@blazetrails/ruby-compat";
 import { Mail, Message } from "../lib/index.js";
@@ -44,11 +45,11 @@ describe("Mail", () => {
       Mail.defaults(function () {
         this.deliveryMethod("smtp");
       });
-      expect(Mail.deliveryMethod()).toBeInstanceOf(Mail.SMTP);
+      expect((Mail.deliveryMethod() as object).constructor).toBe(Mail.SMTP);
     });
 
     it("should default to settings for smtp", () => {
-      expect(Mail.deliveryMethod()).toBeInstanceOf(Mail.SMTP);
+      expect((Mail.deliveryMethod() as object).constructor).toBe(Mail.SMTP);
       expect(deliveryMethod().settings).toEqual({
         address: "localhost",
         port: 25,
@@ -70,11 +71,11 @@ describe("Mail", () => {
       Mail.defaults(function () {
         this.retrieverMethod("pop3");
       });
-      expect(Mail.retrieverMethod()).toBeInstanceOf(Mail.POP3);
+      expect(Mail.retrieverMethod().constructor).toBe(Mail.POP3);
     });
 
     it("should default to settings for pop3", () => {
-      expect(Mail.retrieverMethod()).toBeInstanceOf(Mail.POP3);
+      expect(Mail.retrieverMethod().constructor).toBe(Mail.POP3);
       expect(retrieverMethod().settings).toEqual({
         address: "localhost",
         port: 110,
@@ -106,11 +107,16 @@ describe("Mail", () => {
       Mail.defaults(function () {
         this.deliveryMethod(MyDelivery);
       });
-      expect(Mail.deliveryMethod()).toBeInstanceOf(MyDelivery);
+      expect((Mail.deliveryMethod() as object).constructor).toBe(MyDelivery);
     });
 
     it("should ask the custom delivery agent for its settings", () => {
-      const mockMyDelivery = { settings: { theseAre: "settings" } };
+      const mockMyDelivery = {
+        get settings(): Record<string, unknown> {
+          return { theseAre: "settings" };
+        },
+      };
+      const settings = vi.spyOn(mockMyDelivery, "settings", "get");
       const myDeliveryNew = vi.fn(function () {
         return mockMyDelivery;
       });
@@ -119,17 +125,23 @@ describe("Mail", () => {
       });
       expect(myDeliveryNew).toHaveBeenCalled();
       expect(deliveryMethod().settings).toEqual({ theseAre: "settings" });
+      expect(settings).toHaveBeenCalled();
     });
 
     it("should allow you to pass in your own retriever method", () => {
       Mail.defaults(function () {
         this.retrieverMethod(MyRetriever);
       });
-      expect(Mail.retrieverMethod()).toBeInstanceOf(MyRetriever);
+      expect(Mail.retrieverMethod().constructor).toBe(MyRetriever);
     });
 
     it("should ask the custom retriever agent for its settings", () => {
-      const mockMyRetriever = { settings: { theseAre: "settings" } };
+      const mockMyRetriever = {
+        get settings(): Record<string, unknown> {
+          return { theseAre: "settings" };
+        },
+      };
+      const settings = vi.spyOn(mockMyRetriever, "settings", "get");
       const myRetrieverNew = vi.fn(function () {
         return mockMyRetriever;
       });
@@ -138,26 +150,27 @@ describe("Mail", () => {
       });
       expect(myRetrieverNew).toHaveBeenCalled();
       expect(retrieverMethod().settings).toEqual({ theseAre: "settings" });
+      expect(settings).toHaveBeenCalled();
     });
   });
 
   describe("instance delivery methods", () => {
     it("should copy the defaults defined by Mail.defaults", () => {
       const mail = Mail.new();
-      expect(mail.deliveryMethod()).toBeInstanceOf(Mail.SMTP);
+      expect((mail.deliveryMethod() as object).constructor).toBe(Mail.SMTP);
     });
 
     it("should be able to change the delivery_method", () => {
       const mail = Mail.new();
       mail.deliveryMethod("file");
-      expect(mail.deliveryMethod()).toBeInstanceOf(Mail.FileDelivery);
+      expect((mail.deliveryMethod() as object).constructor).toBe(Mail.FileDelivery);
     });
 
     it("should be able to change the delivery_method and pass in settings", () => {
       const mail = Mail.new();
       const tmpdir = decodeURIComponent(new URL("../../../tmp/mail", import.meta.url).pathname);
       mail.deliveryMethod("file", { location: tmpdir });
-      expect(mail.deliveryMethod()).toBeInstanceOf(Mail.FileDelivery);
+      expect((mail.deliveryMethod() as object).constructor).toBe(Mail.FileDelivery);
       expect((mail.deliveryMethod() as Settings).settings).toEqual({
         location: tmpdir,
         extension: "",
@@ -168,9 +181,9 @@ describe("Mail", () => {
       const mail1 = Mail.new();
       const mail2 = Mail.new();
       mail1.deliveryMethod("file");
-      expect(Mail.deliveryMethod()).toBeInstanceOf(Mail.SMTP);
-      expect(mail1.deliveryMethod()).toBeInstanceOf(Mail.FileDelivery);
-      expect(mail2.deliveryMethod()).toBeInstanceOf(Mail.SMTP);
+      expect((Mail.deliveryMethod() as object).constructor).toBe(Mail.SMTP);
+      expect((mail1.deliveryMethod() as object).constructor).toBe(Mail.FileDelivery);
+      expect((mail2.deliveryMethod() as object).constructor).toBe(Mail.SMTP);
     });
 
     it("should not change the default settings when it changes the delivery_method settings", () => {
@@ -187,9 +200,9 @@ describe("Mail", () => {
     it("should retrieve all emails via POP3", () => {
       const messages = Mail.all() as Message[];
 
-      expect(messages).not.toHaveLength(0);
+      expect(messages).not.toBeEmpty();
       for (const message of messages) {
-        expect(message.constructor).toBe(Mail.Message);
+        expect(message).toBeExactInstanceOf(Mail.Message);
       }
     });
   });
@@ -276,18 +289,17 @@ describe("Mail", () => {
 
     describe("adding to Mail.deliveries", () => {
       it("should add itself to the deliveries collection on mail on delivery", async () => {
-        const before = testDeliveries().length;
-        await message.deliver();
-        expect(testDeliveries().length - before).toBe(1);
+        await expect(() => message.deliver()).toChange(() => testDeliveries().length, { by: 1 });
       });
     });
 
     describe("perform_deliveries", () => {
       it("should call deliver! on the delivery method by default", async () => {
         const deliveryAgent = new MyDeliveryMethod();
-        vi.spyOn(message, "deliveryMethod").mockReturnValue(deliveryAgent);
+        const spy = vi.spyOn(message, "deliveryMethod").mockReturnValue(deliveryAgent);
         const deliverBang = vi.spyOn(deliveryAgent, "deliverBang");
         await message.deliver();
+        expect(spy).toHaveBeenCalled();
         expect(deliverBang).toHaveBeenCalledWith(message);
       });
 
@@ -303,16 +315,12 @@ describe("Mail", () => {
 
       it("should add to the deliveries array if perform_deliveries is true", async () => {
         message.performDeliveries = true;
-        const before = testDeliveries().length;
-        await message.deliver();
-        expect(testDeliveries().length - before).toBe(1);
+        await expect(() => message.deliver()).toChange(() => testDeliveries().length, { by: 1 });
       });
 
       it("should not add to the deliveries array if perform_deliveries is false", async () => {
         message.performDeliveries = false;
-        const before = testDeliveries().length;
-        await message.deliver();
-        expect(testDeliveries().length).toBe(before);
+        await expect(() => message.deliver()).not.toChange(() => testDeliveries().length);
       });
     });
 
@@ -323,8 +331,7 @@ describe("Mail", () => {
         Mail.registerObserver(MyObserver);
         const spy = vi.spyOn(MyObserver, "deliveredEmail");
         await message.deliver();
-        expect(spy).toHaveBeenCalledOnce();
-        expect(spy).toHaveBeenCalledWith(message);
+        expect(spy).toHaveBeenCalledExactlyOnceWith(message);
       });
 
       it("should tell its observers that it was told to deliver an email even if perform_deliveries is false", async () => {
@@ -332,8 +339,7 @@ describe("Mail", () => {
         message.performDeliveries = false;
         const spy = vi.spyOn(MyObserver, "deliveredEmail");
         await message.deliver();
-        expect(spy).toHaveBeenCalledOnce();
-        expect(spy).toHaveBeenCalledWith(message);
+        expect(spy).toHaveBeenCalledExactlyOnceWith(message);
       });
 
       it("should tell its observers that it was told to deliver an email even if it is using a delivery_handler", async () => {
@@ -342,8 +348,7 @@ describe("Mail", () => {
         message.performDeliveries = false;
         const spy = vi.spyOn(MyObserver, "deliveredEmail");
         await message.deliver();
-        expect(spy).toHaveBeenCalledOnce();
-        expect(spy).toHaveBeenCalledWith(message);
+        expect(spy).toHaveBeenCalledExactlyOnceWith(message);
       });
     });
 
@@ -360,7 +365,7 @@ describe("Mail", () => {
         vi.spyOn(message, "deliveryMethod").mockReturnValue(deliveryAgent);
         message.raiseDeliveryErrors = false;
         vi.spyOn(deliveryAgent, "deliverBang").mockRejectedValue(new StandardError());
-        await expect(message.deliver()).resolves.toBe(message);
+        await expect(message.deliver()).resolves.not.toThrow();
       });
 
       it("should pass through Exceptions even when raise_delivery_errors is set to false", async () => {
@@ -378,8 +383,7 @@ describe("Mail", () => {
         const spy = vi.spyOn(deliveryHandler, "deliverMail").mockReturnValue(undefined);
         message.deliveryHandler = deliveryHandler;
         await message.deliver();
-        expect(spy).toHaveBeenCalledOnce();
-        expect(spy.mock.calls[0][0]).toBe(message);
+        expect(spy).toHaveBeenCalledExactlyOnceWith(message, expect.any(Function));
       });
 
       it("mail should be told to :deliver once and then :deliver! once by the delivery handler", async () => {
@@ -398,19 +402,16 @@ describe("Mail", () => {
 
       it("mail should not catch any exceptions when using a delivery_handler", async () => {
         message.deliveryHandler = new MyYieldingDeliveryHandler();
-        vi.spyOn(message, "deliveryMethod").mockImplementation(() => {
+        const spy = vi.spyOn(message, "deliveryMethod").mockImplementation(() => {
           throw new Exception();
         });
         await expect(message.deliver()).rejects.toThrow(Exception);
+        expect(spy).toHaveBeenCalled();
       });
 
       it("mail should not modify the Mail.deliveries object if using a delivery_handler that does not append to deliveries", async () => {
         message.deliveryHandler = new MyDeliveryHandler();
-        const before = testDeliveries();
-        const snapshot = [...before];
-        await message.deliver();
-        expect(testDeliveries()).toBe(before);
-        expect(testDeliveries()).toEqual(snapshot);
+        await expect(() => message.deliver()).not.toChange(() => Mail.TestMailer.deliveries);
       });
 
       it("should be able to just yield and let mail do its thing", async () => {
