@@ -159,23 +159,27 @@ export class Listener extends SubscriberMap {
 
     return new Promise<void>((resolve, reject) => {
       conn.on("subscribe", async (chan: string, count: number) => {
-        await this._subscriptionLock.synchronize(() => {
-          if (count === 1) {
-            this._reconnectAttempt = 0;
-            this._subscribedClient = originalClient;
+        try {
+          await this._subscriptionLock.synchronize(() => {
+            if (count === 1) {
+              this._reconnectAttempt = 0;
+              this._subscribedClient = originalClient;
 
-            while (this._whenConnected.length !== 0) {
-              this._whenConnected.shift()!();
+              while (this._whenConnected.length !== 0) {
+                this._whenConnected.shift()!();
+              }
             }
-          }
 
-          const callbacks = this._subscribeCallbacks.get(chan);
-          if (callbacks) {
-            const nextCallback = callbacks.shift();
-            if (nextCallback) this._eventLoop.post(null, nextCallback);
-            if (callbacks.length === 0) this._subscribeCallbacks.delete(chan);
-          }
-        });
+            const callbacks = this._subscribeCallbacks.get(chan);
+            if (callbacks) {
+              const nextCallback = callbacks.shift();
+              if (nextCallback) this._eventLoop.post(null, nextCallback);
+              if (callbacks.length === 0) this._subscribeCallbacks.delete(chan);
+            }
+          });
+        } catch (error) {
+          reject(error);
+        }
       });
 
       conn.on("message", (chan: string, message: string) => {
@@ -184,9 +188,13 @@ export class Listener extends SubscriberMap {
 
       conn.on("unsubscribe", async (_chan: string, count: number) => {
         if (count === 0) {
-          await this._subscriptionLock.synchronize(() => {
-            this._subscribedClient = null;
-          });
+          try {
+            await this._subscriptionLock.synchronize(() => {
+              this._subscribedClient = null;
+            });
+          } catch (error) {
+            return reject(error);
+          }
           resolve();
         }
       });
