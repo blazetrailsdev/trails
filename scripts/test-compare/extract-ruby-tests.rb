@@ -172,9 +172,6 @@ class LoopSymbolName < String; end
 
 LOOP_OPAQUE_HASH = Object.new.freeze
 
-# A literal `nil` / `false` array element, bound so `x || 'nil'` can take its
-# right operand (mail spec/mail/message_spec.rb:2001-2004) while a bare
-# interpolation of it still fails to resolve.
 LOOP_FALSY = { "nil" => Object.new.freeze, "false" => Object.new.freeze }.freeze
 
 def vendored_ruby_version
@@ -1526,7 +1523,7 @@ class TestExtractor
   # string (`:"test_to_regexp_#{Regexp.escape(path)}"` at
   # journey/path/pattern_test.rb:28) and `.keys.map(&:to_s).join(<literal>)` on a
   # bound hash (`"test_recognize_#{expected.keys.map(&:to_s).join('_')}"` at
-  # journey/router_test.rb:320), and `x || <expr>` with Ruby truthiness.
+  # journey/router_test.rb:320).
   def eval_loop_expr(node, bindings)
     return nil unless node.is_a?(Array)
     case node[0]
