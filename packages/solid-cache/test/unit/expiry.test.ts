@@ -67,7 +67,8 @@ describe("SolidCache::ExpiryTest", () => {
   }
 
   async function drain(): Promise<void> {
-    await drain();
+    await waitForBackgroundTasks(cache);
+    await t.performEnqueuedJobs();
   }
 
   async function entryCount(): Promise<number> {

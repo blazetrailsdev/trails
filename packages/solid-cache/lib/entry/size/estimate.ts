@@ -1,5 +1,5 @@
 import { sql } from "@blazetrails/arel";
-import { kernelRand, Range } from "@blazetrails/ruby-compat";
+import { Kernel, Range } from "@blazetrails/ruby-compat";
 import { Entry } from "../../entry.js";
 
 export class Estimate {
@@ -94,7 +94,7 @@ export class Estimate {
       const sampleRangeSize = await this.sampleRangeSize();
       const begin = this.keyHashRange().begin as bigint;
       const end = this.keyHashRange().end as bigint;
-      const start = begin + (kernelRand(end - sampleRangeSize - begin + 1n) as bigint);
+      const start = begin + (Kernel.rand(end - sampleRangeSize - begin + 1n) as bigint);
       return new Range(start, start + sampleRangeSize);
     }
   }

@@ -1,4 +1,4 @@
-import { rbProcCall } from "@blazetrails/ruby-compat";
+import { rbProcCall, type FixedThreadPool } from "@blazetrails/ruby-compat";
 import { Entry } from "../entry.js";
 import { Record } from "../record.js";
 import { SolidCache } from "../solid-cache.js";
@@ -6,9 +6,9 @@ import type { StoreHost } from "../store.js";
 
 export const Execution = {
   /** @internal */
-  async(this: StoreHost, block: () => unknown): void {
+  async(this: StoreHost, block: () => unknown): FixedThreadPool {
     const currentShard = Entry.currentShard();
-    this._background.append(async () => {
+    return this._background.append(async () => {
       try {
         await this.wrapInRailsExecutor(() =>
           this.connections().with(currentShard, () => this.setupInstrumentation(block)),
@@ -23,10 +23,9 @@ export const Execution = {
   },
 
   /** @internal */
-  execute<T>(this: StoreHost, async: boolean, block: () => T): T | Promise<T> | undefined {
+  execute<T>(this: StoreHost, async: boolean, block: () => T): T | Promise<T> | FixedThreadPool {
     if (async) {
-      this.async(block);
-      return undefined;
+      return this.async(block);
     } else {
       return this.setupInstrumentation(block) as T | Promise<T>;
     }

@@ -40,7 +40,7 @@ export class Engine extends TrailsEngine {
         const configPaths = ["config/cache", "config/solid_cache"];
 
         for (const path of configPaths) {
-          app.paths().add(path, { with: env.SOLID_CACHE_CONFIG || `${path}.ts` });
+          app.paths().add(path, { with: env.SOLID_CACHE_CONFIG ?? `${path}.ts` });
         }
 
         let configPathname: Pathname | undefined;
@@ -57,10 +57,15 @@ export class Engine extends TrailsEngine {
           : {};
 
         const config = this.config.solidCache;
-        if (config.connectsTo) options.connectsTo = config.connectsTo;
-        if (config.sizeEstimateSamples) options.sizeEstimateSamples = config.sizeEstimateSamples;
-        if (config.encrypt) options.encrypt = config.encrypt;
-        if (config.encryptionContextProperties) {
+        if (config.connectsTo != null && config.connectsTo !== false)
+          options.connectsTo = config.connectsTo;
+        if (config.sizeEstimateSamples != null)
+          options.sizeEstimateSamples = config.sizeEstimateSamples;
+        if (config.encrypt != null && config.encrypt !== false) options.encrypt = config.encrypt;
+        if (
+          config.encryptionContextProperties != null &&
+          config.encryptionContextProperties !== false
+        ) {
           options.encryptionContextProperties = config.encryptionContextProperties;
         }
 
@@ -68,7 +73,7 @@ export class Engine extends TrailsEngine {
           options as ConstructorParameters<typeof Configuration>[0],
         );
 
-        if (config.keyHashStage) {
+        if (config.keyHashStage != null && config.keyHashStage !== false) {
           deprecator().warn("config.solid_cache.key_hash_stage is deprecated and has no effect.");
         }
 

@@ -17,7 +17,7 @@ export const Expiry = {
   expiryBatches(this: StoreHost, count: number): number {
     let batches = Math.floor(count * this.expiresPerWrite);
     const overflowBatchChance = count * this.expiresPerWrite - batches;
-    if ((Kernel.rand as () => number)() < overflowBatchChance) batches += 1;
+    if ((Kernel.rand() as number) < overflowBatchChance) batches += 1;
     return batches;
   },
 
