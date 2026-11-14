@@ -77,7 +77,7 @@ describe("Net::HTTP", () => {
     const response = await new Net.HTTP("127.0.0.1", port).post(uri as never, "");
     expect(acceptEncoding).toBe("gzip;q=1.0,deflate;q=0.6,identity;q=0.3");
     expect(response).toBeInstanceOf(Net.HTTPOK);
-    expect(new TextDecoder().decode(response.body!)).toBe("hello");
+    expect(new TextDecoder().decode(response.body as Uint8Array)).toBe("hello");
     expect(response.get("content-encoding")).toBeNull();
     expect(response.get("content-length")).toBe("5");
     expect(response.uri!.toString()).toBe(`http://127.0.0.1:${port}/x`);
@@ -232,7 +232,7 @@ describe("Net::HTTP", () => {
     const response = await new Net.HTTP("127.0.0.1", port).get("/");
     expect(connections).toBe(2);
     expect(response.code).toBe("200");
-    expect(new TextDecoder().decode(response.body!)).toBe("ok");
+    expect(new TextDecoder().decode(response.body as Uint8Array)).toBe("ok");
 
     const error = await new Net.HTTP("127.0.0.1", port).post("/", "").catch((e: unknown) => e);
     expect(connections).toBe(3);
@@ -336,14 +336,48 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
     const http = new Net.HTTP("127.0.0.1", port);
     const chunks: string[] = [];
     await http.start(async (h) => {
-      await h.request(new Net.HTTP.Get("/"), null, (res: InstanceType<typeof Net.HTTPResponse>) => {
-        expect(res.toHash()["x-a"]).toEqual(["1"]);
-        expect(() => res.readBody("", () => {})).toThrow(
-          "both arg and block given for HTTP method",
-        );
-        res.readBody(null, (c: Uint8Array) => chunks.push(new TextDecoder().decode(c)));
-      });
+      await h.request(
+        new Net.HTTP.Get("/"),
+        null,
+        async (res: InstanceType<typeof Net.HTTPResponse>) => {
+          expect(res.toHash()["x-a"]).toEqual(["1"]);
+          await expect(res.readBody({ append: () => {} }, () => {})).rejects.toThrow(
+            "both arg and block given for HTTP method",
+          );
+          await res.readBody(null, (c: Uint8Array) => chunks.push(new TextDecoder().decode(c)));
+        },
+      );
     });
     expect(chunks).toEqual(["hello"]);
+  });
+
+  it("read_body streams each chunk through a ReadAdapter as it arrives", async () => {
+    // vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383, :592-613; protocol.rb:516-537
+    let release!: () => void;
+    const released = new Promise<void>((r) => (release = r));
+    const port = await listen(
+      createServer(async (_req, res) => {
+        res.writeHead(200, { "Content-Type": "text/plain" });
+        res.write("first");
+        await released;
+        res.end("second");
+      }),
+    );
+    const http = new Net.HTTP("127.0.0.1", port);
+    const chunks: string[] = [];
+    await http.start(async (h) => {
+      await h.request(
+        new Net.HTTP.Get("/"),
+        null,
+        async (res: InstanceType<typeof Net.HTTPResponse>) => {
+          await res.readBody(null, (c: Uint8Array) => {
+            chunks.push(new TextDecoder().decode(c));
+            release();
+          });
+          expect(res.body).toBeInstanceOf(Net.ReadAdapter);
+        },
+      );
+    });
+    expect(chunks).toEqual(["first", "second"]);
   });
 });

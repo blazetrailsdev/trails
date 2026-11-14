@@ -1,16 +1,17 @@
 import type { HttpClientResponse } from "../../http-adapter.js";
 import { ArgumentError } from "../../argument-error.js";
+import { EOFError } from "../../eof-error.js";
 import { IOError } from "../../io-error.js";
 import { rbObjDup } from "../../include.js";
 import type { HTTP as URIHTTP } from "../../uri/http.js";
 import { Zlib } from "../../zlib.js";
-import { Net } from "../protocol.js";
+import { Net, ReadAdapter } from "../protocol.js";
 
 /**
  * `Net::HTTPResponse` (`vendor/ruby/v3.3.11/lib/net/http/response.rb:136`), with
  * the part of `HTTPHeader` its reader reaches. The adapter has already read the
- * status line, headers and body off the socket, so `read_new` reads them off
- * the adapter's response.
+ * status line and headers off the socket, so `read_new` reads them off the
+ * adapter's response, whose body streams as the socket delivers it.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
  */
@@ -59,7 +60,7 @@ export class HTTPResponse {
   ignoreEof = true;
   private _uri: URIHTTP | null = null;
   private readonly _header: Record<string, string[]> = {};
-  private _body: Uint8Array | null = null;
+  private _body: Uint8Array | ReadAdapter | { append(str: Uint8Array): unknown } | null = null;
   private _read = false;
   private _socket: HttpClientResponse | null = null;
   private _bodyExist = false;
@@ -126,13 +127,13 @@ export class HTTPResponse {
     sock: HttpClientResponse,
     reqmethodallowbody: boolean,
     block: () => unknown,
-  ): Promise<Uint8Array | null> {
+  ): Promise<HTTPResponse["body"]> {
     this._socket = sock;
     this._bodyExist =
       reqmethodallowbody && (this.constructor as typeof HTTPResponse).isBodyPermitted();
     try {
       await block();
-      return this.body;
+      return await this.readBody();
     } finally {
       this._socket = null;
     }
@@ -143,33 +144,46 @@ export class HTTPResponse {
     return { ...this._header };
   }
 
-  /**
-   * `vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383`. The adapter has read the whole body
-   * before `read_body` runs, so a block is yielded it as one chunk and `@body` keeps the bytes
-   * where Ruby keeps the `Net::ReadAdapter` `procdest` builds.
-   *
-   * @noRailsEquivalent PERMANENT
-   */
-  readBody(
-    dest: unknown = null,
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#chunked?` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:654-658`). */
+  isChunked(): boolean {
+    const field = this.get("transfer-encoding");
+    return field != null && /(?:^|[^-\w])chunked(?![-\w])/i.test(field);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#content_length` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:616-621`). */
+  get contentLength(): number | null {
+    const len = this.get("content-length");
+    if (len == null) return null;
+    const m = /\d+/.exec(len);
+    if (m == null) throw new Net.HTTPHeaderSyntaxError("wrong Content-Length format");
+    return Number(m[0]);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383`. */
+  async readBody(
+    dest: { append(str: Uint8Array): unknown } | null = null,
     block: ((chunk: Uint8Array) => unknown) | null = null,
-  ): Uint8Array | null {
+  ): Promise<HTTPResponse["body"]> {
     if (this._read) {
       if (dest != null || block != null) {
         throw new IOError(`${this.constructor.name}#read_body called twice`);
       }
       return this._body;
     }
-    this.procdest(dest, block);
+    const to = this.procdest(dest, block);
     this.streamCheck();
-    this._body = this._bodyExist ? this.readBody0() : null;
-    if (this._body != null && block != null) block(this._body);
+    if (this._bodyExist) {
+      await this.readBody0(to);
+      this._body = Array.isArray(to) ? _concat(to) : to;
+    } else {
+      this._body = null;
+    }
     this._read = true;
     return this._body;
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:557-590`. */
-  inflater<T>(block: (io: Uint8Array) => T): T {
+  async inflater(block: (io: AsyncIterable<Uint8Array>) => Promise<void>): Promise<void> {
     if (!this.decodeContent) return block(this._socket!.body);
     if (this.get("content-range") != null) return block(this._socket!.body);
 
@@ -183,10 +197,9 @@ export class HTTPResponse {
         const inflateBodyIo = new Inflater(this._socket!.body);
 
         let success = false;
-        let ret!: T;
         let finishError: unknown = null;
         try {
-          ret = block(inflateBodyIo.readAll());
+          await block(inflateBodyIo);
           success = true;
         } finally {
           try {
@@ -199,7 +212,7 @@ export class HTTPResponse {
           }
         }
         if (finishError != null) throw finishError;
-        return ret;
+        return;
       }
       case "none":
       case "identity":
@@ -211,27 +224,77 @@ export class HTTPResponse {
     }
   }
 
+  /**
+   * `vendor/ruby/v3.3.11/lib/net/http/response.rb:592-613`. The adapter has
+   * already de-chunked the body, so each arm differs only in whether an early
+   * EOF raises, as `BufferedIO#read`'s `ignore_eof` and `#read_all` decide
+   * (`vendor/ruby/v3.3.11/lib/net/protocol.rb:155-192`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async readBody0(
+    dest: ReadAdapter | { append(str: Uint8Array): unknown } | Uint8Array[],
+  ): Promise<void> {
+    await this.inflater(async (inflateBodyIo) => {
+      let ignoreEof: boolean;
+      if (this.isChunked()) {
+        ignoreEof = false;
+      } else if (this.contentLength != null) {
+        ignoreEof = this.ignoreEof;
+      } else {
+        ignoreEof = true;
+      }
+      try {
+        for await (const chunk of inflateBodyIo) {
+          if (Array.isArray(dest)) dest.push(chunk);
+          else await dest.append(chunk);
+        }
+      } catch (e) {
+        if (!(e instanceof EOFError) || !ignoreEof) throw e;
+      }
+    });
+  }
+
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:642-644`. */
   private streamCheck(): void {
     if (this._socket == null) throw new IOError("attempt to read body out of block");
   }
 
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:646-654`. */
-  private procdest(dest: unknown, block: unknown): void {
+  private procdest(
+    dest: { append(str: Uint8Array): unknown } | null,
+    block: ((chunk: Uint8Array) => unknown) | null,
+  ): ReadAdapter | { append(str: Uint8Array): unknown } | Uint8Array[] {
     if (dest != null && block != null) {
       throw new ArgumentError("both arg and block given for HTTP method");
     }
+    if (block != null) {
+      return new ReadAdapter(block);
+    } else {
+      return dest ?? [];
+    }
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  readBody0(): Uint8Array {
-    return this.inflater((inflateBodyIo) => inflateBodyIo);
+  /**
+   * `HTTPResponse#body` (`vendor/ruby/v3.3.11/lib/net/http/response.rb:400-402`),
+   * read once `reading_body` has awaited `read_body`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get body(): Uint8Array | ReadAdapter | { append(str: Uint8Array): unknown } | null {
+    return this._body;
   }
+}
 
-  /** @noRailsEquivalent PERMANENT */
-  get body(): Uint8Array | null {
-    return this.readBody();
+/** @noRailsEquivalent PERMANENT */
+function _concat(chunks: Uint8Array[]): Uint8Array {
+  const bytes = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
+  let offset = 0;
+  for (const c of chunks) {
+    bytes.set(c, offset);
+    offset += c.length;
   }
+  return bytes;
 }
 
 /**
@@ -241,11 +304,11 @@ export class HTTPResponse {
  * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
  */
 export class Inflater {
-  private readonly _socket: Uint8Array;
+  private readonly _socket: AsyncIterable<Uint8Array>;
   private readonly _inflate: InstanceType<typeof Zlib.Inflate>;
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(socket: Uint8Array) {
+  constructor(socket: AsyncIterable<Uint8Array>) {
     this._socket = socket;
     this._inflate = new Zlib.Inflate(32 + Zlib.MAX_WBITS);
   }
@@ -261,8 +324,8 @@ export class Inflater {
     return this._inflate.totalOut();
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  readAll(): Uint8Array {
-    return this._inflate.inflate(this._socket);
+  /** @noRailsEquivalent PERMANENT — `Inflater#read_all` (`vendor/ruby/v3.3.11/lib/net/http/response.rb:729-735`). */
+  async *[Symbol.asyncIterator](): AsyncGenerator<Uint8Array> {
+    for await (const chunk of this._socket) yield this._inflate.inflate(chunk);
   }
 }

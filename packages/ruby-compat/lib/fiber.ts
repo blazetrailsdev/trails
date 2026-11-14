@@ -70,8 +70,9 @@ export class Fiber<R = unknown> {
     }
     fiber.#status = "suspended";
     fiber.#transfer = null;
-    return new Promise<void>((resolve) => {
+    return new Promise<void>((resolve, reject) => {
       fiber.#continue = resolve;
+      fiber.#fail = reject;
       transfer.resolve(value);
     });
   }
@@ -82,6 +83,7 @@ export class Fiber<R = unknown> {
   #running = false;
   #transfer: Transfer | null = null;
   #continue: (() => void) | null = null;
+  #fail: ((error: unknown) => void) | null = null;
 
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Fiber.new` (`vendor/ruby/v3.3.11/cont.c:3539`).
@@ -119,6 +121,7 @@ export class Fiber<R = unknown> {
       this.#status = "resumed";
       const resume = this.#continue!;
       this.#continue = null;
+      this.#fail = null;
       resume();
       return transfer.promise as R;
     }
@@ -151,6 +154,33 @@ export class Fiber<R = unknown> {
     this.#status = "terminated";
     this.#transfer = null;
     return value;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Fiber#raise` (`vendor/ruby/v3.3.11/cont.c:3269-3291`).
+   *
+   * A suspended fiber is resumed with `exception` raised at its `Fiber.yield`;
+   * every other state takes `#resume`'s checks.
+   */
+  raise(exception: Error): R {
+    if (this === Fiber.current()) throw exception;
+    if (this.#status !== "suspended") {
+      if (this.#status === "created" && this.#thread === Thread.current()) {
+        this.#status = "terminated";
+        throw exception;
+      }
+      return this.resume();
+    }
+    if (this.#thread !== Thread.current()) {
+      throw new FiberError("fiber called across threads");
+    }
+    const transfer = (this.#transfer = newTransfer());
+    this.#status = "resumed";
+    const fail = this.#fail!;
+    this.#continue = null;
+    this.#fail = null;
+    fail(exception);
+    return transfer.promise as R;
   }
 
   /**
