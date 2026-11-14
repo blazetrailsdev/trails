@@ -1,6 +1,7 @@
 import {
   extend,
   kernelCatch,
+  kernelCatchSync,
   NoMethodError,
   rbBlockGivenP,
   rbClassSuperclass,
@@ -437,7 +438,7 @@ export class Before {
     }
 
     let terminate = true;
-    const caught = kernelCatch(":abort", () => {
+    const block = () => {
       const cbResult = resultLambda();
       if (!isThenable(cbResult)) {
         terminate = false;
@@ -452,7 +453,9 @@ export class Before {
       return Promise.resolve(cbResult).then(() => {
         terminate = false;
       });
-    });
+    };
+    const caught =
+      syncChain !== undefined ? kernelCatchSync(":abort", block) : kernelCatch(":abort", block);
     if (isThenable(caught)) {
       return Promise.resolve(caught).then(() => {
         if (terminate) this.halt(env);
@@ -485,7 +488,7 @@ export class Before {
       }
       if (terminatorFn) return !terminatorFn(target, () => cb.call(target, target));
       let terminate = true;
-      kernelCatch(":abort", () => {
+      kernelCatchSync(":abort", () => {
         cb.call(target, target);
         terminate = false;
       });

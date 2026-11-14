@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "../lib/argument-error.js";
-import { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "../lib/kernel-catch.js";
+import {
+  kernelCatch,
+  kernelCatchSync,
+  kernelThrow,
+  throwDataP,
+  UncaughtThrowError,
+} from "../lib/kernel-catch.js";
 
 describe("kernelCatch", () => {
   it("raises UncaughtThrowError at the throw site with the inspected tag and value", () => {
@@ -100,24 +106,34 @@ describe("kernelCatch", () => {
     expect((results[1] as PromiseRejectedResult).reason).toBeInstanceOf(UncaughtThrowError);
   });
 
-  it("catches a throw from an awaited callback a sync block returns", async () => {
+  it("catches a throw from an awaited callback", async () => {
     const callback = async () => {
       await Promise.resolve();
       kernelThrow(":abort", ":halted");
     };
-    const res = kernelCatch(":abort", () => {
-      const cbResult = callback();
-      return Promise.resolve(cbResult).then(() => ":ran");
-    });
+    const res = kernelCatch(":abort", () => Promise.resolve(callback()).then(() => ":ran"));
     expect(await res).toBe(":halted");
     expect(() => kernelThrow(":abort")).toThrow(UncaughtThrowError);
   });
 
-  it("catches a throw from a nested sync catch inside an async block", async () => {
+  it("unwinds a sync catch to its thrown value and pops its tag", () => {
+    expect(kernelCatchSync(":abort", () => kernelThrow(":abort", ":halted"))).toBe(":halted");
+    expect(() => kernelThrow(":abort")).toThrow(UncaughtThrowError);
+  });
+
+  it("unwinds through a sync catch to an enclosing async catch", async () => {
     const res = kernelCatch(":outer", async () => {
       await Promise.resolve();
-      return kernelCatch(":inner", () => kernelThrow(":outer", ":unwound"));
+      return kernelCatchSync(":inner", () => kernelThrow(":outer", ":unwound"));
     });
     expect(await res).toBe(":unwound");
+  });
+
+  it("unwinds from an async catch nested in a sync catch to the sync tag", () => {
+    const res = kernelCatchSync(":outer", () => {
+      kernelCatch(":inner", () => kernelThrow(":outer", ":unwound"));
+      return ":ran";
+    });
+    expect(res).toBe(":unwound");
   });
 });
