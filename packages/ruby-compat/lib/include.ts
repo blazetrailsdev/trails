@@ -1830,8 +1830,8 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
  * @noRailsEquivalent PERMANENT
  */
 export function rbClassNewInstance<T>(klass: { prototype: T }, ...args: unknown[]): T {
-  if ((klass as unknown) === Hash) return new Hash(...(args as [])) as T;
-  if (klass === rbCString) return (args.length > 0 ? args[0] : "") as T;
+  if ((klass as unknown) === Hash) return new Hash() as T;
+  if (klass === rbCString) return "" as T;
   if (klass === rbCClass) return class {} as T;
   if ((klass as unknown) === RegExp && args.length === 0) {
     throw new ArgumentError("wrong number of arguments (given 0, expected 1..3)");

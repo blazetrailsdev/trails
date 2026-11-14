@@ -413,6 +413,7 @@ async function rewarmDataSourceCache(host: SchemaKlass): Promise<void> {
 /**
  * @inventedArm try — PERMANENT
  * @inventedArm rescue — PERMANENT
+ * @inventedArm rewarmDataSourceCache — PERMANENT
  */
 export async function resetColumnInformation(this: SchemaKlass): Promise<void> {
   let connection: { clearCacheBang?: () => unknown } | null | undefined;
