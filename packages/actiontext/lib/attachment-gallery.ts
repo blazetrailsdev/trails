@@ -19,14 +19,11 @@ export class AttachmentGallery extends Model {
     content: unknown,
     block: (node: Html5Node) => unknown,
   ): Promise<Fragment> {
-    let nodes: Html5Node[] = [];
-    const fragment = Fragment.wrap(content).update((source) => {
-      nodes = this.findAttachmentGalleryNodes(source);
+    return Fragment.wrap(content).update(async (source) => {
+      for (const node of this.findAttachmentGalleryNodes(source)) {
+        node.replace(toS(await block(node)));
+      }
     });
-    for (const node of nodes) {
-      node.replace(toS(await block(node)));
-    }
-    return fragment;
   }
 
   static findAttachmentGalleryNodes(content: unknown): Html5Node[] {

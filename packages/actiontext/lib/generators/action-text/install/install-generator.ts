@@ -69,8 +69,8 @@ export class InstallGenerator extends Base {
     const gemRoot = `${__dir__}/../../../..`;
 
     await this.copyFile(
-      `${gemRoot}/app/views/active-storage/blobs/_blob.html.tse`,
-      "app/views/active-storage/blobs/_blob.html.tse",
+      `${gemRoot}/app/views/active_storage/blobs/_blob.html.tse`,
+      "app/views/active_storage/blobs/_blob.html.tse",
     );
 
     await this.copyFile(

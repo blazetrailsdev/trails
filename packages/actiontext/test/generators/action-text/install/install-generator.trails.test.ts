@@ -58,7 +58,7 @@ describe("ActionText::Generators::InstallGenerator", () => {
       'pin "trix"\npin "@rails/actiontext", to: "actiontext.esm.js"\n',
     );
     expect(await read("app/assets/stylesheets/actiontext.css")).toContain(".trix-content");
-    expect(await read("app/views/active-storage/blobs/_blob.html.tse")).toContain("blob");
+    expect(await read("app/views/active_storage/blobs/_blob.html.tse")).toContain("blob");
     expect(await read("app/views/layouts/action_text/contents/_content.html.tse")).toContain(
       "trix-content",
     );

@@ -136,21 +136,15 @@ export class Content {
     options: { withFullAttributes?: boolean } = {},
     block: (attachment: Attachment | null) => unknown,
   ): Promise<Content> {
-    const nodes: Html5Node[] = [];
-    const content = this.fragment.replace(Attachment.tagName, (node) => {
+    const content = await this.fragment.replace(Attachment.tagName, async (node) => {
       if (node.isKey("content")) {
         const sanitizedContent = this.sanitizeContentAttachment(
           String(node.removeAttribute("content")),
         );
         if (isPresent(sanitizedContent)) node.set("content", sanitizedContent);
       }
-      nodes.push(node);
-      return node;
+      return block(await this.attachmentForNode(node, options));
     });
-    for (const node of nodes) {
-      const replacementNode = await block(await this.attachmentForNode(node, options));
-      if (!node.equals(replacementNode)) node.replace(String(replacementNode));
-    }
     return new (this.constructor as typeof Content)(content, { canonicalize: false });
   }
 

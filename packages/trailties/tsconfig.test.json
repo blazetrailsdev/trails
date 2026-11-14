@@ -12,6 +12,7 @@
   "references": [
     { "path": "./tsconfig.json" },
     { "path": "../actionmailbox" },
+    { "path": "../actiontext" },
     { "path": "../actioncable/tsconfig.test.json" }
   ]
 }

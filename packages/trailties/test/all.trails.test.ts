@@ -83,6 +83,7 @@ export function read(config: InstanceType<typeof Application>["config"]) {
       "actionView",
       "actionMailer",
       "actionMailbox",
+      "actionText",
     ]) {
       expect(app.deprecators.get(framework), framework).toBeDefined();
     }
@@ -91,5 +92,6 @@ export function read(config: InstanceType<typeof Application>["config"]) {
     expect(Base.queueAdapterName).toBe("test");
     expect(Base.logger).toBe(Trails.logger);
     expect(rbObjRespondTo(RecordBase, "hasOneAttached")).toBe(true);
-  });
+    expect(rbObjRespondTo(RecordBase, "hasRichText")).toBe(true);
+  }, 30_000);
 });

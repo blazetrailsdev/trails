@@ -12,9 +12,9 @@ describe("ActionText::Fragment", () => {
     expect(fragment.toString()).toBe("<p>Hi</p>");
   });
 
-  it("replaces matching nodes on a copy", () => {
+  it("replaces matching nodes on a copy", async () => {
     const fragment = Fragment.wrap("<p>a</p><div>b</div>");
-    const replaced = fragment.replace("p", () => "<span>x</span>");
+    const replaced = await fragment.replace("p", () => "<span>x</span>");
     expect(replaced.toHtml()).toBe("<span>x</span><div>b</div>");
     expect(fragment.toHtml()).toBe("<p>a</p><div>b</div>");
     expect(replaced.findAll("span").length).toBe(1);

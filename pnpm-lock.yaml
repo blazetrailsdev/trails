@@ -1243,6 +1243,9 @@ importers:
       '@blazetrails/actionmailbox':
         specifier: workspace:*
         version: link:../actionmailbox
+      '@blazetrails/actiontext':
+        specifier: workspace:*
+        version: link:../actiontext
       '@blazetrails/activerecord-cli':
         specifier: workspace:*
         version: link:../activerecord-cli

@@ -36,18 +36,18 @@ export class Fragment {
     return this.source.css(selector);
   }
 
-  update(block: (source: Html5DocumentFragment) => void): Fragment {
+  async update(block: (source: Html5DocumentFragment) => unknown): Promise<Fragment> {
     const source = this.source.dup();
-    block(source);
+    await block(source);
     return new (this.constructor as typeof Fragment)(source);
   }
 
-  replace(selector: string, block: (node: Html5Node) => unknown): Fragment {
-    return this.update((source) => {
-      source.css(selector).each((node) => {
-        const replacementNode = block(node);
+  replace(selector: string, block: (node: Html5Node) => unknown): Promise<Fragment> {
+    return this.update(async (source) => {
+      for (const node of source.css(selector).toA()) {
+        const replacementNode = await block(node);
         if (!node.equals(replacementNode)) node.replace(String(replacementNode));
-      });
+      }
     });
   }
 

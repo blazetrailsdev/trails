@@ -46,18 +46,13 @@ export const TrixConversion = {
 extend(TrixConversion, Concern);
 
 TrixConversion.classMethods((mod) => {
-  /** @inventedArm await — CONVERGEABLE actiontext-fragment-replace-awaits-its-block */
-  mod.fragmentByConvertingTrixAttachments = async function (
+  mod.fragmentByConvertingTrixAttachments = function (
     this: TrixConversionClass,
     content: unknown,
   ): Promise<Fragment> {
-    const fragment = Fragment.wrap(content);
-    const attachments: unknown[] = [];
-    for (const node of fragment.findAll(TrixAttachment.SELECTOR).toA()) {
-      attachments.push(await this.fromTrixAttachment(new TrixAttachment(node)));
-    }
-    let index = 0;
-    return fragment.replace(TrixAttachment.SELECTOR, () => attachments[index++]);
+    return Fragment.wrap(content).replace(TrixAttachment.SELECTOR, (node) =>
+      this.fromTrixAttachment(new TrixAttachment(node)),
+    );
   };
 
   mod.fromTrixAttachment = function (

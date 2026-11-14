@@ -40,7 +40,7 @@ export interface Attachment {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class Attachment {
   declare static tagName: string;
-  declare static fragmentByMinifyingAttachments: (content: unknown) => Fragment;
+  declare static fragmentByMinifyingAttachments: (content: unknown) => Promise<Fragment>;
   declare static fragmentByConvertingTrixAttachments: (content: unknown) => Promise<Fragment>;
   declare static fromTrixAttachment: (trixAttachment: unknown) => Promise<Attachment | null>;
 
