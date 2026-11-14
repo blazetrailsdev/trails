@@ -43,7 +43,7 @@ describe("DevServerTest", () => {
     await refreshConfig({ mode: "development" });
     await removeMetaFile();
 
-    expect(await ViteAssets.instance().isDevServerRunning()).toBe(false);
+    expect(await ViteAssets.instance().isDevServerRunning()).toBeFalsy();
   });
 
   it("running with meta file", async () => {
@@ -57,7 +57,7 @@ describe("DevServerTest", () => {
         pid: 1234,
       });
 
-      expect(await ViteAssets.instance().isDevServerRunning()).toBe(true);
+      expect(await ViteAssets.instance().isDevServerRunning()).toBeTruthy();
       expect((await exposed().devServerMeta())["url"]).toBe("http://localhost:3535");
     } finally {
       await removeMetaFile();
@@ -75,7 +75,7 @@ describe("DevServerTest", () => {
       await refreshConfig({ mode: "test" });
 
       await withoutCi(async () => {
-        expect(await ViteAssets.instance().isDevServerRunning()).toBe(false);
+        expect(await ViteAssets.instance().isDevServerRunning()).toBeFalsy();
       });
     } finally {
       if ((await ViteAssets.config()).mode === "test") await removeMetaFile();
@@ -90,7 +90,7 @@ describe("DevServerTest", () => {
       await writeMetaFile({ port: (await ViteAssets.config()).port });
 
       await withoutCi(async () => {
-        expect(await ViteAssets.instance().isDevServerRunning()).toBe(true);
+        expect(await ViteAssets.instance().isDevServerRunning()).toBeTruthy();
       });
     } finally {
       await removeMetaFile();
@@ -102,7 +102,7 @@ describe("DevServerTest", () => {
     try {
       await writeMetaFile({ port: (await ViteAssets.config()).port + 1 });
 
-      expect(await ViteAssets.instance().isDevServerRunning()).toBe(false);
+      expect(await ViteAssets.instance().isDevServerRunning()).toBeFalsy();
     } finally {
       await removeMetaFile();
     }
@@ -115,7 +115,7 @@ describe("DevServerTest", () => {
       await FileUtils.mkdirPAsync(File.dirname(path.toString()));
       await path.write(JSON.stringify("not a metadata object"));
 
-      expect(await ViteAssets.instance().isDevServerRunning()).toBe(false);
+      expect(await ViteAssets.instance().isDevServerRunning()).toBeFalsy();
     } finally {
       await removeMetaFile();
     }
@@ -126,7 +126,7 @@ describe("DevServerTest", () => {
     try {
       await writeMetaFile({ url: "http://localhost:3036" });
 
-      expect(await ViteAssets.instance().isDevServerRunning()).toBe(false);
+      expect(await ViteAssets.instance().isDevServerRunning()).toBeFalsy();
     } finally {
       await removeMetaFile();
     }
@@ -140,7 +140,7 @@ describe("DevServerTest", () => {
       await stubConnect(
         () => Promise.reject(new Error("ECONNREFUSED")),
         async () => {
-          expect(await ViteAssets.instance().isDevServerRunning()).toBe(false);
+          expect(await ViteAssets.instance().isDevServerRunning()).toBeFalsy();
         },
       );
     } finally {
@@ -155,7 +155,7 @@ describe("DevServerTest", () => {
     await stubConnect(
       () => Promise.resolve({ close() {} }),
       async () => {
-        expect(await ViteAssets.instance().isDevServerRunning()).toBe(true);
+        expect(await ViteAssets.instance().isDevServerRunning()).toBeTruthy();
       },
     );
   });
