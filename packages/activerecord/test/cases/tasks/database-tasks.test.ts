@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
-import { EnvironmentInquirer, getEnv } from "@blazetrails/activesupport";
+import { StringInquirer, getEnv } from "@blazetrails/activesupport";
 import {
   assertCalled,
   assertCalledWith as assertCalledWithArgs,
@@ -605,7 +605,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
         [configFor("test", "primary")],
         {},
         async () => {
-          await DatabaseTasks.createCurrent(new EnvironmentInquirer("test"));
+          await DatabaseTasks.createCurrent(new StringInquirer("test"));
         },
       ),
     );
@@ -619,7 +619,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
         [configFor("production", "primary")],
         {},
         async () => {
-          await DatabaseTasks.createCurrent(new EnvironmentInquirer("production"));
+          await DatabaseTasks.createCurrent(new StringInquirer("production"));
         },
       ),
     );
@@ -631,7 +631,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
         "create",
         [[configFor("development", "primary")], [configFor("test", "primary")]],
         async () => {
-          await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+          await DatabaseTasks.createCurrent(new StringInquirer("development"));
         },
       ),
     );
@@ -647,7 +647,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
           "create",
           [[configFor("development", "primary")], [configFor("test", "primary")]],
           async () => {
-            await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+            await DatabaseTasks.createCurrent(new StringInquirer("development"));
           },
         ),
       );
@@ -664,7 +664,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     try {
       await withStubbedConfigurationsEstablishConnection(() =>
         assertCalledForConfigs("create", [[configFor("development", "primary")]], async () => {
-          await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+          await DatabaseTasks.createCurrent(new StringInquirer("development"));
         }),
       );
     } finally {
@@ -676,7 +676,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   it("establishes connection for the given environments", async () => {
     await stub(DatabaseTasks, "create", null, undefined, () =>
       assertCalledWithArgs(Base, "establishConnection", [":development"], {}, async () => {
-        await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+        await DatabaseTasks.createCurrent(new StringInquirer("development"));
       }),
     );
   });
@@ -720,7 +720,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
         "create",
         [[configFor("test", "primary")], [configFor("test", "secondary")]],
         async () => {
-          await DatabaseTasks.createCurrent(new EnvironmentInquirer("test"));
+          await DatabaseTasks.createCurrent(new StringInquirer("test"));
         },
       ),
     );
@@ -732,7 +732,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
         "create",
         [[configFor("production", "primary")], [configFor("production", "secondary")]],
         async () => {
-          await DatabaseTasks.createCurrent(new EnvironmentInquirer("production"));
+          await DatabaseTasks.createCurrent(new StringInquirer("production"));
         },
       ),
     );
@@ -749,7 +749,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
           [configFor("test", "secondary")],
         ],
         async () => {
-          await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+          await DatabaseTasks.createCurrent(new StringInquirer("development"));
         },
       ),
     );
@@ -770,7 +770,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
             [configFor("test", "secondary")],
           ],
           async () => {
-            await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+            await DatabaseTasks.createCurrent(new StringInquirer("development"));
           },
         ),
       );
@@ -782,7 +782,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   it("establishes connection for the given environments config", async () => {
     await stub(DatabaseTasks, "create", null, undefined, () =>
       assertCalledWithArgs(Base, "establishConnection", [":development"], {}, async () => {
-        await DatabaseTasks.createCurrent(new EnvironmentInquirer("development"));
+        await DatabaseTasks.createCurrent(new StringInquirer("development"));
       }),
     );
   });
@@ -910,7 +910,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
   it("drops current environment database", async () => {
     await withStubbedConfigurations(() =>
       assertCalledWithArgs(DatabaseTasks, "drop", [configFor("test", "primary")], {}, async () => {
-        await DatabaseTasks.dropCurrent(new EnvironmentInquirer("test"));
+        await DatabaseTasks.dropCurrent(new StringInquirer("test"));
       }),
     );
   });
@@ -923,7 +923,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
         [configFor("production", "primary")],
         {},
         async () => {
-          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("production"));
+          await DatabaseTasks.dropCurrent(new StringInquirer("production"));
         },
       ),
     );
@@ -935,7 +935,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
         "drop",
         [[configFor("development", "primary")], [configFor("test", "primary")]],
         async () => {
-          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("development"));
+          await DatabaseTasks.dropCurrent(new StringInquirer("development"));
         },
       ),
     );
@@ -951,7 +951,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
           "drop",
           [[configFor("development", "primary")], [configFor("test", "primary")]],
           async () => {
-            await DatabaseTasks.dropCurrent(new EnvironmentInquirer("development"));
+            await DatabaseTasks.dropCurrent(new StringInquirer("development"));
           },
         ),
       );
@@ -997,7 +997,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
         "drop",
         [[configFor("test", "primary")], [configFor("test", "secondary")]],
         async () => {
-          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("test"));
+          await DatabaseTasks.dropCurrent(new StringInquirer("test"));
         },
       ),
     );
@@ -1009,7 +1009,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
         "drop",
         [[configFor("production", "primary")], [configFor("production", "secondary")]],
         async () => {
-          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("production"));
+          await DatabaseTasks.dropCurrent(new StringInquirer("production"));
         },
       ),
     );
@@ -1026,7 +1026,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
           [configFor("test", "secondary")],
         ],
         async () => {
-          await DatabaseTasks.dropCurrent(new EnvironmentInquirer("development"));
+          await DatabaseTasks.dropCurrent(new StringInquirer("development"));
         },
       ),
     );
@@ -1047,7 +1047,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
             [configFor("test", "secondary")],
           ],
           async () => {
-            await DatabaseTasks.dropCurrent(new EnvironmentInquirer("development"));
+            await DatabaseTasks.dropCurrent(new StringInquirer("development"));
           },
         ),
       );
@@ -1413,7 +1413,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     Base.configurations(configurations);
 
     await stub(DatabaseTasks, "root", null, undefined, async () => {
-      await DatabaseTasks.truncateAll(new EnvironmentInquirer("development"));
+      await DatabaseTasks.truncateAll(new StringInquirer("development"));
     });
 
     expect(await schemaMigration.count()).toBeGreaterThan(0);
@@ -1480,7 +1480,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
         "truncateTables",
         [[configFor("test", "primary")], [configFor("test", "secondary")]],
         async () => {
-          await DatabaseTasks.truncateAll(new EnvironmentInquirer("test"));
+          await DatabaseTasks.truncateAll(new StringInquirer("test"));
         },
       ),
     );
@@ -1492,7 +1492,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
         "truncateTables",
         [[configFor("production", "primary")], [configFor("production", "secondary")]],
         async () => {
-          await DatabaseTasks.truncateAll(new EnvironmentInquirer("production"));
+          await DatabaseTasks.truncateAll(new StringInquirer("production"));
         },
       ),
     );
@@ -1504,7 +1504,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
         "truncateTables",
         [[configFor("development", "primary")], [configFor("development", "secondary")]],
         async () => {
-          await DatabaseTasks.truncateAll(new EnvironmentInquirer("development"));
+          await DatabaseTasks.truncateAll(new StringInquirer("development"));
         },
       ),
     );
@@ -1520,7 +1520,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
           "truncateTables",
           [[configFor("development", "primary")], [configFor("development", "secondary")]],
           async () => {
-            await DatabaseTasks.truncateAll(new EnvironmentInquirer("development"));
+            await DatabaseTasks.truncateAll(new StringInquirer("development"));
           },
         ),
       );
