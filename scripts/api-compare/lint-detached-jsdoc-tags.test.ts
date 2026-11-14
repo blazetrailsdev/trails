@@ -110,9 +110,9 @@ describe("listLintedFiles", () => {
       await fs.mkdir(path.dirname(abs), { recursive: true });
       await fs.writeFile(abs, "");
     };
-    await write(path.join("packages", "actionmailbox", "src", "base.ts"));
-    await write(path.join("packages", "actionmailbox", "src", "base.test.ts"));
-    await write(path.join("packages", "actionmailbox", "src", "dist", "base.ts"));
+    await write(path.join("packages", "website", "src", "base.ts"));
+    await write(path.join("packages", "website", "src", "base.test.ts"));
+    await write(path.join("packages", "website", "src", "dist", "base.ts"));
     await write(path.join("packages", "arel", "no-src-dir.ts"));
     await write(path.join("scripts", "start-worktree.ts"));
     await write(path.join("scripts", "api-compare", "extract-ts-api.ts"));
@@ -129,8 +129,8 @@ describe("listLintedFiles", () => {
   it("adds every nested .ts under scripts to the packages population", async () => {
     const files = await listLintedFiles(path.join(dir, "packages"), path.join(dir, "scripts"));
     expect(files.map((f) => path.relative(dir, f))).toEqual([
-      path.join("packages", "actionmailbox", "src", "base.test.ts"),
-      path.join("packages", "actionmailbox", "src", "base.ts"),
+      path.join("packages", "website", "src", "base.test.ts"),
+      path.join("packages", "website", "src", "base.ts"),
       path.join("scripts", "api-compare", "extract-ts-api.test.ts"),
       path.join("scripts", "api-compare", "extract-ts-api.ts"),
       path.join("scripts", "start-worktree.ts"),
@@ -140,8 +140,8 @@ describe("listLintedFiles", () => {
   it("keeps the packages population when the scripts directory does not exist", async () => {
     const files = await listLintedFiles(path.join(dir, "packages"), path.join(dir, "missing"));
     expect(files.map((f) => path.relative(dir, f))).toEqual([
-      path.join("packages", "actionmailbox", "src", "base.test.ts"),
-      path.join("packages", "actionmailbox", "src", "base.ts"),
+      path.join("packages", "website", "src", "base.test.ts"),
+      path.join("packages", "website", "src", "base.ts"),
     ]);
   });
 });
