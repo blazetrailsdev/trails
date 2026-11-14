@@ -36,19 +36,41 @@ export class Fragment {
     return this.source.css(selector);
   }
 
-  update(block: (source: Html5DocumentFragment) => void): Fragment {
+  update(block: (source: Html5DocumentFragment) => Promise<void>): Promise<Fragment>;
+  update(block: (source: Html5DocumentFragment) => void): Fragment;
+  /** @inventedArm then — PERMANENT */
+  update(block: (source: Html5DocumentFragment) => unknown): Fragment | Promise<Fragment> {
     const source = this.source.dup();
-    block(source);
+    const yielded = block(source);
+    if (yielded instanceof Promise) {
+      return yielded.then(() => new (this.constructor as typeof Fragment)(source));
+    }
     return new (this.constructor as typeof Fragment)(source);
   }
 
-  replace(selector: string, block: (node: Html5Node) => unknown): Fragment {
-    return this.update((source) => {
+  replace(selector: string, block: (node: Html5Node) => Promise<unknown>): Promise<Fragment>;
+  replace(selector: string, block: (node: Html5Node) => unknown): Fragment;
+  /** @inventedArm then — PERMANENT */
+  replace(selector: string, block: (node: Html5Node) => unknown): Fragment | Promise<Fragment> {
+    return this.update((source): Promise<void> | void => {
+      let pending: Promise<void> | null = null;
       source.css(selector).each((node) => {
+        const swap = (replacementNode: unknown): void => {
+          if (!node.equals(replacementNode)) node.replace(String(replacementNode));
+        };
+        if (pending) {
+          pending = pending.then(async () => swap(await block(node)));
+          return;
+        }
         const replacementNode = block(node);
-        if (!node.equals(replacementNode)) node.replace(String(replacementNode));
+        if (replacementNode instanceof Promise) {
+          pending = replacementNode.then(swap);
+        } else {
+          swap(replacementNode);
+        }
       });
-    });
+      return pending ?? undefined;
+    }) as Fragment | Promise<Fragment>;
   }
 
   toPlainText(): string {

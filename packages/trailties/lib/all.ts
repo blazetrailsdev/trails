@@ -8,6 +8,7 @@ export type {} from "./trailties/active-job.js";
 
 const activeStorageEngine = "@blazetrails/activestorage/engine";
 const actionMailboxEngine = "@blazetrails/actionmailbox/engine";
+const actionTextEngine = "@blazetrails/actiontext/engine";
 const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/railtie": () => import("./trailties/active-record.js"),
   "active_storage/engine": () => import(activeStorageEngine),
@@ -17,6 +18,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_job/railtie": () => import("./trailties/active-job.js"),
   "action_cable/engine": () => import("./trailties/action-cable.js"),
   "action_mailbox/engine": () => import(actionMailboxEngine),
+  "action_text/engine": () => import(actionTextEngine),
   "trails/test_unit/railtie": () => import("./test-unit/trailtie.js"),
 };
 

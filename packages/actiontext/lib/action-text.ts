@@ -9,6 +9,7 @@ import type { Attachment } from "./attachment.js";
 import type { Attribute } from "./attribute.js";
 import type { EncryptedRichText } from "./encrypted-rich-text.js";
 import type { Encryption } from "./encryption.js";
+import type { Engine } from "./engine.js";
 import type { FixtureSet } from "./fixture-set.js";
 import type { Record as ActionTextRecord } from "./record.js";
 import type { RichText } from "./rich-text.js";
@@ -90,6 +91,7 @@ export const ActionText = {
   Content?: typeof Content;
   EncryptedRichText?: typeof EncryptedRichText;
   Encryption?: typeof Encryption;
+  Engine?: typeof Engine;
   FixtureSet?: typeof FixtureSet;
   ContentHelper?: typeof ContentHelper;
   Fragment?: typeof Fragment;
