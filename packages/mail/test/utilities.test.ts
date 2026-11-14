@@ -49,7 +49,7 @@ describe("Utilities Module", () => {
         expect(quoteToken("?=abc")).toBe('"?=abc"');
       });
 
-      it.skip("should work with mb_chars", () => {
+      it("should work with mb_chars", () => {
         expect(String(quoteToken(mbChars(".abc")))).toBe(".abc");
         expect(quoteToken(mbChars("?=abc"))).toBe('"?=abc"');
       });
@@ -81,12 +81,12 @@ describe("Utilities Module", () => {
         expect(quoteAtom(".abc")).toBe('".abc"');
       });
 
-      it.skip("should work with mb_chars", () => {
+      it("should work with mb_chars", () => {
         expect(String(quoteAtom(mbChars("?=abc")))).toBe("?=abc");
         expect(quoteAtom(mbChars(".abc"))).toBe('".abc"');
       });
 
-      it.skip("should quote mb_chars white space", () => {
+      it("should quote mb_chars white space", () => {
         expect(quoteAtom(mbChars("ab abc"))).toBe('"ab abc"');
         expect(quoteAtom(mbChars("a b\ta\r\nbc"))).toBe('"a b\ta\r\nbc"');
       });
@@ -143,13 +143,13 @@ describe("Utilities Module", () => {
       expect(unparen("This is a string")).toBe("This is a string");
     });
 
-    it.skip("should work using Multibyte.mb_chars", () => {
+    it("should work using Multibyte.mb_chars", () => {
       const test = mbChars("(This is a string)");
       const result = "This is a string";
       expect(String(unparen(test))).toBe(result);
     });
 
-    it.skip("should work without parens using Multibyte.mb_chars", () => {
+    it("should work without parens using Multibyte.mb_chars", () => {
       const test = mbChars("This is a string");
       const result = "This is a string";
       expect(String(unparen(test))).toBe(result);
@@ -165,13 +165,13 @@ describe("Utilities Module", () => {
       expect(unbracket("This is a string")).toBe("This is a string");
     });
 
-    it.skip("should work using Multibyte.mb_chars", () => {
+    it("should work using Multibyte.mb_chars", () => {
       const test = mbChars("<This is a string>");
       const result = "This is a string";
       expect(String(unbracket(test))).toBe(result);
     });
 
-    it.skip("should work without parens using Multibyte.mb_chars", () => {
+    it("should work without parens using Multibyte.mb_chars", () => {
       const test = mbChars("This is a string");
       const result = "This is a string";
       expect(String(unbracket(test))).toBe(result);

@@ -1311,10 +1311,12 @@
       },
       "queue-adapter.ts": {
         "*": {
-          "queueAdapter": ["ArgumentError"]
+          "queueAdapter": ["ArgumentError"],
+          "setQueueAdapter": ["ArgumentError"]
         },
         "ClassMethods": {
-          "queueAdapter": ["ArgumentError"]
+          "queueAdapter": ["ArgumentError"],
+          "setQueueAdapter": ["ArgumentError"]
         }
       },
       "queue-adapters/abstract-adapter.ts": {
@@ -1380,6 +1382,7 @@
       }
     },
     "msgpack": {},
+    "rack-proxy": {},
     "rack-session": {},
     "rack-test": {},
     "thor": {
@@ -1417,6 +1420,7 @@
     "globalid": [],
     "i18n": [],
     "msgpack": [],
+    "rack-proxy": [],
     "rack-session": [],
     "rack-test": [],
     "thor": []

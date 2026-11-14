@@ -4,6 +4,7 @@ import {
   kernelRand,
   Process,
   rbObjAsString,
+  rbAutoloadStr,
   rbObjId,
   rbStrToI,
   sprintf,
@@ -76,6 +77,7 @@ export interface MailConstants {
   "new"(...args: unknown[]): Message;
   read(filename: string): Promise<Message>;
   readFromString(mailAsString: string): Message;
+  deliver(...args: unknown[]): Promise<Message>;
   defaults(block: (this: Configuration) => unknown): unknown;
   deliveryMethod(): unknown;
   retrieverMethod(): RetrieverMethod;
@@ -96,6 +98,8 @@ export interface MailConstants {
   unregisterInterceptor(interceptor: DeliveryInterceptor): void;
   informObservers(mail: Message): void;
   informInterceptors(mail: Message): void;
+  registerAutoload(name: string, path: string): void;
+  eagerAutoloadBang(): Promise<void>;
 }
 
 export interface DeliveryObserver {
@@ -108,8 +112,18 @@ export interface DeliveryInterceptor {
 
 const deliveryNotificationObservers: DeliveryObserver[] = [];
 const deliveryInterceptors: DeliveryInterceptor[] = [];
+const autoloads: Record<string, string> = {};
 
 export const Mail: MailConstants = {
+  registerAutoload(name: string, path: string) {
+    autoloads[name] = path;
+    rbAutoloadStr(Mail, name, path);
+  },
+
+  async eagerAutoloadBang() {
+    for (const path of Object.values(autoloads)) await import(path);
+  },
+
   RANDOM_TAG: "%x%x_%x%x%d%x",
 
   new(...args: unknown[]) {
@@ -151,6 +165,13 @@ export const Mail: MailConstants = {
 
   async read(filename: string): Promise<Message> {
     return Mail.new(await File.openAsync(filename, "rb", (f) => f.readAsync()));
+  },
+
+  async deliver(...args: unknown[]) {
+    const block = typeof args.at(-1) === "function" ? args.pop() : undefined;
+    const mail = block === undefined ? Mail.new(args) : Mail.new(args, block);
+    await mail.deliver();
+    return mail;
   },
 
   deleteAll(...args: unknown[]) {

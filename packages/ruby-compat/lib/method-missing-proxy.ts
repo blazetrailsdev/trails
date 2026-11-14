@@ -128,8 +128,14 @@ function isMethod(delegate: object, prop: string | symbol): boolean {
  */
 export function methodMissingPrototype<
   T extends { methodMissing(m: string, ...args: unknown[]): unknown },
->(klass: { prototype: T }, options: { delegate: (receiver: T) => unknown }): void {
-  const { delegate: readDelegate } = options;
+>(
+  klass: { prototype: T },
+  options: {
+    delegate: (receiver: T) => unknown;
+    wrap?: (receiver: T, result: unknown) => unknown;
+  },
+): void {
+  const { delegate: readDelegate, wrap } = options;
   const parent = Object.getPrototypeOf(klass.prototype) as object;
   Object.setPrototypeOf(
     klass.prototype,
@@ -145,9 +151,9 @@ export function methodMissingPrototype<
         const delegate = readDelegate(receiver);
         if (respondsTo(delegate, prop)) {
           const value = (delegate as Record<string | symbol, unknown>)[prop];
-          return typeof value === "function" && isMethod(delegate as object, prop)
-            ? value.bind(delegate)
-            : value;
+          if (typeof value !== "function" || !isMethod(delegate as object, prop)) return value;
+          if (wrap === undefined) return value.bind(delegate);
+          return (...args: unknown[]) => wrap(receiver, value.apply(delegate, args));
         }
         if (typeof prop === "symbol" || PROTOCOL_PROBES.has(prop) || KERNEL_METHODS.has(prop)) {
           return undefined;

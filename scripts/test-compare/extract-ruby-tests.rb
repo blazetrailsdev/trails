@@ -172,6 +172,8 @@ class LoopSymbolName < String; end
 
 LOOP_OPAQUE_HASH = Object.new.freeze
 
+LOOP_FALSY = { "nil" => Object.new.freeze, "false" => Object.new.freeze }.freeze
+
 def vendored_ruby_version
   @vendored_ruby_version ||= JSON.parse(
     File.read(File.join(SCRIPT_DIR, "..", "..", "vendor", "sources.lock.json"))
@@ -1399,6 +1401,9 @@ class TestExtractor
 
   def array_element_value(node)
     return nil unless node.is_a?(Array)
+    if node[0] == :var_ref && node[1].is_a?(Array) && node[1][0] == :@kw && LOOP_FALSY.key?(node[1][1])
+      return LOOP_FALSY[node[1][1]]
+    end
     case node[0]
     when :var_ref, :const_ref, :const_path_ref, :top_const_ref, :@const
       path = const_path(node)
@@ -1527,6 +1532,14 @@ class TestExtractor
       bound.is_a?(String) ? bound : nil
     when :string_literal
       interpolated_name(node, bindings)
+    when :binary
+      _, left, op, right = node
+      return nil unless op == :"||"
+      if left.is_a?(Array) && %i[var_ref vcall].include?(left[0]) && LOOP_FALSY.value?(bindings[ident_name(left[1])])
+        eval_loop_expr(right, bindings)
+      else
+        eval_loop_expr(left, bindings)
+      end
     when :ifop
       taken = eval_loop_condition(node[1], bindings)
       return nil if taken.nil?

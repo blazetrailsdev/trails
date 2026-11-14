@@ -890,6 +890,18 @@ export function deleteAt<T>(ary: T[], pos: number): T | null {
 }
 
 /**
+ * Ruby `Array#first(n)` (`ary_take_first_or_last_n`,
+ * `vendor/ruby/v3.3.11/array.c:1292`): at most `n` elements, and
+ * `ArgumentError` for a negative `n`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbAryFirst<T>(ary: readonly T[], n: number): T[] {
+  if (n < 0) throw new ArgumentError("negative array size");
+  return ary.slice(0, n);
+}
+
+/**
  * Ruby `Array#first` with no argument (`vendor/ruby/v3.3.11/array.c:1901` `ary_first`):
  * the first element, or `nil` for an empty array. Any other enumerable is
  * `Enumerable#first` (`vendor/ruby/v3.3.11/enum.c:1284` `enum_first`), whose

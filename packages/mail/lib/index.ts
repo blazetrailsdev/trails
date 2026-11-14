@@ -1,4 +1,7 @@
 import "./constants.generated.js";
+import "./network.js";
+import "./fields.js";
+import "./elements.js";
 export { Encodings, UnknownEncodingType } from "./encodings.js";
 export { TransferEncoding } from "./encodings/transfer-encoding.js";
 export { Identity } from "./encodings/identity.js";

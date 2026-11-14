@@ -66,3 +66,23 @@ describe("Unicode.applyMapping", () => {
     expect(Unicode.applyMapping("aÉ", ":uppercase_mapping")).toBe("AÉ");
   });
 });
+
+describe("Mail::Multibyte::Chars method_missing (trails)", () => {
+  it("wraps a String result of a forwarded String method in Chars", () => {
+    const chars = new Chars("(abc)") as unknown as { replace(re: RegExp, s: string): unknown };
+    expect(chars.replace(/[()]/g, "")).toBeInstanceOf(Chars);
+    expect(String(chars.replace(/[()]/g, ""))).toBe("abc");
+  });
+});
+
+describe("Mail::Multibyte::Chars bang method_missing (trails)", () => {
+  it("mutates the wrapped string and returns self for a forwarded bang", () => {
+    const chars = new Chars("(abc)");
+    const result = (chars as unknown as { gsubBang(re: RegExp, s: string): unknown }).gsubBang(
+      /[()]/g,
+      "",
+    );
+    expect(result).toBe(chars);
+    expect(chars.wrappedString).toBe("abc");
+  });
+});

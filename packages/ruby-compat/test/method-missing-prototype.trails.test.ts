@@ -26,4 +26,23 @@ describe("methodMissingPrototype (trails)", () => {
     const name = wrapper.name;
     expect(name()).toBe("posts");
   });
+
+  it("maps a delegate method's result through wrap", () => {
+    class Box {
+      constructor(readonly inner: string) {}
+      methodMissing(m: string): never {
+        throw new Error(`undefined method '${m}'`);
+      }
+      static {
+        methodMissingPrototype(Box, {
+          delegate: (receiver) => receiver.inner,
+          wrap: (_receiver, result) => (typeof result === "string" ? new Box(result) : result),
+        });
+      }
+    }
+    const box = new Box("abc") as Box & { toUpperCase(): unknown; indexOf(s: string): unknown };
+    expect(box.toUpperCase()).toBeInstanceOf(Box);
+    expect((box.toUpperCase() as Box).inner).toBe("ABC");
+    expect(box.indexOf("b")).toBe(1);
+  });
 });
