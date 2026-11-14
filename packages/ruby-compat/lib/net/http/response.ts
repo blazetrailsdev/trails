@@ -226,9 +226,8 @@ export class HTTPResponse {
 
   /**
    * `vendor/ruby/v3.3.11/lib/net/http/response.rb:592-613`. The adapter has
-   * already de-chunked the body, so each arm differs only in whether an early
-   * EOF raises, as `BufferedIO#read`'s `ignore_eof` and `#read_all` decide
-   * (`vendor/ruby/v3.3.11/lib/net/protocol.rb:155-192`).
+   * already de-chunked and length-delimited the body, so each arm reads it to
+   * the end and differs only in whether an early EOF raises.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -236,23 +235,40 @@ export class HTTPResponse {
     dest: ReadAdapter | { append(str: Uint8Array): unknown } | Uint8Array[],
   ): Promise<void> {
     await this.inflater(async (inflateBodyIo) => {
-      let ignoreEof: boolean;
       if (this.isChunked()) {
-        ignoreEof = false;
-      } else if (this.contentLength != null) {
-        ignoreEof = this.ignoreEof;
-      } else {
-        ignoreEof = true;
+        await _read(inflateBodyIo, dest, false);
+        return;
       }
-      try {
-        for await (const chunk of inflateBodyIo) {
-          if (Array.isArray(dest)) dest.push(chunk);
-          else await dest.append(chunk);
-        }
-      } catch (e) {
-        if (!(e instanceof EOFError) || !ignoreEof) throw e;
+
+      let clen = this.contentLength;
+      if (clen != null) {
+        await _read(inflateBodyIo, dest, this.ignoreEof);
+        return;
       }
+      clen = this.rangeLength();
+      if (clen != null) {
+        await _read(inflateBodyIo, dest, false);
+        return;
+      }
+      await _read(inflateBodyIo, dest, true);
     });
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#content_range` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:670-676`). */
+  contentRange(): [number, number] | null {
+    const field = this.get("content-range");
+    if (field == null) return null;
+    const m = /^\s*(\w+)\s+(\d+)-(\d+)\/(\d+|\*)/.exec(field);
+    if (m == null) throw new Net.HTTPHeaderSyntaxError("wrong Content-Range format");
+    if (m[1] !== "bytes") return null;
+    return [Number(m[2]), Number(m[3])];
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#range_length` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:687-690`). */
+  rangeLength(): number | null {
+    const r = this.contentRange();
+    if (r == null) return null;
+    return r[1] - r[0] + 1;
   }
 
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:642-644`. */
@@ -283,6 +299,27 @@ export class HTTPResponse {
    */
   get body(): Uint8Array | ReadAdapter | { append(str: Uint8Array): unknown } | null {
     return this._body;
+  }
+}
+
+/**
+ * `BufferedIO#read` / `#read_all` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:155-192`)
+ * over the adapter's body stream.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+async function _read(
+  io: AsyncIterable<Uint8Array>,
+  dest: ReadAdapter | { append(str: Uint8Array): unknown } | Uint8Array[],
+  ignoreEof: boolean,
+): Promise<void> {
+  try {
+    for await (const chunk of io) {
+      if (Array.isArray(dest)) dest.push(chunk);
+      else await dest.append(chunk);
+    }
+  } catch (e) {
+    if (!(e instanceof EOFError) || !ignoreEof) throw e;
   }
 }
 
