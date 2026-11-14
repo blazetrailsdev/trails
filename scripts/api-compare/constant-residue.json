@@ -1339,14 +1339,21 @@
     "residue": {}
   },
   "solid-cache": {
-    "rows": 15,
-    "excluded": [],
+    "rows": 22,
+    "excluded": [
+      "entry/expiration.ts::ClassMethods",
+      "entry/size.ts::ClassMethods",
+      "expiry-job.ts::ExpiryJob"
+    ],
     "unwalked": [
       "connections.ts::Connections",
       "store/api.ts::Api",
       "store/connections.ts::Connections",
       "store/entries.ts::Entries",
-      "store/failsafe.ts::Failsafe"
+      "store/execution.ts::Execution",
+      "store/expiry.ts::Expiry",
+      "store/failsafe.ts::Failsafe",
+      "store/stats.ts::Stats"
     ],
     "residue": {}
   },

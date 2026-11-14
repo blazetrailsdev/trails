@@ -4,6 +4,7 @@ import { Entry } from "./entry.js";
 import { Record } from "./record.js";
 import { SolidCache } from "./solid-cache.js";
 
+/** @noRailsEquivalent CONVERGEABLE rails-api-manifest-records-app-jobs-and-concern-class-methods */
 export class ExpiryJob extends Base {
   static {
     constSet(SolidCache, "ExpiryJob", this);

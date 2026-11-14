@@ -2,8 +2,10 @@ import { Concern, extend } from "@blazetrails/activesupport";
 import { classModule } from "@blazetrails/ruby-compat";
 import type { Entry } from "../entry.js";
 import { SolidCache } from "../solid-cache.js";
+import { Estimate } from "./size/estimate.js";
 import { MovingAverageEstimate } from "./size/moving-average-estimate.js";
 
+/** @noRailsEquivalent CONVERGEABLE rails-api-manifest-records-app-jobs-and-concern-class-methods */
 export class ClassMethods {
   static async estimatedSize(
     this: typeof Entry,
@@ -16,9 +18,13 @@ export class ClassMethods {
 export class Size {
   static readonly [classModule] = true;
   declare static ClassMethods: typeof ClassMethods;
+  static Estimate: typeof Estimate;
+  static MovingAverageEstimate: typeof MovingAverageEstimate;
 }
 extend(Size, Concern);
 Object.defineProperty(Size, "ClassMethods", { value: ClassMethods });
+Size.Estimate = Estimate;
+Size.MovingAverageEstimate = MovingAverageEstimate;
 (
   Size as unknown as {
     included(base: null, block: (this: typeof Entry) => void): void;
