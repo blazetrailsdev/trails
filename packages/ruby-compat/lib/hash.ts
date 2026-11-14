@@ -457,6 +457,21 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
 }
 
 /**
+ * Ruby `Hash#clear` (`rb_hash_clear`, `vendor/ruby/v3.3.11/hash.c:2868`), which
+ * raises `FrozenError` through `rb_hash_modify_check` on a frozen receiver.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function hashClear<H extends object>(hash: H): H {
+  if (Object.isFrozen(hash)) {
+    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
+  }
+  if (hash instanceof Map) hash.clear();
+  else for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
+  return hash;
+}
+
+/**
  * Ruby `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121` `rb_hash_aref`) — the stored
  * value, or `nil` when the key is absent, whichever hash it is given. A
  * receiver that is not a Hash is sent its own `[]`, which it must spell `get`,

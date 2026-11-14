@@ -11,7 +11,6 @@ import {
   stringInspect,
   RuntimeError,
   rbObjAsString,
-  isPlainHash,
   rbToHashType,
   Hash,
   eachPair,
@@ -389,7 +388,7 @@ export class Wrapper {
       if (
         !(
           rbObjRespondTo(session, "toHash") &&
-          isPlainHash(rbToHashType(session)) &&
+          rbObjIsKindOf(rbToHashType(session), Hash) &&
           !Object.isFrozen(rbToHashType(session))
         )
       ) {

@@ -3,7 +3,7 @@ import { LocalJumpError } from "./local-jump-error.js";
 import { classpaths, rbClassPath, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes, each as aryEach } from "./array.js";
 import { Enumerable } from "./enumerable.js";
-import { hasKey, hashAref, hashAset, hashDelete, fetch } from "./hash.js";
+import { hasKey, hashAref, hashAset, hashClear, hashDelete, fetch } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.js";
 import { rbPlus } from "./numeric.js";
@@ -1477,11 +1477,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (mid === "store" || mid === "set") return hashAset(hash, args[0], args[1]);
     if (mid === "fetch") return (fetch as AnyFunction)(hash, ...args);
     if (mid === "delete") return (hashDelete as AnyFunction)(hash, ...args);
-    if (mid === "clear") {
-      if (hash instanceof Map) hash.clear();
-      else for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
-      return hash;
-    }
+    if (mid === "clear") return hashClear(hash);
   }
   if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
     return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);

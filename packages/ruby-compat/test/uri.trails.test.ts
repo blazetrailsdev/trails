@@ -279,4 +279,9 @@ describe("URI::RFC2396_Parser#make_regexp", () => {
     const re = RFC2396_PARSER.makeRegexp(["ftp"]);
     expect(re.exec("http://a.example ftp://b.example")?.[0]).toBe("ftp://b.example");
   });
+
+  it("embeds a Regexp scheme with its own options", () => {
+    const re = RFC2396_PARSER.makeRegexp([/FTP/i]);
+    expect(re.exec("http://a.example ftp://b.example")?.[0]).toBe("ftp://b.example");
+  });
 });

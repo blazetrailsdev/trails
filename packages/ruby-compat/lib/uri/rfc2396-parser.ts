@@ -1,6 +1,6 @@
 import { strNew } from "../string/bytes.js";
 import { ArgumentError } from "../argument-error.js";
-import { regexpEscape, rbRegSUnion } from "../regexp.js";
+import { regexpEscape, rbRegSUnion, rbRegToS } from "../regexp.js";
 import { b } from "../string/b.js";
 import { TopLevel } from "../object.js";
 import type { Generic } from "./generic.js";
@@ -125,7 +125,7 @@ export class RFC2396Parser {
     if (schemes == null) {
       return this.regexp.ABS_URI_REF;
     } else {
-      return new RegExp(`(?=${rbRegSUnion(...schemes).source}:)${this.pattern.X_ABS_URI}`);
+      return new RegExp(`(?=${rbRegToS(rbRegSUnion(...schemes))}:)${this.pattern.X_ABS_URI}`);
     }
   }
 

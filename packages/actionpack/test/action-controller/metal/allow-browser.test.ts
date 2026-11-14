@@ -65,6 +65,14 @@ describe("BrowserBlocker", () => {
       const b = new BrowserBlocker(request(CHROME_120), { versions: "modern" });
       expect(b.isBot()).toBe(false);
     });
+
+    it("returns true for a crawler the parser knows without a bot token", () => {
+      const b = new BrowserBlocker(
+        request("facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)"),
+        { versions: "modern" },
+      );
+      expect(b.isBot()).toBe(true);
+    });
   });
 
   describe("isUserAgentVersionReported", () => {

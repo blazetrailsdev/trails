@@ -1724,6 +1724,10 @@ describe("Hash#store / #fetch / #delete / #clear through respond_to? and send", 
     expect(h).toEqual({});
   });
 
+  it("raises FrozenError when clearing a frozen hash", () => {
+    expect(() => rbFSend(Object.freeze({ a: 1 }), "clear")).toThrow(FrozenError);
+  });
+
   it("answers and dispatches store and fetch on a Map", () => {
     const m = new Map<string, number>();
     expect(rbObjRespondTo(m, "store")).toBe(true);
