@@ -36,5 +36,12 @@
   "devDependencies": {
     "@blazetrails/chronic": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "et-orbi",
+      "ref": "v1.2.11",
+      "sha": "037e2074b009186d2da43e0e948069d874abe10c"
+    }
+  ]
 }

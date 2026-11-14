@@ -20,5 +20,12 @@
   },
   "engines": {
     "node": ">=26"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "rack-test",
+      "ref": "v2.2.0",
+      "sha": "8c0cfbac2b9874322d942428498a32c0489603f5"
+    }
+  ]
 }

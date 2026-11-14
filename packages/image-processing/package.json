@@ -44,5 +44,12 @@
     "wasm-vips": {
       "optional": true
     }
-  }
+  },
+  "mirrors": [
+    {
+      "source": "image_processing",
+      "ref": "v1.14.0",
+      "sha": "8185ea61518d8cf477594505cd4b5ab478b28aea"
+    }
+  ]
 }

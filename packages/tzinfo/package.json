@@ -23,5 +23,12 @@
   },
   "engines": {
     "node": ">=26"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "tzinfo",
+      "ref": "v2.0.6",
+      "sha": "d5893c99bbcd842af86023f02a84fac1659b3031"
+    }
+  ]
 }

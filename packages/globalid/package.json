@@ -35,5 +35,12 @@
   "devDependencies": {
     "@blazetrails/activemodel": "workspace:*",
     "@types/node": "25.3.5"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "globalid",
+      "ref": "v1.3.0",
+      "sha": "a10102196ceaa9ffec3744eda857ebe421a57134"
+    }
+  ]
 }

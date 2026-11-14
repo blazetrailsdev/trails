@@ -238,6 +238,13 @@ the upgrade is scoped. The active version is always `versionDir(ref)` of the
    names the old `ref`, so the fetch treats it as the pin being bumped: it
    adopts the candidate clone from step 1 (or clones the tag) and re-locks
    `sources.lock.json` to the new SHA. Commit the lockfile with the `ref`.
+   Then run `pnpm vendor:mirrors`, which rewrites the `mirrors` field in the
+   `package.json` of every package ported from the source, and commit those
+   files in the same PR. Preflight's "Package mirrors fields" step
+   (`scripts/vendor-mirrors.ts --check`) fails a bump that skips this; never
+   switch it off. `mirrors` names the ref the gates measure the package
+   against, not a finished burn-down: the source's bump ledger says what is
+   still open.
 5. **Rewrite the citations.** Save the stale list first —
    `pnpm vendor:recite --check` prints every file carrying a
    `vendor/<name>/<old-version>/…` citation, the same set

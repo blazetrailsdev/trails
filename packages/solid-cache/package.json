@@ -32,5 +32,12 @@
   },
   "engines": {
     "node": ">=26"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "solid_cache",
+      "ref": "v1.0.7",
+      "sha": "411771527afdc7b8f91b79b15ff12680d1a628a4"
+    }
+  ]
 }

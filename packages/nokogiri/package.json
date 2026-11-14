@@ -25,5 +25,17 @@
   },
   "engines": {
     "node": ">=26"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "nokogiri",
+      "ref": "v1.18.3",
+      "sha": "fd3ca2e22df67fd25fd5c25c466f6896b6547cb8"
+    },
+    {
+      "source": "racc",
+      "ref": "v1.8.0",
+      "sha": "8eeca623c95c77724d3b0856806d2f9fc82684b1"
+    }
+  ]
 }

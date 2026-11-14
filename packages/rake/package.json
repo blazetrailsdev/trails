@@ -38,5 +38,12 @@
   },
   "engines": {
     "node": ">=26"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "rake",
+      "ref": "v13.2.1",
+      "sha": "d84f6ef7f3540a1d0e95fabe451ea3a16157791b"
+    }
+  ]
 }

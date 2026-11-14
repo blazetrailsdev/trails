@@ -42,5 +42,12 @@
   "devDependencies": {
     "@blazetrails/vitest-matchers": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "solid_cable",
+      "ref": "v3.0.7",
+      "sha": "f383a5816271dda411aa36099df5d236110e5600"
+    }
+  ]
 }

@@ -33,5 +33,12 @@
   },
   "devDependencies": {
     "@blazetrails/vitest-matchers": "workspace:*"
-  }
+  },
+  "mirrors": [
+    {
+      "source": "raabro",
+      "ref": "v1.4.0",
+      "sha": "aaf1aa27e7bfb86a63339f4ebf3938ff2e0c0258"
+    }
+  ]
 }
