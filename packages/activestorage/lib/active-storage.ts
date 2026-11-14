@@ -13,7 +13,6 @@ import type { MessageVerifier } from "@blazetrails/activesupport/message-verifie
 import type { Analyzer } from "./analyzer.js";
 import type { Attachment } from "./attachment.js";
 import type { Blob } from "./blob.js";
-import type { FixtureSet } from "./fixture-set.js";
 import type { ProxyController } from "./blobs/proxy-controller.js";
 import type { RedirectController } from "./blobs/redirect-controller.js";
 import type * as RepresentationsProxy from "./representations/proxy-controller.js";
@@ -35,7 +34,7 @@ export const ActiveStorage = {
   Reflection: { name: string };
   Attached: unknown;
   Attachment?: typeof Attachment;
-  FixtureSet?: typeof FixtureSet;
+  FixtureSet: unknown;
   Service: unknown;
   Previewer: typeof Previewer;
   Analyzer: typeof Analyzer;

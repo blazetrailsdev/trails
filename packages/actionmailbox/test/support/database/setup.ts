@@ -3,7 +3,6 @@ import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { setEnv } from "@blazetrails/ruby-compat";
 import "@blazetrails/actionmailer/test-case";
 import "@blazetrails/actionmailer/test-helper";
-import "@blazetrails/activestorage/testing/fixture-set";
 import "@blazetrails/activejob/test-helper";
 import { Trails } from "@blazetrails/trailties";
 
