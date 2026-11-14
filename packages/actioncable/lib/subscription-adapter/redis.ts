@@ -160,7 +160,8 @@ export class Listener extends SubscriberMap {
     return new Promise<void>((resolve, reject) => {
       conn.on("subscribe", async (chan: string, count: number) => {
         try {
-          await this._subscriptionLock.synchronize(async () => {
+          await this._subscriptionLock.lock();
+          try {
             if (count === 1) {
               this._reconnectAttempt = 0;
               this._subscribedClient = originalClient;
@@ -176,7 +177,9 @@ export class Listener extends SubscriberMap {
               if (nextCallback) this._eventLoop.post(null, nextCallback);
               if (callbacks.length === 0) this._subscribeCallbacks.delete(chan);
             }
-          });
+          } finally {
+            this._subscriptionLock.unlock();
+          }
         } catch (error) {
           reject(error);
         }
@@ -189,9 +192,12 @@ export class Listener extends SubscriberMap {
       conn.on("unsubscribe", async (_chan: string, count: number) => {
         if (count === 0) {
           try {
-            await this._subscriptionLock.synchronize(() => {
+            await this._subscriptionLock.lock();
+            try {
               this._subscribedClient = null;
-            });
+            } finally {
+              this._subscriptionLock.unlock();
+            }
           } catch (error) {
             return reject(error);
           }

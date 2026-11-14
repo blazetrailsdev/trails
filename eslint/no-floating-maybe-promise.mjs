@@ -6,6 +6,8 @@
  * only where a member is the built-in `Promise` (it leaves `checkThenables`
  * off), so `PromiseLike<void> | void` floats unreported. A type with a
  * built-in `Promise` member is upstream's finding and is not reported twice.
+ * Like upstream with `ignoreVoid: false`, it reads an expression statement or
+ * its `void` operand; the call is the only form the seeded sites take.
  *
  * Hard rules: no node:* imports, no process.* references.
  */
@@ -14,8 +16,12 @@ function constituents(type) {
   return type.isUnion() ? type.types : [type];
 }
 
-function isBuiltinPromise(type) {
-  return type.getSymbol()?.getName() === "Promise";
+function isBuiltinPromise(program, type) {
+  const symbol = type.getSymbol();
+  if (symbol?.getName() !== "Promise") return false;
+  return (symbol.getDeclarations() ?? []).some((decl) =>
+    program.isSourceFileDefaultLibrary(decl.getSourceFile()),
+  );
 }
 
 function isThenable(checker, type, tsNode) {
@@ -47,7 +53,7 @@ export default {
         if (expression.type !== "CallExpression") return;
         const tsNode = services.esTreeNodeToTSNodeMap.get(expression);
         const parts = constituents(checker.getApparentType(checker.getTypeAtLocation(tsNode)));
-        if (parts.some(isBuiltinPromise)) return;
+        if (parts.some((part) => isBuiltinPromise(services.program, part))) return;
         if (parts.some((part) => isThenable(checker, part, tsNode))) {
           context.report({ node, messageId: "maybePromise" });
         }

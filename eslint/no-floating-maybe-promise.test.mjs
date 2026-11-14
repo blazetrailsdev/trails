@@ -22,6 +22,8 @@ const declarations = `
   declare function thenable(): PromiseLike<number>;
   declare function either(): Promise<number> | number;
   declare function plain(): string | number | undefined;
+  declare namespace local { interface Promise { then(fn: () => void): void } }
+  declare function shadowed(): local.Promise | void;
   declare const obj: { reset?(): PromiseLike<void> | void };
 `;
 

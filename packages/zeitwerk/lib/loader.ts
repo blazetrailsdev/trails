@@ -642,12 +642,11 @@ export class Loader {
     this.inceptions.clear();
   }
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
+  /** @internal */
   raiseIfConflictingDirectory(dir: string): void {
+    let raised = false;
     const synchronized = MUTEX.synchronize(() => {
+      if (raised) return;
       const dirSlash = `${dir}/`;
 
       for (const loader of Registry.loaders) {
@@ -667,8 +666,10 @@ export class Loader {
         }
       }
     });
-    if (synchronized instanceof Promise)
+    if (synchronized instanceof Promise) {
+      raised = true;
       throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   }
 
   /** @internal */

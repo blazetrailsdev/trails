@@ -57,34 +57,46 @@ export class Map<V = unknown> {
 
   /** @inventedArm if — PERMANENT */
   deleteByValue(value: V): void {
+    let raised = false;
     const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       for (const [mod, cnames] of this._map) {
         for (const [cname, v] of cnames) if (v === value) cnames.delete(cname);
         if (cnames.size === 0) this._map.delete(mod);
       }
     });
-    if (synchronized instanceof Promise)
+    if (synchronized instanceof Promise) {
+      raised = true;
       throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   }
 
   /** @inventedArm if — PERMANENT */
   eachKey(block: (cref: Cref) => void): void {
+    let raised = false;
     const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       for (const [mod, cnames] of this._map) {
         for (const cname of cnames.keys()) block(new Cref(mod, cname));
       }
     });
-    if (synchronized instanceof Promise)
+    if (synchronized instanceof Promise) {
+      raised = true;
       throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   }
 
   /** @inventedArm if — PERMANENT */
   clear(): void {
+    let raised = false;
     const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       this._map.clear();
     });
-    if (synchronized instanceof Promise)
+    if (synchronized instanceof Promise) {
+      raised = true;
       throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   }
 
   isEmpty(): boolean {
