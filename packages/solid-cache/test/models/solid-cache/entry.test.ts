@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Entry, SolidCache } from "../../../lib/index.js";
 import { useSolidCache } from "../../support/test-helper.js";
 
-describe("SolidCache::EntryTest", () => {
+describe("EntryTest", () => {
   useSolidCache();
 
   afterEach(() => vi.restoreAllMocks());
@@ -69,13 +69,7 @@ describe("SolidCache::EntryTest", () => {
   it("byte_size", async () => {
     const byteSize = () =>
       Entry.uncached(async () => (await Entry.last())!.readAttribute("byte_size"));
-    const encrypted = SolidCache.configuration.isEncrypt();
-    await Entry.write("hello", "test");
-    expect(await byteSize()).toBe(encrypted ? 319 : 149);
-    await Entry.write("hello", "12345");
-    expect(await byteSize()).toBe(encrypted ? 320 : 150);
-    await Entry.write("hi", "12345");
-    expect(await byteSize()).toBe(encrypted ? 317 : 147);
+    await verifyByteSizes(byteSize);
   });
 
   it("batching multi queries", async () => {
@@ -97,6 +91,24 @@ describe("SolidCache::EntryTest", () => {
       });
     });
   });
+
+  async function verifyByteSizes(byteSize: () => Promise<unknown>): Promise<void> {
+    if (SolidCache.configuration.isEncrypt()) {
+      await Entry.write("hello", "test");
+      expect(await byteSize()).toBe(319);
+      await Entry.write("hello", "12345");
+      expect(await byteSize()).toBe(320);
+      await Entry.write("hi", "12345");
+      expect(await byteSize()).toBe(317);
+    } else {
+      await Entry.write("hello", "test");
+      expect(await byteSize()).toBe(149);
+      await Entry.write("hello", "12345");
+      expect(await byteSize()).toBe(150);
+      await Entry.write("hi", "12345");
+      expect(await byteSize()).toBe(147);
+    }
+  }
 
   function utf8(value: unknown): unknown {
     return value instanceof Uint8Array ? new TextDecoder().decode(value) : value;

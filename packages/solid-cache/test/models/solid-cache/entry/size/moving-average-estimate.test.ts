@@ -3,7 +3,7 @@ import { Entry, SolidCache } from "../../../../../lib/index.js";
 import { MovingAverageEstimate } from "../../../../../lib/entry/size/moving-average-estimate.js";
 import { useSolidCache } from "../../../../support/test-helper.js";
 
-describe("SolidCache::EntrySizeMovingAverageEstimateTest", () => {
+describe("EntrySizeMovingAverageEstimateTest", () => {
   useSolidCache();
   let encrypted: boolean;
 
@@ -19,7 +19,7 @@ describe("SolidCache::EntrySizeMovingAverageEstimateTest", () => {
     await writeEntries({ valueLengths: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] });
 
     const estimate = await MovingAverageEstimate.new({ samples: 12 });
-    expect(await estimate.isExact()).toBe(true);
+    expect(await estimate.isExact()).toBeTruthy();
     expect(await estimate.size).toBe(encrypted ? 3235 : 1535);
   });
 

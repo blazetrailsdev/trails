@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Entry, SolidCache } from "../../../../lib/index.js";
 import { useSolidCache } from "../../../support/test-helper.js";
 
-describe("SolidCache::EntrySizeTest", () => {
+describe("EntrySizeTest", () => {
   useSolidCache();
   let encrypted: boolean;
 

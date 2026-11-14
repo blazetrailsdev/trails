@@ -3,7 +3,7 @@ import { Entry, SolidCache } from "../../../../../lib/index.js";
 import { Estimate } from "../../../../../lib/entry/size/estimate.js";
 import { useSolidCache } from "../../../../support/test-helper.js";
 
-describe("SolidCache::EntrySizeEstimateTest", () => {
+describe("EntrySizeEstimateTest", () => {
   useSolidCache();
   let encrypted: boolean;
 
