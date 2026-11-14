@@ -37,6 +37,7 @@ export const RULES = [
   "@typescript-eslint/no-floating-promises",
   "blazetrails/constructor-creates-no-promise",
   "blazetrails/no-swallowed-rejection",
+  "blazetrails/no-floating-maybe-promise",
 ] as const;
 
 /** Findings per rule, per package (`packages/<name>` is `<name>`; `scripts` is `scripts`). */

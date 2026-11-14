@@ -160,13 +160,13 @@ export class Listener extends SubscriberMap {
     return new Promise<void>((resolve, reject) => {
       conn.on("subscribe", async (chan: string, count: number) => {
         try {
-          await this._subscriptionLock.synchronize(() => {
+          await this._subscriptionLock.synchronize(async () => {
             if (count === 1) {
               this._reconnectAttempt = 0;
               this._subscribedClient = originalClient;
 
               while (this._whenConnected.length !== 0) {
-                this._whenConnected.shift()!();
+                await this._whenConnected.shift()!();
               }
             }
 
@@ -207,11 +207,11 @@ export class Listener extends SubscriberMap {
   }
 
   async shutdown(): Promise<void> {
-    const thread = await this._subscriptionLock.synchronize(() => {
+    const thread = await this._subscriptionLock.synchronize(async () => {
       if (this._thread == null) return null;
 
-      this.whenConnected(() => {
-        void this._subscribedClient!.unsubscribe();
+      await this.whenConnected(async () => {
+        await this._subscribedClient!.unsubscribe();
         this._subscribedClient = null;
       });
       return this._thread;
@@ -222,18 +222,18 @@ export class Listener extends SubscriberMap {
   }
 
   override async addChannel(channel: string, onSuccess: (() => unknown) | null): Promise<void> {
-    await this._subscriptionLock.synchronize(() => {
+    await this._subscriptionLock.synchronize(async () => {
       this.ensureListenerRunning();
       const callbacks = this._subscribeCallbacks.get(channel) ?? [];
       this._subscribeCallbacks.set(channel, callbacks);
       callbacks.push(onSuccess);
-      this.whenConnected(() => this._subscribedClient!.subscribe(channel));
+      await this.whenConnected(() => this._subscribedClient!.subscribe(channel));
     });
   }
 
   override async removeChannel(channel: string): Promise<void> {
-    await this._subscriptionLock.synchronize(() => {
-      this.whenConnected(() => this._subscribedClient!.unsubscribe(channel));
+    await this._subscriptionLock.synchronize(async () => {
+      await this.whenConnected(() => this._subscribedClient!.unsubscribe(channel));
     });
   }
 
@@ -254,16 +254,16 @@ export class Listener extends SubscriberMap {
           if (!(error instanceof ConnectionError)) throw error;
           await this.reset();
           if (!(await this.isRetryConnecting())) return;
-          this.whenConnected(() => this.resubscribe());
+          await this.whenConnected(() => this.resubscribe());
         }
       }
     });
   }
 
   /** @internal */
-  private whenConnected(block: () => unknown): void {
+  private async whenConnected(block: () => unknown): Promise<void> {
     if (this._subscribedClient) {
-      block();
+      await block();
     } else {
       this._whenConnected.push(block);
     }
@@ -283,9 +283,9 @@ export class Listener extends SubscriberMap {
   }
 
   /** @internal */
-  private resubscribe(): void {
+  private async resubscribe(): Promise<void> {
     const channels = this.sync.synchronize(() => Object.keys(this.subscribers)) as string[];
-    if (channels.length !== 0) void this._subscribedClient!.subscribe(...channels);
+    if (channels.length !== 0) await this._subscribedClient!.subscribe(...channels);
   }
 
   /** @internal */

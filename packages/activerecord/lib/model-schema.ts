@@ -425,6 +425,9 @@ export async function resetColumnInformation(this: SchemaKlass): Promise<void> {
   } catch {}
   const rewarm = !_inSetTableName;
   const cleared = connection?.clearCacheBang?.();
+  for (const klass of [this, ...this.descendants]) {
+    klass.undefineAttributeMethods();
+  }
   clearAdapterDataSourceCache(this);
 
   this.reloadSchemaFromCache();

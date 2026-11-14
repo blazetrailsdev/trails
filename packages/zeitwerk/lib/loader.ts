@@ -15,6 +15,7 @@ import {
   rbInspect,
   type Included,
   type Pathname,
+  ThreadError,
 } from "@blazetrails/ruby-compat";
 import { Cref } from "./cref.js";
 import { Map } from "./cref/map.js";
@@ -641,9 +642,12 @@ export class Loader {
     this.inceptions.clear();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   raiseIfConflictingDirectory(dir: string): void {
-    MUTEX.synchronize(() => {
+    const synchronized = MUTEX.synchronize(() => {
       const dirSlash = `${dir}/`;
 
       for (const loader of Registry.loaders) {
@@ -663,6 +667,8 @@ export class Loader {
         }
       }
     });
+    if (synchronized instanceof Promise)
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
   }
 
   /** @internal */
