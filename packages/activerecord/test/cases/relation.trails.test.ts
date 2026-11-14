@@ -943,3 +943,43 @@ describe("lock_value stores the argument", () => {
     );
   });
 });
+
+describe("Relation#clone own state", () => {
+  fixtures([]);
+
+  it("keeps own key order and descriptors of defined fields", () => {
+    const relation: Record<string, unknown> & { clone(): object } = CanonPost.all() as never;
+    relation._plainField = 1;
+    let reads = 0;
+    Object.defineProperty(relation, "_accessorField", {
+      get: () => ++reads,
+      enumerable: true,
+      configurable: true,
+    });
+    Object.defineProperty(relation, "_hiddenField", { value: 2, writable: false });
+    Object.defineProperty(relation, "_frozenCloneField", {
+      value: 4,
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    });
+    relation._lastField = 3;
+
+    const copy = relation.clone();
+
+    const keys = Reflect.ownKeys(relation);
+    expect(Reflect.ownKeys(copy).slice(0, keys.length)).toEqual(keys);
+    expect(reads).toBe(0);
+    for (const key of [
+      "_plainField",
+      "_accessorField",
+      "_hiddenField",
+      "_frozenCloneField",
+      "_lastField",
+    ]) {
+      expect(Object.getOwnPropertyDescriptor(copy, key)).toEqual(
+        Object.getOwnPropertyDescriptor(relation, key),
+      );
+    }
+  });
+});
