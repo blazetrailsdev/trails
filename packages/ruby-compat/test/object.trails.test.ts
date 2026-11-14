@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import { nameErrMesgReceiver } from "../lib/object.js";
 import { classModule } from "../lib/class-module.js";
 import {
@@ -1467,6 +1467,65 @@ describe("rbClassNewInstance", () => {
     expect(rbClassNewInstance(rbCString)).toBe("");
     expect(rbClassNewInstance(Array)).toEqual([]);
     expect(rbObjClass(rbClassNewInstance(rbCClass))).toBe(rbCClass);
+  });
+
+  class Connection {
+    readonly log: string[] = [];
+
+    protected constructor(
+      readonly host: string,
+      readonly port: number,
+    ) {}
+
+    static async new<T extends Connection>(
+      this: { prototype: T },
+      host: string,
+      port: number,
+    ): Promise<T> {
+      const obj = rbClassNewInstance(this, host, port);
+      await Promise.resolve();
+      obj.log.push("Connection");
+      return obj;
+    }
+  }
+
+  class TlsConnection extends Connection {}
+
+  class PooledConnection extends Connection {
+    protected constructor(host: string, port: number) {
+      super(host, port);
+    }
+
+    static override async new<T extends Connection>(
+      this: { prototype: T },
+      host: string,
+      port: number,
+    ): Promise<T> {
+      const obj = await (super.new as typeof Connection.new<T>).call(this, host, port);
+      obj.log.push("PooledConnection");
+      return obj;
+    }
+  }
+
+  it("forwards its arguments to the constructor", async () => {
+    const conn = await Connection.new("localhost", 5432);
+    expect([conn.host, conn.port]).toEqual(["localhost", 5432]);
+    // @ts-expect-error the constructor is protected; Klass.new is the only way in
+    expect(() => new Connection("localhost", 5432)).not.toThrow();
+  });
+
+  it("builds a subclass that inherits static new as its own type", async () => {
+    const conn = await TlsConnection.new("localhost", 5432);
+    expectTypeOf(conn).toEqualTypeOf<TlsConnection>();
+    expect(conn).toBeInstanceOf(TlsConnection);
+    expect(conn.log).toEqual(["Connection"]);
+  });
+
+  it("runs the parent's async half before an overriding static new's own", async () => {
+    const conn = await PooledConnection.new("localhost", 5432);
+    expectTypeOf(conn).toEqualTypeOf<PooledConnection>();
+    expect(conn).toBeInstanceOf(PooledConnection);
+    expect(conn.log).toEqual(["Connection", "PooledConnection"]);
   });
 });
 
