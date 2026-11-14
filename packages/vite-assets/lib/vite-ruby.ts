@@ -5,6 +5,7 @@ import {
   Logger,
   NotImplementedError,
   stdout as $stdout,
+  StandardError,
   SystemCallError,
   Timeout,
   TopLevel,
@@ -129,7 +130,7 @@ export class ViteRuby {
       const config = await this.config();
       return config.mode === "development" || (config.mode === "test" && !ENV["CI"]);
     } catch (error) {
-      this.logger.error(`Failed to check mode for Vite: ${(error as Error).message}`);
+      this.logger.error(`Failed to check mode for Vite: ${(error as StandardError).message}`);
       return false;
     }
   }
