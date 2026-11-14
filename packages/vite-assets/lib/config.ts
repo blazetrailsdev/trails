@@ -126,6 +126,10 @@ export class Config {
     ]);
   }
 
+  withinRoot<T>(block: (path: string) => T): T {
+    return Dir.chdir(File.expandPath(this.root.toString()), block);
+  }
+
   /** @internal */
   private async coerceValues(config: Record<string, unknown>): Promise<void> {
     config.mode = String(config.mode ?? "");
