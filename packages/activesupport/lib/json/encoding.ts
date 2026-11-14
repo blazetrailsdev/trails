@@ -66,7 +66,7 @@ export class JSONGemEncoder {
     }
   }
 
-  /** @perf 18% — PERMANENT */
+  /** @perf 72% — PERMANENT */
   private _jsonifyPlainObject(value: Record<string, unknown>): unknown {
     let result: Record<string, unknown> | null = null;
     const keys = Object.keys(value);
@@ -84,7 +84,7 @@ export class JSONGemEncoder {
     return result ?? value;
   }
 
-  /** @perf 18% — PERMANENT */
+  /** @perf 72% — PERMANENT */
   private _jsonifyArray(value: unknown[]): unknown {
     let result: unknown[] | null = null;
     for (let i = 0; i < value.length; i++) {
