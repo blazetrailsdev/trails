@@ -1574,11 +1574,12 @@
     }
   },
   "tzinfo": {
-    "rows": 29,
-    "excluded": ["country.ts::Country"],
+    "rows": 30,
+    "excluded": [],
     "unwalked": [],
     "residue": {
       "country-timezone.ts::CountryTimezone": "TZInfo::CountryTimezone",
+      "country.ts::Country": "TZInfo::Country",
       "country.ts::InvalidCountryCode": "TZInfo::InvalidCountryCode",
       "data-source.ts::DataSource": "TZInfo::DataSource",
       "data-source.ts::DataSourceNotFound": "TZInfo::DataSourceNotFound",
