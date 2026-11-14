@@ -90,7 +90,6 @@ function ecTagSlot(): AsyncContext<RbVmTag> {
   return _ecTag;
 }
 
-/** @perf 4.6% — PERMANENT */
 let _syncTag: RbVmTag | undefined;
 
 /**
@@ -194,7 +193,9 @@ function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
  * `Kernel#catch` (`vendor/ruby/v3.3.11/vm_eval.c:2342` `rb_f_catch`) for a
  * block its caller knows is synchronous: the tag is
  * pushed on a stack popped when the block returns, with no async-context
- * frame, which only a block that can `await` needs.
+ * frame, which only a block that can `await` needs. The block must not
+ * return a thenable: its tag is popped when it returns, so a `throw` after
+ * an `await` inside it finds no tag and raises `UncaughtThrowError`.
  *
  * @noRailsEquivalent PERMANENT
  * @perf 4.6% — PERMANENT

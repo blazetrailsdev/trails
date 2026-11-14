@@ -136,4 +136,12 @@ describe("kernelCatch", () => {
     });
     expect(res).toBe(":unwound");
   });
+
+  it("pops a sync catch's tag before a thenable its block returns settles", async () => {
+    const later = kernelCatchSync(":abort", async () => {
+      await Promise.resolve();
+      kernelThrow(":abort");
+    }) as Promise<unknown>;
+    await expect(later).rejects.toBeInstanceOf(UncaughtThrowError);
+  });
 });

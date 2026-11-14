@@ -488,7 +488,7 @@ export class Before {
       }
       if (terminatorFn) return !terminatorFn(target, () => cb.call(target, target));
       let terminate = true;
-      kernelCatchSync(":abort", () => {
+      kernelCatch(":abort", () => {
         cb.call(target, target);
         terminate = false;
       });
