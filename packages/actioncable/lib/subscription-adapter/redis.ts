@@ -152,6 +152,10 @@ export class Listener extends SubscriberMap {
     this._thread = null;
   }
 
+  /**
+   * @inventedArm lock — PERMANENT
+   * @inventedArm unlock — PERMANENT
+   */
   listen(conn: RedisConnection): Promise<void> {
     const retryStrategy = conn.options.retryStrategy;
     conn.options.retryStrategy = () => null;
