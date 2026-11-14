@@ -490,7 +490,7 @@ export class HTTP {
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:2472-2476`. */
-  private debug(msg: string): void {
+  debug(msg: string): void {
     if (this._debugOutput == null) return;
     this._debugOutput.write(msg);
     this._debugOutput.write("\n");
