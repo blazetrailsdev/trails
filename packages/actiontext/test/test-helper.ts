@@ -8,6 +8,7 @@ import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailtie
 import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
 import { Trailtie as ActionViewRailtie } from "@blazetrails/trailties/trailties/action-view";
 import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trailties/action-controller";
+import { ActionController } from "@blazetrails/actionpack";
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Registry } from "@blazetrails/activestorage";
 import { FixtureSet } from "@blazetrails/activestorage/fixture-set";
@@ -54,6 +55,16 @@ routes.disableClearAndFinalize = false;
 routes.finalizeBang();
 app.routes().defineMountedHelper("main_app");
 runLoadHooks("after_initialize", app);
+
+const { Engine } = await import("../lib/engine.js");
+for (const initializer of Engine.initializers) {
+  if (["action_text.helper", "action_text.renderer"].includes(initializer.name)) {
+    await initializer.bind(Engine.instance()).run(app);
+  }
+}
+ActionController.Base.prependViewPath([File.expandPath("dummy/app/views", import.meta.dirname)]);
+await import("./dummy/app/controllers/messages-controller.js");
+await import("./dummy/app/controllers/admin/messages-controller.js");
 
 DatabaseTasks.root = TopLevel.Trails!.root()!;
 

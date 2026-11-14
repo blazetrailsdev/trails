@@ -1,0 +1,4 @@
+{
+  "id": <%= this.message.id %>,
+  "form": "<%= j(await render({ partial: "form", formats: ":html", locals: { message: this.message } })) %>"
+}

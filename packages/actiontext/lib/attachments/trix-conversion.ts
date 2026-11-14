@@ -32,7 +32,7 @@ export const TrixConversion = {
     if (partialPath != null && partialPath !== false) {
       return ActionText.Content!.render({
         partial: partialPath,
-        formats: "html",
+        formats: ":html",
         object: this,
         as: this.modelName.element,
       });

@@ -1,0 +1,8 @@
+<p id="notice"><%= notice %></p>
+
+<h1 id="subject"><%= this.message.subject %></h1>
+
+<div id="content"><%= await this.message.content.toString() %></div>
+
+<%= linkTo('Edit', editMessagePath(this.message)) %> |
+<%= linkTo('Back', messagesPath()) %>

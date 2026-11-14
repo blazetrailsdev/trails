@@ -8,7 +8,7 @@
       <%= caption %>
     <% } else { %>
       <span class="attachment__name"><%= blob.filename %></span>
-      <span class="attachment__size"><%= numberToHumanSize(blob.byteSize) %></span>
+      <span class="attachment__size"><%= numberToHumanSize(blob.byte_size) %></span>
     <% } %>
   </figcaption>
 </figure>

@@ -1,0 +1,28 @@
+<%= await formWith({ model: message }, async (form) => { %>
+  <% if (message.errors.isAny()) { %>
+    <div id="error_explanation">
+      <h2><%= pluralize(message.errors.count, "error") %> prohibited this message from being saved:</h2>
+
+      <ul>
+      <% for (const message of message.errors.fullMessages) { %>
+        <li><%= message %></li>
+      <% } %>
+      </ul>
+    </div>
+  <% } %>
+
+  <div class="field">
+    <%= form.label("subject") %>
+    <%= form.textField("subject") %>
+  </div>
+
+  <div class="field">
+    <%= form.label("content", "Message content label") %>
+    <%= await form.richTextarea("content", { class: "trix-content",
+          placeholder: "Your message here", aria: { label: "Message content aria-label" } }) %>
+  </div>
+
+  <div class="actions">
+    <%= form.submit() %>
+  </div>
+<% }) %>
