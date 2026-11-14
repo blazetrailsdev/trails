@@ -36,6 +36,7 @@ export const MARK_PATH = path.join(ROOT_DIR, "scripts/parity/promise-count-mark.
 export const RULES = [
   "@typescript-eslint/no-floating-promises",
   "blazetrails/constructor-creates-no-promise",
+  "blazetrails/no-swallowed-rejection",
 ] as const;
 
 /** Findings per rule, per package (`packages/<name>` is `<name>`; `scripts` is `scripts`). */

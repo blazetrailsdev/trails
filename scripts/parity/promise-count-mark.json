@@ -33,5 +33,20 @@
     "ruby-compat": 1,
     "thor": 2,
     "trailties": 2
+  },
+  "blazetrails/no-swallowed-rejection": {
+    "actionpack": 2,
+    "actiontext": 1,
+    "activemodel": 3,
+    "activerecord": 13,
+    "activestorage": 2,
+    "activesupport": 5,
+    "mini-magick": 1,
+    "rack": 1,
+    "ruby-compat": 2,
+    "scripts": 3,
+    "thor": 1,
+    "trailties": 1,
+    "website": 1
   }
 }
