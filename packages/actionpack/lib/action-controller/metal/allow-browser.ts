@@ -123,7 +123,10 @@ export class BrowserBlocker {
     return this.minimumBrowserVersionForBrowser() !== undefined;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs bot? — PERMANENT
+   */
   isBot(): boolean {
     return isBot(this.parsedUserAgent().getUA());
   }
