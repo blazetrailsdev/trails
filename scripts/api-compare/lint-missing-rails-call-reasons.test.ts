@@ -108,12 +108,12 @@ describe("listSourceFiles", () => {
       await fs.mkdir(path.dirname(abs), { recursive: true });
       await fs.writeFile(abs, "");
     };
-    await write(path.join("website", "src", "base.ts"));
-    await write(path.join("website", "src", "relation", "query-methods.ts"));
-    await write(path.join("website", "src", "base.test.ts"));
-    await write(path.join("website", "src", "README.md"));
-    await write(path.join("website", "src", "dist", "base.ts"));
-    await write(path.join("website", "src", "node_modules", "dep", "index.ts"));
+    await write(path.join("activerecord", "lib", "base.ts"));
+    await write(path.join("activerecord", "lib", "relation", "query-methods.ts"));
+    await write(path.join("activerecord", "lib", "base.test.ts"));
+    await write(path.join("activerecord", "lib", "README.md"));
+    await write(path.join("activerecord", "lib", "dist", "base.ts"));
+    await write(path.join("activerecord", "lib", "node_modules", "dep", "index.ts"));
     await write(path.join("website", "dist", "base.ts"));
     await write(path.join("arel", "no-src-dir.ts"));
   });
@@ -124,9 +124,9 @@ describe("listSourceFiles", () => {
 
   it("collects nested .ts files under each package's src, tests included", async () => {
     expect((await listSourceFiles(dir)).map((f) => path.relative(dir, f))).toEqual([
-      path.join("website", "src", "base.test.ts"),
-      path.join("website", "src", "base.ts"),
-      path.join("website", "src", "relation", "query-methods.ts"),
+      path.join("activerecord", "lib", "base.test.ts"),
+      path.join("activerecord", "lib", "base.ts"),
+      path.join("activerecord", "lib", "relation", "query-methods.ts"),
     ]);
   });
 
