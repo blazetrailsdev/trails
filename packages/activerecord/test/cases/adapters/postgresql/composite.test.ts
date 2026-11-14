@@ -68,9 +68,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     beforeEach(async () => {
       connection = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await setupCompositeType();
-      await PostgresqlComposite.resetColumnInformation();
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
+        await PostgresqlComposite.resetColumnInformation();
         await PostgresqlComposite.loadSchema();
         stderr = warnSpy.mock.calls.map((c) => `${String(c[0])}\n`).join("");
       } finally {

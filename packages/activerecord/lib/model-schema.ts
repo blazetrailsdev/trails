@@ -396,7 +396,6 @@ function clearAdapterDataSourceCache(host: SchemaKlass): void {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
 let _inSetTableName = false;
 
 /** @inventedArm columns — PERMANENT */
