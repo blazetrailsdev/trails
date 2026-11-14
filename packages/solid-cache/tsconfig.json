@@ -7,9 +7,11 @@
   },
   "include": ["lib"],
   "references": [
+    { "path": "../activejob" },
     { "path": "../activerecord" },
     { "path": "../activesupport" },
     { "path": "../arel" },
+    { "path": "../date" },
     { "path": "../ruby-compat" },
     { "path": "../trailties" }
   ]

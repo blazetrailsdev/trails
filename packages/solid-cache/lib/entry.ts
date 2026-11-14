@@ -1,6 +1,9 @@
 import { type Result } from "@blazetrails/activerecord";
 import { include, runLoadHooks } from "@blazetrails/activesupport";
 import { Encryption } from "./entry/encryption.js";
+import { Expiration, type ClassMethods as ExpirationClassMethods } from "./entry/expiration.js";
+import { Size, type ClassMethods as SizeClassMethods } from "./entry/size.js";
+import { type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
 import { constSet, Range, Digest, eachSlice, toS, unpack } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
@@ -23,10 +26,24 @@ export class Entry extends Record {
   /** @internal */
   declare static _selectSql: Map<number, string> | undefined;
 
+  declare static expire: typeof ExpirationClassMethods.expire;
+  /** @internal */
+  declare static isCacheFull: typeof ExpirationClassMethods.isCacheFull;
+  /** @internal */
+  declare static expiryCandidateIds: typeof ExpirationClassMethods.expiryCandidateIds;
+  declare static estimatedSize: typeof SizeClassMethods.estimatedSize;
+  declare static largestByteSizes: (limit: number) => Relation<Entry>;
+  declare static inKeyHashRange: (range: unknown) => Relation<Entry>;
+  declare static upToByteSize: (cutoff: unknown) => Relation<Entry>;
+
   static {
     constSet(SolidCache, "Entry", this);
     constSet(this, "Encryption", Encryption);
+    constSet(this, "Expiration", Expiration);
+    constSet(this, "Size", Size);
     include(this, Encryption);
+    include(this, Expiration);
+    include(this, Size);
   }
 
   static async write(key: unknown, value: unknown): Promise<void> {

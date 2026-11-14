@@ -22,7 +22,11 @@ export const Entries = {
     block: (value: unknown) => unknown,
   ): Promise<unknown> {
     return await this.writingKey(key, { failsafe: "increment" }, () =>
-      Entry.lockAndWrite(key, (value) => block(value)),
+      Entry.lockAndWrite(key, async (value) => {
+        const result = await block(value);
+        if (result != null && result !== false) await this.trackWrites(1);
+        return result;
+      }),
     );
   },
 
@@ -47,6 +51,7 @@ export const Entries = {
       { failsafe: "write_entry", failsafeReturning: null },
       async () => {
         await Entry.write(key, payload);
+        await this.trackWrites(1);
         return true;
       },
     )) as boolean;
@@ -59,6 +64,7 @@ export const Entries = {
       { failsafe: "write_multi_entries", failsafeReturning: false },
       async (entries) => {
         await Entry.writeMulti(entries as Payload[]);
+        await this.trackWrites(entries.length);
         return true;
       },
     )) as boolean[];

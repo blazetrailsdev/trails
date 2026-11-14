@@ -541,6 +541,7 @@ export { ThreadError } from "./thread-error.js";
 export { Timeout } from "./timeout.js";
 export {
   CachedThreadPool,
+  FixedThreadPool,
   globalIoExecutor,
   RejectedExecutionError,
   ThreadPoolExecutor,
