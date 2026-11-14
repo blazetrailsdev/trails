@@ -60,7 +60,7 @@ describe("PrimaryKeysTrailsTest", () => {
   fixtures([]);
 
   it("resolves a custom string primary key with no explicit primary_key= via the schema cache", async () => {
-    Country.resetColumnInformation();
+    await Country.resetColumnInformation();
     await Country.loadSchema();
     expect(Country.primaryKey).toBe("country_id");
   });

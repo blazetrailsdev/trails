@@ -35,7 +35,7 @@ describe("timestamp reload_schema_from_cache", () => {
     }
 
     for (const reset of [false, true]) {
-      if (reset) BookWithoutUpdatedOn.resetColumnInformation();
+      if (reset) await BookWithoutUpdatedOn.resetColumnInformation();
       const book = (await BookWithoutUpdatedOn.first())!;
       const updatedOn = book.readAttribute("updated_on");
       book.writeAttribute("name", `renamed ${reset}`);

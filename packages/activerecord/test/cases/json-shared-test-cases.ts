@@ -37,7 +37,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
 
   afterEach(async () => {
     await connection.dropTable("json_data_type", { ifExists: true });
-    void klass().resetColumnInformation();
+    await klass().resetColumnInformation();
   });
 
   it("test_column", async () => {

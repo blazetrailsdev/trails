@@ -148,7 +148,7 @@ describe("select alias dynamic reader (trails)", () => {
     const aliased = Comment.select("comments.*, (id + 1000) AS bumped_id").order("id");
     const record = (await Comment.order("id"))[0] as Comment & { bumped_id: unknown };
     rbObjSingletonClass(record);
-    Comment.resetColumnInformation();
+    await Comment.resetColumnInformation();
     await aliased.scoping({ allQueries: true }, async () => {
       await record.reload();
     });

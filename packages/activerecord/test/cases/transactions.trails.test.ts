@@ -168,6 +168,7 @@ describe("TransactionTest", () => {
 });
 
 describe("savepoint statements dirty the current transaction (trails ensure relocation)", () => {
+  fixtures({}, { useTransactionalTests: false });
   afterEach(() => {
     vi.restoreAllMocks();
   });

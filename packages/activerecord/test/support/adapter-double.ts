@@ -33,7 +33,7 @@ export async function establishConnectionTo(
   }
   const schemaCache = Object.getOwnPropertyDescriptor(connection, "schemaCache")?.value;
   if (schemaCache) pool.schemaReflection.loadedCache = schemaCache;
-  (klass as unknown as { resetColumnInformation(): void }).resetColumnInformation();
+  await (klass as unknown as { resetColumnInformation(): Promise<void> }).resetColumnInformation();
   let restored = false;
   const restore = async () => {
     if (restored) return;
@@ -45,7 +45,9 @@ export async function establishConnectionTo(
     (connection as unknown as { pool: unknown }).pool = originalPool;
     await klass.removeConnection();
     klass.connectionClass = wasConnectionClass;
-    (klass as unknown as { resetColumnInformation(): void }).resetColumnInformation();
+    await (
+      klass as unknown as { resetColumnInformation(): Promise<void> }
+    ).resetColumnInformation();
   };
   try {
     onTestFinished(restore);

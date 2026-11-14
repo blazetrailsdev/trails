@@ -513,7 +513,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return super.addColumn(tableName, columnName, type as ColumnType, options as ColumnOptions);
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     if (columnName === undefined) {
       throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
     }
@@ -523,7 +525,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async removeColumns(tableName: string, ...columnNames: string[]): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       for (const columnName of columnNames) {
         definition.removeColumn(columnName);
@@ -532,23 +536,27 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async changeColumnDefault(
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const newDefault = this.extractNewDefaultValue(defaultOrChanges);
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       definition.get(columnName)!.options.default = newDefault;
     });
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async changeColumnNull(
     tableName: string,
     columnName: string,
     null_: boolean,
     default_?: unknown,
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     this.validateChangeColumnNullArgumentBang(null_);
     if (!null_ && default_ !== undefined) {
       const existing = (await this.columns(tableName)).find((c) => c.name === columnName);
@@ -563,18 +571,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async changeColumn(
     tableName: string,
     columnName: string,
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
       definition.changeColumn(columnName, type as ColumnType, (options ?? {}) as ColumnOptions);
     });
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const column = await this.columnFor(tableName, columnName);
     await this.alterTable(tableName, undefined, undefined, {
       rename: { [column.name]: newColumnName },

@@ -30,14 +30,14 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.bit("another_bit");
         t.bitVarying("another_bit_varying");
       });
-      void PostgresqlBitString.resetColumnInformation();
+      await PostgresqlBitString.resetColumnInformation();
       await PostgresqlBitString.loadSchema();
     });
 
     afterEach(async () => {
       if (!connection) return;
       await connection.dropTable("postgresql_bit_strings", { ifExists: true });
-      void PostgresqlBitString.resetColumnInformation();
+      await PostgresqlBitString.resetColumnInformation();
     });
 
     it("bit string column", () => {

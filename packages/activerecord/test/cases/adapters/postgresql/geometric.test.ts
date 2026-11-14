@@ -49,7 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.point("legacy_y", { default: [12.2, 13.3] });
         t.point("legacy_z", { default: "(14.4,15.5)" });
       });
-      void PostgresqlPoint.resetColumnInformation();
+      await PostgresqlPoint.resetColumnInformation();
       await PostgresqlPoint.loadSchema();
     });
     afterEach(async () => {
@@ -301,7 +301,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.polygon("a_polygon");
         t.circle("a_circle");
       });
-      void PostgresqlGeometric.resetColumnInformation();
+      await PostgresqlGeometric.resetColumnInformation();
       await PostgresqlGeometric.loadSchema();
     });
     afterEach(async () => {
@@ -393,7 +393,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.createTable("postgresql_lines", (t: TableDefinition) => {
         t.line("a_line");
       });
-      void PostgresqlLine.resetColumnInformation();
+      await PostgresqlLine.resetColumnInformation();
       await PostgresqlLine.loadSchema();
     });
     afterEach(async () => {

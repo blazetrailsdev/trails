@@ -137,7 +137,7 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialize does not eagerly load columns", async () => {
-    Topic.resetColumnInformation();
+    await Topic.resetColumnInformation();
     await assertNoQueries(false, () => {
       Topic.serialize("content");
     });
@@ -654,7 +654,7 @@ describe("SerializedAttributeTest", () => {
     await topic.update({ group: "1" });
 
     model.serialize("group", { coder: JSON });
-    model.resetColumnInformation();
+    await model.resetColumnInformation();
 
     const threads = Array.from({ length: 4 }, async () => {
       return (await topic.reload()).group;
@@ -804,7 +804,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("serialize does not eagerly load columns", async () => {
-    Topic.resetColumnInformation();
+    await Topic.resetColumnInformation();
     await assertNoQueries(false, () => {
       Topic.serialize("content");
     });
@@ -1201,7 +1201,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     await topic.update({ group: "1" });
 
     model.serialize("group", { coder: JSON });
-    model.resetColumnInformation();
+    await model.resetColumnInformation();
 
     const threads = Array.from({ length: 4 }, async () => {
       return (await topic.reload()).group;

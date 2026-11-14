@@ -25,13 +25,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       t.cidr("cidr_address", { default: "192.168.1.0/24" });
       t.macaddr("mac_address", { default: "ff:ff:ff:ff:ff:ff" });
     });
-    void PostgresqlNetworkAddress.resetColumnInformation();
+    await PostgresqlNetworkAddress.resetColumnInformation();
     await PostgresqlNetworkAddress.loadSchema();
   });
 
   afterEach(async () => {
     await connection.dropTable("postgresql_network_addresses", { ifExists: true });
-    void PostgresqlNetworkAddress.resetColumnInformation();
+    await PostgresqlNetworkAddress.resetColumnInformation();
   });
 
   describe("PostgresqlNetworkTest", () => {

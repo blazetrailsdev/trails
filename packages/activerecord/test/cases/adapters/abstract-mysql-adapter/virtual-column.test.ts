@@ -39,7 +39,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
   afterEach(async () => {
     await adapter.dropTable("virtual_columns", { ifExists: true });
-    void VirtualColumn.resetColumnInformation();
+    await VirtualColumn.resetColumnInformation();
   });
 
   describeIfSupports("virtual_columns", "VirtualColumnTest", () => {
@@ -61,7 +61,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await adapter.changeTable("virtual_columns", {}, async (t) => {
         await t.virtual("lower_name", { type: "string", as: "LOWER(name)" });
       });
-      void VirtualColumn.resetColumnInformation();
+      await VirtualColumn.resetColumnInformation();
       await VirtualColumn.loadSchema();
       const column = VirtualColumn.columnsHash()["lower_name"] as unknown as MySQLColumn;
       assertPredicate(column, (c) => c.isVirtual());

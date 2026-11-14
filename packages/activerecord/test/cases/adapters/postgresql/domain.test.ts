@@ -26,14 +26,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       `CREATE TABLE postgresql_domains (id SERIAL PRIMARY KEY, price custom_money)`,
     );
     await connection.reloadTypeMap();
-    void PostgresqlDomain.resetColumnInformation();
+    await PostgresqlDomain.resetColumnInformation();
     await PostgresqlDomain.loadSchema();
   });
 
   afterEach(async () => {
     await connection.execute("DROP TABLE IF EXISTS postgresql_domains");
     await connection.execute("DROP DOMAIN IF EXISTS custom_money");
-    void PostgresqlDomain.resetColumnInformation();
+    await PostgresqlDomain.resetColumnInformation();
     await connection.reloadTypeMap();
   });
 

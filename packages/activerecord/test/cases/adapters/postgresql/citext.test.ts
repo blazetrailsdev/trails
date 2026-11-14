@@ -24,14 +24,14 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.createTable("citexts", (t) => {
       t.citext("cival");
     });
-    void Citext.resetColumnInformation();
+    await Citext.resetColumnInformation();
     await Citext.loadSchema();
   });
 
   afterEach(async () => {
     await connection.dropTable("citexts", { ifExists: true });
     await connection.disableExtension("citext");
-    void Citext.resetColumnInformation();
+    await Citext.resetColumnInformation();
   });
 
   describe("PostgresqlCitextTest", () => {
@@ -62,7 +62,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           throw new Rollback();
         });
       } finally {
-        void Citext.resetColumnInformation();
+        await Citext.resetColumnInformation();
       }
     });
 

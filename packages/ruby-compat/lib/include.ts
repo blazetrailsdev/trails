@@ -1846,10 +1846,13 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
 }
 
 /**
- * `rb_class_new_instance` (`vendor/ruby/v3.3.11/object.c:2158`), `Class#new`
- * with no arguments. `empty_hash_alloc` (`vendor/ruby/v3.3.11/hash.c:1488`) is a
- * `Hash`, and a String is a primitive (CLAUDE.md, "Ruby Strings are JS string
- * primitives"), so `empty_str_alloc`
+ * `rb_class_new_instance` (`vendor/ruby/v3.3.11/object.c:2158`), `Class#new`:
+ * allocate, then `initialize` with `args`. A JS constructor is both halves, so
+ * a class is built with `new`, reached past a `protected` constructor; that is
+ * how a `static async new` builds `this`, and why its result is typed as the
+ * receiver's instance. `empty_hash_alloc` (`vendor/ruby/v3.3.11/hash.c:1488`)
+ * is a `Hash`, and a String is a primitive (CLAUDE.md, "Ruby Strings are JS
+ * string primitives"), so `empty_str_alloc`
  * (`vendor/ruby/v3.3.11/string.c:858`) is `""`. `Class.new` is an anonymous
  * class (`rb_class_initialize`, `vendor/ruby/v3.3.11/object.c:2007`), and
  * `Regexp.new` takes one to three arguments (`rb_reg_initialize_m`,
@@ -1857,14 +1860,14 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbClassNewInstance(klass: unknown): unknown {
-  if (klass === Hash) return new Hash();
-  if (klass === rbCString) return "";
-  if (klass === rbCClass) return class {};
-  if (klass === RegExp) {
+export function rbClassNewInstance<T>(klass: { prototype: T }, ...args: unknown[]): T {
+  if ((klass as unknown) === Hash) return new Hash() as T;
+  if (klass === rbCString) return "" as T;
+  if (klass === rbCClass) return class {} as T;
+  if ((klass as unknown) === RegExp && args.length === 0) {
     throw new ArgumentError("wrong number of arguments (given 0, expected 1..3)");
   }
-  return new (klass as new () => unknown)();
+  return new (klass as unknown as new (...args: unknown[]) => T)(...args);
 }
 
 function classAlloc(orig: AnyClass, superclass: object | null): object {

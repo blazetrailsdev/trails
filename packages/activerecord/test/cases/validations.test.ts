@@ -231,7 +231,7 @@ describe("ValidationsTest", () => {
     class Klass extends Base {
       static tableName = "posts";
     }
-    void Klass.resetColumnInformation();
+    await Klass.resetColumnInformation();
 
     await assertNoQueries(false, () => {
       Klass.validatesAcceptanceOf("foo");

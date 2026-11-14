@@ -129,7 +129,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((PgArrays as any).columnDefaults["score"]).toEqual([4, 4, 2]);
         expect((new PgArrays() as any).score).toEqual([4, 4, 2]);
       } finally {
-        void PgArrays.resetColumnInformation();
+        await PgArrays.resetColumnInformation();
       }
     });
     it("default strings", async () => {
@@ -148,7 +148,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect((PgArrays as any).columnDefaults["names"]).toEqual(["foo", "bar"]);
         expect((new PgArrays() as any).names).toEqual(["foo", "bar"]);
       } finally {
-        void PgArrays.resetColumnInformation();
+        await PgArrays.resetColumnInformation();
       }
     });
     it("schema dump with shorthand", async () => {

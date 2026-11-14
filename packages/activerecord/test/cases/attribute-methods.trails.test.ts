@@ -206,7 +206,9 @@ describe("AttributeMethodsTest (trails)", () => {
     class Topic extends Base {}
     await Topic.loadSchema();
     const first = Topic.attributeNames();
-    (Topic as unknown as { resetColumnInformation(): void }).resetColumnInformation();
+    await (
+      Topic as unknown as { resetColumnInformation(): Promise<void> }
+    ).resetColumnInformation();
     await Topic.loadSchema();
     const second = Topic.attributeNames();
     expect(second).not.toBe(first);
@@ -260,7 +262,9 @@ describe("AttributeMethodsTest (trails)", () => {
     class Topic extends Base {}
     await Topic.loadSchema();
     const first = Topic.columnNames();
-    (Topic as unknown as { resetColumnInformation(): void }).resetColumnInformation();
+    await (
+      Topic as unknown as { resetColumnInformation(): Promise<void> }
+    ).resetColumnInformation();
     await Topic.loadSchema();
     const second = Topic.columnNames();
     expect(second).not.toBe(first);

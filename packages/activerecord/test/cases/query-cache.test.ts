@@ -588,7 +588,7 @@ describe("QueryCacheTest", () => {
     await Task.cache(async () => {
       await Task.find(1);
 
-      (Task as never as { resetColumnInformation(): void }).resetColumnInformation();
+      await (Task as never as { resetColumnInformation(): Promise<void> }).resetColumnInformation();
 
       await assertNoQueries(false, async () => {
         await Task.find(1);

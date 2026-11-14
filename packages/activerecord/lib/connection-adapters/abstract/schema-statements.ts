@@ -298,23 +298,27 @@ export class SchemaStatements {
     return tableNames;
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async addColumn(
     tableName: string,
     columnName: string,
     type: ColumnType,
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<unknown> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
     return this.execute(await this.schemaCreation.accept(addColumnDef));
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   async removeColumn(
     tableName: string,
     columnName: string,
     type?: ColumnType,
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     if (columnName === undefined) {
       throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
     }

@@ -17,7 +17,7 @@ describe("DupTest", () => {
 
   beforeAll(async () => {
     constSet(TopLevel, "Car", Car);
-    void Car.resetColumnInformation();
+    await Car.resetColumnInformation();
     await Car.loadSchema();
   });
 

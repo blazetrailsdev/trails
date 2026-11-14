@@ -26,7 +26,7 @@ describe("Migration", () => {
     it("add column newline default", async () => {
       const string = "foo\nbar";
       await self.addColumn("test_models", "command", "string", { default: string });
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
       expect(new TestModel().command).toBe(string);
@@ -54,14 +54,14 @@ describe("Migration", () => {
 
     it.skipIf(adapterType === "mysql")("add column without limit", async () => {
       await self.addColumn("test_models", "description", "string", { limit: null });
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["description"].limit).toBeNull();
     });
 
     it.skipIf(adapterType === "sqlite")("unabstracted database dependent types", async () => {
       await self.addColumn("test_models", "intelligence_quotient", "smallint");
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
       await TestModel.loadSchema();
       expect(TestModel.columnsHash()["intelligence_quotient"].sqlType).toMatch(/smallint/);
     });
@@ -73,7 +73,7 @@ describe("Migration", () => {
         precision: 30,
         scale: 10,
       });
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
       await self.connection.execute(
@@ -97,7 +97,7 @@ describe("Migration", () => {
 
     it("add column with precision and scale", async () => {
       await self.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
       const wealthColumn = TestModel.columnsHash()["wealth"];
@@ -112,7 +112,7 @@ describe("Migration", () => {
         precision: 12,
         scale: 8,
       });
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
       const wealthColumn = TestModel.columnsHash()["wealth"];
@@ -125,7 +125,7 @@ describe("Migration", () => {
       async () => {
         await self.addColumn("test_models", "last_name", "string");
         await self.addColumn("test_models", "wealth", "decimal", { precision: 9, scale: 7 });
-        void TestModel.resetColumnInformation();
+        await TestModel.resetColumnInformation();
         await TestModel.loadSchema();
 
         let wealthColumn = TestModel.columnsHash()["wealth"];
@@ -133,7 +133,7 @@ describe("Migration", () => {
         expect(wealthColumn.scale).toBe(7);
 
         await self.changeColumn("test_models", "last_name", "string", { null: false });
-        void TestModel.resetColumnInformation();
+        await TestModel.resetColumnInformation();
         await TestModel.loadSchema();
 
         wealthColumn = TestModel.columnsHash()["wealth"];
@@ -153,7 +153,7 @@ describe("Migration", () => {
       await self.addColumn("test_models", "favorite_day", "date");
       await self.addColumn("test_models", "moment_of_truth", "datetime");
       await self.addColumn("test_models", "male", "boolean");
-      void TestModel.resetColumnInformation();
+      await TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
       await TestModel.create({

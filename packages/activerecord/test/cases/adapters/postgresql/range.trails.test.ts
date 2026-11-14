@@ -73,7 +73,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         this.attribute("id", "integer");
       }
     }
-    void PostgresqlRangesCls.resetColumnInformation();
+    await PostgresqlRangesCls.resetColumnInformation();
     await PostgresqlRangesCls.loadSchema();
     PostgresqlRanges = PostgresqlRangesCls;
   });

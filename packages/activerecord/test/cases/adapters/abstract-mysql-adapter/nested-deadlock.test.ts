@@ -62,7 +62,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await connection.createTable("samples", { force: true }, (t) => {
         t.integer("value");
       });
-      Sample.resetColumnInformation();
+      await Sample.resetColumnInformation();
     });
 
     afterEach(async () => {

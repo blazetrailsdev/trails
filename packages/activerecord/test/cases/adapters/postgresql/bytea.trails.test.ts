@@ -23,13 +23,13 @@ describeIfPg("PostgreSQL bytea round trip", () => {
       t.binary("payload");
       t.binary("serialized");
     });
-    void ByteaDataType.resetColumnInformation();
+    await ByteaDataType.resetColumnInformation();
     await ByteaDataType.loadSchema();
   });
 
   afterEach(async () => {
     await connection.dropTable("bytea_data_type", { ifExists: true });
-    void ByteaDataType.resetColumnInformation();
+    await ByteaDataType.resetColumnInformation();
   });
 
   const cases: [string, number[]][] = [

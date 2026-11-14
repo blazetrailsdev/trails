@@ -361,16 +361,16 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
   beforeEach(async () => {
     connection = await Base.leaseConnection();
     await connection.dropTable("auto_increments", { ifExists: true });
-    void AutoIncrement.resetColumnInformation();
+    await AutoIncrement.resetColumnInformation();
   });
 
   afterEach(async () => {
-    void AutoIncrement.resetColumnInformation();
+    await AutoIncrement.resetColumnInformation();
     await connection.dropTable("auto_increments", { ifExists: true });
   });
 
   async function assertAutoIncremented() {
-    void AutoIncrement.resetColumnInformation();
+    await AutoIncrement.resetColumnInformation();
     await AutoIncrement.loadSchema();
     const record1 = await AutoIncrement.createBang();
     expect(record1.id).not.toBeNull();
@@ -422,12 +422,12 @@ describe("PrimaryKeyAnyTypeTest", () => {
       id: { type: "string", limit: 42 },
       force: true,
     });
-    void Barcode.resetColumnInformation();
+    await Barcode.resetColumnInformation();
     await Barcode.loadSchema();
   });
 
   afterEach(async () => {
-    void Barcode.resetColumnInformation();
+    await Barcode.resetColumnInformation();
     await connection.dropTable("barcodes", { ifExists: true });
   });
 
@@ -437,7 +437,7 @@ describe("PrimaryKeyAnyTypeTest", () => {
     expect(col.null).toBeFalsy();
     expect(col.type).toBe("string");
     expect(col.limit).toBe(42);
-    void Barcode.resetColumnInformation();
+    await Barcode.resetColumnInformation();
     await Barcode.loadSchema();
   });
 
@@ -670,7 +670,7 @@ describe("PrimaryKeyIntegerTest", () => {
   });
 
   afterEach(async () => {
-    void Widget.resetColumnInformation();
+    await Widget.resetColumnInformation();
     await connection.dropTable("widgets", { ifExists: true });
   });
 
@@ -678,7 +678,7 @@ describe("PrimaryKeyIntegerTest", () => {
 
   it.skipIf(adapterType === "sqlite")("primary key column type with serial/integer", async () => {
     await connection.createTable("widgets", { id: { type: pkType }, force: true });
-    void Widget.resetColumnInformation();
+    await Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
     expect(col.type).toBe("integer");
@@ -689,7 +689,7 @@ describe("PrimaryKeyIntegerTest", () => {
     "primary key with serial/integer are automatically numbered",
     async () => {
       await connection.createTable("widgets", { id: { type: pkType }, force: true });
-      void Widget.resetColumnInformation();
+      await Widget.resetColumnInformation();
       await Widget.loadSchema();
       const w = await Widget.createBang();
       expect(w.id).not.toBeNull();
@@ -707,7 +707,7 @@ describe("PrimaryKeyIntegerTest", () => {
       id: { type: "primary_key", limit: 4, unsigned: true },
       force: true,
     });
-    void Widget.resetColumnInformation();
+    await Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
     expect(col.isAutoIncrement()).toBeTruthy();
@@ -724,7 +724,7 @@ describe("PrimaryKeyIntegerTest", () => {
       id: { type: "bigint", unsigned: true },
       force: true,
     });
-    void Widget.resetColumnInformation();
+    await Widget.resetColumnInformation();
     await Widget.loadSchema();
     const col = (Widget as any).columnsHash()["id"];
     expect(col.isAutoIncrement()).toBeTruthy();

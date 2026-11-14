@@ -54,9 +54,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       t.column("settings", "hstore");
     });
 
-    void Hstore.resetColumnInformation();
+    await Hstore.resetColumnInformation();
     await Hstore.loadSchema();
-    void HstoreWithSerialize.resetColumnInformation();
+    await HstoreWithSerialize.resetColumnInformation();
     await HstoreWithSerialize.loadSchema();
 
     column = (Hstore as any).columnsHash()["tags"];
@@ -66,8 +66,8 @@ describeIfPg("PostgreSQLAdapter", () => {
   afterEach(async () => {
     await connection.dropTable("hstores", { ifExists: true });
     await connection.disableExtension("hstore", { force: "cascade" }).catch(() => {});
-    void Hstore.resetColumnInformation();
-    void HstoreWithSerialize.resetColumnInformation();
+    await Hstore.resetColumnInformation();
+    await HstoreWithSerialize.resetColumnInformation();
   });
 
   describe("PostgresqlHstoreTest", () => {
@@ -118,7 +118,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await connection.addColumn("hstores", "permissions", "hstore", {
         default: '"users"=>"read", "articles"=>"write"',
       });
-      void Hstore.resetColumnInformation();
+      await Hstore.resetColumnInformation();
       await Hstore.loadSchema();
       expect((Hstore as any).columnDefaults["permissions"]).toEqual({
         users: "read",
@@ -131,7 +131,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await connection.changeTable("hstores", {}, async (t) => {
         await t.hstore("users", { default: "" });
       });
-      void Hstore.resetColumnInformation();
+      await Hstore.resetColumnInformation();
       await Hstore.loadSchema();
       const col = (Hstore as any).columnsHash()["users"];
       expect(col.type).toBe("hstore");

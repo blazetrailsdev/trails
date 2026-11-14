@@ -342,7 +342,7 @@ describe("Migration", () => {
         null: false,
         default: 99,
       });
-      void PersonKlass.resetColumnInformation();
+      await PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnDefaults["wealth"]).toBe(99);
       expect(PersonKlass.columnsHash()["wealth"].null).toBe(false);
@@ -351,13 +351,13 @@ describe("Migration", () => {
       );
 
       await personConnection.changeColumnDefault("testings", "wealth", 100);
-      void PersonKlass.resetColumnInformation();
+      await PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnDefaults["wealth"]).toBe(100);
       expect(PersonKlass.columnsHash()["wealth"].null).toBe(false);
 
       await personConnection.renameColumn("testings", "wealth", "money");
-      void PersonKlass.resetColumnInformation();
+      await PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnsHash()["wealth"]).toBeUndefined();
       expect(PersonKlass.columnDefaults["money"]).toBe(100);
@@ -367,7 +367,7 @@ describe("Migration", () => {
         null: false,
         default: 1000,
       });
-      void PersonKlass.resetColumnInformation();
+      await PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnDefaults["money"]).toBe(1000);
       expect(PersonKlass.columnsHash()["money"].null).toBe(false);
@@ -376,14 +376,14 @@ describe("Migration", () => {
         null: true,
         default: null,
       });
-      void PersonKlass.resetColumnInformation();
+      await PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnsHash()["money"].default).toBeNull();
       expect(PersonKlass.columnsHash()["money"].null).toBe(true);
 
       await personConnection.execute("UPDATE testings SET money = NULL");
       await personConnection.changeColumnNull("testings", "money", false, 2000);
-      void PersonKlass.resetColumnInformation();
+      await PersonKlass.resetColumnInformation();
       await PersonKlass.loadSchema();
       expect(PersonKlass.columnsHash()["money"].default).toBeNull();
       expect(PersonKlass.columnsHash()["money"].null).toBe(false);

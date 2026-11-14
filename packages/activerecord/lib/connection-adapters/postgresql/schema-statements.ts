@@ -640,12 +640,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   override async changeColumn(
     tableName: string,
     columnName: string,
     type: ColumnType,
     options: ColumnOptions & { using?: string; castAs?: string } = {},
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.clearCacheBang();
     const parts = await this.changeColumnForAlter(tableName, columnName, type, options);
     const sqls = parts.filter((v): v is string => typeof v === "string");
@@ -665,11 +667,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return new ChangeColumnDefinition(cd, columnName);
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   override async changeColumnDefault(
     tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
     );
@@ -687,12 +691,14 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return new ChangeColumnDefaultDefinition(column, default_);
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   override async changeColumnNull(
     tableName: string,
     columnName: string,
     null_: boolean,
     default_: unknown = null,
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     this.validateChangeColumnNullArgumentBang(null_);
 
     await this.clearCacheBang();
@@ -731,11 +737,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
+  /** @inventedArm clearDataSourceCacheBang — PERMANENT */
   override async renameColumn(
     tableName: string,
     columnName: string,
     newColumnName: string,
   ): Promise<void> {
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
     await this.clearCacheBang();
     await this.execute(
       `ALTER TABLE ${this.quoteTableName(tableName)} ${this.renameColumnSql(tableName, columnName, newColumnName)}`,

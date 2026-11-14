@@ -638,7 +638,7 @@ describe("AttributeMethodsTest", () => {
         expect(record.equals(YAML.unsafeLoad(payload))).toBe(true);
       });
     } finally {
-      CanonicalTopic.resetColumnInformation();
+      await CanonicalTopic.resetColumnInformation();
     }
   });
   it("setting a time zone-aware time in the current time zone", async () => {

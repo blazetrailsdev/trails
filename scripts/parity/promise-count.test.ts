@@ -12,7 +12,7 @@ import {
   tightened,
 } from "./promise-count.js";
 
-const [FLOAT, CTOR] = RULES;
+const [FLOAT, CTOR, SWALLOW] = RULES;
 
 describe("promise-count gate", () => {
   it("keys a file by its package", () => {
@@ -24,9 +24,9 @@ describe("promise-count gate", () => {
   it("tallies the gated rules only", () => {
     const counts = tally([
       { file: "packages/rack/lib/a.ts", ruleIds: [FLOAT, FLOAT, "other", null] },
-      { file: "packages/rake/lib/b.ts", ruleIds: [CTOR] },
+      { file: "packages/rake/lib/b.ts", ruleIds: [CTOR, SWALLOW] },
     ]);
-    expect(counts).toEqual({ [FLOAT]: { rack: 2 }, [CTOR]: { rake: 1 } });
+    expect(counts).toEqual({ [FLOAT]: { rack: 2 }, [CTOR]: { rake: 1 }, [SWALLOW]: { rake: 1 } });
   });
 
   it("passes at the mark and fails one over, holding an unmarked package at 0", () => {
@@ -37,11 +37,12 @@ describe("promise-count gate", () => {
   });
 
   it("tightens a linted package down and never up", () => {
-    const mark = { [FLOAT]: { rack: 2, rake: 5 }, [CTOR]: { rake: 1 } };
-    const current = { [FLOAT]: { rack: 9, rake: 3 }, [CTOR]: {} };
+    const mark = { [FLOAT]: { rack: 2, rake: 5 }, [CTOR]: { rake: 1 }, [SWALLOW]: {} };
+    const current = { [FLOAT]: { rack: 9, rake: 3 }, [CTOR]: {}, [SWALLOW]: {} };
     expect(tightened(mark, current, ["rack", "rake"])).toEqual({
       [FLOAT]: { rack: 2, rake: 3 },
       [CTOR]: {},
+      [SWALLOW]: {},
     });
     expect(tightened(mark, current, ["rack"])).toEqual(mark);
   });
@@ -51,6 +52,9 @@ describe("promise-count gate", () => {
     expect(raisedMarks(base, { [FLOAT]: { rack: 1 }, [CTOR]: {} })).toEqual([]);
     expect(raisedMarks(base, { [FLOAT]: { rack: 3 }, [CTOR]: {} })).toHaveLength(1);
     expect(raisedMarks(base, { [FLOAT]: { rack: 2 }, [CTOR]: { rake: 1 } })).toHaveLength(1);
+    expect(raisedMarks(base, { [FLOAT]: { rack: 2 }, [CTOR]: {}, [SWALLOW]: { rack: 4 } })).toEqual(
+      [],
+    );
   });
 
   it("re-measures every package when a rule, the config or a tsconfig changes", () => {

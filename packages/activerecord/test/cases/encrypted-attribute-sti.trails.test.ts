@@ -73,7 +73,7 @@ describe("STI subclass encrypts", () => {
       EncryptedAttributeType,
     );
 
-    void ReflectedEncryptedCompany.resetColumnInformation();
+    await ReflectedEncryptedCompany.resetColumnInformation();
     await Company.loadSchema();
     await ReflectedEncryptedCompany.loadSchema();
 

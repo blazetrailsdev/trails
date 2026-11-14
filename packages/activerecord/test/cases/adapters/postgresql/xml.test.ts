@@ -20,13 +20,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     await connection.createTable("xml_data_type", {}, (t) => {
       t.xml("payload");
     });
-    void XmlDataType.resetColumnInformation();
+    await XmlDataType.resetColumnInformation();
     await XmlDataType.loadSchema();
   });
 
   afterEach(async () => {
     await connection.dropTable("xml_data_type", { ifExists: true });
-    void XmlDataType.resetColumnInformation();
+    await XmlDataType.resetColumnInformation();
   });
 
   describe("PostgreSQLXMLTest", () => {

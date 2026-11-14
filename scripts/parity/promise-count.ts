@@ -36,6 +36,7 @@ export const MARK_PATH = path.join(ROOT_DIR, "scripts/parity/promise-count-mark.
 export const RULES = [
   "@typescript-eslint/no-floating-promises",
   "blazetrails/constructor-creates-no-promise",
+  "blazetrails/no-swallowed-rejection",
 ] as const;
 
 /** Findings per rule, per package (`packages/<name>` is `<name>`; `scripts` is `scripts`). */
@@ -120,10 +121,11 @@ async function changedPackages(ref: string): Promise<string[]> {
   return [...new Set(files.map(packageOf).filter((p): p is string => p !== null))].sort();
 }
 
-/** `rule::package` rows whose mark is above the mark committed at `base`; an unmarked base package is 0. */
+/** `rule::package` rows whose mark is above the mark committed at `base`; an unmarked base package is 0, and a rule `base` does not mark is seeded. */
 export function raisedMarks(base: Counts, mark: Counts): string[] {
   const rows: string[] = [];
   for (const rule of RULES) {
+    if (base[rule] === undefined) continue;
     for (const [pkg, n] of Object.entries(mark[rule] ?? {}).sort()) {
       const was = base[rule]?.[pkg] ?? 0;
       if (n > was) rows.push(`${rule}::${pkg}: mark ${was} → ${n}`);

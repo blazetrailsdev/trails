@@ -69,7 +69,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         "current_mood" mood
       )
     `);
-    void PostgresqlEnum.resetColumnInformation();
+    await PostgresqlEnum.resetColumnInformation();
   });
   afterEach(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS "postgresql_enums" CASCADE`);
@@ -82,7 +82,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.execute(`DROP TYPE IF EXISTS "color" CASCADE`);
     await adapter.setSchemaSearchPath(defaultSearchPath);
     adapter.schemaCache.clearBang();
-    void PostgresqlEnum.resetColumnInformation();
+    await PostgresqlEnum.resetColumnInformation();
     vi.restoreAllMocks();
   });
 
@@ -100,7 +100,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("enum defaults", async () => {
       await adapter.addColumn("postgresql_enums", "good_mood", "mood", { default: "happy" });
-      void PostgresqlEnum.resetColumnInformation();
+      await PostgresqlEnum.resetColumnInformation();
       await PostgresqlEnum.loadSchema();
 
       expect((PostgresqlEnum as any).columnDefaults["good_mood"]).toBe("happy");

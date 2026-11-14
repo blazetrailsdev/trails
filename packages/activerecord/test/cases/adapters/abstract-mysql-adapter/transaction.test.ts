@@ -67,7 +67,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         });
       });
 
-      Sample.resetColumnInformation();
+      await Sample.resetColumnInformation();
     });
     afterEach(async () => {
       await (await Base.leaseConnection()).dropTable("samples", { ifExists: true });
