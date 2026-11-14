@@ -13,8 +13,8 @@ export interface TimezoneDefinitionHost {
 
 /** @internal */
 export const ClassMethods = {
-  get(this: TimezoneDefinitionHost): TimezoneInfo | undefined {
-    return this._timezone;
+  get(this: TimezoneDefinitionHost): TimezoneInfo | null {
+    return this._timezone ?? null;
   },
 
   /** @internal */

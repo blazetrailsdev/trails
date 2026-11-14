@@ -38,11 +38,7 @@ export class RubyDataSource extends DataSource {
   static async load(): Promise<void> {
     const { loadPath } = TopLevel.TZInfo! as unknown as TZInfoNamespace;
     for (const feature of Object.keys(loadPath)) {
-      try {
-        await rbFRequire(loadPath, feature);
-      } catch (e) {
-        if (!(e instanceof LoadError)) throw e;
-      }
+      await rbFRequire(loadPath, feature);
     }
   }
 
