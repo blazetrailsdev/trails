@@ -14,6 +14,7 @@ import {
   arySlice,
   Range,
   rbObjClassname,
+  methodMissingPrototype,
 } from "@blazetrails/ruby-compat";
 import { Multibyte } from "../multibyte.js";
 import { Unicode } from "./unicode.js";
@@ -297,6 +298,8 @@ export class Chars {
     return new (this.constructor as typeof Chars)(string);
   }
 }
+
+methodMissingPrototype(Chars, { delegate: (receiver) => receiver.wrappedString });
 
 const W = "[\\p{L}\\p{M}\\p{N}\\p{Pc}]";
 const WORD_BOUNDARY_TITLEIZE = new RegExp(`(?:(?<=${W})(?!${W})|(?<!${W})(?=${W}))('?\\S)`, "gu");

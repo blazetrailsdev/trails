@@ -28,7 +28,9 @@ import {
   unpack,
   constDefined,
   constGet,
+  Range,
 } from "@blazetrails/ruby-compat";
+import type { Chars } from "./multibyte/chars.js";
 import { Configuration } from "./configuration.js";
 import * as Constants from "./constants.js";
 import { Encodings } from "./encodings.js";
@@ -123,7 +125,9 @@ export const Utilities = {
 
   unparen(str: string): string {
     if (str.startsWith("(") && str.endsWith(")")) {
-      return str.slice(1, -1);
+      return typeof str === "string"
+        ? str.slice(1, -1)
+        : ((str as unknown as Chars).slice(new Range(1, -2)) as unknown as string);
     } else {
       return str;
     }
@@ -131,7 +135,9 @@ export const Utilities = {
 
   unbracket(str: string): string {
     if (str.startsWith("<") && str.endsWith(">")) {
-      return str.slice(1, -1);
+      return typeof str === "string"
+        ? str.slice(1, -1)
+        : ((str as unknown as Chars).slice(new Range(1, -2)) as unknown as string);
     } else {
       return str;
     }

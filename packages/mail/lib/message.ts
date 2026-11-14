@@ -143,13 +143,15 @@ export class Message {
 
   async deliverBang(): Promise<unknown> {
     this.informInterceptors();
-    const deliveryMethod = this._deliveryMethod as {
+    type DeliveryMethod = {
       deliverBang(mail: Message): Promise<unknown>;
       settings: Record<string, unknown>;
     };
-    const response = await deliveryMethod.deliverBang(this);
+    const response = await (this.deliveryMethod() as DeliveryMethod).deliverBang(this);
     this.informObservers();
-    return rtest(deliveryMethod.settings.returnResponse) ? response : this;
+    return rtest((this.deliveryMethod() as DeliveryMethod).settings.returnResponse)
+      ? response
+      : this;
   }
 
   deliveryMethod(method: unknown = null, settings: Record<string, unknown> = {}): unknown {
@@ -1315,7 +1317,7 @@ export class Message {
     try {
       if (this.performDeliveries) {
         await (
-          this._deliveryMethod as { deliverBang(mail: Message): Promise<unknown> }
+          this.deliveryMethod() as { deliverBang(mail: Message): Promise<unknown> }
         ).deliverBang(this);
       }
     } catch (e) {

@@ -12,6 +12,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
 import {
+  CODEPOINTS,
   COMBINING_CLASS,
   COMPOSITION_EXCLUSION,
   COMPOSITION_MAP,
@@ -145,15 +146,10 @@ export class UnicodeDatabase {
 
   load(): void {
     try {
-      /** @missingRailsCall open — CONVERGEABLE mail-unicode-database-full-codepoint-table */
-      /** @missingRailsCall load — CONVERGEABLE mail-unicode-database-full-codepoint-table */
+      /** @missingRailsCall open — PERMANENT */
+      /** @missingRailsCall load — PERMANENT */
       const codepoints = new Hash<number, Codepoint>(new Codepoint());
-      for (const cp of new Set([
-        ...COMBINING_CLASS.keys(),
-        ...UPPERCASE_MAPPING.keys(),
-        ...LOWERCASE_MAPPING.keys(),
-        ...DECOMPOSITION.keys(),
-      ])) {
+      for (const cp of CODEPOINTS) {
         const codepoint = new Codepoint();
         codepoint.code = cp;
         codepoint.combiningClass = COMBINING_CLASS.get(cp) ?? 0;
@@ -188,11 +184,13 @@ export class UnicodeDatabase {
   }
 
   static dirname(): string {
-    return File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)) + "/../values/";
+    return File.dirname(decodeURIComponent(new URL(import.meta.url).pathname)) + "/";
   }
 
   static filename(): string {
-    return File.expandPath(File.join(UnicodeDatabase.dirname(), "unicode_tables.dat"));
+    return File.expandPath(
+      File.join(UnicodeDatabase.dirname(), "simple-case-mappings.generated.js"),
+    );
   }
 }
 

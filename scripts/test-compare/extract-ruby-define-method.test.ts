@@ -62,6 +62,29 @@ describe("Ruby extractor define_method loop expansion", () => {
     expect(unexpandedLoops).toEqual([]);
   });
 
+  it("takes the right operand of || for a nil or false element", () => {
+    const { cases, unexpandedLoops } = extract(`
+  ["UTF-8", nil, false].each do |charset|
+    define_method("test_when_#{charset || 'nil'}") do
+      assert_equal 1, 1
+    end
+  end
+`);
+    expect(cases.map((c) => c.description)).toEqual(["when UTF-8", "when nil", "when nil"]);
+    expect(unexpandedLoops).toEqual([]);
+  });
+
+  it("still reports a bare interpolation of a nil element", () => {
+    const { unexpandedLoops } = extract(`
+  ["UTF-8", nil].each do |charset|
+    define_method("test_when_#{charset}") do
+      assert_equal 1, 1
+    end
+  end
+`);
+    expect(unexpandedLoops).toHaveLength(1);
+  });
+
   it("takes a constant path as written when no namespace encloses the test class", () => {
     const { cases } = extract(`
   [Nodes::Sum, ::Top::Level].each do |klass|
