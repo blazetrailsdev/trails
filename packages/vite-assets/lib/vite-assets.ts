@@ -3,27 +3,39 @@ import {
   File,
   getHttpAsync,
   Logger,
-  NotImplementedError,
   stdout as $stdout,
   StandardError,
   SystemCallError,
   Timeout,
   TopLevel,
 } from "@blazetrails/ruby-compat";
+import { Build } from "./build.js";
+import { Builder } from "./builder.js";
 import { Config, type ConfigOptions } from "./config.js";
 import { Error } from "./error.js";
-import { Manifest, type ManifestBuilder } from "./manifest.js";
+import { IO } from "./io.js";
+import { Manifest } from "./manifest.js";
 import { MissingEntrypointError } from "./missing-entrypoint-error.js";
 import { MissingExecutableError } from "./missing-executable-error.js";
+import { Runner } from "./runner.js";
 
 type ConfigAttrs = Partial<Record<keyof ConfigOptions, unknown>>;
 
 export class ViteAssets {
+  declare static Build: typeof Build;
+  declare static Builder: typeof Builder;
   declare static Config: typeof Config;
   declare static Error: typeof Error;
   declare static Manifest: typeof Manifest;
   declare static MissingEntrypointError: typeof MissingEntrypointError;
   declare static MissingExecutableError: typeof MissingExecutableError;
+  declare static IO: typeof IO;
+  declare static Runner: typeof Runner;
+
+  static readonly VERSION = "3.11.1";
+
+  static readonly DEFAULT_VITE_VERSION = "^8.0.0";
+  static readonly DEFAULT_PLUGIN_VERSION = "^5.2.5";
 
   static readonly ENV_PREFIX = "VITE_RUBY";
 
@@ -49,6 +61,14 @@ export class ViteAssets {
 
   static configure(options: ConfigAttrs = {}): Promise<Config> {
     return this.instance().configure(options);
+  }
+
+  static digest(): Promise<string> {
+    return this.instance().digest();
+  }
+
+  static run(argv: string[], options: { exec?: boolean } = {}): Promise<unknown> {
+    return this.instance().run(argv, options);
   }
 
   static env(): Record<string, string> {
@@ -86,6 +106,10 @@ export class ViteAssets {
   /** @internal */
   private _runningCheckedAt = 0;
   /** @internal */
+  private _runner: Runner | undefined;
+  /** @internal */
+  private _builder: Builder | undefined;
+  /** @internal */
   private _devServerMeta: unknown;
   /** @internal */
   private _devServerMetaCheckedAt: number | undefined;
@@ -100,6 +124,10 @@ export class ViteAssets {
 
   set logger(logger: Logger) {
     this._logger = logger;
+  }
+
+  digest(): Promise<string> {
+    return this.builder().watchedFilesDigest();
   }
 
   async isDevServerRunning(): Promise<boolean> {
@@ -137,8 +165,12 @@ export class ViteAssets {
 
   declare isRunProxy: () => Promise<boolean>;
 
-  builder(): ManifestBuilder {
-    throw new NotImplementedError("ViteAssets::Builder is not ported yet");
+  run(argv: string[], options: { exec?: boolean } = {}): Promise<unknown> {
+    return (this._runner ??= new Runner(this)).run(argv, options);
+  }
+
+  builder(): Builder {
+    return (this._builder ??= new Builder(this));
   }
 
   async config(): Promise<Config> {
@@ -213,11 +245,15 @@ export class ViteAssets {
 
 ViteAssets.prototype.isRunProxy = ViteAssets.prototype.isDevMode;
 
+ViteAssets.Build = Build;
+ViteAssets.Builder = Builder;
 ViteAssets.Config = Config;
 ViteAssets.Error = Error;
 ViteAssets.Manifest = Manifest;
 ViteAssets.MissingEntrypointError = MissingEntrypointError;
 ViteAssets.MissingExecutableError = MissingExecutableError;
+ViteAssets.IO = IO;
+ViteAssets.Runner = Runner;
 
 TopLevel.ViteAssets = ViteAssets;
 

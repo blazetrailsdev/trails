@@ -80,13 +80,16 @@ export interface ChildProcessAdapter {
    * a String whose encoding is broken (`vendor/ruby/v3.3.11/lib/open3.rb:665`),
    * and a JS string cannot hold them. With no `args`, `command` is a command
    * line for `/bin/sh -c`; with `args` it is the program, exec'd with that argv
-   * and no shell, as {@link ChildProcessAdapter.system} spawns it.
+   * and no shell, as {@link ChildProcessAdapter.system} spawns it. `chdir`
+   * is the `chdir:` option (`vendor/ruby/v3.3.11/process.c:2215-2221`): the
+   * directory the child starts in.
    */
   capture3?(
     command: string,
     env: Record<string, string | undefined>,
     args: string[] | null,
     stdinData: string | Uint8Array,
+    chdir?: string,
   ): Promise<[stdout: string | Uint8Array, stderr: string, status: WaitStatus]>;
   /**
    * Runs `command` with `args` as its argv and no shell, as `IO.popen` execs
@@ -179,9 +182,10 @@ function spawnChild(
   read: ((chunk: string) => void) | { bytes: (chunk: Uint8Array) => void },
   input?: string | Uint8Array,
   readErr?: ((chunk: string) => void) | { bytes: (chunk: Uint8Array) => void },
+  cwd?: string,
 ): Promise<WaitStatus> {
   return new Promise((resolve) => {
-    const child = cp.spawn(file, args, { env, stdio });
+    const child = cp.spawn(file, args, { env, stdio, cwd });
     child.stdin?.on("error", () => {});
     child.stdin?.end(input);
     if (typeof read === "function") {
@@ -289,7 +293,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
           : await spawnChild(cp, command, args, env, ["pipe", "pipe", "pipe"], read, "", read);
       return [output, status];
     },
-    async capture3(command, env, args, stdinData) {
+    async capture3(command, env, args, stdinData, chdir) {
       const stdoutChunks: Uint8Array[] = [];
       let stderr = "";
       const [file, argv] = args == null ? ["/bin/sh", ["-c", command]] : [command, args];
@@ -304,6 +308,7 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         (chunk) => {
           stderr += chunk;
         },
+        chdir,
       );
       const bytes = new Uint8Array(stdoutChunks.reduce((n, c) => n + c.length, 0));
       let offset = 0;
