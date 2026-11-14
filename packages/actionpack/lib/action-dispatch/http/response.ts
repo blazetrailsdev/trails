@@ -134,6 +134,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
       const yielded: Array<{ chunk: unknown; resume: () => void }> = [];
       let wake: (() => void) | null = null;
       let done = false;
+      let failure: { error: unknown } | null = null;
       const eachChunk = Promise.resolve(
         this.eachChunk(
           (chunk) =>
@@ -142,11 +143,14 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
               wake?.();
             }),
         ),
-      ).finally(() => {
-        done = true;
-        wake?.();
-      });
-      eachChunk.catch(() => {});
+      )
+        .catch((error: unknown) => {
+          failure = { error };
+        })
+        .finally(() => {
+          done = true;
+          wake?.();
+        });
       while (yielded.length > 0 || !done) {
         const next = yielded.shift();
         if (next) {
@@ -158,6 +162,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
         }
       }
       await eachChunk;
+      if (failure) throw (failure as { error: unknown }).error;
     }
   }
 

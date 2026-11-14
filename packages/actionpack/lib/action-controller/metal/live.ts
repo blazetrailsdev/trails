@@ -77,9 +77,9 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     return this.write(string.endsWith("\n") ? string : `${string}\n`);
   }
 
-  override close(): void {
+  override async close(): Promise<void> {
     super.close();
-    void this._buf.push(null);
+    await this._buf.push(null);
   }
 
   override abort(): void {
@@ -244,7 +244,7 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
           this.logError(exception as Error);
         } finally {
           this.logError(e as Error);
-          (resp.stream as Buffer).close();
+          await (resp.stream as Buffer).close();
         }
       } else {
         error = e;
@@ -299,7 +299,7 @@ export async function sendStream(
       await block(this.response.stream as Buffer);
     });
   } finally {
-    (this.response.stream as Buffer).close();
+    await (this.response.stream as Buffer).close();
   }
 }
 

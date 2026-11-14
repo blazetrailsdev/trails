@@ -48,7 +48,6 @@ export class Driver {
   private options: Record<string, unknown>;
   private capabilities: ((options: LaunchOptions | undefined) => void) | undefined;
   private browser: Browser | null;
-  private _preload: Promise<void> | undefined;
 
   constructor(
     driverType: string,
@@ -63,10 +62,6 @@ export class Driver {
 
     if (driverType === "selenium") {
       this.browser = new Browser(options.using);
-      if (this.options.browser !== "remote") {
-        this._preload = this.browser.preload();
-        this._preload.catch(() => {});
-      }
     } else {
       this.browser = null;
     }
@@ -108,7 +103,7 @@ export class Driver {
 
   /** @internal */
   private async registerSelenium(app: RackMiddleware | undefined): Promise<unknown> {
-    await this._preload;
+    if (this.options.browser !== "remote") await this.browser!.preload();
     this.browserOptions();
     // @nie disposition=port-real rails=actionpack/lib/action_dispatch/system_testing/driver.rb:55
     throw new NotImplementedError(

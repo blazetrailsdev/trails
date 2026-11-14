@@ -171,7 +171,7 @@ export class Pattern {
   eagerLoadBang(): void {
     void this.requiredNames;
     void this.offsets;
-    void this.toRegexp();
+    this.toRegexp();
     this.ast = null;
   }
 
