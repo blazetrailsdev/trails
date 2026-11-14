@@ -53,6 +53,7 @@
     "@blazetrails/nokogiri": "workspace:*",
     "@blazetrails/net-smtp": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/vite-assets": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

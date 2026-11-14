@@ -1521,6 +1521,9 @@ importers:
       '@blazetrails/tzinfo':
         specifier: workspace:*
         version: link:../../packages/tzinfo
+      '@blazetrails/vite-assets':
+        specifier: workspace:*
+        version: link:../../packages/vite-assets
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../../packages/vitest-matchers
