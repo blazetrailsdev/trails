@@ -266,3 +266,17 @@ describe("URI error class paths", () => {
     expect(rbObjClassname(new BadURIError("x"))).toBe("URI::BadURIError");
   });
 });
+
+describe("URI::RFC2396_Parser#make_regexp", () => {
+  it("answers ABS_URI_REF with no schemes", () => {
+    expect(RFC2396_PARSER.makeRegexp()).toBe(RFC2396_PARSER.regexp.ABS_URI_REF);
+    expect(RFC2396_PARSER.makeRegexp().exec("see http://example.com/a?b now")?.[0]).toBe(
+      "http://example.com/a?b",
+    );
+  });
+
+  it("restricts the match to the given schemes", () => {
+    const re = RFC2396_PARSER.makeRegexp(["ftp"]);
+    expect(re.exec("http://a.example ftp://b.example")?.[0]).toBe("ftp://b.example");
+  });
+});

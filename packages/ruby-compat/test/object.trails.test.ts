@@ -1708,3 +1708,27 @@ describe("rbModMethodDefined on a plain-object module", () => {
     expect(rbModMethodDefined(outer, "missing")).toBe(false);
   });
 });
+
+describe("Hash#store / #fetch / #delete / #clear through respond_to? and send", () => {
+  it("answers and dispatches them on a plain hash", () => {
+    const h: Record<string, unknown> = { a: 1 };
+    for (const mid of ["store", "set", "fetch", "get", "delete", "clear", "toHash"]) {
+      expect(rbObjRespondTo(h, mid)).toBe(true);
+    }
+    expect(rbFSend(h, "store", "b", 2)).toBe(2);
+    expect(rbFSend(h, "fetch", "b")).toBe(2);
+    expect(rbFSend(h, "get", "a")).toBe(1);
+    expect(rbFSend(h, "delete", "a")).toBe(1);
+    expect(h).toEqual({ b: 2 });
+    expect(rbFSend(h, "clear")).toBe(h);
+    expect(h).toEqual({});
+  });
+
+  it("answers and dispatches store and fetch on a Map", () => {
+    const m = new Map<string, number>();
+    expect(rbObjRespondTo(m, "store")).toBe(true);
+    expect(rbObjRespondTo(m, "fetch")).toBe(true);
+    rbFSend(m, "store", "a", 1);
+    expect(rbFSend(m, "fetch", "a")).toBe(1);
+  });
+});

@@ -1473,7 +1473,6 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
   if (recv instanceof Map || isPlainHash(recv)) {
     const hash = recv as object;
-    // vendor/ruby/v3.3.11/hash.c:2121, :2941, :2176, :2441, :2868.
     if (mid === "get") return hashAref(hash, args[0]);
     if (mid === "store" || mid === "set") return hashAset(hash, args[0], args[1]);
     if (mid === "fetch") return (fetch as AnyFunction)(hash, ...args);
