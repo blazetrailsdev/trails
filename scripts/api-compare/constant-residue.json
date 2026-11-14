@@ -1275,7 +1275,15 @@
       "urlmap.ts::URLMap": "Rack::URLMap"
     }
   },
-  "rack-proxy": { "rows": 2, "excluded": [], "unwalked": [], "residue": {} },
+  "rack-proxy": {
+    "rows": 4,
+    "excluded": [],
+    "unwalked": [
+      "http-streaming-response.ts::HttpStreamingResponse.ResponseTooLarge",
+      "http-streaming-response.ts::HttpStreamingResponse.StreamAborted"
+    ],
+    "residue": {}
+  },
   "rack-session": {
     "rows": 17,
     "excluded": [],
@@ -1603,6 +1611,18 @@
       "timezone.ts::PeriodNotFound": "TZInfo::PeriodNotFound",
       "timezone.ts::Timezone": "TZInfo::Timezone",
       "transitions-timezone-period.ts::TransitionsTimezonePeriod": "TZInfo::TransitionsTimezonePeriod"
+    }
+  },
+  "vite-assets": {
+    "rows": 5,
+    "excluded": ["vite-assets.ts::ViteAssets"],
+    "unwalked": [],
+    "residue": {
+      "config.ts::Config": "ViteAssets::Config",
+      "error.ts::Error": "ViteAssets::Error",
+      "manifest.ts::Manifest": "ViteAssets::Manifest",
+      "missing-entrypoint-error.ts::MissingEntrypointError": "ViteAssets::MissingEntrypointError",
+      "missing-executable-error.ts::MissingExecutableError": "ViteAssets::MissingExecutableError"
     }
   },
   "zeitwerk": {
