@@ -1687,7 +1687,17 @@ function prependOrigin(proto: object, key: string): { slot: symbol } | undefined
  * when it copied `method` there, seated under `method`'s own slot. With none
  * seated, the search ends in `Kernel`, where every Ruby ancestry ends.
  *
+ * A function seated at two places in one ancestry (a module included into a
+ * class and then into its superclass below a prepend, both copies kept by
+ * `include_modules_at`, vendor/ruby/v3.3.11/class.c:1253) has one slot, so
+ * the lower copy's seat shadows the upper one's; the upper copy's seat is
+ * read off the link it was found at. MRI runs the upper copy a second time
+ * (`["mod", "prepended", "mod", "base"]` for the subclass in ruby 3.3.11);
+ * trails skips it, since one function's slot cannot answer from two ancestry
+ * positions and an awaited body carries no frame to tell the copies apart.
+ *
  * @noRailsEquivalent PERMANENT
+ * @inventedArm skip — PERMANENT
  */
 export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unknown[]): unknown {
   let slot = (method as { [_superSlot]?: symbol })[_superSlot];
@@ -1700,8 +1710,12 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
   ) {
     nextEntry = superSlots.get(next as AnyFunction);
     if (nextEntry === undefined || (nextEntry.seats ?? 0) < 2) break;
-    const holder = slotHolder(receiver, slot);
-    const own = slotHolder(receiver, nextEntry.slot);
+    let holder: object | null = receiver;
+    while (holder && !Object.hasOwn(holder, slot))
+      holder = Object.getPrototypeOf(holder) as object | null;
+    let own: object | null = receiver;
+    while (own && !Object.hasOwn(own, nextEntry.slot))
+      own = Object.getPrototypeOf(own) as object | null;
     if (!holder || !own || own === holder || !Object.prototype.isPrototypeOf.call(holder, own))
       break;
     slot = nextEntry.slot;
@@ -1719,29 +1733,6 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
     );
   }
   return (next as (...a: unknown[]) => unknown).apply(receiver, args);
-}
-
-/**
- * The link of `receiver`'s ancestry that owns `slot`. A function seated at two
- * places in one ancestry (a module included into a class and then into its
- * superclass below a prepend, both copies kept by `include_modules_at`,
- * vendor/ruby/v3.3.11/class.c:1253) has one slot, so the lower copy's seat
- * shadows the upper one's; {@link rbCallSuper} reads the upper copy's seat off
- * the link it was found at. MRI runs the upper copy a second time
- * (`["mod", "prepended", "mod", "base"]` for the subclass in ruby 3.3.11);
- * trails skips it, since one function's slot cannot answer from two ancestry
- * positions and an awaited body carries no frame to tell the copies apart.
- *
- * @inventedArm skip — PERMANENT
- */
-function slotHolder(receiver: object, slot: symbol): object | undefined {
-  for (
-    let link: object | null = receiver;
-    link;
-    link = Object.getPrototypeOf(link) as object | null
-  )
-    if (Object.hasOwn(link, slot)) return link;
-  return undefined;
 }
 
 export type Extended<M extends object> = CallableMethods<M>;
