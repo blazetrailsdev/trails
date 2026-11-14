@@ -37,18 +37,39 @@ export class ReadTimeout extends Timeout.Error {
 ReadTimeout.prototype.name = "Net::ReadTimeout";
 
 /**
+ * `Net::WriteTimeout` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:99-113`), raised
+ * when a chunk of the request cannot be written within `write_timeout`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails rescues without defining.
+ */
+export class WriteTimeout extends Timeout.Error {
+  /** @noRailsEquivalent PERMANENT */
+  readonly io: unknown;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(io: unknown = null) {
+    super(io != null ? `Net::WriteTimeout with ${rbInspect(io)}` : "Net::WriteTimeout");
+    this.io = io;
+  }
+}
+
+WriteTimeout.prototype.name = "Net::WriteTimeout";
+
+/**
  * Ruby's `Net` module (`vendor/ruby/v3.3.11/lib/net/protocol.rb:26`), each
  * constant seated by the file that defines it.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
  */
-export const Net = { name: "Net", OpenTimeout, ReadTimeout } as {
+export const Net = { name: "Net", OpenTimeout, ReadTimeout, WriteTimeout } as {
   /** @noRailsEquivalent PERMANENT */
   name: string;
   /** @noRailsEquivalent PERMANENT */
   OpenTimeout: typeof OpenTimeout;
   /** @noRailsEquivalent PERMANENT */
   ReadTimeout: typeof ReadTimeout;
+  /** @noRailsEquivalent PERMANENT */
+  WriteTimeout: typeof WriteTimeout;
   /** @noRailsEquivalent PERMANENT */
   HTTP: typeof HTTP & { Post: typeof Post };
   /** @noRailsEquivalent PERMANENT */
