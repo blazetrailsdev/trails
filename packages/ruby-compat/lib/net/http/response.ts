@@ -159,7 +159,13 @@ export class HTTPResponse {
     return Number(m[0]);
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383`. */
+  /**
+   * `vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383`. The `@body_encoding`
+   * arm is not ported: a JS string carries no encoding tag (CLAUDE.md, "A String
+   * has no encoding tag either"), and the body is bytes.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   async readBody(
     dest: { append(str: Uint8Array): unknown } | null = null,
     block: ((chunk: Uint8Array) => unknown) | null = null,

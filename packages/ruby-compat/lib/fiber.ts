@@ -156,18 +156,21 @@ export class Fiber<R = unknown> {
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Fiber#raise` (`vendor/ruby/v3.3.11/cont.c:3269-3291`).
    *
-   * A suspended fiber is resumed with `exception` raised at its `Fiber.yield`;
-   * every other state takes `#resume`'s checks.
+   * A suspended fiber is resumed with `exception` raised at its `Fiber.yield`
+   * (`fiber_transfer_kw` / `fiber_resume_kw` with an exception). Any other
+   * fiber takes `fiber_resume_kw`: a terminated or resumed one raises
+   * `#resume`'s errors, and an unborn one terminates raising `exception`
+   * before its block runs. `resuming_fiber` has no arm: a JS fiber resumes no
+   * nested fiber it could forward to.
    */
   raise(exception: Error | (new (message?: string) => Error), message?: string): R {
     if (typeof exception === "function") exception = new exception(message);
-    if (this === Fiber.current()) throw exception;
-    if (this.#status !== "suspended") {
-      if (this.#status === "created" && this.#thread === Thread.current()) {
-        this.#status = "terminated";
-        throw exception;
-      }
-      return this.resume();
+    if (this === Fiber.current()) {
+      throw exception;
+    } else if (this.#status !== "suspended") {
+      if (this.#status !== "created" || this.#thread !== Thread.current()) return this.resume();
+      this.#status = "terminated";
+      throw exception;
     }
     if (this.#thread !== Thread.current()) {
       throw new FiberError("fiber called across threads");

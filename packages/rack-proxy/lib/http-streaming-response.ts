@@ -6,6 +6,7 @@ import {
   Net,
   rbObjIvarDefined,
   rbObjIvarSet,
+  rbModName,
   rbObjRespondTo,
   StandardError,
   StringIO,
@@ -117,7 +118,7 @@ export class HttpStreamingResponse {
       if (!(e instanceof StandardError)) throw e;
       if (rbObjRespondTo(this.logger, "append")) {
         (this.logger as { append(str: string): unknown }).append(
-          `rack-proxy: streaming backend read failed: ${e.constructor.name}: ${e.message}\n`,
+          `rack-proxy: streaming backend read failed: ${rbModName(e.constructor)}: ${e.message}\n`,
         );
       }
       throw e;
@@ -174,7 +175,7 @@ export class HttpStreamingResponse {
     return (this._session ??= await (async () => {
       const http = new Net.HTTP(this.host, this.port);
       if (this.configure != null) {
-        this.configure(http);
+        await this.configure(http);
       } else {
         http.useSsl = this.useSsl as boolean;
         http.verifyMode = this.verifyMode as number | null;
@@ -203,14 +204,14 @@ export class HttpStreamingResponse {
           "backend stream closed before the response was fully read",
         );
       } catch (e) {
-        void e;
+        if (!(e instanceof StandardError)) throw e;
       }
     }
 
     try {
       if (this._session?.isStarted()) this._session.finish();
     } catch (e) {
-      void e;
+      if (!(e instanceof StandardError)) throw e;
     }
   }
 }
