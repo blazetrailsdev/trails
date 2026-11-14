@@ -2,7 +2,7 @@
 
 <h1 id="subject"><%= this.message.subject %></h1>
 
-<% await this.message.richTextContent %><div id="content"><%= await this.message.content.toString() %></div>
+<div id="content"><%= await this.message.content.toString() %></div>
 
 <%= linkTo('Edit', editMessagePath(this.message)) %> |
 <%= linkTo('Back', messagesPath()) %>

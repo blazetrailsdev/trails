@@ -1,4 +1,4 @@
-<% await this.message.richTextContent %><dl>
+<dl>
   <dt>Subject</dt>
   <dd>
     <span id="subject"><%= this.message.subject %></span>

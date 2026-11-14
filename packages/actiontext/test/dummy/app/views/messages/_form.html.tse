@@ -1,4 +1,3 @@
-<% await message.richTextContent %>
 <%= await formWith({ model: message }, async (form) => { %>
   <% if (message.errors.isAny()) { %>
     <div id="error_explanation">

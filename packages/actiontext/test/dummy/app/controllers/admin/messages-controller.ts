@@ -7,6 +7,7 @@ export class MessagesController extends ActionController.Base {
 
   async show(): Promise<void> {
     this.message = await Message.find(this.params.get("id"));
+    await this.message.richTextContent;
   }
 }
 const Admin = {};

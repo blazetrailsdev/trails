@@ -1,5 +1,5 @@
 {
   "id": <%= this.message.id %>,
   "subject": "<%= j(this.message.subject) %>",
-<% await this.message.richTextContent %>  "content": "<%= j(await this.message.content.toString()) %>"
+  "content": "<%= j(await this.message.content.toString()) %>"
 }

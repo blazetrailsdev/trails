@@ -44,19 +44,20 @@ export class MessagesController extends ActionController.Base {
 
   async destroy(): Promise<void> {
     await this.message.destroy();
-    this.redirectTo(this.messagesUrl(), { notice: "Message was successfully destroyed." });
+    this.redirectTo((this as unknown as { messagesUrl(): string }).messagesUrl(), {
+      notice: "Message was successfully destroyed.",
+    });
   }
 
   /** @internal */
   private async setMessage(): Promise<void> {
     this.message = await Message.find(this.params.get("id"));
+    await this.message.richTextContent;
   }
 
   /** @internal */
   private messageParams() {
     return this.params.expect({ message: ["subject", "content"] as const });
   }
-
-  declare messagesUrl: () => string;
 }
 constSet(TopLevel, "MessagesController", MessagesController);
