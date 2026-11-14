@@ -234,3 +234,24 @@ export function partitionLedgered<T extends PinKey>(
     red: entries.filter((e) => !isLedgered(e)),
   };
 }
+
+/**
+ * Whether this PR moves `source`'s ref: fork → head, not main's tip → head,
+ * so a ref main moved after the fork is not read as a backwards bump. A PR
+ * that moves a ref main also moved since the fork must rebase; otherwise
+ * `from` is the base's ref, the one the base's pins were taken at (equal to
+ * the fork's here), and the main-tip ledger is the only one rows can have
+ * been added to since the fork.
+ */
+export function bumpOf(
+  source: string,
+  forkLock: Lock,
+  baseLock: Lock,
+  headLock: Lock,
+): { kind: "none" } | { kind: "rebase" } | { kind: "bump"; from: string; to: string } {
+  if (!movedSources(forkLock, headLock).includes(source)) return { kind: "none" };
+  if (movedSources(forkLock, baseLock).includes(source)) return { kind: "rebase" };
+  const from = baseLock.sources[source]?.ref;
+  const to = headLock.sources[source]?.ref;
+  return from === undefined || to === undefined ? { kind: "none" } : { kind: "bump", from, to };
+}

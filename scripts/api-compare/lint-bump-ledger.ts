@@ -36,7 +36,7 @@ import {
   addedRows,
   carrySeed,
   forkedBeforeRef,
-  movedSources,
+  bumpOf,
   resolveRevisions,
   checkRows,
   ledgerPath,
@@ -108,20 +108,25 @@ async function main(baseBranch: string): Promise<number> {
   const problems: LedgerProblem[] = [];
   for (const rows of ledgers.values()) problems.push(...checkRows(rows, pins, artifact.hashes));
 
-  const bumped = new Set(movedSources(baseLock, headLock));
   const { pairSeed } = await import("../parity/bump-dry-run/ledger.js");
   for (const s of SOURCES) {
     const file = path.relative(ROOT_DIR, ledgerPath(s.name));
     const [base, head] = await Promise.all(
       [revs.base, revs.head].map((rev) => showJson<LedgerRow[]>(rev, file, [])),
     );
-    if (!bumped.has(s.name)) {
+    const bump = bumpOf(s.name, forkLock, baseLock, headLock);
+    if (bump.kind === "none") {
       for (const row of addedRows(base, head)) problems.push({ row, problem: "unbumped" });
       continue;
     }
-    const from = baseLock.sources[s.name]?.ref;
-    const to = headLock.sources[s.name]?.ref;
-    if (from === undefined || to === undefined) continue;
+    if (bump.kind === "rebase") {
+      errors.push(
+        `bump-ledger gate: this PR moves ${s.name}'s ref, which main also moved since the ` +
+          "fork. Rebase onto main and recompute the ledger seed.",
+      );
+      continue;
+    }
+    const { from, to } = bump;
     const names = new Set(s.packages.map((p) => p.name));
     const basePins = (await showJson<BodyPin[]>(revs.base, PINS, [])).filter((p) =>
       names.has(p.package),

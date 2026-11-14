@@ -6,6 +6,7 @@ import {
   type LedgerRow,
   type Lock,
   addedRows,
+  bumpOf,
   carrySeed,
   checkRows,
   clearedRows,
@@ -195,6 +196,28 @@ describe("partitionLedgered", () => {
     expect(partitionLedgered([pin("a"), pin("t", "touch")], isLedgered)).toEqual({
       ledgered: [pin("a")],
       red: [pin("t", "touch")],
+    });
+  });
+});
+
+describe("bumpOf", () => {
+  it("does not read a ref main moved after the fork as this PR's bump", () => {
+    expect(bumpOf("rails", lock("v8.0.2"), lock("v8.0.5.2"), lock("v8.0.2"))).toEqual({
+      kind: "none",
+    });
+  });
+
+  it("takes a PR's own move from the base ref to the head ref", () => {
+    expect(bumpOf("rails", lock("v8.0.2"), lock("v8.0.2"), lock("v8.0.5.2"))).toEqual({
+      kind: "bump",
+      from: "v8.0.2",
+      to: "v8.0.5.2",
+    });
+  });
+
+  it("asks a PR that moves a ref main also moved to rebase", () => {
+    expect(bumpOf("rails", lock("v8.0.2"), lock("v8.0.5.2"), lock("v8.1.4"))).toEqual({
+      kind: "rebase",
     });
   });
 });
