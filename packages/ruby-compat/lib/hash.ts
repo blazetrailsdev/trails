@@ -305,8 +305,10 @@ type ToHash = { toHash(): object };
  * conversion `rb_hash_update_call` (`vendor/ruby/v3.3.11/hash.c:3960`) applies to
  * each argument: a Hash is itself, anything else is asked for `to_hash`, and
  * one that does not answer it raises `TypeError` (`rb_convert_type_with_id`).
+ *
+ * @noRailsEquivalent PERMANENT
  */
-function rbToHashType<T>(
+export function rbToHashType<T>(
   hash: Record<string, T> | Map<string, T> | ToHash,
 ): Record<string, T> | Map<string, T> {
   if (hash instanceof Map || isPlainHash(hash)) return hash as Record<string, T> | Map<string, T>;

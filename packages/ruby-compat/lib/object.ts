@@ -3,7 +3,7 @@ import { LocalJumpError } from "./local-jump-error.js";
 import { classpaths, rbClassPath, isModuleObject } from "./classpath.js";
 import { ARRAY_METHOD_TABLE, aryIncludes, each as aryEach } from "./array.js";
 import { Enumerable } from "./enumerable.js";
-import { hasKey } from "./hash.js";
+import { hasKey, hashAref, hashAset, hashDelete, fetch } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, rbErrorArity, stringValue } from "./string/support.js";
 import { rbPlus } from "./numeric.js";
@@ -803,6 +803,16 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
     if (mid === "eachPair" && (obj instanceof Map || isPlainHash(obj))) return true;
     if (mid === "toHash" && (obj instanceof Map || isPlainHash(obj))) return true;
     if (
+      (mid === "store" ||
+        mid === "set" ||
+        mid === "fetch" ||
+        mid === "delete" ||
+        mid === "clear") &&
+      (obj instanceof Map || isPlainHash(obj))
+    ) {
+      return true;
+    }
+    if (
       mid === "get" &&
       (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
     ) {
@@ -1461,6 +1471,19 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     }
   }
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
+  if (recv instanceof Map || isPlainHash(recv)) {
+    const hash = recv as object;
+    // vendor/ruby/v3.3.11/hash.c:2121, :2941, :2176, :2441, :2868.
+    if (mid === "get") return hashAref(hash, args[0]);
+    if (mid === "store" || mid === "set") return hashAset(hash, args[0], args[1]);
+    if (mid === "fetch") return (fetch as AnyFunction)(hash, ...args);
+    if (mid === "delete") return (hashDelete as AnyFunction)(hash, ...args);
+    if (mid === "clear") {
+      if (hash instanceof Map) hash.clear();
+      else for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
+      return hash;
+    }
+  }
   if (Array.isArray(recv) && Object.hasOwn(ARRAY_METHOD_TABLE, mid)) {
     return (ARRAY_METHOD_TABLE[mid] as AnyFunction)(recv, ...args);
   }
