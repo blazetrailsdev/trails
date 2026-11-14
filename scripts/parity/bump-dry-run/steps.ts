@@ -69,6 +69,11 @@ export const NOT_EXERCISED: {
   predictor?: string;
 }[] = [
   {
+    name: "Bump-ledger gate",
+    covers: ["scripts/api-compare/lint-bump-ledger.ts"],
+    reason: "checks the ledger the dry run seeds, against the PR's git history",
+  },
+  {
     name: "Rails-private JSDoc lint and runtime artifact",
     covers: ["scripts/build-rails-privates-manifest.ts", "eslint/rails-private-jsdoc.config.mjs"],
     reason: "reads the active version directory's lib files",
