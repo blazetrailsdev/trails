@@ -102,9 +102,9 @@ describe("measure", () => {
 
 describe("followLibRoot", () => {
   it("re-keys a base count under src/ for a package now under lib/", () => {
-    expect(followLibRoot({ "ruby-compat/src/pp.ts": 1, "actionmailbox/src/a.ts": 2 })).toEqual({
+    expect(followLibRoot({ "ruby-compat/src/pp.ts": 1, "website/src/a.ts": 2 })).toEqual({
       "ruby-compat/lib/pp.ts": 1,
-      "actionmailbox/src/a.ts": 2,
+      "website/src/a.ts": 2,
     });
   });
 });

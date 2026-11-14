@@ -15,6 +15,7 @@
 /** Packages already moved to `lib/` + `test/`. Only-grow. */
 export const LIB_TEST_PACKAGES: ReadonlySet<string> = new Set<string>([
   "actioncable",
+  "actionmailbox",
   "actionmailer",
   "actionpack",
   "actiontext",

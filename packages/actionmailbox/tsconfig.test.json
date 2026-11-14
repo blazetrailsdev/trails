@@ -2,10 +2,11 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "outDir": "dist-test",
-    "declarationDir": "dist-test/types"
+    "declarationDir": "dist-test/types",
+    "rootDir": "."
   },
   "exclude": [],
-  "include": ["src/**/*.test.ts", "src/test-helpers/**/*"],
+  "include": ["test"],
   "references": [
     {
       "path": "./tsconfig.json"

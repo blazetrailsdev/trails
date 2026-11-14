@@ -4,9 +4,9 @@
     "composite": true,
     "outDir": "dist",
     "declarationDir": "dist/types",
-    "rootDir": "src"
+    "rootDir": "lib"
   },
-  "include": ["src"],
+  "include": ["lib"],
   "references": [
     {
       "path": "../actionpack"
@@ -38,6 +38,5 @@
     {
       "path": "../trailties"
     }
-  ],
-  "exclude": ["src/**/*.test.ts", "src/test-helpers"]
+  ]
 }
