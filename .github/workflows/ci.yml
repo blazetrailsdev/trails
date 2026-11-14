@@ -2205,6 +2205,12 @@ jobs:
         # or when a pin no longer resolves. Re-pin after re-verifying with
         # `pnpm tsx scripts/api-compare/body-pins.ts --pin <ruby-file>`.
         run: pnpm exec tsx scripts/api-compare/lint-body-pins.ts
+      - name: Bump-ledger gate
+        # RFC 0191 § 3. Reds a scripts/parity/bump-ledger/ row whose pin was
+        # re-pinned or no longer resolves, a row added without a `ref` move in
+        # vendor/sources.lock.json, a bump PR's ledger that differs from the
+        # recomputed seed, and a body-pins.json edit forked before a ref move.
+        run: pnpm exec tsx scripts/api-compare/lint-bump-ledger.ts
       - name: API comparison (calls)
         # Writes the call-set artifact (output/call-mismatches.json) over
         # SIGNIFICANT_CALLS (all ported names except `super` and the
