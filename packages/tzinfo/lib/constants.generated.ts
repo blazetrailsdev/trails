@@ -12,22 +12,23 @@ import * as m9 from "./data-sources/transitions-data-timezone-info.js";
 import * as m10 from "./data-timezone.js";
 import * as m11 from "./format2/country-definer.js";
 import * as m12 from "./format2/country-index-definer.js";
-import * as m13 from "./format2/timezone-definer.js";
-import * as m14 from "./format2/timezone-index-definer.js";
-import * as m15 from "./info-timezone.js";
-import * as m16 from "./offset-timezone-period.js";
-import * as m17 from "./string-deduper.js";
-import * as m18 from "./timestamp.js";
-import * as m19 from "./timezone-offset.js";
-import * as m20 from "./timezone-period.js";
-import * as m21 from "./timezone-transition.js";
-import * as m22 from "./timezone.js";
-import * as m23 from "./transitions-timezone-period.js";
+import * as m13 from "./format2/country-index-definition.js";
+import * as m14 from "./format2/timezone-definer.js";
+import * as m15 from "./format2/timezone-definition.js";
+import * as m16 from "./format2/timezone-index-definer.js";
+import * as m17 from "./format2/timezone-index-definition.js";
+import * as m18 from "./info-timezone.js";
+import * as m19 from "./offset-timezone-period.js";
+import * as m20 from "./string-deduper.js";
+import * as m21 from "./timestamp.js";
+import * as m22 from "./timezone-offset.js";
+import * as m23 from "./timezone-period.js";
+import * as m24 from "./timezone-transition.js";
+import * as m25 from "./timezone.js";
+import * as m26 from "./transitions-timezone-period.js";
 
 defineConstants([
-  [() => m7.RubyDataSource, "DataSources::RubyDataSource"],
-  [() => m7.TZInfoDataNotFound, "DataSources::RubyDataSource::TZInfoDataNotFound"],
-  [() => m22.AmbiguousTime, "TZInfo::AmbiguousTime"],
+  [() => m25.AmbiguousTime, "TZInfo::AmbiguousTime"],
   [() => m1.Country, "TZInfo::Country"],
   [() => m0.CountryTimezone, "TZInfo::CountryTimezone"],
   [() => m2.DataSource, "TZInfo::DataSource"],
@@ -36,25 +37,33 @@ defineConstants([
   [() => m4.CountryInfo, "TZInfo::DataSources::CountryInfo"],
   [() => m5.DataTimezoneInfo, "TZInfo::DataSources::DataTimezoneInfo"],
   [() => m6.LinkedTimezoneInfo, "TZInfo::DataSources::LinkedTimezoneInfo"],
+  [() => m7.RubyDataSource, "TZInfo::DataSources::RubyDataSource"],
   [() => m8.TimezoneInfo, "TZInfo::DataSources::TimezoneInfo"],
   [() => m9.TransitionsDataTimezoneInfo, "TZInfo::DataSources::TransitionsDataTimezoneInfo"],
+  [() => m7.TZInfoDataNotFound, "TZInfo::DataSources::TZInfoDataNotFound"],
   [() => m10.DataTimezone, "TZInfo::DataTimezone"],
   [() => m11.CountryDefiner, "TZInfo::Format2::CountryDefiner"],
   [() => m12.CountryIndexDefiner, "TZInfo::Format2::CountryIndexDefiner"],
-  [() => m13.TimezoneDefiner, "TZInfo::Format2::TimezoneDefiner"],
-  [() => m14.TimezoneIndexDefiner, "TZInfo::Format2::TimezoneIndexDefiner"],
-  [() => m15.InfoTimezone, "TZInfo::InfoTimezone"],
+  [() => m13.CountryIndexDefinition, "TZInfo::Format2::CountryIndexDefinition"],
+  [() => m13.ClassMethods, "TZInfo::Format2::CountryIndexDefinition::ClassMethods"],
+  [() => m14.TimezoneDefiner, "TZInfo::Format2::TimezoneDefiner"],
+  [() => m15.TimezoneDefinition, "TZInfo::Format2::TimezoneDefinition"],
+  [() => m15.ClassMethods, "TZInfo::Format2::TimezoneDefinition::ClassMethods"],
+  [() => m16.TimezoneIndexDefiner, "TZInfo::Format2::TimezoneIndexDefiner"],
+  [() => m17.TimezoneIndexDefinition, "TZInfo::Format2::TimezoneIndexDefinition"],
+  [() => m17.ClassMethods, "TZInfo::Format2::TimezoneIndexDefinition::ClassMethods"],
+  [() => m18.InfoTimezone, "TZInfo::InfoTimezone"],
   [() => m1.InvalidCountryCode, "TZInfo::InvalidCountryCode"],
   [() => m2.InvalidDataSource, "TZInfo::InvalidDataSource"],
-  [() => m22.InvalidTimezoneIdentifier, "TZInfo::InvalidTimezoneIdentifier"],
-  [() => m16.OffsetTimezonePeriod, "TZInfo::OffsetTimezonePeriod"],
-  [() => m22.PeriodNotFound, "TZInfo::PeriodNotFound"],
-  [() => m17.StringDeduper, "TZInfo::StringDeduper"],
-  [() => m18.Timestamp, "TZInfo::Timestamp"],
-  [() => m22.Timezone, "TZInfo::Timezone"],
-  [() => m19.TimezoneOffset, "TZInfo::TimezoneOffset"],
-  [() => m20.TimezonePeriod, "TZInfo::TimezonePeriod"],
-  [() => m21.TimezoneTransition, "TZInfo::TimezoneTransition"],
-  [() => m23.TransitionsTimezonePeriod, "TZInfo::TransitionsTimezonePeriod"],
-  [() => m17.UnaryMinusGlobalStringDeduper, "TZInfo::UnaryMinusGlobalStringDeduper"],
+  [() => m25.InvalidTimezoneIdentifier, "TZInfo::InvalidTimezoneIdentifier"],
+  [() => m19.OffsetTimezonePeriod, "TZInfo::OffsetTimezonePeriod"],
+  [() => m25.PeriodNotFound, "TZInfo::PeriodNotFound"],
+  [() => m20.StringDeduper, "TZInfo::StringDeduper"],
+  [() => m21.Timestamp, "TZInfo::Timestamp"],
+  [() => m25.Timezone, "TZInfo::Timezone"],
+  [() => m22.TimezoneOffset, "TZInfo::TimezoneOffset"],
+  [() => m23.TimezonePeriod, "TZInfo::TimezonePeriod"],
+  [() => m24.TimezoneTransition, "TZInfo::TimezoneTransition"],
+  [() => m26.TransitionsTimezonePeriod, "TZInfo::TransitionsTimezonePeriod"],
+  [() => m20.UnaryMinusGlobalStringDeduper, "TZInfo::UnaryMinusGlobalStringDeduper"],
 ]);

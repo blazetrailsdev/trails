@@ -1,4 +1,4 @@
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { LoadError, NameError } from "@blazetrails/ruby-compat";
 import {
   CountryInfo,
@@ -9,10 +9,12 @@ import {
   TZInfo,
   TimezoneInfo,
 } from "../../lib/index.js";
-import { assertRaises } from "../test-utils.js";
+import { assertRaises, assertSubProcessReturns } from "../test-utils.js";
 import { loadPath } from "../tzinfo-data2/load-path.js";
 
 const { RubyDataSource } = TZInfo.DataSources;
+
+const TZINFO_TEST_DATA_FORMAT: number = 2;
 
 interface RubyDataSourceProtected {
   loadTimezoneInfo(identifier: unknown): TimezoneInfo;
@@ -35,19 +37,23 @@ describe("TCRubyDataSource", () => {
   });
 
   it("initialize not found", async () => {
-    vi.resetModules();
-    const fresh = await import("../../lib/index.js");
-    let error: unknown;
-    try {
-      await fresh.TZInfo.DataSources.RubyDataSource.load();
-      const ds = new fresh.TZInfo.DataSources.RubyDataSource();
-      error = `No exception raised, returned ${ds} instead`;
-    } catch (e) {
-      error = e;
-    }
-    expect(error).toBeInstanceOf(fresh.TZInfo.DataSources.TZInfoDataNotFound);
-    expect((error as Error).message).toBe(
-      "The tzinfo-data gem could not be found (require 'tzinfo/data' failed).",
+    await assertSubProcessReturns(
+      [
+        "TZInfo::DataSources::TZInfoDataNotFound",
+        "The tzinfo-data gem could not be found (require 'tzinfo/data' failed).",
+      ],
+      async (puts) => {
+        const { rbModName } = await import("@blazetrails/ruby-compat");
+        const { TZInfo } = await import("../../lib/index.js");
+        try {
+          await TZInfo.DataSources.RubyDataSource.load();
+          const ds = new TZInfo.DataSources.RubyDataSource();
+          puts(`No exception raised, returned ${ds} instead`);
+        } catch (e) {
+          puts(rbModName((e as Error).constructor));
+          puts((e as Error).message);
+        }
+      },
     );
   });
 
@@ -140,7 +146,7 @@ describe("TCRubyDataSource", () => {
 
   it("load timezone info returned identifier frozen", () => {
     const info = ds.loadTimezoneInfo("Europe/London");
-    expect(Object.isFrozen(info.identifier)).toBe(true);
+    expect(Object.isFrozen(info.identifier)).toBeTruthy();
   });
 
   // PERMANENT-SKIP: CLAUDE.md § "Ruby Strings are JS string primitives (no mutable String carrier)"
@@ -169,8 +175,8 @@ describe("TCRubyDataSource", () => {
     ).Data.Indexes;
     const all = dataSource.timezoneIdentifiers();
     expect(all).toEqual([...Timezones.dataTimezones, ...Timezones.linkedTimezones].sort());
-    expect(Object.isFrozen(all)).toBe(true);
-    expect(all.every((i) => Object.isFrozen(i))).toBe(true);
+    expect(Object.isFrozen(all)).toBeTruthy();
+    expect(all.every((i) => Object.isFrozen(i))).toBeTruthy();
   });
 
   it("data timezone identifiers", () => {
@@ -179,8 +185,8 @@ describe("TCRubyDataSource", () => {
       (TZInfo as unknown as { Data: { Indexes: { Timezones: { dataTimezones: unknown } } } }).Data
         .Indexes.Timezones.dataTimezones,
     );
-    expect(Object.isFrozen(allData)).toBe(true);
-    expect(allData.every((i) => Object.isFrozen(i))).toBe(true);
+    expect(Object.isFrozen(allData)).toBeTruthy();
+    expect(allData.every((i) => Object.isFrozen(i))).toBeTruthy();
   });
 
   it("linked timezone identifiers", () => {
@@ -189,8 +195,8 @@ describe("TCRubyDataSource", () => {
       (TZInfo as unknown as { Data: { Indexes: { Timezones: { linkedTimezones: unknown } } } }).Data
         .Indexes.Timezones.linkedTimezones,
     );
-    expect(Object.isFrozen(allLinked)).toBe(true);
-    expect(allLinked.every((i) => Object.isFrozen(i))).toBe(true);
+    expect(Object.isFrozen(allLinked)).toBeTruthy();
+    expect(allLinked.every((i) => Object.isFrozen(i))).toBeTruthy();
   });
 
   it("load country info", () => {
@@ -229,10 +235,10 @@ describe("TCRubyDataSource", () => {
 
   it("load country info returned strings frozen", () => {
     const info = ds.loadCountryInfo("US");
-    expect(Object.isFrozen(info.code)).toBe(true);
-    expect(Object.isFrozen(info.name)).toBe(true);
-    expect(info.zones.map((z) => z.identifier).every((i) => Object.isFrozen(i))).toBe(true);
-    expect(info.zones.map((z) => z.description).every((d) => Object.isFrozen(d))).toBe(true);
+    expect(Object.isFrozen(info.code)).toBeTruthy();
+    expect(Object.isFrozen(info.name)).toBeTruthy();
+    expect(info.zones.map((z) => z.identifier).every((i) => Object.isFrozen(i))).toBeTruthy();
+    expect(info.zones.map((z) => z.description).every((d) => Object.isFrozen(d))).toBeTruthy();
   });
 
   it("get country info", () => {
@@ -248,26 +254,61 @@ describe("TCRubyDataSource", () => {
           .Indexes.Countries.countries,
       ).sort(),
     );
-    expect(Object.isFrozen(codes)).toBe(true);
-    expect(codes.every((c) => Object.isFrozen(c))).toBe(true);
+    expect(Object.isFrozen(codes)).toBeTruthy();
+    expect(codes.every((c) => Object.isFrozen(c))).toBeTruthy();
     expect(dataSource.countryCodes()).toBe(codes);
   });
 
   it("to s", () => {
-    expect(dataSource.toString()).toBe("Ruby DataSource: tzdb v2020d, tzinfo-data v2.2020.4.test");
+    expect(dataSource.toString()).toBe(
+      `Ruby DataSource: tzdb v2020d, tzinfo-data v${TZINFO_TEST_DATA_FORMAT}.2020.4.test`,
+    );
   });
 
   it("inspect", () => {
     expect(dataSource.inspect()).toBe(
-      "#<TZInfo::DataSources::RubyDataSource: tzdb v2020d, tzinfo-data v2.2020.4.test>",
+      `#<TZInfo::DataSources::RubyDataSource: tzdb v2020d, tzinfo-data v${TZINFO_TEST_DATA_FORMAT}.2020.4.test>`,
     );
   });
 
-  it("tzinfo data not found in loaded features", () => {
-    const ds = new RubyDataSource();
-    const c = ds.getCountryInfo("GB");
-    expect(c.code).toBe("GB");
-    const tz = ds.getTimezoneInfo("Europe/London");
-    expect(tz.identifier).toBe("Europe/London");
+  it.skipIf(TZINFO_TEST_DATA_FORMAT !== 1)("to s no tzinfo data version", async () => {
+    await assertSubProcessReturns(["Ruby DataSource: tzdb v2020d"], async (puts) => {
+      const { TZInfo } = await import("../../lib/index.js");
+      const { loadPath } = await import("../tzinfo-data2/load-path.js");
+      Object.assign(TZInfo.loadPath, loadPath);
+      await TZInfo.DataSources.RubyDataSource.load();
+      delete (TZInfo as unknown as { Data: { VERSION?: string } }).Data.VERSION;
+      const ds = new TZInfo.DataSources.RubyDataSource();
+      puts(ds.toString());
+    });
+  });
+
+  it.skipIf(TZINFO_TEST_DATA_FORMAT !== 1)("inspect no tzinfo data version", async () => {
+    await assertSubProcessReturns(
+      ["#<TZInfo::DataSources::RubyDataSource: tzdb v2020d>"],
+      async (puts) => {
+        const { TZInfo } = await import("../../lib/index.js");
+        const { loadPath } = await import("../tzinfo-data2/load-path.js");
+        Object.assign(TZInfo.loadPath, loadPath);
+        await TZInfo.DataSources.RubyDataSource.load();
+        delete (TZInfo as unknown as { Data: { VERSION?: string } }).Data.VERSION;
+        const ds = new TZInfo.DataSources.RubyDataSource();
+        puts(ds.inspect());
+      },
+    );
+  });
+
+  it("tzinfo data not found in loaded features", async () => {
+    await assertSubProcessReturns(["GB", "Europe/London"], async (puts) => {
+      const { TZInfo } = await import("../../lib/index.js");
+      const { loadPath } = await import("../tzinfo-data2/load-path.js");
+      Object.assign(TZInfo.loadPath, loadPath);
+      await TZInfo.DataSources.RubyDataSource.load();
+      const ds = new TZInfo.DataSources.RubyDataSource();
+      const c = ds.getCountryInfo("GB");
+      puts(c.code);
+      const tz = ds.getTimezoneInfo("Europe/London");
+      puts(tz.identifier);
+    });
   });
 });
