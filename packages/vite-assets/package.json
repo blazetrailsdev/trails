@@ -21,9 +21,12 @@
   "license": "MIT",
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rack-proxy": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*"
   },
   "devDependencies": {
+    "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
   },
   "engines": {

@@ -11,6 +11,13 @@ import {
 
 type RackEnv = Record<string, unknown>;
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Proxy {
+  /** @internal */
+  performRequest(env: RackEnv): Promise<RackResponse>;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Proxy {
   static readonly HOP_BY_HOP_HEADERS: Readonly<Record<string, boolean>> = Object.freeze({
     connection: true,
@@ -180,6 +187,10 @@ export class Proxy {
     this.logger = opts.logger;
 
     this.opts = opts;
+  }
+
+  async call(env: RackEnv): Promise<RackResponse> {
+    return this.rewriteResponse(await this.performRequest(this.rewriteEnv(env)));
   }
 
   rewriteEnv(env: RackEnv): RackEnv {
