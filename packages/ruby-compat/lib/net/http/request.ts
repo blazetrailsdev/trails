@@ -194,8 +194,8 @@ export class HTTPRequest {
     this._header["authorization"] = this.basicEncode(account, password);
   }
 
-  /** @internal @noRailsEquivalent PERMANENT — `HTTPHeader#basic_encode` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:960-962`). */
-  private basicEncode(account: string, password: string): string {
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#basic_encode` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:960-962`). */
+  basicEncode(account: string, password: string): string {
     return "Basic " + Base64.strictEncode64(`${account}:${password}`);
   }
 
