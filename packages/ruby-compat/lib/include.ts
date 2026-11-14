@@ -1694,7 +1694,7 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
   let entry;
   if (slot === undefined) slot = (entry = superSlots.get(method))?.slot;
   let next = slot === undefined ? undefined : (receiver as Record<symbol, unknown>)[slot];
-  for (let nextEntry; slot !== undefined && typeof next === "function"; ) {
+  for (let nextEntry; slot !== undefined && typeof next === "function" && _superSlot in next; ) {
     nextEntry = superSlots.get(next as AnyFunction);
     if (nextEntry === undefined || (nextEntry.seats ?? 0) < 2) break;
     const holder = slotHolder(receiver, slot);
@@ -1724,7 +1724,12 @@ export function rbCallSuper(receiver: object, method: AnyFunction, ...args: unkn
  * superclass below a prepend, both copies kept by `include_modules_at`,
  * vendor/ruby/v3.3.11/class.c:1253) has one slot, so the lower copy's seat
  * shadows the upper one's; {@link rbCallSuper} reads the upper copy's seat off
- * the link it was found at.
+ * the link it was found at. MRI runs the upper copy a second time
+ * (`["mod", "prepended", "mod", "base"]` for the subclass in ruby 3.3.11);
+ * trails skips it, since one function's slot cannot answer from two ancestry
+ * positions and an awaited body carries no frame to tell the copies apart.
+ *
+ * @inventedArm skip — PERMANENT
  */
 function slotHolder(receiver: object, slot: symbol): object | undefined {
   for (
