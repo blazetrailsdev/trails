@@ -2,6 +2,8 @@ import { serializableHash as amSerializableHash } from "@blazetrails/activemodel
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { kernelArray } from "@blazetrails/activesupport";
+import { ActiveRecord } from "./namespaces.js";
+import * as Serialization from "./serialization.js";
 
 export function serializableHash(this: Base, options?: SerializeOptions): Record<string, unknown> {
   const klass = this.constructor;
@@ -19,3 +21,5 @@ export function serializableHash(this: Base, options?: SerializeOptions): Record
 export function attributeNamesForSerialization(this: Base): string[] {
   return this.attributeNames();
 }
+
+ActiveRecord.Serialization = Serialization;

@@ -86,3 +86,4 @@ export async function eagerLoadBang(this: Autoload): Promise<void> {
     this._eagerloadedConstants = null;
   }
 }
+export const Autoload = { autoload, autoloadUnder, autoloadAt, eagerAutoload, eagerLoadBang };

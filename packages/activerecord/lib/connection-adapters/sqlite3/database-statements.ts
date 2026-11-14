@@ -12,6 +12,8 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
+import { ConnectionAdapters } from "../../namespaces.js";
+import * as DatabaseStatements from "./database-statements.js";
 
 const READ_QUERY = AbstractAdapter.buildReadQueryRegexp("pragma");
 
@@ -289,3 +291,5 @@ export function defaultInsertValue(column: {
   }
   return column.default;
 }
+
+ConnectionAdapters.SQLite3.DatabaseStatements = DatabaseStatements;

@@ -1,3 +1,5 @@
+import { ActiveSupport } from "./namespaces.js";
+import * as LazyLoadHooks from "./lazy-load-hooks.js";
 type Hook = (this: any, base: any) => void;
 
 interface HookOptions {
@@ -72,3 +74,5 @@ export function resetLoadHooks(): void {
   loaded.clear();
   runOnce.clear();
 }
+
+ActiveSupport.LazyLoadHooks = LazyLoadHooks;

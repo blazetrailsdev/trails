@@ -25,3 +25,5 @@ export type CompareKey = keyof typeof COMPARE_CHECKS;
 export interface Comparability {
   errorOptions(value: unknown, optionValue: unknown): Record<string, unknown>;
 }
+
+export const Comparability = { COMPARE_CHECKS, errorOptions };

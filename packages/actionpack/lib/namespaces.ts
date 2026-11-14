@@ -152,6 +152,7 @@ ActionDispatch.Routing = Routing;
 export const Http = { name: "ActionDispatch::Http" } as {
   name: string;
   MimeNegotiation: typeof MimeNegotiation;
+  FilterParameters: typeof import("./action-dispatch/http/filter-parameters.js");
   Parameters: typeof HttpParameters;
   Cache: typeof Cache;
 };

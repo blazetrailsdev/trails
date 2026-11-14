@@ -21,3 +21,5 @@ export function resolveValue(record: unknown, value: unknown): unknown {
     }
   }
 }
+
+export const ResolveValue = { resolveValue };

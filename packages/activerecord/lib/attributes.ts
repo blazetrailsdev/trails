@@ -148,3 +148,7 @@ function typeForColumn(this: AnyClass, connection: unknown, column: unknown): Va
     modelSchemaTypeForColumn.call(this, connection, column),
   );
 }
+
+export const Attributes = {
+  ClassMethods: { defineAttribute, _defaultAttributes, resetDefaultAttributes },
+};

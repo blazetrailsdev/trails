@@ -46,6 +46,7 @@ import { Options } from "./parser/options.js";
 import type { Basic } from "./shell/basic.js";
 import { thorClassesIn } from "./util.js";
 import * as LineEditor from "./line-editor.js";
+import * as Util from "./util.js";
 
 type Mappings = Record<string, string> | Map<unknown, string>;
 
@@ -78,6 +79,8 @@ export class Thor {
   static Group = Group;
 
   static LineEditor = LineEditor;
+
+  static Util = Util;
 
   /** @internal */
   static _packageName?: string | null;

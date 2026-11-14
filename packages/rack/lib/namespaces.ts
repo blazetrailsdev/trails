@@ -1,6 +1,6 @@
 import { TopLevel } from "@blazetrails/ruby-compat";
 import { BadRequest } from "./bad-request.js";
-import * as Mime from "./mime.js";
+import { Mime } from "./mime.js";
 import { QueryParser } from "./query-parser.js";
 import * as Utils from "./utils.js";
 

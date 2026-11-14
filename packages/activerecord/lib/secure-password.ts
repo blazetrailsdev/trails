@@ -2,6 +2,8 @@ import { camelize } from "@blazetrails/activesupport";
 import { ArgumentError, hasSecurePassword } from "@blazetrails/activemodel";
 import { hashAref, keys, partition, toH } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
+import { ActiveRecord } from "./namespaces.js";
+import * as SecurePassword from "./secure-password.js";
 
 export { hasSecurePassword };
 
@@ -37,3 +39,5 @@ export async function authenticateBy(
     return null;
   }
 }
+
+ActiveRecord.SecurePassword = SecurePassword;

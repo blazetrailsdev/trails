@@ -5,6 +5,7 @@ import {
   rbObjDup,
   update,
 } from "@blazetrails/ruby-compat";
+import * as Utils from "./utils.js";
 
 export type TranslationData = Hash<unknown, unknown>;
 
@@ -40,7 +41,7 @@ export function deepMergeBang(
     otherHash as unknown as Map<string, unknown>,
     rbBlock((key: string, thisVal: unknown, otherVal: unknown) => {
       if (isHash(thisVal) && isHash(otherVal)) {
-        return deepMerge(thisVal, otherVal, block);
+        return Utils.deepMerge(thisVal, otherVal, block);
       } else if (block) {
         return block(key, thisVal, otherVal);
       } else {

@@ -91,7 +91,7 @@ export { MethodOverride } from "./method-override.js";
 export { Multipart, type UploadedFileInfo } from "./multipart.js";
 export { MockRequest, FatalWarning } from "./mock-request.js";
 export { MockResponse } from "./mock-response.js";
-export * as Mime from "./mime.js";
+export { Mime } from "./mime.js";
 export * as Utils from "./utils.js";
 
 import "./constants.generated.js";

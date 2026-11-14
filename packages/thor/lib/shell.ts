@@ -1,6 +1,7 @@
 import { env, RbConfig, rbCallSuper, constGet, rbEnsure } from "@blazetrails/ruby-compat";
 import { Basic } from "./shell/basic.js";
 import { Color } from "./shell/color.js";
+import * as Terminal from "./shell/terminal.js";
 
 type ShellClass = new () => Basic;
 
@@ -148,6 +149,7 @@ export const Shell = {
   SHELL_DELEGATED_METHODS,
   Basic,
   Color,
+  Terminal,
   ask,
   error,
   setColor,

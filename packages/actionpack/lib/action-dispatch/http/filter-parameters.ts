@@ -1,6 +1,8 @@
 import { ParameterFilter } from "@blazetrails/activesupport";
 import type { ParametersHost } from "./parameters.js";
 import { ParseError } from "./parameters.js";
+import { ActionDispatch } from "../../namespaces.js";
+import * as FilterParametersModule from "./filter-parameters.js";
 
 export const ENV_MATCH: ReadonlyArray<string | RegExp> = [
   /RAW_POST_DATA/,
@@ -103,3 +105,5 @@ export function filteredQueryString(this: FilterParametersHost): string {
   });
   return filteredParts.join("");
 }
+
+ActionDispatch.Http.FilterParameters = FilterParametersModule;

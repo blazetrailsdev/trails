@@ -12,18 +12,21 @@ import * as m9 from "./core-ext/hash-with-indifferent-access.js";
 import * as m10 from "./error.js";
 import * as m11 from "./group.js";
 import * as m12 from "./invocation.js";
-import * as m13 from "./line-editor/basic.js";
-import * as m14 from "./nested-context.js";
-import * as m15 from "./parser/argument.js";
-import * as m16 from "./parser/arguments.js";
-import * as m17 from "./parser/option.js";
-import * as m18 from "./parser/options.js";
-import * as m19 from "./shell.js";
-import * as m20 from "./shell/basic.js";
-import * as m21 from "./shell/color.js";
-import * as m22 from "./shell/column-printer.js";
-import * as m23 from "./shell/table-printer.js";
-import * as m24 from "./shell/wrapped-printer.js";
+import * as m13 from "./line-editor.js";
+import * as m14 from "./line-editor/basic.js";
+import * as m15 from "./nested-context.js";
+import * as m16 from "./parser/argument.js";
+import * as m17 from "./parser/arguments.js";
+import * as m18 from "./parser/option.js";
+import * as m19 from "./parser/options.js";
+import * as m20 from "./shell.js";
+import * as m21 from "./shell/basic.js";
+import * as m22 from "./shell/color.js";
+import * as m23 from "./shell/column-printer.js";
+import * as m24 from "./shell/table-printer.js";
+import * as m25 from "./shell/terminal.js";
+import * as m26 from "./shell/wrapped-printer.js";
+import * as m27 from "./util.js";
 
 defineConstants([
   [() => m0.Actions, "Thor::Actions"],
@@ -35,8 +38,8 @@ defineConstants([
   [() => m4.EmptyDirectory, "Thor::Actions::EmptyDirectory"],
   [() => m6.InjectIntoFile, "Thor::Actions::InjectIntoFile"],
   [() => m10.AmbiguousCommandError, "Thor::AmbiguousCommandError"],
-  [() => m15.Argument, "Thor::Argument"],
-  [() => m16.Arguments, "Thor::Arguments"],
+  [() => m16.Argument, "Thor::Argument"],
+  [() => m17.Arguments, "Thor::Arguments"],
   [() => m10.AtLeastOneRequiredArgumentError, "Thor::AtLeastOneRequiredArgumentError"],
   [() => m7.Base, "Thor::Base"],
   [() => m7.ClassMethods, "Thor::Base::ClassMethods"],
@@ -51,18 +54,21 @@ defineConstants([
   [() => m12.Invocation, "Thor::Invocation"],
   [() => m12.ClassMethods, "Thor::Invocation::ClassMethods"],
   [() => m10.InvocationError, "Thor::InvocationError"],
-  [() => m13.Basic, "Thor::LineEditor::Basic"],
+  [() => m13, "Thor::LineEditor"],
+  [() => m14.Basic, "Thor::LineEditor::Basic"],
   [() => m10.MalformattedArgumentError, "Thor::MalformattedArgumentError"],
-  [() => m14.NestedContext, "Thor::NestedContext"],
-  [() => m17.Option, "Thor::Option"],
-  [() => m18.Options, "Thor::Options"],
+  [() => m15.NestedContext, "Thor::NestedContext"],
+  [() => m18.Option, "Thor::Option"],
+  [() => m19.Options, "Thor::Options"],
   [() => m10.RequiredArgumentMissingError, "Thor::RequiredArgumentMissingError"],
-  [() => m19.Shell, "Thor::Shell"],
-  [() => m20.Basic, "Thor::Shell::Basic"],
-  [() => m21.Color, "Thor::Shell::Color"],
-  [() => m22.ColumnPrinter, "Thor::Shell::ColumnPrinter"],
-  [() => m23.TablePrinter, "Thor::Shell::TablePrinter"],
-  [() => m24.WrappedPrinter, "Thor::Shell::WrappedPrinter"],
+  [() => m20.Shell, "Thor::Shell"],
+  [() => m21.Basic, "Thor::Shell::Basic"],
+  [() => m22.Color, "Thor::Shell::Color"],
+  [() => m23.ColumnPrinter, "Thor::Shell::ColumnPrinter"],
+  [() => m24.TablePrinter, "Thor::Shell::TablePrinter"],
+  [() => m25, "Thor::Shell::Terminal"],
+  [() => m26.WrappedPrinter, "Thor::Shell::WrappedPrinter"],
   [() => m10.UndefinedCommandError, "Thor::UndefinedCommandError"],
   [() => m10.UnknownArgumentError, "Thor::UnknownArgumentError"],
+  [() => m27, "Thor::Util"],
 ]);

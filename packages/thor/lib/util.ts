@@ -12,6 +12,7 @@ import {
   stringSplit,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass } from "./base.js";
+import * as Util from "./util.js";
 
 type ThorClass = BaseClass & { isCommandExists(commandName: string): boolean };
 
@@ -71,12 +72,12 @@ export function findClassAndCommandByNamespace(
       ) ?? null;
   }
   if (!rtest(klass)) {
-    klass = findByNamespace(namespace);
+    klass = Util.findByNamespace(namespace);
     command = null;
   }
   if (!rtest(klass) && rtest(fallback)) {
     command = namespace;
-    klass = findByNamespace("");
+    klass = Util.findByNamespace("");
   }
   return [klass, command];
 }

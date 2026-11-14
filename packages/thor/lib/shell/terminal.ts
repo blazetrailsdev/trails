@@ -1,4 +1,5 @@
 import { env, getChildProcess, RUBY_PLATFORM, toI } from "@blazetrails/ruby-compat";
+import * as Terminal from "./terminal.js";
 
 export const DEFAULT_TERMINAL_WIDTH = 80;
 
@@ -10,7 +11,7 @@ export function terminalWidth(): number {
     if (env["THOR_COLUMNS"] != null) {
       result = Number(toI(env["THOR_COLUMNS"]));
     } else {
-      result = isUnix() ? dynamicWidth() : DEFAULT_TERMINAL_WIDTH;
+      result = Terminal.isUnix() ? dynamicWidth() : DEFAULT_TERMINAL_WIDTH;
     }
     return result < 10 ? DEFAULT_TERMINAL_WIDTH : result;
   } catch {

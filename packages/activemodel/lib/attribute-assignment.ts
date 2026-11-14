@@ -207,3 +207,10 @@ export async function awaitingAssignment<R, K = never>(
   await yielded;
   return record;
 }
+
+export const AttributeAssignment = {
+  assignAttributes,
+  attributeWriterMissing,
+  _assignAttributes,
+  _assignAttribute,
+};

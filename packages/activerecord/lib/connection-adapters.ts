@@ -128,6 +128,8 @@ register(
   "active_record/connection_adapters/postgresql_adapter",
 );
 
+export { ConnectionAdapters };
+
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";

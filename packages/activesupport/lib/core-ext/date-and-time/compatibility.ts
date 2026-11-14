@@ -1,4 +1,6 @@
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { deprecator } from "../../deprecator.js";
+import * as Compatibility from "./compatibility.js";
 
 let _preserveTimezone: boolean | string | null = null;
 
@@ -28,3 +30,5 @@ export function utcToLocalReturnsUtcOffsetTimes(): boolean {
 export function setUtcToLocalReturnsUtcOffsetTimes(value: boolean): void {
   _utcToLocalReturnsUtcOffsetTimes = value;
 }
+
+(TopLevel.DateAndTime ??= { name: "DateAndTime" }).Compatibility = Compatibility;

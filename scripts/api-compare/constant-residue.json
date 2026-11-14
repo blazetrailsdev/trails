@@ -88,7 +88,7 @@
     }
   },
   "actionpack": {
-    "rows": 331,
+    "rows": 333,
     "excluded": [
       "action-dispatch/http/request.ts::MissingController",
       "action-dispatch/journey/scanner.ts::Scanner",
@@ -136,6 +136,7 @@
       "action-controller/metal/http-authentication.ts::HttpAuthentication",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic.ControllerMethods",
+      "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic.ControllerMethods.ClassMethods",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest.ControllerMethods",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Token",
@@ -229,6 +230,7 @@
       "action-dispatch/http/cache.ts::Request": "ActionDispatch::Http::Cache::Request",
       "action-dispatch/http/cache.ts::Response": "ActionDispatch::Http::Cache::Response",
       "action-dispatch/http/content-disposition.ts::ContentDisposition": "ActionDispatch::Http::ContentDisposition",
+      "action-dispatch/http/filter-parameters.ts::FilterParameters": "ActionDispatch::Http::FilterParameters",
       "action-dispatch/http/headers.ts::Headers": "ActionDispatch::Http::Headers",
       "action-dispatch/http/mime-negotiation.ts::InvalidType": "ActionDispatch::Http::MimeNegotiation::InvalidType",
       "action-dispatch/http/mime-negotiation.ts::MimeNegotiation": "ActionDispatch::Http::MimeNegotiation",
@@ -413,7 +415,7 @@
     }
   },
   "activejob": {
-    "rows": 50,
+    "rows": 51,
     "excluded": [],
     "unwalked": [
       "arguments.ts::Arguments",
@@ -421,6 +423,7 @@
       "gem-version.ts::VERSION",
       "instrumentation.ts::Instrumentation",
       "logging.ts::Logging",
+      "queue-adapters.ts::QueueAdapters",
       "serializers.ts::Serializers",
       "timezones.ts::Timezones",
       "translation.ts::Translation"
@@ -433,9 +436,10 @@
     }
   },
   "activemodel": {
-    "rows": 96,
+    "rows": 100,
     "excluded": [],
     "unwalked": [
+      "attribute-assignment.ts::AttributeAssignment",
       "attribute-methods.ts::AttributeMethods",
       "attribute-registration.ts::AttributeRegistration",
       "conversion.ts::Conversion",
@@ -447,7 +451,10 @@
       "type/helpers/time-value.ts::TimeValue",
       "type/serialize-cast-value.ts::SerializeCastValue",
       "validations/callbacks.ts::Callbacks",
-      "validations/helper-methods.ts::HelperMethods"
+      "validations/clusivity.ts::Clusivity",
+      "validations/comparability.ts::Comparability",
+      "validations/helper-methods.ts::HelperMethods",
+      "validations/resolve-value.ts::ResolveValue"
     ],
     "residue": {
       "attribute-methods.ts::AttrNames": "ActiveModel::AttributeMethods::AttrNames",
@@ -490,7 +497,7 @@
     }
   },
   "activerecord": {
-    "rows": 559,
+    "rows": 574,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
@@ -511,6 +518,7 @@
       "associations/foreign-association.ts::ForeignAssociation",
       "associations/through-association.ts::ThroughAssociation",
       "attribute-assignment.ts::AttributeAssignment",
+      "attribute-methods.ts::AttributeMethods",
       "attribute-methods/before-type-cast.ts::BeforeTypeCast",
       "attribute-methods/dirty.ts::Dirty",
       "attribute-methods/query.ts::Query",
@@ -518,8 +526,11 @@
       "attribute-methods/serialization.ts::Serialization",
       "attribute-methods/time-zone-conversion.ts::TimeZoneConversion",
       "attribute-methods/write.ts::Write",
+      "attributes.ts::Attributes",
       "autosave-association.ts::AutosaveAssociation",
       "callbacks.ts::Callbacks",
+      "connection-adapters.ts::ConnectionAdapters",
+      "connection-adapters/abstract/connection-pool.ts::AbstractPool",
       "connection-adapters/abstract/connection-pool/queue.ts::BiasableQueue",
       "connection-adapters/abstract/database-statements.ts::DatabaseStatements",
       "connection-adapters/abstract/query-cache.ts::QueryCache",
@@ -549,6 +560,7 @@
       "no-touching.ts::NoTouching",
       "normalization.ts::Normalization",
       "persistence.ts::Persistence",
+      "querying.ts::Querying",
       "readonly-attributes.ts::ReadonlyAttributes",
       "reflection.ts::Reflection",
       "relation.ts::Relation.StrictLoadingScope",
@@ -557,11 +569,15 @@
       "relation/finder-methods.ts::FinderMethods",
       "relation/query-methods.ts::QueryMethods",
       "relation/spawn-methods.ts::SpawnMethods",
+      "runtime-registry.ts::RuntimeRegistry",
       "sanitization.ts::Sanitization",
       "scoping/named.ts::Named",
+      "secure-password.ts::SecurePassword",
       "secure-token.ts::SecureToken",
+      "serialization.ts::Serialization",
       "signed-id.ts::SignedId",
       "store.ts::Store",
+      "suppressor.ts::Suppressor",
       "timestamp.ts::Timestamp",
       "token-for.ts::TokenFor",
       "touch-later.ts::TouchLater",
@@ -607,6 +623,7 @@
       "attribute-methods/serialization.ts::ClassMethods": "ActiveRecord::AttributeMethods::Serialization::ClassMethods",
       "attribute-methods/serialization.ts::ColumnNotSerializableError": "ActiveRecord::AttributeMethods::Serialization::ColumnNotSerializableError",
       "attribute-methods/time-zone-conversion.ts::TimeZoneConverter": "ActiveRecord::AttributeMethods::TimeZoneConversion::TimeZoneConverter",
+      "callbacks.ts::ClassMethods": "ActiveRecord::Callbacks::ClassMethods",
       "connection-adapters/abstract-adapter.ts::Version": "ActiveRecord::ConnectionAdapters::AbstractAdapter::Version",
       "connection-adapters/abstract-mysql-adapter.ts::StatementPool": "ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter::StatementPool",
       "connection-adapters/abstract/connection-handler.ts::ConnectionDescriptor": "ActiveRecord::ConnectionAdapters::ConnectionHandler::ConnectionDescriptor",
@@ -667,6 +684,7 @@
       "connection-adapters/postgresql/oid/xml.ts::Data": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Xml::Data",
       "connection-adapters/postgresql/oid/xml.ts::Xml": "ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Xml",
       "connection-adapters/postgresql/quoting.ts::IntegerOutOf64BitRange": "ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting::IntegerOutOf64BitRange",
+      "connection-adapters/postgresql/referential-integrity.ts::ReferentialIntegrity": "ActiveRecord::ConnectionAdapters::PostgreSQL::ReferentialIntegrity",
       "connection-adapters/postgresql/schema-creation.ts::SchemaCreation": "ActiveRecord::ConnectionAdapters::PostgreSQL::SchemaCreation",
       "connection-adapters/postgresql/schema-definitions.ts::AlterTable": "ActiveRecord::ConnectionAdapters::PostgreSQL::AlterTable",
       "connection-adapters/postgresql/schema-definitions.ts::ColumnMethods": "ActiveRecord::ConnectionAdapters::PostgreSQL::ColumnMethods",
@@ -683,10 +701,13 @@
       "connection-adapters/sqlite3-adapter.ts::SQLite3Integer": "ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer",
       "connection-adapters/sqlite3-adapter.ts::StatementPool": "ActiveRecord::ConnectionAdapters::SQLite3Adapter::StatementPool",
       "connection-adapters/sqlite3/column.ts::Column": "ActiveRecord::ConnectionAdapters::SQLite3::Column",
+      "connection-adapters/sqlite3/database-statements.ts::DatabaseStatements": "ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements",
       "connection-adapters/sqlite3/explain-pretty-printer.ts::ExplainPrettyPrinter": "ActiveRecord::ConnectionAdapters::SQLite3::ExplainPrettyPrinter",
+      "connection-adapters/sqlite3/quoting.ts::Quoting": "ActiveRecord::ConnectionAdapters::SQLite3::Quoting",
       "connection-adapters/sqlite3/schema-creation.ts::SchemaCreation": "ActiveRecord::ConnectionAdapters::SQLite3::SchemaCreation",
       "connection-adapters/sqlite3/schema-definitions.ts::TableDefinition": "ActiveRecord::ConnectionAdapters::SQLite3::TableDefinition",
       "connection-adapters/sqlite3/schema-dumper.ts::SchemaDumper": "ActiveRecord::ConnectionAdapters::SQLite3::SchemaDumper",
+      "connection-adapters/sqlite3/schema-statements.ts::SchemaStatements": "ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements",
       "core.ts::ClassMethods": "ActiveRecord::Core::ClassMethods",
       "core.ts::InspectionMask": "ActiveRecord::Core::InspectionMask",
       "counter-cache.ts::ClassMethods": "ActiveRecord::CounterCache::ClassMethods",
@@ -730,6 +751,7 @@
       "migration/compatibility.ts::V5_0": "ActiveRecord::Migration::Compatibility::V5_0",
       "migration/compatibility.ts::V5_1": "ActiveRecord::Migration::Compatibility::V5_1",
       "migration/compatibility.ts::V5_2": "ActiveRecord::Migration::Compatibility::V5_2",
+      "migration/compatibility.ts::V5_2.CommandRecorder": "ActiveRecord::Migration::Compatibility::V5_2::CommandRecorder",
       "migration/compatibility.ts::V6_0": "ActiveRecord::Migration::Compatibility::V6_0",
       "migration/compatibility.ts::V6_0.ReferenceDefinition": "ActiveRecord::Migration::Compatibility::V6_0::ReferenceDefinition",
       "migration/compatibility.ts::V6_1": "ActiveRecord::Migration::Compatibility::V6_1",
@@ -836,7 +858,7 @@
     }
   },
   "activesupport": {
-    "rows": 184,
+    "rows": 187,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -910,6 +932,7 @@
       "gzip.ts::Gzip",
       "html-safe-translation.ts::HtmlSafeTranslation",
       "isolated-execution-state.ts::IsolatedExecutionState",
+      "lazy-load-hooks.ts::LazyLoadHooks",
       "message-encryptor.ts::NullSerializer",
       "messages/serializer-with-fallback.ts::AllowMarshal",
       "messages/serializer-with-fallback.ts::JsonWithFallback",
@@ -945,6 +968,7 @@
       "concurrency/load-interlock-aware-monitor.ts::ThreadLoadInterlockAwareMonitor": "ActiveSupport::Concurrency::ThreadLoadInterlockAwareMonitor",
       "core-ext/big-decimal/conversions.ts::BigDecimalWithDefaultFormat": "ActiveSupport::BigDecimalWithDefaultFormat",
       "core-ext/date-and-time/calculations.ts::Calculations": "DateAndTime::Calculations",
+      "core-ext/date-and-time/compatibility.ts::Compatibility": "DateAndTime::Compatibility",
       "core-ext/date-and-time/zones.ts::Zones": "DateAndTime::Zones",
       "core-ext/enumerable.ts::SoleItemExpectedError": "Enumerable::SoleItemExpectedError",
       "core-ext/hash/conversions.ts::DisallowedType": "ActiveSupport::XMLConverter::DisallowedType",
@@ -956,6 +980,7 @@
       "core-ext/string/output-safety.ts::SafeConcatError": "ActiveSupport::SafeBuffer::SafeConcatError",
       "core-ext/tse/util.ts::Util": "TSE::Util",
       "delegation.ts::DelegationError": "ActiveSupport::DelegationError",
+      "dependencies/autoload.ts::Autoload": "ActiveSupport::Autoload",
       "deprecation/proxy-wrappers.ts::DeprecatedConstantProxy": "ActiveSupport::Deprecation::DeprecatedConstantProxy",
       "deprecation/proxy-wrappers.ts::DeprecatedInstanceVariableProxy": "ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy",
       "deprecation/proxy-wrappers.ts::DeprecatedObjectProxy": "ActiveSupport::Deprecation::DeprecatedObjectProxy",
@@ -1070,9 +1095,14 @@
     }
   },
   "i18n": {
-    "rows": 28,
+    "rows": 30,
     "excluded": [],
-    "unwalked": ["backend/transliterator.ts::Transliterator", "locale.ts::Locale"],
+    "unwalked": [
+      "backend/transliterator.ts::Transliterator",
+      "locale.ts::Locale",
+      "locale/tag/parents.ts::Parents",
+      "utils.ts::Utils"
+    ],
     "residue": {
       "backend/key-value.ts::SubtreeProxy": "I18n::Backend::KeyValue::SubtreeProxy",
       "backend/transliterator.ts::HashTransliterator": "I18n::Backend::Transliterator::HashTransliterator",
@@ -1227,9 +1257,9 @@
   },
   "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },
   "rack": {
-    "rows": 60,
+    "rows": 61,
     "excluded": [],
-    "unwalked": ["bad-request.ts::BadRequest", "multipart.ts::Multipart"],
+    "unwalked": ["bad-request.ts::BadRequest", "mime.ts::Mime", "multipart.ts::Multipart"],
     "residue": {
       "etag.ts::ETag": "Rack::ETag",
       "lint.ts::ErrorWrapper": "Rack::Lint::Wrapper::ErrorWrapper",
@@ -1344,13 +1374,16 @@
     "residue": {}
   },
   "thor": {
-    "rows": 39,
+    "rows": 42,
     "excluded": ["thor.ts::Thor"],
     "unwalked": [
       "actions.ts::Actions",
       "base.ts::Base",
       "invocation.ts::Invocation",
-      "shell.ts::Shell"
+      "line-editor.ts::LineEditor",
+      "shell.ts::Shell",
+      "shell/terminal.ts::Terminal",
+      "util.ts::Util"
     ],
     "residue": {
       "actions.ts::ClassMethods": "Thor::Actions::ClassMethods",
@@ -1360,7 +1393,7 @@
     }
   },
   "trailties": {
-    "rows": 156,
+    "rows": 157,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
@@ -1527,6 +1560,7 @@
       "source-annotation-extractor.ts::PatternExtractor": "Trails::SourceAnnotationExtractor::PatternExtractor",
       "source-annotation-extractor.ts::SourceAnnotationExtractor": "Trails::SourceAnnotationExtractor",
       "trailtie.ts::Trailtie": "Trails::Trailtie",
+      "trailtie/configurable.ts::Configurable": "Trails::Trailtie::Configurable",
       "trailtie/configuration.ts::Configuration": "Trails::Trailtie::Configuration",
       "welcome-controller.ts::WelcomeController": "Trails::WelcomeController",
       "zeitwerk-checker.ts::ZeitwerkChecker": "Trails::ZeitwerkChecker"

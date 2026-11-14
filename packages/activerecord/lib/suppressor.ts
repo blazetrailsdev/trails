@@ -1,5 +1,7 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import { ActiveRecord } from "./namespaces.js";
+import * as Suppressor from "./suppressor.js";
 
 const SUPPRESSOR_REGISTRY_KEY = Symbol.for("ar_suppressor_registry");
 
@@ -31,3 +33,5 @@ export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T 
 export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T | true> {
   return registry()[this.constructor.name] ? true : superFn();
 }
+
+ActiveRecord.Suppressor = Suppressor;

@@ -12,26 +12,27 @@ import * as m9 from "./instrumentation.js";
 import * as m10 from "./log-subscriber.js";
 import * as m11 from "./logging.js";
 import * as m12 from "./queue-adapter.js";
-import * as m13 from "./queue-adapters/abstract-adapter.js";
-import * as m14 from "./queue-adapters/async-adapter.js";
-import * as m15 from "./queue-adapters/inline-adapter.js";
-import * as m16 from "./queue-adapters/test-adapter.js";
-import * as m17 from "./queue-name.js";
-import * as m18 from "./queue-priority.js";
-import * as m19 from "./serializers.js";
-import * as m20 from "./serializers/big-decimal-serializer.js";
-import * as m21 from "./serializers/date-serializer.js";
-import * as m22 from "./serializers/date-time-serializer.js";
-import * as m23 from "./serializers/duration-serializer.js";
-import * as m24 from "./serializers/module-serializer.js";
-import * as m25 from "./serializers/object-serializer.js";
-import * as m26 from "./serializers/range-serializer.js";
-import * as m27 from "./serializers/symbol-serializer.js";
-import * as m28 from "./serializers/time-object-serializer.js";
-import * as m29 from "./serializers/time-serializer.js";
-import * as m30 from "./serializers/time-with-zone-serializer.js";
-import * as m31 from "./timezones.js";
-import * as m32 from "./translation.js";
+import * as m13 from "./queue-adapters.js";
+import * as m14 from "./queue-adapters/abstract-adapter.js";
+import * as m15 from "./queue-adapters/async-adapter.js";
+import * as m16 from "./queue-adapters/inline-adapter.js";
+import * as m17 from "./queue-adapters/test-adapter.js";
+import * as m18 from "./queue-name.js";
+import * as m19 from "./queue-priority.js";
+import * as m20 from "./serializers.js";
+import * as m21 from "./serializers/big-decimal-serializer.js";
+import * as m22 from "./serializers/date-serializer.js";
+import * as m23 from "./serializers/date-time-serializer.js";
+import * as m24 from "./serializers/duration-serializer.js";
+import * as m25 from "./serializers/module-serializer.js";
+import * as m26 from "./serializers/object-serializer.js";
+import * as m27 from "./serializers/range-serializer.js";
+import * as m28 from "./serializers/symbol-serializer.js";
+import * as m29 from "./serializers/time-object-serializer.js";
+import * as m30 from "./serializers/time-serializer.js";
+import * as m31 from "./serializers/time-with-zone-serializer.js";
+import * as m32 from "./timezones.js";
+import * as m33 from "./translation.js";
 
 defineConstants([
   [() => m0.Arguments, "ActiveJob::Arguments"],
@@ -54,30 +55,31 @@ defineConstants([
   [() => m10.LogSubscriber, "ActiveJob::LogSubscriber"],
   [() => m12.QueueAdapter, "ActiveJob::QueueAdapter"],
   [() => m12.ClassMethods, "ActiveJob::QueueAdapter::ClassMethods"],
-  [() => m13.AbstractAdapter, "ActiveJob::QueueAdapters::AbstractAdapter"],
-  [() => m14.AsyncAdapter, "ActiveJob::QueueAdapters::AsyncAdapter"],
-  [() => m14.JobWrapper, "ActiveJob::QueueAdapters::AsyncAdapter::JobWrapper"],
-  [() => m14.Scheduler, "ActiveJob::QueueAdapters::AsyncAdapter::Scheduler"],
-  [() => m15.InlineAdapter, "ActiveJob::QueueAdapters::InlineAdapter"],
-  [() => m16.TestAdapter, "ActiveJob::QueueAdapters::TestAdapter"],
-  [() => m17.QueueName, "ActiveJob::QueueName"],
-  [() => m17.ClassMethods, "ActiveJob::QueueName::ClassMethods"],
-  [() => m18.QueuePriority, "ActiveJob::QueuePriority"],
-  [() => m18.ClassMethods, "ActiveJob::QueuePriority::ClassMethods"],
+  [() => m13.QueueAdapters, "ActiveJob::QueueAdapters"],
+  [() => m14.AbstractAdapter, "ActiveJob::QueueAdapters::AbstractAdapter"],
+  [() => m15.AsyncAdapter, "ActiveJob::QueueAdapters::AsyncAdapter"],
+  [() => m15.JobWrapper, "ActiveJob::QueueAdapters::AsyncAdapter::JobWrapper"],
+  [() => m15.Scheduler, "ActiveJob::QueueAdapters::AsyncAdapter::Scheduler"],
+  [() => m16.InlineAdapter, "ActiveJob::QueueAdapters::InlineAdapter"],
+  [() => m17.TestAdapter, "ActiveJob::QueueAdapters::TestAdapter"],
+  [() => m18.QueueName, "ActiveJob::QueueName"],
+  [() => m18.ClassMethods, "ActiveJob::QueueName::ClassMethods"],
+  [() => m19.QueuePriority, "ActiveJob::QueuePriority"],
+  [() => m19.ClassMethods, "ActiveJob::QueuePriority::ClassMethods"],
   [() => m0.SerializationError, "ActiveJob::SerializationError"],
-  [() => m19.Serializers, "ActiveJob::Serializers"],
-  [() => m20.BigDecimalSerializer, "ActiveJob::Serializers::BigDecimalSerializer"],
-  [() => m21.DateSerializer, "ActiveJob::Serializers::DateSerializer"],
-  [() => m22.DateTimeSerializer, "ActiveJob::Serializers::DateTimeSerializer"],
-  [() => m23.DurationSerializer, "ActiveJob::Serializers::DurationSerializer"],
-  [() => m24.ModuleSerializer, "ActiveJob::Serializers::ModuleSerializer"],
-  [() => m25.ObjectSerializer, "ActiveJob::Serializers::ObjectSerializer"],
-  [() => m26.RangeSerializer, "ActiveJob::Serializers::RangeSerializer"],
-  [() => m27.SymbolSerializer, "ActiveJob::Serializers::SymbolSerializer"],
-  [() => m28.TimeObjectSerializer, "ActiveJob::Serializers::TimeObjectSerializer"],
-  [() => m29.TimeSerializer, "ActiveJob::Serializers::TimeSerializer"],
-  [() => m30.TimeWithZoneSerializer, "ActiveJob::Serializers::TimeWithZoneSerializer"],
-  [() => m31.Timezones, "ActiveJob::Timezones"],
-  [() => m32.Translation, "ActiveJob::Translation"],
+  [() => m20.Serializers, "ActiveJob::Serializers"],
+  [() => m21.BigDecimalSerializer, "ActiveJob::Serializers::BigDecimalSerializer"],
+  [() => m22.DateSerializer, "ActiveJob::Serializers::DateSerializer"],
+  [() => m23.DateTimeSerializer, "ActiveJob::Serializers::DateTimeSerializer"],
+  [() => m24.DurationSerializer, "ActiveJob::Serializers::DurationSerializer"],
+  [() => m25.ModuleSerializer, "ActiveJob::Serializers::ModuleSerializer"],
+  [() => m26.ObjectSerializer, "ActiveJob::Serializers::ObjectSerializer"],
+  [() => m27.RangeSerializer, "ActiveJob::Serializers::RangeSerializer"],
+  [() => m28.SymbolSerializer, "ActiveJob::Serializers::SymbolSerializer"],
+  [() => m29.TimeObjectSerializer, "ActiveJob::Serializers::TimeObjectSerializer"],
+  [() => m30.TimeSerializer, "ActiveJob::Serializers::TimeSerializer"],
+  [() => m31.TimeWithZoneSerializer, "ActiveJob::Serializers::TimeWithZoneSerializer"],
+  [() => m32.Timezones, "ActiveJob::Timezones"],
+  [() => m33.Translation, "ActiveJob::Translation"],
   [() => m8.VERSION, "ActiveJob::VERSION"],
 ]);

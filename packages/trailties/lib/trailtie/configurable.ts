@@ -22,3 +22,5 @@ export function assertNotSealed(subclass: typeof Trailtie): void {
     parent = Object.getPrototypeOf(parent) as typeof Trailtie | null;
   }
 }
+
+export const Configurable = { sealAgainstInheritance, assertNotSealed };

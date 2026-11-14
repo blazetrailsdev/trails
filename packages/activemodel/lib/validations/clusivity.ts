@@ -86,3 +86,11 @@ export function inclusionMethod(enumerable: unknown): "isInclude" | "cover" {
     return "isInclude";
   }
 }
+
+export const Clusivity = {
+  ERROR_MESSAGE,
+  checkValidityBang,
+  isInclude,
+  delimiter,
+  inclusionMethod,
+};

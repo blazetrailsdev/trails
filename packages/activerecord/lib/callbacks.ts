@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import type { CallbackConditions, CallbackObject } from "@blazetrails/activemodel";
 import { RecordNotDestroyed } from "./errors.js";
 import { include, included } from "@blazetrails/activesupport";
-import { ValidationsCallbacks } from "@blazetrails/activemodel";
+import { Callbacks as ActiveModelCallbacks, ValidationsCallbacks } from "@blazetrails/activemodel";
 import { rtest, rbCallSuper } from "@blazetrails/ruby-compat";
 import type { TouchArgs } from "./timestamp.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
@@ -27,7 +27,7 @@ export const Callbacks = {
   },
 };
 
-export declare class ClassMethods {
+export interface ClassMethods {
   afterInitialize: <T extends typeof Base>(
     this: T,
     fn:
@@ -163,6 +163,9 @@ export declare class ClassMethods {
     conditions?: CallbackConditions<InstanceType<T>>,
   ) => void;
 }
+
+export const ClassMethods = {};
+include(ClassMethods, ActiveModelCallbacks);
 
 export async function destroy<T>(this: any, superFn: () => Promise<T>): Promise<T | boolean> {
   this._destroyCallbackAlreadyCalled ||= false;

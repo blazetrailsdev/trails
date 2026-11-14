@@ -503,6 +503,7 @@ declare module "@blazetrails/ruby-compat" {
       name: string;
       Calculations?: typeof DateAndTimeCalculations;
       Zones?: typeof import("./zones.js").Zones;
+      Compatibility?: typeof import("./compatibility.js");
     };
   }
 }

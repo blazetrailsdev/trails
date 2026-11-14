@@ -18,7 +18,7 @@ import {
   Thread,
   ThreadPoolExecutor,
 } from "@blazetrails/ruby-compat";
-import { prepend } from "@blazetrails/ruby-compat/include";
+import { include, prepend } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import {
@@ -58,6 +58,8 @@ export class NullConfig {
 }
 
 const NULL_CONFIG = new NullConfig();
+
+export const AbstractPool = {};
 
 export class NullPool implements AbstractPool {
   static readonly NullConfig = NullConfig;
@@ -123,6 +125,8 @@ export class NullPool implements AbstractPool {
     return true;
   }
 }
+
+include(NullPool, AbstractPool);
 
 Object.setPrototypeOf(
   NullPool.prototype,

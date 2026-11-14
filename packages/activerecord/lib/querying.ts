@@ -19,6 +19,8 @@ import type {
   PluckedRow,
   SumBlock,
 } from "./relation/calculations.js";
+import { ActiveRecord } from "./namespaces.js";
+import * as Querying from "./querying.js";
 
 export const QUERYING_METHODS = [
   "find",
@@ -1086,3 +1088,5 @@ export function asyncPick<T extends typeof Base>(
 }
 
 export { withCte as with };
+
+ActiveRecord.Querying = Querying;
