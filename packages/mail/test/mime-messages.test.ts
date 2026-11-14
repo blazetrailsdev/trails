@@ -1,5 +1,13 @@
 import type {} from "@blazetrails/vitest-matchers";
-import { binaryString, Encoding, forceEncoding, IO, rbObjEncoding } from "@blazetrails/ruby-compat";
+import {
+  binaryString,
+  Dir,
+  File,
+  Encoding,
+  forceEncoding,
+  IO,
+  rbObjEncoding,
+} from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import "../lib/index.js";
 import { Mail } from "../lib/mail.js";
@@ -11,6 +19,8 @@ const fixturePath = (...path: string[]) =>
   decodeURIComponent(new URL(`./fixtures/${path.join("/")}`, import.meta.url).pathname);
 const readFixture = (...path: string[]) => Mail.read(fixturePath(...path));
 const readRawFixture = async (...path: string[]) => await IO.binreadAsync(fixturePath(...path));
+
+const testAttachments = await Dir.globAsync(fixturePath("attachments", "test.*"));
 
 describe("MIME Emails", () => {
   describe("general helper methods", () => {
@@ -158,8 +168,8 @@ describe("MIME Emails", () => {
   describe("multipart emails", () => {
     it("should add a boundary if there is none defined and a part is added", () => {
       const mail = Mail.new(function (this: Message) {
-        this.part("This is a part" as never);
-        this.part("This is another part" as never);
+        this.part("This is a part");
+        this.part("This is another part");
       });
       expect(mail.boundary()).not.toBeNull();
     });
@@ -404,7 +414,7 @@ describe("MIME Emails", () => {
 
     it("should detect a text_part in an existing email with plain text attachment", async () => {
       const m = Mail.new({ contentType: "multipart/alternative" });
-      await m.addFile(fixturePath("attachments", "tesuto.txt"));
+      await m.addFile(fixturePath("attachments", "てすと.txt"));
       m.addPart(new Mail.Part({ contentType: "text/html", body: "HTML TEXT" }));
       m.addPart(new Mail.Part({ contentType: "text/plain", body: "PLAIN TEXT" }));
       expect((m.textPart() as Message).body().decoded()).toEqual("PLAIN TEXT");
@@ -470,16 +480,19 @@ describe("MIME Emails", () => {
       expect(mail.attachments()[1].filename()).toEqual("smime.p7s");
     });
 
-    for (const ext of [".gif", ".jpg", ".pdf", ".png", ".tiff", ".zip"]) {
-      it(`should find binary encoded attachments of type ${ext}`, async () => {
+    for (const testAttachment of testAttachments) {
+      it(`should find binary encoded attachments of type ${File.extname(testAttachment)}`, async () => {
         const raw = await readRawFixture(
           "emails",
           "mime_emails",
           "raw_email_with_binary_encoded.eml",
         );
         const marker = binaryString(raw).indexOf("BINARY_CONTENT_GOES_HERE");
-        const [pre, post] = [raw.subarray(0, marker), raw.subarray(marker + 24)];
-        const rawFile = await IO.binreadAsync(fixturePath("attachments", `test${ext}`));
+        const [pre, post] = [
+          raw.subarray(0, marker),
+          raw.subarray(marker + "BINARY_CONTENT_GOES_HERE".length),
+        ];
+        const rawFile = await IO.binreadAsync(testAttachment);
 
         const rawMail = forceEncoding(
           new Uint8Array([...pre, ...rawFile, ...post]),
