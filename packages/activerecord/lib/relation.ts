@@ -1705,7 +1705,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         _lookupGetter.call(this, key) === undefined &&
         _lookupSetter.call(this, key) === undefined
       ) {
-        copy[key] = (this as any)[key];
+        copy[key] = Reflect.get(this, key);
       } else {
         Object.defineProperty(copy, key, Object.getOwnPropertyDescriptor(this, key)!);
       }
