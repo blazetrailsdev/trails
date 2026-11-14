@@ -90,6 +90,8 @@ function ecTagSlot(): AsyncContext<RbVmTag> {
   return _ecTag;
 }
 
+let _syncTag: RbVmTag | undefined;
+
 /**
  * `Kernel#throw` (`vendor/ruby/v3.3.11/vm_eval.c:2244-2251` `rb_f_throw`):
  * `rb_scan_args(argc, argv, "11", &tag, &value)`, then `rb_throw_obj`.
@@ -105,7 +107,7 @@ export function kernelThrow(tag: unknown, value: unknown = null): never {
 }
 
 function rbThrowObj(tag: unknown, value: unknown): never {
-  let tt = ecTagSlot().getStore();
+  let tt = _syncTag ?? ecTagSlot().getStore();
 
   while (tt) {
     if (!tt.popped && tt.tag === tag) {
@@ -156,27 +158,59 @@ export function kernelCatch(...argv: unknown[]): unknown {
 
 function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
   const context = ecTagSlot();
-  const tt: RbVmTag = { tag, retval: null, prev: context.getStore(), popped: false };
+  const outer = _syncTag;
+  const tt: RbVmTag = { tag, retval: null, prev: outer ?? context.getStore(), popped: false };
   const rescue = (errinfo: unknown): unknown => {
     if (errinfo instanceof VmThrowData && errinfo.tag === tag) return tt.retval;
     throw errinfo;
   };
-  return context.run(tt, () => {
-    let val: unknown;
-    try {
-      val = func(tag);
-    } catch (errinfo) {
+  _syncTag = undefined;
+  try {
+    return context.run(tt, () => {
+      let val: unknown;
+      try {
+        val = func(tag);
+      } catch (errinfo) {
+        tt.popped = true;
+        return rescue(errinfo);
+      }
+      if (val !== null && typeof (val as PromiseLike<unknown>)?.then === "function") {
+        return Promise.resolve(val as PromiseLike<unknown>)
+          .finally(() => {
+            tt.popped = true;
+          })
+          .then(undefined, rescue);
+      }
       tt.popped = true;
-      return rescue(errinfo);
-    }
-    if (val !== null && typeof (val as PromiseLike<unknown>)?.then === "function") {
-      return Promise.resolve(val as PromiseLike<unknown>)
-        .finally(() => {
-          tt.popped = true;
-        })
-        .then(undefined, rescue);
-    }
+      return val;
+    });
+  } finally {
+    _syncTag = outer;
+  }
+}
+
+/**
+ * `Kernel#catch` (`vendor/ruby/v3.3.11/vm_eval.c:2342` `rb_f_catch`) for a
+ * block its caller knows is synchronous: the tag is
+ * pushed on a stack popped when the block returns, with no async-context
+ * frame, which only a block that can `await` needs. The block must not
+ * return a thenable: its tag is popped when it returns, so a `throw` after
+ * an `await` inside it finds no tag and raises `UncaughtThrowError`.
+ *
+ * @noRailsEquivalent PERMANENT
+ * @perf 4.6% — PERMANENT
+ */
+export function kernelCatchSync<T>(tag: unknown, block: (tag: unknown) => T): T | unknown {
+  const outer = _syncTag;
+  const tt: RbVmTag = { tag, retval: null, prev: outer ?? ecTagSlot().getStore(), popped: false };
+  _syncTag = tt;
+  try {
+    return block(tag);
+  } catch (errinfo) {
+    if (errinfo instanceof VmThrowData && errinfo.tag === tag) return tt.retval;
+    throw errinfo;
+  } finally {
     tt.popped = true;
-    return val;
-  });
+    _syncTag = outer;
+  }
 }

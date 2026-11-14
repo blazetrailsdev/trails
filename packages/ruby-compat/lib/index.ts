@@ -309,7 +309,13 @@ export {
 } from "./include.js";
 export type { Extended, Included, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";
-export { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "./kernel-catch.js";
+export {
+  kernelCatch,
+  kernelCatchSync,
+  kernelThrow,
+  throwDataP,
+  UncaughtThrowError,
+} from "./kernel-catch.js";
 export { kernelFloat } from "./kernel-float.js";
 export { kernelHash } from "./kernel-hash.js";
 export { format, sprintf } from "./kernel-format.js";

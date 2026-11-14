@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "../lib/argument-error.js";
-import { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "../lib/kernel-catch.js";
+import {
+  kernelCatch,
+  kernelCatchSync,
+  kernelThrow,
+  throwDataP,
+  UncaughtThrowError,
+} from "../lib/kernel-catch.js";
 
 describe("kernelCatch", () => {
   it("raises UncaughtThrowError at the throw site with the inspected tag and value", () => {
@@ -98,5 +104,44 @@ describe("kernelCatch", () => {
     expect(results[0]).toEqual({ status: "fulfilled", value: ":a_done" });
     expect(results[1].status).toBe("rejected");
     expect((results[1] as PromiseRejectedResult).reason).toBeInstanceOf(UncaughtThrowError);
+  });
+
+  it("catches a throw from an awaited callback", async () => {
+    const callback = async () => {
+      await Promise.resolve();
+      kernelThrow(":abort", ":halted");
+    };
+    const res = kernelCatch(":abort", () => Promise.resolve(callback()).then(() => ":ran"));
+    expect(await res).toBe(":halted");
+    expect(() => kernelThrow(":abort")).toThrow(UncaughtThrowError);
+  });
+
+  it("unwinds a sync catch to its thrown value and pops its tag", () => {
+    expect(kernelCatchSync(":abort", () => kernelThrow(":abort", ":halted"))).toBe(":halted");
+    expect(() => kernelThrow(":abort")).toThrow(UncaughtThrowError);
+  });
+
+  it("unwinds through a sync catch to an enclosing async catch", async () => {
+    const res = kernelCatch(":outer", async () => {
+      await Promise.resolve();
+      return kernelCatchSync(":inner", () => kernelThrow(":outer", ":unwound"));
+    });
+    expect(await res).toBe(":unwound");
+  });
+
+  it("unwinds from an async catch nested in a sync catch to the sync tag", () => {
+    const res = kernelCatchSync(":outer", () => {
+      kernelCatch(":inner", () => kernelThrow(":outer", ":unwound"));
+      return ":ran";
+    });
+    expect(res).toBe(":unwound");
+  });
+
+  it("pops a sync catch's tag before a thenable its block returns settles", async () => {
+    const later = kernelCatchSync(":abort", async () => {
+      await Promise.resolve();
+      kernelThrow(":abort");
+    }) as Promise<unknown>;
+    await expect(later).rejects.toBeInstanceOf(UncaughtThrowError);
   });
 });
