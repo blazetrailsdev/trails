@@ -352,7 +352,6 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
   });
 
   it("read_body streams each chunk through a ReadAdapter as it arrives", async () => {
-    // vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383, :592-613; protocol.rb:516-537
     let release!: () => void;
     const released = new Promise<void>((r) => (release = r));
     const port = await listen(

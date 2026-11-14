@@ -77,7 +77,6 @@ describe("Fiber", () => {
   });
 
   it("raise resumes a suspended fiber with the exception at its yield", async () => {
-    // vendor/ruby/v3.3.11/cont.c:3269-3291
     const seen: unknown[] = [];
     const fiber = new Fiber(async () => {
       try {
