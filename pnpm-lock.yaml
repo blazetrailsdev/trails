@@ -1454,6 +1454,9 @@ importers:
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../../packages/rack
+      '@blazetrails/rack-proxy':
+        specifier: workspace:*
+        version: link:../../packages/rack-proxy
       '@blazetrails/rack-session':
         specifier: workspace:*
         version: link:../../packages/rack-session

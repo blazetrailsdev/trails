@@ -25,6 +25,7 @@
     "@blazetrails/raabro": "workspace:*",
     "@blazetrails/zeitwerk": "workspace:*",
     "@blazetrails/rack": "workspace:*",
+    "@blazetrails/rack-proxy": "workspace:*",
     "@blazetrails/rack-session": "workspace:*",
     "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/rackup": "workspace:*",
