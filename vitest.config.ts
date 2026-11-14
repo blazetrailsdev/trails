@@ -666,6 +666,7 @@ export default defineConfig({
           // tracking removal).
           hookTimeout: 30_000,
           pool: "forks",
+          env: { SOLID_CACHE_CONFIG: "config/cache_no_database.yml" },
         },
       },
       {

@@ -46,6 +46,9 @@ describe("SolidQueue::InstallGeneratorTest", () => {
       expect(fs.existsSync(path.join(app, file))).toBe(true);
     }
     expect(fs.statSync(path.join(app, "bin/jobs")).mode & 0o111).not.toBe(0);
+    const binJobs = fs.readFileSync(path.join(app, "bin/jobs"), "utf8");
+    expect(binJobs).toContain("await Cli.start(rbArgv());");
+    expect(binJobs).not.toContain("app/jobs");
   });
 
   it("configures the adapter and database in production", () => {
