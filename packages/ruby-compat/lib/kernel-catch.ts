@@ -92,9 +92,9 @@ function ecTagSlot(): AsyncContext<RbVmTag> {
   return _ecTag;
 }
 
-/** @perf 4.6% — CONVERGEABLE kernel-catch-without-als-run-per-callback */
+/** @perf 4.6% — PERMANENT */
 let _syncTag: RbVmTag | undefined;
-/** @perf 4.6% — CONVERGEABLE kernel-catch-without-als-run-per-callback */
+/** @perf 4.6% — PERMANENT */
 const _unboundTags = new Map<unknown, number>();
 const AsyncFunction = (async () => {}).constructor;
 
