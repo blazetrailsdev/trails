@@ -1635,6 +1635,13 @@ export function rbModAppendFeatures(
         if (origin) {
           const entry = superSlotFor(modDesc.value, String(key));
           const below = Reflect.get(klass.prototype, origin.slot) as unknown;
+          if (
+            below !== undefined &&
+            !installed.has(key) &&
+            below !== Reflect.get(Object.getPrototypeOf(klass.prototype) as object, key)
+          ) {
+            continue;
+          }
           if (below !== undefined) {
             descriptors[entry.slot] = { value: below, configurable: true };
             entry.seats = (entry.seats ?? 0) + 1;

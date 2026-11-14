@@ -84,6 +84,16 @@ describe("Net::HTTP", () => {
     expect(response.uri).not.toBe(uri);
   });
 
+  it("get yields the body segment to its block", async () => {
+    const port = await listen(createServer((_req, res) => res.end("hello")));
+    const segments: string[] = [];
+    const response = await new Net.HTTP("127.0.0.1", port).get("/", null, null, (segment) => {
+      segments.push(new TextDecoder().decode(segment));
+    });
+    expect(segments).toEqual(["hello"]);
+    expect(response.code).toBe("200");
+  });
+
   it("reads past a 1xx response to the final one", async () => {
     const port = await listen(
       createServer((_req, res) => {
