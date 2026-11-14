@@ -3,6 +3,7 @@ import { Open3, STDOUT as $stdout, StringIO, type Process } from "@blazetrails/r
 type CaptureResult = [string, string, InstanceType<typeof Process.Status>];
 
 export const IO = {
+  /** @inventedArm capture3 — CONVERGEABLE ruby-compat-open3-popen3-streams-lines */
   async capture(...cmd: unknown[]): Promise<CaptureResult> {
     const {
       withOutput = (line: string) => $stdout.puts(line),

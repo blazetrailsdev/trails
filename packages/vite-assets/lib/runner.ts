@@ -1,4 +1,4 @@
-import { ArgumentError, Errno, exec, File, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, Errno, exec, File, partition, rbInspect } from "@blazetrails/ruby-compat";
 import type { Config } from "./config.js";
 import { IO } from "./io.js";
 import { MissingExecutableError } from "./missing-executable-error.js";
@@ -51,8 +51,7 @@ export class Runner {
   private async commandFor(args: string[]): Promise<[Record<string, string>, ...string[]]> {
     const config = await this.config();
     const cmd: [Record<string, string>, ...string[]] = [config.toEnv(this.env())];
-    const execArgs = args.filter((arg) => arg.startsWith("--node-options"));
-    const viteArgs = args.filter((arg) => !arg.startsWith("--node-options"));
+    const [execArgs, viteArgs] = partition(args, (arg) => arg.startsWith("--node-options"));
     cmd.push(...(await this.viteExecutable(...execArgs)));
     cmd.push(...viteArgs);
     if (!(args.includes("--mode") || args.includes("-m"))) cmd.push("--mode", config.mode);
