@@ -7,7 +7,7 @@ import {
   symbolToS,
   toS,
 } from "@blazetrails/ruby-compat";
-import { type EnvironmentInquirer, getEnv } from "@blazetrails/activesupport";
+import { type StringInquirer, getEnv } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {
   DatabaseConfig,
@@ -70,20 +70,20 @@ export class DatabaseConfigurations {
   }
 
   configsFor(options: {
-    envName?: string | EnvironmentInquirer;
+    envName?: string | StringInquirer;
     name: string;
     configKey?: string;
     includeHidden?: boolean;
   }): HashConfig | undefined;
   configsFor(options?: {
-    envName?: string | EnvironmentInquirer;
+    envName?: string | StringInquirer;
     name?: undefined;
     configKey?: string;
     includeHidden?: boolean;
   }): HashConfig[];
   configsFor(
     options: {
-      envName?: string | EnvironmentInquirer;
+      envName?: string | StringInquirer;
       name?: string;
       configKey?: string;
       includeHidden?: boolean;
@@ -174,7 +174,7 @@ export class DatabaseConfigurations {
   }
 
   /** @internal */
-  private envWithConfigs(env?: string | EnvironmentInquirer): HashConfig[] {
+  private envWithConfigs(env?: string | StringInquirer): HashConfig[] {
     if (env != null) return this._configurations.filter((c) => rbEqual(c.envName, env));
     return this._configurations;
   }

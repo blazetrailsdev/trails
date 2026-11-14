@@ -22,9 +22,9 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   DatabaseTasks.dbDir = resolve(join(cwd, "db"));
   DatabaseTasks.migrationsPaths = [resolve(join(cwd, "db/migrate"))];
   Migrator.migrationsPaths = await DatabaseTasks.migrationsPaths;
-  DatabaseTasks.env =
-    presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV")) ?? "development";
-  await establishEnvironmentConnection(DatabaseTasks.env);
+  const env = presence(getEnv("TRAILS_ENV")) ?? presence(getEnv("NODE_ENV")) ?? "development";
+  DatabaseTasks.env = env;
+  await establishEnvironmentConnection(env);
   return configs;
 }
 

@@ -6,7 +6,7 @@ import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { BoundSchemaReflection } from "../connection-adapters/schema-cache.js";
 import {
-  type EnvironmentInquirer,
+  type StringInquirer,
   getEnv,
   isBlank,
   isPresent,
@@ -48,13 +48,13 @@ export type SchemaFormat = "ts" | "js" | "sql";
 export class DatabaseTasks {
   static readonly LOCAL_HOSTS: readonly string[] = ["127.0.0.1", "localhost"];
 
-  private static _env: string | EnvironmentInquirer | null = null;
+  private static _env: string | StringInquirer | null = null;
 
-  static get env(): string | EnvironmentInquirer {
+  static get env(): string | StringInquirer {
     return (this._env ??= TopLevel.Trails!.env);
   }
 
-  static set env(value: string | EnvironmentInquirer | null) {
+  static set env(value: string | StringInquirer | null) {
     this._env = value;
   }
 
@@ -185,7 +185,7 @@ export class DatabaseTasks {
   }
 
   static async createCurrent(
-    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+    environment: string | StringInquirer = DatabaseTasks.env,
     name?: string,
   ): Promise<void> {
     await this.eachCurrentConfiguration(environment, name, async (dbConfig) => {
@@ -221,7 +221,7 @@ export class DatabaseTasks {
   }
 
   static async dropCurrent(
-    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+    environment: string | StringInquirer = DatabaseTasks.env,
   ): Promise<void> {
     await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.drop(dbConfig);
@@ -276,7 +276,7 @@ export class DatabaseTasks {
   }
 
   static async purgeCurrent(
-    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+    environment: string | StringInquirer = DatabaseTasks.env,
   ): Promise<void> {
     await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.purge(dbConfig);
@@ -291,7 +291,7 @@ export class DatabaseTasks {
   }
 
   static async truncateAll(
-    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+    environment: string | StringInquirer = DatabaseTasks.env,
   ): Promise<void> {
     for (const dbConfig of this.configsFor({ envName: environment })) {
       await this.truncateTables(dbConfig);
@@ -307,7 +307,7 @@ export class DatabaseTasks {
   }
 
   static async charsetCurrent(
-    envName: string | EnvironmentInquirer = DatabaseTasks.env,
+    envName: string | StringInquirer = DatabaseTasks.env,
     dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
     const dbConfig = this.configsFor({ envName, name: dbName });
@@ -325,7 +325,7 @@ export class DatabaseTasks {
   }
 
   static async collationCurrent(
-    envName: string | EnvironmentInquirer = DatabaseTasks.env,
+    envName: string | StringInquirer = DatabaseTasks.env,
     dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
     const dbConfig = this.configsFor({ envName, name: dbName });
@@ -357,7 +357,7 @@ export class DatabaseTasks {
   }
 
   static async checkProtectedEnvironmentsBang(
-    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+    environment: string | StringInquirer = DatabaseTasks.env,
   ): Promise<void> {
     if (getEnv("DISABLE_DATABASE_ENVIRONMENT_CHECK") !== undefined) return;
 
@@ -368,20 +368,20 @@ export class DatabaseTasks {
 
   /** @internal */
   static configsFor(options: {
-    envName?: string | EnvironmentInquirer;
+    envName?: string | StringInquirer;
     name: string;
     includeHidden?: boolean;
   }): HashConfig | undefined;
   /** @internal */
   static configsFor(options?: {
-    envName?: string | EnvironmentInquirer;
+    envName?: string | StringInquirer;
     name?: undefined;
     includeHidden?: boolean;
   }): HashConfig[];
   /** @internal */
   static configsFor(
     options: {
-      envName?: string | EnvironmentInquirer;
+      envName?: string | StringInquirer;
       name?: string;
       includeHidden?: boolean;
     } = {},
@@ -396,7 +396,7 @@ export class DatabaseTasks {
 
   /** @internal */
   private static async eachCurrentConfiguration(
-    environment: string | EnvironmentInquirer,
+    environment: string | StringInquirer,
     name?: string | null | ((dbConfig: HashConfig) => unknown),
     block?: (dbConfig: HashConfig) => unknown,
   ): Promise<void> {
@@ -586,7 +586,7 @@ export class DatabaseTasks {
   static async loadSchemaCurrent(
     format: SchemaFormat = schemaFormat(),
     file?: string,
-    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+    environment: string | StringInquirer = DatabaseTasks.env,
   ): Promise<void> {
     await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.withTemporaryConnection(dbConfig, async () => {
@@ -684,7 +684,7 @@ export class DatabaseTasks {
   }
 
   static async dbConfigsWithVersions(
-    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+    environment: string | StringInquirer = DatabaseTasks.env,
   ): Promise<Map<number, HashConfig[]>> {
     const dbConfigsWithVersions = new Map<number, HashConfig[]>();
     await this.withTemporaryPoolForEach({ env: environment }, async (pool) => {
@@ -738,7 +738,7 @@ export class DatabaseTasks {
       env = DatabaseTasks.env,
       name,
       clobber = false,
-    }: { env?: string | EnvironmentInquirer; name?: string; clobber?: boolean } = {},
+    }: { env?: string | StringInquirer; name?: string; clobber?: boolean } = {},
     block: (pool: ConnectionPool) => Promise<void>,
   ): Promise<void> {
     if (name != null) {
@@ -816,7 +816,7 @@ export class DatabaseTasks {
   }
 
   static raiseForMultiDb(
-    environment: string | EnvironmentInquirer | undefined,
+    environment: string | StringInquirer | undefined,
     opts: { command: string },
   ): void {
     environment ??= DatabaseTasks.env;
@@ -900,9 +900,9 @@ export function isVerbose(): boolean {
 
 /** @internal */
 export async function eachCurrentEnvironment(
-  environment: string | EnvironmentInquirer,
-  block: (env: string | EnvironmentInquirer) => unknown,
-): Promise<(string | EnvironmentInquirer)[]> {
+  environment: string | StringInquirer,
+  block: (env: string | StringInquirer) => unknown,
+): Promise<(string | StringInquirer)[]> {
   const environments = [environment];
   if (
     rbEqual(environment, "development") &&
