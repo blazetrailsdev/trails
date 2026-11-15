@@ -26,16 +26,16 @@ export class Install extends Command {
     });
   }
 
-  static readonly TEMPLATES_PATH = new Pathname(
-    new URL("../../templates", import.meta.url).pathname,
-  );
-
   /** @internal */
   private _root: Pathname | undefined;
-  declare protected append: typeof FileUtils.append;
-  declare protected cp: typeof FileUtils.cp;
-  declare protected injectLineAfterLast: typeof FileUtils.injectLineAfterLast;
-  declare protected write: typeof FileUtils.write;
+  declare private append: typeof FileUtils.append;
+  declare private appendUnlessPresent: typeof FileUtils.appendUnlessPresent;
+  declare private cp: typeof FileUtils.cp;
+  declare private injectLineAfter: typeof FileUtils.injectLineAfter;
+  declare private injectLineAfterLast: typeof FileUtils.injectLineAfterLast;
+  declare private injectLineBefore: typeof FileUtils.injectLineBefore;
+  declare private replaceFirstLine: typeof FileUtils.replaceFirstLine;
+  declare private write: typeof FileUtils.write;
 
   override async call({
     packageManager = null,
@@ -92,17 +92,43 @@ export class Install extends Command {
   }
 
   /** @internal */
-  protected config(): Promise<Config> {
+  private config(): Promise<Config> {
     return ViteAssets.config();
   }
 
+  static {
+    for (const util of [
+      "append",
+      "appendUnlessPresent",
+      "cp",
+      "injectLineAfter",
+      "injectLineAfterLast",
+      "injectLineBefore",
+      "replaceFirstLine",
+      "write",
+    ] as const) {
+      Object.defineProperty(this.prototype, util, {
+        value: (...args: unknown[]) =>
+          (FileUtils[util] as (...args: unknown[]) => Promise<void>)(...args).catch(
+            () => undefined,
+          ),
+        writable: true,
+        configurable: true,
+      });
+    }
+  }
+
+  static readonly TEMPLATES_PATH = new Pathname(
+    decodeURIComponent(new URL("../../templates", import.meta.url).pathname),
+  );
+
   /** @internal */
-  protected copyTemplate(path: string, { to }: { to: Pathname | string }): Promise<void> {
+  private copyTemplate(path: string, { to }: { to: Pathname | string }): Promise<void> {
     return this.cp(Install.TEMPLATES_PATH.join(path), to);
   }
 
   /** @internal */
-  protected async createConfigurationFiles(): Promise<void> {
+  private async createConfigurationFiles(): Promise<void> {
     const root = await this.root();
     await this.copyTemplate("config/vite.config.ts", { to: root.join("vite.config.ts") });
     await this.append(root.join("Procfile.dev"), "vite: bin/vite dev");
@@ -111,7 +137,7 @@ export class Install extends Command {
   }
 
   /** @internal */
-  protected async installJsDependencies(): Promise<void> {
+  private async installJsDependencies(): Promise<void> {
     const root = await this.root();
     const packageJson = root.join("package.json");
     if (!(await File.isExistAsync(packageJson.toString()))) {
@@ -143,7 +169,7 @@ export class Install extends Command {
   }
 
   /** @internal */
-  protected async installGitignore(): Promise<void> {
+  private async installGitignore(): Promise<void> {
     const gitignoreFile = (await this.root()).join(".gitignore");
     if (!(await File.isExistAsync(gitignoreFile.toString()))) return;
 
@@ -161,7 +187,7 @@ node_modules
   }
 
   /** @internal */
-  protected async root(): Promise<Pathname> {
+  private async root(): Promise<Pathname> {
     return (this._root ??= await this.silentWarnings(async () => (await this.config()).root));
   }
 
@@ -199,22 +225,4 @@ node_modules
       stderr.write = oldStderr;
     }
   }
-}
-
-for (const util of [
-  "append",
-  "appendUnlessPresent",
-  "cp",
-  "injectLineAfter",
-  "injectLineAfterLast",
-  "injectLineBefore",
-  "replaceFirstLine",
-  "write",
-] as const) {
-  Object.defineProperty(Install.prototype, util, {
-    value: (...args: unknown[]) =>
-      (FileUtils[util] as (...args: unknown[]) => Promise<void>)(...args).catch(() => undefined),
-    writable: true,
-    configurable: true,
-  });
 }

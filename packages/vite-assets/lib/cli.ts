@@ -88,7 +88,8 @@ export class CLI extends Thor {
       for (const [, library] of ViteAssets.frameworkLibraries()) {
         await import([library.name.replaceAll("-", "/"), path].filter((x) => x != null).join("/"));
       }
-    } catch {
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw error;
       if (path !== "installation") await this.requireFrameworkLibraries("installation");
     }
   }
@@ -106,3 +107,5 @@ CLI.Version = Version;
 CLI.Vite = Vite;
 
 ViteAssets.CLI = CLI;
+
+await CLI.requireFrameworkLibraries("cli");

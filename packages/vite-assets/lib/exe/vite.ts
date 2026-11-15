@@ -1,6 +1,6 @@
 import { env as ENV, rbArgv, setEnv } from "@blazetrails/ruby-compat";
 
-setEnv("TRAILS_ENV", ENV["TRAILS_ENV"] || ENV["RACK_ENV"]);
+if (!ENV["TRAILS_ENV"]) setEnv("TRAILS_ENV", ENV["RACK_ENV"]);
 
 const { CLI } = await import("../cli.js");
 

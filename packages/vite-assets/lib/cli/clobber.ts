@@ -2,11 +2,11 @@ import { env as ENV } from "@blazetrails/ruby-compat";
 import { ViteAssets } from "../vite-assets.js";
 import { Command } from "./command.js";
 
-const currentEnv = ENV["RACK_ENV"] || ENV["TRAILS_ENV"] || "development";
-
 export class Clobber extends Command {
   static {
     this.desc("Clear the Vite cache, temp files, and builds");
+
+    const currentEnv = ENV["RACK_ENV"] || ENV["TRAILS_ENV"] || "development";
 
     this.option("mode", {
       default: currentEnv,
