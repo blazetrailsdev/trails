@@ -33,6 +33,8 @@ import {
   waitForProcessTerminationWithTimeout,
   waitForRegisteredProcesses,
 } from "./support/processes-test-helper.js";
+import { TestCase } from "@blazetrails/activesupport/test-case";
+import { TopLevel, constSet } from "@blazetrails/ruby-compat";
 
 const dummyRoot = `${import.meta.dirname}/support/dummy`;
 
@@ -69,6 +71,13 @@ async function assertRegisteredSupervisor(pid: number) {
   expect(await processes[0].supervisor).toBeNull();
   expect(processes[0].pid).toEqual(pid);
 }
+
+class SupervisorTest extends TestCase {
+  static {
+    (this as unknown as { useTransactionalTests: boolean }).useTransactionalTests = false;
+  }
+}
+constSet(TopLevel, "SupervisorTest", SupervisorTest);
 
 describe("SupervisorTest", () => {
   let oldPermanentConnectionCheckout: ReturnType<typeof permanentConnectionCheckout>;

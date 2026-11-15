@@ -538,7 +538,7 @@ export { Fiber } from "./fiber.js";
 export { Logger, type Logdev, type LoggerFormatter, type LoggerKwargs } from "./logger.js";
 export { Benchmark } from "./benchmark.js";
 export { FiberError } from "./fiber-error.js";
-export { Thread, rbIterBreakValue } from "./thread.js";
+export { Thread, rbIterBreakValue, rbFSleep } from "./thread.js";
 export {
   Location,
   excBacktrace,
@@ -566,6 +566,7 @@ import "./concurrent/cyclic-barrier.js";
 import "./concurrent/event.js";
 import "./concurrent/atomic-boolean.js";
 import "./concurrent/read-write-lock.js";
+export { Semaphore } from "./concurrent/semaphore.js";
 export { AtomicFixnum } from "./concurrent/atomic-fixnum.js";
 export { TimerTask } from "./concurrent/timer-task.js";
 export type { MonitorMixin } from "./monitor.js";

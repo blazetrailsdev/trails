@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
+import type { StreamEventLoop } from "@blazetrails/actioncable/connection/stream-event-loop";
+import { Concurrent, Thread, rbFSleep } from "@blazetrails/ruby-compat";
 import { Listener } from "../../../lib/action-cable/subscription-adapter/solid-cable.js";
+import { loadCableSchema } from "../../support/cable-schema.js";
+import { useDummyApplication } from "../../support/config-stubs.js";
 
 interface SelfPipeListener {
   wakeUp(): void;
@@ -38,5 +42,27 @@ describe("Listener self-pipe", () => {
     expect(l.selfPipe.reader.readNonblock(11, null, { exception: false })).toEqual(
       new Uint8Array([46]),
     );
+  });
+});
+
+describe("Listener shutdown", () => {
+  useDummyApplication();
+
+  beforeAll(async () => {
+    await loadCableSchema();
+  });
+
+  it("shutdown during interruptible raises Stop in the listener thread", async () => {
+    const eventLoop = { post: () => null } as unknown as StreamEventLoop;
+    const l = new Listener(eventLoop);
+    const thread = (l as unknown as { thread: Thread }).thread;
+    const critical = (l as unknown as { _critical: InstanceType<typeof Concurrent.Semaphore> })
+      ._critical;
+    await rbFSleep(0.2);
+    const start = Date.now();
+    await l.shutdown();
+    expect(thread.isAlive()).toBe(false);
+    expect(Date.now() - start).toBeLessThan(1000);
+    expect(critical.availablePermits()).toBe(1);
   });
 });

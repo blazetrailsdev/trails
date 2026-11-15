@@ -6,7 +6,16 @@ import { Base } from "@blazetrails/actioncable/subscription-adapter/base";
 import { ChannelPrefix } from "@blazetrails/actioncable/subscription-adapter/channel-prefix";
 import type { InlineServer } from "@blazetrails/actioncable/subscription-adapter/inline";
 import { SubscriberMap } from "@blazetrails/actioncable/subscription-adapter/subscriber-map";
-import { Errno, Exception, IO, Thread, forceEncoding } from "@blazetrails/ruby-compat";
+import {
+  Concurrent,
+  Errno,
+  Exception,
+  IO,
+  Thread,
+  forceEncoding,
+  rbFSleep,
+  type Semaphore,
+} from "@blazetrails/ruby-compat";
 import type { PipeIO } from "@blazetrails/ruby-compat";
 import { prepend } from "@blazetrails/ruby-compat/include";
 import { Message } from "../../message.js";
@@ -62,10 +71,6 @@ export class SolidCable extends Base {
 }
 prepend(SolidCable, ChannelPrefix);
 
-/**
- * @missingRailsCall acquire — PERMANENT
- * @missingRailsCall release — PERMANENT
- */
 export class Listener extends SubscriberMap {
   static Stop = class Stop extends Exception {};
 
@@ -73,16 +78,15 @@ export class Listener extends SubscriberMap {
   private _thread: Thread<Promise<void>>;
   private _lastId: number | null = null;
   private _channels: Set<string> | null = null;
-  private _timer: ReturnType<typeof setTimeout> | undefined;
-  private _isStopped = false;
+  private _critical: Semaphore;
   private _selfPipe: { reader: PipeIO; writer: PipeIO } | null = null;
-  private _stop!: (stop: Exception) => void;
-  private readonly _stopped = new Promise<never>((_resolve, reject) => (this._stop = reject));
 
   constructor(eventLoop: StreamEventLoop) {
     super();
 
     this._eventLoop = eventLoop;
+
+    this._critical = new Concurrent.Semaphore(0);
 
     this._thread = new Thread(() => this.listen());
   }
@@ -100,26 +104,28 @@ export class Listener extends SubscriberMap {
           if (instance) await instance.completeBang();
         }
 
-        await this.interruptible(async () => {
-          await new Promise((resolve) => {
-            this._timer = setTimeout(resolve, SolidCableConfig.pollingInterval().toF() * 1000);
-            if (this._isStopped) clearTimeout(this._timer);
-          });
-        });
+        await this.interruptible(() => rbFSleep(SolidCableConfig.pollingInterval().toF()));
       }
     } catch (error) {
       if (!(error instanceof Listener.Stop)) throw error;
+    } finally {
+      this._critical.release();
     }
   }
 
   async interruptible<T>(block: () => T | Promise<T>): Promise<T> {
-    return await Promise.race([Promise.resolve().then(block), this._stopped]);
+    this._critical.release();
+    try {
+      return await block();
+    } finally {
+      await this._critical.acquire();
+    }
   }
 
   async shutdown(): Promise<void> {
-    this._isStopped = true;
-    this._stop(new Listener.Stop());
-    clearTimeout(this._timer);
+    await this._critical.acquire();
+    this.thread.raise(Listener.Stop);
+    this._critical.release();
     await this.thread.join();
   }
 
