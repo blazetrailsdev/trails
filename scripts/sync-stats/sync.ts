@@ -150,7 +150,6 @@ await Base.establishConnection({ adapter: "sqlite3", database: DB_PATH });
 // Models
 // ---------------------------------------------------------------------------
 
-// vendor_bump_report_packages' integer columns, in BumpReportPackage's order.
 const BUMP_PACKAGE_INT_COLUMNS = [
   "files_changed",
   "lines_added",
@@ -447,8 +446,6 @@ class ApiCallArgsStat extends Base {
   }
 }
 
-// Bump history (RFC 0191 § 7). Reports are committed JSON files and the
-// ledger summary is a CI log line, so every row here is rebuilt from the repo.
 class VendorBump extends Base {
   static {
     this.tableName = "vendor_bumps";

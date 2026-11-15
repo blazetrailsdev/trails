@@ -27,59 +27,6 @@
       "testsRemoved": 115,
       "testsChanged": 236,
       "testsMoved": 187
-    },
-    {
-      "package": "actioncontroller",
-      "pinsDrift": 29,
-      "pinsStale": 1,
-      "rubyFiles": 14
-    },
-    {
-      "package": "actiondispatch",
-      "pinsDrift": 95,
-      "pinsStale": 18,
-      "rubyFiles": 35
-    },
-    {
-      "package": "actionview",
-      "pinsDrift": 17,
-      "pinsStale": 0,
-      "rubyFiles": 13
-    },
-    {
-      "package": "activemodel",
-      "pinsDrift": 19,
-      "pinsStale": 2,
-      "rubyFiles": 11
-    },
-    {
-      "package": "activerecord",
-      "pinsDrift": 388,
-      "pinsStale": 65,
-      "rubyFiles": 127
-    },
-    {
-      "package": "activerecord-test-support",
-      "pinsDrift": 4,
-      "pinsStale": 0
-    },
-    {
-      "package": "activesupport",
-      "pinsDrift": 104,
-      "pinsStale": 28,
-      "rubyFiles": 47
-    },
-    {
-      "package": "arel",
-      "pinsDrift": 42,
-      "pinsStale": 3,
-      "rubyFiles": 20
-    },
-    {
-      "package": "trailties",
-      "pinsDrift": 30,
-      "pinsStale": 8,
-      "rubyFiles": 17
     }
   ],
   "gates": [
