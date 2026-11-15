@@ -1,4 +1,7 @@
+import { setArg0 } from "@blazetrails/ruby-compat";
 import { run } from "./cli.js";
+
+setArg0("ar");
 
 run(process.argv.slice(2), process.cwd()).then(
   (code) => process.exit(code),
