@@ -5,6 +5,8 @@ import { ApplicationRecord } from "./application-record.js";
 
 export class Message extends ApplicationRecord {
   declare subject: string | null;
+  declare content: RichText | null;
+  declare body: RichText | null;
   declare richTextContent: RichText | null | Promise<RichText | null>;
   declare review: Review | null | Promise<Review | null>;
 

@@ -8,7 +8,7 @@ export class BroadcastJob extends ApplicationJob {
     await File.writeAsync(
       file,
       `<turbo-stream action="replace" target="message_${message.id}">
-  <template>${await (message as Message & { content: { toString(): Promise<string> } }).content.toString()}</template>
+  <template>${await message.content!.toString()}</template>
 </turbo-stream>
 `,
     );
