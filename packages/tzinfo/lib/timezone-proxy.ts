@@ -4,10 +4,6 @@ import type { TimezonePeriod } from "./timezone-period.js";
 import type { TimezoneTransition } from "./timezone-transition.js";
 
 export class TimezoneProxy extends Timezone {
-  static _load(data: string | typeof String.prototype): TimezoneProxy {
-    return new TimezoneProxy(data.valueOf());
-  }
-
   /** @internal */
   private _realTimezone: Timezone | null;
 
@@ -39,6 +35,10 @@ export class TimezoneProxy extends Timezone {
   // eslint-disable-next-line unused-imports/no-unused-vars
   _dump(limit: number): string {
     return this.identifier;
+  }
+
+  static _load(data: string | typeof String.prototype): TimezoneProxy {
+    return new TimezoneProxy(data.valueOf());
   }
 
   /** @internal */

@@ -414,7 +414,7 @@ export class Timezone {
   }
 
   get identifier(): string {
-    return this._identifier;
+    return this.raiseUnknownTimezone();
   }
 
   // eslint-disable-next-line unused-imports/no-unused-vars

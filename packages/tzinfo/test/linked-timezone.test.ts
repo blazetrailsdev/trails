@@ -27,6 +27,10 @@ class TestTimezone extends Timezone {
     this.transitionsUpToResult = [{} as TimezoneTransition, {} as TimezoneTransition];
   }
 
+  override get identifier(): string {
+    return this._identifier;
+  }
+
   override periodFor(time: Time): TimezonePeriod {
     if (time == null) throw new ArgumentError("linked zone exception: nil");
     this.time = time;
