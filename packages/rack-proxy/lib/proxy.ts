@@ -61,6 +61,7 @@ export class RequestBodyStream {
     if (length == null) return this.readRemaining(buffer);
 
     if (this.remaining === 0) {
+      buffer?.fill(0);
       return null;
     }
 
@@ -83,11 +84,12 @@ export class RequestBodyStream {
     while ((chunk = await this.read(16_384)) != null) {
       data.push(chunk);
     }
-    void buffer;
-    return _concat(
+    const bytes = _concat(
       data,
       data.reduce((n, c) => n + c.length, 0),
     );
+    buffer?.set(bytes.subarray(0, buffer.length));
+    return bytes;
   }
 }
 
