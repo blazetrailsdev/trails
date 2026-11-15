@@ -73,13 +73,12 @@ describe("HttpStreamingResponseTest", () => {
 
   it("to s", async () => {
     const bodyString = await response.body.toString();
-    expect(bodyString.length > 0).toBeTruthy();
+    const bytesize = new TextEncoder().encode(bodyString).length;
+    expect(bytesize > 0).toBeTruthy();
     const contentLength = (await response.headers()).get("Content-Length") as unknown as
       | string[]
       | null;
-    expect(contentLength == null ? bodyString.length : Number(contentLength[0])).toBe(
-      bodyString.length,
-    );
+    expect(contentLength == null ? bytesize : Number(contentLength[0])).toBe(bytesize);
   });
 
   it("to s called twice", async () => {
