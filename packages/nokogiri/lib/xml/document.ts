@@ -1,5 +1,5 @@
 import { XmlDocument as LibXmlDocument, XmlParseError } from "libxml2-wasm";
-import { constSet, include } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
@@ -156,4 +156,4 @@ export class XmlDocument {
 }
 
 include(XmlDocument, Searchable);
-constSet(XML, "Document", XmlDocument);
+XML.Document = XmlDocument;

@@ -22,6 +22,7 @@ import * as m18 from "./routing.js";
 defineConstants([
   [() => m4.Base, "ActionMailbox::Base"],
   [() => m5.Callbacks, "ActionMailbox::Callbacks"],
+  [() => m5.ClassMethods, "ActionMailbox::Callbacks::ClassMethods"],
   [() => m7.IncinerationJob, "ActionMailbox::IncinerationJob"],
   [() => m8.InboundEmailsController, "ActionMailbox::Ingresses::Mailgun::InboundEmailsController"],
   [
@@ -49,6 +50,7 @@ defineConstants([
   [() => m16.Route, "ActionMailbox::Router::Route"],
   [() => m15.Router.RoutingError, "ActionMailbox::Router::RoutingError"],
   [() => m18.Routing, "ActionMailbox::Routing"],
+  [() => m18.ClassMethods, "ActionMailbox::Routing::ClassMethods"],
   [() => m17.RoutingJob, "ActionMailbox::RoutingJob"],
   [() => m6.VERSION, "ActionMailbox::VERSION"],
   [

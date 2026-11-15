@@ -87,6 +87,7 @@ defineConstants([
   [() => m18.PurgeOne, "ActiveStorage::Attached::Changes::PurgeOne"],
   [() => m19.Many, "ActiveStorage::Attached::Many"],
   [() => m20.Model, "ActiveStorage::Attached::Model"],
+  [() => m20.ClassMethods, "ActiveStorage::Attached::Model::ClassMethods"],
   [() => m21.One, "ActiveStorage::Attached::One"],
   [() => m22.Attachment, "ActiveStorage::Attachment"],
   [() => m23.BaseController, "ActiveStorage::BaseController"],

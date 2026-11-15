@@ -1,4 +1,3 @@
-import { constSet } from "@blazetrails/ruby-compat";
 import { XML } from "../namespaces.js";
 export class SyntaxError extends Error {
   readonly level: number;
@@ -30,4 +29,4 @@ export class SyntaxError extends Error {
   }
 }
 
-constSet(XML, "SyntaxError", SyntaxError);
+XML.SyntaxError = SyntaxError;

@@ -676,7 +676,9 @@ class ApiExtractor
       # define_method arm and record the same method a second time.
       consumed_call = process_define_method_block(node)
       process_each_include(node)
-      unless process_each_codegen(node)
+      if concern_class_methods_block?(node) && @modules.key?(current_fqn)
+        process_concern_class_methods(node)
+      elsif !process_each_codegen(node)
         on_load = on_load_block?(node)
         if on_load
           @in_on_load += 1
@@ -1385,6 +1387,35 @@ class ApiExtractor
   # framework loads — NOT into the lexically enclosing Railtie. Attributing it
   # to `current_fqn` credits the module's methods to a class Rails never puts
   # them on, so `include`/`extend` inside an on_load block records nothing.
+  # `class_methods do … end` (concern.rb:209-215) evaluates the block in the
+  # concern's `ClassMethods` module, defining it when the concern has none, so
+  # the block's methods are `M::ClassMethods` instance methods, as if the
+  # module had been written out.
+  def concern_class_methods_block?(node)
+    call = node[1]
+    call = call[1] if call.is_a?(Array) && call[0] == :method_add_arg
+    call.is_a?(Array) && %i[fcall vcall].include?(call[0]) &&
+      call[1].is_a?(Array) && call[1][0] == :@ident && call[1][1] == "class_methods"
+  end
+
+  def process_concern_class_methods(node)
+    block = node[2]
+    body = block.is_a?(Array) && %i[do_block brace_block].include?(block[0]) ? block[2] : nil
+    return unless body
+
+    @namespace_stack.push("ClassMethods")
+    @visibility_stack.push(:public)
+    @module_function_stack.push(false)
+    fqn = current_fqn
+    @modules[fqn] ||= new_class_info("ClassMethods", fqn)
+    @attr_names_stack.push(collect_attr_declarations(body))
+    walk_body(body)
+    @attr_names_stack.pop
+    @module_function_stack.pop
+    @visibility_stack.pop
+    @namespace_stack.pop
+  end
+
   # A bare `included do … end` in a module body. ActiveSupport::Concern runs
   # that block with the INCLUDER as self (concern.rb:137-138), so the singleton
   # methods it defines — `def self.x`, `class_attribute`, `class << self;

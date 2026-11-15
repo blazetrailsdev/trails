@@ -11,16 +11,17 @@ import * as m8 from "./entry/expiration.js";
 import * as m9 from "./entry/size.js";
 import * as m10 from "./entry/size/estimate.js";
 import * as m11 from "./entry/size/moving-average-estimate.js";
-import * as m12 from "./maglev-hash.js";
-import * as m13 from "./record.js";
-import * as m14 from "./store.js";
-import * as m15 from "./store/api.js";
-import * as m16 from "./store/connections.js";
-import * as m17 from "./store/entries.js";
-import * as m18 from "./store/execution.js";
-import * as m19 from "./store/expiry.js";
-import * as m20 from "./store/failsafe.js";
-import * as m21 from "./store/stats.js";
+import * as m12 from "./expiry-job.js";
+import * as m13 from "./maglev-hash.js";
+import * as m14 from "./record.js";
+import * as m15 from "./store.js";
+import * as m16 from "./store/api.js";
+import * as m17 from "./store/connections.js";
+import * as m18 from "./store/entries.js";
+import * as m19 from "./store/execution.js";
+import * as m20 from "./store/expiry.js";
+import * as m21 from "./store/failsafe.js";
+import * as m22 from "./store/stats.js";
 
 defineConstants([
   [() => m0.Configuration, "SolidCache::Configuration"],
@@ -32,17 +33,20 @@ defineConstants([
   [() => m6.Entry, "SolidCache::Entry"],
   [() => m7.Encryption, "SolidCache::Entry::Encryption"],
   [() => m8.Expiration, "SolidCache::Entry::Expiration"],
+  [() => m8.ClassMethods, "SolidCache::Entry::Expiration::ClassMethods"],
   [() => m9.Size, "SolidCache::Entry::Size"],
+  [() => m9.ClassMethods, "SolidCache::Entry::Size::ClassMethods"],
   [() => m10.Estimate, "SolidCache::Entry::Size::Estimate"],
   [() => m11.MovingAverageEstimate, "SolidCache::Entry::Size::MovingAverageEstimate"],
-  [() => m12.MaglevHash, "SolidCache::MaglevHash"],
-  [() => m13.Record, "SolidCache::Record"],
-  [() => m14.Store, "SolidCache::Store"],
-  [() => m15.Api, "SolidCache::Store::Api"],
-  [() => m16.Connections, "SolidCache::Store::Connections"],
-  [() => m17.Entries, "SolidCache::Store::Entries"],
-  [() => m18.Execution, "SolidCache::Store::Execution"],
-  [() => m19.Expiry, "SolidCache::Store::Expiry"],
-  [() => m20.Failsafe, "SolidCache::Store::Failsafe"],
-  [() => m21.Stats, "SolidCache::Store::Stats"],
+  [() => m12.ExpiryJob, "SolidCache::ExpiryJob"],
+  [() => m13.MaglevHash, "SolidCache::MaglevHash"],
+  [() => m14.Record, "SolidCache::Record"],
+  [() => m15.Store, "SolidCache::Store"],
+  [() => m16.Api, "SolidCache::Store::Api"],
+  [() => m17.Connections, "SolidCache::Store::Connections"],
+  [() => m18.Entries, "SolidCache::Store::Entries"],
+  [() => m19.Execution, "SolidCache::Store::Execution"],
+  [() => m20.Expiry, "SolidCache::Store::Expiry"],
+  [() => m21.Failsafe, "SolidCache::Store::Failsafe"],
+  [() => m22.Stats, "SolidCache::Store::Stats"],
 ]);

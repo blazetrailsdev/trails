@@ -4,7 +4,6 @@ import type { Entry } from "../entry.js";
 
 type MaxOptions = { maxAge: unknown; maxEntries: unknown; maxSize: unknown };
 
-/** @noRailsEquivalent CONVERGEABLE rails-api-manifest-records-app-jobs-and-concern-class-methods */
 export class ClassMethods {
   static async expire(
     this: typeof Entry,

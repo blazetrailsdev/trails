@@ -20,7 +20,6 @@ import {
   RuntimeError,
   StandardError,
   Zlib,
-  constSet,
   rbObjRespondTo,
   slice,
   isModuleIncluded,
@@ -48,6 +47,7 @@ const contextClasses = new WeakMap<object, new () => object>();
 const allCachedFixtures = new Map<ConnectionPool, Record<string, FixtureSet>>();
 
 export class FixtureSet {
+  declare static File: typeof File;
   static readonly MAX_ID = 2 ** 30 - 1;
 
   declare static allLoadedFixtures: Record<string, FixtureSet>;
@@ -447,9 +447,9 @@ export class Fixture {
 }
 
 ActiveRecord.Fixture = Fixture;
-constSet(ActiveRecord, "FixtureSet", FixtureSet);
-constSet(FixtureSet, "File", File);
+ActiveRecord.FixtureSet = FixtureSet;
+FixtureSet.File = File;
 
 runLoadHooks("active_record_fixture_set", FixtureSet);
 
-constSet(ActiveRecord, "FixtureClassNotFound", FixtureClassNotFound);
+ActiveRecord.FixtureClassNotFound = FixtureClassNotFound;

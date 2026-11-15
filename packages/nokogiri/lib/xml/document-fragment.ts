@@ -1,6 +1,5 @@
 import { XmlDocument as LibXmlDocument } from "libxml2-wasm";
 import { defaultTreeAdapter } from "parse5";
-import { constSet } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
@@ -62,4 +61,4 @@ export class DocumentFragment extends XmlNode {
   }
 }
 
-constSet(XML, "DocumentFragment", DocumentFragment);
+XML.DocumentFragment = DocumentFragment;

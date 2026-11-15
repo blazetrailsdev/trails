@@ -1,7 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
 import { any, assertValidKeys, isBlank, isPlainObject } from "@blazetrails/activesupport";
 
-import { Relation } from "../relation.js";
+import { ActiveRecord } from "../namespaces.js";
 import type { ValueMethod } from "../relation.js";
 import type { AssociationSpec } from "./query-methods.js";
 import { isEmpty, partition, union } from "@blazetrails/ruby-compat";
@@ -19,9 +19,9 @@ export class Merger {
   }
 
   static get NORMAL_VALUES(): readonly ValueMethod[] {
-    return Relation.VALUE_METHODS.filter(
+    return ActiveRecord.Relation.VALUE_METHODS.filter(
       (name) =>
-        !(Relation.CLAUSE_METHODS as readonly string[]).includes(name) &&
+        !(ActiveRecord.Relation.CLAUSE_METHODS as readonly string[]).includes(name) &&
         ![
           "select",
           "includes",
@@ -197,7 +197,7 @@ export class HashMerger {
   readonly hash: Record<string, unknown>;
 
   constructor(relation: any, hash: Record<string, unknown>) {
-    assertValidKeys(hash, Relation.VALUE_METHODS as string[]);
+    assertValidKeys(hash, ActiveRecord.Relation.VALUE_METHODS as string[]);
     this.relation = relation;
     this.hash = hash;
   }
@@ -207,7 +207,7 @@ export class HashMerger {
   }
 
   private other(): any {
-    const other: any = Relation.create(this.relation.model, {
+    const other: any = ActiveRecord.Relation.create(this.relation.model, {
       table: this.relation.table,
       predicateBuilder: this.relation.predicateBuilder,
     });

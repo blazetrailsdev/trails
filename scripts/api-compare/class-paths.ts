@@ -50,6 +50,7 @@ const SUBPATH_ENTRIES: Record<string, string | string[]> = {
   actionpack: ["system-testing.ts", "testing.ts"],
   activejob: "test-case.ts",
   activerecord: "fixtures.ts",
+  activesupport: "configuration-file.ts",
   activestorage: "transformers/image-processing-transformer.ts",
 };
 /** A subpath entry that must not load another subpath's table, so its table is named for it. */

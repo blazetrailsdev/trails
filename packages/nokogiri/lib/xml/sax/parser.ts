@@ -1,4 +1,3 @@
-import { constSet } from "@blazetrails/ruby-compat";
 import {
   XmlDocument as LibXmlDocument,
   XmlElement,
@@ -56,4 +55,4 @@ export class SaxParser {
   }
 }
 
-constSet(SAX, "Parser", SaxParser);
+SAX.Parser = SaxParser;

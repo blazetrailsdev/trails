@@ -37,7 +37,7 @@
     }
   },
   "actionmailbox": {
-    "rows": 27,
+    "rows": 29,
     "excluded": ["base-controller.ts::BaseController"],
     "unwalked": [
       "callbacks.ts::Callbacks",
@@ -54,7 +54,9 @@
       "action-mailbox/inbound-emails-controller.ts::InboundEmailsController": "Trails::Conductor::ActionMailbox::InboundEmailsController",
       "action-mailbox/inbound-emails/sources-controller.ts::SourcesController": "Trails::Conductor::ActionMailbox::InboundEmails::SourcesController",
       "action-mailbox/incinerates-controller.ts::IncineratesController": "Trails::Conductor::ActionMailbox::IncineratesController",
-      "action-mailbox/reroutes-controller.ts::ReroutesController": "Trails::Conductor::ActionMailbox::ReroutesController"
+      "action-mailbox/reroutes-controller.ts::ReroutesController": "Trails::Conductor::ActionMailbox::ReroutesController",
+      "callbacks.ts::ClassMethods": "ActionMailbox::Callbacks::ClassMethods",
+      "routing.ts::ClassMethods": "ActionMailbox::Routing::ClassMethods"
     }
   },
   "actionmailer": {
@@ -830,7 +832,7 @@
     }
   },
   "activestorage": {
-    "rows": 85,
+    "rows": 86,
     "excluded": [],
     "unwalked": [
       "attached/changes.ts::Changes",
@@ -847,6 +849,7 @@
       "streaming.ts::Streaming"
     ],
     "residue": {
+      "attached/model.ts::ClassMethods": "ActiveStorage::Attached::Model::ClassMethods",
       "reflection.ts::ActiveRecordExtensions": "ActiveStorage::Reflection::ActiveRecordExtensions",
       "reflection.ts::ClassMethods": "ActiveStorage::Reflection::ActiveRecordExtensions::ClassMethods",
       "reflection.ts::HasAttachedReflection": "ActiveStorage::Reflection::HasAttachedReflection",
@@ -858,7 +861,7 @@
     }
   },
   "activesupport": {
-    "rows": 187,
+    "rows": 189,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -1343,12 +1346,8 @@
     "residue": {}
   },
   "solid-cache": {
-    "rows": 22,
-    "excluded": [
-      "entry/expiration.ts::ClassMethods",
-      "entry/size.ts::ClassMethods",
-      "expiry-job.ts::ExpiryJob"
-    ],
+    "rows": 25,
+    "excluded": [],
     "unwalked": [
       "connections.ts::Connections",
       "store/api.ts::Api",
@@ -1359,22 +1358,17 @@
       "store/failsafe.ts::Failsafe",
       "store/stats.ts::Stats"
     ],
-    "residue": {}
+    "residue": {
+      "entry/expiration.ts::ClassMethods": "SolidCache::Entry::Expiration::ClassMethods",
+      "entry/size.ts::ClassMethods": "SolidCache::Entry::Size::ClassMethods"
+    }
   },
   "solid-queue": {
-    "rows": 61,
+    "rows": 69,
     "excluded": [
       "active-job/concurrency-controls.ts::ClassMethods",
       "active-job/concurrency-controls.ts::ConcurrencyControls",
-      "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter",
-      "execution/dispatching.ts::ClassMethods",
-      "execution/job-attributes.ts::ClassMethods",
-      "job/clearable.ts::ClassMethods",
-      "job/concurrency-controls.ts::ClassMethods",
-      "job/executable.ts::ClassMethods",
-      "job/schedulable.ts::ClassMethods",
-      "lifecycle-hooks.ts::ClassMethods",
-      "process/prunable.ts::ClassMethods"
+      "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter"
     ],
     "unwalked": [
       "app-executor.ts::AppExecutor",

@@ -446,6 +446,7 @@ export const Enum = {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
   detectNegativeEnumConditionsBang,
+  EnumType,
 };
 
 ActiveRecord.Enum = Enum;

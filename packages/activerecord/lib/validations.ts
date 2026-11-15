@@ -1,6 +1,5 @@
 import type { AttrNameArg } from "@blazetrails/activemodel";
 import { I18n, Model } from "@blazetrails/activemodel";
-import { constSet } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 
@@ -46,15 +45,24 @@ export class RecordInvalid extends ActiveRecordError {
 export const Validations = {
   validate,
   customValidationContext,
+} as {
+  validate: typeof validate;
+  customValidationContext: typeof customValidationContext;
+  AbsenceValidator: typeof AbsenceValidator;
+  AssociatedValidator: typeof AssociatedValidator;
+  LengthValidator: typeof LengthValidator;
+  NumericalityValidator: typeof NumericalityValidator;
+  PresenceValidator: typeof PresenceValidator;
+  UniquenessValidator: typeof UniquenessValidator;
 };
 
-constSet(ActiveRecord, "Validations", Validations);
-constSet(Validations, "AbsenceValidator", AbsenceValidator);
-constSet(Validations, "AssociatedValidator", AssociatedValidator);
-constSet(Validations, "LengthValidator", LengthValidator);
-constSet(Validations, "NumericalityValidator", NumericalityValidator);
-constSet(Validations, "PresenceValidator", PresenceValidator);
-constSet(Validations, "UniquenessValidator", UniquenessValidator);
+ActiveRecord.Validations = Validations;
+Validations.AbsenceValidator = AbsenceValidator;
+Validations.AssociatedValidator = AssociatedValidator;
+Validations.LengthValidator = LengthValidator;
+Validations.NumericalityValidator = NumericalityValidator;
+Validations.PresenceValidator = PresenceValidator;
+Validations.UniquenessValidator = UniquenessValidator;
 
 export interface Validations {
   validate(context?: ValidationContextArg): Promise<boolean>;

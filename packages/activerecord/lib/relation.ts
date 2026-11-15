@@ -13,7 +13,6 @@ import {
   Enumerable,
   isEmpty,
   rbDefineAllocFunc,
-  constSet,
   rbObjClone,
   toS,
   type Each,
@@ -327,6 +326,8 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<object> = {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base, G extends boolean = false> {
+  declare static WhereClause: typeof WhereClause;
+  declare static QueryAttribute: typeof QueryAttribute;
   static create = _delegationCreate;
 
   static readonly MULTI_VALUE_METHODS = [
@@ -1831,9 +1832,9 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 }
 
-constSet(ActiveRecord, "Relation", Relation);
-constSet(Relation, "WhereClause", WhereClause);
-constSet(Relation, "QueryAttribute", QueryAttribute);
+ActiveRecord.Relation = Relation;
+Relation.WhereClause = WhereClause;
+Relation.QueryAttribute = QueryAttribute;
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 export interface RelationScopes<T extends Base> {}
