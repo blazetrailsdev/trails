@@ -101,7 +101,10 @@ export class Driver {
     return compact({ ...this.options, options: this.browser!.options });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   private async registerSelenium(app: RackMiddleware | undefined): Promise<unknown> {
     if (this.options.browser !== "remote") await this.browser!.preload();
     this.browserOptions();
