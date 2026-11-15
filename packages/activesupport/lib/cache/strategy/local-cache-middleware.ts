@@ -1,16 +1,23 @@
-import { BodyProxy, InvalidParameterError } from "@blazetrails/rack";
+import {
+  BodyProxy,
+  InvalidParameterError,
+  type RackApp,
+  type RackEnv,
+  type RackMiddleware,
+  type RackResponse,
+} from "@blazetrails/rack";
 import { rbProcCall } from "@blazetrails/ruby-compat";
 import { LocalCacheRegistry, LocalStore } from "./local-cache.js";
 
-type Env = Record<string, unknown>;
-type Response = [number, Record<string, unknown>, unknown];
-type App = ((env: Env) => Response | Promise<Response>) | { call(env: Env): unknown };
-
 export class Middleware {
+  static toString(): string {
+    return "ActiveSupport::Cache::Strategy::LocalCache::Middleware";
+  }
+
   readonly name: string;
   readonly localCacheKey: string;
   /** @internal */
-  private app: App | null;
+  private app: RackApp | RackMiddleware | null;
 
   constructor(name: string, localCacheKey: string) {
     this.name = name;
@@ -18,16 +25,16 @@ export class Middleware {
     this.app = null;
   }
 
-  new(app: App): this {
+  new(app: RackApp | RackMiddleware): this {
     this.app = app;
     return this;
   }
 
-  async call(env: Env): Promise<Response> {
+  async call(env: RackEnv): Promise<RackResponse> {
     let cleanupOnBodyClose = false;
     try {
       LocalCacheRegistry.setCacheFor(this.localCacheKey, new LocalStore());
-      const response = (await rbProcCall(this.app, env)) as Response;
+      const response = (await rbProcCall(this.app, env)) as RackResponse;
       response[2] = new BodyProxy(response[2], () => {
         LocalCacheRegistry.setCacheFor(this.localCacheKey, null);
       });
