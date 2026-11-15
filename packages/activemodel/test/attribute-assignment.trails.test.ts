@@ -380,3 +380,29 @@ describe("AttributeAssignmentTest", () => {
     });
   });
 });
+
+describe("AttributeAssignment async writers", () => {
+  class Recorder extends Model {
+    order: string[] = [];
+    override _assignAttribute(k: string, v: unknown): unknown {
+      return Promise.resolve().then(() => {
+        if (v === "boom") throw new Error(`cannot assign ${k}`);
+        this.order.push(k);
+      });
+    }
+  }
+
+  it("awaits each async writer in order", async () => {
+    const record = new Recorder();
+    await record.setAttributes({ a: 1, b: 2, c: 3 });
+    expect(record.order).toEqual(["a", "b", "c"]);
+  });
+
+  it("rejects to the caller when an async writer rejects", async () => {
+    const record = new Recorder();
+    await expect(record.setAttributes({ a: 1, b: "boom", c: 3 })).rejects.toThrow(
+      "cannot assign b",
+    );
+    expect(record.order).toEqual(["a"]);
+  });
+});

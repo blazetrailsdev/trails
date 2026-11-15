@@ -8,6 +8,7 @@ import {
   type SerializeOptions,
 } from "../serialization.js";
 import { ModelName, Naming } from "../naming.js";
+import { assertAssignedSynchronously } from "../attribute-assignment.js";
 import {
   ActiveSupportJSON,
   include,
@@ -63,7 +64,7 @@ export class JSON {
     if (includeRoot !== false && includeRoot != null) {
       hash = Object.values(hash as object)[0] ?? null;
     }
-    void this.setAttributes(hash);
+    assertAssignedSynchronously(this.setAttributes(hash), "fromJson");
     return this;
   }
 

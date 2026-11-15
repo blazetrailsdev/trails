@@ -378,7 +378,7 @@ export function initializeDup<TBase extends object>(
 
 export function freeze<T extends Validations>(this: T): T {
   void this.errors;
-  void this.contextForValidation();
+  this.contextForValidation();
 
   return rbCallSuper(this, freeze) as T;
 }
