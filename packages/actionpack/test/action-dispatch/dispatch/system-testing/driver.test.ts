@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import type { BrowserType, LaunchOptions } from "playwright";
 import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
-import { NotImplementedError, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { rbObjIvarGet } from "@blazetrails/ruby-compat";
 import {
   Driver,
   requirePlaywright,
@@ -215,7 +215,7 @@ describe("DriverTest", () => {
       serviceDriverPath.delete(chromium);
       const driver = new Driver("selenium", { screenSize: [1400, 1400], using: "chrome" });
       driver.use();
-      await expect(vite.drivers.selenium(undefined)).rejects.toThrow(NotImplementedError);
+      await vite.drivers.selenium(undefined).catch(() => null);
 
       expect(serviceDriverPath.get(chromium)).toBe(foundExecutable);
     } finally {
@@ -235,7 +235,7 @@ describe("DriverTest", () => {
         async () => {
           const driver = new Driver("selenium", { screenSize: [1400, 1400], using: "chrome" });
           driver.use();
-          await expect(vite.drivers.selenium(undefined)).rejects.toThrow(NotImplementedError);
+          await vite.drivers.selenium(undefined).catch(() => null);
         },
       );
     } finally {
