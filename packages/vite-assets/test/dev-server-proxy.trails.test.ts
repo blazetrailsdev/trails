@@ -20,8 +20,12 @@ describe("DevServerProxy streaming default", () => {
     expect(streaming(new DevServerProxy(null))).toBe(true);
   });
 
-  it("constructs on a ViteAssets whose config is not yet resolved", () => {
-    const viteRuby = new ViteAssets();
-    expect(streaming(new DevServerProxy(null, { viteRuby }))).toBe(true);
+  it("applies the test-mode default on a ViteAssets whose config is not yet resolved", () => {
+    expect(
+      streaming(new DevServerProxy(null, { viteRuby: new ViteAssets({ mode: "test" }) })),
+    ).toBe(false);
+    expect(
+      streaming(new DevServerProxy(null, { viteRuby: new ViteAssets({ mode: "development" }) })),
+    ).toBe(true);
   });
 });

@@ -215,8 +215,10 @@ export class ViteAssets {
    * @internal
    * @noRailsEquivalent CONVERGEABLE vite-assets-config-resolves-synchronously
    */
-  peekConfig(): Config | undefined {
-    return this._config;
+  peekConfig(): Pick<Config, "mode"> {
+    return (
+      this._config ?? { mode: String({ ...Config.configDefaults(), ...this._configOptions }.mode) }
+    );
   }
 
   async configure(options: ConfigAttrs = {}): Promise<Config> {
