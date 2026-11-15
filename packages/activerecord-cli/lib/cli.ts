@@ -296,10 +296,13 @@ Remaining args: __ARGV__. Pass --env <name> to override TRAILS_ENV for this invo
     return false;
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  static perform(command: string | null, args: string[], config: BaseConfig): Promise<unknown> {
-    if (HELP_MAPPINGS.includes(args[0])) {
-      [command, args] = ["help", [command as string]];
+  static perform(
+    command: string | null,
+    args: (string | null)[],
+    config: BaseConfig,
+  ): Promise<unknown> {
+    if (HELP_MAPPINGS.includes(args[0] as string)) {
+      [command, args] = ["help", [command]];
     }
 
     return (this as unknown as ThorClass).dispatch(command, [...args], null, config);
@@ -319,10 +322,9 @@ Remaining args: __ARGV__. Pass --env <name> to override TRAILS_ENV for this invo
   async new(appName: string): Promise<number> {
     const driver = parseDriver((this.options.driver as string | null) ?? undefined);
     if (driver === null) {
-      console.error(
+      throw new ThorError(
         `ar: unknown driver "${String(this.options.driver)}". Valid options: better-sqlite3, node-sqlite, pg, mysql2.`,
       );
-      return 1;
     }
     const result = await arNew(this.destinationRoot, appName, driver, {
       force: this.options.force === true,
@@ -342,10 +344,9 @@ Remaining args: __ARGV__. Pass --env <name> to override TRAILS_ENV for this invo
     const cwd = this.destinationRoot;
     const driver = parseDriver((this.options.driver as string | null) ?? undefined);
     if (driver === null) {
-      console.error(
+      throw new ThorError(
         `ar: unknown driver "${String(this.options.driver)}". Valid options: better-sqlite3, node-sqlite, pg, mysql2.`,
       );
-      return 1;
     }
     const { created, skipped, packageJsonUpdated, tsconfigMerged } = await init(cwd, {
       force: this.options.force === true,
