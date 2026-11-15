@@ -309,6 +309,8 @@ export {
   classModule,
   methodCacheSerial,
   rbClearMethodCache,
+  displacedIncludedMembers,
+  shadowsIncluded,
 } from "./include.js";
 export type { Extended, Included, ModuleVisibility } from "./include.js";
 export { JSON } from "./json.js";

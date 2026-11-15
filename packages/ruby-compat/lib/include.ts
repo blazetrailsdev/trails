@@ -1610,6 +1610,8 @@ export function rbModAppendFeatures(
         if (existingIsMixin) installed.add(key);
       } else if (existingIsMixin) {
         descriptors[key] = modDesc;
+      } else {
+        recordDisplaced(klass, key, mod);
       }
     }
   } else {
@@ -1651,6 +1653,7 @@ export function rbModAppendFeatures(
           continue;
         }
         if (Object.hasOwn(klass.prototype, key) && !installed.has(key)) {
+          recordDisplaced(klass, key, mod);
           continue;
         }
         installed.add(key);
@@ -1665,6 +1668,27 @@ export function rbModAppendFeatures(
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
+}
+
+/** @noRailsEquivalent PERMANENT */
+export const shadowsIncluded = Symbol.for("@blazetrails/ruby-compat:shadowsIncluded");
+
+const displaced = new WeakMap<object, Map<string, object>>();
+
+function recordDisplaced(klass: AnyClass, key: string | symbol, mod: object): void {
+  if (typeof key !== "string") return;
+  const optOut = Object.hasOwn(klass, shadowsIncluded)
+    ? (klass as unknown as Record<symbol, readonly string[]>)[shadowsIncluded]
+    : undefined;
+  if (optOut?.includes(key)) return;
+  let names = displaced.get(klass.prototype);
+  if (!names) displaced.set(klass.prototype, (names = new Map()));
+  if (!names.has(key)) names.set(key, mod);
+}
+
+/** @noRailsEquivalent PERMANENT */
+export function displacedIncludedMembers(klass: AnyClass): Map<string, object> {
+  return new Map(displaced.get(klass.prototype));
 }
 
 const prependedMethods = new WeakMap<object, Set<unknown>>();

@@ -20,6 +20,8 @@ import {
 } from "../lib/object.js";
 import {
   include,
+  displacedIncludedMembers,
+  shadowsIncluded,
   rbCallSuper,
   rbObjIsKindOf,
   constDefined,
@@ -2527,5 +2529,31 @@ describe("rbObjIsKindOf with a defineModule module", () => {
   it("answers Module for a defineModule object and not for a bare object", () => {
     expect(rbObjIsKindOf(defineModule({}), Module)).toBe(true);
     expect(rbObjIsKindOf({}, Module)).toBe(false);
+  });
+});
+
+describe("displacedIncludedMembers", () => {
+  it("records a class-body member that keeps a module member from being installed", () => {
+    const mod = { greet: () => "module", other: () => "other" };
+    class Host {
+      greet() {
+        return "class";
+      }
+    }
+    include(Host, mod);
+    expect(new Host().greet()).toBe("class");
+    expect([...displacedIncludedMembers(Host)]).toEqual([["greet", mod]]);
+  });
+
+  it("skips a name the class lists under shadowsIncluded", () => {
+    const mod = { greet: () => "module" };
+    class Host {
+      static readonly [shadowsIncluded] = ["greet"];
+      greet() {
+        return "class";
+      }
+    }
+    include(Host, mod);
+    expect(displacedIncludedMembers(Host).size).toBe(0);
   });
 });
