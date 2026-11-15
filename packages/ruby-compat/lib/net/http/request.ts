@@ -16,6 +16,7 @@ import { SecureRandom } from "../../secure-random.js";
 import { Tempfile } from "../../tempfile.js";
 import { File } from "../../file.js";
 import { encode } from "../../string/encode.js";
+import { rbObjRespondTo } from "../../object.js";
 
 /** @internal @noRailsEquivalent PERMANENT — `HTTPGenericRequest::Chunker` (`vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:242-257`). */
 class Chunker {
@@ -498,11 +499,14 @@ export class HTTPRequest {
     const chunkedP = this.isChunked();
 
     const buf: (string | Uint8Array)[] = [];
-    for (const [rawKey, value, h = {}] of Array.isArray(params) ? params : Object.entries(params)) {
+    for (const [rawKey, rawValue, h = {}] of Array.isArray(params)
+      ? params
+      : Object.entries(params)) {
       const key = this.quoteString(rawKey, charset);
+      const value = rawValue as FormIO;
       let filename = Object.hasOwn(h, "filename")
         ? h.filename
-        : _isRespondTo(value, "toPath")
+        : rbObjRespondTo(value, "toPath")
           ? File.basename(value.toPath())
           : null;
 
@@ -514,9 +518,9 @@ export class HTTPRequest {
           `Content-Disposition: form-data; name="${key}"; filename="${filename}"\r\n` +
             `Content-Type: ${type}\r\n\r\n`,
         );
-        if (!_isRespondTo(out, "write") || !_isRespondTo(value, "read")) {
-          buf.push(_formValue(_isRespondTo(value, "read") ? await value.read() : value));
-        } else if (_isRespondTo(value, "size") && chunkedP) {
+        if (!rbObjRespondTo(out, "write") || !rbObjRespondTo(value, "read")) {
+          buf.push(_formValue(rbObjRespondTo(value, "read") ? await value.read() : value));
+        } else if (rbObjRespondTo(value, "size") && chunkedP) {
           await this.flushBuffer(out, buf, chunkedP);
           if (chunkedP) await out.write(`${value.size().toString(16)}\r\n`);
           await IO.copyStreamAsync(value, out as { write(data: Uint8Array): unknown });
@@ -533,7 +537,7 @@ export class HTTPRequest {
         }
       } else {
         buf.push(`Content-Disposition: form-data; name="${key}"\r\n\r\n`);
-        buf.push(_formValue(_isRespondTo(value, "read") ? await value.read() : value));
+        buf.push(_formValue(rbObjRespondTo(value, "read") ? await value.read() : value));
       }
       buf.push("\r\n");
     }
@@ -620,10 +624,6 @@ type FormIO = {
   size(): number;
   write(str: string | Uint8Array): unknown;
 };
-
-function _isRespondTo(obj: unknown, name: keyof FormIO): obj is FormIO {
-  return obj != null && typeof (obj as Record<string, unknown>)[name] === "function";
-}
 
 function _formValue(value: unknown): string | Uint8Array {
   return value instanceof Uint8Array ? value : String(value);

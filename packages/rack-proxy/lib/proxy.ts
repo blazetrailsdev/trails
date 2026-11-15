@@ -19,7 +19,9 @@ import {
   rbObjIvarSet,
   rbObjRespondTo,
   SocketError,
+  StandardError,
   stringSplit,
+  rbFArray,
   Timeout,
   URI,
   HTTP as URIHTTP,
@@ -37,7 +39,7 @@ type RackInput = {
 type Backend = { host: string | null; port: number | string | null; scheme: string | null };
 
 /** @internal */
-export class InvalidRequest extends Error {}
+export class InvalidRequest extends StandardError {}
 InvalidRequest.prototype.name = "Rack::Proxy::InvalidRequest";
 
 /** @internal */
@@ -74,7 +76,10 @@ export class RequestBodyStream {
     return data;
   }
 
-  /** @internal */
+  /**
+   * @missingRailsCall replace — PERMANENT
+   * @internal
+   */
   private async readRemaining(buffer: Uint8Array | null): Promise<Uint8Array> {
     const data: Uint8Array[] = [];
     let chunk: Uint8Array | null;
@@ -505,13 +510,13 @@ export class Proxy {
     if (transferEncoding != null) {
       if (
         contentLength != null ||
-        _array(transferEncoding).join(",").trim().toLowerCase() !== "chunked"
+        (rbFArray(transferEncoding) as string[]).join(",").trim().toLowerCase() !== "chunked"
       ) {
         throw new Net.HTTPBadResponse("ambiguous or unsupported backend transfer encoding");
       }
     }
     if (contentLength != null) {
-      const lengths = _array(contentLength).flatMap((value) =>
+      const lengths = (rbFArray(contentLength) as string[]).flatMap((value) =>
         value.split(",").map((v) => v.trim()),
       );
       if (
@@ -528,7 +533,7 @@ export class Proxy {
       }
     }
 
-    const connectionNamed = _array(headers.get("Connection"))
+    const connectionNamed = (rbFArray(headers.get("Connection")) as string[])
       .join(",")
       .toLowerCase()
       .split(",")
@@ -587,10 +592,6 @@ export class Proxy {
     }
     return conn;
   }
-}
-
-function _array(value: unknown): string[] {
-  return value == null ? [] : Array.isArray(value) ? value : [value as string];
 }
 
 function _concat(chunks: Uint8Array[], bytesize: number): Uint8Array {
