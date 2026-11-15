@@ -379,8 +379,7 @@ export class IPSocket extends BasicSocket {
     try {
       return await adapter.getaddress(host);
     } catch (e) {
-      const code = (e as { code?: unknown }).code;
-      if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_NONAME") {
+      if (typeof (e as { code?: unknown }).code === "string") {
         throw new ResolutionError("getaddrinfo: Name or service not known");
       }
       throw e;

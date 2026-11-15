@@ -245,7 +245,7 @@ export class HTTP {
         pPort = null;
       }
       this.setProxyAddress(pAddr);
-      this.setProxyPort(pPort || HTTP.defaultPort());
+      this.setProxyPort(pPort || klass.defaultPort());
       this.setProxyUser(pUser);
       this.setProxyPass(pPass);
     }
