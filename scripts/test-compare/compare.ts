@@ -1034,8 +1034,6 @@ export function main(
 
       // Flag a divergence between Rails' gate and our TS gate for a matched
       // pair (advisory — does not affect the matched/skipped counts).
-      // A bump-ledgered test (RFC 0191 § 3) is matched as usual, but a
-      // mismatch on it is held for the ledger rather than counted.
       const suspended = (rubyTc: (typeof file.testCases)[number]): boolean => {
         const key = testLedgerKey(pkg, file.file, rubyTc.path);
         if (!ledgerKeys.has(key)) return false;
@@ -1846,5 +1844,10 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
 }
 
 if (require.main === module) {
-  void loadTestLedger().then((ledger) => main(process.argv.slice(2), OUTPUT_DIR, ledger));
+  loadTestLedger()
+    .then((ledger) => main(process.argv.slice(2), OUTPUT_DIR, ledger))
+    .catch((err: unknown) => {
+      console.error(err);
+      process.exit(1);
+    });
 }

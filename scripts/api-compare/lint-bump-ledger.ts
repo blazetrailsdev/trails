@@ -136,8 +136,6 @@ async function main(baseBranch: string): Promise<number> {
     const hashes = artifact.hashes.filter((h) => names.has(h.package));
     const current = new Map(hashes.map((h) => [keyOf(h), h.digest]));
     const seed = liveRows(pairSeed(basePins, hashes, from, to), pins, current);
-    // A `signature` row is seeded from the param/block artifacts, not the pins;
-    // lint-param-names.ts judges it.
     const bodyRows = (ledgers.get(s.name) ?? []).filter((r) => r.kind !== "signature");
     problems.push(...seedDiff(bodyRows, carrySeed(seed, base)));
   }
