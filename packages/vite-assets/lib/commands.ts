@@ -54,8 +54,9 @@ export class Commands {
    * @inventedArm chmodAsync — PERMANENT
    */
   async installBinstubs(): Promise<void> {
-    const binstub = (await this.config()).root.join("bin/vite").toString();
-    await FileUtils.mkdirPAsync(File.dirname(binstub));
+    const bin = (await this.config()).root.join("bin");
+    const binstub = bin.join("vite").toString();
+    await FileUtils.mkdirPAsync(bin.toString());
     await FileUtils.cpAsync(
       decodeURIComponent(new URL("../templates/bin/vite", import.meta.url).pathname),
       binstub,

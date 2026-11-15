@@ -4,6 +4,7 @@ type Path = Pathname | string;
 type Finder = (content: string[], path: Path, target: string) => number;
 
 export const FileUtils = {
+  /** @missingRailsArgs join — PERMANENT */
   async write(path: Path, ...content: (string | string[])[]): Promise<void> {
     await FileUtils.mkdirP(path);
     await File.writeAsync(path.toString(), content.flat().join(""));
@@ -55,7 +56,7 @@ export const FileUtils = {
 
   /** @internal */
   async mkdirP(path: Path): Promise<void> {
-    await RbFileUtils.mkpathAsync(File.dirname(new Pathname(path).toString()));
+    await new Pathname(path).dirname().mkpath();
   },
 
   /** @internal */
