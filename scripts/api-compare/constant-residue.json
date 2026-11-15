@@ -1623,13 +1623,14 @@
     }
   },
   "vite-assets": {
-    "rows": 11,
+    "rows": 12,
     "excluded": ["vite-assets.ts::ViteAssets"],
     "unwalked": [],
     "residue": {
       "build.ts::Build": "ViteAssets::Build",
       "builder.ts::Builder": "ViteAssets::Builder",
       "commands.ts::Commands": "ViteAssets::Commands",
+      "compatibility-check.ts::CompatibilityCheck": "ViteAssets::CompatibilityCheck",
       "config.ts::Config": "ViteAssets::Config",
       "dev-server-proxy.ts::DevServerProxy": "ViteAssets::DevServerProxy",
       "error.ts::Error": "ViteAssets::Error",

@@ -14,6 +14,7 @@ import {
 import { Build } from "./build.js";
 import { Builder } from "./builder.js";
 import { Commands } from "./commands.js";
+import { CompatibilityCheck } from "./compatibility-check.js";
 import { Config, type ConfigOptions } from "./config.js";
 import { DevServerProxy } from "./dev-server-proxy.js";
 import { Error } from "./error.js";
@@ -31,6 +32,7 @@ export class ViteAssets {
   declare static CLI: typeof import("./cli.js").CLI;
   declare static Builder: typeof Builder;
   declare static Commands: typeof Commands;
+  declare static CompatibilityCheck: typeof CompatibilityCheck;
   declare static Config: typeof Config;
   declare static DevServerProxy: typeof DevServerProxy;
   declare static Error: typeof Error;
@@ -291,6 +293,7 @@ ViteAssets.prototype.isRunProxy = ViteAssets.prototype.isDevMode;
 ViteAssets.Build = Build;
 ViteAssets.Builder = Builder;
 ViteAssets.Commands = Commands;
+ViteAssets.CompatibilityCheck = CompatibilityCheck;
 ViteAssets.Config = Config;
 ViteAssets.DevServerProxy = DevServerProxy;
 ViteAssets.Error = Error;
