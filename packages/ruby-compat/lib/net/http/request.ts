@@ -8,7 +8,7 @@ import { rbObjDup } from "../../include.js";
 import { Base64 } from "../../base64.js";
 import { warn } from "../../kernel-warn.js";
 import { verbose } from "../../verbose.js";
-import { Net } from "../protocol.js";
+import { Net, type BufferedIO } from "../protocol.js";
 
 /**
  * `Net::HTTPRequest` (`vendor/ruby/v3.3.11/lib/net/http/request.rb:40`), with the
@@ -282,5 +282,79 @@ export class HTTPRequest {
     } else {
       this.uri = new klass(scheme, uri.userinfo, host, port, null, uri.path, null, uri.query, null);
     }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#delete` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:453-455`). */
+  delete(key: string): string[] | null {
+    const v = this._header[key.toLowerCase()];
+    delete this._header[key.toLowerCase()];
+    return v != null ? [v] : null;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#each_capitalized` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:484-489`). */
+  eachCapitalized(block: (key: string, value: string) => void): void {
+    for (const [k, v] of Object.entries(this._header)) block(this.capitalize(k), v);
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `HTTPHeader#capitalize` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:493-495`). */
+  private capitalize(name: string): string {
+    return name
+      .split("-")
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+      .join("-");
+  }
+
+  /**
+   * @missingRailsCall send_request_with_body_stream — CONVERGEABLE net-http-send-request-with-body-stream
+   * @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:198-208`.
+   */
+  async exec(sock: BufferedIO, ver: string, path: string): Promise<void> {
+    if (this.body != null) {
+      await this.sendRequestWithBody(sock, ver, path, this.body);
+    } else {
+      await this.writeHeader(sock, ver, path);
+    }
+  }
+
+  /**
+   * @missingRailsCall wait_for_continue — CONVERGEABLE net-http-edit-path-and-wait-for-continue
+   * @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:259-266`.
+   */
+  private async sendRequestWithBody(
+    sock: BufferedIO,
+    ver: string,
+    path: string,
+    body: string | Uint8Array,
+  ): Promise<void> {
+    this.contentLength =
+      typeof body === "string" ? new TextEncoder().encode(body).length : body.length;
+    this.delete("Transfer-Encoding");
+    this.supplyDefaultContentType();
+    await this.writeHeader(sock, ver, path);
+    await sock.write(body);
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:385-390`. */
+  private supplyDefaultContentType(): void {
+    if (this.contentType != null) return;
+    if (verbose() === true) {
+      warn("net/http: Content-Type did not set; using application/x-www-form-urlencoded", {
+        uplevel: 1,
+      });
+    }
+    this.setContentType("application/x-www-form-urlencoded");
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:399-411`. */
+  private async writeHeader(sock: BufferedIO, ver: string, path: string): Promise<void> {
+    const reqline = `${this.method} ${path} HTTP/${ver}`;
+    if (/[\r\n]/.test(reqline)) {
+      throw new ArgumentError("A Request-Line must not contain CR or LF");
+    }
+    let buf = "";
+    buf += reqline + "\r\n";
+    this.eachCapitalized((k, v) => (buf += `${k}: ${v}\r\n`));
+    buf += "\r\n";
+    await sock.write(buf);
   }
 }

@@ -216,7 +216,7 @@ describe("Net::HTTP", () => {
     client.readTimeout = 0.1;
     const error = await client.post("/", "").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(Net.ReadTimeout);
-    expect((error as Error).message).toBe("Net::ReadTimeout");
+    expect((error as Error).message).toBe("Net::ReadTimeout with #<TCPSocket>");
   });
   it("retries an idempotent GET once on a dropped connection and not a POST", async () => {
     let connections = 0;
@@ -249,7 +249,6 @@ describe("Net::HTTP", () => {
 
 describe("Net::HTTP surface rack-proxy reaches", () => {
   it("resolves every request class by Net::HTTP const name", () => {
-    // vendor/ruby/v3.3.11/lib/net/http/requests.rb:31-259
     const H = Net.HTTP as unknown as Record<string, { METHOD: string }>;
     for (const m of ["Get", "Head", "Post", "Put", "Delete", "Options", "Trace", "Patch"]) {
       expect(H[m].METHOD).toBe(m.toUpperCase());
@@ -257,7 +256,6 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
   });
 
   it("initialize_http_header downcases keys, strips values and rejects CR/LF", () => {
-    // vendor/ruby/v3.3.11/lib/net/http/header.rb:185-205
     const req = new Net.HTTP.Get("/", { "X-Foo": " bar ", "X-Nil": null });
     expect(req.get("x-foo")).toBe("bar");
     expect(req.get("x-nil")).toBeNull();
@@ -268,7 +266,6 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
   });
 
   it("basic_auth, content_length= and content_type= write their headers", () => {
-    // vendor/ruby/v3.3.11/lib/net/http/header.rb:637-643, :772-776, :945-962
     const req = new Net.HTTP.Post("/");
     req.basicAuth("my_account", "my_password");
     expect(req.get("Authorization")).toBe("Basic bXlfYWNjb3VudDpteV9wYXNzd29yZA==");
@@ -287,7 +284,6 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
   });
 
   it("request_body_permitted?, response_body_permitted? and body_stream=", () => {
-    // vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:120-131, :179-190
     expect(new Net.HTTP.Post("/").isRequestBodyPermitted()).toBe(true);
     expect(new Net.HTTP.Get("/").isRequestBodyPermitted()).toBe(false);
     expect(new Net.HTTP.Head("/").isResponseBodyPermitted()).toBe(false);
@@ -303,7 +299,6 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
   });
 
   it("HTTP's SSL and timeout accessors and set_debug_output", () => {
-    // vendor/ruby/v3.3.11/lib/net/http.rb:1188-1191, :1296, :1367-1370, :1479-1516
     const http = new Net.HTTP("example.com", 443);
     expect(http.writeTimeout).toBe(60);
     http.openTimeout = 5;
@@ -326,7 +321,6 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
   });
 
   it("read_body yields the body to a block and to_hash answers the header lists", async () => {
-    // vendor/ruby/v3.3.11/lib/net/http/response.rb:355-383, :646-654; header.rb:477-479
     const port = await listen(
       createServer((_req, res) => {
         res.writeHead(200, { "X-A": "1" });
@@ -352,15 +346,12 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
   });
 
   it("content_length= reads a String the way String#to_i does", () => {
-    // vendor/ruby/v3.3.11/lib/net/http/header.rb:642
     const req = new Net.HTTP.Get("/");
     req.contentLength = "1_000";
     expect(req.get("content-length")).toBe("1000");
   });
 
   it("set_debug_output receives the connection and wire traffic", async () => {
-    // vendor/ruby/v3.3.11/lib/net/http.rb:1600, :1610, :2408-2416, :2472-2476;
-    // vendor/ruby/v3.3.11/lib/net/protocol.rb:275, :301-312
     const port = await listen(
       createServer((_req, res) => {
         res.writeHead(200, { "Content-Length": "2" });
@@ -380,7 +371,6 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
   });
 
   it("write_timeout= reaches the open socket and raises Net::WriteTimeout", async () => {
-    // vendor/ruby/v3.3.11/lib/net/http.rb:1367-1370, :1681-1684; lib/net/protocol.rb:335
     const server = createNetServer((s) => s.pause());
     const port = await listen(server);
     const http = new Net.HTTP("127.0.0.1", port);
@@ -419,5 +409,91 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
       );
     });
     expect(chunks).toEqual(["first", "second"]);
+  });
+});
+
+describe("Net::HTTP over Net::BufferedIO", () => {
+  it("opens TCP before SSL and closes the socket on a failed handshake", async () => {
+    let closed = false;
+    const port = await listen(
+      createNetServer((s) => {
+        s.on("close", () => (closed = true));
+        s.once("data", () => s.write("HTTP/1.1 400 Bad Request\r\n\r\n"));
+      }),
+    );
+    let out = "";
+    const client = new Net.HTTP("127.0.0.1", port);
+    client.useSsl = true;
+    client.setDebugOutput({ write: (s: string) => (out += s) });
+    const error = await client.post("/", "").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(OpenSSL.SSL.SSLError);
+    expect(out).toBe(
+      `opening connection to 127.0.0.1:${port}...\nopened\n` +
+        `starting SSL for 127.0.0.1:${port}...\n` +
+        `Conn close because of connect error ${(error as Error).message}\n`,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(closed).toBe(true);
+  });
+
+  it("debug_output shows the bytes the server received and sent", async () => {
+    const sent = "HTTP/1.1 200 OK\r\nContent-Length: 2\r\nX-A: 1\r\n\r\nok";
+    let received = "";
+    const port = await listen(
+      createNetServer((s) => {
+        s.on("data", (c) => {
+          received += c.toString("latin1");
+          if (received.endsWith("body")) s.end(sent);
+        });
+      }),
+    );
+    let out = "";
+    const http = new Net.HTTP("127.0.0.1", port);
+    http.setDebugOutput({ write: (s: string) => (out += s) });
+    const res = await http.post("/p", "body", { "Content-Type": "text/plain" });
+    expect(res.code).toBe("200");
+    const writes = [...out.matchAll(/^<- (.*)$/gm)].map((m) => JSON.parse(m[1]) as string);
+    expect(writes.join("")).toBe(received);
+    const reads = [...out.matchAll(/^-> (.*)$/gm)].map((m) => JSON.parse(m[1]) as string);
+    expect(reads.join("")).toBe(sent);
+    expect(reads.slice(0, 3)).toEqual([
+      "HTTP/1.1 200 OK\r\n",
+      "Content-Length: 2\r\n",
+      "X-A: 1\r\n",
+    ]);
+  });
+
+  it("reads a chunked response body", async () => {
+    const port = await listen(
+      createNetServer((s) =>
+        s.once("data", () =>
+          s.end(
+            "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n2\r\nok\r\n1\r\n!\r\n0\r\n\r\n",
+          ),
+        ),
+      ),
+    );
+    const res = await new Net.HTTP("127.0.0.1", port).get("/");
+    expect(new TextDecoder().decode(res.body as Uint8Array)).toBe("ok!");
+  });
+
+  it("reads a header line split across socket reads", async () => {
+    const port = await listen(
+      createNetServer((s) =>
+        s.once("data", () => {
+          s.write("HTTP/1.1 200 OK\r\nX-A: 1");
+          setTimeout(() => s.end("\r\nContent-Length: 2\r\n\r\nok"), 20);
+        }),
+      ),
+    );
+    const res = await new Net.HTTP("127.0.0.1", port).get("/");
+    expect([res.get("x-a"), new TextDecoder().decode(res.body as Uint8Array)]).toEqual(["1", "ok"]);
+  });
+
+  it("raises Net::HTTPBadResponse for a wrong status line", async () => {
+    const port = await listen(createNetServer((s) => s.once("data", () => s.end("nope\r\n\r\n"))));
+    const http = new Net.HTTP("127.0.0.1", port);
+    http.maxRetries = 0;
+    await expect(http.get("/")).rejects.toThrow(Net.HTTPBadResponse);
   });
 });

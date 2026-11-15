@@ -227,15 +227,7 @@ export class ViteAssets {
       const config = await this.config();
       const http = await getHttpAsync();
       const connection = await Timeout.timeout(config.devServerConnectTimeout, null, null, () =>
-        http.connect!({
-          host: config.host,
-          port: config.port,
-          useSsl: false,
-          sslHostAddress: null,
-          verifyPeer: false,
-          writeTimeout: null,
-          debugOutput: null,
-        }),
+        http.connect!({ host: config.host, port: config.port }),
       );
       connection.close();
       return (this._running = true);

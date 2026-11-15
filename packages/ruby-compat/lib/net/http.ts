@@ -3,7 +3,7 @@ import { StandardError } from "../standard-error.js";
 import { ArgumentError } from "../argument-error.js";
 import { EOFError } from "../eof-error.js";
 import { Errno } from "../errno.js";
-import { getHttpAsync, type HttpClientConnection, type HttpDebugOutput } from "../http-adapter.js";
+import { getHttpAsync, type HttpClientSocket, type HttpDebugOutput } from "../http-adapter.js";
 import { IOError } from "../io-error.js";
 import { NotImplementedError } from "../not-implemented-error.js";
 import { OpenSSL } from "../openssl.js";
@@ -11,7 +11,7 @@ import { Resolv } from "../resolv.js";
 import { Socket } from "../socket.js";
 import { Timeout } from "../timeout.js";
 import type { HTTP as URIHTTP } from "../uri/http.js";
-import { Net, OpenTimeout, ReadTimeout, WriteTimeout } from "./protocol.js";
+import { BufferedIO, Net, OpenTimeout, ReadTimeout } from "./protocol.js";
 import type { HTTPRequest } from "./http/request.js";
 import {
   Get,
@@ -32,6 +32,10 @@ import {
 } from "./http/requests.js";
 import { HTTPResponse } from "./http/response.js";
 import { HTTPInformation } from "./http/responses.js";
+
+/** @noRailsEquivalent PERMANENT — `Net::HTTPBadResponse` (`vendor/ruby/v3.3.11/lib/net/http.rb:31`). */
+export class HTTPBadResponse extends StandardError {}
+HTTPBadResponse.prototype.name = "Net::HTTPBadResponse";
 
 /**
  * `Net::HTTPHeaderSyntaxError` (`vendor/ruby/v3.3.11/lib/net/http.rb:32`).
@@ -140,7 +144,7 @@ export class HTTP {
   ignoreEof = true;
   private _useSsl = false;
   private _started = false;
-  private _socket: HttpClientConnection | null = null;
+  private _socket: BufferedIO | null = null;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(address: string, port: number | null = null) {
@@ -155,6 +159,7 @@ export class HTTP {
 
   /** @noRailsEquivalent PERMANENT */
   set readTimeout(sec: number | null) {
+    if (this._socket) this._socket.readTimeout = sec;
     this._readTimeout = sec;
   }
 
@@ -240,36 +245,64 @@ export class HTTP {
       sslHostAddress = connAddr;
     }
 
-    this.debug(`opening connection to ${connAddr}:${connPort}...`);
-    const adapter = await getHttpAsync();
-    if (adapter.connect === undefined) {
-      throw new NotImplementedError("the HTTP adapter has no client connect");
-    }
-    this._socket = await Timeout.timeout(this.openTimeout, OpenTimeout, null, async () => {
-      try {
-        return await adapter.connect!({
-          host: connAddr,
-          port: connPort,
-          useSsl: this.isUseSsl(),
+    let s: HttpClientSocket | null = null;
+    try {
+      this.debug(`opening connection to ${connAddr}:${connPort}...`);
+      const adapter = await getHttpAsync();
+      if (adapter.connect === undefined) {
+        throw new NotImplementedError("the HTTP adapter has no client connect");
+      }
+      s = await Timeout.timeout(this.openTimeout, OpenTimeout, null, async () => {
+        try {
+          return await adapter.connect!({ host: connAddr, port: connPort });
+        } catch (e) {
+          const error = _rsockSysFail(e, connAddr, connPort);
+          error.message = `Failed to open TCP connection to ${connAddr}:${connPort} (${error.message})`;
+          throw error;
+        }
+      });
+      this.debug("opened");
+      if (this.isUseSsl()) {
+        this.debug(`starting SSL for ${connAddr}:${connPort}...`);
+        await this.sslSocketConnect(s, this.openTimeout, {
           sslHostAddress,
           verifyPeer: this.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
-          writeTimeout: this._writeTimeout,
-          debugOutput: this._debugOutput,
         });
-      } catch (e) {
-        const error = _rsockSysFail(e, connAddr, connPort);
-        error.message = `Failed to open TCP connection to ${connAddr}:${connPort} (${error.message})`;
-        throw error;
+        this.debug(`SSL established, protocol: ${s.sslVersion}, cipher: ${s.cipher![0]}`);
       }
-    });
-    this.debug("opened");
-    if (this.isUseSsl()) {
-      this.debug(`starting SSL for ${connAddr}:${connPort}...`);
-      this.debug(
-        `SSL established, protocol: ${this._socket.sslVersion}, cipher: ${this._socket.cipher![0]}`,
-      );
+      this._socket = new BufferedIO(s, {
+        readTimeout: this._readTimeout,
+        writeTimeout: this._writeTimeout,
+        debugOutput: this._debugOutput,
+      });
+      this._lastCommunicated = null;
+    } catch (exception) {
+      if (s) {
+        this.debug(`Conn close because of connect error ${(exception as Error).message}`);
+        s.close();
+      }
+      throw exception;
     }
-    this._lastCommunicated = null;
+  }
+
+  /**
+   * `Net::Protocol#ssl_socket_connect` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:41-56`).
+   * The handshake's `connect_nonblock` / `wait_readable` loop is the adapter's
+   * `start_ssl`, raced against the remaining `timeout`.
+   *
+   * @internal @noRailsEquivalent PERMANENT
+   */
+  private async sslSocketConnect(
+    s: HttpClientSocket,
+    timeout: number | null,
+    sslParameters: Parameters<HttpClientSocket["startSsl"]>[0],
+  ): Promise<void> {
+    if (timeout != null) {
+      if (timeout <= 0) throw new OpenTimeout("execution expired");
+      await Timeout.timeout(timeout, OpenTimeout, null, () => s.startSsl(sslParameters));
+    } else {
+      await s.startSsl(sslParameters);
+    }
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1708-1711`. */
@@ -371,7 +404,11 @@ export class HTTP {
     return res!;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * @missingRailsCall edit_path — CONVERGEABLE net-http-edit-path-and-wait-for-continue
+   * @missingRailsCall catch — CONVERGEABLE net-http-edit-path-and-wait-for-continue
+   * @noRailsEquivalent PERMANENT
+   */
   async transportRequest(
     req: HTTPRequest,
     block?: (res: HTTPResponse) => unknown,
@@ -382,15 +419,13 @@ export class HTTP {
       for (;;) {
         try {
           await this.beginTransport(req);
-          const sock = await Timeout.timeout(this._readTimeout, null, null, () =>
-            this._socket!.request(req.method, req.path, req.toHash(), req.body),
-          ).catch((e: unknown) => {
-            throw e instanceof Timeout.Error && !(e instanceof WriteTimeout)
-              ? new ReadTimeout()
-              : e;
-          });
+          try {
+            await req.exec(this._socket!, this._currHttpVersion, req.path);
+          } catch (e) {
+            if (!(e instanceof Errno.EPIPE)) throw e;
+          }
           do {
-            res = HTTPResponse.readNew(sock);
+            res = await HTTPResponse.readNew(this._socket!);
             res.decodeContent = req.decodeContent;
             res.bodyEncoding = this.responseBodyEncoding;
             res.ignoreEof = this.ignoreEof;
@@ -398,7 +433,7 @@ export class HTTP {
 
           res.uri = req.uri;
 
-          await res.readingBody(sock, req.isResponseBodyPermitted(), () => block?.(res));
+          await res.readingBody(this._socket!, req.isResponseBodyPermitted(), () => block?.(res));
           break;
         } catch (exception) {
           if (exception instanceof OpenTimeout) throw exception;
@@ -524,3 +559,4 @@ function _rsockSysFail(e: unknown, host: string, port: number): Error {
 
 Net.HTTP = HTTP;
 Net.HTTPHeaderSyntaxError = HTTPHeaderSyntaxError;
+Net.HTTPBadResponse = HTTPBadResponse;
