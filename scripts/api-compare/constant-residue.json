@@ -40,15 +40,11 @@
     "rows": 29,
     "excluded": ["base-controller.ts::BaseController"],
     "unwalked": [
-      "callbacks.ts::Callbacks",
       "gem-version.ts::VERSION",
-      "inbound-email/incineratable.ts::Incineratable",
-      "inbound-email/routable.ts::Routable",
       "ingresses/mailgun/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
       "ingresses/mandrill/inbound-emails-controller.ts::InboundEmailsController.Authenticator",
       "relayer.ts::Relayer.Result",
-      "router.ts::Router.RoutingError",
-      "routing.ts::Routing"
+      "router.ts::Router.RoutingError"
     ],
     "residue": {
       "action-mailbox/inbound-emails-controller.ts::InboundEmailsController": "Trails::Conductor::ActionMailbox::InboundEmailsController",
@@ -62,19 +58,7 @@
   "actionmailer": {
     "rows": 31,
     "excluded": [],
-    "unwalked": [
-      "base.ts::Base.LateAttachmentsProxy",
-      "callbacks.ts::Callbacks",
-      "delivery-methods.ts::DeliveryMethods",
-      "form-builder.ts::FormBuilder",
-      "gem-version.ts::VERSION",
-      "mail-helper.ts::MailHelper",
-      "parameterized.ts::Parameterized",
-      "preview.ts::Previews",
-      "queued-delivery.ts::QueuedDelivery",
-      "rescuable.ts::Rescuable",
-      "test-helper.ts::TestHelper"
-    ],
+    "unwalked": ["base.ts::Base.LateAttachmentsProxy", "gem-version.ts::VERSION"],
     "residue": {
       "base.ts::NullMail": "ActionMailer::Base::NullMail",
       "callbacks.ts::ClassMethods": "ActionMailer::Callbacks::ClassMethods",
@@ -93,47 +77,15 @@
     "rows": 334,
     "excluded": [
       "action-dispatch/journey/scanner.ts::Scanner",
-      "action-dispatch/middleware/cookies.ts::CookieOverflow"
+      "action-dispatch/testing/test-helpers/page-dump-helper.ts::Launchy"
     ],
     "unwalked": [
-      "abstract-controller/caching.ts::Caching",
-      "abstract-controller/caching.ts::ClassMethods",
-      "abstract-controller/caching.ts::ConfigMethods",
-      "abstract-controller/caching/fragments.ts::ClassMethods",
-      "abstract-controller/caching/fragments.ts::Fragments",
-      "abstract-controller/callbacks.ts::Callbacks",
-      "abstract-controller/callbacks.ts::ClassMethods",
       "abstract-controller/collector.ts::Collector",
       "abstract-controller/helpers.ts::ClassMethods",
       "abstract-controller/helpers.ts::Helpers",
-      "abstract-controller/helpers.ts::Resolution",
-      "abstract-controller/logger.ts::Logger",
       "abstract-controller/rendering.ts::Rendering",
       "abstract-controller/trailties/routes-helpers.ts::RoutesHelpers",
-      "abstract-controller/translation.ts::Translation",
-      "abstract-controller/url-for.ts::ClassMethods",
-      "abstract-controller/url-for.ts::UrlFor",
       "action-controller/api/api-rendering.ts::ApiRendering",
-      "action-controller/caching.ts::Caching",
-      "action-controller/form-builder.ts::ClassMethods",
-      "action-controller/form-builder.ts::FormBuilder",
-      "action-controller/metal/allow-browser.ts::AllowBrowser",
-      "action-controller/metal/allow-browser.ts::ClassMethods",
-      "action-controller/metal/basic-implicit-render.ts::BasicImplicitRender",
-      "action-controller/metal/conditional-get.ts::ClassMethods",
-      "action-controller/metal/conditional-get.ts::ConditionalGet",
-      "action-controller/metal/content-security-policy.ts::ClassMethods",
-      "action-controller/metal/content-security-policy.ts::ContentSecurityPolicy",
-      "action-controller/metal/data-streaming.ts::DataStreaming",
-      "action-controller/metal/default-headers.ts::ClassMethods",
-      "action-controller/metal/default-headers.ts::DefaultHeaders",
-      "action-controller/metal/etag-with-flash.ts::EtagWithFlash",
-      "action-controller/metal/etag-with-template-digest.ts::EtagWithTemplateDigest",
-      "action-controller/metal/flash.ts::ClassMethods",
-      "action-controller/metal/flash.ts::Flash",
-      "action-controller/metal/head.ts::Head",
-      "action-controller/metal/helpers.ts::ClassMethods",
-      "action-controller/metal/helpers.ts::Helpers",
       "action-controller/metal/http-authentication.ts::HttpAuthentication",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Basic.ControllerMethods",
@@ -142,50 +94,22 @@
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Digest.ControllerMethods",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Token",
       "action-controller/metal/http-authentication.ts::HttpAuthentication.Token.ControllerMethods",
-      "action-controller/metal/implicit-render.ts::ImplicitRender",
-      "action-controller/metal/instrumentation.ts::ClassMethods",
-      "action-controller/metal/live.ts::ClassMethods",
-      "action-controller/metal/live.ts::Live",
-      "action-controller/metal/logging.ts::ClassMethods",
-      "action-controller/metal/logging.ts::Logging",
-      "action-controller/metal/mime-responds.ts::MimeResponds",
-      "action-controller/metal/parameter-encoding.ts::ClassMethods",
-      "action-controller/metal/parameter-encoding.ts::ParameterEncoding",
-      "action-controller/metal/params-wrapper.ts::ClassMethods",
-      "action-controller/metal/params-wrapper.ts::ParamsWrapper",
-      "action-controller/metal/permissions-policy.ts::ClassMethods",
-      "action-controller/metal/permissions-policy.ts::PermissionsPolicy",
-      "action-controller/metal/rate-limiting.ts::ClassMethods",
-      "action-controller/metal/rate-limiting.ts::RateLimiting",
-      "action-controller/metal/redirecting.ts::Redirecting",
       "action-controller/metal/renderers.ts::All",
-      "action-controller/metal/renderers.ts::ClassMethods",
       "action-controller/metal/renderers.ts::Renderers",
       "action-controller/metal/rendering.ts::ClassMethods",
       "action-controller/metal/rendering.ts::Rendering",
       "action-controller/metal/request-forgery-protection.ts::RequestForgeryProtection.ClassMethods",
       "action-controller/metal/request-forgery-protection.ts::RequestForgeryProtection.ProtectionMethods",
-      "action-controller/metal/rescue.ts::Rescue",
-      "action-controller/metal/streaming.ts::Streaming",
-      "action-controller/metal/testing.ts::Functional",
       "action-controller/metal/testing.ts::Testing",
-      "action-controller/metal/url-for.ts::UrlFor",
-      "action-controller/template-assertions.ts::TemplateAssertions",
       "action-controller/test-case.ts::Behavior",
-      "action-dispatch/journey/route.ts::VerbMatchers",
       "action-dispatch/routing/mapper.ts::Mapper.BacktraceCleaner",
       "action-dispatch/routing/mapper.ts::Mapper.Resources",
       "action-dispatch/routing/polymorphic-routes.ts::PolymorphicRoutes",
-      "action-dispatch/routing/redirection.ts::Redirection",
       "action-dispatch/routing/route-set.ts::MountedHelpers",
-      "action-dispatch/routing/url-for.ts::UrlFor",
       "action-dispatch/system-testing/test-helpers/screenshot-helper.ts::ScreenshotHelper",
-      "action-dispatch/system-testing/test-helpers/setup-and-teardown.ts::SetupAndTeardown",
       "action-dispatch/testing/assertions.ts::Assertions",
       "action-dispatch/testing/integration.ts::RequestHelpers",
       "action-dispatch/testing/integration.ts::Runner",
-      "action-dispatch/testing/test-process.ts::FixtureFile",
-      "action-dispatch/testing/test-process.ts::TestProcess",
       "action-pack/gem-version.ts::VERSION"
     ],
     "residue": {
@@ -339,14 +263,11 @@
     "excluded": ["helpers/form-helper.ts::FormBuilder", "template/handlers/builder.ts::Builder"],
     "unwalked": [
       "cache-expiry.ts::CacheExpiry",
-      "context.ts::Context",
       "gem-version.ts::VERSION",
       "helpers.ts::Helpers",
-      "helpers/active-model-helper.ts::ActiveModelHelper",
       "helpers/asset-tag-helper.ts::AssetTagHelper",
       "helpers/asset-url-helper.ts::AssetUrlHelper",
       "helpers/cache-helper.ts::CacheHelper",
-      "helpers/cache-helper.ts::CachingRegistry",
       "helpers/capture-helper.ts::CaptureHelper",
       "helpers/content-exfiltration-prevention-helper.ts::ContentExfiltrationPreventionHelper",
       "helpers/csp-helper.ts::CspHelper",
@@ -358,25 +279,13 @@
       "helpers/number-helper.ts::NumberHelper",
       "helpers/output-safety-helper.ts::OutputSafetyHelper",
       "helpers/rendering-helper.ts::RenderingHelper",
-      "helpers/sanitize-helper.ts::ClassMethods",
-      "helpers/tag-helper.ts::TagHelper",
-      "helpers/tags/checkable.ts::Checkable",
       "helpers/tags/collection-helpers.ts::CollectionHelpers",
-      "helpers/tags/placeholderable.ts::Placeholderable",
-      "helpers/tags/select-renderer.ts::SelectRenderer",
       "helpers/text-helper.ts::TextHelper",
       "helpers/translation-helper.ts::TranslationHelper",
-      "helpers/url-helper.ts::ClassMethods",
-      "helpers/url-helper.ts::UrlHelper",
-      "layouts.ts::ClassMethods",
       "layouts.ts::Layouts",
       "lookup-context.ts::Accessors",
-      "model-naming.ts::ModelNaming",
-      "record-identifier.ts::RecordIdentifier",
-      "rendering.ts::ClassMethods",
       "rendering.ts::Rendering",
-      "template/sources.ts::Sources",
-      "test-case.ts::Behavior"
+      "template/sources.ts::Sources"
     ],
     "residue": {
       "buffers.ts::OutputBuffer": "ActionView::OutputBuffer",
@@ -420,15 +329,12 @@
     "rows": 51,
     "excluded": [],
     "unwalked": [
-      "arguments.ts::Arguments",
       "callbacks.ts::Callbacks",
       "gem-version.ts::VERSION",
       "instrumentation.ts::Instrumentation",
       "logging.ts::Logging",
       "queue-adapters.ts::QueueAdapters",
-      "serializers.ts::Serializers",
-      "timezones.ts::Timezones",
-      "translation.ts::Translation"
+      "serializers.ts::Serializers"
     ],
     "residue": {
       "arguments.ts::DeserializationError": "ActiveJob::DeserializationError",
@@ -441,22 +347,10 @@
     "rows": 100,
     "excluded": [],
     "unwalked": [
-      "attribute-assignment.ts::AttributeAssignment",
-      "attribute-methods.ts::AttributeMethods",
-      "attribute-registration.ts::AttributeRegistration",
-      "conversion.ts::Conversion",
-      "forbidden-attributes-protection.ts::ForbiddenAttributesProtection",
       "gem-version.ts::VERSION",
       "naming.ts::Naming",
       "type.ts::Type",
-      "type/helpers/mutable.ts::Mutable",
-      "type/helpers/time-value.ts::TimeValue",
-      "type/serialize-cast-value.ts::SerializeCastValue",
-      "validations/callbacks.ts::Callbacks",
-      "validations/clusivity.ts::Clusivity",
-      "validations/comparability.ts::Comparability",
-      "validations/helper-methods.ts::HelperMethods",
-      "validations/resolve-value.ts::ResolveValue"
+      "type/serialize-cast-value.ts::SerializeCastValue"
     ],
     "residue": {
       "attribute-methods.ts::AttrNames": "ActiveModel::AttributeMethods::AttrNames",
@@ -499,7 +393,7 @@
     }
   },
   "activerecord": {
-    "rows": 574,
+    "rows": 575,
     "excluded": [
       "associations/errors.ts::CollectionIdsAssignmentError",
       "associations/errors.ts::CollectionPersistedAssignmentError",
@@ -516,54 +410,15 @@
       "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredPluck"
     ],
     "unwalked": [
-      "aggregations.ts::Aggregations",
-      "associations/foreign-association.ts::ForeignAssociation",
-      "associations/through-association.ts::ThroughAssociation",
-      "attribute-assignment.ts::AttributeAssignment",
       "attribute-methods.ts::AttributeMethods",
-      "attribute-methods/before-type-cast.ts::BeforeTypeCast",
-      "attribute-methods/dirty.ts::Dirty",
-      "attribute-methods/query.ts::Query",
-      "attribute-methods/read.ts::Read",
-      "attribute-methods/serialization.ts::Serialization",
-      "attribute-methods/time-zone-conversion.ts::TimeZoneConversion",
-      "attribute-methods/write.ts::Write",
-      "attributes.ts::Attributes",
-      "autosave-association.ts::AutosaveAssociation",
-      "callbacks.ts::Callbacks",
       "connection-adapters.ts::ConnectionAdapters",
-      "connection-adapters/abstract/connection-pool.ts::AbstractPool",
-      "connection-adapters/abstract/connection-pool/queue.ts::BiasableQueue",
-      "connection-adapters/abstract/database-statements.ts::DatabaseStatements",
-      "connection-adapters/abstract/query-cache.ts::QueryCache",
-      "connection-adapters/abstract/quoting.ts::Quoting",
-      "connection-adapters/abstract/savepoints.ts::Savepoints",
-      "connection-adapters/abstract/schema-definitions.ts::ColumnMethods",
-      "connection-adapters/deduplicable.ts::Deduplicable",
-      "connection-adapters/mysql2/database-statements.ts::DatabaseStatements",
-      "connection-handling.ts::ConnectionHandling",
-      "core.ts::Core",
-      "counter-cache.ts::CounterCache",
-      "dynamic-matchers.ts::DynamicMatchers",
       "encryption.ts::Encryption",
-      "encryption/encrypted-fixtures.ts::EncryptedFixtures",
       "encryption/errors.ts::Errors",
       "explain.ts::Explain",
       "gem-version.ts::VERSION",
-      "inheritance.ts::Inheritance",
-      "integration.ts::Integration",
-      "legacy-yaml-adapter.ts::LegacyYamlAdapter",
-      "locking/optimistic.ts::Optimistic",
-      "locking/pessimistic.ts::Pessimistic",
       "marshalling.ts::Marshalling",
       "migration/compatibility.ts::Compatibility",
-      "model-schema.ts::ModelSchema",
-      "nested-attributes.ts::NestedAttributes",
-      "no-touching.ts::NoTouching",
-      "normalization.ts::Normalization",
-      "persistence.ts::Persistence",
       "querying.ts::Querying",
-      "readonly-attributes.ts::ReadonlyAttributes",
       "reflection.ts::Reflection",
       "relation.ts::Relation.StrictLoadingScope",
       "relation/batches.ts::Batches",
@@ -577,18 +432,10 @@
       "secure-password.ts::SecurePassword",
       "secure-token.ts::SecureToken",
       "serialization.ts::Serialization",
-      "signed-id.ts::SignedId",
       "store.ts::Store",
       "suppressor.ts::Suppressor",
-      "timestamp.ts::Timestamp",
-      "token-for.ts::TokenFor",
-      "touch-later.ts::TouchLater",
-      "trailties/job-runtime.ts::JobRuntime",
-      "transactions.ts::Transactions",
-      "translation.ts::Translation",
       "type.ts::Type",
-      "validations.ts::Validations",
-      "validations/absence.ts::ClassMethods"
+      "validations.ts::Validations"
     ],
     "residue": {
       "aggregations.ts::ClassMethods": "ActiveRecord::Aggregations::ClassMethods",
@@ -837,16 +684,7 @@
     "unwalked": [
       "attached/changes.ts::Changes",
       "attached/model.ts::Model",
-      "blob/analyzable.ts::Analyzable",
-      "blob/identifiable.ts::Identifiable",
-      "blob/representable.ts::Representable",
-      "blob/servable.ts::Servable",
-      "disable-session.ts::DisableSession",
-      "file-server.ts::FileServer",
-      "gem-version.ts::VERSION",
-      "set-blob.ts::SetBlob",
-      "set-current.ts::SetCurrent",
-      "streaming.ts::Streaming"
+      "gem-version.ts::VERSION"
     ],
     "residue": {
       "attached/model.ts::ClassMethods": "ActiveStorage::Attached::Model::ClassMethods",
@@ -880,7 +718,6 @@
       "core-ext/object/json.ts::BigDecimal",
       "core-ext/object/json.ts::Date",
       "core-ext/object/json.ts::DateTime",
-      "core-ext/object/json.ts::Enumerable",
       "core-ext/object/json.ts::Exception",
       "core-ext/object/json.ts::Float",
       "core-ext/object/json.ts::Hash",
@@ -907,7 +744,6 @@
       "xml-mini.ts::XmlStringBuilder"
     ],
     "unwalked": [
-      "benchmarkable.ts::Benchmarkable",
       "cache/memory-store.ts::DupCoder",
       "cache/serializer-with-fallback.ts::Marshal70WithFallback",
       "cache/serializer-with-fallback.ts::Marshal71WithFallback",
@@ -916,29 +752,18 @@
       "cache/serializer-with-fallback.ts::SerializerWithFallback",
       "callbacks.ts::CallTemplate",
       "callbacks.ts::Callbacks",
-      "callbacks.ts::ClassMethods",
       "callbacks.ts::Conditionals",
       "callbacks.ts::Filters",
       "class-attribute.ts::ClassAttribute",
-      "concern.ts::Concern",
-      "concurrency/null-lock.ts::NullLock",
       "configurable.ts::Configurable",
       "configurable.ts::Configurable.ClassMethods",
-      "deep-mergeable.ts::DeepMergeable",
       "delegation.ts::Delegation",
-      "dependencies.ts::Dependencies",
-      "descendants-tracker.ts::ReloadedClassesFiltering",
       "error-reporter.ts::ErrorReporter.UnexpectedError",
-      "execution-context.ts::ExecutionContext",
-      "executor/test-helper.ts::TestHelper",
       "gem-version.ts::VERSION",
       "gzip.ts::Gzip",
-      "html-safe-translation.ts::HtmlSafeTranslation",
       "inflector.ts::Inflector",
-      "isolated-execution-state.ts::IsolatedExecutionState",
       "lazy-load-hooks.ts::LazyLoadHooks",
       "message-encryptor.ts::NullSerializer",
-      "messages/serializer-with-fallback.ts::AllowMarshal",
       "messages/serializer-with-fallback.ts::JsonWithFallback",
       "messages/serializer-with-fallback.ts::JsonWithFallbackAllowMarshal",
       "messages/serializer-with-fallback.ts::MarshalWithFallback",
@@ -948,12 +773,6 @@
       "multibyte.ts::Multibyte",
       "multibyte/unicode.ts::Unicode",
       "number-helper.ts::NumberHelper",
-      "rescuable.ts::ClassMethods",
-      "rescuable.ts::Rescuable",
-      "tagged-logging.ts::Formatter",
-      "tagged-logging.ts::LocalTagStorage",
-      "tagged-logging.ts::TaggedLogging",
-      "xml-mini.ts::FileLike",
       "xml-mini.ts::XmlMini"
     ],
     "residue": {
@@ -1011,18 +830,7 @@
   "arel": {
     "rows": 149,
     "excluded": [],
-    "unwalked": [
-      "alias-predication.ts::AliasPredication",
-      "crud.ts::Crud",
-      "expressions.ts::Expressions",
-      "factory-methods.ts::FactoryMethods",
-      "filter-predications.ts::FilterPredications",
-      "math.ts::Math",
-      "nodes/binary.ts::FetchAttribute",
-      "order-predications.ts::OrderPredications",
-      "predications.ts::Predications",
-      "window-predications.ts::WindowPredications"
-    ],
+    "unwalked": [],
     "residue": {
       "tree-manager.ts::StatementMethods": "Arel::TreeManager::StatementMethods",
       "visitors/dot.ts::Edge": "Arel::Visitors::Dot::Edge",
@@ -1044,7 +852,7 @@
   "chronic": {
     "rows": 61,
     "excluded": [],
-    "unwalked": ["handlers.ts::Handlers"],
+    "unwalked": [],
     "residue": { "repeaters/repeater-time.ts::Tick": "Chronic::RepeaterTime::Tick" }
   },
   "date": {
@@ -1076,7 +884,7 @@
   "globalid": {
     "rows": 12,
     "excluded": ["global-id.ts::GlobalID", "signed-global-id.ts::SignedGlobalID"],
-    "unwalked": ["fixture-set.ts::FixtureSet", "identification.ts::Identification"],
+    "unwalked": [],
     "residue": {
       "signed-global-id.ts::ExpiredMessage": "SignedGlobalID::ExpiredMessage",
       "uri/gid.ts::GID": "URI::GID",
@@ -1101,12 +909,7 @@
   "i18n": {
     "rows": 30,
     "excluded": [],
-    "unwalked": [
-      "backend/transliterator.ts::Transliterator",
-      "locale.ts::Locale",
-      "locale/tag/parents.ts::Parents",
-      "utils.ts::Utils"
-    ],
+    "unwalked": ["backend/transliterator.ts::Transliterator", "utils.ts::Utils"],
     "residue": {
       "backend/key-value.ts::SubtreeProxy": "I18n::Backend::KeyValue::SubtreeProxy",
       "backend/transliterator.ts::HashTransliterator": "I18n::Backend::Transliterator::HashTransliterator",
@@ -1176,12 +979,7 @@
     }
   },
   "marcel": { "rows": 2, "excluded": [], "unwalked": [], "residue": {} },
-  "mini-magick": {
-    "rows": 10,
-    "excluded": [],
-    "unwalked": ["utilities.ts::Utilities"],
-    "residue": {}
-  },
+  "mini-magick": { "rows": 10, "excluded": [], "unwalked": [], "residue": {} },
   "mini-mime": {
     "rows": 5,
     "excluded": [],
@@ -1191,7 +989,7 @@
   "msgpack": {
     "rows": 17,
     "excluded": [],
-    "unwalked": ["bigint.ts::Bigint", "core-ext.ts::CoreExt", "time.ts::Time"],
+    "unwalked": [],
     "residue": {
       "factory.ts::MemberPool": "MessagePack::Factory::Pool::MemberPool",
       "unpacker.ts::MalformedFormatError": "MessagePack::MalformedFormatError",
@@ -1262,11 +1060,11 @@
       "xml/xpath/syntax-error.ts::SyntaxError": "Nokogiri::XML::XPath::SyntaxError"
     }
   },
-  "raabro": { "rows": 3, "excluded": ["raabro.ts::Raabro"], "unwalked": [], "residue": {} },
+  "raabro": { "rows": 3, "excluded": [], "unwalked": [], "residue": {} },
   "rack": {
     "rows": 61,
     "excluded": [],
-    "unwalked": ["bad-request.ts::BadRequest", "mime.ts::Mime", "multipart.ts::Multipart"],
+    "unwalked": [],
     "residue": {
       "etag.ts::ETag": "Rack::ETag",
       "lint.ts::ErrorWrapper": "Rack::Lint::Wrapper::ErrorWrapper",
@@ -1328,39 +1126,22 @@
     "rows": 33,
     "excluded": ["promise.ts::Promise"],
     "unwalked": [
-      "backtrace.ts::Backtrace",
-      "cloneable.ts::Cloneable",
       "dsl-definition.ts::DSL",
       "file-utils-ext.ts::FileUtilsExt",
-      "invocation-exception-mixin.ts::InvocationExceptionMixin",
-      "private-reader.ts::PrivateReader",
-      "version.ts::Version",
-      "win32.ts::Win32"
+      "version.ts::Version"
     ],
     "residue": { "win32.ts::Win32HomeError": "Rake::Win32::Win32HomeError" }
   },
   "solid-cable": {
     "rows": 4,
-    "excluded": [
-      "action-cable/subscription-adapter/solid-cable.ts::Listener",
-      "action-cable/subscription-adapter/solid-cable.ts::SolidCable"
-    ],
+    "excluded": ["action-cable/subscription-adapter/solid-cable.ts::Listener"],
     "unwalked": [],
     "residue": {}
   },
   "solid-cache": {
     "rows": 25,
     "excluded": [],
-    "unwalked": [
-      "connections.ts::Connections",
-      "store/api.ts::Api",
-      "store/connections.ts::Connections",
-      "store/entries.ts::Entries",
-      "store/execution.ts::Execution",
-      "store/expiry.ts::Expiry",
-      "store/failsafe.ts::Failsafe",
-      "store/stats.ts::Stats"
-    ],
+    "unwalked": [],
     "residue": {
       "entry/expiration.ts::ClassMethods": "SolidCache::Entry::Expiration::ClassMethods",
       "entry/size.ts::ClassMethods": "SolidCache::Entry::Size::ClassMethods"
@@ -1373,21 +1154,14 @@
       "active-job/concurrency-controls.ts::ConcurrencyControls",
       "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter"
     ],
-    "unwalked": [
-      "app-executor.ts::AppExecutor",
-      "processes/interruptible.ts::Interruptible",
-      "processes/procline.ts::Procline",
-      "timer.ts::Timer"
-    ],
+    "unwalked": [],
     "residue": {}
   },
   "thor": {
     "rows": 42,
     "excluded": ["thor.ts::Thor"],
     "unwalked": [
-      "actions.ts::Actions",
       "base.ts::Base",
-      "invocation.ts::Invocation",
       "line-editor.ts::LineEditor",
       "shell.ts::Shell",
       "shell/terminal.ts::Terminal",
@@ -1408,7 +1182,6 @@
       "assets/vite-manifest.ts::ViteManifest",
       "commands/build.ts::BuildCommand",
       "info.ts::PropertyList",
-      "trails.ts::Trails",
       "trailties/action-dispatch.ts::Trailtie",
       "trailties/active-support.ts::Trailtie",
       "trailties/i18n.ts::Trailtie"
@@ -1641,20 +1414,5 @@
       "runner.ts::Runner": "ViteAssets::Runner"
     }
   },
-  "zeitwerk": {
-    "rows": 18,
-    "excluded": [],
-    "unwalked": [
-      "internal.ts::Internal",
-      "loader/callbacks.ts::Callbacks",
-      "loader/config.ts::Config",
-      "loader/eager-load.ts::EagerLoad",
-      "loader/helpers.ts::Helpers",
-      "real-mod-name.ts::RealModName",
-      "registry.ts::Registry",
-      "registry/explicit-namespaces.ts::ExplicitNamespaces",
-      "registry/inceptions.ts::Inceptions"
-    ],
-    "residue": {}
-  }
+  "zeitwerk": { "rows": 18, "excluded": [], "unwalked": [], "residue": {} }
 }
