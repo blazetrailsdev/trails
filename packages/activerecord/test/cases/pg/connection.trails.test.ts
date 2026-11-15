@@ -99,7 +99,7 @@ describe("PG::Connection#send_query and #get_last_result", () => {
 describe("PG::Connection.escape_bytea", () => {
   it("renders the hex format unescape_bytea reads back", () => {
     expect(escapeBytea(Buffer.from("hi"))).toBe("\\x6869");
-    expect(unescapeBytea(escapeBytea("a\\\u0000"))).toEqual(Buffer.from([0x61, 0x5c, 0x00]));
+    expect(unescapeBytea(escapeBytea("a\\\u0000"))).toEqual(Uint8Array.from([0x61, 0x5c, 0x00]));
   });
 });
 

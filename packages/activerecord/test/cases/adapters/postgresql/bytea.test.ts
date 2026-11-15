@@ -60,12 +60,12 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       const data = "\u001F\x8B";
       expect(data.constructor).toBe(String);
-      expect(type.deserialize(data).constructor).toBe(Buffer);
+      expect(type.deserialize(data).constructor).toBe(Uint8Array);
     });
 
     it("type cast binary value", () => {
       const data = new Uint8Array([0x1f, 0x8b]);
-      expect(type.deserialize(data)).toEqual(Buffer.from(data));
+      expect(type.deserialize(data)).toEqual(data);
     });
 
     it("type case nil", () => {

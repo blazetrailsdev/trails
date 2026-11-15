@@ -264,7 +264,7 @@ export class Connection {
     );
   }
 
-  unescapeBytea(value: string | Uint8Array): Buffer {
+  unescapeBytea(value: string | Uint8Array): Uint8Array {
     return unescapeBytea(value);
   }
 
@@ -420,9 +420,9 @@ export function escapeBytea(value: Buffer | Uint8Array | string): string {
   return `\\x${buffer.toString("hex")}`;
 }
 
-export function unescapeBytea(value: string | Uint8Array): Buffer {
+export function unescapeBytea(value: string | Uint8Array): Uint8Array {
   if (typeof value !== "string") value = Buffer.from(value).toString("latin1");
-  if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
+  if (value.startsWith("\\x")) return Uint8Array.from(Buffer.from(value.slice(2), "hex"));
 
   const bytes: number[] = [];
   for (let i = 0; i < value.length; i++) {
@@ -446,7 +446,7 @@ export function unescapeBytea(value: string | Uint8Array): Buffer {
     }
     bytes.push(ch.charCodeAt(0));
   }
-  return Buffer.from(bytes);
+  return Uint8Array.from(bytes);
 }
 
 const STRING_OIDS = new Set([

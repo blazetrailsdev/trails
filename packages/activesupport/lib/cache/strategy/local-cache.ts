@@ -170,8 +170,13 @@ export const LocalCache = {
     return value;
   },
 
-  async fetchMulti(this: Host, ...names: unknown[]): Promise<Map<unknown, unknown>> {
-    const block = names.pop() as (key: unknown) => unknown;
+  async fetchMulti(
+    this: Host,
+    ...names:
+      | [...NonNullable<unknown>[], StoreOptions, (key: unknown) => unknown]
+      | [...NonNullable<unknown>[], (key: unknown) => unknown]
+  ): Promise<Map<unknown, unknown>> {
+    const block = (names as unknown[]).pop() as (key: unknown) => unknown;
     if (this.localCache() == null || names.length === 0)
       return (await rbCallSuper(this, LocalCache.fetchMulti, ...names, block)) as Map<
         unknown,
