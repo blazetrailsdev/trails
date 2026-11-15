@@ -61,7 +61,7 @@ export class LazyRouteSet extends RouteSet {
 
   constructor(config?: ConstructorParameters<typeof RouteSet>[0]) {
     super(config);
-    this.namedRoutes = new LazyRouteSet.NamedRouteCollection();
+    this.namedRoutes = new NamedRouteCollection();
     prepend(this.namedRoutes.urlHelpersModule, this.methodMissingModule());
     prepend(this.namedRoutes.pathHelpersModule, this.methodMissingModule());
   }

@@ -64,6 +64,27 @@ describe("LazyRouteSet url helper modules", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ["urlFor", [{ host: "example.com" }]],
+    ["fullUrlFor", [{ host: "example.com" }]],
+    ["optimizeRoutesGeneration", []],
+    ["polymorphicUrl", [[]]],
+    ["polymorphicPath", [[]]],
+  ] as const)("reloads routes before %s delegates", (name, args) => {
+    const mod = new LazyRouteSet().generateUrlHelpers(true) as unknown as Record<
+      string,
+      (...a: unknown[]) => unknown
+    >;
+    const delegate = vi.spyOn(mod._proxy as unknown as Record<string, () => unknown>, name);
+    delegate.mockImplementation(() => {
+      expect(reload).toHaveBeenCalledTimes(1);
+      return "";
+    });
+
+    mod[name](...args);
+    expect(delegate).toHaveBeenCalledTimes(1);
+  });
+
   it("reloads routes before route_for answers", () => {
     const mod = new LazyRouteSet().generateUrlHelpers(true) as unknown as {
       routeFor(name: string): string;
