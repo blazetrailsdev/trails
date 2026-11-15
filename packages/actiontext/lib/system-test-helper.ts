@@ -1,3 +1,5 @@
+import { ArgumentError, toS } from "@blazetrails/ruby-compat";
+
 type SystemTestHost = {
   page(): Promise<{
     locator(selector: string): {
@@ -6,53 +8,42 @@ type SystemTestHost = {
   }>;
 };
 
-/**
- * @inventedArm locator — PERMANENT
- * @inventedArm evaluate — PERMANENT
- */
 async function fillInRichTextarea(
   this: SystemTestHost,
-  locator: string | null | { with: unknown } = null,
-  options?: { with: unknown },
+  locator: string | null | { with?: unknown } = null,
+  options: { with?: unknown } = {},
 ): Promise<void> {
   if (locator !== null && typeof locator === "object") {
     options = locator;
     locator = null;
   }
-  const page = await this.page();
-  await page
-    .locator(`xpath=${richTextareaXpath(locator)}`)
-    .evaluate(
-      (editor, html) =>
-        (editor as { editor: { loadHTML(html: string): void } }).editor.loadHTML(html),
-      String(options!.with),
-    );
-}
-
-/** @noRailsEquivalent PERMANENT */
-function richTextareaXpath(locator: string | null): string {
+  if (!Object.hasOwn(options, "with")) throw new ArgumentError("missing keyword: :with");
+  let xpath: string;
   if (locator == null) {
-    return ".//trix-editor";
+    xpath = ".//trix-editor";
   } else {
-    const string = xpathString(locator);
+    const string = locator.includes("'")
+      ? `concat('${locator.split("'").join(`', "'", '`)}')`
+      : `'${locator}'`;
     const inputLocatedByName = `//input[(./@name = ${string})]/@id`;
     const inputLocatedByLabel = `//label[contains(normalize-space(string(.)), ${string})]/@for`;
 
-    return (
+    xpath =
       ".//trix-editor[(((((" +
       `./@id = ${string}) or ` +
       `(./@placeholder = ${string})) or ` +
       `(./@aria-label = ${string})) or ` +
       `(./@input = ${inputLocatedByName})) or ` +
-      `(./@id = ${inputLocatedByLabel}))]`
-    );
+      `(./@id = ${inputLocatedByLabel}))]`;
   }
-}
-
-/** @noRailsEquivalent PERMANENT */
-function xpathString(value: string): string {
-  if (!value.includes("'")) return `'${value}'`;
-  return `concat('${value.split("'").join(`', "'", '`)}')`;
+  const page = await this.page();
+  await page
+    .locator(`xpath=${xpath}`)
+    .evaluate(
+      (editor, html) =>
+        (editor as { editor: { loadHTML(html: string): void } }).editor.loadHTML(html),
+      toS(options.with),
+    );
 }
 
 export const SystemTestHelper = {

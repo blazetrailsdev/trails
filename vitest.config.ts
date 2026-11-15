@@ -636,7 +636,6 @@ export default defineConfig({
             "packages/solid-queue/test/generators/**",
             "packages/actionmailbox/test/generators/**",
             "packages/actiontext/test/generators/**",
-            "packages/actiontext/test/system/**",
           ],
           // Phase 0 sqlite template-clone (perf): build the canonical schema
           // into a template file once for the whole run; workers clone it
@@ -754,13 +753,8 @@ export default defineConfig({
         test: {
           name: "system",
           globals: true,
-          include: [
-            "packages/*/test/**/*.system.test.ts",
-            "packages/actiontext/test/system/**/*.test.ts",
-          ],
+          include: ["packages/*/test/**/*.system.test.ts"],
           exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
-          // actiontext's form-builder methods must be on FormHelper before
-          // actionview's compiled-template setup includes it.
           setupFiles: ["./packages/actiontext/lib/tag-helper.ts", ...otherSetupFiles],
           globalSetup: ["./packages/activerecord/test/support/template-global-setup.ts"],
           pool: "forks",

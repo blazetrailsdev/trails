@@ -24,6 +24,7 @@ function attributeNamesForSerialization(this: AttachableHost): string[] {
   return [...(rbCallSuper(this, attributeNamesForSerialization) as string[]), "attachable_sgid"];
 }
 
+/** @missingRailsCall super — PERMANENT */
 function readAttributeForSerialization(this: AttachableHost, key: string): unknown {
   if (key === "attachable_sgid") {
     return this.isPersisted() ? this.attachableSgid() : null;
