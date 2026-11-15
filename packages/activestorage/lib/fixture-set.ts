@@ -1,3 +1,4 @@
+import "./constants.fixture-set.generated.js";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { FileFixtures } from "@blazetrails/activesupport/testing/file-fixtures";
 import { Base } from "@blazetrails/activerecord";

@@ -11,7 +11,7 @@ import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trai
 import { ActionController } from "@blazetrails/actionpack";
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Registry } from "@blazetrails/activestorage";
-import { FixtureSet } from "@blazetrails/activestorage/fixture-set";
+import { FixtureSet } from "@blazetrails/activestorage/testing/fixture-set";
 import { fixtures } from "../../activerecord/test/support/use-fixtures.js";
 import { RichText } from "../lib/rich-text.js";
 import { richTexts } from "./fixtures/action_text/rich_texts.js";

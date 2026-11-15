@@ -21,6 +21,7 @@ import type * as RepresentationsBase from "./representations/base-controller.js"
 import type * as Errors from "./errors.js";
 import type { LogSubscriber } from "./log-subscriber.js";
 import type { Previewer } from "./previewer.js";
+import type { FixtureSet } from "./fixture-set.js";
 
 export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -34,7 +35,7 @@ export const ActiveStorage = {
   Reflection: { name: string };
   Attached: unknown;
   Attachment?: typeof Attachment;
-  FixtureSet: unknown;
+  FixtureSet: typeof FixtureSet;
   Service: unknown;
   Previewer: typeof Previewer;
   Analyzer: typeof Analyzer;
