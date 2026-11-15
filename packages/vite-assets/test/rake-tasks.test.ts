@@ -1,12 +1,5 @@
 import { Application, Rake, Task } from "@blazetrails/rake";
-import {
-  childProcessAdapterConfig,
-  Dir,
-  File,
-  getChildProcess,
-  registerChildProcessAdapter,
-  stderr,
-} from "@blazetrails/ruby-compat";
+import { Dir, File, stderr } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViteAssets } from "../lib/vite-assets.js";
 import { pathToTestApp, refreshConfig } from "./support/test-helper.js";
@@ -17,26 +10,9 @@ async function testAppDevDependencies(): Promise<Record<string, string>> {
 
 type WithNodeEnv = { withNodeEnv(env: string, block: () => Promise<unknown>): Promise<unknown> };
 
-async function installDependencies(nodeEnv: string): Promise<[string, Record<string, unknown>]> {
-  const calls: [string, Record<string, unknown>][] = [];
-  registerChildProcessAdapter("rake-tasks-test", {
-    spawnSync: getChildProcess().spawnSync,
-    system: async (command, env, args) => {
-      calls.push([[command, ...(args ?? [])].join(" "), env]);
-      return { pid: 1, status: 0, signal: null };
-    },
-  });
-  childProcessAdapterConfig.adapter = "rake-tasks-test";
-  try {
-    await (ViteAssets.commands() as unknown as WithNodeEnv).withNodeEnv(nodeEnv, () =>
-      Dir.chdir(pathToTestApp(), async () =>
-        (await Task.get("vite:install_dependencies")).invoke(),
-      ),
-    );
-  } finally {
-    childProcessAdapterConfig.adapter = null;
-  }
-  return calls[0];
+async function installedNodeModuleNames(): Promise<string[]> {
+  const nodeModulesPath = File.expandPath("node_modules", pathToTestApp());
+  return Dir.chdir(nodeModulesPath, () => Dir.globAsync("*"));
 }
 
 describe("RakeTasksTest", () => {
@@ -80,15 +56,24 @@ describe("RakeTasksTest", () => {
     await ViteAssets.installTasks();
     expect(Object.keys(await testAppDevDependencies())).toContain("right-pad");
 
-    const [command, env] = await installDependencies("test");
+    await (ViteAssets.commands() as unknown as WithNodeEnv).withNodeEnv("test", () =>
+      invoke("vite:install_dependencies"),
+    );
 
-    expect([command, env["NODE_ENV"]]).toEqual(["yarn install --frozen-lockfile", "development"]);
-  });
+    expect(await installedNodeModuleNames(), "Expected dev dependencies to be installed").toContain(
+      "right-pad",
+    );
+  }, 300_000);
 
   it("rake vite install dependencies in production environment", async () => {
     await ViteAssets.installTasks();
-    const [command, env] = await installDependencies("production");
+    await (ViteAssets.commands() as unknown as WithNodeEnv).withNodeEnv("production", () =>
+      invoke("vite:install_dependencies"),
+    );
 
-    expect([command, env["NODE_ENV"]]).toEqual(["yarn install --frozen-lockfile", "development"]);
-  });
+    expect(
+      await installedNodeModuleNames(),
+      "Expected development dependencies to be installed as well",
+    ).toContain("right-pad");
+  }, 300_000);
 });

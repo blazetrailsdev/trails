@@ -26,7 +26,6 @@ import { rake } from "./assertion-receipts/rake.js";
 import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
 import { solidQueue } from "./assertion-receipts/solid-queue.js";
 import { trailties } from "./assertion-receipts/trailties.js";
-import { viteAssets } from "./assertion-receipts/vite-assets.js";
 import { tzinfo } from "./assertion-receipts/tzinfo.js";
 import { zeitwerk } from "./assertion-receipts/zeitwerk.js";
 
@@ -72,7 +71,6 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   "solid-queue": solidQueue,
   trailties,
   tzinfo,
-  "vite-assets": viteAssets,
   zeitwerk,
 };
 
