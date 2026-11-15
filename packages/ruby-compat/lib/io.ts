@@ -912,8 +912,21 @@ export class IO {
    */
   static async copyStreamAsync(
     src: { read(length?: number): string | Uint8Array | null } | IO,
-    dst: string | IO,
+    dst: string | IO | { write(data: Uint8Array): unknown },
   ): Promise<number> {
+    if (typeof dst !== "string" && !(dst instanceof IO)) {
+      let total = 0;
+      let chunk: string | Uint8Array | null;
+      while (
+        (chunk = await (src instanceof IO ? src.readAsync(16384) : src.read(16384))) != null &&
+        chunk.length > 0
+      ) {
+        const bytes = typeof chunk === "string" ? new TextEncoder().encode(chunk) : chunk;
+        await dst.write(bytes);
+        total += bytes.length;
+      }
+      return total;
+    }
     const chunks: Uint8Array[] = [];
     let data: string | Uint8Array | null;
     while (
