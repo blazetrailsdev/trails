@@ -75,12 +75,12 @@ export const ClassMethods = {
 /** @internal */
 export function wrapDeliveryBehaviorBang(
   this: {
-    message: unknown;
+    _message: unknown;
     constructor: { wrapDeliveryBehavior(mail: Message, ...args: unknown[]): void };
   },
   ...args: unknown[]
 ): void {
-  this.constructor.wrapDeliveryBehavior(this.message as Message, ...args);
+  this.constructor.wrapDeliveryBehavior(this._message as Message, ...args);
 }
 
 export const DeliveryMethods = { ClassMethods, wrapDeliveryBehaviorBang };

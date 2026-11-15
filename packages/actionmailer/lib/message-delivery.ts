@@ -45,7 +45,7 @@ export class MessageDelivery extends Delegator {
   }
 
   async message(): Promise<Message> {
-    return (this._mailMessage ||= (await this.processedMailer()).message as Message);
+    return (this._mailMessage ||= (await this.processedMailer())._message as Message);
   }
 
   isProcessed(): ProcessedMailer | Message | null {

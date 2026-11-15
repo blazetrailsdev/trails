@@ -5,6 +5,7 @@ import {
   dasherize,
   humanize,
   isBlank,
+  attrInternal,
   constantize,
   include,
   isAnonymous,
@@ -244,12 +245,7 @@ export class Base extends AbstractController.Base {
   /** @internal */
   _message: Message | NullMail;
 
-  get message(): Message | NullMail {
-    return this._message;
-  }
-  set message(value: Message | NullMail) {
-    this._message = value;
-  }
+  declare message: Message | NullMail;
 
   /** @internal */
   declare _actionHasLayout?: boolean;
@@ -327,8 +323,8 @@ export class Base extends AbstractController.Base {
   };
 
   async mail(headers: Headers = {}, block?: (collector: Collector) => unknown): Promise<Message> {
-    if (this._mailWasCalled && isBlank(headers) && !block) return this.message as Message;
-    const message = this.message as Message;
+    if (this._mailWasCalled && isBlank(headers) && !block) return this._message as Message;
+    const message = this._message as Message;
 
     const contentType = headers.contentType;
 
@@ -619,6 +615,7 @@ export class NullMail {
 }
 
 Base.NullMail = NullMail;
+attrInternal.call(Base.prototype, "message");
 include(Base, Callbacks);
 include(Base, DeliveryMethods);
 include(Base, QueuedDelivery);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HTML4 } from "@blazetrails/html-sanitizer";
+import { HTML5 } from "@blazetrails/html-sanitizer";
 import { include } from "@blazetrails/activesupport";
 import { Base, LookupContext, Template } from "@blazetrails/actionview";
 import { TSE } from "@blazetrails/actionview/template/handlers/tse.js";
@@ -10,8 +10,8 @@ import { Content } from "../lib/content.js";
 import { ContentHelper } from "../lib/content-helper.js";
 
 describe("ContentHelperTest", () => {
-  it("sanitizer defaults to the HTML4 safe list sanitizer", () => {
-    expect(ContentHelper.sanitizer).toBeInstanceOf(HTML4.SafeListSanitizer);
+  it("sanitizer is the configured sanitizer_vendor's safe list sanitizer", () => {
+    expect(ContentHelper.sanitizer).toBeInstanceOf(HTML5.SafeListSanitizer);
     expect(new ContentHelper().sanitizer).toBe(ContentHelper.sanitizer);
   });
 
