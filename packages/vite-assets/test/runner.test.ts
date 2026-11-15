@@ -21,7 +21,7 @@ async function assertRunCommand(argv: string[], { flags = [] as string[] } = {})
   if (/node_modules\/.bin\/vite/.test(executable)) {
     expect(rest).toEqual([...argv, ...flags]);
   } else {
-    expect([executable, ...rest]).toEqual(["yarn", "vite", ...argv, ...flags]);
+    expect([executable, ...rest]).toEqual(["pnpm", "exec", "vite", ...argv, ...flags]);
   }
 }
 
