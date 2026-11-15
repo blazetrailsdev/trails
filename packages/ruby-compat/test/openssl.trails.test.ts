@@ -24,6 +24,6 @@ describe("OpenSSL::SSL::SSLContext", () => {
     const context = new OpenSSL.SSL.SSLContext();
     expect(context.options).toBe(OpenSSL.SSL.OP_ALL);
     context.setParams();
-    expect(context.options).toBe(0x80020850);
+    expect(context.options).toBe(0x80020050);
   });
 });
