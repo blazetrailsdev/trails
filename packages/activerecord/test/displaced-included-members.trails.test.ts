@@ -16,6 +16,6 @@ describe("class-body members displacing include()d ports", () => {
       }
     }
     include(Record, port);
-    expect(displacedIncludedMembers(Record).get("attributeInDatabase")).toBe(port);
+    expect(displacedIncludedMembers(Record).get("attributeInDatabase")).toEqual([port]);
   });
 });

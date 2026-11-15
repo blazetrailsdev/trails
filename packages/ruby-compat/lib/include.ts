@@ -1585,6 +1585,8 @@ export function rbModAppendFeatures(
         if (!existing || existingIsMixin) {
           descriptors[key] = modDesc;
           installed.add(key);
+        } else {
+          recordDisplaced(klass, key, mod);
         }
         continue;
       }
@@ -1608,6 +1610,9 @@ export function rbModAppendFeatures(
           enumerable: higher.enumerable ?? lower.enumerable ?? false,
         };
         if (existingIsMixin) installed.add(key);
+        else if ((existing.get && modDesc.get) || (existing.set && modDesc.set)) {
+          recordDisplaced(klass, key, mod);
+        }
       } else if (existingIsMixin) {
         descriptors[key] = modDesc;
       } else {
@@ -1673,22 +1678,23 @@ export function rbModAppendFeatures(
 /** @noRailsEquivalent PERMANENT */
 export const shadowsIncluded = Symbol.for("@blazetrails/ruby-compat:shadowsIncluded");
 
-const displaced = new WeakMap<object, Map<string, object>>();
+const displaced = new WeakMap<object, Map<string | symbol, object[]>>();
 
 function recordDisplaced(klass: AnyClass, key: string | symbol, mod: object): void {
-  if (typeof key !== "string") return;
   const optOut = Object.hasOwn(klass, shadowsIncluded)
-    ? (klass as unknown as Record<symbol, readonly string[]>)[shadowsIncluded]
+    ? (klass as unknown as Record<symbol, readonly (string | symbol)[]>)[shadowsIncluded]
     : undefined;
   if (optOut?.includes(key)) return;
   let names = displaced.get(klass.prototype);
   if (!names) displaced.set(klass.prototype, (names = new Map()));
-  if (!names.has(key)) names.set(key, mod);
+  const mods = names.get(key);
+  if (!mods) names.set(key, [mod]);
+  else if (!mods.includes(mod)) mods.push(mod);
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function displacedIncludedMembers(klass: AnyClass): Map<string, object> {
-  return new Map(displaced.get(klass.prototype));
+export function displacedIncludedMembers(klass: AnyClass): Map<string | symbol, object[]> {
+  return new Map([...(displaced.get(klass.prototype) ?? [])].map(([k, v]) => [k, [...v]]));
 }
 
 const prependedMethods = new WeakMap<object, Set<unknown>>();

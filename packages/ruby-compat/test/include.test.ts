@@ -2542,7 +2542,7 @@ describe("displacedIncludedMembers", () => {
     }
     include(Host, mod);
     expect(new Host().greet()).toBe("class");
-    expect([...displacedIncludedMembers(Host)]).toEqual([["greet", mod]]);
+    expect([...displacedIncludedMembers(Host)]).toEqual([["greet", [mod]]]);
   });
 
   it("skips a name the class lists under shadowsIncluded", () => {
@@ -2555,5 +2555,33 @@ describe("displacedIncludedMembers", () => {
     }
     include(Host, mod);
     expect(displacedIncludedMembers(Host).size).toBe(0);
+  });
+
+  it("records a class-body getter that masks a module getter", () => {
+    const mod = {
+      get name() {
+        return "module";
+      },
+    };
+    class Host {
+      get name() {
+        return "class";
+      }
+    }
+    include(Host, mod);
+    expect(displacedIncludedMembers(Host).get("name")).toEqual([mod]);
+  });
+
+  it("records every module a class-body member displaces", () => {
+    const first = { greet: () => "first" };
+    const second = { greet: () => "second" };
+    class Host {
+      greet() {
+        return "class";
+      }
+    }
+    include(Host, first);
+    include(Host, second);
+    expect(displacedIncludedMembers(Host).get("greet")).toEqual([first, second]);
   });
 });
