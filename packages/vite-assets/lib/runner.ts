@@ -6,10 +6,10 @@ import type { ViteAssets } from "./vite-assets.js";
 
 export class Runner {
   /** @internal */
-  private readonly _viteRuby: ViteAssets;
+  private readonly _viteAssets: ViteAssets;
 
-  constructor(viteRuby: ViteAssets) {
-    this._viteRuby = viteRuby;
+  constructor(viteAssets: ViteAssets) {
+    this._viteAssets = viteAssets;
   }
 
   /** @missingRailsCall within_root — PERMANENT */
@@ -31,17 +31,17 @@ export class Runner {
 
   /** @internal */
   private config(): Promise<Config> {
-    return this._viteRuby.config();
+    return this._viteAssets.config();
   }
 
   /** @internal */
   private get logger() {
-    return this._viteRuby.logger;
+    return this._viteAssets.logger;
   }
 
   /** @internal */
   private env(): Record<string, string> {
-    return this._viteRuby.env();
+    return this._viteAssets.env();
   }
 
   /** @internal */

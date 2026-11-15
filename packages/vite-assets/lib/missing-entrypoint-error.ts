@@ -5,7 +5,7 @@ import { Error } from "./error.js";
 export interface LastBuild {
   success: boolean | null;
   errors: unknown;
-  toJson(): string;
+  toJSON(): Record<string, unknown>;
 }
 
 export class MissingEntrypointError extends Error {
@@ -34,7 +34,7 @@ Possible causes:
 ${MissingEntrypointError.prototype.possibleCauses.call({ config } as MissingEntrypointError, lastBuild)}
 :troubleshooting:
 ${lastBuild.success ? `Manifest files found:\n${manifestPaths.map((path) => `  ${path.relativePathFrom(config.root)}`).join("\n")}\n` : ""}
-${lastBuild.success ? `Last build in ${config.mode} mode:\n${lastBuild.toJson()}\n` : ""}
+${lastBuild.success ? `Last build in ${config.mode} mode:\n${JSON.stringify(lastBuild, null, 2)}\n` : ""}
 `);
     [this.fileName, this.lastBuild, this.manifest, this.config] = [
       fileName,

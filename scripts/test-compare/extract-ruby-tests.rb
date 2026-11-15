@@ -312,6 +312,13 @@ class TestExtractor
       process_method_add_arg(node)
     when :def
       process_def(node)
+    when :vcall, :var_ref
+      process_visibility(node)
+    when :sclass, :do_block, :brace_block
+      prev_private = @in_private
+      @in_private = false
+      node.each { |child| walk(child) if child.is_a?(Array) }
+      @in_private = prev_private
     when :class
       process_class(node)
     when :module
@@ -441,6 +448,8 @@ class TestExtractor
     # ActionDispatch::IntegrationTest` (dispatch/routing_test.rb) is a test case.
     superclass = const_name(node[2])
     prev_non_test = @in_non_test_class
+    prev_private = @in_private
+    @in_private = false
     @in_non_test_class = !superclass.nil? &&
       (NON_TEST_SUPERCLASSES.include?(superclass) || @non_test_classes.include?(superclass))
     @non_test_classes << name << name.split("::").last if @in_non_test_class
@@ -455,8 +464,23 @@ class TestExtractor
     class_def[:tests] = @test_cases[first..].select { |tc| tc[:ancestors] == class_def[:ancestors] }
     @module_collect = prev
     @in_non_test_class = prev_non_test
+    @in_private = prev_private
     @class_stack.pop
     @describe_stack.pop
+  end
+
+  # A bare `private` / `protected` / `public` in a class body. Minitest runs
+  # only `public_instance_methods(true).grep(/^test_/)`
+  # (minitest/test.rb `runnable_methods`), so a `def test_*` below `private`
+  # is a helper, as `test_app_dev_dependencies`
+  # (vendor/vite_ruby/v3.11.1/test/rake_tasks_test.rb:53) is.
+  def process_visibility(node)
+    ident = node[1]
+    return unless ident.is_a?(Array) && ident[0] == :@ident
+    case ident[1]
+    when "private", "protected" then @in_private = true
+    when "public" then @in_private = false
+    end
   end
 
   # Minitest runs every `test_*` a test class answers, inherited ones included
@@ -495,9 +519,12 @@ class TestExtractor
     prev_base = @module_gate_base
     @module_collect = []
     @module_gate_base = @gate_stack.length
+    prev_private = @in_private
+    @in_private = false
     @class_stack.push(name) if name
     walk_body(node[2])
     @class_stack.pop if name
+    @in_private = prev_private
     collected = @module_collect
     @module_collect = prev
     @module_gate_base = prev_base
@@ -877,6 +904,7 @@ class TestExtractor
     return unless name
     return unless name.start_with?("test_")
     return if @in_non_test_class
+    return if @in_private
     # Minitest invokes test methods with no arguments, so a `def test_*` that
     # declares a *required* parameter (e.g. the private helper
     # `test_lock_free(lock_name)`) can never be run as a test — skip it so it

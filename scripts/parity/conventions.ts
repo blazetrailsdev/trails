@@ -766,6 +766,16 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`ViteRuby::Commands#legacy_yarn_version?` (vite_ruby/lib/vite_ruby/commands.rb:44-46) " +
+      "shells out to `yarn --version` and gates `YARN_PRODUCTION`; the `yarn` -> `pnpm` token " +
+      "rename would name it for a binary it never runs, so it keeps the yarn spelling. PERMANENT.",
+    names: ["legacy_yarn_version?"],
+    rubyFiles: ["commands.rb"],
+    packages: ["vite-assets"],
+    tsMirrorName: "isLegacyYarnVersion",
+  },
+  {
+    reason:
       "Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no " +
       "hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, " +
       '"`Module#autoload` is a build step"). PERMANENT.',

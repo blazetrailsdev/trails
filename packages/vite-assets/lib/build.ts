@@ -4,7 +4,7 @@ import { VERSION } from "./version.js";
 export interface BuildAttrs {
   success?: boolean | null;
   timestamp?: string | null;
-  viteRuby?: string | null;
+  viteAssets?: string | null;
   digest?: string | null;
   currentDigest?: string | null;
   lastBuildPath?: Pathname | null;
@@ -14,7 +14,7 @@ export interface BuildAttrs {
 const MEMBERS: Readonly<Record<string, keyof BuildAttrs>> = Object.freeze({
   success: "success",
   timestamp: "timestamp",
-  vite_ruby: "viteRuby",
+  vite_ruby: "viteAssets",
   digest: "digest",
   current_digest: "currentDigest",
   last_build_path: "lastBuildPath",
@@ -24,7 +24,7 @@ const MEMBERS: Readonly<Record<string, keyof BuildAttrs>> = Object.freeze({
 export class Build {
   success: boolean | null;
   timestamp: string | null;
-  viteRuby: string | null;
+  viteAssets: string | null;
   digest: string | null;
   currentDigest: string | null;
   lastBuildPath: Pathname | null;
@@ -33,7 +33,7 @@ export class Build {
   constructor({
     success = null,
     timestamp = null,
-    viteRuby = null,
+    viteAssets = null,
     digest = null,
     currentDigest = null,
     lastBuildPath = null,
@@ -41,7 +41,7 @@ export class Build {
   }: BuildAttrs = {}) {
     this.success = success;
     this.timestamp = timestamp;
-    this.viteRuby = viteRuby;
+    this.viteAssets = viteAssets;
     this.digest = digest;
     this.currentDigest = currentDigest;
     this.lastBuildPath = lastBuildPath;
@@ -85,7 +85,9 @@ export class Build {
   }
 
   isStale(): boolean {
-    return this.digest !== this.currentDigest || this.isRetryFailed() || this.viteRuby !== VERSION;
+    return (
+      this.digest !== this.currentDigest || this.isRetryFailed() || this.viteAssets !== VERSION
+    );
   }
 
   isFresh(): boolean {
@@ -109,7 +111,7 @@ export class Build {
       timestamp:
         `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ` +
         `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`,
-      viteRuby: VERSION,
+      viteAssets: VERSION,
       digest: this.currentDigest,
       currentDigest: this.currentDigest,
       lastBuildPath: this.lastBuildPath,
@@ -117,20 +119,16 @@ export class Build {
   }
 
   async writeToCache(): Promise<void> {
-    await this.lastBuildPath!.write(this.toJson());
+    await this.lastBuildPath!.write(JSON.stringify(this, null, 2));
   }
 
-  toJson(..._args: unknown[]): string {
-    return JSON.stringify(
-      {
-        success: this.success,
-        errors: this.errors,
-        timestamp: this.timestamp,
-        vite_ruby: this.viteRuby,
-        digest: this.digest,
-      },
-      null,
-      2,
-    );
+  toJSON(..._args: unknown[]): Record<string, unknown> {
+    return {
+      success: this.success,
+      errors: this.errors,
+      timestamp: this.timestamp,
+      vite_ruby: this.viteAssets,
+      digest: this.digest,
+    };
   }
 }

@@ -17,7 +17,7 @@ export class DevServerProxy extends Proxy {
 
   constructor(app: unknown = null, options: Record<string, unknown> = {}) {
     const viteRuby =
-      (hashDelete(options, "viteRuby") as ViteAssets | null) ?? TopLevel.ViteAssets!.instance();
+      (hashDelete(options, "viteAssets") as ViteAssets | null) ?? TopLevel.ViteAssets!.instance();
     if (viteRuby.peekConfig().mode === "test" && !Object.hasOwn(options, "streaming"))
       options["streaming"] = false;
     super(app, options);
