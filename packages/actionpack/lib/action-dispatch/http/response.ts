@@ -134,7 +134,6 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
       const yielded: Array<{ chunk: unknown; resume: () => void }> = [];
       let wake: (() => void) | null = null;
       let done = false;
-      let failure: { error: unknown } | null = null;
       const eachChunk = Promise.resolve(
         this.eachChunk(
           (chunk) =>
@@ -144,9 +143,10 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
             }),
         ),
       )
-        .catch((error: unknown) => {
-          failure = { error };
-        })
+        .then(
+          () => null,
+          (error: unknown) => ({ error }),
+        )
         .finally(() => {
           done = true;
           wake?.();
@@ -161,8 +161,8 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
           wake = null;
         }
       }
-      await eachChunk;
-      if (failure) throw (failure as { error: unknown }).error;
+      const failure = await eachChunk;
+      if (failure) throw failure.error;
     }
   }
 
@@ -402,9 +402,9 @@ export class Response {
     return (this.stream as { write(string: string): unknown }).write(string);
   }
 
-  close(): void {
-    const stream = this.stream as { close?: () => void };
-    if (typeof stream?.close === "function") stream.close();
+  close(): unknown {
+    const stream = this.stream as { close?: () => unknown };
+    if (typeof stream?.close === "function") return stream.close();
   }
 
   get committed(): boolean {

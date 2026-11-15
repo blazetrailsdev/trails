@@ -143,19 +143,19 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
 export class SSE {
   static readonly PERMITTED_OPTIONS = ["retry", "event", "id"] as const;
 
-  private _stream: { write(s: string): unknown; close(): void };
+  private _stream: { write(s: string): unknown; close(): unknown };
   private _options: { retry?: number | string; event?: string; id?: number | string };
 
   constructor(
-    stream: { write(s: string): unknown; close(): void },
+    stream: { write(s: string): unknown; close(): unknown },
     options: { retry?: number | string; event?: string; id?: number | string } = {},
   ) {
     this._stream = stream;
     this._options = options;
   }
 
-  close(): void {
-    this._stream.close();
+  close(): unknown {
+    return this._stream.close();
   }
 
   write(
