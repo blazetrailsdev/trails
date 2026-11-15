@@ -147,9 +147,13 @@ export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError
  */
 export function assertAssignedSynchronously(pending: unknown, methodName: string): void {
   if (!(pending instanceof Promise)) return;
-  throw new RuntimeError(
+  const error = new RuntimeError(
     `${methodName} cannot assign this attribute synchronously; use \`await record.setAttributes(...)\` instead.`,
   );
+  pending.catch((reason: unknown) => {
+    error.cause = reason;
+  });
+  throw error;
 }
 
 /**
@@ -162,6 +166,11 @@ export function capturingAssignment<R>(build: () => R): [R, Promise<void> | unde
   try {
     const record = build();
     return [record, capture.assigned];
+  } catch (error) {
+    capture.assigned?.catch((reason: unknown) => {
+      if (error instanceof Error) error.cause ??= reason;
+    });
+    throw error;
   } finally {
     assignmentCapture = null;
   }

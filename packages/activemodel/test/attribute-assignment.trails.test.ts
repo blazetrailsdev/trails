@@ -406,3 +406,24 @@ describe("AttributeAssignment async writers", () => {
     expect(record.order).toEqual(["a"]);
   });
 });
+
+describe("AttributeAssignment async writers through new", () => {
+  class Rejecting extends Model {
+    override _assignAttribute(k: string): unknown {
+      return Promise.reject(new Error(`cannot assign ${k}`));
+    }
+  }
+
+  it("raises and carries the writer's rejection as the cause", async () => {
+    let raised: unknown;
+    try {
+      new Rejecting({ a: 1 });
+    } catch (error) {
+      raised = error;
+    }
+    expect(raised).toBeInstanceOf(Error);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(((raised as Error).cause as Error).message).toBe("cannot assign a");
+  });
+});

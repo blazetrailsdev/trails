@@ -317,7 +317,7 @@ export function assignNestedAttributesForOneToOneAssociation(
           rbFSend(this, method, assignableAttributes),
         );
         if (built instanceof Promise) {
-          return built.then(() => assigned).then(() => {});
+          return Promise.all([built, assigned]).then(() => {});
         }
         return assigned;
       } else {
