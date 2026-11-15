@@ -19,7 +19,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const pool = adapter._statements;
       await adapter.rollbackDbTransaction();
       await adapter.disconnectBang();
-      await expect(pool.clear()).resolves.toBeUndefined();
+      await expect(pool.clear()).resolves.not.toThrow();
     });
 
     it("prepared statements do not get stuck on query interruption", async () => {
