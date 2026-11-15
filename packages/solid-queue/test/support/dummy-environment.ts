@@ -35,6 +35,7 @@ const primaryConfig =
   primary.database === ":memory:"
     ? new HashConfig(envName, "primary", {
         ...primary.configurationHash,
+        timeout: 5000,
         database: databaseNameFrom("primary"),
       })
     : primary;
