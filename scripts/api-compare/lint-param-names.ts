@@ -28,12 +28,13 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { scopeOf } from "./scope.js";
+import { loadLedgerScope, loadLedgers, renderSkipped, staleSignatureRows } from "./bump-ledger.js";
 import {
   GATED_PACKAGES,
   MARK_PATH,
   exceedances,
   loadMarks,
-  measure,
+  ledgeredMeasure,
   staleMarkFailure,
   staleMarks,
   tightened,
@@ -45,7 +46,7 @@ import {
 
 interface ParamNameArtifact {
   packages: string[];
-  mismatches: MeasuredRow[];
+  mismatches: (MeasuredRow & { rubyName: string })[];
 }
 
 async function readArtifact(): Promise<ParamNameArtifact> {
@@ -79,9 +80,32 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  const current = measure(artifact.mismatches, gated);
+  const ledger = await loadLedgerScope();
+  const { current, measured, skipped } = ledgeredMeasure(
+    artifact.mismatches,
+    ledger.signaturePair,
+    gated,
+  );
+  console.log(renderSkipped("param-name gate", skipped));
+  const blocks = JSON.parse(
+    await fs.readFile(path.join(OUTPUT_DIR, "block-param-mismatches.json"), "utf-8"),
+  ) as ParamNameArtifact;
+  const staleSignatures = staleSignatureRows(
+    [...(await loadLedgers()).values()]
+      .flat()
+      .filter((r) => (GATED_PACKAGES as readonly string[]).includes(r.package)),
+    [...artifact.mismatches, ...blocks.mismatches],
+  );
+  if (staleSignatures.length > 0) {
+    console.error(
+      `\nparam-name gate: ${staleSignatures.length} STALE signature ledger row(s): the port's ` +
+        "signature now agrees with Rails. Delete each from scripts/parity/bump-ledger/:\n" +
+        staleSignatures.map((r) => `  - ${r.package} ${r.rubyFile}:${r.rubyName}`).join("\n"),
+    );
+    return 1;
+  }
   const grew = exceedances(marks, current, gated);
-  const stale = staleMarks(marks, current, gated);
+  const stale = staleMarks(marks, measured, gated);
 
   if (tighten) {
     if (grew.length > 0) {
@@ -91,7 +115,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
       );
       return 1;
     }
-    await writeMarks(tightened(marks, current));
+    await writeMarks(tightened(marks, measured));
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MARK_PATH)}: narrowed ${stale.length} dimension(s).`,
     );

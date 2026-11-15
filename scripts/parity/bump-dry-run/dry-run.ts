@@ -40,14 +40,21 @@ import {
   attribute,
   gateRows,
   mergeManifest,
+  mismatchAxes,
   newRows,
   pairKey,
   pairSeed,
+  constantSeed,
+  signatureSeed,
+  suspendedTests,
   table,
   testDelta,
   testSeed,
   type GateRow,
+  type ApiConstants,
   type HashRecord,
+  type PairKey,
+  type PairSeedRow,
   type Pin,
   type RubyTestManifest,
 } from "./ledger.js";
@@ -60,11 +67,36 @@ import {
 } from "./report.js";
 import { LEDGERED_STEPS, NOT_EXERCISED, STEPS, TSX, parseArgs } from "./steps.js";
 
+/** Every parameter-name and block-parameter row of an api output directory. */
+async function signatureRows(dir: string): Promise<PairKey[]> {
+  const rows: PairKey[] = [];
+  for (const f of ["param-name-mismatches.json", "block-param-mismatches.json"]) {
+    const a = await readJson<{ mismatches: PairKey[] }>(path.join(dir, f)).catch(() => null);
+    rows.push(...(a?.mismatches ?? []));
+  }
+  return rows;
+}
+
+async function axesOf(rel: string): Promise<Map<string, Set<string>>> {
+  return mismatchAxes((await readJson<{ results?: [] }>(rel)).results ?? []);
+}
+
+/** `<package> <rubyFile>` → the file's missing descriptions, for each file with a TS twin. */
+async function missingOf(rel: string): Promise<Map<string, Set<string>>> {
+  const m = new Map<string, Set<string>>();
+  for (const r of (await readJson<ConventionComparison>(rel)).results ?? []) {
+    for (const f of r.files ?? [])
+      if (f.tsFileExists) m.set(`${r.package} ${f.rubyFile}`, new Set(f.missingTests ?? []));
+  }
+  return m;
+}
+
 const { fetchCandidate } = await import("../../../vendor/fetch.js");
 const { SOURCES, testPathsManifest, vendoredRoot } = await import("../../../vendor/sources.js");
 const { extractTargetApi } = await import("../../api-compare/drift.js");
 const { compareArms } = await import("../../api-compare/report-arms.js");
 const { buildReport, loadConcernHooks } = await import("../../api-compare/extra-surface.js");
+const { rubyFileToTs } = await import("../conventions.js");
 
 type Env = Record<string, string | undefined>;
 const run = promisify(execFile);
@@ -281,6 +313,11 @@ async function main(argv: string[], env: Env): Promise<number> {
   let ledgeredSteps: StepResult[];
   const ledgerFile = path.join(ROOT, "scripts/parity/bump-ledger", `${source.name}.json`);
   const priorLedger = await fs.readFile(ledgerFile, "utf8").catch(() => null);
+  const testLedgerFile = path.join(path.dirname(ledgerFile), `${source.name}.tests.json`);
+  const priorTestLedger = await fs.readFile(testLedgerFile, "utf8").catch(() => null);
+  const testRows: ReturnType<typeof testSeed> = [];
+  const pairRows: PairSeedRow[] = [];
+  const testTable: (string | number)[][] = [];
   let citationRewrites: string[];
   let restoreBuild: boolean;
   try {
@@ -331,16 +368,73 @@ async function main(argv: string[], env: Env): Promise<number> {
     await must("pnpm", extractTs, { ...childEnv, API_COMPARE_FORCE: "1" });
     candidateSteps = await runSteps(childEnv, "candidate");
     await snapshot(path.join(outDir, "candidate"));
-    const seeded = pairSeed(
-      (await readJson<Pin[]>(path.join(ROOT, "scripts/api-compare/body-pins.json"))).filter((p) =>
-        packages.includes(p.package),
-      ),
+    const seedPins = (
+      await readJson<Pin[]>(path.join(ROOT, "scripts/api-compare/body-pins.json"))
+    ).filter((p) => packages.includes(p.package));
+    const bodySeed = pairSeed(
+      seedPins,
       (await readJson<{ hashes: HashRecord[] }>(path.join(API_OUT, "body-hashes.json"))).hashes,
       fromRef,
       ref,
     );
+    pairRows.push(
+      ...bodySeed,
+      ...signatureSeed(
+        await signatureRows(path.join(outDir, "active/api")),
+        await signatureRows(path.join(outDir, "candidate/api")),
+        bodySeed,
+        seedPins,
+        fromRef,
+        ref,
+      ),
+      ...constantSeed(
+        await readJson<ApiConstants>(path.join(outDir, "active/api/rails-api.json")),
+        await readJson<ApiConstants>(path.join(outDir, "candidate/api/rails-api.json")),
+        newRows(
+          await extraRows(path.join(outDir, "active/api")),
+          await extraRows(path.join(outDir, "candidate/api")),
+        ),
+        packages,
+        rubyFileToTs,
+        fromRef,
+        ref,
+      ),
+    );
     await fs.mkdir(path.dirname(ledgerFile), { recursive: true });
-    await fs.writeFile(ledgerFile, JSON.stringify(seeded, null, 2) + "\n");
+    await fs.writeFile(ledgerFile, JSON.stringify(pairRows, null, 2) + "\n");
+    const candidateComparison = path.join(outDir, "candidate/test/convention-comparison.json");
+    const missing = await missingOf(candidateComparison);
+    const mergedTests = await readJson<RubyTestManifest>(
+      path.join(outDir, "candidate/test/rails-tests.json"),
+    );
+    const activeAxes = await axesOf(path.join(outDir, "active/test/convention-comparison.json"));
+    const candidateAxes = await axesOf(candidateComparison);
+    const descriptionOf = new Map<string, string>();
+    for (const [pkg, { files }] of Object.entries(activeTests.packages))
+      for (const f of files)
+        for (const tc of f.testCases)
+          descriptionOf.set(`${pkg} ${f.file} ${tc.path}`, tc.description);
+    for (const pkg of Object.keys(mergedTests.packages).filter((p) => packages.includes(p))) {
+      const d = testDelta(activeTests, mergedTests, pkg);
+      testRows.push(
+        ...suspendedTests(
+          testSeed(pkg, d, activeTests, missing, fromRef, ref),
+          (r) => descriptionOf.get(`${r.package} ${r.rubyFile} ${r.path}`) ?? "",
+          activeAxes,
+          candidateAxes,
+        ),
+      );
+      testTable.push([
+        pkg,
+        d.before,
+        d.after,
+        d.added,
+        d.removed,
+        d.changed.length,
+        d.moved.length,
+      ]);
+    }
+    await fs.writeFile(testLedgerFile, JSON.stringify(testRows, null, 2) + "\n");
     ledgeredSteps = await runSteps(
       childEnv,
       "ledgered",
@@ -350,6 +444,8 @@ async function main(argv: string[], env: Env): Promise<number> {
   } finally {
     if (priorLedger === null) await fs.rm(ledgerFile, { force: true });
     else await fs.writeFile(ledgerFile, priorLedger);
+    if (priorTestLedger === null) await fs.rm(testLedgerFile, { force: true });
+    else await fs.writeFile(testLedgerFile, priorTestLedger);
     await restore(path.join(outDir, "active"));
     for (const f of await trackedDiff(env)) {
       const { code } = await sh("git", ["checkout", "HEAD", "--", f], env);
@@ -369,26 +465,7 @@ async function main(argv: string[], env: Env): Promise<number> {
     .hashes;
   const candidateHashes: HashRecord[] = (await c<{ hashes: HashRecord[] }>("api/body-hashes.json"))
     .hashes;
-  const seed = pairSeed(pins, candidateHashes, fromRef, ref);
-
-  const missingOf = async (rel: string) => {
-    const m = new Map<string, Set<string>>();
-    for (const r of (await readJson<ConventionComparison>(rel)).results ?? []) {
-      for (const f of r.files ?? [])
-        if (f.tsFileExists) m.set(`${r.package} ${f.rubyFile}`, new Set(f.missingTests ?? []));
-    }
-    return m;
-  };
-  const activeTests = await a<RubyTestManifest>("test/rails-tests.json");
-  const candidateTests = await c<RubyTestManifest>("test/rails-tests.json");
-  const missing = await missingOf(path.join(outDir, "active/test/convention-comparison.json"));
-  const testRows: ReturnType<typeof testSeed> = [];
-  const testTable: (string | number)[][] = [];
-  for (const pkg of Object.keys(candidateTests.packages).filter((p) => packages.includes(p))) {
-    const d = testDelta(activeTests, candidateTests, pkg);
-    testRows.push(...testSeed(pkg, d, activeTests, missing, fromRef, ref));
-    testTable.push([pkg, d.before, d.after, d.added, d.removed, d.changed.length, d.moved.length]);
-  }
+  const seed = pairRows;
 
   const artifacts = cols(
     "call-mismatches|call-arg-mismatches|param-name-mismatches|block-param-mismatches|call-skeletons",

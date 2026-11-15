@@ -778,3 +778,63 @@ describe("PKG_SRC_DIRS", () => {
     ).resolves.toBeUndefined();
   });
 });
+
+describe("main with a bump-ledgered test", () => {
+  it("holds a ledgered test's mismatch, counts its neighbour, and reds a stale row", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
+    const pkg = "activesupport";
+    const rb = "core_ext/time_ext_test.rb";
+    const rubyTc = (description: string, assertionCount: number) => ({
+      ancestors: ["T"],
+      description,
+      path: `T > ${description}`,
+      assertionCount,
+    });
+    const tsTc = (description: string, assertionCount: number) => ({
+      ancestors: ["T"],
+      description,
+      assertionCount,
+    });
+    const manifest = (source: string, file: string, testCases: unknown[]) => ({
+      source,
+      generatedAt: "",
+      packages: { [pkg]: { files: [{ file, testCases }] } },
+    });
+    const ruby = manifest("ruby", rb, [rubyTc("held", 2), rubyTc("counted", 2), rubyTc("ok", 1)]);
+    const ts = manifest("typescript", `${PKG_SRC_DIRS[pkg]}${rubyToConventionTs(rb, pkg)}`, [
+      tsTc("held", 1),
+      tsTc("counted", 1),
+      tsTc("ok", 1),
+    ]);
+    await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
+    await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify(ts));
+    const row = (p: string) => ({
+      package: pkg,
+      rubyFile: rb,
+      path: p,
+      kind: "changed" as const,
+      from: "v8.0.2",
+      to: "v8.0.5.2",
+    });
+    const errors: string[] = [];
+    const [log, error, code] = [console.log, console.error, process.exitCode];
+    console.log = () => {};
+    console.error = (...parts: unknown[]) => void errors.push(parts.join(" "));
+    try {
+      main(["--package", pkg, "--json"], dir, [row("T > held"), row("T > ok")]);
+    } finally {
+      [console.log, console.error] = [log, error];
+    }
+    const exitCode = process.exitCode;
+    process.exitCode = code;
+    const { results } = JSON.parse(
+      await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
+    ) as { results: { totalAssertionMismatch: number }[] };
+    await fs.rm(dir, { recursive: true });
+    expect(results[0].totalAssertionMismatch).toBe(1);
+    expect(errors.filter((e) => e.includes("bump-ledger"))).toEqual([
+      expect.stringContaining(`STALE bump-ledger test row: ${pkg} ${rb} T > ok`),
+    ]);
+    expect(exitCode).toBe(1);
+  });
+});

@@ -35,7 +35,9 @@ import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import { compareArms, staleArmReceipts, type SkeletonArtifact } from "./report-arms.js";
 import { TAG as INVENTED_ARM_TAG } from "./invented-arm-tags.js";
 import { staleMarkFailure } from "./param-name-mark.js";
+import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
 import {
+  GATED_TOKEN,
   MARK_PATH,
   exceedances,
   loadMarks,
@@ -101,9 +103,18 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   }
 
   const marks = scopedMarks(committed, scope);
-  const current = measure(artifact.skeletons.flatMap((s) => compareArms(s) ?? []));
+  const ledger = await loadLedgerScope();
+  const { counted, skipped } = skipLedgered(
+    artifact.skeletons.flatMap((s) => compareArms(s) ?? []),
+    ledger.pair,
+  );
+  console.log(
+    renderSkipped("arm-throw gate", skipped.filter((r) => r.missing.includes(GATED_TOKEN)).length),
+  );
+  const current = measure(counted);
+  const measured = measure([...counted, ...skipped]);
   const grew = exceedances(marks, current);
-  const stale = staleMarks(marks, current);
+  const stale = staleMarks(marks, measured);
 
   if (tighten) {
     if (grew.length > 0) {
@@ -113,7 +124,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
       );
       return 1;
     }
-    await writeMarks(tightened(marks, current));
+    await writeMarks(tightened(marks, measured));
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MARK_PATH)}: narrowed ${stale.length} dimension(s).`,
     );

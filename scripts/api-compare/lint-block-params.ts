@@ -24,11 +24,12 @@ import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
 import { BLOCK_IDIOM } from "./block-params.js";
 import { scopeOf } from "./scope.js";
+import { loadLedgerScope, renderSkipped } from "./bump-ledger.js";
 import {
   GATED_PACKAGES,
   exceedances,
   loadMarks,
-  measure,
+  ledgeredMeasure,
   staleMarkFailure,
   staleMarks,
   tightened,
@@ -65,16 +66,22 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  const current = measure(artifact.mismatches, gated);
+  const ledger = await loadLedgerScope();
+  const { current, measured, counted, skipped } = ledgeredMeasure(
+    artifact.mismatches,
+    ledger.signaturePair,
+    gated,
+  );
+  console.log(renderSkipped("block-param gate", skipped));
   const grew = exceedances(marks, current, gated);
-  const stale = staleMarks(marks, current, gated);
+  const stale = staleMarks(marks, measured, gated);
 
   if (tighten) {
     if (grew.length > 0) {
       console.error("\nblock-param gate: refusing to tighten while the mark is EXCEEDED.\n");
       return 1;
     }
-    await writeMarks(tightened(marks, current, GATED_PACKAGES), BLOCK_MARK_PATH);
+    await writeMarks(tightened(marks, measured, GATED_PACKAGES), BLOCK_MARK_PATH);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BLOCK_MARK_PATH)}: narrowed ${stale.length} dimension(s).`,
     );
@@ -86,7 +93,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     console.error(`Rails' method takes a block the port does not. ${BLOCK_IDIOM}\n`);
     for (const v of grew) {
       console.error(`  + ${v.package}  ${v.dimension}: mark ${v.mark} → current ${v.current}`);
-      for (const row of artifact.mismatches) {
+      for (const row of counted) {
         if (row.package === v.package && row.rubyFile === v.dimension) {
           console.error(`      ${row.rubyName} → ${row.tsName}`);
         }

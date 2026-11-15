@@ -210,3 +210,23 @@ export async function writeMarks(marks: ParamNameMarks, file = MARK_PATH): Promi
   for (const name of Object.keys(marks).sort()) sorted[name] = marks[name]!;
   await fs.writeFile(file, serializeBaseline(sorted));
 }
+
+/**
+ * A gate's two measurements under the bump ledger (RFC 0191 § 3, rule 3):
+ * `current` without the ledgered rows, which growth is judged on, and
+ * `measured` with them, which the STALE check and `--tighten` read, so a
+ * ledgered pair's debt neither reds as growth nor lets a mark be written down.
+ */
+export function ledgeredMeasure<T extends MeasuredRow>(
+  rows: readonly T[],
+  isLedgered: (row: T) => boolean,
+  gated: readonly string[] = GATED_PACKAGES,
+): { current: ParamNameMarks; measured: ParamNameMarks; counted: T[]; skipped: number } {
+  const counted = rows.filter((r) => !isLedgered(r));
+  return {
+    current: measure(counted, gated),
+    measured: measure(rows, gated),
+    counted,
+    skipped: rows.length - counted.length,
+  };
+}

@@ -85,6 +85,13 @@ import { PATH_SEGMENT_ALIASES } from "@blazetrails/parity/conventions";
 import { SpellChecker } from "../../packages/did-you-mean/lib/spell-checker.js";
 import { testPathsManifest } from "../../vendor/sources.js";
 import { classifyTestFile, closureFiles } from "./closure-manifest.js";
+import {
+  type TestLedgerRow,
+  loadTestLedger,
+  testLedgerKey,
+  testLedgerProblems,
+  testRowKey,
+} from "../api-compare/bump-ledger.js";
 
 const SCRIPT_DIR = __dirname;
 const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
@@ -751,7 +758,16 @@ export function compareFileResults(
 // Main
 // ---------------------------------------------------------------------------
 
-export function main(args: string[] = process.argv.slice(2), outputDir: string = OUTPUT_DIR) {
+export function main(
+  args: string[] = process.argv.slice(2),
+  outputDir: string = OUTPUT_DIR,
+  testLedger: readonly TestLedgerRow[] = [],
+) {
+  const ledgerKeys = new Set(testLedger.map(testRowKey));
+  const ledgerMatched = new Set<string>();
+  const ledgerHeld = new Set<string>();
+  const ledgerCompared = new Set<string>();
+  let ledgerSkipped = 0;
   const pkgIndex = args.indexOf("--package");
   let filterPkg: string | null = null;
   if (pkgIndex !== -1) {
@@ -913,6 +929,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
 
     const lookup = tsLookup.get(pkg);
     if (!lookup) continue;
+    ledgerCompared.add(pkg);
 
     const fileResults: ConventionFileResult[] = [];
 
@@ -1017,9 +1034,19 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
 
       // Flag a divergence between Rails' gate and our TS gate for a matched
       // pair (advisory — does not affect the matched/skipped counts).
+      const suspended = (rubyTc: (typeof file.testCases)[number]): boolean => {
+        const key = testLedgerKey(pkg, file.file, rubyTc.path);
+        if (!ledgerKeys.has(key)) return false;
+        ledgerHeld.add(key);
+        ledgerSkipped++;
+        return true;
+      };
+
       const recordGate = (rubyTc: (typeof file.testCases)[number], tsInfo: TsTestInfo) => {
+        const key = testLedgerKey(pkg, file.file, rubyTc.path);
+        if (ledgerKeys.has(key)) ledgerMatched.add(key);
         const kind = classifyGateMismatch(rubyTc.gate, tsInfo.gate, tsInfo.pending);
-        if (!kind) return;
+        if (!kind || suspended(rubyTc)) return;
         gateMismatches.push({
           description: rubyTc.description,
           rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
@@ -1037,6 +1064,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         const railsCount = rubyTc.assertionCount;
         const trailsCount = tsInfo.assertionCount;
         if (!isAssertionCountMismatch(railsCount, trailsCount, tsInfo.pending)) return;
+        if (suspended(rubyTc)) return;
         assertionMismatches.push({
           description: rubyTc.description,
           rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
@@ -1057,7 +1085,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
           tsInfo.assertionKinds,
           !!tsInfo.pending,
         );
-        if (!mismatch) return;
+        if (!mismatch || suspended(rubyTc)) return;
         kindMismatches.push({
           description: rubyTc.description,
           rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
@@ -1079,7 +1107,7 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
           tsInfo.assertionValues,
           !!tsInfo.pending,
         );
-        if (!deltas) return;
+        if (!deltas || suspended(rubyTc)) return;
         valueMismatches.push({
           description: rubyTc.description,
           rubyPath: normPath(rubyTc.ancestors, rubyTc.description),
@@ -1347,6 +1375,21 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
       ...(pkg === "activesupport" ? { arClosure: arClosureResult(fileResults) } : {}),
       files: fileResults,
     });
+  }
+
+  console.log(`test-compare: skipped ${ledgerSkipped} mismatch row(s) on a bump-ledgered test`);
+  for (const { row, problem } of testLedgerProblems(
+    testLedger,
+    ledgerCompared,
+    ledgerMatched,
+    ledgerHeld,
+  )) {
+    console.error(
+      problem === "stale"
+        ? `STALE bump-ledger test row: ${testRowKey(row)} now agrees with Rails on every axis; delete the row`
+        : `UNMATCHED bump-ledger test row: ${testRowKey(row)} matches no TS test; delete the row`,
+    );
+    process.exitCode = 1;
   }
 
   // A receipt that consumed nothing names a Rails assertion that moved or was
@@ -1800,4 +1843,11 @@ function extractRelativeTsPath(fullPath: string, pkg: string): string {
   return path.basename(fullPath);
 }
 
-if (require.main === module) main();
+if (require.main === module) {
+  loadTestLedger()
+    .then((ledger) => main(process.argv.slice(2), OUTPUT_DIR, ledger))
+    .catch((err: unknown) => {
+      console.error(err);
+      process.exit(1);
+    });
+}

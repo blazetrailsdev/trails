@@ -20,7 +20,7 @@ import { type BodyPin, type PinKey, comparePinKeys, currentDigests, keyOf } from
 export const LEDGER_DIR = path.join(ROOT_DIR, "scripts/parity/bump-ledger");
 
 export interface LedgerRow extends PinKey {
-  kind: "drift" | "removed";
+  kind: "drift" | "removed" | "signature" | "constant";
   from: string;
   to: string;
   story?: string;
@@ -103,8 +103,11 @@ export function checkRows(
   for (const row of rows) {
     const pin = pinned.get(keyOf(row));
     const digest = current.get(keyOf(row));
+    if (row.kind === "constant") continue;
     if (pin === undefined) problems.push({ row, problem: "unmatched" });
-    else if (pin === digest) problems.push({ row, problem: "stale" });
+    else if (row.kind === "signature") {
+      if (digest === undefined) problems.push({ row, problem: "kind" });
+    } else if (pin === digest) problems.push({ row, problem: "stale" });
     else if ((digest === undefined) !== (row.kind === "removed"))
       problems.push({ row, problem: "kind" });
   }
@@ -275,8 +278,12 @@ export interface TsPairKey {
  */
 export interface LedgerScope {
   pair(k: PinKey): boolean;
+  /** `pair`, plus a `signature` row: only the parameter-name and block-parameter gates read it. */
+  signaturePair(k: PinKey): boolean;
   ts(k: TsPairKey): boolean;
   tsName(k: { package: string; tsFile: string; tsName: string }): boolean;
+  /** A TS member whose pair is a `removed` row: the extra-surface ratchet subtracts only these. */
+  removedTsName(k: { package: string; tsFile: string; tsName: string }): boolean;
 }
 
 export function ledgerScope(
@@ -289,7 +296,10 @@ export function ledgerScope(
     tsName: string;
   }[],
 ): LedgerScope {
-  const ledgered = new Set(rows.map(keyOf));
+  const ledgered = new Set(
+    rows.filter((r) => r.kind !== "signature" && r.kind !== "constant").map(keyOf),
+  );
+  const signatures = new Set(rows.filter((r) => r.kind === "signature").map(keyOf));
   const filesOf = new Map<string, Set<string>>();
   for (const h of hashes) {
     const f = `${h.package} ${h.rubyFile}`;
@@ -297,7 +307,7 @@ export function ledgerScope(
   }
   const removed = new Set<string>();
   const removedTsNames = new Set<string>();
-  for (const r of rows.filter((x) => x.kind === "removed")) {
+  for (const r of rows.filter((x) => x.kind === "removed" || x.kind === "constant")) {
     const tsFiles = new Set(filesOf.get(`${r.package} ${r.rubyFile}`));
     tsFiles.add(rubyFileToTs(r.rubyFile, r.package));
     for (const tsFile of tsFiles) {
@@ -317,12 +327,16 @@ export function ledgerScope(
   }
   return {
     pair: (k) => ledgered.has(keyOf(k)),
+    signaturePair: (k) => ledgered.has(keyOf(k)) || signatures.has(keyOf(k)),
     ts: (k) =>
       byTs.get(`${k.package} ${k.tsFile} ${k.rubyName}`) ??
       removed.has(`${k.package} ${k.tsFile} ${k.rubyName}`),
     tsName: (k) =>
       byTsName.get(`${k.package} ${k.tsFile} ${k.tsName}`) ??
       removedTsNames.has(`${k.package} ${k.tsFile} ${k.tsName}`),
+    removedTsName: (k) =>
+      removedTsNames.has(`${k.package} ${k.tsFile} ${k.tsName}`) ||
+      removed.has(`${k.package} ${k.tsFile} ${k.tsName}`),
   };
 }
 
@@ -332,6 +346,19 @@ export async function loadLedgerScope(dir = LEDGER_DIR): Promise<LedgerScope> {
   if (rows.length === 0) return ledgerScope([], []);
   const { loadArtifact } = await import("./body-pins.js");
   return ledgerScope(rows, (await loadArtifact()).hashes);
+}
+
+/**
+ * A `signature` row is stale once neither the parameter-name nor the
+ * block-parameter artifact carries a row on its pair: the port's signature
+ * agrees with the new Rails one. `lint-param-names.ts` reds these.
+ */
+export function staleSignatureRows(
+  rows: readonly LedgerRow[],
+  signatureRows: readonly PinKey[],
+): LedgerRow[] {
+  const live = new Set(signatureRows.map(keyOf));
+  return rows.filter((r) => r.kind === "signature" && !live.has(keyOf(r)));
 }
 
 /** Split `rows` into the ones a gate counts and the ones it skips for the ledger. */
@@ -360,4 +387,133 @@ export function summaryLine(source: string, rows: readonly LedgerRow[]): string 
     tally.set(`${r.package}:${r.kind}`, (tally.get(`${r.package}:${r.kind}`) ?? 0) + 1);
   const cells = [...tally].sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, n]) => `${k}=${n}`);
   return `bump-ledger rows: ${source} ${cells.length === 0 ? "none" : cells.join(" ")}`;
+}
+
+/**
+ * A test row (RFC 0191 § 3 "The test half"), keyed as test-compare keys a
+ * Rails test: package, Ruby test file, and the test's path in
+ * `rails-tests.json`. A `moved` row is keyed by `toPath`, the describe path the
+ * test sits under at `to`. It lives in `<source>.tests.json` beside the pair
+ * ledger, so the body-pins readers never see it.
+ */
+export interface TestLedgerRow {
+  package: string;
+  rubyFile: string;
+  path: string;
+  kind: "changed" | "moved";
+  toPath?: string;
+  from: string;
+  to: string;
+  story?: string;
+}
+
+export function testLedgerPath(source: string, dir = LEDGER_DIR): string {
+  return path.join(dir, `${source}.tests.json`);
+}
+
+export function testLedgerKey(pkg: string, rubyFile: string, testPath: string): string {
+  return `${pkg} ${rubyFile} ${testPath}`;
+}
+
+export function testRowKey(r: TestLedgerRow): string {
+  return testLedgerKey(r.package, r.rubyFile, r.toPath ?? r.path);
+}
+
+/** Every source's test rows; a source with no file contributes none. */
+export async function loadTestLedger(dir = LEDGER_DIR): Promise<TestLedgerRow[]> {
+  const out: TestLedgerRow[] = [];
+  for (const s of SOURCES) {
+    const text = await fs.readFile(testLedgerPath(s.name, dir), "utf-8").catch(() => null);
+    if (text !== null) out.push(...(JSON.parse(text) as TestLedgerRow[]));
+  }
+  return out;
+}
+
+export interface TestLedgerProblem {
+  row: TestLedgerRow;
+  problem: "stale" | "unmatched";
+}
+
+/**
+ * A test row is `unmatched` when test-compare matched no TS test to it, and
+ * `stale` once the matched TS test agrees with the Rails test on every axis
+ * the row suspends (count, kinds, values, gate). Only rows of `compared`
+ * packages are judged, so a `--package` run does not red the others.
+ */
+export function testLedgerProblems(
+  rows: readonly TestLedgerRow[],
+  compared: ReadonlySet<string>,
+  matched: ReadonlySet<string>,
+  held: ReadonlySet<string>,
+): TestLedgerProblem[] {
+  const problems: TestLedgerProblem[] = [];
+  for (const row of rows) {
+    if (!compared.has(row.package)) continue;
+    const k = testRowKey(row);
+    if (!matched.has(k)) problems.push({ row, problem: "unmatched" });
+    else if (!held.has(k)) problems.push({ row, problem: "stale" });
+  }
+  return problems;
+}
+
+/** A package's extra-surface totals, as far as {@link withoutRemoved} reads them. */
+export interface LedgeredTotals {
+  package: string;
+  totalExtras: number;
+  totalNovel: number;
+  noCounterpartFiles: number;
+  extraFiles: {
+    tsFile: string;
+    rubyFile: string | null;
+    extras: { name: string; kind: string }[];
+  }[];
+}
+
+/**
+ * The package totals less every extra whose pair is a `removed` ledger row
+ * (RFC 0191 § 3, rule 3): a TS member whose Ruby method the bump removed.
+ * Nothing else is subtracted, so a package pinned at `novel === 0` stays
+ * pinned against every other name.
+ */
+export function withoutRemoved<T extends LedgeredTotals>(
+  packages: readonly T[],
+  removedTsName: LedgerScope["removedTsName"],
+): { packages: T[]; skipped: number } {
+  let skipped = 0;
+  const out = packages.map((p) => {
+    let extras = p.totalExtras;
+    let novel = p.totalNovel;
+    let noCounterpart = p.noCounterpartFiles;
+    for (const f of p.extraFiles) {
+      const hit = f.extras.filter((e) =>
+        removedTsName({ package: p.package, tsFile: f.tsFile, tsName: e.name }),
+      );
+      skipped += hit.length;
+      extras -= hit.length;
+      novel -= hit.filter((e) => e.kind === "novel").length;
+      if (f.rubyFile === null && hit.length > 0 && hit.length === f.extras.length) noCounterpart--;
+    }
+    return { ...p, totalExtras: extras, totalNovel: novel, noCounterpartFiles: noCounterpart };
+  });
+  return { packages: out, skipped };
+}
+
+/**
+ * A `constant` row is stale once no extra-surface name in the TS file its Ruby
+ * file maps to (`rubyFileToTs`) still spells the removed constant: the port
+ * dropped or renamed it. `lint-extra-surface-ratchet.ts` reds these.
+ */
+export function staleConstantRows(
+  rows: readonly LedgerRow[],
+  packages: readonly LedgeredTotals[],
+): LedgerRow[] {
+  const extras = new Set<string>();
+  for (const p of packages)
+    for (const f of p.extraFiles)
+      for (const e of f.extras) extras.add(`${p.package} ${f.tsFile} ${e.name}`);
+  return rows.filter(
+    (r) =>
+      r.kind === "constant" &&
+      !extras.has(`${r.package} ${rubyFileToTs(r.rubyFile, r.package)} ${r.rubyName}`),
+  );
 }

@@ -48,6 +48,13 @@ import { buildReport, loadConcernHooks } from "./extra-surface.js";
 import { staleMarkFailure } from "./param-name-mark.js";
 import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import {
+  loadLedgerScope,
+  loadLedgers,
+  renderSkipped,
+  staleConstantRows,
+  withoutRemoved,
+} from "./bump-ledger.js";
+import {
   GATED_PACKAGES,
   MARK_PATH,
   ROWLESS_PACKAGES,
@@ -97,7 +104,22 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     topN: 0,
     concernHooks: await loadConcernHooks(ruby, scope),
   });
-  const current = scopedMarks(measure(report.packages), scope);
+  const ledgered = withoutRemoved(report.packages, (await loadLedgerScope()).removedTsName);
+  console.log(renderSkipped("extra-surface gate", ledgered.skipped));
+  const staleConstants = staleConstantRows(
+    [...(await loadLedgers()).values()].flat().filter((r) => inScope(r.package)),
+    report.packages,
+  );
+  if (staleConstants.length > 0) {
+    console.error(
+      `\nextra-surface gate: ${staleConstants.length} STALE constant ledger row(s): the port ` +
+        "no longer carries the removed constant. Delete each from scripts/parity/bump-ledger/:\n" +
+        staleConstants.map((r) => `  - ${r.package} ${r.rubyFile}:${r.rubyName}`).join("\n"),
+    );
+    return 1;
+  }
+  const current = scopedMarks(measure(ledgered.packages), scope);
+  const measured = scopedMarks(measure(report.packages), scope);
 
   const absent = unmeasuredPackages(current).filter(inScope);
   if (absent.length > 0) {
@@ -160,7 +182,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const grew = [...exceedances(marks, current), ...internal.grew.filter((v) => inScope(v.package))];
   const unreceipted = taggedOnlyViolations(current);
   const stale = [
-    ...staleMarks(marks, current),
+    ...staleMarks(marks, measured),
     ...internal.stale.filter((v) => inScope(v.package)),
   ];
 
@@ -177,7 +199,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
       );
       return 1;
     }
-    await writeMarks(tightened(marks, current));
+    await writeMarks(tightened(marks, measured));
     await writeInternalMarks(tightenedInternal(internalMarks, currentInternal));
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MARK_PATH)}: narrowed ${stale.length} dimension(s).`,
