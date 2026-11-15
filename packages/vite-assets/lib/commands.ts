@@ -7,10 +7,13 @@ import {
   Logger,
   rbFBackquote,
   setEnv,
+  StandardError,
   STDOUT as $stdout,
   TopLevel,
+  warn,
 } from "@blazetrails/ruby-compat";
 import type { Builder } from "./builder.js";
+import { CompatibilityCheck } from "./compatibility-check.js";
 import type { Config } from "./config.js";
 import type { Manifest } from "./manifest.js";
 import type { ViteAssets } from "./vite-assets.js";
@@ -64,6 +67,44 @@ export class Commands {
     await File.chmodAsync(0o755, binstub);
   }
 
+  async isLegacyNpmVersion(): Promise<boolean> {
+    try {
+      return (parseInt(await rbFBackquote("npm --version"), 10) || 0) < 7;
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
+      return false;
+    }
+  }
+
+  async isLegacyYarnVersion(): Promise<boolean> {
+    try {
+      return (parseInt(await rbFBackquote("yarn --version"), 10) || 0) < 2;
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
+      return false;
+    }
+  }
+
+  async verifyInstall(): Promise<void> {
+    const config = await this.config();
+    if (!(await File.isExistAsync(config.root.join("bin/vite").toString()))) {
+      warn(`
+vite binstub not found.
+Have you run \`bundle binstub vite_ruby\`?
+Make sure the bin directory and bin/vite are not included in .gitignore
+`);
+    }
+
+    const configPath = config.root.join(config.configPath);
+    if (!(await File.isExistAsync(configPath.toString()))) {
+      warn(`
+Configuration ${configPath} file for vite-plugin-ruby not found.
+Make sure \`bundle exec vite install\` has run successfully before running dependent tasks.
+`);
+      exitBang();
+    }
+  }
+
   async printInfo(): Promise<void> {
     const config = await this.config();
     await config.withinRoot(async () => {
@@ -93,6 +134,8 @@ export class Commands {
         ? `installed packages:\n${packages}`
         : "❌ Check that vite and vite-plugin-ruby have been added as development dependencies and installed.";
       $stdout.puts(packagesMsg);
+
+      await CompatibilityCheck.verifyPluginVersion(config.root);
     });
   }
 

@@ -4,6 +4,7 @@ import {
   Gem,
   getHttpAsync,
   Logger,
+  rbFLoad,
   stdout as $stdout,
   StandardError,
   SystemCallError,
@@ -13,6 +14,7 @@ import {
 import { Build } from "./build.js";
 import { Builder } from "./builder.js";
 import { Commands } from "./commands.js";
+import { CompatibilityCheck } from "./compatibility-check.js";
 import { Config, type ConfigOptions } from "./config.js";
 import { DevServerProxy } from "./dev-server-proxy.js";
 import { Error } from "./error.js";
@@ -30,6 +32,7 @@ export class ViteAssets {
   declare static CLI: typeof import("./cli.js").CLI;
   declare static Builder: typeof Builder;
   declare static Commands: typeof Commands;
+  declare static CompatibilityCheck: typeof CompatibilityCheck;
   declare static Config: typeof Config;
   declare static DevServerProxy: typeof DevServerProxy;
   declare static Error: typeof Error;
@@ -103,6 +106,10 @@ export class ViteAssets {
 
   static bootstrap(): Promise<unknown> {
     return this.instance().manifest().refresh();
+  }
+
+  static installTasks(): Promise<true> {
+    return rbFLoad(decodeURIComponent(new URL("./tasks/vite.js", import.meta.url).pathname));
   }
 
   static reloadWith(configOptions: ConfigAttrs = {}): ViteAssets {
@@ -206,6 +213,18 @@ export class ViteAssets {
     return this._config!;
   }
 
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE vite-assets-config-resolves-synchronously
+   */
+  peekConfig(): Pick<Config, "mode"> {
+    return (
+      this._config ?? {
+        mode: String({ ...Config["configDefaults"](), ...this._configOptions }.mode),
+      }
+    );
+  }
+
   async configure(options: ConfigAttrs = {}): Promise<Config> {
     return (this._config = await Config.resolveConfig({ ...this._configOptions, ...options }));
   }
@@ -266,6 +285,7 @@ ViteAssets.prototype.isRunProxy = ViteAssets.prototype.isDevMode;
 ViteAssets.Build = Build;
 ViteAssets.Builder = Builder;
 ViteAssets.Commands = Commands;
+ViteAssets.CompatibilityCheck = CompatibilityCheck;
 ViteAssets.Config = Config;
 ViteAssets.DevServerProxy = DevServerProxy;
 ViteAssets.Error = Error;

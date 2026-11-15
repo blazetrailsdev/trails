@@ -3,6 +3,7 @@ import { Errno, SystemCallError } from "./errno.js";
 import { Interrupt, SignalException } from "./signal-exception.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { RuntimeError } from "./runtime-error.js";
+import { rbExecargNew } from "./process.js";
 import { num2long, rbCheckStringType, stringValue } from "./string/support.js";
 
 export interface WriteStream {
@@ -57,7 +58,7 @@ export interface ProcessAdapter {
    * `proc_exec_cmd` (`vendor/ruby/v3.3.11/process.c:1729`). A command that
    * could not be run raises its `SystemCallError`.
    */
-  exec?(argv: readonly string[]): never;
+  exec?(argv: readonly string[], env?: Record<string, string | undefined>): never;
   setExitCode(code: number): void;
   setSourceMapsSupport?(enabled: boolean): void;
   onSignal(name: SignalName, handler: () => void): () => void;
@@ -613,22 +614,29 @@ export function abort(message?: string): never {
 
 /**
  * `Kernel#exec` (`vendor/ruby/v3.3.11/process.c:3015` `rb_f_exec`) for the
- * `exec(exe_path, *args)` form: the process is replaced by `exe_path`, run
- * with `args` and no shell, and the call does not return. A command that
- * cannot be run raises its `SystemCallError` (`rb_syserr_fail_str`,
- * `process.c:3041`), and a host with no way to run one raises
- * `rb_notimplement`'s `NotImplementedError` (`vendor/ruby/v3.3.11/error.c:3498`).
+ * `exec([env, ] command_line)` and `exec([env, ] exe_path, *args)` forms,
+ * read by `rb_execarg_new` (`process.c:2767`): a leading env Hash is laid
+ * over `ENV`, and the process is replaced by the command, which does not
+ * return. A command that cannot be run raises its `SystemCallError`
+ * (`rb_syserr_fail_str`, `process.c:3041`), and a host with no way to run one
+ * raises `rb_notimplement`'s `NotImplementedError`
+ * (`vendor/ruby/v3.3.11/error.c:3498`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#exec`
  * (`vendor/ruby/v3.3.11/process.c:3015`).
  */
-export function exec(...argv: [exePath: string, ...args: string[]]): never {
+export function exec(
+  ...argv:
+    | [exePath: string, ...args: string[]]
+    | [env: Record<string, string | null>, ...args: string[]]
+): never {
   const adapter = requireAdapter();
   if (adapter.exec === undefined) {
     throw new NotImplementedError("exec() function is unimplemented on this machine");
   }
 
-  return adapter.exec(argv);
+  const [prog, env, args] = rbExecargNew(argv);
+  return adapter.exec(args == null ? ["/bin/sh", "-c", prog] : [prog, ...args], env);
 }
 
 let rubyTzUptodateP = false;
@@ -918,7 +926,7 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       else proc.env[key] = value;
     },
     exit: (code) => proc.exit(code),
-    exec: (argv) => {
+    exec: (argv, env) => {
       const childProcess = proc.getBuiltinModule?.("node:child_process") as
         | {
             spawnSync(
@@ -931,7 +939,10 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       if (childProcess == null) {
         throw new NotImplementedError("exec() function is unimplemented on this machine");
       }
-      const result = childProcess.spawnSync(argv[0], argv.slice(1), { stdio: "inherit" });
+      const result = childProcess.spawnSync(argv[0], argv.slice(1), {
+        stdio: "inherit",
+        env: env ?? proc.env,
+      });
       if (result.error !== undefined) {
         if (result.error.code === "ENOENT") throw new Errno.ENOENT(argv[0]);
         throw new SystemCallError(`${result.error.message} - ${argv[0]}`);

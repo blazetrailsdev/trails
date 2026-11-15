@@ -1309,6 +1309,9 @@ importers:
       '@blazetrails/rack-proxy':
         specifier: workspace:*
         version: link:../rack-proxy
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

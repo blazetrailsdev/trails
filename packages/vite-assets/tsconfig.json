@@ -17,6 +17,9 @@
       "path": "../rack-proxy"
     },
     {
+      "path": "../rake"
+    },
+    {
       "path": "../ruby-compat"
     },
     {

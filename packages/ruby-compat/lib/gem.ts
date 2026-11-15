@@ -1,4 +1,5 @@
 import { Deprecate } from "./gem/deprecate.js";
+import { Requirement } from "./gem/requirement.js";
 import { Version } from "./gem/version.js";
 import { getOs } from "./os-adapter.js";
 import { RbConfig } from "./rb-config.js";
@@ -16,6 +17,7 @@ let ruby: string | null = null;
  */
 export const Gem = {
   Deprecate,
+  Requirement,
   Version,
 
   /**

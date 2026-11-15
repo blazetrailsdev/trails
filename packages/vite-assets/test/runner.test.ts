@@ -12,7 +12,12 @@ vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
 async function assertRunCommand(argv: string[], { flags = [] as string[] } = {}) {
   vi.mocked(exec).mockClear();
   await ViteAssets.run(argv, { exec: true });
-  const [executable, ...rest] = vi.mocked(exec).mock.calls[0];
+  const [env, executable, ...rest] = vi.mocked(exec).mock.calls[0] as [
+    unknown,
+    string,
+    ...string[],
+  ];
+  expect(env).toEqual((await ViteAssets.config()).toEnv());
   if (/node_modules\/.bin\/vite/.test(executable)) {
     expect(rest).toEqual([...argv, ...flags]);
   } else {

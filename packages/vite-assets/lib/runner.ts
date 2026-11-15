@@ -17,7 +17,7 @@ export class Runner {
     try {
       const config = await this.config();
       const cmd = await this.commandFor(argv);
-      if (isExec) return exec(...(cmd.slice(1) as [string, ...string[]]));
+      if (isExec) return exec(...cmd);
 
       const logOrNoop = config.hideBuildConsoleOutput
         ? null

@@ -92,6 +92,24 @@ export interface ChildProcessAdapter {
     chdir?: string,
   ): Promise<[stdout: string | Uint8Array, stderr: string, status: WaitStatus]>;
   /**
+   * Spawns the child with stdin, stdout and stderr on three pipes, as
+   * `Open3.popen3` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:218-235`):
+   * what is written to `inR`'s writer reaches the child's stdin once that
+   * writer closes, and the child's stdout and stderr are written to `outW` and
+   * `errW` as they arrive, each closed when the child exits. Resolves once the
+   * child is spawned, with `error` what the spawn failed with, and `wait` its
+   * status once it is waited for. `chdir` is as {@link capture3} takes it.
+   */
+  popen3?(
+    command: string,
+    env: Record<string, string | undefined>,
+    args: string[] | null,
+    chdir: string | undefined,
+    inR: PipeIO,
+    outW: PipeIO,
+    errW: PipeIO,
+  ): Promise<{ error?: Error; wait: Promise<WaitStatus> }>;
+  /**
    * Runs `command` with `args` as its argv and no shell, as `IO.popen` execs
    * an Array command (`rb_io_popen`, `vendor/ruby/v3.3.11/io.c:7968-7983`),
    * with stdin inherited, stdout on a pipe and stderr on the `err` descriptor
@@ -166,6 +184,7 @@ type NodeChild = {
   stderr: NodeReadable | null;
   on(event: "error", listener: (error: Error) => void): void;
   on(event: "close", listener: (code: number | null, signal: string | null) => void): void;
+  on(event: "spawn", listener: () => void): void;
 };
 
 type NodeChildProcess = {
@@ -323,6 +342,40 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         stdout = bytes;
       }
       return [stdout, stderr, status];
+    },
+    popen3(command, env, args, chdir, inR, outW, errW) {
+      const [file, argv] = args == null ? ["/bin/sh", ["-c", command]] : [command, args];
+      const child = cp.spawn(file, argv, { env, stdio: ["pipe", "pipe", "pipe"], cwd: chdir });
+      const pump = (w: PipeIO) => (chunk: Uint8Array) => {
+        try {
+          w.write(chunk);
+        } catch (error) {
+          if (!(error instanceof Errno.EPIPE)) throw error;
+        }
+      };
+      child.stdin?.on("error", () => {});
+      child.stdout?.on("data", pump(outW));
+      child.stderr?.on("data", pump(errW));
+      void inR.readAsync().then(
+        (data) => child.stdin?.end(data),
+        () => child.stdin?.end(),
+      );
+      const wait = new Promise<WaitStatus>((resolve) => {
+        child.on("error", (error) => {
+          outW.close();
+          errW.close();
+          resolve({ pid: child.pid ?? null, status: null, signal: null, error });
+        });
+        child.on("close", (status, signal) => {
+          outW.close();
+          errW.close();
+          resolve({ pid: child.pid ?? null, status, signal });
+        });
+      });
+      return new Promise((resolve) => {
+        child.on("spawn", () => resolve({ wait }));
+        child.on("error", (error) => resolve({ error, wait }));
+      });
     },
     async popen(command, args, env, err, stdinData) {
       const chunks: Uint8Array[] = [];
