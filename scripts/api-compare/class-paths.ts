@@ -120,6 +120,7 @@ interface Manifest {
     {
       classes: Record<string, ClassInfo & { fqn?: string }>;
       modules: Record<string, ClassInfo & { fqn?: string }>;
+      fileConstants?: Record<string, Record<string, unknown>>;
     }
   >;
 }
@@ -321,6 +322,8 @@ export async function walkedClassPaths(
   record: ConstantResidue,
 ): Promise<ClassPathEntry[]> {
   const rows = await walkConstants(dir);
+  const answered = await rubyAnswered(dir);
+  for (const [key, fqn] of rows) if (answered(key, fqn)) rows.delete(key);
   for (const key of record.excluded) rows.delete(key);
   for (const key of record.unwalked) {
     const [file, tsName] = splitKey(key);
@@ -376,11 +379,9 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
         const tsFile = rubyFileToTs(info.file, pkg);
         const rubyPath = renameTokens(fqn);
         const rubyShort = rubyPath.split("::").at(-1)!;
-        let tsCls: { file?: string; name: string } | undefined = resolveTsClassForRuby(
-          short,
-          tsFile,
-          tsByFileName,
-        );
+        let tsCls: { file?: string; name: string } | undefined =
+          (kind === "modules" ? tsByFileName.get(`${tsFile}::${short}`) : undefined) ??
+          resolveTsClassForRuby(short, tsFile, tsByFileName);
         const prefixed = `${tsFile}::${fqn.split("::").at(-2)}${short}`.toLowerCase();
         tsCls ??= kind === "classes" ? tsByLowerFileName.get(prefixed) : undefined;
         const barrel = `${path.dirname(tsFile)}.ts`;
@@ -757,8 +758,11 @@ export async function constantResidue(
     } else residue[key] = fqn;
   }
   const place = await placement(dir);
-  const excluded = [...walked.keys()]
-    .filter((key) => !fqns.has(key) && place.at(splitKey(key)[0]) !== null)
+  const answered = await rubyAnswered(dir);
+  const excluded = [...walked.entries()]
+    .filter(([key, fqn]) => !fqns.has(key) && !answered(key, fqn))
+    .filter(([key]) => place.at(splitKey(key)[0]) !== null)
+    .map(([key]) => key)
     .sort();
   return { rows: entries.length, excluded, unwalked, residue };
 }
@@ -792,7 +796,7 @@ async function baseRecord(): Promise<Record<string, ConstantResidue>> {
  */
 export function isReceipted(source: string, tsName: string): boolean {
   const decl = new RegExp(
-    `^export\\s+(?:default\\s+)?(?:abstract\\s+)?class\\s+${tsName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
+    `^export\\s+(?:(?:default\\s+)?(?:abstract\\s+)?class|const)\\s+${tsName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`,
     "m",
   ).exec(source);
   if (decl === null) return false;
@@ -824,6 +828,9 @@ async function topLevelRubyConstants(dir: string): Promise<Set<string>> {
   const ruby = await readJson<Manifest>("rails-api.json").catch(() => null);
   const out = new Set<string>();
   for (const [pkg, rubyPkg] of Object.entries(ruby?.packages ?? {})) {
+    for (const fqn of Object.keys(rubyPkg.modules ?? {})) {
+      if (!fqn.includes("::")) out.add(renameTokens(fqn));
+    }
     if ((PACKAGE_DIR_OVERRIDES[pkg] ?? pkg) !== dir) continue;
     const srcRoot = path.join(ROOT_DIR, "packages", dir, "lib");
     const subDir = path.relative(srcRoot, packageSrcDir(pkg));
@@ -833,6 +840,53 @@ async function topLevelRubyConstants(dir: string): Promise<Set<string>> {
     }
   }
   return out;
+}
+
+/**
+ * The walked exports Ruby answers that no table row seats: one named for a
+ * top-level Ruby constant, whose JS name is already its path (`Mime`; every
+ * gem's, so `ActionView` reopened by `rails-html-sanitizer.rb:14`); one the
+ * layout places at a module Ruby defines in another file and reopens here
+ * (`module HelperMethods` in every `validations/*.rb`); and one the layout
+ * misplaces in the file that defines or assigns it (`DidYouMean::Correctable`,
+ * `did_you_mean/core_ext/name_error.rb:1-2`; `Thor::Correctable`, `thor/error.rb:2`).
+ */
+async function rubyAnswered(dir: string): Promise<(key: string, fqn: string) => boolean> {
+  const ruby = await readJson<Manifest>("rails-api.json").catch(() => null);
+  const topLevel = new Set<string>();
+  const known = new Set<string>();
+  const reopened = new Map<string, string>();
+  const defined = new Set<string>();
+  const assigned = new Set<string>();
+  for (const [pkg, rubyPkg] of Object.entries(ruby?.packages ?? {})) {
+    for (const kind of ["classes", "modules"] as const) {
+      for (const fqn of Object.keys(rubyPkg[kind] ?? {})) {
+        known.add(renameTokens(fqn));
+        if (!fqn.includes("::")) topLevel.add(renameTokens(fqn));
+      }
+    }
+    if ((PACKAGE_DIR_OVERRIDES[pkg] ?? pkg) !== dir) continue;
+    const subDir = path.relative(path.join(ROOT_DIR, "packages", dir, "lib"), packageSrcDir(pkg));
+    const tsFile = (rubyFile: string) => path.join(subDir, rubyFileToTs(rubyFile, pkg));
+    for (const [fqn, info] of Object.entries(rubyPkg.modules ?? {})) {
+      if (!info.file) continue;
+      reopened.set(renameTokens(fqn), tsFile(info.file));
+      defined.add(`${tsFile(info.file)}::${renameTokens(fqn).split("::").at(-1)}`);
+    }
+    for (const [file, constants] of Object.entries(rubyPkg.fileConstants ?? {})) {
+      for (const name of Object.keys(constants)) assigned.add(`${tsFile(file)}::${name}`);
+    }
+  }
+  return (key, walkedFqn) => {
+    const [file, tsName] = splitKey(key);
+    const fqn = renameTokens(walkedFqn);
+    if (fqn === tsName && topLevel.has(tsName)) return true;
+    if (known.has(fqn)) {
+      const home = reopened.get(fqn);
+      return home !== undefined && home !== file;
+    }
+    return topLevel.has(tsName) || defined.has(key) || assigned.has(key);
+  };
 }
 
 /**

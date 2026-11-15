@@ -30,8 +30,6 @@ export interface PackageLayout {
   collapse?: string[];
   /** A second class in `foo.ts` is `Foo`'s sibling (`Arel::Nodes::Between`), not nested in it. */
   siblings?: boolean;
-  /** An exported `const` plain-object module or `Struct.new` class is walked as a constant. */
-  constModules?: boolean;
 }
 
 /** A package with no row has its directories for roots. */
@@ -69,7 +67,7 @@ export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
   fugit: { root: "Fugit" },
   globalid: { root: "GlobalID" },
   i18n: { root: "I18n", siblings: true },
-  mail: { root: "Mail", collapse: ["fields", "elements"], constModules: true },
+  mail: { root: "Mail", collapse: ["fields", "elements"] },
   marcel: { root: "Marcel", siblings: true },
   "mini-magick": { root: "MiniMagick", siblings: true },
   msgpack: { root: "MessagePack" },
@@ -178,6 +176,7 @@ export async function derivedConstantPath(
   }
   if (cpath === null) return null;
   const segments = cpath.split("::");
+  if (File.basename(file) === "index.ts") segments.pop();
   const [first, ...nested] = tsName.split(".").map(rubyCname);
   if (first !== segments.at(-1)) {
     if (PACKAGE_LAYOUTS[dir]?.siblings) segments.pop();
@@ -191,9 +190,9 @@ export async function derivedConstantPath(
  * a plain-object module (`export const Utilities = { … }`) or a `Struct.new`
  * class (`export const PhraseListsStruct = Struct.new(…)`).
  */
-function seatedNames(statement: ts.Statement, constModules: boolean): string[] {
+function seatedNames(statement: ts.Statement): string[] {
   if (ts.isClassDeclaration(statement)) return statement.name ? [statement.name.text] : [];
-  if (!constModules || !ts.isVariableStatement(statement)) return [];
+  if (!ts.isVariableStatement(statement)) return [];
   if (!(statement.declarationList.flags & ts.NodeFlags.Const)) return [];
   return statement.declarationList.declarations.flatMap((decl) => {
     if (!ts.isIdentifier(decl.name) || !/^[A-Z][a-z]/.test(decl.name.text)) return [];
@@ -214,7 +213,6 @@ function seatedNames(statement: ts.Statement, constModules: boolean): string[] {
 export async function walkConstants(dir: string): Promise<Map<string, string>> {
   const loader = await loaderFor(dir);
   const src = srcRoot(dir);
-  const constModules = PACKAGE_LAYOUTS[dir]?.constModules ?? false;
   const rows = new Map<string, string>();
   const walk = async (subdir: string): Promise<void> => {
     await loader.ls(subdir, async (_basename, abspath, ftype) => {
@@ -227,7 +225,7 @@ export async function walkConstants(dir: string): Promise<Map<string, string>> {
         const exported = modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
         const ambient = modifiers?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword);
         if (!exported || ambient) continue;
-        for (const tsName of seatedNames(statement, constModules)) {
+        for (const tsName of seatedNames(statement)) {
           const fqn = await derivedConstantPath(dir, file, tsName);
           if (fqn !== null) rows.set(`${file}::${tsName}`, fqn);
         }

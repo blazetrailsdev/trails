@@ -55,7 +55,9 @@ describe("walkedClassPaths", () => {
   it("leaves a walked export no table can seat out of excluded", async () => {
     const record = await constantResidue("activerecord", []);
     expect(record.excluded).not.toContain("test-helpers/models/topic.ts::Topic");
-    expect(record.excluded).toContain("future-result.ts::Canceled");
+    expect(record.excluded).toContain(
+      "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredPluck",
+    );
   });
 });
 

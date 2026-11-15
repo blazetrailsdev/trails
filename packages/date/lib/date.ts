@@ -271,9 +271,6 @@ export class ERANGE extends Error {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const Errno = { ERANGE };
-
 /**
  * @internal
  * @noRailsEquivalent PERMANENT
