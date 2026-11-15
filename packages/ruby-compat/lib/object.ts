@@ -1564,47 +1564,47 @@ function _writerFor(recv: object, mid: string): AnyFunction | null {
   return entry.write;
 }
 
-/** @perf 1% — PERMANENT */
+/** @perf 240ns — PERMANENT */
 function _methodFor(recv: object, mid: string): AnyFunction | null {
-  let entry = _methodEntries.get(mid);
-  if (entry === undefined) {
-    entry =
-      _SEND_OPERATORS.has(mid) || RELOPS.has(mid) || mid.endsWith("=")
-        ? null
-        : { proto: null, serial: -1, method: null };
-    _methodEntries.set(mid, entry);
-  }
-  if (entry === null) return null;
   const proto = Object.getPrototypeOf(recv) as object | null;
   if (proto === null) return null;
-  if (entry.proto !== proto || entry.serial !== methodCacheSerial) {
-    entry.proto = proto;
-    entry.serial = methodCacheSerial;
-    entry.method = null;
-    if (
-      !(recv instanceof Date || recv instanceof Uint8Array || recv instanceof rbCDate) &&
-      temporalTag(recv) === null
-    ) {
-      for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
-        const desc = Object.getOwnPropertyDescriptor(o, mid);
-        if (desc === undefined) continue;
-        if (typeof desc.value === "function") entry.method = desc.value as AnyFunction;
-        break;
-      }
-    }
+  let entries = _methodEntries.get(proto);
+  if (entries === undefined || entries.serial !== methodCacheSerial) {
+    entries = { serial: methodCacheSerial, methods: new Map() };
+    _methodEntries.set(proto, entries);
   }
-  if (entry.method === null || Object.hasOwn(recv, mid)) return null;
-  return entry.method;
+  let method = entries.methods.get(mid);
+  if (method === undefined) {
+    if (
+      mid === "==" ||
+      mid === "!=" ||
+      mid === "+" ||
+      RELOPS.has(mid) ||
+      mid.endsWith("=") ||
+      recv instanceof Date ||
+      recv instanceof Uint8Array ||
+      recv instanceof rbCDate ||
+      temporalTag(recv) !== null
+    ) {
+      return null;
+    }
+    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+      const desc = Object.getOwnPropertyDescriptor(o, mid);
+      if (desc === undefined) continue;
+      if (typeof desc.value !== "function") return null;
+      method = desc.value as AnyFunction;
+      break;
+    }
+    if (method === undefined) return null;
+    entries.methods.set(mid, method);
+  }
+  return (recv as Record<string, unknown>)[mid] === method && !Object.hasOwn(recv, mid)
+    ? method
+    : null;
 }
 
-/** @perf 1% — PERMANENT */
-const _SEND_OPERATORS = new Set(["==", "!=", "+"]);
-
-/** @perf 1% — PERMANENT */
-const _methodEntries = new Map<
-  string,
-  { proto: object | null; serial: number; method: AnyFunction | null } | null
->();
+/** @perf 240ns — PERMANENT */
+const _methodEntries = new WeakMap<object, { serial: number; methods: Map<string, AnyFunction> }>();
 
 /** @perf 100ns — PERMANENT */
 const _writerEntries = new Map<

@@ -1780,6 +1780,87 @@ describe("rbFSend method cache", () => {
     expect(rbFSend(new A(), "name")).toBe("a");
   });
 
+  it("sees a prototype method replaced by plain assignment, without a cache clear", () => {
+    class Visitor {
+      visitNode(): string {
+        return "first";
+      }
+    }
+    const v = new Visitor();
+    expect(rbFSend(v, "visitNode")).toBe("first");
+    Visitor.prototype.visitNode = () => "second";
+    expect(rbFSend(v, "visitNode")).toBe("second");
+  });
+
+  it("resolves a name sent to alternating prototypes", () => {
+    class A {
+      visitNode(): string {
+        return "a";
+      }
+    }
+    class B {
+      visitNode(): string {
+        return "b";
+      }
+    }
+    const a = new A();
+    const b = new B();
+    for (let i = 0; i < 3; i++) {
+      expect(rbFSend(a, "visitNode")).toBe("a");
+      expect(rbFSend(b, "visitNode")).toBe("b");
+    }
+  });
+
+  it("re-resolves after a module is prepended", () => {
+    class Visitor {
+      visitNode(): string {
+        return "own";
+      }
+    }
+    const v = new Visitor();
+    expect(rbFSend(v, "visitNode")).toBe("own");
+    prepend(Visitor, {
+      visitNode(this: Visitor) {
+        return "prepended";
+      },
+    });
+    expect(rbFSend(v, "visitNode")).toBe("prepended");
+  });
+
+  it("re-resolves after the receiver's singleton class is created", () => {
+    class Visitor {
+      visitNode(): string {
+        return "class";
+      }
+    }
+    const v = new Visitor();
+    expect(rbFSend(v, "visitNode")).toBe("class");
+    rbModDefineMethod(rbObjSingletonClass(v), "visitNode", () => "singleton");
+    expect(rbFSend(v, "visitNode")).toBe("singleton");
+    expect(rbFSend(new Visitor(), "visitNode")).toBe("class");
+  });
+
+  it("dispatches native Array and Map methods, and falls through for Date", () => {
+    expect(rbFSend([3, 1, 2], "includes", 2)).toBe(true);
+    expect(rbFSend(new Map([["k", 1]]), "get", "k")).toBe(1);
+    expect(rbFSend(new Date(0), "getTime")).toBe(0);
+  });
+
+  it("dispatches a Proxy receiver as sendInternal does, by descriptor", () => {
+    class Collector {
+      html(): string {
+        return "html";
+      }
+    }
+    const proxy = new Proxy(new Collector(), {
+      get(target, key, receiver) {
+        return key === "html" ? () => "trapped" : Reflect.get(target, key, receiver);
+      },
+    });
+    expect(rbFSend(new Collector(), "html")).toBe("html");
+    expect(rbFSend(proxy, "html")).toBe("html");
+  });
+
   it("raises NoMethodError for a name the receiver does not answer", () => {
     expect(() => rbFSend(new (class {})(), "visitMissing")).toThrow(NoMethodError);
   });
