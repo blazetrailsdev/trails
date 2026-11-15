@@ -59,12 +59,10 @@ export class RequestBodyStream {
     buffer: Uint8Array | null = null,
   ): Promise<Uint8Array | null> {
     if (length == null) return this.readRemaining(buffer);
-
     if (this.remaining === 0) {
       buffer?.fill(0);
       return null;
     }
-
     let data = (await this.input.read(Math.min(length, this.remaining), buffer)) as
       | string
       | Uint8Array
@@ -318,12 +316,9 @@ export class Proxy {
         sourceRequest.fullpath === ""
           ? (URI.parse(env["REQUEST_URI"] as string) as InstanceType<typeof URIHTTP>).requestUri()!
           : sourceRequest.fullpath;
-
       const requestClass = this.netHttpRequestClass(sourceRequest.requestMethod);
       if (requestClass == null) return [501, {}, []];
-
       const targetRequest = new requestClass(fullPath);
-
       const requestHeaders = (this.constructor as typeof Proxy).extractHttpRequestHeaders(
         sourceRequest.env,
       );
@@ -340,18 +335,15 @@ export class Proxy {
         }
       }
       targetRequest.initializeHttpHeader(Object.fromEntries(requestHeaders.entries()));
-
       if (rbObjIvarDefined(targetRequest, "@decode_content")) {
         rbObjIvarSet(targetRequest, "@decode_content", false);
       }
-
       if (targetRequest.isRequestBodyPermitted() && sourceRequest.body != null) {
         const input = sourceRequest.body as RackInput;
         if (rbObjRespondTo(input, "rewind")) await input.rewind!();
         const length = sourceRequest.contentLength;
         if (length != null) {
           if (!/^[0-9]+$/.test(length)) throw new InvalidRequest("invalid Content-Length");
-
           targetRequest.contentLength = Number.parseInt(length, 10);
           targetRequest.setBodyStream(new RequestBodyStream(input, Number.parseInt(length, 10)));
         } else {
@@ -362,7 +354,6 @@ export class Proxy {
         if (sourceRequest.contentType != null)
           targetRequest.contentType = sourceRequest.contentType;
       }
-
       if (
         this.username != null &&
         this.username !== false &&
@@ -371,7 +362,6 @@ export class Proxy {
       ) {
         targetRequest.basicAuth(this.username as string, this.password as string);
       }
-
       let backend = env["rack.backend"] as Backend | string | false | null | undefined;
       delete env["rack.backend"];
       if (backend == null || backend === false) backend = this.backend as Backend | null;
@@ -396,12 +386,10 @@ export class Proxy {
         }
         return [502, {}, []];
       }
-
       const useSsl = backend.scheme === "https" || (this.cert != null && this.cert !== false);
       let readTimeout = env["http.read_timeout"];
       delete env["http.read_timeout"];
       if (readTimeout == null || readTimeout === false) readTimeout = this.readTimeout;
-
       if (this.streaming != null && this.streaming !== false) {
         targetResponse = new HttpStreamingResponse(
           targetRequest,
@@ -429,7 +417,6 @@ export class Proxy {
           backend.port == null ? null : Number(backend.port),
         );
         this.configureBackendConnection(http, { useSsl, readTimeout });
-
         await http.start(async () => {
           await http.request(targetRequest, null, async (response) => {
             code = Number.parseInt(response.code, 10);
@@ -532,7 +519,6 @@ export class Proxy {
         this.checkResponseLengthBang(Number.parseInt(lengths[0], 10));
       }
     }
-
     const connectionNamed = (rbFArray(headers.get("Connection")) as string[])
       .join(",")
       .toLowerCase()
@@ -575,7 +561,6 @@ export class Proxy {
     conn.readTimeout = readTimeout as number | null;
     if (this.openTimeout != null) conn.openTimeout = this.openTimeout as number;
     if (this.writeTimeout != null) conn.writeTimeout = this.writeTimeout as number;
-
     if (useSsl) {
       conn.verifyMode = (this.verifyMode ?? OpenSSL.SSL.VERIFY_PEER) as number;
       if (this.caFile != null) conn.caFile = this.caFile as string;

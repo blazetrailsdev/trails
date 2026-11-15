@@ -176,6 +176,7 @@ class _NodeClientSocket implements HttpClientSocket {
   private writable = true;
   private ssl = false;
   private readonly onData = (chunk: Uint8Array) => void this.rbuf.push(chunk);
+  private closed = false;
   private readonly onEnd = () => void (this.eof = true);
   private readonly onError = (e: Error) => void (this.error = e);
   private readonly onDrain = () => void (this.writable = true);
@@ -233,11 +234,12 @@ class _NodeClientSocket implements HttpClientSocket {
   }
 
   close(): void {
+    this.closed = true;
     this.io.destroy();
   }
 
   isClosed(): boolean {
-    return this.io.destroyed;
+    return this.closed;
   }
 
   isEof(): boolean {

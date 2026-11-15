@@ -618,6 +618,35 @@ describe("Net::HTTP over Net::BufferedIO", () => {
     expect(
       await URI.parse("http://10.0.0.1/").findProxy({ REQUEST_METHOD: "GET", HTTP_PROXY: "x" }),
     ).toBeNull();
+  });
+
+  it("wait_for_continue answers a final response without sending the body", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("\r\n\r\n"),
+      "HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const http = new Net.HTTP("127.0.0.1", port);
+    http.continueTimeout = 5;
+    const res = await http.post("/p", "body", {
+      Expect: "100-continue",
+      "Content-Type": "text/plain",
+    });
+    expect(res.code).toBe("417");
+    expect(seen.received.endsWith("\r\n\r\n")).toBe(true);
+  });
+
+  it("reads the body after the server has closed its end", async () => {
+    const { server } = rawServer(() => true, "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+    const port = await listen(server);
+    let body: unknown;
+    await new Net.HTTP("127.0.0.1", port).request(new Net.HTTP.Get("/"), null, async (res) => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      body = await res.readBody();
+    });
+    expect(new TextDecoder().decode(body as Uint8Array)).toBe("ok");
+  });
+
   it("set_form posts urlencoded params", async () => {
     const { seen, server } = rawServer(
       (r) => r.endsWith("a=1&b=x+y"),

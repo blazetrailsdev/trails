@@ -9,5 +9,7 @@ defineConstants([
     "Rack::HttpStreamingResponse::ResponseTooLarge",
   ],
   [() => m0.HttpStreamingResponse.StreamAborted, "Rack::HttpStreamingResponse::StreamAborted"],
+  [() => m1.InvalidRequest, "Rack::InvalidRequest"],
   [() => m1.Proxy, "Rack::Proxy"],
+  [() => m1.RequestBodyStream, "Rack::RequestBodyStream"],
 ]);
