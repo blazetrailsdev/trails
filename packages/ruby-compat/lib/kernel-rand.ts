@@ -137,9 +137,13 @@ function randMtStart(r: RandomMT): MT {
 
 /** `vendor/ruby/v3.3.11/random.c:989` `make_mask`. */
 function makeMask(x: bigint): bigint {
-  let mask = 0n;
-  while (mask < x) mask = (mask << 1n) | 1n;
-  return mask;
+  x = x | (x >> 1n);
+  x = x | (x >> 2n);
+  x = x | (x >> 4n);
+  x = x | (x >> 8n);
+  x = x | (x >> 16n);
+  x = x | (x >> 32n);
+  return x;
 }
 
 /** `vendor/ruby/v3.3.11/random.c:1003` `limited_rand`, whose `limit` is INCLUSIVE. */
