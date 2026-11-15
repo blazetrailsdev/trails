@@ -19,6 +19,7 @@ import { Manifest } from "./manifest.js";
 import { MissingEntrypointError } from "./missing-entrypoint-error.js";
 import { MissingExecutableError } from "./missing-executable-error.js";
 import { Runner } from "./runner.js";
+import { DEFAULT_PLUGIN_VERSION, DEFAULT_VITE_VERSION, VERSION } from "./version.js";
 
 type ConfigAttrs = Partial<Record<keyof ConfigOptions, unknown>>;
 
@@ -34,10 +35,10 @@ export class ViteAssets {
   declare static IO: typeof IO;
   declare static Runner: typeof Runner;
 
-  static readonly VERSION = "3.11.1";
+  static readonly VERSION = VERSION;
 
-  static readonly DEFAULT_VITE_VERSION = "^8.0.0";
-  static readonly DEFAULT_PLUGIN_VERSION = "^5.2.5";
+  static readonly DEFAULT_VITE_VERSION = DEFAULT_VITE_VERSION;
+  static readonly DEFAULT_PLUGIN_VERSION = DEFAULT_PLUGIN_VERSION;
 
   static readonly ENV_PREFIX = "VITE_RUBY";
 

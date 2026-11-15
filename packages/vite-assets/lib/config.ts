@@ -172,7 +172,7 @@ export class Config {
     return "npm";
   }
 
-  /** @missingRailsCall verify_plugin_version — CONVERGEABLE vite-assets-builder-commands-runner */
+  /** @missingRailsCall verify_plugin_version — CONVERGEABLE vite-assets-commands-and-compatibility-check */
   private constructor(attrs: Record<string, unknown>) {
     this._config = attrs;
   }
