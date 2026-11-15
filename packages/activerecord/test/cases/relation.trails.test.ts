@@ -1,5 +1,5 @@
 import { DescendantsTracker } from "@blazetrails/activesupport";
-import { constSet, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { constSet, TopLevel, rbModRemoveConst, Hash } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { isPresent, presence } from "@blazetrails/activesupport";
@@ -860,6 +860,7 @@ describe("Relation Enumerable surface (trails)", () => {
     const posts = CanonPost.where({ type: "Post" }).order("id");
 
     const grouped = await posts.groupBy((post: any) => post.author_id);
+    expect(grouped).toBeInstanceOf(Hash);
     expect([...grouped.keys()].sort()).toEqual(
       [...new Set((await posts).map((post: any) => post.author_id))].sort(),
     );
