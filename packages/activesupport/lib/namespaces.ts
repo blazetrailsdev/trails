@@ -55,6 +55,7 @@ export const ActiveSupport = {
   LazyLoadHooks: typeof import("./lazy-load-hooks.js");
   BroadcastLogger: typeof BroadcastLogger;
   Duration: typeof Duration;
+  TestCase?: typeof import("./test-case.js").TestCase;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
   Inflector: typeof Inflector;
   MessagePack?: typeof MessagePack;

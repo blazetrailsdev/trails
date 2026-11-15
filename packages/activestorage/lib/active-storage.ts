@@ -37,7 +37,7 @@ export const ActiveStorage = {
   Reflection: { name: string };
   Attached: unknown;
   Attachment?: typeof Attachment;
-  FixtureSet: typeof FixtureSet;
+  FixtureSet?: typeof FixtureSet;
   Service: unknown;
   Previewer: typeof Previewer;
   Analyzer: typeof Analyzer;

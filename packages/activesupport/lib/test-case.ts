@@ -1,5 +1,6 @@
 import type { Pathname } from "@blazetrails/ruby-compat";
 import { runLoadHooks } from "./lazy-load-hooks.js";
+import { ActiveSupport } from "./namespaces.js";
 import {
   testOrder as activeSupportTestOrder,
   setTestOrder as activeSupportSetTestOrder,
@@ -109,5 +110,7 @@ prepend(TestCase, { afterTeardown: testsWithoutAssertionsAfterTeardown });
 include(TestCase, ErrorReporterAssertions);
 include(TestCase, TimeHelpers);
 include(TestCase, FileFixtures);
+
+ActiveSupport.TestCase = TestCase;
 
 runLoadHooks("active_support_test_case", TestCase);

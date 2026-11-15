@@ -29,7 +29,6 @@ import { VideoPreviewer } from "../../../lib/previewer/video-previewer.js";
 import { Attachment } from "../../../lib/attachment.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
 import { Engine } from "../../../lib/engine.js";
-import "../../../lib/fixture-set.js";
 import { Current } from "../../../lib/current.js";
 import "../../../lib/service/configurator.js";
 import { ActiveStorageCreateUsers } from "./create-users-migration.js";
