@@ -50,6 +50,13 @@ class SSLError extends StandardError {
   }
 }
 
+/** `OP_ALL` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:3004`). */
+const OP_ALL = 0x80000850;
+/** `OP_DONT_INSERT_EMPTY_FRAGMENTS` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:3026`). */
+const OP_DONT_INSERT_EMPTY_FRAGMENTS = 0x800;
+/** `OP_NO_COMPRESSION` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:3029`). */
+const OP_NO_COMPRESSION = 0x20000;
+
 /**
  * `OpenSSL::X509` verify-result constants (`DefX509Const`,
  * `vendor/ruby/v3.3.11/ext/openssl/ossl_x509.c:50-71`), keyed by the code a
@@ -114,7 +121,7 @@ export class SSLContext {
     minVersion: 0x301,
     verifyMode: 1,
     verifyHostname: true,
-    options: (0x80000850 & ~0x800) | 0x20000,
+    options: (OP_ALL & ~OP_DONT_INSERT_EMPTY_FRAGMENTS) | OP_NO_COMPRESSION,
   };
 
   /** @noRailsEquivalent PERMANENT */
@@ -435,9 +442,9 @@ export const OpenSSL = {
   SSL: {
     VERIFY_NONE: 0,
     VERIFY_PEER: 1,
-    OP_ALL: 0x80000850,
-    OP_DONT_INSERT_EMPTY_FRAGMENTS: 0x800,
-    OP_NO_COMPRESSION: 0x20000,
+    OP_ALL,
+    OP_DONT_INSERT_EMPTY_FRAGMENTS,
+    OP_NO_COMPRESSION,
     SSLError,
     SSLContext,
     SSLSocket,

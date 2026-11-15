@@ -42,6 +42,13 @@ type Connection = SMTPConnection & {
 
 type ConnectionError = Error & { code?: string };
 
+const TLS_VERSIONS: Record<number, "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3"> = {
+  0x301: "TLSv1",
+  0x302: "TLSv1.1",
+  0x303: "TLSv1.2",
+  0x304: "TLSv1.3",
+};
+
 type SSLContext = InstanceType<typeof OpenSSL.SSL.SSLContext>;
 type SSLSocket = InstanceType<typeof OpenSSL.SSL.SSLSocket<Connection>>;
 
@@ -614,13 +621,17 @@ export class SMTP {
     io.options.tls = {
       ...(ca != null ? { ca } : {}),
       rejectUnauthorized: context.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
+      secureOptions: context.options,
+      ...(context.minVersion != null ? { minVersion: TLS_VERSIONS[context.minVersion] } : {}),
       ...(isIP(hostname) === 0 ? { servername: hostname } : {}),
       checkServerIdentity: (_host: string, cert: PeerCertificate) =>
         context.verifyHostname ? checkServerIdentity(hostname, cert) : undefined,
     };
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let onError: ((err: Error) => void) | undefined;
     await Promise.race([
       new Promise<void>((resolve, reject) => {
+        onError = reject;
         io.once("error", reject);
         io._upgradeConnection((err) => {
           io.removeListener("error", reject);
@@ -639,7 +650,10 @@ export class SMTP {
         s._setVerifyResult(err.code);
         throw err;
       })
-      .finally(() => clearTimeout(timer));
+      .finally(() => {
+        clearTimeout(timer);
+        if (onError) io.removeListener("error", onError);
+      });
   }
 
   /** @internal */
