@@ -768,3 +768,13 @@ describe("erubi wiring", () => {
     expect(files.every((f) => f.startsWith(PKG_SRC_DIRS.erubi))).toBe(true);
   });
 });
+
+describe("PKG_SRC_DIRS", () => {
+  it("roots activerecord where its Rails test paths resolve to committed files", async () => {
+    const rubyFile = "associations/has_many_associations_test.rb";
+    const tsFile = `${PKG_SRC_DIRS.activerecord}${rubyToConventionTs(rubyFile, "activerecord")}`;
+    await expect(
+      fs.access(path.join(import.meta.dirname, "../..", tsFile)),
+    ).resolves.toBeUndefined();
+  });
+});
