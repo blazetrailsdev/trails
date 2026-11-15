@@ -11,7 +11,7 @@ import {
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Config, type ConfigOptions } from "./config.js";
-import type { DevServerProxy } from "./dev-server-proxy.js";
+import { DevServerProxy } from "./dev-server-proxy.js";
 import { Error } from "./error.js";
 import { Manifest, type ManifestBuilder } from "./manifest.js";
 import { MissingEntrypointError } from "./missing-entrypoint-error.js";
@@ -216,6 +216,7 @@ export class ViteAssets {
 ViteAssets.prototype.isRunProxy = ViteAssets.prototype.isDevMode;
 
 ViteAssets.Config = Config;
+ViteAssets.DevServerProxy = DevServerProxy;
 ViteAssets.Error = Error;
 ViteAssets.Manifest = Manifest;
 ViteAssets.MissingEntrypointError = MissingEntrypointError;

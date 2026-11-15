@@ -1,8 +1,8 @@
 import type { RackResponse } from "@blazetrails/rack";
 import { Proxy } from "@blazetrails/rack-proxy";
-import { hashDelete, kernelURI, rbProcCall, stringSplit } from "@blazetrails/ruby-compat";
+import { hashDelete, kernelURI, rbProcCall, stringSplit, TopLevel } from "@blazetrails/ruby-compat";
 import type { Config } from "./config.js";
-import { ViteAssets } from "./vite-assets.js";
+import type { ViteAssets } from "./vite-assets.js";
 
 type RackEnv = Record<string, unknown>;
 
@@ -17,7 +17,7 @@ export class DevServerProxy extends Proxy {
 
   constructor(app: unknown = null, options: Record<string, unknown> = {}) {
     const viteRuby =
-      (hashDelete(options, "viteRuby") as ViteAssets | null) ?? ViteAssets.instance();
+      (hashDelete(options, "viteRuby") as ViteAssets | null) ?? TopLevel.ViteAssets!.instance();
     super(app, options);
     this.viteRuby = viteRuby;
   }
@@ -108,5 +108,3 @@ export class DevServerProxy extends Proxy {
         : `/${(await this.config()).publicOutputDir}/`);
   }
 }
-
-ViteAssets.DevServerProxy = DevServerProxy;
