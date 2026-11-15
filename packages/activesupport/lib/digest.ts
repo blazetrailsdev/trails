@@ -19,7 +19,7 @@ export class Digest {
     this._hashDigestClass = klass;
   }
 
-  static hexdigest(arg: string): string {
+  static hexdigest(arg: string | Uint8Array): string {
     return this.hashDigestClass.hexdigest(arg).slice(0, 32);
   }
 }

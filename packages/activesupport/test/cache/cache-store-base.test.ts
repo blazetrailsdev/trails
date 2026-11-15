@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Store, ArgumentError } from "../../lib/cache/store.js";
+import { Store, ArgumentError, type StoreOptions } from "../../lib/cache/store.js";
 import { Entry } from "../../lib/cache/entry.js";
 
 class TestStore extends Store {
+  declare protected normalizeKey: (key: unknown, options?: StoreOptions) => Promise<string>;
   private _data = new Map<string, Entry>();
   protected async readEntry(key: string, _o: Record<string, unknown>): Promise<Entry | null> {
     return this._data.get(key) ?? null;

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "cache.ts",
+    "rubyName": "write_multi",
+    "call": "order:constructor,normalizeKey",
+    "reason": "TS reads `new Hash()` (constructor) before the first normalizeKey: cache.rb:555 builds `normalized_hash` with `transform_keys`, which allocates without a `.new` call, but its block is async here (normalizeKey awaits) so the Hash is allocated first and filled in a loop; a binary SolidCache key cannot key the plain object the port used before. An `order:` row has no call-site receipt (compare.ts ORDER_PREFIX keys the baseline only)"
+  }
+]

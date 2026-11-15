@@ -5,14 +5,26 @@ import { Expiration, type ClassMethods as ExpirationClassMethods } from "./entry
 import { Size, type ClassMethods as SizeClassMethods } from "./entry/size.js";
 import { type Relation } from "@blazetrails/activerecord";
 import { sql } from "@blazetrails/arel";
-import { constSet, Range, Digest, eachSlice, toS, unpack } from "@blazetrails/ruby-compat";
+import {
+  constSet,
+  Range,
+  Digest,
+  eachSlice,
+  Hash,
+  b,
+  rbEqual,
+  toS,
+  unpack,
+} from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidCache } from "./solid-cache.js";
 
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
-
-type Payload = { key: unknown; value: unknown; keyHash?: number | bigint; byteSize?: number };
+type Payload = {
+  key: string | Uint8Array;
+  value: unknown;
+  keyHash?: number | bigint;
+  byteSize?: number;
+};
 
 export class Entry extends Record {
   static readonly ESTIMATED_ROW_OVERHEAD = 140;
@@ -46,7 +58,7 @@ export class Entry extends Record {
     include(this, Size);
   }
 
-  static async write(key: unknown, value: unknown): Promise<void> {
+  static async write(key: string | Uint8Array, value: unknown): Promise<void> {
     await this.writeMulti([{ key: key, value: value }]);
   }
 
@@ -62,13 +74,15 @@ export class Entry extends Record {
     });
   }
 
-  static async read(key: string): Promise<unknown> {
+  static async read(key: string | Uint8Array): Promise<unknown> {
     return (await this.readMulti([key])).get(key) ?? null;
   }
 
-  static async readMulti(keys: string[]): Promise<Map<string, unknown>> {
+  static async readMulti(
+    keys: (string | Uint8Array)[],
+  ): Promise<Hash<string | Uint8Array, unknown>> {
     return await this.withoutQueryCache(async () => {
-      const results = new Map<string, unknown>();
+      const results = new Hash<string | Uint8Array, unknown>();
       for (const keysBatch of eachSlice(keys, Entry.MULTI_BATCH_SIZE)) {
         const query = sql(this.selectSql(keysBatch), ...this.keyHashesFor(keysBatch));
 
@@ -76,13 +90,13 @@ export class Entry extends Record {
         const rows = (await connection.selectAll(query, "SolidCache::Entry Load")).castValues(
           this.attributeTypes() as unknown as Parameters<Result["castValues"]>[0],
         ) as [unknown, unknown][];
-        for (const [key, value] of rows) results.set(decoder.decode(key as Uint8Array), value);
+        for (const [key, value] of rows) results.set(key as Uint8Array, value);
       }
       return results;
     });
   }
 
-  static async deleteByKey(...keys: string[]): Promise<number> {
+  static async deleteByKey(...keys: (string | Uint8Array)[]): Promise<number> {
     return await this.withoutQueryCache(() =>
       this.where({ key_hash: this.keyHashesFor(keys) }).deleteAll(),
     );
@@ -97,7 +111,7 @@ export class Entry extends Record {
   }
 
   static async lockAndWrite(
-    key: string,
+    key: string | Uint8Array,
     block: (value: unknown) => unknown | Promise<unknown>,
   ): Promise<unknown> {
     return await this.transaction(async () => {
@@ -105,9 +119,7 @@ export class Entry extends Record {
         const result = (await this.lock()
           .where({ key_hash: this.keyHashFor(key) })
           .pick("key", "value")) as [unknown, unknown] | null;
-        const newValue = await block(
-          result != null && decoder.decode(result[0] as Uint8Array) === key ? result[1] : null,
-        );
+        const newValue = await block(result != null && rbEqual(result[0], key) ? result[1] : null);
         if (newValue != null && newValue !== false) await this.write(key, newValue);
         return newValue;
       });
@@ -163,11 +175,7 @@ export class Entry extends Record {
 
   /** @internal */
   private static byteSizeFor(payload: Payload): number {
-    return (
-      encoder.encode(toS(payload.key)).length +
-      encoder.encode(toS(payload.value)).length +
-      this.estimatedRowOverhead()
-    );
+    return b(toS(payload.key)).length + b(toS(payload.value)).length + this.estimatedRowOverhead();
   }
 
   /** @internal */

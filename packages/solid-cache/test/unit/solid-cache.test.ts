@@ -23,7 +23,7 @@ describe("SolidCacheTest", () => {
 
   it("max key bytesize", async () => {
     const cache = host.lookupStore({ maxKeyBytesize: 100 }) as unknown as {
-      normalizeKey(key: string, options: object): Promise<string>;
+      normalizeKey(key: string, options: object): Promise<Uint8Array>;
     };
     const key = await cache.normalizeKey(
       Array.from(crypto.getRandomValues(new Uint8Array(200)), (b) =>
@@ -31,7 +31,7 @@ describe("SolidCacheTest", () => {
       ).join(""),
       {},
     );
-    expect(new TextEncoder().encode(key).length).toBe(100);
+    expect(key.length).toBe(100);
   });
 
   it("loads defaults from config/solid_cache.yml", () => {

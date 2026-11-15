@@ -283,11 +283,11 @@ export abstract class Store {
     if (names.length === 0) return new Map();
     let options = extractOptionsBang(names);
     options = this.mergedOptions(options);
-    const keys: string[] = [];
+    const keys: (string | Uint8Array)[] = [];
     for (const name of names) keys.push(await this.normalizeKey(name, options));
     return await this.instrumentMulti("read_multi", keys, options, async (payload) => {
       const results = await this.readMultiEntries(names, options);
-      const hits: string[] = [];
+      const hits: (string | Uint8Array)[] = [];
       for (const name of results.keys()) hits.push(await this.normalizeKey(name, options));
       payload.hits = hits;
       return results;
@@ -301,17 +301,20 @@ export abstract class Store {
     const pairs = hash instanceof Map ? [...hash] : Object.entries(hash);
     if (pairs.length === 0) return hash;
     options = this.mergedOptions(options);
-    const normalizedHash: Record<string, unknown> = {};
+    const normalizedHash = new Hash<string | Uint8Array, unknown>();
     for (const [key, value] of pairs) {
-      normalizedHash[await this.normalizeKey(key, options)] = value;
+      normalizedHash.set(await this.normalizeKey(key, options), value);
     }
     return await this.instrumentMulti("write_multi", normalizedHash, options, async () => {
-      const entries: Record<string, Entry> = {};
+      const entries = new Hash<string | Uint8Array, Entry>();
       for (const [name, value] of pairs) {
-        entries[await this.normalizeKey(name, options)] = new Entry(value, {
-          expiresIn: (options.expiresIn as number | Duration | undefined) ?? null,
-          version: (await this.normalizeVersion(name, options)) ?? undefined,
-        });
+        entries.set(
+          await this.normalizeKey(name, options),
+          new Entry(value, {
+            expiresIn: (options.expiresIn as number | Duration | undefined) ?? null,
+            version: (await this.normalizeVersion(name, options)) ?? undefined,
+          }),
+        );
       }
       return await this.writeMultiEntries(entries, options);
     });
@@ -328,7 +331,7 @@ export abstract class Store {
     if (names.length === 0) return new Map();
     let options = extractOptionsBang(names as unknown[]);
     options = this.mergedOptions(options);
-    const keys: string[] = [];
+    const keys: (string | Uint8Array)[] = [];
     for (const name of names as unknown[]) keys.push(await this.normalizeKey(name, options));
     const writes = new Map<unknown, unknown>();
     const ordered = await this.instrumentMulti("read_multi", keys, options, async (payload) => {
@@ -345,7 +348,7 @@ export abstract class Store {
           if (v == null) writes.delete(k);
         }
       }
-      const hits: string[] = [];
+      const hits: (string | Uint8Array)[] = [];
       for (const name of reads.keys()) hits.push(await this.normalizeKey(name, options));
       payload.hits = hits;
       payload.super_operation = "fetch_multi";
@@ -376,14 +379,14 @@ export abstract class Store {
     return await this.instrument("delete", key, options, () => this.deleteEntry(key, options));
   }
 
-  async deleteMulti(names: string[], options?: StoreOptions): Promise<number> {
+  async deleteMulti(names: unknown[], options?: StoreOptions): Promise<number> {
     if (names.length === 0) return 0;
     options = this.mergedOptions(options);
-    const keys: string[] = [];
+    const keys: (string | Uint8Array)[] = [];
     for (const key of names) keys.push(await this.normalizeKey(key, options));
     names = keys;
     return await this.instrumentMulti("delete_multi", names, options, () =>
-      this.deleteMultiEntries(names, options),
+      this.deleteMultiEntries(names as (string | Uint8Array)[], options),
     );
   }
 
@@ -462,13 +465,15 @@ export abstract class Store {
       const key = payload.key;
       const multiSize = Array.isArray(key)
         ? key.length
-        : key && typeof key === "object"
-          ? Object.keys(key).length
-          : 0;
+        : key instanceof Map
+          ? key.size
+          : key && typeof key === "object"
+            ? Object.keys(key).length
+            : 0;
       const debugKey = multi
         ? `: ${multiSize} key(s) specified`
         : key != null
-          ? `: ${String(key)}`
+          ? `: ${key instanceof Uint8Array ? new TextDecoder().decode(key) : String(key)}`
           : "";
       const debugOptions =
         options && Object.keys(options).length > 0 ? ` (${JSON.stringify(options)})` : "";
@@ -494,9 +499,16 @@ export abstract class Store {
     }
   }
 
-  protected abstract readEntry(key: string, options: StoreOptions): Promise<Entry | null>;
-  protected abstract writeEntry(key: string, entry: Entry, options: StoreOptions): Promise<boolean>;
-  protected abstract deleteEntry(key: string, options: StoreOptions): Promise<boolean>;
+  protected abstract readEntry(
+    key: string | Uint8Array,
+    options: StoreOptions,
+  ): Promise<Entry | null>;
+  protected abstract writeEntry(
+    key: string | Uint8Array,
+    entry: Entry,
+    options: StoreOptions,
+  ): Promise<boolean>;
+  protected abstract deleteEntry(key: string | Uint8Array, options: StoreOptions): Promise<boolean>;
 
   protected serializeEntry(entry: Entry, options?: StoreOptions): unknown {
     options = this.mergedOptions(options);
@@ -539,14 +551,17 @@ export abstract class Store {
   }
 
   protected async writeMultiEntries(
-    hash: Record<string, Entry>,
+    hash: Hash<string | Uint8Array, Entry>,
     options: StoreOptions,
-  ): Promise<Record<string, Entry>> {
-    for (const [key, entry] of Object.entries(hash)) await this.writeEntry(key, entry, options);
+  ): Promise<Hash<string | Uint8Array, Entry>> {
+    for (const [key, entry] of hash) await this.writeEntry(key, entry, options);
     return hash;
   }
 
-  protected async deleteMultiEntries(entries: string[], options: StoreOptions): Promise<number> {
+  protected async deleteMultiEntries(
+    entries: (string | Uint8Array)[],
+    options: StoreOptions,
+  ): Promise<number> {
     let count = 0;
     for (const key of entries) if (await this.deleteEntry(key, options)) count++;
     return count;
@@ -631,7 +646,7 @@ export abstract class Store {
     }
   }
 
-  protected async normalizeKey(key: unknown, options?: StoreOptions): Promise<string> {
+  protected async normalizeKey(key: unknown, options?: StoreOptions): Promise<string | Uint8Array> {
     const strKey = await this.expandedKey(key);
     if (!strKey) throw new ArgumentError("key cannot be blank");
     return this.namespaceKey(strKey, options);
@@ -722,7 +737,7 @@ export abstract class Store {
 
   protected async handleExpiredEntry(
     entry: Entry | null,
-    key: string,
+    key: string | Uint8Array,
     options: StoreOptions,
   ): Promise<Entry | null> {
     if (entry && entry.isExpired()) {
@@ -745,7 +760,7 @@ export abstract class Store {
 
   protected async saveBlockResultToCache(
     name: string,
-    key: string,
+    key: string | Uint8Array,
     options: StoreOptions,
     block: (key: string, opts: WriteOptions) => unknown,
   ): Promise<unknown> {

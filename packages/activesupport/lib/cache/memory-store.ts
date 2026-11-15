@@ -29,6 +29,8 @@ export class MemoryStore extends Store implements CacheStore {
     return true;
   }
 
+  declare protected normalizeKey: (key: unknown, options?: StoreOptions) => Promise<string>;
+
   protected data: Map<string, Entry | string> = new Map();
   private maxSize: number;
   private maxPruneTime: number;

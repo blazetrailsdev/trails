@@ -1,11 +1,17 @@
 import { Digest as ActiveSupportDigest } from "@blazetrails/activesupport/digest";
 import { DeserializationError, Entry as CacheEntry } from "@blazetrails/activesupport/cache";
-import { NotImplementedError, rbCallSuper, toI } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  NotImplementedError,
+  b,
+  byteslice,
+  rbCallSuper,
+  toI,
+  rbStrPlus,
+} from "@blazetrails/ruby-compat";
 import type { StoreHost } from "../store.js";
 
 type Options = Record<string, unknown>;
-
-const encoder = new TextEncoder();
 
 export const Api = {
   DEFAULT_MAX_KEY_BYTESIZE: 1024,
@@ -38,19 +44,19 @@ export const Api = {
   },
 
   /** @internal */
-  async readEntry(this: StoreHost, key: string, options: Options): Promise<CacheEntry | null> {
+  async readEntry(this: StoreHost, key: Uint8Array, options: Options): Promise<CacheEntry | null> {
     return this.deserializeEntry(await this.readSerializedEntry(key, options), options);
   },
 
   /** @internal */
-  async readSerializedEntry(this: StoreHost, key: string, _options: Options): Promise<unknown> {
+  async readSerializedEntry(this: StoreHost, key: Uint8Array, _options: Options): Promise<unknown> {
     return await this.entryRead(key);
   },
 
   /** @internal */
   async writeEntry(
     this: StoreHost,
-    key: string,
+    key: Uint8Array,
     entry: CacheEntry,
     options: Options,
   ): Promise<boolean> {
@@ -78,7 +84,7 @@ export const Api = {
   /** @internal */
   writeSerializedEntry(
     this: StoreHost,
-    _key: string,
+    _key: Uint8Array,
     _payload: unknown,
     { returning = true }: Options = {},
   ): unknown {
@@ -86,8 +92,11 @@ export const Api = {
   },
 
   /** @internal */
-  async readSerializedEntries(this: StoreHost, keys: string[]): Promise<Map<string, unknown>> {
-    const merged = new Map<string, unknown>();
+  async readSerializedEntries(
+    this: StoreHost,
+    keys: Uint8Array[],
+  ): Promise<Hash<Uint8Array, unknown>> {
+    const merged = new Hash<Uint8Array, unknown>();
     for (const results of await this.entryReadMulti(keys)) {
       for (const [key, value] of results) merged.set(key, value);
     }
@@ -100,7 +109,7 @@ export const Api = {
     names: unknown[],
     options: Options,
   ): Promise<Map<unknown, unknown>> {
-    const keysAndNames = new Map<string, unknown>();
+    const keysAndNames = new Hash<Uint8Array, unknown>();
     for (const name of names) keysAndNames.set(await this.normalizeKey(name, options), name);
     const serializedEntries = await this.readSerializedEntries([...keysAndNames.keys()]);
 
@@ -129,11 +138,11 @@ export const Api = {
   /** @internal */
   async writeMultiEntries(
     this: StoreHost,
-    entries: Record<string, CacheEntry>,
+    entries: Hash<Uint8Array, CacheEntry>,
     options: Options,
   ): Promise<boolean | undefined> {
     const { expiresIn: _expiresIn, ...rest } = options;
-    if (Object.keys(entries).length > 0) {
+    if (entries.size > 0) {
       const serializedEntries = this.serializeEntries(entries, rest);
       for (const entries of serializedEntries) {
         this.writeSerializedEntry(entries.key, entries.value);
@@ -145,12 +154,16 @@ export const Api = {
   },
 
   /** @internal */
-  async deleteEntry(this: StoreHost, key: string, _options: Options): Promise<boolean> {
+  async deleteEntry(this: StoreHost, key: Uint8Array, _options: Options): Promise<boolean> {
     return await this.entryDelete(key);
   },
 
   /** @internal */
-  async deleteMultiEntries(this: StoreHost, entries: string[], _options: Options): Promise<number> {
+  async deleteMultiEntries(
+    this: StoreHost,
+    entries: Uint8Array[],
+    _options: Options,
+  ): Promise<number> {
     return (await this.entryDeleteMulti(entries))
       .filter((x) => x != null)
       .reduce((sum, count) => sum + count, 0);
@@ -165,10 +178,10 @@ export const Api = {
   /** @internal */
   serializeEntries(
     this: StoreHost,
-    entries: Record<string, CacheEntry>,
+    entries: Hash<Uint8Array, CacheEntry>,
     options: Options,
-  ): { key: string; value: unknown }[] {
-    return Object.entries(entries).map(([key, entry]) => ({
+  ): { key: Uint8Array; value: unknown }[] {
+    return [...entries].map(([key, entry]) => ({
       key: key,
       value: this.serializeEntry(entry, options),
     }));
@@ -179,19 +192,24 @@ export const Api = {
     return rbCallSuper(this, Api.deserializeEntry, payload) as CacheEntry | null;
   },
 
-  /** @internal */
-  async normalizeKey(this: StoreHost, key: unknown, options?: Options): Promise<string> {
-    return this.truncateKey(
-      (await (rbCallSuper(this, Api.normalizeKey, key, options) as Promise<string>)) ?? null,
-    )!;
+  /**
+   * @internal
+   * @missingRailsArgs b — PERMANENT
+   */
+  async normalizeKey(this: StoreHost, key: unknown, options?: Options): Promise<Uint8Array> {
+    const normalized = (await rbCallSuper(this, Api.normalizeKey, key, options)) as
+      | string
+      | null
+      | undefined;
+    return this.truncateKey(normalized != null ? b(normalized) : null)!;
   },
 
   /** @internal */
-  truncateKey(this: StoreHost, key: string | null): string | null {
-    if (key != null && encoder.encode(key).length > this.maxKeyBytesize) {
+  truncateKey(this: StoreHost, key: Uint8Array | null): Uint8Array | null {
+    if (key != null && key.length > this.maxKeyBytesize) {
       const suffix = `:hash:${ActiveSupportDigest.hexdigest(key)}`;
-      const truncateAt = this.maxKeyBytesize - encoder.encode(suffix).length;
-      return `${new TextDecoder().decode(encoder.encode(key).subarray(0, truncateAt))}${suffix}`;
+      const truncateAt = this.maxKeyBytesize - b(suffix).length;
+      return b(rbStrPlus(byteslice(key, 0, truncateAt)!, suffix));
     } else {
       return key;
     }
