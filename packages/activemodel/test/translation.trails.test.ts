@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { ActiveModel, Model } from "../lib/index.js";
 import { I18n } from "../lib/i18n.js";
-import { raiseOnMissingTranslations } from "../lib/translation.js";
 import { resetI18n } from "./support/i18n.js";
 import { Attributes, type AttributesClassHalf } from "../lib/attributes.js";
 import { extend, include } from "@blazetrails/activesupport";
@@ -74,10 +73,10 @@ describe("ActiveModelI18nTests — duplicate-name TS copies", () => {
 describe("P11 humanAttributeName — dotted attributes, options, ancestor walk", () => {
   beforeEach(() => {
     resetI18n();
-    raiseOnMissingTranslations(false);
+    Translation.raiseOnMissingTranslations = false;
   });
   afterEach(() => {
-    raiseOnMissingTranslations(false);
+    Translation.raiseOnMissingTranslations = false;
     resetI18n();
   });
 
@@ -127,13 +126,13 @@ describe("P11 humanAttributeName — dotted attributes, options, ancestor walk",
 
   it("throws when raiseOnMissingTranslations is enabled globally", () => {
     class User extends Model {}
-    raiseOnMissingTranslations(true);
+    Translation.raiseOnMissingTranslations = true;
     expect(() => User.humanAttributeName("foo")).toThrow();
   });
 
   it("explicit raise:false suppresses the global raiseOnMissingTranslations toggle", () => {
     class User extends Model {}
-    raiseOnMissingTranslations(true);
+    Translation.raiseOnMissingTranslations = true;
     expect(User.humanAttributeName("foo", { raise: false })).toBe("Foo");
   });
 

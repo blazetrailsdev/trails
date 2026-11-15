@@ -11,7 +11,7 @@ import {
   type Extended,
 } from "@blazetrails/activesupport";
 import { isModuleIncluded, methodCacheSerial, rbObjDup, type Hash } from "@blazetrails/ruby-compat";
-import { humanAttributeName as translationHumanAttributeName } from "./translation.js";
+import type { Translation } from "./translation.js";
 import { ModelName } from "./naming.js";
 import { defineModelCallbacks as defineModelCallbacksImpl } from "./callbacks.js";
 import { EachValidator, Validator as ValidatorBase } from "./validator.js";
@@ -114,7 +114,7 @@ export class Model {
 
   declare static defineModelCallbacks: typeof defineModelCallbacksImpl;
 
-  declare static humanAttributeName: typeof translationHumanAttributeName;
+  declare static humanAttributeName: Translation["humanAttributeName"];
 
   declare static i18nScope: string;
 

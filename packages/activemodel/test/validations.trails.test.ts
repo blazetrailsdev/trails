@@ -7,7 +7,7 @@ import { include } from "@blazetrails/activesupport";
 import { Model } from "../lib/index.js";
 import { Errors } from "../lib/errors.js";
 import { ModelName } from "../lib/naming.js";
-import { humanAttributeName } from "../lib/translation.js";
+import type { Translation } from "../lib/translation.js";
 import { Validations } from "../lib/validations.js";
 import { BlockValidator } from "../lib/validator.js";
 import { resetI18n } from "./support/i18n.js";
@@ -2307,7 +2307,7 @@ describe("ValidationsTest (trails)", () => {
         new (...args: never[]): unknown;
         modelName: ModelName;
       }>;
-      declare static humanAttributeName: typeof humanAttributeName;
+      declare static humanAttributeName: Translation["humanAttributeName"];
 
       title: string | null = null;
 
