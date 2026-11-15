@@ -618,6 +618,71 @@ describe("Net::HTTP over Net::BufferedIO", () => {
     expect(
       await URI.parse("http://10.0.0.1/").findProxy({ REQUEST_METHOD: "GET", HTTP_PROXY: "x" }),
     ).toBeNull();
+  it("set_form posts urlencoded params", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("a=1&b=x+y"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/f");
+    req.setForm([
+      ["a", 1],
+      ["b", "x y"],
+    ]);
+    await new Net.HTTP("127.0.0.1", port).request(req);
+    expect(seen.received).toContain("Content-Type: application/x-www-form-urlencoded\r\n");
+    expect(seen.received).toContain("Content-Length: 9\r\n");
+  });
+
+  it("set_form_data replaces the separator and sets the body", () => {
+    const req = new Net.HTTP.Post("/f");
+    req.setFormData({ a: "1", b: "2" }, ";");
+    expect(req.body).toBe("a=1;b=2");
+    expect(req.contentType).toBe("application/x-www-form-urlencoded");
+    req.formData = { c: "3" };
+    expect(req.body).toBe("c=3");
+    expect(() => req.setForm({}, "text/plain")).toThrow("invalid enctype: text/plain");
+  });
+
+  const multipart =
+    '--B\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n' +
+    '--B\r\nContent-Disposition: form-data; name="f\\"q"; filename="t.txt"\r\n' +
+    "Content-Type: text/plain\r\n\r\nhello\r\n--B--\r\n";
+
+  it("set_form posts multipart form data with a Content-Length", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("--B--\r\n"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/m");
+    req.setForm(
+      [
+        ["a", "1"],
+        ['f"q', source("hello"), { filename: "t.txt", contentType: "text/plain" }],
+      ],
+      "multipart/form-data",
+      { boundary: "B" },
+    );
+    await new Net.HTTP("127.0.0.1", port).request(req);
+    expect(seen.received).toContain("Content-Type: multipart/form-data; boundary=B\r\n");
+    expect(seen.received).toContain(`Content-Length: ${multipart.length}\r\n`);
+    expect(seen.received.endsWith(`\r\n\r\n${multipart}`)).toBe(true);
+  });
+
+  it("set_form posts chunked multipart form data", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("0\r\n\r\n"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/m", { "Transfer-Encoding": "chunked" });
+    req.setForm([["a", "1"]], "multipart/form-data", { boundary: "B" });
+    await new Net.HTTP("127.0.0.1", port).request(req);
+    const body = '--B\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--B--\r\n';
+    expect(
+      seen.received.endsWith(`\r\n\r\n${body.length.toString(16)}\r\n${body}\r\n0\r\n\r\n`),
+    ).toBe(true);
   });
 
   it("wait_for_continue answers a final response without sending the body", async () => {
