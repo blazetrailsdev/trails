@@ -23,7 +23,7 @@ export interface AttrNode {
   value: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- TS2425: a `declare css` property here conflicts with HTML5::DocumentFragment#css (html5/document_fragment.rb), a method; a class cannot declare a bodiless method.
 export interface XmlNode {
   css(...args: unknown[]): NodeSet;
   atCss(...args: unknown[]): XmlNode | undefined;
@@ -31,7 +31,7 @@ export interface XmlNode {
   atXpath(...args: unknown[]): XmlNode | undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class XmlNode {
   static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly SaveOptions = SaveOptions;
