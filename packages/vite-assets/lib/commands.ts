@@ -8,11 +8,12 @@ import {
   rbFBackquote,
   setEnv,
   STDOUT as $stdout,
+  TopLevel,
 } from "@blazetrails/ruby-compat";
 import type { Builder } from "./builder.js";
 import type { Config } from "./config.js";
 import type { Manifest } from "./manifest.js";
-import { ViteAssets } from "./vite-assets.js";
+import type { ViteAssets } from "./vite-assets.js";
 
 export class Commands {
   /** @internal */
@@ -67,8 +68,8 @@ export class Commands {
     await config.withinRoot(async () => {
       $stdout.puts(`bin/vite present?: ${await File.isExistAsync("bin/vite")}`);
 
-      $stdout.puts(`vite_ruby: ${ViteAssets.VERSION}`);
-      for (const [framework, library] of ViteAssets.frameworkLibraries()) {
+      $stdout.puts(`vite_ruby: ${TopLevel.ViteAssets!.VERSION}`);
+      for (const [framework, library] of TopLevel.ViteAssets!.frameworkLibraries()) {
         $stdout.puts(`${library.name}: ${library.version}`);
         $stdout.puts(`${framework}: ${Gem.loadedSpecs[framework]?.version ?? ""}`);
       }
