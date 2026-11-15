@@ -9,6 +9,7 @@ import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/gl
 import { Trailtie as ActionViewRailtie } from "@blazetrails/trailties/trailties/action-view";
 import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trailties/action-controller";
 import { ActionController } from "@blazetrails/actionpack";
+import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Registry } from "@blazetrails/activestorage";
 import { FixtureSet } from "@blazetrails/activestorage/fixture-set";
@@ -54,6 +55,13 @@ await import("@blazetrails/activestorage/config/routes.js");
 routes.disableClearAndFinalize = false;
 routes.finalizeBang();
 app.routes().defineMountedHelper("main_app");
+const { Engine: ActiveStorageEngine } = await import("@blazetrails/activestorage/engine");
+await import("@blazetrails/activestorage/variant-record");
+for (const initializer of ActiveStorageEngine.initializers) {
+  if (["active_storage.configs", "active_storage.verifier"].includes(initializer.name)) {
+    await initializer.bind(ActiveStorageEngine.instance()).run(app);
+  }
+}
 runLoadHooks("after_initialize", app);
 
 const { Engine } = await import("../lib/engine.js");
@@ -80,6 +88,8 @@ await Base.establishConnection();
 await Base.connectionPool().migrationContext.migrate();
 await Migration.maintainTestSchemaBang();
 await RichText.loadSchema();
+
+ActiveJobBase.queueAdapter = "test";
 
 I18n.config().enforceAvailableLocales = false;
 

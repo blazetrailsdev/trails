@@ -393,6 +393,9 @@ importers:
         specifier: workspace:*
         version: link:../trailties
     devDependencies:
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc

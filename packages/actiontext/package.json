@@ -46,6 +46,7 @@
     "node": ">=26"
   },
   "devDependencies": {
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*"
   },
   "mirrors": [

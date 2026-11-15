@@ -1028,31 +1028,34 @@ function observeProceed(
   tracker.pending = Promise.resolve(r);
   const observed = tracker.pending.then(() => env.value);
   observed.catch(() => {});
-  return {
-    then(onFulfilled?: any, onRejected?: any) {
-      if (typeof onRejected === "function") {
-        tracker.observed = true;
-        return observed.then(onFulfilled, onRejected);
-      }
-      const p = observed.then(onFulfilled);
-      p.catch(() => {});
-      return p;
+  return Object.setPrototypeOf(
+    {
+      then(onFulfilled?: any, onRejected?: any) {
+        if (typeof onRejected === "function") {
+          tracker.observed = true;
+          return observed.then(onFulfilled, onRejected);
+        }
+        const p = observed.then(onFulfilled);
+        p.catch(() => {});
+        return p;
+      },
+      catch(onRejected?: any) {
+        if (typeof onRejected === "function") {
+          tracker.observed = true;
+          return observed.catch(onRejected);
+        }
+        const p = observed.catch(onRejected);
+        p.catch(() => {});
+        return p;
+      },
+      finally(onFinally?: any) {
+        const p = observed.finally(onFinally);
+        p.catch(() => {});
+        return p;
+      },
     },
-    catch(onRejected?: any) {
-      if (typeof onRejected === "function") {
-        tracker.observed = true;
-        return observed.catch(onRejected);
-      }
-      const p = observed.catch(onRejected);
-      p.catch(() => {});
-      return p;
-    },
-    finally(onFinally?: any) {
-      const p = observed.finally(onFinally);
-      p.catch(() => {});
-      return p;
-    },
-  };
+    Promise.prototype,
+  );
 }
 
 export const ClassMethods = {
