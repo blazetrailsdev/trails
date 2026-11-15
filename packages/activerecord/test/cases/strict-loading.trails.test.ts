@@ -110,3 +110,15 @@ describe("StrictLoadingNewRecordFindTargetTest", () => {
     );
   });
 });
+
+describe("strict loading in a destroy callback", () => {
+  fixtures(["accounts", "companies"]);
+
+  it("raises from loadTarget when a before_destroy reads an unloaded belongs_to, as association.rb:189-196 does", async () => {
+    const { Account } = await import("../models/account.js");
+    const account = await Account.find(1);
+    account.strictLoadingBang();
+    await expect(account.destroy()).rejects.toThrow(StrictLoadingViolationError);
+    expect(await Account.isExists(1)).toBe(true);
+  });
+});

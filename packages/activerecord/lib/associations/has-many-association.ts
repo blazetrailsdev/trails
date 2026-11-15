@@ -21,7 +21,7 @@ import { min, selectBang } from "@blazetrails/activesupport";
 
 export class HasManyAssociation extends CollectionAssociation {
   /** @internal */
-  declare updateCounterInMemory: (difference: number) => void;
+  declare updateCounterInMemory: (difference: number, reflection?: AssociationDefinition) => void;
   /** @internal */
   declare updateCounterIfSuccess: <T>(savedSuccessfully: T, difference: number) => T;
   /** @internal */
@@ -220,14 +220,16 @@ async function updateCounter(
 }
 
 /** @internal */
-function updateCounterInMemory(this: HasManyAssociation, difference: number): void {
-  const reflection = this.reflection;
-  if (!reflection.isCounterMustBeUpdatedByHasMany?.()) return;
-  const counter = reflection.counterCacheColumn?.() as string;
-  const owner = this.owner;
-  const current = Number(owner.readAttribute?.(counter) ?? 0);
-  owner.writeAttribute?.(counter, current + difference);
-  owner.clearAttributeChange?.(counter);
+function updateCounterInMemory(
+  this: HasManyAssociation,
+  difference: number,
+  reflection: AssociationDefinition = this.reflection,
+): void {
+  if (reflection.isCounterMustBeUpdatedByHasMany?.()) {
+    const counter = reflection.counterCacheColumn?.() as string;
+    this.owner.increment(counter, difference);
+    this.owner.clearAttributeChange(counter);
+  }
 }
 
 /** @internal */

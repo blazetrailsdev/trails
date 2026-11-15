@@ -515,18 +515,18 @@ describe("QueryCacheTest", () => {
     await Base.establishConnection(dbConfig);
     assertNotPredicate(Task, (k) => k.isConnected());
 
-    try {
-      await Task.cache(async () => {
+    await Task.cache(async () => {
+      try {
         await assertQueriesCount(1, false, async () => {
           await Task.find(1);
         });
         await assertNoQueries(false, async () => {
           await Task.find(1);
         });
-      });
-    } finally {
-      await Base.establishConnection(originalConnection);
-    }
+      } finally {
+        await Base.establishConnection(originalConnection);
+      }
+    });
   });
 
   it("query cache executes new queries within block", async () => {
