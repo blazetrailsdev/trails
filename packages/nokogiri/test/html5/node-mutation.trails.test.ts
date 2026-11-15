@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { XmlTreeNode } from "libxml2-wasm";
 import { HTML5, SaveOptions, XML } from "../../lib/index.js";
 
 const { Document, DocumentFragment } = HTML5;
@@ -152,5 +153,13 @@ describe("HTML5 nodes share the XML::Node chain", () => {
     expect(fragment).toBeInstanceOf(XML.Node);
     expect(fragment.children[0]).toBeInstanceOf(XML.Node);
     expect(fragment._node.nodeName).toBe("#document-fragment");
+    expect(fragment._node).not.toBeInstanceOf(XmlTreeNode);
+  });
+
+  it("builds an HTML5 fragment in the context of an HTML5 node", () => {
+    const doc = Document.parse("<div></div>");
+    const fragment = doc.atCss("div")!.fragment("<b>x</b>");
+    expect(fragment).toBeInstanceOf(DocumentFragment);
+    expect(fragment.toHtml()).toBe("<b>x</b>");
   });
 });

@@ -22,6 +22,7 @@ import { HTML5 } from "../namespaces.js";
 import * as Searchable from "../xml/searchable.js";
 import { SaveOptions } from "../xml/node/save-options.js";
 import { XmlNode } from "../xml/node.js";
+import type { DocumentFragment as XmlDocumentFragment } from "../xml/document-fragment.js";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
@@ -194,6 +195,12 @@ export class Node extends XmlNode {
   }
 
   /** @missingRailsArgs join — PERMANENT */
+  override fragment(tags: string): XmlDocumentFragment {
+    if (!(this.document instanceof HTML5.Document)) return super.fragment(tags);
+
+    return new HTML5.DocumentFragment(this.document, tags, this);
+  }
+
   innerHtml(options: { preserveNewline?: boolean; saveWith?: number } = {}): string {
     let result = options.preserveNewline && this.isPrependNewline() ? "\n" : "";
     result += this.children.map((child) => child.toHtml(options)).join("");
