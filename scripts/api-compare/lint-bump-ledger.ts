@@ -44,6 +44,7 @@ import {
   loadLedgers,
   seedDiff,
   sourceOf,
+  summaryLine,
 } from "./bump-ledger.js";
 
 const LOCK = "vendor/sources.lock.json";
@@ -83,6 +84,8 @@ function describe(p: LedgerProblem): string {
 }
 
 async function main(baseBranch: string): Promise<number> {
+  const ledgers = await loadLedgers();
+  for (const s of SOURCES) console.log(summaryLine(s.name, ledgers.get(s.name) ?? []));
   const revs = await resolveRevisions(git, baseBranch);
   if ("error" in revs) {
     console.error(`\n${revs.error}\n`);
@@ -102,7 +105,6 @@ async function main(baseBranch: string): Promise<number> {
     );
   }
 
-  const ledgers = await loadLedgers();
   const artifact = await loadArtifact();
   const pins = await loadManifest();
   const problems: LedgerProblem[] = [];

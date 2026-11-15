@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "method": "manual",
+  "date": "2026-10-13",
+  "source": "rails",
+  "from": {
+    "ref": "v8.0.2",
+    "sha": null
+  },
+  "to": {
+    "ref": "v8.0.5.1",
+    "sha": null
+  },
+  "trailsCommit": null,
+  "packages": [
+    {
+      "package": "all",
+      "filesChanged": 189,
+      "linesAdded": 1221,
+      "linesRemoved": 710,
+      "pinsDrift": 141,
+      "pinsStale": 12,
+      "rubyFiles": 82,
+      "unpinnedChanged": 16,
+      "methodsAfter": "8855/8872",
+      "testsAdded": 112,
+      "testsRemoved": 5,
+      "testsChanged": 36,
+      "testsMoved": 0
+    }
+  ],
+  "gates": [
+    {
+      "gate": "Call-mismatches ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "counts": [22],
+      "summary": "22 new call rows"
+    },
+    {
+      "gate": "Call-argument ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "counts": [17, 7],
+      "summary": "17 new argument rows, 7 naming failures"
+    }
+  ],
+  "seed": [
+    {
+      "package": "all",
+      "kind": "drift",
+      "rows": 141
+    },
+    {
+      "package": "all",
+      "kind": "removed",
+      "rows": 12
+    },
+    {
+      "package": "all",
+      "kind": "changed",
+      "rows": 36
+    },
+    {
+      "package": "all",
+      "kind": "moved",
+      "rows": 0
+    }
+  ]
+}

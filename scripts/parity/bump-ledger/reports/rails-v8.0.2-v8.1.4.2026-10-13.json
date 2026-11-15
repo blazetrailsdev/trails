@@ -1,0 +1,219 @@
+{
+  "version": 1,
+  "method": "manual",
+  "date": "2026-10-13",
+  "source": "rails",
+  "from": {
+    "ref": "v8.0.2",
+    "sha": null
+  },
+  "to": {
+    "ref": "v8.1.4",
+    "sha": "c3466ea00d7121798e3aa3144ffdf7174b81d8cb"
+  },
+  "trailsCommit": null,
+  "packages": [
+    {
+      "package": "all",
+      "filesChanged": 635,
+      "linesAdded": 12906,
+      "linesRemoved": 4728,
+      "pinsDrift": 728,
+      "pinsStale": 125,
+      "rubyFiles": 288,
+      "unpinnedChanged": 77,
+      "methodsAfter": "8780/9059",
+      "testsAdded": 1239,
+      "testsRemoved": 115,
+      "testsChanged": 236,
+      "testsMoved": 187
+    },
+    {
+      "package": "actioncontroller",
+      "pinsDrift": 29,
+      "pinsStale": 1,
+      "rubyFiles": 14
+    },
+    {
+      "package": "actiondispatch",
+      "pinsDrift": 95,
+      "pinsStale": 18,
+      "rubyFiles": 35
+    },
+    {
+      "package": "actionview",
+      "pinsDrift": 17,
+      "pinsStale": 0,
+      "rubyFiles": 13
+    },
+    {
+      "package": "activemodel",
+      "pinsDrift": 19,
+      "pinsStale": 2,
+      "rubyFiles": 11
+    },
+    {
+      "package": "activerecord",
+      "pinsDrift": 388,
+      "pinsStale": 65,
+      "rubyFiles": 127
+    },
+    {
+      "package": "activerecord-test-support",
+      "pinsDrift": 4,
+      "pinsStale": 0
+    },
+    {
+      "package": "activesupport",
+      "pinsDrift": 104,
+      "pinsStale": 28,
+      "rubyFiles": 47
+    },
+    {
+      "package": "arel",
+      "pinsDrift": 42,
+      "pinsStale": 3,
+      "rubyFiles": 20
+    },
+    {
+      "package": "trailties",
+      "pinsDrift": 30,
+      "pinsStale": 8,
+      "rubyFiles": 17
+    }
+  ],
+  "gates": [
+    {
+      "gate": "Call-mismatches ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "counts": [107],
+      "summary": "107 new call rows"
+    },
+    {
+      "gate": "Call-argument ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "counts": [76],
+      "summary": "76 new argument rows"
+    },
+    {
+      "gate": "Receipt audit",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "counts": [5],
+      "summary": "5 receipts"
+    },
+    {
+      "gate": "Ruby-compat call ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "counts": [2],
+      "summary": "2 rows"
+    },
+    {
+      "gate": "Extra-surface ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "counts": [0, 22, 0, 71, 0, 2],
+      "summary": "activerecord novel 0 \u2192 22, total 0 \u2192 71; arel total 0 \u2192 2"
+    }
+  ],
+  "seed": [
+    {
+      "package": "actioncontroller",
+      "kind": "drift",
+      "rows": 29
+    },
+    {
+      "package": "actioncontroller",
+      "kind": "removed",
+      "rows": 1
+    },
+    {
+      "package": "actiondispatch",
+      "kind": "drift",
+      "rows": 95
+    },
+    {
+      "package": "actiondispatch",
+      "kind": "removed",
+      "rows": 18
+    },
+    {
+      "package": "actionview",
+      "kind": "drift",
+      "rows": 17
+    },
+    {
+      "package": "activemodel",
+      "kind": "drift",
+      "rows": 19
+    },
+    {
+      "package": "activemodel",
+      "kind": "removed",
+      "rows": 2
+    },
+    {
+      "package": "activerecord",
+      "kind": "drift",
+      "rows": 388
+    },
+    {
+      "package": "activerecord",
+      "kind": "removed",
+      "rows": 65
+    },
+    {
+      "package": "activerecord-test-support",
+      "kind": "drift",
+      "rows": 4
+    },
+    {
+      "package": "activesupport",
+      "kind": "drift",
+      "rows": 104
+    },
+    {
+      "package": "activesupport",
+      "kind": "removed",
+      "rows": 28
+    },
+    {
+      "package": "arel",
+      "kind": "drift",
+      "rows": 42
+    },
+    {
+      "package": "arel",
+      "kind": "removed",
+      "rows": 3
+    },
+    {
+      "package": "trailties",
+      "kind": "drift",
+      "rows": 30
+    },
+    {
+      "package": "trailties",
+      "kind": "removed",
+      "rows": 8
+    },
+    {
+      "package": "all",
+      "kind": "changed",
+      "rows": 236
+    },
+    {
+      "package": "all",
+      "kind": "moved",
+      "rows": 187
+    }
+  ]
+}

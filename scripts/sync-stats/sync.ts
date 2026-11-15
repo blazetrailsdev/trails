@@ -6,6 +6,7 @@ import { Base } from "@blazetrails/activerecord";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { parseTestCompareFromLogs } from "./parse-test-compare.js";
 import { parseCallSummariesFromLogs } from "./parse-call-summaries.js";
+import { parseBumpLedgerSummaries, parseBumpReport } from "./parse-bump-history.js";
 import { classifyCompareStep } from "./classify-compare-step.js";
 import { isTransientGhError, transientGhFailureLine } from "./gh-transient-error.js";
 import { isExpiredJobLogError } from "./expired-job-log.js";
@@ -148,6 +149,23 @@ await Base.establishConnection({ adapter: "sqlite3", database: DB_PATH });
 // ---------------------------------------------------------------------------
 // Models
 // ---------------------------------------------------------------------------
+
+// vendor_bump_report_packages' integer columns, in BumpReportPackage's order.
+const BUMP_PACKAGE_INT_COLUMNS = [
+  "files_changed",
+  "lines_added",
+  "lines_removed",
+  "pins_drift",
+  "pins_stale",
+  "ruby_files",
+  "unpinned_changed",
+  "tests_before",
+  "tests_after",
+  "tests_added",
+  "tests_removed",
+  "tests_changed",
+  "tests_moved",
+] as const;
 
 class PullRequest extends Base {
   static {
@@ -429,6 +447,82 @@ class ApiCallArgsStat extends Base {
   }
 }
 
+// Bump history (RFC 0191 § 7). Reports are committed JSON files and the
+// ledger summary is a CI log line, so every row here is rebuilt from the repo.
+class VendorBump extends Base {
+  static {
+    this.tableName = "vendor_bumps";
+    this.attribute("id", "big_integer");
+    this.attribute("source", "string");
+    this.attribute("from_ref", "string");
+    this.attribute("from_sha", "string");
+    this.attribute("to_ref", "string");
+    this.attribute("to_sha", "string");
+    this.attribute("flip_pr", "integer");
+    this.attribute("flip_merge_commit_sha", "string");
+    this.attribute("merged_at", "string");
+    this.attribute("tag", "string");
+    this.attribute("closed_at", "string");
+    this.attribute("burn_down_rfc", "string");
+  }
+}
+
+class VendorBumpReport extends Base {
+  static {
+    this.tableName = "vendor_bump_reports";
+    this.attribute("id", "big_integer");
+    this.attribute("file", "string");
+    this.attribute("method", "string");
+    this.attribute("report_date", "string");
+    this.attribute("source", "string");
+    this.attribute("from_ref", "string");
+    this.attribute("from_sha", "string");
+    this.attribute("to_ref", "string");
+    this.attribute("to_sha", "string");
+    this.attribute("trails_commit", "string");
+    this.attribute("predicted_rows", "integer");
+  }
+}
+
+class VendorBumpReportPackage extends Base {
+  static {
+    this.tableName = "vendor_bump_report_packages";
+    this.attribute("id", "big_integer");
+    this.attribute("file", "string");
+    this.attribute("package", "string");
+    for (const col of BUMP_PACKAGE_INT_COLUMNS) this.attribute(col, "integer");
+    this.attribute("methods_before", "string");
+    this.attribute("methods_after", "string");
+  }
+}
+
+class VendorBumpGateResult extends Base {
+  static {
+    this.tableName = "vendor_bump_gate_results";
+    this.attribute("id", "big_integer");
+    this.attribute("file", "string");
+    this.attribute("gate", "string");
+    this.attribute("active", "string");
+    this.attribute("status", "string");
+    this.attribute("ledgered", "string");
+    this.attribute("counts", "string");
+    this.attribute("summary", "string");
+  }
+}
+
+class BumpLedgerStat extends Base {
+  static {
+    this.tableName = "bump_ledger_stats";
+    this.attribute("id", "big_integer");
+    this.attribute("merge_commit_sha", "string");
+    this.attribute("pr_number", "integer");
+    this.attribute("source", "string");
+    this.attribute("package", "string");
+    this.attribute("kind", "string");
+    this.attribute("rows", "integer");
+  }
+}
+
 class CompareLog extends Base {
   static {
     this.tableName = "compare_logs";
@@ -498,6 +592,67 @@ async function columnExists(
     name: string;
   }[];
   return cols.some((c) => c.name === column);
+}
+
+async function createBumpHistoryTables(adapter: SQLite3Adapter) {
+  if (!(await tableExists(adapter, "vendor_bumps"))) {
+    await adapter.createTable("vendor_bumps", {}, (t) => {
+      t.string("source");
+      for (const c of ["from_ref", "from_sha", "to_ref", "to_sha"]) t.string(c);
+      t.integer("flip_pr");
+      t.string("flip_merge_commit_sha");
+      t.string("merged_at");
+      t.string("tag");
+      t.string("closed_at");
+      t.string("burn_down_rfc");
+      t.index(["source", "from_ref", "to_ref"], { unique: true });
+    });
+  }
+  if (!(await tableExists(adapter, "vendor_bump_reports"))) {
+    await adapter.createTable("vendor_bump_reports", {}, (t) => {
+      t.string("file");
+      t.string("method");
+      t.string("report_date");
+      t.string("source");
+      for (const c of ["from_ref", "from_sha", "to_ref", "to_sha"]) t.string(c);
+      t.string("trails_commit");
+      t.integer("predicted_rows");
+      t.index(["file"], { unique: true });
+    });
+  }
+  if (!(await tableExists(adapter, "vendor_bump_report_packages"))) {
+    await adapter.createTable("vendor_bump_report_packages", {}, (t) => {
+      t.string("file");
+      t.string("package");
+      for (const c of BUMP_PACKAGE_INT_COLUMNS) t.integer(c);
+      t.string("methods_before");
+      t.string("methods_after");
+      t.index(["file", "package"], { unique: true });
+    });
+  }
+  if (!(await tableExists(adapter, "vendor_bump_gate_results"))) {
+    await adapter.createTable("vendor_bump_gate_results", {}, (t) => {
+      t.string("file");
+      t.string("gate");
+      t.string("active");
+      t.string("status");
+      t.string("ledgered");
+      t.string("counts");
+      t.text("summary");
+      t.index(["file", "gate"], { unique: true });
+    });
+  }
+  if (!(await tableExists(adapter, "bump_ledger_stats"))) {
+    await adapter.createTable("bump_ledger_stats", {}, (t) => {
+      t.string("merge_commit_sha");
+      t.integer("pr_number");
+      t.string("source");
+      t.string("package");
+      t.string("kind");
+      t.integer("rows");
+      t.index(["merge_commit_sha", "source", "package", "kind"], { unique: true });
+    });
+  }
 }
 
 async function migrateDb(adapter: SQLite3Adapter) {
@@ -714,6 +869,7 @@ async function migrateDb(adapter: SQLite3Adapter) {
       });
     }
 
+    await createBumpHistoryTables(adapter);
     return;
   }
 
@@ -981,6 +1137,7 @@ async function migrateDb(adapter: SQLite3Adapter) {
     await adapter.rollbackTransaction();
     throw err;
   }
+  await createBumpHistoryTables(adapter);
 }
 
 // ---------------------------------------------------------------------------
@@ -2100,6 +2257,13 @@ const MISSING_STATS_PREDICATE = `
           WHERE acls.merge_commit_sha = rjl.merge_commit_sha
         )
       )
+      OR (
+        rjl.log_output LIKE '%bump-ledger rows: %'
+        AND NOT EXISTS (
+          SELECT 1 FROM bump_ledger_stats bls
+          WHERE bls.merge_commit_sha = rjl.merge_commit_sha
+        )
+      )
       OR EXISTS (
         WITH expected(step_name, required) AS (
           VALUES
@@ -2284,6 +2448,14 @@ async function syncCompareStats(
       );
     }
 
+    const ledgerStats = parseBumpLedgerSummaries(logs);
+    if (ledgerStats.length > 0) {
+      await BumpLedgerStat.upsertAll(
+        ledgerStats.map((l) => ({ merge_commit_sha: headSha, pr_number: prNumber, ...l })),
+        { uniqueBy: ["merge_commit_sha", "source", "package", "kind"] },
+      );
+    }
+
     if (stepLogs.size > 0 || testStats.size > 0 || apiStats.size > 0 || apiPrivatesStats.size > 0) {
       parsed++;
       const totalTests = [...testStats.values()].reduce((sum, s) => sum + s.matched, 0);
@@ -2314,6 +2486,146 @@ async function syncCompareStats(
 // ---------------------------------------------------------------------------
 // Summary
 // ---------------------------------------------------------------------------
+
+const BUMP_REPORTS_DIR = "scripts/parity/bump-ledger/reports";
+
+/**
+ * Bump history from the committed dry-run reports on main (RFC 0191 § 7). A
+ * bump's flip PR is the merged PR that added one of its reports; it closed at
+ * the first merge after the flip whose ledger summary reads `none`.
+ */
+async function syncBumpHistory(): Promise<number> {
+  let listing: { name: string; path: string; type: string }[];
+  try {
+    listing = ghJson(`api repos/${REPO}/contents/${BUMP_REPORTS_DIR}?ref=main`);
+  } catch {
+    console.log("No bump reports on main yet");
+    return 0;
+  }
+  const conn = await Base.leaseConnection();
+  let synced = 0;
+  for (const entry of listing.filter((e) => e.type === "file" && e.name.endsWith(".json"))) {
+    const content = gh(`api repos/${REPO}/contents/${entry.path}?ref=main --jq .content`);
+    const report = parseBumpReport(Buffer.from(content, "base64").toString("utf8"));
+    if (report === null) {
+      console.warn(`  WARNING: ${entry.path} is not a version-1 bump report; skipped`);
+      continue;
+    }
+    const file = entry.path;
+    const predicted = report.seed
+      .filter((s) => s.kind === "drift" || s.kind === "removed")
+      .reduce((n, s) => n + s.rows, 0);
+    await VendorBumpReport.upsertAll(
+      [
+        {
+          file,
+          method: report.method,
+          report_date: report.date,
+          source: report.source,
+          from_ref: report.from.ref,
+          from_sha: report.from.sha,
+          to_ref: report.to.ref,
+          to_sha: report.to.sha,
+          trails_commit: report.trailsCommit,
+          predicted_rows: predicted,
+        },
+      ],
+      { uniqueBy: ["file"] },
+    );
+    if (report.packages.length > 0) {
+      await VendorBumpReportPackage.upsertAll(
+        report.packages.map((p) => ({
+          file,
+          package: p.package,
+          files_changed: p.filesChanged ?? null,
+          lines_added: p.linesAdded ?? null,
+          lines_removed: p.linesRemoved ?? null,
+          pins_drift: p.pinsDrift ?? null,
+          pins_stale: p.pinsStale ?? null,
+          ruby_files: p.rubyFiles ?? null,
+          unpinned_changed: p.unpinnedChanged ?? null,
+          tests_before: p.testsBefore ?? null,
+          tests_after: p.testsAfter ?? null,
+          tests_added: p.testsAdded ?? null,
+          tests_removed: p.testsRemoved ?? null,
+          tests_changed: p.testsChanged ?? null,
+          tests_moved: p.testsMoved ?? null,
+          methods_before: p.methodsBefore ?? null,
+          methods_after: p.methodsAfter ?? null,
+        })),
+        { uniqueBy: ["file", "package"] },
+      );
+    }
+    if (report.gates.length > 0) {
+      await VendorBumpGateResult.upsertAll(
+        report.gates.map((g) => ({
+          file,
+          gate: g.gate,
+          active: g.active,
+          status: g.candidate,
+          ledgered: g.ledgered,
+          counts: JSON.stringify(g.counts),
+          summary: g.summary,
+        })),
+        { uniqueBy: ["file", "gate"] },
+      );
+    }
+
+    const flip = (
+      await conn.execQuery(
+        `SELECT p.number, p.merge_commit_sha, p.merged_at FROM pull_requests p
+         JOIN pr_files f ON f.pr_number = p.number
+         WHERE p.merged_at IS NOT NULL AND f.filename LIKE ?
+         ORDER BY p.merged_at LIMIT 1`,
+        "SQL",
+        [`${BUMP_REPORTS_DIR}/${report.source}-${report.from.ref}-${report.to.ref}.%`],
+      )
+    ).toArray()[0];
+    const mergedAt = (flip?.merged_at as string | undefined) ?? null;
+    const closed = mergedAt
+      ? ((
+          await conn.execQuery(
+            `SELECT MIN(p.merged_at) AS closed_at FROM bump_ledger_stats b
+             JOIN pull_requests p ON p.merge_commit_sha = b.merge_commit_sha
+             WHERE b.source = ? AND b.kind = 'none' AND p.merged_at > ?`,
+            "SQL",
+            [report.source, mergedAt],
+          )
+        ).toArray()[0]?.closed_at as string | null)
+      : null;
+    const tagName = `${report.source}-${report.from.ref.replace(/^v/, "")}`;
+    let tag: string | null = null;
+    if (mergedAt) {
+      try {
+        gh(`api repos/${REPO}/git/ref/tags/${tagName}`);
+        tag = tagName;
+      } catch {
+        tag = null;
+      }
+    }
+    await VendorBump.upsertAll(
+      [
+        {
+          source: report.source,
+          from_ref: report.from.ref,
+          from_sha: report.from.sha,
+          to_ref: report.to.ref,
+          to_sha: report.to.sha,
+          flip_pr: (flip?.number as number | undefined) ?? null,
+          flip_merge_commit_sha: (flip?.merge_commit_sha as string | undefined) ?? null,
+          merged_at: mergedAt,
+          tag,
+          closed_at: closed ?? null,
+          burn_down_rfc: report.burnDownRfc ?? null,
+        },
+      ],
+      { uniqueBy: ["source", "from_ref", "to_ref"] },
+    );
+    synced++;
+  }
+  console.log(`Synced ${synced} bump report(s)`);
+  return synced;
+}
 
 async function printSummary() {
   const count = async (table: string) => {
@@ -2604,6 +2916,9 @@ async function main() {
       console.log("\n=== Backfilling compare stats (uncapped) ===");
       const logsParsed = await syncCompareStats("backfill");
 
+      console.log("\n=== Syncing bump history ===");
+      await syncBumpHistory();
+
       console.log("\n=== Backfilling check annotations (uncapped) ===");
       await syncCheckAnnotations("backfill");
 
@@ -2653,6 +2968,9 @@ async function main() {
 
     console.log("\n=== Syncing compare stats from CI logs ===");
     const logsParsed = await syncCompareStats(fetchMode);
+
+    console.log("\n=== Syncing bump history ===");
+    await syncBumpHistory();
 
     console.log("\n=== Syncing check annotations ===");
     await syncCheckAnnotations(fetchMode);

@@ -185,3 +185,17 @@ export function unaccounted(scripts: readonly string[]): string[] {
   ]);
   return scripts.filter((s) => !known.has(s));
 }
+
+/**
+ * The steps that read the bump ledger (RFC 0191 § 3, rule 3): the dry run
+ * re-runs them on the candidate with the seed written as the ledger, which is
+ * the state the flip PR merges in.
+ */
+export const LEDGERED_STEPS: ReadonlySet<string> = new Set([
+  "Body-pins gate",
+  "Call-mismatches ratchet",
+  "Call-argument ratchet",
+  "Receipt audit (activerecord)",
+  "Receipt audit (activemodel)",
+  "Ruby-compat call ratchet",
+]);

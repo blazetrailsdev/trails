@@ -41,6 +41,7 @@ import {
   rowsOfKind,
 } from "./call-mismatch-baseline.js";
 import { listJsonFiles } from "./baseline-json.js";
+import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
 import { BASELINE_DIR } from "./lint-call-mismatches.js";
 import { type RubyCompatKey, reverseRows } from "./report-ruby-compat.js";
 import { NATIVE_FORM_ANALOGUES, NATIVE_HASH_FORM_SPELLINGS } from "./enumerable-idioms.js";
@@ -188,14 +189,18 @@ export async function main(scope: string | null = null): Promise<number> {
     return 1;
   }
 
-  const current = enrolled(reverseRows(artifact));
-  const baseline = inScope(await loadBaseline(), scope);
-  const { added, stale } = diffAgainstBaseline(current, baseline);
+  const ledger = await loadLedgerScope();
+  const current = skipLedgered(enrolled(reverseRows(artifact)), ledger.ts);
+  const baseline = skipLedgered(inScope(await loadBaseline(), scope), ledger.ts);
+  console.log(
+    renderSkipped("ruby-compat call ratchet", current.skipped.length + baseline.skipped.length),
+  );
+  const { added, stale } = diffAgainstBaseline(current.counted, baseline.counted);
 
   if (added.length === 0 && stale.length === 0) {
     console.log(
       `ruby-compat call ratchet: OK (${ENROLLED_PACKAGES.length} enrolled package(s), ` +
-        `${baseline.length} baselined row(s))`,
+        `${baseline.counted.length} baselined row(s))`,
     );
     return 0;
   }

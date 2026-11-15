@@ -127,6 +127,7 @@ import { spawn } from "child_process";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { inScope, scopeMismatch, scopeOf } from "./scope.js";
+import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
 import {
   type Artifact,
   type CallMismatchKey,
@@ -733,11 +734,29 @@ async function main(
   autoTighten: boolean,
   scope: string | null = null,
 ): Promise<number> {
-  const baseline = await loadBaseline();
+  const scopeOfLedger = await loadLedgerScope();
+  const allBaseline = await loadBaseline();
   const artifact = await loadArtifact();
-  const current = flattenArtifact(artifact);
+  const { counted: current, skipped: skippedCurrent } = skipLedgered(
+    flattenArtifact(artifact),
+    scopeOfLedger.ts,
+  );
+  const { counted: baseline, skipped: ledgeredBaseline } = skipLedgered(
+    allBaseline,
+    scopeOfLedger.ts,
+  );
+  const { counted: staleTags, skipped: skippedTags } = skipLedgered(
+    artifact.staleTags ?? [],
+    scopeOfLedger.tsName,
+  );
+  console.log(
+    renderSkipped(
+      "call-mismatches ratchet",
+      skippedCurrent.length + ledgeredBaseline.length + skippedTags.length,
+    ),
+  );
 
-  const dups = findDuplicateKeys(baseline);
+  const dups = findDuplicateKeys(allBaseline);
   if (dups.length > 0) {
     console.error(
       `\ncall-mismatches ratchet: ${dups.length} duplicate baseline key(s):\n` +
@@ -770,24 +789,24 @@ async function main(
   }
 
   if (write) {
-    const next = reseed(current, baseline, DEFAULT_REASON);
+    const next = sortKeys([...reseed(current, baseline, DEFAULT_REASON), ...ledgeredBaseline]);
     await writeSplitBaseline([...next, ...(await loadForeignRows())], BASELINE_DIR);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined call mismatches`,
     );
 
     const count = unreviewedCount(next);
-    const newly = sortKeys(newlySeeded(next, baseline, DEFAULT_REASON));
+    const newly = sortKeys(newlySeeded(next, allBaseline, DEFAULT_REASON));
     // Rows this reseed just seeded are held out of their own file's mark, so a
     // reseed can never buy unreviewed headroom (see unreviewed-ratchet.ts).
     const counts = unreviewedCounts(next, DEFAULT_REASON, relPathFor);
     const marks = nextMarks(heldOutCounts(counts, newly, relPathFor), await loadMarks(MARK_DIR));
     await writeMarks(MARK_DIR, marks);
     console.log(renderWriteSummary(count, newly, marks, path.relative(ROOT_DIR, MARK_DIR)));
-    const dropped = renderDroppedReviewed(droppedReviewed(next, baseline, DEFAULT_REASON));
+    const dropped = renderDroppedReviewed(droppedReviewed(next, allBaseline, DEFAULT_REASON));
     if (dropped) console.log(dropped);
     const seeded = renderDroppedSeeded(
-      droppedSeeded(next, baseline, DEFAULT_REASON),
+      droppedSeeded(next, allBaseline, DEFAULT_REASON),
       showSeededKeys,
     );
     if (seeded) console.log(seeded);
@@ -801,12 +820,11 @@ async function main(
   if (await reportEmptyBaselines(files, "call-mismatches ratchet")) return 1;
 
   const { added, stale } = diffAgainstBaseline(current, inScope(baseline, scope));
-  const staleTags = artifact.staleTags ?? [];
   const staleTagReport = renderStaleTags(staleTags);
   if (staleTagReport) console.error(staleTagReport);
 
-  const unreviewed = unreviewedCount(baseline);
-  const counts = unreviewedCounts(baseline, DEFAULT_REASON, relPathFor);
+  const unreviewed = unreviewedCount(allBaseline);
+  const counts = unreviewedCounts(allBaseline, DEFAULT_REASON, relPathFor);
   const marks = await loadMarks(MARK_DIR);
   const markDir = path.relative(ROOT_DIR, MARK_DIR);
   // Both arms are PER FILE: a review in one source can no longer pay for a

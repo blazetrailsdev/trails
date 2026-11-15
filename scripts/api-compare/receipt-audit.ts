@@ -40,6 +40,7 @@ import {
   type TaggedEntry,
 } from "./extra-surface.js";
 import { classifyReason } from "./missing-rails-call-tags.js";
+import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
 
 /** The manifest with every `@noRailsEquivalent` receipt removed. */
 export function stripReceipts(ts: ApiManifest): ApiManifest {
@@ -242,11 +243,17 @@ export async function main(argv: readonly string[]): Promise<void> {
   }
   const coveringNothing = receiptsCoveringNothing(ruby, ts, filterPkg);
   const unverifiable = unverifiableReceipts(ts, await readSources(ts, filterPkg));
-  const [calls, args] = await Promise.all(
+  const ledger = await loadLedgerScope();
+  const [callTags, argTags] = await Promise.all(
     ["call-mismatches.json", "call-arg-mismatches.json"].map(async (file) =>
-      callTagsSuppressingNothing((await readJson<CallTagArtifact>(file)) ?? {}, filterPkg),
+      skipLedgered(
+        callTagsSuppressingNothing((await readJson<CallTagArtifact>(file)) ?? {}, filterPkg),
+        ledger.tsName,
+      ),
     ),
   );
+  const [calls, args] = [callTags.counted, argTags.counted];
+  console.log(renderSkipped("receipt-audit", callTags.skipped.length + argTags.skipped.length));
   const claim = (reason: string): string => classifyReason(reason).toUpperCase();
   console.log(
     `\nReceipts covering nothing (allowed or exempt without the tag): ${coveringNothing.length}`,

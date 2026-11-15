@@ -50,6 +50,7 @@ import { fileURLToPath } from "url";
 import { type ArClosure, DATA_LAYER_PACKAGES } from "./ar-closure.js";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { inScope, scopeMismatch, scopeOf } from "./scope.js";
+import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
 import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
 import { TAG as NAME_TAG } from "./missing-rails-name-tags.js";
 import { NAMING_CLASSES, classifyPair, differingRefPairs } from "./naming-taxonomy.js";
@@ -245,7 +246,17 @@ export function renderKey(k: CallArgKey): string {
 }
 
 export async function main(write: boolean, scope: string | null = null): Promise<number> {
-  const artifact = await loadArtifact();
+  const ledger = await loadLedgerScope();
+  const fullArtifact = await loadArtifact();
+  const mismatches = skipLedgered(fullArtifact.mismatches, ledger.pair);
+  const staleTagRows = skipLedgered(fullArtifact.staleTags ?? [], ledger.tsName);
+  const staleNameTagRows = skipLedgered(fullArtifact.staleNameTags ?? [], ledger.tsName);
+  const artifact = {
+    ...fullArtifact,
+    mismatches: mismatches.counted,
+    staleTags: staleTagRows.counted,
+    staleNameTags: staleNameTagRows.counted,
+  };
   const current: CallArgKey[] = gatedRows(artifact);
   const namingRows = artifact.mismatches.length - current.length;
 
@@ -272,8 +283,20 @@ export async function main(write: boolean, scope: string | null = null): Promise
     return 1;
   }
 
+  const allBaseline = await loadBaseline();
+  const { counted: baseline, skipped: ledgeredBaseline } = skipLedgered(allBaseline, ledger.ts);
+  console.log(
+    renderSkipped(
+      "call-args ratchet",
+      mismatches.skipped.length +
+        staleTagRows.skipped.length +
+        staleNameTagRows.skipped.length +
+        ledgeredBaseline.length,
+    ),
+  );
+
   if (write) {
-    const next = reseed(current, await loadBaseline(), DEFAULT_REASON);
+    const next = sortKeys([...reseed(current, baseline, DEFAULT_REASON), ...ledgeredBaseline]);
     // The call-set rows share these shards and are not this gate's to rewrite.
     await writeSplitBaseline([...next, ...(await loadCallSetRows())], BASELINE_DIR);
     console.log(
@@ -283,9 +306,7 @@ export async function main(write: boolean, scope: string | null = null): Promise
     return 0;
   }
 
-  const baseline = await loadBaseline();
-
-  const dups = findDuplicateKeys(baseline);
+  const dups = findDuplicateKeys(allBaseline);
   if (dups.length > 0) {
     console.error(
       `\ncall-args ratchet: ${dups.length} duplicate baseline key(s):\n` +
