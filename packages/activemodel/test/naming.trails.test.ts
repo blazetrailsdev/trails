@@ -14,6 +14,21 @@ const klass = class {};
 describe("naming (trails-only)", () => {
   class Post extends Model {}
 
+  it("extend Naming copies model_name but not its module functions", () => {
+    expect(Naming.plural(Post)).toBe("posts");
+    for (const moduleFunction of [
+      "plural",
+      "singular",
+      "isUncountable",
+      "singularRouteKey",
+      "routeKey",
+      "paramKey",
+      "modelNameFromRecordOrClass",
+    ]) {
+      expect(moduleFunction in Model).toBe(false);
+    }
+  });
+
   it("name returns class name", () => {
     expect(Post.modelName.name).toBe("Post");
   });

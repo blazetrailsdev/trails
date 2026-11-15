@@ -18,52 +18,52 @@ import {
   rbObjRespondTo,
   rbStrMatch,
   rbStrSend,
+  classModule,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, TypeError } from "./attribute-assignment.js";
 
-export interface Naming {
-  readonly modelName: ModelName;
-}
-
-function modelName(this: NamingHost): ModelName {
-  if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
-    const namespace = moduleParents(this).find((n) => {
-      if (!rbObjRespondTo(n, "isUseRelativeModelNaming")) return false;
-      const relative = (
-        n as { isUseRelativeModelNaming: () => unknown }
-      ).isUseRelativeModelNaming();
-      return relative != null && relative !== false;
-    });
-    const name = new ModelName(this as unknown as ModelLike, namespace ?? null);
-    if (isClassPathPending(this)) return name;
-    this._modelName = name;
-  }
-  return this._modelName;
-}
-
-function namingExtended(base: NamingHost): void {
-  Object.defineProperty(base.prototype, "modelName", {
-    get(this: object): ModelName {
-      return (this.constructor as unknown as { modelName: ModelName }).modelName;
-    },
-    configurable: true,
-  });
-}
+type RecordOrClass =
+  | ModelName
+  | { modelName: ModelName }
+  | { toModel: () => unknown }
+  | { constructor: { modelName: ModelName } };
 
 interface NamingHost {
   prototype: object;
   _modelName?: ModelName | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-namespace
-export namespace Naming {
-  type RecordOrClass =
-    | ModelName
-    | { modelName: ModelName }
-    | { toModel: () => unknown }
-    | { constructor: { modelName: ModelName } };
+export class Naming {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
 
-  export function modelNameFromRecordOrClass(recordOrClass: RecordOrClass): ModelName {
+  get modelName(): ModelName {
+    const self = this as unknown as NamingHost;
+    if (!Object.hasOwn(self, "_modelName") || !self._modelName) {
+      const namespace = moduleParents(this).find((n) => {
+        if (!rbObjRespondTo(n, "isUseRelativeModelNaming")) return false;
+        const relative = (
+          n as { isUseRelativeModelNaming: () => unknown }
+        ).isUseRelativeModelNaming();
+        return relative != null && relative !== false;
+      });
+      const name = new ModelName(self as unknown as ModelLike, namespace ?? null);
+      if (isClassPathPending(self)) return name;
+      self._modelName = name;
+    }
+    return self._modelName;
+  }
+
+  static [extended](base: NamingHost): void {
+    Object.defineProperty(base.prototype, "modelName", {
+      get(this: object): ModelName {
+        return (this.constructor as unknown as { modelName: ModelName }).modelName;
+      },
+      configurable: true,
+    });
+  }
+
+  static modelNameFromRecordOrClass(recordOrClass: RecordOrClass): ModelName {
     if (recordOrClass instanceof ModelName) return recordOrClass;
     if ("toModel" in recordOrClass && typeof recordOrClass.toModel === "function") {
       const model = recordOrClass.toModel() as { modelName: ModelName };
@@ -73,28 +73,28 @@ export namespace Naming {
     return (recordOrClass.constructor as { modelName: ModelName }).modelName;
   }
 
-  export function plural(recordOrClass: RecordOrClass): string {
-    return modelNameFromRecordOrClass(recordOrClass).plural;
+  static plural(recordOrClass: RecordOrClass): string {
+    return Naming.modelNameFromRecordOrClass(recordOrClass).plural;
   }
 
-  export function singular(recordOrClass: RecordOrClass): string {
-    return modelNameFromRecordOrClass(recordOrClass).singular;
+  static singular(recordOrClass: RecordOrClass): string {
+    return Naming.modelNameFromRecordOrClass(recordOrClass).singular;
   }
 
-  export function isUncountable(recordOrClass: RecordOrClass): boolean {
-    return modelNameFromRecordOrClass(recordOrClass).isUncountable;
+  static isUncountable(recordOrClass: RecordOrClass): boolean {
+    return Naming.modelNameFromRecordOrClass(recordOrClass).isUncountable;
   }
 
-  export function singularRouteKey(recordOrClass: RecordOrClass): string {
-    return modelNameFromRecordOrClass(recordOrClass).singularRouteKey;
+  static singularRouteKey(recordOrClass: RecordOrClass): string {
+    return Naming.modelNameFromRecordOrClass(recordOrClass).singularRouteKey;
   }
 
-  export function routeKey(recordOrClass: RecordOrClass): string {
-    return modelNameFromRecordOrClass(recordOrClass).routeKey;
+  static routeKey(recordOrClass: RecordOrClass): string {
+    return Naming.modelNameFromRecordOrClass(recordOrClass).routeKey;
   }
 
-  export function paramKey(recordOrClass: RecordOrClass): string {
-    return modelNameFromRecordOrClass(recordOrClass).paramKey;
+  static paramKey(recordOrClass: RecordOrClass): string {
+    return Naming.modelNameFromRecordOrClass(recordOrClass).paramKey;
   }
 }
 import { I18n } from "./i18n.js";
@@ -268,20 +268,3 @@ function builtinClassName(value: unknown): string {
   if (typeof value === "bigint") return "Integer";
   return (value as { constructor?: { name?: string } })?.constructor?.name ?? typeof value;
 }
-
-for (const moduleFunction of Object.keys(Naming)) {
-  Object.defineProperty(Naming, moduleFunction, {
-    ...Object.getOwnPropertyDescriptor(Naming, moduleFunction)!,
-    enumerable: false,
-  });
-}
-Object.defineProperty(Naming, "modelName", {
-  get: modelName,
-  enumerable: true,
-  configurable: true,
-});
-Object.defineProperty(Naming, extended, {
-  value: namingExtended,
-  enumerable: false,
-  configurable: true,
-});

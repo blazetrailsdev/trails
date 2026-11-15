@@ -605,6 +605,10 @@ a porting problem. Ruled by the operator on 2026-10-22.
   and an instance member of the same name (`mattr_accessor`), or when a
   definer writes instance members non-enumerably (`attr_internal`,
   `delegate`, accessor `defineProperties`): `FormHelper`, `SanitizeHelper`.
+  A Ruby module with both `def x` and `def self.x` is a class module too:
+  `extend()` copies only its prototype, so a module function never reaches
+  a host (`ActiveModel::Naming`: `model_name` on the prototype, `plural` &c.
+  as statics).
 
 **A module that includes a module records it.** `include(mod, other)` on
 either shape copies nothing onto `mod`. When a class later includes `mod`,

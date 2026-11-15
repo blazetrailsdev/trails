@@ -27,13 +27,11 @@ export class Translation {
   static humanAttributeName = humanAttributeName;
 }
 
-for (const moduleMethod of Object.keys(Naming)) {
-  Object.defineProperty(
-    Translation,
-    moduleMethod,
-    Object.getOwnPropertyDescriptor(Naming, moduleMethod)!,
-  );
-}
+Object.defineProperty(
+  Translation,
+  "modelName",
+  Object.getOwnPropertyDescriptor(Naming.prototype, "modelName")!,
+);
 
 export interface HumanAttributeNameOptions {
   default?: string | string[];
