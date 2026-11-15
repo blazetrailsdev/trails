@@ -1,57 +1,44 @@
 import "@blazetrails/vitest-matchers";
 import { describe, expect, it } from "vitest";
+import { include } from "@blazetrails/ruby-compat";
 import { Multibyte } from "../lib/multibyte.js";
 import { Utilities } from "../lib/utilities.js";
 
 const mbChars = (str: string): string => Multibyte.mbChars(str) as string;
 
-const {
-  isTokenSafe,
-  quoteToken,
-  isAtomSafe,
-  quoteAtom,
-  quotePhrase,
-  escapeParen,
-  unparen,
-  unbracket,
-  dquote,
-  unquote,
-  unescape,
-  paren,
-  bracket,
-  uriEscape,
-  uriUnescape,
-} = Utilities;
+class UtilitiesSpec {}
+include(UtilitiesSpec, Utilities);
+const self = new UtilitiesSpec() as Utilities;
 
 describe("Utilities Module", () => {
   describe("token safe", () => {
     describe("checking", () => {
       it("should return true if a string is token safe", () => {
-        expect(isTokenSafe(".abc")).toBeTruthy();
+        expect(self.isTokenSafe(".abc")).toBeTruthy();
       });
 
       it("should return false if a string is token safe", () => {
-        expect(isTokenSafe("?=abc")).toBeFalsy();
+        expect(self.isTokenSafe("?=abc")).toBeFalsy();
       });
 
       it("should work with mb_chars", () => {
-        expect(isTokenSafe(mbChars(".abc"))).toBeTruthy();
-        expect(isTokenSafe(mbChars("?=abc"))).toBeFalsy();
+        expect(self.isTokenSafe(mbChars(".abc"))).toBeTruthy();
+        expect(self.isTokenSafe(mbChars("?=abc"))).toBeFalsy();
       });
     });
 
     describe("quoting", () => {
       it("should return true if a string is token safe", () => {
-        expect(quoteToken(".abc")).toBe(".abc");
+        expect(self.quoteToken(".abc")).toBe(".abc");
       });
 
       it("should return false if a string is token safe", () => {
-        expect(quoteToken("?=abc")).toBe('"?=abc"');
+        expect(self.quoteToken("?=abc")).toBe('"?=abc"');
       });
 
       it("should work with mb_chars", () => {
-        expect(String(quoteToken(mbChars(".abc")))).toBe(".abc");
-        expect(quoteToken(mbChars("?=abc"))).toBe('"?=abc"');
+        expect(String(self.quoteToken(mbChars(".abc")))).toBe(".abc");
+        expect(self.quoteToken(mbChars("?=abc"))).toBe('"?=abc"');
       });
     });
   });
@@ -59,36 +46,36 @@ describe("Utilities Module", () => {
   describe("atom safe", () => {
     describe("checking", () => {
       it("should return true if a string is token safe", () => {
-        expect(isAtomSafe("?=abc")).toBeTruthy();
+        expect(self.isAtomSafe("?=abc")).toBeTruthy();
       });
 
       it("should return false if a string is token safe", () => {
-        expect(isAtomSafe(".abc")).toBeFalsy();
+        expect(self.isAtomSafe(".abc")).toBeFalsy();
       });
 
       it("should work with mb_chars", () => {
-        expect(isAtomSafe(mbChars("?=abc"))).toBeTruthy();
-        expect(isAtomSafe(mbChars(".abc"))).toBeFalsy();
+        expect(self.isAtomSafe(mbChars("?=abc"))).toBeTruthy();
+        expect(self.isAtomSafe(mbChars(".abc"))).toBeFalsy();
       });
     });
 
     describe("quoting", () => {
       it("should return true if a string is token safe", () => {
-        expect(quoteAtom("?=abc")).toBe("?=abc");
+        expect(self.quoteAtom("?=abc")).toBe("?=abc");
       });
 
       it("should return false if a string is token safe", () => {
-        expect(quoteAtom(".abc")).toBe('".abc"');
+        expect(self.quoteAtom(".abc")).toBe('".abc"');
       });
 
       it("should work with mb_chars", () => {
-        expect(String(quoteAtom(mbChars("?=abc")))).toBe("?=abc");
-        expect(quoteAtom(mbChars(".abc"))).toBe('".abc"');
+        expect(String(self.quoteAtom(mbChars("?=abc")))).toBe("?=abc");
+        expect(self.quoteAtom(mbChars(".abc"))).toBe('".abc"');
       });
 
       it("should quote mb_chars white space", () => {
-        expect(quoteAtom(mbChars("ab abc"))).toBe('"ab abc"');
-        expect(quoteAtom(mbChars("a b\ta\r\nbc"))).toBe('"a b\ta\r\nbc"');
+        expect(self.quoteAtom(mbChars("ab abc"))).toBe('"ab abc"');
+        expect(self.quoteAtom(mbChars("a b\ta\r\nbc"))).toBe('"a b\ta\r\nbc"');
       });
     });
   });
@@ -96,20 +83,20 @@ describe("Utilities Module", () => {
   describe("quoting phrases", () => {
     it("doesn't mutate original string", () => {
       const inputStr = Object.freeze("blargh");
-      expect(() => quotePhrase(inputStr)).not.toThrow();
+      expect(() => self.quotePhrase(inputStr)).not.toThrow();
     });
 
     describe("given a non-unsafe string", () => {
       // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the assertion is on `String#encoding`.
       it.skip("should not change the encoding", () => {
-        expect(quotePhrase("blargh")).toBe("blargh");
+        expect(self.quotePhrase("blargh")).toBe("blargh");
       });
     });
 
     describe("given an unsafe string", () => {
       // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either" — the assertion is on `String#encoding`.
       it.skip("should not change the encoding", () => {
-        expect(quotePhrase("Bjørn")).toBe('"Bjørn"');
+        expect(self.quotePhrase("Bjørn")).toBe('"Bjørn"');
       });
     });
   });
@@ -118,81 +105,83 @@ describe("Utilities Module", () => {
     it("should escape parens", () => {
       const test = "This is not (escaped)";
       const result = String.raw`This is not \(escaped\)`;
-      expect(escapeParen(test)).toBe(result);
+      expect(self.escapeParen(test)).toBe(result);
     });
 
     it("should not double escape parens", () => {
       const test = String.raw`This is not \(escaped\)`;
       const result = String.raw`This is not \(escaped\)`;
-      expect(escapeParen(test)).toBe(result);
+      expect(self.escapeParen(test)).toBe(result);
     });
 
     it("should escape all parens", () => {
       const test = String.raw`This is not \()escaped(\)`;
       const result = String.raw`This is not \(\)escaped\(\)`;
-      expect(escapeParen(test)).toBe(result);
+      expect(self.escapeParen(test)).toBe(result);
     });
   });
 
   describe("unescaping parenthesis", () => {
     it("should work", () => {
-      expect(unparen("(This is a string)")).toBe("This is a string");
+      expect(self.unparen("(This is a string)")).toBe("This is a string");
     });
 
     it("should work without parens", () => {
-      expect(unparen("This is a string")).toBe("This is a string");
+      expect(self.unparen("This is a string")).toBe("This is a string");
     });
 
     it("should work using Multibyte.mb_chars", () => {
       const test = mbChars("(This is a string)");
       const result = "This is a string";
-      expect(String(unparen(test))).toBe(result);
+      expect(String(self.unparen(test))).toBe(result);
     });
 
     it("should work without parens using Multibyte.mb_chars", () => {
       const test = mbChars("This is a string");
       const result = "This is a string";
-      expect(String(unparen(test))).toBe(result);
+      expect(String(self.unparen(test))).toBe(result);
     });
   });
 
   describe("unescaping brackets", () => {
     it("should work", () => {
-      expect(unbracket("<This is a string>")).toBe("This is a string");
+      expect(self.unbracket("<This is a string>")).toBe("This is a string");
     });
 
     it("should work without brackets", () => {
-      expect(unbracket("This is a string")).toBe("This is a string");
+      expect(self.unbracket("This is a string")).toBe("This is a string");
     });
 
     it("should work using Multibyte.mb_chars", () => {
       const test = mbChars("<This is a string>");
       const result = "This is a string";
-      expect(String(unbracket(test))).toBe(result);
+      expect(String(self.unbracket(test))).toBe(result);
     });
 
     it("should work without parens using Multibyte.mb_chars", () => {
       const test = mbChars("This is a string");
       const result = "This is a string";
-      expect(String(unbracket(test))).toBe(result);
+      expect(String(self.unbracket(test))).toBe(result);
     });
   });
 
   describe("quoting phrases", () => {
     it("should quote a phrase if it is unsafe", () => {
-      expect(dquote("this.needs quoting")).toBe('"this.needs quoting"');
+      expect(self.dquote("this.needs quoting")).toBe('"this.needs quoting"');
     });
 
     it("should properly quote a string, even if quoted but not escaped properly", () => {
-      expect(dquote('"this needs "escaping"')).toBe(String.raw`"this needs \"escaping"`);
+      expect(self.dquote('"this needs "escaping"')).toBe(String.raw`"this needs \"escaping"`);
     });
 
     it("should quote correctly a phrase with an escaped quote in it", () => {
-      expect(dquote(String.raw`this needs \"quoting`)).toBe(String.raw`"this needs \\\"quoting"`);
+      expect(self.dquote(String.raw`this needs \"quoting`)).toBe(
+        String.raw`"this needs \\\"quoting"`,
+      );
     });
 
     it("should quote correctly a phrase with an escaped backslash followed by an escaped quote in it", () => {
-      expect(dquote(String.raw`this needs \\"quoting`)).toBe(
+      expect(self.dquote(String.raw`this needs \\"quoting`)).toBe(
         String.raw`"this needs \\\\\"quoting"`,
       );
     });
@@ -200,95 +189,95 @@ describe("Utilities Module", () => {
 
   describe("unquoting phrases", () => {
     it("should remove quotes from the edge", () => {
-      expect(unquote('"This is quoted"')).toBe("This is quoted");
+      expect(self.unquote('"This is quoted"')).toBe("This is quoted");
     });
 
     it("should remove backslash escaping from quotes", () => {
-      expect(unquote(String.raw`"This is \"quoted\""`)).toBe('This is "quoted"');
+      expect(self.unquote(String.raw`"This is \"quoted\""`)).toBe('This is "quoted"');
     });
 
     it("should remove backslash escaping from any char", () => {
-      expect(unquote(String.raw`"This is \quoted"`)).toBe("This is quoted");
+      expect(self.unquote(String.raw`"This is \quoted"`)).toBe("This is quoted");
     });
 
     it("should be able to handle unquoted strings", () => {
-      expect(unquote("This is not quoted")).toBe("This is not quoted");
+      expect(self.unquote("This is not quoted")).toBe("This is not quoted");
     });
 
     it("should preserve backslashes in unquoted strings", () => {
-      expect(unquote(String.raw`This is not \"quoted`)).toBe(String.raw`This is not \"quoted`);
+      expect(self.unquote(String.raw`This is not \"quoted`)).toBe(String.raw`This is not \"quoted`);
     });
 
     it("should be able to handle unquoted quotes", () => {
-      expect(unquote('"This is "quoted"')).toBe('This is "quoted');
+      expect(self.unquote('"This is "quoted"')).toBe('This is "quoted');
     });
   });
 
   describe("unescaping phrases", () => {
     it("should not modify a string with no backslashes", () => {
-      expect(unescape("This is a string")).toBe("This is a string");
+      expect(self.unescape("This is a string")).toBe("This is a string");
     });
 
     it("should not modify a quoted string with no backslashes", () => {
-      expect(unescape('"This is a string"')).toBe('"This is a string"');
+      expect(self.unescape('"This is a string"')).toBe('"This is a string"');
     });
 
     it("should remove backslash escaping from a string", () => {
-      expect(unescape(String.raw`This is \"a string\"`)).toBe('This is "a string"');
+      expect(self.unescape(String.raw`This is \"a string\"`)).toBe('This is "a string"');
     });
 
     it("should remove backslash escaping from a quoted string", () => {
-      expect(unescape(String.raw`"This is \"a string\""`)).toBe('"This is "a string""');
+      expect(self.unescape(String.raw`"This is \"a string\""`)).toBe('"This is "a string""');
     });
   });
 
   describe("parenthesizing phrases", () => {
     it("should parenthesize a phrase", () => {
-      expect(paren("this.needs parenthesizing")).toBe("(this.needs parenthesizing)");
+      expect(self.paren("this.needs parenthesizing")).toBe("(this.needs parenthesizing)");
     });
 
     it("should properly parenthesize a string, and escape properly", () => {
-      expect(paren("this needs (escaping")).toBe(String.raw`(this needs \(escaping)`);
+      expect(self.paren("this needs (escaping")).toBe(String.raw`(this needs \(escaping)`);
     });
 
     it("should properly parenthesize a string, and escape properly (other way)", () => {
-      expect(paren("this needs )escaping")).toBe(String.raw`(this needs \)escaping)`);
+      expect(self.paren("this needs )escaping")).toBe(String.raw`(this needs \)escaping)`);
     });
 
     it("should properly parenthesize a string, even if parenthesized but not escaped properly", () => {
-      expect(paren("(this needs (escaping)")).toBe(String.raw`(this needs \(escaping)`);
+      expect(self.paren("(this needs (escaping)")).toBe(String.raw`(this needs \(escaping)`);
     });
 
     it("should properly parenthesize a string, even if parenthesized but not escaped properly (other way)", () => {
-      expect(paren("(this needs )escaping)")).toBe(String.raw`(this needs \)escaping)`);
+      expect(self.paren("(this needs )escaping)")).toBe(String.raw`(this needs \)escaping)`);
     });
 
     it("should parenthesize correctly a phrase with an escaped parentheses in it", () => {
-      expect(paren(String.raw`this needs \(parenthesizing`)).toBe(
+      expect(self.paren(String.raw`this needs \(parenthesizing`)).toBe(
         String.raw`(this needs \(parenthesizing)`,
       );
     });
 
     it("should parenthesize correctly a phrase with an escaped parentheses in it (other way)", () => {
-      expect(paren(String.raw`this needs \)parenthesizing`)).toBe(
+      expect(self.paren(String.raw`this needs \)parenthesizing`)).toBe(
         String.raw`(this needs \)parenthesizing)`,
       );
     });
 
     it("should parenthesize correctly a phrase with an escaped backslash followed by an escaped parentheses in it", () => {
-      expect(paren(String.raw`this needs \\(parenthesizing`)).toBe(
+      expect(self.paren(String.raw`this needs \\(parenthesizing`)).toBe(
         String.raw`(this needs \\(parenthesizing)`,
       );
     });
 
     it("should parenthesize correctly a phrase with an escaped backslash followed by an escaped parentheses in it (other way)", () => {
-      expect(paren(String.raw`this needs \\)parenthesizing`)).toBe(
+      expect(self.paren(String.raw`this needs \\)parenthesizing`)).toBe(
         String.raw`(this needs \\)parenthesizing)`,
       );
     });
 
     it("should parenthesize correctly a phrase with a set of parentheses", () => {
-      expect(paren("this (needs) parenthesizing")).toBe(
+      expect(self.paren("this (needs) parenthesizing")).toBe(
         String.raw`(this \(needs\) parenthesizing)`,
       );
     });
@@ -296,51 +285,53 @@ describe("Utilities Module", () => {
 
   describe("bracketizing phrases", () => {
     it("should bracketize a phrase", () => {
-      expect(bracket("this.needs bracketizing")).toBe("<this.needs bracketizing>");
+      expect(self.bracket("this.needs bracketizing")).toBe("<this.needs bracketizing>");
     });
 
     it("should properly bracketize a string, and escape properly", () => {
-      expect(bracket("this needs <escaping")).toBe(String.raw`<this needs \<escaping>`);
+      expect(self.bracket("this needs <escaping")).toBe(String.raw`<this needs \<escaping>`);
     });
 
     it("should properly bracketize a string, and escape properly (other way)", () => {
-      expect(bracket("this needs >escaping")).toBe(String.raw`<this needs \>escaping>`);
+      expect(self.bracket("this needs >escaping")).toBe(String.raw`<this needs \>escaping>`);
     });
 
     it("should properly bracketize a string, even if bracketized but not escaped properly", () => {
-      expect(bracket("<this needs <escaping>")).toBe(String.raw`<this needs \<escaping>`);
+      expect(self.bracket("<this needs <escaping>")).toBe(String.raw`<this needs \<escaping>`);
     });
 
     it("should properly bracketize a string, even if bracketized but not escaped properly (other way)", () => {
-      expect(bracket("<this needs >escaping>")).toBe(String.raw`<this needs \>escaping>`);
+      expect(self.bracket("<this needs >escaping>")).toBe(String.raw`<this needs \>escaping>`);
     });
 
     it("should bracketize correctly a phrase with an escaped brackets in it", () => {
-      expect(bracket(String.raw`this needs \<bracketizing`)).toBe(
+      expect(self.bracket(String.raw`this needs \<bracketizing`)).toBe(
         String.raw`<this needs \<bracketizing>`,
       );
     });
 
     it("should bracketize correctly a phrase with an escaped brackets in it (other way)", () => {
-      expect(bracket(String.raw`this needs \>bracketizing`)).toBe(
+      expect(self.bracket(String.raw`this needs \>bracketizing`)).toBe(
         String.raw`<this needs \>bracketizing>`,
       );
     });
 
     it("should bracketize correctly a phrase with an escaped backslash followed by an escaped brackets in it", () => {
-      expect(bracket(String.raw`this needs \\<bracketizing`)).toBe(
+      expect(self.bracket(String.raw`this needs \\<bracketizing`)).toBe(
         String.raw`<this needs \\<bracketizing>`,
       );
     });
 
     it("should bracketize correctly a phrase with an escaped backslash followed by an escaped brackets in it (other way)", () => {
-      expect(bracket(String.raw`this needs \\>bracketizing`)).toBe(
+      expect(self.bracket(String.raw`this needs \\>bracketizing`)).toBe(
         String.raw`<this needs \\>bracketizing>`,
       );
     });
 
     it("should bracketize correctly a phrase with a set of brackets", () => {
-      expect(bracket("this <needs> bracketizing")).toBe(String.raw`<this \<needs\> bracketizing>`);
+      expect(self.bracket("this <needs> bracketizing")).toBe(
+        String.raw`<this \<needs\> bracketizing>`,
+      );
     });
   });
 
@@ -348,11 +339,11 @@ describe("Utilities Module", () => {
     const uriParser = Utilities.uriParser();
 
     it("should have a wrapper on URI.escape", () => {
-      expect(uriEscape("@?@!")).toBe(uriParser.escape("@?@!"));
+      expect(self.uriEscape("@?@!")).toBe(uriParser.escape("@?@!"));
     });
 
     it("should have a wrapper on URI.unescape", () => {
-      expect(uriUnescape("@?@!")).toBe(uriParser.unescape("@?@!"));
+      expect(self.uriUnescape("@?@!")).toBe(uriParser.unescape("@?@!"));
     });
   });
 

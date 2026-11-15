@@ -590,10 +590,12 @@ export class SMTP {
     };
     this.logging("TLS connection started");
     await new Promise<void>((resolve, reject) => {
-      s.once("error", reject);
+      const sslError = (err: Error & { originalCode?: string }) =>
+        reject(Object.assign(err, { code: err.originalCode ?? (err as ConnectionError).code }));
+      s.once("error", sslError);
       s._upgradeConnection((err) => {
-        s.removeListener("error", reject);
-        if (err) reject(err);
+        s.removeListener("error", sslError);
+        if (err) sslError(err);
         else resolve();
       });
     });
