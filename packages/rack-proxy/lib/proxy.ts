@@ -31,6 +31,7 @@ import { HttpStreamingResponse } from "./http-streaming-response.js";
 
 type RackEnv = Record<string, unknown>;
 type NetHTTP = InstanceType<typeof Net.HTTP>;
+type DebugOutput = Parameters<NetHTTP["setDebugOutput"]>[0];
 type NetHTTPRequest = InstanceType<typeof Net.HTTP.Get>;
 type RackInput = {
   read(length?: number | null, buffer?: unknown): unknown;
@@ -53,6 +54,7 @@ export class RequestBodyStream {
     [this.input, this.remaining] = [input, length];
   }
 
+  /** @missingRailsCall clear — PERMANENT */
   async read(
     length: number | null = null,
     buffer: Uint8Array | null = null,
@@ -307,7 +309,6 @@ export class Proxy {
   /** @internal */
   protected async performRequest(env: RackEnv): Promise<RackResponse> {
     const sourceRequest = new Request(env);
-
     let code: number;
     let headers: Headers;
     let body: unknown;
@@ -362,12 +363,7 @@ export class Proxy {
           targetRequest.contentType = sourceRequest.contentType;
       }
 
-      if (
-        this.username != null &&
-        this.username !== false &&
-        this.password != null &&
-        this.password !== false
-      ) {
+      if (this.username != null && this.password != null) {
         targetRequest.basicAuth(this.username as string, this.password as string);
       }
 
@@ -586,9 +582,7 @@ export class Proxy {
       if (this.key != null) conn.key = this.key;
     }
 
-    if (this.logger != null && this.logger !== false) {
-      conn.setDebugOutput(this.logger as Parameters<NetHTTP["setDebugOutput"]>[0]);
-    }
+    if (this.logger != null) conn.setDebugOutput(this.logger as DebugOutput);
     return conn;
   }
 }

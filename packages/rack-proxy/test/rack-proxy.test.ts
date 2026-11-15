@@ -18,10 +18,10 @@ import { startServer, type TestServer } from "./support/proxy-test-server.js";
 
 type Env = Record<string, unknown>;
 type Triplet = [number, Headers, unknown];
+type Configurable = { configureBackendConnection(...args: unknown[]): unknown };
 
 class HostProxy extends Proxy {
   host: string | null = null;
-
   override rewriteEnv(env: Env): Env {
     env["HTTP_HOST"] = this.host ?? "example.com";
     return env;
@@ -41,7 +41,6 @@ describe("RackProxyTest", () => {
   let server: TestServer | null = null;
   let app: HostProxy | null = null;
   let lastResponse: { status: number; headers: Headers; body: string };
-
   afterEach(async () => {
     await server?.shutdown();
     server = null;
@@ -65,23 +64,19 @@ describe("RackProxyTest", () => {
   }
   const get = (path: string) => request("GET", path);
 
-  it("http streaming", async () => {
-    await withWebrickProxy({}, async (port, proxy) => {
-      proxy.host = `127.0.0.1:${port}`;
-      await get("/");
-      expect(lastResponse.status).toBe(200);
-      expect(lastResponse.body).toMatch(/Example Domain/);
+  for (const [name, streaming] of [
+    ["http streaming", true],
+    ["http full request", false],
+  ] as const) {
+    it(name, async () => {
+      await withWebrickProxy({ streaming }, async (port, proxy) => {
+        proxy.host = `127.0.0.1:${port}`;
+        await get("/");
+        expect(lastResponse.status).toBe(200);
+        expect(lastResponse.body).toMatch(/Example Domain/);
+      });
     });
-  });
-
-  it("http full request", async () => {
-    await withWebrickProxy({ streaming: false }, async (port, proxy) => {
-      proxy.host = `127.0.0.1:${port}`;
-      await get("/");
-      expect(lastResponse.status).toBe(200);
-      expect(lastResponse.body).toMatch(/Example Domain/);
-    });
-  });
+  }
 
   it("handles missing content length", async () => {
     await withWebrickProxy({}, async (port, proxy) => {
@@ -171,9 +166,10 @@ describe("RackProxyTest", () => {
   it("connect and write timeouts are applied", () => {
     const proxy = new Proxy({ readTimeout: 5, openTimeout: 3, writeTimeout: 7 });
     const http = new Net.HTTP("127.0.0.1", 80);
-    (
-      proxy as unknown as { configureBackendConnection: (...args: unknown[]) => unknown }
-    ).configureBackendConnection(http, { useSsl: false, readTimeout: 5 });
+    (proxy as unknown as Configurable).configureBackendConnection(http, {
+      useSsl: false,
+      readTimeout: 5,
+    });
     expect(http.readTimeout).toBe(5);
     expect(http.openTimeout).toBe(3);
     expect(http.writeTimeout).toBe(7);
@@ -183,9 +179,10 @@ describe("RackProxyTest", () => {
     const store = new OpenSSL.X509.Store();
     const proxy = new Proxy({ caFile: "/tmp/some-ca.pem", certStore: store });
     const http = new Net.HTTP("127.0.0.1", 443);
-    (
-      proxy as unknown as { configureBackendConnection: (...args: unknown[]) => unknown }
-    ).configureBackendConnection(http, { useSsl: true, readTimeout: 5 });
+    (proxy as unknown as Configurable).configureBackendConnection(http, {
+      useSsl: true,
+      readTimeout: 5,
+    });
     expect(http.caFile).toBe("/tmp/some-ca.pem");
     expect(http.certStore).toBe(store);
   });
