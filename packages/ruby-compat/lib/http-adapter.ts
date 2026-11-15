@@ -91,6 +91,7 @@ export interface HttpSslOptions {
 export interface HttpAdapter {
   createServer(handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer;
   connect?(options: HttpConnectOptions): Promise<HttpClientSocket>;
+  lookup?(host: string): Promise<string>;
 }
 
 const registry = new Map<string, HttpAdapter>();
@@ -281,9 +282,13 @@ function tryAutoRegisterNode(): boolean {
     const http = req("node:http") as NodeHttp;
     const net = req("node:net") as NodeNet;
     const tls = req("node:tls") as NodeNet;
+    const dns = req("node:dns") as {
+      promises: { lookup(host: string): Promise<{ address: string }> };
+    };
     registry.set("node", {
       createServer: (handler) => http.createServer(handler),
       connect: (options) => _nodeConnect(net, tls, options),
+      lookup: async (host) => (await dns.promises.lookup(host)).address,
     });
     return true;
   } catch {

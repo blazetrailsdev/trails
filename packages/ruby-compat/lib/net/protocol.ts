@@ -342,6 +342,18 @@ export class BufferedIO {
 export class ProtocolError extends StandardError {}
 ProtocolError.prototype.name = "Net::ProtocolError";
 
+/** @noRailsEquivalent PERMANENT — `Net::ProtoFatalError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:62`). */
+export class ProtoFatalError extends ProtocolError {}
+ProtoFatalError.prototype.name = "Net::ProtoFatalError";
+
+/** @noRailsEquivalent PERMANENT — `Net::ProtoServerError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:64`). */
+export class ProtoServerError extends ProtocolError {}
+ProtoServerError.prototype.name = "Net::ProtoServerError";
+
+/** @noRailsEquivalent PERMANENT — `Net::ProtoRetriableError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:67`). */
+export class ProtoRetriableError extends ProtocolError {}
+ProtoRetriableError.prototype.name = "Net::ProtoRetriableError";
+
 /**
  * Ruby's `Net` module (`vendor/ruby/v3.3.11/lib/net/protocol.rb:26`), each
  * constant seated by the file that defines it.

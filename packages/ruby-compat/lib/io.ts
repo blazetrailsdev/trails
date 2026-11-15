@@ -913,7 +913,9 @@ export class IO {
    * (`vendor/ruby/v3.3.11/io.c:13365`).
    */
   static async copyStreamAsync(
-    src: { read(length?: number): string | Uint8Array | null } | IO,
+    src:
+      | { read(length?: number): string | Uint8Array | null | Promise<string | Uint8Array | null> }
+      | IO,
     dst: string | IO | { write(data: Uint8Array): unknown },
   ): Promise<number> {
     const chunks: Uint8Array[] = [];

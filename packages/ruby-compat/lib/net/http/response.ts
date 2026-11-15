@@ -16,6 +16,8 @@ export class HTTPResponse {
   /** @noRailsEquivalent PERMANENT */
   static readonly HAS_BODY: boolean;
   /** @noRailsEquivalent PERMANENT */
+  static readonly EXCEPTION_TYPE: new (msg: string, res: HTTPResponse) => Error;
+  /** @noRailsEquivalent PERMANENT */
   static CODE_CLASS_TO_OBJ: Record<string, typeof HTTPResponse>;
   /** @noRailsEquivalent PERMANENT */
   static CODE_TO_OBJ: Record<string, typeof HTTPResponse>;
@@ -94,6 +96,23 @@ export class HTTPResponse {
     this.httpVersion = httpv;
     this.code = code;
     this.message = msg;
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:274-278`. */
+  errorBang(): never {
+    let message = this.code;
+    if (this.message != null) message = `${message} ${rbStrDump(this.message)}`;
+    throw new (this.errorType())(message, this);
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:280-282`. */
+  errorType(): (typeof HTTPResponse)["EXCEPTION_TYPE"] {
+    return (this.constructor as typeof HTTPResponse).EXCEPTION_TYPE;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:285-287`. */
+  value(): void {
+    if (!(this instanceof Net.HTTPSuccess)) this.errorBang();
   }
 
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#[]` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:224-227`). */

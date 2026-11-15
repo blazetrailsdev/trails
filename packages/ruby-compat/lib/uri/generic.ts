@@ -2,8 +2,18 @@ import { classpaths } from "../classpath.js";
 import { b } from "../string/b.js";
 import { ArgumentError } from "../argument-error.js";
 import { rbEqual } from "../rb-equal.js";
+import { IPAddr } from "../ipaddr.js";
+import { warn } from "../kernel-warn.js";
+import { env as ENV } from "../process-adapter.js";
+import { IPSocket, SocketError } from "../socket.js";
 
-import { BadURIError, DEFAULT_PARSER, InvalidComponentError, InvalidURIError } from "./common.js";
+import {
+  BadURIError,
+  DEFAULT_PARSER,
+  InvalidComponentError,
+  InvalidURIError,
+  URI,
+} from "./common.js";
 import type { RFC2396Parser } from "./rfc2396-parser.js";
 import type { RFC3986Parser } from "./rfc3986-parser.js";
 
@@ -22,8 +32,7 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
  * `route_from` / `route_to` (`generic.rb:1167,1206,1274,1314`), `normalize` /
  * `hash` / `eql?` (`generic.rb:1404,1408`), `select`
  * (`generic.rb:1452`), `coerce`
- * (`generic.rb:1486`), `replace!` (`generic.rb:299`), and `find_proxy` /
- * `use_proxy?` (`generic.rb:1512,1578`).
+ * (`generic.rb:1486`), and `replace!` (`generic.rb:299`).
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI::Generic`
  * (`vendor/ruby/v3.3.11/lib/uri/generic.rb:21`) ships with the interpreter.
@@ -793,6 +802,106 @@ export class Generic {
       str += this._fragment;
     }
     return str;
+  }
+
+  /**
+   * `find_proxy` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1512-1576`), awaited for
+   * `IPSocket.getaddress`. The JRuby `ENV_JAVA` arm is not taken.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async findProxy(
+    env: Readonly<Record<string, string | undefined>> = ENV,
+  ): Promise<Generic | null> {
+    if (this.isRelative()) throw new BadURIError(`relative URI: ${this}`);
+    let name = this.scheme!.toLowerCase() + "_proxy";
+    let proxyUri: string | null | undefined;
+    if (name === "http_proxy" && env["REQUEST_METHOD"] !== undefined) {
+      const pairs = Object.entries(env).filter(([k]) => /^http_proxy$/i.test(k));
+      switch (pairs.length) {
+        case 0:
+          proxyUri = null;
+          break;
+        case 1: {
+          const [k] = pairs.shift()!;
+          if (k === "http_proxy" && env[k.toUpperCase()] == null) {
+            proxyUri = env[name];
+          } else {
+            proxyUri = null;
+          }
+          break;
+        }
+        default:
+          proxyUri = env[name];
+      }
+      if (proxyUri == null) {
+        proxyUri = env[`CGI_${name.toUpperCase()}`];
+      }
+    } else if (name === "http_proxy") {
+      if ((proxyUri = env[name]) == null) {
+        if ((proxyUri = env[name.toUpperCase()]) != null) {
+          warn("The environment variable HTTP_PROXY is discouraged.  Use http_proxy.", {
+            uplevel: 1,
+          });
+        }
+      }
+    } else {
+      proxyUri = env[name] ?? env[name.toUpperCase()];
+    }
+
+    if (proxyUri == null || proxyUri.length === 0) {
+      return null;
+    }
+
+    let addr: string | null = null;
+    if (this.hostname != null) {
+      try {
+        addr = await IPSocket.getaddress(this.hostname);
+        if (/^127\.|^::1$/.test(addr)) return null;
+      } catch (e) {
+        if (!(e instanceof SocketError)) throw e;
+      }
+    }
+
+    name = "no_proxy";
+    const noProxy = env[name] ?? env[name.toUpperCase()];
+    if (noProxy != null) {
+      if (!Generic.isUseProxy(this.hostname!, addr, this.port, noProxy)) return null;
+    }
+    return URI.parse(proxyUri);
+  }
+
+  /**
+   * `use_proxy?` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1578-1597`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static isUseProxy(
+    hostname: string,
+    addr: string | null,
+    port: number | null,
+    noProxy: string,
+  ): boolean {
+    hostname = hostname.toLowerCase();
+    const dothostname = `.${hostname}`;
+    for (const [, pHost, pPort] of noProxy.matchAll(/([^:,\s]+)(?::(\d+))?/g)) {
+      if (pPort == null || port === Number.parseInt(pPort, 10)) {
+        if (pHost.startsWith(".")) {
+          if (hostname.endsWith(pHost.toLowerCase())) return false;
+        } else {
+          if (dothostname.endsWith(`.${pHost.toLowerCase()}`)) return false;
+        }
+        if (addr != null) {
+          try {
+            if (new IPAddr(pHost).includes(addr)) return false;
+          } catch (e) {
+            if (!(e instanceof IPAddr.InvalidAddressError)) throw e;
+            continue;
+          }
+        }
+      }
+    }
+    return true;
   }
 }
 

@@ -15,7 +15,9 @@ describe("DevServerProxyTest", () => {
       { "Content-Type": "application/json" },
       [JSON.stringify(env, (k, v: unknown) => (k === "rack.backend" ? String(v) : v))],
     ];
-    Proxy.prototype.performRequest = (env) => captureApp(env);
+    (
+      Proxy.prototype as unknown as { performRequest(env: RackEnv): Promise<RackResponse> }
+    ).performRequest = (env) => captureApp(env);
 
     return new DevServerProxy(captureApp);
   }

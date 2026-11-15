@@ -559,12 +559,134 @@ describe("Net::HTTP over Net::BufferedIO", () => {
       "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
     );
     const port = await listen(server);
-    const http = new Net.HTTP("127.0.0.1", port);
-    expect(http.isProxy()).toBe(false);
-    http.proxyAddress = "127.0.0.1";
-    expect(http.isProxy()).toBe(true);
+    expect(await new Net.HTTP("127.0.0.1", port, null).isProxy()).toBe(false);
+    const http = new Net.HTTP("example.test", 80, "127.0.0.1", port);
+    expect(await http.isProxy()).toBe(true);
+    expect(http.isProxyFromEnv()).toBe(false);
     await http.get("/x");
-    expect(seen.received.startsWith(`GET http://127.0.0.1:${port}/x HTTP/1.1\r\n`)).toBe(true);
+    expect(seen.received.startsWith("GET http://example.test/x HTTP/1.1\r\n")).toBe(true);
+  });
+
+  it("connect sends CONNECT through a proxy for use_ssl and raises on a refusal", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("\r\n\r\n"),
+      "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const http = new Net.HTTP("example.test", 443, "127.0.0.1", port, "u", "p w");
+    http.useSsl = true;
+    const error = await http.start().catch((e: unknown) => e);
+    expect((error as Error).name).toBe("Net::HTTPClientException");
+    expect((error as Error).message).toBe('407 "Proxy Authentication Required"');
+    expect(seen.received).toBe(
+      "CONNECT example.test:443 HTTP/1.1\r\nHost: example.test:443\r\n" +
+        "Proxy-Authorization: Basic dTpwIHc=\r\n\r\n",
+    );
+  });
+
+  it("HTTP.Proxy builds a class whose instances use the proxy", async () => {
+    const klass = Net.HTTP.Proxy("proxy.test", 8080, "u");
+    expect(klass.isProxyClass()).toBe(true);
+    expect(Net.HTTP.isProxyClass()).toBe(false);
+    expect(klass.proxyAddress).toBe("proxy.test");
+    const http = new klass("example.test");
+    expect(await http.proxyAddress()).toBe("proxy.test");
+    expect(await http.proxyPort()).toBe(8080);
+    expect(await http.proxyUser()).toBe("u");
+    expect(Net.HTTP.Proxy(null)).toBe(Net.HTTP);
+  });
+
+  it("no_proxy drops an explicit proxy for a matching address", async () => {
+    const http = new Net.HTTP("example.test", 80, "proxy.test", 8080, null, null, "example.test");
+    expect(await http.isProxy()).toBe(false);
+  });
+
+  it("find_proxy reads the scheme's proxy from the env, honouring no_proxy", async () => {
+    const uri = URI.parse("http://192.0.2.1/") as InstanceType<typeof HTTPS>;
+    expect(await uri.findProxy({})).toBeNull();
+    expect((await uri.findProxy({ http_proxy: "http://u:p%40@proxy.test:3128" }))!.host).toBe(
+      "proxy.test",
+    );
+    expect(
+      await uri.findProxy({ http_proxy: "http://proxy.test", no_proxy: "192.0.2.0/24" }),
+    ).toBeNull();
+    expect(
+      await uri.findProxy({ http_proxy: "http://proxy.test", no_proxy: ".test,192.0.2.1:80" }),
+    ).toBeNull();
+    expect(await uri.findProxy({ REQUEST_METHOD: "GET", HTTP_PROXY: "x" })).toBeNull();
+    expect(
+      (await uri.findProxy({ REQUEST_METHOD: "GET", CGI_HTTP_PROXY: "http://cgi.test" }))!.host,
+    ).toBe("cgi.test");
+    expect(
+      await URI.parse("http://127.0.0.1/").findProxy({ http_proxy: "http://p.test" }),
+    ).toBeNull();
+  });
+
+  it("set_form posts urlencoded params", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("a=1&b=x+y"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/f");
+    req.setForm([
+      ["a", 1],
+      ["b", "x y"],
+    ]);
+    await new Net.HTTP("127.0.0.1", port, null).request(req);
+    expect(seen.received).toContain("Content-Type: application/x-www-form-urlencoded\r\n");
+    expect(seen.received).toContain("Content-Length: 9\r\n");
+  });
+
+  it("set_form_data replaces the separator and sets the body", () => {
+    const req = new Net.HTTP.Post("/f");
+    req.setFormData({ a: "1", b: "2" }, ";");
+    expect(req.body).toBe("a=1;b=2");
+    expect(req.contentType).toBe("application/x-www-form-urlencoded");
+    req.formData = { c: "3" };
+    expect(req.body).toBe("c=3");
+    expect(() => req.setForm({}, "text/plain")).toThrow("invalid enctype: text/plain");
+  });
+
+  const multipart =
+    '--B\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n' +
+    '--B\r\nContent-Disposition: form-data; name="f\\"q"; filename="t.txt"\r\n' +
+    "Content-Type: text/plain\r\n\r\nhello\r\n--B--\r\n";
+
+  it("set_form posts multipart form data with a Content-Length", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("--B--\r\n"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/m");
+    req.setForm(
+      [
+        ["a", "1"],
+        ['f"q', source("hello"), { filename: "t.txt", contentType: "text/plain" }],
+      ],
+      "multipart/form-data",
+      { boundary: "B" },
+    );
+    await new Net.HTTP("127.0.0.1", port, null).request(req);
+    expect(seen.received).toContain("Content-Type: multipart/form-data; boundary=B\r\n");
+    expect(seen.received).toContain(`Content-Length: ${multipart.length}\r\n`);
+    expect(seen.received.endsWith(`\r\n\r\n${multipart}`)).toBe(true);
+  });
+
+  it("set_form posts chunked multipart form data", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("0\r\n\r\n"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/m", { "Transfer-Encoding": "chunked" });
+    req.setForm([["a", "1"]], "multipart/form-data", { boundary: "B" });
+    await new Net.HTTP("127.0.0.1", port, null).request(req);
+    const body = '--B\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n--B--\r\n';
+    expect(
+      seen.received.endsWith(`\r\n\r\n${body.length.toString(16)}\r\n${body}\r\n0\r\n\r\n`),
+    ).toBe(true);
   });
 
   it("wait_for_continue answers a final response without sending the body", async () => {
