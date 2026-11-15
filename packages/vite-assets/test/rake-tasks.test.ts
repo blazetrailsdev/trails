@@ -60,7 +60,9 @@ describe("RakeTasksTest", () => {
       invoke("vite:install_dependencies"),
     );
 
-    expect(await installedNodeModuleNames()).toContain("right-pad");
+    expect(await installedNodeModuleNames(), "Expected dev dependencies to be installed").toContain(
+      "right-pad",
+    );
   }, 300_000);
 
   it("rake vite install dependencies in production environment", async () => {
@@ -69,6 +71,9 @@ describe("RakeTasksTest", () => {
       invoke("vite:install_dependencies"),
     );
 
-    expect(await installedNodeModuleNames()).toContain("right-pad");
+    expect(
+      await installedNodeModuleNames(),
+      "Expected development dependencies to be installed as well",
+    ).toContain("right-pad");
   }, 300_000);
 });
