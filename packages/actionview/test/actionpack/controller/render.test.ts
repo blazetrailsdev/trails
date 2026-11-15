@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from "vitest";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
 import { TestCase } from "@blazetrails/actionpack/testing";
 import { ActiveModel, Conversion, Naming } from "@blazetrails/activemodel";
-import { isPresent, Logger } from "@blazetrails/activesupport";
+import { htmlEscape, isPresent, Logger } from "@blazetrails/activesupport";
 import {
   assert,
   assertNothingRaised,
@@ -16,6 +16,7 @@ import {
   type Included,
   File,
   constSet,
+  rbInspect,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjSingletonClass,
@@ -748,7 +749,7 @@ describe("RenderTest", () => {
   });
 
   test("controller does not leak instance variables", async () => {
-    const expected = [
+    const expected = rbInspect([
       "_assigns",
       "_config",
       "_controller",
@@ -762,10 +763,10 @@ describe("RenderTest", () => {
       "viewFlow",
       "viewRenderer",
       "virtualPath",
-    ].join(",");
+    ]);
     await testCase.get("renderInstanceVariables");
     testCase.assertResponse(200);
-    expect(testCase.response.body).toBe(expected);
+    expect(testCase.response.body).toBe(htmlEscape(expected).toString());
   });
 
   test("renders default template for missing action", async () => {
