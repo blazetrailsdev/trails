@@ -277,6 +277,8 @@ export interface LedgerScope {
   pair(k: PinKey): boolean;
   ts(k: TsPairKey): boolean;
   tsName(k: { package: string; tsFile: string; tsName: string }): boolean;
+  /** A TS member whose pair is a `removed` row: the extra-surface ratchet subtracts only these. */
+  removedTsName(k: { package: string; tsFile: string; tsName: string }): boolean;
 }
 
 export function ledgerScope(
@@ -323,6 +325,9 @@ export function ledgerScope(
     tsName: (k) =>
       byTsName.get(`${k.package} ${k.tsFile} ${k.tsName}`) ??
       removedTsNames.has(`${k.package} ${k.tsFile} ${k.tsName}`),
+    removedTsName: (k) =>
+      removedTsNames.has(`${k.package} ${k.tsFile} ${k.tsName}`) ||
+      removed.has(`${k.package} ${k.tsFile} ${k.tsName}`),
   };
 }
 
@@ -360,4 +365,71 @@ export function summaryLine(source: string, rows: readonly LedgerRow[]): string 
     tally.set(`${r.package}:${r.kind}`, (tally.get(`${r.package}:${r.kind}`) ?? 0) + 1);
   const cells = [...tally].sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, n]) => `${k}=${n}`);
   return `bump-ledger rows: ${source} ${cells.length === 0 ? "none" : cells.join(" ")}`;
+}
+
+/**
+ * A test row (RFC 0191 § 3 "The test half"), keyed as test-compare keys a
+ * Rails test: package, Ruby test file, and the test's path in
+ * `rails-tests.json`. A `moved` row is keyed by `toPath`, the describe path the
+ * test sits under at `to`. It lives in `<source>.tests.json` beside the pair
+ * ledger, so the body-pins readers never see it.
+ */
+export interface TestLedgerRow {
+  package: string;
+  rubyFile: string;
+  path: string;
+  kind: "changed" | "moved";
+  toPath?: string;
+  from: string;
+  to: string;
+  story?: string;
+}
+
+export function testLedgerPath(source: string, dir = LEDGER_DIR): string {
+  return path.join(dir, `${source}.tests.json`);
+}
+
+export function testLedgerKey(pkg: string, rubyFile: string, testPath: string): string {
+  return `${pkg} ${rubyFile} ${testPath}`;
+}
+
+export function testRowKey(r: TestLedgerRow): string {
+  return testLedgerKey(r.package, r.rubyFile, r.toPath ?? r.path);
+}
+
+/** Every source's test rows; a source with no file contributes none. */
+export async function loadTestLedger(dir = LEDGER_DIR): Promise<TestLedgerRow[]> {
+  const out: TestLedgerRow[] = [];
+  for (const s of SOURCES) {
+    const text = await fs.readFile(testLedgerPath(s.name, dir), "utf-8").catch(() => null);
+    if (text !== null) out.push(...(JSON.parse(text) as TestLedgerRow[]));
+  }
+  return out;
+}
+
+export interface TestLedgerProblem {
+  row: TestLedgerRow;
+  problem: "stale" | "unmatched";
+}
+
+/**
+ * A test row is `unmatched` when test-compare matched no TS test to it, and
+ * `stale` once the matched TS test agrees with the Rails test on every axis
+ * the row suspends (count, kinds, values, gate). Only rows of `compared`
+ * packages are judged, so a `--package` run does not red the others.
+ */
+export function testLedgerProblems(
+  rows: readonly TestLedgerRow[],
+  compared: ReadonlySet<string>,
+  matched: ReadonlySet<string>,
+  held: ReadonlySet<string>,
+): TestLedgerProblem[] {
+  const problems: TestLedgerProblem[] = [];
+  for (const row of rows) {
+    if (!compared.has(row.package)) continue;
+    const k = testRowKey(row);
+    if (!matched.has(k)) problems.push({ row, problem: "unmatched" });
+    else if (!held.has(k)) problems.push({ row, problem: "stale" });
+  }
+  return problems;
 }

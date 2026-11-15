@@ -28,6 +28,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { scopeOf } from "./scope.js";
+import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
 import {
   GATED_PACKAGES,
   MARK_PATH,
@@ -45,7 +46,7 @@ import {
 
 interface ParamNameArtifact {
   packages: string[];
-  mismatches: MeasuredRow[];
+  mismatches: (MeasuredRow & { rubyName: string })[];
 }
 
 async function readArtifact(): Promise<ParamNameArtifact> {
@@ -79,7 +80,10 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  const current = measure(artifact.mismatches, gated);
+  const ledger = await loadLedgerScope();
+  const { counted, skipped } = skipLedgered(artifact.mismatches, ledger.pair);
+  console.log(renderSkipped("param-name gate", skipped.length));
+  const current = measure(counted, gated);
   const grew = exceedances(marks, current, gated);
   const stale = staleMarks(marks, current, gated);
 

@@ -59,6 +59,17 @@ import {
   type BumpReport,
 } from "./report.js";
 import { LEDGERED_STEPS, NOT_EXERCISED, STEPS, TSX, parseArgs } from "./steps.js";
+import { testLedgerPath } from "../../api-compare/bump-ledger.js";
+
+/** `<package> <rubyFile>` → the file's missing descriptions, for each file with a TS twin. */
+async function missingOf(rel: string): Promise<Map<string, Set<string>>> {
+  const m = new Map<string, Set<string>>();
+  for (const r of (await readJson<ConventionComparison>(rel)).results ?? []) {
+    for (const f of r.files ?? [])
+      if (f.tsFileExists) m.set(`${r.package} ${f.rubyFile}`, new Set(f.missingTests ?? []));
+  }
+  return m;
+}
 
 const { fetchCandidate } = await import("../../../vendor/fetch.js");
 const { SOURCES, testPathsManifest, vendoredRoot } = await import("../../../vendor/sources.js");
@@ -281,6 +292,10 @@ async function main(argv: string[], env: Env): Promise<number> {
   let ledgeredSteps: StepResult[];
   const ledgerFile = path.join(ROOT, "scripts/parity/bump-ledger", `${source.name}.json`);
   const priorLedger = await fs.readFile(ledgerFile, "utf8").catch(() => null);
+  const testLedgerFile = testLedgerPath(source.name);
+  const priorTestLedger = await fs.readFile(testLedgerFile, "utf8").catch(() => null);
+  const testRows: ReturnType<typeof testSeed> = [];
+  const testTable: (string | number)[][] = [];
   let citationRewrites: string[];
   let restoreBuild: boolean;
   try {
@@ -341,6 +356,24 @@ async function main(argv: string[], env: Env): Promise<number> {
     );
     await fs.mkdir(path.dirname(ledgerFile), { recursive: true });
     await fs.writeFile(ledgerFile, JSON.stringify(seeded, null, 2) + "\n");
+    const missing = await missingOf(path.join(outDir, "active/test/convention-comparison.json"));
+    const mergedTests = await readJson<RubyTestManifest>(
+      path.join(outDir, "candidate/test/rails-tests.json"),
+    );
+    for (const pkg of Object.keys(mergedTests.packages).filter((p) => packages.includes(p))) {
+      const d = testDelta(activeTests, mergedTests, pkg);
+      testRows.push(...testSeed(pkg, d, activeTests, missing, fromRef, ref));
+      testTable.push([
+        pkg,
+        d.before,
+        d.after,
+        d.added,
+        d.removed,
+        d.changed.length,
+        d.moved.length,
+      ]);
+    }
+    await fs.writeFile(testLedgerFile, JSON.stringify(testRows, null, 2) + "\n");
     ledgeredSteps = await runSteps(
       childEnv,
       "ledgered",
@@ -350,6 +383,8 @@ async function main(argv: string[], env: Env): Promise<number> {
   } finally {
     if (priorLedger === null) await fs.rm(ledgerFile, { force: true });
     else await fs.writeFile(ledgerFile, priorLedger);
+    if (priorTestLedger === null) await fs.rm(testLedgerFile, { force: true });
+    else await fs.writeFile(testLedgerFile, priorTestLedger);
     await restore(path.join(outDir, "active"));
     for (const f of await trackedDiff(env)) {
       const { code } = await sh("git", ["checkout", "HEAD", "--", f], env);
@@ -370,25 +405,6 @@ async function main(argv: string[], env: Env): Promise<number> {
   const candidateHashes: HashRecord[] = (await c<{ hashes: HashRecord[] }>("api/body-hashes.json"))
     .hashes;
   const seed = pairSeed(pins, candidateHashes, fromRef, ref);
-
-  const missingOf = async (rel: string) => {
-    const m = new Map<string, Set<string>>();
-    for (const r of (await readJson<ConventionComparison>(rel)).results ?? []) {
-      for (const f of r.files ?? [])
-        if (f.tsFileExists) m.set(`${r.package} ${f.rubyFile}`, new Set(f.missingTests ?? []));
-    }
-    return m;
-  };
-  const activeTests = await a<RubyTestManifest>("test/rails-tests.json");
-  const candidateTests = await c<RubyTestManifest>("test/rails-tests.json");
-  const missing = await missingOf(path.join(outDir, "active/test/convention-comparison.json"));
-  const testRows: ReturnType<typeof testSeed> = [];
-  const testTable: (string | number)[][] = [];
-  for (const pkg of Object.keys(candidateTests.packages).filter((p) => packages.includes(p))) {
-    const d = testDelta(activeTests, candidateTests, pkg);
-    testRows.push(...testSeed(pkg, d, activeTests, missing, fromRef, ref));
-    testTable.push([pkg, d.before, d.after, d.added, d.removed, d.changed.length, d.moved.length]);
-  }
 
   const artifacts = cols(
     "call-mismatches|call-arg-mismatches|param-name-mismatches|block-param-mismatches|call-skeletons",

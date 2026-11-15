@@ -22,7 +22,12 @@ import {
   skipLedgered,
   summaryLine,
   seedDiff,
+  testLedgerKey,
+  testLedgerProblems,
+  testRowKey,
+  type TestLedgerRow,
 } from "./bump-ledger.js";
+import { withoutRemoved } from "./lint-extra-surface-ratchet.js";
 
 const key = { package: "activerecord", rubyFile: "persistence.rb", rubyName: "save" };
 const pin = (digest: string, rubyName = "save"): BodyPin => ({ ...key, rubyName, digest });
@@ -336,6 +341,93 @@ describe("ledgerScope", () => {
         rubyName: "inspect",
       }),
     ).toBe(false);
+  });
+
+  it("lint-param-names: skips a param row on a drifted pair, counts its neighbour", () => {
+    const params = [
+      { package: "activerecord", rubyFile: "core.rb", rubyName: "inspect", position: 0 },
+      { package: "activerecord", rubyFile: "core.rb", rubyName: "hash", position: 0 },
+    ];
+    const { counted, skipped } = skipLedgered(params, scope.pair);
+    expect(skipped.map((r) => r.rubyName)).toEqual(["inspect"]);
+    expect(counted.map((r) => r.rubyName)).toEqual(["hash"]);
+  });
+
+  it("lint-block-params: skips a block row on a removed pair, counts another file's", () => {
+    const blocks = [
+      { package: "activerecord", rubyFile: "gone.rb", rubyName: "gone", tsName: "gone" },
+      { package: "activerecord", rubyFile: "other.rb", rubyName: "gone", tsName: "gone" },
+    ];
+    const { counted, skipped } = skipLedgered(blocks, scope.pair);
+    expect(skipped.map((r) => r.rubyFile)).toEqual(["gone.rb"]);
+    expect(counted.map((r) => r.rubyFile)).toEqual(["other.rb"]);
+  });
+
+  it("lint-arm-throws: skips a missing-throw arm on a drifted pair only", () => {
+    const arms = [
+      { package: "activerecord", rubyFile: "core.rb", rubyName: "inspect", missing: ["throw"] },
+      { package: "activerecord", rubyFile: "core.rb", rubyName: "hash", missing: ["throw"] },
+    ];
+    const { counted, skipped } = skipLedgered(arms, scope.pair);
+    expect([skipped.length, counted[0].rubyName]).toEqual([1, "hash"]);
+  });
+
+  it("lint-extra-surface-ratchet: subtracts only a member on a removed pair", () => {
+    const pkg = {
+      package: "activerecord",
+      totalExtras: 3,
+      totalNovel: 2,
+      noCounterpartFiles: 0,
+      extraFiles: [
+        {
+          tsFile: "gone.ts",
+          rubyFile: "gone.rb",
+          extras: [
+            { name: "gone", kind: "novel" },
+            { name: "invented", kind: "novel" },
+          ],
+        },
+        { tsFile: "core.ts", rubyFile: "core.rb", extras: [{ name: "inspect", kind: "moved" }] },
+      ],
+    };
+    const { packages, skipped } = withoutRemoved([pkg], scope.removedTsName);
+    expect(skipped).toBe(1);
+    expect([packages[0].totalExtras, packages[0].totalNovel]).toEqual([2, 1]);
+  });
+});
+
+describe("testLedgerProblems", () => {
+  const testRow = (p: string, kind: TestLedgerRow["kind"] = "changed"): TestLedgerRow => ({
+    package: "activerecord",
+    rubyFile: "cases/base_test.rb",
+    path: p,
+    kind,
+    from: "v8.0.2",
+    to: "v8.0.5.2",
+  });
+
+  it("keys a moved row by its new path", () => {
+    const moved = { ...testRow("A > old"), kind: "moved" as const, toPath: "B > old" };
+    expect(testRowKey(moved)).toBe(testLedgerKey("activerecord", "cases/base_test.rb", "B > old"));
+  });
+
+  it("reds a row whose TS test now agrees, and one that matches nothing", () => {
+    const rows = [testRow("T > held"), testRow("T > agrees"), testRow("T > gone")];
+    const k = (p: string) => testLedgerKey("activerecord", "cases/base_test.rb", p);
+    const problems = testLedgerProblems(
+      rows,
+      new Set(["activerecord"]),
+      new Set([k("T > held"), k("T > agrees")]),
+      new Set([k("T > held")]),
+    );
+    expect(problems.map((p) => [p.row.path, p.problem])).toEqual([
+      ["T > agrees", "stale"],
+      ["T > gone", "unmatched"],
+    ]);
+  });
+
+  it("judges no row of a package the run did not compare", () => {
+    expect(testLedgerProblems([testRow("T > x")], new Set(), new Set(), new Set())).toEqual([]);
   });
 });
 

@@ -24,6 +24,7 @@ import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
 import { BLOCK_IDIOM } from "./block-params.js";
 import { scopeOf } from "./scope.js";
+import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
 import {
   GATED_PACKAGES,
   exceedances,
@@ -65,7 +66,10 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  const current = measure(artifact.mismatches, gated);
+  const ledger = await loadLedgerScope();
+  const { counted, skipped } = skipLedgered(artifact.mismatches, ledger.pair);
+  console.log(renderSkipped("block-param gate", skipped.length));
+  const current = measure(counted, gated);
   const grew = exceedances(marks, current, gated);
   const stale = staleMarks(marks, current, gated);
 
@@ -86,7 +90,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     console.error(`Rails' method takes a block the port does not. ${BLOCK_IDIOM}\n`);
     for (const v of grew) {
       console.error(`  + ${v.package}  ${v.dimension}: mark ${v.mark} → current ${v.current}`);
-      for (const row of artifact.mismatches) {
+      for (const row of counted) {
         if (row.package === v.package && row.rubyFile === v.dimension) {
           console.error(`      ${row.rubyName} → ${row.tsName}`);
         }

@@ -198,4 +198,10 @@ export const LEDGERED_STEPS: ReadonlySet<string> = new Set([
   "Receipt audit (activerecord)",
   "Receipt audit (activemodel)",
   "Ruby-compat call ratchet",
+  "Missing-throw arm ratchet",
+  "Extra-surface ratchet",
+  "Parameter-name ratchet",
+  "Block-parameter ratchet",
+  "Test comparison",
+  "Assertion-mismatch ratchet",
 ]);
