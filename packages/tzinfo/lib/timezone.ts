@@ -392,9 +392,11 @@ export class Timezone {
   }
 
   static all(): Timezone[] {
-    return this.getProxies(
-      [...new Set([...Intl.supportedValuesOf("timeZone"), ...TZDB_NAMES])].sort(),
-    );
+    return this.getProxies(this.allIdentifiers());
+  }
+
+  static allIdentifiers(): string[] {
+    return [...new Set([...Intl.supportedValuesOf("timeZone"), ...TZDB_NAMES])].sort();
   }
 
   /** @internal */
