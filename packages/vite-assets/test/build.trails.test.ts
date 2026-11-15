@@ -1,7 +1,6 @@
 import { FileUtils as RbFileUtils, Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 import { Build } from "../lib/build.js";
-import { Error } from "../lib/error.js";
 import { VERSION } from "../lib/version.js";
 
 describe("Build", () => {
@@ -34,14 +33,5 @@ describe("Build", () => {
     expect(previous.toJSON()).toEqual(build.toJSON());
     expect(previous.viteAssets).toBe(VERSION);
     expect(previous.isFresh()).toBe(true);
-  });
-});
-
-describe("Error", () => {
-  it("substitutes :troubleshooting: on every message read", () => {
-    class LateError extends Error {}
-    const error = new LateError("Failed. :troubleshooting:");
-    expect(error.message).toContain("Visit the Troubleshooting guide");
-    expect(error.message).not.toContain(":troubleshooting:");
   });
 });

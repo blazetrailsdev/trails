@@ -469,11 +469,6 @@ class TestExtractor
     @describe_stack.pop
   end
 
-  # A bare `private` / `protected` / `public` in a class body. Minitest runs
-  # only `public_instance_methods(true).grep(/^test_/)`
-  # (minitest/test.rb `runnable_methods`), so a `def test_*` below `private`
-  # is a helper, as `test_app_dev_dependencies`
-  # (vendor/vite_ruby/v3.11.1/test/rake_tasks_test.rb:53) is.
   def process_visibility(node)
     ident = node[1]
     return unless ident.is_a?(Array) && ident[0] == :@ident

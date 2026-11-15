@@ -3294,10 +3294,6 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   // calls `super`. Ruby's include puts the module in the ancestor chain, so TS
   // `Codec extends Metadata` reproduces both the chain and that `super`.
   ["Codec", "Metadata"],
-  // `ViteRuby::CLI` (`vite_ruby/lib/vite_ruby/cli.rb`) is a plain module
-  // registry over dry-cli; RFC 0239 builds `bin/vite` on `@blazetrails/thor`
-  // instead (operator ruling 2026-11-12, CLAUDE.md "importmap-rails and
-  // propshaft are out of scope"), so TS `CLI extends Thor`.
   ["CLI", "Thor"],
 ]);
 
