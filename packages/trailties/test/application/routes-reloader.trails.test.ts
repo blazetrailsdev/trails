@@ -44,6 +44,7 @@ describe("RoutesReloader", () => {
       expect(r.isUpdated()).toBe(false);
       FileUtils.touch(routes);
       expect(r.isUpdated()).toBe(true);
+      await r.prefetchBang();
       r.execute();
       expect(r.isUpdated()).toBe(false);
       expect(a.calls).toEqual(["clear", "finalize"]);
@@ -137,6 +138,37 @@ describe("RoutesReloader", () => {
       await first;
 
       expect(Object.getOwnPropertyDescriptor(a, "draw")).toEqual(draw);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("reload! raises when the routes files were never prefetched", () => {
+    const r = new RoutesReloader();
+    const a = makeRouteSet();
+    r.routeSets.push(a);
+    r.paths.push("/nonexistent/routes.ts");
+
+    expect(() => r.reloadBang()).toThrow(/not prefetched/);
+    expect(a.disableClearAndFinalize).toBe(false);
+  });
+
+  it("a failed prefetch drops the previous recording", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, drawInto("Trails.application", "/before"));
+      const r = new RoutesReloader();
+      const a = makeRouteSet();
+      Trails.application = { routes: () => a } as never;
+      r.routeSets.push(a);
+      r.paths.push(routes);
+      await r.prefetchBang();
+
+      File.write(routes, `throw new Error("load failed");\n`);
+      await expect(r.prefetchBang()).rejects.toThrow(/load failed/);
+
+      expect(() => r.reloadBang()).toThrow(/not prefetched/);
     } finally {
       FileUtils.rmRf(tmp);
     }

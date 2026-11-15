@@ -1,5 +1,5 @@
 import { FileUpdateChecker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
-import { rbFLoad } from "@blazetrails/ruby-compat";
+import { rbFLoad, RuntimeError } from "@blazetrails/ruby-compat";
 import type { DrawCallback } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {
@@ -20,13 +20,16 @@ export class RoutesReloader {
   runAfterLoadPaths: () => void = () => {};
   private _updater?: FileUpdateChecker<void>;
   /** @internal */
-  private _drawn: [RouteSetLike, DrawCallback][] = [];
+  private _drawn: [RouteSetLike, DrawCallback][] | null = null;
   /** @internal */
   private _prefetching?: Promise<void>;
 
   /** @inventedArm prefetchBang — PERMANENT */
   async executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
-    if (this.isUpdated()) await this.prefetchBang();
+    if (this.isUpdated()) {
+      await this._prefetching;
+      await this.prefetchBang();
+    }
     return this.updater().executeIfUpdated(block);
   }
 
@@ -68,6 +71,7 @@ export class RoutesReloader {
 
   /** @internal */
   private async _prefetch(): Promise<void> {
+    this._drawn = null;
     const drawn: [RouteSetLike, DrawCallback][] = [];
     const own = this.routeSets.map((routes) => Object.getOwnPropertyDescriptor(routes, "draw"));
     for (const routes of this.routeSets) {
@@ -110,8 +114,12 @@ export class RoutesReloader {
   }
 
   /** @internal */
+  /** @inventedArm throw — PERMANENT */
   private loadPaths(): void {
-    for (const [routes, block] of this._drawn) routes.draw(block);
+    if (this._drawn === null && this.paths.length > 0) {
+      throw new RuntimeError("routes files were not prefetched");
+    }
+    for (const [routes, block] of this._drawn ?? []) routes.draw(block);
     this.runAfterLoadPaths();
   }
 
