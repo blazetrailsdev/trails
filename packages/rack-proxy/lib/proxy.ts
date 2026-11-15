@@ -73,7 +73,6 @@ export class RequestBodyStream {
       throw new InvalidRequest("request body is shorter than Content-Length");
     }
     if (typeof data === "string") data = new TextEncoder().encode(data);
-
     this.remaining -= data.length;
     return data;
   }
@@ -363,7 +362,12 @@ export class Proxy {
           targetRequest.contentType = sourceRequest.contentType;
       }
 
-      if (this.username != null && this.password != null) {
+      if (
+        this.username != null &&
+        this.username !== false &&
+        this.password != null &&
+        this.password !== false
+      ) {
         targetRequest.basicAuth(this.username as string, this.password as string);
       }
 
@@ -582,7 +586,9 @@ export class Proxy {
       if (this.key != null) conn.key = this.key;
     }
 
-    if (this.logger != null) conn.setDebugOutput(this.logger as DebugOutput);
+    if (this.logger != null && this.logger !== false) {
+      conn.setDebugOutput(this.logger as DebugOutput);
+    }
     return conn;
   }
 }

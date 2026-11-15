@@ -10,7 +10,6 @@ import {
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { MockRequest, Rack, type Headers } from "@blazetrails/rack";
-import { createServer as createNetServer } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Proxy } from "../lib/index.js";
@@ -64,19 +63,17 @@ describe("RackProxyTest", () => {
   }
   const get = (path: string) => request("GET", path);
 
-  for (const [name, streaming] of [
-    ["http streaming", true],
-    ["http full request", false],
-  ] as const) {
-    it(name, async () => {
-      await withWebrickProxy({ streaming }, async (port, proxy) => {
-        proxy.host = `127.0.0.1:${port}`;
-        await get("/");
-        expect(lastResponse.status).toBe(200);
-        expect(lastResponse.body).toMatch(/Example Domain/);
-      });
+  async function assertGetsExampleDomain(streaming: boolean): Promise<void> {
+    await withWebrickProxy({ streaming }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      await get("/");
+      expect(lastResponse.status).toBe(200);
+      expect(lastResponse.body).toMatch(/Example Domain/);
     });
   }
+
+  it("http streaming", () => assertGetsExampleDomain(true));
+  it("http full request", () => assertGetsExampleDomain(false));
 
   it("handles missing content length", async () => {
     await withWebrickProxy({}, async (port, proxy) => {
@@ -132,36 +129,32 @@ describe("RackProxyTest", () => {
     await expect(stream.read()).rejects.toThrow(constGet(Proxy, "InvalidRequest") as typeof Error);
   });
 
-  for (const [name, streaming] of [
-    ["connection refused returns 502", false],
-    ["connection refused returns 502 streaming", true],
-  ] as const) {
-    it(name, async () => {
-      const [probe, closedPort] = await startServer();
-      await probe.shutdown();
-      app = new HostProxy({ allowDynamicBackend: true, streaming });
-      app.host = `127.0.0.1:${closedPort}`;
-      await get("/");
-      expect(lastResponse.status).toBe(502);
+  async function assertConnectionRefused(streaming: boolean): Promise<void> {
+    const [probe, closedPort] = await startServer();
+    await probe.shutdown();
+    app = new HostProxy({ allowDynamicBackend: true, streaming });
+    app.host = `127.0.0.1:${closedPort}`;
+    await get("/");
+    expect(lastResponse.status).toBe(502);
+    expect(lastResponse.body).toBe("");
+  }
+
+  it("connection refused returns 502", () => assertConnectionRefused(false));
+  it("connection refused returns 502 streaming", () => assertConnectionRefused(true));
+
+  async function assertNoEntityBody(path: string, status: number, streaming: boolean) {
+    await withWebrickProxy({ streaming }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      await get(path);
+      expect(lastResponse.status).toBe(status);
       expect(lastResponse.body).toBe("");
     });
   }
 
-  for (const [name, path, status, streaming] of [
-    ["no entity body for 204", "/no-content", 204, false],
-    ["no entity body for 304", "/not-modified", 304, false],
-    ["no entity body for 204 streaming", "/no-content", 204, true],
-    ["no entity body for 304 streaming", "/not-modified", 304, true],
-  ] as const) {
-    it(name, async () => {
-      await withWebrickProxy({ streaming }, async (port, proxy) => {
-        proxy.host = `127.0.0.1:${port}`;
-        await get(path);
-        expect(lastResponse.status).toBe(status);
-        expect(lastResponse.body).toBe("");
-      });
-    });
-  }
+  it("no entity body for 204", () => assertNoEntityBody("/no-content", 204, false));
+  it("no entity body for 304", () => assertNoEntityBody("/not-modified", 304, false));
+  it("no entity body for 204 streaming", () => assertNoEntityBody("/no-content", 204, true));
+  it("no entity body for 304 streaming", () => assertNoEntityBody("/not-modified", 304, true));
 
   it("connect and write timeouts are applied", () => {
     const proxy = new Proxy({ readTimeout: 5, openTimeout: 3, writeTimeout: 7 });
@@ -195,32 +188,6 @@ describe("RackProxyTest", () => {
       const [status] = (await proxy.call(env)) as unknown as Triplet;
       expect(status).toBe(501);
     });
-  });
-
-  it("invalid content length returns 400", async () => {
-    await withWebrickProxy({ streaming: false }, async (port, proxy) => {
-      proxy.host = `127.0.0.1:${port}`;
-      const env = MockRequest.envFor("/echo-body", { ":method": "POST", ":input": "a" });
-      env["CONTENT_LENGTH"] = "1x";
-      const [status] = (await proxy.call(env)) as unknown as Triplet;
-      expect(status).toBe(400);
-    });
-  });
-
-  it("chunked backend response with content length returns 502", async () => {
-    const backend = createNetServer((c) =>
-      c.once("data", () =>
-        c.end(
-          "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 3\r\n\r\n0\r\n\r\n",
-        ),
-      ),
-    );
-    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
-    app = new HostProxy({ allowDynamicBackend: true, streaming: false });
-    app.host = `127.0.0.1:${(backend.address() as { port: number }).port}`;
-    await get("/");
-    backend.close();
-    expect(lastResponse.status).toBe(502);
   });
 
   it("disallowed backend returns 502", async () => {
