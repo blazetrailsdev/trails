@@ -28,6 +28,8 @@ import {
   unpack,
   constDefined,
   constGet,
+  classModule,
+  extend,
   Range,
 } from "@blazetrails/ruby-compat";
 import type { Chars } from "./multibyte/chars.js";
@@ -41,37 +43,6 @@ export interface CharsetEncoder {
   encode(string: RubyString, charset: string): RubyString;
 }
 
-class StrictCharsetEncoder implements CharsetEncoder {
-  encode(string: RubyString, charset: string): RubyString {
-    if (/utf-?7/i.test(charset)) {
-      return Utilities.decodeUtf7(string);
-    } else {
-      return forceEncoding(b(string), Utilities.pickEncoding(charset));
-    }
-  }
-}
-
-class BestEffortCharsetEncoder implements CharsetEncoder {
-  encode(string: RubyString, charset: string): RubyString {
-    if (/utf-?7/i.test(charset)) {
-      return Utilities.decodeUtf7(string);
-    } else {
-      return forceEncoding(b(string), this.pickEncoding(charset));
-    }
-  }
-
-  /** @internal */
-  private pickEncoding(charset: string): Encoding {
-    let resolved = charset;
-    if (/ansi_x3.110-1983/.test(charset)) {
-      resolved = "ISO-8859-1";
-    } else if (/Windows-?1258/i.test(charset)) {
-      resolved = "Windows-1252";
-    }
-    return Utilities.pickEncoding(resolved);
-  }
-}
-
 /** @noRailsEquivalent PERMANENT */
 function gsubBytes(string: Uint8Array, re: RegExp, replacement: string): Uint8Array {
   const scanned = Array.from(string, (c) => String.fromCharCode(c))
@@ -80,48 +51,76 @@ function gsubBytes(string: Uint8Array, re: RegExp, replacement: string): Uint8Ar
   return Uint8Array.from(scanned, (c) => c.charCodeAt(0));
 }
 
-export const Utilities = {
-  StrictCharsetEncoder,
-  BestEffortCharsetEncoder,
+export class Utilities {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
 
-  charsetEncoder: new BestEffortCharsetEncoder() as CharsetEncoder,
+  declare static capitalizeField: Utilities["capitalizeField"];
+  declare static constantize: Utilities["constantize"];
+  declare static dasherize: Utilities["dasherize"];
+  declare static dquote: Utilities["dquote"];
+  declare static generateMessageId: Utilities["generateMessageId"];
+  declare static isAtomSafe: Utilities["isAtomSafe"];
+  declare static isBlank: Utilities["isBlank"];
+  declare static isTokenSafe: Utilities["isTokenSafe"];
+  declare static mapLines: Utilities["mapLines"];
+  declare static mapWithIndex: Utilities["mapWithIndex"];
+  declare static matchToS: Utilities["matchToS"];
+  declare static quoteAtom: Utilities["quoteAtom"];
+  declare static quotePhrase: Utilities["quotePhrase"];
+  declare static quoteToken: Utilities["quoteToken"];
+  declare static unbracket: Utilities["unbracket"];
+  declare static underscoreize: Utilities["underscoreize"];
+  declare static unescape: Utilities["unescape"];
+  declare static unparen: Utilities["unparen"];
+  declare static unquote: Utilities["unquote"];
+  declare static uriEscape: Utilities["uriEscape"];
+  declare static uriUnescape: Utilities["uriUnescape"];
+
+  static {
+    extend(this, this);
+  }
 
   isAtomSafe(str: string): boolean {
     return !Constants.ATOM_UNSAFE.test(str);
-  },
+  }
 
   quoteAtom(str: string): string {
-    return Utilities.isAtomSafe(str) ? str : Utilities.dquote(str);
-  },
+    return this.isAtomSafe(str) ? str : this.dquote(str);
+  }
 
   quotePhrase(str: string): string {
-    return Constants.PHRASE_UNSAFE.test(str) ? Utilities.dquote(str) : str;
-  },
+    return Constants.PHRASE_UNSAFE.test(str) ? this.dquote(str) : str;
+  }
 
   isTokenSafe(str: string): boolean {
     return !Constants.TOKEN_UNSAFE.test(str);
-  },
+  }
 
   quoteToken(str: string): string {
-    return Utilities.isTokenSafe(str) ? str : Utilities.dquote(str);
-  },
+    return this.isTokenSafe(str) ? str : this.dquote(str);
+  }
 
   dquote(str: string): string {
-    return '"' + Utilities.unquote(str).replace(/[\\"]/g, (s) => "\\" + s) + '"';
-  },
+    return '"' + this.unquote(str).replace(/[\\"]/g, (s) => "\\" + s) + '"';
+  }
 
   unquote(str: string): string {
     const m = /(?:^|(?<=\n))"([^\n]*?)"(?=\n|$)/.exec(str);
     if (m) {
-      return Utilities.unescape(m[1]);
+      return this.unescape(m[1]);
     } else {
       return str;
     }
-  },
+  }
 
   unescape(str: string): string {
     return str.replace(/\\([^\n])/g, "$1");
-  },
+  }
+
+  paren(str: string): string {
+    return Utilities.paren(str);
+  }
 
   /** @inventedArm if — CONVERGEABLE mail-utilities-slice-range-and-chars-forward-wrap */
   unparen(str: string): string {
@@ -132,7 +131,11 @@ export const Utilities = {
     } else {
       return str;
     }
-  },
+  }
+
+  bracket(str: string): string {
+    return Utilities.bracket(str);
+  }
 
   /** @inventedArm if — CONVERGEABLE mail-utilities-slice-range-and-chars-forward-wrap */
   unbracket(str: string): string {
@@ -143,26 +146,35 @@ export const Utilities = {
     } else {
       return str;
     }
-  },
+  }
+
+  escapeParen(str: string): string {
+    return Utilities.escapeParen(str);
+  }
 
   uriEscape(str: string): string {
-    return Utilities.uriParser().escape(str);
-  },
+    return this.uriParser().escape(str);
+  }
 
   uriUnescape(str: string): string {
-    return Utilities.uriParser().unescape(str);
-  },
+    return this.uriParser().unescape(str);
+  }
+
+  /** @missingRailsCall const_defined? — PERMANENT */
+  uriParser(): typeof DEFAULT_PARSER {
+    return DEFAULT_PARSER;
+  }
 
   matchToS(obj1: unknown, obj2: unknown): boolean {
     return casecmp(String(obj1 ?? ""), String(obj2 ?? "")) === 0;
-  },
+  }
 
   capitalizeField(str: unknown): string {
     return String(str ?? "")
       .split("-")
       .map((v) => capitalize(v, []))
       .join("-");
-  },
+  }
 
   constantize(str: unknown): string {
     return rbInspect(
@@ -170,41 +182,41 @@ export const Utilities = {
         .split(/[-_]/)
         .map((v) => capitalize(v, [])),
     );
-  },
+  }
 
   dasherize(str: unknown): string {
     return String(str ?? "").replaceAll(Constants.UNDERSCORE, Constants.HYPHEN);
-  },
+  }
 
   underscoreize(str: unknown): string {
     return String(str ?? "")
       .toLowerCase()
       .replaceAll(Constants.HYPHEN, Constants.UNDERSCORE);
-  },
+  }
 
   mapLines<T>(str: string, block: (line: string) => T): T[] {
     return rbStrEnumerateLines(str, []).map((line) => block(line));
-  },
+  }
 
   mapWithIndex<E, T>(enumerable: E[], block: (item: E, index: number) => T): T[] {
     return enumerable.map((item, index) => block(item, index));
-  },
+  }
 
-  binaryUnsafeToLf<T extends string | Uint8Array>(string: T): T {
+  static binaryUnsafeToLf<T extends string | Uint8Array>(string: T): T {
     if (typeof string === "string") return string.replace(/\r\n|\r/g, Constants.LF) as T;
     return gsubBytes(string, /\r\n|\r/g, Constants.LF) as T;
-  },
+  }
 
-  TO_CRLF_REGEX: /(?<!\r)\n|\r(?!\n)/g,
+  static TO_CRLF_REGEX = /(?<!\r)\n|\r(?!\n)/g;
 
-  binaryUnsafeToCrlf<T extends string | Uint8Array>(string: T): T {
+  static binaryUnsafeToCrlf<T extends string | Uint8Array>(string: T): T {
     if (typeof string === "string") {
       return string.replace(Utilities.TO_CRLF_REGEX, Constants.CRLF) as T;
     }
     return gsubBytes(string, Utilities.TO_CRLF_REGEX, Constants.CRLF) as T;
-  },
+  }
 
-  isSafeForLineEndingConversion(string: string | Uint8Array): boolean {
+  static isSafeForLineEndingConversion(string: string | Uint8Array): boolean {
     if (rbObjEncoding(string) === Encoding.BINARY) {
       return isAsciiOnly(string);
     } else if (typeof string === "string") {
@@ -212,25 +224,25 @@ export const Utilities = {
     } else {
       return isValidEncoding(String.fromCharCode(...string), rbObjEncoding(string));
     }
-  },
+  }
 
-  toLf<T extends string | Uint8Array>(string: T): T {
+  static toLf<T extends string | Uint8Array>(string: T): T {
     string = (string instanceof Uint8Array ? string : String(string ?? "")) as T;
     if (Utilities.isSafeForLineEndingConversion(string)) {
       return Utilities.binaryUnsafeToLf(string);
     } else {
       return string;
     }
-  },
+  }
 
-  toCrlf<T extends string | Uint8Array>(string: T): T {
+  static toCrlf<T extends string | Uint8Array>(string: T): T {
     string = (string instanceof Uint8Array ? string : String(string ?? "")) as T;
     if (Utilities.isSafeForLineEndingConversion(string)) {
       return Utilities.binaryUnsafeToCrlf(string);
     } else {
       return string;
     }
-  },
+  }
 
   isBlank(value: unknown): boolean {
     if (value == null) {
@@ -242,56 +254,88 @@ export const Utilities = {
     } else {
       return rbObjRespondTo(value, "isEmpty") ? isEmpty(value as object) : value === false;
     }
-  },
+  }
 
   generateMessageId(): string {
     return `<${Mail.randomTag()}@${Socket.gethostname()}.mail>`;
-  },
+  }
 
-  escapeParen(str: string): string {
+  static StrictCharsetEncoder = class StrictCharsetEncoder implements CharsetEncoder {
+    encode(string: RubyString, charset: string): RubyString {
+      if (/utf-?7/i.test(charset)) {
+        return Utilities.decodeUtf7(string);
+      } else {
+        return forceEncoding(b(string), Utilities.pickEncoding(charset));
+      }
+    }
+  };
+  static BestEffortCharsetEncoder = class BestEffortCharsetEncoder implements CharsetEncoder {
+    encode(string: RubyString, charset: string): RubyString {
+      if (/utf-?7/i.test(charset)) {
+        return Utilities.decodeUtf7(string);
+      } else {
+        return forceEncoding(b(string), this.pickEncoding(charset));
+      }
+    }
+
+    /** @internal */
+    pickEncoding(charset: string): Encoding {
+      let resolved = charset;
+      if (/ansi_x3.110-1983/.test(charset)) {
+        resolved = "ISO-8859-1";
+      } else if (/Windows-?1258/i.test(charset)) {
+        resolved = "Windows-1252";
+      }
+      return Utilities.pickEncoding(resolved);
+    }
+  };
+
+  static charsetEncoder: CharsetEncoder = new Utilities.BestEffortCharsetEncoder();
+
+  static escapeParen(str: string): string {
     const re = /(?<!\\)([()])/g;
     return str.replace(re, (s) => "\\" + s);
-  },
+  }
 
-  paren(str: string): string {
+  static paren(str: string): string {
     str = Utilities.unparen(str);
     str = Utilities.escapeParen(str);
     return "(" + str + ")";
-  },
+  }
 
-  escapeBracket(str: string): string {
+  static escapeBracket(str: string): string {
     const re = /(?<!\\)([<>])/g;
     return str.replace(re, (s) => "\\" + s);
-  },
+  }
 
-  bracket(str: string): string {
+  static bracket(str: string): string {
     str = Utilities.unbracket(str);
     str = Utilities.escapeBracket(str);
     return "<" + str + ">";
-  },
+  }
 
-  decodeBase64(str: string | Uint8Array): Uint8Array {
+  static decodeBase64(str: string | Uint8Array): Uint8Array {
     if (str instanceof Uint8Array) str = binaryString(str);
     if (!str.endsWith("=") && str.length % 4 !== 0) {
       str = str.padEnd((str.length + 3) & ~3, "=");
     }
     return unpack(str, "m")[0] as Uint8Array;
-  },
+  }
 
-  encodeBase64(str: string | Uint8Array): string {
+  static encodeBase64(str: string | Uint8Array): string {
     return pack([str], "m");
-  },
+  }
 
-  isHasConstant(klass: object, string: string): boolean {
+  static isHasConstant(klass: object, string: string): boolean {
     return constDefined(klass as { readonly name: string }, string, false);
-  },
+  }
 
-  getConstant(klass: object, string: string): unknown {
+  static getConstant(klass: object, string: string): unknown {
     return constGet(klass, string);
-  },
+  }
 
   /** @missingRailsArgs encode — PERMANENT */
-  transcodeCharset(
+  static transcodeCharset(
     str: RubyString,
     fromEncoding: string,
     toEncoding: string | Encoding = Encoding.UTF_8,
@@ -303,10 +347,10 @@ export const Utilities = {
       invalid: ":replace",
       replace: replacementChar,
     });
-  },
+  }
 
   /** @missingRailsArgs encode — PERMANENT */
-  encodeUtf7(string: string): Uint8Array {
+  static encodeUtf7(string: string): Uint8Array {
     return b(
       string.replace(/(&)|[^\x20-\x7e]+/g, (m, amp: string | undefined) => {
         if (amp != null) {
@@ -317,10 +361,10 @@ export const Utilities = {
         }
       }),
     );
-  },
+  }
 
   /** @missingRailsArgs encode — PERMANENT */
-  decodeUtf7(utf7: RubyString): RubyString {
+  static decodeUtf7(utf7: RubyString): RubyString {
     const scanned = Array.from(b(utf7), (c) => String.fromCharCode(c))
       .join("")
       .replace(/&([^-]+)?-/g, (_m, s: string | undefined) => {
@@ -338,14 +382,14 @@ export const Utilities = {
       Uint8Array.from(scanned, (c) => c.charCodeAt(0)),
       Encoding.UTF_8,
     );
-  },
+  }
 
-  bValueEncode(str: RubyString, _encoding: string | null = null): [string, string] {
+  static bValueEncode(str: RubyString, _encoding: string | null = null): [string, string] {
     const encoding = rbObjEncoding(str).toString();
     return [Utilities.encodeBase64(str), encoding];
-  },
+  }
 
-  bValueDecode(str: RubyString): RubyString {
+  static bValueDecode(str: RubyString): RubyString {
     try {
       const match = /=\?(.+)?\?[Bb]\?(.*)\?=/s.exec(str as string);
       if (match) {
@@ -368,14 +412,14 @@ export const Utilities = {
       warn(`Encoding conversion failed ${e.message}`);
       return forceEncoding(b(str), Encoding.UTF_8);
     }
-  },
+  }
 
-  qValueEncode(str: RubyString, _encoding: string | null = null): [string, string] {
+  static qValueEncode(str: RubyString, _encoding: string | null = null): [string, string] {
     const encoding = rbObjEncoding(str).toString();
     return [Encodings.QuotedPrintable!.encode(str), encoding];
-  },
+  }
 
-  qValueDecode(str: RubyString): RubyString {
+  static qValueDecode(str: RubyString): RubyString {
     try {
       const match = /=\?(.+)?\?[Qq]\?(.*)\?=/s.exec(str as string);
       if (match) {
@@ -400,9 +444,9 @@ export const Utilities = {
       warn(`Encoding conversion failed ${e.message}`);
       return forceEncoding(b(str), Encoding.UTF_8);
     }
-  },
+  }
 
-  paramDecode(str: RubyString, encoding: string | null): RubyString {
+  static paramDecode(str: RubyString, encoding: string | null): RubyString {
     try {
       str = Utilities.uriParser().unescape(str as string);
       if (encoding != null) str = Utilities.charsetEncoder.encode(str, encoding);
@@ -420,19 +464,19 @@ export const Utilities = {
       warn(`Encoding conversion failed ${e.message}`);
       return forceEncoding(b(str), Encoding.UTF_8);
     }
-  },
+  }
 
-  paramEncode(str: string): string {
+  static paramEncode(str: string): string {
     const encoding = rbObjEncoding(str).toString().toLowerCase();
     const language = Configuration.instance().paramEncodeLanguage();
     return `${encoding}'${language}'${Utilities.uriParser().escape(str)}`;
-  },
+  }
 
-  uriParser(): typeof DEFAULT_PARSER {
+  static uriParser(): typeof DEFAULT_PARSER {
     return DEFAULT_PARSER;
-  },
+  }
 
-  pickEncoding(charset: unknown): Encoding {
+  static pickEncoding(charset: unknown): Encoding {
     charset = String(charset ?? "");
     const down = (charset as string).toLowerCase();
     let encoding: unknown;
@@ -469,14 +513,14 @@ export const Utilities = {
     }
 
     return Utilities.convertToEncoding(encoding as string | Encoding);
-  },
+  }
 
-  stringByteslice(str: RubyString, ...args: unknown[]): RubyString | null {
+  static stringByteslice(str: RubyString, ...args: unknown[]): RubyString | null {
     return typeof str === "string" ? rbStrByteslice(str, ...args) : byteslice(str, ...args);
-  },
+  }
 
   /** @internal */
-  convertToEncoding(encoding: string | Encoding): Encoding {
+  static convertToEncoding(encoding: string | Encoding): Encoding {
     if (encoding instanceof Encoding) {
       return encoding;
     } else {
@@ -487,13 +531,13 @@ export const Utilities = {
         return Encoding.BINARY;
       }
     }
-  },
+  }
 
   /**
    * @internal
    * @missingRailsArgs encode — PERMANENT
    */
-  transcodeToScrubbedUtf8(str: RubyString): string {
+  static transcodeToScrubbedUtf8(str: RubyString): string {
     const decoded = encode(str, Encoding.UTF_8, {
       undef: ":replace",
       invalid: ":replace",
@@ -506,5 +550,5 @@ export const Utilities = {
           Encoding.UTF_8,
           { invalid: ":replace", replace: "\ufffd" },
         ) as string);
-  },
-};
+  }
+}

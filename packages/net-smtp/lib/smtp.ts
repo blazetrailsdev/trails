@@ -574,7 +574,10 @@ export class SMTP {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   private async tlsconnect(s: Connection, context: SslContext | null): Promise<void> {
     const { verifyMode, ...tls } = context ?? {};
     const hostname = this.tlsHostname ?? this.address;
@@ -596,6 +599,9 @@ export class SMTP {
         if (err) reject(err);
         else resolve();
       });
+    }).catch((err: ConnectionError & { originalCode?: string }) => {
+      if (err.originalCode != null) err.code = err.originalCode;
+      throw err;
     });
   }
 
