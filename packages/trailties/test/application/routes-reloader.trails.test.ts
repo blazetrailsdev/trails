@@ -75,6 +75,28 @@ describe("RoutesReloader", () => {
     }
   });
 
+  it("execute_unless_loaded draws the prefetched routes in line", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, drawInto("Trails.application", "/posts"));
+      const r = new RoutesReloader();
+      const a = makeRouteSet();
+      Trails.application = { routes: () => a } as never;
+      r.routeSets.push(a);
+      r.paths.push(routes);
+
+      await r.prefetchBang();
+      expect(a.calls).toEqual([]);
+      expect(r.executeUnlessLoaded()).toBe(true);
+
+      expect(a.calls).toEqual(["clear", "get /posts", "finalize"]);
+      expect(Object.hasOwn(a, "draw")).toBe(true);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
   it("an engine's routes file draws into the engine's route set, not the application's", async () => {
     const tmp = Dir.mktmpdir("routes_reloader");
     try {
