@@ -2,7 +2,10 @@ import { File, include, setEnv } from "@blazetrails/ruby-compat";
 import { getEnv, isBlank } from "@blazetrails/activesupport";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import { Actions } from "@blazetrails/thor/actions";
-import { HELP_MAPPINGS, type Base as ThorBase } from "@blazetrails/thor/base";
+import { HELP_MAPPINGS, type Base as ThorBase, type BaseConfig } from "@blazetrails/thor/base";
+import { Error as ThorError } from "@blazetrails/thor/error";
+import { Base as ShellBase } from "@blazetrails/thor/shell";
+import type { Basic } from "@blazetrails/thor/shell/basic";
 import { init, detectPackageManager } from "./init.js";
 import { generateManifest } from "./generate-manifest.js";
 import { generateMigration, migrationTimestamp, parseFields } from "./generate-migration.js";
@@ -34,14 +37,12 @@ const DRIVER_OPTION = {
   desc: "Database driver: better-sqlite3 (default), node-sqlite, pg, mysql2.",
 } as const;
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
-export interface Cli extends ThorBase {
-  destinationRoot: string;
-}
-
 /** @noRailsEquivalent PERMANENT */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Cli extends Thor {
+  declare options: ThorBase["options"];
+  declare destinationRoot: string;
+  declare shell: Basic;
+
   static {
     const klass = this as unknown as ThorClass;
 
@@ -66,7 +67,7 @@ export class Cli extends Thor {
       "db:prepare": "dbPrepare",
       "db:abort_if_pending_migrations": "dbAbortIfPendingMigrations",
     });
-    klass.stopOnUnknownOptionBang("typecheck", "modelsDump");
+    klass.stopOnUnknownOptionBang("typecheck", "modelsDump", "runner");
 
     klass.desc("new APP_NAME", "Create a new directory and scaffold a standalone AR project");
     klass.longDesc(
@@ -112,6 +113,7 @@ The manifest is build output under .trails/ — gitignore it, don't commit it.`,
     klass.methodOption("root", {
       type: "string",
       desc: "Directory to scan (default: ./app/models)",
+      lazyDefault: "",
     });
     klass.methodAdded("generateManifest");
 
@@ -294,6 +296,26 @@ Remaining args: __ARGV__. Pass --env <name> to override TRAILS_ENV for this invo
     return false;
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  static perform(command: string | null, args: string[], config: BaseConfig): Promise<unknown> {
+    if (HELP_MAPPINGS.includes(args[0])) {
+      [command, args] = ["help", [command as string]];
+    }
+
+    return (this as unknown as ThorClass).dispatch(command, [...args], null, config);
+  }
+
+  async help(command: string | null = null, subcommand: unknown = false): Promise<void> {
+    await super.help(command, subcommand);
+    if (command === "models:dump") {
+      this.shell.say("");
+      await runModelsDump(["--help"]);
+    } else if (command === "typecheck") {
+      this.shell.say("");
+      delegateBin("@blazetrails/activerecord-cli", "trails-tsc", ["--help"]);
+    }
+  }
+
   async new(appName: string): Promise<number> {
     const driver = parseDriver((this.options.driver as string | null) ?? undefined);
     if (driver === null) {
@@ -386,6 +408,7 @@ Remaining args: __ARGV__. Pass --env <name> to override TRAILS_ENV for this invo
 
   async generateManifest(): Promise<number> {
     const cwd = this.destinationRoot;
+    if (this.options.root === "") throw new ThorError("--root requires a directory argument.");
     const modelsDir = File.expandPath((this.options.root as string | null) ?? "app/models", cwd);
     const { path, changed } = await generateManifest(modelsDir, cwd);
     console.log(changed ? `  write   ${path}` : `  ok      ${path} (unchanged)`);
@@ -560,16 +583,14 @@ export async function run(argv: string[], cwd: string): Promise<number> {
   if (isBlank(getEnv("TRAILS_ENV")) && isBlank(getEnv("NODE_ENV"))) {
     setEnv("TRAILS_ENV", "development");
   }
-  const [command, ...args] = argv;
-  const klass = Cli as unknown as ThorClass;
-  if (
-    command !== undefined &&
-    HELP_MAPPINGS.includes(args[0]) &&
-    !klass.isStopOnUnknownOption(klass.allCommands()[klass.normalizeCommandName(command)] ?? null)
-  ) {
-    argv = ["help", command];
+  const [command = null, ...args] = argv;
+  const config: BaseConfig = { destinationRoot: cwd, shell: new ShellBase.shell() };
+  try {
+    const result = await Cli.perform(command, args, config);
+    return typeof result === "number" ? result : 0;
+  } catch (e) {
+    if (!(e instanceof ThorError)) throw e;
+    config.shell!.error(e.message);
+    return 1;
   }
-  const result = await klass.start(argv, { destinationRoot: cwd });
-  if (result === null) return 1;
-  return typeof result === "number" ? result : 0;
 }

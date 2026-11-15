@@ -23,7 +23,16 @@ describe("ArCliTest", () => {
     for (const argv of [[], ["help"], ["--help"], ["-h"]]) {
       expect(await run(argv, ".")).toBe(0);
     }
-    expect(out.join("\n")).toContain("db:migrate:status");
+    const help = out.join("\n");
+    for (const cmd of [
+      "init",
+      "new APP_NAME",
+      "db:migrate",
+      "db:migrate:status",
+      "runner SCRIPT",
+    ]) {
+      expect(help).toContain(` ${cmd} `);
+    }
   });
 
   it("prints init usage for init --help without scaffolding", async () => {
@@ -83,9 +92,8 @@ describe("ArCliTest", () => {
   });
 
   it("fails fast when --root is given without a directory argument", async () => {
-    await expect(run(["generate:manifest", "--root"], ".")).rejects.toThrow(
-      "models directory not found",
-    );
+    expect(await run(["generate:manifest", "--root"], ".")).toBe(1);
+    expect(err.join("\n")).toContain("--root requires a directory");
   });
 
   it("generate:migration prints help for --help", async () => {
@@ -96,6 +104,7 @@ describe("ArCliTest", () => {
   it("generate:migration requires a name", async () => {
     expect(await run(["generate:migration"], ".")).toBe(1);
     expect(err.join("\n")).toContain("was called with no arguments");
+    expect(err.join("\n")).toContain(`generate:migration NAME [field:type ...]"`);
   });
 
   it("generate:migration writes file and prints create line with path", async () => {
@@ -124,11 +133,13 @@ describe("ArCliTest", () => {
   it("generate:model requires a name", async () => {
     expect(await run(["generate:model"], ".")).toBe(1);
     expect(err.join("\n")).toContain("was called with no arguments");
+    expect(err.join("\n")).toContain(`generate:model NAME [field:type ...]"`);
   });
 
   it("destroy:migration requires a name", async () => {
     expect(await run(["destroy:migration"], ".")).toBe(1);
     expect(err.join("\n")).toContain("was called with no arguments");
+    expect(err.join("\n")).toContain(`destroy:migration NAME [field:type ...]"`);
   });
 
   it("destroy:migration deletes a generated migration and prints remove line", async () => {
@@ -157,6 +168,7 @@ describe("ArCliTest", () => {
   it("destroy:model requires a name", async () => {
     expect(await run(["destroy:model"], ".")).toBe(1);
     expect(err.join("\n")).toContain("was called with no arguments");
+    expect(err.join("\n")).toContain(`destroy:model NAME [field:type ...]"`);
   });
 
   it("destroy:model deletes model and migration and prints remove lines", async () => {
