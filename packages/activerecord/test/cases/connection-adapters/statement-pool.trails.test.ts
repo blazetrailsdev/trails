@@ -16,8 +16,8 @@ describe("StatementPool (trails)", () => {
       }
     }
     const pool = new TestPool();
-    pool.set("key", "prepared_stmt");
-    pool.delete("key");
+    await pool.set("key", "prepared_stmt");
+    await pool.delete("key");
     expect(dealloced).toEqual(["prepared_stmt"]);
     expect(pool.length).toBe(0);
   });
@@ -30,9 +30,9 @@ describe("StatementPool (trails)", () => {
       }
     }
     const pool = new TestPool();
-    pool.set("a", "stmt_a");
-    pool.set("b", "stmt_b");
-    pool.clear();
+    await pool.set("a", "stmt_a");
+    await pool.set("b", "stmt_b");
+    await pool.clear();
     expect(dealloced.sort()).toEqual(["stmt_a", "stmt_b"]);
     expect(pool.length).toBe(0);
   });
@@ -45,8 +45,8 @@ describe("StatementPool (trails)", () => {
       }
     }
     const pool = new TestPool();
-    pool.set("a", "stmt_a");
-    pool.set("b", "stmt_b");
+    await pool.set("a", "stmt_a");
+    await pool.set("b", "stmt_b");
     pool.reset();
     expect(dealloced).toHaveLength(0);
     expect(pool.length).toBe(0);
@@ -54,8 +54,8 @@ describe("StatementPool (trails)", () => {
 
   it("each iterates over all entries", async () => {
     const pool = new StatementPool<string>();
-    pool.set("a", "1");
-    pool.set("b", "2");
+    await pool.set("a", "1");
+    await pool.set("b", "2");
     const entries: [string, string][] = [];
     pool.each((key, stmt) => entries.push([key, stmt]));
     expect(entries).toEqual([
@@ -72,9 +72,9 @@ describe("StatementPool (trails)", () => {
       }
     }
     const pool = new TestPool(2);
-    pool.set("a", "1");
-    pool.set("b", "2");
-    pool.set("c", "3");
+    await pool.set("a", "1");
+    await pool.set("b", "2");
+    await pool.set("c", "3");
     expect(pool.length).toBe(2);
     expect(pool.isKey("a")).toBe(false);
     expect(pool.isKey("b")).toBe(true);
@@ -84,10 +84,10 @@ describe("StatementPool (trails)", () => {
 
   it("evicts in insertion order regardless of reads", async () => {
     const pool = new EvictingPool(2);
-    pool.set("a", "1");
-    pool.set("b", "2");
+    await pool.set("a", "1");
+    await pool.set("b", "2");
     pool.get("a");
-    pool.set("c", "3");
+    await pool.set("c", "3");
     expect(pool.isKey("a")).toBe(false);
     expect(pool.isKey("b")).toBe(true);
     expect(pool.isKey("c")).toBe(true);
@@ -95,10 +95,10 @@ describe("StatementPool (trails)", () => {
 
   it("evicts before storing, so a full pool sheds its oldest entry on re-assign", async () => {
     const pool = new EvictingPool(2);
-    pool.set("a", "1");
-    pool.set("b", "2");
-    pool.set("a", "1b");
-    pool.set("c", "3");
+    await pool.set("a", "1");
+    await pool.set("b", "2");
+    await pool.set("a", "1b");
+    await pool.set("c", "3");
     expect(pool.isKey("a")).toBe(true);
     expect(pool.isKey("b")).toBe(false);
     expect(pool.isKey("c")).toBe(true);
@@ -106,7 +106,7 @@ describe("StatementPool (trails)", () => {
 
   it("key? reports membership", async () => {
     const pool = new StatementPool<string>();
-    pool.set("a", "1");
+    await pool.set("a", "1");
     expect(pool.isKey("a")).toBe(true);
     expect(pool.isKey("b")).toBe(false);
   });
@@ -151,11 +151,11 @@ describe("SQLite3 StatementPool integration", () => {
 
   it("a statement limit of 0 raises on the first insert", async () => {
     const pool = new StatementPool<string>(0);
-    expect(() => pool.set("c", "stmt_c")).toThrow();
+    await expect(pool.set("c", "stmt_c")).rejects.toThrow();
     expect(pool.length).toBe(0);
   });
 
-  it("clear empties the pool before it returns when dealloc is still pending", () => {
+  it("clear empties the pool before it returns when dealloc is still pending", async () => {
     const dealloced: string[] = [];
     class TestPool extends StatementPool<string> {
       protected async dealloc(stmt: string): Promise<void> {
@@ -164,9 +164,9 @@ describe("SQLite3 StatementPool integration", () => {
       }
     }
     const pool = new TestPool();
-    pool.set("a", "stmt_a");
-    pool.set("b", "stmt_b");
-    pool.clear();
+    await pool.set("a", "stmt_a");
+    await pool.set("b", "stmt_b");
+    await pool.clear();
     expect(pool.length).toBe(0);
     expect(dealloced).toEqual(["stmt_a", "stmt_b"]);
   });

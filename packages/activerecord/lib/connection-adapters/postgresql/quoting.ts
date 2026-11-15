@@ -15,7 +15,15 @@ import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
 import { escapeBytea as pgEscapeBytea, type PGConnection } from "../../pg/connection.js";
-import { format, rbFSend, toS, rbObjRespondTo, Range, Rational } from "@blazetrails/ruby-compat";
+import {
+  format,
+  rbFSend,
+  toS,
+  rbObjRespondTo,
+  Range,
+  Rational,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
 
 export class IntegerOutOf64BitRange extends Error {
@@ -173,7 +181,13 @@ export function lookupCastTypeFromColumn(
   this: { typeMap: LookupableTypeMap; verifyBang(): Promise<void> },
   column: CastableColumn,
 ): ValueType {
-  if (this.typeMap == null) this.verifyBang().catch(() => {});
+  if (this.typeMap == null) {
+    const error = new RuntimeError("lookupCastTypeFromColumn read an unloaded type map");
+    this.verifyBang().catch((reason: unknown) => {
+      error.cause = reason;
+    });
+    throw error;
+  }
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 

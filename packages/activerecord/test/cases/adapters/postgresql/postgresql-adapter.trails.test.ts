@@ -501,6 +501,25 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    it("a failing dealloc propagates out of clearCacheBang", async () => {
+      const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+      try {
+        other.preparedStatements = true;
+        await other.internalExecQuery("SELECT $1::int", "SQL", [1], { prepare: true });
+        expect(other._statements.length).toBe(1);
+        const raw = other._rawConnection!;
+        const query = raw.query.bind(raw);
+        vi.spyOn(raw, "query").mockImplementation(((sql: string, ...rest: unknown[]) =>
+          sql.startsWith("DEALLOCATE")
+            ? Promise.reject(new Error("dealloc failed"))
+            : (query as (...args: unknown[]) => unknown)(sql, ...rest)) as typeof raw.query);
+        await expect(other.clearCacheBang()).rejects.toThrow("dealloc failed");
+      } finally {
+        vi.restoreAllMocks();
+        await other.disconnectBang();
+      }
+    });
+
     it("translate exception serialization failure", async () => {
       await adapter.execute(`CREATE TABLE "ex_ser" ("id" SERIAL PRIMARY KEY, "val" INTEGER)`);
       await adapter.execute(`INSERT INTO "ex_ser" (val) VALUES (0)`);

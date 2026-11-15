@@ -376,8 +376,8 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   }
 
   /** @internal */
-  protected ensureKlassExistsBang(): void {
-    void this.klass;
+  protected ensureKlassExistsBang(): typeof Base {
+    return this.klass;
   }
 
   /** @missingRailsName class — PERMANENT */

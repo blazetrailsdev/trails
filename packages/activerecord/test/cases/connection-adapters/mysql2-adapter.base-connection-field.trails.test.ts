@@ -70,10 +70,10 @@ describe("Mysql2Adapter base _rawConnection field", () => {
     for (let i = 0; i < 1000 && spy.mock.calls.length < 1; i++) await Promise.resolve();
     expect(spy).toHaveBeenCalledTimes(1);
 
-    adapter.discardBang();
+    const discarded = adapter.discardBang();
     resolve(mysql2Client(fakeConn) as never);
     await reconnect;
-    await adapter.lock.synchronize(() => {});
+    await discarded;
 
     expect(connectionOf(adapter)).toBeNull();
     expect(end).not.toHaveBeenCalled();
@@ -84,7 +84,7 @@ describe("Mysql2Adapter base _rawConnection field", () => {
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
     await adapter.connectBang();
-    adapter.discardBang();
+    await adapter.discardBang();
     expect(connectionOf(adapter)).toBeNull();
   });
 

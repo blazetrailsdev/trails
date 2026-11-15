@@ -13,9 +13,9 @@ describe("StatementPoolTest", () => {
     const pool = new TestPool();
     const stmt = {};
     const sql = "SELECT 1";
-    pool.set(sql, stmt);
+    await pool.set(sql, stmt);
     assertSame(stmt, pool.get(sql));
-    assertSame(stmt, pool.delete(sql));
-    assertNil(pool.delete(sql));
+    assertSame(stmt, await pool.delete(sql));
+    assertNil(await pool.delete(sql));
   });
 });

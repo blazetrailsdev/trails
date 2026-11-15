@@ -145,13 +145,13 @@ export async function performQuery(
       this._affectedRowsBeforeWarnings = result?.size ?? rawConnection.affectedRows;
     } else if (prepare) {
       const stmt =
-        this._statements.get(sql) ?? this._statements.set(sql, rawConnection.prepare(sql));
+        this._statements.get(sql) ?? (await this._statements.set(sql, rawConnection.prepare(sql)));
       try {
         result = await stmt.execute(...typeCastedBinds);
         this._affectedRowsBeforeWarnings = stmt.affectedRows;
       } catch (e) {
         if (!(e instanceof Mysql2.Error)) throw e;
-        this._statements.delete(sql);
+        await this._statements.delete(sql);
         throw e;
       }
     } else {

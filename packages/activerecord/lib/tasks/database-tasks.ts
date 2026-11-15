@@ -772,7 +772,6 @@ export class DatabaseTasks {
     format: SchemaFormat = schemaFormat(),
     file?: string,
   ): Promise<boolean> {
-    void format;
     const dbConfig = this.resolveConfiguration(configuration)!;
     file ??= this.schemaDumpPath(dbConfig) ?? undefined;
     if (!(file != null && File.isExist(file))) return true;

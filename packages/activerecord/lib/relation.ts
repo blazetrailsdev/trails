@@ -387,7 +387,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
   /** @internal */
   _offsets?: Record<number, T | null>;
-  private _futureResult?: FutureResult | Complete | Promise<Result>;
+  private _futureResult?: FutureResult | Complete | Promise<{ rows: Result } | { error: unknown }>;
   /** @internal */
   _loadResult?: Promise<T[]>;
   private _loadToken = 0;
@@ -525,8 +525,12 @@ export class Relation<T extends Base, G extends boolean = false> {
         const result = this.execMainQuery(!c.currentTransaction().joinable);
         if (result instanceof Result) {
           this.loadRecords(this.instantiateRecords(result));
+        } else if (result instanceof Promise) {
+          this._futureResult = result.then(
+            (rows) => ({ rows }),
+            (error: unknown) => ({ error }),
+          );
         } else {
-          if (result instanceof Promise) void result.catch(() => {});
           this._futureResult = result;
         }
         this._loaded = true;
@@ -721,7 +725,13 @@ export class Relation<T extends Base, G extends boolean = false> {
       if (this.isScheduled) {
         const future = this._futureResult!;
         this._futureResult = undefined;
-        rows = await (future instanceof FutureResult ? future.result() : future);
+        if (future instanceof Promise) {
+          const settled = await future;
+          if ("error" in settled) throw settled.error;
+          rows = settled.rows;
+        } else {
+          rows = await (future instanceof FutureResult ? future.result() : future);
+        }
       } else {
         rows = await this.execMainQuery();
       }

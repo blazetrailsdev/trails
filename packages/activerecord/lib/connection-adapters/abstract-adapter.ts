@@ -1456,7 +1456,7 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
-  discardBang(): void {}
+  async discardBang(): Promise<void> {}
 
   async resetBang(): Promise<void> {
     await this.clearCacheBang({ newConnection: true });

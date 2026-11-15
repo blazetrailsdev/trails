@@ -135,7 +135,6 @@ export class JoinAssociation extends JoinPart {
 
 /** @internal */
 function appendConstraints(join: unknown, constraints: unknown[]): Nodes.Node | null {
-  void Nodes.StringJoin;
   if (!join || !constraints.length) return join as Nodes.Node | null;
   constraints = constraints.filter(Arel.arelNode);
   if (!constraints.length) return join as Nodes.Node | null;

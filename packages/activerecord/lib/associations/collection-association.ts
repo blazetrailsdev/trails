@@ -1,3 +1,4 @@
+import { ActiveSupport } from "@blazetrails/activesupport";
 import {
   aryDelete,
   kernelCatch,
@@ -49,7 +50,7 @@ export abstract class CollectionAssociation extends Association {
     } else if (Array.isArray(record)) {
       super.target = record;
     } else {
-      void this.replaceOnTarget(record, true, { replace: true, inversing: true });
+      this.replaceOnTarget(record, true, { replace: true, inversing: true }) as Base | null;
     }
   }
 
@@ -518,7 +519,11 @@ export abstract class CollectionAssociation extends Association {
 
     if (this.isStaleTarget()) {
       const reloaded = this.reload();
-      if (reloaded instanceof Promise) reloaded.catch(() => {});
+      if (reloaded instanceof Promise) {
+        reloaded.catch((error: Error) => {
+          ActiveSupport.errorReporter.report(error, { handled: true });
+        });
+      }
     }
 
     this._proxy ??= CollectionProxy.create(this.klass, this);

@@ -589,8 +589,8 @@ export class PostgreSQLAdapter
     });
   }
 
-  override discardBang(): void {
-    super.discardBang();
+  override async discardBang(): Promise<void> {
+    await super.discardBang();
     try {
       this._rawConnection?.socketIo()?.reopen(IO.NULL);
     } catch {}
@@ -1179,7 +1179,7 @@ export class PostgreSQLAdapter
       } catch (e) {
         throw excSetupMessage(await this.translateExceptionClass(e, sql, binds), e);
       }
-      this._statements.set(sqlKey, { name: nextkey });
+      await this._statements.set(sqlKey, { name: nextkey });
     }
     return this._statements.get(sqlKey)!.name;
   }

@@ -183,9 +183,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     });
   }
 
-  override discardBang(): void {
-    void this.lock.synchronize(() => {
-      super.discardBang();
+  override async discardBang(): Promise<void> {
+    await this.lock.synchronize(async () => {
+      await super.discardBang();
       if (this._rawConnection) this._rawConnection.automaticClose = false;
       this._rawConnection = null;
     });

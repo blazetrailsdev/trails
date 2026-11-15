@@ -39,7 +39,7 @@ describeIfPg("PostgresqlConnectionTest (trails)", () => {
     )?.connection?.stream;
     try {
       expect(await a.active()).toBe(true);
-      a.discardBang();
+      await a.discardBang();
       expect(await a.active()).toBe(false);
       expect(a.isConnected()).toBe(false);
       expect(endSpy).not.toHaveBeenCalled();

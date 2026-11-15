@@ -211,7 +211,7 @@ export function inBatches<T extends Base>(
     };
     let wake = (): void => {};
     let batch: Batch | null = null;
-    void run(
+    const running = run(
       (relation) =>
         new Promise<void>((resume, stop) => {
           state.pending = { relation, resume, stop };
@@ -239,6 +239,7 @@ export function inBatches<T extends Base>(
       }
     } finally {
       batch?.stop(stopped);
+      await running;
     }
     if (state.failure.length > 0) throw state.failure[0];
   };
