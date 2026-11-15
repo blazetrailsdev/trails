@@ -1,6 +1,6 @@
 import { beforeEach, expect, it as vitestIt } from "vitest";
 import { Time } from "@blazetrails/date";
-import { NotImplementedError } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 import type { LocalStore } from "../../../lib/cache/strategy/local-cache.js";
 import { plusWithDuration } from "../../../lib/core-ext/time/calculations.js";
@@ -58,7 +58,7 @@ export function localCacheBehavior(host?: LocalCacheBehaviorHost): void {
         await cache.read(key);
       });
 
-      const expected = [cache.constructor.name, cache.localCache()!.constructor.name];
+      const expected = [cache.constructor.name, rbModName(cache.localCache()!.constructor)];
       expect(events.map((p) => p.payload.store)).toEqual(expected);
     });
   });

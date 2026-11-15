@@ -1,4 +1,4 @@
-import { Hash, rbCallSuper, rbObjId, slice } from "@blazetrails/ruby-compat";
+import { Hash, rbCallSuper, rbModName, rbObjId, slice } from "@blazetrails/ruby-compat";
 import { underscore } from "../../inflector.js";
 import { extractOptionsBang } from "../../hash-utils.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
@@ -73,7 +73,9 @@ export class LocalStore {
   }
 
   deleteEntry(key: unknown): boolean {
-    return this.data.delete(key);
+    const value = this.data.get(key);
+    this.data.delete(key);
+    return value != null && value !== false;
   }
 
   async fetchEntry(key: unknown, block?: () => unknown): Promise<unknown> {
@@ -203,7 +205,7 @@ export const LocalCache = {
         hit = false;
         return rbCallSuper(this, LocalCache.readSerializedEntry, key, options);
       });
-      if (hit && options.event) options.event.store = cache.constructor.name;
+      if (hit && options.event) options.event.store = rbModName(cache.constructor);
       return entry;
     } else {
       return await rbCallSuper(this, LocalCache.readSerializedEntry, key, options);
