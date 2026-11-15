@@ -5,7 +5,6 @@ import { SolidCache } from "../solid-cache.js";
 import { Estimate } from "./size/estimate.js";
 import { MovingAverageEstimate } from "./size/moving-average-estimate.js";
 
-/** @noRailsEquivalent CONVERGEABLE rails-api-manifest-records-app-jobs-and-concern-class-methods */
 export class ClassMethods {
   static async estimatedSize(
     this: typeof Entry,

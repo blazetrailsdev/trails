@@ -40,7 +40,7 @@ import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";
 import { FutureResult } from "../future-result.js";
-import { EnumType } from "../enum.js";
+import { ActiveRecord } from "../namespaces.js";
 import { defaultValue } from "../type.js";
 import {
   arelColumn,
@@ -888,7 +888,7 @@ export async function executeSimpleCalculation(
       typeCasterFor(column) ??
       lookupCastTypeFromJoinDependencies.call(this, String(columnName ?? "")) ??
       defaultValue();
-    if (type instanceof EnumType) type = type.subtype;
+    if (type instanceof ActiveRecord.Enum.EnumType) type = type.subtype;
   }
 
   return typeCastCalculatedValue.call(this, result.castValues()[0] ?? null, operation, type);
@@ -991,7 +991,7 @@ export async function executeGroupedCalculation(
         typeCasterFor(column) ??
         lookupCastTypeFromJoinDependencies.call(this, String(columnName)) ??
         defaultValue();
-      if (type instanceof EnumType) type = type.subtype;
+      if (type instanceof ActiveRecord.Enum.EnumType) type = type.subtype;
     }
 
     return eachWithObject(hashRows, new Map<unknown, unknown>(), (row, result) => {

@@ -1,5 +1,3 @@
-import { constSet } from "@blazetrails/ruby-compat";
-
 import { SAX } from "../../namespaces.js";
 
 export class SaxDocument {
@@ -12,4 +10,4 @@ export class SaxDocument {
   error(_message: string): void {}
 }
 
-constSet(SAX, "Document", SaxDocument);
+SAX.Document = SaxDocument;

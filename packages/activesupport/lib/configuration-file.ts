@@ -8,6 +8,7 @@ import {
 import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
+import "./constants.excluded.generated.js";
 
 export class FormatError extends StandardError {
   static toString(): string {

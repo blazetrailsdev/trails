@@ -1,7 +1,4 @@
 {
   "story": "relation-include-spawn-methods-calculations-import-cycle",
-  "edges": [
-    "packages/activerecord/lib/relation.ts -> packages/activerecord/lib/relation/calculations.ts [Calculations]",
-    "packages/activerecord/lib/relation.ts -> packages/activerecord/lib/relation/spawn-methods.ts [SpawnMethods]"
-  ]
+  "edges": []
 }

@@ -9,7 +9,6 @@ import {
   last,
   rbEqual,
   rbInspect,
-  constSet,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { FutureResult, type Complete } from "./future-result.js";
@@ -88,6 +87,7 @@ export class IndexedRow {
 }
 
 export class Result {
+  declare static IndexedRow: typeof IndexedRow;
   readonly columns: string[];
   rows: unknown[][];
   columnTypes: ColumnTypes;
@@ -298,5 +298,5 @@ export function columnType(
   );
 }
 
-constSet(ActiveRecord, "Result", Result);
-constSet(Result, "IndexedRow", IndexedRow);
+ActiveRecord.Result = Result;
+Result.IndexedRow = IndexedRow;

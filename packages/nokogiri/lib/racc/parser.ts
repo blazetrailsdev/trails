@@ -1,11 +1,5 @@
 import { Racc } from "../namespaces.js";
-import {
-  constSet,
-  kernelCatch,
-  kernelThrow,
-  NotImplementedError,
-  rbInspect,
-} from "@blazetrails/ruby-compat";
+import { kernelCatch, kernelThrow, NotImplementedError, rbInspect } from "@blazetrails/ruby-compat";
 
 export class ParseError extends Error {
   override name = "Racc::ParseError";
@@ -254,5 +248,5 @@ export abstract class Parser {
   }
 }
 
-constSet(Racc, "ParseError", ParseError);
-constSet(Racc, "Parser", Parser);
+Racc.ParseError = ParseError;
+Racc.Parser = Parser;

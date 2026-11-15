@@ -1,5 +1,4 @@
 import { CSS } from "../namespaces.js";
-import { constSet } from "@blazetrails/ruby-compat";
 import type { XPathVisitor } from "./xpath-visitor.js";
 
 let cache = new Map<string, string[]>();
@@ -30,4 +29,4 @@ export const SelectorCache = {
   },
 };
 
-constSet(CSS, "SelectorCache", SelectorCache);
+CSS.SelectorCache = SelectorCache;

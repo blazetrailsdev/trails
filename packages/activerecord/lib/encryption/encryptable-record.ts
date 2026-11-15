@@ -139,7 +139,6 @@ export function sourceAttributeFromPreservedAttribute(
     : undefined;
 }
 
-/** @internal */
 export function isEncryptedAttribute(this: Base, attributeName: string): boolean {
   const klass = this.constructor;
   const name = klass.attributeAliases?.[attributeName] ?? attributeName;
@@ -148,7 +147,6 @@ export function isEncryptedAttribute(this: Base, attributeName: string): boolean
   return type.isEncrypted(this.readAttributeBeforeTypeCast?.(name));
 }
 
-/** @internal */
 export function ciphertextFor(this: Base, attributeName: string): unknown {
   const klass = this.constructor;
   attributeName = klass.attributeAliases?.[attributeName] ?? attributeName;
@@ -158,14 +156,12 @@ export function ciphertextFor(this: Base, attributeName: string): unknown {
   return this.readAttributeForDatabase(attributeName);
 }
 
-/** @internal */
 export async function encrypt(this: Base): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
     return await encryptAttributes.call(this);
   }
 }
 
-/** @internal */
 export async function decrypt(this: Base): Promise<boolean | undefined> {
   if (hasEncryptedAttributes.call(this)) {
     return await decryptAttributes.call(this);

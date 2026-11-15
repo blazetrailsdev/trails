@@ -30805,24 +30805,10 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
-    "rubyName": "deterministic_encrypted_attributes",
-    "digest": "96ba6213022cee78",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
     "rubyName": "encode_with",
     "digest": "ffff2b86213f0d8e",
     "ref": "v8.0.2",
     "reason": "activerecord-verify-and-pin-protocol-bodies"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
-    "rubyName": "encrypts",
-    "digest": "6c3319c2ea1c8a8e",
-    "ref": "v8.0.2"
   },
   {
     "package": "activerecord",
@@ -80730,8 +80716,64 @@
   {
     "package": "trailties",
     "rubyFile": "generators.rb",
+    "rubyName": "add_generated_file",
+    "digest": "abe18d4bc6b193b0",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "after_generate_callbacks",
+    "digest": "45df4e5aaa2ab33b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "aliases",
+    "digest": "6509b27502b1432e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "api_only!",
+    "digest": "62691b4ff79d5e53",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "command_type",
+    "digest": "9333943ed5302b0e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "configure!",
+    "digest": "afd9ec8e205d89b1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "fallbacks",
+    "digest": "d34bbc9d7ec092d1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
     "rubyName": "find_by_namespace",
     "digest": "0267dfdc67034864",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "help",
+    "digest": "f68538435c6b46d9",
     "ref": "v8.0.2"
   },
   {
@@ -80758,8 +80800,22 @@
   {
     "package": "trailties",
     "rubyFile": "generators.rb",
-    "rubyName": "lookup!",
-    "digest": "78973650afef6d98",
+    "rubyName": "invoke_fallbacks_for",
+    "digest": "251756573d6ad09b",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "lookup_paths",
+    "digest": "b60dd9a7966d63ad",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
+    "rubyName": "options",
+    "digest": "76a74874b5478ac3",
     "ref": "v8.0.2"
   },
   {
@@ -80773,7 +80829,7 @@
     "package": "trailties",
     "rubyFile": "generators.rb",
     "rubyName": "print_list",
-    "digest": "48b998b6ca9e5b60",
+    "digest": "05895c209d45fc50",
     "ref": "v8.0.2"
   },
   {
@@ -80786,6 +80842,13 @@
   {
     "package": "trailties",
     "rubyFile": "generators.rb",
+    "rubyName": "run_after_generate_callback",
+    "digest": "01f1233befd14815",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "trailties",
+    "rubyFile": "generators.rb",
     "rubyName": "sorted_groups",
     "digest": "3478587c712a7110",
     "ref": "v8.0.2"
@@ -80793,8 +80856,8 @@
   {
     "package": "trailties",
     "rubyFile": "generators.rb",
-    "rubyName": "subclasses",
-    "digest": "5afb14887279c9e6",
+    "rubyName": "templates_path",
+    "digest": "97876a66e0675f90",
     "ref": "v8.0.2"
   },
   {

@@ -2,7 +2,6 @@ import {
   ArgumentError,
   rbCBasicObject as BasicObject,
   rbFSend,
-  constSet,
   rbObjAsString as toS,
   rbObjIsKindOf,
   rbObjRespondTo,
@@ -27,6 +26,10 @@ import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-val
 import type { TableMetadata } from "../table-metadata.js";
 
 export class PredicateBuilder {
+  declare static ArrayHandler: typeof ArrayHandler;
+  declare static BasicObjectHandler: typeof BasicObjectHandler;
+  declare static RangeHandler: typeof RangeHandler;
+  declare static RelationHandler: typeof RelationHandler;
   private _table: TableMetadata;
 
   /** @internal */
@@ -258,11 +261,11 @@ export class PredicateBuilder {
   }
 }
 
-constSet(ActiveRecord, "PredicateBuilder", PredicateBuilder);
-constSet(PredicateBuilder, "ArrayHandler", ArrayHandler);
-constSet(PredicateBuilder, "BasicObjectHandler", BasicObjectHandler);
-constSet(PredicateBuilder, "RangeHandler", RangeHandler);
-constSet(PredicateBuilder, "RelationHandler", RelationHandler);
+ActiveRecord.PredicateBuilder = PredicateBuilder;
+PredicateBuilder.ArrayHandler = ArrayHandler;
+PredicateBuilder.BasicObjectHandler = BasicObjectHandler;
+PredicateBuilder.RangeHandler = RangeHandler;
+PredicateBuilder.RelationHandler = RelationHandler;
 
 type Attributes = Record<string, unknown> | Map<unknown, unknown>;
 

@@ -1,5 +1,5 @@
 export { NotImplementedError } from "@blazetrails/ruby-compat";
-import { StandardError, constSet } from "@blazetrails/ruby-compat";
+import { StandardError } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import type { Column } from "./connection-adapters/column.js";
 
@@ -651,9 +651,5 @@ export class MultiparameterAssignmentErrors extends ActiveRecordError {
   }
 }
 
-constSet(
-  ActiveRecord,
-  "AsynchronousQueryInsideTransactionError",
-  AsynchronousQueryInsideTransactionError,
-);
-constSet(ActiveRecord, "Deadlocked", Deadlocked);
+ActiveRecord.AsynchronousQueryInsideTransactionError = AsynchronousQueryInsideTransactionError;
+ActiveRecord.Deadlocked = Deadlocked;

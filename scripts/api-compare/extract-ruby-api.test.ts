@@ -5181,7 +5181,7 @@ describe("Ruby extractor file-order independence", { timeout: RUBY_SUBPROCESS_TI
       "context.rb": CONTEXT,
       "configurable.rb": CONFIGURABLE,
     });
-    expect(out["ActiveRecord::Encryption::Configurable"].members).toEqual([
+    expect(out["ActiveRecord::Encryption::Configurable::ClassMethods"].members).toEqual([
       "key_provider",
       "cipher",
     ]);
@@ -5192,7 +5192,7 @@ describe("Ruby extractor file-order independence", { timeout: RUBY_SUBPROCESS_TI
       "context.rb": CONTEXT,
       "configurable.rb": CONFIGURABLE,
     });
-    expect(out["ActiveRecord::Encryption::Configurable"].members).toEqual([
+    expect(out["ActiveRecord::Encryption::Configurable::ClassMethods"].members).toEqual([
       "key_provider",
       "cipher",
     ]);
@@ -5202,7 +5202,7 @@ describe("Ruby extractor file-order independence", { timeout: RUBY_SUBPROCESS_TI
   // not leave a parked entry behind for a later pass to replay.
   it("credits nothing and parks nothing for a CONST.each over an unknown constant", () => {
     const out = rubyEntities(["configurable.rb"], { "configurable.rb": CONFIGURABLE });
-    expect(out["ActiveRecord::Encryption::Configurable"].members).toEqual([]);
+    expect(out["ActiveRecord::Encryption::Configurable::ClassMethods"].members).toEqual([]);
     expect(out["__pending"]).toBe(0);
   });
 
@@ -5212,8 +5212,28 @@ describe("Ruby extractor file-order independence", { timeout: RUBY_SUBPROCESS_TI
       "context.rb": CONTEXT.replace("%i[ key_provider cipher ]", "[]"),
       "configurable.rb": CONFIGURABLE,
     });
-    expect(out["ActiveRecord::Encryption::Configurable"].members).toEqual([]);
+    expect(out["ActiveRecord::Encryption::Configurable::ClassMethods"].members).toEqual([]);
     expect(out["__pending"]).toBe(0);
+  });
+
+  it("files a class_methods block's defs on the concern's ClassMethods", () => {
+    const out = rubyEntities(["expiration.rb"], {
+      "expiration.rb": `
+          module SolidCache
+            class Entry
+              module Expiration
+                extend ActiveSupport::Concern
+                class_methods do
+                  def expire(count); end
+                end
+                def touch; end
+              end
+            end
+          end
+        `,
+    });
+    expect(out["SolidCache::Entry::Expiration::ClassMethods"].members).toEqual(["expire"]);
+    expect(out["SolidCache::Entry::Expiration"].members).toEqual(["touch"]);
   });
 
   // encryption.rb:39 reopens `class Cipher` purely to hang a nested autoload
