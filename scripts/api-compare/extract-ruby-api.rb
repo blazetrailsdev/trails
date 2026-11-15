@@ -1387,31 +1387,6 @@ class ApiExtractor
   # framework loads — NOT into the lexically enclosing Railtie. Attributing it
   # to `current_fqn` credits the module's methods to a class Rails never puts
   # them on, so `include`/`extend` inside an on_load block records nothing.
-  def concern_class_methods_block?(node)
-    call = node[1]
-    call = call[1] if call.is_a?(Array) && call[0] == :method_add_arg
-    call.is_a?(Array) && %i[fcall vcall].include?(call[0]) &&
-      call[1].is_a?(Array) && call[1][0] == :@ident && call[1][1] == "class_methods"
-  end
-
-  def process_concern_class_methods(node)
-    block = node[2]
-    body = block.is_a?(Array) && %i[do_block brace_block].include?(block[0]) ? block[2] : nil
-    return unless body
-
-    @namespace_stack.push("ClassMethods")
-    @visibility_stack.push(:public)
-    @module_function_stack.push(false)
-    fqn = current_fqn
-    @modules[fqn] ||= new_class_info("ClassMethods", fqn)
-    @attr_names_stack.push(collect_attr_declarations(body))
-    walk_body(body)
-    @attr_names_stack.pop
-    @module_function_stack.pop
-    @visibility_stack.pop
-    @namespace_stack.pop
-  end
-
   # A bare `included do … end` in a module body. ActiveSupport::Concern runs
   # that block with the INCLUDER as self (concern.rb:137-138), so the singleton
   # methods it defines — `def self.x`, `class_attribute`, `class << self;
@@ -1437,6 +1412,31 @@ class ApiExtractor
     end
     walker.call(call)
     found
+  end
+
+  def concern_class_methods_block?(node)
+    call = node[1]
+    call = call[1] if call.is_a?(Array) && call[0] == :method_add_arg
+    call.is_a?(Array) && %i[fcall vcall].include?(call[0]) &&
+      call[1].is_a?(Array) && call[1][0] == :@ident && call[1][1] == "class_methods"
+  end
+
+  def process_concern_class_methods(node)
+    block = node[2]
+    body = block.is_a?(Array) && %i[do_block brace_block].include?(block[0]) ? block[2] : nil
+    return unless body
+
+    @namespace_stack.push("ClassMethods")
+    @visibility_stack.push(:public)
+    @module_function_stack.push(false)
+    fqn = current_fqn
+    @modules[fqn] ||= new_class_info("ClassMethods", fqn)
+    @attr_names_stack.push(collect_attr_declarations(body))
+    walk_body(body)
+    @attr_names_stack.pop
+    @module_function_stack.pop
+    @visibility_stack.pop
+    @namespace_stack.pop
   end
 
   # `ActiveSupport.on_load(:action_controller) { include ControllerRuntime }`
