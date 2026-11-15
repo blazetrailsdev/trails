@@ -1,10 +1,11 @@
 import type {} from "@blazetrails/activestorage/engine";
 import { Trails } from "@blazetrails/trailties";
-import { hours } from "@blazetrails/activesupport";
+import { hours, isPresent } from "@blazetrails/activesupport";
+import { env } from "@blazetrails/ruby-compat";
 
 Trails.application!.configure(function () {
   this.config.enableReloading = false;
-  this.config.eagerLoad = false;
+  this.config.eagerLoad = isPresent(env.CI);
   this.config.publicFileServer.headers = { "Cache-Control": `public, max-age=${hours(1).toI()}` };
   this.config.considerAllRequestsLocal = true;
   this.config.actionController.performCaching = false;
