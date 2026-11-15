@@ -74,17 +74,17 @@ describe("BuilderTest", () => {
   });
 
   it("freshness", async () => {
-    expect((await lastBuild()).isStale()).toBe(true);
-    expect((await lastBuild()).isFresh()).toBe(false);
+    expect((await lastBuild()).isStale()).toBeTruthy();
+    expect((await lastBuild()).isFresh()).toBeFalsy();
   });
 
   it("freshness on build success", async () => {
-    expect((await lastBuild()).isStale()).toBe(true);
+    expect((await lastBuild()).isStale()).toBeTruthy();
     await stubRunner({ success: true }, async () => {
-      expect(await builder().build()).toBe(true);
-      expect((await lastBuild()).success).toBe(true);
-      expect((await lastBuild()).errors).toBe("");
-      expect((await lastBuild()).isFresh()).toBe(true);
+      expect(await builder().build()).toBeTruthy();
+      expect((await lastBuild()).success).toBeTruthy();
+      expect((await lastBuild()).errors).toBeEmpty();
+      expect((await lastBuild()).isFresh()).toBeTruthy();
       expect((await lastBuild()).digest).toBeTruthy();
       expect((await lastBuild()).timestamp).toBeTruthy();
 
@@ -95,13 +95,13 @@ describe("BuilderTest", () => {
   });
 
   it("freshness on build fail", async () => {
-    expect((await lastBuild()).isStale()).toBe(true);
+    expect((await lastBuild()).isStale()).toBeTruthy();
     const errorMessage = "SyntaxError: Hero.jsx: Unexpected token (6:6)";
     await stubRunner({ errors: errorMessage }, async () => {
-      expect(await builder().build()).toBe(false);
-      expect((await lastBuild()).success).toBe(false);
+      expect(await builder().build()).toBeFalsy();
+      expect((await lastBuild()).success).toBeFalsy();
       expect((await lastBuild()).errors).toBe(errorMessage);
-      expect((await lastBuild()).isFresh()).toBe(true);
+      expect((await lastBuild()).isFresh()).toBeTruthy();
       expect((await lastBuild()).digest).toBeTruthy();
       expect((await lastBuild()).timestamp).toBeTruthy();
 
@@ -132,7 +132,7 @@ describe("BuilderTest", () => {
     await travel(60_000, async () => {
       expect(
         await hashedFiles(async () => expect(await ViteAssets.digest()).toBe(previousDigest)),
-      ).toEqual([]);
+      ).toBeEmpty();
     });
 
     await FileUtils.touchAsync(watchedFile().toString());
@@ -183,26 +183,22 @@ describe("BuilderTest", () => {
     const spy = vi.spyOn(File, "isExistAsync").mockResolvedValue(true);
     let error: unknown;
     try {
-      error = await builder()
-        .build()
-        .then(
-          () => null,
-          (e: unknown) => e,
-        );
+      const build = builder().build();
+      await expect(build).rejects.toThrow(MissingExecutableError);
+      error = await build.catch((e: unknown) => e);
     } finally {
       spy.mockRestore();
     }
-    expect(error).toBeInstanceOf(MissingExecutableError);
 
     expect((error as MissingExecutableError).message).toMatch("The vite binary is not available.");
 
-    await stubRunner({ success: true }, async () => expect(await builder().build()).toBe(true));
+    await stubRunner({ success: true }, async () => expect(await builder().build()).toBeTruthy());
   });
 
   it("build cache", async () => {
     const build = await Build.fromPrevious(new Pathname(import.meta.filename), "digest");
 
     expect(build.timestamp).toBe("never");
-    expect(build.isRetryFailed()).toBe(true);
+    expect(build.isRetryFailed()).toBeTruthy();
   });
 });
