@@ -378,6 +378,17 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
         );
         const prefixed = `${tsFile}::${fqn.split("::").at(-2)}${short}`.toLowerCase();
         tsCls ??= kind === "classes" ? tsByLowerFileName.get(prefixed) : undefined;
+        const barrel = `${path.dirname(tsFile)}.ts`;
+        if (
+          tsCls === undefined &&
+          kind === "modules" &&
+          path
+            .basename(barrel, ".ts")
+            .replace(/(?:^|-)(\w)/g, (_, c: string) => c.toUpperCase()) === rubyShort &&
+          tsByFileName.get(`${barrel}::${rubyShort}`)?.name === rubyShort
+        ) {
+          tsCls = { file: barrel, name: rubyShort };
+        }
         const fallback = tsCls === undefined && kind === "modules";
         if (fallback) tsCls = { file: tsFile, name: rubyShort };
         if (!tsCls?.file || rubyPath === tsCls.name) continue;
