@@ -1,5 +1,6 @@
 import { Hash, rbCallSuper, rbObjId, slice } from "@blazetrails/ruby-compat";
 import { underscore } from "../../inflector.js";
+import { extractOptionsBang } from "../../hash-utils.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import type { Entry } from "../entry.js";
 import type { StoreOptions } from "../store.js";
@@ -145,24 +146,20 @@ export const LocalCache = {
   },
 
   async fetchMulti(this: Host, ...names: unknown[]): Promise<Map<unknown, unknown>> {
-    const localCache = LocalCache.localCache.call(this);
     const block = names.pop() as (key: unknown) => unknown;
-    const last = names.at(-1);
-    let options: StoreOptions =
-      last != null && typeof last === "object" && last.constructor === Object
-        ? (names.pop() as StoreOptions)
-        : {};
-    if (localCache == null || names.length === 0)
-      return (await rbCallSuper(this, LocalCache.fetchMulti, ...names, options, block)) as Map<
+    if (LocalCache.localCache.call(this) == null || names.length === 0)
+      return (await rbCallSuper(this, LocalCache.fetchMulti, ...names, block)) as Map<
         unknown,
         unknown
       >;
 
+    let options: StoreOptions = extractOptionsBang(names);
     options = this.mergedOptions(options);
 
     const keysToNames = new Hash<unknown, unknown>();
     for (const name of names) keysToNames.set(await this.normalizeKey(name, options), name);
 
+    const localCache = LocalCache.localCache.call(this)!;
     const localEntries = localCache.readMultiEntries([...keysToNames.keys()]);
     const results = new Map<unknown, unknown>();
     for (const [key, value] of localEntries) {
