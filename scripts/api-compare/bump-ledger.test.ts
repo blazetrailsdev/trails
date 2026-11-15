@@ -320,6 +320,12 @@ describe("ledgerScope", () => {
     expect([counted.length, skipped.length]).toEqual([1, 1]);
   });
 
+  it("receipt-audit: skips an uncompared tag on a removed pair", () => {
+    const tag = { package: "activerecord", tsFile: "gone.ts", tsName: "gone", call: "x" };
+    expect(scope.tsName(tag)).toBe(true);
+    expect(scope.tsName({ ...tag, tsName: "kept" })).toBe(false);
+  });
+
   it("an empty ledger skips nothing", () => {
     expect(
       ledgerScope([], hashes).ts({

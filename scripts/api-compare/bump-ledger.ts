@@ -14,6 +14,7 @@ import * as path from "path";
 import { SOURCES } from "../../vendor/sources.js";
 import { serializeBaseline } from "./baseline-json.js";
 import { ROOT_DIR } from "./config.js";
+import { rubyMethodToTs } from "../parity/conventions.js";
 import { type BodyPin, type PinKey, comparePinKeys, currentDigests, keyOf } from "./body-pins.js";
 
 export const LEDGER_DIR = path.join(ROOT_DIR, "scripts/parity/bump-ledger");
@@ -268,7 +269,7 @@ export interface TsPairKey {
  * row that carries its Ruby file; `ts` and `tsName` map a TS-side row through
  * the body-hashes records. A removed pair has no record, so a TS-side row with
  * no record of its own is ledgered when a removed row in its package names
- * its Ruby method.
+ * its Ruby method, or for a TS-named row, a name `rubyMethodToTs` gives it.
  */
 export interface LedgerScope {
   pair(k: PinKey): boolean;
@@ -290,6 +291,13 @@ export function ledgerScope(
   const removed = new Set(
     rows.filter((r) => r.kind === "removed").map((r) => `${r.package} ${r.rubyName}`),
   );
+  const removedTsNames = new Set(
+    rows
+      .filter((r) => r.kind === "removed")
+      .flatMap((r) =>
+        (rubyMethodToTs(r.rubyName, undefined, r.package) ?? []).map((n) => `${r.package} ${n}`),
+      ),
+  );
   const byTs = new Map<string, boolean>();
   const byTsName = new Map<string, boolean>();
   for (const h of hashes) {
@@ -304,7 +312,9 @@ export function ledgerScope(
     ts: (k) =>
       byTs.get(`${k.package} ${k.tsFile} ${k.rubyName}`) ??
       removed.has(`${k.package} ${k.rubyName}`),
-    tsName: (k) => byTsName.get(`${k.package} ${k.tsFile} ${k.tsName}`) ?? false,
+    tsName: (k) =>
+      byTsName.get(`${k.package} ${k.tsFile} ${k.tsName}`) ??
+      removedTsNames.has(`${k.package} ${k.tsName}`),
   };
 }
 
