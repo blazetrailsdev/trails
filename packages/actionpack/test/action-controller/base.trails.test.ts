@@ -235,6 +235,14 @@ describe("ActionController::Streaming chunked response body", () => {
     }
     expect(rest.join("")).toBe("body");
   });
+
+  it("raises on a sync body read while the streamed Body is pending", async () => {
+    const controller = new StreamGateController();
+    await controller.dispatch("show", makeRequest(), new Response());
+
+    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
+    release();
+  });
 });
 
 describe("ActionController::Base bare render", () => {

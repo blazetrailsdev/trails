@@ -5,6 +5,7 @@ import {
   File,
   IO,
   IOError,
+  RuntimeError,
   basicObjRespondTo,
   rbCheckArrayType,
   rbObjAsString,
@@ -91,10 +92,15 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   get body(): string {
     if (this._strBody !== null) return this._strBody;
     let buf = "";
-    this.each((chunk) => {
+    const pending = this.each((chunk) => {
       const str = rbObjAsString(chunk) as string | Uint8Array;
       buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
     });
+    if (pending instanceof Promise) {
+      throw new RuntimeError(
+        "streaming ActionDispatch::Response body: await awaitBody before body",
+      );
+    }
     this._strBody = buf;
     return this._strBody;
   }
