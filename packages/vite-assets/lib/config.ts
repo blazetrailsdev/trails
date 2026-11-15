@@ -197,7 +197,7 @@ export class Config {
   }
 
   /** @internal */
-  static configDefaults({
+  private static configDefaults({
     assetHost = null,
     mode = Object.hasOwn(ENV, "RACK_ENV") ? ENV["RACK_ENV"] : "development",
     root = Dir.pwd(),

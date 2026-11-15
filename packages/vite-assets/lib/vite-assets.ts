@@ -217,7 +217,9 @@ export class ViteAssets {
    */
   peekConfig(): Pick<Config, "mode"> {
     return (
-      this._config ?? { mode: String({ ...Config.configDefaults(), ...this._configOptions }.mode) }
+      this._config ?? {
+        mode: String({ ...Config["configDefaults"](), ...this._configOptions }.mode),
+      }
     );
   }
 
