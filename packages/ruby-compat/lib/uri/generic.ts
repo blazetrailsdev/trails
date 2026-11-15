@@ -3,7 +3,17 @@ import { b } from "../string/b.js";
 import { ArgumentError } from "../argument-error.js";
 import { rbEqual } from "../rb-equal.js";
 
-import { BadURIError, DEFAULT_PARSER, InvalidComponentError, InvalidURIError } from "./common.js";
+import {
+  BadURIError,
+  DEFAULT_PARSER,
+  InvalidComponentError,
+  InvalidURIError,
+  URI,
+} from "./common.js";
+import { IPAddr } from "../ipaddr.js";
+import { warn } from "../kernel-warn.js";
+import { env as ENV } from "../process-adapter.js";
+import { IPSocket, SocketError } from "../socket.js";
 import type { RFC2396Parser } from "./rfc2396-parser.js";
 import type { RFC3986Parser } from "./rfc3986-parser.js";
 
@@ -755,6 +765,107 @@ export class Generic {
    *  `merge` mutates in place (`generic.rb:1140`). */
   protected dup(): this {
     return Object.assign(Object.create(Object.getPrototypeOf(this) as object), this) as this;
+  }
+
+  /**
+   * `find_proxy` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1512-1576`). The
+   * `IPSocket.getaddress` lookup is the adapter's resolver, so the method is
+   * awaited.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async findProxy(
+    env: Readonly<Record<string, string | undefined>> = ENV,
+  ): Promise<Generic | null> {
+    if (this.isRelative()) throw new BadURIError(`relative URI: ${this.toString()}`);
+    let name = this.scheme!.toLowerCase() + "_proxy";
+    let proxyUri: string | null | undefined;
+    if (name === "http_proxy" && "REQUEST_METHOD" in env) {
+      const pairs = Object.entries(env).filter(([k]) => /^http_proxy$/i.test(k));
+      switch (pairs.length) {
+        case 0:
+          proxyUri = null;
+          break;
+        case 1: {
+          const [k] = pairs.shift()!;
+          if (k === "http_proxy" && env[k.toUpperCase()] == null) {
+            proxyUri = env[name];
+          } else {
+            proxyUri = null;
+          }
+          break;
+        }
+        default:
+          proxyUri = env[name];
+      }
+      if (!proxyUri) {
+        proxyUri = env[`CGI_${name.toUpperCase()}`];
+      }
+    } else if (name === "http_proxy") {
+      if (!(proxyUri = env[name])) {
+        if ((proxyUri = env[name.toUpperCase()])) {
+          warn("The environment variable HTTP_PROXY is discouraged.  Use http_proxy.", {
+            uplevel: 1,
+          });
+        }
+      }
+    } else {
+      proxyUri = env[name] || env[name.toUpperCase()];
+    }
+
+    if (proxyUri == null || proxyUri.length === 0) {
+      return null;
+    }
+
+    let addr: string | null = null;
+    if (this.hostname) {
+      try {
+        addr = await IPSocket.getaddress(this.hostname);
+        if (/^127\.|^::1$/.test(addr)) return null;
+      } catch (e) {
+        if (!(e instanceof SocketError)) throw e;
+      }
+    }
+
+    name = "no_proxy";
+    let noProxy: string | undefined;
+    if ((noProxy = env[name] || env[name.toUpperCase()])) {
+      if (!Generic.isUseProxy(this.hostname!, addr, this.port, noProxy)) return null;
+    }
+    return URI.parse(proxyUri);
+  }
+
+  /**
+   * `self.use_proxy?` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1578-1597`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static isUseProxy(
+    hostname: string,
+    addr: string | null,
+    port: number | null,
+    noProxy: string,
+  ): boolean {
+    hostname = hostname.toLowerCase();
+    const dothostname = `.${hostname}`;
+    for (const [, pHost, pPort] of noProxy.matchAll(/([^:,\s]+)(?::(\d+))?/g)) {
+      if (pPort === undefined || port === parseInt(pPort, 10)) {
+        if (pHost.startsWith(".")) {
+          if (hostname.endsWith(pHost.toLowerCase())) return false;
+        } else {
+          if (dothostname.endsWith(`.${pHost.toLowerCase()}`)) return false;
+        }
+        if (addr) {
+          try {
+            if (new IPAddr(pHost).includes(addr)) return false;
+          } catch (e) {
+            if (e instanceof IPAddr.InvalidAddressError) continue;
+            throw e;
+          }
+        }
+      }
+    }
+    return true;
   }
 
   /** `to_s` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:1355`). */

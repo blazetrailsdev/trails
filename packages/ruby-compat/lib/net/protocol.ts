@@ -10,6 +10,7 @@ import type { HttpClientSocket, HttpDebugOutput } from "../http-adapter.js";
 import type { HTTP, HTTPBadResponse, HTTPHeaderSyntaxError } from "./http.js";
 import type { HTTPResponse } from "./http/response.js";
 import type * as Responses from "./http/responses.js";
+import type * as Exceptions from "./http/exceptions.js";
 import type { Post } from "./http/requests.js";
 
 /**
@@ -342,6 +343,34 @@ export class BufferedIO {
 export class ProtocolError extends StandardError {}
 ProtocolError.prototype.name = "Net::ProtocolError";
 
+/** @noRailsEquivalent PERMANENT — `Net::ProtoSyntaxError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:61`). */
+export class ProtoSyntaxError extends ProtocolError {}
+ProtoSyntaxError.prototype.name = "Net::ProtoSyntaxError";
+
+/** @noRailsEquivalent PERMANENT — `Net::ProtoFatalError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:62`). */
+export class ProtoFatalError extends ProtocolError {}
+ProtoFatalError.prototype.name = "Net::ProtoFatalError";
+
+/** @noRailsEquivalent PERMANENT — `Net::ProtoUnknownError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:63`). */
+export class ProtoUnknownError extends ProtocolError {}
+ProtoUnknownError.prototype.name = "Net::ProtoUnknownError";
+
+/** @noRailsEquivalent PERMANENT — `Net::ProtoServerError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:64`). */
+export class ProtoServerError extends ProtocolError {}
+ProtoServerError.prototype.name = "Net::ProtoServerError";
+
+/** @noRailsEquivalent PERMANENT — `Net::ProtoAuthError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:65`). */
+export class ProtoAuthError extends ProtocolError {}
+ProtoAuthError.prototype.name = "Net::ProtoAuthError";
+
+/** @noRailsEquivalent PERMANENT — `Net::ProtoCommandError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:66`). */
+export class ProtoCommandError extends ProtocolError {}
+ProtoCommandError.prototype.name = "Net::ProtoCommandError";
+
+/** @noRailsEquivalent PERMANENT — `Net::ProtoRetriableError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:67`). */
+export class ProtoRetriableError extends ProtocolError {}
+ProtoRetriableError.prototype.name = "Net::ProtoRetriableError";
+
 /**
  * Ruby's `Net` module (`vendor/ruby/v3.3.11/lib/net/protocol.rb:26`), each
  * constant seated by the file that defines it.
@@ -356,9 +385,30 @@ export const Net = {
   ReadAdapter,
   BufferedIO,
   ProtocolError,
+  ProtoSyntaxError,
+  ProtoFatalError,
+  ProtoUnknownError,
+  ProtoServerError,
+  ProtoAuthError,
+  ProtoCommandError,
+  ProtoRetriableError,
 } as {
   /** @noRailsEquivalent PERMANENT */
   ProtocolError: typeof ProtocolError;
+  /** @noRailsEquivalent PERMANENT */
+  ProtoSyntaxError: typeof ProtoSyntaxError;
+  /** @noRailsEquivalent PERMANENT */
+  ProtoFatalError: typeof ProtoFatalError;
+  /** @noRailsEquivalent PERMANENT */
+  ProtoUnknownError: typeof ProtoUnknownError;
+  /** @noRailsEquivalent PERMANENT */
+  ProtoServerError: typeof ProtoServerError;
+  /** @noRailsEquivalent PERMANENT */
+  ProtoAuthError: typeof ProtoAuthError;
+  /** @noRailsEquivalent PERMANENT */
+  ProtoCommandError: typeof ProtoCommandError;
+  /** @noRailsEquivalent PERMANENT */
+  ProtoRetriableError: typeof ProtoRetriableError;
   /** @noRailsEquivalent PERMANENT */
   name: string;
   /** @noRailsEquivalent PERMANENT */
@@ -379,5 +429,6 @@ export const Net = {
   HTTPResponse: typeof HTTPResponse;
   /** @noRailsEquivalent PERMANENT */
   HTTPHeaderSyntaxError: typeof HTTPHeaderSyntaxError;
-} & typeof Responses;
+} & typeof Responses &
+  typeof Exceptions;
 constSet(TopLevel, "Net", Net);

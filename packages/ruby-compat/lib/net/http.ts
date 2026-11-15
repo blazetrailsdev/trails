@@ -11,7 +11,10 @@ import { Resolv } from "../resolv.js";
 import { Socket } from "../socket.js";
 import { Timeout } from "../timeout.js";
 import { kernelCatch } from "../kernel-catch.js";
-import type { HTTP as URIHTTP } from "../uri/http.js";
+import { HTTP as URIHTTP } from "../uri/http.js";
+import { Generic as URIGeneric } from "../uri/generic.js";
+import { CGI } from "../cgi.js";
+import { Base64 } from "../base64.js";
 import { BufferedIO, Net, OpenTimeout, ReadTimeout } from "./protocol.js";
 import type { HTTPRequest } from "./http/request.js";
 import {
@@ -144,22 +147,133 @@ export class HTTP {
   /** @noRailsEquivalent PERMANENT */
   ignoreEof = true;
   private _continueTimeout: number | null = null;
-  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_address` (`vendor/ruby/v3.3.11/lib/net/http.rb:1241`). */
-  proxyAddress: string | null = null;
-  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_port` (`vendor/ruby/v3.3.11/lib/net/http.rb:1245`). */
-  proxyPort: number | null = null;
-  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_user` (`vendor/ruby/v3.3.11/lib/net/http.rb:1249`). */
-  proxyUser: string | null = null;
-  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_pass` (`vendor/ruby/v3.3.11/lib/net/http.rb:1253`). */
-  proxyPass: string | null = null;
+  private _proxyFromEnv = false;
+  private _proxyUri: URIGeneric | false | null = null;
+  private _proxyAddress: string | null = null;
+  private _proxyPort: number | null = null;
+  private _proxyUser: string | null = null;
+  private _proxyPass: string | null = null;
   private _useSsl = false;
   private _started = false;
   private _socket: BufferedIO | null = null;
 
   /** @noRailsEquivalent PERMANENT */
-  constructor(address: string, port: number | null = null) {
+  static _isProxyClass = false;
+  /** @noRailsEquivalent PERMANENT */
+  static _proxyFromEnv = false;
+  /** @noRailsEquivalent PERMANENT */
+  static proxyAddress: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  static proxyPort: number | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  static proxyUser: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  static proxyPass: string | null = null;
+
+  /**
+   * `HTTP.Proxy` (`vendor/ruby/v3.3.11/lib/net/http.rb:1736-1757`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static Proxy(
+    pAddr: string | null = ":ENV",
+    pPort: number | null = null,
+    pUser: string | null = null,
+    pPass: string | null = null,
+  ): typeof HTTP {
+    if (!pAddr) return this;
+
+    return class extends this {
+      static {
+        this._isProxyClass = true;
+
+        if (pAddr === ":ENV") {
+          this._proxyFromEnv = true;
+          this.proxyAddress = null;
+          this.proxyPort = null;
+        } else {
+          this._proxyFromEnv = false;
+          this.proxyAddress = pAddr;
+          this.proxyPort = pPort || this.defaultPort();
+        }
+
+        this.proxyUser = pUser;
+        this.proxyPass = pPass;
+      }
+    };
+  }
+
+  /**
+   * `HTTP.proxy_class?` (`vendor/ruby/v3.3.11/lib/net/http.rb:1761-1763`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static isProxyClass(): boolean {
+    return Object.hasOwn(this, "_isProxyClass") ? this._isProxyClass : false;
+  }
+
+  /**
+   * `HTTP.new` (`vendor/ruby/v3.3.11/lib/net/http.rb:1065-1088`) and
+   * `#initialize` (`:1093-1131`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  constructor(
+    address: string,
+    port: number | null = null,
+    pAddr: string | null = ":ENV",
+    pPort: number | null = null,
+    pUser: string | null = null,
+    pPass: string | null = null,
+    pNoProxy: string | null = null,
+  ) {
     this.address = address;
     this.port = port ?? HTTP.defaultPort();
+
+    const klass = new.target;
+    if (klass.isProxyClass()) {
+      this.proxyFromEnv = klass._proxyFromEnv;
+      this.setProxyAddress(klass.proxyAddress);
+      this.setProxyPort(klass.proxyPort);
+      this.setProxyUser(klass.proxyUser);
+      this.setProxyPass(klass.proxyPass);
+    } else if (pAddr === ":ENV") {
+      this.proxyFromEnv = true;
+    } else {
+      if (pAddr && pNoProxy && !URIGeneric.isUseProxy(address, address, port, pNoProxy)) {
+        pAddr = null;
+        pPort = null;
+      }
+      this.setProxyAddress(pAddr);
+      this.setProxyPort(pPort || HTTP.defaultPort());
+      this.setProxyUser(pUser);
+      this.setProxyPass(pPass);
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_from_env` (`vendor/ruby/v3.3.11/lib/net/http.rb:1237`). */
+  set proxyFromEnv(value: boolean) {
+    this._proxyFromEnv = value;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_address` (`vendor/ruby/v3.3.11/lib/net/http.rb:1241`). */
+  setProxyAddress(value: string | null): void {
+    this._proxyAddress = value;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_port` (`vendor/ruby/v3.3.11/lib/net/http.rb:1245`). */
+  setProxyPort(value: number | null): void {
+    this._proxyPort = value;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_user` (`vendor/ruby/v3.3.11/lib/net/http.rb:1249`). */
+  setProxyUser(value: string | null): void {
+    this._proxyUser = value;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_pass` (`vendor/ruby/v3.3.11/lib/net/http.rb:1253`). */
+  setProxyPass(value: string | null): void {
+    this._proxyPass = value;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -196,13 +310,74 @@ export class HTTP {
   }
 
   /**
-   * `vendor/ruby/v3.3.11/lib/net/http.rb:1785-1787`.
+   * `proxy?` (`vendor/ruby/v3.3.11/lib/net/http.rb:1785-1787`), awaited because
+   * `proxy_uri`'s `find_proxy` resolves the address.
    *
-   * @missingRailsCall proxy_uri — CONVERGEABLE net-http-proxy-from-env-and-connect
    * @noRailsEquivalent PERMANENT
    */
-  isProxy(): boolean {
-    return !!this.proxyAddress;
+  async isProxy(): Promise<boolean> {
+    return !!(this._proxyFromEnv ? await this.proxyUri() : this._proxyAddress);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1792-1794`. */
+  isProxyFromEnv(): boolean {
+    return this._proxyFromEnv;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1797-1803`. */
+  async proxyUri(): Promise<URIGeneric | null> {
+    if (this._proxyUri === false) return null;
+    this._proxyUri ||=
+      (await new URIHTTP(
+        "http",
+        null,
+        this.address,
+        this.port,
+        null,
+        null,
+        null,
+        null,
+        null,
+      ).findProxy()) || false;
+    return this._proxyUri || null;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1807-1813`. */
+  async proxyAddress(): Promise<string | null> {
+    if (this._proxyFromEnv) {
+      return (await this.proxyUri())?.hostname ?? null;
+    } else {
+      return this._proxyAddress;
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1817-1823`. */
+  async proxyPort(): Promise<number | null> {
+    if (this._proxyFromEnv) {
+      return (await this.proxyUri())?.port ?? null;
+    } else {
+      return this._proxyPort;
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1827-1834`. */
+  async proxyUser(): Promise<string | null> {
+    if (this._proxyFromEnv) {
+      const user = (await this.proxyUri())?.user;
+      return user ? CGI.unescape(user) : null;
+    } else {
+      return this._proxyUser;
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1838-1845`. */
+  async proxyPass(): Promise<string | null> {
+    if (this._proxyFromEnv) {
+      const pass = (await this.proxyUri())?.password;
+      return pass ? CGI.unescape(pass) : null;
+    } else {
+      return this._proxyPass;
+    }
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1188-1191`. */
@@ -268,8 +443,15 @@ export class HTTP {
 
   /** @noRailsEquivalent PERMANENT */
   async connect(): Promise<void> {
-    const connAddr = this.address;
-    const connPort = this.port;
+    let connAddr: string;
+    let connPort: number;
+    if (await this.isProxy()) {
+      connAddr = (await this.proxyAddress())!;
+      connPort = (await this.proxyPort())!;
+    } else {
+      connAddr = this.address;
+      connPort = this.port;
+    }
 
     let sslHostAddress: string | null = null;
     if (!(Resolv.IPv4.Regex.test(connAddr) || Resolv.IPv6.Regex.test(connAddr))) {
@@ -294,6 +476,25 @@ export class HTTP {
       });
       this.debug("opened");
       if (this.isUseSsl()) {
+        if (await this.isProxy()) {
+          const plainSock = new BufferedIO(s, {
+            readTimeout: this._readTimeout,
+            writeTimeout: this._writeTimeout,
+            continueTimeout: this._continueTimeout,
+            debugOutput: this._debugOutput,
+          });
+          let buf =
+            `CONNECT ${this.address}:${this.port} HTTP/${HTTP.HTTPVersion}\r\n` +
+            `Host: ${this.address}:${this.port}\r\n`;
+          const proxyUser = await this.proxyUser();
+          if (proxyUser) {
+            const credential = Base64.strictEncode64(`${proxyUser}:${await this.proxyPass()}`);
+            buf += `Proxy-Authorization: Basic ${credential}\r\n`;
+          }
+          buf += "\r\n";
+          await plainSock.write(buf);
+          (await HTTPResponse.readNew(plainSock)).value();
+        }
         this.debug(`starting SSL for ${connAddr}:${connPort}...`);
         await this.sslSocketConnect(s, this.openTimeout, {
           sslHostAddress,
@@ -449,7 +650,7 @@ export class HTTP {
           await this.beginTransport(req);
           res = (await kernelCatch("response", async () => {
             try {
-              await req.exec(this._socket!, this._currHttpVersion, this.editPath(req.path));
+              await req.exec(this._socket!, this._currHttpVersion, await this.editPath(req.path));
             } catch (e) {
               if (!(e instanceof Errno.EPIPE)) throw e;
             }
@@ -555,8 +756,8 @@ export class HTTP {
   }
 
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1869-1879`. */
-  private editPath(path: string): string {
-    if (this.isProxy()) {
+  private async editPath(path: string): Promise<string> {
+    if (await this.isProxy()) {
       if (path.startsWith("ftp://") || this.isUseSsl()) {
         return path;
       } else {

@@ -1,40 +1,58 @@
 import { Net } from "../protocol.js";
 import { HTTPResponse } from "./response.js";
+import {
+  HTTPClientException,
+  HTTPError,
+  HTTPFatalError,
+  HTTPRetriableError,
+} from "./exceptions.js";
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/responses.rb:7` */
 export class HTTPUnknownResponse extends HTTPResponse {
   /** @noRailsEquivalent PERMANENT */
   static override readonly HAS_BODY: boolean = true;
+  /** @noRailsEquivalent PERMANENT */
+  static override readonly EXCEPTION_TYPE = HTTPError;
 }
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/responses.rb:21` */
 export class HTTPInformation extends HTTPResponse {
   /** @noRailsEquivalent PERMANENT */
   static override readonly HAS_BODY: boolean = false;
+  /** @noRailsEquivalent PERMANENT */
+  static override readonly EXCEPTION_TYPE = HTTPError;
 }
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/responses.rb:36` */
 export class HTTPSuccess extends HTTPResponse {
   /** @noRailsEquivalent PERMANENT */
   static override readonly HAS_BODY: boolean = true;
+  /** @noRailsEquivalent PERMANENT */
+  static override readonly EXCEPTION_TYPE = HTTPError;
 }
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/responses.rb:51` */
 export class HTTPRedirection extends HTTPResponse {
   /** @noRailsEquivalent PERMANENT */
   static override readonly HAS_BODY: boolean = true;
+  /** @noRailsEquivalent PERMANENT */
+  static override readonly EXCEPTION_TYPE = HTTPRetriableError;
 }
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/responses.rb:65` */
 export class HTTPClientError extends HTTPResponse {
   /** @noRailsEquivalent PERMANENT */
   static override readonly HAS_BODY: boolean = true;
+  /** @noRailsEquivalent PERMANENT */
+  static override readonly EXCEPTION_TYPE = HTTPClientException;
 }
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/responses.rb:79` */
 export class HTTPServerError extends HTTPResponse {
   /** @noRailsEquivalent PERMANENT */
   static override readonly HAS_BODY: boolean = true;
+  /** @noRailsEquivalent PERMANENT */
+  static override readonly EXCEPTION_TYPE = HTTPFatalError;
 }
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/responses.rb:96` */
@@ -534,3 +552,7 @@ Net.HTTPInsufficientStorage = HTTPInsufficientStorage;
 Net.HTTPLoopDetected = HTTPLoopDetected;
 Net.HTTPNotExtended = HTTPNotExtended;
 Net.HTTPNetworkAuthenticationRequired = HTTPNetworkAuthenticationRequired;
+Net.HTTPError = HTTPError;
+Net.HTTPRetriableError = HTTPRetriableError;
+Net.HTTPClientException = HTTPClientException;
+Net.HTTPFatalError = HTTPFatalError;

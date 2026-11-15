@@ -1,4 +1,4 @@
-import type { HttpSocket } from "./http-adapter.js";
+import { getHttpAsync, type HttpSocket } from "./http-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { StandardError } from "./standard-error.js";
 import { EOFError } from "./eof-error.js";
@@ -360,12 +360,41 @@ class ResolutionError extends SocketError {}
 ResolutionError.prototype.name = "Socket::ResolutionError";
 
 /**
+ * Ruby's `IPSocket` (`vendor/ruby/v3.3.11/ext/socket/ipsocket.c:393`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class IPSocket extends BasicSocket {
+  /**
+   * `IPSocket.getaddress` (`vendor/ruby/v3.3.11/ext/socket/ipsocket.c:372-381`),
+   * over the HTTP adapter's resolver.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static async getaddress(host: string): Promise<string> {
+    const adapter = await getHttpAsync();
+    if (adapter.getaddress === undefined) {
+      throw new NotImplementedError("the HTTP adapter has no resolver");
+    }
+    try {
+      return await adapter.getaddress(host);
+    } catch (e) {
+      const code = (e as { code?: unknown }).code;
+      if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_NONAME") {
+        throw new ResolutionError("getaddrinfo: Name or service not known");
+      }
+      throw e;
+    }
+  }
+}
+
+/**
  * Ruby's `TCPSocket` (`vendor/ruby/v3.3.11/ext/socket/tcpsocket.c:108`), the
  * `BasicSocket` a Ruby server hands a `rack.hijack` caller.
  *
  * @noRailsEquivalent PERMANENT
  */
-export class TCPSocket extends BasicSocket {}
+export class TCPSocket extends IPSocket {}
 
 /**
  * @noRailsEquivalent PERMANENT — Ruby core `Socket`
