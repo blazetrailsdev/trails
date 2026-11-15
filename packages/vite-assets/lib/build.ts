@@ -119,7 +119,7 @@ export class Build {
   }
 
   async writeToCache(): Promise<void> {
-    await this.lastBuildPath!.write(JSON.stringify(this, null, 2));
+    await this.lastBuildPath!.write(JSON.stringify(this.toJSON(), null, 2));
   }
 
   toJSON(..._args: unknown[]): Record<string, unknown> {
