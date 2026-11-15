@@ -1,4 +1,12 @@
-import { fetch, Hash, rbCallSuper, rbModName, rbObjId, slice } from "@blazetrails/ruby-compat";
+import {
+  block as rbBlock,
+  fetch,
+  Hash,
+  rbCallSuper,
+  rbModName,
+  rbObjId,
+  slice,
+} from "@blazetrails/ruby-compat";
 import { underscore } from "../../inflector.js";
 import { extractOptionsBang } from "../../hash-utils.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
