@@ -18,6 +18,9 @@ import {
   liveRows,
   loadLedgered,
   saveLedgerFile,
+  ledgerScope,
+  skipLedgered,
+  summaryLine,
   seedDiff,
 } from "./bump-ledger.js";
 
@@ -219,5 +222,136 @@ describe("bumpOf", () => {
     expect(bumpOf("rails", lock("v8.0.2"), lock("v8.0.5.2"), lock("v8.1.4"))).toEqual({
       kind: "rebase",
     });
+  });
+});
+
+describe("ledgerScope", () => {
+  const rows: LedgerRow[] = [
+    {
+      package: "activerecord",
+      rubyFile: "core.rb",
+      rubyName: "inspect",
+      kind: "drift",
+      from: "v8.0.2",
+      to: "v8.0.5.2",
+    },
+    {
+      package: "activerecord",
+      rubyFile: "gone.rb",
+      rubyName: "gone",
+      kind: "removed",
+      from: "v8.0.2",
+      to: "v8.0.5.2",
+    },
+  ];
+  const hashes: BodyHashRecord[] = [
+    {
+      package: "activerecord",
+      rubyFile: "core.rb",
+      rubyName: "inspect",
+      tsFile: "core.ts",
+      tsName: "inspect",
+      digest: "b",
+    },
+    {
+      package: "activerecord",
+      rubyFile: "core.rb",
+      rubyName: "hash",
+      tsFile: "core.ts",
+      tsName: "hash",
+      digest: "c",
+    },
+  ];
+  const scope = ledgerScope(rows, hashes);
+
+  it("lint-call-mismatches: skips a call row on a drifted pair, counts its neighbour", () => {
+    const calls = [
+      {
+        package: "activerecord",
+        tsFile: "core.ts",
+        rubyName: "inspect",
+        call: "inspection_filter",
+      },
+      { package: "activerecord", tsFile: "core.ts", rubyName: "hash", call: "id" },
+    ];
+    const { counted, skipped } = skipLedgered(calls, scope.ts);
+    expect(skipped.map((r) => r.rubyName)).toEqual(["inspect"]);
+    expect(counted.map((r) => r.rubyName)).toEqual(["hash"]);
+  });
+
+  it("lint-call-mismatches: skips a stale baseline row on a removed pair", () => {
+    const stale = { package: "activerecord", tsFile: "gone.ts", rubyName: "gone", call: "x" };
+    expect(scope.ts(stale)).toBe(true);
+    expect(scope.ts({ ...stale, rubyName: "kept" })).toBe(false);
+    expect(scope.ts({ ...stale, tsFile: "other.ts" })).toBe(false);
+  });
+
+  it("lint-call-args: reads a mismatch by its Ruby file", () => {
+    const shape = { package: "activerecord", rubyFile: "core.rb", rubyName: "inspect" };
+    expect(scope.pair(shape)).toBe(true);
+    expect(scope.pair({ ...shape, rubyName: "hash" })).toBe(false);
+  });
+
+  it("lint-ruby-compat-calls: skips a rubyCompat row on a drifted pair only", () => {
+    const rows = [
+      {
+        package: "activerecord",
+        tsFile: "core.ts",
+        rubyName: "inspect",
+        call: "dup",
+        kind: "rubyCompat",
+      },
+      {
+        package: "activerecord",
+        tsFile: "core.ts",
+        rubyName: "hash",
+        call: "dup",
+        kind: "rubyCompat",
+      },
+    ];
+    expect(skipLedgered(rows, scope.ts).counted).toHaveLength(1);
+  });
+
+  it("receipt-audit: skips a tag on a drifted pair by its TS name", () => {
+    const tags = [
+      { package: "activerecord", tsFile: "core.ts", tsName: "inspect", call: "x" },
+      { package: "activerecord", tsFile: "core.ts", tsName: "hash", call: "x" },
+    ];
+    const { counted, skipped } = skipLedgered(tags, scope.tsName);
+    expect([counted.length, skipped.length]).toEqual([1, 1]);
+  });
+
+  it("receipt-audit: skips an uncompared tag on a removed pair", () => {
+    const tag = { package: "activerecord", tsFile: "gone.ts", tsName: "gone", call: "x" };
+    expect(scope.tsName(tag)).toBe(true);
+    expect(scope.tsName({ ...tag, tsName: "kept" })).toBe(false);
+    expect(scope.tsName({ ...tag, tsFile: "other.ts" })).toBe(false);
+  });
+
+  it("an empty ledger skips nothing", () => {
+    expect(
+      ledgerScope([], hashes).ts({
+        package: "activerecord",
+        tsFile: "core.ts",
+        rubyName: "inspect",
+      }),
+    ).toBe(false);
+  });
+});
+
+describe("summaryLine", () => {
+  it("tallies rows by package and kind, or says none", () => {
+    expect(summaryLine("rack", [])).toBe("bump-ledger rows: rack none");
+    const row: LedgerRow = {
+      package: "arel",
+      rubyFile: "a.rb",
+      rubyName: "x",
+      kind: "drift",
+      from: "a",
+      to: "b",
+    };
+    expect(summaryLine("rails", [row, { ...row, rubyName: "y" }])).toBe(
+      "bump-ledger rows: rails arel:drift=2",
+    );
   });
 });

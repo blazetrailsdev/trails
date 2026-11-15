@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "method": "manual",
+  "date": "2026-10-13",
+  "source": "rails",
+  "from": {
+    "ref": "v8.0.2",
+    "sha": null
+  },
+  "to": {
+    "ref": "v8.1.4",
+    "sha": "c3466ea00d7121798e3aa3144ffdf7174b81d8cb"
+  },
+  "trailsCommit": null,
+  "packages": [
+    {
+      "package": "all",
+      "filesChanged": 635,
+      "linesAdded": 12906,
+      "linesRemoved": 4728,
+      "pinsDrift": 728,
+      "pinsStale": 125,
+      "rubyFiles": 288,
+      "unpinnedChanged": 77,
+      "methodsAfter": "8780/9059",
+      "testsAdded": 1239,
+      "testsRemoved": 115,
+      "testsChanged": 236,
+      "testsMoved": 187
+    }
+  ],
+  "gates": [
+    {
+      "gate": "Call-mismatches ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "summary": "107 new call rows",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Call-argument ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "summary": "76 new argument rows",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Receipt audit",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "summary": "5 receipts",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Ruby-compat call ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "summary": "2 rows",
+      "ledgeredSummary": null
+    },
+    {
+      "gate": "Extra-surface ratchet",
+      "active": "green",
+      "candidate": "red",
+      "ledgered": null,
+      "summary": "activerecord novel 0 \u2192 22, total 0 \u2192 71; arel total 0 \u2192 2",
+      "ledgeredSummary": null
+    }
+  ],
+  "seed": [
+    {
+      "package": "actioncontroller",
+      "kind": "drift",
+      "rows": 29
+    },
+    {
+      "package": "actioncontroller",
+      "kind": "removed",
+      "rows": 1
+    },
+    {
+      "package": "actiondispatch",
+      "kind": "drift",
+      "rows": 95
+    },
+    {
+      "package": "actiondispatch",
+      "kind": "removed",
+      "rows": 18
+    },
+    {
+      "package": "actionview",
+      "kind": "drift",
+      "rows": 17
+    },
+    {
+      "package": "activemodel",
+      "kind": "drift",
+      "rows": 19
+    },
+    {
+      "package": "activemodel",
+      "kind": "removed",
+      "rows": 2
+    },
+    {
+      "package": "activerecord",
+      "kind": "drift",
+      "rows": 388
+    },
+    {
+      "package": "activerecord",
+      "kind": "removed",
+      "rows": 65
+    },
+    {
+      "package": "activerecord-test-support",
+      "kind": "drift",
+      "rows": 4
+    },
+    {
+      "package": "activesupport",
+      "kind": "drift",
+      "rows": 104
+    },
+    {
+      "package": "activesupport",
+      "kind": "removed",
+      "rows": 28
+    },
+    {
+      "package": "arel",
+      "kind": "drift",
+      "rows": 42
+    },
+    {
+      "package": "arel",
+      "kind": "removed",
+      "rows": 3
+    },
+    {
+      "package": "trailties",
+      "kind": "drift",
+      "rows": 30
+    },
+    {
+      "package": "trailties",
+      "kind": "removed",
+      "rows": 8
+    },
+    {
+      "package": "all",
+      "kind": "changed",
+      "rows": 236
+    },
+    {
+      "package": "all",
+      "kind": "moved",
+      "rows": 187
+    }
+  ]
+}

@@ -14,6 +14,7 @@ import * as path from "path";
 import { SOURCES } from "../../vendor/sources.js";
 import { serializeBaseline } from "./baseline-json.js";
 import { ROOT_DIR } from "./config.js";
+import { rubyFileToTs, rubyMethodToTs } from "../parity/conventions.js";
 import { type BodyPin, type PinKey, comparePinKeys, currentDigests, keyOf } from "./body-pins.js";
 
 export const LEDGER_DIR = path.join(ROOT_DIR, "scripts/parity/bump-ledger");
@@ -254,4 +255,109 @@ export function bumpOf(
   const from = baseLock.sources[source]?.ref;
   const to = headLock.sources[source]?.ref;
   return from === undefined || to === undefined ? { kind: "none" } : { kind: "bump", from, to };
+}
+
+/** A ratchet row's TS-side identity: the call gates key on (package, tsFile, rubyName). */
+export interface TsPairKey {
+  package: string;
+  tsFile: string;
+  rubyName: string;
+}
+
+/**
+ * Which gate rows sit on a ledgered pair (RFC 0191 § 3, rule 3). `pair` reads a
+ * row that carries its Ruby file; `ts` and `tsName` map a TS-side row through
+ * the body-hashes records. A removed pair has no record, so a TS-side row with
+ * no record of its own is ledgered when it sits in a TS file the removed
+ * row's Ruby file maps to (`rubyFileToTs`, or any file a surviving pair of
+ * that Ruby file is recorded in) and names the removed method, by its Ruby
+ * name or a `rubyMethodToTs` spelling.
+ */
+export interface LedgerScope {
+  pair(k: PinKey): boolean;
+  ts(k: TsPairKey): boolean;
+  tsName(k: { package: string; tsFile: string; tsName: string }): boolean;
+}
+
+export function ledgerScope(
+  rows: readonly LedgerRow[],
+  hashes: readonly {
+    package: string;
+    rubyFile: string;
+    rubyName: string;
+    tsFile: string;
+    tsName: string;
+  }[],
+): LedgerScope {
+  const ledgered = new Set(rows.map(keyOf));
+  const filesOf = new Map<string, Set<string>>();
+  for (const h of hashes) {
+    const f = `${h.package} ${h.rubyFile}`;
+    filesOf.set(f, (filesOf.get(f) ?? new Set()).add(h.tsFile));
+  }
+  const removed = new Set<string>();
+  const removedTsNames = new Set<string>();
+  for (const r of rows.filter((x) => x.kind === "removed")) {
+    const tsFiles = new Set(filesOf.get(`${r.package} ${r.rubyFile}`));
+    tsFiles.add(rubyFileToTs(r.rubyFile, r.package));
+    for (const tsFile of tsFiles) {
+      removed.add(`${r.package} ${tsFile} ${r.rubyName}`);
+      for (const n of rubyMethodToTs(r.rubyName, undefined, r.package) ?? [])
+        removedTsNames.add(`${r.package} ${tsFile} ${n}`);
+    }
+  }
+  const byTs = new Map<string, boolean>();
+  const byTsName = new Map<string, boolean>();
+  for (const h of hashes) {
+    const hit = ledgered.has(keyOf(h));
+    const t = `${h.package} ${h.tsFile} ${h.rubyName}`;
+    const n = `${h.package} ${h.tsFile} ${h.tsName}`;
+    byTs.set(t, (byTs.get(t) ?? false) || hit);
+    byTsName.set(n, (byTsName.get(n) ?? false) || hit);
+  }
+  return {
+    pair: (k) => ledgered.has(keyOf(k)),
+    ts: (k) =>
+      byTs.get(`${k.package} ${k.tsFile} ${k.rubyName}`) ??
+      removed.has(`${k.package} ${k.tsFile} ${k.rubyName}`),
+    tsName: (k) =>
+      byTsName.get(`${k.package} ${k.tsFile} ${k.tsName}`) ??
+      removedTsNames.has(`${k.package} ${k.tsFile} ${k.tsName}`),
+  };
+}
+
+/** The scope over every committed ledger; with none, nothing is ledgered and no artifact is read. */
+export async function loadLedgerScope(dir = LEDGER_DIR): Promise<LedgerScope> {
+  const rows = [...(await loadLedgers(dir)).values()].flat();
+  if (rows.length === 0) return ledgerScope([], []);
+  const { loadArtifact } = await import("./body-pins.js");
+  return ledgerScope(rows, (await loadArtifact()).hashes);
+}
+
+/** Split `rows` into the ones a gate counts and the ones it skips for the ledger. */
+export function skipLedgered<T>(
+  rows: readonly T[],
+  isLedgered: (row: T) => boolean,
+): { counted: T[]; skipped: T[] } {
+  return {
+    counted: rows.filter((r) => !isLedgered(r)),
+    skipped: rows.filter((r) => isLedgered(r)),
+  };
+}
+
+export function renderSkipped(gate: string, skipped: number): string {
+  return `${gate}: skipped ${skipped} row(s) on a bump-ledgered pair`;
+}
+
+/**
+ * The line `lint-bump-ledger.ts` prints per source on every run, which
+ * `scripts/sync-stats/parse-bump-history.ts` reads into `bump_ledger_stats`:
+ * `bump-ledger rows: <source> <package>:<kind>=<n> ...`, or `none`.
+ */
+export function summaryLine(source: string, rows: readonly LedgerRow[]): string {
+  const tally = new Map<string, number>();
+  for (const r of rows)
+    tally.set(`${r.package}:${r.kind}`, (tally.get(`${r.package}:${r.kind}`) ?? 0) + 1);
+  const cells = [...tally].sort(([a], [b]) => (a < b ? -1 : 1)).map(([k, n]) => `${k}=${n}`);
+  return `bump-ledger rows: ${source} ${cells.length === 0 ? "none" : cells.join(" ")}`;
 }

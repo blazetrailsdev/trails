@@ -17,7 +17,10 @@
  * 4. Restore the active outputs and every tracked file from HEAD, rebuild, and
  *    refuse a run that left any tracked file changed. The run needs a clean
  *    tracked tree to start.
- * 5. Write the ledger seed, the attribution of every new gate row and RFC
+ *    The candidate is then re-run through `LEDGERED_STEPS` with the seed
+ *    written as the source's ledger, as the flip PR will carry it.
+ * 5. Write the versioned JSON report to scripts/parity/bump-ledger/reports/
+ *    for the flip PR to commit (`report.ts`), the ledger seed, the attribution of every new gate row and RFC
  *    § 2's tables to scripts/parity/output/bump-dry-run/<source>@<ref>/.
  *
  * `vendor/` and `scripts/api-compare` resolve as CommonJS while
@@ -48,7 +51,14 @@ import {
   type Pin,
   type RubyTestManifest,
 } from "./ledger.js";
-import { NOT_EXERCISED, STEPS, TSX, parseArgs } from "./steps.js";
+import {
+  REPORTS_DIR,
+  REPORT_VERSION,
+  reportFileName,
+  seedCounts,
+  type BumpReport,
+} from "./report.js";
+import { LEDGERED_STEPS, NOT_EXERCISED, STEPS, TSX, parseArgs } from "./steps.js";
 
 const { fetchCandidate } = await import("../../../vendor/fetch.js");
 const { SOURCES, testPathsManifest, vendoredRoot } = await import("../../../vendor/sources.js");
@@ -118,9 +128,14 @@ function summarize(out: string): string {
   return (counted.length > 0 ? counted.slice(0, 4) : lines.slice(-2)).join(" / ").slice(0, 400);
 }
 
-async function runSteps(env: Env, label: string): Promise<StepResult[]> {
+async function runSteps(
+  env: Env,
+  label: string,
+  steps = STEPS,
+  missingReport = true,
+): Promise<StepResult[]> {
   const results: StepResult[] = [];
-  for (const step of STEPS) {
+  for (const step of steps) {
     const { code, out } = await sh("pnpm", step.args, env);
     const result: StepResult = {
       name: step.name,
@@ -130,7 +145,7 @@ async function runSteps(env: Env, label: string): Promise<StepResult[]> {
     console.log(`[bump:${label}] ${result.status.padEnd(5)} ${step.name}: ${result.summary}`);
     results.push(result);
   }
-  await sh("pnpm", MISSING_REPORT, env);
+  if (missingReport) await sh("pnpm", MISSING_REPORT, env);
   return results;
 }
 
@@ -263,6 +278,9 @@ async function main(argv: string[], env: Env): Promise<number> {
   await snapshot(path.join(outDir, "active"));
 
   let candidateSteps: StepResult[];
+  let ledgeredSteps: StepResult[];
+  const ledgerFile = path.join(ROOT, "scripts/parity/bump-ledger", `${source.name}.json`);
+  const priorLedger = await fs.readFile(ledgerFile, "utf8").catch(() => null);
   let citationRewrites: string[];
   let restoreBuild: boolean;
   try {
@@ -313,7 +331,25 @@ async function main(argv: string[], env: Env): Promise<number> {
     await must("pnpm", extractTs, { ...childEnv, API_COMPARE_FORCE: "1" });
     candidateSteps = await runSteps(childEnv, "candidate");
     await snapshot(path.join(outDir, "candidate"));
+    const seeded = pairSeed(
+      (await readJson<Pin[]>(path.join(ROOT, "scripts/api-compare/body-pins.json"))).filter((p) =>
+        packages.includes(p.package),
+      ),
+      (await readJson<{ hashes: HashRecord[] }>(path.join(API_OUT, "body-hashes.json"))).hashes,
+      fromRef,
+      ref,
+    );
+    await fs.mkdir(path.dirname(ledgerFile), { recursive: true });
+    await fs.writeFile(ledgerFile, JSON.stringify(seeded, null, 2) + "\n");
+    ledgeredSteps = await runSteps(
+      childEnv,
+      "ledgered",
+      STEPS.filter((s) => LEDGERED_STEPS.has(s.name)),
+      false,
+    );
   } finally {
+    if (priorLedger === null) await fs.rm(ledgerFile, { force: true });
+    else await fs.writeFile(ledgerFile, priorLedger);
     await restore(path.join(outDir, "active"));
     for (const f of await trackedDiff(env)) {
       const { code } = await sh("git", ["checkout", "HEAD", "--", f], env);
@@ -457,6 +493,59 @@ async function main(argv: string[], env: Env): Promise<number> {
     s.predictor === undefined ? "independent of the ref" : predicted[s.predictor],
   ]);
 
+  const ledgeredOf = new Map(ledgeredSteps.map((r) => [r.name, r]));
+  const gates: BumpReport["gates"] = STEPS.map((s, i) => {
+    const l = ledgeredOf.get(s.name);
+    return {
+      gate: s.name,
+      active: activeSteps[i].status,
+      candidate: candidateSteps[i].status,
+      ledgered: l?.status ?? null,
+      summary: candidateSteps[i].summary,
+      ledgeredSummary: l?.summary ?? null,
+    };
+  });
+  const testsOf = new Map(testTable.map((r) => [String(r[0]), r.slice(1).map(Number)]));
+  const revParse = async (cwd: string) =>
+    (await sh("git", ["rev-parse", "HEAD"], env, cwd)).out.trim() || null;
+  const lock = await readJson<{ sources: Record<string, { sha?: string }> }>(
+    path.join(ROOT, "vendor/sources.lock.json"),
+  );
+  const json: BumpReport = {
+    version: REPORT_VERSION,
+    method: "dry-run",
+    date: new Date().toISOString().slice(0, 10),
+    source: source.name,
+    from: { ref: fromRef, sha: lock.sources[source.name]?.sha ?? null },
+    to: { ref, sha: await revParse(candidateRoot) },
+    trailsCommit: await revParse(ROOT),
+    packages: pairTable.map(
+      ([pkg, files, plus, minus, drift, stale, rubyFiles, unpinned, b, a]) => {
+        const t = testsOf.get(String(pkg));
+        return {
+          package: String(pkg),
+          filesChanged: Number(files),
+          linesAdded: Number(plus),
+          linesRemoved: Number(minus),
+          pinsDrift: Number(drift),
+          pinsStale: Number(stale),
+          rubyFiles: Number(rubyFiles),
+          unpinnedChanged: Number(unpinned),
+          methodsBefore: String(b) || null,
+          methodsAfter: String(a) || null,
+          testsBefore: t?.[0] ?? null,
+          testsAfter: t?.[1] ?? null,
+          testsAdded: t?.[2] ?? null,
+          testsRemoved: t?.[3] ?? null,
+          testsChanged: t?.[4] ?? null,
+          testsMoved: t?.[5] ?? null,
+        };
+      },
+    ),
+    gates,
+    seed: seedCounts([...seed, ...testRows]),
+  };
+
   const report = [
     `# Bump dry run: ${source.name} ${fromRef} → ${ref}`,
     "",
@@ -466,12 +555,13 @@ async function main(argv: string[], env: Env): Promise<number> {
     "",
     "## Gates",
     table(
-      ["Step", "Active", "Candidate", "Candidate counts"],
-      STEPS.map((s, i) => [
-        s.name,
-        activeSteps[i].status,
-        candidateSteps[i].status,
-        candidateSteps[i].summary.replaceAll("|", "\\|"),
+      ["Step", "Active", "Candidate", "Candidate, seed ledgered", "Candidate counts"],
+      gates.map((g) => [
+        g.gate,
+        g.active ?? "",
+        g.candidate,
+        g.ledgered ?? "n/a",
+        g.summary.replaceAll("|", "\\|"),
       ]),
     ),
     "",
@@ -512,10 +602,21 @@ async function main(argv: string[], env: Env): Promise<number> {
       (r) =>
         `- unattributed: ${r.artifact} ${r.package} ${r.tsFile} ${r.rubyName ?? r.tsName ?? ""}`,
     ),
+    "",
+    "## Rows on a pair the ledger does not hold (the flip PR fixes these)",
+    "",
+    ...Object.entries(attribution).flatMap(([f, rows]) =>
+      rows
+        .filter((r) => r.attribution === "unpinnedChanged")
+        .map((r) => `- ${f} ${r.row.package} ${r.row.tsFile} ${r.row.rubyName ?? ""}`),
+    ),
   ].join("\n");
   const ledger = { source: source.name, from: fromRef, to: ref, pairs: seed, tests: testRows };
   await fs.writeFile(path.join(outDir, "ledger-seed.json"), JSON.stringify(ledger, null, 2) + "\n");
   await fs.writeFile(path.join(outDir, "report.md"), report + "\n");
+  const reportFile = path.join(ROOT, REPORTS_DIR, reportFileName(json));
+  await fs.mkdir(path.dirname(reportFile), { recursive: true });
+  await fs.writeFile(reportFile, JSON.stringify(json, null, 2) + "\n");
   console.log(`\n${report}\n\n[bump] written to ${outDir}`);
   return touched.length === 0 ? 0 : 1;
 }
