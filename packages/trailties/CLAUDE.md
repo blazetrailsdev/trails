@@ -286,4 +286,11 @@ mechanism"; its cross-table rules and
   no synchronous `load`. `set_routes_reloader_hook`, `reload_routes!` and the
   `to_run` block first await `prefetchBang`, which `rbFLoad`s each routes file
   while recording the blocks it hands a route set's `draw`. `load_paths`
-  replays those blocks in line. Ruled by the operator on 2026-11-15.
+  replays those blocks in line. `execute_if_updated` prefetches when a file
+  changed, and concurrent prefetches share one load. Ruled by the operator on
+  2026-11-15. Two consequences follow:
+  - A lazy, non-eager app imports its routes files at boot, where Rails
+    defers the `load` (`finisher.rb:179`). Drawing is still deferred to the
+    first reload.
+  - Only the reloader's own `route_sets` record. A `draw` on any other route
+    set runs during the prefetch.

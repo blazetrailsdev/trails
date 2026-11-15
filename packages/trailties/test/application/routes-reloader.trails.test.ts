@@ -97,6 +97,51 @@ describe("RoutesReloader", () => {
     }
   });
 
+  it("execute_if_updated draws the edited routes file, not the prefetched one", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, drawInto("Trails.application", "/before"));
+      FileUtils.touch(routes, { mtime: new Date(Date.now() - 10_000) });
+      const r = new RoutesReloader();
+      const a = makeRouteSet();
+      Trails.application = { routes: () => a } as never;
+      r.routeSets.push(a);
+      r.paths.push(routes);
+      await r.prefetchBang();
+      r.execute();
+
+      File.write(routes, drawInto("Trails.application", "/after"));
+      expect(await r.executeIfUpdated()).toBe(true);
+
+      expect(a.calls.filter((c) => c.startsWith("get"))).toEqual(["get /before", "get /after"]);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("concurrent prefetches share one load and restore draw", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, drawInto("Trails.application", "/posts"));
+      const r = new RoutesReloader();
+      const a = makeRouteSet();
+      const draw = Object.getOwnPropertyDescriptor(a, "draw");
+      Trails.application = { routes: () => a } as never;
+      r.routeSets.push(a);
+      r.paths.push(routes);
+
+      const first = r.prefetchBang();
+      expect(r.prefetchBang()).toBe(first);
+      await first;
+
+      expect(Object.getOwnPropertyDescriptor(a, "draw")).toEqual(draw);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
   it("an engine's routes file draws into the engine's route set, not the application's", async () => {
     const tmp = Dir.mktmpdir("routes_reloader");
     try {

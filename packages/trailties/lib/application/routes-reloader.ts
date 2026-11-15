@@ -21,8 +21,12 @@ export class RoutesReloader {
   private _updater?: FileUpdateChecker<void>;
   /** @internal */
   private _drawn: [RouteSetLike, DrawCallback][] = [];
+  /** @internal */
+  private _prefetching?: Promise<void>;
 
-  executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
+  /** @inventedArm prefetchBang — PERMANENT */
+  async executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
+    if (this.isUpdated()) await this.prefetchBang();
     return this.updater().executeIfUpdated(block);
   }
 
@@ -43,7 +47,7 @@ export class RoutesReloader {
 
   execute(): void {
     this.loaded = true;
-    this.updater().execute();
+    return this.updater().execute();
   }
 
   executeUnlessLoaded(): true | null {
@@ -56,7 +60,14 @@ export class RoutesReloader {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  async prefetchBang(): Promise<void> {
+  prefetchBang(): Promise<void> {
+    return (this._prefetching ??= this._prefetch().finally(() => {
+      this._prefetching = undefined;
+    }));
+  }
+
+  /** @internal */
+  private async _prefetch(): Promise<void> {
     const drawn: [RouteSetLike, DrawCallback][] = [];
     const own = this.routeSets.map((routes) => Object.getOwnPropertyDescriptor(routes, "draw"));
     for (const routes of this.routeSets) {
