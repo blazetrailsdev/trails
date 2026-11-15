@@ -121,7 +121,7 @@ describe("RoutesReloader", () => {
     }
   });
 
-  it("concurrent prefetches share one load and restore draw", async () => {
+  it("concurrent prefetches run in turn and restore draw", async () => {
     const tmp = Dir.mktmpdir("routes_reloader");
     try {
       const routes = `${tmp}/routes.ts`;
@@ -134,8 +134,11 @@ describe("RoutesReloader", () => {
       r.paths.push(routes);
 
       const first = r.prefetchBang();
-      expect(r.prefetchBang()).toBe(first);
-      await first;
+      File.write(routes, drawInto("Trails.application", "/edited"));
+      await Promise.all([first, r.prefetchBang()]);
+      r.reloadBang();
+
+      expect(a.calls.filter((c) => c.startsWith("get"))).toEqual(["get /edited"]);
 
       expect(Object.getOwnPropertyDescriptor(a, "draw")).toEqual(draw);
     } finally {

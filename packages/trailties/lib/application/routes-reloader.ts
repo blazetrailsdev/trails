@@ -26,10 +26,7 @@ export class RoutesReloader {
 
   /** @inventedArm prefetchBang — PERMANENT */
   async executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
-    if (this.isUpdated()) {
-      await this._prefetching;
-      await this.prefetchBang();
-    }
+    if (this.isUpdated()) await this.prefetchBang();
     return this.updater().executeIfUpdated(block);
   }
 
@@ -63,15 +60,19 @@ export class RoutesReloader {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  prefetchBang(): Promise<void> {
-    return (this._prefetching ??= this._prefetch().finally(() => {
-      this._prefetching = undefined;
-    }));
+  async prefetchBang(): Promise<void> {
+    const previous = this._prefetching;
+    const current = Promise.allSettled([previous]).then(() => this._prefetch());
+    this._prefetching = current;
+    try {
+      await current;
+    } finally {
+      if (this._prefetching === current) this._prefetching = undefined;
+    }
   }
 
   /** @internal */
   private async _prefetch(): Promise<void> {
-    this._drawn = null;
     const drawn: [RouteSetLike, DrawCallback][] = [];
     const own = this.routeSets.map((routes) => Object.getOwnPropertyDescriptor(routes, "draw"));
     for (const routes of this.routeSets) {
@@ -83,6 +84,9 @@ export class RoutesReloader {
     }
     try {
       for (const path of this.paths) await rbFLoad(path);
+    } catch (error) {
+      this._drawn = null;
+      throw error;
     } finally {
       this.routeSets.forEach((routes, i) => {
         const descriptor = own[i];
@@ -113,8 +117,10 @@ export class RoutesReloader {
     }
   }
 
-  /** @internal */
-  /** @inventedArm throw — PERMANENT */
+  /**
+   * @internal
+   * @inventedArm throw — PERMANENT
+   */
   private loadPaths(): void {
     if (this._drawn === null && this.paths.length > 0) {
       throw new RuntimeError("routes files were not prefetched");
