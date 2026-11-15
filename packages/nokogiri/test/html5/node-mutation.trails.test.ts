@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { XmlTreeNode } from "libxml2-wasm";
 import { HTML5, SaveOptions, XML } from "../../lib/index.js";
 
 const { Document, DocumentFragment } = HTML5;
@@ -142,5 +143,23 @@ describe("HTML5::DocumentFragment elements and is_a?", () => {
     expect(fragment.elements.deconstruct()).toEqual(fragment.elements.toA());
     expect(fragment).toBeInstanceOf(XML.DocumentFragment);
     expect(fragment.children[0]).not.toBeInstanceOf(XML.DocumentFragment);
+  });
+});
+
+describe("HTML5 nodes share the XML::Node chain", () => {
+  it("is an XML::Node and its fragment holds a parse5 tree", () => {
+    const fragment = DocumentFragment.parse("<p>hi</p>");
+    expect(fragment).toBeInstanceOf(XML.DocumentFragment);
+    expect(fragment).toBeInstanceOf(XML.Node);
+    expect(fragment.children[0]).toBeInstanceOf(XML.Node);
+    expect(fragment._node.nodeName).toBe("#document-fragment");
+    expect(fragment._node).not.toBeInstanceOf(XmlTreeNode);
+  });
+
+  it("builds an HTML5 fragment in the context of an HTML5 node", () => {
+    const doc = Document.parse("<div></div>");
+    const fragment = doc.atCss("div")!.fragment("<b>x</b>");
+    expect(fragment).toBeInstanceOf(DocumentFragment);
+    expect((fragment as InstanceType<typeof DocumentFragment>).toHtml()).toBe("<b>x</b>");
   });
 });

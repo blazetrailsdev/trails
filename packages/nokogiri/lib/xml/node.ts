@@ -6,6 +6,7 @@ import {
   XmlTreeNode,
 } from "libxml2-wasm";
 import { xmlAddChild, xmlUnlinkNode } from "libxml2-wasm/lib/libxml2.mjs";
+import type { DefaultTreeAdapterMap } from "parse5";
 import { ArgumentError, include, rbObjClassname } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
@@ -22,13 +23,17 @@ export interface AttrNode {
   value: string;
 }
 
-export class XmlNode {
-  declare css: (...args: unknown[]) => NodeSet;
-  declare atCss: (...args: unknown[]) => XmlNode | undefined;
-  declare xpath: (...args: unknown[]) => NodeSet;
-  declare atXpath: (...args: unknown[]) => XmlNode | undefined;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- TS2425: a `declare css` property here conflicts with HTML5::DocumentFragment#css (html5/document_fragment.rb), a method; a class cannot declare a bodiless method.
+export interface XmlNode {
+  css(...args: unknown[]): NodeSet;
+  atCss(...args: unknown[]): XmlNode | undefined;
+  xpath(...args: unknown[]): NodeSet;
+  atXpath(...args: unknown[]): XmlNode | undefined;
+}
 
-  static readonly IMPLIED_XPATH_CONTEXTS = [".//"] as const;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class XmlNode {
+  static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly SaveOptions = SaveOptions;
 
   constructor(
@@ -36,8 +41,8 @@ export class XmlNode {
      * @internal
      * @noRailsEquivalent PERMANENT
      */
-    readonly _node: XmlTreeNode,
-    readonly document: unknown,
+    readonly _node: XmlTreeNode | DefaultTreeAdapterMap["node"],
+    public document: unknown = null,
   ) {}
 
   get pointerId(): number {
@@ -79,7 +84,7 @@ export class XmlNode {
   }
 
   get content(): string {
-    return this._node.content ?? "";
+    return (this._node as XmlTreeNode).content ?? "";
   }
 
   get children(): XmlNode[] {
@@ -142,7 +147,7 @@ export class XmlNode {
   }
 
   /** @internal */
-  private addChildNode(node: XmlNode): void {
+  protected addChildNode(node: XmlNode): void {
     xmlUnlinkNode(node.pointerId);
     xmlAddChild(this.pointerId, node.pointerId);
   }

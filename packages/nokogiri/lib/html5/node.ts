@@ -21,6 +21,8 @@ import type { DocumentFragment } from "./document-fragment.js";
 import { HTML5 } from "../namespaces.js";
 import * as Searchable from "../xml/searchable.js";
 import { SaveOptions } from "../xml/node/save-options.js";
+import { XmlNode } from "../xml/node.js";
+import type { DocumentFragment as XmlDocumentFragment } from "../xml/document-fragment.js";
 
 type Parse5Node = DefaultTreeAdapterMap["childNode"];
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
@@ -36,7 +38,7 @@ export function parse5PointerId(node: object): number {
   return id;
 }
 
-export class Node {
+export class Node extends XmlNode {
   declare css: (...args: unknown[]) => NodeSet;
   declare atCss: (...args: unknown[]) => Node | undefined;
   declare xpath: (...args: unknown[]) => NodeSet;
@@ -55,9 +57,11 @@ export class Node {
      * @internal
      * @noRailsEquivalent PERMANENT
      */
-    readonly _node: Parse5Node,
-    public document: unknown = null,
-  ) {}
+    override readonly _node: Parse5Node,
+    document: unknown = null,
+  ) {
+    super(_node, document);
+  }
 
   get pointerId(): number {
     return parse5PointerId(this._node);
@@ -281,6 +285,12 @@ export class Node {
       const html = this.htmlStandardSerialize(opts.preserveNewline || false);
       io.write(html);
     }
+  }
+
+  override fragment(tags: string): XmlDocumentFragment {
+    if (!(this.document instanceof HTML5.Document)) return super.fragment(tags);
+
+    return new HTML5.DocumentFragment(this.document, tags, this);
   }
 
   /** @internal */
@@ -536,12 +546,12 @@ export class Node {
   }
 
   /** @internal */
-  private addChildNodeAndReparentAttrs(node: Node): void {
+  protected override addChildNodeAndReparentAttrs(node: Node): void {
     this.addChildNode(node);
   }
 
   /** @internal */
-  private addChildNode(node: Node): void {
+  protected override addChildNode(node: Node): void {
     defaultTreeAdapter.detachNode(node._node);
     defaultTreeAdapter.appendChild(this._node as Parse5Parent, node._node);
   }

@@ -8,14 +8,11 @@ import { HTML5 } from "../namespaces.js";
 
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
-/** @noRailsEquivalent CONVERGEABLE nokogiri-html5-node-is-xml-node */
-const _XmlDocumentFragment = XmlDocumentFragment as unknown as new (
-  document: Document,
-) => Omit<XmlDocumentFragment, "_node" | "document" | "children" | "css" | "atCss" | "errors">;
+/** @noRailsEquivalent CONVERGEABLE nokogiri-html5-fragment-parse-static-override */
+const _XmlDocumentFragment: new (document: Document) => XmlDocumentFragment = XmlDocumentFragment;
 
 export class DocumentFragment extends _XmlDocumentFragment {
   declare document: Document;
-  declare errors: unknown[];
   /**
    * @internal
    * @noRailsEquivalent PERMANENT
@@ -32,7 +29,6 @@ export class DocumentFragment extends _XmlDocumentFragment {
     super(document);
     this.document = document;
     this.errors = [];
-    (this as { _node: Parse5Parent })._node = defaultTreeAdapter.createDocumentFragment();
     if (input == null) return;
 
     if (typeof context === "string") {

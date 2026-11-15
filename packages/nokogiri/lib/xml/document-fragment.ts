@@ -1,4 +1,5 @@
 import { XmlDocument as LibXmlDocument } from "libxml2-wasm";
+import { defaultTreeAdapter } from "parse5";
 import { constSet } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
@@ -21,15 +22,23 @@ export class DocumentFragment extends XmlNode {
     return new this(new XmlDocument(), tags, null, options, block);
   }
 
-  /** @inventedArm createRoot — CONVERGEABLE nokogiri-xml-document-fragment-native-new */
+  /**
+   * @inventedArm createRoot — CONVERGEABLE nokogiri-xml-document-fragment-native-new
+   * @inventedArm createDocumentFragment — CONVERGEABLE nokogiri-xml-document-fragment-native-new
+   */
   constructor(
-    document: XmlDocument,
+    document: XmlDocument | XmlNode,
     tags: string | null = null,
     context: XmlNode | null = null,
     options: ParseOptions | number = ParseOptions.DEFAULT_XML,
     block?: (options: ParseOptions) => void,
   ) {
-    super(LibXmlDocument.create().createRoot("root"), document);
+    super(
+      document instanceof XmlDocument
+        ? LibXmlDocument.create().createRoot("root")
+        : defaultTreeAdapter.createDocumentFragment(),
+      document,
+    );
     if (tags == null) return;
 
     if (typeof options === "number") options = new ParseOptions(options);
