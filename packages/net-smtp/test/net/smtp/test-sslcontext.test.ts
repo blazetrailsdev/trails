@@ -26,7 +26,10 @@ class MySMTP extends SMTP {
     super("localhost", port, kw);
   }
 
-  override sslSocket(socket: Parameters<SMTP["sslSocket"]>[0], context: SSLContext): SSLSocket {
+  protected override sslSocket(
+    socket: Parameters<SMTP["sslSocket"]>[0],
+    context: SSLContext,
+  ): SSLSocket {
     this.__sslContext = context;
     return (this.__sslSocket = super.sslSocket(socket, context));
   }

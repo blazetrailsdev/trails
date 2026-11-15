@@ -138,7 +138,7 @@ export class SSLContext {
   minVersion: number | null = null;
 
   constructor() {
-    this.verifyMode = 0;
+    this.verifyMode = OpenSSL.SSL.VERIFY_NONE;
     this.verifyHostname = false;
   }
 

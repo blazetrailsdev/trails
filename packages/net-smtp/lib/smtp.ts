@@ -580,7 +580,7 @@ export class SMTP {
   }
 
   /** @internal */
-  sslSocket(socket: Connection, context: SSLContext): SSLSocket {
+  protected sslSocket(socket: Connection, context: SSLContext): SSLSocket {
     return new OpenSSL.SSL.SSLSocket(socket, context);
   }
 
