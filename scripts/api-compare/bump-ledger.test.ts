@@ -283,6 +283,7 @@ describe("ledgerScope", () => {
     const stale = { package: "activerecord", tsFile: "gone.ts", rubyName: "gone", call: "x" };
     expect(scope.ts(stale)).toBe(true);
     expect(scope.ts({ ...stale, rubyName: "kept" })).toBe(false);
+    expect(scope.ts({ ...stale, tsFile: "other.ts" })).toBe(false);
   });
 
   it("lint-call-args: reads a mismatch by its Ruby file", () => {
@@ -324,6 +325,7 @@ describe("ledgerScope", () => {
     const tag = { package: "activerecord", tsFile: "gone.ts", tsName: "gone", call: "x" };
     expect(scope.tsName(tag)).toBe(true);
     expect(scope.tsName({ ...tag, tsName: "kept" })).toBe(false);
+    expect(scope.tsName({ ...tag, tsFile: "other.ts" })).toBe(false);
   });
 
   it("an empty ledger skips nothing", () => {

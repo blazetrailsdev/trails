@@ -56,7 +56,6 @@ import {
   REPORT_VERSION,
   reportFileName,
   seedCounts,
-  summaryCounts,
   type BumpReport,
 } from "./report.js";
 import { LEDGERED_STEPS, NOT_EXERCISED, STEPS, TSX, parseArgs } from "./steps.js";
@@ -129,7 +128,12 @@ function summarize(out: string): string {
   return (counted.length > 0 ? counted.slice(0, 4) : lines.slice(-2)).join(" / ").slice(0, 400);
 }
 
-async function runSteps(env: Env, label: string, steps = STEPS): Promise<StepResult[]> {
+async function runSteps(
+  env: Env,
+  label: string,
+  steps = STEPS,
+  missingReport = true,
+): Promise<StepResult[]> {
   const results: StepResult[] = [];
   for (const step of steps) {
     const { code, out } = await sh("pnpm", step.args, env);
@@ -141,7 +145,7 @@ async function runSteps(env: Env, label: string, steps = STEPS): Promise<StepRes
     console.log(`[bump:${label}] ${result.status.padEnd(5)} ${step.name}: ${result.summary}`);
     results.push(result);
   }
-  if (steps === STEPS) await sh("pnpm", MISSING_REPORT, env);
+  if (missingReport) await sh("pnpm", MISSING_REPORT, env);
   return results;
 }
 
@@ -341,6 +345,7 @@ async function main(argv: string[], env: Env): Promise<number> {
       childEnv,
       "ledgered",
       STEPS.filter((s) => LEDGERED_STEPS.has(s.name)),
+      false,
     );
   } finally {
     if (priorLedger === null) await fs.rm(ledgerFile, { force: true });
@@ -491,14 +496,13 @@ async function main(argv: string[], env: Env): Promise<number> {
   const ledgeredOf = new Map(ledgeredSteps.map((r) => [r.name, r]));
   const gates: BumpReport["gates"] = STEPS.map((s, i) => {
     const l = ledgeredOf.get(s.name);
-    const summary = (l ?? candidateSteps[i]).summary;
     return {
       gate: s.name,
       active: activeSteps[i].status,
       candidate: candidateSteps[i].status,
       ledgered: l?.status ?? null,
-      counts: summaryCounts(summary),
-      summary,
+      summary: candidateSteps[i].summary,
+      ledgeredSummary: l?.summary ?? null,
     };
   });
   const testsOf = new Map(testTable.map((r) => [String(r[0]), r.slice(1).map(Number)]));

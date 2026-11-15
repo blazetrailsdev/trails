@@ -734,20 +734,17 @@ async function main(
   autoTighten: boolean,
   scope: string | null = null,
 ): Promise<number> {
-  const scopeOfLedger = await loadLedgerScope();
+  const ledger = await loadLedgerScope();
   const allBaseline = await loadBaseline();
   const artifact = await loadArtifact();
   const { counted: current, skipped: skippedCurrent } = skipLedgered(
     flattenArtifact(artifact),
-    scopeOfLedger.ts,
+    ledger.ts,
   );
-  const { counted: baseline, skipped: ledgeredBaseline } = skipLedgered(
-    allBaseline,
-    scopeOfLedger.ts,
-  );
+  const { counted: baseline, skipped: ledgeredBaseline } = skipLedgered(allBaseline, ledger.ts);
   const { counted: staleTags, skipped: skippedTags } = skipLedgered(
     artifact.staleTags ?? [],
-    scopeOfLedger.tsName,
+    ledger.tsName,
   );
   console.log(
     renderSkipped(

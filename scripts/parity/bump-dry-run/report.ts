@@ -43,8 +43,8 @@ export interface BumpReportGate {
   candidate: GateStatus;
   /** The candidate re-run with the seed as the ledger; null where the gate does not read it. */
   ledgered: GateStatus | null;
-  counts: number[];
   summary: string;
+  ledgeredSummary: string | null;
 }
 
 export interface BumpReportSeed {
@@ -72,11 +72,6 @@ export const REPORTS_DIR = "scripts/parity/bump-ledger/reports";
 
 export function reportFileName(r: Pick<BumpReport, "source" | "from" | "to" | "date">): string {
   return `${r.source}-${r.from.ref}-${r.to.ref}.${r.date}.json`;
-}
-
-/** Every integer a step's summary line carries, in order. */
-export function summaryCounts(summary: string): number[] {
-  return [...summary.matchAll(/\d+/g)].map((m) => Number(m[0]));
 }
 
 /** Seed rows tallied by package and kind, sorted. */

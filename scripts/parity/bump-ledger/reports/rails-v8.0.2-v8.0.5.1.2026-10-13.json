@@ -35,16 +35,16 @@
       "active": "green",
       "candidate": "red",
       "ledgered": null,
-      "counts": [22],
-      "summary": "22 new call rows"
+      "summary": "22 new call rows",
+      "ledgeredSummary": null
     },
     {
       "gate": "Call-argument ratchet",
       "active": "green",
       "candidate": "red",
       "ledgered": null,
-      "counts": [17, 7],
-      "summary": "17 new argument rows, 7 naming failures"
+      "summary": "17 new argument rows, 7 naming failures",
+      "ledgeredSummary": null
     }
   ],
   "seed": [

@@ -502,7 +502,7 @@ class VendorBumpGateResult extends Base {
     this.attribute("active", "string");
     this.attribute("status", "string");
     this.attribute("ledgered", "string");
-    this.attribute("counts", "string");
+    this.attribute("ledgered_summary", "string");
     this.attribute("summary", "string");
   }
 }
@@ -634,7 +634,7 @@ async function createBumpHistoryTables(adapter: SQLite3Adapter) {
       t.string("active");
       t.string("status");
       t.string("ledgered");
-      t.string("counts");
+      t.text("ledgered_summary");
       t.text("summary");
       t.index(["file", "gate"], { unique: true });
     });
@@ -2486,6 +2486,11 @@ async function syncCompareStats(
 
 const BUMP_REPORTS_DIR = "scripts/parity/bump-ledger/reports";
 
+/** A `gh api` 404: the path is absent, which is an answer and not a failure. */
+function isGhNotFound(err: unknown): boolean {
+  return /HTTP 404|Not Found/.test(err instanceof Error ? err.message : String(err));
+}
+
 /**
  * Bump history from the committed dry-run reports on main (RFC 0191 § 7). A
  * bump's flip PR is the merged PR that added one of its reports; it closed at
@@ -2495,7 +2500,8 @@ async function syncBumpHistory(): Promise<number> {
   let listing: { name: string; path: string; type: string }[];
   try {
     listing = ghJson(`api repos/${REPO}/contents/${BUMP_REPORTS_DIR}?ref=main`);
-  } catch {
+  } catch (err) {
+    if (!isGhNotFound(err)) throw err;
     console.log("No bump reports on main yet");
     return 0;
   }
@@ -2561,7 +2567,7 @@ async function syncBumpHistory(): Promise<number> {
           active: g.active,
           status: g.candidate,
           ledgered: g.ledgered,
-          counts: JSON.stringify(g.counts),
+          ledgered_summary: g.ledgeredSummary,
           summary: g.summary,
         })),
         { uniqueBy: ["file", "gate"] },
@@ -2596,8 +2602,8 @@ async function syncBumpHistory(): Promise<number> {
       try {
         gh(`api repos/${REPO}/git/ref/tags/${tagName}`);
         tag = tagName;
-      } catch {
-        tag = null;
+      } catch (err) {
+        if (!isGhNotFound(err)) throw err;
       }
     }
     await VendorBump.upsertAll(

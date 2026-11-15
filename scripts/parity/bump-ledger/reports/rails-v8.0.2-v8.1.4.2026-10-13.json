@@ -35,40 +35,40 @@
       "active": "green",
       "candidate": "red",
       "ledgered": null,
-      "counts": [107],
-      "summary": "107 new call rows"
+      "summary": "107 new call rows",
+      "ledgeredSummary": null
     },
     {
       "gate": "Call-argument ratchet",
       "active": "green",
       "candidate": "red",
       "ledgered": null,
-      "counts": [76],
-      "summary": "76 new argument rows"
+      "summary": "76 new argument rows",
+      "ledgeredSummary": null
     },
     {
       "gate": "Receipt audit",
       "active": "green",
       "candidate": "red",
       "ledgered": null,
-      "counts": [5],
-      "summary": "5 receipts"
+      "summary": "5 receipts",
+      "ledgeredSummary": null
     },
     {
       "gate": "Ruby-compat call ratchet",
       "active": "green",
       "candidate": "red",
       "ledgered": null,
-      "counts": [2],
-      "summary": "2 rows"
+      "summary": "2 rows",
+      "ledgeredSummary": null
     },
     {
       "gate": "Extra-surface ratchet",
       "active": "green",
       "candidate": "red",
       "ledgered": null,
-      "counts": [0, 22, 0, 71, 0, 2],
-      "summary": "activerecord novel 0 \u2192 22, total 0 \u2192 71; arel total 0 \u2192 2"
+      "summary": "activerecord novel 0 \u2192 22, total 0 \u2192 71; arel total 0 \u2192 2",
+      "ledgeredSummary": null
     }
   ],
   "seed": [
