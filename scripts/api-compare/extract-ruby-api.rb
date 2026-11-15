@@ -1387,10 +1387,6 @@ class ApiExtractor
   # framework loads — NOT into the lexically enclosing Railtie. Attributing it
   # to `current_fqn` credits the module's methods to a class Rails never puts
   # them on, so `include`/`extend` inside an on_load block records nothing.
-  # `class_methods do … end` (concern.rb:209-215) evaluates the block in the
-  # concern's `ClassMethods` module, defining it when the concern has none, so
-  # the block's methods are `M::ClassMethods` instance methods, as if the
-  # module had been written out.
   def concern_class_methods_block?(node)
     call = node[1]
     call = call[1] if call.is_a?(Array) && call[0] == :method_add_arg

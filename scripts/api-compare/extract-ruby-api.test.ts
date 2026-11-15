@@ -5216,8 +5216,6 @@ describe("Ruby extractor file-order independence", { timeout: RUBY_SUBPROCESS_TI
     expect(out["__pending"]).toBe(0);
   });
 
-  // concern.rb:209-215: `class_methods do … end` evaluates its block in the
-  // concern's `ClassMethods`, so its defs are that module's, not the concern's.
   it("files a class_methods block's defs on the concern's ClassMethods", () => {
     const out = rubyEntities(["expiration.rb"], {
       "expiration.rb": `
