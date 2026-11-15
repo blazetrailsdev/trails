@@ -1,8 +1,3 @@
-import { WriteTimeout } from "./net/protocol.js";
-import { strNew } from "./string/bytes.js";
-import { rbStrDump } from "./string/convert.js";
-import { EOFError } from "./eof-error.js";
-
 export interface HttpRequest {
   method?: string | undefined;
   url?: string | undefined;
@@ -55,30 +50,23 @@ export interface HttpServer {
   on(event: "close", listener: () => void): unknown;
 }
 
-/** @noRailsEquivalent PERMANENT */
-export interface HttpClientResponse {
-  httpVersion: string;
-  statusCode: number;
-  statusMessage: string;
-  headers: Record<string, string | string[] | undefined>;
-  body: AsyncIterable<Uint8Array>;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export interface HttpClientConnection {
-  request(
-    method: string,
-    path: string,
-    headers: Record<string, string[]>,
-    body: string | Uint8Array | null,
-  ): Promise<HttpClientResponse>;
+/**
+ * The socket `Net::BufferedIO` reads and writes (`vendor/ruby/v3.3.11/lib/net/protocol.rb:116-125`):
+ * a `TCPSocket`, which `start_ssl` turns into an `OpenSSL::SSL::SSLSocket`
+ * (`vendor/ruby/v3.3.11/lib/net/http.rb:1666-1676`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface HttpClientSocket {
+  readNonblock(): Uint8Array | "wait_readable" | null;
+  waitReadable(timeout: number | null): Promise<boolean>;
+  writeNonblock(str: Uint8Array): boolean;
+  waitWritable(timeout: number | null): Promise<boolean>;
+  startSsl(options: HttpSslOptions): Promise<void>;
   close(): void;
   isClosed(): boolean;
   isEof(): boolean;
-  /** `BufferedIO#write_timeout` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:129`). */
-  writeTimeout: number | null;
-  /** `BufferedIO#debug_output` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:131`). */
-  debugOutput: HttpDebugOutput | null;
+  inspect(): string;
   readonly sslVersion: string | null;
   readonly cipher: string[] | null;
 }
@@ -92,16 +80,17 @@ export interface HttpDebugOutput {
 export interface HttpConnectOptions {
   host: string;
   port: number;
-  useSsl: boolean;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export interface HttpSslOptions {
   sslHostAddress: string | null;
   verifyPeer: boolean;
-  writeTimeout: number | null;
-  debugOutput: HttpDebugOutput | null;
 }
 
 export interface HttpAdapter {
   createServer(handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer;
-  connect?(options: HttpConnectOptions): Promise<HttpClientConnection>;
+  connect?(options: HttpConnectOptions): Promise<HttpClientSocket>;
 }
 
 const registry = new Map<string, HttpAdapter>();
@@ -142,154 +131,138 @@ function syncBuiltinLoader(): ((id: string) => unknown) | null {
 
 type NodeSocket = {
   once(event: string, listener: (error?: Error) => void): unknown;
-  removeListener(event: string, listener: (error?: Error) => void): unknown;
+  on(event: string, listener: (arg?: never) => void): unknown;
+  removeListener(event: string, listener: (arg?: never) => void): unknown;
+  write(chunk: Uint8Array): boolean;
   destroy(): unknown;
   readonly destroyed: boolean;
-  readonly readableEnded: boolean;
-  on(event: "drain", listener: () => void): unknown;
   getProtocol?(): string | null;
   getCipher?(): { name: string };
 };
 
-type NodeIncoming = {
-  httpVersion: string;
-  statusCode?: number;
-  statusMessage?: string;
-  headers: Record<string, string | string[] | undefined>;
-  rawHeaders: string[];
-  [Symbol.asyncIterator](): AsyncIterator<Uint8Array>;
-};
-
-/**
- * A response body Node aborts before it is complete raises Ruby's `EOFError`,
- * as `Net::BufferedIO#rbuf_fill` does (`vendor/ruby/v3.3.11/lib/net/protocol.rb:218-240`),
- * and `BufferedIO#read`'s `LOG` lines go to the debug output (`:155-192`).
- *
- * @noRailsEquivalent PERMANENT
- */
-async function* _nodeBody(
-  res: NodeIncoming,
-  out: HttpDebugOutput | null,
-): AsyncGenerator<Uint8Array> {
-  const len = res.headers["content-length"];
-  out?.write(len != null ? `reading ${String(len)} bytes...\n` : "reading all...\n");
-  let readBytes = 0;
-  try {
-    for await (const chunk of res) {
-      readBytes += chunk.length;
-      out?.write(`-> ${rbStrDump(strNew(chunk))}\n`);
-      yield chunk;
-    }
-    out?.write(`read ${readBytes} bytes\n`);
-  } catch (e) {
-    if ((e as { code?: unknown }).code === "ECONNRESET") throw new EOFError("end of file reached");
-    throw e;
-  }
-}
-
 type NodeHttp = {
   createServer: (handler: (req: HttpRequest, res: HttpResponse) => void) => HttpServer;
-  request(
-    options: Record<string, unknown>,
-    callback: (res: NodeIncoming) => void,
-  ): {
-    on(event: "error", listener: (error: Error) => void): unknown;
-    once(event: "finish" | "error", listener: () => void): unknown;
-    end(chunk?: string | Uint8Array | null): unknown;
-  };
 };
 
 type NodeNet = { connect(options: Record<string, unknown>): NodeSocket };
 
-function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions, http: NodeHttp) {
-  return new Promise<HttpClientConnection>((resolve, reject) => {
-    const socket = options.useSsl
-      ? tls.connect({
-          host: options.host,
-          port: options.port,
-          ...(options.sslHostAddress !== null && { servername: options.sslHostAddress }),
-          rejectUnauthorized: options.verifyPeer,
-        })
-      : net.connect({ host: options.host, port: options.port });
-    socket.once("error", reject);
-    socket.once(options.useSsl ? "secureConnect" : "connect", () => {
-      socket.removeListener("error", reject);
-      const conn: HttpClientConnection = {
-        writeTimeout: options.writeTimeout,
-        debugOutput: options.debugOutput,
-        sslVersion: socket.getProtocol?.() ?? null,
-        cipher: socket.getCipher !== undefined ? [socket.getCipher().name] : null,
-        request: (method, path, headers, body) =>
-          new Promise((resolveResponse, rejectResponse) => {
-            const out = conn.debugOutput;
-            if (out != null) {
-              let buf = `${method} ${path} HTTP/1.1\r\n`;
-              for (const [k, vs] of Object.entries(headers)) {
-                const name = k.replace(
-                  /[^-]+/g,
-                  (w) => w[0].toUpperCase() + w.slice(1).toLowerCase(),
-                );
-                for (const v of vs) buf += `${name}: ${v}\r\n`;
-              }
-              buf += "\r\n";
-              out.write(`<- ${rbStrDump(buf)}\n`);
-              if (body != null && body.length > 0) {
-                const text = typeof body === "string" ? body : strNew(body);
-                out.write(`<- ${rbStrDump(text)}\n`);
-              }
-            }
-            let timer: ReturnType<typeof setTimeout> | null = null;
-            const req = http.request(
-              { method, path, headers, createConnection: () => socket },
-              (res) => {
-                if (timer !== null) clearTimeout(timer);
-                const out = conn.debugOutput;
-                if (out != null) {
-                  const line = (l: string) => out.write(`-> ${rbStrDump(`${l}\r\n`)}\n`);
-                  line(`HTTP/${res.httpVersion} ${res.statusCode} ${res.statusMessage ?? ""}`);
-                  for (let i = 0; i < res.rawHeaders.length; i += 2) {
-                    line(`${res.rawHeaders[i]}: ${res.rawHeaders[i + 1]}`);
-                  }
-                  line("");
-                }
-                resolveResponse({
-                  httpVersion: res.httpVersion,
-                  statusCode: res.statusCode!,
-                  statusMessage: res.statusMessage ?? "",
-                  headers: res.headers,
-                  body: _nodeBody(res, out),
-                });
-              },
-            );
-            req.on("error", (error) => {
-              if (timer !== null) clearTimeout(timer);
-              rejectResponse(error);
-            });
-            req.end(body);
-            if (conn.writeTimeout != null) {
-              const sec = conn.writeTimeout;
-              const wait = () => {
-                if (timer !== null) clearTimeout(timer);
-                timer = setTimeout(() => {
-                  socket.removeListener("drain", wait);
-                  socket.destroy();
-                  rejectResponse(new WriteTimeout());
-                }, sec * 1000);
-              };
-              socket.on("drain", wait);
-              req.once("error", () => socket.removeListener("drain", wait));
-              req.once("finish", () => {
-                socket.removeListener("drain", wait);
-                if (timer !== null) clearTimeout(timer);
-              });
-              wait();
-            }
-          }),
-        close: () => socket.destroy(),
-        isClosed: () => socket.destroyed,
-        isEof: () => socket.readableEnded,
-      };
-      resolve(conn);
+function _nodeWait(
+  sock: NodeSocket,
+  events: string[],
+  ready: () => boolean,
+  timeout: number | null,
+): Promise<boolean> {
+  if (ready()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const done = (v: boolean) => {
+      clearTimeout(timer);
+      for (const e of events) sock.removeListener(e, wake);
+      resolve(v);
+    };
+    const wake = () => done(true);
+    for (const e of events) sock.on(e, wake);
+    if (timeout != null) timer = setTimeout(() => done(false), timeout * 1000);
+  });
+}
+
+/** @noRailsEquivalent PERMANENT */
+class _NodeClientSocket implements HttpClientSocket {
+  private readonly rbuf: Uint8Array[] = [];
+  private eof = false;
+  private error: Error | null = null;
+  private writable = true;
+  private ssl = false;
+  private readonly onData = (chunk: Uint8Array) => void this.rbuf.push(chunk);
+  private readonly onEnd = () => void (this.eof = true);
+  private readonly onError = (e: Error) => void (this.error = e);
+  private readonly onDrain = () => void (this.writable = true);
+
+  constructor(
+    private io: NodeSocket,
+    private readonly tls: NodeNet,
+  ) {
+    this.bind("on");
+  }
+
+  private bind(on: "on" | "removeListener"): void {
+    this.io[on]("data", this.onData as never);
+    this.io[on]("end", this.onEnd);
+    this.io[on]("error", this.onError as never);
+    this.io[on]("drain", this.onDrain);
+  }
+
+  readNonblock(): Uint8Array | "wait_readable" | null {
+    if (this.error !== null) throw this.error;
+    if (this.rbuf.length > 0) return this.rbuf.shift()!;
+    return this.eof ? null : "wait_readable";
+  }
+
+  waitReadable(timeout: number | null): Promise<boolean> {
+    const ready = () => this.rbuf.length > 0 || this.eof || this.error !== null;
+    return _nodeWait(this.io, ["data", "end", "error", "close"], ready, timeout);
+  }
+
+  writeNonblock(str: Uint8Array): boolean {
+    if (this.error !== null) throw this.error;
+    return (this.writable = this.io.write(str));
+  }
+
+  waitWritable(timeout: number | null): Promise<boolean> {
+    return _nodeWait(this.io, ["drain", "error", "close"], () => this.writable, timeout);
+  }
+
+  startSsl(options: HttpSslOptions): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.bind("removeListener");
+      this.io = this.tls.connect({
+        socket: this.io,
+        ...(options.sslHostAddress !== null && { servername: options.sslHostAddress }),
+        rejectUnauthorized: options.verifyPeer,
+      });
+      this.ssl = true;
+      this.bind("on");
+      this.io.once("error", reject);
+      this.io.once("secureConnect", () => {
+        this.io.removeListener("error", reject as never);
+        resolve();
+      });
+    });
+  }
+
+  close(): void {
+    this.io.destroy();
+  }
+
+  isClosed(): boolean {
+    return this.io.destroyed;
+  }
+
+  isEof(): boolean {
+    return this.eof && this.rbuf.length === 0;
+  }
+
+  inspect(): string {
+    const name = this.ssl ? "OpenSSL::SSL::SSLSocket" : "TCPSocket";
+    return `#<${name}${this.io.destroyed ? ":(closed)" : ""}>`;
+  }
+
+  get sslVersion(): string | null {
+    return this.io.getProtocol?.() ?? null;
+  }
+
+  get cipher(): string[] | null {
+    return this.io.getCipher !== undefined ? [this.io.getCipher().name] : null;
+  }
+}
+
+function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions) {
+  return new Promise<HttpClientSocket>((resolve, reject) => {
+    const io = net.connect({ host: options.host, port: options.port, noDelay: true });
+    io.once("error", reject);
+    io.once("connect", () => {
+      io.removeListener("error", reject as never);
+      resolve(new _NodeClientSocket(io, tls));
     });
   });
 }
@@ -310,7 +283,7 @@ function tryAutoRegisterNode(): boolean {
     const tls = req("node:tls") as NodeNet;
     registry.set("node", {
       createServer: (handler) => http.createServer(handler),
-      connect: (options) => _nodeConnect(net, tls, options, http),
+      connect: (options) => _nodeConnect(net, tls, options),
     });
     return true;
   } catch {
