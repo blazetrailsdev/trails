@@ -28,19 +28,13 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { scopeOf } from "./scope.js";
-import {
-  loadLedgerScope,
-  loadLedgers,
-  renderSkipped,
-  skipLedgered,
-  staleSignatureRows,
-} from "./bump-ledger.js";
+import { loadLedgerScope, loadLedgers, renderSkipped, staleSignatureRows } from "./bump-ledger.js";
 import {
   GATED_PACKAGES,
   MARK_PATH,
   exceedances,
   loadMarks,
-  measure,
+  ledgeredMeasure,
   staleMarkFailure,
   staleMarks,
   tightened,
@@ -87,15 +81,19 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   }
 
   const ledger = await loadLedgerScope();
-  const { counted, skipped } = skipLedgered(artifact.mismatches, ledger.pair);
-  console.log(renderSkipped("param-name gate", skipped.length));
+  const { current, measured, skipped } = ledgeredMeasure(
+    artifact.mismatches,
+    ledger.signaturePair,
+    gated,
+  );
+  console.log(renderSkipped("param-name gate", skipped));
   const blocks = JSON.parse(
     await fs.readFile(path.join(OUTPUT_DIR, "block-param-mismatches.json"), "utf-8"),
   ) as ParamNameArtifact;
   const staleSignatures = staleSignatureRows(
     [...(await loadLedgers()).values()]
       .flat()
-      .filter((r) => (gated as readonly string[]).includes(r.package)),
+      .filter((r) => (GATED_PACKAGES as readonly string[]).includes(r.package)),
     [...artifact.mismatches, ...blocks.mismatches],
   );
   if (staleSignatures.length > 0) {
@@ -106,8 +104,6 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     );
     return 1;
   }
-  const current = measure(counted, gated);
-  const measured = measure(artifact.mismatches, gated);
   const grew = exceedances(marks, current, gated);
   const stale = staleMarks(marks, measured, gated);
 

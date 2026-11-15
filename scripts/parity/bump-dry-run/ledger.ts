@@ -26,7 +26,7 @@ export interface Pin extends PairKey {
 }
 
 export interface PairSeedRow extends PairKey {
-  kind: "drift" | "removed" | "signature";
+  kind: "drift" | "removed" | "signature" | "constant";
   from: string;
   to: string;
 }
@@ -226,7 +226,13 @@ export function newRows(active: readonly GateRow[], candidate: readonly GateRow[
   return candidate.filter((r) => !seen.has(stableJson(r)));
 }
 
-export type Attribution = "drift" | "removed" | "signature" | "unpinnedChanged" | "fileSeed";
+export type Attribution =
+  | "drift"
+  | "removed"
+  | "signature"
+  | "constant"
+  | "unpinnedChanged"
+  | "fileSeed";
 
 export interface Attributed {
   row: GateRow;
@@ -386,4 +392,40 @@ export function signatureSeed(
     });
   }
   return [...out.values()].sort((a, b) => cmp(pairKey(a), pairKey(b)));
+}
+
+/** `rails-api.json`'s per-file constants, as far as {@link constantSeed} reads them. */
+export interface ApiConstants {
+  packages: Record<string, { fileConstants?: Record<string, string[]> }>;
+}
+
+/**
+ * The `constant` half of the pair seed: a file constant the candidate drops
+ * whose name is a new extra-surface name in the TS file the Ruby file maps to.
+ * Body pins cover methods only, so a removed constant (`redis.rb`'s
+ * `ConnectionError`) has no pin to seed a `removed` row from.
+ */
+export function constantSeed(
+  active: ApiConstants,
+  candidate: ApiConstants,
+  freshExtras: readonly { package: string; tsFile: string; tsName?: string }[],
+  packages: readonly string[],
+  tsFileOf: (rubyFile: string, pkg: string) => string,
+  from: string,
+  to: string,
+): PairSeedRow[] {
+  const fresh = new Set(freshExtras.map((e) => `${e.package} ${e.tsFile} ${e.tsName}`));
+  const rows: PairSeedRow[] = [];
+  for (const pkg of packages) {
+    const before = active.packages[pkg]?.fileConstants ?? {};
+    const after = candidate.packages[pkg]?.fileConstants ?? {};
+    for (const [rubyFile, names] of Object.entries(before)) {
+      const kept = new Set(after[rubyFile] ?? []);
+      for (const name of names) {
+        if (kept.has(name) || !fresh.has(`${pkg} ${tsFileOf(rubyFile, pkg)} ${name}`)) continue;
+        rows.push({ package: pkg, rubyFile, rubyName: name, kind: "constant", from, to });
+      }
+    }
+  }
+  return rows.sort((a, b) => cmp(pairKey(a), pairKey(b)));
 }

@@ -47,7 +47,13 @@ import type { ApiManifest } from "@blazetrails/parity/types";
 import { buildReport, loadConcernHooks } from "./extra-surface.js";
 import { staleMarkFailure } from "./param-name-mark.js";
 import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
-import { type LedgerScope, loadLedgerScope, renderSkipped } from "./bump-ledger.js";
+import {
+  loadLedgerScope,
+  loadLedgers,
+  renderSkipped,
+  staleConstantRows,
+  withoutRemoved,
+} from "./bump-ledger.js";
 import {
   GATED_PACKAGES,
   MARK_PATH,
@@ -71,47 +77,6 @@ import {
   tightenedInternal,
   writeInternalMarks,
 } from "./extra-surface-mark.js";
-
-interface LedgeredTotals {
-  package: string;
-  totalExtras: number;
-  totalNovel: number;
-  noCounterpartFiles: number;
-  extraFiles: {
-    tsFile: string;
-    rubyFile: string | null;
-    extras: { name: string; kind: string }[];
-  }[];
-}
-
-/**
- * The package totals less every extra whose pair is a `removed` ledger row
- * (RFC 0191 § 3, rule 3): a TS member whose Ruby method the bump removed.
- * Nothing else is subtracted, so a package pinned at `novel === 0` stays
- * pinned against every other name.
- */
-export function withoutRemoved<T extends LedgeredTotals>(
-  packages: readonly T[],
-  removedTsName: LedgerScope["removedTsName"],
-): { packages: T[]; skipped: number } {
-  let skipped = 0;
-  const out = packages.map((p) => {
-    let extras = p.totalExtras;
-    let novel = p.totalNovel;
-    let noCounterpart = p.noCounterpartFiles;
-    for (const f of p.extraFiles) {
-      const hit = f.extras.filter((e) =>
-        removedTsName({ package: p.package, tsFile: f.tsFile, tsName: e.name }),
-      );
-      skipped += hit.length;
-      extras -= hit.length;
-      novel -= hit.filter((e) => e.kind === "novel").length;
-      if (f.rubyFile === null && hit.length > 0 && hit.length === f.extras.length) noCounterpart--;
-    }
-    return { ...p, totalExtras: extras, totalNovel: novel, noCounterpartFiles: noCounterpart };
-  });
-  return { packages: out, skipped };
-}
 
 async function readManifest(name: string): Promise<ApiManifest> {
   return JSON.parse(await fs.readFile(path.join(OUTPUT_DIR, name), "utf-8")) as ApiManifest;
@@ -141,6 +106,18 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   });
   const ledgered = withoutRemoved(report.packages, (await loadLedgerScope()).removedTsName);
   console.log(renderSkipped("extra-surface gate", ledgered.skipped));
+  const staleConstants = staleConstantRows(
+    [...(await loadLedgers()).values()].flat().filter((r) => inScope(r.package)),
+    report.packages,
+  );
+  if (staleConstants.length > 0) {
+    console.error(
+      `\nextra-surface gate: ${staleConstants.length} STALE constant ledger row(s): the port ` +
+        "no longer carries the removed constant. Delete each from scripts/parity/bump-ledger/:\n" +
+        staleConstants.map((r) => `  - ${r.package} ${r.rubyFile}:${r.rubyName}`).join("\n"),
+    );
+    return 1;
+  }
   const current = scopedMarks(measure(ledgered.packages), scope);
   const measured = scopedMarks(measure(report.packages), scope);
 

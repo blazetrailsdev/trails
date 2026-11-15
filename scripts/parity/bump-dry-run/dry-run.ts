@@ -44,12 +44,14 @@ import {
   newRows,
   pairKey,
   pairSeed,
+  constantSeed,
   signatureSeed,
   suspendedTests,
   table,
   testDelta,
   testSeed,
   type GateRow,
+  type ApiConstants,
   type HashRecord,
   type PairKey,
   type PairSeedRow,
@@ -94,6 +96,7 @@ const { SOURCES, testPathsManifest, vendoredRoot } = await import("../../../vend
 const { extractTargetApi } = await import("../../api-compare/drift.js");
 const { compareArms } = await import("../../api-compare/report-arms.js");
 const { buildReport, loadConcernHooks } = await import("../../api-compare/extra-surface.js");
+const { rubyFileToTs } = await import("../conventions.js");
 
 type Env = Record<string, string | undefined>;
 const run = promisify(execFile);
@@ -381,6 +384,18 @@ async function main(argv: string[], env: Env): Promise<number> {
         await signatureRows(path.join(outDir, "candidate/api")),
         bodySeed,
         seedPins,
+        fromRef,
+        ref,
+      ),
+      ...constantSeed(
+        await readJson<ApiConstants>(path.join(outDir, "active/api/rails-api.json")),
+        await readJson<ApiConstants>(path.join(outDir, "candidate/api/rails-api.json")),
+        newRows(
+          await extraRows(path.join(outDir, "active/api")),
+          await extraRows(path.join(outDir, "candidate/api")),
+        ),
+        packages,
+        rubyFileToTs,
         fromRef,
         ref,
       ),

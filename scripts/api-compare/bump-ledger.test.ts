@@ -22,13 +22,15 @@ import {
   skipLedgered,
   summaryLine,
   seedDiff,
+  staleConstantRows,
   staleSignatureRows,
+  withoutRemoved,
   testLedgerKey,
   testLedgerProblems,
   testRowKey,
   type TestLedgerRow,
 } from "./bump-ledger.js";
-import { withoutRemoved } from "./lint-extra-surface-ratchet.js";
+import { exceedances, ledgeredMeasure, staleMarks, tightened } from "./param-name-mark.js";
 
 const key = { package: "activerecord", rubyFile: "persistence.rb", rubyName: "save" };
 const pin = (digest: string, rubyName = "save"): BodyPin => ({ ...key, rubyName, digest });
@@ -406,6 +408,88 @@ describe("signature rows", () => {
   it("staleSignatureRows reds a row no param or block row still names", () => {
     expect(staleSignatureRows([sig], [key])).toEqual([]);
     expect(staleSignatureRows([sig], [])).toEqual([sig]);
+  });
+});
+
+describe("signature rows reach the signature gates only", () => {
+  const sigRow: LedgerRow = { ...key, kind: "signature", from: "v8.0.2", to: "v8.0.5.2" };
+  const hashes: BodyHashRecord[] = [record("a")];
+  const scope = ledgerScope([sigRow], hashes);
+
+  it("a call row on a signature pair is still counted by the call ratchets", () => {
+    expect(scope.pair(key)).toBe(false);
+    expect(scope.ts({ package: key.package, tsFile: "persistence.ts", rubyName: "save" })).toBe(
+      false,
+    );
+    expect(scope.signaturePair(key)).toBe(true);
+  });
+
+  it("lint-block-params: a ledgered row neither grows the mark nor lets --tighten write it down", () => {
+    const gated = ["activerecord"];
+    const marks = { activerecord: { total: 1, byFile: { "persistence.rb": 1 } } };
+    const rows = [
+      { ...key, tsName: "save" },
+      { ...key, tsName: "save" },
+    ];
+    const { current, measured, skipped } = ledgeredMeasure(rows, scope.signaturePair, gated);
+    expect(skipped).toBe(2);
+    expect(exceedances(marks, current, gated)).toEqual([]);
+    expect(staleMarks(marks, measured, gated)).toEqual([]);
+    expect(tightened(marks, measured, gated)).toEqual(marks);
+  });
+
+  it("lint-param-names: an unledgered row on another pair still grows the mark", () => {
+    const gated = ["activerecord"];
+    const marks = { activerecord: { total: 0, byFile: {} } };
+    const rows = [{ package: "activerecord", rubyFile: "core.rb", rubyName: "inspect" }];
+    const { current } = ledgeredMeasure(rows, scope.signaturePair, gated);
+    expect(exceedances(marks, current, gated).map((v) => v.dimension)).toEqual([
+      "total",
+      "core.rb",
+    ]);
+  });
+});
+
+describe("constant rows", () => {
+  const constRow: LedgerRow = {
+    package: "actioncable",
+    rubyFile: "subscription_adapter/redis.rb",
+    rubyName: "ConnectionError",
+    kind: "constant",
+    from: "v8.0.2",
+    to: "v8.0.5.2",
+  };
+  const pkg = (names: string[]) => ({
+    package: "actioncable",
+    totalExtras: names.length,
+    totalNovel: 0,
+    noCounterpartFiles: 0,
+    extraFiles: [
+      {
+        tsFile: "subscription-adapter/redis.ts",
+        rubyFile: "subscription_adapter/redis.rb",
+        extras: names.map((name) => ({ name, kind: "moved" })),
+      },
+    ],
+  });
+
+  it("lint-extra-surface-ratchet: subtracts the removed constant, counts another name", () => {
+    const scope = ledgerScope([constRow], []);
+    const { packages, skipped } = withoutRemoved(
+      [pkg(["ConnectionError", "Invented"])],
+      scope.removedTsName,
+    );
+    expect([skipped, packages[0].totalExtras]).toEqual([1, 1]);
+    expect(scope.pair(constRow)).toBe(false);
+  });
+
+  it("checkRows leaves a constant row to the extra-surface gate", () => {
+    expect(checkRows([constRow], [], [])).toEqual([]);
+  });
+
+  it("staleConstantRows reds a row once the TS name is no longer extra", () => {
+    expect(staleConstantRows([constRow], [pkg(["ConnectionError"])])).toEqual([]);
+    expect(staleConstantRows([constRow], [pkg([])])).toEqual([constRow]);
   });
 });
 

@@ -5,6 +5,7 @@ import {
   mergeManifest,
   newRows,
   pairSeed,
+  constantSeed,
   signatureSeed,
   suspendedTests,
   testDelta,
@@ -188,5 +189,29 @@ describe("suspendedTests", () => {
       ]),
     );
     expect(kept.map((r) => r.path)).toEqual(["T > new"]);
+  });
+});
+
+describe("constantSeed", () => {
+  it("seeds a removed file constant that is a new extra in its TS file only", () => {
+    const api = (names: string[]) => ({
+      packages: { actioncable: { fileConstants: { "subscription_adapter/redis.rb": names } } },
+    });
+    const rows = constantSeed(
+      api(["ConnectionError", "Unported", "Kept"]),
+      api(["Kept", "CONNECTION_ERRORS"]),
+      [
+        {
+          package: "actioncable",
+          tsFile: "subscription-adapter/redis.ts",
+          tsName: "ConnectionError",
+        },
+      ],
+      ["actioncable"],
+      () => "subscription-adapter/redis.ts",
+      "v8.0.2",
+      "v8.0.5.2",
+    );
+    expect(rows.map((r) => [r.rubyName, r.kind])).toEqual([["ConnectionError", "constant"]]);
   });
 });

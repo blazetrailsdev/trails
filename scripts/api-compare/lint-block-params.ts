@@ -24,12 +24,12 @@ import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
 import { BLOCK_IDIOM } from "./block-params.js";
 import { scopeOf } from "./scope.js";
-import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
+import { loadLedgerScope, renderSkipped } from "./bump-ledger.js";
 import {
   GATED_PACKAGES,
   exceedances,
   loadMarks,
-  measure,
+  ledgeredMeasure,
   staleMarkFailure,
   staleMarks,
   tightened,
@@ -67,10 +67,12 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   }
 
   const ledger = await loadLedgerScope();
-  const { counted, skipped } = skipLedgered(artifact.mismatches, ledger.pair);
-  console.log(renderSkipped("block-param gate", skipped.length));
-  const current = measure(counted, gated);
-  const measured = measure(artifact.mismatches, gated);
+  const { current, measured, counted, skipped } = ledgeredMeasure(
+    artifact.mismatches,
+    ledger.signaturePair,
+    gated,
+  );
+  console.log(renderSkipped("block-param gate", skipped));
   const grew = exceedances(marks, current, gated);
   const stale = staleMarks(marks, measured, gated);
 

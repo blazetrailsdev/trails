@@ -136,7 +136,9 @@ async function main(baseBranch: string): Promise<number> {
     const hashes = artifact.hashes.filter((h) => names.has(h.package));
     const current = new Map(hashes.map((h) => [keyOf(h), h.digest]));
     const seed = liveRows(pairSeed(basePins, hashes, from, to), pins, current);
-    const bodyRows = (ledgers.get(s.name) ?? []).filter((r) => r.kind !== "signature");
+    const bodyRows = (ledgers.get(s.name) ?? []).filter(
+      (r) => r.kind !== "signature" && r.kind !== "constant",
+    );
     problems.push(...seedDiff(bodyRows, carrySeed(seed, base)));
   }
 
