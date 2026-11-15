@@ -13,13 +13,13 @@ const readFixture = (...path: string[]) => Mail.read(decodeURIComponent(fixtureP
 describe("multipart/report emails", () => {
   it("should know if it is a multipart report type", async () => {
     const mail = await readFixture("emails", "multipart_report_emails", "report_422.eml");
-    expect(mail.isMultipartReport()).toBe(true);
+    expect(mail.isMultipartReport()).toBeTruthy();
   });
 
   describe("delivery-status reports", () => {
     it("should know if it is a deliver-status report", async () => {
       const mail = await readFixture("emails", "multipart_report_emails", "report_422.eml");
-      expect(mail.isDeliveryStatusReport()).toBe(true);
+      expect(mail.isDeliveryStatusReport()).toBeTruthy();
     });
 
     it("should find its message/delivery-status part", async () => {
@@ -33,7 +33,7 @@ describe("multipart/report emails", () => {
         "multipart_report_emails",
         "multipart_report_multiple_status.eml",
       );
-      expect(mail.isBounced()).toBe(true);
+      expect(mail.isBounced()).toBeTruthy();
     });
 
     describe("delivery-status part in a non report email", () => {
@@ -79,8 +79,8 @@ describe("multipart/report emails", () => {
           "multipart_report_emails",
           "multi_address_bounce2.eml",
         );
-        expect(mail1.isBounced()).toBe(true);
-        expect(mail2.isBounced()).toBe(true);
+        expect(mail1.isBounced()).toBeTruthy();
+        expect(mail2.isBounced()).toBeTruthy();
       });
     });
 
@@ -91,7 +91,7 @@ describe("multipart/report emails", () => {
       });
 
       it("should be bounced", () => {
-        expect(mail.isBounced()).toBe(false);
+        expect(mail.isBounced()).toBeFalsy();
       });
 
       it("should say action 'delayed'", () => {
@@ -117,7 +117,7 @@ describe("multipart/report emails", () => {
       });
 
       it("should be retryable", () => {
-        expect(mail.isRetryable()).toBe(true);
+        expect(mail.isRetryable()).toBeTruthy();
       });
     });
 
@@ -128,7 +128,7 @@ describe("multipart/report emails", () => {
       });
 
       it("should be bounced", () => {
-        expect(mail.isBounced()).toBe(true);
+        expect(mail.isBounced()).toBeTruthy();
       });
 
       it("should say action 'failed'", () => {
@@ -154,7 +154,7 @@ describe("multipart/report emails", () => {
       });
 
       it("should be retryable", () => {
-        expect(mail.isRetryable()).toBe(false);
+        expect(mail.isRetryable()).toBeFalsy();
       });
     });
   });
