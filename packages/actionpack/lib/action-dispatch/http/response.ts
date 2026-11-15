@@ -77,6 +77,8 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   protected _closed = false;
   /** @internal */
   protected _strBody: string | null = null;
+  /** @internal */
+  protected _pendingBody: Promise<string> | null = null;
 
   constructor(response: Response | null, buf: Buf) {
     this._response = response;
@@ -97,6 +99,8 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
       buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
     });
     if (pending instanceof Promise) {
+      this._pendingBody = pending.then(() => buf);
+      this._pendingBody.catch(() => {});
       throw new RuntimeError(
         "streaming ActionDispatch::Response body: await awaitBody before body",
       );
@@ -108,6 +112,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   /** @noRailsEquivalent PERMANENT */
   async awaitBody(): Promise<string> {
     if (this._strBody !== null) return this._strBody;
+    if (this._pendingBody) return (this._strBody = await this._pendingBody);
     let buf = "";
     for await (const chunk of this) buf += String(chunk);
     this._strBody = buf;
@@ -118,6 +123,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     if (this.isClosed) throw new IOError("closed stream");
 
     this._strBody = null;
+    this._pendingBody = null;
     this._response!.commitBang();
     return this._buf.push(string);
   }
