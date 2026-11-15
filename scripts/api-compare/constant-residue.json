@@ -1401,7 +1401,7 @@
     }
   },
   "trailties": {
-    "rows": 157,
+    "rows": 158,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
       "assets/trailtie.ts::Trailtie",
@@ -1470,6 +1470,7 @@
       "engine.ts::Engine": "Trails::Engine",
       "engine/configuration.ts::EngineConfiguration": "Trails::Engine::Configuration",
       "engine/lazy-route-set.ts::LazyRouteSet": "Trails::Engine::LazyRouteSet",
+      "engine/lazy-route-set.ts::LazyRouteSet.ProxyUrlHelpers": "Trails::Engine::LazyRouteSet::ProxyUrlHelpers",
       "engine/trailties.ts::Trailties": "Trails::Engine::Trailties",
       "gem-version.ts::VERSION": "Trails::VERSION",
       "generators/actions/create-migration.ts::CreateMigration": "Trails::Generators::Actions::CreateMigration",
