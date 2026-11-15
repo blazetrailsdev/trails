@@ -27,6 +27,10 @@ describe("FilesTest", () => {
     expect(content).toContain(await path.read());
   }
 
+  async function assertPathExists(path: Pathname) {
+    expect(await File.isExistAsync(path.toString())).toBe(true);
+  }
+
   it("fresh installation", async () => {
     const appRoot = (await root()).join("test_fresh_install");
     await RbFileUtils.mkdirPAsync(appRoot.toString());
@@ -46,8 +50,8 @@ describe("FilesTest", () => {
       await refreshConfig();
     }
 
-    expect(await File.isExistAsync(appRoot.join("vite.config.ts").toString())).toBe(true);
-    expect(await File.isExistAsync(appRoot.join("package.json").toString())).toBe(true);
+    await assertPathExists(appRoot.join("vite.config.ts"));
+    await assertPathExists(appRoot.join("package.json"));
     expect(JSON.parse(await appRoot.join("package.json").read())["type"]).toBe("module");
   });
 
@@ -55,7 +59,7 @@ describe("FilesTest", () => {
     const path = (await root()).join("write");
     await write(path, "Hello\nWorld");
 
-    expect(await File.isExistAsync(path.toString())).toBe(true);
+    expect(await File.isExistAsync(path.toString())).toBeTruthy();
     await assertContent(path, "Hello\nWorld");
   });
 

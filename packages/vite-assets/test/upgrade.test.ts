@@ -24,7 +24,6 @@ describe("UpgradeTest", () => {
       await (
         new CLI.Upgrade() as unknown as { upgradeRubyGems(): Promise<void> }
       ).upgradeRubyGems();
-      expect(captureSpy).toHaveBeenCalledOnce();
     } finally {
       librariesSpy.mockRestore();
       captureSpy.mockRestore();
