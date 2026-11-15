@@ -104,7 +104,6 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     });
     if (pending instanceof Promise) {
       this._pendingBody = pending.then(() => buf);
-      this._pendingBody.catch(() => {});
       throw new RuntimeError(
         "streaming ActionDispatch::Response body: await awaitBody before body",
       );
