@@ -55,7 +55,9 @@ describe("walkedClassPaths", () => {
   it("leaves a walked export no table can seat out of excluded", async () => {
     const record = await constantResidue("activerecord", []);
     expect(record.excluded).not.toContain("test-helpers/models/topic.ts::Topic");
-    expect(record.excluded).toContain("future-result.ts::Canceled");
+    expect(record.excluded).toContain(
+      "relation/predicate-builder/deferred-distinct-pk-in.ts::DeferredPluck",
+    );
   });
 });
 
@@ -100,6 +102,24 @@ describe("isReceipted", () => {
     expect(
       isReceipted(`/** @noRailsEquivalent PERMANENT */\nexport default class Foo {}`, "Foo"),
     ).toBe(true);
+  });
+
+  it("accepts a receipt on an exported const module", () => {
+    expect(
+      isReceipted(`/** @noRailsEquivalent PERMANENT */\nexport const Foo = {};\n`, "Foo"),
+    ).toBe(true);
+    expect(
+      isReceipted(
+        `/** @noRailsEquivalent PERMANENT */\nexport const Foo = { a: 1 } as const;`,
+        "Foo",
+      ),
+    ).toBe(true);
+    expect(
+      isReceipted(
+        `/** @noRailsEquivalent PERMANENT */\nexport const Bar = {};\nexport const Foo = {};`,
+        "Foo",
+      ),
+    ).toBe(false);
   });
 
   it("refuses a bare tag, prose, a detached JSDoc, or another class's receipt", () => {

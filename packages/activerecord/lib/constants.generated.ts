@@ -510,6 +510,7 @@ defineConstants([
   [() => m112.NullEncryptor, "ActiveRecord::Encryption::NullEncryptor"],
   [() => m113.Properties, "ActiveRecord::Encryption::Properties"],
   [() => m114.Scheme, "ActiveRecord::Encryption::Scheme"],
+  [() => m115.Enum, "ActiveRecord::Enum"],
   [() => m115.EnumMethods, "ActiveRecord::Enum::EnumMethods"],
   [() => m115.EnumType, "ActiveRecord::Enum::EnumType"],
   [() => m135.EnvironmentMismatchError, "ActiveRecord::EnvironmentMismatchError"],

@@ -8,6 +8,15 @@ describe("derivedConstantPath", () => {
     ).toBe("ActiveJob::QueueAdapters::TestAdapter");
   });
 
+  it("reads a directory's index.ts as the directory's own namespace", async () => {
+    expect(await derivedConstantPath("actionpack", "action-controller/index.ts", "Railties")).toBe(
+      "ActionController::Railties",
+    );
+    expect(await derivedConstantPath("activesupport", "index.ts", "ActiveSupport")).toBe(
+      "ActiveSupport",
+    );
+  });
+
   it("takes a two-segment root from the package layout", async () => {
     expect(await derivedConstantPath("rack-test", "cookie-jar.ts", "CookieJar")).toBe(
       "Rack::Test::CookieJar",
