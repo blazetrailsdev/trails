@@ -2,10 +2,6 @@ import { ArgumentError } from "./hash-utils.js";
 import { OpenSSL, type DigestClass } from "@blazetrails/ruby-compat";
 
 export class Digest {
-  static toString(): string {
-    return "ActiveSupport::Digest";
-  }
-
   private static _hashDigestClass?: DigestClass;
 
   static get hashDigestClass(): DigestClass {

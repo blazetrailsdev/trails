@@ -15,10 +15,6 @@ export const ReloadedClassesFiltering = {
 };
 
 export class WeakSet<T extends object> {
-  static toString(): string {
-    return "ActiveSupport::DescendantsTracker::WeakSet";
-  }
-
   private _map = new globalThis.WeakMap<T, boolean>();
   private _refs: WeakRef<T>[] = [];
   private _addsSinceCompact = 0;

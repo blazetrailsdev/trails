@@ -4,10 +4,6 @@ import { QueueAdapters } from "../namespaces.js";
 import { AbstractAdapter } from "./abstract-adapter.js";
 
 export class InlineAdapter extends AbstractAdapter {
-  static toString(): string {
-    return "ActiveJob::QueueAdapters::InlineAdapter";
-  }
-
   override async enqueue(job: { serialize(): Record<string, unknown> }): Promise<unknown> {
     return await Base.execute(job.serialize());
   }

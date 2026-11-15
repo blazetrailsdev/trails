@@ -55,10 +55,6 @@ function getState(cls: AnyClass): ClassState {
 }
 
 export class Subscriber {
-  static toString(): string {
-    return "ActiveSupport::Subscriber";
-  }
-
   patterns: Map<string, NotificationSubscriber> = new Map();
 
   private static _subscribers: Subscriber[] = [];

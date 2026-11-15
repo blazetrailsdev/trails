@@ -46,10 +46,6 @@ import { include, type Extended } from "@blazetrails/ruby-compat/include";
 import { prepend } from "@blazetrails/ruby-compat";
 
 export class TestCase extends Minitest.Test {
-  static toString(): string {
-    return "ActiveSupport::TestCase";
-  }
-
   declare static fileFixturePath: string | Pathname | null;
   declare readonly fileFixturePath: string | Pathname | null;
   declare static isFileFixturePath: () => boolean;

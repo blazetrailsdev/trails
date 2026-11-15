@@ -31,10 +31,6 @@ for (const [exp, name] of Object.entries(DECIMAL_UNITS)) {
 }
 
 export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions> {
-  static toString(): string {
-    return "ActiveSupport::NumberHelper::NumberToHumanConverter";
-  }
-
   static {
     this.namespace = "human";
     this.validateFloat = true;

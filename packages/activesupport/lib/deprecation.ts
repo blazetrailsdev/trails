@@ -213,10 +213,6 @@ interface NodeCallSite {
 const TRAILS_GEM_ROOT = new URL(".", import.meta.url).pathname;
 
 export class Deprecation {
-  static toString(): string {
-    return "ActiveSupport::Deprecation";
-  }
-
   static _instance(): Deprecation {
     return (Deprecation.__instance ??= new Deprecation());
   }

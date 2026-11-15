@@ -8,20 +8,12 @@ export function isDuplicable(value: unknown): boolean {
 }
 
 export class Method {
-  static toString(): string {
-    return "Method";
-  }
-
   static isDuplicable(): false {
     return false;
   }
 }
 
 export class UnboundMethod {
-  static toString(): string {
-    return "UnboundMethod";
-  }
-
   static isDuplicable(): false {
     return false;
   }

@@ -3,10 +3,6 @@ import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
 export class RangeSerializer extends ObjectSerializer {
-  static toString(): string {
-    return "ActiveJob::Serializers::RangeSerializer";
-  }
-
   static readonly KEYS = Object.freeze(["begin", "end", "exclude_end"]);
 
   serialize(range: Range): Record<string, unknown> {

@@ -27,7 +27,6 @@ import { fileURLToPath } from "url";
 import {
   rubyMethodToTs,
   rubyFileToTs,
-  TS_CLASS_RENAMES,
   scopedSkipMirrorName,
 } from "@blazetrails/parity/conventions";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
@@ -106,7 +105,6 @@ interface FileOrder {
   // Window, NamedWindow, Rows, Range, CurrentRow, Preceding, Following) can
   // otherwise get wrong while staying green.
   declarations: string[];
-  classPaths?: Record<string, string>;
 }
 interface Manifest {
   files: Record<string, FileOrder>;
@@ -366,7 +364,6 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       if (n === undefined || n.includes(".") || have.has(n)) continue;
       have.add(n);
       order.declarations.push(n);
-      (order.classPaths ??= {})[TS_CLASS_RENAMES[n] ?? n] = fqn;
     }
   }
 
@@ -397,18 +394,8 @@ for (const k of Object.keys(manifest.files).sort()) {
   const hasFns = order.functions.length > 0;
   // A single declaration orders nothing.
   const declarations = order.declarations.length > 1 ? order.declarations : [];
-  const classPaths = order.classPaths;
-  if (
-    Object.keys(classes).length === 0 &&
-    !hasFns &&
-    declarations.length === 0 &&
-    classPaths === undefined
-  ) {
-    continue;
-  }
-  const out: FileOrder = { classes, functions: order.functions, declarations };
-  if (classPaths !== undefined) out.classPaths = classPaths;
-  sortedFiles[k] = out;
+  if (Object.keys(classes).length === 0 && !hasFns && declarations.length === 0) continue;
+  sortedFiles[k] = { classes, functions: order.functions, declarations };
 }
 const final: Manifest = { files: sortedFiles };
 

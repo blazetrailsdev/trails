@@ -36,10 +36,6 @@ const defaultOutput: LoggerOutput = {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerThreadSafeLevel` (`logger_silence.rb:9`); the class/interface merge is how `include()` surfaces on the type side.
 export class Logger extends RubyLogger {
-  static toString(): string {
-    return "ActiveSupport::Logger";
-  }
-
   static silencer: boolean = true;
 
   static setSilencer(silencer: boolean): void {
@@ -110,10 +106,6 @@ export interface Logger {
 include(Logger, LoggerThreadSafeLevel);
 
 export class SimpleFormatter extends RubyLogger.Formatter {
-  static toString(): string {
-    return "ActiveSupport::Logger::SimpleFormatter";
-  }
-
   override call(severity: string, timestamp: unknown, progname: unknown, msg: unknown): string {
     return `${typeof msg === "string" ? msg : rbInspect(msg)}\n`;
   }

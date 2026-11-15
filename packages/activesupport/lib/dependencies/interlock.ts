@@ -2,10 +2,6 @@ import { ShareLock, type ShareLockThreadInfo } from "../concurrency/share-lock.j
 import type { Thread } from "@blazetrails/ruby-compat";
 
 export class Interlock {
-  static toString(): string {
-    return "ActiveSupport::Dependencies::Interlock";
-  }
-
   private lock: ShareLock;
 
   constructor() {

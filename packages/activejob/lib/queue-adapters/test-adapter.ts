@@ -19,10 +19,6 @@ interface TestAdapterJob {
 }
 
 export class TestAdapter extends AbstractAdapter {
-  static toString(): string {
-    return "ActiveJob::QueueAdapters::TestAdapter";
-  }
-
   performEnqueuedJobs: unknown = null;
   performEnqueuedAtJobs: unknown = null;
   filter: unknown = null;

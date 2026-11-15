@@ -4,10 +4,6 @@ import { SECONDS_PER_DAY, SECONDS_PER_WEEK } from "../duration.js";
 const DATE_COMPONENTS: (keyof DurationParts)[] = ["years", "months", "days"];
 
 export class ISO8601Serializer {
-  static toString(): string {
-    return "ActiveSupport::Duration::ISO8601Serializer";
-  }
-
   private duration: Duration;
   private precision: number | null;
 

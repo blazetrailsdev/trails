@@ -3,10 +3,6 @@ import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
 export class BigDecimalSerializer extends ObjectSerializer {
-  static toString(): string {
-    return "ActiveJob::Serializers::BigDecimalSerializer";
-  }
-
   serialize(bigDecimal: BigDecimal): Record<string, unknown> {
     return super.serialize({ value: bigDecimal.toString() });
   }

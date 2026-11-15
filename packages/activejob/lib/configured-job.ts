@@ -8,10 +8,6 @@ interface ConfiguredJobClass {
 }
 
 export class ConfiguredJob {
-  static toString(): string {
-    return "ActiveJob::ConfiguredJob";
-  }
-
   private _options: Record<string, unknown>;
   private _jobClass: ConfiguredJobClass;
 

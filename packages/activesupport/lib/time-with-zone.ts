@@ -110,10 +110,6 @@ type TimeLike =
   | Temporal.ZonedDateTime;
 
 export class TimeWithZone {
-  static toString(): string {
-    return "ActiveSupport::TimeWithZone";
-  }
-
   private _utc!: Time | null;
   private _time!: TimeLike | null;
   private _timeZone!: TimeZone | Timezone;

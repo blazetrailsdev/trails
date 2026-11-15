@@ -21,10 +21,6 @@ interface AsyncAdapterJob {
 type ExecutorOptions = Partial<ConstructorParameters<typeof ThreadPoolExecutor>[0]>;
 
 export class AsyncAdapter extends AbstractAdapter {
-  static toString(): string {
-    return "ActiveJob::QueueAdapters::AsyncAdapter";
-  }
-
   declare static JobWrapper: typeof JobWrapper;
   declare static Scheduler: typeof Scheduler;
 
@@ -55,10 +51,6 @@ export class AsyncAdapter extends AbstractAdapter {
 }
 
 export class JobWrapper {
-  static toString(): string {
-    return "ActiveJob::QueueAdapters::AsyncAdapter::JobWrapper";
-  }
-
   private _jobData: Record<string, unknown>;
 
   constructor(job: AsyncAdapterJob) {
@@ -72,10 +64,6 @@ export class JobWrapper {
 }
 
 export class Scheduler {
-  static toString(): string {
-    return "ActiveJob::QueueAdapters::AsyncAdapter::Scheduler";
-  }
-
   static readonly DEFAULT_EXECUTOR_OPTIONS = Object.freeze({
     minThreads: 0,
     maxThreads: Number(toI(getEnv("TRAILS_MAX_THREADS", "5"))),

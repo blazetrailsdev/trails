@@ -3,10 +3,6 @@ import { Process, rbObjRespondTo, SecureRandom, throwDataP } from "@blazetrails/
 export type EventPayload = Record<string, unknown>;
 
 export class Event {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Event";
-  }
-
   readonly name: string;
   readonly transactionId: string;
   payload: EventPayload;
@@ -148,10 +144,6 @@ export interface NotificationHandle {
 }
 
 export class Instrumenter {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Instrumenter";
-  }
-
   readonly id: string;
   private _notifier: InstrumenterNotifier & {
     buildHandle(name: string, id: unknown, payload: EventPayload): NotificationHandle;
@@ -225,10 +217,6 @@ export class Instrumenter {
 }
 
 export class LegacyHandle implements NotificationHandle {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Instrumenter::LegacyHandle";
-  }
-
   private _notifier: InstrumenterNotifier;
   private _name: string;
   private _id: unknown;
@@ -252,10 +240,6 @@ export class LegacyHandle implements NotificationHandle {
 }
 
 export class Wrapper {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Instrumenter::LegacyHandle::Wrapper";
-  }
-
   private _notifier: InstrumenterNotifier;
 
   constructor(notifier: InstrumenterNotifier) {

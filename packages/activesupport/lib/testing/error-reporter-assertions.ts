@@ -13,10 +13,6 @@ const RECORDERS = "active_support_error_reporter_assertions";
 
 /** @internal */
 export class Report {
-  static toString(): string {
-    return "ActiveSupport::Testing::ErrorReporterAssertions::ErrorCollector::Report";
-  }
-
   error: Error;
   handled: boolean;
   severity: ErrorSeverity;

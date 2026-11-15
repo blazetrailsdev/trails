@@ -40,10 +40,6 @@ import { ActiveJob } from "./namespaces.js";
 import { Serializers } from "./serializers.js";
 
 export class DeserializationError extends StandardError {
-  static toString(): string {
-    return "ActiveJob::DeserializationError";
-  }
-
   constructor(errinfo: unknown) {
     super(`Error while trying to deserialize arguments: ${(errinfo as Error).message}`, {
       cause: errinfo,
@@ -55,10 +51,6 @@ export class DeserializationError extends StandardError {
 ActiveJob.DeserializationError = DeserializationError;
 
 export class SerializationError extends ArgumentError {
-  static toString(): string {
-    return "ActiveJob::SerializationError";
-  }
-
   constructor(message?: string) {
     super(message);
     this.name = "ActiveJob::SerializationError";

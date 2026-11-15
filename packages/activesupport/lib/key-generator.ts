@@ -2,10 +2,6 @@ import { ArgumentError } from "./hash-utils.js";
 import { DigestClass, getCrypto, OpenSSL, type Bytes } from "@blazetrails/ruby-compat";
 
 export class KeyGenerator {
-  static toString(): string {
-    return "ActiveSupport::KeyGenerator";
-  }
-
   private static _hashDigestClass?: DigestClass;
 
   static set hashDigestClass(klass: DigestClass) {
@@ -49,10 +45,6 @@ export class KeyGenerator {
 }
 
 export class CachingKeyGenerator {
-  static toString(): string {
-    return "ActiveSupport::CachingKeyGenerator";
-  }
-
   private readonly keyGenerator: KeyGenerator;
   private readonly cacheKeys = new Map<string, Bytes>();
 

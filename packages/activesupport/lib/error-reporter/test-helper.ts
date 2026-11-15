@@ -5,10 +5,6 @@ import type {
 } from "../error-reporter.js";
 
 export class ErrorSubscriber implements ErrorSubscriberInterface {
-  static toString(): string {
-    return "ActiveSupport::ErrorReporter::TestHelper::ErrorSubscriber";
-  }
-
   events: Array<[unknown, boolean, ErrorSeverity, string, ErrorContext]> = [];
 
   report(

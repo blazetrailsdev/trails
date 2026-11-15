@@ -11,10 +11,6 @@ import { toTime } from "../core-ext/date-time/compatibility.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
 class Stub {
-  static toString(): string {
-    return "ActiveSupport::Testing::SimpleStubs::Stub";
-  }
-
   constructor(
     readonly object: object,
     readonly methodName: string,
@@ -23,10 +19,6 @@ class Stub {
 }
 
 export class SimpleStubs {
-  static toString(): string {
-    return "ActiveSupport::Testing::SimpleStubs";
-  }
-
   private stubs: Map<object, Map<string, Stub>>;
 
   constructor() {

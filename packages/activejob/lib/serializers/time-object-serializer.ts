@@ -6,10 +6,6 @@ import { ObjectSerializer } from "./object-serializer.js";
 export class TimeObjectSerializer extends ObjectSerializer {
   static readonly NANO_PRECISION = 9;
 
-  static toString(): string {
-    return "ActiveJob::Serializers::TimeObjectSerializer";
-  }
-
   /** @inventedArm if — PERMANENT */
   serialize(
     time:

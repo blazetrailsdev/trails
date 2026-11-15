@@ -6,11 +6,7 @@ import { TestHelper } from "./test-helper.js";
 import "./constants.test-case.generated.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class TestCase extends ActiveSupportTestCase {
-  static toString(): string {
-    return "ActiveJob::TestCase";
-  }
-}
+export class TestCase extends ActiveSupportTestCase {}
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface TestCase extends Omit<TestHelper, "beforeSetup" | "afterTeardown"> {}
 include(TestCase, TestHelper);

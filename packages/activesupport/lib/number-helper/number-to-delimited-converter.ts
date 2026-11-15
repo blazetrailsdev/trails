@@ -3,10 +3,6 @@ import { NumberConverter } from "./number-converter.js";
 import type { NumberWithDelimiterOptions } from "../number-helper.js";
 
 export class NumberToDelimitedConverter extends NumberConverter<NumberWithDelimiterOptions> {
-  static toString(): string {
-    return "ActiveSupport::NumberHelper::NumberToDelimitedConverter";
-  }
-
   static DEFAULT_DELIMITER_REGEX = /(\d)(?=(\d\d\d)+(?!\d))/g;
 
   static {

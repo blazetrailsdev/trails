@@ -4,10 +4,6 @@ import { Event } from "./instrumenter.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export class InstrumentationSubscriberError extends Error {
-  static toString(): string {
-    return "ActiveSupport::Notifications::InstrumentationSubscriberError";
-  }
-
   readonly exceptions: Error[];
 
   constructor(exceptions: Error[]) {
@@ -66,10 +62,6 @@ type Delegate = EventedListener | TimedCallback | EventObjectCallback;
 export type CallableListener = { call(...args: never[]): void };
 
 export class Matcher {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::Subscribers::Matcher";
-  }
-
   readonly pattern: RegExp;
   readonly exclusions = new Set<string>();
 
@@ -111,10 +103,6 @@ class StringMatcher {
 }
 
 export class AllMessages {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::Subscribers::Matcher::AllMessages";
-  }
-
   unsubscribeBang(_name: string): boolean {
     return false;
   }
@@ -134,10 +122,6 @@ type GroupClass = new (
 ) => BaseGroup;
 
 export abstract class BaseGroup<L = Delegate> {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::BaseGroup";
-  }
-
   protected listeners: L[];
 
   constructor(listeners: L[], _name: string, _id: unknown, _payload: Record<string, unknown>) {
@@ -154,10 +138,6 @@ export abstract class BaseGroup<L = Delegate> {
 }
 
 export abstract class BaseTimeGroup extends BaseGroup<TimedCallback> {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::BaseTimeGroup";
-  }
-
   private startTime: Time | number = 0;
 
   override start(_name: string, _id: unknown, _payload: Record<string, unknown>): void {
@@ -175,30 +155,18 @@ export abstract class BaseTimeGroup extends BaseGroup<TimedCallback> {
 }
 
 export class MonotonicTimedGroup extends BaseTimeGroup {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::MonotonicTimedGroup";
-  }
-
   protected override now(): number {
     return Process.clockGettime(Process.CLOCK_MONOTONIC);
   }
 }
 
 export class TimedGroup extends BaseTimeGroup {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::TimedGroup";
-  }
-
   protected override now(): Time {
     return Time.now();
   }
 }
 
 export class EventedGroup extends BaseGroup<EventedListener> {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::EventedGroup";
-  }
-
   override start(name: string, id: unknown, payload: Record<string, unknown>): void {
     this.each((s) => {
       s.start(name, id, payload);
@@ -213,10 +181,6 @@ export class EventedGroup extends BaseGroup<EventedListener> {
 }
 
 export class EventObjectGroup extends BaseGroup<EventObjectCallback> {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::EventObjectGroup";
-  }
-
   private _event: Event | null = null;
 
   get event(): Event | null {
@@ -243,10 +207,6 @@ export class EventObjectGroup extends BaseGroup<EventObjectCallback> {
 }
 
 export class Handle {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::Handle";
-  }
-
   private _name: string;
   private _id: unknown;
   private _payload: Record<string, unknown>;
@@ -300,10 +260,6 @@ export class Handle {
 }
 
 export class Fanout {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout";
-  }
-
   private stringSubscribers = new Map<string, Evented[]>();
   private otherSubscribers: Evented[] = [];
   private allListenersForCache = new Map<string, Evented[]>();
@@ -495,10 +451,6 @@ function groupBy(subscribers: Evented[]): Map<GroupClass, Delegate[]> {
 }
 
 export class Evented<D = Delegate> {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::Subscribers::Evented";
-  }
-
   readonly pattern: AnyMatcher;
   readonly delegate: D;
   readonly silenceable: boolean;
@@ -548,10 +500,6 @@ export class Evented<D = Delegate> {
 }
 
 export class Timed extends Evented<TimedCallback> {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::Subscribers::Timed";
-  }
-
   override groupClass(): GroupClass {
     return TimedGroup as GroupClass;
   }
@@ -562,20 +510,12 @@ export class Timed extends Evented<TimedCallback> {
 }
 
 export class MonotonicTimed extends Timed {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::Subscribers::MonotonicTimed";
-  }
-
   override groupClass(): GroupClass {
     return MonotonicTimedGroup as GroupClass;
   }
 }
 
 export class EventObject extends Evented<EventObjectCallback> {
-  static toString(): string {
-    return "ActiveSupport::Notifications::Fanout::Subscribers::EventObject";
-  }
-
   override groupClass(): GroupClass {
     return EventObjectGroup as GroupClass;
   }

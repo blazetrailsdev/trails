@@ -4,11 +4,7 @@ function isPredicateSpelling(prop: string): boolean {
   return /^is[A-Z]/.test(prop) && !KERNEL_METHODS.has(prop) && !PROTOCOL_PROBES.has(prop);
 }
 
-export class StringInquirer extends String {
-  static toString(): string {
-    return "ActiveSupport::StringInquirer";
-  }
-}
+export class StringInquirer extends String {}
 
 Object.setPrototypeOf(
   StringInquirer.prototype,

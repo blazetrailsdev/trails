@@ -2,10 +2,6 @@ import { MessageVerifier } from "./message-verifier.js";
 import { RotationCoordinator, type BuildOptions } from "./messages/rotation-coordinator.js";
 
 export class MessageVerifiers extends RotationCoordinator<MessageVerifier> {
-  static toString(): string {
-    return "ActiveSupport::MessageVerifiers";
-  }
-
   /** @internal */
   protected build(salt: string, options: BuildOptions): MessageVerifier {
     const { secretGenerator, secretGeneratorOptions, ...rest } = options;

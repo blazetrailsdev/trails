@@ -3,10 +3,6 @@ import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
 export class SymbolSerializer extends ObjectSerializer {
-  static toString(): string {
-    return "ActiveJob::Serializers::SymbolSerializer";
-  }
-
   serialize(argument: string): Record<string, unknown> {
     return super.serialize({ value: symbolToS(argument) });
   }

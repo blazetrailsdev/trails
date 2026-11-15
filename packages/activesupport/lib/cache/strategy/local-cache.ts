@@ -63,10 +63,6 @@ export const LocalCacheRegistry = {
 };
 
 export class LocalStore {
-  static toString(): string {
-    return "ActiveSupport::Cache::Strategy::LocalCache::LocalStore";
-  }
-
   private data: Hash<unknown, unknown>;
 
   constructor() {

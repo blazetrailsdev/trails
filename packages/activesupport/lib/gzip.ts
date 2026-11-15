@@ -1,10 +1,6 @@
 import { StringIO, Zlib, b, getZlib } from "@blazetrails/ruby-compat";
 
 export class Stream extends StringIO {
-  static toString(): string {
-    return "ActiveSupport::Gzip::Stream";
-  }
-
   constructor(string = "") {
     super(string);
     this.setEncoding("BINARY");
