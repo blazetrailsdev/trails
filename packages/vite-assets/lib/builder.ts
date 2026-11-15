@@ -101,11 +101,13 @@ export class Builder {
     this._fileDigests = Object.create(null);
     const files: string[] = [];
     for (const pattern of config.watchedPaths()) {
-      files.push(...(await Dir.globAsync(pattern, 0, { base: root })));
+      files.push(
+        ...(await Dir.globAsync(pattern, 0, { base: root })).map((file) => File.join(root, file)),
+      );
     }
     const fileIds: string[] = [];
     for (const file of files.sort()) {
-      const id = await this.fileDigest(file, previousDigests, root);
+      const id = await this.fileDigest(file, previousDigests);
       if (id != null) fileIds.push(id);
     }
     this._lastDigestAt = Date.now();
@@ -116,10 +118,8 @@ export class Builder {
   private async fileDigest(
     file: string,
     previousDigests: Record<string, [Signature, string]>,
-    root: string,
   ): Promise<string | null> {
-    const path = File.join(root, file);
-    const stat = await getFs().stat!(path);
+    const stat = await getFs().stat!(file);
     if (stat.isDirectory()) return null;
 
     const signature: Signature = [stat.mtime.getTime(), stat.size];
@@ -129,7 +129,7 @@ export class Builder {
       previousSignature[1] === signature[1] &&
       !this.isRecentlyModified(stat)
         ? previousId
-        : `${File.basename(file)}/${(await Digest.SHA1.file(path)).hexdigest()}`;
+        : `${File.basename(file)}/${(await Digest.SHA1.file(file)).hexdigest()}`;
     this._fileDigests[file] = [signature, id];
     return id;
   }

@@ -12,10 +12,7 @@ export class Runner {
     this._viteRuby = viteRuby;
   }
 
-  /**
-   * @missingRailsCall within_root — PERMANENT
-   * @missingRailsArgs exec — CONVERGEABLE vite-assets-framework-libraries-reads-loaded-packages
-   */
+  /** @missingRailsCall within_root — PERMANENT */
   async run(argv: string[], { exec: isExec = false }: { exec?: boolean } = {}): Promise<unknown> {
     try {
       const config = await this.config();
