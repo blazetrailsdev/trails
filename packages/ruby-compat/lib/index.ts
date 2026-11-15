@@ -529,7 +529,6 @@ export {
   MonitorConditionVariable,
   isMonOwned,
   monSynchronize,
-  monSynchronizeSync,
   newCond,
   synchronize,
 } from "./monitor.js";
