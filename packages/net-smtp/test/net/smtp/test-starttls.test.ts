@@ -75,8 +75,9 @@ describe("TestStarttls", () => {
   it("enable starttls without starttls capable", async () => {
     const smtp = new MySMTP(await startSmtpd(false));
     smtp.enableStarttls();
-    const err = (await smtp.start().catch((e: unknown) => e)) as SMTPUnsupportedCommand;
-    expect(err).toBeInstanceOf(SMTPUnsupportedCommand);
+    const started = smtp.start();
+    await expect(started).rejects.toThrow(SMTPUnsupportedCommand);
+    const err = (await started.catch((e: unknown) => e)) as SMTPUnsupportedCommand;
     expect(err.message).toEqual("STARTTLS is not supported on this server");
     expect(err.response).toBeNull();
   });
