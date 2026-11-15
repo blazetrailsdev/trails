@@ -104,6 +104,24 @@ describe("isReceipted", () => {
     ).toBe(true);
   });
 
+  it("accepts a receipt on an exported const module", () => {
+    expect(
+      isReceipted(`/** @noRailsEquivalent PERMANENT */\nexport const Foo = {};\n`, "Foo"),
+    ).toBe(true);
+    expect(
+      isReceipted(
+        `/** @noRailsEquivalent PERMANENT */\nexport const Foo = { a: 1 } as const;`,
+        "Foo",
+      ),
+    ).toBe(true);
+    expect(
+      isReceipted(
+        `/** @noRailsEquivalent PERMANENT */\nexport const Bar = {};\nexport const Foo = {};`,
+        "Foo",
+      ),
+    ).toBe(false);
+  });
+
   it("refuses a bare tag, prose, a detached JSDoc, or another class's receipt", () => {
     expect(isReceipted(receipted("@noRailsEquivalent"), "Foo")).toBe(false);
     expect(isReceipted(receipted("has no @noRailsEquivalent receipt"), "Foo")).toBe(false);

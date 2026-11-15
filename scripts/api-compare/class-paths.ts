@@ -828,9 +828,6 @@ async function topLevelRubyConstants(dir: string): Promise<Set<string>> {
   const ruby = await readJson<Manifest>("rails-api.json").catch(() => null);
   const out = new Set<string>();
   for (const [pkg, rubyPkg] of Object.entries(ruby?.packages ?? {})) {
-    for (const fqn of Object.keys(rubyPkg.modules ?? {})) {
-      if (!fqn.includes("::")) out.add(renameTokens(fqn));
-    }
     if ((PACKAGE_DIR_OVERRIDES[pkg] ?? pkg) !== dir) continue;
     const srcRoot = path.join(ROOT_DIR, "packages", dir, "lib");
     const subDir = path.relative(srcRoot, packageSrcDir(pkg));
@@ -844,7 +841,7 @@ async function topLevelRubyConstants(dir: string): Promise<Set<string>> {
 
 /**
  * The walked exports Ruby answers that no table row seats: one named for a
- * top-level Ruby constant, whose JS name is already its path (`Mime`; every
+ * top-level Ruby module, whose JS name is already its path (`Mime`; every
  * gem's, so `ActionView` reopened by `rails-html-sanitizer.rb:14`); one the
  * layout places at a module Ruby defines in another file and reopens here
  * (`module HelperMethods` in every `validations/*.rb`); and one the layout
@@ -862,7 +859,7 @@ async function rubyAnswered(dir: string): Promise<(key: string, fqn: string) => 
     for (const kind of ["classes", "modules"] as const) {
       for (const fqn of Object.keys(rubyPkg[kind] ?? {})) {
         known.add(renameTokens(fqn));
-        if (!fqn.includes("::")) topLevel.add(renameTokens(fqn));
+        if (kind === "modules" && !fqn.includes("::")) topLevel.add(renameTokens(fqn));
       }
     }
     if ((PACKAGE_DIR_OVERRIDES[pkg] ?? pkg) !== dir) continue;

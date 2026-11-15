@@ -176,7 +176,7 @@ export async function derivedConstantPath(
   }
   if (cpath === null) return null;
   const segments = cpath.split("::");
-  if (File.basename(file) === "index.ts") segments.pop();
+  if (File.basename(file) === "index.ts" && segments.length > 1) segments.pop();
   const [first, ...nested] = tsName.split(".").map(rubyCname);
   if (first !== segments.at(-1)) {
     if (PACKAGE_LAYOUTS[dir]?.siblings) segments.pop();
