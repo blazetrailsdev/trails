@@ -7,41 +7,61 @@ type MethodMissingModule = {
   respondToMissing(this: object, name: string, includeAll?: boolean): boolean;
 };
 
-const ProxyUrlHelpers = {
-  urlFor(this: object, options: unknown): unknown {
+class NamedRouteCollection extends RouteSet.NamedRouteCollection {
+  override isRouteDefined(name: string): boolean {
     TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return rbCallSuper(this, ProxyUrlHelpers.urlFor, options);
-  },
-
-  fullUrlFor(this: object, options: unknown): unknown {
-    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return rbCallSuper(this, ProxyUrlHelpers.fullUrlFor, options);
-  },
-
-  routeFor(this: object, name: string, ...args: unknown[]): unknown {
-    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return rbCallSuper(this, ProxyUrlHelpers.routeFor, name, ...args);
-  },
-
-  optimizeRoutesGeneration(this: object): unknown {
-    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return rbCallSuper(this, ProxyUrlHelpers.optimizeRoutesGeneration);
-  },
-
-  polymorphicUrl(this: object, recordOrHashOrArray: unknown, options: unknown = {}): unknown {
-    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return rbCallSuper(this, ProxyUrlHelpers.polymorphicUrl, recordOrHashOrArray, options);
-  },
-
-  polymorphicPath(this: object, recordOrHashOrArray: unknown, options: unknown = {}): unknown {
-    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-    return rbCallSuper(this, ProxyUrlHelpers.polymorphicPath, recordOrHashOrArray, options);
-  },
-};
+    return super.isRouteDefined(name);
+  }
+}
 
 export class LazyRouteSet extends RouteSet {
+  static NamedRouteCollection = NamedRouteCollection;
+
+  static ProxyUrlHelpers = {
+    urlFor(this: object, options: unknown): unknown {
+      TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+      return rbCallSuper(this, LazyRouteSet.ProxyUrlHelpers.urlFor, options);
+    },
+
+    fullUrlFor(this: object, options: unknown): unknown {
+      TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+      return rbCallSuper(this, LazyRouteSet.ProxyUrlHelpers.fullUrlFor, options);
+    },
+
+    routeFor(this: object, name: string, ...args: unknown[]): unknown {
+      TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+      return rbCallSuper(this, LazyRouteSet.ProxyUrlHelpers.routeFor, name, ...args);
+    },
+
+    optimizeRoutesGeneration(this: object): unknown {
+      TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+      return rbCallSuper(this, LazyRouteSet.ProxyUrlHelpers.optimizeRoutesGeneration);
+    },
+
+    polymorphicUrl(this: object, recordOrHashOrArray: unknown, options: unknown = {}): unknown {
+      TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+      return rbCallSuper(
+        this,
+        LazyRouteSet.ProxyUrlHelpers.polymorphicUrl,
+        recordOrHashOrArray,
+        options,
+      );
+    },
+
+    polymorphicPath(this: object, recordOrHashOrArray: unknown, options: unknown = {}): unknown {
+      TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+      return rbCallSuper(
+        this,
+        LazyRouteSet.ProxyUrlHelpers.polymorphicPath,
+        recordOrHashOrArray,
+        options,
+      );
+    },
+  };
+
   constructor(config?: ConstructorParameters<typeof RouteSet>[0]) {
     super(config);
+    this.namedRoutes = new LazyRouteSet.NamedRouteCollection();
     prepend(this.namedRoutes.urlHelpersModule, this.methodMissingModule());
     prepend(this.namedRoutes.pathHelpersModule, this.methodMissingModule());
   }
@@ -56,7 +76,7 @@ export class LazyRouteSet extends RouteSet {
 
   override generateUrlHelpers(supportsPath: boolean): ReturnType<RouteSet["generateUrlHelpers"]> {
     const mod = super.generateUrlHelpers(supportsPath);
-    prepend({ prototype: mod }, ProxyUrlHelpers);
+    prepend({ prototype: mod }, LazyRouteSet.ProxyUrlHelpers);
     const parent = Object.getPrototypeOf(mod) as object;
     Object.setPrototypeOf(
       mod,
