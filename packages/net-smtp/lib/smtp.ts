@@ -1,5 +1,5 @@
 import { isIP } from "node:net";
-import { checkServerIdentity, type PeerCertificate } from "node:tls";
+import { checkServerIdentity, rootCertificates, type PeerCertificate } from "node:tls";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import {
   binaryBytes,
@@ -601,32 +601,45 @@ export class SMTP {
   }
 
   /** @internal */
-  private async sslSocketConnect(s: SSLSocket, _timeout: number | null): Promise<void> {
+  private async sslSocketConnect(s: SSLSocket, timeout: number | null): Promise<void> {
     const { io, context } = s;
     const hostname = s.hostname!;
     const store = context.certStore;
+    const ca =
+      store == null || store._certs.length === 0
+        ? null
+        : store._defaultPaths
+          ? [...rootCertificates, ...store._certs]
+          : store._certs;
     io.options.tls = {
-      ...(store != null && !store._defaultPaths ? { ca: store._certs } : {}),
+      ...(ca != null ? { ca } : {}),
       rejectUnauthorized: context.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
-      ...(isIP(hostname) === 0
-        ? { servername: hostname }
-        : {
-            checkServerIdentity: (_host: string, cert: PeerCertificate) =>
-              checkServerIdentity(hostname, cert),
-          }),
+      ...(isIP(hostname) === 0 ? { servername: hostname } : {}),
+      checkServerIdentity: (_host: string, cert: PeerCertificate) =>
+        context.verifyHostname ? checkServerIdentity(hostname, cert) : undefined,
     };
-    await new Promise<void>((resolve, reject) => {
-      io.once("error", reject);
-      io._upgradeConnection((err) => {
-        io.removeListener("error", reject);
-        if (err) reject(err);
-        else resolve();
-      });
-    }).catch((err: ConnectionError & { originalCode?: string }) => {
-      if (err.originalCode != null) err.code = err.originalCode;
-      s._setVerifyResult(err.code);
-      throw err;
-    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    await Promise.race([
+      new Promise<void>((resolve, reject) => {
+        io.once("error", reject);
+        io._upgradeConnection((err) => {
+          io.removeListener("error", reject);
+          if (err) reject(err);
+          else resolve();
+        });
+      }),
+      new Promise<never>((_resolve, reject) => {
+        if (timeout != null) {
+          timer = setTimeout(() => reject(new OpenTimeout("execution expired")), timeout * 1000);
+        }
+      }),
+    ])
+      .catch((err: ConnectionError & { originalCode?: string }) => {
+        if (err.originalCode != null) err.code = err.originalCode;
+        s._setVerifyResult(err.code);
+        throw err;
+      })
+      .finally(() => clearTimeout(timer));
   }
 
   /** @internal */

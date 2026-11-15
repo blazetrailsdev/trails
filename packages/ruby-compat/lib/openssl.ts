@@ -3,6 +3,7 @@ import { getFs, type Bytes } from "./fs-adapter.js";
 import { DigestClass, type DigestInstance } from "./digest.js";
 import { SecureRandom } from "./secure-random.js";
 import { ArgumentError } from "./argument-error.js";
+import { NoMethodError } from "./no-method-error.js";
 import { StandardError } from "./standard-error.js";
 
 const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
@@ -113,6 +114,7 @@ export class SSLContext {
     minVersion: 0x301,
     verifyMode: 1,
     verifyHostname: true,
+    options: (0x80000850 & ~0x800) | 0x20000,
   };
 
   /** @noRailsEquivalent PERMANENT */
@@ -122,6 +124,8 @@ export class SSLContext {
     return store;
   })();
 
+  /** @noRailsEquivalent PERMANENT */
+  options = 0;
   /** @noRailsEquivalent PERMANENT */
   verifyMode: number | null;
   /** @noRailsEquivalent PERMANENT */
@@ -138,6 +142,7 @@ export class SSLContext {
   minVersion: number | null = null;
 
   constructor() {
+    this.options |= OpenSSL.SSL.OP_ALL;
     this.verifyMode = OpenSSL.SSL.VERIFY_NONE;
     this.verifyHostname = false;
   }
@@ -145,8 +150,14 @@ export class SSLContext {
   /** @noRailsEquivalent PERMANENT */
   setParams(params: Record<string, unknown> = {}): Record<string, unknown> {
     params = { ...SSLContext.DEFAULT_PARAMS, ...params };
+    this.options = params.options as number;
     delete params.options;
     for (const [name, value] of Object.entries(params)) {
+      if (!Object.hasOwn(this, name)) {
+        throw new NoMethodError(
+          `undefined method '${name}=' for an instance of OpenSSL::SSL::SSLContext`,
+        );
+      }
       (this as unknown as Record<string, unknown>)[name] = value;
     }
     if (this.verifyMode !== OpenSSL.SSL.VERIFY_NONE) {
@@ -187,8 +198,9 @@ export class SSLSocket<IO extends { close(): void } = { close(): void }> {
     return this._verifyResult;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @internal */
   _setVerifyResult(code: unknown): void {
+    if (code === "ERR_TLS_CERT_ALTNAME_INVALID") code = "HOSTNAME_MISMATCH";
     const result =
       typeof code === "string"
         ? (X509_VERIFY_RESULTS as Record<string, number>)[`V_ERR_${code}`]
@@ -420,7 +432,16 @@ export const Random = {
 export const OpenSSL = {
   Cipher,
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2999-3000 */
-  SSL: { VERIFY_NONE: 0, VERIFY_PEER: 1, SSLError, SSLContext, SSLSocket },
+  SSL: {
+    VERIFY_NONE: 0,
+    VERIFY_PEER: 1,
+    OP_ALL: 0x80000850,
+    OP_DONT_INSERT_EMPTY_FRAGMENTS: 0x800,
+    OP_NO_COMPRESSION: 0x20000,
+    SSLError,
+    SSLContext,
+    SSLSocket,
+  },
   X509: { Store, ...X509_VERIFY_RESULTS },
   HMAC,
   Random,
