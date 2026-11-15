@@ -50,6 +50,7 @@ defineConstants([
   [() => m11.Engine, "Trails::Engine"],
   [() => m12.EngineConfiguration, "Trails::Engine::Configuration"],
   [() => m13.LazyRouteSet, "Trails::Engine::LazyRouteSet"],
+  [() => m13.LazyRouteSet.ProxyUrlHelpers, "Trails::Engine::LazyRouteSet::ProxyUrlHelpers"],
   [() => m14.Trailties, "Trails::Engine::Trailties"],
   [() => m16.HealthController, "Trails::HealthController"],
   [() => m18.Info, "Trails::Info"],

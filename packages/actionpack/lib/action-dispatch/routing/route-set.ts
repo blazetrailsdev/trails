@@ -817,6 +817,9 @@ export class RouteSet {
     "scriptName",
     "originalScriptName",
   ];
+
+  static NamedRouteCollection = NamedRouteCollection;
+
   namedRoutes: NamedRouteCollection = new NamedRouteCollection();
   /** @internal */
   private _config: Config;

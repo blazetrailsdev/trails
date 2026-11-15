@@ -275,13 +275,18 @@ Class-specific rules under root § "Ruby protocol methods with a different JS
 mechanism"; its cross-table rules and
 [docs/method-missing-definers.md](../../docs/method-missing-definers.md) apply too.
 
-- `rails/engine/lazy_route_set.rb`'s `method_missing_module` is spliced beneath
-  the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since
-  `include()` copies a module's methods into each includer and a Proxy on the
-  module itself would reach no includer. That row is not converged: the reload
-  runs in line, but `respondToMissing` still answers `super`, the in-line
-  re-send is unported, and test_help's integration `before_setup` awaits the
-  reload — debt tracked by `lazy-route-set-method-missing-resends-in-line`.
+- `rails/engine/lazy_route_set.rb`'s `method_missing_module` is a plain-object
+  module the constructor prepends onto `namedRoutes`' url and path helper
+  modules, where `initialize` prepends it (`lazy_route_set.rb:52-57`), so every
+  includer receives `respondToMissing` through `include()`; its `methodMissing`
+  half is not ported. `ProxyUrlHelpers` is a
+  plain-object module prepended onto the generated module's statics, reaching
+  `super` through `rbCallSuper`. The trap is a bare `Object.create(parent)`
+  Proxy above the generated module's static chain, with no carrier copied into
+  it. The row is still not converged: the reload runs in line,
+  but `respondToMissing` still answers `super`, the in-line re-send is
+  unported, and test_help's integration `before_setup` awaits the reload —
+  debt tracked by `lazy-route-set-method-missing-resends-in-line`.
 - `RoutesReloader#execute_unless_loaded` runs synchronously because ESM has
   no synchronous `load`. `set_routes_reloader_hook`, `reload_routes!` and the
   `to_run` block first await `prefetchBang`, which `rbFLoad`s each routes file

@@ -1,9 +1,0 @@
-[
-  {
-    "package": "trailties",
-    "tsFile": "engine/lazy-route-set.ts",
-    "rubyName": "generate_url_helpers",
-    "call": "prepend",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  }
-]
