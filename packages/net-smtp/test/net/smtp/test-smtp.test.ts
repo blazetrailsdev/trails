@@ -41,7 +41,7 @@ class FakeServer {
   private _tls: unknown;
   private _server: Server | null = null;
   private _sockets: Socket[] = [];
-  private _serverThread: Thread | null = null;
+  private _serverThreads: Thread[] = [];
   private _buffer = "";
   private _waiter: ((line: string | null) => void) | null = null;
   private _eof = false;
@@ -61,18 +61,22 @@ class FakeServer {
       this.sock = s;
       this._sockets.push(s);
       s.on("error", () => {});
-      this._serverThread = new Thread(async () => {
+      const serverThread = new Thread(async () => {
+        Thread.current().abortOnException = true;
         await this.init();
         await this.loop();
       });
+      this._serverThreads.push(serverThread);
     });
     await new Promise<void>((resolve) => this._server!.listen(0, "127.0.0.1", () => resolve()));
     this.port = (this._server.address() as { port: number }).port;
   }
 
   async stop(): Promise<void> {
-    this._serverThread?.kill();
-    await this._serverThread?.join();
+    for (const serverThread of this._serverThreads.splice(0)) {
+      serverThread.kill();
+      await serverThread.join();
+    }
     for (const s of this._sockets) s.destroy();
     await new Promise<void>((resolve) => this._server!.close(() => resolve()));
   }
