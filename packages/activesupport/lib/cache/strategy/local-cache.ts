@@ -1,4 +1,12 @@
-import { Hash, rbCallSuper, rbModName, rbObjId, slice } from "@blazetrails/ruby-compat";
+import {
+  block,
+  fetch,
+  Hash,
+  rbCallSuper,
+  rbModName,
+  rbObjId,
+  slice,
+} from "@blazetrails/ruby-compat";
 import { underscore } from "../../inflector.js";
 import { extractOptionsBang } from "../../hash-utils.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
@@ -17,7 +25,17 @@ export interface LocalCacheHost {
   newEntry(value: unknown, options?: StoreOptions): Entry;
 }
 
-type Host = LocalCacheHost & { _localCacheKey?: string };
+interface Host extends LocalCacheHost {
+  _localCacheKey?: string;
+  localCache(): LocalStore | null | undefined;
+  localCacheKey(): string;
+  bypassLocalCache<T>(block: () => T | Promise<T>): Promise<T>;
+  useTemporaryLocalCache<T>(
+    temporaryCache: LocalStore | null,
+    block: () => T | Promise<T>,
+  ): Promise<T>;
+  writeCacheValue(name: unknown, value: unknown, options?: StoreOptions): Promise<void>;
+}
 
 /** @internal */
 export const LocalCacheRegistry = {
@@ -78,28 +96,33 @@ export class LocalStore {
     return value != null && value !== false;
   }
 
-  async fetchEntry(key: unknown, block?: () => unknown): Promise<unknown> {
-    if (this.data.has(key)) return this.data.get(key);
-    const value = await block!();
-    this.data.set(key, value);
-    return value;
+  async fetchEntry(key: unknown, _block?: () => unknown): Promise<unknown> {
+    return await fetch(
+      this.data,
+      key,
+      block(async () => {
+        const value = await _block!();
+        this.data.set(key, value);
+        return value;
+      }),
+    );
   }
 }
 
 export const LocalCache = {
   withLocalCache<T>(this: Host, block: () => T | Promise<T>): Promise<T> {
-    return LocalCache.useTemporaryLocalCache.call(this, new LocalStore(), block) as Promise<T>;
+    return this.useTemporaryLocalCache(new LocalStore(), block);
   },
 
   async clear(this: Host, options: StoreOptions | null = null): Promise<void> {
-    const cache = LocalCache.localCache.call(this);
+    const cache = this.localCache();
     if (cache == null) return (await rbCallSuper(this, LocalCache.clear, options)) as void;
     cache.clear(options);
     await rbCallSuper(this, LocalCache.clear, options);
   },
 
   async cleanup(this: Host, options: StoreOptions | null = null): Promise<void> {
-    const cache = LocalCache.localCache.call(this);
+    const cache = this.localCache();
     if (cache == null) return (await rbCallSuper(this, LocalCache.cleanup, options)) as void;
     cache.clear(options);
     await rbCallSuper(this, LocalCache.cleanup, options);
@@ -110,7 +133,7 @@ export const LocalCache = {
     matcher: unknown,
     options: StoreOptions | null = null,
   ): Promise<void> {
-    const cache = LocalCache.localCache.call(this);
+    const cache = this.localCache();
     if (cache == null)
       return (await rbCallSuper(this, LocalCache.deleteMatched, matcher, options)) as void;
     cache.clear(options);
@@ -123,12 +146,12 @@ export const LocalCache = {
     amount = 1,
     options: StoreOptions = {},
   ): Promise<unknown> {
-    if (LocalCache.localCache.call(this) == null)
+    if (this.localCache() == null)
       return await rbCallSuper(this, LocalCache.increment, name, amount, options);
-    const value = await LocalCache.bypassLocalCache.call(this, () =>
+    const value = await this.bypassLocalCache(() =>
       rbCallSuper(this, LocalCache.increment, name, amount, options),
     );
-    await LocalCache.writeCacheValue.call(this, name, value, { raw: true, ...options });
+    await this.writeCacheValue(name, value, { raw: true, ...options });
     return value;
   },
 
@@ -138,18 +161,18 @@ export const LocalCache = {
     amount = 1,
     options: StoreOptions = {},
   ): Promise<unknown> {
-    if (LocalCache.localCache.call(this) == null)
+    if (this.localCache() == null)
       return await rbCallSuper(this, LocalCache.decrement, name, amount, options);
-    const value = await LocalCache.bypassLocalCache.call(this, () =>
+    const value = await this.bypassLocalCache(() =>
       rbCallSuper(this, LocalCache.decrement, name, amount, options),
     );
-    await LocalCache.writeCacheValue.call(this, name, value, { raw: true, ...options });
+    await this.writeCacheValue(name, value, { raw: true, ...options });
     return value;
   },
 
   async fetchMulti(this: Host, ...names: unknown[]): Promise<Map<unknown, unknown>> {
     const block = names.pop() as (key: unknown) => unknown;
-    if (LocalCache.localCache.call(this) == null || names.length === 0)
+    if (this.localCache() == null || names.length === 0)
       return (await rbCallSuper(this, LocalCache.fetchMulti, ...names, block)) as Map<
         unknown,
         unknown
@@ -161,7 +184,7 @@ export const LocalCache = {
     const keysToNames = new Hash<unknown, unknown>();
     for (const name of names) keysToNames.set(await this.normalizeKey(name, options), name);
 
-    const localCache = LocalCache.localCache.call(this)!;
+    const localCache = this.localCache()!;
     const localEntries = localCache.readMultiEntries([...keysToNames.keys()]);
     const results = new Map<unknown, unknown>();
     for (const [key, value] of localEntries) {
@@ -198,7 +221,7 @@ export const LocalCache = {
 
   /** @internal */
   async readSerializedEntry(this: Host, key: unknown, options: Options = {}): Promise<unknown> {
-    const cache = LocalCache.localCache.call(this);
+    const cache = this.localCache();
     if (cache != null) {
       let hit = true;
       const entry = await cache.fetchEntry(key, () => {
@@ -218,7 +241,7 @@ export const LocalCache = {
     names: unknown[],
     options: StoreOptions = {},
   ): Promise<Map<unknown, unknown>> {
-    const localCache = LocalCache.localCache.call(this);
+    const localCache = this.localCache();
     if (localCache == null)
       return (await rbCallSuper(this, LocalCache.readMultiEntries, names, options)) as Map<
         unknown,
@@ -270,7 +293,7 @@ export const LocalCache = {
     options?: StoreOptions,
   ): unknown {
     const returnValue = rbCallSuper(this, LocalCache.writeSerializedEntry, key, payload, options);
-    const localCache = LocalCache.localCache.call(this);
+    const localCache = this.localCache();
     if (returnValue != null && returnValue !== false) {
       if (localCache != null) localCache.writeEntry(key, payload);
     } else {
@@ -281,7 +304,7 @@ export const LocalCache = {
 
   /** @internal */
   async deleteEntry(this: Host, key: unknown, options?: StoreOptions): Promise<boolean> {
-    const localCache = LocalCache.localCache.call(this);
+    const localCache = this.localCache();
     if (localCache != null) localCache.deleteEntry(key);
     return (await rbCallSuper(this, LocalCache.deleteEntry, key, options)) as boolean;
   },
@@ -294,7 +317,7 @@ export const LocalCache = {
     options: StoreOptions = {},
   ): Promise<void> {
     name = await this.normalizeKey(name, options);
-    const cache = LocalCache.localCache.call(this)!;
+    const cache = this.localCache()!;
     if (value != null && value !== false) {
       cache.writeEntry(name, this.serializeEntry(this.newEntry(value, options), options));
     } else {
@@ -310,22 +333,25 @@ export const LocalCache = {
 
   /** @internal */
   localCache(this: Host): LocalStore | null | undefined {
-    return LocalCacheRegistry.cacheFor(LocalCache.localCacheKey.call(this));
+    return LocalCacheRegistry.cacheFor(this.localCacheKey());
   },
 
   /** @internal */
   bypassLocalCache<T>(this: Host, block: () => T | Promise<T>): Promise<T> {
-    return LocalCache.useTemporaryLocalCache.call(this, null, block) as Promise<T>;
+    return this.useTemporaryLocalCache(null, block);
   },
 
-  /** @internal */
+  /**
+   * @inventedArm fork — PERMANENT
+   * @internal
+   */
   useTemporaryLocalCache<T>(
     this: Host,
     temporaryCache: LocalStore | null,
     block: () => T | Promise<T>,
   ): Promise<T> {
     return IsolatedExecutionState.fork("active_support_local_cache_registry", async () => {
-      const localCacheKey = LocalCache.localCacheKey.call(this);
+      const localCacheKey = this.localCacheKey();
       const saveCache = LocalCacheRegistry.cacheFor(localCacheKey);
       try {
         LocalCacheRegistry.setCacheFor(localCacheKey, temporaryCache);
