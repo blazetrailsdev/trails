@@ -1,5 +1,5 @@
 import { Mail } from "../../mail.js";
-import { ArgumentError, block, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, block, OpenSSL, rbInspect } from "@blazetrails/ruby-compat";
 import { SMTP as NetSMTP } from "@blazetrails/net-smtp";
 import { SMTPConnection } from "./smtp-connection.js";
 import type { Message } from "../../message.js";
@@ -104,20 +104,22 @@ export class SMTP {
   }
 
   /** @internal */
-  private sslContext(): Record<string, unknown> {
+  private sslContext(): ReturnType<typeof NetSMTP.defaultSslContext> {
     let opensslVerifyMode = this.settings.opensslVerifyMode;
 
     if (typeof opensslVerifyMode === "string") {
-      opensslVerifyMode = `VERIFY_${opensslVerifyMode.toUpperCase()}`;
+      opensslVerifyMode = (OpenSSL.SSL as Record<string, unknown>)[
+        `VERIFY_${opensslVerifyMode.toUpperCase()}`
+      ];
     }
 
     const context = NetSMTP.defaultSslContext();
     if (opensslVerifyMode != null && opensslVerifyMode !== false)
-      context.verifyMode = opensslVerifyMode;
+      context.verifyMode = opensslVerifyMode as number;
     if (this.settings.caPath != null && this.settings.caPath !== false)
-      context.caPath = this.settings.caPath;
+      context.caPath = this.settings.caPath as string;
     if (this.settings.caFile != null && this.settings.caFile !== false)
-      context.caFile = this.settings.caFile;
+      context.caFile = this.settings.caFile as string;
     return context;
   }
 }

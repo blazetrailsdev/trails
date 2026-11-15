@@ -9,6 +9,7 @@ import {
   IOError,
   include,
   isModuleIncluded,
+  OpenSSL,
   rbBlockGivenP,
   rbFArray,
   rbModName,
@@ -41,7 +42,8 @@ type Connection = SMTPConnection & {
 
 type ConnectionError = Error & { code?: string };
 
-type SslContext = Record<string, unknown>;
+type SSLContext = InstanceType<typeof OpenSSL.SSL.SSLContext>;
+type SSLSocket = InstanceType<typeof OpenSSL.SSL.SSLSocket<Connection>>;
 
 interface StartOptions {
   helo?: string | null;
@@ -56,7 +58,7 @@ interface NewOptions {
   starttls?: boolean | string;
   tlsVerify?: boolean;
   tlsHostname?: string | null;
-  sslContextParams?: SslContext | null;
+  sslContextParams?: Record<string, unknown> | null;
 }
 
 export const SMTPError = {
@@ -244,9 +246,10 @@ export class SMTP {
     return SMTP.defaultTlsPort();
   }
 
-  /** @missingRailsCall new — PERMANENT */
-  static defaultSslContext(sslContextParams: SslContext | null = null): SslContext {
-    return { ...(sslContextParams ?? {}) };
+  static defaultSslContext(sslContextParams: Record<string, unknown> | null = null): SSLContext {
+    const context = new OpenSSL.SSL.SSLContext();
+    context.setParams(sslContextParams ?? {});
+    return context;
   }
 
   static async start(
@@ -287,7 +290,7 @@ export class SMTP {
   capabilities: Record<string, string[]> | null = null;
   tlsVerify: boolean;
   tlsHostname: string | null;
-  sslContextParams: SslContext | null;
+  sslContextParams: Record<string, unknown> | null;
   openTimeout = 30;
   /** @internal */
   _socket: Connection | null = null;
@@ -297,8 +300,8 @@ export class SMTP {
   private _debugOutput: { write(str: string): unknown } | null = null;
   private _tls: boolean;
   private _starttls: boolean | string;
-  private _sslContextTls: SslContext | null = null;
-  private _sslContextStarttls: SslContext | null = null;
+  private _sslContextTls: SSLContext | null = null;
+  private _sslContextStarttls: SSLContext | null = null;
 
   constructor(
     address: string,
@@ -368,7 +371,7 @@ export class SMTP {
     return this.isTls();
   }
 
-  enableTls(context: SslContext | null = null): void {
+  enableTls(context: SSLContext | null = null): void {
     if (this._starttls === "always") {
       throw new ArgumentError("SMTPS and STARTTLS is exclusive");
     }
@@ -376,7 +379,7 @@ export class SMTP {
     this._sslContextTls = context;
   }
 
-  enableSsl(context: SslContext | null = null): void {
+  enableSsl(context: SSLContext | null = null): void {
     this.enableTls(context);
   }
 
@@ -401,13 +404,13 @@ export class SMTP {
     return this._starttls === "auto";
   }
 
-  enableStarttls(context: SslContext | null = null): void {
+  enableStarttls(context: SSLContext | null = null): void {
     if (this._tls) throw new ArgumentError("SMTPS and STARTTLS is exclusive");
     this._starttls = "always";
     this._sslContextStarttls = context;
   }
 
-  enableStarttlsAuto(context: SslContext | null = null): void {
+  enableStarttlsAuto(context: SSLContext | null = null): void {
     if (this._tls) throw new ArgumentError("SMTPS and STARTTLS is exclusive");
     this._starttls = "auto";
     this._sslContextStarttls = context;
@@ -452,7 +455,9 @@ export class SMTP {
     const authtype = options.authtype ?? (args[3] as string | undefined) ?? null;
     const sslContextParams = this.sslContextParams ?? {};
     if (!Object.hasOwn(sslContextParams, "verifyMode")) {
-      sslContextParams["verifyMode"] = this.tlsVerify ? "VERIFY_PEER" : "VERIFY_NONE";
+      sslContextParams["verifyMode"] = this.tlsVerify
+        ? OpenSSL.SSL.VERIFY_PEER
+        : OpenSSL.SSL.VERIFY_NONE;
     }
     if (this._tls && this._sslContextTls == null) {
       this._sslContextTls = SMTP.defaultSslContext(sslContextParams);
@@ -574,16 +579,35 @@ export class SMTP {
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm if — PERMANENT
-   */
-  private async tlsconnect(s: Connection, context: SslContext | null): Promise<void> {
-    const { verifyMode, ...tls } = context ?? {};
-    const hostname = this.tlsHostname ?? this.address;
-    s.options.tls = {
-      ...tls,
-      rejectUnauthorized: verifyMode !== "VERIFY_NONE",
+  /** @internal */
+  sslSocket(socket: Connection, context: SSLContext): SSLSocket {
+    return new OpenSSL.SSL.SSLSocket(socket, context);
+  }
+
+  /** @internal */
+  private async tlsconnect(s: Connection, context: SSLContext | null): Promise<SSLSocket> {
+    let verified = false;
+    const ssl = this.sslSocket(s, context!);
+    try {
+      this.logging("TLS connection started");
+      ssl.syncClose = true;
+      ssl.hostname = this.tlsHostname ?? this.address;
+      await this.sslSocketConnect(ssl, this.openTimeout);
+      verified = true;
+      return ssl;
+    } finally {
+      if (!verified) ssl.close();
+    }
+  }
+
+  /** @internal */
+  private async sslSocketConnect(s: SSLSocket, _timeout: number | null): Promise<void> {
+    const { io, context } = s;
+    const hostname = s.hostname!;
+    const store = context.certStore;
+    io.options.tls = {
+      ...(store != null && !store._defaultPaths ? { ca: store._certs } : {}),
+      rejectUnauthorized: context.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
       ...(isIP(hostname) === 0
         ? { servername: hostname }
         : {
@@ -591,16 +615,16 @@ export class SMTP {
               checkServerIdentity(hostname, cert),
           }),
     };
-    this.logging("TLS connection started");
     await new Promise<void>((resolve, reject) => {
-      s.once("error", reject);
-      s._upgradeConnection((err) => {
-        s.removeListener("error", reject);
+      io.once("error", reject);
+      io._upgradeConnection((err) => {
+        io.removeListener("error", reject);
         if (err) reject(err);
         else resolve();
       });
     }).catch((err: ConnectionError & { originalCode?: string }) => {
       if (err.originalCode != null) err.code = err.originalCode;
+      s._setVerifyResult(err.code);
       throw err;
     });
   }
