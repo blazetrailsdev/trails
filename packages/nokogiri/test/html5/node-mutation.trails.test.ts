@@ -144,3 +144,13 @@ describe("HTML5::DocumentFragment elements and is_a?", () => {
     expect(fragment.children[0]).not.toBeInstanceOf(XML.DocumentFragment);
   });
 });
+
+describe("HTML5 nodes share the XML::Node chain", () => {
+  it("is an XML::Node and its fragment holds a parse5 tree", () => {
+    const fragment = DocumentFragment.parse("<p>hi</p>");
+    expect(fragment).toBeInstanceOf(XML.DocumentFragment);
+    expect(fragment).toBeInstanceOf(XML.Node);
+    expect(fragment.children[0]).toBeInstanceOf(XML.Node);
+    expect(fragment._node.nodeName).toBe("#document-fragment");
+  });
+});
