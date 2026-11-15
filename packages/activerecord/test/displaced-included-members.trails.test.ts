@@ -5,7 +5,7 @@ import { attributeInDatabase } from "../lib/attribute-methods.js";
 
 describe("class-body members displacing include()d ports", () => {
   it("Base displaces no included member it does not list under shadowsIncluded", () => {
-    expect([...displacedIncludedMembers(Base).keys()]).toEqual([]);
+    expect(displacedIncludedMembers(Base)).toEqual(new Map());
   });
 
   it("reports a class-body attributeInDatabase that displaces the mixed-in port", () => {
