@@ -252,7 +252,7 @@ export abstract class Store {
     const key = await this.normalizeKey(name, options);
     const version = await this.normalizeVersion(name, options);
     return await this.instrument("read", key, options, async (payload) => {
-      const entry = await this.readEntry(key, options);
+      const entry = await this.readEntry(key, { ...options, event: payload });
       if (!entry) {
         payload.hit = false;
         return null;

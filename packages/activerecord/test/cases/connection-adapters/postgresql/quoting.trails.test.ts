@@ -197,20 +197,22 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("unescapes hex bytea values we now own locally", () => {
-    expect(pgUnescapeBytea("\\x6869")).toEqual(Buffer.from("hi"));
+    expect(pgUnescapeBytea("\\x6869")).toEqual(new TextEncoder().encode("hi"));
   });
 
   it("unescapes legacy octal bytea with escaped backslashes", () => {
-    expect(pgUnescapeBytea("a\\134\\000b")).toEqual(Buffer.from([0x61, 0x5c, 0x00, 0x62]));
+    expect(pgUnescapeBytea("a\\134\\000b")).toEqual(Uint8Array.from([0x61, 0x5c, 0x00, 0x62]));
   });
 
   it("unescapes the bytes Type::Binary#deserialize hands it", () => {
-    expect(pgUnescapeBytea(new TextEncoder().encode("\\x6869"))).toEqual(Buffer.from("hi"));
+    expect(pgUnescapeBytea(new TextEncoder().encode("\\x6869"))).toEqual(
+      new TextEncoder().encode("hi"),
+    );
   });
 
   it("unescape_bytea asks the valid raw connection, and only for a value", async () => {
     const host = { validRawConnection: async () => pgConnection({}) };
-    expect(await unescapeBytea.call(host, "\\x6869")).toEqual(Buffer.from("hi"));
+    expect(await unescapeBytea.call(host, "\\x6869")).toEqual(new TextEncoder().encode("hi"));
     expect(await unescapeBytea.call(host, null)).toBeUndefined();
   });
 

@@ -4,6 +4,7 @@ import {
   type Entry as CacheEntry,
   type StoreOptions,
 } from "@blazetrails/activesupport/cache";
+import { LocalCache } from "@blazetrails/activesupport/cache/strategy/local-cache";
 import type { EventPayload } from "@blazetrails/activesupport/notifications/instrumenter";
 import {
   ArgumentError,
@@ -11,6 +12,7 @@ import {
   fetch,
   FixedThreadPool,
   include,
+  prepend,
   rbModName,
   TopLevel,
   type Included,
@@ -71,7 +73,8 @@ export interface Store
     Included<typeof Execution>,
     Included<typeof Expiry>,
     Included<typeof Failsafe>,
-    Included<typeof Stats> {}
+    Included<typeof Stats>,
+    Pick<Included<typeof LocalCache>, "withLocalCache"> {}
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above. */
 export class Store extends CacheStore {
@@ -83,6 +86,7 @@ export class Store extends CacheStore {
     include(this, Expiry);
     include(this, Failsafe);
     include(this, Stats);
+    prepend(this, LocalCache);
     constSet(SolidCache, "Store", this);
     constSet(this, "Api", Api);
     constSet(this, "Connections", Connections);

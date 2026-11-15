@@ -91,12 +91,6 @@ export const ACTIVESUPPORT_UNPORTED_FILES: UnportedFile[] = [
     reason: SOLID_STACK_ONLY,
   },
   {
-    pattern: "cache/strategy/local_cache.rb",
-    package: "activesupport",
-    reason:
-      "outside the AR/AM require closure; deferred until an actionpack/railties port needs it.",
-  },
-  {
     pattern: "cache/strategy/local_cache_middleware.rb",
     testFile: "local_cache_middleware_test.rb",
     package: "activesupport",

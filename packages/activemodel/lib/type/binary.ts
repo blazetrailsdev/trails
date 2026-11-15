@@ -1,4 +1,4 @@
-import { rbEqual, rbObjAsString as toS, unpack1 } from "@blazetrails/ruby-compat";
+import { b, rbEqual, rbObjAsString as toS, unpack1 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./value.js";
 
 const textEncoder = new TextEncoder();
@@ -12,12 +12,17 @@ export class BinaryType extends ValueType<unknown> {
     return true;
   }
 
+  /** @inventedArm constructor — PERMANENT */
   cast(value: unknown): unknown {
     if (value instanceof Data) {
       return value.toString();
     } else {
       value = super.cast(value);
-      if (typeof value === "string") value = textEncoder.encode(value);
+      if (
+        typeof value === "string" ||
+        (value instanceof Uint8Array && value.constructor !== Uint8Array)
+      )
+        value = b(value);
       return value;
     }
   }

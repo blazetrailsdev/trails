@@ -53,7 +53,7 @@ describeIfPg("PostgreSQL bytea round trip", () => {
     const executed = await connection.execute("SELECT payload FROM bytea_data_type");
     expect(executed[0].payload).toBe("\\x5c5c");
     const rows = await connection.query("SELECT payload FROM bytea_data_type");
-    expect(rows).toEqual([[Buffer.from([0x5c, 0x5c])]]);
+    expect(rows).toEqual([[Uint8Array.from([0x5c, 0x5c])]]);
   });
 
   it("reads back a bytea[] holding backslash bytes unchanged", async () => {

@@ -5,6 +5,8 @@ import { cacheStoreFormatVersionBehavior } from "@blazetrails/activesupport/test
 import { cacheIncrementDecrementBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-increment-decrement-behavior";
 import { cacheStoreBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-behavior";
 import { cacheStoreCoderBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-coder-behavior";
+import { cacheStoreSerializerBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-serializer-behavior";
+import { localCacheBehavior } from "@blazetrails/activesupport/test/cache/behaviors/local-cache-behavior";
 import { cacheStoreVersionBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-version-behavior";
 import { describe, expect, it } from "vitest";
 import { useSolidCache } from "../support/test-helper.js";
@@ -17,6 +19,8 @@ describe("SolidCacheTest", () => {
   cacheStoreCoderBehavior(host);
   cacheStoreCompressionBehavior(host);
   cacheStoreFormatVersionBehavior(host);
+  cacheStoreSerializerBehavior(host);
+  localCacheBehavior(host);
   cacheIncrementDecrementBehavior(host);
   cacheInstrumentationBehavior({ ...host, storeName: "Store" });
   cacheLoggingBehavior(host);
