@@ -54,7 +54,7 @@ describe("TCTimezoneProxy", () => {
     expect(new TimezoneProxy("Europe/London").equals(new TimezoneProxy("Europe/Paris"))).toBe(
       false,
     );
-    expect(!new TimezoneProxy("Europe/London").equals({})).toBe(true);
+    expect(!new TimezoneProxy("Europe/London").equals({})).toBeTruthy();
   });
 
   // BLOCKED: tzinfo-timezone-reads-the-data-source
