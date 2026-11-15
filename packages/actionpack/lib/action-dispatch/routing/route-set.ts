@@ -35,6 +35,7 @@ import {
   RFC2396_PARSER,
   classModule,
 } from "@blazetrails/ruby-compat";
+import { Routing } from "../../namespaces.js";
 import { Mapper } from "./mapper.js";
 import { isIncludedMember } from "../../abstract-controller/trailties/routes-helpers.js";
 import { deprecator } from "../deprecator.js";
@@ -817,6 +818,7 @@ export type UrlHelpersModule = { prototype: object } & Record<
   };
 
 export class RouteSet {
+  static readonly RESERVED_OPTIONS: readonly string[] = RESERVED_OPTIONS;
   namedRoutes: NamedRouteCollection = new NamedRouteCollection();
   /** @internal */
   private _config: Config;
@@ -1470,3 +1472,5 @@ export class RouteSet {
     return (await this.router.serve(req as unknown as RouterRequest)) as unknown as RackResponse;
   }
 }
+
+Routing.RouteSet = RouteSet;

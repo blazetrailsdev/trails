@@ -4,6 +4,7 @@ import {
   Concern,
   mattrWriter,
   reverseMergeBang,
+  transformKeys,
 } from "@blazetrails/activesupport";
 import {
   classModule,
@@ -91,9 +92,15 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   }
   if (isPlainObject(options) || options instanceof Hash || options instanceof Parameters) {
     const routeName =
-      options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
+      options instanceof Parameters ? options.delete("use_route") : hashDelete(options, "useRoute");
+    const h = toH<Record<string, unknown> | Hash<string, unknown>>(options);
     const mergedUrlOptions = reverseMergeBang(
-      dup(toH<Record<string, unknown> | Hash<string, unknown>>(options)),
+      options instanceof Parameters
+        ? (transformKeys(h as Hash<string, unknown>, (key: string) => {
+            const symbol = camelize(key, "lower");
+            return Routing.RouteSet.RESERVED_OPTIONS.includes(symbol) ? symbol : key;
+          }) as Hash<string, unknown>)
+        : dup(h),
       this.urlOptions(),
     );
     return this._routes!.urlFor(

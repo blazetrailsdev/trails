@@ -239,6 +239,11 @@ describe("action_view.setup_action_pack", () => {
     expect(view.urlFor({ controller: "foo", action: "other", onlyPath: false })).toBe(
       "http://example.com/foo/other",
     );
+    expect(
+      view.urlFor(
+        new ActionController.Parameters({ controller: "foo", action: "other" }).permitBang(),
+      ),
+    ).toBe("/foo/other");
   });
 });
 

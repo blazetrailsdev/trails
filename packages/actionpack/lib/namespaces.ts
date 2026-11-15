@@ -35,6 +35,7 @@ import type { TestRequest as DispatchTestRequest } from "./action-dispatch/testi
 import type { AssertionResponse } from "./action-dispatch/testing/assertion-response.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
+import type { RouteSet } from "./action-dispatch/routing/route-set.js";
 import type { ActionableExceptions } from "./action-dispatch/middleware/actionable-exceptions.js";
 import type { RemoteIp } from "./action-dispatch/middleware/remote-ip.js";
 import type { HtmlTableFormatter } from "./action-dispatch/routing/inspector.js";
@@ -140,6 +141,7 @@ ActionDispatch.autoloadUnder("testing", () => {
 export const Routing = { name: "ActionDispatch::Routing", loadPath } as AutoloadModule & {
   PolymorphicRoutes: typeof PolymorphicRoutes;
   RoutesProxy: typeof RoutesProxy;
+  RouteSet: typeof RouteSet;
   UrlFor: typeof UrlFor;
   HtmlTableFormatter: typeof HtmlTableFormatter;
 };
