@@ -11,6 +11,7 @@ import {
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { Config, type ConfigOptions } from "./config.js";
+import { DevServerProxy } from "./dev-server-proxy.js";
 import { Error } from "./error.js";
 import { Manifest, type ManifestBuilder } from "./manifest.js";
 import { MissingEntrypointError } from "./missing-entrypoint-error.js";
@@ -20,6 +21,7 @@ type ConfigAttrs = Partial<Record<keyof ConfigOptions, unknown>>;
 
 export class ViteAssets {
   declare static Config: typeof Config;
+  declare static DevServerProxy: typeof DevServerProxy;
   declare static Error: typeof Error;
   declare static Manifest: typeof Manifest;
   declare static MissingEntrypointError: typeof MissingEntrypointError;
@@ -216,6 +218,7 @@ export class ViteAssets {
 ViteAssets.prototype.isRunProxy = ViteAssets.prototype.isDevMode;
 
 ViteAssets.Config = Config;
+ViteAssets.DevServerProxy = DevServerProxy;
 ViteAssets.Error = Error;
 ViteAssets.Manifest = Manifest;
 ViteAssets.MissingEntrypointError = MissingEntrypointError;

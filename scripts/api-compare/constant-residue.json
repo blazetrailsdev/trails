@@ -1623,11 +1623,12 @@
     }
   },
   "vite-assets": {
-    "rows": 5,
+    "rows": 6,
     "excluded": ["vite-assets.ts::ViteAssets"],
     "unwalked": [],
     "residue": {
       "config.ts::Config": "ViteAssets::Config",
+      "dev-server-proxy.ts::DevServerProxy": "ViteAssets::DevServerProxy",
       "error.ts::Error": "ViteAssets::Error",
       "manifest.ts::Manifest": "ViteAssets::Manifest",
       "missing-entrypoint-error.ts::MissingEntrypointError": "ViteAssets::MissingEntrypointError",
