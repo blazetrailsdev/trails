@@ -76,10 +76,7 @@ export class RequestBodyStream {
     return data;
   }
 
-  /**
-   * @missingRailsCall replace — PERMANENT
-   * @internal
-   */
+  /** @internal */
   private async readRemaining(buffer: Uint8Array | null): Promise<Uint8Array> {
     const data: Uint8Array[] = [];
     let chunk: Uint8Array | null;
