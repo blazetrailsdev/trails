@@ -49,7 +49,7 @@ export interface BumpReportGate {
 
 export interface BumpReportSeed {
   package: string;
-  kind: "drift" | "removed" | "changed" | "moved";
+  kind: "drift" | "removed" | "signature" | "changed" | "moved";
   rows: number;
 }
 

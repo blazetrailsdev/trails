@@ -5,10 +5,13 @@ import {
   mergeManifest,
   newRows,
   pairSeed,
+  signatureSeed,
+  suspendedTests,
   testDelta,
   testSeed,
   type HashRecord,
   type RubyTestManifest,
+  type TestSeedRow,
 } from "./ledger.js";
 
 const hash = (rubyName: string, digest: string, tsFile = "base.ts"): HashRecord => ({
@@ -141,5 +144,49 @@ describe("attribute", () => {
       null,
       "fileSeed",
     ]);
+  });
+});
+
+describe("signatureSeed", () => {
+  const k = (rubyName: string) => ({ package: "activesupport", rubyFile: "try.rb", rubyName });
+  const pin = (rubyName: string) => ({ ...k(rubyName), digest: "d" });
+  it("seeds a pinned pair that gains a signature row and no body seed row", () => {
+    const rows = signatureSeed(
+      [k("try")],
+      [k("try"), k("try"), k("tryBang"), k("drifted"), k("unpinned")],
+      [k("drifted")],
+      [pin("try"), pin("tryBang"), pin("drifted")],
+      "v8.0.2",
+      "v8.0.5.2",
+    );
+    expect(rows.map((r) => [r.rubyName, r.kind])).toEqual([
+      ["try", "signature"],
+      ["tryBang", "signature"],
+    ]);
+  });
+});
+
+describe("suspendedTests", () => {
+  const row = (p: string): TestSeedRow => ({
+    package: "activerecord",
+    rubyFile: "base_test.rb",
+    path: p,
+    kind: "changed",
+    from: "v8.0.2",
+    to: "v8.0.5.2",
+  });
+  it("keeps a test the candidate reports on a new axis only", () => {
+    const axes = (entries: [string, string[]][]) =>
+      new Map(entries.map(([d, a]) => [`activerecord base_test.rb ${d}`, new Set(a)]));
+    const kept = suspendedTests(
+      [row("T > new"), row("T > agrees"), row("T > already")],
+      (r) => r.path.slice(4),
+      axes([["already", ["assertionMismatches"]]]),
+      axes([
+        ["new", ["valueMismatches"]],
+        ["already", ["assertionMismatches"]],
+      ]),
+    );
+    expect(kept.map((r) => r.path)).toEqual(["T > new"]);
   });
 });

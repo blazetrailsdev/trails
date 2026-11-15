@@ -20,7 +20,7 @@ import { type BodyPin, type PinKey, comparePinKeys, currentDigests, keyOf } from
 export const LEDGER_DIR = path.join(ROOT_DIR, "scripts/parity/bump-ledger");
 
 export interface LedgerRow extends PinKey {
-  kind: "drift" | "removed";
+  kind: "drift" | "removed" | "signature";
   from: string;
   to: string;
   story?: string;
@@ -104,7 +104,9 @@ export function checkRows(
     const pin = pinned.get(keyOf(row));
     const digest = current.get(keyOf(row));
     if (pin === undefined) problems.push({ row, problem: "unmatched" });
-    else if (pin === digest) problems.push({ row, problem: "stale" });
+    else if (row.kind === "signature") {
+      if (digest === undefined) problems.push({ row, problem: "kind" });
+    } else if (pin === digest) problems.push({ row, problem: "stale" });
     else if ((digest === undefined) !== (row.kind === "removed"))
       problems.push({ row, problem: "kind" });
   }
@@ -337,6 +339,19 @@ export async function loadLedgerScope(dir = LEDGER_DIR): Promise<LedgerScope> {
   if (rows.length === 0) return ledgerScope([], []);
   const { loadArtifact } = await import("./body-pins.js");
   return ledgerScope(rows, (await loadArtifact()).hashes);
+}
+
+/**
+ * A `signature` row is stale once neither the parameter-name nor the
+ * block-parameter artifact carries a row on its pair: the port's signature
+ * agrees with the new Rails one. `lint-param-names.ts` reds these.
+ */
+export function staleSignatureRows(
+  rows: readonly LedgerRow[],
+  signatureRows: readonly PinKey[],
+): LedgerRow[] {
+  const live = new Set(signatureRows.map(keyOf));
+  return rows.filter((r) => r.kind === "signature" && !live.has(keyOf(r)));
 }
 
 /** Split `rows` into the ones a gate counts and the ones it skips for the ledger. */

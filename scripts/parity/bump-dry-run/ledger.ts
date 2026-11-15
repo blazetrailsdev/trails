@@ -26,7 +26,7 @@ export interface Pin extends PairKey {
 }
 
 export interface PairSeedRow extends PairKey {
-  kind: "drift" | "removed";
+  kind: "drift" | "removed" | "signature";
   from: string;
   to: string;
 }
@@ -226,7 +226,7 @@ export function newRows(active: readonly GateRow[], candidate: readonly GateRow[
   return candidate.filter((r) => !seen.has(stableJson(r)));
 }
 
-export type Attribution = "drift" | "removed" | "unpinnedChanged" | "fileSeed";
+export type Attribution = "drift" | "removed" | "signature" | "unpinnedChanged" | "fileSeed";
 
 export interface Attributed {
   row: GateRow;
@@ -293,4 +293,97 @@ export function stableJson(x: unknown): string {
 
 function cmp(a: string, b: string): number {
   return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/** The part of `convention-comparison.json` the test seed reads. */
+export interface ComparedFile {
+  rubyFile: string;
+  tsFileExists: boolean;
+  missingTests?: string[];
+  gateMismatches?: { description: string }[];
+  assertionMismatches?: { description: string }[];
+  kindMismatches?: { description: string }[];
+  valueMismatches?: { description: string }[];
+}
+
+const AXES = [
+  "gateMismatches",
+  "assertionMismatches",
+  "kindMismatches",
+  "valueMismatches",
+] as const;
+
+/** `<package> <rubyFile> <description>` → the mismatch axes test-compare reports for it. */
+export function mismatchAxes(
+  results: readonly { package: string; files?: ComparedFile[] }[],
+): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const r of results) {
+    for (const f of r.files ?? []) {
+      for (const axis of AXES) {
+        for (const m of f[axis] ?? []) {
+          const k = `${r.package} ${f.rubyFile} ${m.description}`;
+          out.set(k, (out.get(k) ?? new Set()).add(axis));
+        }
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * The seed rows the flip actually suspends: a test the candidate comparison
+ * reports on an axis the active comparison did not. A changed test trails
+ * still agrees with would be a stale row from birth, and one that already
+ * mismatched at the active ref is debt the base already counts.
+ */
+export function suspendedTests(
+  rows: readonly TestSeedRow[],
+  descriptionOf: (row: TestSeedRow) => string,
+  active: ReadonlyMap<string, ReadonlySet<string>>,
+  candidate: ReadonlyMap<string, ReadonlySet<string>>,
+): TestSeedRow[] {
+  return rows.filter((row) => {
+    const k = `${row.package} ${row.rubyFile} ${descriptionOf(row)}`;
+    const before = active.get(k) ?? new Set<string>();
+    return [...(candidate.get(k) ?? [])].some((axis) => !before.has(axis));
+  });
+}
+
+/**
+ * The `signature` half of the pair seed: a pinned pair the body seed does not
+ * hold that gains a parameter-name or block-parameter row at the candidate. A
+ * signature can change with no body change (`def try(*)` → `def try(*, &)`),
+ * so no DRIFT pin names it.
+ */
+export function signatureSeed(
+  active: readonly PairKey[],
+  candidate: readonly PairKey[],
+  bodySeed: readonly PairKey[],
+  pins: readonly Pin[],
+  from: string,
+  to: string,
+): PairSeedRow[] {
+  const tally = (rows: readonly PairKey[]) => {
+    const m = new Map<string, number>();
+    for (const r of rows) m.set(pairKey(r), (m.get(pairKey(r)) ?? 0) + 1);
+    return m;
+  };
+  const before = tally(active);
+  const seeded = new Set(bodySeed.map(pairKey));
+  const pinned = new Set(pins.map(pairKey));
+  const out = new Map<string, PairSeedRow>();
+  for (const [k, n] of tally(candidate)) {
+    if (n <= (before.get(k) ?? 0) || seeded.has(k) || !pinned.has(k)) continue;
+    const r = candidate.find((c) => pairKey(c) === k)!;
+    out.set(k, {
+      package: r.package,
+      rubyFile: r.rubyFile,
+      rubyName: r.rubyName,
+      kind: "signature",
+      from,
+      to,
+    });
+  }
+  return [...out.values()].sort((a, b) => cmp(pairKey(a), pairKey(b)));
 }

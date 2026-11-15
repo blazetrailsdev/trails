@@ -22,6 +22,7 @@ import {
   skipLedgered,
   summaryLine,
   seedDiff,
+  staleSignatureRows,
   testLedgerKey,
   testLedgerProblems,
   testRowKey,
@@ -393,6 +394,18 @@ describe("ledgerScope", () => {
     const { packages, skipped } = withoutRemoved([pkg], scope.removedTsName);
     expect(skipped).toBe(1);
     expect([packages[0].totalExtras, packages[0].totalNovel]).toEqual([2, 1]);
+  });
+});
+
+describe("signature rows", () => {
+  const sig: LedgerRow = { ...key, kind: "signature", from: "v8.0.2", to: "v8.0.5.2" };
+  it("checkRows passes a signature row on an unchanged pin and reds one on a removed pair", () => {
+    expect(checkRows([sig], [pin("a")], [record("a")])).toEqual([]);
+    expect(checkRows([sig], [pin("a")], []).map((p) => p.problem)).toEqual(["kind"]);
+  });
+  it("staleSignatureRows reds a row no param or block row still names", () => {
+    expect(staleSignatureRows([sig], [key])).toEqual([]);
+    expect(staleSignatureRows([sig], [])).toEqual([sig]);
   });
 });
 

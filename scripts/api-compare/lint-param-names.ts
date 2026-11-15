@@ -28,7 +28,13 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { scopeOf } from "./scope.js";
-import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
+import {
+  loadLedgerScope,
+  loadLedgers,
+  renderSkipped,
+  skipLedgered,
+  staleSignatureRows,
+} from "./bump-ledger.js";
 import {
   GATED_PACKAGES,
   MARK_PATH,
@@ -83,6 +89,23 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const ledger = await loadLedgerScope();
   const { counted, skipped } = skipLedgered(artifact.mismatches, ledger.pair);
   console.log(renderSkipped("param-name gate", skipped.length));
+  const blocks = JSON.parse(
+    await fs.readFile(path.join(OUTPUT_DIR, "block-param-mismatches.json"), "utf-8"),
+  ) as ParamNameArtifact;
+  const staleSignatures = staleSignatureRows(
+    [...(await loadLedgers()).values()]
+      .flat()
+      .filter((r) => (gated as readonly string[]).includes(r.package)),
+    [...artifact.mismatches, ...blocks.mismatches],
+  );
+  if (staleSignatures.length > 0) {
+    console.error(
+      `\nparam-name gate: ${staleSignatures.length} STALE signature ledger row(s): the port's ` +
+        "signature now agrees with Rails. Delete each from scripts/parity/bump-ledger/:\n" +
+        staleSignatures.map((r) => `  - ${r.package} ${r.rubyFile}:${r.rubyName}`).join("\n"),
+    );
+    return 1;
+  }
   const current = measure(counted, gated);
   const grew = exceedances(marks, current, gated);
   const stale = staleMarks(marks, current, gated);
