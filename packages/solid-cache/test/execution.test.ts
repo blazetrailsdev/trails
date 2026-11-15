@@ -1,5 +1,14 @@
-import { ActiveSupport, ExecutionWrapper, Notifications } from "@blazetrails/activesupport";
-import { assertChanges, assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
+import {
+  ActiveSupport,
+  ExecutionWrapper,
+  gemVersion,
+  Notifications,
+} from "@blazetrails/activesupport";
+import {
+  assertChanges,
+  assertEqual,
+  assertNoChanges,
+} from "@blazetrails/activesupport/testing/assertions";
 import { ActiveRecord, StatementTimeout } from "@blazetrails/activerecord";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { SolidCache } from "../lib/index.js";
@@ -42,12 +51,27 @@ describe("SolidCache::ExecutionTest", () => {
       await new Promise((resolve) => setTimeout(resolve, 100));
       expect(errorSubscriber.errors.length).toBe(1);
       expect(errorSubscriber.errors[0][0].message).toBe("Boom!");
-      expect(errorSubscriber.errors[0][1]).toEqual({
-        context: {},
-        handled: false,
-        level: "error",
-        source: "application.active_support",
-      });
+      if (gemVersion() >= "7.1") {
+        assertEqual(
+          {
+            context: {},
+            handled: false,
+            level: "error",
+            source: "application.active_support",
+          },
+          errorSubscriber.errors[0][1],
+        );
+      } else {
+        assertEqual(
+          {
+            context: {},
+            handled: false,
+            level: "error",
+            source: null,
+          },
+          errorSubscriber.errors[0][1],
+        );
+      }
     } finally {
       ActiveSupport.errorReporter.unsubscribe(errorSubscriber);
       SolidCache.executor = oldExecutor;
