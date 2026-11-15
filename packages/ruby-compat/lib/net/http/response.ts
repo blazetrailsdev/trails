@@ -51,8 +51,8 @@ export class HTTPResponse {
     for (;;) {
       const line = (await sock.readuntil("\n", true)).replace(/\s+$/, "");
       if (line.length === 0) break;
-      if ((line[0] === " " || line[0] === "\t") && value != null) {
-        if (value.length > 0) value += " ";
+      if (line[0] === " " || (line[0] === "\t" && value != null)) {
+        if (value!.length > 0) value += " ";
         value += line.trim();
       } else {
         if (key != null) block(key, value!);

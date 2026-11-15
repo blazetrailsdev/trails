@@ -477,6 +477,19 @@ describe("Net::HTTP over Net::BufferedIO", () => {
     expect(new TextDecoder().decode(res.body as Uint8Array)).toBe("ok!");
   });
 
+  it("reads a header line split across socket reads", async () => {
+    const port = await listen(
+      createNetServer((s) =>
+        s.once("data", () => {
+          s.write("HTTP/1.1 200 OK\r\nX-A: 1");
+          setTimeout(() => s.end("\r\nContent-Length: 2\r\n\r\nok"), 20);
+        }),
+      ),
+    );
+    const res = await new Net.HTTP("127.0.0.1", port).get("/");
+    expect([res.get("x-a"), new TextDecoder().decode(res.body as Uint8Array)]).toEqual(["1", "ok"]);
+  });
+
   it("raises Net::HTTPBadResponse for a wrong status line", async () => {
     const port = await listen(createNetServer((s) => s.once("data", () => s.end("nope\r\n\r\n"))));
     const http = new Net.HTTP("127.0.0.1", port);

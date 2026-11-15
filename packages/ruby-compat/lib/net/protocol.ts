@@ -108,6 +108,7 @@ export class BufferedIO {
   debugOutput: HttpDebugOutput | null;
   private _rbuf = new Uint8Array(0);
   private _rbufOffset = 0;
+  private _rbufEmpty = true;
   private _writtenBytes: number | null = null;
 
   /** @noRailsEquivalent PERMANENT */
@@ -200,15 +201,22 @@ export class BufferedIO {
 
   /** @noRailsEquivalent PERMANENT */
   async readuntil(terminator: string, ignoreEof = false): Promise<string> {
-    const term = terminator.charCodeAt(0);
+    const term = new TextEncoder().encode(terminator);
+    const index = (from: number) => {
+      let i = from - 1;
+      while ((i = this._rbuf.indexOf(term[0], i + 1)) !== -1) {
+        if (term.every((b, j) => this._rbuf[i + j] === b)) return i;
+      }
+      return null;
+    };
     let offset = this._rbufOffset;
     try {
-      let idx: number;
-      while ((idx = this._rbuf.indexOf(term, offset)) === -1) {
+      let idx: number | null;
+      while ((idx = index(offset)) == null) {
         offset = this._rbuf.length;
         await this.rbufFill();
       }
-      return strNew(this.rbufConsume(idx + terminator.length - this._rbufOffset));
+      return strNew(this.rbufConsume(idx + term.length - this._rbufOffset));
     } catch (e) {
       if (!(e instanceof EOFError) || !ignoreEof) throw e;
       return strNew(this.rbufConsume());
@@ -225,18 +233,29 @@ export class BufferedIO {
     for (;;) {
       const rv = this.io.readNonblock();
       if (rv instanceof Uint8Array) {
-        const rest = this._rbuf.subarray(this._rbufOffset);
-        this._rbuf = new Uint8Array(rest.length + rv.length);
-        this._rbuf.set(rest);
-        this._rbuf.set(rv, rest.length);
-        this._rbufOffset = 0;
+        this._rbufEmpty = false;
+        const rbuf = new Uint8Array(this._rbuf.length + rv.length);
+        rbuf.set(this._rbuf);
+        rbuf.set(rv, this._rbuf.length);
+        this._rbuf = rbuf;
         return;
       } else if (rv === "wait_readable") {
         if (!(await this.io.waitReadable(this.readTimeout))) throw new ReadTimeout(this.io);
+      } else if (rv === "wait_writable") {
+        if (!(await this.io.waitWritable(this.readTimeout))) throw new ReadTimeout(this.io);
       } else {
         throw new EOFError("end of file reached");
       }
     }
+  }
+
+  /** @internal */
+  private rbufFlush(): null {
+    if (this._rbufEmpty) {
+      this._rbuf = new Uint8Array(0);
+      this._rbufOffset = 0;
+    }
+    return null;
   }
 
   /** @internal */
@@ -252,17 +271,21 @@ export class BufferedIO {
   /** @internal */
   private rbufConsume(len: number | null = null): Uint8Array {
     let s: Uint8Array;
-    if (len == null) {
+    if (this._rbufOffset === 0 && (len == null || len === this._rbuf.length)) {
+      s = this._rbuf;
+      this._rbuf = new Uint8Array(0);
+      this._rbufOffset = 0;
+      this._rbufEmpty = true;
+    } else if (len == null) {
       s = this._rbuf.subarray(this._rbufOffset);
       this._rbuf = new Uint8Array(0);
       this._rbufOffset = 0;
+      this._rbufEmpty = true;
     } else {
       s = this._rbuf.subarray(this._rbufOffset, this._rbufOffset + len);
       this._rbufOffset += len;
-      if (this._rbufOffset === this._rbuf.length) {
-        this._rbuf = new Uint8Array(0);
-        this._rbufOffset = 0;
-      }
+      this._rbufEmpty = this._rbufOffset === this._rbuf.length;
+      this.rbufFlush();
     }
     this.debugOutput?.write(`-> ${rbStrDump(strNew(s))}\n`);
     return s;
@@ -289,6 +312,7 @@ export class BufferedIO {
    * every byte it is handed and answers whether its buffer is past the high
    * water mark, so the partial-write retry is the wait for `drain`.
    *
+   * @inventedArm if — PERMANENT
    * @internal @noRailsEquivalent PERMANENT
    */
   private async write0(...strs: (string | Uint8Array)[]): Promise<number> {
@@ -298,11 +322,10 @@ export class BufferedIO {
     const origWrittenBytes = this._writtenBytes!;
     for (const str of strs) {
       const bytes = typeof str === "string" ? new TextEncoder().encode(str) : str;
-      const written = this.io.writeNonblock(bytes);
-      this._writtenBytes! += bytes.length;
-      if (!written && !(await this.io.waitWritable(this.writeTimeout))) {
+      if (!this.io.writeNonblock(bytes) && !(await this.io.waitWritable(this.writeTimeout))) {
         throw new WriteTimeout(this.io);
       }
+      this._writtenBytes! += bytes.length;
     }
     return this._writtenBytes! - origWrittenBytes;
   }

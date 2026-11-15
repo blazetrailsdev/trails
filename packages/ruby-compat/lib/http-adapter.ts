@@ -58,7 +58,7 @@ export interface HttpServer {
  * @noRailsEquivalent PERMANENT
  */
 export interface HttpClientSocket {
-  readNonblock(): Uint8Array | "wait_readable" | null;
+  readNonblock(): Uint8Array | "wait_readable" | "wait_writable" | null;
   waitReadable(timeout: number | null): Promise<boolean>;
   writeNonblock(str: Uint8Array): boolean;
   waitWritable(timeout: number | null): Promise<boolean>;
@@ -192,7 +192,7 @@ class _NodeClientSocket implements HttpClientSocket {
     this.io[on]("drain", this.onDrain);
   }
 
-  readNonblock(): Uint8Array | "wait_readable" | null {
+  readNonblock(): Uint8Array | "wait_readable" | "wait_writable" | null {
     if (this.error !== null) throw this.error;
     if (this.rbuf.length > 0) return this.rbuf.shift()!;
     return this.eof ? null : "wait_readable";

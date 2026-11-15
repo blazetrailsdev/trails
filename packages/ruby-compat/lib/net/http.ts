@@ -405,9 +405,9 @@ export class HTTP {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT
    * @missingRailsCall edit_path — CONVERGEABLE net-http-edit-path-and-wait-for-continue
    * @missingRailsCall catch — CONVERGEABLE net-http-edit-path-and-wait-for-continue
+   * @noRailsEquivalent PERMANENT
    */
   async transportRequest(
     req: HTTPRequest,
