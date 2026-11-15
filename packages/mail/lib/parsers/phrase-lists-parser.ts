@@ -4,7 +4,7 @@ import { Field } from "../field.js";
 import { PhraseList } from "../elements/phrase-list.js";
 import { ParserTools } from "../parser-tools.js";
 
-export const PhraseListsStruct = Struct.new("phrases", "error");
+export const PhraseListsStruct = Struct.new<"phrases" | "error", { phrases: string[]; error: unknown }>("phrases", "error");
 
 export class PhraseListsParser {
     static PhraseListsStruct = PhraseListsStruct;
@@ -28,7 +28,7 @@ export class PhraseListsParser {
     static enCommentTail = 30;
     static enMain = 1;
 
-    static parse(data: string | Uint8Array | null): any {
+    static parse(data: string | Uint8Array | null): InstanceType<typeof PhraseListsStruct> {
       const self = PhraseListsParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, phraseLists: any, phraseS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
       data = (data == null ? data : b(data)) as Uint8Array;

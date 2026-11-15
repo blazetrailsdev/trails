@@ -5,7 +5,7 @@ import { ContentDispositionElement } from "../elements/content-disposition-eleme
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-export const ContentDispositionStruct = Struct.new("dispositionType", "parameters", "error");
+export const ContentDispositionStruct = Struct.new<"dispositionType" | "parameters" | "error", { dispositionType: string; parameters: Record<string, string>[]; error: unknown }>("dispositionType", "parameters", "error");
 
 export const ContentDispositionParser = extend(
   {
@@ -30,7 +30,7 @@ export const ContentDispositionParser = extend(
     enCommentTail: 28,
     enMain: 1,
 
-    parse(data: string | Uint8Array | null): any {
+    parse(data: string | Uint8Array | null): InstanceType<typeof ContentDispositionStruct> {
       const self = ContentDispositionParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, contentDisposition: any, dispTypeS: number | null = null, paramAttrS: number | null = null, paramAttr: any, qstrS: number | null = null, qstr: any, paramValS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, value: any;
       data = (data == null ? data : b(data)) as Uint8Array;

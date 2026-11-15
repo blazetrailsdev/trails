@@ -4,7 +4,7 @@ import { Field } from "../field.js";
 import { DateTimeElement } from "../elements/date-time-element.js";
 import { ParserTools } from "../parser-tools.js";
 
-export const DateTimeStruct = Struct.new("dateString", "timeString", "error");
+export const DateTimeStruct = Struct.new<"dateString" | "timeString" | "error", { dateString: string; timeString: string; error: unknown }>("dateString", "timeString", "error");
 
 export const DateTimeParser = extend(
   {
@@ -29,7 +29,7 @@ export const DateTimeParser = extend(
     enCommentTail: 91,
     enMain: 1,
 
-    parse(data: string | Uint8Array | null): any {
+    parse(data: string | Uint8Array | null): InstanceType<typeof DateTimeStruct> {
       const self = DateTimeParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, dateTime: any, dateS: number | null = null, timeS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
       data = (data == null ? data : b(data)) as Uint8Array;

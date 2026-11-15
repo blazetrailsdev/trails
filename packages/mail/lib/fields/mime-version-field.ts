@@ -1,4 +1,4 @@
-import { rbStrToI, type Encoding } from "@blazetrails/ruby-compat";
+import { rbStrToI, toI, type Encoding } from "@blazetrails/ruby-compat";
 import { MimeVersionElement } from "../elements/mime-version-element.js";
 import { Utilities } from "../utilities.js";
 import { NamedStructuredField } from "./named-structured-field.js";
@@ -29,7 +29,7 @@ export class MimeVersionField extends NamedStructuredField {
   }
 
   minor(): number {
-    return rbStrToI(this.element().minor) as number;
+    return toI(this.element().minor) as number;
   }
 
   override encoded(): string {

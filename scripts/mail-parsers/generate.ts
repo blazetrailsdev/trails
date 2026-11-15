@@ -35,6 +35,29 @@ interface Parser {
 
 const STRUCT_MEMBER_TYPES: Record<string, Record<string, string>> = {
   AddressListStruct: { addresses: "InstanceType<typeof AddressStruct>[]", groupNames: "string[]" },
+  AddressStruct: {
+    raw: "string | null",
+    domain: "string | null",
+    comments: "string[]",
+    local: "string | null",
+    obsDomainList: "string | null",
+    displayName: "string | null",
+    group: "string | null",
+  },
+  ContentDispositionStruct: { dispositionType: "string", parameters: "Record<string, string>[]" },
+  ContentLocationStruct: { location: "string" },
+  ContentTransferEncodingStruct: { encoding: "string" },
+  ContentTypeStruct: {
+    mainType: "string",
+    subType: "string",
+    parameters: "Record<string, string>[]",
+  },
+  DateTimeStruct: { dateString: "string", timeString: "string" },
+  EnvelopeFromStruct: { address: "string", ctimeDate: "string" },
+  MessageIdsStruct: { messageIds: "string[]" },
+  MimeVersionStruct: { major: "string", minor: "string | null" },
+  PhraseListsStruct: { phrases: "string[]" },
+  ReceivedStruct: { date: "string", time: "string", info: "string" },
 };
 
 function read(rb: string): Parser {

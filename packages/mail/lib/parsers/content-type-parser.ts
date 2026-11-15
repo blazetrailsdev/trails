@@ -5,7 +5,7 @@ import { ContentTypeElement } from "../elements/content-type-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-export const ContentTypeStruct = Struct.new("mainType", "subType", "parameters", "error");
+export const ContentTypeStruct = Struct.new<"mainType" | "subType" | "parameters" | "error", { mainType: string; subType: string; parameters: Record<string, string>[]; error: unknown }>("mainType", "subType", "parameters", "error");
 
 export const ContentTypeParser = extend(
   {
@@ -30,7 +30,7 @@ export const ContentTypeParser = extend(
     enCommentTail: 35,
     enMain: 1,
 
-    parse(data: string | Uint8Array | null): any {
+    parse(data: string | Uint8Array | null): InstanceType<typeof ContentTypeStruct> {
       const self = ContentTypeParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, contentType: any, mainTypeS: number | null = null, subTypeS: number | null = null, paramAttrS: number | null = null, paramAttr: any, qstrS: number | null = null, qstr: any, paramValS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, value: any;
       data = (data == null ? data : b(data)) as Uint8Array;

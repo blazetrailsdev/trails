@@ -9,7 +9,7 @@ import { Collector } from "../lib/collector.js";
 class LayoutMailer extends Base {
   static {
     this.setMailerName("layout_mailer");
-    (this as unknown as { layout(name: string): void }).layout("layout-mailer");
+    this.layout("layout-mailer");
     this.prependViewPath(
       new FixtureResolver({
         "layout-mailer/plain.text.tse": "Body",

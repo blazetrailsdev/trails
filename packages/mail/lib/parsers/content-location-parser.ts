@@ -5,7 +5,7 @@ import { ContentLocationElement } from "../elements/content-location-element.js"
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-export const ContentLocationStruct = Struct.new("location", "error");
+export const ContentLocationStruct = Struct.new<"location" | "error", { location: string; error: unknown }>("location", "error");
 
 export const ContentLocationParser = extend(
   {
@@ -30,7 +30,7 @@ export const ContentLocationParser = extend(
     enCommentTail: 20,
     enMain: 1,
 
-    parse(data: string | Uint8Array | null): any {
+    parse(data: string | Uint8Array | null): InstanceType<typeof ContentLocationStruct> {
       const self = ContentLocationParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, contentLocation: any, dispTypeS: number | null = null, paramAttrS: number | null = null, paramAttr: any, qstrS: number | null = null, qstr: any, paramValS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, tokenStringS: number | null = null;
       data = (data == null ? data : b(data)) as Uint8Array;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { constGet, rbAutoloadP } from "@blazetrails/ruby-compat";
+import { constGet, rbAutoloadLoad, rbAutoloadP } from "@blazetrails/ruby-compat";
 import { Mail } from "../lib/mail.js";
 import "../lib/index.js";
 import type { Message } from "../lib/message.js";
@@ -36,9 +36,13 @@ describe("Mail::Message#identify_and_set_transfer_encoding", () => {
 
 describe("Mail.register_autoload", () => {
   it("records each gem constant's feature, which eager_autoload! loads", async () => {
-    expect(rbAutoloadP(Mail, "SMTP")).toBe("./network/delivery-methods/smtp.js");
-    expect(rbAutoloadP(Mail, "ToField")).toBe("./fields/to-field.js");
-    expect(rbAutoloadP(Mail, "ReceivedElement")).toBe("./elements/received-element.js");
+    expect(rbAutoloadP(Mail, "SMTP")).toBe("network/delivery-methods/smtp");
+    expect(rbAutoloadP(Mail, "ToField")).toBe("fields/to-field");
+    expect(rbAutoloadP(Mail, "ReceivedElement")).toBe("elements/received-element");
     await expect(Mail.eagerAutoloadBang()).resolves.toBeUndefined();
+  });
+
+  it("resolves a registered feature through Kernel.require on $LOAD_PATH", async () => {
+    await expect(rbAutoloadLoad(Mail, "SMTP")).resolves.toBeTypeOf("boolean");
   });
 });
