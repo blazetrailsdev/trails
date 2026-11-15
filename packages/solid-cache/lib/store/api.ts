@@ -7,6 +7,7 @@ import {
   byteslice,
   rbCallSuper,
   toI,
+  rbStrPlus,
 } from "@blazetrails/ruby-compat";
 import type { StoreHost } from "../store.js";
 
@@ -208,7 +209,7 @@ export const Api = {
     if (key != null && key.length > this.maxKeyBytesize) {
       const suffix = `:hash:${ActiveSupportDigest.hexdigest(key)}`;
       const truncateAt = this.maxKeyBytesize - b(suffix).length;
-      return b(new Uint8Array([...byteslice(key, 0, truncateAt)!, ...b(suffix)]));
+      return b(rbStrPlus(byteslice(key, 0, truncateAt)!, suffix));
     } else {
       return key;
     }
