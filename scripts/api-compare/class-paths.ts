@@ -219,12 +219,12 @@ function isExported(source: string, name: string): boolean {
   );
 }
 
-/** A file that imports its own namespace (`import * as X from "./calculations.js"`) to `include` it. */
 /** The constant a kebab-case file basename names (`html-safe-translation` → `HtmlSafeTranslation`). */
 function fileConstant(base: string): string {
   return base.replace(/(?:^|-)(\w)/g, (_, c: string) => c.toUpperCase());
 }
 
+/** A file that imports its own namespace (`import * as X from "./calculations.js"`) to `include` it. */
 function isSelfNamespace(source: string, file: string, tsName: string): boolean {
   const base = path.basename(file, ".ts");
   if (fileConstant(base) !== tsName) return false;
