@@ -54,7 +54,7 @@ export class HttpStreamingResponse {
   /** @internal */
   private _session: NetHTTP | null = null;
   /** @internal */
-  private _toS: Uint8Array | null = null;
+  private _toS: string | null = null;
 
   constructor(
     request: NetHTTPRequest,
@@ -123,9 +123,9 @@ export class HttpStreamingResponse {
     }
   }
 
-  async toS(): Promise<Uint8Array> {
+  async toString(): Promise<string> {
     if (this._toS != null) return this._toS;
-    const io = new StringIO<Uint8Array>(new Uint8Array(0));
+    const io = new StringIO();
     await this.each((line) => io.append(line));
     return (this._toS = io.string());
   }
