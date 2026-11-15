@@ -42,7 +42,7 @@ import type { ParameterHash } from "./fields/parameter-hash.js";
 import { ContentTypeField } from "./fields/content-type-field.js";
 import type { Part } from "./part.js";
 import { Envelope } from "./envelope.js";
-import { Field } from "./field.js";
+import { Field, type FieldFor } from "./field.js";
 import { Header } from "./header.js";
 import { IndifferentHash } from "./indifferent-hash.js";
 import { Mail } from "./mail.js";
@@ -622,8 +622,8 @@ export class Message {
     }
   }
 
-  get(name: unknown): Field | Field[] | null {
-    return this.header().get(Utilities.underscoreize(name));
+  get<const N>(name: N): FieldFor<N> {
+    return this.header().get(Utilities.underscoreize(name)) as FieldFor<N>;
   }
 
   methodMissing(name: string, ...args: unknown[]): unknown {
