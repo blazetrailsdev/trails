@@ -1,6 +1,6 @@
 import { inflections } from "./inflector/inflections.js";
 import { NameError } from "./core-ext/name-error.js";
-import { type ConstantTable, regexpEscape, constGet, constSet } from "@blazetrails/ruby-compat";
+import { type ConstantTable, regexpEscape, constGet } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import * as Inflector from "./inflector.js";
 import { I18n } from "./i18n.js";
@@ -231,4 +231,4 @@ export function ordinalize(number: number): string {
 
 export { parameterize } from "./transliterate.js";
 
-constSet(ActiveSupport, "Inflector", Inflector);
+ActiveSupport.Inflector = Inflector;

@@ -219,10 +219,15 @@ function isExported(source: string, name: string): boolean {
   );
 }
 
+/** The constant a kebab-case file basename names (`html-safe-translation` → `HtmlSafeTranslation`). */
+function fileConstant(base: string): string {
+  return base.replace(/(?:^|-)(\w)/g, (_, c: string) => c.toUpperCase());
+}
+
 /** A file that imports its own namespace (`import * as X from "./calculations.js"`) to `include` it. */
 function isSelfNamespace(source: string, file: string, tsName: string): boolean {
   const base = path.basename(file, ".ts");
-  if (base.replace(/(?:^|-)(\w)/g, (_, c: string) => c.toUpperCase()) !== tsName) return false;
+  if (fileConstant(base) !== tsName) return false;
   const self = `${base}.js`;
   return new RegExp(
     `^import\\s+\\*\\s+as\\s+\\w+\\s+from\\s+"\\./${self.replace(".", "\\.")}"`,
@@ -378,6 +383,15 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
         );
         const prefixed = `${tsFile}::${fqn.split("::").at(-2)}${short}`.toLowerCase();
         tsCls ??= kind === "classes" ? tsByLowerFileName.get(prefixed) : undefined;
+        const barrel = `${path.dirname(tsFile)}.ts`;
+        if (
+          tsCls === undefined &&
+          kind === "modules" &&
+          fileConstant(path.basename(barrel, ".ts")) === rubyShort &&
+          tsByFileName.get(`${barrel}::${rubyShort}`)?.name === rubyShort
+        ) {
+          tsCls = { file: barrel, name: rubyShort };
+        }
         const fallback = tsCls === undefined && kind === "modules";
         if (fallback) tsCls = { file: tsFile, name: rubyShort };
         if (!tsCls?.file || rubyPath === tsCls.name) continue;

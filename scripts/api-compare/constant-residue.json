@@ -861,7 +861,7 @@
     }
   },
   "activesupport": {
-    "rows": 189,
+    "rows": 190,
     "excluded": [
       "cache/deserialization-error.ts::DeserializationError",
       "cache/store.ts::Store",
@@ -934,6 +934,7 @@
       "gem-version.ts::VERSION",
       "gzip.ts::Gzip",
       "html-safe-translation.ts::HtmlSafeTranslation",
+      "inflector.ts::Inflector",
       "isolated-execution-state.ts::IsolatedExecutionState",
       "lazy-load-hooks.ts::LazyLoadHooks",
       "message-encryptor.ts::NullSerializer",
