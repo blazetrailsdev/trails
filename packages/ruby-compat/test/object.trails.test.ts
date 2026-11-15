@@ -1736,3 +1736,51 @@ describe("Hash#store / #fetch / #delete / #clear through respond_to? and send", 
     expect(rbFSend(m, "fetch", "a")).toBe(1);
   });
 });
+
+describe("rbFSend method cache", () => {
+  it("re-resolves a method after the method cache is cleared", () => {
+    class Visitor {
+      visitNode(node: unknown): unknown {
+        return ["first", node];
+      }
+    }
+    const v = new Visitor();
+    expect(rbFSend(v, "visitNode", 1)).toEqual(["first", 1]);
+    Visitor.prototype.visitNode = (node: unknown) => ["second", node];
+    rbClearMethodCache();
+    expect(rbFSend(v, "visitNode", 2)).toEqual(["second", 2]);
+  });
+
+  it("dispatches a receiver's own method over the cached one", () => {
+    class Visitor {
+      visitNode(): string {
+        return "proto";
+      }
+    }
+    const a = new Visitor();
+    const b = new Visitor();
+    expect(rbFSend(a, "visitNode")).toBe("proto");
+    Object.defineProperty(b, "visitNode", { value: () => "own" });
+    expect(rbFSend(b, "visitNode")).toBe("own");
+  });
+
+  it("resolves per prototype, and a getter is not cached as a method", () => {
+    class A {
+      name(): string {
+        return "a";
+      }
+    }
+    class B {
+      get name(): string {
+        return "b";
+      }
+    }
+    expect(rbFSend(new A(), "name")).toBe("a");
+    expect(rbFSend(new B(), "name")).toBe("b");
+    expect(rbFSend(new A(), "name")).toBe("a");
+  });
+
+  it("raises NoMethodError for a name the receiver does not answer", () => {
+    expect(() => rbFSend(new (class {})(), "visitMissing")).toThrow(NoMethodError);
+  });
+});

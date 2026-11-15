@@ -1465,7 +1465,7 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
               return (toA(value) as [unknown, unknown][]).map(([field, dir]) =>
                 rbFSend(
                   orderColumn.call(this, [toS(key), toS(field)].join(".")),
-                  rbFSend(dir, "downcase"),
+                  (dir as string).toLowerCase(),
                 ),
               );
             } else {
@@ -1474,9 +1474,9 @@ export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]
                 key instanceof Nodes.Node ||
                 key instanceof Arel.Attribute
               ) {
-                return rbFSend(key, rbFSend(value, "downcase"));
+                return rbFSend(key, (value as string).toLowerCase());
               } else {
-                return rbFSend(orderColumn.call(this, toS(key)), rbFSend(value, "downcase"));
+                return rbFSend(orderColumn.call(this, toS(key)), (value as string).toLowerCase());
               }
             }
           });

@@ -25,6 +25,7 @@ interface MonData {
   waiters: MonWaiter[];
   storage: AsyncContext<symbol> | null;
   adapter: AsyncContextAdapter | null;
+  syncOwner: symbol | null;
 }
 
 const MON_DATA = new WeakMap<object, MonData>();
@@ -32,7 +33,7 @@ const MON_DATA = new WeakMap<object, MonData>();
 function monData(self: object): MonData {
   let data = MON_DATA.get(self);
   if (!data) {
-    data = { entries: [], waiters: [], storage: null, adapter: null };
+    data = { entries: [], waiters: [], storage: null, adapter: null, syncOwner: null };
     MON_DATA.set(self, data);
   }
   const adapter = getAsyncContext();
@@ -46,7 +47,11 @@ function monData(self: object): MonData {
 function currentOwner(data: MonData): Owner {
   const store = data.storage!.getStore();
   const thread = Thread.current();
-  if (data.entries.some((entry) => entry.owner === store && entry.thread === thread)) return store!;
+  for (let index = data.entries.length - 1; index >= 0; index -= 1) {
+    const entry = data.entries[index];
+    if (entry.thread !== thread) continue;
+    if (entry.owner === data.syncOwner || entry.owner === store) return entry.owner;
+  }
   return Fiber.current();
 }
 
@@ -161,8 +166,50 @@ export async function monSynchronize<T>(this: object, block: () => T | Promise<T
   });
   if (acquired) await acquired;
   try {
-    return await data.storage!.run(owner, () => block());
+    const syncOwner = data.syncOwner;
+    data.syncOwner = null;
+    try {
+      return await data.storage!.run(owner, () => block());
+    } finally {
+      data.syncOwner = syncOwner;
+    }
   } finally {
+    release(data, owner);
+  }
+}
+
+/**
+ * `mon_synchronize` (`vendor/ruby/v3.3.11/ext/monitor/lib/monitor.rb:200`) for
+ * a block its caller knows is synchronous: the owner is held on the monitor
+ * until the block returns, with no async-context frame, which only a block
+ * that can `await` needs. Answers a promise only when it has to wait for the
+ * monitor. The block must not return a thenable: the owner is released when
+ * it returns.
+ *
+ * @noRailsEquivalent PERMANENT
+ * @perf 4.6% — PERMANENT
+ */
+export function monSynchronizeSync<T>(this: object, block: () => T): T | Promise<T> {
+  const data = monData(this);
+  const owner = Symbol("monitor");
+  const current = currentOwner(data);
+  const parent = data.entries.some((entry) => entry.owner === current) ? current : null;
+  const acquired = acquire(data, parent, {
+    owner,
+    count: 1,
+    thread: Thread.current(),
+  });
+  if (acquired) return acquired.then(() => runSync(data, owner, block));
+  return runSync(data, owner, block);
+}
+
+function runSync<T>(data: MonData, owner: symbol, block: () => T): T {
+  const syncOwner = data.syncOwner;
+  data.syncOwner = owner;
+  try {
+    return block();
+  } finally {
+    data.syncOwner = syncOwner;
     release(data, owner);
   }
 }

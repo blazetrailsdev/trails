@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Monitor, newCond } from "../lib/monitor.js";
+import { Monitor, monSynchronizeSync, newCond } from "../lib/monitor.js";
 import { Thread } from "../lib/thread.js";
 
 describe("Monitor#mon_owned?", () => {
@@ -48,6 +48,45 @@ describe("Monitor#synchronize", () => {
       ),
     );
     expect(served).toEqual(Array.from({ length: 10 }, (_unused, i) => i));
+  });
+});
+
+describe("Monitor#mon_synchronize (sync block)", () => {
+  it("re-enters at once from a sync block, and from an async synchronize nested in it", async () => {
+    const monitor = new Monitor();
+    const result = monSynchronizeSync.call(monitor, () => {
+      expect(monitor.isMonOwned()).toBe(true);
+      return monSynchronizeSync.call(monitor, () => monitor.synchronize(async () => "nested"));
+    });
+    expect(await result).toBe("nested");
+    expect(monitor.isMonOwned()).toBe(false);
+  });
+
+  it("re-enters from a sync block nested in an async holder after an await", async () => {
+    const monitor = new Monitor();
+    const result = await monitor.synchronize(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return monSynchronizeSync.call(monitor, () => monSynchronizeSync.call(monitor, () => 7));
+    });
+    expect(result).toBe(7);
+  });
+
+  it("waits for another holder, then runs the block", async () => {
+    const monitor = new Monitor();
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const log: string[] = [];
+    const held = monitor.synchronize(async () => {
+      await gate;
+      log.push("first");
+    });
+    await Promise.resolve();
+    const waited = monSynchronizeSync.call(monitor, () => log.push("second"));
+    expect(waited).toBeInstanceOf(Promise);
+    release();
+    await held;
+    await waited;
+    expect(log).toEqual(["first", "second"]);
   });
 });
 
