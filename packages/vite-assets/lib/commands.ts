@@ -76,15 +76,6 @@ export class Commands {
     }
   }
 
-  async isLegacyYarnVersion(): Promise<boolean> {
-    try {
-      return (parseInt(await rbFBackquote("yarn --version"), 10) || 0) < 2;
-    } catch (error) {
-      if (!(error instanceof StandardError)) throw error;
-      return false;
-    }
-  }
-
   async verifyInstall(): Promise<void> {
     const config = await this.config();
     if (!(await File.isExistAsync(config.root.join("bin/vite").toString()))) {

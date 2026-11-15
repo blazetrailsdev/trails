@@ -119,8 +119,4 @@ if (ARGV.includes("assets:precompile")) {
   } else {
     setEnv("NPM_CONFIG_INCLUDE", "dev");
   }
-
-  if (await ViteAssets.commands().isLegacyYarnVersion()) {
-    setEnv("YARN_PRODUCTION", "false");
-  }
 }

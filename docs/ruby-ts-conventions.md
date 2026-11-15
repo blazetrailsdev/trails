@@ -216,6 +216,8 @@ parity:api skips these Ruby methods, but only within the listed files — they
 have a real TS surface elsewhere, so the skip is file-scoped to avoid silencing
 a genuine gap:
 
+- `ViteRuby::Commands#legacy_yarn_version?` (vite_ruby/lib/vite_ruby/commands.rb:44-46) and its `YARN_PRODUCTION` arm (lib/tasks/vite.rake:92-94) are not ported: trails apps use pnpm, never yarn (CLAUDE.md, "importmap-rails and propshaft are out of scope"). PERMANENT.
+  - `legacy_yarn_version?` (only in: `commands.rb`)
 - Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, "`Module#autoload` is a build step"). PERMANENT.
   - `require`, `const_added` (only in: `core_ext/kernel.rb`, `core_ext/module.rb`)
 - `Registry::Inceptions` is not ported: it exists for a `Module#autoload?` edge case with no JS counterpart (RFC 0213). PERMANENT.
