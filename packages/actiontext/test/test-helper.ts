@@ -9,6 +9,7 @@ import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/gl
 import { Trailtie as ActionViewRailtie } from "@blazetrails/trailties/trailties/action-view";
 import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trailties/action-controller";
 import { ActionController } from "@blazetrails/actionpack";
+import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Registry } from "@blazetrails/activestorage";
@@ -71,6 +72,7 @@ for (const initializer of Engine.initializers) {
   }
 }
 ActionController.Base.prependViewPath([File.expandPath("dummy/app/views", import.meta.dirname)]);
+ActionMailerBase.prependViewPath([File.expandPath("dummy/app/views", import.meta.dirname)]);
 await import("./dummy/app/controllers/messages-controller.js");
 await import("./dummy/app/controllers/admin/messages-controller.js");
 

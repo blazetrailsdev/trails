@@ -75,6 +75,7 @@ export class Base extends AbstractController.Base {
   declare static prependViewPath: OmitThisParameter<
     typeof ActionView.ViewPaths.ClassMethods.prependViewPath
   >;
+  declare static layout: OmitThisParameter<typeof ActionView.Layouts.ClassMethods.layout>;
   declare static appendViewPath: OmitThisParameter<
     typeof ActionView.ViewPaths.ClassMethods.appendViewPath
   >;

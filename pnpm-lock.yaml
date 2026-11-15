@@ -393,6 +393,9 @@ importers:
         specifier: workspace:*
         version: link:../trailties
     devDependencies:
+      '@blazetrails/actionmailer':
+        specifier: workspace:*
+        version: link:../actionmailer
       '@blazetrails/activejob':
         specifier: workspace:*
         version: link:../activejob

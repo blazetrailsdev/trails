@@ -1,0 +1,1 @@
+<div id="message-content"><%= await this.message.content.toString() %></div>
