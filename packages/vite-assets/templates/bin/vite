@@ -1,0 +1,2 @@
+#!/usr/bin/env node
+await import("@blazetrails/vite-assets/exe/vite.js");
