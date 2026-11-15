@@ -136,7 +136,6 @@
   },
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*",
-    "@blazetrails/rack": "workspace:*",
     "@blazetrails/i18n": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/date": "workspace:*",
