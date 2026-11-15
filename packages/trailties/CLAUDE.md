@@ -277,8 +277,9 @@ mechanism"; its cross-table rules and
 
 - `rails/engine/lazy_route_set.rb`'s `method_missing_module` is a plain-object
   module the constructor prepends onto `namedRoutes`' url and path helper
-  modules, as `initialize` does (`lazy_route_set.rb:52-57`), so every includer
-  receives `respondToMissing` through `include()`. `ProxyUrlHelpers` is a
+  modules, where `initialize` prepends it (`lazy_route_set.rb:52-57`), so every
+  includer receives `respondToMissing` through `include()`; its `methodMissing`
+  half is not ported. `ProxyUrlHelpers` is a
   plain-object module prepended onto the generated module's statics, reaching
   `super` through `rbCallSuper`. The trap is a bare `Object.create(parent)`
   Proxy above the generated module's static chain, with no carrier copied into

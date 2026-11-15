@@ -74,6 +74,10 @@ export class LazyRouteSet extends RouteSet {
     return super.generateExtras(options, recall);
   }
 
+  /**
+   * @inventedArm setPrototypeOf — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   override generateUrlHelpers(supportsPath: boolean): ReturnType<RouteSet["generateUrlHelpers"]> {
     const mod = super.generateUrlHelpers(supportsPath);
     prepend({ prototype: mod }, LazyRouteSet.ProxyUrlHelpers);
