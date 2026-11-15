@@ -119,6 +119,8 @@ const RAILS_MAP: Record<string, CanonicalKind> = {
   assert_predicate: "truthy",
   assert_not_predicate: "falsy",
   refute_predicate: "falsy",
+  assert_path_exists: "truthy",
+  refute_path_exists: "falsy",
   assert_instance_of: "instanceOf",
   assert_not_instance_of: "notInstanceOf",
   refute_instance_of: "notInstanceOf",

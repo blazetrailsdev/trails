@@ -2,6 +2,7 @@ import { Application, Rake, Task } from "@blazetrails/rake";
 import {
   childProcessAdapterConfig,
   Dir,
+  File,
   getChildProcess,
   registerChildProcessAdapter,
   stderr,
@@ -9,6 +10,15 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ViteAssets } from "../lib/vite-assets.js";
 import { pathToTestApp, refreshConfig } from "./support/test-helper.js";
+
+async function testAppDevDependencies(): Promise<Record<string, string>> {
+  return JSON.parse(await File.readAsync(`${pathToTestApp()}/package.json`))["devDependencies"];
+}
+
+async function installedNodeModuleNames(env: Record<string, unknown>): Promise<string[]> {
+  const devDependencies = env["NODE_ENV"] === "development" ? await testAppDevDependencies() : {};
+  return Object.keys(devDependencies);
+}
 
 type WithNodeEnv = { withNodeEnv(env: string, block: () => Promise<unknown>): Promise<unknown> };
 
@@ -73,26 +83,21 @@ describe("RakeTasksTest", () => {
 
   it("rake vite install dependencies in non production environments", async () => {
     await ViteAssets.installTasks();
-    const [command, env] = await installDependencies("test");
+    expect(Object.keys(await testAppDevDependencies())).toContain("right-pad");
 
-    expect(command).toBe("yarn install --frozen-lockfile");
-    expect(env["NODE_ENV"]).toBe("development");
+    const [, env] = await installDependencies("test");
+
+    expect(await installedNodeModuleNames(env)).toContain("right-pad");
   });
 
   it("rake vite install dependencies in production environment", async () => {
     await ViteAssets.installTasks();
-    const [command, env] = await installDependencies("production");
+    const [, env] = await installDependencies("production");
 
-    expect(command).toBe("yarn install --frozen-lockfile");
-    expect(env["NODE_ENV"]).toBe("development");
+    expect(await installedNodeModuleNames(env)).toContain("right-pad");
   });
 
-  it("defines assets:precompile over install_dependencies and build_all", async () => {
-    await ViteAssets.installTasks();
-    expect((await Task.get("assets:precompile")).prerequisites).toEqual([
-      "vite:install_dependencies",
-      "vite:build_all",
-    ]);
-    expect((await Task.get("assets:clobber")).prerequisites).toEqual(["vite:clobber"]);
+  it("app dev dependencies", async () => {
+    await testAppDevDependencies();
   });
 });

@@ -53,10 +53,10 @@ describe("CommandsTest", () => {
       await ensureOutputDirs(config);
       await config.buildOutputDir().join(".vite/manifest.json").write("{}");
 
-      expect(await File.isExistAsync(config.buildOutputDir().toString())).toBe(true);
+      expect(await File.isExistAsync(config.buildOutputDir().toString())).toBeTruthy();
       await clobber();
 
-      expect(await File.isExistAsync(config.buildOutputDir().toString())).toBe(false);
+      expect(await File.isExistAsync(config.buildOutputDir().toString())).toBeFalsy();
     });
   });
 });

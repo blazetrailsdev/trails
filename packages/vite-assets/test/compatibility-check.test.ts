@@ -17,22 +17,22 @@ describe("CompatibilityCheckTest", () => {
   });
 
   it("compatible plugin", () => {
-    expect(isCompatiblePlugin("^3.1.0", "^3.0.1")).toBe(false);
-    expect(isCompatiblePlugin("^4.1.0", "^3.0")).toBe(false);
-    expect(isCompatiblePlugin("4.1.0", "^3.0")).toBe(false);
+    expect(isCompatiblePlugin("^3.1.0", "^3.0.1")).toBeFalsy();
+    expect(isCompatiblePlugin("^4.1.0", "^3.0")).toBeFalsy();
+    expect(isCompatiblePlugin("4.1.0", "^3.0")).toBeFalsy();
 
-    expect(isCompatiblePlugin("3.0.5", "^3.0.1")).toBe(true);
-    expect(isCompatiblePlugin("^3.0.9", "^3.0.1")).toBe(true);
-    expect(isCompatiblePlugin("3.1.0", "^3.0")).toBe(true);
-    expect(isCompatiblePlugin("^3.1.0", "^3.0")).toBe(true);
-    expect(isCompatiblePlugin(undefined, "^3.0")).toBe(true);
-    expect(isCompatiblePlugin(undefined, null)).toBe(true);
+    expect(isCompatiblePlugin("3.0.5", "^3.0.1")).toBeTruthy();
+    expect(isCompatiblePlugin("^3.0.9", "^3.0.1")).toBeTruthy();
+    expect(isCompatiblePlugin("3.1.0", "^3.0")).toBeTruthy();
+    expect(isCompatiblePlugin("^3.1.0", "^3.0")).toBeTruthy();
+    expect(isCompatiblePlugin(undefined, "^3.0")).toBeTruthy();
+    expect(isCompatiblePlugin(undefined, null)).toBeTruthy();
   });
 
   it("requires plugin version with mode specific metadata", () => {
     expect(ViteAssets.DEFAULT_PLUGIN_VERSION).toBe("^5.2.5");
-    expect(isCompatiblePlugin("^5.2.4", ViteAssets.DEFAULT_PLUGIN_VERSION)).toBe(false);
-    expect(isCompatiblePlugin("^5.2.5", ViteAssets.DEFAULT_PLUGIN_VERSION)).toBe(true);
+    expect(isCompatiblePlugin("^5.2.4", ViteAssets.DEFAULT_PLUGIN_VERSION)).toBeFalsy();
+    expect(isCompatiblePlugin("^5.2.5", ViteAssets.DEFAULT_PLUGIN_VERSION)).toBeTruthy();
   });
 
   it("raise unless satisfied", () => {
