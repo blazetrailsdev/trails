@@ -160,6 +160,6 @@ describe("HTML5 nodes share the XML::Node chain", () => {
     const doc = Document.parse("<div></div>");
     const fragment = doc.atCss("div")!.fragment("<b>x</b>");
     expect(fragment).toBeInstanceOf(DocumentFragment);
-    expect(fragment.toHtml()).toBe("<b>x</b>");
+    expect((fragment as InstanceType<typeof DocumentFragment>).toHtml()).toBe("<b>x</b>");
   });
 });
