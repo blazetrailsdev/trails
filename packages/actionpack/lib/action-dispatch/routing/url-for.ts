@@ -85,7 +85,11 @@ export type UrlForOptions =
   | ModelClass
   | ToModel;
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm camelize — PERMANENT
+ * @inventedArm transformKeys — PERMANENT
+ */
 export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
   if (options == null) {
     return this._routes!.urlFor({ ...this.urlOptions() });
