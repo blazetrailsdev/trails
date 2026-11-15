@@ -12,10 +12,6 @@ describe("Open3.popen3", () => {
         stdin.write("a\n");
         stdin.close();
         let line: string | null;
-        waitThr.value().then(
-          () => (done = true),
-          () => null,
-        );
         while ((line = await stdout.getsAsync()) !== null) seen.push([line, waitThr.isAlive()]);
         const err = new TextDecoder().decode((await stderr.readAsync()) as Uint8Array);
         return [err, (await waitThr.value()).exitstatus()];
