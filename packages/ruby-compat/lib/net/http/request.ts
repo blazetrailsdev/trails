@@ -337,7 +337,6 @@ export class HTTPRequest {
   }
 
   /**
-   * @missingRailsCall send_request_with_body_stream — CONVERGEABLE net-http-send-request-with-body-stream
    * @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:198-208`.
    */
   async exec(sock: BufferedIO, ver: string, path: string): Promise<void> {
@@ -351,7 +350,6 @@ export class HTTPRequest {
   }
 
   /**
-   * @missingRailsCall wait_for_continue — CONVERGEABLE net-http-edit-path-and-wait-for-continue
    * @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:259-266`.
    */
   private async sendRequestWithBody(

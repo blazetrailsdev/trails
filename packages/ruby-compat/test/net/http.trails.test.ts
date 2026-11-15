@@ -289,7 +289,7 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
     expect(new Net.HTTP.Head("/").isResponseBodyPermitted()).toBe(false);
     const req = new Net.HTTP.Put("/");
     req.body = "x";
-    const io = {};
+    const io = { read: () => null };
     expect(req.setBodyStream(io)).toBe(io);
     expect(req.body).toBeNull();
     expect(req.bodyStream).toBe(io);
