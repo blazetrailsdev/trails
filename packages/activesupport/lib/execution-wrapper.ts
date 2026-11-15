@@ -30,10 +30,6 @@ export interface ExecutionWrapper extends Included<typeof Callbacks> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ExecutionWrapper {
-  static toString(): string {
-    return "ActiveSupport::ExecutionWrapper";
-  }
-
   static RunHook: typeof RunHook;
 
   static CompleteHook: typeof CompleteHook;
@@ -270,10 +266,6 @@ export class ExecutionWrapper {
 }
 
 export class RunHook {
-  static toString(): string {
-    return "ActiveSupport::ExecutionWrapper::RunHook";
-  }
-
   [key: string]: unknown;
 
   constructor(readonly hook: ExecutionHook) {}
@@ -292,10 +284,6 @@ export class RunHook {
 }
 
 export class CompleteHook {
-  static toString(): string {
-    return "ActiveSupport::ExecutionWrapper::CompleteHook";
-  }
-
   [key: string]: unknown;
 
   constructor(readonly hook: ExecutionHook) {}

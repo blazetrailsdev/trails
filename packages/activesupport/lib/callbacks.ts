@@ -70,10 +70,6 @@ function swallowRejection(v: unknown): void {
 }
 
 export class Value {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::Conditionals::Value";
-  }
-
   private readonly block: (value: unknown) => unknown;
 
   constructor(block: (value: unknown) => unknown) {
@@ -96,10 +92,6 @@ export interface CallTemplate {
 }
 
 export class MethodCall implements CallTemplate {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::CallTemplate::MethodCall";
-  }
-
   constructor(readonly methodName: PropertyKey) {}
 
   expand(target: object, _value: unknown, block: (() => unknown) | null): unknown[] {
@@ -142,10 +134,6 @@ export class MethodCall implements CallTemplate {
 }
 
 export class ObjectCall implements CallTemplate {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::CallTemplate::ObjectCall";
-  }
-
   constructor(
     readonly target: object | null,
     readonly methodName: string,
@@ -187,10 +175,6 @@ export class ObjectCall implements CallTemplate {
 }
 
 export class InstanceExec0 implements CallTemplate {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::CallTemplate::InstanceExec0";
-  }
-
   constructor(readonly fn: () => unknown) {}
 
   expand(target: object, _value: unknown, block: (() => unknown) | null): unknown[] {
@@ -209,10 +193,6 @@ export class InstanceExec0 implements CallTemplate {
 }
 
 export class InstanceExec1 implements CallTemplate {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::CallTemplate::InstanceExec1";
-  }
-
   constructor(readonly fn: (target: object) => unknown) {}
 
   expand(target: object, _value: unknown, block: (() => unknown) | null): unknown[] {
@@ -231,10 +211,6 @@ export class InstanceExec1 implements CallTemplate {
 }
 
 export class InstanceExec2 implements CallTemplate {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::CallTemplate::InstanceExec2";
-  }
-
   constructor(readonly fn: (target: object, block: (() => unknown) | null) => unknown) {}
 
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
@@ -259,10 +235,6 @@ export class InstanceExec2 implements CallTemplate {
 }
 
 export class ProcCall implements CallTemplate {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::CallTemplate::ProcCall";
-  }
-
   readonly overrideTarget: ((...args: any[]) => unknown) | Value | null;
 
   constructor(target: ((...args: any[]) => unknown) | Value | null) {
@@ -342,10 +314,6 @@ export namespace CallTemplate {
 }
 
 export class Environment extends Struct.new("target", "halted", "value") {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::Filters::Environment";
-  }
-
   declare target: object;
   declare halted: boolean;
   declare value: unknown;
@@ -354,10 +322,6 @@ export class Environment extends Struct.new("target", "halted", "value") {
 }
 
 export class Before {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::Filters::Before";
-  }
-
   readonly userCallback: (target: object, value: unknown) => unknown;
   readonly userConditions: Array<(target: object, value: unknown) => boolean>;
   readonly terminator:
@@ -498,10 +462,6 @@ export class Before {
 }
 
 export class After {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::Filters::After";
-  }
-
   readonly userCallback: (target: object, value: unknown) => unknown;
   readonly userConditions: Array<(target: object, value: unknown) => boolean>;
   readonly halting: boolean;
@@ -546,10 +506,6 @@ export class After {
 }
 
 export class Around {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::Filters::Around";
-  }
-
   private readonly userCallback: CallTemplate;
   private readonly userConditions: Array<(target: object, value: unknown) => boolean>;
 
@@ -577,10 +533,6 @@ export class Around {
 }
 
 export class Callback {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::Callback";
-  }
-
   kind: CallbackKind;
   name: string;
   readonly filter: AnyCallback | string | symbol | CallbackObject;
@@ -705,10 +657,6 @@ export class Callback {
 }
 
 export class CallbackSequence {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::CallbackSequence";
-  }
-
   readonly nested: CallbackSequence | null;
   private readonly callTemplate: CallTemplate | null;
   private readonly userConditions: Array<(target: object, value: unknown) => boolean> | null;
@@ -784,10 +732,6 @@ export class CallbackSequence {
 }
 
 export class CallbackChain {
-  static toString(): string {
-    return "ActiveSupport::Callbacks::CallbackChain";
-  }
-
   readonly name: string;
   readonly config: DefineCallbacksOptions;
   private chain: Callback[];

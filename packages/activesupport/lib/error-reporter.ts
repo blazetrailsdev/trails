@@ -29,10 +29,6 @@ type ErrorSubscriberClass = abstract new (...args: any[]) => ErrorSubscriber;
 const ABOVE_STANDARD_ERROR = Symbol.for("@blazetrails/activesupport:aboveStandardError");
 
 export class ErrorReporter {
-  static toString(): string {
-    return "ActiveSupport::ErrorReporter";
-  }
-
   static readonly SEVERITIES: ErrorSeverity[] = ["error", "warning", "info"];
   static readonly DEFAULT_SOURCE = "application";
   static readonly DEFAULT_RESCUE: readonly ErrorClass[] = Object.freeze([Error]);

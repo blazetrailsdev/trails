@@ -37,17 +37,9 @@ export const LoadInterlockAwareMonitorMixin = {
   },
 };
 
-export class LoadInterlockAwareMonitor extends Monitor {
-  static toString(): string {
-    return "ActiveSupport::Concurrency::LoadInterlockAwareMonitor";
-  }
-}
+export class LoadInterlockAwareMonitor extends Monitor {}
 
 export class ThreadLoadInterlockAwareMonitor {
-  static toString(): string {
-    return "ActiveSupport::Concurrency::ThreadLoadInterlockAwareMonitor";
-  }
-
   private owner: Fiber | null;
   private count: number;
   private mutex: Mutex;

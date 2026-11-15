@@ -17,10 +17,6 @@ const HTML_ESCAPE: Record<string, string> = {
 const HTML_ESCAPE_PATTERN = /[&<>"']/g;
 
 export class SafeConcatError extends Error {
-  static toString(): string {
-    return "ActiveSupport::SafeBuffer::SafeConcatError";
-  }
-
   constructor() {
     super("Could not concatenate to the buffer because it is not HTML safe.");
     this.name = "SafeConcatError";
@@ -104,10 +100,6 @@ function strRange(str: string, args: ArefArgs): [number, number] {
 }
 
 export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJson") {
-  static toString(): string {
-    return "ActiveSupport::SafeBuffer";
-  }
-
   static readonly UNSAFE_STRING_METHODS = [
     "capitalize",
     "chomp",

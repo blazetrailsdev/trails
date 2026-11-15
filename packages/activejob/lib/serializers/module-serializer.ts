@@ -4,10 +4,6 @@ import { ActiveJob, Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
 export class ModuleSerializer extends ObjectSerializer {
-  static toString(): string {
-    return "ActiveJob::Serializers::ModuleSerializer";
-  }
-
   serialize(constant: object): Record<string, unknown> {
     if (rbModName(constant) == null)
       throw new ActiveJob.SerializationError("Serializing an anonymous class is not supported");

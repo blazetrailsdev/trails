@@ -23,11 +23,7 @@ import { Assertion, Skip, UnexpectedError, type Test } from "./assertions.js";
 type Status = InstanceType<typeof Process.Status>;
 type SerializedFailure = [kind: string, message: string, backtrace: string[]];
 
-export class SubprocessCrashed extends StandardError {
-  static toString(): string {
-    return "ActiveSupport::Testing::Isolation::SubprocessCrashed";
-  }
-}
+export class SubprocessCrashed extends StandardError {}
 
 export function isForkingEnv(): boolean {
   return env["NO_FORK"] == null && rbObjRespondTo(Process, "fork");

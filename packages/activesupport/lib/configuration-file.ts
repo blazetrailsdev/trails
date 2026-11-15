@@ -10,19 +10,11 @@ import { Psych } from "@blazetrails/ruby-compat/psych";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
 import "./constants.excluded.generated.js";
 
-export class FormatError extends StandardError {
-  static toString(): string {
-    return "ActiveSupport::ConfigurationFile::FormatError";
-  }
-}
+export class FormatError extends StandardError {}
 
 FormatError.prototype.name = "ActiveSupport::ConfigurationFile::FormatError";
 
 export class ConfigurationFile {
-  static toString(): string {
-    return "ActiveSupport::ConfigurationFile";
-  }
-
   private content: string;
   private contentPath: string;
 

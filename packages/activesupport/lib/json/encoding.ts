@@ -9,10 +9,6 @@ export interface EncodeOptions {
 }
 
 export class JSONGemEncoder {
-  static toString(): string {
-    return "ActiveSupport::JSON::Encoding::JSONGemEncoder";
-  }
-
   readonly options: EncodeOptions;
 
   constructor(options?: EncodeOptions | null) {

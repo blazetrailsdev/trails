@@ -10,10 +10,6 @@ function bigDecimal(value: string): BigDecimal {
 }
 
 export class RoundingHelper {
-  static toString(): string {
-    return "ActiveSupport::NumberHelper::RoundingHelper";
-  }
-
   readonly options: Record<string, unknown>;
 
   constructor(options: Record<string, unknown>) {

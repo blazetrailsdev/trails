@@ -12,11 +12,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ActiveJob } from "./namespaces.js";
 
-export class EnqueueError extends StandardError {
-  static toString(): string {
-    return "ActiveJob::EnqueueError";
-  }
-}
+export class EnqueueError extends StandardError {}
 ActiveJob.EnqueueError = EnqueueError;
 
 interface QueueAdapterLike {

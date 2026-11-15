@@ -1,5 +1,5 @@
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
-import { NotImplementedError, TSE, TopLevel } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbObjAsString, TSE, TopLevel } from "@blazetrails/ruby-compat";
 import { Unicode } from "../../multibyte/unicode.js";
 
 const HTML_ESCAPE: Record<string, string> = {
@@ -16,7 +16,7 @@ const HTML_ESCAPE_ONCE_REGEXP = /["><']|&(?!([a-zA-Z]+|(#\d+)|(#[xX][\dA-Fa-f]+)
 
 export function unwrappedHtmlEscape(s: unknown): string | SafeBuffer {
   if (s instanceof SafeBuffer && s.htmlSafe) return s;
-  return Unicode.tidyBytes(String(s ?? "")).replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
+  return Unicode.tidyBytes(rbObjAsString(s)).replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
 }
 
 export function htmlEscape(s: unknown): SafeBuffer {
@@ -57,7 +57,7 @@ const TAG_NAME_REPLACEMENT_CHAR = "_";
 
 export function htmlEscapeOnce(s: unknown): SafeBuffer {
   return htmlSafe(
-    Unicode.tidyBytes(String(s ?? "")).replace(HTML_ESCAPE_ONCE_REGEXP, (c) =>
+    Unicode.tidyBytes(rbObjAsString(s)).replace(HTML_ESCAPE_ONCE_REGEXP, (c) =>
       c === "&" ? "&amp;" : HTML_ESCAPE[c],
     ),
   );

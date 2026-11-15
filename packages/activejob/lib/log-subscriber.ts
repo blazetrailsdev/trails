@@ -28,6 +28,7 @@ import {
   transformValues,
   sortBy,
   tally,
+  rbModToS,
 } from "@blazetrails/ruby-compat";
 import { verboseEnqueueLogs } from "./active-job.js";
 import { Base } from "./base.js";
@@ -289,7 +290,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     );
     return (
       `Enqueued ${enqueuedCount} ${pluralize("job", enqueuedCount)} to ${ActiveJob.adapterName(adapter)}` +
-      ` (${jobClassesCounts.map(([klass, count]) => `${count} ${klass}`).join(", ")})`
+      ` (${jobClassesCounts.map(([klass, count]) => `${count} ${rbModToS(klass)}`).join(", ")})`
     );
   }
 }

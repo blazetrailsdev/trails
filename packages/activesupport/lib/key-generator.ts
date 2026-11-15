@@ -1,18 +1,22 @@
 import { ArgumentError } from "./hash-utils.js";
-import { DigestClass, getCrypto, OpenSSL, type Bytes } from "@blazetrails/ruby-compat";
+import {
+  DigestClass,
+  getCrypto,
+  OpenSSL,
+  rbObjAsString,
+  type Bytes,
+} from "@blazetrails/ruby-compat";
 
 export class KeyGenerator {
-  static toString(): string {
-    return "ActiveSupport::KeyGenerator";
-  }
-
   private static _hashDigestClass?: DigestClass;
 
   static set hashDigestClass(klass: DigestClass) {
     if (klass instanceof DigestClass) {
       this._hashDigestClass = klass;
     } else {
-      throw new ArgumentError(`${String(klass)} is expected to be an OpenSSL::Digest subclass`);
+      throw new ArgumentError(
+        `${rbObjAsString(klass)} is expected to be an OpenSSL::Digest subclass`,
+      );
     }
   }
 
@@ -49,10 +53,6 @@ export class KeyGenerator {
 }
 
 export class CachingKeyGenerator {
-  static toString(): string {
-    return "ActiveSupport::CachingKeyGenerator";
-  }
-
   private readonly keyGenerator: KeyGenerator;
   private readonly cacheKeys = new Map<string, Bytes>();
 

@@ -32,10 +32,6 @@ type DefaultBlock<V> = (key: string) => V;
 type ToHash = { toHash(): AnyObject | Hash<unknown, unknown> };
 
 export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
-  static toString(): string {
-    return "ActiveSupport::HashWithIndifferentAccess";
-  }
-
   constructor(constructor?: AnyObject | Hash<string, V> | DefaultProc<string, V> | NoInfer<V>) {
     super();
     if (

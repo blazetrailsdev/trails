@@ -4,10 +4,6 @@ import type { NumberToPhoneOptions } from "../number-helper.js";
 import { isBlank, isPresent } from "../core-ext/object/blank.js";
 
 export class NumberToPhoneConverter extends NumberConverter<NumberToPhoneOptions> {
-  static toString(): string {
-    return "ActiveSupport::NumberHelper::NumberToPhoneConverter";
-  }
-
   /** @missingRailsName strip — PERMANENT */
   protected convert(): string {
     let str = rbObjDup(this.countryCode(this.opts.countryCode));

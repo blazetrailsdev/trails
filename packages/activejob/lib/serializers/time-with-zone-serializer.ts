@@ -7,10 +7,6 @@ import { ObjectSerializer } from "./object-serializer.js";
 export class TimeWithZoneSerializer extends ObjectSerializer {
   static readonly NANO_PRECISION = 9;
 
-  static toString(): string {
-    return "ActiveJob::Serializers::TimeWithZoneSerializer";
-  }
-
   serialize(timeWithZone: TimeWithZone): Record<string, unknown> {
     return super.serialize({
       value: timeWithZone.iso8601(TimeWithZoneSerializer.NANO_PRECISION),

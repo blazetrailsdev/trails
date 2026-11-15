@@ -2,10 +2,6 @@ import { presence } from "./core-ext/object/blank.js";
 import { KeyError, rbObjClassname } from "@blazetrails/ruby-compat";
 
 export class OrderedOptions {
-  static toString(): string {
-    return "ActiveSupport::OrderedOptions";
-  }
-
   static name = "ActiveSupport::OrderedOptions";
 
   private readonly data: Map<string, unknown>;
@@ -186,10 +182,6 @@ Object.setPrototypeOf(
 );
 
 export class InheritableOptions extends OrderedOptions {
-  static toString(): string {
-    return "ActiveSupport::InheritableOptions";
-  }
-
   static override name = "ActiveSupport::InheritableOptions";
 
   private readonly parent: OrderedOptions | Record<string, unknown>;

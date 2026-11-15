@@ -20,10 +20,6 @@ import { truncateBytes } from "../string-utils.js";
 import { Unicode } from "./unicode.js";
 
 export class Chars {
-  static toString(): string {
-    return "ActiveSupport::Multibyte::Chars";
-  }
-
   wrappedString: string;
 
   /** @missingRailsCall dup — PERMANENT */

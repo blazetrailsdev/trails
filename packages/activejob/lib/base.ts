@@ -50,10 +50,6 @@ export interface Base
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base {
-  static toString(): string {
-    return "ActiveJob::Base";
-  }
-
   declare static deserialize: typeof ClassMethods.deserialize;
   declare static set: typeof ClassMethods.set;
   declare static queueAdapter: unknown;

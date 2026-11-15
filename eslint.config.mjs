@@ -30,7 +30,6 @@ import asyncQueryingEmpty from "./eslint/async-querying-empty.mjs";
 import noQSuffixPredicate from "./eslint/no-q-suffix-predicate.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
-import classToStringSeat from "./eslint/class-to-string-seat.mjs";
 import railsFileStructureMethodOrder, {
   isManifestAvailable as railsFileStructureManifestAvailable,
 } from "./eslint/rails-file-structure-method-order.mjs";
@@ -329,7 +328,6 @@ export default defineConfig(
           "prefer-await-relation": preferAwaitRelation,
           "nie-requires-annotation": nieRequiresAnnotation,
           "rails-file-structure-method-order": railsFileStructureMethodOrder,
-          "class-to-string-seat": classToStringSeat,
           "rails-test-name-parity": railsTestNameParity,
           "expected-fixtures": expectedFixtures,
           "test-fixture-parity": testFixtureParity,
@@ -643,13 +641,6 @@ export default defineConfig(
           ignores: ["**/*.test.ts"],
           rules: {
             "blazetrails/rails-file-structure-method-order": "error",
-          },
-        },
-        {
-          files: ["packages/activejob/lib/**/*.ts", "packages/activesupport/lib/**/*.ts"],
-          ignores: ["**/*.test.ts", "**/test-helpers/**"],
-          rules: {
-            "blazetrails/class-to-string-seat": "error",
           },
         },
       ]

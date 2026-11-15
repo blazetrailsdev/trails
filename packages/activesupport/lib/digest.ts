@@ -1,11 +1,7 @@
 import { ArgumentError } from "./hash-utils.js";
-import { OpenSSL, type DigestClass } from "@blazetrails/ruby-compat";
+import { OpenSSL, rbObjAsString, type DigestClass } from "@blazetrails/ruby-compat";
 
 export class Digest {
-  static toString(): string {
-    return "ActiveSupport::Digest";
-  }
-
   private static _hashDigestClass?: DigestClass;
 
   static get hashDigestClass(): DigestClass {
@@ -14,7 +10,9 @@ export class Digest {
 
   static set hashDigestClass(klass: DigestClass) {
     if (typeof (klass as DigestClass | null)?.hexdigest !== "function") {
-      throw new ArgumentError(`${String(klass)} is expected to implement hexdigest class method`);
+      throw new ArgumentError(
+        `${rbObjAsString(klass)} is expected to implement hexdigest class method`,
+      );
     }
     this._hashDigestClass = klass;
   }

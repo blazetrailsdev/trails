@@ -21,10 +21,6 @@ function toI(value: unknown): number {
 }
 
 export class MemoryStore extends Store implements CacheStore {
-  static toString(): string {
-    return "ActiveSupport::Cache::MemoryStore";
-  }
-
   static supportsCacheVersioning(): boolean {
     return true;
   }

@@ -63,16 +63,8 @@ function offset(_datetime: Temporal.PlainDateTime): Rational {
   return rational(0, 1);
 }
 
-export class UnserializableObjectError extends Error {
-  static toString(): string {
-    return "ActiveSupport::MessagePack::UnserializableObjectError";
-  }
-}
-export class MissingClassError extends Error {
-  static toString(): string {
-    return "ActiveSupport::MessagePack::MissingClassError";
-  }
-}
+export class UnserializableObjectError extends Error {}
+export class MissingClassError extends Error {}
 
 export interface ObjectClass {
   name: string;

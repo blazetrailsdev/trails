@@ -39,10 +39,6 @@ OBJECT_METHOD_TABLE.isBlank = (self: object): boolean => {
 };
 
 export class NilClass {
-  static toString(): string {
-    return "NilClass";
-  }
-
   static isBlank(_value: null | undefined): true {
     return true;
   }
@@ -52,10 +48,6 @@ export class NilClass {
 }
 
 export class FalseClass {
-  static toString(): string {
-    return "FalseClass";
-  }
-
   static isBlank(_value: false): true {
     return true;
   }
@@ -65,10 +57,6 @@ export class FalseClass {
 }
 
 export class TrueClass {
-  static toString(): string {
-    return "TrueClass";
-  }
-
   static isBlank(_value: true): false {
     return false;
   }
@@ -78,10 +66,6 @@ export class TrueClass {
 }
 
 export class Symbol {
-  static toString(): string {
-    return "Symbol";
-  }
-
   static isBlank(value: string | symbol): boolean {
     const str = typeof value === "symbol" ? (value.description ?? "") : value;
     return str.length === 0;
@@ -92,10 +76,6 @@ export class Symbol {
 }
 
 export class String {
-  static toString(): string {
-    return "String";
-  }
-
   static readonly BLANK_RE = BLANK_RE;
 
   static isBlank(value: string | Uint8Array): boolean {
@@ -123,10 +103,6 @@ STRING_METHOD_TABLE.isBlank = rbDefineMethod(0, (self) => String.isBlank(self.st
 BINARY_METHOD_TABLE.isBlank = (self) => String.isBlank(self);
 
 export class Time {
-  static toString(): string {
-    return "Time";
-  }
-
   static isBlank(_value: TimeValue): false {
     return false;
   }

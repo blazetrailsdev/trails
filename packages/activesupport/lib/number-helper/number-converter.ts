@@ -69,10 +69,6 @@ const DEFAULTS: Record<string, Record<string, unknown>> = {
 };
 
 export abstract class NumberConverter<TOptions extends NumberFormatOptions = NumberFormatOptions> {
-  static toString(): string {
-    return "ActiveSupport::NumberHelper::NumberConverter";
-  }
-
   protected number: unknown;
   protected opts: TOptions;
   protected _options: Record<string, unknown> | undefined;

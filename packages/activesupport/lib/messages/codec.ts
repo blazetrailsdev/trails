@@ -20,10 +20,6 @@ export interface CodecOptions {
 }
 
 export class Codec extends Metadata {
-  static toString(): string {
-    return "ActiveSupport::Messages::Codec";
-  }
-
   static defaultSerializer: Format | MessageSerializer = "marshal";
 
   protected override readonly serializer: MessageSerializer;

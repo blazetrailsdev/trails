@@ -44,10 +44,6 @@ function undefMethodProxy(
 type MethodMissing = (this: unknown, called: string, args: unknown[]) => unknown;
 
 export abstract class DeprecationProxy {
-  static toString(): string {
-    return "ActiveSupport::Deprecation::DeprecationProxy";
-  }
-
   inspect(): string {
     return inspect(this.target);
   }
@@ -69,10 +65,6 @@ export abstract class DeprecationProxy {
 }
 
 export class DeprecatedObjectProxy extends DeprecationProxy {
-  static toString(): string {
-    return "ActiveSupport::Deprecation::DeprecatedObjectProxy";
-  }
-
   private _object: unknown;
   private _message: string;
   private _deprecator: Deprecation;
@@ -98,10 +90,6 @@ export class DeprecatedObjectProxy extends DeprecationProxy {
 }
 
 export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
-  static toString(): string {
-    return "ActiveSupport::Deprecation::DeprecatedInstanceVariableProxy";
-  }
-
   private _instance: Record<string, unknown>;
   private _method: string;
   private _var: string;
@@ -146,10 +134,6 @@ export class DeprecatedInstanceVariableProxy extends DeprecationProxy {
 }
 
 export class DeprecatedConstantProxy extends Module {
-  static toString(): string {
-    return "ActiveSupport::Deprecation::DeprecatedConstantProxy";
-  }
-
   private _oldConst: string;
   private _newConst: string;
   private _deprecator: Deprecation;

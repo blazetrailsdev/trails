@@ -2,10 +2,6 @@ import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { QueueAdapters } from "../namespaces.js";
 
 export class AbstractAdapter {
-  static toString(): string {
-    return "ActiveJob::QueueAdapters::AbstractAdapter";
-  }
-
   enqueue(_job: unknown): Promise<unknown> | unknown {
     throw new NotImplementedError();
   }

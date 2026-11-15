@@ -5,10 +5,6 @@ import { Serializers } from "../namespaces.js";
 import { ObjectSerializer } from "./object-serializer.js";
 
 export class DateSerializer extends ObjectSerializer {
-  static toString(): string {
-    return "ActiveJob::Serializers::DateSerializer";
-  }
-
   /** @inventedArm if — PERMANENT */
   serialize(date: Date | Temporal.PlainDate): Record<string, unknown> {
     let rbDate = date;
