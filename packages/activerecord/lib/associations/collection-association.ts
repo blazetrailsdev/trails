@@ -40,7 +40,6 @@ export abstract class CollectionAssociation extends Association {
     return this._targetStore as Base[];
   }
 
-  /** @inventedArm if — PERMANENT */
   override set target(record: Base | Base[] | null) {
     if (!this.reflection.klass?.hasManyInversing) {
       super.target = record;
