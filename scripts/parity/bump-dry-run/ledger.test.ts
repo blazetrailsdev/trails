@@ -195,7 +195,13 @@ describe("suspendedTests", () => {
 describe("constantSeed", () => {
   it("seeds a removed file constant that is a new extra in its TS file only", () => {
     const api = (names: string[]) => ({
-      packages: { actioncable: { fileConstants: { "subscription_adapter/redis.rb": names } } },
+      packages: {
+        actioncable: {
+          fileConstants: {
+            "subscription_adapter/redis.rb": Object.fromEntries(names.map((n) => [n, {}])),
+          },
+        },
+      },
     });
     const rows = constantSeed(
       api(["ConnectionError", "Unported", "Kept"]),

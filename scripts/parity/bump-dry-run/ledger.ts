@@ -396,7 +396,7 @@ export function signatureSeed(
 
 /** `rails-api.json`'s per-file constants, as far as {@link constantSeed} reads them. */
 export interface ApiConstants {
-  packages: Record<string, { fileConstants?: Record<string, string[]> }>;
+  packages: Record<string, { fileConstants?: Record<string, Record<string, unknown>> }>;
 }
 
 /**
@@ -420,8 +420,8 @@ export function constantSeed(
     const before = active.packages[pkg]?.fileConstants ?? {};
     const after = candidate.packages[pkg]?.fileConstants ?? {};
     for (const [rubyFile, names] of Object.entries(before)) {
-      const kept = new Set(after[rubyFile] ?? []);
-      for (const name of names) {
+      const kept = new Set(Object.keys(after[rubyFile] ?? {}));
+      for (const name of Object.keys(names)) {
         if (kept.has(name) || !fresh.has(`${pkg} ${tsFileOf(rubyFile, pkg)} ${name}`)) continue;
         rows.push({ package: pkg, rubyFile, rubyName: name, kind: "constant", from, to });
       }
