@@ -123,7 +123,7 @@ export class HttpStreamingResponse {
     }
   }
 
-  async toS(): Promise<Uint8Array> {
+  async toString(): Promise<Uint8Array> {
     if (this._toS != null) return this._toS;
     const io = new StringIO<Uint8Array>(new Uint8Array(0));
     await this.each((line) => io.append(line));

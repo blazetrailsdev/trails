@@ -72,7 +72,7 @@ describe("HttpStreamingResponseTest", () => {
   });
 
   it("to s", async () => {
-    const bodyString = await response.body.toS();
+    const bodyString = await response.body.toString();
     expect(bodyString.length > 0).toBeTruthy();
     const contentLength = (await response.headers()).get("Content-Length") as unknown as
       | string[]
@@ -84,7 +84,7 @@ describe("HttpStreamingResponseTest", () => {
 
   it("to s called twice", async () => {
     const body = response.body;
-    expect(await body.toS()).toEqual(await body.toS());
+    expect(await body.toString()).toEqual(await body.toString());
   });
 
   it("body responds to close", () => {
