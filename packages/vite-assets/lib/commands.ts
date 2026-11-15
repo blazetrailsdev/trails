@@ -48,6 +48,10 @@ export class Commands {
     $stdout.puts(`Removed vite cache and output dirs:\n\t${dirs.join("\n\t")}`);
   }
 
+  /**
+   * @inventedArm cpAsync — PERMANENT
+   * @inventedArm chmodAsync — PERMANENT
+   */
   async installBinstubs(): Promise<void> {
     const binstub = (await this.config()).root.join("bin/vite").toString();
     await FileUtils.mkdirPAsync(File.dirname(binstub));
