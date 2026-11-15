@@ -437,6 +437,7 @@ function expandCallbackSourcesWithHelpers(
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
+  /** @noRailsEquivalent PERMANENT */
   static readonly [shadowsIncluded] = ["initInternals"];
 
   declare static includeRootInJson: boolean | string;
