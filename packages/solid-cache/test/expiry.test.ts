@@ -3,8 +3,8 @@ import type { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/t
 import { weeks } from "@blazetrails/activesupport";
 import { Kernel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Entry, ExpiryJob, Record, type Store } from "../../lib/index.js";
-import { useSolidCache, waitForBackgroundTasks } from "../support/test-helper.js";
+import { Entry, ExpiryJob, Record, type Store } from "../lib/index.js";
+import { useSolidCache, waitForBackgroundTasks } from "./support/test-helper.js";
 
 class ExpiryTest extends ActiveJobTestCase {
   expiry(): void {}

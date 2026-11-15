@@ -242,6 +242,7 @@ import "./tasks/mysql-database-tasks.js";
 export {
   Migrator,
   UnknownMigrationVersionError,
+  IrreversibleMigration,
   ProtectedEnvironmentError,
   EnvironmentMismatchError,
   EnvironmentStorageError,

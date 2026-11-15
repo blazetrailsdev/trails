@@ -8,6 +8,7 @@
   "include": ["lib"],
   "references": [
     { "path": "../ruby-compat" },
+    { "path": "../rack" },
     { "path": "../date" },
     { "path": "../tzinfo" },
     { "path": "../i18n" },

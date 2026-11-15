@@ -5,6 +5,7 @@ import { SolidCache } from "../../solid-cache.js";
 export class Estimate {
   readonly samples: number;
   maxRecords!: number;
+  size!: number;
   private _outlierSizeAndCutoff?: Promise<[number, number, unknown]>;
   private _nonOutlierEstimatedSize?: number;
   private _sampledFraction?: number;
@@ -18,11 +19,8 @@ export class Estimate {
   static async new({ samples }: { samples: number }): Promise<Estimate> {
     const estimate = new Estimate({ samples });
     estimate.maxRecords ??= Number(await SolidCache.Entry!.idRange());
+    estimate.size = (await estimate.outliersSize()) + (await estimate.nonOutlierEstimatedSize());
     return estimate;
-  }
-
-  async size(): Promise<number> {
-    return (await this.outliersSize()) + (await this.nonOutlierEstimatedSize());
   }
 
   async isExact(): Promise<boolean> {

@@ -39,13 +39,13 @@ export class MovingAverageEstimate {
   }
 
   /** @internal */
-  private latestValue(): Promise<number> {
-    return this.estimate.size();
+  private latestValue(): number {
+    return this.estimate.size;
   }
 
   /** @internal */
   private async latestValues(): Promise<number[]> {
-    return [...(await this.previousValues()), await this.latestValue()].slice(
+    return [...(await this.previousValues()), this.latestValue()].slice(
       -(await this.retainedEstimates()),
     );
   }

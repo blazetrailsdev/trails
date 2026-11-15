@@ -3,6 +3,7 @@ import { Time } from "@blazetrails/date";
 import { NotImplementedError, rbModName } from "@blazetrails/ruby-compat";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
 import type { LocalStore } from "../../../lib/cache/strategy/local-cache.js";
+import type { Middleware } from "../../../lib/cache/strategy/local-cache-middleware.js";
 import { plusWithDuration } from "../../../lib/core-ext/time/calculations.js";
 import { Notifications } from "../../../lib/notifications.js";
 import type { Event } from "../../../lib/notifications/instrumenter.js";
@@ -18,6 +19,7 @@ interface LocalCacheStore {
   withLocalCache<T>(block: () => T | Promise<T>): Promise<T>;
   localCache(): LocalStore | null | undefined;
   bypassLocalCache<T>(block: () => T | Promise<T>): Promise<T>;
+  middleware(): Middleware;
 }
 
 function alphanumeric(): string {
@@ -372,7 +374,18 @@ export function localCacheBehavior(host?: LocalCacheBehaviorHost): void {
     });
   });
 
-  vitestIt.skip("middleware");
+  it("middleware", async () => {
+    const key = crypto.randomUUID();
+    const value = alphanumeric();
+    let app: Parameters<Middleware["new"]>[0] = async () => {
+      const result = await cache.write(key, value);
+      expect(await cache.read(key)).toBe(value);
+      expect(result).toBeTruthy();
+      return [200, {}, []];
+    };
+    app = cache.middleware().new(app);
+    await app.call({});
+  });
 
   it("local race condition protection", async () => {
     const key = crypto.randomUUID();

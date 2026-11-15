@@ -2,8 +2,8 @@ import { minutes, weeks } from "@blazetrails/activesupport";
 import { freezeTime, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { Time } from "@blazetrails/date";
 import { afterEach, describe, expect, it } from "vitest";
-import { Entry, Record } from "../../lib/index.js";
-import { useSolidCache } from "../support/test-helper.js";
+import { Entry, Record } from "../lib/index.js";
+import { useSolidCache } from "./support/test-helper.js";
 
 describe("SolidCache::StatsTest", () => {
   const host = useSolidCache();
