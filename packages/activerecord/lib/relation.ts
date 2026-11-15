@@ -669,7 +669,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return ENUMERABLE_DELEGATES.sortBy(await this.toArray(), key);
   }
 
-  async groupBy<K>(fn: (record: T) => K): Promise<Map<K, T[]>> {
+  async groupBy<K>(fn: (record: T) => K): Promise<Hash<K, T[]>> {
     return ENUMERABLE_DELEGATES.groupBy(await this.toArray(), fn);
   }
 
