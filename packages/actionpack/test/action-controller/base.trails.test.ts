@@ -207,10 +207,14 @@ describe("ActionController::Streaming layout content_for fallback", () => {
 
 describe("ActionController::Streaming chunked response body", () => {
   let release!: () => void;
+  let fail!: (error: Error) => void;
   class StreamGateController extends ApplicationController {
     declare gate: Promise<string>;
     async show(): Promise<void> {
-      this.gate = new Promise<string>((resolve) => (release = () => resolve("body")));
+      this.gate = new Promise<string>((resolve, reject) => {
+        release = () => resolve("body");
+        fail = reject;
+      });
       await this.render({ stream: true, layout: "application" });
     }
   }
@@ -244,6 +248,15 @@ describe("ActionController::Streaming chunked response body", () => {
     expect(() => controller.response.body).toThrow(/await awaitBody before body/);
     release();
     expect(await (controller.response.stream as Buffer).awaitBody()).toBe("<head></head>body");
+  });
+
+  it("rescues a template that rejects after a sync body read", async () => {
+    const controller = new StreamGateController();
+    await controller.dispatch("show", makeRequest(), new Response());
+
+    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
+    fail(new Error("boom"));
+    expect(await (controller.response.stream as Buffer).awaitBody()).toMatch(/^<head><\/head>/);
   });
 });
 

@@ -78,7 +78,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   /** @internal */
   protected _strBody: string | null = null;
   /** @internal */
-  protected _pendingBody: Promise<string> | null = null;
+  protected _pendingBody: { each: Promise<unknown>; buf: () => string } | null = null;
 
   constructor(response: Response | null, buf: Buf) {
     this._response = response;
@@ -103,7 +103,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
       buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
     });
     if (pending instanceof Promise) {
-      this._pendingBody = pending.then(() => buf);
+      this._pendingBody = { each: pending, buf: () => buf };
       throw new RuntimeError(
         "streaming ActionDispatch::Response body: await awaitBody before body",
       );
@@ -115,7 +115,11 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   /** @noRailsEquivalent PERMANENT */
   async awaitBody(): Promise<string> {
     if (this._strBody !== null) return this._strBody;
-    if (this._pendingBody) return (this._strBody = await this._pendingBody);
+    if (this._pendingBody) {
+      const { each, buf } = this._pendingBody;
+      await each;
+      return (this._strBody = buf());
+    }
     let buf = "";
     for await (const chunk of this) buf += String(chunk);
     this._strBody = buf;
