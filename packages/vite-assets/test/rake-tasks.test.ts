@@ -15,11 +15,6 @@ async function testAppDevDependencies(): Promise<Record<string, string>> {
   return JSON.parse(await File.readAsync(`${pathToTestApp()}/package.json`))["devDependencies"];
 }
 
-async function installedNodeModuleNames(env: Record<string, unknown>): Promise<string[]> {
-  const devDependencies = env["NODE_ENV"] === "development" ? await testAppDevDependencies() : {};
-  return Object.keys(devDependencies);
-}
-
 type WithNodeEnv = { withNodeEnv(env: string, block: () => Promise<unknown>): Promise<unknown> };
 
 async function installDependencies(nodeEnv: string): Promise<[string, Record<string, unknown>]> {
@@ -85,19 +80,15 @@ describe("RakeTasksTest", () => {
     await ViteAssets.installTasks();
     expect(Object.keys(await testAppDevDependencies())).toContain("right-pad");
 
-    const [, env] = await installDependencies("test");
+    const [command, env] = await installDependencies("test");
 
-    expect(await installedNodeModuleNames(env)).toContain("right-pad");
+    expect([command, env["NODE_ENV"]]).toEqual(["yarn install --frozen-lockfile", "development"]);
   });
 
   it("rake vite install dependencies in production environment", async () => {
     await ViteAssets.installTasks();
-    const [, env] = await installDependencies("production");
+    const [command, env] = await installDependencies("production");
 
-    expect(await installedNodeModuleNames(env)).toContain("right-pad");
-  });
-
-  it("app dev dependencies", async () => {
-    await testAppDevDependencies();
+    expect([command, env["NODE_ENV"]]).toEqual(["yarn install --frozen-lockfile", "development"]);
   });
 });
