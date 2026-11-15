@@ -1740,7 +1740,7 @@ function formatGate(g?: TestGate): string {
 export const PKG_SRC_DIRS: Record<string, string> = {
   arel: "packages/arel/test/",
   activemodel: "packages/activemodel/test/",
-  activerecord: `packages/activerecord/${testRoots("activerecord")[0]}/`,
+  activerecord: `packages/activerecord/${testRoots("activerecord")[0]}/cases/`,
   activesupport: "packages/activesupport/test/",
   rack: "packages/rack/test/",
   "rack-proxy": "packages/rack-proxy/test/",
