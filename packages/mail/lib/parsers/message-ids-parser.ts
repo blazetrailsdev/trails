@@ -4,7 +4,7 @@ import { Field } from "../field.js";
 import { MessageIdsElement } from "../elements/message-ids-element.js";
 import { ParserTools } from "../parser-tools.js";
 
-export const MessageIdsStruct = Struct.new("messageIds", "error");
+export const MessageIdsStruct = Struct.new<"messageIds" | "error", { messageIds: string[]; error: unknown }>("messageIds", "error");
 
 export const MessageIdsParser = extend(
   {
@@ -29,7 +29,7 @@ export const MessageIdsParser = extend(
     enCommentTail: 306,
     enMain: 318,
 
-    parse(data: string | Uint8Array | null): any {
+    parse(data: string | Uint8Array | null): InstanceType<typeof MessageIdsStruct> {
       const self = MessageIdsParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, messageIds: any, msgIdS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number, id: any;
       data = (data == null ? data : b(data)) as Uint8Array;

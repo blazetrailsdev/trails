@@ -5,7 +5,7 @@ import { EnvelopeFromElement } from "../elements/envelope-from-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-export const EnvelopeFromStruct = Struct.new("address", "ctimeDate", "error");
+export const EnvelopeFromStruct = Struct.new<"address" | "ctimeDate" | "error", { address: string; ctimeDate: string; error: unknown }>("address", "ctimeDate", "error");
 
 export const EnvelopeFromParser = extend(
   {
@@ -30,7 +30,7 @@ export const EnvelopeFromParser = extend(
     enCommentTail: 245,
     enMain: 1,
 
-    parse(data: string | Uint8Array | null): any {
+    parse(data: string | Uint8Array | null): InstanceType<typeof EnvelopeFromStruct> {
       const self = EnvelopeFromParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, envelopeFrom: any, addressS: number | null = null, ctimeDateS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
       data = (data == null ? data : b(data)) as Uint8Array;

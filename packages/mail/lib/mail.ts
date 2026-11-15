@@ -1,7 +1,9 @@
 import { Time } from "@blazetrails/date";
 import {
   File,
+  Kernel,
   kernelRand,
+  LOAD_PATH,
   Process,
   rbObjAsString,
   rbAutoloadStr,
@@ -110,6 +112,9 @@ export interface DeliveryInterceptor {
   deliveringEmail(mail: Message): unknown;
 }
 
+const LIB = File.expandPath(decodeURIComponent(new URL(".", import.meta.url).pathname));
+if (!LOAD_PATH.includes(LIB)) LOAD_PATH.push(LIB);
+
 const deliveryNotificationObservers: DeliveryObserver[] = [];
 const deliveryInterceptors: DeliveryInterceptor[] = [];
 const autoloads: Record<string, string> = {};
@@ -121,7 +126,7 @@ export const Mail: MailConstants = {
   },
 
   async eagerAutoloadBang() {
-    for (const path of Object.values(autoloads)) await import(path);
+    for (const path of Object.values(autoloads)) await Kernel.require(path);
   },
 
   RANDOM_TAG: "%x%x_%x%x%d%x",

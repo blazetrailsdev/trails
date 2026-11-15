@@ -72,6 +72,7 @@ export class Base extends AbstractController.Base {
 
   declare static NullMail: typeof NullMail;
   declare static helper: (...args: unknown[]) => void;
+  declare static layout: OmitThisParameter<typeof ActionView.Layouts.ClassMethods.layout>;
   declare static prependViewPath: OmitThisParameter<
     typeof ActionView.ViewPaths.ClassMethods.prependViewPath
   >;

@@ -82,3 +82,24 @@ export function sliceBang(
   const sliced = chars.splice(start, len).join("");
   return [sliced, chars.join("")];
 }
+
+/**
+ * Ruby core `String#slice` / `String#[]` (`vendor/ruby/v3.3.11/string.c:5282`
+ * `rb_str_aref_m`): the substring `sliceBang` would remove, with the receiver
+ * left as it is. A receiver that is not a JS string, such as a `Chars`, answers
+ * its own `slice`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function strSlice(
+  str: string | { slice(...args: unknown[]): unknown },
+  ...args:
+    | [number]
+    | [number, number]
+    | [Range<number | null>]
+    | [RegExp, (number | string)?]
+    | [string]
+): string | null {
+  if (typeof str !== "string") return str.slice(...args) as string | null;
+  return sliceBang(str, ...args)[0];
+}

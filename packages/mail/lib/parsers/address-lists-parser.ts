@@ -6,7 +6,7 @@ import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
 export const AddressListStruct = Struct.new<"addresses" | "groupNames" | "error", { addresses: InstanceType<typeof AddressStruct>[]; groupNames: string[]; error: unknown }>("addresses", "groupNames", "error");
-export const AddressStruct = Struct.new("raw", "domain", "comments", "local", "obsDomainList", "displayName", "group", "error");
+export const AddressStruct = Struct.new<"raw" | "domain" | "comments" | "local" | "obsDomainList" | "displayName" | "group" | "error", { raw: string | null; domain: string | null; comments: string[]; local: string | null; obsDomainList: string | null; displayName: string | null; group: string | null; error: unknown }>("raw", "domain", "comments", "local", "obsDomainList", "displayName", "group", "error");
 
 export const AddressListsParser = extend(
   {

@@ -5,7 +5,7 @@ import { MimeVersionElement } from "../elements/mime-version-element.js";
 import { ParserTools } from "../parser-tools.js";
 import { Utilities } from "../utilities.js";
 
-export const MimeVersionStruct = Struct.new("major", "minor", "error");
+export const MimeVersionStruct = Struct.new<"major" | "minor" | "error", { major: string; minor: string | null; error: unknown }>("major", "minor", "error");
 
 export const MimeVersionParser = extend(
   {
@@ -30,7 +30,7 @@ export const MimeVersionParser = extend(
     enCommentTail: 11,
     enMain: 1,
 
-    parse(data: string | Uint8Array | null): any {
+    parse(data: string | Uint8Array | null): InstanceType<typeof MimeVersionStruct> {
       const self = MimeVersionParser as any;
       let p: number, pe: number, eof: number, stack: number[], cs: number, top: number, mimeVersion: any, majorDigitsS: number | null = null, minorDigitsS: number | null = null, testEof: boolean, _slen: any, _trans: any, _keys: any, _inds: any, _acts: null, _nacts: null, _gotoLevel: number, _resume: number, _eofTrans: number, _again: number, _testEof: number, _out: number, _wide: number;
       data = (data == null ? data : b(data)) as Uint8Array;

@@ -31,8 +31,8 @@ import {
   classModule,
   extend,
   Range,
+  strSlice,
 } from "@blazetrails/ruby-compat";
-import type { Chars } from "./multibyte/chars.js";
 import { Configuration } from "./configuration.js";
 import * as Constants from "./constants.js";
 import { Encodings } from "./encodings.js";
@@ -122,12 +122,9 @@ export class Utilities {
     return Utilities.paren(str);
   }
 
-  /** @inventedArm if — CONVERGEABLE mail-utilities-slice-range-and-chars-forward-wrap */
   unparen(str: string): string {
     if (str.startsWith("(") && str.endsWith(")")) {
-      return typeof str === "string"
-        ? str.slice(1, -1)
-        : ((str as unknown as Chars).slice(new Range(1, -2)) as unknown as string);
+      return strSlice(str, new Range(1, -2))!;
     } else {
       return str;
     }
@@ -137,12 +134,9 @@ export class Utilities {
     return Utilities.bracket(str);
   }
 
-  /** @inventedArm if — CONVERGEABLE mail-utilities-slice-range-and-chars-forward-wrap */
   unbracket(str: string): string {
     if (str.startsWith("<") && str.endsWith(">")) {
-      return typeof str === "string"
-        ? str.slice(1, -1)
-        : ((str as unknown as Chars).slice(new Range(1, -2)) as unknown as string);
+      return strSlice(str, new Range(1, -2))!;
     } else {
       return str;
     }

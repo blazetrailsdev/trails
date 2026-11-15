@@ -1,4 +1,3 @@
-import type { layout } from "@blazetrails/actionview";
 import { describe, expect, it } from "vitest";
 import { Base } from "../lib/base.js";
 import type { Collector } from "../lib/collector.js";
@@ -48,12 +47,7 @@ class ExplicitLayoutMailer extends Base {
   static {
     this.setMailerName("explicit_layout_mailer");
     this.prependViewPath(FIXTURES);
-    (this as unknown as ThisParameterType<typeof layout> & { layout: typeof layout }).layout(
-      "spam",
-      {
-        except: ["logout"],
-      },
-    );
+    this.layout("spam", { except: ["logout"] });
     this.default({ to: "test@localhost", subject: "You have a mail", from: "tester@example.com" });
   }
 

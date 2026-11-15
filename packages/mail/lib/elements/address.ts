@@ -115,7 +115,7 @@ export class Address {
   }
 
   get group(): string | null {
-    return (this._data?.group ?? null) as string | null;
+    return this._data?.group ?? null;
   }
 
   /** @internal */
@@ -149,7 +149,7 @@ export class Address {
     const comments = this.comments;
     if (!Utilities.isBlank(comments)) {
       for (const comment of comments!) {
-        if ((this._data!.domain as string | null)?.includes(`(${comment})`)) {
+        if (this._data!.domain?.includes(`(${comment})`)) {
           value = value!.replaceAll(`(${comment})`, Constants.EMPTY);
         }
       }
@@ -161,7 +161,7 @@ export class Address {
   private getDisplayName(): string | null {
     let str: string | null = null;
     if (this._data != null && this._data.displayName != null) {
-      str = this.stripAllComments(this._data.displayName as string);
+      str = this.stripAllComments(this._data.displayName);
     } else if (this._data != null && this._data.comments != null && this._data.domain != null) {
       str = this.stripDomainComments(this.formatComments());
     }
@@ -196,16 +196,16 @@ export class Address {
 
   /** @internal */
   private getLocal(): string | null {
-    return (this._data?.local ?? null) as string | null;
+    return this._data?.local ?? null;
   }
 
   /** @internal */
   private getDomain(): string | null {
-    return (this._data?.domain ?? null) as string | null;
+    return this._data?.domain ?? null;
   }
 
   /** @internal */
   private getComments(): string[] | null {
-    return (this._data?.comments ?? null) as string[] | null;
+    return this._data?.comments ?? null;
   }
 }
