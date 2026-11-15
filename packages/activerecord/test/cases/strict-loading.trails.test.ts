@@ -14,6 +14,7 @@ import { Comment } from "../models/comment.js";
 import { Member } from "../models/member.js";
 import { Membership, CurrentMembership } from "../models/membership.js";
 import { Club } from "../models/club.js";
+import { Account } from "../models/account.js";
 
 describe("StrictLoadingNewRecordFindTargetTest", () => {
   const { developers, authors, members } = fixtures([
@@ -115,7 +116,6 @@ describe("strict loading in a destroy callback", () => {
   fixtures(["accounts", "companies"]);
 
   it("raises from loadTarget when a before_destroy reads an unloaded belongs_to, as association.rb:189-196 does", async () => {
-    const { Account } = await import("../models/account.js");
     const account = await Account.find(1);
     account.strictLoadingBang();
     await expect(account.destroy()).rejects.toThrow(StrictLoadingViolationError);

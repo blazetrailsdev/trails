@@ -8,6 +8,7 @@ import {
   rbDeclareIvar,
   rbModName,
   shadowsIncluded,
+  toS,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { NotImplementedError } from "./errors.js";
@@ -516,9 +517,10 @@ export class Base extends Model {
     );
   }
 
-  static typeForAttribute(name: string | string[], block?: () => ValueType): ValueType | null {
+  static typeForAttribute(name: unknown, block?: () => ValueType): ValueType | null {
     ModelSchema.loadSchema.call(this);
-    const resolved = this.attributeAliases?.[name as string] ?? name;
+    const attributeName = toS(name);
+    const resolved = this.attributeAliases?.[attributeName] ?? attributeName;
     if (block) {
       return fetch(this.attributeTypes(), resolved, rbBlock(block));
     }

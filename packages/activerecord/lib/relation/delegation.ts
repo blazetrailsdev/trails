@@ -270,7 +270,7 @@ export class Delegation {
     return withRecords(this, (records): Base[] | Promise<Base[]> => {
       for (let i = 0; i < records.length; i++) {
         const yielded = fn(records[i]);
-        if (yielded instanceof Promise) {
+        if (typeof (yielded as PromiseLike<unknown> | null)?.then === "function") {
           return (async () => {
             await yielded;
             for (i++; i < records.length; i++) await fn(records[i]);
