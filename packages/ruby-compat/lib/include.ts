@@ -23,7 +23,7 @@
 import { methodCacheSerial, rbClearMethodCache } from "./method-cache.js";
 import { ArgumentError } from "./argument-error.js";
 import { abort } from "./process-adapter.js";
-import type { kernelRand } from "./kernel-rand.js";
+import type { kernelRand, kernelSrand } from "./kernel-rand.js";
 import type { rbFRequireFile } from "./load.js";
 import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -2262,6 +2262,7 @@ export interface KernelModule {
   freeze(this: object): object;
   abort: typeof abort;
   rand: typeof kernelRand;
+  srand: typeof kernelSrand;
   require: typeof rbFRequireFile;
 }
 
