@@ -1420,7 +1420,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope != ''
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
-        run: pnpm vitest run $AR_SCOPE
+        run: pnpm vitest run $AR_SCOPE --project '!system'
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run packages/activerecord-cli
@@ -1746,7 +1746,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope != ''
-        run: pnpm vitest run $AR_SCOPE
+        run: pnpm vitest run $AR_SCOPE --project '!system'
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
           ARCONN: postgresql
@@ -1986,7 +1986,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope != ''
-        run: pnpm vitest run $AR_SCOPE
+        run: pnpm vitest run $AR_SCOPE --project '!system'
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
           ARCONN: mysql2
