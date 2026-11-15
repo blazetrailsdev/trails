@@ -93,6 +93,10 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
 
   get body(): string {
     if (this._strBody !== null) return this._strBody;
+    if (this._pendingBody)
+      throw new RuntimeError(
+        "streaming ActionDispatch::Response body: await awaitBody before body",
+      );
     let buf = "";
     const pending = this.each((chunk) => {
       const str = rbObjAsString(chunk) as string | Uint8Array;

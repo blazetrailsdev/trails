@@ -241,6 +241,7 @@ describe("ActionController::Streaming chunked response body", () => {
     await controller.dispatch("show", makeRequest(), new Response());
 
     expect(() => controller.response.body).toThrow(/await awaitBody before body/);
+    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
     release();
     expect(await (controller.response.stream as Buffer).awaitBody()).toBe("<head></head>body");
   });
