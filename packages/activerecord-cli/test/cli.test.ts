@@ -13,6 +13,8 @@ describe("ArCliTest", () => {
     err = [];
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
+    vi.spyOn(process.stdout, "write").mockImplementation((m) => (out.push(String(m)), true));
+    vi.spyOn(process.stderr, "write").mockImplementation((m) => (err.push(String(m)), true));
   });
 
   afterEach(() => vi.restoreAllMocks());
@@ -21,7 +23,16 @@ describe("ArCliTest", () => {
     for (const argv of [[], ["help"], ["--help"], ["-h"]]) {
       expect(await run(argv, ".")).toBe(0);
     }
-    expect(out.join("\n")).toContain("Scaffold config/database.ts");
+    const help = out.join("\n");
+    for (const cmd of [
+      "init",
+      "new APP_NAME",
+      "db:migrate",
+      "db:migrate:status",
+      "runner SCRIPT",
+    ]) {
+      expect(help).toContain(` ${cmd} `);
+    }
   });
 
   it("prints init usage for init --help without scaffolding", async () => {
@@ -40,7 +51,7 @@ describe("ArCliTest", () => {
 
   it("exits 1 for unknown commands", async () => {
     expect(await run(["frobnicate"], ".")).toBe(1);
-    expect(err.join("\n")).toContain('unknown command "frobnicate"');
+    expect(err.join("\n")).toContain('Could not find command "frobnicate".');
   });
 
   it("generate:manifest writes .trails/models/index.ts and is idempotent", async () => {
@@ -92,7 +103,8 @@ describe("ArCliTest", () => {
 
   it("generate:migration requires a name", async () => {
     expect(await run(["generate:migration"], ".")).toBe(1);
-    expect(err.join("\n")).toContain("requires a migration name");
+    expect(err.join("\n")).toContain("was called with no arguments");
+    expect(err.join("\n")).toContain(`generate:migration NAME [field:type ...]"`);
   });
 
   it("generate:migration writes file and prints create line with path", async () => {
@@ -120,12 +132,14 @@ describe("ArCliTest", () => {
 
   it("generate:model requires a name", async () => {
     expect(await run(["generate:model"], ".")).toBe(1);
-    expect(err.join("\n")).toContain("requires a model name");
+    expect(err.join("\n")).toContain("was called with no arguments");
+    expect(err.join("\n")).toContain(`generate:model NAME [field:type ...]"`);
   });
 
   it("destroy:migration requires a name", async () => {
     expect(await run(["destroy:migration"], ".")).toBe(1);
-    expect(err.join("\n")).toContain("requires a migration name");
+    expect(err.join("\n")).toContain("was called with no arguments");
+    expect(err.join("\n")).toContain(`destroy:migration NAME [field:type ...]"`);
   });
 
   it("destroy:migration deletes a generated migration and prints remove line", async () => {
@@ -153,7 +167,8 @@ describe("ArCliTest", () => {
 
   it("destroy:model requires a name", async () => {
     expect(await run(["destroy:model"], ".")).toBe(1);
-    expect(err.join("\n")).toContain("requires a model name");
+    expect(err.join("\n")).toContain("was called with no arguments");
+    expect(err.join("\n")).toContain(`destroy:model NAME [field:type ...]"`);
   });
 
   it("destroy:model deletes model and migration and prints remove lines", async () => {

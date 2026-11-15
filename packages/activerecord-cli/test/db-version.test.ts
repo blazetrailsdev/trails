@@ -32,6 +32,7 @@ describe("DbVersionTest", () => {
     err = [];
     priorTrailsEnv = process.env["TRAILS_ENV"];
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
+    vi.spyOn(process.stdout, "write").mockImplementation((m) => (out.push(String(m)), true));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
     currentVersionSpy = vi.fn().mockResolvedValue(20260101000001);
     vi.spyOn(MigrationContext.prototype, "currentVersion").mockImplementation(currentVersionSpy);

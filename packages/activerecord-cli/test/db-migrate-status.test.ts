@@ -108,6 +108,7 @@ describe("DbMigrateStatusTest", () => {
   it("--help prints usage", async () => {
     const out: string[] = [];
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
+    vi.spyOn(process.stdout, "write").mockImplementation((m) => (out.push(String(m)), true));
     const code = await run(["db:migrate:status", "--help"], await makeFakeProject());
     expect(code).toBe(0);
     expect(out.join("\n")).toContain("db:migrate:status");

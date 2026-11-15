@@ -34,6 +34,7 @@ describe("DbPrepareTest", () => {
     out = [];
     err = [];
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
+    vi.spyOn(process.stdout, "write").mockImplementation((m) => (out.push(String(m)), true));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
 
     createSpy = vi.fn().mockResolvedValue(undefined);

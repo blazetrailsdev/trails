@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { arRunner } from "../lib/runner.js";
+import { run } from "../lib/cli.js";
 
 const DB_CONFIG = `export default { development: { adapter: "sqlite3", database: ":memory:" }, test: { adapter: "sqlite3", database: ":memory:" } };\n`;
 async function scaffoldProject(dir: string) {
@@ -50,6 +51,17 @@ describe("ArRunnerTest", () => {
     );
     const code = await arRunner(dir, ["check.ts", "hello", "--flag", "--env", "test"]);
     expect(code).toBe(0);
+  });
+
+  it("ar runner forwards script args and --env through Thor unparsed", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "ar-runner-cli-"));
+    await scaffoldProject(dir);
+    await writeFile(
+      join(dir, "check.ts"),
+      `const a = (globalThis as any).__ARGV__;\nif (a[0] !== "hello" || a[1] !== "--flag") throw new Error("ARGV mismatch: " + JSON.stringify(a));\nif (process.env.TRAILS_ENV !== "test") throw new Error("env " + process.env.TRAILS_ENV);\n`,
+      "utf8",
+    );
+    expect(await run(["runner", "check.ts", "hello", "--flag", "--env", "test"], dir)).toBe(0);
   });
 
   it("returns 1 when the script throws", async () => {
