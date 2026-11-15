@@ -19,7 +19,7 @@ import {
   ThreadPoolExecutor,
 } from "@blazetrails/ruby-compat";
 import { include, prepend } from "@blazetrails/ruby-compat/include";
-import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import { ActiveSupport, IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import {
   asyncQueryExecutor,
@@ -739,8 +739,8 @@ export class ConnectionPool implements ReapablePool {
             const error = new RuntimeError(
               "withConnectionSync borrowed a busy connection; its block must not go async",
             );
-            value.catch((reason: unknown) => {
-              error.cause = reason;
+            value.catch((reason: Error) => {
+              ActiveSupport.errorReporter.report(reason, { handled: true });
             });
             throw error;
           }
@@ -807,8 +807,8 @@ export class ConnectionPool implements ReapablePool {
         const error = new RuntimeError(
           "Async :checkout callback on a synchronous connection lease",
         );
-        ran.catch((reason: unknown) => {
-          error.cause = reason;
+        ran.catch((reason: Error) => {
+          ActiveSupport.errorReporter.report(reason, { handled: true });
         });
         throw error;
       }

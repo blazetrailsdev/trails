@@ -40,6 +40,7 @@ export abstract class CollectionAssociation extends Association {
     return this._targetStore as Base[];
   }
 
+  /** @inventedArm if — PERMANENT */
   override set target(record: Base | Base[] | null) {
     if (!this.reflection.klass?.hasManyInversing) {
       super.target = record;
@@ -50,7 +51,12 @@ export abstract class CollectionAssociation extends Association {
     } else if (Array.isArray(record)) {
       super.target = record;
     } else {
-      this.replaceOnTarget(record, true, { replace: true, inversing: true }) as Base | null;
+      const replaced = this.replaceOnTarget(record, true, { replace: true, inversing: true });
+      if (isThenable(replaced)) {
+        replaced.catch((error: Error) => {
+          ActiveSupport.errorReporter.report(error, { handled: true });
+        });
+      }
     }
   }
 

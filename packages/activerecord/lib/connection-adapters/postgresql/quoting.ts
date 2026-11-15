@@ -1,6 +1,6 @@
 import "../../constants.postgresql-quoting.generated.js";
 import { BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { ActiveSupport, BigDecimal } from "@blazetrails/activesupport";
 import {
   quote as abstractQuote,
   lookupCastType as abstractLookupCastType,
@@ -176,15 +176,18 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   return abstractTypeCast.call(this, value);
 }
 
-/** @inventedArm try — PERMANENT */
+/**
+ * @inventedArm try — PERMANENT
+ * @inventedArm if — PERMANENT
+ */
 export function lookupCastTypeFromColumn(
   this: { typeMap: LookupableTypeMap; verifyBang(): Promise<void> },
   column: CastableColumn,
 ): ValueType {
   if (this.typeMap == null) {
     const error = new RuntimeError("lookupCastTypeFromColumn read an unloaded type map");
-    this.verifyBang().catch((reason: unknown) => {
-      error.cause = reason;
+    this.verifyBang().catch((reason: Error) => {
+      ActiveSupport.errorReporter.report(reason, { handled: true });
     });
     throw error;
   }

@@ -558,7 +558,7 @@ export class PostgreSQLAdapter
       }
 
       await this.initializeTypeMap();
-      this._statements.reset();
+      await this._statements.reset();
     });
   }
 
