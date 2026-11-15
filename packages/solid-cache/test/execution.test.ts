@@ -2,7 +2,7 @@ import { ActiveSupport, ExecutionWrapper, Notifications } from "@blazetrails/act
 import { assertChanges, assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
 import { ActiveRecord, StatementTimeout } from "@blazetrails/activerecord";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SolidCache, type Store } from "../lib/index.js";
+import { SolidCache } from "../lib/index.js";
 import { useSolidCache, waitForBackgroundTasks } from "./support/test-helper.js";
 
 class ErrorSubscriber {
@@ -115,32 +115,41 @@ describe("SolidCache::ExecutionTest", () => {
       if (/solid_cache_entries/.test(String(payloadSql))) calls += 1;
     };
 
-    const writeThrice = async (cache: Store) => {
-      await cache.write("foo", "bar");
-      await cache.write("foo", "bar");
-      await cache.write("foo", "bar");
-      await waitForBackgroundTasks(cache);
-    };
-
     await Notifications.subscribed(callback, "sql.active_record", async () => {
-      await writeThrice(uninstrumentedCache);
+      await uninstrumentedCache.write("foo", "bar");
+      await uninstrumentedCache.write("foo", "bar");
+      await uninstrumentedCache.write("foo", "bar");
+      await waitForBackgroundTasks(uninstrumentedCache);
 
       await assertNoChanges(
         () => calls,
         null,
         {},
-        () => writeThrice(uninstrumentedCache),
+        async () => {
+          await uninstrumentedCache.write("foo", "bar");
+          await uninstrumentedCache.write("foo", "bar");
+          await uninstrumentedCache.write("foo", "bar");
+          await waitForBackgroundTasks(uninstrumentedCache);
+        },
       );
     });
 
     await Notifications.subscribed(callback, "sql.active_record", async () => {
-      await writeThrice(instrumentedCache);
+      await instrumentedCache.write("foo", "bar");
+      await instrumentedCache.write("foo", "bar");
+      await instrumentedCache.write("foo", "bar");
+      await waitForBackgroundTasks(instrumentedCache);
 
       await assertChanges(
         () => calls,
         null,
         {},
-        () => writeThrice(instrumentedCache),
+        async () => {
+          await instrumentedCache.write("foo", "bar");
+          await instrumentedCache.write("foo", "bar");
+          await instrumentedCache.write("foo", "bar");
+          await waitForBackgroundTasks(instrumentedCache);
+        },
       );
     });
   });
