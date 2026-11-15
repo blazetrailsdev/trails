@@ -19,10 +19,11 @@ import {
   tzdataIsdstFlips,
   tzdataOffsetInstant,
 } from "@blazetrails/date";
-import { Rational, rbModName } from "@blazetrails/ruby-compat";
+import { Rational, StandardError, TopLevel, rbModName } from "@blazetrails/ruby-compat";
 import { OffsetTimezonePeriod } from "./offset-timezone-period.js";
 import { TimezoneOffset } from "./timezone-offset.js";
 import type { TimezonePeriod } from "./timezone-period.js";
+import type { TimezoneProxy } from "./timezone-proxy.js";
 import { TransitionsTimezonePeriod } from "./transitions-timezone-period.js";
 import { TimezoneTransition } from "./timezone-transition.js";
 import { ConstantOffsetDataTimezoneInfo } from "./data-sources/constant-offset-data-timezone-info.js";
@@ -36,6 +37,8 @@ export class AmbiguousTime extends Error {
 export class PeriodNotFound extends Error {
   override name = "PeriodNotFound";
 }
+
+export class UnknownTimezone extends StandardError {}
 
 export class InvalidTimezoneIdentifier extends Error {
   override name = "InvalidTimezoneIdentifier";
@@ -367,12 +370,6 @@ const _periodsCache = new Map<string, TimezonePeriod[]>();
 const _offsetPeriodsCache = new Map<string, OffsetTimezonePeriod>();
 
 export class Timezone {
-  static all(): Timezone[] {
-    return [...new Set([...Intl.supportedValuesOf("timeZone"), ...TZDB_NAMES])]
-      .sort()
-      .map((id) => new Timezone(id));
-  }
-
   /** @missingRailsCall get_timezone_info — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   static get(identifier: string): Timezone {
     if (!loadedTimezoneIdentifiers.has(identifier)) {
@@ -390,12 +387,48 @@ export class Timezone {
     return new DataTimezoneInfo(identifier).createTimezone();
   }
 
-  readonly identifier: string;
+  static getProxy(identifier: string): TimezoneProxy {
+    return new TopLevel.TZInfo!.TimezoneProxy(identifier);
+  }
+
+  static all(): Timezone[] {
+    return this.getProxies(this.allIdentifiers());
+  }
+
+  static allIdentifiers(): string[] {
+    return [...new Set([...Intl.supportedValuesOf("timeZone"), ...TZDB_NAMES])].sort();
+  }
+
+  /** @internal */
+  private static getProxies(identifiers: readonly string[]): TimezoneProxy[] {
+    return identifiers.map((identifier) => this.getProxy(identifier));
+  }
+
+  /** @internal */
+  protected readonly _identifier: string;
   readonly info: TimezoneInfo | null;
 
   constructor(name: string, info: TimezoneInfo | null = null) {
-    this.identifier = name;
+    this._identifier = name;
     this.info = info;
+  }
+
+  get identifier(): string {
+    return this.raiseUnknownTimezone();
+  }
+
+  // eslint-disable-next-line unused-imports/no-unused-vars
+  periodFor(time: Time): TimezonePeriod {
+    this.raiseUnknownTimezone();
+  }
+
+  // eslint-disable-next-line unused-imports/no-unused-vars
+  transitionsUpTo(to: Time, from: Time | null = null): TimezoneTransition[] {
+    this.raiseUnknownTimezone();
+  }
+
+  canonicalZone(): Timezone {
+    this.raiseUnknownTimezone();
   }
 
   equals(tz: unknown): boolean {
@@ -475,7 +508,7 @@ export class Timezone {
   }
 
   get canonicalIdentifier(): string {
-    return this.identifier;
+    return this.canonicalZone().identifier;
   }
 
   /**
@@ -610,5 +643,12 @@ export class Timezone {
     const period = this.periodForLocal(local, dst);
     const utcNs = BigInt(localMs - period.observedUtcOffset * 1000) * 1_000_000n;
     return Time.at(new Rational(utcNs + BigInt(time.nsec % 1_000_000), 1_000_000_000n)).getutc();
+  }
+
+  /** @internal */
+  private raiseUnknownTimezone(): never {
+    throw new UnknownTimezone(
+      "TZInfo::Timezone should not be constructed directly (use TZInfo::Timezone.get instead)",
+    );
   }
 }

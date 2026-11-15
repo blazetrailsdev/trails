@@ -5,4 +5,8 @@ export class InfoTimezone extends Timezone {
   constructor(info: TimezoneInfo) {
     super(info.identifier, info);
   }
+
+  override get identifier(): string {
+    return this.info!.identifier;
+  }
 }

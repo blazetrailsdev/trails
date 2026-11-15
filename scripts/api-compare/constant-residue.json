@@ -1575,7 +1575,7 @@
     }
   },
   "tzinfo": {
-    "rows": 38,
+    "rows": 41,
     "excluded": [],
     "unwalked": [],
     "residue": {
@@ -1605,17 +1605,20 @@
       "format2/timezone-index-definition.ts::ClassMethods": "TZInfo::Format2::TimezoneIndexDefinition::ClassMethods",
       "format2/timezone-index-definition.ts::TimezoneIndexDefinition": "TZInfo::Format2::TimezoneIndexDefinition",
       "info-timezone.ts::InfoTimezone": "TZInfo::InfoTimezone",
+      "linked-timezone.ts::LinkedTimezone": "TZInfo::LinkedTimezone",
       "offset-timezone-period.ts::OffsetTimezonePeriod": "TZInfo::OffsetTimezonePeriod",
       "string-deduper.ts::StringDeduper": "TZInfo::StringDeduper",
       "string-deduper.ts::UnaryMinusGlobalStringDeduper": "TZInfo::UnaryMinusGlobalStringDeduper",
       "timestamp.ts::Timestamp": "TZInfo::Timestamp",
       "timezone-offset.ts::TimezoneOffset": "TZInfo::TimezoneOffset",
       "timezone-period.ts::TimezonePeriod": "TZInfo::TimezonePeriod",
+      "timezone-proxy.ts::TimezoneProxy": "TZInfo::TimezoneProxy",
       "timezone-transition.ts::TimezoneTransition": "TZInfo::TimezoneTransition",
       "timezone.ts::AmbiguousTime": "TZInfo::AmbiguousTime",
       "timezone.ts::InvalidTimezoneIdentifier": "TZInfo::InvalidTimezoneIdentifier",
       "timezone.ts::PeriodNotFound": "TZInfo::PeriodNotFound",
       "timezone.ts::Timezone": "TZInfo::Timezone",
+      "timezone.ts::UnknownTimezone": "TZInfo::UnknownTimezone",
       "transitions-timezone-period.ts::TransitionsTimezonePeriod": "TZInfo::TransitionsTimezonePeriod"
     }
   },

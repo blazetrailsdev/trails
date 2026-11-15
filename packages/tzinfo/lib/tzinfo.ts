@@ -20,7 +20,15 @@ import { DataSource, DataSourceNotFound, InvalidDataSource } from "./data-source
 import { TimezoneInfo } from "./data-sources/timezone-info.js";
 import { DataTimezone } from "./data-timezone.js";
 import { InfoTimezone } from "./info-timezone.js";
-import { AmbiguousTime, InvalidTimezoneIdentifier, PeriodNotFound, Timezone } from "./timezone.js";
+import { LinkedTimezone } from "./linked-timezone.js";
+import { TimezoneProxy } from "./timezone-proxy.js";
+import {
+  AmbiguousTime,
+  InvalidTimezoneIdentifier,
+  PeriodNotFound,
+  Timezone,
+  UnknownTimezone,
+} from "./timezone.js";
 import { OffsetTimezonePeriod } from "./offset-timezone-period.js";
 import { TimezoneOffset } from "./timezone-offset.js";
 import { TimezonePeriod } from "./timezone-period.js";
@@ -43,6 +51,7 @@ export {
   InvalidCountryCode,
   InvalidDataSource,
   InvalidTimezoneIdentifier,
+  LinkedTimezone,
   LinkedTimezoneInfo,
   OffsetTimezonePeriod,
   PeriodNotFound,
@@ -51,9 +60,11 @@ export {
   TimezoneInfo,
   TimezoneOffset,
   TimezonePeriod,
+  TimezoneProxy,
   TimezoneTransition,
   TransitionsDataTimezoneInfo,
   TransitionsTimezonePeriod,
+  UnknownTimezone,
 };
 
 export const TZInfo = {
@@ -61,6 +72,8 @@ export const TZInfo = {
   Timezone,
   InfoTimezone,
   DataTimezone,
+  LinkedTimezone,
+  TimezoneProxy,
   TimezonePeriod,
   OffsetTimezonePeriod,
   TransitionsTimezonePeriod,
@@ -69,6 +82,7 @@ export const TZInfo = {
   AmbiguousTime,
   PeriodNotFound,
   InvalidTimezoneIdentifier,
+  UnknownTimezone,
   InvalidCountryCode,
   InvalidDataSource,
   DataSourceNotFound,
