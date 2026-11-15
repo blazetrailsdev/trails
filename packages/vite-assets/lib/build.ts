@@ -119,16 +119,20 @@ export class Build {
   }
 
   async writeToCache(): Promise<void> {
-    await this.lastBuildPath!.write(JSON.stringify(this.toJSON(), null, 2));
+    await this.lastBuildPath!.write(this.toJSON());
   }
 
-  toJSON(..._args: unknown[]): Record<string, unknown> {
-    return {
-      success: this.success,
-      errors: this.errors,
-      timestamp: this.timestamp,
-      vite_ruby: this.viteAssets,
-      digest: this.digest,
-    };
+  toJSON(..._args: unknown[]): string {
+    return JSON.stringify(
+      {
+        success: this.success,
+        errors: this.errors,
+        timestamp: this.timestamp,
+        vite_ruby: this.viteAssets,
+        digest: this.digest,
+      },
+      null,
+      2,
+    );
   }
 }

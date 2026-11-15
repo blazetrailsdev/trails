@@ -11,17 +11,17 @@ export class DevServerProxy extends Proxy {
   static readonly VITE_DEPENDENCY_PREFIX = "/@";
 
   /** @internal */
-  private viteRuby: ViteAssets;
+  private viteAssets: ViteAssets;
   /** @internal */
   private _viteUrlPrefix: string | undefined;
 
   constructor(app: unknown = null, options: Record<string, unknown> = {}) {
-    const viteRuby =
+    const viteAssets =
       (hashDelete(options, "viteAssets") as ViteAssets | null) ?? TopLevel.ViteAssets!.instance();
-    if (viteRuby.peekConfig().mode === "test" && !Object.hasOwn(options, "streaming"))
+    if (viteAssets.peekConfig().mode === "test" && !Object.hasOwn(options, "streaming"))
       options["streaming"] = false;
     super(app, options);
-    this.viteRuby = viteRuby;
+    this.viteAssets = viteAssets;
   }
 
   async performRequest(env: RackEnv): Promise<RackResponse> {
@@ -35,12 +35,12 @@ export class DevServerProxy extends Proxy {
 
   /** @internal */
   private config(): Promise<Config> {
-    return this.viteRuby.config();
+    return this.viteAssets.config();
   }
 
   /** @internal */
   private isDevServerRunning(): Promise<boolean> {
-    return this.viteRuby.isDevServerRunning();
+    return this.viteAssets.isDevServerRunning();
   }
 
   /** @internal */

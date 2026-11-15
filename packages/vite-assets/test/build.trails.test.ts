@@ -20,7 +20,7 @@ describe("Build", () => {
       success: true,
       errors: "",
     });
-    expect(build.toJSON()).toEqual({
+    expect(JSON.parse(build.toJSON())).toEqual({
       success: true,
       errors: "",
       timestamp: build.timestamp,
