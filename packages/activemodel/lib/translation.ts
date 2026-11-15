@@ -1,15 +1,8 @@
-import { humanize, isPresent } from "@blazetrails/activesupport";
-import { rbModAncestors, toS } from "@blazetrails/ruby-compat";
+import { humanize, include, isPresent } from "@blazetrails/activesupport";
+import { classModule, rbModAncestors, toS } from "@blazetrails/ruby-compat";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName } from "./naming.js";
-
-export function raiseOnMissingTranslations(value?: boolean): boolean {
-  if (value !== undefined) {
-    _raiseOnMissingTranslations = value;
-  }
-  return _raiseOnMissingTranslations;
-}
 
 export interface TranslationClassMethods {
   readonly i18nScope: string;
@@ -17,21 +10,24 @@ export interface TranslationClassMethods {
   humanAttributeName(attr: string, options?: HumanAttributeNameOptions): string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Translation {
-  static get i18nScope(): string {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [classModule] = true;
+
+  static raiseOnMissingTranslations = false;
+
+  get i18nScope(): string {
     return "activemodel";
   }
-
-  static lookupAncestors = lookupAncestors;
-
-  static humanAttributeName = humanAttributeName;
 }
 
-Object.defineProperty(
-  Translation,
-  "modelName",
-  Object.getOwnPropertyDescriptor(Naming.prototype, "modelName")!,
-);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+export interface Translation extends TranslationClassMethods {}
+
+include(Translation, Naming);
+Translation.prototype.lookupAncestors = lookupAncestors;
+Translation.prototype.humanAttributeName = humanAttributeName;
 
 export interface HumanAttributeNameOptions {
   default?: string | string[];
@@ -46,8 +42,6 @@ interface TranslationHost {
 
 /** @internal */
 const MISSING_TRANSLATION = -(2 ** 60);
-
-let _raiseOnMissingTranslations = false;
 
 export function lookupAncestors(
   this: object,
@@ -93,7 +87,9 @@ export function humanAttributeName(
     );
   }
 
-  const raiseOnMissing = options.raise ?? _raiseOnMissingTranslations;
+  const raiseOnMissing = Object.hasOwn(options, "raise")
+    ? options.raise
+    : Translation.raiseOnMissingTranslations;
 
   defaults.push(`:attributes.${attribute}`);
   if (options.default != null) defaults.push(options.default);

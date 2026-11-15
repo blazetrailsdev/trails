@@ -447,7 +447,6 @@
       "conversion.ts::Conversion",
       "forbidden-attributes-protection.ts::ForbiddenAttributesProtection",
       "gem-version.ts::VERSION",
-      "naming.ts::Naming",
       "type.ts::Type",
       "type/helpers/mutable.ts::Mutable",
       "type/helpers/time-value.ts::TimeValue",

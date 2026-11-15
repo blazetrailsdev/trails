@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { I18n } from "../lib/i18n.js";
-import { raiseOnMissingTranslations } from "../lib/translation.js";
+import { Translation } from "../lib/translation.js";
 import { resetI18n } from "./support/i18n.js";
 import { Person, Child, Gender } from "./models/person.js";
 
@@ -173,12 +173,12 @@ describe("ActiveModelI18nTests", () => {
   });
 
   it("raise on missing translations", () => {
-    const original = raiseOnMissingTranslations();
-    raiseOnMissingTranslations(true);
+    const original = Translation.raiseOnMissingTranslations;
+    Translation.raiseOnMissingTranslations = true;
     try {
       expect(() => Person.humanAttributeName("name")).toThrow();
     } finally {
-      raiseOnMissingTranslations(original);
+      Translation.raiseOnMissingTranslations = original;
     }
   });
 });

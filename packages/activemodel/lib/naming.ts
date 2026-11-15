@@ -37,6 +37,15 @@ export class Naming {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
 
+  static [extended](base: NamingHost): void {
+    Object.defineProperty(base.prototype, "modelName", {
+      get(this: object): ModelName {
+        return (this.constructor as unknown as { modelName: ModelName }).modelName;
+      },
+      configurable: true,
+    });
+  }
+
   get modelName(): ModelName {
     const self = this as unknown as NamingHost;
     if (!Object.hasOwn(self, "_modelName") || !self._modelName) {
@@ -54,16 +63,8 @@ export class Naming {
     return self._modelName;
   }
 
-  static [extended](base: NamingHost): void {
-    Object.defineProperty(base.prototype, "modelName", {
-      get(this: object): ModelName {
-        return (this.constructor as unknown as { modelName: ModelName }).modelName;
-      },
-      configurable: true,
-    });
-  }
-
-  static modelNameFromRecordOrClass(recordOrClass: RecordOrClass): ModelName {
+  /** @internal */
+  private static modelNameFromRecordOrClass(recordOrClass: RecordOrClass): ModelName {
     if (recordOrClass instanceof ModelName) return recordOrClass;
     if ("toModel" in recordOrClass && typeof recordOrClass.toModel === "function") {
       const model = recordOrClass.toModel() as { modelName: ModelName };
