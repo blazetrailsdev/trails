@@ -264,7 +264,6 @@ export class BufferedIO {
         this._rbufOffset = 0;
       }
     }
-
     this.debugOutput?.write(`-> ${rbStrDump(strNew(s))}\n`);
     return s;
   }

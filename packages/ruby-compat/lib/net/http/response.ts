@@ -29,9 +29,7 @@ export class HTTPResponse {
   static async readNew(sock: BufferedIO): Promise<HTTPResponse> {
     const [httpv, code, msg] = await this.readStatusLine(sock);
     const res = new (this.responseClass(code))(httpv, code, msg);
-    await this.eachResponseHeader(sock, (k, v) => {
-      res.addField(k, v);
-    });
+    await this.eachResponseHeader(sock, (k, v) => res.addField(k, v));
     return res;
   }
 
@@ -314,9 +312,7 @@ export class HTTPResponse {
 
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:642-644`. */
   private streamCheck(): void {
-    if (this._socket == null || this._socket.isClosed()) {
-      throw new IOError("attempt to read body out of block");
-    }
+    if (this._socket?.isClosed() !== false) throw new IOError("attempt to read body out of block");
   }
 
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:646-654`. */
@@ -405,21 +401,18 @@ export class Inflater {
       if (Array.isArray(dest)) dest.push(chunk);
       else await dest.append(chunk);
     };
-
     return new ReadAdapter(block);
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:720-724`. */
   async read(clen: number, dest: ReadBodyDest, ignoreEof = false): Promise<unknown> {
     const tempDest = this.inflateAdapter(dest);
-
     return this._socket.read(clen, tempDest, ignoreEof);
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/response.rb:729-733`. */
   async readAll(dest: ReadBodyDest): Promise<unknown> {
     const tempDest = this.inflateAdapter(dest);
-
     return this._socket.readAll(tempDest);
   }
 }

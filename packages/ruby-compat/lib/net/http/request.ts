@@ -304,7 +304,10 @@ export class HTTPRequest {
       .join("-");
   }
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:198-208`. */
+  /**
+   * @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:198-208`.
+   * @missingRailsCall send_request_with_body_stream — CONVERGEABLE net-http-send-request-with-body-stream
+   */
   async exec(sock: BufferedIO, ver: string, path: string): Promise<void> {
     if (this.body != null) {
       await this.sendRequestWithBody(sock, ver, path, this.body);
@@ -313,7 +316,10 @@ export class HTTPRequest {
     }
   }
 
-  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:259-266`. */
+  /**
+   * @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:259-266`.
+   * @missingRailsCall wait_for_continue — CONVERGEABLE net-http-edit-path-and-wait-for-continue
+   */
   private async sendRequestWithBody(
     sock: BufferedIO,
     ver: string,
@@ -347,9 +353,7 @@ export class HTTPRequest {
     }
     let buf = "";
     buf += reqline + "\r\n";
-    this.eachCapitalized((k, v) => {
-      buf += `${k}: ${v}\r\n`;
-    });
+    this.eachCapitalized((k, v) => (buf += `${k}: ${v}\r\n`));
     buf += "\r\n";
     await sock.write(buf);
   }

@@ -33,13 +33,8 @@ import {
 import { HTTPResponse } from "./http/response.js";
 import { HTTPInformation } from "./http/responses.js";
 
-/**
- * `Net::HTTPBadResponse` (`vendor/ruby/v3.3.11/lib/net/http.rb:31`).
- *
- * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
- */
+/** @noRailsEquivalent PERMANENT — `Net::HTTPBadResponse` (`vendor/ruby/v3.3.11/lib/net/http.rb:31`). */
 export class HTTPBadResponse extends StandardError {}
-
 HTTPBadResponse.prototype.name = "Net::HTTPBadResponse";
 
 /**
@@ -409,7 +404,11 @@ export class HTTP {
     return res!;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * @noRailsEquivalent PERMANENT
+   * @missingRailsCall edit_path — CONVERGEABLE net-http-edit-path-and-wait-for-continue
+   * @missingRailsCall catch — CONVERGEABLE net-http-edit-path-and-wait-for-continue
+   */
   async transportRequest(
     req: HTTPRequest,
     block?: (res: HTTPResponse) => unknown,
@@ -425,7 +424,6 @@ export class HTTP {
           } catch (e) {
             if (!(e instanceof Errno.EPIPE)) throw e;
           }
-
           do {
             res = await HTTPResponse.readNew(this._socket!);
             res.decodeContent = req.decodeContent;
