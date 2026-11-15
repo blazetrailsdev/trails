@@ -1,18 +1,51 @@
 import { RouteSet, type DrawCallback, type Request } from "@blazetrails/actionpack";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { TopLevel } from "@blazetrails/activesupport";
-import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat";
+import { KERNEL_METHODS, PROTOCOL_PROBES, prepend, rbCallSuper } from "@blazetrails/ruby-compat";
 
-type AnyFn = (...args: unknown[]) => unknown;
-type ProxyHelpers = Record<
-  "urlFor" | "fullUrlFor" | "routeFor" | "polymorphicUrl" | "polymorphicPath",
-  AnyFn
->;
 type MethodMissingModule = {
   respondToMissing(this: object, name: string, includeAll?: boolean): boolean;
 };
 
+const ProxyUrlHelpers = {
+  urlFor(this: object, options: unknown): unknown {
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return rbCallSuper(this, ProxyUrlHelpers.urlFor, options);
+  },
+
+  fullUrlFor(this: object, options: unknown): unknown {
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return rbCallSuper(this, ProxyUrlHelpers.fullUrlFor, options);
+  },
+
+  routeFor(this: object, name: string, ...args: unknown[]): unknown {
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return rbCallSuper(this, ProxyUrlHelpers.routeFor, name, ...args);
+  },
+
+  optimizeRoutesGeneration(this: object): unknown {
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return rbCallSuper(this, ProxyUrlHelpers.optimizeRoutesGeneration);
+  },
+
+  polymorphicUrl(this: object, recordOrHashOrArray: unknown, options: unknown = {}): unknown {
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return rbCallSuper(this, ProxyUrlHelpers.polymorphicUrl, recordOrHashOrArray, options);
+  },
+
+  polymorphicPath(this: object, recordOrHashOrArray: unknown, options: unknown = {}): unknown {
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    return rbCallSuper(this, ProxyUrlHelpers.polymorphicPath, recordOrHashOrArray, options);
+  },
+};
+
 export class LazyRouteSet extends RouteSet {
+  constructor(config?: ConstructorParameters<typeof RouteSet>[0]) {
+    super(config);
+    prepend(this.namedRoutes.urlHelpersModule, this.methodMissingModule());
+    prepend(this.namedRoutes.pathHelpersModule, this.methodMissingModule());
+  }
+
   override generateExtras(
     options: Record<string, unknown>,
     recall: Record<string, unknown> = {},
@@ -23,41 +56,24 @@ export class LazyRouteSet extends RouteSet {
 
   override generateUrlHelpers(supportsPath: boolean): ReturnType<RouteSet["generateUrlHelpers"]> {
     const mod = super.generateUrlHelpers(supportsPath);
-    const helpers = mod as unknown as ProxyHelpers;
-    const wrap = (name: keyof ProxyHelpers): void => {
-      const original = helpers[name].bind(helpers);
-      helpers[name] = (...args: unknown[]): unknown => {
-        TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
-        return original(...args);
-      };
-    };
-    wrap("urlFor");
-    wrap("fullUrlFor");
-    wrap("routeFor");
-    wrap("polymorphicUrl");
-    wrap("polymorphicPath");
+    prepend({ prototype: mod }, ProxyUrlHelpers);
+    const parent = Object.getPrototypeOf(mod) as object;
     Object.setPrototypeOf(
       mod,
-      new Proxy(
-        Object.create(
-          Object.getPrototypeOf(mod) as object,
-          Object.getOwnPropertyDescriptors(this.methodMissingModule()),
-        ) as object,
-        {
-          get(target, name, receiver: MethodMissingModule) {
-            if (
-              typeof name === "symbol" ||
-              Reflect.has(target, name) ||
-              PROTOCOL_PROBES.has(name) ||
-              KERNEL_METHODS.has(name)
-            ) {
-              return Reflect.get(target, name, receiver);
-            }
-            receiver.respondToMissing(name);
-            return undefined;
-          },
+      new Proxy(Object.create(parent) as object, {
+        get(target, name, receiver: MethodMissingModule) {
+          if (
+            typeof name === "symbol" ||
+            Reflect.has(target, name) ||
+            PROTOCOL_PROBES.has(name) ||
+            KERNEL_METHODS.has(name)
+          ) {
+            return Reflect.get(target, name, receiver);
+          }
+          receiver.respondToMissing(name);
+          return undefined;
         },
-      ),
+      }),
     );
     return mod;
   }
