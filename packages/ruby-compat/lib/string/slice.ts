@@ -101,5 +101,5 @@ export function strSlice(
     | [string]
 ): string | null {
   if (typeof str !== "string") return str.slice(...args) as string | null;
-  return sliceBang(str, ...(args as [number]))[0];
+  return sliceBang(str, ...args)[0];
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { constGet, rbAutoloadLoad, rbAutoloadP } from "@blazetrails/ruby-compat";
+import { constGet, LOADED_FEATURES, rbAutoloadLoad, rbAutoloadP } from "@blazetrails/ruby-compat";
 import { Mail } from "../lib/mail.js";
 import "../lib/index.js";
 import type { Message } from "../lib/message.js";
@@ -43,6 +43,12 @@ describe("Mail.register_autoload", () => {
   });
 
   it("resolves a registered feature through Kernel.require on $LOAD_PATH", async () => {
-    await expect(rbAutoloadLoad(Mail, "SMTP")).resolves.toBeTypeOf("boolean");
+    await rbAutoloadLoad(Mail, "SMTP");
+    expect(
+      LOADED_FEATURES.some((f) =>
+        /\/mail\/(lib|dist)\/network\/delivery-methods\/smtp\.(js|ts)$/.test(f),
+      ),
+    ).toBe(true);
+    expect(constGet(Mail, "SMTP")).toBeDefined();
   });
 });
