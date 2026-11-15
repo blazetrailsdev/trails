@@ -1,3 +1,4 @@
+import { ActiveSupport } from "../namespaces.js";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
@@ -5,7 +6,6 @@ import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store
 import { atomicWrite } from "../core-ext/file/atomic.js";
 import { kernelInteger } from "@blazetrails/ruby-compat";
 import { hexdigest } from "../hexdigest.js";
-import { registerStoreClass } from "./store-registry.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
 export const FILENAME_MAX_SIZE = 226;
@@ -286,4 +286,4 @@ function toI(value: unknown): number {
   return 0;
 }
 
-registerStoreClass(":file_store", FileStore);
+ActiveSupport.Cache.FileStore = FileStore;

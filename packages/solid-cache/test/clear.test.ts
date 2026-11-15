@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Entry, Record, type Store } from "../../lib/index.js";
-import { useSolidCache } from "../support/test-helper.js";
+import { Entry, Record, type Store } from "../lib/index.js";
+import { useSolidCache } from "./support/test-helper.js";
 
 describe("ClearTest", () => {
   const host = useSolidCache();

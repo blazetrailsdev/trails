@@ -1,10 +1,11 @@
+import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { TestCase as ActiveJobTestCase } from "@blazetrails/activejob/test-case";
 import type { TestHelper as ActiveJobTestHelper } from "@blazetrails/activejob/test-helper";
 import { weeks } from "@blazetrails/activesupport";
 import { Kernel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Entry, ExpiryJob, Record, type Store } from "../../lib/index.js";
-import { useSolidCache, waitForBackgroundTasks } from "../support/test-helper.js";
+import { Entry, ExpiryJob, Record, type Store } from "../lib/index.js";
+import { useSolidCache, waitForBackgroundTasks } from "./support/test-helper.js";
 
 class ExpiryTest extends ActiveJobTestCase {
   expiry(): void {}
@@ -193,21 +194,49 @@ describe("SolidCache::ExpiryTest", () => {
   it("triggers multiple expiry tasks when there are many writes", async () => {
     cache = host.lookupStore({ expiryBatchSize: 20, maxEntries: 2, expiryQueue: "cache_expiry" });
     const background = cache._background;
-    const scheduled = async (n: number) => {
-      const before = background.scheduledTaskCount;
-      await writeMulti(n);
-      await waitForBackgroundTasks(cache);
-      return background.scheduledTaskCount - before;
-    };
 
     stubRand(0.25, 0.24);
-    expect(await scheduled(8)).toBe(1);
-    expect(await scheduled(24)).toBe(3);
+    await assertDifference(
+      () => background.scheduledTaskCount,
+      1,
+      null,
+      async () => {
+        await writeMulti(8);
+        await waitForBackgroundTasks(cache);
+      },
+    );
+
+    await assertDifference(
+      () => background.scheduledTaskCount,
+      3,
+      null,
+      async () => {
+        await writeMulti(24);
+        await waitForBackgroundTasks(cache);
+      },
+    );
 
     vi.restoreAllMocks();
     stubRand(0.25, 0.24);
-    expect(await scheduled(10)).toBe(1);
-    expect(await scheduled(10)).toBe(1);
+    await assertDifference(
+      () => background.scheduledTaskCount,
+      1,
+      null,
+      async () => {
+        await writeMulti(10);
+        await waitForBackgroundTasks(cache);
+      },
+    );
+
+    await assertDifference(
+      () => background.scheduledTaskCount,
+      1,
+      null,
+      async () => {
+        await writeMulti(10);
+        await waitForBackgroundTasks(cache);
+      },
+    );
   });
 
   it("triggers multiple expiry jobs when there are many writes", async () => {

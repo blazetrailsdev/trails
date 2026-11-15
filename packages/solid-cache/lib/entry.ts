@@ -155,7 +155,7 @@ export class Entry extends Record {
     let selectSql = this._selectSql!.get(keys.length);
     if (selectSql == null) {
       selectSql = this.where({ key_hash: [1111, 2222] })
-        .select("key", "value")
+        .select(":key", ":value")
         .toSql()
         .replaceAll("1111, 2222", Array.from({ length: keys.length }, () => "?").join(", "));
       this._selectSql!.set(keys.length, selectSql);

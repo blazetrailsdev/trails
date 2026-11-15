@@ -9,7 +9,7 @@ import { cacheStoreSerializerBehavior } from "@blazetrails/activesupport/test/ca
 import { localCacheBehavior } from "@blazetrails/activesupport/test/cache/behaviors/local-cache-behavior";
 import { cacheStoreVersionBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-version-behavior";
 import { describe, expect, it } from "vitest";
-import { useSolidCache } from "../support/test-helper.js";
+import { useSolidCache } from "./support/test-helper.js";
 
 describe("SolidCacheTest", () => {
   const host = useSolidCache();

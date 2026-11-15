@@ -186,6 +186,10 @@ const alias = {
     __dirname,
     "packages/activesupport/lib/key-generator.ts",
   ),
+  "@blazetrails/activesupport/namespaces": path.resolve(
+    __dirname,
+    "packages/activesupport/lib/namespaces.ts",
+  ),
   "@blazetrails/activesupport/digest": path.resolve(
     __dirname,
     "packages/activesupport/lib/digest.ts",

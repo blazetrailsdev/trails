@@ -1,10 +1,10 @@
-import { LoadError, RuntimeError } from "@blazetrails/ruby-compat";
+import { constGet, LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 import { extractOptionsBang, toParam } from "./hash-utils.js";
 import { env } from "@blazetrails/ruby-compat";
 import { MemoryStore } from "./cache/memory-store.js";
 import "./cache/null-store.js";
 import "./cache/file-store.js";
-import { lookupStoreClass } from "./cache/store-registry.js";
+import { camelize } from "./inflector.js";
 import type { CacheStore } from "./cache/index.js";
 import { ActiveSupport } from "./namespaces.js";
 import {
@@ -78,16 +78,15 @@ function retrieveCacheKey(key: unknown): string {
 
 /** @internal */
 function retrieveStoreClass(store: string): new (...args: any[]) => CacheStore {
-  try {
-    return lookupStoreClass(store);
-  } catch (e) {
-    if (e instanceof LoadError) {
-      throw new RuntimeError(
-        `Could not find cache store adapter for ${store.slice(1)} (${e.message})`,
-      );
-    }
-    throw e;
+  if (!Object.hasOwn(ActiveSupport.Cache, camelize(store.slice(1)))) {
+    const e = new LoadError(`cannot load such file -- active_support/cache/${store.slice(1)}`);
+    throw new RuntimeError(
+      `Could not find cache store adapter for ${store.slice(1)} (${e.message})`,
+    );
   }
+  return constGet(ActiveSupport.Cache, camelize(store.slice(1))) as new (
+    ...args: any[]
+  ) => CacheStore;
 }
 
 Object.assign(ActiveSupport.Cache, {

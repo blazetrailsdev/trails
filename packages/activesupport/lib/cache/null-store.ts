@@ -1,7 +1,7 @@
+import { ActiveSupport } from "../namespaces.js";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { Store } from "./store.js";
-import { registerStoreClass } from "./store-registry.js";
 
 export class NullStore extends Store implements CacheStore {
   static supportsCacheVersioning(): boolean {
@@ -47,4 +47,4 @@ export class NullStore extends Store implements CacheStore {
   }
 }
 
-registerStoreClass(":null_store", NullStore);
+ActiveSupport.Cache.NullStore = NullStore;

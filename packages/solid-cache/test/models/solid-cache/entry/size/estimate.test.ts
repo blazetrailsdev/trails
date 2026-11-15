@@ -34,6 +34,8 @@ describe("EntrySizeEstimateTest", () => {
   }
 
   async function estimate({ samples }: { samples: number }): Promise<number> {
-    return await (await Estimate.new({ samples })).size();
+    return await (
+      await Estimate.new({ samples })
+    ).size;
   }
 });

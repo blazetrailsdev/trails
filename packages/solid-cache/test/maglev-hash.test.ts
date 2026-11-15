@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { MaglevHash } from "../../lib/maglev-hash.js";
+import { MaglevHash } from "../lib/maglev-hash.js";
 
 function nodesFor1To30(maglevHash: MaglevHash) {
   const results: { [node: string]: number[] } = {};

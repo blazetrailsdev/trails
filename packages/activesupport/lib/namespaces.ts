@@ -43,7 +43,12 @@ export const ActiveSupport = {
   Messages: { name: "ActiveSupport::Messages" },
   Testing: { name: "ActiveSupport::Testing" },
 } as AutoloadModule & {
-  Cache: { name: string } & Partial<typeof import("./cache.js")>;
+  Cache: { name: string } & Partial<typeof import("./cache.js")> & {
+      MemoryStore?: typeof import("./cache/memory-store.js").MemoryStore;
+      FileStore?: typeof import("./cache/file-store.js").FileStore;
+      NullStore?: typeof import("./cache/null-store.js").NullStore;
+      SolidCacheStore?: new (...args: any[]) => import("./cache/index.js").CacheStore;
+    };
   Concurrency: { name: string };
   JSON: typeof import("./json.js");
   Messages: { name: string };

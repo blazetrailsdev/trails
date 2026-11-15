@@ -8,3 +8,4 @@ export { ExpiryJob } from "./expiry-job.js";
 export { MaglevHash } from "./maglev-hash.js";
 export { Record } from "./record.js";
 export { Store } from "./store.js";
+import "./active-support/cache/solid-cache-store.js";

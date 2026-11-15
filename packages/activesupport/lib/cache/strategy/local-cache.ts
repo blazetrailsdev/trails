@@ -12,6 +12,7 @@ import { extractOptionsBang } from "../../hash-utils.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import type { Entry } from "../entry.js";
 import type { StoreOptions } from "../store.js";
+import { Middleware } from "./local-cache-middleware.js";
 
 type Options = StoreOptions & { event?: Record<string, unknown> };
 
@@ -27,6 +28,7 @@ export interface LocalCacheHost {
 
 interface Host extends LocalCacheHost {
   _localCacheKey?: string;
+  _middleware?: Middleware;
   localCache(): LocalStore | null | undefined;
   localCacheKey(): string;
   bypassLocalCache<T>(block: () => T | Promise<T>): Promise<T>;
@@ -108,6 +110,13 @@ export class LocalStore {
 export const LocalCache = {
   withLocalCache<T>(this: Host, block: () => T | Promise<T>): Promise<T> {
     return this.useTemporaryLocalCache(new LocalStore(), block);
+  },
+
+  middleware(this: Host): Middleware {
+    return (this._middleware ??= new Middleware(
+      "ActiveSupport::Cache::Strategy::LocalCache",
+      this.localCacheKey(),
+    ));
   },
 
   async clear(this: Host, options: StoreOptions | null = null): Promise<void> {
