@@ -59,7 +59,6 @@ import {
   type BumpReport,
 } from "./report.js";
 import { LEDGERED_STEPS, NOT_EXERCISED, STEPS, TSX, parseArgs } from "./steps.js";
-import { testLedgerPath } from "../../api-compare/bump-ledger.js";
 
 /** `<package> <rubyFile>` → the file's missing descriptions, for each file with a TS twin. */
 async function missingOf(rel: string): Promise<Map<string, Set<string>>> {
@@ -292,7 +291,7 @@ async function main(argv: string[], env: Env): Promise<number> {
   let ledgeredSteps: StepResult[];
   const ledgerFile = path.join(ROOT, "scripts/parity/bump-ledger", `${source.name}.json`);
   const priorLedger = await fs.readFile(ledgerFile, "utf8").catch(() => null);
-  const testLedgerFile = testLedgerPath(source.name);
+  const testLedgerFile = path.join(path.dirname(ledgerFile), `${source.name}.tests.json`);
   const priorTestLedger = await fs.readFile(testLedgerFile, "utf8").catch(() => null);
   const testRows: ReturnType<typeof testSeed> = [];
   const testTable: (string | number)[][] = [];
