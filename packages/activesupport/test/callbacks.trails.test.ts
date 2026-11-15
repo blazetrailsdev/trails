@@ -1345,3 +1345,18 @@ describe("module singleton-class callbacks (trails)", () => {
     expect(log).toEqual(["before", "block"]);
   });
 });
+
+describe("around callback proceed (trails)", () => {
+  it("answers instanceof Promise when the block is async", async () => {
+    class Target extends Model {}
+    const target = new Target();
+    Target.defineCallbacks("save");
+    let proceeded: unknown;
+    Target.setCallback("save", "around", (_record: unknown, block: () => unknown) => {
+      proceeded = block();
+      return proceeded;
+    });
+    await target.runCallbacks("save", async () => "saved");
+    expect(proceeded).toBeInstanceOf(Promise);
+  });
+});
