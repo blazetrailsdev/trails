@@ -7,6 +7,7 @@ import {
   hashAref,
   rbDeclareIvar,
   rbModName,
+  shadowsIncluded,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { NotImplementedError } from "./errors.js";
@@ -436,6 +437,9 @@ function expandCallbackSourcesWithHelpers(
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly [shadowsIncluded] = ["initInternals"];
+
   declare static includeRootInJson: boolean | string;
 
   declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];

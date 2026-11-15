@@ -1567,6 +1567,7 @@ export function rbModAppendFeatures(
   trackIncludedModule(klass.prototype, mod);
   const descriptors: PropertyDescriptorMap = {};
   const installed = trackedKeys(klass.prototype);
+  const skipped: (string | symbol)[] = [];
 
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
   if (isClassModule) {
@@ -1585,6 +1586,8 @@ export function rbModAppendFeatures(
         if (!existing || existingIsMixin) {
           descriptors[key] = modDesc;
           installed.add(key);
+        } else {
+          skipped.push(key);
         }
         continue;
       }
@@ -1608,8 +1611,13 @@ export function rbModAppendFeatures(
           enumerable: higher.enumerable ?? lower.enumerable ?? false,
         };
         if (existingIsMixin) installed.add(key);
+        else if ((existing.get && modDesc.get) || (existing.set && modDesc.set)) {
+          skipped.push(key);
+        }
       } else if (existingIsMixin) {
         descriptors[key] = modDesc;
+      } else {
+        skipped.push(key);
       }
     }
   } else {
@@ -1651,6 +1659,7 @@ export function rbModAppendFeatures(
           continue;
         }
         if (Object.hasOwn(klass.prototype, key) && !installed.has(key)) {
+          skipped.push(key);
           continue;
         }
         installed.add(key);
@@ -1665,6 +1674,27 @@ export function rbModAppendFeatures(
     }
   }
   Object.defineProperties(klass.prototype, descriptors);
+  const optOut = Object.hasOwn(klass, shadowsIncluded)
+    ? (klass as unknown as Record<symbol, readonly (string | symbol)[]>)[shadowsIncluded]
+    : [];
+  for (const key of skipped) {
+    if (optOut.includes(key)) continue;
+    let names = displaced.get(klass.prototype);
+    if (!names) displaced.set(klass.prototype, (names = new Map()));
+    const mods = names.get(key);
+    if (!mods) names.set(key, [mod]);
+    else if (!mods.includes(mod)) mods.push(mod);
+  }
+}
+
+/** @noRailsEquivalent PERMANENT */
+export const shadowsIncluded = Symbol.for("@blazetrails/ruby-compat:shadowsIncluded");
+
+const displaced = new WeakMap<object, Map<string | symbol, object[]>>();
+
+/** @noRailsEquivalent PERMANENT */
+export function displacedIncludedMembers(klass: AnyClass): Map<string | symbol, object[]> {
+  return new Map([...(displaced.get(klass.prototype) ?? [])].map(([k, v]) => [k, [...v]]));
 }
 
 const prependedMethods = new WeakMap<object, Set<unknown>>();
