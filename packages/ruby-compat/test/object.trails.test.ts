@@ -1736,3 +1736,132 @@ describe("Hash#store / #fetch / #delete / #clear through respond_to? and send", 
     expect(rbFSend(m, "fetch", "a")).toBe(1);
   });
 });
+
+describe("rbFSend method cache", () => {
+  it("re-resolves a method after the method cache is cleared", () => {
+    class Visitor {
+      visitNode(node: unknown): unknown {
+        return ["first", node];
+      }
+    }
+    const v = new Visitor();
+    expect(rbFSend(v, "visitNode", 1)).toEqual(["first", 1]);
+    Visitor.prototype.visitNode = (node: unknown) => ["second", node];
+    rbClearMethodCache();
+    expect(rbFSend(v, "visitNode", 2)).toEqual(["second", 2]);
+  });
+
+  it("dispatches a receiver's own method over the cached one", () => {
+    class Visitor {
+      visitNode(): string {
+        return "proto";
+      }
+    }
+    const a = new Visitor();
+    const b = new Visitor();
+    expect(rbFSend(a, "visitNode")).toBe("proto");
+    Object.defineProperty(b, "visitNode", { value: () => "own" });
+    expect(rbFSend(b, "visitNode")).toBe("own");
+  });
+
+  it("resolves per prototype, and a getter is not cached as a method", () => {
+    class A {
+      name(): string {
+        return "a";
+      }
+    }
+    class B {
+      get name(): string {
+        return "b";
+      }
+    }
+    expect(rbFSend(new A(), "name")).toBe("a");
+    expect(rbFSend(new B(), "name")).toBe("b");
+    expect(rbFSend(new A(), "name")).toBe("a");
+  });
+
+  it("sees a prototype method replaced by plain assignment, without a cache clear", () => {
+    class Visitor {
+      visitNode(): string {
+        return "first";
+      }
+    }
+    const v = new Visitor();
+    expect(rbFSend(v, "visitNode")).toBe("first");
+    Visitor.prototype.visitNode = () => "second";
+    expect(rbFSend(v, "visitNode")).toBe("second");
+  });
+
+  it("resolves a name sent to alternating prototypes", () => {
+    class A {
+      visitNode(): string {
+        return "a";
+      }
+    }
+    class B {
+      visitNode(): string {
+        return "b";
+      }
+    }
+    const a = new A();
+    const b = new B();
+    for (let i = 0; i < 3; i++) {
+      expect(rbFSend(a, "visitNode")).toBe("a");
+      expect(rbFSend(b, "visitNode")).toBe("b");
+    }
+  });
+
+  it("re-resolves after a module is prepended", () => {
+    class Visitor {
+      visitNode(): string {
+        return "own";
+      }
+    }
+    const v = new Visitor();
+    expect(rbFSend(v, "visitNode")).toBe("own");
+    prepend(Visitor, {
+      visitNode(this: Visitor) {
+        return "prepended";
+      },
+    });
+    expect(rbFSend(v, "visitNode")).toBe("prepended");
+  });
+
+  it("re-resolves after the receiver's singleton class is created", () => {
+    class Visitor {
+      visitNode(): string {
+        return "class";
+      }
+    }
+    const v = new Visitor();
+    expect(rbFSend(v, "visitNode")).toBe("class");
+    rbModDefineMethod(rbObjSingletonClass(v), "visitNode", () => "singleton");
+    expect(rbFSend(v, "visitNode")).toBe("singleton");
+    expect(rbFSend(new Visitor(), "visitNode")).toBe("class");
+  });
+
+  it("dispatches native Array and Map methods, and falls through for Date", () => {
+    expect(rbFSend([3, 1, 2], "includes", 2)).toBe(true);
+    expect(rbFSend(new Map([["k", 1]]), "get", "k")).toBe(1);
+    expect(rbFSend(new Date(0), "getTime")).toBe(0);
+  });
+
+  it("dispatches a Proxy receiver as sendInternal does, by descriptor", () => {
+    class Collector {
+      html(): string {
+        return "html";
+      }
+    }
+    const proxy = new Proxy(new Collector(), {
+      get(target, key, receiver) {
+        return key === "html" ? () => "trapped" : Reflect.get(target, key, receiver);
+      },
+    });
+    expect(rbFSend(new Collector(), "html")).toBe("html");
+    expect(rbFSend(proxy, "html")).toBe("html");
+  });
+
+  it("raises NoMethodError for a name the receiver does not answer", () => {
+    expect(() => rbFSend(new (class {})(), "visitMissing")).toThrow(NoMethodError);
+  });
+});

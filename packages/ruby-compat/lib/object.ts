@@ -1328,6 +1328,10 @@ export function rbFSend(recv: unknown, mid: unknown, ...args: unknown[]): unknow
     const write = _writerFor(recv, mid);
     if (write !== null) return write.call(recv, args[0]);
   }
+  if (typeof mid === "string" && typeof recv === "object" && recv !== null) {
+    const method = _methodFor(recv, mid);
+    if (method !== null) return method.apply(recv, args);
+  }
   return sendInternal(args.length, [mid, ...args], recv);
 }
 
@@ -1559,6 +1563,48 @@ function _writerFor(recv: object, mid: string): AnyFunction | null {
   }
   return entry.write;
 }
+
+/** @perf 240ns — PERMANENT */
+function _methodFor(recv: object, mid: string): AnyFunction | null {
+  const proto = Object.getPrototypeOf(recv) as object | null;
+  if (proto === null) return null;
+  let entries = _methodEntries.get(proto);
+  if (entries === undefined || entries.serial !== methodCacheSerial) {
+    entries = { serial: methodCacheSerial, methods: new Map() };
+    _methodEntries.set(proto, entries);
+  }
+  let method = entries.methods.get(mid);
+  if (method === undefined) {
+    if (
+      mid === "==" ||
+      mid === "!=" ||
+      mid === "+" ||
+      RELOPS.has(mid) ||
+      mid.endsWith("=") ||
+      recv instanceof Date ||
+      recv instanceof Uint8Array ||
+      recv instanceof rbCDate ||
+      temporalTag(recv) !== null
+    ) {
+      return null;
+    }
+    for (let o: object | null = proto; o; o = Object.getPrototypeOf(o) as object | null) {
+      const desc = Object.getOwnPropertyDescriptor(o, mid);
+      if (desc === undefined) continue;
+      if (typeof desc.value !== "function") return null;
+      method = desc.value as AnyFunction;
+      break;
+    }
+    if (method === undefined) return null;
+    entries.methods.set(mid, method);
+  }
+  return (recv as Record<string, unknown>)[mid] === method && !Object.hasOwn(recv, mid)
+    ? method
+    : null;
+}
+
+/** @perf 240ns — PERMANENT */
+const _methodEntries = new WeakMap<object, { serial: number; methods: Map<string, AnyFunction> }>();
 
 /** @perf 100ns — PERMANENT */
 const _writerEntries = new Map<
