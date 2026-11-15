@@ -7,11 +7,11 @@ type Op = "=" | "!=" | ">" | "<" | ">=" | "<=" | "~>";
 const OPS: Readonly<Record<Op, (v: Version, r: Version) => boolean>> = Object.freeze({
   "=": (v, r) => v.compare(r) === 0,
   "!=": (v, r) => v.compare(r) !== 0,
-  ">": (v, r) => v.compare(r) === 1,
-  "<": (v, r) => v.compare(r) === -1,
-  ">=": (v, r) => (v.compare(r) ?? -1) >= 0,
-  "<=": (v, r) => (v.compare(r) ?? 1) <= 0,
-  "~>": (v, r) => (v.compare(r) ?? -1) >= 0 && v.release().compare(r.bump()) === -1,
+  ">": (v, r) => v.compare(r)! > 0,
+  "<": (v, r) => v.compare(r)! < 0,
+  ">=": (v, r) => v.compare(r)! >= 0,
+  "<=": (v, r) => v.compare(r)! <= 0,
+  "~>": (v, r) => v.compare(r)! >= 0 && v.release().compare(r.bump())! < 0,
 });
 
 const quoted = Object.keys(OPS)

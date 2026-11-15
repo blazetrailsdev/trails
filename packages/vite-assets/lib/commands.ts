@@ -7,6 +7,7 @@ import {
   Logger,
   rbFBackquote,
   setEnv,
+  StandardError,
   STDOUT as $stdout,
   TopLevel,
   warn,
@@ -69,7 +70,8 @@ export class Commands {
   async isLegacyNpmVersion(): Promise<boolean> {
     try {
       return (parseInt(await rbFBackquote("npm --version"), 10) || 0) < 7;
-    } catch {
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
       return false;
     }
   }
@@ -77,7 +79,8 @@ export class Commands {
   async isLegacyYarnVersion(): Promise<boolean> {
     try {
       return (parseInt(await rbFBackquote("yarn --version"), 10) || 0) < 2;
-    } catch {
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
       return false;
     }
   }

@@ -213,10 +213,10 @@ export class ViteAssets {
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE vite-assets-config-resolves-synchronously
    */
-  peekConfig(): Config {
-    return this._config!;
+  peekConfig(): Config | undefined {
+    return this._config;
   }
 
   async configure(options: ConfigAttrs = {}): Promise<Config> {
