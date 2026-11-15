@@ -405,7 +405,7 @@ export class HTTPRequest {
     if (
       ver >= "1.1" &&
       this._header["expect"] != null &&
-      this._header["expect"].split(", ").includes("100-continue")
+      [this._header["expect"]].includes("100-continue")
     ) {
       if (await sock.io.waitReadable(sock.continueTimeout)) {
         const res = await Net.HTTPResponse.readNew(sock);
