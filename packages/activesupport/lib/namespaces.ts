@@ -108,7 +108,7 @@ declare module "@blazetrails/ruby-compat" {
         };
         initialized(): boolean;
         initializeBang(): Promise<unknown>;
-        reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
+        reloadRoutesUnlessLoaded(): boolean | null | undefined;
         routes(): {
           namedRoutes: { helperNames(): string[] };
           urlHelpers(): Record<`${string}Url`, (...args: unknown[]) => string>;

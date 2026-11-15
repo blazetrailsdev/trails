@@ -1,11 +1,13 @@
 import { FileUpdateChecker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import { rbFLoad } from "@blazetrails/ruby-compat";
+import type { DrawCallback } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {
   disableClearAndFinalize?: boolean;
   clearBang(): void;
   finalizeBang(): void;
   eagerLoadBang(): void;
+  draw(block: DrawCallback): void;
 }
 
 export class RoutesReloader {
@@ -15,8 +17,10 @@ export class RoutesReloader {
   eagerLoad = false;
   loaded = false;
   /** @internal */
-  runAfterLoadPaths: () => void | Promise<void> = () => {};
-  private _updater?: FileUpdateChecker;
+  runAfterLoadPaths: () => void = () => {};
+  private _updater?: FileUpdateChecker<void>;
+  /** @internal */
+  private _drawn: [RouteSetLike, DrawCallback][] = [];
 
   executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
     return this.updater().executeIfUpdated(block);
@@ -26,10 +30,10 @@ export class RoutesReloader {
     return this.updater().isUpdated();
   }
 
-  async reloadBang(): Promise<void> {
+  reloadBang(): void {
     try {
       this.clearBang();
-      await this.loadPaths();
+      this.loadPaths();
       this.finalizeBang();
       if (this.eagerLoad) for (const s of this.routeSets) s.eagerLoadBang();
     } finally {
@@ -37,29 +41,52 @@ export class RoutesReloader {
     }
   }
 
-  execute(): Promise<void> {
+  execute(): void {
     this.loaded = true;
-    return this.updater().execute();
+    this.updater().execute();
   }
 
-  async executeUnlessLoaded(): Promise<true | null> {
+  executeUnlessLoaded(): true | null {
     if (!this.loaded) {
-      await this.execute();
+      this.execute();
       runLoadHooks("after_routes_loaded", TopLevel.Trails!.application);
       return true;
     }
     return null;
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  async prefetchBang(): Promise<void> {
+    const drawn: [RouteSetLike, DrawCallback][] = [];
+    const own = this.routeSets.map((routes) => Object.getOwnPropertyDescriptor(routes, "draw"));
+    for (const routes of this.routeSets) {
+      Object.defineProperty(routes, "draw", {
+        value: (block: DrawCallback) => void drawn.push([routes, block]),
+        configurable: true,
+        writable: true,
+      });
+    }
+    try {
+      for (const path of this.paths) await rbFLoad(path);
+    } finally {
+      this.routeSets.forEach((routes, i) => {
+        const descriptor = own[i];
+        if (descriptor) Object.defineProperty(routes, "draw", descriptor);
+        else delete (routes as Partial<RouteSetLike>).draw;
+      });
+    }
+    this._drawn = drawn;
+  }
+
   /** @internal */
-  private updater(): FileUpdateChecker {
+  private updater(): FileUpdateChecker<void> {
     return (this._updater ??= (() => {
       const dirs = this.externalRoutes.reduce<Record<string, string[]>>((hash, dir) => {
         hash[String(dir)] = ["ts"];
         return hash;
       }, {});
 
-      return new FileUpdateChecker(this.paths, dirs, () => this.reloadBang());
+      return new FileUpdateChecker<void>(this.paths, dirs, () => this.reloadBang());
     })());
   }
 
@@ -72,9 +99,9 @@ export class RoutesReloader {
   }
 
   /** @internal */
-  private async loadPaths(): Promise<void> {
-    for (const path of this.paths) await rbFLoad(path);
-    await this.runAfterLoadPaths();
+  private loadPaths(): void {
+    for (const [routes, block] of this._drawn) routes.draw(block);
+    this.runAfterLoadPaths();
   }
 
   /** @internal */

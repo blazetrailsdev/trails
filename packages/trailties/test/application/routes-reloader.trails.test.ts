@@ -44,7 +44,7 @@ describe("RoutesReloader", () => {
       expect(r.isUpdated()).toBe(false);
       FileUtils.touch(routes);
       expect(r.isUpdated()).toBe(true);
-      await r.execute();
+      r.execute();
       expect(r.isUpdated()).toBe(false);
       expect(a.calls).toEqual(["clear", "finalize"]);
     } finally {
@@ -63,9 +63,11 @@ describe("RoutesReloader", () => {
       r.routeSets.push(a);
       r.paths.push(routes);
 
-      await r.execute();
+      await r.prefetchBang();
+      r.execute();
       File.write(routes, drawInto("Trails.application", "/after"));
-      await r.execute();
+      await r.prefetchBang();
+      r.execute();
 
       expect(a.calls.filter((c) => c.startsWith("get"))).toEqual(["get /before", "get /after"]);
     } finally {
@@ -98,7 +100,8 @@ describe("RoutesReloader", () => {
       const r = new RoutesReloader();
       r.routeSets.push(app, engineRoutes);
       r.paths.push(`${tmp}/app-routes.ts`, `${tmp}/engine-routes.ts`);
-      await r.reloadBang();
+      await r.prefetchBang();
+      r.reloadBang();
 
       expect(app.calls).toEqual(["clear", "get /posts", "finalize"]);
       expect(engineRoutes.routes().length).toBe(1);

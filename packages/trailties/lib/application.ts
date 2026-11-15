@@ -401,11 +401,12 @@ export class Application extends Engine {
   }
 
   async reloadRoutesBang(): Promise<void> {
-    await this.routesReloader().reloadBang();
+    await this.routesReloader().prefetchBang();
+    this.routesReloader().reloadBang();
   }
 
-  async reloadRoutesUnlessLoaded(): Promise<boolean | null> {
-    return this.initialized() && (await this.routesReloader().executeUnlessLoaded());
+  reloadRoutesUnlessLoaded(): boolean | null {
+    return this.initialized() && this.routesReloader().executeUnlessLoaded();
   }
 
   secretKeyBase(): string {

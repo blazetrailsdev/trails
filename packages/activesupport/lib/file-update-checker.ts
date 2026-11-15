@@ -1,13 +1,13 @@
 import { ArgumentError, Dir, File } from "@blazetrails/ruby-compat";
 
-export class FileUpdateChecker {
+export class FileUpdateChecker<R extends Promise<void> | void = Promise<void> | void> {
   static toString(): string {
     return "ActiveSupport::FileUpdateChecker";
   }
 
   private files: string[];
   private glob?: string;
-  private block: () => Promise<void> | void;
+  private block: () => R;
   private watchedMemo: string[] | null;
   private updatedAtMemo: Date | null;
   private lastWatched: string[];
@@ -16,7 +16,7 @@ export class FileUpdateChecker {
   constructor(
     files: string[],
     dirs: Record<string, string | string[]> | string[] = {},
-    block?: () => Promise<void> | void,
+    block?: () => R,
   ) {
     if (!block) {
       throw new ArgumentError("A block is required to initialize a FileUpdateChecker");
@@ -50,11 +50,11 @@ export class FileUpdateChecker {
     }
   }
 
-  async execute(): Promise<void> {
+  execute(): R {
     this.lastWatched = this.watched();
     this.lastUpdateAt = this.updatedAt(this.lastWatched);
     try {
-      await this.block();
+      return this.block();
     } finally {
       this.watchedMemo = null;
       this.updatedAtMemo = null;

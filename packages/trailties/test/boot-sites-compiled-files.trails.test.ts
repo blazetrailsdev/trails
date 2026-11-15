@@ -33,7 +33,7 @@ describe("boot sites load through a registered compiled file", () => {
     const r = new RoutesReloader();
     r.paths.push(`${tmp}/config/routes.ts`);
 
-    await r.execute();
+    await r.prefetchBang();
 
     expect(loads).toEqual(["config/routes.ts"]);
   });

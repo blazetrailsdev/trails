@@ -55,7 +55,8 @@ describe("RoutesReloader", () => {
     r.eagerLoad = true;
     const after = vi.fn();
     r.runAfterLoadPaths = after;
-    await r.reloadBang();
+    await r.prefetchBang();
+    r.reloadBang();
     expect(after).toHaveBeenCalledOnce();
     expect(a.calls).toEqual(["clear", "get /a", "get /b", "finalize", "eagerLoad"]);
     expect(a.disableClearAndFinalize).toBe(false);
@@ -67,7 +68,7 @@ describe("RoutesReloader", () => {
     r.routeSets.push(a);
     File.write(`${tmp}/boom.ts`, `throw new Error("load failed");\n`);
     r.paths.push(`${tmp}/boom.ts`);
-    await expect(r.reloadBang()).rejects.toThrow(/load failed/);
+    await expect(r.prefetchBang()).rejects.toThrow(/load failed/);
     expect(a.disableClearAndFinalize).toBe(false);
   });
 
@@ -77,8 +78,8 @@ describe("RoutesReloader", () => {
     onLoad("after_routes_loaded", (a) => void fired.push(a));
     const app = { tag: "app" };
     Trails.application = app as never;
-    expect([await r.executeUnlessLoaded(), r.loaded, fired]).toEqual([true, true, [app]]);
-    expect(await r.executeUnlessLoaded()).toBeNull();
+    expect([r.executeUnlessLoaded(), r.loaded, fired]).toEqual([true, true, [app]]);
+    expect(r.executeUnlessLoaded()).toBeNull();
     expect(fired).toEqual([app]);
   });
 });
