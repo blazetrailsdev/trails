@@ -25,7 +25,9 @@ import type { FixtureSet } from "./fixture-set.js";
 
 export type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
-const loadPath: Record<string, () => Promise<unknown>> = {};
+const loadPath: Record<string, () => Promise<unknown>> = {
+  "active_storage/fixture_set": () => import("@blazetrails/activestorage/testing/fixture-set"),
+};
 
 export const ActiveStorage = {
   name: "ActiveStorage",
