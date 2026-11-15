@@ -142,11 +142,15 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
               wake?.();
             }),
         ),
-      ).finally(() => {
-        done = true;
-        wake?.();
-      });
-      eachChunk.catch(() => {});
+      )
+        .then(
+          () => null,
+          (error: unknown) => ({ error }),
+        )
+        .finally(() => {
+          done = true;
+          wake?.();
+        });
       while (yielded.length > 0 || !done) {
         const next = yielded.shift();
         if (next) {
@@ -157,7 +161,8 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
           wake = null;
         }
       }
-      await eachChunk;
+      const failure = await eachChunk;
+      if (failure) throw failure.error;
     }
   }
 
@@ -397,9 +402,9 @@ export class Response {
     return (this.stream as { write(string: string): unknown }).write(string);
   }
 
-  close(): void {
-    const stream = this.stream as { close?: () => void };
-    if (typeof stream?.close === "function") stream.close();
+  close(): unknown {
+    const stream = this.stream as { close?: () => unknown };
+    if (typeof stream?.close === "function") return stream.close();
   }
 
   get committed(): boolean {

@@ -77,9 +77,9 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     return this.write(string.endsWith("\n") ? string : `${string}\n`);
   }
 
-  override close(): void {
+  override async close(): Promise<void> {
     super.close();
-    void this._buf.push(null);
+    await this._buf.push(null);
   }
 
   override abort(): void {
@@ -143,19 +143,19 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
 export class SSE {
   static readonly PERMITTED_OPTIONS = ["retry", "event", "id"] as const;
 
-  private _stream: { write(s: string): unknown; close(): void };
+  private _stream: { write(s: string): unknown; close(): unknown };
   private _options: { retry?: number | string; event?: string; id?: number | string };
 
   constructor(
-    stream: { write(s: string): unknown; close(): void },
+    stream: { write(s: string): unknown; close(): unknown },
     options: { retry?: number | string; event?: string; id?: number | string } = {},
   ) {
     this._stream = stream;
     this._options = options;
   }
 
-  close(): void {
-    this._stream.close();
+  close(): unknown {
+    return this._stream.close();
   }
 
   write(
@@ -244,7 +244,7 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
           this.logError(exception as Error);
         } finally {
           this.logError(e as Error);
-          (resp.stream as Buffer).close();
+          await (resp.stream as Buffer).close();
         }
       } else {
         error = e;
@@ -299,7 +299,7 @@ export async function sendStream(
       await block(this.response.stream as Buffer);
     });
   } finally {
-    (this.response.stream as Buffer).close();
+    await (this.response.stream as Buffer).close();
   }
 }
 

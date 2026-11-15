@@ -49,7 +49,7 @@ describe("ActionController", () => {
         const t = new Thread(async () => {
           await (response.stream as LiveBuffer).write("foo");
           await latch.wait();
-          (response.stream as LiveBuffer).close();
+          await (response.stream as LiveBuffer).close();
         });
 
         await response.awaitCommit();

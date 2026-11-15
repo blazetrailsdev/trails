@@ -53,7 +53,7 @@ describe("ActionController::Live::Buffer", () => {
     const buf = new Buffer(makeResponse());
     await buf.writeln("a");
     await buf.writeln("b\n");
-    buf.close();
+    await buf.close();
     expect(await drain(buf)).toEqual(["a\n", "b\n"]);
   });
 
@@ -61,21 +61,21 @@ describe("ActionController::Live::Buffer", () => {
     const buf = new Buffer(makeResponse());
     await buf.write("one");
     await buf.write("two");
-    buf.close();
+    await buf.close();
     expect(await drain(buf)).toEqual(["one", "two"]);
     expect(buf.isClosed).toBe(true);
   });
 
   it("write after close raises (matches Rails IOError-on-closed-stream)", async () => {
     const buf = new Buffer(makeResponse());
-    buf.close();
+    await buf.close();
     await expect(buf.write("x")).rejects.toThrow(IOError);
   });
 
-  it("close commits the underlying response", () => {
+  it("close commits the underlying response", async () => {
     const res = makeResponse();
     const buf = new Buffer(res);
-    buf.close();
+    await buf.close();
     expect(res.committed).toBe(true);
   });
 
@@ -84,7 +84,7 @@ describe("ActionController::Live::Buffer", () => {
     await buf.write("a");
     buf.abort();
     expect(buf.isConnected).toBe(false);
-    buf.close();
+    await buf.close();
     expect(await drain(buf)).toEqual([]);
   });
 
@@ -134,7 +134,7 @@ describe("ActionController::Live::Buffer", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     await buf.write("two");
     await new Promise((resolve) => setTimeout(resolve, 0));
-    buf.close();
+    await buf.close();
     expect(await read).toEqual(["one", "two"]);
   });
 
@@ -175,11 +175,11 @@ describe("ActionController::Live::Buffer", () => {
     }
     const buf = new SmallBuffer(makeResponse());
     const writes = [buf.write("one"), buf.write("two"), buf.write("three")];
-    buf.close();
+    const closed = buf.close();
     const parts: unknown[] = [];
     buf.each((part) => parts.push(part));
     expect(parts).toEqual(["one", "two", "three"]);
-    await Promise.all(writes);
+    await Promise.all([...writes, closed]);
   });
 
   it("a sync read of a live buffer raises rather than blocking before close", async () => {
@@ -266,7 +266,7 @@ describe("ActionController::Live::Response", () => {
     const res = makeResponse();
     await (res.stream as Buffer).write("a");
     await (res.stream as Buffer).write("b");
-    (res.stream as Buffer).close();
+    await (res.stream as Buffer).close();
     expect(await drain(res.stream as Buffer)).toEqual(["a", "b"]);
   });
 
@@ -274,7 +274,7 @@ describe("ActionController::Live::Response", () => {
     const res = new Response(201, { "x-test": "1" }, []);
     res.request = makeResponse().request;
     await (res.stream as Buffer).write("seed");
-    (res.stream as Buffer).close();
+    await (res.stream as Buffer).close();
     expect(res.status).toBe(201);
     expect(res.headers.get("x-test")).toBe("1");
     expect(res.body).toBe("seed");
@@ -285,7 +285,7 @@ describe("ActionController::Live::Response", () => {
     const res = makeResponse();
     res.request!.cookieJar().set("hello", "world");
     await (res.stream as Buffer).write("a");
-    (res.stream as Buffer).close();
+    await (res.stream as Buffer).close();
     expect(res.committed).toBe(true);
     expect(res.cookies).toEqual({ hello: "world" });
   });
@@ -494,7 +494,7 @@ describe("ActionController::Live private helpers", () => {
     await buf.write("a");
     await buf.write("b");
     expect(() => buf.body).toThrow(ThreadError);
-    buf.close();
+    await buf.close();
     expect(buf.body).toBe("ab");
   });
 
@@ -503,7 +503,7 @@ describe("ActionController::Live private helpers", () => {
     await buf.write("a");
     const body = buf.awaitBody();
     await buf.write("b");
-    buf.close();
+    await buf.close();
     expect(await body).toBe("ab");
     expect(buf.body).toBe("ab");
   });

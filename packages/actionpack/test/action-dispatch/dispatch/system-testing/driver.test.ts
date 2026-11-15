@@ -10,6 +10,7 @@ import {
   serviceDriverPath,
   type Browser,
 } from "../../../../lib/action-dispatch/system-testing/browser.js";
+import { vite } from "../../../../lib/action-dispatch/system-testing/server.js";
 
 const foundExecutable = new URL(import.meta.url).pathname;
 let chromium: BrowserType;
@@ -213,7 +214,8 @@ describe("DriverTest", () => {
     try {
       serviceDriverPath.delete(chromium);
       const driver = new Driver("selenium", { screenSize: [1400, 1400], using: "chrome" });
-      await (driver as unknown as { _preload: Promise<void> })._preload;
+      driver.use();
+      await vite.drivers.selenium(undefined).catch(() => null);
 
       expect(serviceDriverPath.get(chromium)).toBe(foundExecutable);
     } finally {
@@ -232,7 +234,8 @@ describe("DriverTest", () => {
         {},
         async () => {
           const driver = new Driver("selenium", { screenSize: [1400, 1400], using: "chrome" });
-          await (driver as unknown as { _preload: Promise<void> })._preload;
+          driver.use();
+          await vite.drivers.selenium(undefined).catch(() => null);
         },
       );
     } finally {

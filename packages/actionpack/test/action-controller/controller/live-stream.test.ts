@@ -219,12 +219,12 @@ describe("LiveStreamTest", () => {
     async writeLines(): Promise<void> {
       await (this.response.stream as Buffer).writeln("hello\n");
       await (this.response.stream as Buffer).writeln("world");
-      (this.response.stream as Buffer).close();
+      await (this.response.stream as Buffer).close();
     }
 
     async defaultHeader(): Promise<void> {
       await (this.response.stream as Buffer).write("<html><body>hi</body></html>");
-      (this.response.stream as Buffer).close();
+      await (this.response.stream as Buffer).close();
     }
 
     async basicStream(): Promise<void> {
@@ -232,7 +232,7 @@ describe("LiveStreamTest", () => {
       for (const word of ["hello", "world"]) {
         await (this.response.stream as Buffer).write(word);
       }
-      (this.response.stream as Buffer).close();
+      await (this.response.stream as Buffer).close();
     }
 
     async basicSendStream(): Promise<void> {
@@ -277,7 +277,7 @@ describe("LiveStreamTest", () => {
         await (this.response.stream as Buffer).write(word);
         await this.latch.wait();
       }
-      (this.response.stream as Buffer).close();
+      await (this.response.stream as Buffer).close();
     }
 
     async threadLocals(): Promise<void> {
@@ -287,7 +287,7 @@ describe("LiveStreamTest", () => {
       for (const word of ["hello", "world"]) {
         await (this.response.stream as Buffer).write(word);
       }
-      (this.response.stream as Buffer).close();
+      await (this.response.stream as Buffer).close();
     }
 
     async noThreadLocals(): Promise<void> {
@@ -297,7 +297,7 @@ describe("LiveStreamTest", () => {
       for (const word of ["hello", "world"]) {
         await (this.response.stream as Buffer).write(word);
       }
-      (this.response.stream as Buffer).close();
+      await (this.response.stream as Buffer).close();
     }
 
     async isolatedState(): Promise<void> {
@@ -328,7 +328,7 @@ describe("LiveStreamTest", () => {
 
       (this.response.stream as Buffer).onError(async () => {
         await (this.response.stream as Buffer).write('data: "500 Internal Server Error"\n\n');
-        (this.response.stream as Buffer).close();
+        await (this.response.stream as Buffer).close();
       });
 
       await (this.response.stream as Buffer).write("");
@@ -380,7 +380,7 @@ describe("LiveStreamTest", () => {
       for (const char of "abcdefghijklmnopqrstuvwxyz") {
         writes.push((this.response.stream as Buffer).write(char));
       }
-      (this.response.stream as Buffer).close();
+      await (this.response.stream as Buffer).close();
       await Promise.all(writes);
     }
 
@@ -762,7 +762,7 @@ describe("LiveControllerThreadTest", () => {
       for (const word of ["hello", "world"]) {
         await (this.response.stream as Buffer).write(word);
       }
-      (this.response.stream as Buffer).close();
+      await (this.response.stream as Buffer).close();
     }
   }
 

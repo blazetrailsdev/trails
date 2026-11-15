@@ -31,7 +31,7 @@ export class Router {
   }
 
   eagerLoadBang(): void {
-    void this.simulator();
+    this.simulator();
   }
 
   async serve(req: RouterRequest): Promise<RackishResponse> {
