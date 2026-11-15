@@ -213,7 +213,7 @@ describe("NumberHelperTest", () => {
     );
   });
 
-  it("number to human with custom translation scope", () => {
+  it("number to human with custom translation scope", async () => {
     try {
       I18n.backend().storeTranslations("ts", {
         custom_units_for_number_to_human: {
@@ -230,7 +230,7 @@ describe("NumberHelperTest", () => {
         s(numberToHuman(0.0101, { locale: "ts", units: "custom_units_for_number_to_human" })),
       ).toBe("1.01 cm");
     } finally {
-      I18n.reloadBang();
+      await I18n.reloadBang();
     }
   });
 

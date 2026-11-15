@@ -50,15 +50,15 @@ describe("ActionCable::Connection::StreamTest", () => {
 
         const client = (connection as unknown as { websocket: { websocket: ClientSocket } })
           .websocket.websocket;
-        stub(
+        await stub(
           rackHijackIo,
           "writeNonblock",
           () => {
             throw new closedException("foo");
           },
           [],
-          () => {
-            tc.assertCalled(client, "clientGone", null, {}, () => {
+          async () => {
+            await tc.assertCalled(client, "clientGone", null, {}, () => {
               client.write("boo");
             });
           },

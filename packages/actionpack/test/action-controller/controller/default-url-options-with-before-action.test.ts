@@ -23,8 +23,8 @@ class ControllerWithBeforeActionAndDefaultUrlOptions extends Base {
     });
   }
 
-  target() {
-    this.render({ plain: "final response" });
+  async target() {
+    await this.render({ plain: "final response" });
   }
 
   redirect() {

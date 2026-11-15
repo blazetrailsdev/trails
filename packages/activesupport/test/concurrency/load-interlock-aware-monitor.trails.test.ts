@@ -6,13 +6,14 @@ import { Dependencies } from "../../lib/dependencies.js";
 const tick = () => new Promise((resolve) => setTimeout(resolve, 5));
 
 describe("ThreadLoadInterlockAwareMonitor", () => {
-  it("runs an uncontended block before synchronize returns", () => {
+  it("runs an uncontended block before synchronize returns", async () => {
     const monitor = new ThreadLoadInterlockAwareMonitor();
     let ran = false;
-    void monitor.synchronize(() => {
+    const synchronized = monitor.synchronize(() => {
       ran = true;
     });
     expect(ran).toBe(true);
+    await synchronized;
   });
 
   it("serializes sibling promises of one thread", async () => {

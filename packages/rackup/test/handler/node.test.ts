@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
-import { b, stderr, TCPSocket } from "@blazetrails/ruby-compat";
+import { b, stderr, TCPSocket, Thread } from "@blazetrails/ruby-compat";
 import type { RackApp, RackBody, RackEnv, RackMiddleware } from "@blazetrails/rack";
 import {
   Files,
@@ -517,6 +517,7 @@ describe("Rack::Handler::Node", () => {
     });
 
     it("writes the head, hands the stream to a rack.hijack response header, and lets it see the client go", async () => {
+      let hijacked!: Thread;
       let sawClose!: () => void;
       const clientGone = new Promise<void>((resolve) => (sawClose = resolve));
       let text = "";
@@ -526,7 +527,10 @@ describe("Rack::Handler::Node", () => {
           {
             "content-type": "text/event-stream",
             "rack.hijack": (stream: TCPSocket) => {
-              void stream.waitReadable().then(sawClose);
+              hijacked = new Thread(async () => {
+                await stream.waitReadable();
+                sawClose();
+              });
               stream.write("data: one\n\n");
             },
           },
@@ -548,6 +552,7 @@ describe("Rack::Handler::Node", () => {
         },
       );
 
+      await hijacked.join();
       expect(text.startsWith("HTTP/1.1 200 OK\r\n")).toBe(true);
       expect(text).toContain("content-type: text/event-stream\r\n");
       expect(text).not.toContain("rack.hijack");
@@ -692,11 +697,13 @@ describe("Rack::Handler::Node", () => {
     });
 
     it("hands over the socket and writes nothing itself", async () => {
+      let hijacked!: Thread;
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
             const io = (env[RACK_HIJACK] as () => TCPSocket)();
-            void io.waitReadable().then(() => {
+            hijacked = new Thread(async () => {
+              await io.waitReadable();
               io.write(`echo:${Buffer.from(io.read()).toString()}`);
               io.closeWrite();
             });
@@ -709,15 +716,18 @@ describe("Rack::Handler::Node", () => {
         ).catch(reject);
       });
 
+      await hijacked.join();
       expect(reply).toBe("echo:after-handshake");
     });
 
     it("delivers bytes pipelined with the handshake to the hijacked socket", async () => {
+      let hijacked!: Thread;
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
             const io = (env[RACK_HIJACK] as () => TCPSocket)();
-            void io.waitReadable().then(() => {
+            hijacked = new Thread(async () => {
+              await io.waitReadable();
               io.write(`head:${Buffer.from(io.read()).toString()}`);
               io.closeWrite();
             });
@@ -730,17 +740,20 @@ describe("Rack::Handler::Node", () => {
         ).catch(reject);
       });
 
+      await hijacked.join();
       expect(reply).toBe("head:first-frame");
     });
 
     it("reads an upgrade request's body into rack.input and leaves the frame on the socket", async () => {
+      let hijacked!: Thread;
       let input = "";
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
             input = Buffer.from((env[RACK_INPUT] as StringIO<Uint8Array>).read()).toString();
             const io = (env[RACK_HIJACK] as () => TCPSocket)();
-            void io.waitReadable().then(() => {
+            hijacked = new Thread(async () => {
+              await io.waitReadable();
               io.write(`frame:${Buffer.from(io.read()).toString()}`);
               io.closeWrite();
             });
@@ -762,18 +775,21 @@ describe("Rack::Handler::Node", () => {
         ).catch(reject);
       });
 
+      await hijacked.join();
       expect(input).toBe("hello");
       expect(reply).toBe("frame:first-frame");
     });
 
     it("reads an upgrade body sent after the handshake and hands the rest to the hijacker", async () => {
+      let hijacked!: Thread;
       let input = "";
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
             input = Buffer.from((env[RACK_INPUT] as StringIO<Uint8Array>).read()).toString();
             const io = (env[RACK_HIJACK] as () => TCPSocket)();
-            void io.waitReadable().then(() => {
+            hijacked = new Thread(async () => {
+              await io.waitReadable();
               io.write(`frame:${Buffer.from(io.read()).toString()}`);
               io.closeWrite();
             });
@@ -799,6 +815,7 @@ describe("Rack::Handler::Node", () => {
         ).catch(reject);
       });
 
+      await hijacked.join();
       expect(input).toBe("hello");
       expect(reply).toBe("frame:first-frame");
     });

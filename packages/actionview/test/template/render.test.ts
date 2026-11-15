@@ -252,8 +252,8 @@ function cacheKey(...namesAndVirtualPath: unknown[]): unknown {
   return view.combinedFragmentCacheKey([`${virtualPath}:${digest}`, ...namesAndVirtualPath]);
 }
 
-function teardown(): void {
-  I18n.reloadBang();
+async function teardown(): Promise<void> {
+  await I18n.reloadBang();
   ActionController.Base.viewPaths().paths.map((path) => path.clearCache!());
 }
 

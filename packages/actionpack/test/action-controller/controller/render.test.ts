@@ -27,6 +27,7 @@ import {
   Struct,
   type StructInstance,
   Tempfile,
+  Thread,
   toI,
   TopLevel,
 } from "@blazetrails/ruby-compat";
@@ -1201,7 +1202,7 @@ describe("LiveHeadRenderTest", () => {
 
     const controller = tc.controller as LiveTestController & LiveControllerHost;
     controller.newControllerThread = async (block) => {
-      void Promise.resolve().then(block);
+      new Thread(block);
     };
 
     const responseBody = Object.getOwnPropertyDescriptor(Metal.prototype, "responseBody")!;

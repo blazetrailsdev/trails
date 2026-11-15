@@ -140,19 +140,19 @@ describe("ControllerClassTests", () => {
     assertEqual("contained_empty", Submodule.ContainedEmptyController.controllerName());
   });
 
-  it("no deprecation when action view record identifier is included", () => {
+  it("no deprecation when action view record identifier is included", async () => {
     const record = new Comment();
     record.save();
 
     let domId: string | null = null;
-    assertNotDeprecated(deprecator(), () => {
+    await assertNotDeprecated(deprecator(), () => {
       domId = new RecordIdentifierIncludedController().domId(record);
     });
 
     assertEqual("comment_1", domId);
 
     let domClass: string | null = null;
-    assertNotDeprecated(deprecator(), () => {
+    await assertNotDeprecated(deprecator(), () => {
       domClass = new RecordIdentifierIncludedController().domClass(record);
     });
     assertEqual("comment", domClass);

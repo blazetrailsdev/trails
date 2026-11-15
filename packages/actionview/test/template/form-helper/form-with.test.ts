@@ -466,8 +466,8 @@ describe("FormWithActsLikeFormForTest", () => {
     (view as unknown as { post: Post }).post = post;
   });
 
-  afterEach(() => {
-    I18n.reloadBang();
+  afterEach(async () => {
+    await I18n.reloadBang();
   });
 
   const titleField = "<input name='post[title]' type='text' value='Hello World' id='post_title' />";

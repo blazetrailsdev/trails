@@ -23,10 +23,10 @@ class FakeWatcher {
     return this.changed;
   }
 
-  execute(): void {
+  async execute(): Promise<void> {
     this.executed++;
     this.changed = false;
-    this.block();
+    await this.block();
   }
 }
 
@@ -83,7 +83,7 @@ describe("ActionView::CacheExpiry::ViewReloader", () => {
     expect(FakeWatcher.instances).toHaveLength(1);
   });
 
-  it("a change landing on the old watcher while the new one initializes survives the rebuild", () => {
+  it("a change landing on the old watcher while the new one initializes survives the rebuild", async () => {
     PathRegistry.castFileSystemResolvers(["/a/views"]);
     const reloader = new ViewReloader({ watcher: FakeWatcher });
     reloader.isUpdated();
@@ -97,19 +97,19 @@ describe("ActionView::CacheExpiry::ViewReloader", () => {
     expect(FakeWatcher.instances[1].isUpdated()).toBe(false);
     expect(reloader.isUpdated()).toBe(true);
 
-    reloader.execute();
+    await reloader.execute();
     expect(FakeWatcher.instances[1].executed).toBe(1);
     expect(reloader.isUpdated()).toBe(false);
   });
 
-  it("reload! clears DetailsKey and empties the digest cache", () => {
+  it("reload! clears DetailsKey and empties the digest cache", async () => {
     PathRegistry.castFileSystemResolvers(["/a/views"]);
     const reloader = new ViewReloader({ watcher: FakeWatcher });
     reloader.isUpdated();
     DetailsKey.digestCache({ formats: ["html"] }).set("template", "digest");
     expect(DetailsKey.digestCaches()).toHaveLength(1);
 
-    reloader.execute();
+    await reloader.execute();
     expect(DetailsKey.digestCaches()).toHaveLength(0);
   });
 });

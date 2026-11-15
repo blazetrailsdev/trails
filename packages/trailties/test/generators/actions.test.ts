@@ -381,13 +381,13 @@ describe("ActionsTest", () => {
   it("add source adds source to gemfile", async () => {
     File.write(File.join(root, ".npmrc"), "");
     await capture("stdout", () => makeGen().addSource("http://gems.github.com"));
-    assertFile(".npmrc", /registry=http:\/\/gems\.github\.com\n/);
+    await assertFile(".npmrc", /registry=http:\/\/gems\.github\.com\n/);
   });
 
   it("gem should put gem dependency in gemfile", async () => {
     File.write(File.join(root, "package.json"), '{\n  "name": "app"\n}\n');
     await capture("stdout", () => makeGen().gem("will-paginate"));
-    assertFile("package.json", /"will-paginate": "\*"\n/);
+    await assertFile("package.json", /"will-paginate": "\*"\n/);
   });
 
   it("gem with version should include version in gemfile", async () => {
@@ -400,7 +400,7 @@ describe("ActionsTest", () => {
       await gen.gem("faker", { version: [">= 0.1.0", "< 0.3.0"] });
     });
 
-    assertFile("package.json", (content: string) => {
+    await assertFile("package.json", (content: string) => {
       assertMatch(/"rspec": ">= 2\.0\.0\.a5"/, content);
       assertMatch(/"RedCloth": ">= 4\.1\.0 < 4\.2\.0"/, content);
       assertMatch(/"nokogiri": ">= 1\.4\.2"/, content);
@@ -416,7 +416,7 @@ describe("ActionsTest", () => {
       await gen.gemGroup("test", () => gen.gem("fakeweb"));
     });
 
-    assertFile(
+    await assertFile(
       "package.json",
       /"devDependencies": \{\n {4}"rspec-rails": "\*",\n {4}"fakeweb": "\*"\n {2}\}\n/,
     );

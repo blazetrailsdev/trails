@@ -159,7 +159,7 @@ class RequestForgeryProtectionControllerUsingNullSession extends Base {
   }
 
   async tryToResetSession(): Promise<void> {
-    this.resetSession();
+    await this.resetSession();
     this.head(":ok");
   }
 }

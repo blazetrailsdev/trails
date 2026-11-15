@@ -59,10 +59,10 @@ describe("TaggedLoggingWithoutBlockTest", () => {
     expect(output.string).toBe("[BCX] [Jason] Funky time\n[BCX] Junky time!\n");
   });
 
-  it("shares tags across threads", () => {
+  it("shares tags across threads", async () => {
     const tagged = logger.tagged("BCX");
 
-    new Thread(() => {
+    await new Thread(() => {
       tagged.info("Dull story");
       tagged.tagged("OMG").info("Cool story");
     }).join();
@@ -147,9 +147,9 @@ describe("TaggedLoggingTest", () => {
     expect(output.string).toBe("[OMG] Cool story\n[BCX] Funky time\n");
   });
 
-  it("cleans up the taggings on flush", () => {
-    logger.tagged("BCX", () => {
-      new Thread(() => {
+  it("cleans up the taggings on flush", async () => {
+    await logger.tagged("BCX", async () => {
+      await new Thread(() => {
         logger.tagged("OMG", () => {
           logger.flush();
           logger.info("Cool story");
@@ -226,9 +226,9 @@ describe("TaggedLoggingTest", () => {
     expect(output.string).toBe("[New] Funky time\n");
   });
 
-  it("keeps each tag in their own thread", () => {
-    logger.tagged("BCX", () => {
-      new Thread(() => {
+  it("keeps each tag in their own thread", async () => {
+    await logger.tagged("BCX", async () => {
+      await new Thread(() => {
         logger.info("Dull story");
         logger.tagged("OMG", () => {
           logger.info("Cool story");
@@ -239,8 +239,8 @@ describe("TaggedLoggingTest", () => {
     expect(output.string).toBe("Dull story\n[OMG] Cool story\n[BCX] Funky time\n");
   });
 
-  it("keeps each tag in their own thread even when pushed directly", () => {
-    new Thread(() => {
+  it("keeps each tag in their own thread even when pushed directly", async () => {
+    await new Thread(() => {
       logger.pushTags("OMG");
       logger.info("Cool story");
     }).join();

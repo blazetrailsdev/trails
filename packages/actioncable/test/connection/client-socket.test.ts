@@ -45,15 +45,15 @@ describe("ActionCable::Connection::ClientSocketTest", () => {
       const connection = await openConnection();
 
       const client = websocketOf(connection);
-      stub(
+      await stub(
         rbObjIvarGet(client, "@stream") as Stream,
         "write",
         () => {
           throw new RuntimeError("foo");
         },
         [],
-        () => {
-          tc.assertNotCalled(client, "clientGone", null, () => {
+        async () => {
+          await tc.assertNotCalled(client, "clientGone", null, () => {
             client.write("boo");
           });
         },

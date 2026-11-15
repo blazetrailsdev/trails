@@ -32,7 +32,7 @@ describe("TestRakeFileCreationTask", () => {
   });
 
   it("directory", async () => {
-    dsl.directory(DUMMY_DIR);
+    await dsl.directory(DUMMY_DIR);
     const fcTask = await rake.tm.get(DUMMY_DIR);
     expect(fcTask.name).toEqual(DUMMY_DIR);
     expect(fcTask instanceof FileCreationTask).toBeTruthy();

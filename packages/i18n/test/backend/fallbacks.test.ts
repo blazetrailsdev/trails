@@ -181,7 +181,7 @@ describe("I18nBackendFallbacksTranslateTest", () => {
     expect(t("missing_bar", { count: 0, default: "default" })).toBe("default");
   });
 
-  it("multi-threaded fallbacks", () => {
+  it("multi-threaded fallbacks", async () => {
     setFallbacks(["en"]);
 
     const thread = new Thread(() => {
@@ -189,7 +189,7 @@ describe("I18nBackendFallbacksTranslateTest", () => {
     });
 
     try {
-      thread.join();
+      await thread.join();
       expect(t(":bar", { locale: "pt-BR" })).toBe("Bar in :en");
     } finally {
       thread.exit();

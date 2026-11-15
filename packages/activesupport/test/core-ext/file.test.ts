@@ -42,9 +42,9 @@ describe("AtomicWriteTest", () => {
     expect(readFileSync(fileName(), "utf-8")).toEqual(contents);
   });
 
-  it("atomic write doesnt write when block raises", () => {
+  it("atomic write doesnt write when block raises", async () => {
     try {
-      atomicWrite(fileName(), (file) => {
+      await atomicWrite(fileName(), (file) => {
         file.write("testing");
         throw new Error("something bad");
       });

@@ -1,7 +1,7 @@
 import { createServer, type Server, type Socket } from "node:net";
 import { TLSSocket } from "node:tls";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError, EOFError, RuntimeError, block } from "@blazetrails/ruby-compat";
+import { ArgumentError, EOFError, RuntimeError, Thread, block } from "@blazetrails/ruby-compat";
 import { AuthCramMD5 } from "../../../lib/auth-cram-md5.js";
 import { SMTPServer, type SMTPServerOptions } from "smtp-server";
 import { OpenTimeout } from "../../../lib/protocol.js";
@@ -41,6 +41,7 @@ class FakeServer {
   private _tls: unknown;
   private _server: Server | null = null;
   private _sockets: Socket[] = [];
+  private _serverThreads: Thread[] = [];
   private _buffer = "";
   private _waiter: ((line: string | null) => void) | null = null;
   private _eof = false;
@@ -60,13 +61,22 @@ class FakeServer {
       this.sock = s;
       this._sockets.push(s);
       s.on("error", () => {});
-      void this.init().then(() => this.loop());
+      const serverThread = new Thread(async () => {
+        Thread.current().abortOnException = true;
+        await this.init();
+        await this.loop();
+      });
+      this._serverThreads.push(serverThread);
     });
     await new Promise<void>((resolve) => this._server!.listen(0, "127.0.0.1", () => resolve()));
     this.port = (this._server.address() as { port: number }).port;
   }
 
   async stop(): Promise<void> {
+    for (const serverThread of this._serverThreads.splice(0)) {
+      serverThread.kill();
+      await serverThread.join();
+    }
     for (const s of this._sockets) s.destroy();
     await new Promise<void>((resolve) => this._server!.close(() => resolve()));
   }

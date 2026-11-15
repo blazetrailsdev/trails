@@ -35,12 +35,13 @@ describe("PP", () => {
     expect(await pp([new Mask("y")])).toBe('["y"]\n');
   });
 
-  it("runs a synchronous block in line", () => {
+  it("runs a synchronous block in line", async () => {
     const out = new StringIO();
     const q = new PP(out);
-    q.group(1, "[", "]", () => q.seplist(["a", "b"], null, (v) => q.pp(v)));
+    const grouped = q.group(1, "[", "]", () => q.seplist(["a", "b"], null, (v) => q.pp(v)));
     q.flush();
     expect(out.string()).toBe('["a", "b"]');
+    await grouped;
   });
 
   it("answers the width of an output with no winsize as 79", () => {

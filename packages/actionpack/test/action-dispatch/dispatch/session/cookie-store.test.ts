@@ -77,7 +77,7 @@ class TestController extends Base {
   }
 
   async getClassAfterResetSession(): Promise<void> {
-    this.resetSession();
+    await this.resetSession();
     await this.render({ plain: `class: ${rbModToS(rbObjClass(this.session))}` });
   }
 
@@ -86,8 +86,8 @@ class TestController extends Base {
     this.head(":ok");
   }
 
-  callResetSession(): void {
-    this.resetSession();
+  async callResetSession(): Promise<void> {
+    await this.resetSession();
     this.head(":ok");
   }
 

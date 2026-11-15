@@ -19,8 +19,8 @@ describe("TestRakePackageTask", () => {
     const packageFiles = new FileList();
     await packageFiles.append("install.rb");
     packageFiles.include("*.c");
-    packageFiles.exclude(/\bCVS\b/);
-    packageFiles.exclude(/~$/);
+    await packageFiles.exclude(/\bCVS\b/);
+    await packageFiles.exclude(/~$/);
     await packageFiles.resolve();
 
     const pkg = new PackageTask("pkgr", "1.2.3", (p) => {

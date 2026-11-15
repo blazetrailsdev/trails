@@ -170,10 +170,10 @@ describe("Monitor#synchronize after the holder's block returns", () => {
 });
 
 describe("Monitor#enter", () => {
-  it("counts a re-entry, and leaves on the matching exit", () => {
+  it("counts a re-entry, and leaves on the matching exit", async () => {
     const monitor = new Monitor();
-    monitor.enter();
-    monitor.enter();
+    await monitor.enter();
+    await monitor.enter();
     monitor.exit();
     expect(monitor.isMonOwned()).toBe(true);
     monitor.exit();
@@ -182,7 +182,7 @@ describe("Monitor#enter", () => {
 
   it("holds another thread out until exit", async () => {
     const monitor = new Monitor();
-    monitor.enter();
+    await monitor.enter();
     const order: string[] = [];
     const other = new Thread(async () => {
       await monitor.enter();

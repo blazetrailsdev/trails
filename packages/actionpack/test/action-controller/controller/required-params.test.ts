@@ -77,14 +77,14 @@ describe("ParametersRequireTest", () => {
     assertEqual(false, new Parameters({ person: false }).require("person"));
   });
 
-  it("required parameters must not be nil", () => {
-    assertRaises([ParameterMissing], {}, () => {
+  it("required parameters must not be nil", async () => {
+    await assertRaises([ParameterMissing], {}, () => {
       new Parameters({ person: null }).require("person");
     });
   });
 
-  it("required parameters must not be empty", () => {
-    assertRaises([ParameterMissing], {}, () => {
+  it("required parameters must not be empty", async () => {
+    await assertRaises([ParameterMissing], {}, () => {
       new Parameters({ person: {} }).require("person");
     });
   });
@@ -100,8 +100,8 @@ describe("ParametersRequireTest", () => {
     assertEqual(["Gaurish", "Mjallo"], safeParams);
   });
 
-  it("require array when a required param is missing", () => {
-    assertRaises([ParameterMissing], {}, () => {
+  it("require array when a required param is missing", async () => {
+    await assertRaises([ParameterMissing], {}, () => {
       (
         new Parameters({ person: { first_name: "Gaurish", title: null } }).require(
           "person",
@@ -117,7 +117,7 @@ describe("ParametersRequireTest", () => {
     assert(params.isValue("cinco"));
   });
 
-  it("to_param works like in a Hash", () => {
+  it("to_param works like in a Hash", async () => {
     let params: Parameters | { root: Parameters } = new Parameters({
       nested: { key: "value" },
     }).permitBang();
@@ -126,12 +126,12 @@ describe("ParametersRequireTest", () => {
     params = { root: new Parameters({ nested: { key: "value" } }).permitBang() };
     assertEqual(toParam({ root: { nested: { key: "value" } } }), toParam(params));
 
-    assertRaise([UnfilteredParameters], {}, () => {
+    await assertRaise([UnfilteredParameters], {}, () => {
       new Parameters({ nested: { key: "value" } }).toParam();
     });
   });
 
-  it("to_query works like in a Hash", () => {
+  it("to_query works like in a Hash", async () => {
     let params: Parameters | { root: Parameters } = new Parameters({
       nested: { key: "value" },
     }).permitBang();
@@ -140,7 +140,7 @@ describe("ParametersRequireTest", () => {
     params = { root: new Parameters({ nested: { key: "value" } }).permitBang() };
     assertEqual(toQuery({ root: { nested: { key: "value" } } }), toQuery(params));
 
-    assertRaise([UnfilteredParameters], {}, () => {
+    await assertRaise([UnfilteredParameters], {}, () => {
       new Parameters({ nested: { key: "value" } }).toQuery();
     });
   });

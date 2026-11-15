@@ -33,11 +33,11 @@ describe("DateHelperDistanceOfTimeInWordsI18nTests", () => {
     from = Time.utc(2004, 6, 6, 21, 45, 0);
   });
 
-  function assertDistanceOfTimeInWordsTranslatesKey(
+  async function assertDistanceOfTimeInWordsTranslatesKey(
     passed: [number, Record<string, unknown>],
     expected: [string, number | null],
     expectedOptions: Record<string, unknown> = {},
-  ): void {
+  ): Promise<void> {
     const [diff, passedOptions] = passed;
     const [key, count] = expected;
     const to = from.plus(diff);
@@ -48,12 +48,12 @@ describe("DateHelperDistanceOfTimeInWordsI18nTests", () => {
     );
     if (count != null) options.count = count;
 
-    assertCalledWith(I18n, "t", [key, options], {}, () => {
+    await assertCalledWith(I18n, "t", [key, options], {}, () => {
       distanceOfTimeInWords(from, to, { ...passedOptions, locale: "en" });
     });
   }
 
-  it("distance of time in words calls i18n", () => {
+  it("distance of time in words calls i18n", async () => {
     const cases: Array<[[number, Record<string, unknown>], [string, number | null]]> = [
       [
         [2, { includeSeconds: true }],
@@ -122,11 +122,11 @@ describe("DateHelperDistanceOfTimeInWordsI18nTests", () => {
       ],
     ];
     for (const [passed, expected] of cases) {
-      assertDistanceOfTimeInWordsTranslatesKey(passed, expected);
+      await assertDistanceOfTimeInWordsTranslatesKey(passed, expected);
     }
   });
 
-  it("distance of time in words calls i18n with custom scope", () => {
+  it("distance of time in words calls i18n with custom scope", async () => {
     const cases: Array<[[number, Record<string, unknown>], [string, number]]> = [
       [
         [30 * DAY, { scope: "datetime.distance_in_words_ago" }],
@@ -138,14 +138,14 @@ describe("DateHelperDistanceOfTimeInWordsI18nTests", () => {
       ],
     ];
     for (const [passed, expected] of cases) {
-      assertDistanceOfTimeInWordsTranslatesKey(passed, expected, {
+      await assertDistanceOfTimeInWordsTranslatesKey(passed, expected, {
         scope: "datetime.distance_in_words_ago",
       });
     }
   });
 
-  it("time ago in words passes locale", () => {
-    assertCalledWith(
+  it("time ago in words passes locale", async () => {
+    await assertCalledWith(
       I18n,
       "t",
       ["less_than_x_minutes", { scope: "datetime.distance_in_words", count: 1, locale: "ru" }],
@@ -187,14 +187,14 @@ describe("DateHelperSelectTagsI18nTests", () => {
     view = new (Base.withEmptyTemplateCache())(new LookupContext(null, {}, []), {}, null);
   });
 
-  it("select month given use month names option does not translate monthnames", () => {
-    assertNotCalled(I18n, "translate", null, () => {
+  it("select month given use month names option does not translate monthnames", async () => {
+    await assertNotCalled(I18n, "translate", null, () => {
       selectMonth(8, { locale: "en", useMonthNames: RubyDate.MONTHNAMES });
     });
   });
 
-  it("select month translates monthnames", () => {
-    assertCalledWith(
+  it("select month translates monthnames", async () => {
+    await assertCalledWith(
       I18n,
       "translate",
       ["date.month_names", { locale: "en" }],
@@ -205,8 +205,8 @@ describe("DateHelperSelectTagsI18nTests", () => {
     );
   });
 
-  it("select month given use short month option translates abbr monthnames", () => {
-    assertCalledWith(
+  it("select month given use short month option translates abbr monthnames", async () => {
+    await assertCalledWith(
       I18n,
       "translate",
       ["date.abbr_month_names", { locale: "en" }],
@@ -267,8 +267,8 @@ describe("DateHelperSelectTagsI18nTests", () => {
     expect(promptCalled).toBe(defaults.size);
   });
 
-  it("date or time select given an order options does not translate order", () => {
-    assertNotCalled(I18n, "translate", null, () => {
+  it("date or time select given an order options does not translate order", async () => {
+    await assertNotCalled(I18n, "translate", null, () => {
       datetimeSelect.call(view, "post", "updated_at", {
         order: ["year", "month", "day"],
         locale: "en",
@@ -291,8 +291,8 @@ describe("DateHelperSelectTagsI18nTests", () => {
     assertMock(mock);
   });
 
-  it("date or time select given invalid order", () => {
-    assertCalledWith(
+  it("date or time select given invalid order", async () => {
+    await assertCalledWith(
       I18n,
       "translate",
       ["date.order", { locale: "en", default: [] }],

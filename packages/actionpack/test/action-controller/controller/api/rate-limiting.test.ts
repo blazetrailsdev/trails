@@ -33,7 +33,7 @@ describe("ApiRateLimitingTest", () => {
     tc = new ApiRateLimitingTest(task.name);
     await tc.beforeSetup();
     tc.setup();
-    (ApiRateLimitedController as unknown as CacheStoreHost).cacheStore.clear();
+    await (ApiRateLimitedController as unknown as CacheStoreHost).cacheStore.clear();
   });
 
   it("exceeding basic limit", async () => {

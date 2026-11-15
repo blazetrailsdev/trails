@@ -461,8 +461,8 @@ describe("FormHelperTest", () => {
     view.post_delegator = postDelegator;
   });
 
-  afterEach(() => {
-    I18n.reloadBang();
+  afterEach(async () => {
+    await I18n.reloadBang();
   });
 
   class FooTag extends TagsBase {}
@@ -4953,8 +4953,8 @@ describe("FormHelperTest", () => {
       }
     })();
 
-    formFor(obj, { as: "other_name", url: "/", html: { id: "edit-other-name" } }, (f) => {
-      assertRaises([NoMethodError], {}, () => f.hiddenField("privateProperty"));
+    formFor(obj, { as: "other_name", url: "/", html: { id: "edit-other-name" } }, async (f) => {
+      await assertRaises([NoMethodError], {}, () => f.hiddenField("privateProperty"));
     });
   });
 

@@ -118,9 +118,9 @@ describe("AttributeAssignmentTest", () => {
         include(this, Attributes);
         this.attribute("name", "string");
       }
-      override _assignAttributes(attrs: Record<string, unknown>): void {
+      override _assignAttributes(attrs: Record<string, unknown>): Promise<void> | void {
         called.push(attrs);
-        void super._assignAttributes(attrs);
+        return super._assignAttributes(attrs);
       }
     }
     interface Person extends Attributes {}

@@ -13,7 +13,7 @@ describe("TestRakeDirectoryTask", () => {
   it("directory", async () => {
     dsl.desc("DESC");
 
-    dsl.directory("a/b/c");
+    await dsl.directory("a/b/c");
 
     expect((await rake.tm.get("a")).constructor).toEqual(FileCreationTask);
     expect((await rake.tm.get("a/b")).constructor).toEqual(FileCreationTask);
@@ -30,14 +30,14 @@ describe("TestRakeDirectoryTask", () => {
   });
 
   it("directory colon", async () => {
-    dsl.directory("a:b");
+    await dsl.directory("a:b");
 
     expect((await rake.tm.get("a:b")).constructor).toEqual(FileCreationTask);
   });
 
   it.skipIf(!Win32.isWindows())("directory win32", async () => {
     dsl.desc("WIN32 DESC");
-    dsl.directory("c:/a/b/c");
+    await dsl.directory("c:/a/b/c");
     expect((await rake.tm.get("c:")).constructor).toEqual(FileTask);
     expect((await rake.tm.get("c:/a")).constructor).toEqual(FileCreationTask);
     expect((await rake.tm.get("c:/a/b")).constructor).toEqual(FileCreationTask);
@@ -68,7 +68,7 @@ describe("TestRakeDirectoryTask", () => {
   });
 
   it("can use pathname", async () => {
-    dsl.directory(new Pathname("a/b/c"));
+    await dsl.directory(new Pathname("a/b/c"));
 
     expect((await rake.tm.get("a/b/c")).constructor).toEqual(FileCreationTask);
 

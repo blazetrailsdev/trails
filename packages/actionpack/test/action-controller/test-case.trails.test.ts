@@ -541,9 +541,9 @@ describe("TestSession Rails-mirroring API", () => {
     expect(s.values()).toEqual([1, 2]);
   });
 
-  it("destroy clears stored data", () => {
+  it("destroy clears stored data", async () => {
     const s = new TestSession({ a: 1 });
-    s.destroy();
+    await s.destroy();
     expect(s.keys()).toEqual([]);
   });
 
