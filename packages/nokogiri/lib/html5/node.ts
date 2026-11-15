@@ -195,12 +195,6 @@ export class Node extends XmlNode {
   }
 
   /** @missingRailsArgs join — PERMANENT */
-  override fragment(tags: string): XmlDocumentFragment {
-    if (!(this.document instanceof HTML5.Document)) return super.fragment(tags);
-
-    return new HTML5.DocumentFragment(this.document, tags, this);
-  }
-
   innerHtml(options: { preserveNewline?: boolean; saveWith?: number } = {}): string {
     let result = options.preserveNewline && this.isPrependNewline() ? "\n" : "";
     result += this.children.map((child) => child.toHtml(options)).join("");
@@ -291,6 +285,12 @@ export class Node extends XmlNode {
       const html = this.htmlStandardSerialize(opts.preserveNewline || false);
       io.write(html);
     }
+  }
+
+  override fragment(tags: string): XmlDocumentFragment {
+    if (!(this.document instanceof HTML5.Document)) return super.fragment(tags);
+
+    return new HTML5.DocumentFragment(this.document, tags, this);
   }
 
   /** @internal */
