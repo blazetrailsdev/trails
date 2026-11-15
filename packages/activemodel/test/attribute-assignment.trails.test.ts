@@ -380,3 +380,50 @@ describe("AttributeAssignmentTest", () => {
     });
   });
 });
+
+describe("AttributeAssignment async writers", () => {
+  class Recorder extends Model {
+    order: string[] = [];
+    override _assignAttribute(k: string, v: unknown): unknown {
+      return Promise.resolve().then(() => {
+        if (v === "boom") throw new Error(`cannot assign ${k}`);
+        this.order.push(k);
+      });
+    }
+  }
+
+  it("awaits each async writer in order", async () => {
+    const record = new Recorder();
+    await record.setAttributes({ a: 1, b: 2, c: 3 });
+    expect(record.order).toEqual(["a", "b", "c"]);
+  });
+
+  it("rejects to the caller when an async writer rejects", async () => {
+    const record = new Recorder();
+    await expect(record.setAttributes({ a: 1, b: "boom", c: 3 })).rejects.toThrow(
+      "cannot assign b",
+    );
+    expect(record.order).toEqual(["a"]);
+  });
+});
+
+describe("AttributeAssignment async writers through new", () => {
+  class Rejecting extends Model {
+    override _assignAttribute(k: string): unknown {
+      return Promise.reject(new Error(`cannot assign ${k}`));
+    }
+  }
+
+  it("raises and carries the writer's rejection as the cause", async () => {
+    let raised: unknown;
+    try {
+      new Rejecting({ a: 1 });
+    } catch (error) {
+      raised = error;
+    }
+    expect(raised).toBeInstanceOf(Error);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(((raised as Error).cause as Error).message).toBe("cannot assign a");
+  });
+});

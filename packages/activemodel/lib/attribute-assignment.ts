@@ -34,7 +34,6 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
     if (capture == null) {
       assertAssignedSynchronously(assigned, "assignAttributes");
     } else if (assigned instanceof Promise) {
-      void assigned.catch(() => {});
       capture.assigned = assigned;
       pendingCaptures.set(this, capture);
     }
@@ -59,10 +58,17 @@ export const assigningSynchronously: unique symbol = Symbol.for(
 export function _assignAttributes(
   this: AttributeAssignment,
   attributes: Record<string, unknown> | Map<string, unknown>,
-): void {
+): Promise<void> | void {
+  let pending: Promise<unknown> | undefined;
   eachPair(attributes, (k, v) => {
-    void this._assignAttribute(k, v);
+    if (pending !== undefined) {
+      pending = pending.then(() => this._assignAttribute(k, v));
+      return;
+    }
+    const assigned = this._assignAttribute(k, v);
+    if (assigned instanceof Promise) pending = assigned;
   });
+  if (pending !== undefined) return pending.then(() => {});
 }
 
 export function setAttributes(
@@ -141,10 +147,13 @@ export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError
  */
 export function assertAssignedSynchronously(pending: unknown, methodName: string): void {
   if (!(pending instanceof Promise)) return;
-  void pending.catch(() => {});
-  throw new RuntimeError(
+  const error = new RuntimeError(
     `${methodName} cannot assign this attribute synchronously; use \`await record.setAttributes(...)\` instead.`,
   );
+  pending.catch((reason: unknown) => {
+    error.cause = reason;
+  });
+  throw error;
 }
 
 /**
@@ -157,6 +166,11 @@ export function capturingAssignment<R>(build: () => R): [R, Promise<void> | unde
   try {
     const record = build();
     return [record, capture.assigned];
+  } catch (error) {
+    capture.assigned?.catch((reason: unknown) => {
+      if (error instanceof Error) error.cause ??= reason;
+    });
+    throw error;
   } finally {
     assignmentCapture = null;
   }
@@ -171,7 +185,6 @@ export function deferringToAssignment(record: object, rest: () => unknown): bool
   if (capture === undefined) return false;
   pendingCaptures.delete(record);
   capture.assigned = capture.assigned!.then(rest).then(() => {});
-  void capture.assigned.catch(() => {});
   return true;
 }
 
