@@ -49,7 +49,7 @@ describe("EntrySizeEstimateTest", () => {
       Array.from({ length: 1000 }, () => Math.trunc((Kernel.rand() as number) ** 2 * 1000)),
     );
     await writeEntries({ valueLengths: valuesLengths });
-    const firstMod = ((await Entry.first()) as Entry).id % 3;
+    const firstMod = (((await Entry.first()) as Entry).id as number) % 3;
     await Entry.where(`id % 3 = ${firstMod}`).deleteAll();
 
     expect(await estimate({ samples: 1000 })).toBe(encrypted ? 437752 : 324532);
@@ -73,7 +73,7 @@ describe("EntrySizeEstimateTest", () => {
       Array.from({ length: 1000 }, () => Math.trunc((Kernel.rand() as number) ** 2 * 1000)),
     );
     await writeEntries({ valueLengths: valuesLengths });
-    const firstMod = ((await Entry.first()) as Entry).id % 4;
+    const firstMod = (((await Entry.first()) as Entry).id as number) % 4;
     await Entry.where(`id % 4 != ${firstMod}`).deleteAll();
 
     expect(await estimate({ samples: 1000 })).toBe(encrypted ? 162804 : 120304);
