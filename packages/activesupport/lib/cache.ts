@@ -76,10 +76,7 @@ function retrieveCacheKey(key: unknown): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- */
+/** @internal */
 function retrieveStoreClass(store: string): new (...args: any[]) => CacheStore {
   if (!Object.hasOwn(ActiveSupport.Cache, camelize(store.slice(1)))) {
     const e = new LoadError(`cannot load such file -- active_support/cache/${store.slice(1)}`);
