@@ -42,13 +42,13 @@ type Overridden =
 
 /** @internal */
 export interface StoreInternals {
-  readEntry(key: string, options: StoreOptions): Promise<CacheEntry | null>;
-  writeEntry(key: string, entry: CacheEntry, options: StoreOptions): Promise<boolean>;
+  readEntry(key: Uint8Array, options: StoreOptions): Promise<CacheEntry | null>;
+  writeEntry(key: Uint8Array, entry: CacheEntry, options: StoreOptions): Promise<boolean>;
   readMultiEntries(names: unknown[], options: StoreOptions): Promise<Map<unknown, unknown>>;
-  deleteEntry(key: string, options: StoreOptions): Promise<boolean>;
+  deleteEntry(key: Uint8Array, options: StoreOptions): Promise<boolean>;
   serializeEntry(entry: CacheEntry, options?: StoreOptions): unknown;
   deserializeEntry(payload: unknown, options?: StoreOptions): CacheEntry | null;
-  normalizeKey(key: unknown, options?: StoreOptions): Promise<string>;
+  normalizeKey(key: unknown, options?: StoreOptions): Promise<Uint8Array>;
   mergedOptions(callOptions?: StoreOptions): StoreOptions;
   normalizeVersion(key: unknown, options?: StoreOptions): Promise<string | undefined>;
   instrument<T>(
@@ -93,13 +93,17 @@ export class Store extends CacheStore {
     constSet(this, "Stats", Stats);
   }
 
-  declare protected readEntry: (key: string, options: StoreOptions) => Promise<CacheEntry | null>;
+  declare protected normalizeKey: (key: unknown, options?: StoreOptions) => Promise<Uint8Array>;
+  declare protected readEntry: (
+    key: Uint8Array,
+    options: StoreOptions,
+  ) => Promise<CacheEntry | null>;
   declare protected writeEntry: (
-    key: string,
+    key: Uint8Array,
     entry: CacheEntry,
     options: StoreOptions,
   ) => Promise<boolean>;
-  declare protected deleteEntry: (key: string, options: StoreOptions) => Promise<boolean>;
+  declare protected deleteEntry: (key: Uint8Array, options: StoreOptions) => Promise<boolean>;
 
   readonly maxKeyBytesize: number;
   readonly shardOptions: string[] | null;

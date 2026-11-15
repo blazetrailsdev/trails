@@ -1,5 +1,6 @@
 import { assertQueriesCount } from "@blazetrails/activerecord/testing/query-assertions";
 import { stubConst } from "@blazetrails/activesupport/testing/constant-stubbing";
+import { b, rbEqual } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Entry, SolidCache } from "../../../lib/index.js";
 import { useSolidCache } from "../../support/test-helper.js";
@@ -10,16 +11,16 @@ describe("EntryTest", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("write and read cache entries", async () => {
-    await Entry.write("hello", "there");
-    expect(utf8(await Entry.read("hello"))).toBe("there");
+    await Entry.write(b("hello"), "there");
+    expect(utf8(await Entry.read(b("hello")))).toBe("there");
   });
 
   it("write multi and read multi cache entries", async () => {
     await Entry.writeMulti([
-      { key: "hello", value: "there" },
-      { key: "foo", value: "bar" },
+      { key: b("hello"), value: "there" },
+      { key: b("foo"), value: "bar" },
     ]);
-    expect(utf8Hash(await Entry.readMulti(["hello", "foo", "bar"]))).toEqual({
+    expect(utf8Hash(await Entry.readMulti([b("hello"), b("foo"), b("bar")]))).toEqual({
       foo: "bar",
       hello: "there",
     });
@@ -28,8 +29,8 @@ describe("EntryTest", () => {
   it("id range", async () => {
     expect(Number(await Entry.idRange())).toBe(0);
 
-    await Entry.write("hello", "there");
-    await Entry.write("hello2", "there");
+    await Entry.write(b("hello"), "there");
+    await Entry.write(b("hello2"), "there");
 
     expect(Number(await Entry.uncached(() => Entry.idRange()))).toBe(2);
   });
@@ -52,18 +53,18 @@ describe("EntryTest", () => {
     const entry = Entry as unknown as { keyHashFor(key: unknown): number | bigint };
     const keyHashFor = entry.keyHashFor.bind(Entry);
     vi.spyOn(entry, "keyHashFor").mockImplementation((key) =>
-      key === "hello" || key === "hi" ? 1 : keyHashFor(key),
+      rbEqual(key, b("hello")) || rbEqual(key, b("hi")) ? 1 : keyHashFor(key),
     );
 
-    await Entry.write("hello", "there");
-    expect(utf8(await Entry.read("hello"))).toBe("there");
-    expect(await Entry.read("hi")).toBeNull();
-    expect(utf8Hash(await Entry.readMulti(["hello", "hi"]))).toEqual({ hello: "there" });
+    await Entry.write(b("hello"), "there");
+    expect(utf8(await Entry.read(b("hello")))).toBe("there");
+    expect(await Entry.read(b("hi"))).toBeNull();
+    expect(utf8Hash(await Entry.readMulti([b("hello"), b("hi")]))).toEqual({ hello: "there" });
 
-    await Entry.write("hi", "now");
-    expect(await Entry.read("hello")).toBeNull();
-    expect(utf8(await Entry.read("hi"))).toBe("now");
-    expect(utf8Hash(await Entry.readMulti(["hello", "hi"]))).toEqual({ hi: "now" });
+    await Entry.write(b("hi"), "now");
+    expect(await Entry.read(b("hello"))).toBeNull();
+    expect(utf8(await Entry.read(b("hi")))).toBe("now");
+    expect(utf8Hash(await Entry.readMulti([b("hello"), b("hi")]))).toEqual({ hi: "now" });
   });
 
   it("byte_size", async () => {
@@ -76,36 +77,38 @@ describe("EntryTest", () => {
     await stubConst(Entry as never, "MULTI_BATCH_SIZE", 2, async () => {
       await assertQueriesCount(2, false, () =>
         Entry.writeMulti([
-          { key: "hello", value: "there" },
-          { key: "foo", value: "bar" },
-          { key: "baz", value: "zab" },
+          { key: b("hello"), value: "there" },
+          { key: b("foo"), value: "bar" },
+          { key: b("baz"), value: "zab" },
         ]),
       );
 
       await assertQueriesCount(2, false, async () => {
-        expect(utf8Hash(await Entry.readMulti(["hello", "foo", "baz", "bar"]))).toEqual({
-          foo: "bar",
-          hello: "there",
-          baz: "zab",
-        });
+        expect(utf8Hash(await Entry.readMulti([b("hello"), b("foo"), b("baz"), b("bar")]))).toEqual(
+          {
+            foo: "bar",
+            hello: "there",
+            baz: "zab",
+          },
+        );
       });
     });
   });
 
   async function verifyByteSizes(byteSize: () => unknown): Promise<void> {
     if (SolidCache.configuration.isEncrypt()) {
-      await Entry.write("hello", "test");
+      await Entry.write(b("hello"), "test");
       expect(await byteSize()).toBe(319);
-      await Entry.write("hello", "12345");
+      await Entry.write(b("hello"), "12345");
       expect(await byteSize()).toBe(320);
-      await Entry.write("hi", "12345");
+      await Entry.write(b("hi"), "12345");
       expect(await byteSize()).toBe(317);
     } else {
-      await Entry.write("hello", "test");
+      await Entry.write(b("hello"), "test");
       expect(await byteSize()).toBe(149);
-      await Entry.write("hello", "12345");
+      await Entry.write(b("hello"), "12345");
       expect(await byteSize()).toBe(150);
-      await Entry.write("hi", "12345");
+      await Entry.write(b("hi"), "12345");
       expect(await byteSize()).toBe(147);
     }
   }
@@ -114,8 +117,8 @@ describe("EntryTest", () => {
     return value instanceof Uint8Array ? new TextDecoder().decode(value) : value;
   }
 
-  function utf8Hash(results: Map<string, unknown>): Record<string, unknown> {
-    return Object.fromEntries([...results].map(([key, value]) => [key, utf8(value)]));
+  function utf8Hash(results: Map<unknown, unknown>): Record<string, unknown> {
+    return Object.fromEntries([...results].map(([key, value]) => [utf8(key), utf8(value)]));
   }
 
   async function writeEntries(count = 20): Promise<void> {

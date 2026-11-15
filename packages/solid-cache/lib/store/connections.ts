@@ -57,7 +57,7 @@ export const Connections = {
   /** @internal */
   async readingKey(
     this: StoreHost,
-    key: string,
+    key: Uint8Array,
     { failsafe, failsafeReturning = null }: Failsafe,
     block: () => unknown,
   ): Promise<unknown> {
@@ -87,7 +87,7 @@ export const Connections = {
   /** @internal */
   async writingKey(
     this: StoreHost,
-    key: string,
+    key: Uint8Array,
     { failsafe, failsafeReturning = null }: Failsafe,
     block: () => unknown,
   ): Promise<unknown> {

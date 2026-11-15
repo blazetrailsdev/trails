@@ -1,4 +1,5 @@
 import { beforeEach, expect, it } from "vitest";
+import { Hash } from "@blazetrails/ruby-compat";
 import { Notifications } from "../../../lib/notifications.js";
 import type { Event } from "../../../lib/notifications/instrumenter.js";
 import type { Store, StoreOptions } from "../../../lib/cache/store.js";
@@ -49,10 +50,9 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
 
     expect(events.map((e) => e.name)).toEqual(["cache_write_multi.active_support"]);
     expect(events[0].payload.super_operation).toBeUndefined();
-    expect(events[0].payload.key).toEqual({
-      [await normalizedKey(key1)]: value1,
-      [await normalizedKey(key2)]: value2,
-    });
+    expect(events[0].payload.key).toEqual(
+      new Hash().set(await normalizedKey(key1), value1).set(await normalizedKey(key2), value2),
+    );
   });
 
   it("instrumentation with fetch multi as super operation", async () => {
@@ -122,7 +122,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_read.active_support"]);
-    expect(events[0].payload.key).toBe(await normalizedKey(key));
+    expect(events[0].payload.key).toEqual(await normalizedKey(key));
     assertSame(true, events[0].payload.hit);
     expect(events[0].payload.store).toBe(host.storeName);
   });
@@ -135,7 +135,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_write.active_support"]);
-    expect(events[0].payload.key).toBe(await normalizedKey(key));
+    expect(events[0].payload.key).toEqual(await normalizedKey(key));
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
@@ -148,7 +148,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_delete.active_support"]);
-    expect(events[0].payload.key).toBe(await normalizedKey(key, options));
+    expect(events[0].payload.key).toEqual(await normalizedKey(key, options));
     expect(events[0].payload.store).toBe(host.storeName);
     expect(events[0].payload.namespace).toBe("foo");
   });
@@ -179,7 +179,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_increment.active_support"]);
-    expect(events[0].payload.key).toBe(await normalizedKey(key1));
+    expect(events[0].payload.key).toEqual(await normalizedKey(key1));
     expect(events[0].payload.store).toBe(host.storeName);
   });
 
@@ -192,7 +192,7 @@ export function cacheInstrumentationBehavior(host: CacheInstrumentationBehaviorH
     });
 
     expect(events.map((e) => e.name)).toEqual(["cache_decrement.active_support"]);
-    expect(events[0].payload.key).toBe(await normalizedKey(key1));
+    expect(events[0].payload.key).toEqual(await normalizedKey(key1));
     expect(events[0].payload.store).toBe(host.storeName);
   });
 }

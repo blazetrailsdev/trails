@@ -32,16 +32,16 @@ describe("SolidCache::ExpiryTest", () => {
   }
 
   async function shardKeys(cache: Store, shard: string): Promise<string[]> {
-    const namespacedKeys: string[] = [];
+    const namespacedKeys: Uint8Array[] = [];
     for (let i = 0; i < 100; i++) {
       namespacedKeys.push(
         await (
-          cache as unknown as { normalizeKey(k: string, o: object): Promise<string> }
+          cache as unknown as { normalizeKey(k: string, o: object): Promise<Uint8Array> }
         ).normalizeKey(`key${i}`, {}),
       );
     }
     const keys = cache.connections().assign(namespacedKeys).get(shard)!;
-    return keys.map((key) => key.replace(`${host.namespace()}:`, ""));
+    return keys.map((key) => new TextDecoder().decode(key).replace(`${host.namespace()}:`, ""));
   }
 
   async function sendEntriesBackInTime(distance: ReturnType<typeof weeks>): Promise<void> {

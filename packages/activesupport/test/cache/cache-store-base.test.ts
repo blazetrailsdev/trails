@@ -28,12 +28,12 @@ class TestStore extends Store {
   }
   override async increment(name: string, amount = 1): Promise<number | null> {
     const key = await this.normalizeKey(name, {});
-    const entry = await this.readEntry(key, {});
+    const entry = await this.readEntry(key as string, {});
     if (!entry) return null;
     const n = Number(entry.value);
     if (isNaN(n)) return null;
     const next = n + amount;
-    await this.writeEntry(key, new Entry(next), {});
+    await this.writeEntry(key as string, new Entry(next), {});
     return next;
   }
   override async decrement(name: string, amount = 1): Promise<number | null> {

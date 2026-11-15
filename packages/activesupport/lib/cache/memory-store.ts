@@ -160,14 +160,14 @@ export class MemoryStore extends Store implements CacheStore {
     options = this.mergedOptions(options);
     const key = await this.normalizeKey(name, options);
     const version = (await this.normalizeVersion(name, options)) ?? null;
-    const entry = await this.readEntry(key, options);
+    const entry = await this.readEntry(key as string, options);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
       await this.write(name, kernelInteger(amount), options);
       return amount;
     }
     const num = toI(entry.value) + amount;
     await this.writeEntry(
-      key,
+      key as string,
       new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
       {},
     );
