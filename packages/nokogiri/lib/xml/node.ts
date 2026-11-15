@@ -23,7 +23,7 @@ export interface AttrNode {
   value: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Nokogiri::XML::Searchable` (vendor/nokogiri/v1.18.3/lib/nokogiri/xml/node.rb:58); the class/interface merge is how `include()` surfaces on the type side.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface XmlNode {
   css(...args: unknown[]): NodeSet;
   atCss(...args: unknown[]): XmlNode | undefined;
@@ -31,7 +31,7 @@ export interface XmlNode {
   atXpath(...args: unknown[]): XmlNode | undefined;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class XmlNode {
   static readonly IMPLIED_XPATH_CONTEXTS: readonly string[] = [".//"];
   static readonly SaveOptions = SaveOptions;
