@@ -48,6 +48,35 @@ export class Version {
     );
   }
 
+  /**
+   * `vendor/ruby/v3.3.11/lib/rubygems/version.rb:247-256`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  bump(): Version {
+    const segments = this.segments();
+    while (segments.some((s) => typeof s === "string")) segments.pop();
+    if (segments.length > 1) segments.pop();
+
+    segments[segments.length - 1] = (segments[segments.length - 1] as number) + 1;
+    return new (this.constructor as typeof Version)(segments.join("."));
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/rubygems/version.rb:326-334`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  release(): Version {
+    if (this.isPrerelease()) {
+      const segments = this.segments();
+      while (segments.some((s) => typeof s === "string")) segments.pop();
+      return new (this.constructor as typeof Version)(segments.join("."));
+    } else {
+      return this;
+    }
+  }
+
   /** @noRailsEquivalent PERMANENT */
   isPrerelease(): boolean {
     this.#prerelease ??= /[a-zA-Z]/.test(this.version);

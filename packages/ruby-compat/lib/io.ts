@@ -1933,6 +1933,49 @@ export class PipeIO extends IO {
   }
 
   /**
+   * {@link gets} awaited where `rb_io_gets_m` (`vendor/ruby/v3.3.11/io.c:4363`)
+   * blocks: the bytes up to and including the next `sep`, or the rest once the
+   * writer is closed, as a String; `nil` at end of file.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async getsAsync(sep = "\n"): Promise<string | null> {
+    const rsptr = new TextEncoder().encode(sep);
+    for (;;) {
+      this._checkReadable();
+      const buffered = this._peek();
+      let take = -1;
+      for (let i = 0; i + rsptr.length <= buffered.length; i++) {
+        if (rsptr.every((c, j) => buffered[i + j] === c)) {
+          take = i + rsptr.length;
+          break;
+        }
+      }
+      if (take === -1 && this._pipe.writerClosed) take = buffered.length;
+      if (take === 0) return null;
+      if (take > 0) return new TextDecoder().decode(this._shift(take));
+      await new Promise<void>((resolve) => this._pipe.waiting.push(resolve));
+    }
+  }
+
+  /**
+   * {@link read} awaited where `io_read` (`vendor/ruby/v3.3.11/io.c:3731`)
+   * blocks: with no length, once the writer is closed.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  override async readAsync(length?: null): Promise<string | Uint8Array>;
+  override async readAsync(length: number): Promise<Uint8Array | null>;
+  override async readAsync(length?: number | null): Promise<string | Uint8Array | null> {
+    this._checkReadable();
+    while (!this._pipe.writerClosed && (length == null || this._pipe.length < length)) {
+      await new Promise<void>((resolve) => this._pipe.waiting.push(resolve));
+      this._checkReadable();
+    }
+    return this.read(length ?? null);
+  }
+
+  /**
    * `IO#write` (`vendor/ruby/v3.3.11/io.c:2263` `io_write_m`); a pipe whose
    * reader is closed raises `Errno::EPIPE`, as `write(2)` does.
    *
@@ -2017,6 +2060,16 @@ export class PipeIO extends IO {
     this._pipe.chunks.push(bytes);
     this._pipe.length += bytes.length;
     for (const wake of this._pipe.waiting.splice(0)) wake();
+  }
+
+  private _peek(): Uint8Array {
+    const out = new Uint8Array(this._pipe.length);
+    let n = 0;
+    for (const chunk of this._pipe.chunks) {
+      out.set(chunk, n);
+      n += chunk.length;
+    }
+    return out;
   }
 
   private _shift(length: number): Uint8Array {

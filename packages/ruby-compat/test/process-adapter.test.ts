@@ -105,6 +105,21 @@ describe("processAdapter", () => {
       expect(calls).toEqual([["/usr/bin/sqlite3", "-header", "db.sqlite3"]]);
     });
 
+    it("lays a leading env hash over ENV for the exec'd command", () => {
+      const calls: [readonly string[], Record<string, string | undefined> | undefined][] = [];
+      registerProcessAdapter(
+        makeFakeAdapter({
+          exec: (argv, env) => {
+            calls.push([argv, env]);
+            throw new SystemExit(0);
+          },
+        }),
+      );
+      expect(() => exec({ VITE_RUBY_MODE: "test" }, "vite", "build")).toThrow(SystemExit);
+      expect(calls[0][0]).toEqual(["vite", "build"]);
+      expect(calls[0][1]!["VITE_RUBY_MODE"]).toBe("test");
+    });
+
     it("raises NotImplementedError on an adapter that cannot exec", () => {
       registerProcessAdapter(makeFakeAdapter());
       expect(() => exec("/usr/bin/sqlite3")).toThrow(NotImplementedError);

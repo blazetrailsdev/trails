@@ -4,6 +4,7 @@ import {
   Gem,
   getHttpAsync,
   Logger,
+  rbFLoad,
   stdout as $stdout,
   StandardError,
   SystemCallError,
@@ -105,6 +106,10 @@ export class ViteAssets {
     return this.instance().manifest().refresh();
   }
 
+  static installTasks(): Promise<true> {
+    return rbFLoad(decodeURIComponent(new URL("./tasks/vite.js", import.meta.url).pathname));
+  }
+
   static reloadWith(configOptions: ConfigAttrs = {}): ViteAssets {
     return (this._instance = new this(configOptions));
   }
@@ -203,6 +208,14 @@ export class ViteAssets {
       await this._config!.loadTsConfig();
     }
 
+    return this._config!;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  peekConfig(): Config {
     return this._config!;
   }
 

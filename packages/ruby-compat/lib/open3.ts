@@ -1,7 +1,9 @@
 import { getChildProcess } from "./child-process-adapter.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { IO, type PipeIO } from "./io.js";
 import { isPlainHash } from "./object.js";
 import { Process, rbExecargNew } from "./process.js";
+import { Thread } from "./thread.js";
 
 /**
  * `Open3` (`vendor/ruby/v3.3.11/lib/open3.rb:81`), the sliver of it trails
@@ -41,6 +43,72 @@ export class Open3 {
     const [outerr, status] = await adapter.capture2e(command, env, args);
     if (status.error !== undefined) throw status.error;
     return [outerr, new Process.Status(status)];
+  }
+
+  /**
+   * `Open3.popen3` (`vendor/ruby/v3.3.11/lib/open3.rb:218-235`) in its block
+   * form, with `popen_run` (`open3.rb:533-547`) inlined: the block gets the child's
+   * stdin, stdout and stderr as pipes and its wait thread, whose `value` is the
+   * `Process::Status`; every pipe is closed and the child waited for once the
+   * block finishes, and the call answers the block's value. Stdout and stderr
+   * are written as the child writes them, so a reader sees each line while the
+   * child still runs. Spawn failures and a host with no way to spawn raise as
+   * {@link Open3.capture3} does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Open3.popen3`
+   * (`vendor/ruby/v3.3.11/lib/open3.rb:218`).
+   */
+  static async popen3<T>(
+    ...cmdAndBlock: [
+      ...cmd: unknown[],
+      block: (
+        stdin: PipeIO,
+        stdout: PipeIO,
+        stderr: PipeIO,
+        waitThr: Thread<Promise<InstanceType<typeof Process.Status>>>,
+      ) => T | Promise<T>,
+    ]
+  ): Promise<T> {
+    const cmd = [...cmdAndBlock];
+    const block = cmd.pop() as (...args: unknown[]) => T | Promise<T>;
+    let opts: Record<string, unknown>;
+    if (cmd.length > 0 && isPlainHash(cmd[cmd.length - 1])) {
+      opts = { ...(cmd.pop() as Record<string, unknown>) };
+    } else {
+      opts = {};
+    }
+
+    const [inR, inW] = IO.pipe();
+    const [outR, outW] = IO.pipe();
+    const [errR, errW] = IO.pipe();
+
+    const childIo = [inR, outW, errW] as const;
+    const parentIo = [inW, outR, errR] as const;
+
+    const [command, env, args, opthash] = rbExecargNew([...cmd, opts]);
+    const adapter = getChildProcess();
+    if (adapter.popen3 === undefined) {
+      throw new NotImplementedError("spawn() function is unimplemented on this machine");
+    }
+
+    const { error, wait } = await adapter.popen3(
+      command,
+      env,
+      args,
+      opthash.chdir == null ? undefined : String(opthash.chdir),
+      ...childIo,
+    );
+    if (error !== undefined) {
+      for (const io of [...childIo, ...parentIo]) io.close();
+      throw error;
+    }
+    const waitThr = new Thread(async () => new Process.Status(await wait));
+    try {
+      return await block(...parentIo, waitThr);
+    } finally {
+      for (const io of parentIo) io.close();
+      await waitThr.value();
+    }
   }
 
   /**

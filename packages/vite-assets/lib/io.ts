@@ -1,6 +1,8 @@
-import { Open3, STDOUT as $stdout, StringIO, type Process } from "@blazetrails/ruby-compat";
+import { Open3, STDOUT as $stdout, Thread, type Process } from "@blazetrails/ruby-compat";
 
 type CaptureResult = [string, string, InstanceType<typeof Process.Status>];
+
+type LineReader = { getsAsync(): Promise<string | null> };
 
 export const IO = {
   async capture(...cmd: unknown[]): Promise<CaptureResult> {
@@ -14,15 +16,23 @@ export const IO = {
     } & Record<string, unknown>;
     if (!withOutput) return (await Open3.capture3(...cmd, opts)) as CaptureResult;
 
-    const [stdout, stderr, waitThreads] = await Open3.capture3(...cmd, { stdinData, ...opts });
-    const out = IO.readLines(new StringIO(String(stdout)), withOutput);
-    return [out, String(stderr), waitThreads];
+    return Open3.popen3(...cmd, opts, async (stdin, stdout, stderr, waitThreads) => {
+      stdin.write(stdinData);
+      stdin.close();
+      const out = new Thread(() => IO.readLines(stdout, withOutput));
+      const err = new Thread(() => stderr.readAsync());
+      return [
+        await out.value(),
+        new TextDecoder().decode((await err.value()) as Uint8Array),
+        await waitThreads.value(),
+      ] as CaptureResult;
+    });
   },
 
-  readLines(io: StringIO, block: (line: string) => unknown): string {
+  async readLines(io: LineReader, block: (line: string) => unknown): Promise<string> {
     let buffer = "";
     let line: string | null;
-    while ((line = io.gets()) !== null) {
+    while ((line = await io.getsAsync()) !== null) {
       buffer += line;
       block(line);
     }

@@ -1,3 +1,4 @@
+import { CompatibilityCheck } from "./compatibility-check.js";
 import { underscore } from "@blazetrails/activesupport";
 import {
   Dir,
@@ -172,7 +173,6 @@ export class Config {
     return "npm";
   }
 
-  /** @missingRailsCall verify_plugin_version — CONVERGEABLE vite-assets-commands-and-compatibility-check */
   private constructor(attrs: Record<string, unknown>) {
     this._config = attrs;
   }
@@ -191,6 +191,8 @@ export class Config {
     });
     await resolved.coerceValues(resolved._config);
     Object.freeze(resolved._config);
+    if (!resolved.skipCompatibilityCheck)
+      await CompatibilityCheck.verifyPluginVersion(resolved.root);
     return resolved;
   }
 
