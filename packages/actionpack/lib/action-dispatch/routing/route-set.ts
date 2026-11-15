@@ -35,6 +35,7 @@ import {
   RFC2396_PARSER,
   classModule,
 } from "@blazetrails/ruby-compat";
+import { Routing } from "../../namespaces.js";
 import { Mapper } from "./mapper.js";
 import { isIncludedMember } from "../../abstract-controller/trailties/routes-helpers.js";
 import { deprecator } from "../deprecator.js";
@@ -544,21 +545,6 @@ const PATH: UrlStrategy = (options) => URL.pathFor(options);
 
 const UNKNOWN: UrlStrategy = (options) => URL.urlFor(options);
 
-export const RESERVED_OPTIONS: readonly string[] = [
-  "host",
-  "protocol",
-  "port",
-  "subdomain",
-  "domain",
-  "tldLength",
-  "trailingSlash",
-  "anchor",
-  "params",
-  "onlyPath",
-  "scriptName",
-  "originalScriptName",
-];
-
 export interface UrlHelperContext {
   _routes: RouteSet;
   urlOptions(): Record<string, unknown>;
@@ -817,6 +803,20 @@ export type UrlHelpersModule = { prototype: object } & Record<
   };
 
 export class RouteSet {
+  static readonly RESERVED_OPTIONS: readonly string[] = [
+    "host",
+    "protocol",
+    "port",
+    "subdomain",
+    "domain",
+    "tldLength",
+    "trailingSlash",
+    "anchor",
+    "params",
+    "onlyPath",
+    "scriptName",
+    "originalScriptName",
+  ];
   namedRoutes: NamedRouteCollection = new NamedRouteCollection();
   /** @internal */
   private _config: Config;
@@ -1263,7 +1263,7 @@ export class RouteSet {
   pathFor(
     options: Record<string, unknown>,
     routeName: string | null = null,
-    reserved: readonly string[] = RESERVED_OPTIONS,
+    reserved: readonly string[] = RouteSet.RESERVED_OPTIONS,
   ): string {
     return this.urlFor(options, routeName, PATH, null, reserved);
   }
@@ -1273,7 +1273,7 @@ export class RouteSet {
     routeName: string | null = null,
     urlStrategy: UrlStrategy = UNKNOWN,
     methodName: string | null = null,
-    reserved: readonly string[] = RESERVED_OPTIONS,
+    reserved: readonly string[] = RouteSet.RESERVED_OPTIONS,
   ): string {
     // eslint-disable-next-line blazetrails/ruby-compat-native-required -- options may be a Hash, which merge converts through to_hash
     options = merge(this.defaultUrlOptions, options) as Record<string, unknown>;
@@ -1470,3 +1470,5 @@ export class RouteSet {
     return (await this.router.serve(req as unknown as RouterRequest)) as unknown as RackResponse;
   }
 }
+
+Routing.RouteSet = RouteSet;

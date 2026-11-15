@@ -6,6 +6,7 @@ import { include, isModuleIncluded, rbObjSingletonClass } from "@blazetrails/rub
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import { UrlFor, urlFor, type UrlForHost } from "../../../lib/action-dispatch/routing/url-for.js";
 import { Base as ViewBase } from "@blazetrails/actionview";
+import { Parameters } from "../../../lib/action-controller/metal/strong-parameters.js";
 
 describe("ActionDispatch::Routing::UrlFor included", () => {
   it("gives a class a default_url_options class attribute", () => {
@@ -98,5 +99,23 @@ describe("UrlForOptions mirrors full_url_for's arms", () => {
     expect(urlFor.call(host, { onlyPath: true, useRoute: "root", id: 1 })).toBe(
       "http://www.example.com/",
     );
+  });
+});
+
+describe("ActionDispatch::Routing::UrlFor#full_url_for with Parameters", () => {
+  it("crosses a Parameters' snake_case option keys into the camelCase option names", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/:controller/:action");
+    });
+    const host = {
+      _routes: routes,
+      defaultUrlOptions: { host: "example.com" },
+      urlOptions() {
+        return this.defaultUrlOptions;
+      },
+    } as UrlForHost;
+    const params = new Parameters({ controller: "foo", action: "other", only_path: true });
+    expect(urlFor.call(host, params.permitBang())).toBe("/foo/other");
   });
 });

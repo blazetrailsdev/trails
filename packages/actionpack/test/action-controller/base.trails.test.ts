@@ -182,6 +182,27 @@ describe("ActionController::Streaming#_render_template", () => {
   });
 });
 
+describe("ActionController::Streaming layout content_for fallback", () => {
+  class StreamLayoutController extends ApplicationController {
+    async show(): Promise<void> {
+      await this.render({ stream: true, layout: "application" });
+    }
+  }
+  StreamLayoutController.prependViewPath(
+    new FixtureResolver({
+      "stream-layout/show.html.tse": "body",
+      "layouts/application.html.tse":
+        '<title><%= contentFor("title") ?? "Blog" %></title><%= yield %>',
+    }),
+  );
+
+  it("falls back to the app name when no view provides a title on a streamed render", async () => {
+    const controller = new StreamLayoutController();
+    await controller.dispatch("show", makeRequest(), new Response());
+    expect(controller.response.body).toBe("<title>Blog</title>body");
+  });
+});
+
 describe("ActionController::Base bare render", () => {
   class BareController extends ApplicationController {
     async index(): Promise<void> {
