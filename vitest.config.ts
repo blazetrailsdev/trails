@@ -755,7 +755,9 @@ export default defineConfig({
           globals: true,
           include: ["packages/*/test/**/*.system.test.ts"],
           exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
-          setupFiles: otherSetupFiles,
+          // actiontext's form-builder methods must be on FormHelper before
+          // actionview's compiled-template setup includes it.
+          setupFiles: ["./packages/actiontext/lib/tag-helper.ts", ...otherSetupFiles],
           pool: "forks",
           browser: { enabled: false, screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
           provide: { screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },

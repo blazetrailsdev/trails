@@ -31,7 +31,7 @@ describe("ActionText::Engine", () => {
     expect(tasks).toMatch(/\/tasks\/actiontext\.(ts|js)$/);
   });
 
-  it("runs its ported initializers in Rails' order, system_test_helper excepted", () => {
+  it("runs its initializers in Rails' order", () => {
     expect(
       Engine.initializers.map((i) => i.name).filter((name) => name.startsWith("action_text.")),
     ).toEqual([
@@ -41,6 +41,7 @@ describe("ActionText::Engine", () => {
       "action_text.attachable",
       "action_text.helper",
       "action_text.renderer",
+      "action_text.system_test_helper",
       "action_text.configure",
     ]);
   });

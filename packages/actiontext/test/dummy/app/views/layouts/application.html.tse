@@ -7,6 +7,7 @@
     <%= cspMetaTag() %>
 
     <%= stylesheetLinkTag("application") %>
+    <%= javascriptIncludeTag("/app/javascript/application.js", { type: "module" }) %>
   </head>
 
   <body>

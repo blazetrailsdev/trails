@@ -12,6 +12,7 @@ import { Attribute } from "./attribute.js";
 import { Content } from "./content.js";
 import { ContentHelper } from "./content-helper.js";
 import { Encryption } from "./encryption.js";
+import { SystemTestHelper } from "./system-test-helper.js";
 import { TagHelper } from "./tag-helper.js";
 import "./deprecator.js";
 
@@ -134,6 +135,12 @@ export class Engine extends TrailsEngine {
           );
         });
       }
+    });
+
+    this.initializer("action_text.system_test_helper", () => {
+      onLoad("action_dispatch_system_test_case", function (this: object) {
+        include(this as never, SystemTestHelper);
+      });
     });
 
     this.initializer("action_text.configure", (app) => {

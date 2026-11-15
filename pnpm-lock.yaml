@@ -402,6 +402,15 @@ importers:
       '@blazetrails/trails-tsc':
         specifier: workspace:*
         version: link:../trails-tsc
+      '@rails/actiontext':
+        specifier: 8.0.200
+        version: 8.0.200(trix@2.1.19)
+      trix:
+        specifier: 2.1.19
+        version: 2.1.19
+      vite:
+        specifier: ^7.0.0
+        version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
 
   packages/actionview:
     dependencies:
@@ -2963,6 +2972,14 @@ packages:
 
   '@rails/actioncable@8.0.200':
     resolution: {integrity: sha512-EDqWyxck22BHmv1e+mD8Kl6GmtNkhEPdRfGFT7kvsv1yoXd9iYrqHDVAaR8bKmU/syC5eEZ2I5aWWxtB73ukMw==}
+
+  '@rails/actiontext@8.0.200':
+    resolution: {integrity: sha512-p9SVulDmWKMChQpNYFrRBGa2aIfMSw8vyCRW9bwHzihFB8eAZ1NE6ak88nr037gwurbCBv4UVdnwndtuh2piAA==}
+    peerDependencies:
+      trix: ^2.0.0
+
+  '@rails/activestorage@8.1.401':
+    resolution: {integrity: sha512-PjUMgsCbXrKAhZj6mjvx5U7B/Nmtofe/drucyu8twMlLJkG+Ke1iLQGr8FDl2dOfJ+T5fUEXUpJQUbPZjSzkQw==}
 
   '@react-native/assets-registry@0.85.3':
     resolution: {integrity: sha512-u9ZiYP23vA2IFtdFQFmetzSmk6SM0xgKIoiOsr1hXNHjHaLhOm+/Ph1ud57wX6+Dbwdzx8coJgnzSKL3W21PCg==}
@@ -6409,6 +6426,9 @@ packages:
   space-separated-tokens@2.0.2:
     resolution: {integrity: sha512-PEGlAwrG8yXGXRjW32fGbg66JAlOAwbObuqVoJpv/mRgoWDQfgH1wDPvtzWyUSNAXBGSk8h755YDbbcEy3SH2Q==}
 
+  spark-md5@3.0.2:
+    resolution: {integrity: sha512-wcFzz9cDfbuqe0FZzfi2or1sgyIrsDwmPwfZC4hiNidPdPINjeUwNfv5kldczoEAcjl9Y1L3SM7Uz2PUEQzxQw==}
+
   speakingurl@14.0.1:
     resolution: {integrity: sha512-1POYv7uv2gXoyGFpBCmpDVSNV74IfsWlDW216UPjbWufNf+bSU6GdbDsxdcxtfwb4xlI3yxzOTKClUosxARYrQ==}
     engines: {node: '>=0.10.0'}
@@ -6621,6 +6641,10 @@ packages:
 
   trim-lines@3.0.1:
     resolution: {integrity: sha512-kRj8B+YHZCc9kQYdWfJB2/oUl9rA99qbowYYBtr4ui4mZyAQ2JpvVBd/6U2YloATfqBhBTSMhTpgBHtU0Mf3Rg==}
+
+  trix@2.1.19:
+    resolution: {integrity: sha512-E7RA3EOeUiUwNJlrF5onIOkqCA06xUU6GmHOVxXyMnGMValrDK3Ce7uaMVgiVUOvVt4mzUERAHAzD10mxoLpOg==}
+    engines: {node: '>= 18'}
 
   ts-api-utils@2.4.0:
     resolution: {integrity: sha512-3TaVTaAv2gTiMB35i3FiGJaRfwb3Pyn/j3m/bfAvGe8FB7CF6u+LMYqYlDh7reQf7UNvoTvdfAqHGmPGOSsPmA==}
@@ -8578,6 +8602,15 @@ snapshots:
   '@polka/url@1.0.0-next.29': {}
 
   '@rails/actioncable@8.0.200': {}
+
+  '@rails/actiontext@8.0.200(trix@2.1.19)':
+    dependencies:
+      '@rails/activestorage': 8.1.401
+      trix: 2.1.19
+
+  '@rails/activestorage@8.1.401':
+    dependencies:
+      spark-md5: 3.0.2
 
   '@react-native/assets-registry@0.85.3': {}
 
@@ -12594,6 +12627,8 @@ snapshots:
 
   space-separated-tokens@2.0.2: {}
 
+  spark-md5@3.0.2: {}
+
   speakingurl@14.0.1: {}
 
   split2@4.2.0: {}
@@ -12792,6 +12827,10 @@ snapshots:
       punycode: 2.3.1
 
   trim-lines@3.0.1: {}
+
+  trix@2.1.19:
+    dependencies:
+      dompurify: 3.3.3
 
   ts-api-utils@2.4.0:
     dependencies:

@@ -1,5 +1,5 @@
 import type { Browser, BrowserContext, Locator, Page } from "playwright";
-import { classAttribute, reverseMerge, TopLevel } from "@blazetrails/activesupport";
+import { classAttribute, reverseMerge, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Builder } from "@blazetrails/rack";
 import { include, NoMethodError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -175,3 +175,4 @@ export class SystemTestCase extends TestCase {
 
 include(SystemTestCase, SetupAndTeardown);
 include(SystemTestCase, ScreenshotHelper);
+runLoadHooks("action_dispatch_system_test_case", SystemTestCase);
