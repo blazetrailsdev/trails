@@ -9,6 +9,7 @@ import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/gl
 import { Trailtie as ActionViewRailtie } from "@blazetrails/trailties/trailties/action-view";
 import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trailties/action-controller";
 import { ActionController } from "@blazetrails/actionpack";
+import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Dir, File } from "@blazetrails/ruby-compat";
 import { ActiveStorage, Registry } from "@blazetrails/activestorage";
 import { FixtureSet } from "@blazetrails/activestorage/fixture-set";
@@ -87,6 +88,8 @@ await Base.establishConnection();
 await Base.connectionPool().migrationContext.migrate();
 await Migration.maintainTestSchemaBang();
 await RichText.loadSchema();
+
+ActiveJobBase.queueAdapter = "test";
 
 I18n.config().enforceAvailableLocales = false;
 
