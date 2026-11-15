@@ -101,8 +101,9 @@ describe("HasOneThroughInMemoryJoinAssignmentTrails", () => {
     const original = throughRecord.assignAttributes.bind(throughRecord);
     throughRecord.assignAttributes = (attrs: Record<string, unknown>): Promise<void> =>
       gate.then(() => {
-        void original(attrs);
+        const assigned = original(attrs);
         landed = true;
+        return assigned;
       });
 
     const newClub = clubs("moustache_club");
@@ -131,8 +132,9 @@ describe("HasOneThroughInMemoryJoinAssignmentTrails", () => {
     const original = throughRecord.assignAttributes.bind(throughRecord);
     throughRecord.assignAttributes = (attrs: Record<string, unknown>): Promise<void> =>
       gate.then(() => {
-        void original(attrs);
+        const assigned = original(attrs);
         landed = true;
+        return assigned;
       });
 
     const built = (

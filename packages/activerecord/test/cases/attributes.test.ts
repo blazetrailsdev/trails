@@ -452,8 +452,8 @@ describe("CustomPropertiesTest", () => {
     expect((new Klass({ no_type: "foo" } as any) as any).no_type).toBe("foo");
   });
 
-  it("attributes do not require a connection is established", () => {
-    void assertNotCalled(Base, "leaseConnection", null, () => {
+  it("attributes do not require a connection is established", async () => {
+    await assertNotCalled(Base, "leaseConnection", null, () => {
       class Klass extends OverloadedType {
         static {
           this.attribute("foo", "string");

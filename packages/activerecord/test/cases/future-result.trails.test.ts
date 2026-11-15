@@ -112,9 +112,10 @@ describe("FutureResult", () => {
     const session = new AsynchronousQueriesTracker.Session();
     const futureResult = new FutureResult(fakePool(new Result([], [])), ["SELECT 1", null, []]);
     futureResult.scheduleBang(session);
-    void session.finalize();
+    const finalized = session.finalize();
 
     expect(futureResult.canceled()).toBe(true);
+    await finalized;
     await expect(futureResult.result()).rejects.toThrow(FutureResult.Canceled);
   });
 

@@ -261,7 +261,7 @@ it("withConnection after a rejected overlapping checkout keeps a retry's connect
         await new Promise<void>((resolve) => (open = resolve));
       });
     });
-  const second = pool.withConnection(() => undefined).catch(() => undefined);
+  const second = pool.withConnection(() => undefined).catch((error: unknown) => error);
   await Promise.all([first, second]);
   await vi.waitFor(() => expect(open).toBeDefined());
   expect(pool.isActiveConnection()).not.toBeNull();
@@ -1271,8 +1271,8 @@ describe("execution context at Rails thread-spawn sites", () => {
       flush: async () => {},
       isDiscarded: () => stopped,
     }));
-    void Reaper.registerPool(pools[0], 0.01);
-    void Reaper.registerPool(pools[1], 0.02);
+    await Reaper.registerPool(pools[0], 0.01);
+    await Reaper.registerPool(pools[1], 0.02);
     try {
       await vi.waitFor(() => {
         expect(seen.get(0.01)?.length ?? 0).toBeGreaterThanOrEqual(2);

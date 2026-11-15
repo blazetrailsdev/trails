@@ -37,15 +37,15 @@ function asynchronousQueriesSharedTests(connection: () => AbstractAdapter): void
   });
 
   it("async query from transaction", async () => {
-    expect(() => {
-      void connection().selectAll("SELECT * FROM posts", null, [], { async: true });
-    }).not.toThrow();
+    expect(() =>
+      connection().selectAll("SELECT * FROM posts", null, [], { async: true }),
+    ).not.toThrow();
 
     if (!inMemoryDb()) {
       await connection().transaction(async () => {
-        expect(() => {
-          void connection().selectAll("SELECT * FROM posts", null, [], { async: true });
-        }).toThrow(AsynchronousQueryInsideTransactionError);
+        expect(() =>
+          connection().selectAll("SELECT * FROM posts", null, [], { async: true }),
+        ).toThrow(AsynchronousQueryInsideTransactionError);
       });
     }
   });

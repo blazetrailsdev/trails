@@ -127,13 +127,13 @@ describe("has_one displacement via the synchronous build path", () => {
       throw new Error("build exploded");
     };
 
-    expect(() => {
-      void (
+    expect(() =>
+      (
         refetched as unknown as { setShipAttributes(a: object): Promise<void> | void }
       ).setShipAttributes({
         name: "Davy Jones Gold Dagger",
-      });
-    }).toThrow("build exploded");
+      }),
+    ).toThrow("build exploded");
 
     const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;
     expect((reloaded as unknown as { pirate_id: number | null }).pirate_id).toBe(
@@ -193,13 +193,13 @@ describe("has_one displacement via the synchronous build path", () => {
       throw new Error("build exploded");
     };
 
-    expect(() => {
-      void (
+    expect(() =>
+      (
         pirate as unknown as { setShipAttributes(a: object): Promise<void> | void }
       ).setShipAttributes({
         name: "Davy Jones Gold Dagger",
-      });
-    }).toThrow("build exploded");
+      }),
+    ).toThrow("build exploded");
 
     expect(detached).toBe(false);
     const reloaded = (await Ship.find((displaced as unknown as { id: number }).id)) as Base;

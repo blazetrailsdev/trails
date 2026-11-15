@@ -409,7 +409,6 @@ describe("ModelSchema.load_schema monitor waiter (trails)", () => {
       static override tableName = "topics";
     }
     const held = Promise.reject(new ConnectionNotEstablished("the holder's checkout raised"));
-    held.catch(() => {});
     (Topic as unknown as { _schemaLoadPromise: Promise<void> })._schemaLoadPromise = held;
     await Topic.loadSchema();
     expect(Object.keys(Topic.columnsHash())).toContain("title");
