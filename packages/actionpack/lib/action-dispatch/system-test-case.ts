@@ -28,7 +28,8 @@ export interface ElementAssertions {
   toBeVisible(): Promise<void>;
   toBeInTheDocument(): Promise<void>;
   toHaveTextContent(text: string | RegExp): Promise<void>;
-  toHaveValue(value: string): Promise<void>;
+  toHaveValue(value: string | RegExp): Promise<void>;
+  toHaveAttribute(name: string, value: string | RegExp): Promise<void>;
 }
 
 declare module "vitest" {
@@ -90,7 +91,14 @@ export class SystemTestCase extends TestCase {
         typeof text === "string"
           ? expect.poll(() => locator.textContent(), options).toContain(text)
           : expect.poll(() => locator.textContent(), options).toMatch(text),
-      toHaveValue: (value) => expect.poll(() => locator.inputValue(), options).toBe(value),
+      toHaveValue: (value) =>
+        typeof value === "string"
+          ? expect.poll(() => locator.inputValue(), options).toBe(value)
+          : expect.poll(() => locator.inputValue(), options).toMatch(value),
+      toHaveAttribute: (name, value) =>
+        typeof value === "string"
+          ? expect.poll(() => locator.getAttribute(name), options).toBe(value)
+          : expect.poll(() => locator.getAttribute(name), options).toMatch(value),
     });
     afterAll(async () => {
       for (const session of sessions.values()) await (await session).browser.close();

@@ -212,6 +212,13 @@ function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string
   if (!ts.isPropertyAccessExpression(expression)) return null;
   if (isAssertionDotCall(expression)) return (expression.expression as ts.Identifier).text;
   const owner = expression.expression;
+  if (
+    ts.isIdentifier(owner) &&
+    owner.text === "expect" &&
+    (expression.name.text === "poll" || expression.name.text === "element")
+  ) {
+    return "expect";
+  }
   if (ts.isIdentifier(owner) && helpers.has(`${owner.text}.${expression.name.text}`)) {
     return `${owner.text}.${expression.name.text}`;
   }
@@ -396,6 +403,16 @@ function expectChainMatcher(call: ts.CallExpression): string | null {
       cur = cur.expression;
     } else if (ts.isCallExpression(cur)) {
       if (ts.isIdentifier(cur.expression) && cur.expression.text === "expect") {
+        return negated ? `not:${matcher}` : matcher;
+      }
+      // `expect.poll(fn)` / `expect.element(locator)` (system tests) are
+      // expect chains whose base is a member of `expect`.
+      if (
+        ts.isPropertyAccessExpression(cur.expression) &&
+        ts.isIdentifier(cur.expression.expression) &&
+        cur.expression.expression.text === "expect" &&
+        (cur.expression.name.text === "poll" || cur.expression.name.text === "element")
+      ) {
         return negated ? `not:${matcher}` : matcher;
       }
       cur = cur.expression;
