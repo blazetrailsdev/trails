@@ -308,19 +308,34 @@ export class Thread<R = unknown> {
   /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#raise` (`thread_raise_m`,
    * `vendor/ruby/v3.3.11/thread.c:2682-2695`; `rb_threadptr_raise`, `:2519-2545`),
-   * which queues the exception as a pending interrupt and wakes the target from
-   * a blocking region. JS cannot stop a running async body, so the exception is
-   * raised where the target next blocks (`Thread.blockingRegion`), or at once if
-   * it is blocked now.
+   * which builds the exception as `rb_make_exception` does (none is a
+   * `RuntimeError`, a String its message, a class its instance), raises it at
+   * once on the current thread, and otherwise queues it as a pending interrupt
+   * and wakes the target from a blocking region. JS cannot stop a running async
+   * body, so the exception is raised where the target next blocks
+   * (`Thread.blockingRegion`), or at once if it is blocked now.
    */
-  raise(exception: unknown = new RuntimeError()): null {
+  raise(exception: unknown = null, message: string | null = null): null {
     if (this.status === "dead") return null;
+    let exc: unknown;
+    if (exception == null) {
+      exc = new RuntimeError();
+    } else if (typeof exception === "string") {
+      exc = new RuntimeError(exception);
+    } else if (typeof exception === "function") {
+      exc = new (exception as new (message?: string) => unknown)(message ?? undefined);
+    } else {
+      exc = exception;
+    }
+
+    if (this === Thread.current()) throw exc;
+
     const ubf = _unblockingFunctions.get(this);
     if (ubf) {
       _unblockingFunctions.delete(this);
-      ubf(exception);
+      ubf(exc);
     } else {
-      _pendingInterrupts.set(this, { raised: exception });
+      _pendingInterrupts.set(this, { raised: exc });
     }
     return null;
   }
@@ -329,7 +344,8 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — MRI's `BLOCKING_REGION`
    * (`vendor/ruby/v3.3.11/thread.c:195-210`) with `RUBY_VM_CHECK_INTS`: a pending
    * interrupt is raised before the current thread blocks, and `Thread#raise`
-   * calls `ubf` to unblock it. `exec` starts the wait and returns its `ubf`.
+   * calls `ubf` to unblock it. `exec` starts the wait, may wake it at once, and
+   * returns its `ubf`.
    */
   static blockingRegion<T>(exec: (wake: (value: T) => void) => () => void): Promise<T> {
     const th = Thread.current();
@@ -339,13 +355,19 @@ export class Thread<R = unknown> {
       return Promise.reject(pending.raised);
     }
     return new Promise<T>((resolve, reject) => {
-      const ubf = exec((value) => {
-        _unblockingFunctions.delete(th);
-        resolve(value);
-      });
-      _unblockingFunctions.set(th, (error) => {
-        ubf();
+      let settled = false;
+      let ubf: (() => void) | null = null;
+      const unblock = (error: unknown) => {
+        settled = true;
+        ubf?.();
         reject(error);
+      };
+      _unblockingFunctions.set(th, unblock);
+      ubf = exec((value) => {
+        if (settled) return;
+        settled = true;
+        if (_unblockingFunctions.get(th) === unblock) _unblockingFunctions.delete(th);
+        resolve(value);
       });
     });
   }
@@ -467,12 +489,12 @@ export class Thread<R = unknown> {
  * @noRailsEquivalent PERMANENT
  */
 export function rbFSleep(duration: number | null = null): Promise<number> {
-  const beg = Date.now();
+  const beg = Math.floor(Date.now() / 1000);
   return Thread.blockingRegion<number>((wake) => {
     const timer =
       duration == null
         ? undefined
-        : setTimeout(() => wake(Math.round((Date.now() - beg) / 1000)), duration * 1000);
+        : setTimeout(() => wake(Math.floor(Date.now() / 1000) - beg), duration * 1000);
     return () => clearTimeout(timer);
   });
 }

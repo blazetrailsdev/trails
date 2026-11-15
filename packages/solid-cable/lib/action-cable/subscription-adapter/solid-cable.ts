@@ -124,7 +124,7 @@ export class Listener extends SubscriberMap {
 
   async shutdown(): Promise<void> {
     await this._critical.acquire();
-    this.thread.raise(new Listener.Stop());
+    this.thread.raise(Listener.Stop);
     this._critical.release();
     await this.thread.join();
   }
