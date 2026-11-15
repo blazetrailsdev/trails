@@ -112,8 +112,9 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     renderSkipped("arm-throw gate", skipped.filter((r) => r.missing.includes(GATED_TOKEN)).length),
   );
   const current = measure(counted);
+  const measured = measure([...counted, ...skipped]);
   const grew = exceedances(marks, current);
-  const stale = staleMarks(marks, current);
+  const stale = staleMarks(marks, measured);
 
   if (tighten) {
     if (grew.length > 0) {
@@ -123,7 +124,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
       );
       return 1;
     }
-    await writeMarks(tightened(marks, current));
+    await writeMarks(tightened(marks, measured));
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MARK_PATH)}: narrowed ${stale.length} dimension(s).`,
     );

@@ -107,8 +107,9 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
   const current = measure(counted, gated);
+  const measured = measure(artifact.mismatches, gated);
   const grew = exceedances(marks, current, gated);
-  const stale = staleMarks(marks, current, gated);
+  const stale = staleMarks(marks, measured, gated);
 
   if (tighten) {
     if (grew.length > 0) {
@@ -118,7 +119,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
       );
       return 1;
     }
-    await writeMarks(tightened(marks, current));
+    await writeMarks(tightened(marks, measured));
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MARK_PATH)}: narrowed ${stale.length} dimension(s).`,
     );

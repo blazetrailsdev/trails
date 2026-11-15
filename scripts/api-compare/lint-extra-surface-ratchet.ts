@@ -142,6 +142,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const ledgered = withoutRemoved(report.packages, (await loadLedgerScope()).removedTsName);
   console.log(renderSkipped("extra-surface gate", ledgered.skipped));
   const current = scopedMarks(measure(ledgered.packages), scope);
+  const measured = scopedMarks(measure(report.packages), scope);
 
   const absent = unmeasuredPackages(current).filter(inScope);
   if (absent.length > 0) {
@@ -204,7 +205,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const grew = [...exceedances(marks, current), ...internal.grew.filter((v) => inScope(v.package))];
   const unreceipted = taggedOnlyViolations(current);
   const stale = [
-    ...staleMarks(marks, current),
+    ...staleMarks(marks, measured),
     ...internal.stale.filter((v) => inScope(v.package)),
   ];
 
@@ -221,7 +222,7 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
       );
       return 1;
     }
-    await writeMarks(tightened(marks, current));
+    await writeMarks(tightened(marks, measured));
     await writeInternalMarks(tightenedInternal(internalMarks, currentInternal));
     console.log(
       `Wrote ${path.relative(ROOT_DIR, MARK_PATH)}: narrowed ${stale.length} dimension(s).`,

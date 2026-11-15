@@ -70,15 +70,16 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
   const { counted, skipped } = skipLedgered(artifact.mismatches, ledger.pair);
   console.log(renderSkipped("block-param gate", skipped.length));
   const current = measure(counted, gated);
+  const measured = measure(artifact.mismatches, gated);
   const grew = exceedances(marks, current, gated);
-  const stale = staleMarks(marks, current, gated);
+  const stale = staleMarks(marks, measured, gated);
 
   if (tighten) {
     if (grew.length > 0) {
       console.error("\nblock-param gate: refusing to tighten while the mark is EXCEEDED.\n");
       return 1;
     }
-    await writeMarks(tightened(marks, current, GATED_PACKAGES), BLOCK_MARK_PATH);
+    await writeMarks(tightened(marks, measured, GATED_PACKAGES), BLOCK_MARK_PATH);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BLOCK_MARK_PATH)}: narrowed ${stale.length} dimension(s).`,
     );
