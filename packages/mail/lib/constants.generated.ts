@@ -239,6 +239,8 @@ defineConstants([
   [() => m16.UnknownEncodingType, "Mail::UnknownEncodingType"],
   [() => m66.UnstructuredField, "Mail::UnstructuredField"],
   [() => m101.Utilities, "Mail::Utilities"],
+  [() => m101.Utilities.BestEffortCharsetEncoder, "Mail::Utilities::BestEffortCharsetEncoder"],
+  [() => m101.Utilities.StrictCharsetEncoder, "Mail::Utilities::StrictCharsetEncoder"],
   [() => m102.VERSION, "Mail::VERSION"],
   [() => m103.YAML, "Mail::YAML"],
 ]);

@@ -160,6 +160,7 @@ export class Utilities {
     return this.uriParser().unescape(str);
   }
 
+  /** @missingRailsCall const_defined? — PERMANENT */
   uriParser(): typeof DEFAULT_PARSER {
     return DEFAULT_PARSER;
   }
