@@ -391,7 +391,6 @@ export class Timezone {
     return new TopLevel.TZInfo!.TimezoneProxy(identifier);
   }
 
-  /** @missingRailsCall all_identifiers — CONVERGEABLE tzinfo-timezone-reads-the-data-source */
   static all(): Timezone[] {
     return this.getProxies(
       [...new Set([...Intl.supportedValuesOf("timeZone"), ...TZDB_NAMES])].sort(),

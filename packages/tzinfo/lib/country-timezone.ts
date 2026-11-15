@@ -24,7 +24,7 @@ export class CountryTimezone {
   }
 
   timezone(): Timezone {
-    return Timezone.get(this.identifier);
+    return Timezone.getProxy(this.identifier);
   }
 
   descriptionOrFriendlyIdentifier(): string {
