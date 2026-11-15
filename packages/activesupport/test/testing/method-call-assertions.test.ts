@@ -31,27 +31,27 @@ describe("MethodCallAssertionsTest", () => {
     object = new Level();
   });
 
-  it("assert called with defaults to expect once", () => {
-    assertCalled(object, "increment", null, {}, () => {
+  it("assert called with defaults to expect once", async () => {
+    await assertCalled(object, "increment", null, {}, () => {
       object.increment();
     });
   });
 
-  it("assert called more than once", () => {
-    assertCalled(object, "increment", null, { times: 2 }, () => {
+  it("assert called more than once", async () => {
+    await assertCalled(object, "increment", null, { times: 2 }, () => {
       object.increment();
       object.increment();
     });
   });
 
-  it("assert called method with arguments", () => {
-    assertCalled(object, "<<", null, {}, () => {
+  it("assert called method with arguments", async () => {
+    await assertCalled(object, "<<", null, {}, () => {
       object["<<"](2);
     });
   });
 
-  it("assert called returns", () => {
-    assertCalled(object, "increment", null, { returns: 10 }, () => {
+  it("assert called returns", async () => {
+    await assertCalled(object, "increment", null, { returns: 10 }, () => {
       expect(object.increment()).toBe(10);
     });
 
@@ -59,8 +59,8 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called failure", async () => {
-    const error = await assertRaises([Assertion], {}, () => {
-      assertCalled(object, "increment", null, {}, () => {});
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertCalled(object, "increment", null, {}, () => {});
     });
 
     expect(error.message).toBe(
@@ -69,21 +69,21 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called with message", async () => {
-    const error = await assertRaises([Assertion], {}, () => {
-      assertCalled(object, "increment", "dang it", {}, () => {});
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertCalled(object, "increment", "dang it", {}, () => {});
     });
 
     expect(error.message).toMatch(/dang it.\nExpected increment/);
   });
 
-  it("assert called with arguments", () => {
-    assertCalledWith(object, "<<", [2], {}, () => {
+  it("assert called with arguments", async () => {
+    await assertCalledWith(object, "<<", [2], {}, () => {
       object["<<"](2);
     });
   });
 
-  it("assert called with arguments and returns", () => {
-    assertCalledWith(object, "<<", [2], { returns: 10 }, () => {
+  it("assert called with arguments and returns", async () => {
+    await assertCalledWith(object, "<<", [2], { returns: 10 }, () => {
       expect(object["<<"](2)).toBe(10);
     });
 
@@ -91,34 +91,34 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called with failure", async () => {
-    await assertRaises([MockExpectationError], {}, () => {
-      assertCalledWith(object, "<<", [4567], {}, () => {
+    await assertRaises([MockExpectationError], {}, async () => {
+      await assertCalledWith(object, "<<", [4567], {}, () => {
         object["<<"](2);
       });
     });
   });
 
-  it("assert called on instance of with defaults to expect once", () => {
-    assertCalledOnInstanceOf(Level, "increment", null, {}, () => {
+  it("assert called on instance of with defaults to expect once", async () => {
+    await assertCalledOnInstanceOf(Level, "increment", null, {}, () => {
       object.increment();
     });
   });
 
-  it("assert called on instance of more than once", () => {
-    assertCalledOnInstanceOf(Level, "increment", null, { times: 2 }, () => {
+  it("assert called on instance of more than once", async () => {
+    await assertCalledOnInstanceOf(Level, "increment", null, { times: 2 }, () => {
       object.increment();
       object.increment();
     });
   });
 
-  it("assert called on instance of with arguments", () => {
-    assertCalledOnInstanceOf(Level, "<<", null, {}, () => {
+  it("assert called on instance of with arguments", async () => {
+    await assertCalledOnInstanceOf(Level, "<<", null, {}, () => {
       object["<<"](2);
     });
   });
 
-  it("assert called on instance of returns", () => {
-    assertCalledOnInstanceOf(Level, "increment", null, { returns: 10 }, () => {
+  it("assert called on instance of returns", async () => {
+    await assertCalledOnInstanceOf(Level, "increment", null, { returns: 10 }, () => {
       expect(object.increment()).toBe(10);
     });
 
@@ -126,8 +126,8 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of failure", async () => {
-    const error = await assertRaises([Assertion], {}, () => {
-      assertCalledOnInstanceOf(Level, "increment", null, {}, () => {});
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertCalledOnInstanceOf(Level, "increment", null, {}, () => {});
     });
 
     expect(error.message).toBe(
@@ -136,16 +136,16 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert called on instance of with message", async () => {
-    const error = await assertRaises([Assertion], {}, () => {
-      assertCalledOnInstanceOf(Level, "increment", "dang it", {}, () => {});
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertCalledOnInstanceOf(Level, "increment", "dang it", {}, () => {});
     });
 
     expect(error.message).toMatch(/dang it.\nExpected increment/);
   });
 
-  it("assert called on instance of nesting", () => {
-    assertCalledOnInstanceOf(Level, "increment", null, { times: 3 }, () => {
-      assertCalledOnInstanceOf(Level, "decrement", null, { times: 2 }, () => {
+  it("assert called on instance of nesting", async () => {
+    await assertCalledOnInstanceOf(Level, "increment", null, { times: 3 }, async () => {
+      await assertCalledOnInstanceOf(Level, "decrement", null, { times: 2 }, () => {
         object.increment();
         object.decrement();
         object.increment();
@@ -155,15 +155,15 @@ describe("MethodCallAssertionsTest", () => {
     });
   });
 
-  it("assert not called", () => {
-    assertNotCalled(object, "decrement", null, () => {
+  it("assert not called", async () => {
+    await assertNotCalled(object, "decrement", null, () => {
       object.increment();
     });
   });
 
   it("assert not called failure", async () => {
-    const error = await assertRaises([Assertion], {}, () => {
-      assertNotCalled(object, "increment", null, () => {
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertNotCalled(object, "increment", null, () => {
         object.increment();
       });
     });
@@ -173,15 +173,15 @@ describe("MethodCallAssertionsTest", () => {
     );
   });
 
-  it("assert not called on instance of", () => {
-    assertNotCalledOnInstanceOf(Level, "decrement", null, () => {
+  it("assert not called on instance of", async () => {
+    await assertNotCalledOnInstanceOf(Level, "decrement", null, () => {
       object.increment();
     });
   });
 
   it("assert not called on instance of failure", async () => {
-    const error = await assertRaises([Assertion], {}, () => {
-      assertNotCalledOnInstanceOf(Level, "increment", null, () => {
+    const error = await assertRaises([Assertion], {}, async () => {
+      await assertNotCalledOnInstanceOf(Level, "increment", null, () => {
         object.increment();
       });
     });
@@ -191,9 +191,9 @@ describe("MethodCallAssertionsTest", () => {
     );
   });
 
-  it("assert not called on instance of nesting", () => {
-    assertNotCalledOnInstanceOf(Level, "increment", null, () => {
-      assertNotCalledOnInstanceOf(Level, "decrement", null, () => {});
+  it("assert not called on instance of nesting", async () => {
+    await assertNotCalledOnInstanceOf(Level, "increment", null, async () => {
+      await assertNotCalledOnInstanceOf(Level, "decrement", null, () => {});
     });
   });
 

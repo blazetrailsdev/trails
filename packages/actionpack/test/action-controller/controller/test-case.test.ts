@@ -81,7 +81,7 @@ class TestController extends Base {
   }
 
   async resetTheSession() {
-    this.resetSession();
+    await this.resetSession();
     await this.render({ plain: "ignore me" });
   }
 

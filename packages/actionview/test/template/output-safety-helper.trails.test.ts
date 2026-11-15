@@ -12,8 +12,8 @@ describe("OutputSafetyHelperI18nTest", () => {
     I18n.translate("support.array.words_connector");
   });
 
-  afterEach(() => {
-    I18n.reloadBang();
+  afterEach(async () => {
+    await I18n.reloadBang();
   });
 
   it("to_sentence uses the support.array connectors from I18n", () => {

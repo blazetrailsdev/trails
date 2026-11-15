@@ -1254,9 +1254,9 @@ twz: !ruby/object:ActiveSupport::TimeWithZone
     ).toEqual("bar");
   });
 
-  it("date part value methods", () => {
+  it("date part value methods", async () => {
     const twz = new TimeWithZone(RubyTime.utc(1999, 12, 31, 19, 18, 17, 500), timeZone);
-    assertNotCalled(twz, "methodMissing", null, () => {
+    await assertNotCalled(twz, "methodMissing", null, () => {
       expect(twz.year).toEqual(1999);
       expect(twz.month).toEqual(12);
       expect(twz.day).toEqual(31);

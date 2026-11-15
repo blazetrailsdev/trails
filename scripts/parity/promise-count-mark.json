@@ -1,23 +1,17 @@
 {
   "@typescript-eslint/no-floating-promises": {
-    "actioncable": 7,
+    "actioncable": 5,
     "actionmailbox": 1,
-    "actionmailer": 2,
-    "actionpack": 48,
-    "actionview": 47,
-    "activemodel": 4,
+    "actionpack": 2,
+    "activemodel": 1,
     "activerecord": 26,
-    "activesupport": 50,
-    "builder": 6,
-    "i18n": 3,
-    "image-processing": 1,
-    "net-smtp": 1,
-    "rackup": 6,
-    "rake": 8,
-    "ruby-compat": 18,
+    "activesupport": 2,
+    "rackup": 1,
+    "rake": 1,
+    "ruby-compat": 1,
     "scripts": 46,
-    "solid-queue": 2,
-    "trailties": 17,
+    "solid-queue": 1,
+    "trailties": 9,
     "website": 8
   },
   "blazetrails/constructor-creates-no-promise": {
@@ -49,7 +43,6 @@
     "activerecord": 67,
     "activestorage": 4,
     "arel": 5,
-    "image-processing": 1,
     "ruby-compat": 2
   }
 }

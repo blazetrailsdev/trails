@@ -130,9 +130,9 @@ describe("SyncLogSubscriberTest", () => {
     }).not.toThrow();
   });
 
-  it("does not send the event if logger is nil", () => {
+  it("does not send the event if logger is nil", async () => {
     LogSubscriber.logger = null;
-    assertNotCalled(logSubscriber, "someEvent", null, () => {
+    await assertNotCalled(logSubscriber, "someEvent", null, () => {
       MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
       Notifications.instrument("some_event.my_log_subscriber");
     });

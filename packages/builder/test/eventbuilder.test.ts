@@ -76,8 +76,8 @@ describe("TestEvents", () => {
     expect(target.events.shift()).toBeUndefined();
   });
 
-  it("moderately complex", () => {
-    xml.tagBang("address-book", (x: XmlEvents) => {
+  it("moderately complex", async () => {
+    await xml.tagBang("address-book", (x: XmlEvents) => {
       x.entry({ id: "1" }, () => {
         x.name(() => {
           x.first("Bill");

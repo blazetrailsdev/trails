@@ -52,38 +52,38 @@ describe("Head#head option keys (head.rb:33-35)", () => {
 
 describe("Rendering#render types", () => {
   it("accepts rendering.rb's positional forms and option keys and rejects unknown ones", () => {
-    const typed = (controller: Base, post: ToModel): void => {
-      controller.render();
-      controller.render("new");
-      controller.render("new", { status: ":unprocessable_entity", layout: false });
-      controller.render(post);
-      controller.render(controller.params.permit("action"));
-      controller.render({ action: "new", status: ":unprocessable_entity" });
-      controller.render({ template: "posts/show", formats: ["html"], layout: "admin" });
-      controller.render({ partial: "form", locals: { post }, status: 422 });
-      controller.render({ plain: "ok", status: ":created", contentType: "text/plain" });
-      controller.render({ html: "<b>ok</b>", status: "404 Not Found" });
-      controller.render({ json: { ok: true }, location: "/posts/1", status: 201 });
-      controller.render({ body: "raw", location: { action: "show", id: 1 } });
+    const typed = async (controller: Base, post: ToModel): Promise<void> => {
+      await controller.render();
+      await controller.render("new");
+      await controller.render("new", { status: ":unprocessable_entity", layout: false });
+      await controller.render(post);
+      await controller.render(controller.params.permit("action"));
+      await controller.render({ action: "new", status: ":unprocessable_entity" });
+      await controller.render({ template: "posts/show", formats: ["html"], layout: "admin" });
+      await controller.render({ partial: "form", locals: { post }, status: 422 });
+      await controller.render({ plain: "ok", status: ":created", contentType: "text/plain" });
+      await controller.render({ html: "<b>ok</b>", status: "404 Not Found" });
+      await controller.render({ json: { ok: true }, location: "/posts/1", status: 201 });
+      await controller.render({ body: "raw", location: { action: "show", id: 1 } });
       // @ts-expect-error a misspelled option key
-      controller.render({ acton: "new" });
+      await controller.render({ acton: "new" });
       // @ts-expect-error a misspelled option key after a positional action
-      controller.render("new", { statsu: 422 });
+      await controller.render("new", { statsu: 422 });
       // @ts-expect-error not a Rack status symbol
-      controller.render({ action: "new", status: "unprocessable" });
+      await controller.render({ action: "new", status: "unprocessable" });
       // @ts-expect-error locals is a Hash
-      controller.render({ partial: "form", locals: "post" });
+      await controller.render({ partial: "form", locals: "post" });
       // @ts-expect-error layout is a name, true or false
-      controller.render({ action: "new", layout: 1 });
+      await controller.render({ action: "new", layout: 1 });
       // @ts-expect-error formats names formats
-      controller.render({ action: "new", formats: 1 });
+      await controller.render({ action: "new", formats: 1 });
       // @ts-expect-error content_type is a String
-      controller.render({ plain: "ok", contentType: 1 });
-      controller.render({ partial: "render_types/post", locals: { post: "Hello" } });
+      await controller.render({ plain: "ok", contentType: 1 });
+      await controller.render({ partial: "render_types/post", locals: { post: "Hello" } });
       // @ts-expect-error a registered partial's required local is missing
-      controller.render({ partial: "render_types/post", locals: { highlight: true } });
+      await controller.render({ partial: "render_types/post", locals: { highlight: true } });
       // @ts-expect-error a registered partial's local of the wrong type
-      controller.render({ partial: "render_types/post", locals: { post: 1 } });
+      await controller.render({ partial: "render_types/post", locals: { post: 1 } });
       expectTypeOf(controller.render).returns.toEqualTypeOf<void | Promise<void>>();
     };
     expect(typed).toBeTypeOf("function");
@@ -92,17 +92,17 @@ describe("Rendering#render types", () => {
 
 describe("Rendering#render_to_string types", () => {
   it("takes render's argument list and answers a string", () => {
-    const typed = (controller: Base): void => {
-      controller.renderToString();
-      controller.renderToString("new");
-      controller.renderToString({ action: "new", status: ":unprocessable_entity" });
-      controller.renderToString({ partial: "render_types/post", locals: { post: "Hello" } });
+    const typed = async (controller: Base): Promise<void> => {
+      await controller.renderToString();
+      await controller.renderToString("new");
+      await controller.renderToString({ action: "new", status: ":unprocessable_entity" });
+      await controller.renderToString({ partial: "render_types/post", locals: { post: "Hello" } });
       // @ts-expect-error a misspelled option key
-      controller.renderToString({ acton: "new" });
+      await controller.renderToString({ acton: "new" });
       // @ts-expect-error not a Rack status symbol
-      controller.renderToString({ action: "new", status: "unprocessable" });
+      await controller.renderToString({ action: "new", status: "unprocessable" });
       // @ts-expect-error a registered partial's local of the wrong type
-      controller.renderToString({ partial: "render_types/post", locals: { post: 1 } });
+      await controller.renderToString({ partial: "render_types/post", locals: { post: 1 } });
       expectTypeOf(controller.renderToString).returns.toEqualTypeOf<string | Promise<string>>();
     };
     expect(typed).toBeTypeOf("function");

@@ -119,8 +119,8 @@ describe("BaseTest", () => {
     Base.deliveryMethod = originalDeliveryMethod;
   });
 
-  it("method call to mail does not raise error", () => {
-    assertNothingRaised(() => BaseMailer.welcome());
+  it("method call to mail does not raise error", async () => {
+    await assertNothingRaised(() => BaseMailer.welcome());
   });
 
   it("mail() should set the headers of the mail message", async () => {

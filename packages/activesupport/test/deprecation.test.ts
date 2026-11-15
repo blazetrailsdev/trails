@@ -786,10 +786,10 @@ describe("DeprecationTest", () => {
     );
   });
 
-  it("Module::deprecate with custom deprecator", () => {
+  it("Module::deprecate with custom deprecator", async () => {
     const customDeprecator = { deprecationWarning: (_method: string, _message?: unknown) => {} };
 
-    assertCalledWith(customDeprecator, "deprecationWarning", ["method", null], {}, () => {
+    await assertCalledWith(customDeprecator, "deprecationWarning", ["method", null], {}, () => {
       const klass = class {
         method(): void {}
         static deprecate = deprecate;

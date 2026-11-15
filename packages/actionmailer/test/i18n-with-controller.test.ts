@@ -46,7 +46,7 @@ class TestController extends ActionController.Base {
     )
       .mailWithI18nSubject("test@localhost")
       .deliverNow()) as Message;
-    this.render({ plain: `Mail sent - Subject: ${email.subject()}` });
+    await this.render({ plain: `Mail sent - Subject: ${email.subject()}` });
   }
 }
 void TestController;

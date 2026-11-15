@@ -20,12 +20,12 @@ describe("FormOptionsHelperI18nTests", () => {
     I18n.backend().storeTranslations("en", { helpers: { select: { prompt: promptMessage } } });
   });
 
-  afterEach(() => {
-    I18n.reloadBang();
+  afterEach(async () => {
+    await I18n.reloadBang();
   });
 
-  it("select with prompt true translates prompt message", () => {
-    assertCalledWith(
+  it("select with prompt true translates prompt message", async () => {
+    await assertCalledWith(
       I18n,
       "translate",
       ["helpers.select.prompt", { default: "Please select" }],

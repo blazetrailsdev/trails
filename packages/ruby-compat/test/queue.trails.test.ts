@@ -33,14 +33,14 @@ describe("Thread::Queue", () => {
     const pending = q.pop().then((v) => (popped = v));
     await tick();
     expect(popped).toBeUndefined();
-    void q.push("x");
+    await q.push("x");
     await pending;
     expect(popped).toBe("x");
   });
 
-  it("pop(true) answers at once, or raises ThreadError when empty", () => {
+  it("pop(true) answers at once, or raises ThreadError when empty", async () => {
     const q = new Queue<number>();
-    void q.push(1);
+    await q.push(1);
     expect(q.pop(true)).toBe(1);
     expect(() => q.pop(true)).toThrow(ThreadError);
     expect(() => q.pop(true)).toThrow("queue empty");
@@ -48,9 +48,9 @@ describe("Thread::Queue", () => {
 
   it("clear removes all objects", async () => {
     const q = new Queue<number>();
-    void q.push(1);
+    await q.push(1);
     q.clear();
-    void q.push(2);
+    await q.push(2);
     expect(await q.pop()).toBe(2);
   });
 });
@@ -65,35 +65,34 @@ describe("Thread::SizedQueue", () => {
     const q = new SizedQueue<number>(1);
     expect(q.max).toBe(1);
     let pushedTwo = false;
-    void q.push(1);
-    void q.push(2).then(() => (pushedTwo = true));
-    void q.push(3);
+    const pushes = [q.push(1), q.push(2).then(() => (pushedTwo = true)), q.push(3)];
     await tick();
     expect(pushedTwo).toBe(false);
     expect(await q.pop()).toBe(1);
     expect(await q.pop()).toBe(2);
     expect(pushedTwo).toBe(true);
     expect(await q.pop()).toBe(3);
+    await Promise.all(pushes);
   });
 
-  it("pop(true) finds the object of a pusher it woke", () => {
+  it("pop(true) finds the object of a pusher it woke", async () => {
     const q = new SizedQueue<number>(1);
-    void q.push(1);
-    void q.push(2);
+    const pushes = [q.push(1), q.push(2)];
     expect(q.length).toBe(1);
     expect(q.pop(true)).toBe(1);
     expect(q.pop(true)).toBe(2);
     expect(() => q.pop(true)).toThrow(ThreadError);
+    await Promise.all(pushes);
   });
 
   it("a push arriving after sleeping pushers are woken does not overtake them", async () => {
     const q = new SizedQueue<number>(1);
-    void q.push(1);
-    void q.push(2);
+    const pushes = [q.push(1), q.push(2)];
     await tick();
     q.clear();
-    void q.push(3);
+    pushes.push(q.push(3));
     expect(await q.pop()).toBe(2);
     expect(await q.pop()).toBe(3);
+    await Promise.all(pushes);
   });
 });

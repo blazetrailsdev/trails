@@ -41,16 +41,16 @@ describe("assertCalledWith", () => {
     expect(object.foo(1)).toBe("original");
   });
 
-  it("compares arguments with Ruby ==", () => {
+  it("compares arguments with Ruby ==", async () => {
     const object = { foo: (_h: object) => "original" };
-    assertCalledWith(object, "foo", [{ a: 1 }], {}, () => {
+    await assertCalledWith(object, "foo", [{ a: 1 }], {}, () => {
       object.foo(Object.assign(Object.create(null), { a: 1 }));
     });
   });
 
-  it("matches an argument with Ruby ===", () => {
+  it("matches an argument with Ruby ===", async () => {
     const object = { foo: (_a: unknown, _b: unknown) => "original" };
-    assertCalledWith(object, "foo", [/\d+/, Date], {}, () => {
+    await assertCalledWith(object, "foo", [/\d+/, Date], {}, () => {
       object.foo("id 42", new Date());
     });
     expect(() =>
@@ -60,9 +60,9 @@ describe("assertCalledWith", () => {
     ).toThrow(MockExpectationError);
   });
 
-  it("matches an argument with a ported caseEquals", () => {
+  it("matches an argument with a ported caseEquals", async () => {
     const object = { foo: (_n: number) => "original" };
-    assertCalledWith(object, "foo", [new Range(1, 5)], {}, () => {
+    await assertCalledWith(object, "foo", [new Range(1, 5)], {}, () => {
       object.foo(3);
     });
     expect(() =>
@@ -72,9 +72,9 @@ describe("assertCalledWith", () => {
     ).toThrow(MockExpectationError);
   });
 
-  it("matches an argument with a lambda, as Proc#===", () => {
+  it("matches an argument with a lambda, as Proc#===", async () => {
     const object = { foo: (_n: number) => "original" };
-    assertCalledWith(object, "foo", [(n: number) => n > 2], {}, () => {
+    await assertCalledWith(object, "foo", [(n: number) => n > 2], {}, () => {
       object.foo(3);
     });
     expect(() =>
@@ -165,15 +165,15 @@ describe("assertCalledOnInstanceOf with an async block", () => {
 });
 
 describe("assertCalledOnInstanceOf on a subclass", () => {
-  it("counts an inherited method called on the named class's instances", () => {
-    assertCalledOnInstanceOf(SubWidget, "build", null, {}, () => {
+  it("counts an inherited method called on the named class's instances", async () => {
+    await assertCalledOnInstanceOf(SubWidget, "build", null, {}, () => {
       new SubWidget().build();
     });
     expect(Object.hasOwn(SubWidget.prototype, "build")).toBe(false);
   });
 
-  it("counts reads of an inherited reader", () => {
-    assertCalledOnInstanceOf(SubWidget, "reader", null, { returns: "stubbed" }, () => {
+  it("counts reads of an inherited reader", async () => {
+    await assertCalledOnInstanceOf(SubWidget, "reader", null, { returns: "stubbed" }, () => {
       expect(new SubWidget().reader).toBe("stubbed");
     });
     expect(new SubWidget().reader).toBe("read");

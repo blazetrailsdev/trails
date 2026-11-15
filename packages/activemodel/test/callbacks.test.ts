@@ -22,9 +22,12 @@ function generated(klass: unknown): GeneratedModelCallbacks {
 
 describe("CallbacksTest", () => {
   class CallbackValidator {
-    aroundCreate(model: ModelCallbacks, proceed: () => void | Promise<void>): unknown {
+    async aroundCreate(
+      model: ModelCallbacks,
+      proceed: () => void | Promise<void>,
+    ): Promise<unknown> {
       model.callbacks.push("before_around_create");
-      void proceed();
+      await proceed();
       model.callbacks.push("after_around_create");
       return false;
     }

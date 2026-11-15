@@ -86,9 +86,9 @@ describe("TranslationHelperTest", () => {
     expect(matcherCalled).toBeTruthy();
   });
 
-  it("delegates localize to i18n", () => {
+  it("delegates localize to i18n", async () => {
     const time = Time.utc(2008, 7, 8, 12, 18, 38);
-    assertCalledWith(I18n, "localize", [time, { locale: "en" }], {}, () => {
+    await assertCalledWith(I18n, "localize", [time, { locale: "en" }], {}, () => {
       localize(time, { locale: "en" });
     });
     expect(localize(time, { locale: "en" })).toBe("Tue, 08 Jul 2008 12:18:38 +0000");

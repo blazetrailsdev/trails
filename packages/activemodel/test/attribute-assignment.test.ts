@@ -99,10 +99,10 @@ describe("AttributeAssignmentTest", () => {
     expect(model.description).toEqual("world");
   });
 
-  it("simple assignment alias", () => {
+  it("simple assignment alias", async () => {
     const model = new Model();
 
-    void model.setAttributes({ name: "hello", description: "world" });
+    await model.setAttributes({ name: "hello", description: "world" });
     expect(model.name).toEqual("hello");
     expect(model.description).toEqual("world");
   });

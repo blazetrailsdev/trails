@@ -64,8 +64,8 @@ describe("I18nFallbacksDefaultsTest", () => {
 describe("I18nFallbacksComputationTest", () => {
   let fallbacks: Fallbacks;
 
-  beforeEach(() => {
-    setup();
+  beforeEach(async () => {
+    await setup();
     fallbacks = new Fallbacks("en-US");
   });
 
@@ -173,8 +173,8 @@ describe("I18nFallbacksComputationTest", () => {
 describe("I18nFallbacksHashCompatibilityTest", () => {
   let fallbacks: Fallbacks;
 
-  beforeEach(() => {
-    setup();
+  beforeEach(async () => {
+    await setup();
     fallbacks = new Fallbacks("en-US", { "de-AT": "de-DE" });
   });
 

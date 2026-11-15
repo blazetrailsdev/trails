@@ -290,7 +290,7 @@ describe("ImageProcessing::Pipeline", () => {
   });
 
   it("doesn't allow making system calls", async () => {
-    Vips.source(portrait).apply({ system: "touch foo.txt" });
+    const _pipeline = Vips.source(portrait).apply({ system: "touch foo.txt" });
     expect(await File.isExistAsync("foo.txt")).toBeFalsy();
 
     await expect(Vips.source(portrait).spawn("touch foo.txt").call()).rejects.toThrow();

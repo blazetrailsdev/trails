@@ -452,10 +452,10 @@ describe("FlashIntegrationTest", () => {
     });
   });
 
-  it("flash usable in metal without helper", () => {
+  it("flash usable in metal without helper", async () => {
     let controllerClass: typeof Metal | null = null;
 
-    assertNothingRaised(() => {
+    await assertNothingRaised(() => {
       controllerClass = (() => class extends Metal {})();
       include(controllerClass, ControllerFlash);
     });

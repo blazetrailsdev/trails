@@ -107,13 +107,13 @@ describe("TestMarkup", () => {
     expect(xml.targetBang()).toBe(`<body bg="#ffffff"><title style="red">T</title></body>`);
   });
 
-  it("funky symbol", () => {
-    xml.tagBang("non-ruby-token", { id: 1 }, (x: XmlMarkup) => x.ok());
+  it("funky symbol", async () => {
+    await xml.tagBang("non-ruby-token", { id: 1 }, (x: XmlMarkup) => x.ok());
     expect(xml.targetBang()).toBe(`<non-ruby-token id="1"><ok/></non-ruby-token>`);
   });
 
-  it("tag can handle private method", () => {
-    xml.tagBang("loop", { id: 1 }, (x: XmlMarkup) => x.ok());
+  it("tag can handle private method", async () => {
+    await xml.tagBang("loop", { id: 1 }, (x: XmlMarkup) => x.ok());
     expect(xml.targetBang()).toBe(`<loop id="1"><ok/></loop>`);
   });
 
@@ -174,21 +174,21 @@ describe("TestMarkup", () => {
     expect(xml.targetBang()).toBe(`<div>&lt;hi&gt;<em>H&amp;R Block</em></div>`);
   });
 
-  it("nil", () => {
+  it("nil", async () => {
     const b = new XmlMarkup();
-    b.tagBang("foo", null);
+    await b.tagBang("foo", null);
     expect(b.targetBang()).toBe(`<foo/>`);
   });
 
-  it("nil without explicit nil handling", () => {
+  it("nil without explicit nil handling", async () => {
     const b = new XmlMarkup({ explicitNilHandling: false });
-    b.tagBang("foo", null);
+    await b.tagBang("foo", null);
     expect(b.targetBang()).toBe(`<foo/>`);
   });
 
-  it("nil with explicit nil handling", () => {
+  it("nil with explicit nil handling", async () => {
     const b = new XmlMarkup({ explicitNilHandling: true });
-    b.tagBang("foo", null);
+    await b.tagBang("foo", null);
     expect(b.targetBang()).toBe(`<foo nil="true"/>`);
   });
 

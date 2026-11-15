@@ -9,13 +9,13 @@ declare module "@blazetrails/actionpack" {
 
 describe("Renderers.add render option types", () => {
   it("accepts a renderer key an app merges into RenderOptions", () => {
-    const typed = (controller: ActionController.Base): void => {
-      controller.render({ csv: ["c", "s", "v"], status: ":ok" });
-      controller.render("index", { csv: [] });
+    const typed = async (controller: ActionController.Base): Promise<void> => {
+      await controller.render({ csv: ["c", "s", "v"], status: ":ok" });
+      await controller.render("index", { csv: [] });
       // @ts-expect-error the merged key keeps its declared type
-      controller.render({ csv: "c,s,v" });
+      await controller.render({ csv: "c,s,v" });
       // @ts-expect-error a renderer key nobody declared
-      controller.render({ tsv: [] });
+      await controller.render({ tsv: [] });
     };
     expect(typed).toBeTypeOf("function");
   });

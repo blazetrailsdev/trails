@@ -26,11 +26,11 @@ beforeAll(async () => {
   MigrationGeneratorTest.tests(MigrationGenerator);
 });
 
-beforeEach((context) => {
+beforeEach(async (context) => {
   t = context.testCase as typeof t;
   t.prepareDestination();
   File.write(File.join(t.destinationRoot, "tsconfig.json"), "{}");
-  copyRoutes.call(t);
+  await copyRoutes.call(t);
   Trails.application = MigrationGeneratorApp.instance();
   oldBelongsToRequiredByDefault = Trails.application.config.activeRecord.belongsToRequiredByDefault;
   Trails.application.config.activeRecord.belongsToRequiredByDefault = true;

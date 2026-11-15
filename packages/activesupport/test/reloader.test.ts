@@ -59,7 +59,7 @@ describe("ReloaderTest", () => {
     assertNot(invoked);
   });
 
-  it("full reload sequence", () => {
+  it("full reload sequence", async () => {
     let called: string[] = [];
     reloader.toPrepare(() => called.push("prepare"));
     reloader.toRun(() => called.push("reloader_run"));
@@ -77,7 +77,7 @@ describe("ReloaderTest", () => {
     ]);
 
     called = [];
-    reloader.reloadBang();
+    await reloader.reloadBang();
     expect(called).toEqual([
       "executor_run",
       "reloader_run",
@@ -94,7 +94,7 @@ describe("ReloaderTest", () => {
     expect(called).toEqual(["executor_run", "executor_complete"]);
 
     called = [];
-    reloader.reloadBang();
+    await reloader.reloadBang();
     expect(called).toEqual([
       "executor_run",
       "reloader_run",

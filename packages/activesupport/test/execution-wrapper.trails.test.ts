@@ -99,7 +99,7 @@ describe("ExecutionWrapper.run!(reset: true) on concurrent flows", () => {
       return executor.active();
     });
     await new Fiber(async () => {
-      executor.runBang();
+      await executor.runBang();
       const replaced = await executor.runBang({ reset: true });
       expect(executor.active()).toBe(true);
       await replaced.completeBang();

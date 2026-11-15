@@ -4,7 +4,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
-import { b, stderr, TCPSocket } from "@blazetrails/ruby-compat";
+import { b, stderr, TCPSocket, Thread } from "@blazetrails/ruby-compat";
 import type { RackApp, RackBody, RackEnv, RackMiddleware } from "@blazetrails/rack";
 import {
   Files,
@@ -526,7 +526,10 @@ describe("Rack::Handler::Node", () => {
           {
             "content-type": "text/event-stream",
             "rack.hijack": (stream: TCPSocket) => {
-              void stream.waitReadable().then(sawClose);
+              new Thread(async () => {
+                await stream.waitReadable();
+                sawClose();
+              });
               stream.write("data: one\n\n");
             },
           },
@@ -696,7 +699,8 @@ describe("Rack::Handler::Node", () => {
         serving(
           async (env) => {
             const io = (env[RACK_HIJACK] as () => TCPSocket)();
-            void io.waitReadable().then(() => {
+            new Thread(async () => {
+              await io.waitReadable();
               io.write(`echo:${Buffer.from(io.read()).toString()}`);
               io.closeWrite();
             });
@@ -717,7 +721,8 @@ describe("Rack::Handler::Node", () => {
         serving(
           async (env) => {
             const io = (env[RACK_HIJACK] as () => TCPSocket)();
-            void io.waitReadable().then(() => {
+            new Thread(async () => {
+              await io.waitReadable();
               io.write(`head:${Buffer.from(io.read()).toString()}`);
               io.closeWrite();
             });
@@ -740,7 +745,8 @@ describe("Rack::Handler::Node", () => {
           async (env) => {
             input = Buffer.from((env[RACK_INPUT] as StringIO<Uint8Array>).read()).toString();
             const io = (env[RACK_HIJACK] as () => TCPSocket)();
-            void io.waitReadable().then(() => {
+            new Thread(async () => {
+              await io.waitReadable();
               io.write(`frame:${Buffer.from(io.read()).toString()}`);
               io.closeWrite();
             });
@@ -773,7 +779,8 @@ describe("Rack::Handler::Node", () => {
           async (env) => {
             input = Buffer.from((env[RACK_INPUT] as StringIO<Uint8Array>).read()).toString();
             const io = (env[RACK_HIJACK] as () => TCPSocket)();
-            void io.waitReadable().then(() => {
+            new Thread(async () => {
+              await io.waitReadable();
               io.write(`frame:${Buffer.from(io.read()).toString()}`);
               io.closeWrite();
             });

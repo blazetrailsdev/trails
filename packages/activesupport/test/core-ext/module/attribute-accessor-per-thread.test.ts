@@ -46,10 +46,10 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     expect(subclass.baz).toEqual("default_value");
   });
 
-  it("default value is accessible from other threads", () => {
+  it("default value is accessible from other threads", async () => {
     threadMattrAccessor.call(klass, "baz", { default: "default_value" });
 
-    new Thread(() => {
+    await new Thread(() => {
       expect(klass.baz).toEqual("default_value");
     }).join();
   });
@@ -70,15 +70,15 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     assertSame(_default, klass.baz);
   });
 
-  it("should use mattr default", () => {
-    new Thread(() => {
+  it("should use mattr default", async () => {
+    await new Thread(() => {
       assertNil(klass.foo);
       assertNil(object.foo);
     }).join();
   });
 
-  it("should set mattr value", () => {
-    new Thread(() => {
+  it("should set mattr value", async () => {
+    await new Thread(() => {
       klass.foo = "test";
       expect(klass.foo).toEqual("test");
 
@@ -87,8 +87,8 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     }).join();
   });
 
-  it("should not create instance writer", () => {
-    new Thread(() => {
+  it("should not create instance writer", async () => {
+    await new Thread(() => {
       assertRespondTo(klass, "foo");
       assertRespondTo(klass, "foo=");
       assertRespondTo(object, "bar");
@@ -96,15 +96,15 @@ describe("ModuleAttributeAccessorPerThreadTest", () => {
     }).join();
   });
 
-  it("should not create instance reader", () => {
-    new Thread(() => {
+  it("should not create instance reader", async () => {
+    await new Thread(() => {
       assertRespondTo(klass, "shaq");
       assertNotRespondTo(object, "shaq");
     }).join();
   });
 
-  it("should not create instance accessors", () => {
-    new Thread(() => {
+  it("should not create instance accessors", async () => {
+    await new Thread(() => {
       assertRespondTo(klass, "camp");
       assertNotRespondTo(object, "camp");
       assertNotRespondTo(object, "camp=");

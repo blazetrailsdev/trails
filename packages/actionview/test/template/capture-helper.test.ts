@@ -78,31 +78,31 @@ describe("CaptureHelperTest", () => {
     });
   });
 
-  it("content for used for read", () => {
-    av.contentFor("foo", "foo");
+  it("content for used for read", async () => {
+    await av.contentFor("foo", "foo");
     expect(av.contentFor("foo")?.toString()).toBe("foo");
 
-    av.contentFor("bar", undefined, undefined, () => "bar");
+    await av.contentFor("bar", undefined, undefined, () => "bar");
     expect(av.contentFor("bar")?.toString()).toBe("bar");
   });
 
-  it("content for with multiple calls", () => {
+  it("content for with multiple calls", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", "foo");
-    av.contentFor("title", "bar");
+    await av.contentFor("title", "foo");
+    await av.contentFor("title", "bar");
     expect(av.contentFor("title")?.toString()).toBe("foobar");
   });
 
-  it("content for with multiple calls and flush", () => {
+  it("content for with multiple calls and flush", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", "foo");
-    av.contentFor("title", "bar", { flush: true });
+    await av.contentFor("title", "foo");
+    await av.contentFor("title", "bar", { flush: true });
     expect(av.contentFor("title")?.toString()).toBe("bar");
   });
 
-  it("content for with block", () => {
+  it("content for with block", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", undefined, undefined, () => {
+    await av.contentFor("title", undefined, undefined, () => {
       av.outputBuffer!.concat("foo");
       av.outputBuffer!.concat("bar");
       return null;
@@ -110,46 +110,46 @@ describe("CaptureHelperTest", () => {
     expect(av.contentFor("title")?.toString()).toBe("foobar");
   });
 
-  it("content for with block and multiple calls with flush", () => {
+  it("content for with block and multiple calls with flush", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", undefined, undefined, () => "foo");
-    av.contentFor("title", undefined, { flush: true }, () => "bar");
+    await av.contentFor("title", undefined, undefined, () => "foo");
+    await av.contentFor("title", undefined, { flush: true }, () => "bar");
     expect(av.contentFor("title")?.toString()).toBe("bar");
   });
 
-  it("content for with block and multiple calls with flush nil content", () => {
+  it("content for with block and multiple calls with flush nil content", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", undefined, undefined, () => "foo");
-    av.contentFor("title", null, { flush: true }, () => "bar");
+    await av.contentFor("title", undefined, undefined, () => "foo");
+    await av.contentFor("title", null, { flush: true }, () => "bar");
     expect(av.contentFor("title")?.toString()).toBe("bar");
   });
 
-  it("content for with block and multiple calls without flush", () => {
+  it("content for with block and multiple calls without flush", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", undefined, undefined, () => "foo");
-    av.contentFor("title", undefined, { flush: false }, () => "bar");
+    await av.contentFor("title", undefined, undefined, () => "foo");
+    await av.contentFor("title", undefined, { flush: false }, () => "bar");
     expect(av.contentFor("title")?.toString()).toBe("foobar");
   });
 
-  it("content for with whitespace block", () => {
+  it("content for with whitespace block", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", "foo");
-    av.contentFor("title", undefined, undefined, () => {
+    await av.contentFor("title", "foo");
+    await av.contentFor("title", undefined, undefined, () => {
       av.outputBuffer!.concat("  \n  ");
       return null;
     });
-    av.contentFor("title", "bar");
+    await av.contentFor("title", "bar");
     expect(av.contentFor("title")?.toString()).toBe("foobar");
   });
 
-  it("content for with whitespace block and flush", () => {
+  it("content for with whitespace block and flush", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", "foo");
-    av.contentFor("title", undefined, { flush: true }, () => {
+    await av.contentFor("title", "foo");
+    await av.contentFor("title", undefined, { flush: true }, () => {
       av.outputBuffer!.concat("  \n  ");
       return null;
     });
-    av.contentFor("title", "bar", { flush: true });
+    await av.contentFor("title", "bar", { flush: true });
     expect(av.contentFor("title")?.toString()).toBe("bar");
   });
 
@@ -189,19 +189,19 @@ describe("CaptureHelperTest", () => {
     assertNil(av.contentFor("some_missing_key"));
   });
 
-  it("content for question mark", () => {
+  it("content for question mark", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", "title");
+    await av.contentFor("title", "title");
     expect(av.isContentFor("title")).toBeTruthy();
     expect(av.isContentFor("something_else")).toBeFalsy();
   });
 
-  it("content for should be html safe after flush empty", () => {
+  it("content for should be html safe after flush empty", async () => {
     expect(av.isContentFor("title")).toBeFalsy();
-    av.contentFor("title", undefined, undefined, () => contentTag.call(av, "p", "title"));
+    await av.contentFor("title", undefined, undefined, () => contentTag.call(av, "p", "title"));
     expect((av.contentFor("title") as SafeBuffer).htmlSafe).toBeTruthy();
-    av.contentFor("title", "", { flush: true });
-    av.contentFor("title", undefined, undefined, () => contentTag.call(av, "p", "title"));
+    await av.contentFor("title", "", { flush: true });
+    await av.contentFor("title", undefined, undefined, () => contentTag.call(av, "p", "title"));
     expect((av.contentFor("title") as SafeBuffer).htmlSafe).toBeTruthy();
   });
 

@@ -296,7 +296,7 @@ describe("LoggerTest", () => {
     }
   });
 
-  it("logger level main thread safety", () => {
+  it("logger level main thread safety", async () => {
     logger.level = Logger.INFO;
     assertLevel(Logger.INFO);
 
@@ -308,7 +308,7 @@ describe("LoggerTest", () => {
       });
     });
 
-    t.join();
+    await t.join();
   });
 
   it("logger level local thread safety", () => {

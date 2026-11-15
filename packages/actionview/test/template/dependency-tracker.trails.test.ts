@@ -9,7 +9,7 @@ import { TSE } from "../../lib/template/handlers/tse.js";
 import { FixtureResolver } from "../../lib/testing/resolvers.js";
 
 describe("TSETracker reads Template#source", () => {
-  it("returns the same dependencies after the template has been compiled", () => {
+  it("returns the same dependencies after the template has been compiled", async () => {
     Template.registerTemplateHandler("tse", new TSE());
 
     const template = new Template(
@@ -27,7 +27,7 @@ describe("TSETracker reads Template#source", () => {
     expect(before).toEqual(["comments/comment"]);
 
     const view = new (Base.withEmptyTemplateCache())(null, {}, null);
-    template.render(view, { render: () => "" });
+    await template.render(view, { render: () => "" });
 
     expect(new TSETracker("messages/_message", template, null).dependencies()).toEqual(before);
   });

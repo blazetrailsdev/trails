@@ -12,18 +12,18 @@ describe("PWAController", () => {
     expect(PwaController.controllerPath()).toBe("trails/pwa");
   });
 
-  it("service_worker renders the pwa/service-worker template without a layout", () => {
+  it("service_worker renders the pwa/service-worker template without a layout", async () => {
     const c = new PwaController();
     const render = captureRender(c);
-    c.serviceWorker();
+    await c.serviceWorker();
     expect(render).toHaveBeenCalledTimes(1);
     expect(render).toHaveBeenCalledWith({ template: "pwa/service-worker", layout: false });
   });
 
-  it("manifest renders the pwa/manifest template without a layout", () => {
+  it("manifest renders the pwa/manifest template without a layout", async () => {
     const c = new PwaController();
     const render = captureRender(c);
-    c.manifest();
+    await c.manifest();
     expect(render).toHaveBeenCalledTimes(1);
     expect(render).toHaveBeenCalledWith({ template: "pwa/manifest", layout: false });
   });

@@ -55,8 +55,9 @@ describe("Fiber", () => {
       await Fiber.yield();
     });
     await fiber.resume();
-    void fiber.resume();
+    const second = fiber.resume();
     await fiber.resume();
+    await second;
     expect(fiber.isAlive()).toBe(true);
     await fiber.resume();
     expect(fiber.isAlive()).toBe(false);

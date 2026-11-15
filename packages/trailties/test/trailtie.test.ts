@@ -105,14 +105,14 @@ describe("Trailtie", () => {
     });
   }
 
-  it("non-rake block defined in superclass of railtie is also executed", () => {
+  it("non-rake block defined in superclass of railtie is also executed", async () => {
     const ran: string[] = [];
     class P extends Trailtie {}
     Trailtie.register(P);
     P.console(() => ran.push("p"));
     class C extends P {}
     Trailtie.register(C);
-    C.instance().runConsoleBlocks({});
+    await C.instance().runConsoleBlocks({});
     expect(ran).toEqual(["p"]);
   });
 
