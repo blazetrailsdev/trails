@@ -203,6 +203,7 @@ export class BufferedIO {
   async readuntil(terminator: string, ignoreEof = false): Promise<string> {
     const term = new TextEncoder().encode(terminator);
     const index = (from: number) => {
+      if (term.length === 0) return from;
       let i = from - 1;
       while ((i = this._rbuf.indexOf(term[0], i + 1)) !== -1) {
         if (term.every((b, j) => this._rbuf[i + j] === b)) return i;
