@@ -1,12 +1,4 @@
-import {
-  block,
-  fetch,
-  Hash,
-  rbCallSuper,
-  rbModName,
-  rbObjId,
-  slice,
-} from "@blazetrails/ruby-compat";
+import { fetch, Hash, rbCallSuper, rbModName, rbObjId, slice } from "@blazetrails/ruby-compat";
 import { underscore } from "../../inflector.js";
 import { extractOptionsBang } from "../../hash-utils.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
@@ -96,12 +88,12 @@ export class LocalStore {
     return value != null && value !== false;
   }
 
-  async fetchEntry(key: unknown, _block?: () => unknown): Promise<unknown> {
+  async fetchEntry(key: unknown, block?: () => unknown): Promise<unknown> {
     return await fetch(
       this.data,
       key,
-      block(async () => {
-        const value = await _block!();
+      rbBlock(async () => {
+        const value = await block!();
         this.data.set(key, value);
         return value;
       }),
