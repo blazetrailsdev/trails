@@ -121,7 +121,7 @@ export class SSLContext {
     minVersion: 0x301,
     verifyMode: 1,
     verifyHostname: true,
-    options: (OP_ALL & ~OP_DONT_INSERT_EMPTY_FRAGMENTS) | OP_NO_COMPRESSION,
+    options: ((OP_ALL & ~OP_DONT_INSERT_EMPTY_FRAGMENTS) | OP_NO_COMPRESSION) >>> 0,
   };
 
   /** @noRailsEquivalent PERMANENT */
@@ -149,7 +149,7 @@ export class SSLContext {
   minVersion: number | null = null;
 
   constructor() {
-    this.options |= OpenSSL.SSL.OP_ALL;
+    this.options = (this.options | OpenSSL.SSL.OP_ALL) >>> 0;
     this.verifyMode = OpenSSL.SSL.VERIFY_NONE;
     this.verifyHostname = false;
   }
