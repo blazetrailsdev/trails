@@ -10,6 +10,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   File,
+  constDefined,
   env,
   include,
   prepend,
@@ -36,7 +37,6 @@ import { Vips } from "./analyzer/image-analyzer/vips.js";
 import { VideoAnalyzer } from "./analyzer/video-analyzer.js";
 import { AudioAnalyzer } from "./analyzer/audio-analyzer.js";
 import { Registry } from "./service/registry.js";
-import { FixtureSet } from "./fixture-set.js";
 import type { Blob } from "./blob.js";
 
 export interface ActiveStorageConfig extends OrderedOptions {
@@ -81,6 +81,8 @@ declare module "@blazetrails/ruby-compat" {
 /**
  * @missingRailsCall parse — PERMANENT
  * @inventedArm import — PERMANENT
+ * @inventedArm if — PERMANENT
+ * @inventedArm loadPath — PERMANENT
  */
 export class Engine extends TrailsEngine {
   static {
@@ -289,9 +291,16 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    this.initializer("active_storage.fixture_set", () => {
+    this.initializer("active_storage.fixture_set", async () => {
+      if (
+        constDefined(TopLevel, "ActiveSupport::TestCase") ||
+        constDefined(TopLevel, "ActiveRecord::FixtureSet")
+      ) {
+        await ActiveStorage.loadPath["active_storage/fixture_set"]();
+      }
+
       onLoad("active_record_fixture_set", () => {
-        FixtureSet.fileFixturePath ||= File.join(
+        ActiveStorage.FixtureSet!.fileFixturePath ||= File.join(
           TopLevel.Trails!.root()!,
           ...(compactBlank<string | undefined>([
             env.FIXTURES_PATH ?? File.join("test", "fixtures"),
@@ -302,7 +311,7 @@ export class Engine extends TrailsEngine {
       });
 
       onLoad("active_support_test_case", function (this: typeof TestCase) {
-        FixtureSet.fileFixturePath = this.fileFixturePath;
+        ActiveStorage.FixtureSet!.fileFixturePath = this.fileFixturePath;
       });
     });
   }

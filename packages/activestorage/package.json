@@ -10,6 +10,15 @@
       "types": "./dist/types/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./testing/fixture-set": {
+      "types": "./dist/types/fixture-set.d.ts",
+      "default": "./dist/fixture-set.js"
+    },
+    "./testing/fixture-set.js": null,
+    "./fixture-set": null,
+    "./fixture-set.js": null,
+    "./constants.fixture-set.generated": null,
+    "./constants.fixture-set.generated.js": null,
     "./*.js": {
       "types": "./dist/types/*.d.ts",
       "default": "./dist/*.js"
