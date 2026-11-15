@@ -81,38 +81,6 @@ export class Utilities {
     extend(this, this);
   }
 
-  static StrictCharsetEncoder = class StrictCharsetEncoder implements CharsetEncoder {
-    encode(string: RubyString, charset: string): RubyString {
-      if (/utf-?7/i.test(charset)) {
-        return Utilities.decodeUtf7(string);
-      } else {
-        return forceEncoding(b(string), Utilities.pickEncoding(charset));
-      }
-    }
-  };
-  static BestEffortCharsetEncoder = class BestEffortCharsetEncoder implements CharsetEncoder {
-    encode(string: RubyString, charset: string): RubyString {
-      if (/utf-?7/i.test(charset)) {
-        return Utilities.decodeUtf7(string);
-      } else {
-        return forceEncoding(b(string), this.pickEncoding(charset));
-      }
-    }
-
-    /** @internal */
-    pickEncoding(charset: string): Encoding {
-      let resolved = charset;
-      if (/ansi_x3.110-1983/.test(charset)) {
-        resolved = "ISO-8859-1";
-      } else if (/Windows-?1258/i.test(charset)) {
-        resolved = "Windows-1252";
-      }
-      return Utilities.pickEncoding(resolved);
-    }
-  };
-
-  static charsetEncoder: CharsetEncoder = new Utilities.BestEffortCharsetEncoder();
-
   isAtomSafe(str: string): boolean {
     return !Constants.ATOM_UNSAFE.test(str);
   }
@@ -290,6 +258,38 @@ export class Utilities {
   generateMessageId(): string {
     return `<${Mail.randomTag()}@${Socket.gethostname()}.mail>`;
   }
+
+  static StrictCharsetEncoder = class StrictCharsetEncoder implements CharsetEncoder {
+    encode(string: RubyString, charset: string): RubyString {
+      if (/utf-?7/i.test(charset)) {
+        return Utilities.decodeUtf7(string);
+      } else {
+        return forceEncoding(b(string), Utilities.pickEncoding(charset));
+      }
+    }
+  };
+  static BestEffortCharsetEncoder = class BestEffortCharsetEncoder implements CharsetEncoder {
+    encode(string: RubyString, charset: string): RubyString {
+      if (/utf-?7/i.test(charset)) {
+        return Utilities.decodeUtf7(string);
+      } else {
+        return forceEncoding(b(string), this.pickEncoding(charset));
+      }
+    }
+
+    /** @internal */
+    pickEncoding(charset: string): Encoding {
+      let resolved = charset;
+      if (/ansi_x3.110-1983/.test(charset)) {
+        resolved = "ISO-8859-1";
+      } else if (/Windows-?1258/i.test(charset)) {
+        resolved = "Windows-1252";
+      }
+      return Utilities.pickEncoding(resolved);
+    }
+  };
+
+  static charsetEncoder: CharsetEncoder = new Utilities.BestEffortCharsetEncoder();
 
   static escapeParen(str: string): string {
     const re = /(?<!\\)([()])/g;

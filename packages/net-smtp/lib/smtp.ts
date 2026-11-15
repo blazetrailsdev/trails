@@ -574,7 +574,10 @@ export class SMTP {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   private async tlsconnect(s: Connection, context: SslContext | null): Promise<void> {
     const { verifyMode, ...tls } = context ?? {};
     const hostname = this.tlsHostname ?? this.address;
@@ -590,14 +593,15 @@ export class SMTP {
     };
     this.logging("TLS connection started");
     await new Promise<void>((resolve, reject) => {
-      const sslError = (err: Error & { originalCode?: string }) =>
-        reject(Object.assign(err, { code: err.originalCode ?? (err as ConnectionError).code }));
-      s.once("error", sslError);
+      s.once("error", reject);
       s._upgradeConnection((err) => {
-        s.removeListener("error", sslError);
-        if (err) sslError(err);
+        s.removeListener("error", reject);
+        if (err) reject(err);
         else resolve();
       });
+    }).catch((err: ConnectionError & { originalCode?: string }) => {
+      if (err.originalCode != null) err.code = err.originalCode;
+      throw err;
     });
   }
 
