@@ -5,6 +5,7 @@ import {
   File,
   IO,
   IOError,
+  RuntimeError,
   basicObjRespondTo,
   rbCheckArrayType,
   rbObjAsString,
@@ -76,6 +77,8 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   protected _closed = false;
   /** @internal */
   protected _strBody: string | null = null;
+  /** @internal */
+  protected _pendingBody: { each: Promise<unknown>; buf: () => string } | null = null;
 
   constructor(response: Response | null, buf: Buf) {
     this._response = response;
@@ -90,11 +93,21 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
 
   get body(): string {
     if (this._strBody !== null) return this._strBody;
+    if (this._pendingBody)
+      throw new RuntimeError(
+        "streaming ActionDispatch::Response body: await awaitBody before body",
+      );
     let buf = "";
-    this.each((chunk) => {
+    const pending = this.each((chunk) => {
       const str = rbObjAsString(chunk) as string | Uint8Array;
       buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
     });
+    if (pending instanceof Promise) {
+      this._pendingBody = { each: pending, buf: () => buf };
+      throw new RuntimeError(
+        "streaming ActionDispatch::Response body: await awaitBody before body",
+      );
+    }
     this._strBody = buf;
     return this._strBody;
   }
@@ -102,6 +115,11 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   /** @noRailsEquivalent PERMANENT */
   async awaitBody(): Promise<string> {
     if (this._strBody !== null) return this._strBody;
+    if (this._pendingBody) {
+      const { each, buf } = this._pendingBody;
+      await each;
+      return (this._strBody = buf());
+    }
     let buf = "";
     for await (const chunk of this) buf += String(chunk);
     this._strBody = buf;
@@ -112,6 +130,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     if (this.isClosed) throw new IOError("closed stream");
 
     this._strBody = null;
+    this._pendingBody = null;
     this._response!.commitBang();
     return this._buf.push(string);
   }

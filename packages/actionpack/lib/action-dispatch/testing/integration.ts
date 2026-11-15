@@ -19,6 +19,8 @@ import {
   type StringIO,
 } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
+import { Buffer } from "../http/response.js";
+import { Buffer as LiveBuffer } from "../../action-controller/metal/live.js";
 import { RouteSet } from "../routing/route-set.js";
 import type { Metal } from "../../action-controller/metal.js";
 import { FixtureFile, TestProcess } from "./test-process.js";
@@ -293,6 +295,7 @@ export class Session {
     return this._https;
   }
 
+  /** @inventedArm if — PERMANENT */
   async process(
     method: string,
     path: string,
@@ -380,6 +383,8 @@ export class Session {
 
     this.requestCount += 1;
     this.request = new Request(session.lastRequest().env);
+    const stream = (this.request.controllerInstance as Metal | undefined)?.response?.stream;
+    if (stream instanceof Buffer && !(stream instanceof LiveBuffer)) await stream.awaitBody();
     const response = this._mockSession.lastResponse();
     this.response = TestResponse.fromResponse(response);
     this.response.request = this.request;

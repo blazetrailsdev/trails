@@ -21,7 +21,7 @@ import { Cookies } from "../../lib/action-controller/metal/cookies.js";
 import { Helpers, setHelpersPath } from "../../lib/action-controller/metal/helpers.js";
 import type { HelpersClass } from "../../lib/abstract-controller/helpers.js";
 import { Request } from "../../lib/action-dispatch/http/request.js";
-import { Response } from "../../lib/action-dispatch/http/response.js";
+import { Buffer, Response } from "../../lib/action-dispatch/http/response.js";
 
 class ApplicationController extends Base {}
 
@@ -199,7 +199,64 @@ describe("ActionController::Streaming layout content_for fallback", () => {
   it("falls back to the app name when no view provides a title on a streamed render", async () => {
     const controller = new StreamLayoutController();
     await controller.dispatch("show", makeRequest(), new Response());
-    expect(controller.response.body).toBe("<title>Blog</title>body");
+    expect(await (controller.response.stream as Buffer).awaitBody()).toBe(
+      "<title>Blog</title>body",
+    );
+  });
+});
+
+describe("ActionController::Streaming chunked response body", () => {
+  let release!: () => void;
+  let fail!: (error: Error) => void;
+  class StreamGateController extends ApplicationController {
+    declare gate: Promise<string>;
+    async show(): Promise<void> {
+      this.gate = new Promise<string>((resolve, reject) => {
+        release = () => resolve("body");
+        fail = reject;
+      });
+      await this.render({ stream: true, layout: "application" });
+    }
+  }
+  StreamGateController.prependViewPath(
+    new FixtureResolver({
+      "stream-gate/show.html.tse": "<%= await this.gate %>",
+      "layouts/application.html.tse": "<head></head><%= yield %>",
+    }),
+  );
+
+  it("hands the layout head to the rack body before the template finishes", async () => {
+    const controller = new StreamGateController();
+    await controller.dispatch("show", makeRequest(), new Response());
+    const chunks = (controller.response.toA()[2] as AsyncIterable<unknown>)[Symbol.asyncIterator]();
+
+    expect((await chunks.next()).value).toBe("<head></head>");
+
+    release();
+    const rest: unknown[] = [];
+    for (let next = await chunks.next(); !next.done; next = await chunks.next()) {
+      rest.push(next.value);
+    }
+    expect(rest.join("")).toBe("body");
+  });
+
+  it("raises on a sync body read while the streamed Body is pending", async () => {
+    const controller = new StreamGateController();
+    await controller.dispatch("show", makeRequest(), new Response());
+
+    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
+    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
+    release();
+    expect(await (controller.response.stream as Buffer).awaitBody()).toBe("<head></head>body");
+  });
+
+  it("rescues a template that rejects after a sync body read", async () => {
+    const controller = new StreamGateController();
+    await controller.dispatch("show", makeRequest(), new Response());
+
+    expect(() => controller.response.body).toThrow(/await awaitBody before body/);
+    fail(new Error("boom"));
+    expect(await (controller.response.stream as Buffer).awaitBody()).toMatch(/^<head><\/head>/);
   });
 });
 

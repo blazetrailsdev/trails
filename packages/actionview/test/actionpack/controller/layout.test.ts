@@ -78,7 +78,7 @@ const assertResponse = (type: number | string): void => testCase.assertResponse(
 async function get(controller: LayoutTest, action: string): Promise<string> {
   const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "www.nextangle.com" };
   await controller.dispatch(action, new Request(env), new Response());
-  return controller.response.body;
+  return await (controller.response.stream as { awaitBody(): Promise<string> }).awaitBody();
 }
 
 describe("LayoutAutoDiscoveryTest", () => {

@@ -266,8 +266,6 @@ type RenderArgs<P extends string> =
       RenderOptionsFor<P>?,
     ];
 
-type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
-
 export const PROTECTED_IVARS: readonly string[] = [
   ...DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   "_params",
@@ -499,19 +497,6 @@ export class Base extends Metal {
     if (isModuleIncluded(new.target, TopLevel.ActiveRecord?.Railties.ControllerRuntime as never)) {
       (this as unknown as { dbRuntime: number | null }).dbRuntime = null;
     }
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE response-carries-async-streaming-body
-   */
-  async drainStreamingBody(body: unknown): Promise<unknown> {
-    if (!Array.isArray(body) && typeof (body as StreamingBody | null)?.each === "function") {
-      const chunks: string[] = [];
-      await (body as StreamingBody).each((chunk) => chunks.push(chunk));
-      return chunks;
-    }
-    return body;
   }
 
   declare respondTo: (...mimes: Parameters<OmitThisParameter<typeof respondTo>>) => unknown;
