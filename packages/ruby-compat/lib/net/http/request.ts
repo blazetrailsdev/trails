@@ -527,13 +527,7 @@ export class HTTPRequest {
           if (chunkedP) await out.write("\r\n");
         } else {
           await this.flushBuffer(out, buf, chunkedP);
-          for (;;) {
-            const chunk = await value.read(4096);
-            if (
-              !(await this.flushBuffer(out, chunk == null ? null : [_formValue(chunk)], chunkedP))
-            )
-              break;
-          }
+          while (await this.flushBuffer(out, await value.read(4096), chunkedP));
         }
       } else {
         buf.push(`Content-Disposition: form-data; name="${key}"\r\n\r\n`);
@@ -557,15 +551,15 @@ export class HTTPRequest {
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:370-377`. */
   private async flushBuffer(
     out: FormOut,
-    buf: (string | Uint8Array)[] | null,
+    buf: (string | Uint8Array)[] | string | Uint8Array | null,
     chunkedP: boolean,
   ): Promise<boolean | void> {
     if (buf == null) return;
-    const bytes = _concatBytes(buf);
+    const bytes = _concatBytes(Array.isArray(buf) ? buf : [buf]);
     if (chunkedP) await out.write(`${bytes.length.toString(16)}\r\n`);
     await out.write(bytes);
     if (chunkedP) await out.write("\r\n");
-    buf.length = 0;
+    if (Array.isArray(buf)) buf.length = 0;
     return true;
   }
 

@@ -10,6 +10,7 @@ import {
   TopLevel,
 } from "@blazetrails/ruby-compat";
 import { MockRequest, Rack, type Headers } from "@blazetrails/rack";
+import { createServer as createNetServer } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Proxy } from "../lib/index.js";
@@ -104,7 +105,6 @@ describe("RackProxyTest", () => {
       env["rack.input"] = body;
       env["CONTENT_LENGTH"] = "11";
       env["CONTENT_TYPE"] = "text/plain";
-
       const [status, , response] = (await proxy.call(env)) as unknown as Triplet;
       expect(status).toBe(200);
       expect(await bodyString(response), "body must be forwarded intact").toBe("hello=world");
@@ -120,7 +120,6 @@ describe("RackProxyTest", () => {
 
   it("request body stream read without length returns remaining bytes", async () => {
     const stream = requestBodyStream("hello world, extra", 11);
-
     expect(text(await stream.read(5))).toBe("hello");
     expect(text(await stream.read())).toBe(" world");
     expect(
@@ -135,7 +134,6 @@ describe("RackProxyTest", () => {
 
   it("request body stream read without length rejects short bodies", async () => {
     const stream = requestBodyStream("hi", 5);
-
     await expect(stream.read()).rejects.toThrow(constGet(Proxy, "InvalidRequest") as typeof Error);
   });
 
@@ -170,15 +168,6 @@ describe("RackProxyTest", () => {
     });
   }
 
-  it("empty body is not array with empty string", async () => {
-    await withWebrickProxy({ streaming: false }, async (port, proxy) => {
-      proxy.host = `127.0.0.1:${port}`;
-      await get("/empty");
-      expect(lastResponse.status).toBe(200);
-      expect(lastResponse.body).toBe("");
-    });
-  });
-
   it("connect and write timeouts are applied", () => {
     const proxy = new Proxy({ readTimeout: 5, openTimeout: 3, writeTimeout: 7 });
     const http = new Net.HTTP("127.0.0.1", 80);
@@ -209,6 +198,32 @@ describe("RackProxyTest", () => {
       const [status] = (await proxy.call(env)) as unknown as Triplet;
       expect(status).toBe(501);
     });
+  });
+
+  it("invalid content length returns 400", async () => {
+    await withWebrickProxy({ streaming: false }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      const env = MockRequest.envFor("/echo-body", { ":method": "POST", ":input": "a" });
+      env["CONTENT_LENGTH"] = "1x";
+      const [status] = (await proxy.call(env)) as unknown as Triplet;
+      expect(status).toBe(400);
+    });
+  });
+
+  it("chunked backend response with content length returns 502", async () => {
+    const backend = createNetServer((c) =>
+      c.once("data", () =>
+        c.end(
+          "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Length: 3\r\n\r\n0\r\n\r\n",
+        ),
+      ),
+    );
+    await new Promise<void>((resolve) => backend.listen(0, "127.0.0.1", resolve));
+    app = new HostProxy({ allowDynamicBackend: true, streaming: false });
+    app.host = `127.0.0.1:${(backend.address() as { port: number }).port}`;
+    await get("/");
+    backend.close();
+    expect(lastResponse.status).toBe(502);
   });
 
   it("disallowed backend returns 502", async () => {

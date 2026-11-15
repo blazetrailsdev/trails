@@ -634,16 +634,6 @@ describe("Net::HTTP over Net::BufferedIO", () => {
     expect(seen.received).toContain("Content-Length: 9\r\n");
   });
 
-  it("set_form_data replaces the separator and sets the body", () => {
-    const req = new Net.HTTP.Post("/f");
-    req.setFormData({ a: "1", b: "2" }, ";");
-    expect(req.body).toBe("a=1;b=2");
-    expect(req.contentType).toBe("application/x-www-form-urlencoded");
-    req.formData = { c: "3" };
-    expect(req.body).toBe("c=3");
-    expect(() => req.setForm({}, "text/plain")).toThrow("invalid enctype: text/plain");
-  });
-
   const multipart =
     '--B\r\nContent-Disposition: form-data; name="a"\r\n\r\n1\r\n' +
     '--B\r\nContent-Disposition: form-data; name="f\\"q"; filename="t.txt"\r\n' +

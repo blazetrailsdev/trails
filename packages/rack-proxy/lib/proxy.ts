@@ -371,10 +371,10 @@ export class Proxy {
         targetRequest.basicAuth(this.username as string, this.password as string);
       }
 
-      let backend: unknown = env["rack.backend"];
+      let backend = env["rack.backend"] as Backend | string | false | null | undefined;
       delete env["rack.backend"];
-      if (backend == null || backend === false) backend = this.backend;
-      if (typeof backend === "string") backend = kernelURI(backend);
+      if (backend == null || backend === false) backend = this.backend as Backend | null;
+      if (typeof backend === "string") backend = kernelURI(backend) as Backend;
       if (backend == null) {
         if (!(this.allowDynamicBackend != null && this.allowDynamicBackend !== false)) {
           if (rbObjRespondTo(this.logger, "append")) {
@@ -385,19 +385,18 @@ export class Proxy {
           }
           return [502, {}, []];
         }
-        backend = sourceRequest;
+        backend = sourceRequest as Backend;
       }
-      const target = backend as Backend;
-      if (!this.isBackendAllowed(target)) {
+      if (!this.isBackendAllowed(backend)) {
         if (rbObjRespondTo(this.logger, "append")) {
           (this.logger as { append(str: string): unknown }).append(
-            `rack-proxy: backend ${rbInspect(target.host)} refused by backend_allowed?\n`,
+            `rack-proxy: backend ${rbInspect(backend.host)} refused by backend_allowed?\n`,
           );
         }
         return [502, {}, []];
       }
 
-      const useSsl = target.scheme === "https" || (this.cert != null && this.cert !== false);
+      const useSsl = backend.scheme === "https" || (this.cert != null && this.cert !== false);
       let readTimeout = env["http.read_timeout"];
       delete env["http.read_timeout"];
       if (readTimeout == null || readTimeout === false) readTimeout = this.readTimeout;
@@ -405,8 +404,8 @@ export class Proxy {
       if (this.streaming != null && this.streaming !== false) {
         targetResponse = new HttpStreamingResponse(
           targetRequest,
-          target.host!,
-          target.port == null ? null : Number(target.port),
+          backend.host!,
+          backend.port == null ? null : Number(backend.port),
           (http) => this.configureBackendConnection(http, { useSsl, readTimeout }),
         );
         if (this.logger != null && this.logger !== false) targetResponse.logger = this.logger;
@@ -424,7 +423,10 @@ export class Proxy {
           body = [];
         }
       } else {
-        const http = new Net.HTTP(target.host!, target.port == null ? null : Number(target.port));
+        const http = new Net.HTTP(
+          backend.host!,
+          backend.port == null ? null : Number(backend.port),
+        );
         this.configureBackendConnection(http, { useSsl, readTimeout });
 
         await http.start(async () => {
