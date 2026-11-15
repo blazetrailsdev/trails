@@ -11,39 +11,37 @@ const fixtures: Record<string, string> = import.meta.glob("../fixtures/*.{pem,cr
   eager: true,
 });
 const CA_FILE = fixtures["../fixtures/cacert.pem"];
+const CA_PATH = decodeURIComponent(new URL("../fixtures/cacert.pem", import.meta.url).pathname);
 const SERVER_KEY = fixtures["../fixtures/server.key"];
 const SERVER_CERT = fixtures["../fixtures/server.crt"];
 
-type SslContext = Record<string, unknown>;
-type Connection = { options: { tls?: { servername?: string } }; _socket?: Socket };
-
-const tlsconnect = (
-  SMTP.prototype as unknown as {
-    tlsconnect(s: Connection, context: SslContext | null): Promise<void>;
-  }
-).tlsconnect;
+type SSLContext = InstanceType<typeof OpenSSL.SSL.SSLContext>;
+type SSLSocket = ReturnType<SMTP["sslSocket"]>;
 
 class MySMTP extends SMTP {
-  __sslContext: SslContext | null = null;
-  __sslSocket: Connection | null = null;
+  __sslContext: SSLContext | null = null;
+  __sslSocket: SSLSocket | null = null;
 
   constructor(port: number, kw: Record<string, unknown> = {}) {
     super("localhost", port, kw);
   }
-}
-Object.assign(MySMTP.prototype, {
-  async tlsconnect(this: MySMTP, s: Connection, context: SslContext | null) {
+
+  protected override sslSocket(
+    socket: Parameters<SMTP["sslSocket"]>[0],
+    context: SSLContext,
+  ): SSLSocket {
     this.__sslContext = context;
-    this.__sslSocket = s;
-    return tlsconnect.call(this, s, context);
-  },
-});
+    return (this.__sslSocket = super.sslSocket(socket, context));
+  }
+}
 
 let serverSocket: Server | null = null;
 const clientSockets: Socket[] = [];
 
-function defaultSslContext(): SslContext {
-  return SMTP.defaultSslContext({ ca: [CA_FILE] });
+async function defaultSslContext(): Promise<SSLContext> {
+  const store = new OpenSSL.X509.Store();
+  await store.addFile(CA_PATH);
+  return SMTP.defaultSslContext({ certStore: store });
 }
 
 async function wrapSslSocket(sock: Socket): Promise<Socket | null> {
@@ -141,20 +139,20 @@ describe("TestSSLContext", () => {
     const smtp = new MySMTP(await startSmtpdStarttls());
     const started = smtp.start();
     await expect(started).rejects.toThrow(OpenSSL.SSL.SSLError);
-    const err = (await started.catch((e: unknown) => e)) as { code?: string };
-    expect(err.code).toEqual("SELF_SIGNED_CERT_IN_CHAIN");
-    expect(smtp.__sslContext!["verifyMode"]).toEqual("VERIFY_PEER");
+    await started.catch(() => {});
+    expect(smtp.__sslSocket!.verifyResult).toEqual(OpenSSL.X509.V_ERR_SELF_SIGNED_CERT_IN_CHAIN);
+    expect(smtp.__sslContext!.verifyMode).toEqual(OpenSSL.SSL.VERIFY_PEER);
   });
 
   it("starttls close socket on verify failure", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls());
     await expect(smtp.start()).rejects.toThrow(OpenSSL.SSL.SSLError);
-    expect(smtp.__sslSocket!._socket!.destroyed).toEqual(true);
+    expect(smtp.__sslSocket!.isClosed()).toEqual(true);
   });
 
   it("enable tls", async () => {
     const smtp = new MySMTP(await startSmtpdSmtps());
-    const context = defaultSslContext();
+    const context = await defaultSslContext();
     smtp.enableTls(context);
     await smtp.start();
     expect(smtp.__sslContext).toEqual(context);
@@ -163,7 +161,7 @@ describe("TestSSLContext", () => {
 
   it("enable tls before disable starttls", async () => {
     const smtp = new MySMTP(await startSmtpdSmtps());
-    const context = defaultSslContext();
+    const context = await defaultSslContext();
     smtp.enableTls(context);
     smtp.disableStarttls();
     await smtp.start();
@@ -173,7 +171,7 @@ describe("TestSSLContext", () => {
 
   it("enable starttls", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls());
-    const context = defaultSslContext();
+    const context = await defaultSslContext();
     smtp.enableStarttls(context);
     await smtp.start();
     expect(smtp.__sslContext).toEqual(context);
@@ -182,7 +180,7 @@ describe("TestSSLContext", () => {
 
   it("enable starttls before disable tls", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls());
-    const context = defaultSslContext();
+    const context = await defaultSslContext();
     smtp.enableStarttls(context);
     smtp.disableTls();
     await smtp.start();
@@ -194,15 +192,15 @@ describe("TestSSLContext", () => {
     const smtp = new MySMTP(await startSmtpdStarttls(), { tlsVerify: true });
     const started = smtp.start();
     await expect(started).rejects.toThrow(OpenSSL.SSL.SSLError);
-    const err = (await started.catch((e: unknown) => e)) as { code?: string };
-    expect(err.code).toEqual("SELF_SIGNED_CERT_IN_CHAIN");
-    expect(smtp.__sslContext!["verifyMode"]).toEqual("VERIFY_PEER");
+    await started.catch(() => {});
+    expect(smtp.__sslSocket!.verifyResult).toEqual(OpenSSL.X509.V_ERR_SELF_SIGNED_CERT_IN_CHAIN);
+    expect(smtp.__sslContext!.verifyMode).toEqual(OpenSSL.SSL.VERIFY_PEER);
   });
 
   it("start with tls verify false", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls(), { tlsVerify: false });
     await smtp.start();
-    expect(smtp.__sslContext!["verifyMode"]).toEqual("VERIFY_NONE");
+    expect(smtp.__sslContext!.verifyMode).toEqual(OpenSSL.SSL.VERIFY_NONE);
     expect((await smtp.rset()).isSuccess()).toEqual(true);
   });
 
@@ -211,57 +209,57 @@ describe("TestSSLContext", () => {
     smtp.tlsVerify = true;
     const started = smtp.start();
     await expect(started).rejects.toThrow(OpenSSL.SSL.SSLError);
-    const err = (await started.catch((e: unknown) => e)) as { code?: string };
-    expect(err.code).toEqual("SELF_SIGNED_CERT_IN_CHAIN");
-    expect(smtp.__sslContext!["verifyMode"]).toEqual("VERIFY_PEER");
+    await started.catch(() => {});
+    expect(smtp.__sslSocket!.verifyResult).toEqual(OpenSSL.X509.V_ERR_SELF_SIGNED_CERT_IN_CHAIN);
+    expect(smtp.__sslContext!.verifyMode).toEqual(OpenSSL.SSL.VERIFY_PEER);
   });
 
   it("tls verify false after initialize", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls(), { tlsVerify: true });
     smtp.tlsVerify = false;
     await smtp.start();
-    expect(smtp.__sslContext!["verifyMode"]).toEqual("VERIFY_NONE");
+    expect(smtp.__sslContext!.verifyMode).toEqual(OpenSSL.SSL.VERIFY_NONE);
     expect((await smtp.rset()).isSuccess()).toEqual(true);
   });
 
   it("start with tls hostname", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls(), { tlsHostname: "unexpected.example.com" });
-    const context = defaultSslContext();
+    const context = await defaultSslContext();
     smtp.enableStarttls(context);
     await expect(smtp.start()).rejects.toThrow(OpenSSL.SSL.SSLError);
-    expect(smtp.__sslSocket!.options.tls!.servername).toEqual("unexpected.example.com");
+    expect(smtp.__sslSocket!.hostname).toEqual("unexpected.example.com");
   });
 
   it("start without tls hostname", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls());
-    const context = defaultSslContext();
+    const context = await defaultSslContext();
     smtp.enableStarttls(context);
     await smtp.start();
-    expect(smtp.__sslSocket!.options.tls!.servername).toEqual("localhost");
+    expect(smtp.__sslSocket!.hostname).toEqual("localhost");
     expect((await smtp.rset()).isSuccess()).toEqual(true);
   });
 
   it("tls hostname after initialize", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls());
     smtp.tlsHostname = "unexpected.example.com";
-    const context = defaultSslContext();
+    const context = await defaultSslContext();
     smtp.enableStarttls(context);
     await expect(smtp.start()).rejects.toThrow(OpenSSL.SSL.SSLError);
-    expect(smtp.__sslSocket!.options.tls!.servername).toEqual("unexpected.example.com");
+    expect(smtp.__sslSocket!.hostname).toEqual("unexpected.example.com");
   });
 
   it("start with ssl context params", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls(), {
-      sslContextParams: { timeout: 123, verifyMode: "VERIFY_NONE" },
+      sslContextParams: { timeout: 123, verifyMode: OpenSSL.SSL.VERIFY_NONE },
     });
     await smtp.start();
-    expect(smtp.__sslContext!["timeout"]).toEqual(123);
+    expect(smtp.__sslContext!.timeout).toEqual(123);
   });
 
   it("ssl context params after initialize", async () => {
     const smtp = new MySMTP(await startSmtpdStarttls());
-    smtp.sslContextParams = { timeout: 123, verifyMode: "VERIFY_NONE" };
+    smtp.sslContextParams = { timeout: 123, verifyMode: OpenSSL.SSL.VERIFY_NONE };
     await smtp.start();
-    expect(smtp.__sslContext!["timeout"]).toEqual(123);
+    expect(smtp.__sslContext!.timeout).toEqual(123);
   });
 });

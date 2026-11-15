@@ -104,7 +104,7 @@ describe("SMTP Delivery Method", () => {
     });
     const verifyModeDelivery = (settings: Record<string, unknown>) => {
       const verifyMode = vi.fn();
-      const context = {};
+      const context = new OpenSSL.SSL.SSLContext();
       Object.defineProperty(context, "verifyMode", { set: verifyMode });
       const deliver = async () => {
         const defaultSslContext = vi.spyOn(NetSMTP, "defaultSslContext").mockReturnValue(context);
@@ -133,7 +133,7 @@ describe("SMTP Delivery Method", () => {
     it("should set verify mode if one is given", async () => {
       const { verifyMode, deliver } = verifyModeDelivery({ opensslVerifyMode: "peer" });
       await expect(deliver()).resolves.not.toThrow();
-      expect(verifyMode).toHaveBeenCalledWith("VERIFY_PEER");
+      expect(verifyMode).toHaveBeenCalledWith(OpenSSL.SSL.VERIFY_PEER);
     });
   });
 

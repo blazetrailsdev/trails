@@ -50,6 +50,40 @@ const FIELD_ORDER_LOOKUP: Record<string, number> = Object.assign(
   ),
 );
 
+type FieldClassNames = {
+  to: "ToField";
+  cc: "CcField";
+  bcc: "BccField";
+  message_id: "MessageIdField";
+  in_reply_to: "InReplyToField";
+  references: "ReferencesField";
+  subject: "SubjectField";
+  date: "DateField";
+  from: "FromField";
+  sender: "SenderField";
+  reply_to: "ReplyToField";
+  resent_date: "ResentDateField";
+  resent_from: "ResentFromField";
+  resent_sender: "ResentSenderField";
+  resent_to: "ResentToField";
+  resent_cc: "ResentCcField";
+  resent_bcc: "ResentBccField";
+  resent_message_id: "ResentMessageIdField";
+  return_path: "ReturnPathField";
+  mime_version: "MimeVersionField";
+  content_transfer_encoding: "ContentTransferEncodingField";
+  content_type: "ContentTypeField";
+  content_disposition: "ContentDispositionField";
+  content_id: "ContentIdField";
+  content_description: "ContentDescriptionField";
+  content_location: "ContentLocationField";
+};
+
+/** @noRailsEquivalent PERMANENT */
+export type FieldFor<N> = N extends keyof FieldClassNames
+  ? (Field & InstanceType<(typeof Mail)[FieldClassNames[N]]>) | null
+  : Field | Field[] | null;
+
 let _fieldsMap: Record<string, FieldClass> | undefined;
 let _fieldNameMap: Record<string, string> | undefined;
 

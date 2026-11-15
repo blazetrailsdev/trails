@@ -1,8 +1,9 @@
 import { getCrypto, type CipherAdapter, type DecipherAdapter } from "./crypto-adapter.js";
-import type { Bytes } from "./fs-adapter.js";
+import { getFs, type Bytes } from "./fs-adapter.js";
 import { DigestClass, type DigestInstance } from "./digest.js";
 import { SecureRandom } from "./secure-random.js";
 import { ArgumentError } from "./argument-error.js";
+import { NoMethodError } from "./no-method-error.js";
 import { StandardError } from "./standard-error.js";
 
 const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
@@ -46,6 +47,184 @@ class SSLError extends StandardError {
           code.startsWith("ERR_TLS_") ||
           SSL_VERIFY_CODES.includes(code)))
     );
+  }
+}
+
+/** `OP_ALL` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:3004`). */
+const OP_ALL = 0x80000850;
+/** `OP_DONT_INSERT_EMPTY_FRAGMENTS` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:3026`). */
+const OP_DONT_INSERT_EMPTY_FRAGMENTS = 0x800;
+/** `OP_NO_COMPRESSION` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:3029`). */
+const OP_NO_COMPRESSION = 0x20000;
+
+/**
+ * `OpenSSL::X509` verify-result constants (`DefX509Const`,
+ * `vendor/ruby/v3.3.11/ext/openssl/ossl_x509.c:50-71`), keyed by the code a
+ * TLS failure carries.
+ */
+const X509_VERIFY_RESULTS = {
+  V_OK: 0,
+  V_ERR_UNABLE_TO_GET_ISSUER_CERT: 2,
+  V_ERR_CERT_SIGNATURE_FAILURE: 7,
+  V_ERR_CERT_NOT_YET_VALID: 9,
+  V_ERR_CERT_HAS_EXPIRED: 10,
+  V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT: 18,
+  V_ERR_SELF_SIGNED_CERT_IN_CHAIN: 19,
+  V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY: 20,
+  V_ERR_UNABLE_TO_VERIFY_LEAF_SIGNATURE: 21,
+  V_ERR_CERT_REVOKED: 23,
+  V_ERR_CERT_UNTRUSTED: 27,
+  V_ERR_CERT_REJECTED: 28,
+  V_ERR_HOSTNAME_MISMATCH: 62,
+} as const;
+
+/**
+ * `OpenSSL::X509::Store` (`vendor/ruby/v3.3.11/ext/openssl/ossl_x509store.c:920`).
+ * It holds PEM text, which a TLS handshake is handed as its trust anchors.
+ *
+ * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_x509store.c:920
+ */
+export class Store {
+  /** @internal */
+  _certs: string[] = [];
+  /** @internal */
+  _defaultPaths = false;
+
+  /** @noRailsEquivalent PERMANENT */
+  async addFile(file: string): Promise<this> {
+    this._certs.push(new TextDecoder().decode(await getFs().readFile(file)));
+    return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  addCert(cert: string): this {
+    this._certs.push(cert);
+    return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  setDefaultPaths(): null {
+    this._defaultPaths = true;
+    return null;
+  }
+}
+
+/**
+ * `OpenSSL::SSL::SSLContext` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2633`,
+ * `lib/openssl/ssl.rb:22`).
+ *
+ * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:22
+ */
+export class SSLContext {
+  /** @noRailsEquivalent PERMANENT */
+  static DEFAULT_PARAMS: Record<string, unknown> = {
+    minVersion: 0x301,
+    verifyMode: 1,
+    verifyHostname: true,
+    options: ((OP_ALL & ~OP_DONT_INSERT_EMPTY_FRAGMENTS) | OP_NO_COMPRESSION) >>> 0,
+  };
+
+  /** @noRailsEquivalent PERMANENT */
+  static DEFAULT_CERT_STORE: Store = (() => {
+    const store = new Store();
+    store.setDefaultPaths();
+    return store;
+  })();
+
+  /** @noRailsEquivalent PERMANENT */
+  options = 0;
+  /** @noRailsEquivalent PERMANENT */
+  verifyMode: number | null;
+  /** @noRailsEquivalent PERMANENT */
+  verifyHostname: boolean;
+  /** @noRailsEquivalent PERMANENT */
+  certStore: Store | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  caFile: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  caPath: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  timeout: number | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  minVersion: number | null = null;
+
+  constructor() {
+    this.options = (this.options | OpenSSL.SSL.OP_ALL) >>> 0;
+    this.verifyMode = OpenSSL.SSL.VERIFY_NONE;
+    this.verifyHostname = false;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  setParams(params: Record<string, unknown> = {}): Record<string, unknown> {
+    params = { ...SSLContext.DEFAULT_PARAMS, ...params };
+    this.options = params.options as number;
+    delete params.options;
+    for (const [name, value] of Object.entries(params)) {
+      if (!Object.hasOwn(this, name)) {
+        throw new NoMethodError(
+          `undefined method '${name}=' for an instance of OpenSSL::SSL::SSLContext`,
+        );
+      }
+      (this as unknown as Record<string, unknown>)[name] = value;
+    }
+    if (this.verifyMode !== OpenSSL.SSL.VERIFY_NONE) {
+      if (!(this.caFile != null || this.caPath != null || this.certStore != null)) {
+        this.certStore = SSLContext.DEFAULT_CERT_STORE;
+      }
+    }
+    return params;
+  }
+}
+
+/**
+ * `OpenSSL::SSL::SSLSocket` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2963`,
+ * `lib/openssl/ssl.rb:359`). The handshake is the host's, run over `io` by
+ * its owner, which records `verifyResult` from the failure's code.
+ *
+ * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:359
+ */
+export class SSLSocket<IO extends { close(): void } = { close(): void }> {
+  /** @noRailsEquivalent PERMANENT */
+  hostname: string | null = null;
+  /** @noRailsEquivalent PERMANENT */
+  syncClose = false;
+  /** @internal */
+  _verifyResult: number = X509_VERIFY_RESULTS.V_OK;
+  /** @internal */
+  _closed = false;
+
+  constructor(
+    /** @noRailsEquivalent PERMANENT */
+    readonly io: IO,
+    /** @noRailsEquivalent PERMANENT */
+    readonly context: SSLContext,
+  ) {}
+
+  /** @noRailsEquivalent PERMANENT */
+  get verifyResult(): number {
+    return this._verifyResult;
+  }
+
+  /** @internal */
+  _setVerifyResult(code: unknown): void {
+    if (code === "ERR_TLS_CERT_ALTNAME_INVALID") code = "HOSTNAME_MISMATCH";
+    const result =
+      typeof code === "string"
+        ? (X509_VERIFY_RESULTS as Record<string, number>)[`V_ERR_${code}`]
+        : undefined;
+    if (result !== undefined) this._verifyResult = result;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  close(): void {
+    if (this._closed) return;
+    this._closed = true;
+    if (this.syncClose) this.io.close();
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  isClosed(): boolean {
+    return this._closed;
   }
 }
 
@@ -260,7 +439,17 @@ export const Random = {
 export const OpenSSL = {
   Cipher,
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2999-3000 */
-  SSL: { VERIFY_NONE: 0, VERIFY_PEER: 1, SSLError },
+  SSL: {
+    VERIFY_NONE: 0,
+    VERIFY_PEER: 1,
+    OP_ALL,
+    OP_DONT_INSERT_EMPTY_FRAGMENTS,
+    OP_NO_COMPRESSION,
+    SSLError,
+    SSLContext,
+    SSLSocket,
+  },
+  X509: { Store, ...X509_VERIFY_RESULTS },
   HMAC,
   Random,
   Digest: {

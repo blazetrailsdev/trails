@@ -15,8 +15,6 @@ import { Message } from "../lib/message.js";
 const fixturePath = (...path: string[]) =>
   new URL(`./fixtures/${path.join("/")}`, import.meta.url).pathname;
 const readFixture = (...path: string[]) => Mail.read(decodeURIComponent(fixturePath(...path)));
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-const field = (mail: Message, name: string): any => mail.get(name);
 
 describe("Test emails", () => {
   describe("from RFC2822", () => {
@@ -52,7 +50,7 @@ describe("Test emails", () => {
       const mail = await readFixture("emails", "rfc2822", "example04.eml");
       expect(mail.from()).toEqualRuby(["pete@silly.example"]);
       expect(mail.to()).toEqualRuby(["c@a.test", "joe@where.test", "jdoe@one.test"]);
-      expect(field(mail, "cc").groupNames()).toEqual(["Undisclosed recipients"]);
+      expect(mail.get("cc")!.groupNames()).toEqual(["Undisclosed recipients"]);
       expect(mail.messageId()).toEqual("testabcd.1234@silly.example");
       expect(mail.date()).toEqual(DateTime.parse("Thu, 13 Feb 1969 23:32:54 -0330"));
     });
@@ -73,8 +71,8 @@ describe("Test emails", () => {
       expect(mail.replyTo()).toEqualRuby(["smith@home.example"]);
       expect(mail.subject()).toEqual("Re: Saying Hello");
       expect(mail.messageId()).toEqual("3456@example.net");
-      expect(field(mail, "in_reply_to").messageIds()).toEqual(["1234@local.machine.example"]);
-      expect(field(mail, "references").messageIds()).toEqual(["1234@local.machine.example"]);
+      expect(mail.get("in_reply_to")!.messageIds()).toEqual(["1234@local.machine.example"]);
+      expect(mail.get("references")!.messageIds()).toEqual(["1234@local.machine.example"]);
       expect(mail.date()).toEqual(DateTime.parse("Fri, 21 Nov 1997 10:01:10 -0600"));
     });
 
@@ -86,7 +84,7 @@ describe("Test emails", () => {
       expect(mail.date()).toEqual(DateTime.parse("Fri, 21 Nov 1997 11:00:00 -0600"));
       expect(mail.messageId()).toEqual("abcd.1234@local.machine.tld");
       expect(mail.inReplyTo()).toEqual("3456@example.net");
-      expect(field(mail, "references").messageIds()).toEqual([
+      expect(mail.get("references")!.messageIds()).toEqual([
         "1234@local.machine.example",
         "3456@example.net",
       ]);
@@ -126,17 +124,15 @@ describe("Test emails", () => {
       const mail = await readFixture("emails", "rfc2822", "example10.eml");
       expect(mail.from()).toEqualRuby(["pete(his account)@silly.test"]);
       expect(mail.to()).toEqualRuby(["c@public.example", "joe@example.org", "jdoe@one.test"]);
-      expect(field(mail, "cc").groupNames()).toEqual([
-        "(Empty list)(start)Undisclosed recipients  ",
-      ]);
+      expect(mail.get("cc")!.groupNames()).toEqual(["(Empty list)(start)Undisclosed recipients  "]);
       expect(mail.date()).toEqual(DateTime.parse("Thu, 13 Feb 1969 23:32 -0330"));
       expect(mail.messageId()).toEqual("testabcd.1234@silly.test");
     });
 
     it("should handle the rfc obsolete addressing", async () => {
       const mail = await readFixture("emails", "rfc2822", "example11.eml");
-      expect(field(mail, "from").addresses()).toEqualRuby(["john.q.public@example.com"]);
-      expect(field(mail, "from").toString()).toEqual('"Joe Q. Public" <john.q.public@example.com>');
+      expect(mail.get("from")!.addresses()).toEqualRuby(["john.q.public@example.com"]);
+      expect(mail.get("from")!.toString()).toEqual('"Joe Q. Public" <john.q.public@example.com>');
       expect(mail.to()).toEqualRuby(["@machine.tld:mary@example.net", "jdoe@test   . example"]);
       expect(mail.date()).toEqual(DateTime.parse("Tue, 1 Jul 2003 10:52:37 +0200"));
       expect(mail.messageId()).toEqual("5678.21-Nov-1997@example.com");
@@ -213,7 +209,7 @@ describe("Test emails", () => {
       });
 
       it("should return an empty groups list", () => {
-        expect(field(message, "to").groupAddresses()).toEqual([]);
+        expect(message.get("to")!.groupAddresses()).toEqual([]);
       });
     });
 
@@ -256,7 +252,7 @@ describe("Test emails", () => {
       });
 
       it("should return one invalid Content-Disposition value", () => {
-        expect(field(message, "content_disposition").errors).not.toBeEmpty();
+        expect(message.get("content_disposition")!.errors).not.toBeEmpty();
         expect(message.contentDisposition()).toEqual("invalid");
       });
     });
@@ -288,20 +284,20 @@ describe("Test emails", () => {
     });
 
     it("from", () => {
-      expect(field(message, "from").toString()).toEqual('"Jöhn Doe" <jdöe@mächine.example>');
-      expect(field(message, "from").addresses()[0].toString()).toEqual("jdöe@mächine.example");
+      expect(message.get("from")!.toString()).toEqual('"Jöhn Doe" <jdöe@mächine.example>');
+      expect(message.get("from")!.addresses()[0]!.toString()).toEqual("jdöe@mächine.example");
     });
 
     it("to", () => {
-      expect(field(message, "to").toString()).toEqual('"Märy Smith" <märy@exämple.net>');
-      expect(field(message, "to").addresses()[0].toString()).toEqual("märy@exämple.net");
+      expect(message.get("to")!.toString()).toEqual('"Märy Smith" <märy@exämple.net>');
+      expect(message.get("to")!.addresses()[0]!.toString()).toEqual("märy@exämple.net");
     });
   });
 
   describe("invalid charsets in headers", () => {
     it("falls back to ASCII-8BIT for unrecognized charsets", async () => {
       const mail = await readFixture("emails", "error_emails", "invalid_subject_characters.eml");
-      expect(field(mail, "from").displayNames()).toEqualRuby(["Formação Frenetikpolis"]);
+      expect(mail.get("from")!.displayNames()).toEqualRuby(["Formação Frenetikpolis"]);
 
       let subject: string | Uint8Array =
         "Forma\xE7\xE3o FrenetikPolis: Mega Campanha Final Ver\xE3o | Cursos de Setembro";

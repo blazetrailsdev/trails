@@ -15,7 +15,7 @@ import {
   binaryString,
 } from "@blazetrails/ruby-compat";
 import * as Constants from "./constants.js";
-import { Field } from "./field.js";
+import { Field, type FieldFor } from "./field.js";
 import { FieldList } from "./field-list.js";
 import { Utilities } from "./utilities.js";
 
@@ -90,8 +90,8 @@ export class Header {
     return this._fields!.map((field) => field.errors).flat();
   }
 
-  get(name: unknown): Field | Field[] | null {
-    return this.fields.getField(Utilities.dasherize(name));
+  get<const N>(name: N): FieldFor<N> {
+    return this.fields.getField(Utilities.dasherize(name)) as FieldFor<N>;
   }
 
   set(name: unknown, value: unknown): void {

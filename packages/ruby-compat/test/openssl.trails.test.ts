@@ -18,3 +18,12 @@ describe("OpenSSL::Digest", () => {
     expect(OpenSSL.Random.randomBytes(16).toString("hex")).not.toBe(bytes.toString("hex"));
   });
 });
+
+describe("OpenSSL::SSL::SSLContext", () => {
+  it("set_params options is Ruby's unsigned DEFAULT_PARAMS value", () => {
+    const context = new OpenSSL.SSL.SSLContext();
+    expect(context.options).toBe(OpenSSL.SSL.OP_ALL);
+    context.setParams();
+    expect(context.options).toBe(0x80020050);
+  });
+});
