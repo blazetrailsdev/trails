@@ -247,8 +247,6 @@ const ENUMERABLE_DELEGATES = {
 
   sortBy: fetch<<T>(records: T[], key: (record: T) => any) => T[]>(ARRAY_METHOD_TABLE, "sortBy"),
 
-  groupBy,
-
   indexBy,
 
   compactBlank,
@@ -670,7 +668,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   async groupBy<K>(fn: (record: T) => K): Promise<Hash<K, T[]>> {
-    return ENUMERABLE_DELEGATES.groupBy(await this.toArray(), fn);
+    return groupBy(await this.toArray(), fn);
   }
 
   async indexBy<K extends string | number>(fn: (record: T) => K): Promise<Record<K, T>> {
