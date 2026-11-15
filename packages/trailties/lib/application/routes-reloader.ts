@@ -24,7 +24,6 @@ export class RoutesReloader {
   /** @internal */
   private _prefetching?: Promise<void>;
 
-  /** @inventedArm prefetchBang — PERMANENT */
   async executeIfUpdated(block?: () => Promise<void> | void): Promise<boolean> {
     if (this.isUpdated()) await this.prefetchBang();
     return this.updater().executeIfUpdated(block);
