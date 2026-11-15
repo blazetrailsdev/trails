@@ -44,7 +44,8 @@ describe("RoutesReloader", () => {
       expect(r.isUpdated()).toBe(false);
       FileUtils.touch(routes);
       expect(r.isUpdated()).toBe(true);
-      await r.execute();
+      await r.prefetchBang();
+      r.execute();
       expect(r.isUpdated()).toBe(false);
       expect(a.calls).toEqual(["clear", "finalize"]);
     } finally {
@@ -63,11 +64,114 @@ describe("RoutesReloader", () => {
       r.routeSets.push(a);
       r.paths.push(routes);
 
-      await r.execute();
+      await r.prefetchBang();
+      r.execute();
       File.write(routes, drawInto("Trails.application", "/after"));
-      await r.execute();
+      await r.prefetchBang();
+      r.execute();
 
       expect(a.calls.filter((c) => c.startsWith("get"))).toEqual(["get /before", "get /after"]);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("execute_unless_loaded draws the prefetched routes in line", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, drawInto("Trails.application", "/posts"));
+      const r = new RoutesReloader();
+      const a = makeRouteSet();
+      Trails.application = { routes: () => a } as never;
+      r.routeSets.push(a);
+      r.paths.push(routes);
+
+      await r.prefetchBang();
+      expect(a.calls).toEqual([]);
+      expect(r.executeUnlessLoaded()).toBe(true);
+
+      expect(a.calls).toEqual(["clear", "get /posts", "finalize"]);
+      expect(Object.hasOwn(a, "draw")).toBe(true);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("execute_if_updated draws the edited routes file, not the prefetched one", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, drawInto("Trails.application", "/before"));
+      FileUtils.touch(routes, { mtime: new Date(Date.now() - 10_000) });
+      const r = new RoutesReloader();
+      const a = makeRouteSet();
+      Trails.application = { routes: () => a } as never;
+      r.routeSets.push(a);
+      r.paths.push(routes);
+      await r.prefetchBang();
+      r.execute();
+
+      File.write(routes, drawInto("Trails.application", "/after"));
+      expect(await r.executeIfUpdated()).toBe(true);
+
+      expect(a.calls.filter((c) => c.startsWith("get"))).toEqual(["get /before", "get /after"]);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("concurrent prefetches run in turn and restore draw", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, drawInto("Trails.application", "/posts"));
+      const r = new RoutesReloader();
+      const a = makeRouteSet();
+      const draw = Object.getOwnPropertyDescriptor(a, "draw");
+      Trails.application = { routes: () => a } as never;
+      r.routeSets.push(a);
+      r.paths.push(routes);
+
+      const first = r.prefetchBang();
+      File.write(routes, drawInto("Trails.application", "/edited"));
+      await Promise.all([first, r.prefetchBang()]);
+      r.reloadBang();
+
+      expect(a.calls.filter((c) => c.startsWith("get"))).toEqual(["get /edited"]);
+
+      expect(Object.getOwnPropertyDescriptor(a, "draw")).toEqual(draw);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("reload! raises when the routes files were never prefetched", () => {
+    const r = new RoutesReloader();
+    const a = makeRouteSet();
+    r.routeSets.push(a);
+    r.paths.push("/nonexistent/routes.ts");
+
+    expect(() => r.reloadBang()).toThrow(/not prefetched/);
+    expect(a.disableClearAndFinalize).toBe(false);
+  });
+
+  it("a failed prefetch drops the previous recording", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      File.write(routes, drawInto("Trails.application", "/before"));
+      const r = new RoutesReloader();
+      const a = makeRouteSet();
+      Trails.application = { routes: () => a } as never;
+      r.routeSets.push(a);
+      r.paths.push(routes);
+      await r.prefetchBang();
+
+      File.write(routes, `throw new Error("load failed");\n`);
+      await expect(r.prefetchBang()).rejects.toThrow(/load failed/);
+
+      expect(() => r.reloadBang()).toThrow(/not prefetched/);
     } finally {
       FileUtils.rmRf(tmp);
     }
@@ -98,7 +202,8 @@ describe("RoutesReloader", () => {
       const r = new RoutesReloader();
       r.routeSets.push(app, engineRoutes);
       r.paths.push(`${tmp}/app-routes.ts`, `${tmp}/engine-routes.ts`);
-      await r.reloadBang();
+      await r.prefetchBang();
+      r.reloadBang();
 
       expect(app.calls).toEqual(["clear", "get /posts", "finalize"]);
       expect(engineRoutes.routes().length).toBe(1);

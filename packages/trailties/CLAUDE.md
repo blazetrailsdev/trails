@@ -279,6 +279,18 @@ mechanism"; its cross-table rules and
   the generated url-helpers module in `LazyRouteSet#generateUrlHelpers`, since
   `include()` copies a module's methods into each includer and a Proxy on the
   module itself would reach no includer. That row is not converged: the reload
-  is async, so `respondToMissing` starts it and answers `super`, the in-line
+  runs in line, but `respondToMissing` still answers `super`, the in-line
   re-send is unported, and test_help's integration `before_setup` awaits the
   reload — debt tracked by `lazy-route-set-method-missing-resends-in-line`.
+- `RoutesReloader#execute_unless_loaded` runs synchronously because ESM has
+  no synchronous `load`. `set_routes_reloader_hook`, `reload_routes!` and the
+  `to_run` block first await `prefetchBang`, which `rbFLoad`s each routes file
+  while recording the blocks it hands a route set's `draw`. `load_paths`
+  replays those blocks in line. `execute_if_updated` prefetches when a file
+  changed, and concurrent prefetches share one load. Ruled by the operator on
+  2026-11-15. Two consequences follow:
+  - A lazy, non-eager app imports its routes files at boot, where Rails
+    defers the `load` (`finisher.rb:179`). Drawing is still deferred to the
+    first reload.
+  - Only the reloader's own `route_sets` record. A `draw` on any other route
+    set runs during the prefetch.

@@ -17,7 +17,7 @@ export class LazyRouteSet extends RouteSet {
     options: Record<string, unknown>,
     recall: Record<string, unknown> = {},
   ): [string, string[]] {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.generateExtras(options, recall);
   }
 
@@ -27,7 +27,7 @@ export class LazyRouteSet extends RouteSet {
     const wrap = (name: keyof ProxyHelpers): void => {
       const original = helpers[name].bind(helpers);
       helpers[name] = (...args: unknown[]): unknown => {
-        void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+        TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
         return original(...args);
       };
     };
@@ -63,12 +63,12 @@ export class LazyRouteSet extends RouteSet {
   }
 
   override async call(req: RackEnv): Promise<RackResponse> {
-    await TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.call(req);
   }
 
   override draw(callback: DrawCallback): void {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     super.draw(callback);
   }
 
@@ -76,7 +76,7 @@ export class LazyRouteSet extends RouteSet {
     path: string,
     environment: { method?: string | null; extras?: Record<string, unknown> } = {},
   ): Record<string, unknown> {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.recognizePath(path, environment);
   }
 
@@ -86,12 +86,12 @@ export class LazyRouteSet extends RouteSet {
     extras: Record<string, unknown>,
     options: { raiseOnMissing?: boolean } = {},
   ): Record<string, unknown> | undefined {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.recognizePathWithRequest(req, path, extras, options);
   }
 
   override routes(): ReturnType<RouteSet["routes"]> {
-    void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+    TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
     return super.routes();
   }
 
@@ -102,7 +102,7 @@ export class LazyRouteSet extends RouteSet {
   private methodMissingModule(): MethodMissingModule {
     return (this._methodMissingModule ??= {
       respondToMissing(this: object, _name: string, _includeAll: boolean = false): boolean {
-        void TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
+        TopLevel.Trails!.application?.reloadRoutesUnlessLoaded();
         return false;
       },
     });

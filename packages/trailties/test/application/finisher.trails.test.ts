@@ -102,10 +102,13 @@ class TestApp extends Finisher {
   private _routesReloader: FinisherRoutesReloader = {
     eagerLoad: false,
     runAfterLoadPaths: () => {},
-    execute: async () => {
+    prefetchBang: async () => {
+      this.routesReloaderCalls.push("prefetch!");
+    },
+    execute: () => {
       this.routesReloaderCalls.push("execute");
     },
-    executeUnlessLoaded: async () => {
+    executeUnlessLoaded: () => {
       this.routesReloaderCalls.push("execute_unless_loaded");
       return true;
     },
@@ -254,7 +257,7 @@ describe("Finisher", () => {
     const app = new TestApp();
     await app.runInitializers();
     expect(app.calls).toEqual(["generator_templates", "middleware_stack", "prepare!"]);
-    expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded"]);
+    expect(app.routesReloaderCalls).toEqual(["prefetch!", "execute_unless_loaded"]);
   });
 
   it("set_routes_reloader_hook copies config.eagerLoad onto the reloader", async () => {
@@ -262,7 +265,7 @@ describe("Finisher", () => {
     app.config.eagerLoad = true;
     await run(app, "set_routes_reloader_hook");
     expect(app.routesReloader().eagerLoad).toBe(true);
-    expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded"]);
+    expect(app.routesReloaderCalls).toEqual(["prefetch!", "execute_unless_loaded"]);
   });
 
   it("set_routes_reloader_hook pushes the routes reloader onto app.reloaders", async () => {
@@ -287,7 +290,12 @@ describe("Finisher", () => {
     };
     await app.toRun[0].call(instance);
     expect(locked).toBe(true);
-    expect(app.routesReloaderCalls).toEqual(["execute_unless_loaded", "execute"]);
+    expect(app.routesReloaderCalls).toEqual([
+      "prefetch!",
+      "execute_unless_loaded",
+      "prefetch!",
+      "execute",
+    ]);
     expect(seen).toEqual([instance]);
     resetLoadHooks();
   });

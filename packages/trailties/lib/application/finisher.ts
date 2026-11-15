@@ -54,9 +54,10 @@ export interface FinisherConfig {
 
 export interface FinisherRoutesReloader {
   eagerLoad: boolean;
-  runAfterLoadPaths: () => void | Promise<void>;
-  execute(): Promise<void>;
-  executeUnlessLoaded(): Promise<true | null>;
+  runAfterLoadPaths: () => void;
+  prefetchBang(): Promise<void>;
+  execute(): void;
+  executeUnlessLoaded(): true | null;
 }
 
 export interface FinisherHost {
@@ -224,13 +225,15 @@ Finisher.initializer("set_routes_reloader_hook", async function (this: FinisherH
 
   this.reloader.toRun(function (this: FinisherReloaderInstance) {
     this.requireUnloadLockBang();
-    return reloader.execute().then(() => {
+    return reloader.prefetchBang().then(() => {
+      reloader.execute();
       runLoadHooks("after_routes_loaded", this);
     });
   });
 
+  await reloader.prefetchBang();
   if (!(this.routes() instanceof LazyRouteSet) || this.config.eagerLoad === true) {
-    await reloader.executeUnlessLoaded();
+    reloader.executeUnlessLoaded();
   }
 });
 
