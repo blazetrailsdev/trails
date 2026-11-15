@@ -3,6 +3,7 @@ import { constSet } from "../include.js";
 import { TopLevel } from "../object.js";
 import { Timeout } from "../timeout.js";
 import { EOFError } from "../eof-error.js";
+import { StandardError } from "../standard-error.js";
 import { strNew } from "../string/bytes.js";
 import { rbStrDump } from "../string/convert.js";
 import type { HttpClientSocket, HttpDebugOutput } from "../http-adapter.js";
@@ -337,6 +338,10 @@ export class BufferedIO {
   }
 }
 
+/** @noRailsEquivalent PERMANENT — `Net::ProtocolError` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:60`). */
+export class ProtocolError extends StandardError {}
+ProtocolError.prototype.name = "Net::ProtocolError";
+
 /**
  * Ruby's `Net` module (`vendor/ruby/v3.3.11/lib/net/protocol.rb:26`), each
  * constant seated by the file that defines it.
@@ -350,7 +355,10 @@ export const Net = {
   WriteTimeout,
   ReadAdapter,
   BufferedIO,
+  ProtocolError,
 } as {
+  /** @noRailsEquivalent PERMANENT */
+  ProtocolError: typeof ProtocolError;
   /** @noRailsEquivalent PERMANENT */
   name: string;
   /** @noRailsEquivalent PERMANENT */

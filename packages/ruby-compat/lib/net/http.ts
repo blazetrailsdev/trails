@@ -10,6 +10,7 @@ import { OpenSSL } from "../openssl.js";
 import { Resolv } from "../resolv.js";
 import { Socket } from "../socket.js";
 import { Timeout } from "../timeout.js";
+import { kernelCatch } from "../kernel-catch.js";
 import type { HTTP as URIHTTP } from "../uri/http.js";
 import { BufferedIO, Net, OpenTimeout, ReadTimeout } from "./protocol.js";
 import type { HTTPRequest } from "./http/request.js";
@@ -142,6 +143,15 @@ export class HTTP {
   responseBodyEncoding: string | false = false;
   /** @noRailsEquivalent PERMANENT */
   ignoreEof = true;
+  private _continueTimeout: number | null = null;
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_address` (`vendor/ruby/v3.3.11/lib/net/http.rb:1241`). */
+  proxyAddress: string | null = null;
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_port` (`vendor/ruby/v3.3.11/lib/net/http.rb:1245`). */
+  proxyPort: number | null = null;
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_user` (`vendor/ruby/v3.3.11/lib/net/http.rb:1249`). */
+  proxyUser: string | null = null;
+  /** @noRailsEquivalent PERMANENT — `attr_writer :proxy_pass` (`vendor/ruby/v3.3.11/lib/net/http.rb:1253`). */
+  proxyPass: string | null = null;
   private _useSsl = false;
   private _started = false;
   private _socket: BufferedIO | null = null;
@@ -172,6 +182,27 @@ export class HTTP {
   set writeTimeout(sec: number | null) {
     if (this._socket) this._socket.writeTimeout = sec;
     this._writeTimeout = sec;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `attr_reader :continue_timeout` (`vendor/ruby/v3.3.11/lib/net/http.rb:1374`). */
+  get continueTimeout(): number | null {
+    return this._continueTimeout;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1380-1383`. */
+  set continueTimeout(sec: number | null) {
+    if (this._socket) this._socket.continueTimeout = sec;
+    this._continueTimeout = sec;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/net/http.rb:1785-1787`.
+   *
+   * @missingRailsCall proxy_uri — CONVERGEABLE net-http-proxy-from-env-and-connect
+   * @noRailsEquivalent PERMANENT
+   */
+  isProxy(): boolean {
+    return !!this.proxyAddress;
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1188-1191`. */
@@ -273,6 +304,7 @@ export class HTTP {
       this._socket = new BufferedIO(s, {
         readTimeout: this._readTimeout,
         writeTimeout: this._writeTimeout,
+        continueTimeout: this._continueTimeout,
         debugOutput: this._debugOutput,
       });
       this._lastCommunicated = null;
@@ -404,11 +436,7 @@ export class HTTP {
     return res!;
   }
 
-  /**
-   * @missingRailsCall edit_path — CONVERGEABLE net-http-edit-path-and-wait-for-continue
-   * @missingRailsCall catch — CONVERGEABLE net-http-edit-path-and-wait-for-continue
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   async transportRequest(
     req: HTTPRequest,
     block?: (res: HTTPResponse) => unknown,
@@ -419,20 +447,24 @@ export class HTTP {
       for (;;) {
         try {
           await this.beginTransport(req);
-          try {
-            await req.exec(this._socket!, this._currHttpVersion, req.path);
-          } catch (e) {
-            if (!(e instanceof Errno.EPIPE)) throw e;
-          }
-          do {
-            res = await HTTPResponse.readNew(this._socket!);
-            res.decodeContent = req.decodeContent;
-            res.bodyEncoding = this.responseBodyEncoding;
-            res.ignoreEof = this.ignoreEof;
-          } while (res instanceof HTTPInformation);
+          res = (await kernelCatch("response", async () => {
+            try {
+              await req.exec(this._socket!, this._currHttpVersion, this.editPath(req.path));
+            } catch (e) {
+              if (!(e instanceof Errno.EPIPE)) throw e;
+            }
 
-          res.uri = req.uri;
+            do {
+              res = await HTTPResponse.readNew(this._socket!);
+              res.decodeContent = req.decodeContent;
+              res.bodyEncoding = this.responseBodyEncoding;
+              res.ignoreEof = this.ignoreEof;
+            } while (res instanceof HTTPInformation);
 
+            res.uri = req.uri;
+
+            return res;
+          })) as HTTPResponse;
           await res.readingBody(this._socket!, req.isResponseBodyPermitted(), () => block?.(res));
           break;
         } catch (exception) {
@@ -519,6 +551,19 @@ export class HTTP {
       return res.isConnectionKeepAlive();
     } else {
       return !res.isConnectionClose();
+    }
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1869-1879`. */
+  private editPath(path: string): string {
+    if (this.isProxy()) {
+      if (path.startsWith("ftp://") || this.isUseSsl()) {
+        return path;
+      } else {
+        return `http://${this.addrPort()}${path}`;
+      }
+    } else {
+      return path;
     }
   }
 

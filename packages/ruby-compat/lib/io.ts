@@ -904,37 +904,42 @@ export class IO {
   /**
    * {@link IO.copyStream} into a destination named by path, which
    * `rb_io_s_copy_stream` opens for writing (`io.c:13232-13236`, `O_WRONLY |
-   * O_CREAT | O_TRUNC`), written through the backend's async `writeFile`. The
-   * source is read to EOF first. Answers the byte total (`io.c:13392`).
+   * O_CREAT | O_TRUNC`), written through the backend's async `writeFile`, so
+   * that source is read to EOF first; an IO or any other `write` receiver gets
+   * each chunk as it is read (`copy_stream_body`). Answers the byte total
+   * (`io.c:13392`).
    *
    * @noRailsEquivalent PERMANENT — Ruby core `IO.copy_stream`
    * (`vendor/ruby/v3.3.11/io.c:13365`).
    */
   static async copyStreamAsync(
     src: { read(length?: number): string | Uint8Array | null } | IO,
-    dst: string | IO,
+    dst: string | IO | { write(data: Uint8Array): unknown },
   ): Promise<number> {
     const chunks: Uint8Array[] = [];
+    let total = 0;
     let data: string | Uint8Array | null;
     while (
       (data = await (src instanceof IO ? src.readAsync(16384) : src.read(16384))) != null &&
       data.length > 0
     ) {
-      chunks.push(typeof data === "string" ? new TextEncoder().encode(data) : data);
+      const chunk = typeof data === "string" ? new TextEncoder().encode(data) : data;
+      if (typeof dst === "string") chunks.push(chunk);
+      else if (dst instanceof IO) await dst.writeAsync(chunk);
+      else await dst.write(chunk);
+      total += chunk.length;
     }
-    const bytes = new Uint8Array(chunks.reduce((size, chunk) => size + chunk.length, 0));
+    if (typeof dst !== "string") return total;
+    const bytes = new Uint8Array(total);
     let offset = 0;
     for (const chunk of chunks) {
       bytes.set(chunk, offset);
       offset += chunk.length;
     }
-    if (dst instanceof IO) {
-      return await dst.writeAsync(bytes);
-    }
     const fs = getFs();
     if (fs.writeFile) await fs.writeFile(dst, bytes);
     else fs.writeFileSync(dst, bytes);
-    return bytes.length;
+    return total;
   }
 
   /**

@@ -426,6 +426,50 @@ class ETIMEDOUT extends SystemCallError {
 }
 
 /**
+ * `Errno::EHOSTUNREACH`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
+ * as {@link ENOTTY} is: the host's own error carrying `code: "EHOSTUNREACH"` is this
+ * class to `rescue Errno::EHOSTUNREACH`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EHOSTUNREACH`.
+ */
+class EHOSTUNREACH extends SystemCallError {
+  static readonly Errno = 113;
+  readonly code = "EHOSTUNREACH";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "No route to host" : `No route to host - ${mesg}`);
+    this.name = "Errno::EHOSTUNREACH";
+    this.errno = EHOSTUNREACH.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "EHOSTUNREACH";
+  }
+}
+
+/**
+ * `Errno::ENETUNREACH`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`)
+ * as {@link ENOTTY} is: the host's own error carrying `code: "ENETUNREACH"` is this
+ * class to `rescue Errno::ENETUNREACH`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ENETUNREACH`.
+ */
+class ENETUNREACH extends SystemCallError {
+  static readonly Errno = 101;
+  readonly code = "ENETUNREACH";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Network is unreachable" : `Network is unreachable - ${mesg}`);
+    this.name = "Errno::ENETUNREACH";
+    this.errno = ENETUNREACH.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ENETUNREACH";
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
@@ -439,10 +483,12 @@ export const Errno = {
   ECONNREFUSED,
   ECONNRESET,
   EEXIST,
+  EHOSTUNREACH,
   EINTR,
   EINVAL,
   EISDIR,
   EMFILE,
+  ENETUNREACH,
   ENOENT,
   ENOTDIR,
   ENOTTY,

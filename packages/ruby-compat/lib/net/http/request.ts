@@ -8,7 +8,30 @@ import { rbObjDup } from "../../include.js";
 import { Base64 } from "../../base64.js";
 import { warn } from "../../kernel-warn.js";
 import { verbose } from "../../verbose.js";
+import { IO } from "../../io.js";
+import { kernelThrow } from "../../kernel-catch.js";
 import { Net, type BufferedIO } from "../protocol.js";
+
+/** @internal @noRailsEquivalent PERMANENT — `HTTPGenericRequest::Chunker` (`vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:242-257`). */
+class Chunker {
+  private _sock: BufferedIO;
+  private _prev: unknown;
+
+  constructor(sock: BufferedIO) {
+    this._sock = sock;
+    this._prev = null;
+  }
+
+  async write(buf: Uint8Array): Promise<number> {
+    const rv = buf.length;
+    await this._sock.write(`${rv.toString(16)}\r\n`, buf, "\r\n");
+    return rv;
+  }
+
+  async finish(): Promise<void> {
+    await this._sock.write("0\r\n\r\n");
+  }
+}
 
 /**
  * `Net::HTTPRequest` (`vendor/ruby/v3.3.11/lib/net/http/request.rb:40`), with the
@@ -41,7 +64,7 @@ export class HTTPRequest {
   /** @noRailsEquivalent PERMANENT */
   body: string | Uint8Array | null = null;
   /** @noRailsEquivalent PERMANENT */
-  bodyStream: unknown = null;
+  bodyStream: { read(length?: number): string | Uint8Array | null } | IO | null = null;
   private _header: Record<string, string> = {};
   private readonly _requestHasBody: boolean;
   private readonly _responseHasBody: boolean;
@@ -226,7 +249,9 @@ export class HTTPRequest {
   }
 
   /** @noRailsEquivalent PERMANENT — `HTTPGenericRequest#body_stream=` (`vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:179-184`). */
-  setBodyStream(input: unknown): unknown {
+  setBodyStream(
+    input: { read(length?: number): string | Uint8Array | null } | IO | null,
+  ): typeof input {
     this.body = null;
     this.bodyStream = input;
     return input;
@@ -238,9 +263,16 @@ export class HTTPRequest {
       throw new ArgumentError("both of body argument and HTTPRequest#body set");
     }
     if (str != null) this.body = str;
-    if (this.body == null && (this.constructor as typeof HTTPRequest).REQUEST_HAS_BODY) {
+    if (this.body == null && this.bodyStream == null && this.isRequestBodyPermitted()) {
       this.body = "";
     }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#chunked?` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:654-658`). */
+  isChunked(): boolean {
+    if (this._header["transfer-encoding"] == null) return false;
+    const field = this.get("Transfer-Encoding")!;
+    return /(?:^|[^-\w])chunked(?![-\w])/i.test(field) ? true : false;
   }
 
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#connection_close?` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:966-971`). */
@@ -305,19 +337,19 @@ export class HTTPRequest {
   }
 
   /**
-   * @missingRailsCall send_request_with_body_stream — CONVERGEABLE net-http-send-request-with-body-stream
    * @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:198-208`.
    */
   async exec(sock: BufferedIO, ver: string, path: string): Promise<void> {
     if (this.body != null) {
       await this.sendRequestWithBody(sock, ver, path, this.body);
+    } else if (this.bodyStream != null) {
+      await this.sendRequestWithBodyStream(sock, ver, path, this.bodyStream);
     } else {
       await this.writeHeader(sock, ver, path);
     }
   }
 
   /**
-   * @missingRailsCall wait_for_continue — CONVERGEABLE net-http-edit-path-and-wait-for-continue
    * @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:259-266`.
    */
   private async sendRequestWithBody(
@@ -331,7 +363,30 @@ export class HTTPRequest {
     this.delete("Transfer-Encoding");
     this.supplyDefaultContentType();
     await this.writeHeader(sock, ver, path);
+    if (sock.continueTimeout != null) await this.waitForContinue(sock, ver);
     await sock.write(body);
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:268-283`. */
+  private async sendRequestWithBodyStream(
+    sock: BufferedIO,
+    ver: string,
+    path: string,
+    f: { read(length?: number): string | Uint8Array | null } | IO,
+  ): Promise<void> {
+    if (!(this.contentLength != null || this.isChunked())) {
+      throw new ArgumentError("Content-Length not given and Transfer-Encoding is not `chunked'");
+    }
+    this.supplyDefaultContentType();
+    await this.writeHeader(sock, ver, path);
+    if (sock.continueTimeout != null) await this.waitForContinue(sock, ver);
+    if (this.isChunked()) {
+      const chunker = new Chunker(sock);
+      await IO.copyStreamAsync(f, chunker);
+      await chunker.finish();
+    } else {
+      await IO.copyStreamAsync(f, sock);
+    }
   }
 
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:385-390`. */
@@ -343,6 +398,23 @@ export class HTTPRequest {
       });
     }
     this.setContentType("application/x-www-form-urlencoded");
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:371-383`. */
+  private async waitForContinue(sock: BufferedIO, ver: string): Promise<void> {
+    if (
+      ver >= "1.1" &&
+      this._header["expect"] != null &&
+      [this._header["expect"]].includes("100-continue")
+    ) {
+      if (await sock.io.waitReadable(sock.continueTimeout)) {
+        const res = await Net.HTTPResponse.readNew(sock);
+        if (!(res instanceof Net.HTTPContinue)) {
+          res.decodeContent = this.decodeContent;
+          kernelThrow("response", res);
+        }
+      }
+    }
   }
 
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:399-411`. */

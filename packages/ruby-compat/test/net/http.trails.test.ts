@@ -289,7 +289,7 @@ describe("Net::HTTP surface rack-proxy reaches", () => {
     expect(new Net.HTTP.Head("/").isResponseBodyPermitted()).toBe(false);
     const req = new Net.HTTP.Put("/");
     req.body = "x";
-    const io = {};
+    const io = { read: () => null };
     expect(req.setBodyStream(io)).toBe(io);
     expect(req.body).toBeNull();
     expect(req.bodyStream).toBe(io);
@@ -495,5 +495,97 @@ describe("Net::HTTP over Net::BufferedIO", () => {
     const http = new Net.HTTP("127.0.0.1", port);
     http.maxRetries = 0;
     await expect(http.get("/")).rejects.toThrow(Net.HTTPBadResponse);
+  });
+
+  function rawServer(until: (received: string) => boolean, reply: string) {
+    const seen = { received: "" };
+    const server = createNetServer((s) => {
+      s.on("data", (c) => {
+        seen.received += c.toString("latin1");
+        if (until(seen.received)) s.end(reply);
+      });
+    });
+    return { seen, server };
+  }
+
+  function source(...pieces: string[]) {
+    return { read: () => pieces.shift() ?? null };
+  }
+
+  it("send_request_with_body_stream copies the stream after the header", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("hello world"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/p", { "Content-Type": "text/plain", "Content-Length": "11" });
+    req.setBodyStream(source("hello ", "world"));
+    const res = await new Net.HTTP("127.0.0.1", port).request(req);
+    expect(res.code).toBe("200");
+    expect(seen.received.startsWith("POST /p HTTP/1.1\r\n")).toBe(true);
+    expect(seen.received).toContain("Content-Length: 11\r\n");
+    expect(seen.received.endsWith("\r\n\r\nhello world")).toBe(true);
+  });
+
+  it("send_request_with_body_stream writes each read through Chunker when chunked", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("0\r\n\r\n"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/p", {
+      "Content-Type": "text/plain",
+      "Transfer-Encoding": "chunked",
+    });
+    expect(req.isChunked()).toBe(true);
+    req.setBodyStream(source("hello ", "world"));
+    await new Net.HTTP("127.0.0.1", port).request(req);
+    expect(seen.received.endsWith("\r\n\r\n6\r\nhello \r\n5\r\nworld\r\n0\r\n\r\n")).toBe(true);
+  });
+
+  it("send_request_with_body_stream raises without Content-Length or chunked", async () => {
+    const { server } = rawServer(() => false, "");
+    const port = await listen(server);
+    const req = new Net.HTTP.Post("/p");
+    req.setBodyStream(source("x"));
+    await expect(new Net.HTTP("127.0.0.1", port).request(req)).rejects.toThrow(
+      "Content-Length not given and Transfer-Encoding is not `chunked'",
+    );
+  });
+
+  it("edit_path sends an absolute URI through a proxy", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("\r\n\r\n"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const http = new Net.HTTP("127.0.0.1", port);
+    expect(http.isProxy()).toBe(false);
+    http.proxyAddress = "127.0.0.1";
+    expect(http.isProxy()).toBe(true);
+    await http.get("/x");
+    expect(seen.received.startsWith(`GET http://127.0.0.1:${port}/x HTTP/1.1\r\n`)).toBe(true);
+  });
+
+  it("wait_for_continue answers a final response without sending the body", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("\r\n\r\n"),
+      "HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const http = new Net.HTTP("127.0.0.1", port);
+    http.continueTimeout = 5;
+    const res = await http.post("/p", "body", {
+      Expect: "100-continue",
+      "Content-Type": "text/plain",
+    });
+    expect(res.code).toBe("417");
+    expect(seen.received.endsWith("\r\n\r\n")).toBe(true);
+  });
+
+  it("protocol and unreachable errors are seated", () => {
+    expect(new Net.ProtocolError("x")).toBeInstanceOf(Error);
+    expect(new Errno.EHOSTUNREACH().message).toBe("No route to host");
+    expect(new Errno.ENETUNREACH("a").message).toBe("Network is unreachable - a");
   });
 });
