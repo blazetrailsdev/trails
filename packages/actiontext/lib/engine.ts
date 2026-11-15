@@ -12,7 +12,6 @@ import { Attribute } from "./attribute.js";
 import { Content } from "./content.js";
 import { ContentHelper } from "./content-helper.js";
 import { Encryption } from "./encryption.js";
-import { SystemTestHelper } from "./system-test-helper.js";
 import { TagHelper } from "./tag-helper.js";
 import "./deprecator.js";
 
@@ -138,7 +137,8 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("action_text.system_test_helper", () => {
-      onLoad("action_dispatch_system_test_case", function (this: object) {
+      onLoad("action_dispatch_system_test_case", async function (this: object) {
+        const { SystemTestHelper } = await import("@blazetrails/actiontext/system-test-helper");
         include(this as never, SystemTestHelper);
       });
     });

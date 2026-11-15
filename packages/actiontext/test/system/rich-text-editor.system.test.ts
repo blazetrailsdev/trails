@@ -29,15 +29,20 @@ describe("ActionText::RichTextEditorTest", () => {
     ]);
     await fileChooser.setFiles(imageFile.toString());
     await expect
-      .element(page.locator("trix-editor img"))
-      .toHaveAttribute("src", new RegExp(`/trails/active_storage/blobs/redirect/.*/${basename}$`));
+      .element(
+        page.locator(
+          `trix-editor img[src*="/trails/active_storage/blobs/redirect/"][src$="/${basename}"]`,
+        ),
+      )
+      .toBeInTheDocument();
     await page.getByRole("button", { name: "Create Message" }).click();
 
     await expect
-      .element(page.locator(".trix-content img"))
-      .toHaveAttribute(
-        "src",
-        new RegExp(`/trails/active_storage/representations/redirect/.*/${basename}$`),
-      );
+      .element(
+        page.locator(
+          `.trix-content img[src*="/trails/active_storage/representations/redirect/"][src$="/${basename}"]`,
+        ),
+      )
+      .toBeInTheDocument();
   }, 60_000);
 });
