@@ -454,7 +454,6 @@ export class HTTP {
               if (!(e instanceof Errno.EPIPE)) throw e;
             }
 
-            let res: HTTPResponse;
             do {
               res = await HTTPResponse.readNew(this._socket!);
               res.decodeContent = req.decodeContent;
