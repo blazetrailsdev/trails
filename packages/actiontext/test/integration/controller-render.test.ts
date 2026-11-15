@@ -28,7 +28,7 @@ describe("ActionText::ControllerRenderTest", () => {
     t.app = routes;
   });
 
-  it.skip("uses current request environment", async () => {
+  it("uses current request environment", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
     const message = await Message.createBang({
       content: await new Content().appendAttachables(blob),
@@ -44,7 +44,7 @@ describe("ActionText::ControllerRenderTest", () => {
     );
   });
 
-  it.skip("renders as HTML when the request format is not HTML", async () => {
+  it("renders as HTML when the request format is not HTML", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
     const message = await Message.createBang({
       content: await new Content().appendAttachables(blob),

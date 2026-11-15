@@ -54,6 +54,13 @@ await import("@blazetrails/activestorage/config/routes.js");
 routes.disableClearAndFinalize = false;
 routes.finalizeBang();
 app.routes().defineMountedHelper("main_app");
+const { Engine: ActiveStorageEngine } = await import("@blazetrails/activestorage/engine");
+await import("@blazetrails/activestorage/variant-record");
+for (const initializer of ActiveStorageEngine.initializers) {
+  if (["active_storage.configs", "active_storage.verifier"].includes(initializer.name)) {
+    await initializer.bind(ActiveStorageEngine.instance()).run(app);
+  }
+}
 runLoadHooks("after_initialize", app);
 
 const { Engine } = await import("../lib/engine.js");
