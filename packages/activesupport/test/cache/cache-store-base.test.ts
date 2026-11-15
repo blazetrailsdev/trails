@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Store, ArgumentError } from "../../lib/cache/store.js";
+import { Store, ArgumentError, type StoreOptions } from "../../lib/cache/store.js";
 import { Entry } from "../../lib/cache/entry.js";
 
 class TestStore extends Store {
+  declare protected normalizeKey: (key: unknown, options?: StoreOptions) => Promise<string>;
   private _data = new Map<string, Entry>();
   protected async readEntry(key: string, _o: Record<string, unknown>): Promise<Entry | null> {
     return this._data.get(key) ?? null;
@@ -28,12 +29,12 @@ class TestStore extends Store {
   }
   override async increment(name: string, amount = 1): Promise<number | null> {
     const key = await this.normalizeKey(name, {});
-    const entry = await this.readEntry(key as string, {});
+    const entry = await this.readEntry(key, {});
     if (!entry) return null;
     const n = Number(entry.value);
     if (isNaN(n)) return null;
     const next = n + amount;
-    await this.writeEntry(key as string, new Entry(next), {});
+    await this.writeEntry(key, new Entry(next), {});
     return next;
   }
   override async decrement(name: string, amount = 1): Promise<number | null> {

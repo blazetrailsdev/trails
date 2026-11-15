@@ -4,6 +4,6 @@
     "tsFile": "cache.ts",
     "rubyName": "write_multi",
     "call": "order:constructor,normalizeKey",
-    "reason": "Ruby `memo[normalize_key(name, options)] = Entry.new(...)` (cache.rb write_multi) is extracted RHS-first; a binary SolidCache key cannot key a plain object, so the port is `entries.set(normalizeKey, new Entry)`, which evaluates normalize_key first exactly as Ruby's `[]=` does"
+    "reason": "TS reads `new Hash()` (constructor) before the first normalizeKey: cache.rb:555 builds `normalized_hash` with `transform_keys`, which allocates without a `.new` call, but its block is async here (normalizeKey awaits) so the Hash is allocated first and filled in a loop; a binary SolidCache key cannot key the plain object the port used before. An `order:` row has no call-site receipt (compare.ts ORDER_PREFIX keys the baseline only)"
   }
 ]

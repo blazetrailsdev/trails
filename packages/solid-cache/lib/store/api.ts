@@ -12,8 +12,6 @@ import type { StoreHost } from "../store.js";
 
 type Options = Record<string, unknown>;
 
-const encoder = new TextEncoder();
-
 export const Api = {
   DEFAULT_MAX_KEY_BYTESIZE: 1024,
   SQL_WILDCARD_CHARS: ["_", "%"],
@@ -209,7 +207,7 @@ export const Api = {
   truncateKey(this: StoreHost, key: Uint8Array | null): Uint8Array | null {
     if (key != null && key.length > this.maxKeyBytesize) {
       const suffix = `:hash:${ActiveSupportDigest.hexdigest(key)}`;
-      const truncateAt = this.maxKeyBytesize - encoder.encode(suffix).length;
+      const truncateAt = this.maxKeyBytesize - b(suffix).length;
       return b(new Uint8Array([...byteslice(key, 0, truncateAt)!, ...b(suffix)]));
     } else {
       return key;

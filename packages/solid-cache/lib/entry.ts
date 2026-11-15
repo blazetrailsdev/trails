@@ -11,14 +11,13 @@ import {
   Digest,
   eachSlice,
   Hash,
+  b,
   rbEqual,
   toS,
   unpack,
 } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
 import { SolidCache } from "./solid-cache.js";
-
-const encoder = new TextEncoder();
 
 type Payload = {
   key: string | Uint8Array;
@@ -176,11 +175,7 @@ export class Entry extends Record {
 
   /** @internal */
   private static byteSizeFor(payload: Payload): number {
-    return (
-      toS(payload.key).length +
-      encoder.encode(toS(payload.value)).length +
-      this.estimatedRowOverhead()
-    );
+    return b(toS(payload.key)).length + b(toS(payload.value)).length + this.estimatedRowOverhead();
   }
 
   /** @internal */

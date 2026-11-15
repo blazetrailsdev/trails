@@ -29,6 +29,8 @@ export class MemoryStore extends Store implements CacheStore {
     return true;
   }
 
+  declare protected normalizeKey: (key: unknown, options?: StoreOptions) => Promise<string>;
+
   protected data: Map<string, Entry | string> = new Map();
   private maxSize: number;
   private maxPruneTime: number;
@@ -160,14 +162,14 @@ export class MemoryStore extends Store implements CacheStore {
     options = this.mergedOptions(options);
     const key = await this.normalizeKey(name, options);
     const version = (await this.normalizeVersion(name, options)) ?? null;
-    const entry = await this.readEntry(key as string, options);
+    const entry = await this.readEntry(key, options);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
       await this.write(name, kernelInteger(amount), options);
       return amount;
     }
     const num = toI(entry.value) + amount;
     await this.writeEntry(
-      key as string,
+      key,
       new Entry(num, { expiresAt: entry.expiresAt, version: entry.version }),
       {},
     );
