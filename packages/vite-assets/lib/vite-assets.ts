@@ -1,6 +1,7 @@
 import {
   env as ENV,
   File,
+  Gem,
   getHttpAsync,
   Logger,
   stdout as $stdout,
@@ -11,6 +12,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Build } from "./build.js";
 import { Builder } from "./builder.js";
+import { Commands } from "./commands.js";
 import { Config, type ConfigOptions } from "./config.js";
 import { DevServerProxy } from "./dev-server-proxy.js";
 import { Error } from "./error.js";
@@ -25,7 +27,9 @@ type ConfigAttrs = Partial<Record<keyof ConfigOptions, unknown>>;
 
 export class ViteAssets {
   declare static Build: typeof Build;
+  declare static CLI: typeof import("./cli.js").CLI;
   declare static Builder: typeof Builder;
+  declare static Commands: typeof Commands;
   declare static Config: typeof Config;
   declare static DevServerProxy: typeof DevServerProxy;
   declare static Error: typeof Error;
@@ -54,6 +58,13 @@ export class ViteAssets {
   /** @internal */
   private static _instance: ViteAssets | undefined;
 
+  static frameworkLibraries(): [string, { name: string; version: unknown }][] {
+    return Object.entries(this.COMPANION_LIBRARIES).flatMap(([name, framework]) => {
+      const library = Gem.loadedSpecs[name] as { name: string; version: unknown } | undefined;
+      return library ? [[framework, library] as [string, { name: string; version: unknown }]] : [];
+    });
+  }
+
   static instance(): ViteAssets {
     return (this._instance ??= new this());
   }
@@ -68,6 +79,10 @@ export class ViteAssets {
 
   static digest(): Promise<string> {
     return this.instance().digest();
+  }
+
+  static commands(): Commands {
+    return this.instance().commands();
   }
 
   static run(argv: string[], options: { exec?: boolean } = {}): Promise<unknown> {
@@ -110,6 +125,8 @@ export class ViteAssets {
   private _runningCheckedAt = 0;
   /** @internal */
   private _runner: Runner | undefined;
+  /** @internal */
+  private _commands: Commands | undefined;
   /** @internal */
   private _builder: Builder | undefined;
   /** @internal */
@@ -174,6 +191,10 @@ export class ViteAssets {
 
   builder(): Builder {
     return (this._builder ??= new Builder(this));
+  }
+
+  commands(): Commands {
+    return (this._commands ??= new Commands(this));
   }
 
   async config(): Promise<Config> {
@@ -252,6 +273,7 @@ ViteAssets.prototype.isRunProxy = ViteAssets.prototype.isDevMode;
 
 ViteAssets.Build = Build;
 ViteAssets.Builder = Builder;
+ViteAssets.Commands = Commands;
 ViteAssets.Config = Config;
 ViteAssets.DevServerProxy = DevServerProxy;
 ViteAssets.Error = Error;

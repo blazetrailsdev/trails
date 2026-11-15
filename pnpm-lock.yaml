@@ -1306,6 +1306,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/thor':
+        specifier: workspace:*
+        version: link:../thor
     devDependencies:
       '@blazetrails/rack-test':
         specifier: workspace:*

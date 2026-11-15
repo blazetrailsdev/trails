@@ -20,6 +20,9 @@
       "path": "../ruby-compat"
     },
     {
+      "path": "../thor"
+    },
+    {
       "path": "../vitest-matchers"
     }
   ]

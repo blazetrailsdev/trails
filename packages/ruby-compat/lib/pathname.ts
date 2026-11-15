@@ -2,6 +2,7 @@ import { ArgumentError } from "./argument-error.js";
 import { Dir } from "./dir.js";
 import { Errno } from "./errno.js";
 import { File } from "./file.js";
+import { FileUtils } from "./file-utils.js";
 import { getFs } from "./fs-adapter.js";
 import { rbBlockGivenP } from "./hash.js";
 import { rbInspect } from "./object.js";
@@ -62,6 +63,17 @@ export class Pathname {
     } else {
       return file.open(this.toPath(), ...args);
     }
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:778` `path_dirname` */
+  dirname(): Pathname {
+    return new Pathname(File.dirname(this._path));
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:590` `mkpath` */
+  async mkpath({ mode }: { mode?: number } = {}): Promise<null> {
+    await FileUtils.mkpathAsync(this._path, { mode });
+    return null;
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:356` `path_read` */

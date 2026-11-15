@@ -9,11 +9,16 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./*.js": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
     }
   },
   "files": [
     "dist",
-    "default.vite.json"
+    "default.vite.json",
+    "templates"
   ],
   "scripts": {
     "build": "tsc"
@@ -23,7 +28,8 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "@blazetrails/rack-proxy": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*"
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/thor": "workspace:*"
   },
   "devDependencies": {
     "@blazetrails/rack-test": "workspace:*",
