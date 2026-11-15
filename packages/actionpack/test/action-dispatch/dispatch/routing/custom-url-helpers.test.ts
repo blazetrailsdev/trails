@@ -163,7 +163,7 @@ Routes.draw(function () {
 const APP = IntegrationTest.buildApp(Routes);
 
 class TestCustomUrlHelpers extends IntegrationTest {
-  override get app(): unknown {
+  override get app() {
     return APP;
   }
 

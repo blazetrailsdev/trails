@@ -41,7 +41,7 @@ describe("IPv6IntegrationTest", () => {
       return Routes;
     }
 
-    override get app(): unknown {
+    override get app() {
       return IPv6IntegrationTest.APP;
     }
   }

@@ -15,7 +15,10 @@ import { CacheStore } from "../../../../lib/action-dispatch/middleware/session/c
 import { ShowExceptions } from "../../../../lib/action-dispatch/middleware/show-exceptions.js";
 import type { MiddlewareFactory } from "../../../../lib/action-dispatch/middleware/stack.js";
 import type { RouteSet } from "../../../../lib/action-dispatch/routing/route-set.js";
-import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";
+import {
+  IntegrationTest,
+  type RoutesApp,
+} from "../../../../lib/action-dispatch/testing/integration.js";
 import "../../../support/abstract-unit.js";
 
 class TestController extends Base {
@@ -49,7 +52,7 @@ class CacheStoreTest extends IntegrationTest {
 
   declare _cache: MemoryStore;
 
-  override get app(): unknown {
+  override get app(): RoutesApp {
     return (this._app ??= IntegrationTest.buildApp(null, (middleware) => {
       this._cache = new MemoryStore();
       middleware.use(CacheStore as MiddlewareFactory, { key: "_session_id", cache: this._cache });
@@ -58,7 +61,7 @@ class CacheStoreTest extends IntegrationTest {
   }
 
   override set app(value: unknown) {
-    this._app = value;
+    super.app = value;
   }
 
   async withTestRouteSet(block: () => Promise<void>): Promise<void> {

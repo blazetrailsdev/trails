@@ -25,7 +25,11 @@ import {
 import { HTML5, XML } from "@blazetrails/nokogiri";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
-import { IntegrationTest, Session } from "../../../lib/action-dispatch/testing/integration.js";
+import {
+  IntegrationTest,
+  type RoutesApp,
+  Session,
+} from "../../../lib/action-dispatch/testing/integration.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
@@ -231,14 +235,14 @@ describe("IntegrationTestTest", () => {
 });
 
 class RackLintIntegrationTest extends IntegrationTest {
-  override get app(): unknown {
+  override get app(): RoutesApp {
     return (this._app ??= IntegrationTest.buildApp(this.routes, (middleware) => {
       middleware.unshift(Lint);
     }));
   }
 
   override set app(value: unknown) {
-    this._app = value;
+    super.app = value;
   }
 }
 
@@ -897,7 +901,7 @@ describe("ApplicationIntegrationTest", () => {
     }
   }
 
-  class ApplicationIntegrationTest extends IntegrationTest {
+  class ApplicationIntegrationTest extends IntegrationTest<unknown> {
     static call(env: RackEnv): Promise<RackResponse> {
       return this.routes().call(env);
     }
@@ -929,7 +933,7 @@ describe("ApplicationIntegrationTest", () => {
       });
     }
 
-    override get app(): unknown {
+    override get app() {
       return this.constructor;
     }
   }
@@ -998,7 +1002,7 @@ describe("EnvironmentFilterIntegrationTest", () => {
     }
   }
 
-  class EnvironmentFilterIntegrationTest extends IntegrationTest {
+  class EnvironmentFilterIntegrationTest extends IntegrationTest<unknown> {
     static call(env: RackEnv): Promise<RackResponse> {
       env["action_dispatch.parameter_filter"] = ["password"];
       return this.routes().call(env);
@@ -1017,7 +1021,7 @@ describe("EnvironmentFilterIntegrationTest", () => {
       });
     }
 
-    override get app(): unknown {
+    override get app() {
       return this.constructor;
     }
   }
@@ -1091,7 +1095,7 @@ describe("UrlOptionsIntegrationTest", () => {
     }
   }
 
-  class UrlOptionsIntegrationTest extends IntegrationTest {
+  class UrlOptionsIntegrationTest extends IntegrationTest<unknown> {
     static _routes?: RouteSet;
 
     static routes(): RouteSet {
@@ -1102,7 +1106,7 @@ describe("UrlOptionsIntegrationTest", () => {
       return this.routes().call(env);
     }
 
-    override get app(): unknown {
+    override get app() {
       return this.constructor;
     }
 
@@ -1181,7 +1185,7 @@ describe("HeadWithStatusActionIntegrationTest", () => {
     }
   }
 
-  class HeadWithStatusActionIntegrationTest extends IntegrationTest {
+  class HeadWithStatusActionIntegrationTest extends IntegrationTest<unknown> {
     static _routes?: RouteSet;
 
     static routes(): RouteSet {
@@ -1192,7 +1196,7 @@ describe("HeadWithStatusActionIntegrationTest", () => {
       return this.routes().call(env);
     }
 
-    override get app(): unknown {
+    override get app() {
       return this.constructor;
     }
 
@@ -1499,7 +1503,7 @@ describe("IntegrationFileUploadTest", () => {
     }
   }
 
-  class IntegrationFileUploadTest extends IntegrationTest {
+  class IntegrationFileUploadTest extends IntegrationTest<unknown> {
     static _routes?: RouteSet;
 
     static routes(): RouteSet {
@@ -1510,7 +1514,7 @@ describe("IntegrationFileUploadTest", () => {
       return this.routes().call(env);
     }
 
-    override get app(): unknown {
+    override get app() {
       return this.constructor;
     }
 
@@ -1551,7 +1555,7 @@ describe("PageDumpIntegrationTest", () => {
   }
   include(FooController, SharedTestRoutes.urlHelpers());
 
-  class PageDumpIntegrationTest extends IntegrationTest {
+  class PageDumpIntegrationTest extends IntegrationTest<unknown> {
     static _routes?: RouteSet;
 
     static routes(): RouteSet {
@@ -1562,7 +1566,7 @@ describe("PageDumpIntegrationTest", () => {
       return this.routes().call(env);
     }
 
-    override get app(): unknown {
+    override get app() {
       return this.constructor;
     }
 

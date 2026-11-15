@@ -12,7 +12,7 @@ import type {
   MiddlewareStack,
 } from "../../../lib/action-dispatch/middleware/stack.js";
 import { CookieStore } from "../../../lib/action-dispatch/middleware/session/cookie-store.js";
-import { HashWithIndifferentAccess, include } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { SharedTestRoutes } from "../../support/abstract-unit.js";
 
@@ -237,7 +237,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("PUT /posts/:id updates resource", async () => {
       await app.put("/posts/5", { params: { title: "Updated" } });
       app.assertResponse(":success");
-      expect((app.response.parsedBody as HashWithIndifferentAccess).get("updated")).toBe(true);
+      expect(app.response.parsedBody.get("updated")).toBe(true);
     });
 
     it("PATCH /posts/:id updates resource", async () => {
@@ -260,19 +260,19 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("nested resources work", async () => {
       await app.get("/posts/1/comments");
       app.assertResponse(":success");
-      expect((app.response.parsedBody as HashWithIndifferentAccess).get("postId")).toBe("1");
+      expect(app.response.parsedBody.get("postId")).toBe("1");
     });
 
     it("nested resource POST works", async () => {
       await app.post("/posts/3/comments", { params: { body: "Nice" } });
       app.assertResponse(":created");
-      expect((app.response.parsedBody as HashWithIndifferentAccess).get("postId")).toBe("3");
+      expect(app.response.parsedBody.get("postId")).toBe("3");
     });
 
     it("namespaced resources work", async () => {
       await app.get("/admin/posts");
       app.assertResponse(":success");
-      expect((app.response.parsedBody as HashWithIndifferentAccess).get("admin")).toBe(true);
+      expect(app.response.parsedBody.get("admin")).toBe(true);
     });
 
     it("singular resource works", async () => {
@@ -347,9 +347,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("session persists across requests", async () => {
       await app.post("/posts", { params: { title: "Persisted" } });
       await app.get("/posts/session");
-      expect((app.response.parsedBody as HashWithIndifferentAccess).get("lastPost")).toBe(
-        "Persisted",
-      );
+      expect(app.response.parsedBody.get("lastPost")).toBe("Persisted");
     });
 
     it("login flow with session", async () => {
@@ -357,7 +355,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       app.assertResponse(":redirect");
 
       await app.get("/session");
-      expect((app.response.parsedBody as HashWithIndifferentAccess).get("userId")).toBe(42);
+      expect(app.response.parsedBody.get("userId")).toBe(42);
 
       await app.delete("/session");
       app.assertResponse(":no_content");
@@ -367,7 +365,7 @@ describe("ActionDispatch::IntegrationTest", () => {
       await app.post("/posts", { params: { title: "Before Reset" } });
       app.reset();
       await app.get("/posts/session");
-      expect((app.response.parsedBody as HashWithIndifferentAccess).get("lastPost")).toBe("none");
+      expect(app.response.parsedBody.get("lastPost")).toBe("none");
     });
   });
 

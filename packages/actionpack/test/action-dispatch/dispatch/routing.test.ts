@@ -4734,7 +4734,7 @@ describe("TestUrlGenerationErrors", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestUrlGenerationErrors extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -4828,7 +4828,7 @@ describe("TestAltApp", () => {
 
   const APP = IntegrationTest.buildApp(AltRoutes);
   class TestAltApp extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -4993,7 +4993,7 @@ describe("TestGlobRoutingMapper", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestGlobRoutingMapper extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5117,7 +5117,7 @@ describe("TestNamedRouteUrlHelpers", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestNamedRouteUrlHelpers extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
 
@@ -5166,7 +5166,7 @@ describe("TestUrlConstraints", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestUrlConstraints extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
 
@@ -5322,7 +5322,7 @@ describe("TestOptionalRootSegments", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestOptionalRootSegments extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
 
@@ -5362,7 +5362,7 @@ describe("TestPortConstraints", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestPortConstraints extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5424,7 +5424,7 @@ describe("TestFormatConstraints", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestFormatConstraints extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5505,7 +5505,7 @@ describe("TestRouteDefaults", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestRouteDefaults extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5551,7 +5551,7 @@ describe("TestRackAppRouteGeneration", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestRackAppRouteGeneration extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5593,7 +5593,7 @@ describe("TestRedirectRouteGeneration", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestRedirectRouteGeneration extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5641,7 +5641,7 @@ describe("TestErrorsInController", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestErrorsInController extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5693,7 +5693,7 @@ describe("TestPartialDynamicPathSegments", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestPartialDynamicPathSegments extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5770,7 +5770,7 @@ describe("TestOptionalScopesWithOrWithoutParams", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestOptionalScopesWithOrWithoutParams extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5831,7 +5831,7 @@ describe("TestPathParameters", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestPathParameters extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5865,7 +5865,7 @@ describe("TestInternalRoutingParams", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestInternalRoutingParams extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5939,7 +5939,7 @@ describe("FlashRedirectTest", () => {
   });
 
   class FlashRedirectTest extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -5975,7 +5975,7 @@ describe("TestRelativeUrlRootGeneration", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestRelativeUrlRootGeneration extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
 
@@ -6135,7 +6135,7 @@ describe("TestMultipleNestedController", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestMultipleNestedController extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -6171,7 +6171,7 @@ describe("TestRedirectInterpolation", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestRedirectInterpolation extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -6218,7 +6218,7 @@ describe("TestConstraintsAccessingParameters", () => {
 
   const APP = IntegrationTest.buildApp(Routes);
   class TestConstraintsAccessingParameters extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }
@@ -6254,7 +6254,7 @@ describe("TestDefaultUrlOptions", () => {
   const APP = IntegrationTest.buildApp(Routes);
 
   class TestDefaultUrlOptions extends IntegrationTest {
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
 

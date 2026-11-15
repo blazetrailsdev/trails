@@ -435,7 +435,7 @@ include(Session, RequestHelpers);
 include(Session, Assertions);
 include(Session, urlForMod.UrlFor);
 
-type RoutesApp = { routes(): RouteSet };
+export type RoutesApp = { routes(): RouteSet; _routes?: RouteSet };
 
 interface RunnerHost {
   _integrationSession: Session | null;
@@ -681,7 +681,7 @@ type SessionMethodMissing = Pick<
 > & { options(path: string, options?: IntegrationRequestOptions): Promise<number> };
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
-export class IntegrationTest extends TestCase {
+export class IntegrationTest<App = RoutesApp> extends TestCase {
   routes: RouteSet = new RouteSet();
 
   /** @inlinedFrom ActionDispatch::Routing::UrlFor#initialize rails/v8.0.2/actionpack/lib/action_dispatch/routing/url_for.rb:111-114 */
@@ -732,27 +732,25 @@ export class IntegrationTest extends TestCase {
   _originalRoutes?: RouteSet;
 
   /** @internal */
-  declare _app?: unknown;
+  declare _app?: App | null;
 
-  get app(): unknown {
-    return (
-      Reflect.get(Object.getPrototypeOf(IntegrationTest.prototype) as object, "app", this) ??
-      (this.constructor as typeof IntegrationTest).app
-    );
+  get app(): App {
+    return (Reflect.get(Object.getPrototypeOf(IntegrationTest.prototype) as object, "app", this) ??
+      (this.constructor as typeof IntegrationTest).app) as App;
   }
 
   set app(value: unknown) {
-    this._app = value;
+    this._app = value as App;
   }
 
   /** @internal */
   static _app: unknown = null;
 
-  static get app(): unknown {
+  static get app(): RoutesApp {
     if (IntegrationTest._app != null && IntegrationTest._app !== false) {
-      return IntegrationTest._app;
+      return IntegrationTest._app as RoutesApp;
     } else {
-      return ActionDispatch.testApp;
+      return ActionDispatch.testApp as RoutesApp;
     }
   }
 
@@ -845,8 +843,7 @@ export function spliceMethodMissing(proto: object): void {
   );
 }
 
-/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include TestProcess::FixtureFile` and `include Integration::Runner` (`actionpack/lib/action_dispatch/testing/integration.rb:651,662`), with TestProcess reached through `method_missing`; the class/interface merge is how a mixin surfaces on the type side. */
-export interface IntegrationTest
+export interface IntegrationTest<App = RoutesApp>
   extends
     SessionMethodMissing,
     Included<typeof FixtureFile>,

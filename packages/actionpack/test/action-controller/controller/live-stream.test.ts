@@ -813,7 +813,7 @@ describe("LiveStreamRouterTest", () => {
     }
   }
 
-  class LiveStreamRouterTest extends IntegrationTest {
+  class LiveStreamRouterTest extends IntegrationTest<unknown> {
     static call(env: RackEnv): Promise<RackResponse> {
       return this.routes().call(env);
     }
@@ -831,7 +831,7 @@ describe("LiveStreamRouterTest", () => {
       });
     }
 
-    override get app(): unknown {
+    override get app() {
       return this.constructor;
     }
   }

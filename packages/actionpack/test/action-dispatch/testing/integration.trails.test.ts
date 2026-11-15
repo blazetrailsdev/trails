@@ -115,7 +115,7 @@ describe("Integration::Session includes TestProcess", () => {
 });
 
 describe("Integration::Runner#integration_session", () => {
-  class HelperSession extends IntegrationTest {
+  class HelperSession extends IntegrationTest<unknown> {
     private static _routes = new RouteSet();
 
     static routes(): RouteSet {
@@ -128,7 +128,7 @@ describe("Integration::Runner#integration_session", () => {
       });
     }
 
-    override get app(): unknown {
+    override get app() {
       return HelperSession;
     }
   }

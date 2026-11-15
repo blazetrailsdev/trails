@@ -22,7 +22,10 @@ import type {
 import type { Request } from "../../../lib/action-dispatch/http/request.js";
 import type { MountableApp, RouteOptions } from "../../../lib/action-dispatch/routing/mapper.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
-import { IntegrationTest } from "../../../lib/action-dispatch/testing/integration.js";
+import {
+  IntegrationTest,
+  type RoutesApp,
+} from "../../../lib/action-dispatch/testing/integration.js";
 import { FIXTURE_LOAD_PATH } from "../../support/abstract-unit.js";
 
 class ArticlesController extends Base {}
@@ -83,7 +86,8 @@ interface Host {
   assertRouting: TestCase["assertRouting"];
   withRouting<T>(block: (routes: RouteSet) => T): T;
 }
-type HostClass = (typeof TestCase | typeof IntegrationTest) & (new (name: string) => Host);
+type HostClass = (typeof TestCase | typeof IntegrationTest<RoutesApp>) &
+  (new (name: string) => Host);
 
 function runTest<T extends Host>(klass: new (name: string) => T): () => T {
   let t: T;
@@ -588,9 +592,11 @@ describe("WithRoutingResetTest", () => {
         },
       );
     });
-    (t().app as { routes(): RouteSet }).routes().draw(function () {
-      this.get("/purchase", { to: "store#purchase" });
-    });
+    t()
+      .app.routes()
+      .draw(function () {
+        this.get("/purchase", { to: "store#purchase" });
+      });
 
     middlewareConfig!.foo = "bar";
 
