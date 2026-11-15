@@ -1623,16 +1623,20 @@
     }
   },
   "vite-assets": {
-    "rows": 6,
+    "rows": 10,
     "excluded": ["vite-assets.ts::ViteAssets"],
     "unwalked": [],
     "residue": {
+      "build.ts::Build": "ViteAssets::Build",
+      "builder.ts::Builder": "ViteAssets::Builder",
       "config.ts::Config": "ViteAssets::Config",
       "dev-server-proxy.ts::DevServerProxy": "ViteAssets::DevServerProxy",
       "error.ts::Error": "ViteAssets::Error",
+      "io.ts::IO": "ViteAssets::IO",
       "manifest.ts::Manifest": "ViteAssets::Manifest",
       "missing-entrypoint-error.ts::MissingEntrypointError": "ViteAssets::MissingEntrypointError",
-      "missing-executable-error.ts::MissingExecutableError": "ViteAssets::MissingExecutableError"
+      "missing-executable-error.ts::MissingExecutableError": "ViteAssets::MissingExecutableError",
+      "runner.ts::Runner": "ViteAssets::Runner"
     }
   },
   "zeitwerk": {

@@ -2642,6 +2642,24 @@ describe(
       ]);
     });
 
+    it("synthesizes the accessors a scoped `Mod::CONST = Struct.new(...) do ... end` generates", () => {
+      const m = metaMethods(`
+      ViteRuby::Build = Struct.new(:success, :digest, keyword_init: true) do
+        def stale?
+          digest
+        end
+      end
+    `);
+      expect(m["ViteRuby::Build"].map((x) => x.name).sort()).toEqual([
+        "digest",
+        "digest=",
+        "initialize",
+        "stale?",
+        "success",
+        "success=",
+      ]);
+    });
+
     it("synthesizes the accessors a `Struct.new(*CONST)` superclass generates", () => {
       const m = metaMethods(`
       module I18n

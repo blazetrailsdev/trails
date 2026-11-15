@@ -714,11 +714,17 @@ class ApiExtractor
       # `CONST = Struct.new(...)` carries the same generated members whether or
       # not a `do … end` body follows it (schema_definitions.rb:113-121 has five
       # blockless ones), so both forms enter the struct-class path.
+      # `ViteRuby::Build = Struct.new(...)` (vite_ruby/build.rb:7) names the
+      # struct by a scoped path, a :const_path_field LHS.
       struct_call = struct_new_call(rhs)
-      if lhs.is_a?(Array) && lhs[0] == :var_field &&
-         lhs[1].is_a?(Array) && lhs[1][0] == :@const &&
-         struct_call
-        const_name_str = lhs[1][1]
+      struct_lhs = if lhs.is_a?(Array) && lhs[0] == :var_field &&
+                      lhs[1].is_a?(Array) && lhs[1][0] == :@const
+                     lhs[1][1]
+                   elsif lhs.is_a?(Array) && lhs[0] == :const_path_field
+                     const_name(lhs)
+                   end
+      if struct_lhs && struct_call
+        const_name_str = struct_lhs
         block = rhs[0] == :method_add_block ? rhs[2] : nil
         body = block.is_a?(Array) && (block[0] == :do_block || block[0] == :brace_block) ? block[2] : nil
         @namespace_stack.push(const_name_str)
@@ -5235,7 +5241,7 @@ class ApiExtractor
       node[1]
     when :const_ref
       const_name(node[1])
-    when :const_path_ref
+    when :const_path_ref, :const_path_field
       left = const_name(node[1])
       right = const_name(node[2])
       [left, right].compact.join("::")
