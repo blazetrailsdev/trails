@@ -6,7 +6,7 @@ describe("LazyRouteSet method_missing_module", () => {
   let reload: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    reload = vi.fn(async () => true);
+    reload = vi.fn(() => true);
     Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
   });
 
@@ -35,7 +35,7 @@ describe("LazyRouteSet url helper modules", () => {
   let reload: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    reload = vi.fn(async () => true);
+    reload = vi.fn(() => true);
     Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
   });
 
@@ -99,7 +99,7 @@ describe("LazyRouteSet#routes", () => {
   let reload: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
-    reload = vi.fn(async () => true);
+    reload = vi.fn(() => true);
     Trails.application = { reloadRoutesUnlessLoaded: reload } as never;
   });
 
