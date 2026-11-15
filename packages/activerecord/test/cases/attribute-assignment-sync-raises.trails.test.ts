@@ -65,3 +65,27 @@ describe("synchronous attribute assignment that owes a read", () => {
     expect(await built.save()).toBe(true);
   });
 });
+
+describe("create with an attribute writer that rejects", () => {
+  fixtures(["pirates"]);
+
+  class RejectingPirate extends Pirate {
+    override _assignAttribute(k: string, v: unknown): unknown {
+      if (k === "catchphrase") return Promise.reject(new Error(`cannot assign ${k}`));
+      return super._assignAttribute(k, v);
+    }
+  }
+
+  beforeAll(async () => {
+    constSet(TopLevel, "Pirate", Pirate);
+    await Pirate.loadSchema();
+  });
+
+  it("rejects to the caller and saves nothing", async () => {
+    const before = await Pirate.count();
+    await expect(RejectingPirate.create({ catchphrase: "Aye" })).rejects.toThrow(
+      "cannot assign catchphrase",
+    );
+    expect(await Pirate.count()).toBe(before);
+  });
+});
