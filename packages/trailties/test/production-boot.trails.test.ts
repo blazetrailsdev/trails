@@ -28,8 +28,7 @@ async function workspaceModule(specifier: string): Promise<string | null> {
   };
   const target = pkg.exports?.[subpath ? `./${subpath}` : "."] ?? pkg.main!;
   const built = typeof target === "string" ? target : target.default;
-  const libRoot = (await getFs().exists(getPath().join(root, "lib"))) ? "lib/" : "src/";
-  return getPath().join(root, built.replace(/^(\.\/)?dist\//, libRoot).replace(/\.js$/, ".ts"));
+  return getPath().join(root, built.replace(/^(\.\/)?dist\//, "lib/").replace(/\.js$/, ".ts"));
 }
 
 const fromRoot = (file: string): string =>

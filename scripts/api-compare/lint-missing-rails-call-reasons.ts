@@ -26,7 +26,7 @@ import { COMMITTED_TS_FILES, walkPackageTsFiles } from "./ts-file-walk.js";
 const PACKAGES_DIR = path.join(ROOT_DIR, "packages");
 const JSDOC_BLOCK = /\/\*\*[\s\S]*?\*\//g;
 
-/** Every `.ts` file under each of `<packagesDir>/<pkg>`'s `sourceRoots`, sorted for stable output.
+/** Every `.ts` file under each `<packagesDir>/<pkg>/{lib,test}`, sorted for stable output.
  *  The committed population — `*.test.ts` counts, unlike the extractor's
  *  compared population: the contract is about what is committed, not about
  *  what api-compare measures. */

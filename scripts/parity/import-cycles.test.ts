@@ -150,7 +150,7 @@ describe("import-cycles scanFile", () => {
 describe("import-cycles makeResolver", () => {
   it("resolves a workspace specifier through exports to the src file", () => {
     const dir = path.resolve("/w/packages/x");
-    const files = new Set([path.join(dir, "src/index.ts"), path.join(dir, "src/sub/y.ts")]);
+    const files = new Set([path.join(dir, "lib/index.ts"), path.join(dir, "lib/sub/y.ts")]);
     const r = makeResolver(
       files,
       new Map([
@@ -164,8 +164,8 @@ describe("import-cycles makeResolver", () => {
         ],
       ]),
     );
-    expect(r("/q.ts", "@blazetrails/x")).toBe(path.join(dir, "src/index.ts"));
-    expect(r("/q.ts", "@blazetrails/x/sub/y")).toBe(path.join(dir, "src/sub/y.ts"));
+    expect(r("/q.ts", "@blazetrails/x")).toBe(path.join(dir, "lib/index.ts"));
+    expect(r("/q.ts", "@blazetrails/x/sub/y")).toBe(path.join(dir, "lib/sub/y.ts"));
     expect(r("/q.ts", "@other/x")).toBeNull();
   });
 

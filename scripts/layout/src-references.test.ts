@@ -47,7 +47,7 @@ describe("src-references", () => {
     expect(generic("const entry = `${root}/${name}/src/index.ts`;")).toBe(true);
     expect(generic('return file.replace("/dist/", "/src/");')).toBe(true);
     expect(generic("const m = /packages\\/([^/]+)\\/src\\//.exec(testPath);")).toBe(true);
-    expect(generic('import { libRoot } from "../layout/package-roots.mjs";')).toBe(false);
+    expect(generic('import { SKIP_GROUPS } from "../parity/conventions.js";')).toBe(false);
   });
 
   it("reports package-local src/ paths in package.json scripts", () => {

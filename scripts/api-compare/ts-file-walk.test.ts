@@ -15,7 +15,7 @@ let srcDir: string;
 
 beforeAll(async () => {
   root = await fs.mkdtemp(path.join(os.tmpdir(), "ts-file-walk-"));
-  srcDir = path.join(root, "packages", "pkg", "src");
+  srcDir = path.join(root, "packages", "pkg", "lib");
   await fs.mkdir(path.join(srcDir, "nested"), { recursive: true });
   await fs.mkdir(path.join(srcDir, "dist"), { recursive: true });
   await fs.mkdir(path.join(srcDir, "node_modules"), { recursive: true });
