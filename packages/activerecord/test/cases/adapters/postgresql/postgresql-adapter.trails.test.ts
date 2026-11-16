@@ -452,7 +452,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.beginDbTransaction();
-        const sleep = other.execute("SELECT pg_sleep(2)").catch((error: unknown) => error);
+        const sleep = other.execute("SELECT pg_sleep(2)").then(
+          () => null,
+          (error: unknown) => error,
+        );
         await new Promise<void>((r) => setTimeout(r, 200));
         expect(other._rawConnection!.transactionStatus()).toBe(PQTRANS_ACTIVE);
 
@@ -476,7 +479,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await cancel;
         expect(other._rawConnection!.transactionStatus()).not.toBe(PQTRANS_ACTIVE);
 
-        await sleep;
+        expect(await sleep).toBeInstanceOf(QueryCanceled);
         await other.rollbackDbTransaction();
       } finally {
         await other.disconnectBang();

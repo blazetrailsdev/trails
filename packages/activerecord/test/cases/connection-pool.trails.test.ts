@@ -261,8 +261,14 @@ it("withConnection after a rejected overlapping checkout keeps a retry's connect
         await new Promise<void>((resolve) => (open = resolve));
       });
     });
-  const second = pool.withConnection(() => undefined).catch((error: unknown) => error);
+  const second = pool
+    .withConnection(() => undefined)
+    .then(
+      () => null,
+      (error: unknown) => error,
+    );
   await Promise.all([first, second]);
+  expect(await second).toHaveProperty("message", "boom");
   await vi.waitFor(() => expect(open).toBeDefined());
   expect(pool.isActiveConnection()).not.toBeNull();
   open();
