@@ -15,7 +15,7 @@ import {
   toH,
   synchronize,
 } from "@blazetrails/ruby-compat";
-import { atomicWrite, indexBy } from "@blazetrails/activesupport";
+import { ActiveSupport, atomicWrite, indexBy } from "@blazetrails/activesupport";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import type { Column } from "./column.js";
 import { Deduplicable } from "./deduplicable.js";
@@ -37,6 +37,7 @@ export class SchemaReflection {
 
   private _cache: SchemaCache | null;
   private _cachePath: string | null;
+  private _peekedColumnsHash = new Map<string, Record<string, Column>>();
 
   constructor(cachePath?: string | null, cache?: SchemaCache) {
     this._cache = cache ?? null;
@@ -45,6 +46,7 @@ export class SchemaReflection {
 
   clearBang(): void {
     this._cache = this.emptyCache();
+    this._peekedColumnsHash.clear();
   }
 
   async loadBang(pool: Pool): Promise<this> {
@@ -93,6 +95,7 @@ export class SchemaReflection {
   }
 
   async clearDataSourceCacheBang(pool: Pool, name: string): Promise<void> {
+    this.clearCachedColumnsHash(name);
     if (!this._cache && !this.possibleCacheAvailable()) return;
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
@@ -177,8 +180,42 @@ export class SchemaReflection {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
-  getCachedColumnsHash(_pool: Pool, tableName: string): Record<string, Column> | undefined {
-    return this._cache?.getCachedColumnsHash(tableName);
+  getCachedColumnsHash(pool: Pool, tableName: string): Record<string, Column> | undefined {
+    const hash =
+      this._cache?.getCachedColumnsHash(tableName) ?? this._peekedColumnsHash.get(tableName);
+    if (hash) return hash;
+    let connection: { columns?: (tableName: string) => unknown } | undefined;
+    try {
+      connection = pool.withConnectionSync?.((connection) => connection);
+    } catch {
+      return undefined;
+    }
+    if (typeof connection?.columns !== "function") return undefined;
+    const columns = connection.columns(tableName);
+    if (columns instanceof Promise) {
+      columns.catch((error: Error) => {
+        ActiveSupport.errorReporter.report(error, { handled: true });
+      });
+      return undefined;
+    }
+    if (!Array.isArray(columns)) return undefined;
+    if (this._cache) {
+      this._cache.setColumns(tableName, columns as Column[]);
+      return this._cache.getCachedColumnsHash(tableName);
+    }
+    const columnsHash = Object.fromEntries(
+      (columns as Column[]).map((column) => [column.name, column]),
+    );
+    this._peekedColumnsHash.set(tableName, columnsHash);
+    return columnsHash;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  clearCachedColumnsHash(tableName: string): void {
+    this._peekedColumnsHash.delete(tableName);
   }
 
   /**

@@ -363,7 +363,25 @@ describe("sync loadSchema / columnsHash", () => {
 
 describe("sync loadSchema on a reflection that has not loaded its cache", () => {
   fixtures({}, { useTransactionalTests: false });
-  it("a cold peek reads no adapter columns and answers undefined", async () => {
+  it("reads a synchronous adapter's columns without seating a cache", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const cols = [{ sqlType: "integer", name: "id", default: null }];
+    await establishConnectionTo(
+      Post,
+      adapterDouble({
+        columns: () => cols,
+        lookupCastTypeFromColumn: () => defaultValue(),
+      }) as never,
+    );
+    await Post.leaseConnection();
+
+    expect(Post.columnsHash().id).toBe(cols[0]);
+    expect(Post.connectionPool().schemaReflection.loadedCache).toBeNull();
+  });
+
+  it("reads a table once per reflection and again after its data source cache is cleared", async () => {
     class Post extends Base {
       static override tableName = "posts";
     }
@@ -379,8 +397,12 @@ describe("sync loadSchema on a reflection that has not loaded its cache", () => 
     await Post.leaseConnection();
     const schemaCache = Post.connectionPool().schemaCache;
 
-    expect(schemaCache.getCachedColumnsHash("posts")).toBeUndefined();
-    expect(reads).toBe(0);
-    expect(Post.connectionPool().schemaReflection.loadedCache).toBeNull();
+    schemaCache.getCachedColumnsHash("posts");
+    schemaCache.getCachedColumnsHash("posts");
+    expect(reads).toBe(1);
+
+    await schemaCache.clearDataSourceCacheBang("posts");
+    schemaCache.getCachedColumnsHash("posts");
+    expect(reads).toBe(2);
   });
 });
