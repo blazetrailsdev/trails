@@ -7,8 +7,6 @@ import { SystemExit, env, stderr } from "@blazetrails/ruby-compat";
 import { DBConsole, DbconsoleCommand } from "../../lib/commands/dbconsole.js";
 import { invoke } from "../../lib/command.js";
 
-const database = vi.hoisted(() => ({ results: {} as Record<string, unknown> }));
-
 const kernel = vi.hoisted(() => ({ exec: (..._args: unknown[]): unknown => undefined }));
 
 vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
@@ -16,10 +14,8 @@ vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
   exec: (...args: unknown[]) => kernel.exec(...args),
 }));
 
-vi.mock("../../lib/database.js", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("../../lib/database.js")>()),
-  databaseConfiguration: async () => database.results,
-}));
+import type { Application } from "../../lib/application.js";
+import { Trails } from "../../lib/trails.js";
 
 describe("Trails::DBConsoleTest", () => {
   let aborted = false;
@@ -45,8 +41,15 @@ describe("Trails::DBConsoleTest", () => {
     results: Record<string, unknown> | null,
     block: () => Promise<void>,
   ): Promise<void> {
-    database.results = results ?? {};
-    await block();
+    const was = Trails.application;
+    Trails.application = {
+      config: { databaseConfiguration: async () => results ?? {} },
+    } as unknown as Application;
+    try {
+      await block();
+    } finally {
+      Trails.application = was;
+    }
   }
 
   async function start(config: Record<string, unknown> = {}): Promise<void> {

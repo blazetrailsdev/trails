@@ -53,7 +53,6 @@ import {
 import type { Application } from "../application.js";
 import { Trails } from "../trails.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
-import { databaseConfiguration } from "../database.js";
 import { ENGINE_ROOT } from "../app-path.js";
 import { Engine } from "../engine.js";
 
@@ -313,7 +312,9 @@ export class Trailtie extends BaseTrailtie {
       onLoad("active_record", (base: typeof Base) => {
         initializeDatabase = (async () => {
           base.configurations(
-            (await databaseConfiguration()) as Parameters<typeof base.configurations>[0],
+            (await Trails.application!.config.databaseConfiguration()) as Parameters<
+              typeof base.configurations
+            >[0],
           );
 
           const pool = await base.establishConnection();
