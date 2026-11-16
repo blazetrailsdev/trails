@@ -1,3 +1,4 @@
+import type { PrimaryKeyValue } from "@blazetrails/activerecord";
 import { include } from "@blazetrails/activesupport";
 import { CancelledOperationError, Mutex, ScheduledTask, rbFArray } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
@@ -12,7 +13,7 @@ export class RecurringSchedule {
     include(this, AppExecutor);
   }
 
-  readonly scheduledTasks: Map<unknown, ScheduledTask>;
+  readonly scheduledTasks: Map<PrimaryKeyValue, ScheduledTask>;
   /** @internal */
   staticTasks: RecurringTask[];
   /** @internal */
@@ -30,7 +31,7 @@ export class RecurringSchedule {
     this._dynamicTasksEnabled = dynamicTasksEnabled;
 
     this.scheduleLock = new Mutex();
-    this.scheduledTasks = new Map<unknown, ScheduledTask>();
+    this.scheduledTasks = new Map<PrimaryKeyValue, ScheduledTask>();
   }
 
   configuredTasks(): RecurringTask[] {
