@@ -420,7 +420,7 @@ export class HTTP {
   async proxyUser(): Promise<string | null> {
     if (this._proxyFromEnv) {
       const user = (await this.proxyUri())?.user;
-      return user ? this.unescape(user) : null;
+      return user != null ? this.unescape(user) : null;
     } else {
       return this._proxyUser;
     }
@@ -430,7 +430,7 @@ export class HTTP {
   async proxyPass(): Promise<string | null> {
     if (this._proxyFromEnv) {
       const pass = (await this.proxyUri())?.password;
-      return pass ? this.unescape(pass) : null;
+      return pass != null ? this.unescape(pass) : null;
     } else {
       return this._proxyPass;
     }
