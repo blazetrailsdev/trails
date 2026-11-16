@@ -134,6 +134,15 @@ describe("lint-call-mismatches main", () => {
       await output("call-mismatches.json", mismatchArtifact([]));
       expect(await lint.main(false, false, false)).toBe(code);
     });
+
+    it(`gates a STALE tag on ${rubyName} with exit ${code}`, async () => {
+      const lint = await import("./lint-call-mismatches.js");
+      await output("call-mismatches.json", {
+        ...mismatchArtifact([]),
+        staleTags: [{ package: "activerecord", tsFile: TS_FILE, tsName: rubyName, call: "spawn" }],
+      });
+      expect(await lint.main(false, false, false)).toBe(code);
+    });
   }
 });
 
@@ -164,10 +173,32 @@ describe("lint-call-args main", () => {
     await output("ar-closure.json", { files: {} });
   });
 
+  it("--write keeps a ledgered baseline row and seeds no ledgered artifact row", async () => {
+    const lint = await import("./lint-call-args.js");
+    const { BASELINE_DIR, writeSplitBaseline } = await import("./lint-call-mismatches.js");
+    const kept = { ...argRow(LEDGERED), call: "merge", reason: "reviewed" };
+    await writeSplitBaseline([kept], BASELINE_DIR);
+    await output("call-arg-mismatches.json", argArtifact([LEDGERED, UNLEDGERED]));
+
+    expect(await lint.main(true)).toBe(0);
+
+    expect(await lint.loadBaseline()).toEqual([
+      { ...argRow(UNLEDGERED), reason: lint.DEFAULT_REASON },
+      kept,
+    ]);
+  });
+
   for (const [rubyName, code] of [
     [LEDGERED, 0],
     [UNLEDGERED, 1],
   ] as const) {
+    it(`gates a STALE tag on ${rubyName} with exit ${code}`, async () => {
+      const lint = await import("./lint-call-args.js");
+      const tag = { package: "activerecord", tsFile: TS_FILE, tsName: rubyName, call: "spawn" };
+      await output("call-arg-mismatches.json", { ...argArtifact([]), staleTags: [tag] });
+      expect(await lint.main(false)).toBe(code);
+    });
+
     it(`gates a NEW row on ${rubyName} with exit ${code}`, async () => {
       const lint = await import("./lint-call-args.js");
       await output("call-arg-mismatches.json", argArtifact([rubyName]));
@@ -233,7 +264,7 @@ describe("receipt-audit main", () => {
       const before = process.exitCode;
       try {
         await main(["--gate"]);
-        expect(process.exitCode).toBe(code);
+        expect(process.exitCode ?? 0).toBe(code ?? 0);
       } finally {
         process.exitCode = before;
       }
