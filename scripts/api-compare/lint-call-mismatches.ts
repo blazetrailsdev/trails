@@ -125,7 +125,7 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { spawn } from "child_process";
 import { fileURLToPath } from "url";
-import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
 import { inScope, scopeMismatch, scopeOf } from "./scope.js";
 import { loadLedgerScope, renderSkipped, skipLedgered } from "./bump-ledger.js";
 import {
@@ -194,10 +194,7 @@ import type { ApiManifest, ClassInfo, MethodInfo } from "@blazetrails/parity/typ
 // not a single file. Each entry lives at <BASELINE_DIR>/<package>/<tsFile
 // with .ts→.json>.
 /** Exported so the call-ARGUMENT gate reads the SAME tree (RFC 0095). */
-export const BASELINE_DIR = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "call-mismatches-exclude",
-);
+export const BASELINE_DIR = path.join(SCRIPT_DIR, "call-mismatches-exclude");
 
 // Relative baseline path (under BASELINE_DIR) for an entry, mirroring its
 // source tree: <package>/<tsFile with .ts→.json>. Every artifact tsFile ends in
@@ -221,10 +218,7 @@ const ARTIFACT_PATH = path.join(OUTPUT_DIR, "call-mismatches.json");
 // Committed high-water marks for the unreviewed-reason counter (RFC 0083),
 // sharded per source file exactly like the baseline above so the two trees
 // share one merge-conflict boundary; see unreviewed-ratchet.ts.
-export const MARK_DIR = path.join(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "call-mismatches-unreviewed",
-);
+export const MARK_DIR = path.join(SCRIPT_DIR, "call-mismatches-unreviewed");
 
 export { DEFAULT_REASON } from "./missing-rails-call-tags.js";
 
@@ -728,7 +722,7 @@ async function gitChangedPaths(): Promise<string[]> {
  * a write there would pass the gate over a stale COMMITTED mark and hand the
  * failure to whoever touches that shard next.
  */
-async function main(
+export async function main(
   write: boolean,
   showSeededKeys: boolean,
   autoTighten: boolean,
