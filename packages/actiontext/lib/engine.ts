@@ -10,9 +10,9 @@ import { Attachable } from "./attachable.js";
 import { Attachment } from "./attachment.js";
 import { Attribute } from "./attribute.js";
 import { Content } from "./content.js";
-import { ContentHelper } from "./content-helper.js";
+import { ContentHelper } from "./app/helpers/action-text/content-helper.js";
 import { Encryption } from "./encryption.js";
-import { TagHelper } from "./tag-helper.js";
+import "./app/helpers/action-text/tag-helper.js";
 import "./deprecator.js";
 
 export interface ActionTextConfig extends OrderedOptions {
@@ -52,6 +52,11 @@ export class Engine extends TrailsEngine {
     this.config.paths().add("lib/tasks", {
       with: File.join(import.meta.dirname, "tasks"),
       glob: `*${File.extname(import.meta.filename)}`,
+    });
+
+    this.config.paths().add("app/helpers", {
+      with: File.join(import.meta.dirname, "app", "helpers"),
+      eagerLoad: true,
     });
 
     this.config.set("actionText", new OrderedOptions());
@@ -117,11 +122,11 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    /** @missingRailsCall helpers — CONVERGEABLE actiontext-engine-helper-reads-engine-helpers */
-    this.initializer("action_text.helper", () => {
+    this.initializer("action_text.helper", async () => {
+      const helpers = await Engine.instance().helpers();
       for (const base of ["action_controller_base", "action_mailer"]) {
         onLoad(base, function (this: HelperHost) {
-          this.helper(ContentHelper, TagHelper);
+          this.helper(helpers);
         });
       }
     });

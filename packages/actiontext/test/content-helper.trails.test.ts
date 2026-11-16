@@ -7,7 +7,7 @@ import { FixtureResolver } from "@blazetrails/actionview/testing/resolvers.js";
 import { File } from "@blazetrails/ruby-compat";
 import "./test-helper.js";
 import { Content } from "../lib/content.js";
-import { ContentHelper } from "../lib/content-helper.js";
+import { ContentHelper } from "../lib/app/helpers/action-text/content-helper.js";
 
 describe("ContentHelperTest", () => {
   it("sanitizer is the configured sanitizer_vendor's safe list sanitizer", () => {

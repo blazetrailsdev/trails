@@ -9,7 +9,7 @@ import * as m6 from "./attachments/caching.js";
 import * as m7 from "./attachments/minification.js";
 import * as m8 from "./attachments/trix-conversion.js";
 import * as m9 from "./attribute.js";
-import * as m10 from "./content-helper.js";
+import * as m10 from "./app/helpers/action-text/content-helper.js";
 import * as m11 from "./content.js";
 import * as m12 from "./fragment.js";
 import * as m13 from "./gem-version.js";
@@ -17,7 +17,7 @@ import * as m14 from "./html-conversion.js";
 import * as m15 from "./plain-text-conversion.js";
 import * as m16 from "./rendering.js";
 import * as m17 from "./serialization.js";
-import * as m18 from "./tag-helper.js";
+import * as m18 from "./app/helpers/action-text/tag-helper.js";
 import * as m19 from "./trix-attachment.js";
 
 defineConstants([

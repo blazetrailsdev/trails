@@ -3,7 +3,7 @@ import { TopLevel } from "@blazetrails/activesupport";
 import { Marshal, Thread, regexpEscape } from "@blazetrails/ruby-compat";
 import { createFileBlob, fixturesAll } from "../test-helper.js";
 import { Attachment } from "../../lib/attachment.js";
-import { ContentHelper } from "../../lib/content-helper.js";
+import { ContentHelper } from "../../lib/app/helpers/action-text/content-helper.js";
 import { Content } from "../../lib/content.js";
 import { MissingAttachable } from "../../lib/attachables/missing-attachable.js";
 import { RemoteImage } from "../../lib/attachables/remote-image.js";

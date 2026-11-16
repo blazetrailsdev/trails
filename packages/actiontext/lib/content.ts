@@ -15,7 +15,7 @@ import { rbInspect, rbModName } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
 import { Attachable } from "./attachable.js";
 import { Attachment } from "./attachment.js";
-import { ContentHelper } from "./content-helper.js";
+import { ContentHelper } from "./app/helpers/action-text/content-helper.js";
 import { AttachmentGallery } from "./attachment-gallery.js";
 import { Fragment } from "./fragment.js";
 import { Rendering, type RenderingClassMethods } from "./rendering.js";
