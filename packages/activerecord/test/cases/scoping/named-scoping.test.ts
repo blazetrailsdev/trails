@@ -52,7 +52,7 @@ describe("NamedScopingTest", () => {
 
   it("found items are cached", async () => {
     const allPosts = Topic.base();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await allPosts;
       await allPosts;
     });
@@ -282,7 +282,7 @@ describe("NamedScopingTest", () => {
   it("first and last should not use query when results are loaded", async () => {
     const t = Topic.base();
     await t.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await t.first();
       await t.last();
     });
@@ -290,7 +290,7 @@ describe("NamedScopingTest", () => {
 
   it("empty should not load results", async () => {
     const t = Topic.base();
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await t.isEmpty();
       await t.load();
       await t.isEmpty();
@@ -299,7 +299,7 @@ describe("NamedScopingTest", () => {
 
   it("any should not load results", async () => {
     const t = Topic.base();
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await t.isAny();
       await t.load();
       await t.isAny();
@@ -308,7 +308,7 @@ describe("NamedScopingTest", () => {
 
   it("any should call proxy found if using a block", async () => {
     const t = Topic.base();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await assertNotCalled(t, "isEmpty", null, async () => {
         await t.isAny(() => true);
       });
@@ -318,7 +318,7 @@ describe("NamedScopingTest", () => {
   it("any should not fire query if scope loaded", async () => {
     const t = Topic.base();
     await t.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await t.isAny()).toBeTruthy();
     });
   });
@@ -331,7 +331,7 @@ describe("NamedScopingTest", () => {
 
   it("many should not load results", async () => {
     const t = Topic.base();
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await t.isMany();
       await t.load();
       await t.isMany();
@@ -340,7 +340,7 @@ describe("NamedScopingTest", () => {
 
   it("many should call proxy found if using a block", async () => {
     const t = Topic.base();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await assertNotCalled(t, "size", null, async () => {
         await t.isMany(() => true);
       });
@@ -350,7 +350,7 @@ describe("NamedScopingTest", () => {
   it("many should not fire query if scope loaded", async () => {
     const t = Topic.base();
     await t.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await t.isMany()).toBeTruthy();
     });
   });
@@ -492,7 +492,7 @@ describe("NamedScopingTest", () => {
 
   it("size should use count when results are not loaded", async () => {
     const t = Topic.base();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await self().assertQueriesMatch(/COUNT/i, {}, () => t.size());
     });
   });
@@ -500,7 +500,7 @@ describe("NamedScopingTest", () => {
   it("size should use length when results are loaded", async () => {
     const t = Topic.base();
     await t.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await t.size();
     });
   });
@@ -571,13 +571,13 @@ describe("NamedScopingTest", () => {
   it("scopes batch finders", async () => {
     expect(await Topic.approved().count()).toBe(4);
 
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       for await (const t of Topic.approved().findEach({ batchSize: 1 })) {
         expect(t.approved).toBeTruthy();
       }
     });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       for await (const group of Topic.approved().findInBatches({ batchSize: 2 })) {
         for (const t of group) expect(t.approved).toBeTruthy();
       }
@@ -603,7 +603,7 @@ describe("NamedScopingTest", () => {
   });
 
   it("nested scopes queries size", async () => {
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await (Topic as any)
         .approved()
         .byLifo()
@@ -616,10 +616,10 @@ describe("NamedScopingTest", () => {
   it("scopes are cached on associations", async () => {
     const post = (await Post.find(posts("welcome").id)) as any;
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await post.comments.containingTheLetterE().toArray();
       });
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await post.comments.containingTheLetterE().toArray();
       });
     });
@@ -629,21 +629,21 @@ describe("NamedScopingTest", () => {
     const post = (await Post.find(posts("welcome").id)) as any;
     await Post.cache(async () => {
       let one: any[] = [];
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         one = await post.comments.limitBy(1).toArray();
       });
       expect(one.length).toBe(1);
 
       let two: any[] = [];
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         two = await post.comments.limitBy(2).toArray();
       });
       expect(two.length).toBe(2);
 
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await post.comments.limitBy(1).toArray();
       });
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await post.comments.limitBy(2).toArray();
       });
     });

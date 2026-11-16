@@ -426,7 +426,7 @@ describe("CalculationsTest", () => {
   it("count should shortcut with limit zero", async () => {
     const accounts = Account.limit(0);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await accounts.count()).toEqual(0);
     });
   });
@@ -495,30 +495,30 @@ describe("CalculationsTest", () => {
 
   it("count with eager loading and custom order", async () => {
     const posts = Post.includes(":comments").order("comments.id");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await posts.count()).toEqual(11);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await posts.count(":all")).toEqual(11);
     });
   });
 
   it("count with eager loading and custom select and order", async () => {
     const posts = Post.includes(":comments").order("comments.id").select("type");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await posts.count()).toEqual(11);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await posts.count(":all")).toEqual(11);
     });
   });
 
   it("count with eager loading and custom order and distinct", async () => {
     const posts = Post.includes(":comments").order("comments.id").distinct();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await posts.count()).toEqual(11);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await posts.count(":all")).toEqual(11);
     });
   });
@@ -527,10 +527,10 @@ describe("CalculationsTest", () => {
     const accounts = Account.distinct()
       .select("credit_limit % 10")
       .order(arelSql("credit_limit % 10"));
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await accounts.count(":all")).toEqual(3);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await (await accounts.load()).size()).toEqual(3);
     });
   });
@@ -1003,7 +1003,7 @@ describe("CalculationsTest", () => {
   });
 
   it("count with empty in", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Topic.where({ id: [] }).count()).toEqual(0);
       await assertAsyncEqual(0, Topic.where({ id: [] }).asyncCount());
     });
@@ -1064,31 +1064,31 @@ describe("CalculationsTest", () => {
   });
 
   it("no queries for empty relation on count", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Post.where({ id: [] }).count()).toEqual(0);
     });
   });
 
   it("no queries for empty relation on sum", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Post.where({ id: [] }).sum("tags_count")).toEqual(0);
     });
   });
 
   it("no queries for empty relation on average", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Post.where({ id: [] }).average("tags_count")).toBeNull();
     });
   });
 
   it("no queries for empty relation on minimum", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Account.where({ id: [] }).minimum("id")).toBeNull();
     });
   });
 
   it("no queries for empty relation on maximum", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Account.where({ id: [] }).maximum("id")).toBeNull();
     });
   });
@@ -1157,7 +1157,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with empty in", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Topic.where({ id: [] }).pluck("id")).toEqual([]);
     });
     await assertAsyncEqual([], Topic.where({ id: [] }).asyncPluck("id"));
@@ -1211,7 +1211,7 @@ describe("CalculationsTest", () => {
   it("pluck with type cast does not corrupt the query cache", async () => {
     const topic = topics("first");
     const relation = Topic.where({ id: topic.id });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await Topic.cache(async () => {
         const kind = Object(
           (await (await relation.select("written_on").load()).first())!.readAttributeBeforeTypeCast(
@@ -1399,7 +1399,7 @@ describe("CalculationsTest", () => {
   it("ids on loaded relation", async () => {
     const loadedCompanies = await Company.all().load();
     const companyIds = (await Company.all()).map((c) => c.id);
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect((await loadedCompanies.ids()).sort()).toEqual(companyIds.sort());
     });
   });
@@ -1408,7 +1408,7 @@ describe("CalculationsTest", () => {
     const scopedIds = [1, 2];
     const loadedCompanies = await Company.where({ id: scopedIds }).load();
     const companyIds = (await Company.where({ id: scopedIds })).map((c) => c.id);
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect((await loadedCompanies.ids()).sort()).toEqual(companyIds.sort());
     });
   });
@@ -1422,7 +1422,7 @@ describe("CalculationsTest", () => {
     const emptyScopeIds: number[] = [];
     const companyIds = (await Company.where({ id: emptyScopeIds })).map((c) => c.id);
     assertPredicate(companyIds, (ids) => ids.length === 0);
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Company.where({ id: emptyScopeIds }).ids()).toEqual(companyIds);
     });
   });
@@ -1504,7 +1504,7 @@ describe("CalculationsTest", () => {
     const loadedCompanies = await Company.includes(":contracts")
       .where({ "contracts.id": (await company.contracts.first())!.id })
       .load();
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await loadedCompanies.ids()).toEqual([company.id]);
     });
   });
@@ -1785,7 +1785,7 @@ describe("CalculationsTest", () => {
   it("pluck loaded relation", async () => {
     const companies = await Company.order("id").limit(3).load();
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await companies.pluck("name")).toEqual(["37signals", "Summit", "Microsoft"]);
     });
   });
@@ -1793,7 +1793,7 @@ describe("CalculationsTest", () => {
   it("pluck loaded relation multiple columns", async () => {
     const companies = await Company.order("id").limit(3).load();
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await companies.pluck("id", "name")).toEqual([
         [1, "37signals"],
         [2, "Summit"],
@@ -1805,7 +1805,7 @@ describe("CalculationsTest", () => {
   it("pluck loaded relation sql fragment", async () => {
     const companies = await Company.order("name").limit(3).load();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await companies.pluck(arelSql("DISTINCT name"))).toEqual([
         "37signals",
         "Apex",
@@ -1817,14 +1817,14 @@ describe("CalculationsTest", () => {
   it("pluck loaded relation aliased attribute", async () => {
     const companies = await Company.order("id").limit(3).load();
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await companies.pluck("new_name")).toEqual(["37signals", "Summit", "Microsoft"]);
     });
   });
 
   it("pick one", async () => {
     expect(await Topic.order("id").pick("heading")).toEqual("The First Topic");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Topic.none().pick("heading")).toBeNull();
       expect(await Topic.where({ id: 9999999999999999999n }).pick("heading")).toBeNull();
     });
@@ -1837,7 +1837,7 @@ describe("CalculationsTest", () => {
       "David",
       "david@loudthinking.com",
     ]);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Topic.none().pick("author_name", "author_email_address")).toBeNull();
       expect(
         await Topic.where({ id: 9999999999999999999n }).pick("author_name", "author_email_address"),
@@ -1859,7 +1859,7 @@ describe("CalculationsTest", () => {
     const companies = Company.order("id").limit(3);
     await companies.load();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await companies.pick("name")).toBe("37signals");
     });
   });
@@ -1868,7 +1868,7 @@ describe("CalculationsTest", () => {
     const companies = Company.order("id").limit(3);
     await companies.load();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await companies.pick("id", "name")).toEqual([1, "37signals"]);
     });
   });
@@ -1877,7 +1877,7 @@ describe("CalculationsTest", () => {
     const companies = Company.order("name").limit(3);
     await companies.load();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await companies.pick(arelSql("DISTINCT name"))).toBe("37signals");
     });
   });
@@ -1886,7 +1886,7 @@ describe("CalculationsTest", () => {
     const companies = Company.order("id").limit(3);
     await companies.load();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await companies.pick("new_name")).toBe("37signals");
     });
   });
@@ -1919,7 +1919,7 @@ describe("CalculationsTest", () => {
     let blockCalled = false;
     const relation = await Client.all().load();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(
         await relation.sum(() => {
           blockCalled = true;
@@ -2130,12 +2130,12 @@ LIMIT 1
 
   it("#skip_query_cache! for #pluck", async () => {
     await Account.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Account.pluck("credit_limit");
         await Account.pluck("credit_limit");
       });
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Account.all().skipQueryCacheBang().pluck("credit_limit");
         await Account.all().skipQueryCacheBang().pluck("credit_limit");
       });
@@ -2144,12 +2144,12 @@ LIMIT 1
 
   it("#skip_query_cache! for #ids", async () => {
     await Account.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Account.ids();
         await Account.ids();
       });
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Account.all().skipQueryCacheBang().ids();
         await Account.all().skipQueryCacheBang().ids();
       });
@@ -2158,12 +2158,12 @@ LIMIT 1
 
   it("#skip_query_cache! for a simple calculation", async () => {
     await Account.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Account.calculate("sum", "credit_limit");
         await Account.calculate("sum", "credit_limit");
       });
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Account.all().skipQueryCacheBang().calculate("sum", "credit_limit");
         await Account.all().skipQueryCacheBang().calculate("sum", "credit_limit");
       });
@@ -2172,12 +2172,12 @@ LIMIT 1
 
   it("#skip_query_cache! for a grouped calculation", async () => {
     await Account.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Account.group("firm_id").calculate("sum", "credit_limit");
         await Account.group("firm_id").calculate("sum", "credit_limit");
       });
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Account.all().skipQueryCacheBang().group("firm_id").calculate("sum", "credit_limit");
         await Account.all().skipQueryCacheBang().group("firm_id").calculate("sum", "credit_limit");
       });

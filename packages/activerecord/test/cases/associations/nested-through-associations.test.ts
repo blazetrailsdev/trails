@@ -45,12 +45,12 @@ async function assertIncludesAndJoinsEqual(
   query = query.order(":id");
 
   let actual!: any[];
-  await assertQueriesCount(1, false, async () => {
+  await assertQueriesCount(1, async () => {
     actual = uniqRecords(await query.joins(association).toArray());
   });
   expect(actual.map(recordKey)).toEqual(expected.map(recordKey));
 
-  await assertQueriesCount(1, false, async () => {
+  await assertQueriesCount(1, async () => {
     actual = uniqRecords(await query.includes(association).toArray());
   });
   expect(actual.map(recordKey)).toEqual(expected.map(recordKey));
@@ -164,12 +164,12 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has many with has many through source reflection preload", async () => {
     let author!: Author;
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       [author] = await Author.includes(":tags").order("authors.id").limit(1);
     });
     const general = tags("general");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const authorTags = await author.tags;
       expect(authorTags.map((t) => t.id)).toEqual([general.id, general.id]);
     });
@@ -181,7 +181,7 @@ describe("NestedThroughAssociationsTest", () => {
     assertNot(taggingsReflection.scope);
 
     await self().withAutomaticScopeInversing(tagReflection, taggingsReflection, async () => {
-      await assertQueriesCount(4, false, async () => {
+      await assertQueriesCount(4, async () => {
         await Author.includes(":tags").order("authors.id").limit(1);
       });
     });
@@ -213,10 +213,10 @@ describe("NestedThroughAssociationsTest", () => {
     const luke = subscribers("first");
     const davidSub = subscribers("second");
     let author!: Author;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [author] = await Author.includes(":subscribers").order("authors.id").limit(1);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = (await author.subscribers)
         .slice()
         .sort((a: any, b: any) => a.nick.localeCompare(b.nick));
@@ -245,11 +245,11 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has one with has one through source reflection preload", async () => {
     let member!: Member;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [member] = await Member.includes(":nestedMemberTypes").order("members.id").limit(1);
     });
     const founding = memberTypes("founding");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = await member.nestedMemberTypes;
       expect(preloaded.map(recordKey)).toEqual([founding].map(recordKey));
     });
@@ -274,11 +274,11 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has one through with has one source reflection preload", async () => {
     let member!: Member;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [member] = await Member.includes(":nestedSponsors").order("members.id").limit(1);
     });
     const mustache = sponsors("moustache_club_sponsor_for_groucho");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = await member.nestedSponsors;
       expect(preloaded.map(recordKey)).toEqual([mustache].map(recordKey));
     });
@@ -307,13 +307,13 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has one with has many through source reflection preload", async () => {
     let member!: Member;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [member] = await Member.includes(":organizationMemberDetails").order("members.id").limit(1);
     });
     const grouchoDetails = memberDetails("groucho");
     const otherDetails = memberDetails("some_other_guy");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = (await member.organizationMemberDetails)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
@@ -350,13 +350,13 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has one through with has many source reflection preload", async () => {
     let member!: Member;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [member] = await Member.includes(":organizationMemberDetails_2").order("members.id").limit(1);
     });
     const grouchoDetails = memberDetails("groucho");
     const otherDetails = memberDetails("some_other_guy");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = (await member.organizationMemberDetails_2)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
@@ -393,13 +393,13 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has many with has and belongs to many source reflection preload", async () => {
     let author!: Author;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [, , author] = await Author.includes(":postCategories").order("authors.id");
     });
     const general = categories("general");
     const cooking = categories("cooking");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = (await author.postCategories)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
@@ -430,13 +430,13 @@ describe("NestedThroughAssociationsTest", () => {
     await Category.includes(":postComments").order("categories.id");
 
     let category!: Category;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [, category] = await Category.includes(":postComments").order("categories.id");
     });
     const greetings = comments("greetings");
     const moreGreetings = comments("more_greetings");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = (await category.postComments)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
@@ -466,13 +466,13 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has many with has many through habtm source reflection preload", async () => {
     let author!: Author;
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       [, , author] = await Author.includes(":categoryPostComments").order("authors.id");
     });
     const greetings = comments("greetings");
     const moreGreetings = comments("more_greetings");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = (await author.categoryPostComments)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
@@ -501,12 +501,12 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through has many through with belongs to source reflection preload", async () => {
     let author!: Author;
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       [author] = await Author.includes(":taggingTags").order("authors.id").limit(1);
     });
     const general = tags("general");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = await author.taggingTags;
       expect(preloaded.map(recordKey)).toEqual([general, general].map(recordKey));
     });
@@ -518,7 +518,7 @@ describe("NestedThroughAssociationsTest", () => {
     assertNot(taggingsReflection.scope);
 
     await self().withAutomaticScopeInversing(tagReflection, taggingsReflection, async () => {
-      await assertQueriesCount(4, false, async () => {
+      await assertQueriesCount(4, async () => {
         await Author.includes(":taggingTags").order("authors.id").limit(1);
       });
     });
@@ -547,7 +547,7 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has many through belongs to with has many through source reflection preload", async () => {
     let categorization!: Categorization;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [categorization] = await Categorization.includes(":postTaggings")
         .order("categorizations.id")
         .limit(1);
@@ -555,7 +555,7 @@ describe("NestedThroughAssociationsTest", () => {
     const welcomeGeneral = taggings("welcome_general");
     const thinkingGeneral = taggings("thinking_general");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = (await categorization.postTaggings)
         .slice()
         .sort((a: any, b: any) => Number(a.id) - Number(b.id));
@@ -582,12 +582,12 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has one through has one with has one through source reflection preload", async () => {
     let member!: Member;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [member] = await Member.includes(":nestedMemberType").order("members.id").limit(1);
     });
     const founding = memberTypes("founding");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = await member.nestedMemberType;
       expect(recordKey(preloaded)).toEqual(recordKey(founding));
     });
@@ -630,12 +630,12 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("has one through has one through with belongs to source reflection preload", async () => {
     let member!: Member;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       [member] = await Member.includes(":clubCategory").order("members.id").limit(1);
     });
     const general = categories("general");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = await member.clubCategory;
       expect(recordKey(preloaded)).toEqual(recordKey(general));
     });
@@ -806,12 +806,12 @@ describe("NestedThroughAssociationsTest", () => {
     assertEmpty(await Author.where({ "tags.id": 100 }).joins(":miscPostFirstBlueTags"));
 
     let author!: Author;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       [, , author] = await Author.includes(":miscPostFirstBlueTags").order("authors.id");
     });
     const blue = tags("blue");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = await author.miscPostFirstBlueTags;
       expect(preloaded.map(recordKey)).toEqual([blue].map(recordKey));
     });
@@ -836,10 +836,10 @@ describe("NestedThroughAssociationsTest", () => {
   it("nested has many through with conditions on source associations preload", async () => {
     const blue = tags("blue");
     let author!: Author;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       [, , author] = await Author.includes(":miscPostFirstBlueTags_2").order("authors.id");
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const preloaded = await author.miscPostFirstBlueTags_2;
       expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
     });
@@ -851,7 +851,7 @@ describe("NestedThroughAssociationsTest", () => {
       ":posts": ":firstBlueTags_2",
       ":miscPostFirstBlueTags_2": {},
     }).order("authors.id");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const firstPost = (await author.posts)[0];
       const preloaded = await firstPost.firstBlueTags_2;
       expect(preloaded.map((t) => t.id)).toEqual([blue.id]);

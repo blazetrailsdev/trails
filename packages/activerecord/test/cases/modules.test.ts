@@ -124,7 +124,7 @@ describe("ModulesTest", () => {
     });
 
     for (const client of clients) {
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         assertNotNil(await (await client.firm)!.account);
       });
     }

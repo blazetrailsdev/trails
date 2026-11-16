@@ -17,12 +17,12 @@ describe("Preloader::Batch", () => {
       association(name: string): { isLoaded(): boolean };
     };
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({ records: [tagging], associations: "taggable" }).call();
     });
 
     expect(tagging.association("taggable").isLoaded()).toBe(false);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await tagging.taggable).toBeNull();
     });
   });

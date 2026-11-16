@@ -28,11 +28,11 @@ describe("FinderTrailsTest", () => {
     const relation = Post.all();
     const first = await relation.take();
     expect(first).not.toBeNull();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await relation.take()).toStrictEqual(first);
     });
     relation.reset();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await relation.take()).toStrictEqual(first);
     });
   });
@@ -41,11 +41,11 @@ describe("FinderTrailsTest", () => {
     const relation = Post.order({ id: "asc" });
     const second = await relation.second();
     expect(second).not.toBeNull();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await relation.second()).toStrictEqual(second);
     });
     relation.reset();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await relation.second()).toStrictEqual(second);
     });
   });

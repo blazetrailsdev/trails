@@ -82,7 +82,7 @@ describe("HasOnePersistedSetterThrows", () => {
 
   it("construction issues no query for the association assignment", async () => {
     const account = new Account({ credit_limit: 1000 });
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       new Firm({ name: "GlobalMegaCorp", account });
     });
   });

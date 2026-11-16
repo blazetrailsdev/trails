@@ -295,7 +295,7 @@ describe("CounterCacheTest", () => {
   it("reset counter skips query for correct counter", async () => {
     await Topic.resetCounters(topic.id, "replies_count");
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await Topic.resetCounters(topic.id, "replies_count");
     });
   });
@@ -303,7 +303,7 @@ describe("CounterCacheTest", () => {
   it("reset counter performs query for correct counter with touch: true", async () => {
     await Topic.resetCounters(topic.id, "replies_count");
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await Topic.resetCounters(topic.id, "replies_count", { touch: true });
     });
   });
@@ -718,7 +718,7 @@ describe("CounterCacheTest", () => {
     expect(car.bulbs_count).toEqual(2);
     await car.reload();
 
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       expect(await (car as any).bulbs.size()).toEqual(2);
       expect(await (car as any).bulbs.count()).toEqual(2);
       expect(await (car as any).bulbs.isEmpty()).toBeFalsy();
@@ -735,14 +735,14 @@ describe("CounterCacheTest", () => {
     expect(car.custom_tyres_count).toEqual(2);
     await car.reload();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await (car as any).tyres.size()).toEqual(2);
       expect(await (car as any).tyres.isEmpty()).toBeFalsy();
       expect(await (car as any).tyres.isAny()).toBeTruthy();
       expect(await (car as any).tyres.isNone()).toBeFalsy();
     });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await (car as any).tyres.count()).toEqual(2);
     });
   });

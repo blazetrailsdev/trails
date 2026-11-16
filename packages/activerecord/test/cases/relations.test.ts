@@ -152,10 +152,10 @@ describe("RelationTest", () => {
     await car.engines;
 
     car = (await (Car.inclEngines() as any).inclTyres().first())!;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await car.tyres;
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await car.engines;
     });
   });
@@ -196,7 +196,7 @@ describe("RelationTest", () => {
   it("scoped all", async () => {
     const topics = await Topic.all();
     expect(topics).toBeInstanceOf(Array);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(topics.length).toBe(5);
     });
   });
@@ -207,7 +207,7 @@ describe("RelationTest", () => {
     assertNotPredicate(topics, (t) => t.isLoaded);
     assertNotPredicate(topics, (t) => (t as any).loaded);
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       for (let i = 0; i < 2; i++) {
         expect((await topics).length).toBe(5);
       }
@@ -220,7 +220,7 @@ describe("RelationTest", () => {
   it("scoped first", async () => {
     const topics = Topic.all().order("id ASC");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       for (let i = 0; i < 2; i++) {
         expect((await topics.first())!.title).toBe("The First Topic");
       }
@@ -233,7 +233,7 @@ describe("RelationTest", () => {
     const topics = Topic.all().order("id ASC");
     await topics.load();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await topics.first())!.title).toBe("The First Topic");
     });
 
@@ -244,7 +244,7 @@ describe("RelationTest", () => {
     const topics = Topic.all().order("id ASC");
     await topics.load();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await topics.first(2)).map((t) => t.title)).toEqual([
         "The First Topic",
         "The Second Topic of the day",
@@ -259,7 +259,7 @@ describe("RelationTest", () => {
     const unloadedFirst = await topics.first(10);
     await topics.load();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const loadedFirst = await topics.first(10);
       expect(loadedFirst).toEqual(unloadedFirst);
     });
@@ -268,7 +268,7 @@ describe("RelationTest", () => {
   it("reload", async () => {
     const topics = Topic.all();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       for (let i = 0; i < 2; i++) await topics;
     });
 
@@ -277,7 +277,7 @@ describe("RelationTest", () => {
     const originalSize = (await topics).length;
     await Topic.createBang({ title: "fake" });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await topics.reload();
     });
     expect(await topics.size()).toBe(originalSize + 1);
@@ -822,7 +822,7 @@ describe("RelationTest", () => {
       .order("comments.body, very_special_comments_posts.body")
       .where("posts.id = 4");
     expect(loaded.map((a) => a.id)).toEqual([authors("david").id]);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       const target = (rec: Base, name: string) => (rec.association(name) as any).target;
       const post = target(target(loaded[0], "posts")[0], "specialComments")[0].association("post")
         .target as Base;
@@ -832,27 +832,27 @@ describe("RelationTest", () => {
   });
 
   it("find with preloaded associations", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const postsRel = Post.preload(":comments").order("posts.id");
       expect((await (await postsRel.first())!.comments)[0]).toBeTruthy();
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const postsRel = Post.preload(":comments").order("posts.id");
       expect((await (await postsRel.first())!.comments)[0]).toBeTruthy();
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const postsRel = Post.preload(":author").order("posts.id");
       expect(await (await postsRel.first())!.author).toBeTruthy();
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const postsRel = Post.preload(":author").order("posts.id");
       expect(await (await postsRel.first())!.author).toBeTruthy();
     });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       const postsRel = Post.preload(":author", ":comments").order("posts.id");
       expect(await (await postsRel.first())!.author).toBeTruthy();
       expect((await (await postsRel.first())!.comments)[0]).toBeTruthy();
@@ -860,7 +860,7 @@ describe("RelationTest", () => {
   });
 
   it("preload applies to all chained preloaded scopes", async () => {
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       const post = await (Post as any).withComments().withTags().first();
       expect(post).toBeTruthy();
     });
@@ -868,11 +868,11 @@ describe("RelationTest", () => {
 
   it("extracted association", async () => {
     let relationAuthors: unknown;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       relationAuthors = await Post.all().extractAssociated("author");
     });
     let rootAuthors: unknown;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       rootAuthors = await (Post as any).extractAssociated("author");
     });
     expect(rootAuthors).toEqual(relationAuthors);
@@ -882,22 +882,22 @@ describe("RelationTest", () => {
   });
 
   it("find with included associations", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const postsRel = Post.includes(":comments").order("posts.id");
       expect((await (await postsRel.first())!.comments)[0]).toBeTruthy();
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const postsRel = Post.all().includes(":comments").order("posts.id");
       expect((await (await postsRel.first())!.comments)[0]).toBeTruthy();
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const postsRel = Post.includes(":author").order("posts.id");
       expect(await (await postsRel.first())!.author).toBeTruthy();
     });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       const postsRel = Post.includes(":author", ":comments").order("posts.id");
       expect(await (await postsRel.first())!.author).toBeTruthy();
       expect((await (await postsRel.first())!.comments)[0]).toBeTruthy();
@@ -930,7 +930,7 @@ describe("RelationTest", () => {
     let resultComment = (await Comment.joins(":post").merge(postRel))[0];
     expect(resultComment.equals(comment)).toBe(true);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await (resultComment as any).post).equals(post)).toBe(true);
       expect((await (await (resultComment as any).post).readers).map((r: Reader) => r.id)).toEqual([
         reader.id,
@@ -941,7 +941,7 @@ describe("RelationTest", () => {
     resultComment = (await Comment.joins(":post").merge(postRel).first())!;
     expect(resultComment.equals(comment)).toBe(true);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await (resultComment as any).post).equals(post)).toBe(true);
       expect((await (await (resultComment as any).post).readers).map((r: Reader) => r.id)).toEqual([
         reader.id,
@@ -958,14 +958,14 @@ describe("RelationTest", () => {
       .where({ title: "Uhuu" });
     let resultPost = (await PostWithPreloadDefaultScope.all().merge(postRel))[0];
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await (resultPost as any).readers).map((r: Reader) => r.id)).toEqual([reader.id]);
     });
 
     postRel = PostWithIncludesDefaultScope.includes(":readers").where({ title: "Uhuu" });
     resultPost = (await PostWithIncludesDefaultScope.all().merge(postRel))[0];
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await (resultPost as any).readers).map((r: Reader) => r.id)).toEqual([reader.id]);
     });
   });
@@ -1015,7 +1015,7 @@ describe("RelationTest", () => {
     const author = await (Author.preload(":taggings") as any).findById(david.id);
     const expectedTaggings = [taggings("welcome_general"), taggings("thinking_general")];
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect([...new Set(await author.taggings)].sort((a: any, b: any) => a.id - b.id)).toEqual(
         expectedTaggings,
       );
@@ -1145,17 +1145,17 @@ describe("RelationTest", () => {
 
   it("find all using where with relation", async () => {
     const david = authors("david");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Author.where({ id: Author.where({ id: david.id }) });
       expect(await relation).toEqual([david]);
     });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Author.where("id in (?)", Author.where({ id: david }).select("id"));
       expect(await relation).toEqual([david]);
     });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Author.where("id in (:author_ids)", {
         author_ids: Author.where({ id: david }).select("id"),
       });
@@ -1167,12 +1167,12 @@ describe("RelationTest", () => {
     const david = authors("david");
     const davidsPosts = (await david.posts.order("id")).map((p: Post) => p.id);
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Post.where({ id: david.posts.select("id") });
       expect((await relation.order("id")).map((p) => p.id)).toEqual(davidsPosts);
     });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Post.where("id in (?)", david.posts.select("id"));
       expect(
         (await relation.order("id")).map((p) => p.id),
@@ -1180,7 +1180,7 @@ describe("RelationTest", () => {
       ).toEqual(davidsPosts);
     });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Post.where("id in (:post_ids)", { post_ids: david.posts.select("id") });
       expect(
         (await relation.order("id")).map((p) => p.id),
@@ -1191,7 +1191,7 @@ describe("RelationTest", () => {
 
   it("find all using where with relation and alternate primary key", async () => {
     const coolFirst = minivans("cool_first");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Minivan.where({ minivan_id: Minivan.where({ name: coolFirst.name }) });
       expect(await relation).toEqual([coolFirst]);
     });
@@ -1223,7 +1223,7 @@ describe("RelationTest", () => {
 
     const subquery = Author.where({ id: david.id });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Author.where({ id: subquery });
       expect(await relation).toEqual([david]);
     });
@@ -1233,7 +1233,7 @@ describe("RelationTest", () => {
 
   it("find all using where with relation with joins", async () => {
     const david = authors("david");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Author.where({ id: Author.joins(":posts").where({ id: david.id }) });
       expect(await relation).toEqual([david]);
     });
@@ -1241,7 +1241,7 @@ describe("RelationTest", () => {
 
   it("find all using where with relation with select to build subquery", async () => {
     const david = authors("david");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const relation = Author.where({ name: Author.where({ id: david.id }).select("name") });
       expect(await relation).toEqual([david]);
     });
@@ -1315,10 +1315,10 @@ describe("RelationTest", () => {
 
   it("size with distinct", async () => {
     const postsRel = Post.distinct().select("author_id", "comments_count");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.size()).toBe(8);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await postsRel.load();
       expect(await postsRel.size()).toBe(8);
     });
@@ -1326,10 +1326,10 @@ describe("RelationTest", () => {
 
   it("size with eager loading and custom order", async () => {
     const postsRel = Post.includes(":comments").order("comments.id");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.size()).toBe(11);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await postsRel.load();
       expect(await postsRel.size()).toBe(11);
     });
@@ -1337,10 +1337,10 @@ describe("RelationTest", () => {
 
   it("size with eager loading and custom select and order", async () => {
     const postsRel = Post.includes(":comments").order("comments.id").select("type");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.size()).toBe(11);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await postsRel.load();
       expect(await postsRel.size()).toBe(11);
     });
@@ -1348,10 +1348,10 @@ describe("RelationTest", () => {
 
   it("size with eager loading and custom order and distinct", async () => {
     const postsRel = Post.includes(":comments").order("comments.id").distinct();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.size()).toBe(11);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await postsRel.load();
       expect(await postsRel.size()).toBe(11);
     });
@@ -1360,10 +1360,10 @@ describe("RelationTest", () => {
   it("size with eager loading and manual distinct select and custom order", async () => {
     const accountsRel = Account.select("DISTINCT accounts.firm_id").order("accounts.firm_id");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await accountsRel.size()).toBe(5);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await accountsRel.load();
       expect(await accountsRel.size()).toBe(5);
     });
@@ -1406,14 +1406,14 @@ describe("RelationTest", () => {
   it("size", async () => {
     const postsRel = Post.all();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.size()).toBe(11);
     });
     assertNotPredicate(postsRel, (p) => p.isLoaded);
 
     const bestPosts = postsRel.where({ comments_count: 0 });
     await bestPosts.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await bestPosts.size()).toBe(6);
     });
   });
@@ -1421,14 +1421,14 @@ describe("RelationTest", () => {
   it("size with limit", async () => {
     const postsRel = Post.limit(10);
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.size()).toBe(10);
     });
     assertNotPredicate(postsRel, (p) => p.isLoaded);
 
     const bestPosts = postsRel.where({ comments_count: 0 });
     await bestPosts.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await bestPosts.size()).toBe(6);
     });
   });
@@ -1436,13 +1436,13 @@ describe("RelationTest", () => {
   it("size with zero limit", async () => {
     const postsRel = Post.limit(0);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await postsRel.size()).toBe(0);
     });
     assertNotPredicate(postsRel, (p) => p.isLoaded);
 
     await postsRel.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await postsRel.size()).toBe(0);
     });
   });
@@ -1450,7 +1450,7 @@ describe("RelationTest", () => {
   it("empty with zero limit", async () => {
     const postsRel = Post.limit(0);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await postsRel.isEmpty()).toBe(true);
     });
     assertNotPredicate(postsRel, (p) => p.isLoaded);
@@ -1472,20 +1472,20 @@ describe("RelationTest", () => {
   it("empty", async () => {
     const postsRel = Post.all();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.isEmpty()).toBe(false);
     });
     assertNotPredicate(postsRel, (p) => p.isLoaded);
 
     const noPosts = postsRel.where({ title: "" });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await noPosts.isEmpty()).toBe(true);
     });
     assertNotPredicate(noPosts, (p) => p.isLoaded);
 
     const bestPosts = postsRel.where({ comments_count: 0 });
     await bestPosts.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await bestPosts.isEmpty()).toBe(false);
     });
   });
@@ -1496,13 +1496,13 @@ describe("RelationTest", () => {
       .group("author_id")
       .where("legacy_comments_count > 0");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.isEmpty()).toBe(false);
     });
     assertNotPredicate(postsRel, (p) => p.isLoaded);
 
     const noPosts = postsRel.where({ title: "" });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await noPosts.isEmpty()).toBe(true);
     });
     assertNotPredicate(noPosts, (p) => p.isLoaded);
@@ -1511,7 +1511,7 @@ describe("RelationTest", () => {
   it("any", async () => {
     const postsRel = Post.all();
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       expect(await postsRel.isAny()).toBeTruthy();
       expect(await postsRel.where({ id: null }).isAny()).toBeFalsy();
 
@@ -1528,7 +1528,7 @@ describe("RelationTest", () => {
   it("many", async () => {
     const postsRel = Post.all();
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       expect(await postsRel.isMany()).toBeTruthy();
       expect(await postsRel.isMany((p) => (p.id as number) > 0)).toBeTruthy();
       expect(await postsRel.isMany((p) => (p.id as number) < 2)).toBeFalsy();
@@ -1550,13 +1550,13 @@ describe("RelationTest", () => {
 
   it("none?", async () => {
     const postsRel = Post.all();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.isNone()).toBeFalsy();
     });
 
     assertNotPredicate(postsRel, (p) => p.isLoaded);
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.isNone((p) => (p.id as number) < 0)).toBeTruthy();
       expect(await postsRel.isNone((p) => p.id === 1)).toBeFalsy();
 
@@ -1569,13 +1569,13 @@ describe("RelationTest", () => {
 
   it("one", async () => {
     const postsRel = Post.all();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.isOne()).toBeFalsy();
     });
 
     assertNotPredicate(postsRel, (p) => p.isLoaded);
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.isOne((p) => (p.id as number) < 3)).toBeFalsy();
       expect(await postsRel.isOne((p) => p.id === 1)).toBeTruthy();
 
@@ -1588,7 +1588,7 @@ describe("RelationTest", () => {
 
   it("one with destroy", async () => {
     const postsRel = Post.all();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await postsRel.isOne()).toBeFalsy();
     });
 
@@ -2382,28 +2382,28 @@ describe("RelationTest", () => {
   it("presence", async () => {
     const topicsRel = Topic.all();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await isPresent(topicsRel)).toBeTruthy();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await isPresent(topicsRel)).toBeTruthy();
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await topicsRel.isBlank()).toBeFalsy();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await topicsRel.size();
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await (topicsRel as any).length;
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await (topicsRel as any).each(() => {});
     });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await topicsRel.count();
     });
 
@@ -2584,7 +2584,7 @@ describe("RelationTest", () => {
       .map((p) => p.inspect())
       .join(", ")}]>`;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(relation.inspect()).toBe(expected);
     });
   });
@@ -2614,7 +2614,7 @@ describe("RelationTest", () => {
     const relation = Post.limit(2);
     await relation;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await PP.pp(relation, { write: () => {} });
     });
   });
@@ -2657,10 +2657,10 @@ describe("RelationTest", () => {
 
   it("#load", async () => {
     const relation = Post.all();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await relation.load()).toEqual(relation);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await relation;
     });
   });
@@ -2670,7 +2670,7 @@ describe("RelationTest", () => {
       .group("author_id")
       .order("author_id")
       .includes(":author");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const result = await Promise.all(
         authorsCount.map(async (post: any) => [post.num_posts, (await post.author)?.name]),
       );
@@ -2899,12 +2899,12 @@ describe("RelationTest", () => {
 
   it("#skip_query_cache!", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Post.all().load();
         await Post.all().load();
       });
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Post.all().skipQueryCacheBang().load();
         await Post.all().skipQueryCacheBang().load();
       });
@@ -2913,12 +2913,12 @@ describe("RelationTest", () => {
 
   it("#skip_query_cache! with an eager load", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Post.eagerLoad(":comments").load();
         await Post.eagerLoad(":comments").load();
       });
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Post.eagerLoad(":comments").skipQueryCacheBang().load();
         await Post.eagerLoad(":comments").skipQueryCacheBang().load();
       });
@@ -2927,12 +2927,12 @@ describe("RelationTest", () => {
 
   it("#skip_query_cache! with a preload", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Post.preload(":comments").load();
         await Post.preload(":comments").load();
       });
 
-      await assertQueriesCount(4, false, async () => {
+      await assertQueriesCount(4, async () => {
         await Post.preload(":comments").skipQueryCacheBang().load();
         await Post.preload(":comments").skipQueryCacheBang().load();
       });

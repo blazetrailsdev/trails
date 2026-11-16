@@ -379,7 +379,7 @@ describe("OptimisticLockingTest", () => {
     expect(t1.title).toBe("title1");
     expect(t1.lock_version).toBe(0);
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await t1.update({ title: "title2" });
     });
 
@@ -389,7 +389,7 @@ describe("OptimisticLockingTest", () => {
 
     const t2 = new LockWithoutDefault({ title: "title1" });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await t2.saveBang();
     });
 
@@ -435,7 +435,7 @@ describe("OptimisticLockingTest", () => {
     expect(t1.title).toBe("title1");
     expect(t1.custom_lock_version).toBe(0);
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await t1.update({ title: "title2" });
     });
 
@@ -445,7 +445,7 @@ describe("OptimisticLockingTest", () => {
 
     const t2 = new LockWithCustomColumnWithoutDefault({ title: "title1" });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await t2.saveBang();
     });
 

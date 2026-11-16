@@ -22,19 +22,19 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("encoding", async () => {
-    await assertQueriesCount(1, true, async () => {
+    await assertQueriesCount(1, { includeSchema: true }, async () => {
       expect(await adapter.encoding()).toBeDefined();
     });
   });
 
   it("collation", async () => {
-    await assertQueriesCount(1, true, async () => {
+    await assertQueriesCount(1, { includeSchema: true }, async () => {
       expect(await adapter.collation()).toBeDefined();
     });
   });
 
   it("ctype", async () => {
-    await assertQueriesCount(1, true, async () => {
+    await assertQueriesCount(1, { includeSchema: true }, async () => {
       expect(await adapter.ctype()).toBeDefined();
     });
   });

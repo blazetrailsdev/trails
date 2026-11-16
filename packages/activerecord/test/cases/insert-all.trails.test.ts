@@ -204,7 +204,7 @@ describe("InsertAllTest (trails)", () => {
         ]);
       });
       const returningIsbn = new RegExp(`RETURNING ${regexpEscape(self().quoteTableName("isbn"))}`);
-      await assertNoQueriesMatch(returningIsbn, false, async () => {
+      await assertNoQueriesMatch(returningIsbn, async () => {
         await DivergentPrimaryKeyBook.insertAll([
           { name: "Divergent II", isbn: "9990000000002", author_id: 1 },
         ]);

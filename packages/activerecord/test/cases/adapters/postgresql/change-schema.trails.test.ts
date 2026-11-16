@@ -5,19 +5,18 @@ describeIfPg("Migration", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
-    await adapter.execute("DROP TABLE IF EXISTS strings");
-    await adapter.execute(
-      `CREATE TABLE strings (id serial primary key, somedate character varying)`,
-    );
+    await adapter.createTable("strings", { force: true }, (t) => {
+      t.string("somedate");
+    });
   });
   afterEach(async () => {
-    await adapter.execute("DROP TABLE IF EXISTS strings");
+    await adapter.dropTable("strings", { ifExists: true });
     await adapter.disconnectBang();
   });
 
   describe("PgChangeSchemaTest", () => {
     it("change column with null", async () => {
-      await adapter.execute("ALTER TABLE strings ADD COLUMN score integer");
+      await adapter.addColumn("strings", "score", "integer");
       await adapter.changeColumn("strings", "score", "integer", { null: false });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "score");
@@ -25,7 +24,7 @@ describeIfPg("Migration", () => {
     });
 
     it("change column with default", async () => {
-      await adapter.execute("ALTER TABLE strings ADD COLUMN score integer");
+      await adapter.addColumn("strings", "score", "integer");
       await adapter.changeColumn("strings", "score", "integer", { default: 42 });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "score");
@@ -33,7 +32,7 @@ describeIfPg("Migration", () => {
     });
 
     it("change column default with null", async () => {
-      await adapter.execute("ALTER TABLE strings ADD COLUMN score integer DEFAULT 42 NOT NULL");
+      await adapter.addColumn("strings", "score", "integer", { default: 42, null: false });
       await adapter.changeColumn("strings", "score", "integer", { default: null, null: false });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "score");
@@ -42,7 +41,7 @@ describeIfPg("Migration", () => {
     });
 
     it("change column scale", async () => {
-      await adapter.execute("ALTER TABLE strings ADD COLUMN amount numeric(10,2)");
+      await adapter.addColumn("strings", "amount", "decimal", { precision: 10, scale: 2 });
       await adapter.changeColumn("strings", "amount", "decimal", { precision: 10, scale: 4 });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "amount");
@@ -50,7 +49,7 @@ describeIfPg("Migration", () => {
     });
 
     it("change column precision", async () => {
-      await adapter.execute("ALTER TABLE strings ADD COLUMN amount numeric(10,2)");
+      await adapter.addColumn("strings", "amount", "decimal", { precision: 10, scale: 2 });
       await adapter.changeColumn("strings", "amount", "decimal", { precision: 15, scale: 2 });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "amount");
@@ -58,7 +57,7 @@ describeIfPg("Migration", () => {
     });
 
     it("change column limit", async () => {
-      await adapter.execute("ALTER TABLE strings ADD COLUMN score smallint");
+      await adapter.addColumn("strings", "score", "integer", { limit: 2 });
       await adapter.changeColumn("strings", "score", "integer", { limit: 4 });
       const cols = await adapter.columns("strings");
       const col = cols.find((c) => c.name === "score");

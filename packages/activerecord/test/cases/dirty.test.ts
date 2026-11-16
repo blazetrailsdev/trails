@@ -419,7 +419,7 @@ describe("DirtyTest", () => {
     pirate.catchphrase = "foo";
 
     await withPartialWrites(Pirate, false, async () => {
-      await assertQueriesCount(6, false, async () => {
+      await assertQueriesCount(6, async () => {
         await pirate.saveBang();
         await pirate.saveBang();
       });
@@ -432,13 +432,13 @@ describe("DirtyTest", () => {
     const oldUpdatedOn = pirate.updated_on;
 
     await withPartialWrites(Pirate, true, async () => {
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await pirate.saveBang();
         await pirate.saveBang();
       });
       expect((await pirate.reload()).updated_on).toEqual(oldUpdatedOn);
 
-      await assertQueriesCount(3, false, async () => {
+      await assertQueriesCount(3, async () => {
         pirate.catchphrase = "bar";
         await pirate.saveBang();
       });
@@ -451,7 +451,7 @@ describe("DirtyTest", () => {
     (person as any).first_name = "foo";
 
     await withPartialWrites(Person, false, async () => {
-      await assertQueriesCount(6, false, async () => {
+      await assertQueriesCount(6, async () => {
         await person.saveBang();
         await person.saveBang();
       });
@@ -461,13 +461,13 @@ describe("DirtyTest", () => {
     const savedLockVersion = (person as any).lock_version + 1;
 
     await withPartialWrites(Person, true, async () => {
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await person.saveBang();
         await person.saveBang();
       });
       expect((await person.reload()).lock_version).toEqual(savedLockVersion);
 
-      await assertQueriesCount(3, false, async () => {
+      await assertQueriesCount(3, async () => {
         (person as any).first_name = "bar";
         await person.saveBang();
       });
@@ -776,7 +776,7 @@ describe("DirtyTest", () => {
   it("partial insert", async () => {
     await withPartialWrites(Person, true, async () => {
       let jon!: Person;
-      await assertNoQueriesMatch(/followers_count/, false, async () => {
+      await assertNoQueriesMatch(/followers_count/, async () => {
         await self().assertQueriesMatch(/first_name/, {}, async () => {
           jon = await Person.create({ first_name: "Jon" });
         });

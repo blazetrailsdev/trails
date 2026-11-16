@@ -734,7 +734,7 @@ describe("UniquenessValidationWithIndexTest", () => {
     ).addIndex("topics", "title", { unique: true, name: "topics_index" });
 
     const t = new Topic({ title: "abc" });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -747,7 +747,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("author_name", "John");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await t.isValid();
     });
   });
@@ -760,7 +760,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("title", "abc v2");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -774,7 +774,7 @@ describe("UniquenessValidationWithIndexTest", () => {
     const t = await Topic.createBang({});
     expect(t.readAttribute("title")).toBeNull();
     t.writeAttribute("author_name", "John");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -791,7 +791,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("title", "abc v2");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -804,7 +804,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("title", "abc v2");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -821,7 +821,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("author_name", "John");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -832,7 +832,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("author_name", "John");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -848,12 +848,12 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc", author_name: "John" });
     t.writeAttribute("content", "hello world");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await t.isValid();
     });
 
     t.writeAttribute("author_name", "Amy");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -871,12 +871,12 @@ describe("UniquenessValidationWithIndexTest", () => {
     const t = await TopicWithEvent.createBang({ event: e1 });
     try {
       t.writeAttribute("content", "hello world");
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await t.isValid();
       });
 
       t.event = e2;
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await t.isValid();
       });
     } finally {
@@ -904,12 +904,12 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc", author_name: "John" });
     t.writeAttribute("content", "hello world");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await t.isValid();
     });
 
     t.writeAttribute("author_name", "Amy");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -925,7 +925,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
     const t = await Topic.createBang({ title: "abc", author_name: "John" });
     t.writeAttribute("content", "hello world");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });
@@ -942,7 +942,7 @@ describe("UniquenessValidationWithIndexTest", () => {
     const t = await Topic.createBang({ title: "abc", author_name: "John" });
     t.writeAttribute("content", "hello world");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await t.isValid();
     });
   });

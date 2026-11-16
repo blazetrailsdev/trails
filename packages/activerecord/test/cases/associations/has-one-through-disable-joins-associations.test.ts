@@ -104,12 +104,12 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
   it("nil on disable joins through", async () => {
     const member = members("blarpy_winkup");
     let organization: unknown;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       organization = await member.organization;
     });
     expect(organization).toBeNull();
     let organizationWithoutJoins: unknown;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       organizationWithoutJoins = await member.organizationWithoutJoins;
     });
     expect(organizationWithoutJoins).toBeNull();
@@ -117,10 +117,10 @@ describe("HasOneThroughDisableJoinsAssociationsTest", () => {
 
   it("preload on disable joins through", async () => {
     const members = await Member.preload(":organization", ":organizationWithoutJoins");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await members[0].organization;
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await members[0].organizationWithoutJoins;
     });
   });

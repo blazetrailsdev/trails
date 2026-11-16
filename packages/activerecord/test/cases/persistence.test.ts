@@ -208,7 +208,7 @@ describe("PersistenceTest", () => {
 
   it("update does not run sql if record has not changed", async () => {
     const topic = await Topic.create({ title: "Another New Topic" });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await topic.update({ title: "Another New Topic" })).toBeTruthy();
     });
   });
@@ -1228,7 +1228,7 @@ describe("PersistenceTest", () => {
 
   it("update attribute does not run sql if attribute is not changed", async () => {
     const topic = await Topic.create({ title: "Another New Topic" });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await topic.updateAttribute("title", "Another New Topic")).toBeTruthy();
     });
   });
@@ -1326,7 +1326,7 @@ describe("PersistenceTest", () => {
   });
 
   it("class level delete with invalid ids", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Topic.delete(null as any)).toBe(0);
       expect(await Topic.delete([])).toBe(0);
     });

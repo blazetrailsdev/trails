@@ -188,7 +188,7 @@ describe("ReservedWordTest", () => {
   it("associations work with reserved words", async () => {
     await createTestFixtures("select", "group");
     const selects = await Select.all().includes(":groups");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       for (const s of selects) {
         await (s as unknown as { groups: { toArray(): Promise<Group[]> } }).groups.toArray();
       }

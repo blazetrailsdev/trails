@@ -31,7 +31,7 @@ describe("EachTest", () => {
 
   it("each should execute one query per batch", async () => {
     const total = Number(await Post.count());
-    await assertQueriesCount(total + 1, false, async () => {
+    await assertQueriesCount(total + 1, async () => {
       for await (const post of Post.findEach({ batchSize: 1 })) {
         expect(post).toBeInstanceOf(Post);
       }
@@ -40,14 +40,14 @@ describe("EachTest", () => {
 
   // BLOCKED: find-each-find-in-batches-block-arm
   it("each should not return query chain and execute only one query", async () => {
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const result = await Post.findEach({ batchSize: 100000 }, () => {});
       expect(result).toBeNull();
     });
   });
 
   it("each should return an enumerator if no block is present", async () => {
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       let index = 0;
       for await (const post of Post.findEach({ batchSize: 100000 })) {
         expect(post).toBeInstanceOf(Post);
@@ -67,7 +67,7 @@ describe("EachTest", () => {
 
   it("each enumerator should execute one query per batch", async () => {
     const total = Number(await Post.count());
-    await assertQueriesCount(total + 1, false, async () => {
+    await assertQueriesCount(total + 1, async () => {
       let index = 0;
       for await (const post of Post.findEach({ batchSize: 1 })) {
         expect(post).toBeInstanceOf(Post);
@@ -86,7 +86,7 @@ describe("EachTest", () => {
   });
 
   it("each should execute if id is in select", async () => {
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       for await (const post of Post.select("id, title, type").findEach({ batchSize: 2 })) {
         expect(post).toBeInstanceOf(Post);
       }
@@ -144,7 +144,7 @@ describe("EachTest", () => {
 
   it("find in batches should return batches", async () => {
     const total = Number(await Post.count());
-    await assertQueriesCount(total + 1, false, async () => {
+    await assertQueriesCount(total + 1, async () => {
       for await (const batch of Post.findInBatches({ batchSize: 1 })) {
         expect(batch).toBeInstanceOf(Array);
         expect(batch[0]).toBeInstanceOf(Post);
@@ -154,7 +154,7 @@ describe("EachTest", () => {
 
   it("find in batches should start from the start option", async () => {
     const total = Number(await Post.count());
-    await assertQueriesCount(total, false, async () => {
+    await assertQueriesCount(total, async () => {
       for await (const batch of Post.findInBatches({ batchSize: 1, start: 2 })) {
         expect(batch).toBeInstanceOf(Array);
         expect(batch[0]).toBeInstanceOf(Post);
@@ -163,7 +163,7 @@ describe("EachTest", () => {
   });
 
   it("find in batches should end at the finish option", async () => {
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       for await (const batch of Post.findInBatches({ batchSize: 1, finish: 5 })) {
         expect(batch).toBeInstanceOf(Array);
         expect(batch[0]).toBeInstanceOf(Post);
@@ -173,13 +173,13 @@ describe("EachTest", () => {
 
   it("find in batches shouldnt execute query unless needed", async () => {
     const total = Number(await Post.count());
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       for await (const batch of Post.findInBatches({ batchSize: total })) {
         expect(batch).toBeInstanceOf(Array);
       }
     });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       for await (const batch of Post.findInBatches({ batchSize: total + 1 })) {
         expect(batch).toBeInstanceOf(Array);
       }
@@ -326,7 +326,7 @@ describe("EachTest", () => {
 
   it("find in batches should use any column as primary key when start is not specified", async () => {
     const count = Number(await Subscriber.count());
-    await assertQueriesCount(count + 1, false, async () => {
+    await assertQueriesCount(count + 1, async () => {
       for await (const batch of Subscriber.findInBatches({ batchSize: 1 })) {
         expect(batch).toBeInstanceOf(Array);
         expect(batch[0]).toBeInstanceOf(Subscriber);
@@ -336,10 +336,10 @@ describe("EachTest", () => {
 
   it("find in batches should return an enumerator", async () => {
     let enumerator: AsyncGenerator<Base[]> | undefined;
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       enumerator = Post.findInBatches({ batchSize: 1 });
     });
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       let count = 0;
       for await (const batch of enumerator!) {
         expect(batch).toBeInstanceOf(Array);
@@ -371,7 +371,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should not execute any query", async () => {
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect(Post.inBatches({ of: 2 })).toBeInstanceOf(BatchEnumerator);
     });
   });
@@ -397,7 +397,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should yield relation if block given", async () => {
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       for await (const relation of Post.inBatches({ of: 2 })) {
         expect(relation).toBeInstanceOf(Relation);
       }
@@ -405,7 +405,7 @@ describe("EachTest", () => {
   });
 
   it("in batches should be enumerable if no block given", async () => {
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       for await (const relation of Post.inBatches({ of: 2 })) {
         expect(relation).toBeInstanceOf(Relation);
       }
@@ -413,7 +413,7 @@ describe("EachTest", () => {
   });
 
   it("in batches each record should yield record if block is given", async () => {
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
         expect(isPresent(post.readAttribute("title"))).toBeTruthy();
         expect(post).toBeInstanceOf(Post);
@@ -422,7 +422,7 @@ describe("EachTest", () => {
   });
 
   it("in batches each record should return enumerator if no block given", async () => {
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
         expect(isPresent(post.readAttribute("title"))).toBeTruthy();
         expect(post).toBeInstanceOf(Post);
@@ -432,7 +432,7 @@ describe("EachTest", () => {
 
   it("in batches each record should be ordered by id", async () => {
     const ids = (await Post.order("id ASC")).map((p: any) => p.id);
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       let i = 0;
       for await (const post of Post.inBatches({ of: 2 }).eachRecord()) {
         expect(post.id).toBe(ids[i]);
@@ -442,7 +442,7 @@ describe("EachTest", () => {
   });
 
   it("in batches update all affect all records", async () => {
-    await assertQueriesCount(6 + 6, false, async () => {
+    await assertQueriesCount(6 + 6, async () => {
       await Post.inBatches({ of: 2 }).updateAll({ title: "updated-title" });
     });
     const all = await Post.all();
@@ -463,7 +463,7 @@ describe("EachTest", () => {
 
   it("in batches touch all affect all records", async () => {
     const time = RubyTime.local(2000, 1, 1, 0, 0, 0);
-    await assertQueriesCount(6 + 6, false, async () => {
+    await assertQueriesCount(6 + 6, async () => {
       await Developer.inBatches({ of: 2 }).touchAll({ time });
     });
     const count = Number(await Developer.count());
@@ -531,7 +531,7 @@ describe("EachTest", () => {
 
   it("in batches if not loaded executes more queries", async () => {
     const total = Number(await Post.count());
-    await assertQueriesCount(total + 1, false, async () => {
+    await assertQueriesCount(total + 1, async () => {
       for await (const relation of Post.inBatches({ of: 1, load: false })) {
         expect(relation.isLoaded).toBeFalsy();
       }
@@ -544,7 +544,7 @@ describe("EachTest", () => {
     const total = Number(await Post.count());
     let batchCount = 0;
     let lastId = Math.min(...(await posts).map((p: any) => p.id));
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       for await (const relation of posts.inBatches({ of: 1 })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
@@ -562,7 +562,7 @@ describe("EachTest", () => {
     const total = Number(await Post.count());
     let batchCount = 0;
     let lastId = Math.max(...(await allPosts).map((p: any) => p.id));
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       for await (const relation of allPosts.inBatches({ of: 1, order: ":desc" })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
@@ -580,7 +580,7 @@ describe("EachTest", () => {
     const startId = loadedPosts[1].id as number;
     const finishId = loadedPosts[loadedPosts.length - 2].id as number;
     let batchCount = 0;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       for await (const relation of allPosts.inBatches({
         of: 1,
         start: startId,
@@ -599,7 +599,7 @@ describe("EachTest", () => {
     const startId = loadedPosts[loadedPosts.length - 2].id as number;
     const finishId = loadedPosts[1].id as number;
     let batchCount = 0;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       for await (const relation of allPosts.inBatches({
         of: 1,
         start: startId,
@@ -618,7 +618,7 @@ describe("EachTest", () => {
     await allPosts;
     const total = Number(await Post.count());
     let batchCount = 0;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       for await (const relation of allPosts.inBatches({ of: 1 })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
@@ -635,7 +635,7 @@ describe("EachTest", () => {
     const startId = (expected[0] as any).id;
     const finishId = (expected[expected.length - 1] as any).id;
     const collected: any[] = [];
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       for await (const order of incorrectlySorted.findEach({
         batchSize: 1,
         start: startId,
@@ -660,7 +660,7 @@ describe("EachTest", () => {
       await orderedPosts;
       const expected = await Post.order("id desc");
       const collected: any[] = [];
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         for await (const post of orderedPosts
           .inBatches({ of: 1, cursor: "id", order: ":desc" })
           .eachRecord()) {
@@ -677,7 +677,7 @@ describe("EachTest", () => {
 
   it("in batches should return relations", async () => {
     const total = Number(await Post.count());
-    await assertQueriesCount(total + 1, false, async () => {
+    await assertQueriesCount(total + 1, async () => {
       for await (const relation of Post.inBatches({ of: 1 })) {
         expect(relation).toBeInstanceOf(Relation);
       }
@@ -686,7 +686,7 @@ describe("EachTest", () => {
 
   it("in batches should start from the start option", async () => {
     const post = await Post.order("id ASC").where("id >= ?", 2).first();
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const relation = (await Post.inBatches({ of: 1, start: 2 }).first())!;
       assertEqual(post, await relation.first());
     });
@@ -694,7 +694,7 @@ describe("EachTest", () => {
 
   it("in batches should end at the finish option", async () => {
     const post = await Post.order("id DESC").where("id <= ?", 5).first();
-    await assertQueriesCount(7, false, async () => {
+    await assertQueriesCount(7, async () => {
       const relation = (await Post.inBatches({ of: 1, finish: 5, load: true })
         .reverseEach()
         .first())!;
@@ -760,13 +760,13 @@ describe("EachTest", () => {
 
   it("in batches shouldnt execute query unless needed", async () => {
     const total = Number(await Post.count());
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       for await (const relation of Post.inBatches({ of: total })) {
         expect(relation).toBeInstanceOf(Relation);
       }
     });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       for await (const relation of Post.inBatches({ of: total + 1 })) {
         expect(relation).toBeInstanceOf(Relation);
       }
@@ -871,7 +871,7 @@ describe("EachTest", () => {
 
   it("in batches should use any column as primary key when start is not specified", async () => {
     const count = Number(await Subscriber.count());
-    await assertQueriesCount(count + 1, false, async () => {
+    await assertQueriesCount(count + 1, async () => {
       await Subscriber.inBatches({ of: 1, load: true }, async (relation: any) => {
         expect(relation).toBeInstanceOf(Relation);
         expect(await relation.first()).toBeInstanceOf(Subscriber);
@@ -881,11 +881,11 @@ describe("EachTest", () => {
 
   it("in batches should return an enumerator", async () => {
     let enumerator: BatchEnumerator<any> | undefined;
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       enumerator = Post.inBatches({ of: 1 });
     });
     const relations: any[] = [];
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       let count = 0;
       for await (const relation of enumerator!) {
         relations.push(relation);
@@ -1083,7 +1083,7 @@ describe("EachTest", () => {
   });
 
   it(".find_each respects table alias", async () => {
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const tableAlias = Post.arelTable.alias("omg_posts");
       const postRel = new Relation(Post, { table: tableAlias as any });
       for await (const _post of postRel.findEach({})) {
@@ -1092,7 +1092,7 @@ describe("EachTest", () => {
   });
 
   it(".find_each bypasses the query cache for its own queries", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       for await (const _post of Post.findEach({})) {
       }
       for await (const _post of Post.findEach({})) {
@@ -1102,7 +1102,7 @@ describe("EachTest", () => {
 
   it(".find_each does not disable the query cache inside the given block", async () => {
     const postId = posts("welcome").id as number;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       for await (const p of Post.findEach({ start: postId, finish: postId })) {
         await p.readAttribute("legacy_comments_count");
         await p.readAttribute("legacy_comments_count");
@@ -1112,7 +1112,7 @@ describe("EachTest", () => {
   });
 
   it(".find_in_batches bypasses the query cache for its own queries", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       for await (const _b of Post.findInBatches({})) {
       }
       for await (const _b of Post.findInBatches({})) {
@@ -1122,7 +1122,7 @@ describe("EachTest", () => {
 
   it(".find_in_batches does not disable the query cache inside the given block", async () => {
     const postId = posts("welcome").id as number;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       for await (const batch of Post.findInBatches({ start: postId, finish: postId })) {
         await batch[0].readAttribute("legacy_comments_count");
         await batch[0].readAttribute("legacy_comments_count");
@@ -1132,7 +1132,7 @@ describe("EachTest", () => {
   });
 
   it(".in_batches bypasses the query cache for its own queries", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       for await (const _rel of Post.inBatches({})) {
       }
       for await (const _rel of Post.inBatches({})) {
@@ -1144,7 +1144,7 @@ describe("EachTest", () => {
     const postId = posts("welcome").id as number;
     await Post.cache(async () => {
       for await (const rel of Post.inBatches({ start: postId, finish: postId })) {
-        await assertQueriesCount(1, false, async () => {
+        await assertQueriesCount(1, async () => {
           await rel.count();
           await rel.count();
         });

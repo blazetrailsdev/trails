@@ -188,17 +188,17 @@ describe("CollectionCacheKeyTest", () => {
   it("it triggers at most one query", async () => {
     const developers = Developer.where({ name: "David" });
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await developers.cacheKey();
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await developers.cacheKey();
     });
   });
 
   it("it doesn't trigger any query if the relation is already loaded", async () => {
     const developers = await Developer.where({ name: "David" }).load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await developers.cacheKey();
     });
   });
@@ -206,7 +206,7 @@ describe("CollectionCacheKeyTest", () => {
   it("it doesn't trigger any query if collection_cache_versioning is enabled", async () => {
     await withCollectionCacheVersioning(async () => {
       const developers = Developer.where({ name: "David" });
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await developers.cacheKey();
       });
     });

@@ -5,26 +5,27 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
-    await adapter.execute("DROP TABLE IF EXISTS before_rename CASCADE");
-    await adapter.execute("DROP TABLE IF EXISTS after_rename CASCADE");
   });
   afterEach(async () => {
-    await adapter.execute("DROP TABLE IF EXISTS before_rename CASCADE");
-    await adapter.execute("DROP TABLE IF EXISTS after_rename CASCADE");
+    await adapter.dropTable("before_rename", "after_rename", { ifExists: true });
     await adapter.disconnectBang();
   });
 
   describe("PostgresqlRenameTableTest", () => {
     it("rename table with index", async () => {
-      await adapter.execute("CREATE TABLE before_rename (id serial primary key, name text)");
-      await adapter.execute("CREATE INDEX idx_before_name ON before_rename (name)");
+      await adapter.createTable("before_rename", { force: true }, (t) => {
+        t.text("name");
+      });
+      await adapter.addIndex("before_rename", "name");
       await adapter.renameTable("before_rename", "after_rename");
       const indexes = await adapter.indexes("after_rename");
       expect(indexes.some((i) => i.columns.includes("name"))).toBe(true);
     });
 
     it("rename table with sequence", async () => {
-      await adapter.execute("CREATE TABLE before_rename (id serial primary key, name text)");
+      await adapter.createTable("before_rename", { force: true }, (t) => {
+        t.text("name");
+      });
       await adapter.renameTable("before_rename", "after_rename");
       expect(await adapter.primaryKey("after_rename")).toBe("id");
       const id = await adapter.insert(`INSERT INTO after_rename (name) VALUES ('test')`);
@@ -32,7 +33,9 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("rename table preserves data", async () => {
-      await adapter.execute("CREATE TABLE before_rename (id serial primary key, name text)");
+      await adapter.createTable("before_rename", { force: true }, (t) => {
+        t.text("name");
+      });
       await adapter.execute(`INSERT INTO before_rename (name) VALUES ('alice')`);
       await adapter.execute(`INSERT INTO before_rename (name) VALUES ('bob')`);
       await adapter.renameTable("before_rename", "after_rename");

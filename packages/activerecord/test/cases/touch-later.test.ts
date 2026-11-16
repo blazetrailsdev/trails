@@ -113,7 +113,7 @@ describe("TouchLaterTest", () => {
 
   it("touch later dont hit the db", async () => {
     const invoice = await Invoice.create();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await invoice.touchLater();
     });
   });

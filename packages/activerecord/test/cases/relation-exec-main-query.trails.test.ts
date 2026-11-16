@@ -16,25 +16,25 @@ describe("RelationTest", () => {
   });
 
   it("contradiction where-clause issues no query", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Author.all().where({ id: [] })).toEqual([]);
     });
   });
 
   it("count on contradiction where-clause issues no query", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Author.all().where({ id: [] }).count()).toEqual(0);
     });
   });
 
   it("pluck on contradiction where-clause issues no query", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Author.all().where({ id: [] }).pluck("id")).toEqual([]);
     });
   });
 
   it("exists on contradiction where-clause issues no query", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Author.all().where({ id: [] }).isExists()).toBe(false);
     });
   });

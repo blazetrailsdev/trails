@@ -64,7 +64,7 @@ describe("ActiveRecordMessagePackTest", () => {
     await post.comments.createBang({ body: "Another comment.", author: post.author });
     await post.comments.load();
 
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       const roundtrippedPost = roundtrip(post);
 
       assertEqual(post, roundtrippedPost);
@@ -85,7 +85,7 @@ describe("ActiveRecordMessagePackTest", () => {
     const post = new Post({ title: "A Title", body: "A body." });
     await post.createAuthorBang({ name: "An Author" });
 
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       const roundtrippedPost = roundtrip(post);
 
       assertEqual(post.attributes, roundtrippedPost.attributes);

@@ -540,7 +540,7 @@ describe("Migration", () => {
           t.integer("col_two");
         });
 
-        await assertQueriesCount(expectedAlterQueryCount, false, async () => {
+        await assertQueriesCount(expectedAlterQueryCount, async () => {
           await self.connection.removeColumns("my_table", "col_one", "col_two");
         });
 
@@ -555,7 +555,7 @@ describe("Migration", () => {
       try {
         await self.connection.createTable("my_table");
 
-        await assertQueriesCount(expectedAlterQueryCount, false, async () => {
+        await assertQueriesCount(expectedAlterQueryCount, async () => {
           await self.connection.addTimestamps("my_table");
         });
 

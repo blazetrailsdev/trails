@@ -12,7 +12,7 @@ describe("Relation#exec_queries skip_preloading_value guard", () => {
     relation.skipPreloadingBang();
 
     let authors: Author[] = [];
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       authors = await relation;
     });
 

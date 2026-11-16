@@ -233,7 +233,7 @@ describe("ValidationsTest", () => {
     }
     await Klass.resetColumnInformation();
 
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       Klass.validatesAcceptanceOf("foo");
     });
   });

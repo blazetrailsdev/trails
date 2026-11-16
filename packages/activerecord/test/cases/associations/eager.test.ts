@@ -312,7 +312,7 @@ describe("EagerAssociationTest", () => {
   it("has many through with order", async () => {
     const authorsArr = await Author.all().includes(":favoriteAuthors");
     expect(authorsArr.length > 0).toBeTruthy();
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       authorsArr.map((a: any) => a.favoriteAuthors);
     });
   });
@@ -320,7 +320,7 @@ describe("EagerAssociationTest", () => {
     await Post.updateAll({ author_id: null });
     const authorsArr = await Author.all().includes(":post").references("post");
     expect(authorsArr.length > 0).toBeTruthy();
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       authorsArr.map((a: any) => a.post);
     });
   });
@@ -333,7 +333,7 @@ describe("EagerAssociationTest", () => {
       target_id: m?.target_id,
       weight: m?.weight,
     });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect(mateyAttrs((eagerLoaded as any)?.attackerMatey)).toEqual(mateyAttrs(attackerMatey));
     });
   });
@@ -347,7 +347,7 @@ describe("EagerAssociationTest", () => {
       target_id: m?.target_id,
       weight: m?.weight,
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const eagerMateys: Matey[] = await (eagerLoaded as any).mateys.toArray();
       expect(eagerMateys.map(mateyAttrs)).toEqual(mateysList.map(mateyAttrs));
     });
@@ -394,7 +394,7 @@ describe("EagerAssociationTest", () => {
   });
   it("duplicate middle objects", async () => {
     const commentArr = await Comment.where({ post_id: 1 }).includes({ ":post": ":author" });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       commentArr.forEach((c: any) => {
         void c.post.author.name;
       });
@@ -419,7 +419,7 @@ describe("EagerAssociationTest", () => {
   it("finding with includes on has many association with same include includes only once", async () => {
     const authorId = authors("david").id;
     let author!: Author;
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       author = await Author.includes({ ":postsWithComments": ":comments" }).find(authorId);
     });
     const postsLoaded = (author as any).association("postsWithComments").target as any[];
@@ -437,12 +437,12 @@ describe("EagerAssociationTest", () => {
     const post = await davidAuthor.postAboutThinkingWithLastComment;
     const lastComment = await (post as any).lastComment;
     let author!: Author;
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       author = await Author.includes({ ":postAboutThinkingWithLastComment": ":lastComment" }).find(
         davidAuthor.id,
       );
     });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((author as any).postAboutThinkingWithLastComment?.id).toBe(post?.id);
       expect(
         (author as any).postAboutThinkingWithLastComment?.association("lastComment").target?.id,
@@ -454,10 +454,10 @@ describe("EagerAssociationTest", () => {
     const author = await welcomePost.author;
     const authorAddress = await (author as any).authorAddress;
     let post!: Post;
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       post = await Post.includes({ ":authorWithAddress": ":authorAddress" }).find(welcomePost.id);
     });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((post as any).authorWithAddress?.id).toBe(author?.id);
       expect((post as any).authorWithAddress?.association("authorAddress").target?.id).toBe(
         authorAddress?.id,
@@ -468,10 +468,10 @@ describe("EagerAssociationTest", () => {
     const welcomePost = posts("welcome");
     await Post.where({ id: welcomePost.id }).updateAll({ author_id: null });
     let post!: Post;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       post = await Post.includes({ ":authorWithAddress": ":authorAddress" }).find(welcomePost.id);
     });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((post as any).authorWithAddress).toBeNull();
     });
   });
@@ -482,10 +482,10 @@ describe("EagerAssociationTest", () => {
       sponsorable_type: null,
     });
     let sponsor!: Sponsor;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       sponsor = await Sponsor.includes(":sponsorable").find(sponsorRecord.id);
     });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((sponsor as any).sponsorable).toBeNull();
     });
   });
@@ -496,12 +496,12 @@ describe("EagerAssociationTest", () => {
       sponsorable_id: null,
     });
     let sponsor!: Sponsor;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       sponsor = await assertNothingRaised(() =>
         Sponsor.includes(":sponsorable").find(sponsorRecord.id),
       );
     });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((sponsor as any).sponsorable).toBeNull();
     });
   });
@@ -763,13 +763,13 @@ describe("EagerAssociationTest", () => {
   });
 
   it("load with sti sharing association", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await Comment.all().includes(":post");
     });
   });
   it("eager loading with conditions on string joined table preloads", async () => {
     let loaded: Post[] = [];
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       loaded = await Post.all()
         .select("distinct posts.*")
         .includes(":author")
@@ -778,11 +778,11 @@ describe("EagerAssociationTest", () => {
         .order("posts.id");
     });
     expect(loaded.map((p) => p.id)).toEqual([posts("welcome").id]);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await (loaded[0] as any).author).id).toBe(authors("david").id);
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       loaded = await Post.all()
         .select("distinct posts.*")
         .includes(":author")
@@ -791,7 +791,7 @@ describe("EagerAssociationTest", () => {
         .order("posts.id");
     });
     expect(loaded.map((p) => p.id)).toEqual([posts("welcome").id]);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await (loaded[0] as any).author).id).toBe(authors("david").id);
     });
   });
@@ -800,7 +800,7 @@ describe("EagerAssociationTest", () => {
       (a: any, b: any) => Number(a.id) - Number(b.id),
     );
     const firm = await Firm.includes(":clientsUsingPrimaryKey").first();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const actual = (await firm!.clientsUsingPrimaryKey).sort(
         (a: any, b: any) => Number(a.id) - Number(b.id),
       );
@@ -816,7 +816,7 @@ describe("EagerAssociationTest", () => {
       .includes(":clientsUsingPrimaryKey")
       .order("clients_using_primary_keys_companies.name")
       .find(1);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const actual = await firm.clientsUsingPrimaryKey;
       expect(actual.map((c: any) => c.id)).toEqual(expected.map((c: any) => c.id));
     });
@@ -826,10 +826,10 @@ describe("EagerAssociationTest", () => {
     const c = await Client.create({ name: "Foo", client_of: maxId + 1 });
 
     let client!: InstanceType<typeof Client>;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       client = await Client.preload(":accounts").find(c.id);
     });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       assertPredicate(
         client.association("accounts").target as Base[],
         (a: Base[]) => a.length === 0,
@@ -845,10 +845,10 @@ describe("EagerAssociationTest", () => {
     });
 
     let tagging!: InstanceType<typeof Tagging>;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       tagging = await Tagging.preload(":taggable").find(t.id);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await (tagging as any).taggable).toBeNull();
     });
     expect(Number(tagging.taggable_id)).toBe(maxId + 1);
@@ -945,13 +945,13 @@ describe("EagerAssociationTest", () => {
 
   it("preloading associations with string joins and order references", async () => {
     let author: any;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       author = await Author.includes(":posts")
         .joins("LEFT JOIN posts ON posts.author_id = authors.id")
         .order("posts.title DESC")
         .first();
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await author.posts.size()).toBe(5);
     });
   });
@@ -1015,13 +1015,13 @@ describe("EagerAssociationTest", () => {
   });
   it("preloading through a polymorphic association doesn't require the association to exist", async () => {
     let sponsorRecords: any[] = [];
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       sponsorRecords = await (Sponsor as any)
         .where({ sponsorable_id: 1 })
         .preload({ ":sponsorable": [":post", ":membership"] })
         .toArray();
     });
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       sponsorRecords
         .map((s: any) => s.association("sponsorable").target)
         .map((s: any) =>
@@ -1033,13 +1033,13 @@ describe("EagerAssociationTest", () => {
   });
   it("preloading a regular association through a polymorphic association doesn't require the association to exist on all types", async () => {
     let sponsorRecords: any[] = [];
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       sponsorRecords = await (Sponsor as any)
         .where({ sponsorable_id: 1 })
         .preload({ ":sponsorable": [{ ":post": ":firstComment" }, ":membership"] })
         .toArray();
     });
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       sponsorRecords
         .map((s: any) => s.association("sponsorable").target)
         .map((s: any) =>
@@ -1141,7 +1141,7 @@ describe("EagerAssociationTest", () => {
     expect(people.length).toBe(2);
     for (const person of people) {
       let contact: any;
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         contact = await person.primaryContact;
         expect(contact).not.toBeNull();
       });
@@ -1167,10 +1167,10 @@ describe("EagerAssociationTest", () => {
     const c = await Client.create({ name: "Foo", client_of: clientOf });
 
     let client!: InstanceType<typeof Client>;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       client = await Client.preload(":firm").find(c.id);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await client.firm).toBeNull();
     });
     expect(Number(client.client_of)).toBe(clientOf);
@@ -1192,7 +1192,7 @@ describe("EagerAssociationTest", () => {
       .all()
       .toArray();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const membersWithMembership = members.filter(
         (m: any) => m.association("currentMembership").target,
       );
@@ -1226,13 +1226,13 @@ describe("EagerAssociationTest", () => {
       (post.association("categories").target as Base[]).find((c) => c.id === categoryId)!;
     const categorizationCount = (c: Base): Promise<number> => (c as any).categorizations.length();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await categorizationCount(categoryOf(loaded[0], categories("general").id))).toBe(2);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await categorizationCount(categoryOf(loaded[0], categories("technology").id))).toBe(1);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
     });
   });
@@ -1316,7 +1316,7 @@ describe("EagerAssociationTest", () => {
   it("eager with default scope", async () => {
     const developer = await EagerDeveloperWithDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const loaded = await developer!.projects;
       expect(loaded.map((p) => p.id)).toEqual(projects);
     });
@@ -1327,7 +1327,7 @@ describe("EagerAssociationTest", () => {
       name: "David",
     }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const loaded = await developer!.projects;
       expect(loaded.map((p) => p.id)).toEqual(projects);
     });
@@ -1337,7 +1337,7 @@ describe("EagerAssociationTest", () => {
     const david = developers("david");
     const developer = await EagerDeveloperWithClassMethodDefaultScope.find(david.id);
     const projects = await projectIds();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const loaded = await developer.projects;
       expect(loaded.map((p) => p.id)).toEqual(projects);
     });
@@ -1346,7 +1346,7 @@ describe("EagerAssociationTest", () => {
   it("eager with default scope as class method using find by method", async () => {
     const developer = await EagerDeveloperWithClassMethodDefaultScope.findBy({ name: "David" });
     const projects = await projectIds();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const loaded = await developer!.projects;
       expect(loaded.map((p) => p.id)).toEqual(projects);
     });
@@ -1355,7 +1355,7 @@ describe("EagerAssociationTest", () => {
   it("eager with default scope as lambda", async () => {
     const developer = await EagerDeveloperWithLambdaDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const loaded = await developer!.projects;
       expect(loaded.map((p) => p.id)).toEqual(projects);
     });
@@ -1365,7 +1365,7 @@ describe("EagerAssociationTest", () => {
     await EagerDeveloperWithBlockDefaultScope.where({ name: "David" }).first();
     const developer = await EagerDeveloperWithBlockDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const loaded = await developer!.projects;
       expect(loaded.map((p) => p.id)).toEqual(projects);
     });
@@ -1374,7 +1374,7 @@ describe("EagerAssociationTest", () => {
   it("eager with default scope as callable", async () => {
     const developer = await EagerDeveloperWithCallableDefaultScope.where({ name: "David" }).first();
     const projects = await projectIds();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const loaded = await developer!.projects;
       expect(loaded.map((p) => p.id)).toEqual(projects);
     });
@@ -1382,18 +1382,18 @@ describe("EagerAssociationTest", () => {
 
   it("eager loading with order on joined table preloads", async () => {
     let loaded: Post[] = [];
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       loaded = await Post.all().joins(":comments").includes(":author").order("comments.id DESC");
     });
     expect(loaded[2].id).toBe(posts("eager_other").id);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((loaded[2].association("author").target as Base).id).toBe(authors("mary").id);
     });
   });
 
   it("eager loading with conditions on joined table preloads", async () => {
     let loaded: Post[] = [];
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       loaded = await Post.all()
         .select("distinct posts.*")
         .includes(":author")
@@ -1402,11 +1402,11 @@ describe("EagerAssociationTest", () => {
         .order("posts.id");
     });
     expect(loaded.map((p) => Number(p.id))).toEqual([Number(posts("welcome").id)]);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((loaded[0].association("author").target as Base).id).toBe(authors("david").id);
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       loaded = await Post.all()
         .includes(":author")
         .joins({ ":taggings": ":tag" })
@@ -1418,7 +1418,7 @@ describe("EagerAssociationTest", () => {
       Number(posts("thinking").id),
     ]);
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       loaded = await Post.all()
         .includes(":author")
         .joins({ ":taggings": { ":tag": ":taggings" } })
@@ -1433,7 +1433,7 @@ describe("EagerAssociationTest", () => {
 
   it("eager loading with select on joined table preloads", async () => {
     let loaded: Post[] = [];
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       loaded = await Post.all()
         .select("posts.*, authors.name as author_name")
         .includes(":comments")
@@ -1444,7 +1444,7 @@ describe("EagerAssociationTest", () => {
     const sortById = (records: Base[]) => records.map((c) => Number(c.id)).sort((a, b) => a - b);
     const welcomeComments = sortById(await (posts("welcome") as any).comments.toArray());
     let preloaded: number[] = [];
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       preloaded = sortById(await (loaded[0] as any).comments.toArray());
     });
     expect(preloaded).toEqual(welcomeComments);
@@ -1452,7 +1452,7 @@ describe("EagerAssociationTest", () => {
 
   it("eager loading with conditions on join model preloads", async () => {
     let loaded: Author[] = [];
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       loaded = await Author.all()
         .includes(":authorAddress")
         .joins(":comments")
@@ -1522,11 +1522,11 @@ describe("EagerAssociationTest", () => {
 
   it("joins with includes should preload via joins", async () => {
     let post: Post | undefined;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const loaded = await Post.includes(":comments").joins(":comments").order("posts.id desc");
       post = loaded[0];
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await (post! as any).comments.length()).not.toBe(0);
     });
   });
@@ -1647,13 +1647,13 @@ describe("EagerAssociationTest", () => {
 
   it("including associations with where.not adds implicit references", async () => {
     let author!: Author;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       author = (await Author.includes(":posts")
         .where()
         .not({ posts: { title: "Welcome to the weblog" } })
         .last()) as Author;
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await (author as any).posts.length()).toBe(2);
     });
   });
@@ -1670,10 +1670,10 @@ describe("EagerAssociationTest", () => {
       .includes(":commentsWithOrderAndConditions", ":posts")
       .order("authors.id")
       .first()) as Author;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await (author as any).commentsWithOrderAndConditions.length()).toBe(2);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await (author as any).posts.length()).toBe(5);
     });
   });
@@ -1725,7 +1725,7 @@ describe("EagerAssociationTest", () => {
   it("preconfigured includes with belongs to", async () => {
     const post = await Post.find(posts("welcome").id);
     const author = (await post.association("authorWithPosts").loadTarget()) as Author;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await (author as any).posts.length()).toBe(5);
     });
   });
@@ -1733,7 +1733,7 @@ describe("EagerAssociationTest", () => {
   it("preconfigured includes with has many", async () => {
     const david = await Author.find(authors("david").id);
     const loaded = (await david.association("postsWithComments").loadTarget()) as Base[];
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(loaded.length).toBe(5);
       const one = loaded.find((p) => p.id === posts("welcome").id)!;
       expect(await (one as any).comments.length()).toBe(2);
@@ -1743,13 +1743,13 @@ describe("EagerAssociationTest", () => {
   it("preconfigured includes with has one", async () => {
     const post = await Post.find(posts("sti_comments").id);
     const comment = (await post.association("verySpecialCommentWithPost").loadTarget()) as Base;
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((comment.association("post").target as Base).id).toBe(posts("sti_comments").id);
     });
   });
 
   it("eager with floating point numbers", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await Comment.all().where("123.456 = 123.456").includes(":post");
     });
   });
@@ -1860,7 +1860,7 @@ describe("EagerAssociationTest", () => {
     });
     expect(loaded.length).toBe(3);
     expect(loaded.map((c) => Number(c.id))).toEqual([5, 6, 7]);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       void loaded[0].association("post").target;
     });
   });
@@ -1921,7 +1921,7 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager with has many and limit and high offset and multiple array conditions", async () => {
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const posts = await Post.references("authors", "comments")
         .includes(":author", ":comments")
         .limit(2)
@@ -1932,7 +1932,7 @@ describe("EagerAssociationTest", () => {
   });
 
   it("eager with has many and limit and high offset and multiple hash conditions", async () => {
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const posts = await Post.all()
         .includes(":author", ":comments")
         .limit(2)
@@ -2032,7 +2032,7 @@ describe("EagerAssociationTest", () => {
     const david = await Author.find(authors("david").id);
     const postsList = (await david.association("postsWithCategories").loadTarget()) as Base[];
     const one = postsList.find((p) => Number(p.id) === 1)!;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(postsList.length).toBe(5);
       expect(await (one as any).categories.length()).toBe(2);
     });
@@ -2044,7 +2044,7 @@ describe("EagerAssociationTest", () => {
       .association("postsWithCommentsAndCategories")
       .loadTarget()) as Base[];
     const one = postsList.find((p) => Number(p.id) === 1)!;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(postsList.length).toBe(5);
       expect(await (one as any).comments.length()).toBe(2);
       expect(await (one as any).categories.length()).toBe(2);
@@ -2066,7 +2066,7 @@ describe("EagerAssociationTest", () => {
     const authorFavorite = (await AuthorFavorite.all()
       .includes(":favoriteAuthor")
       .first()) as AuthorFavorite;
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((authorFavorite.association("favoriteAuthor").target as Author).id).toBe(
         authors("mary").id,
       );
@@ -2079,7 +2079,7 @@ describe("EagerAssociationTest", () => {
       .includes(":accountUsingPrimaryKey")
       .order("companies.id")
       .first()) as Firm;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const account = (firm as any).accountUsingPrimaryKey;
       expect(account.id).toBe(expected.id);
     });
@@ -2089,7 +2089,7 @@ describe("EagerAssociationTest", () => {
     const expected = accounts("signals37");
     const firms = await Firm.all().includes(":accountUsingPrimaryKey").order("accounts.id");
     const firm = firms.find((f) => Number(f.id) === 1)!;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const account = (firm as any).accountUsingPrimaryKey;
       expect(account.id).toBe(expected.id);
     });
@@ -2099,10 +2099,10 @@ describe("EagerAssociationTest", () => {
     const grouchoId = members("groucho").id;
     const sponsorId = sponsors("moustache_club_sponsor_for_groucho").id;
     let sponsor!: Sponsor;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       sponsor = (await Sponsor.includes(":thing").where({ id: sponsorId }).first()) as Sponsor;
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const thing = (await sponsor.thing) as Base;
       expect(thing.id).toBe(grouchoId);
     });
@@ -2156,7 +2156,7 @@ describe("EagerAssociationTest", () => {
 
   it("eager load belongs to quotes table and column names", async () => {
     const job = await Job.includes(":idealReference").find(jobs("unicyclist").id);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((job.association("idealReference").target as Base).id).toBe(
         references("michael_unicyclist").id,
       );
@@ -2165,7 +2165,7 @@ describe("EagerAssociationTest", () => {
 
   it("eager load has one quotes table and column names", async () => {
     const michael = await Person.all().includes(":favoriteReference").find(people("michael").id);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((michael.association("favoriteReference").target as Base).id).toBe(
         references("michael_unicyclist").id,
       );
@@ -2174,7 +2174,7 @@ describe("EagerAssociationTest", () => {
 
   it("eager load has many quotes table and column names", async () => {
     const michael = await Person.all().includes(":references").find(people("michael").id);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       const sorted = (michael.association("references").target as Base[])
         .slice()
         .sort((a, b) => Number(a.id) - Number(b.id));
@@ -2187,7 +2187,7 @@ describe("EagerAssociationTest", () => {
 
   it("eager load has many through quotes table and column names", async () => {
     const michael = await Person.all().includes(":jobs").find(people("michael").id);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       const sorted = (michael.association("jobs").target as Base[])
         .slice()
         .sort((a, b) => Number(a.id) - Number(b.id));
@@ -2290,12 +2290,12 @@ describe("EagerAssociationTest", () => {
       commentCount += await (post as any).comments.length();
     }
     expect(commentCount).toBe(2);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((postsWithAuthor[0].association("author").target as Base).id).toBe(
         authors("david").id,
       );
     });
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect((postsWithCommentsAndAuthor[0].association("author").target as Base).id).toBe(
         authors("david").id,
       );
@@ -2310,7 +2310,7 @@ describe("EagerAssociationTest", () => {
     const postsWithAuthorFavorites = (await author.posts
       .includes(":authorFavorites")
       .toArray()) as Base[];
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       const favorites = postsWithAuthorFavorites[0].association("authorFavorites").target as Base[];
       void favorites[0].readAttribute("author_id");
     });
@@ -2321,7 +2321,7 @@ describe("EagerAssociationTest", () => {
       .includes(":specialPostComments")
       .order("authors.id")
       .first()) as Author;
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       const specialPostComments = author.association("specialPostComments").target as Base[];
       expect(specialPostComments.map((c) => c.id)).toEqual([comments("does_it_hurt").id]);
     });
@@ -2353,7 +2353,7 @@ describe("EagerAssociationTest", () => {
   it("eager with has many through join model with include", async () => {
     const author = await Author.all().includes(":commentsWithInclude").find(authors("david").id);
     const authorComments = author.association("commentsWithInclude").target as Base[];
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       void (authorComments[0].association("post").target as Base).readAttribute("title");
     });
   });
@@ -2403,7 +2403,7 @@ describe("EagerAssociationTest", () => {
     const authorList = (await Author.includes(":verySpecialComments")).sort(
       (a, b) => Number(a.id) - Number(b.id),
     );
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const specialCommentAuthors = await Promise.all(
         authorList.map(async (author) => [
           (author as any).name,
@@ -2441,7 +2441,7 @@ describe("EagerAssociationTest", () => {
 
   it("preloading a through association twice does not reset it", async () => {
     const members = await Member.includes({ ":currentMembership": ":club" }).includes(":club");
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       const clubs = members
         .map((m) => m.association("currentMembership").target as Base)
         .map((cm) => cm.association("club").target as Base);

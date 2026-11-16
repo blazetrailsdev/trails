@@ -472,7 +472,7 @@ describe("nested attributes existing record lookup (trails-only)", () => {
     const reloaded = await Pirate.find(pirate.id);
     expect(reloaded.association("birds").isLoaded()).toBe(false);
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await nested(reloaded).setBirdsAttributes([
         { id: bird.id, name: "Renamed" },
         { id: "", name: "Blank" },
@@ -490,7 +490,7 @@ describe("nested attributes existing record lookup (trails-only)", () => {
     const pirate = await Pirate.createBang({ catchphrase: "Arr" });
     const reloaded = await Pirate.find(pirate.id);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await nested(reloaded).setBirdsAttributes([{ id: "", name: "Blank" }]);
     });
   });

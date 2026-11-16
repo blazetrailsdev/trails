@@ -18,33 +18,33 @@ describe("NullRelationTest", () => {
   fixtures(["posts", "comments"]);
 
   it("none", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Developer.none()).toEqual([]);
       expect(await Developer.all().none()).toEqual([]);
     });
   });
 
   it("none chainable", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Developer.none().where({ name: "David" })).toEqual([]);
     });
   });
 
   it("none chainable to existing scope extension method", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((Topic.anonymousExtension().none() as any).one()).toEqual(1);
     });
   });
 
   it("async query on null relation", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const relation = await Developer.none().loadAsync().load();
       expect(await relation.toArray()).toEqual([]);
     });
   });
 
   it("none chained to methods firing queries straight to db", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Developer.none().pluck("id", "name")).toEqual([]);
       expect(await Developer.none().deleteAll()).toBe(0);
       expect(await Developer.none().updateAll({ name: "David" })).toBe(0);
@@ -54,7 +54,7 @@ describe("NullRelationTest", () => {
   });
 
   it("null relation content size methods", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Developer.none().size()).toBe(0);
       expect(await Developer.none().count()).toBe(0);
       expect(await Developer.none().isEmpty()).toBe(true);
@@ -67,7 +67,7 @@ describe("NullRelationTest", () => {
 
   it("null relation used with constraints", async () => {
     const post = await Post.first();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       let scope = post!.comments.scope();
       const none = Post.none();
       scope = scope.merge(none);
@@ -87,70 +87,70 @@ describe("NullRelationTest", () => {
   });
 
   it("null relation count", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Comment.none().count("id")).toBe(0);
       expect(await Comment.none().group("post_id").count("id")).toEqual(new Map());
     });
   });
 
   it("null relation count async", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertAsyncEqual(0, Comment.none().asyncCount("id"));
       await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncCount("id"));
     });
   });
 
   it("null relation sum", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(Number(await Comment.none().sum("id"))).toBe(0);
       expect(await Comment.none().group("post_id").sum("id")).toEqual(new Map());
     });
   });
 
   it("null relation sum async", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertAsyncEqual(0, Comment.none().asyncSum("id"));
       await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncSum("id"));
     });
   });
 
   it("null relation average", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Comment.none().average("id")).toBeNull();
       expect(await Comment.none().group("post_id").average("id")).toEqual(new Map());
     });
   });
 
   it("null relation average async", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertAsyncEqual(null, Comment.none().asyncAverage("id"));
       await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncAverage("id"));
     });
   });
 
   it("null relation minimum", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Comment.none().minimum("id")).toBeNull();
       expect(await Comment.none().group("post_id").minimum("id")).toEqual(new Map());
     });
   });
 
   it("null relation minimum async", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertAsyncEqual(null, Comment.none().asyncMinimum("id"));
       await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncMinimum("id"));
     });
   });
 
   it("null relation maximum", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Comment.none().maximum("id")).toBeNull();
       expect(await Comment.none().group("post_id").maximum("id")).toEqual(new Map());
     });
   });
 
   it("null relation maximum async", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertAsyncEqual(null, Comment.none().asyncMaximum("id"));
       await assertAsyncEqual(new Map(), Comment.none().group("post_id").asyncMaximum("id"));
     });

@@ -24,21 +24,21 @@ describe("SchemaStatements reflection probes", () => {
   }
 
   it("issues tables and views as SCHEMA queries", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await statements().tables()).toContain("books");
       expect(await statements().views()).not.toContain("books");
     });
   });
 
   it("issues dataSourceExists as a SCHEMA query", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await statements().dataSourceExists("books")).toBe(true);
       expect(await statements().dataSourceExists("no_such_table_anywhere")).toBe(false);
     });
   });
 
   it("issues columns and primaryKey as SCHEMA queries", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const columns = await statements().columns("books");
       expect(columns.map((column) => column.name)).toContain("name");
       expect(await statements().primaryKey("books")).toBe("id");

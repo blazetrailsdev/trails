@@ -171,7 +171,7 @@ describe("AssociationProxyTest", () => {
       await david.firstPosts.first(),
     );
     assertPredicate(david.firstPosts, (p: any) => p.loaded);
-    await assertNoQueries(false, () => david.firstPosts.firstBang());
+    await assertNoQueries(() => david.firstPosts.firstBang());
   });
 
   it("size differentiates between new and persisted in memory records when loaded records are empty", async () => {
@@ -250,7 +250,7 @@ describe("AssociationProxyTest", () => {
     const human = await Human.create({});
     await (human as any).interests.create({});
     const found = (await Human.find((human as any).id)) as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await (await found.interests.where("1=1").first()).human).toBe(found);
     });
   });
@@ -260,14 +260,14 @@ describe("AssociationProxyTest", () => {
       await david.firstPosts.pluck("title"),
     );
     assertPredicate(david.firstPosts, (p: any) => p.loaded);
-    await assertNoQueries(false, () => david.firstPosts.pluck("title"));
+    await assertNoQueries(() => david.firstPosts.pluck("title"));
   });
   it("pick uses loaded target", async () => {
     const david = authors("david") as any;
     const expected = await david.firstPosts.pick("title");
     expect(await (await david.firstPosts.load()).pick("title")).toEqual(expected);
     assertPredicate(david.firstPosts, (p: any) => p.loaded);
-    await assertNoQueries(false, () => david.firstPosts.pick("title"));
+    await assertNoQueries(() => david.firstPosts.pick("title"));
   });
   it("reset unloads target", async () => {
     const david = authors("david") as any;
@@ -457,7 +457,7 @@ describe("PreloaderTest", () => {
   it("preload makes correct number of queries on array", async () => {
     const post = posts("welcome");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const preloader = new Preloader({ records: [post], associations: "comments" });
       await preloader.call();
     });
@@ -467,7 +467,7 @@ describe("PreloaderTest", () => {
     const post = posts("welcome");
     const relation = Post.where({ id: post.id });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const preloader = new Preloader({ records: relation, associations: "comments" });
       await preloader.call();
     });
@@ -504,12 +504,12 @@ describe("PreloaderTest", () => {
     const book = books("awdr") as any;
     const post = posts("welcome") as any;
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const preloader = new Preloader({ records: [book, post], associations: "author" });
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await book.author;
       await post.author;
     });
@@ -520,7 +520,7 @@ describe("PreloaderTest", () => {
     const post = posts("welcome") as any;
     await book.author;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({ records: [book, post], associations: "author" }).call();
       await book.author;
       await post.author;
@@ -532,14 +532,14 @@ describe("PreloaderTest", () => {
       comments("eager_sti_on_associations_s_comment2"),
     ];
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await new Preloader({ records, associations: ["author", "ordinaryPost"] }).call();
     });
   });
   it("preload grouped queries of through records", async () => {
     const author = authors("david");
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await new Preloader({
         records: [author],
         associations: ["helloPostComments", "comments"],
@@ -554,14 +554,14 @@ describe("PreloaderTest", () => {
       await member.reload()
     ).organization;
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await new Preloader({
         records: [member],
         associations: "organizationMemberDetails_2",
       }).call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect([...expectedMemberDetailIds].sort()).toEqual(
         (await member.organizationMemberDetails_2.toArray()).map((d: Base) => d.id).sort(),
       );
@@ -583,7 +583,7 @@ describe("PreloaderTest", () => {
       body: "this post is also about David",
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const preloader = new Preloader({
         records: [david, david2, bob],
         associations: "postsMentioningAuthor",
@@ -612,7 +612,7 @@ describe("PreloaderTest", () => {
       body: "This comment mentions david",
     });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const preloader = new Preloader({
         records: [david, david2, bob],
         associations: "commentsMentioningAuthor",
@@ -653,7 +653,7 @@ describe("PreloaderTest", () => {
     const comment2 = await post.comments.createBang({ body: "hello!" });
     const comment3 = await post3.comments.createBang({ body: "HI BOB!" });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       const preloader = new Preloader({
         records: [david, david2, bob],
         associations: "commentsOnPostsMentioningAuthor",
@@ -698,12 +698,12 @@ describe("PreloaderTest", () => {
       { lineItems: { discountApplications: "discount" } },
       { shippingLines: { discountApplications: "discount" } },
     ];
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       const preloader = new Preloader({ records: [invoice], associations });
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(
         await (
           await (await invoice.lineItems.first()).discountApplications.first()
@@ -718,12 +718,12 @@ describe("PreloaderTest", () => {
 
     await invoice.reload();
     for (const i of await invoice.lineItems.toArray()) await i.discountApplications.toArray();
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       const preloader = new Preloader({ records: [invoice], associations });
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(
         await (
           await (await invoice.lineItems.first()).discountApplications.first()
@@ -743,12 +743,12 @@ describe("PreloaderTest", () => {
       comments("eager_sti_on_associations_s_comment2"),
     ];
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const preloader = new Preloader({ records, associations: ["author", "post"] });
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       for (const comment of records) await (comment as any).author;
     });
   });
@@ -756,13 +756,13 @@ describe("PreloaderTest", () => {
   it("preload groups queries with same scope at second level", async () => {
     let author: any = null;
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       author = await Author.where({ name: "David" })
         .includes({ thinkingPosts: "comments", welcomePosts: "comments" })
         .first();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       for (const p of await author.thinkingPosts.toArray()) await p.comments.toArray();
       for (const p of await author.welcomePosts.toArray()) await p.comments.toArray();
     });
@@ -770,13 +770,13 @@ describe("PreloaderTest", () => {
   it("preload groups queries with same sql at second level", async () => {
     let author: any = null;
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       author = await Author.where({ name: "David" })
         .includes({ thinkingPosts: "comments", welcomePosts: "commentsWithExtending" })
         .first();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       for (const p of await author.thinkingPosts.toArray()) await p.comments.toArray();
       for (const p of await author.welcomePosts.toArray()) await p.commentsWithExtending.toArray();
     });
@@ -788,7 +788,7 @@ describe("PreloaderTest", () => {
     await AuthorFavorite.createBang({ author: mary, favoriteAuthor: bob });
     const favorites = await AuthorFavorite.all();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const preloader = new Preloader({
         records: favorites,
         associations: ["author", "favoriteAuthor"],
@@ -796,7 +796,7 @@ describe("PreloaderTest", () => {
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const first = favorites[0] as any;
       await first.author;
       await first.favoriteAuthor;
@@ -808,7 +808,7 @@ describe("PreloaderTest", () => {
 
     await AuthorFavorite.createBang({ author: mary, favoriteAuthor: bob });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       const preloader = new Preloader({
         records: [mary],
         associations: ["posts", { favoriteAuthors: "posts" }],
@@ -816,7 +816,7 @@ describe("PreloaderTest", () => {
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await mary.posts.toArray();
       for (const a of await mary.favoriteAuthors.toArray()) await a.posts.toArray();
     });
@@ -832,12 +832,12 @@ describe("PreloaderTest", () => {
       favoriteAuthors: { similarPosts: "comments" },
     };
 
-    await assertQueriesCount(9, false, async () => {
+    await assertQueriesCount(9, async () => {
       const preloader = new Preloader({ records: [mary], associations });
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       for (const p of await mary.similarPosts.toArray()) await p.comments.toArray();
       for (const a of await mary.favoriteAuthors.toArray()) {
         for (const p of await a.similarPosts.toArray()) await p.comments.toArray();
@@ -864,7 +864,7 @@ describe("PreloaderTest", () => {
     try {
       await mary.reload();
 
-      await assertQueriesCount(8, false, async () => {
+      await assertQueriesCount(8, async () => {
         const preloader = new Preloader({ records: [mary], associations });
         await preloader.call();
       });
@@ -881,7 +881,7 @@ describe("PreloaderTest", () => {
     const postesque = (await PostesquePL.create({ author: await Author.last() })) as any;
     await postesque.reload();
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const preloader = new Preloader({
         records: [post, postesque],
         associations: "authorWithTheLetterA",
@@ -889,7 +889,7 @@ describe("PreloaderTest", () => {
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await post.authorWithTheLetterA;
       await postesque.authorWithTheLetterA;
     });
@@ -897,7 +897,7 @@ describe("PreloaderTest", () => {
     await post.reload();
     await postesque.reload();
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       const preloader = new Preloader({
         records: [post, postesque],
         associations: "authorWithAddress",
@@ -905,7 +905,7 @@ describe("PreloaderTest", () => {
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await post.authorWithAddress;
       await postesque.authorWithAddress;
     });
@@ -915,12 +915,12 @@ describe("PreloaderTest", () => {
     const postesque = (await PostesquePL.create({ author: await Author.last() })) as any;
     await postesque.reload();
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const preloader = new Preloader({ records: [post, postesque], associations: "author" });
       await preloader.call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await post.author;
       await postesque.author;
     });
@@ -936,7 +936,7 @@ describe("PreloaderTest", () => {
     otherDogComment.origin_type = otherDog.constructor.name;
     otherDogComment.origin_id = otherDog.id;
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const preloader = new Preloader({
         records: [dogComment, otherDogComment],
         associations: "origin",
@@ -949,7 +949,7 @@ describe("PreloaderTest", () => {
     const post = posts("welcome") as any;
     const david = authors("david");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({
         records: [post],
         associations: "author",
@@ -970,7 +970,7 @@ describe("PreloaderTest", () => {
 
     assertNotPredicate(book.association("essay"), (a: any) => a.isLoaded());
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({
         records: [book],
         associations: "essay",
@@ -988,7 +988,7 @@ describe("PreloaderTest", () => {
     const bob = authors("bob");
     const mary = authors("mary");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await new Preloader({
         records: [bobPost, maryPost],
         associations: "author",
@@ -996,7 +996,7 @@ describe("PreloaderTest", () => {
       }).call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       assertSame(bob, await bobPost.author);
       expect(mary.equals(await maryPost.author)).toBe(true);
     });
@@ -1011,11 +1011,11 @@ describe("PreloaderTest", () => {
     assertPredicate(bobPost.association("author"), (a: any) => a.isLoaded());
     assertNot(maryPost.association("author").isLoaded());
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await new Preloader({ records: [bobPost, maryPost], associations: "author" }).call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       assertSame(bob, await bobPost.author);
       expect(mary.equals(await maryPost.author)).toBe(true);
     });
@@ -1025,7 +1025,7 @@ describe("PreloaderTest", () => {
     const author = authors("david") as any;
     const categories = await Category.all();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await new Preloader({
         records: [author],
         associations: "essayCategory",
@@ -1046,7 +1046,7 @@ describe("PreloaderTest", () => {
     const dave = authors("david") as any;
     const daveCategory = categories("general");
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await new Preloader({
         records: [mary, dave],
         associations: "essayCategory",
@@ -1054,7 +1054,7 @@ describe("PreloaderTest", () => {
       }).call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       assertSame(maryCategory, await mary.essayCategory);
       expect(daveCategory.equals(await dave.essayCategory)).toBe(true);
     });
@@ -1065,7 +1065,7 @@ describe("PreloaderTest", () => {
     const general = categories("general");
     const david = authors("david");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({
         records: [essay],
         associations: ["category", "author"],
@@ -1083,7 +1083,7 @@ describe("PreloaderTest", () => {
     const post = posts("welcome") as any;
     const david = authors("david");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await new Preloader({
         records: [post],
         associations: "author",
@@ -1100,7 +1100,7 @@ describe("PreloaderTest", () => {
     const post = posts("welcome") as any;
     const comments = await Comment.all();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await new Preloader({
         records: [post],
         associations: "comments",
@@ -1117,7 +1117,7 @@ describe("PreloaderTest", () => {
     const bob = authors("bob");
     const david = authors("david");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await new Preloader({
         records: [post],
         associations: "author",
@@ -1125,7 +1125,7 @@ describe("PreloaderTest", () => {
       }).call();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       assertPredicate(post.association("author"), (a: any) => a.isLoaded());
       expect(david.equals(await post.author)).toBe(true);
     });
@@ -1137,7 +1137,7 @@ describe("PreloaderTest", () => {
     const newPostWithoutAuthor = new Post({}) as any;
     const posts = [newPostWithAuthor, newPostWithoutAuthor];
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({ records: posts, associations: "author" }).call();
 
       assertSame(author, await newPostWithAuthor.author);
@@ -1191,7 +1191,7 @@ describe("PreloaderTest", () => {
     const comment = shardedComments("great_comment_blog_post_one") as any;
     await comment.blogPost;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({ records: [comment], associations: "blogPost" }).call();
     });
   });
@@ -1270,7 +1270,7 @@ describe("PreloaderTest", () => {
     const post = new Post({}) as any;
     const comment = post.comments.build();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({ records: [post], associations: "comments" }).call();
 
       expect(await post.comments.toArray()).toEqual([comment]);
@@ -1281,7 +1281,7 @@ describe("PreloaderTest", () => {
     const post = posts("welcome") as any;
     const comment = post.comments.build();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await new Preloader({ records: [post], associations: "comments" }).call();
 
       expect(await post.comments.toArray()).toContain(comment);
@@ -1292,7 +1292,7 @@ describe("PreloaderTest", () => {
     const post = new Post({}) as any;
     const author = post.buildAuthor();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({ records: [post], associations: "author" }).call();
 
       assertSame(author, await post.author);
@@ -1303,7 +1303,7 @@ describe("PreloaderTest", () => {
     const post = posts("welcome") as any;
     const author = post.buildAuthor();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await new Preloader({ records: [post], associations: "author" }).call();
 
       assertSame(author, await post.author);

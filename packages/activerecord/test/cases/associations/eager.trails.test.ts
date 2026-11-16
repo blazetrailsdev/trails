@@ -53,13 +53,13 @@ describe("EagerAssociationTest", () => {
 
   it("joins with multiple includes should preload via joins", async () => {
     let post: Post | undefined;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const loaded = await Post.includes(":comments", ":author")
         .joins(":comments")
         .order("posts.id desc");
       post = loaded[0];
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await post!.comments.length()).not.toBe(0);
       expect(post!.association("author").target).toBeTruthy();
     });

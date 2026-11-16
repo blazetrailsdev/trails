@@ -34,7 +34,7 @@ describe("has_one replace on a non-persisted owner", () => {
     expect(await displaced.association("pirate").loadTarget()).toBe(newPirate);
 
     const newShip = new Ship({ name: "new ship" });
-    await assertNoQueriesMatch(/UPDATE |INSERT |DELETE /i, false, async () => {
+    await assertNoQueriesMatch(/UPDATE |INSERT |DELETE /i, async () => {
       await (newPirate.association("ship") as HasOneAssociation).writer(newShip);
     });
 

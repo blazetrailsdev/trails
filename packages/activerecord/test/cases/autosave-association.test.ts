@@ -579,7 +579,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     assert(await pirate.save());
 
     await CanonicalPirate.transaction(async () => {
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         assert(await pirate.save());
       });
     });
@@ -932,13 +932,13 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const company = companies("first_firm") as Firm;
 
     let newClient!: Client;
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       newClient = company.clientsOfFirm.build({ name: "Another Client" });
     });
     assertNotPredicate(company.clientsOfFirm, (p) => p.loaded);
 
     company.name += "-changed";
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       assert(await company.save());
     });
     assertPredicate(newClient, (r) => r.isPersisted());
@@ -948,12 +948,12 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   it("build many before save", async () => {
     const company = companies("first_firm") as Firm;
 
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       company.clientsOfFirm.build([{ name: "Another Client" }, { name: "Another Client II" }]);
     });
 
     company.name += "-changed";
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       assert(await company.save());
     });
     expect(await (await company.clientsOfFirm.reload()).size()).toEqual(4);
@@ -963,7 +963,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const company = companies("first_firm") as Firm;
 
     let newClient!: Client;
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       newClient = company.clientsOfFirm.build({}, (client: any) => {
         client.name = "Another Client";
       });
@@ -971,7 +971,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     assertNotPredicate(company.clientsOfFirm, (p) => p.loaded);
 
     company.name += "-changed";
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       assert(await company.save());
     });
     assertPredicate(newClient, (r) => r.isPersisted());
@@ -981,7 +981,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   it("build many via block before save", async () => {
     const company = companies("first_firm") as Firm;
 
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       company.clientsOfFirm.build(
         [{ name: "Another Client" }, { name: "Another Client II" }],
         (client: any) => {
@@ -991,7 +991,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     });
 
     company.name += "-changed";
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       assert(await company.save());
     });
     expect(await (await company.clientsOfFirm.reload()).size()).toEqual(4);
@@ -1028,7 +1028,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   it("should not load the associated model", async () => {
     const firm = await Firm.find((companies("first_firm") as Firm).id);
     firm.clients.reset();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await firm.saveBang();
     });
   });
@@ -1144,25 +1144,25 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
       .merge({ includes: "account" } as any)
       .first()) as any;
     firm.name += "-changed";
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await firm.saveBang();
     });
 
     firm = await Firm.first();
     await firm.setAccount(await Account.first());
-    await assertQueriesCount(Firm.partialUpdates ? 0 : 1, false, async () => {
+    await assertQueriesCount(Firm.partialUpdates ? 0 : 1, async () => {
       await firm.saveBang();
     });
 
     firm = (await Firm.first())!.dup();
     await firm.setAccount(await Account.first());
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await firm.saveBang();
     });
 
     firm = (await Firm.first())!.dup();
     await firm.setAccount((await Account.first())!.dup());
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await firm.saveBang();
     });
   });
@@ -1170,7 +1170,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   it("should not load the associated model", async () => {
     const firm = companies("first_firm") as any;
     firm.resetUnvalidatedAccount();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await firm.saveBang();
     });
   });
@@ -1319,16 +1319,16 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
 
   it("changed for autosave should handle cycles", async () => {
     ship.pirate = pirate;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await ship.saveBang();
     });
 
     const parrot = await pirate.parrots.create({ name: "some_name" });
     parrot.name = "changed_name";
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await ship.saveBang();
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await ship.saveBang();
     });
   });
@@ -1442,7 +1442,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("should not load the associated model", async () => {
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       pirate.catchphrase = "Arr";
       await pirate.saveBang();
     });
@@ -1699,7 +1699,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     const client = (await Client.first()) as any;
     const apple = client.buildFirm({ name: "Apple" });
     await client.saveBang();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await client.firm).equals(apple)).toBe(true);
     });
   });
@@ -1738,7 +1738,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   it("should not load the associated model", async () => {
     const tagging = taggings("welcome_general") as any;
     tagging.resetTag();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await tagging.saveBang();
     });
   });
@@ -1851,7 +1851,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   });
 
   it("should not load the associated model", async () => {
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       ship.name = "The Vile Serpent";
       await ship.saveBang();
     });
@@ -3049,14 +3049,14 @@ describe("TestAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("should not load the associated models if they were not loaded yet", async () => {
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       pirate.catchphrase = "Arr";
       await pirate.saveBang();
     });
 
     await pirate[associationName].loadTarget();
 
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       pirate.catchphrase = "Yarr";
       const newNames = ["Grace OMalley", "Privateers Greed"];
       (await pirate[associationName]).forEach((child: any, i: number) => {

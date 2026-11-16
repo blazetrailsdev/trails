@@ -85,7 +85,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
     post.title = "second";
     await assertNoQueriesMatch(
       /pragma_table_info|PRAGMA table_info|information_schema/i,
-      true,
+      { includeSchema: true },
       async () => {
         await post.save();
       },

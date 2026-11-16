@@ -24,7 +24,7 @@ describe("SchemaStatements#viewExists", () => {
   });
 
   it("issues its probe as a SCHEMA query", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await (await conn()).viewExists(viewName)).toBe(true);
       expect(await (await conn()).viewExists("no_such_view_anywhere")).toBe(false);
     });

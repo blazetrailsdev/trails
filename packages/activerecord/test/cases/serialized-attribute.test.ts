@@ -138,7 +138,7 @@ describe("SerializedAttributeTest", () => {
 
   it("serialize does not eagerly load columns", async () => {
     await Topic.resetColumnInformation();
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       Topic.serialize("content");
     });
   });
@@ -805,7 +805,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
 
   it("serialize does not eagerly load columns", async () => {
     await Topic.resetColumnInformation();
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       Topic.serialize("content");
     });
   });

@@ -1552,7 +1552,7 @@ AND query LIKE '%${lockId}%'`;
         }),
       );
 
-      await assertQueriesCount(expectedQueryCount, false, async () => {
+      await assertQueriesCount(expectedQueryCount, async () => {
         await withBulkChangeTable((t) => {
           t.column("name", "string");
           t.string("qualification", "experience");
@@ -1596,7 +1596,7 @@ AND query LIKE '%${lockId}%'`;
         expect(await column(c)).toBeTruthy();
       }
 
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await withBulkChangeTable((t) => {
           t.remove("qualification", "experience");
           t.string("qualification_experience");
@@ -1616,7 +1616,7 @@ AND query LIKE '%${lockId}%'`;
 
       expect(await column("title")).toBeTruthy();
 
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await withBulkChangeTable((t) => {
           t.timestamps();
           t.remove("title");
@@ -1638,7 +1638,7 @@ AND query LIKE '%${lockId}%'`;
         expect(await column(c)).toBeTruthy();
       }
 
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await withBulkChangeTable((t) => {
           t.removeTimestamps();
           t.string("title");
@@ -1667,7 +1667,7 @@ AND query LIKE '%${lockId}%'`;
         }),
       );
 
-      await assertQueriesCount(expectedQueryCount, false, async () => {
+      await assertQueriesCount(expectedQueryCount, async () => {
         await withBulkChangeTable((t) => {
           t.index("username", { unique: true, name: "awesome_username_index" });
           t.index(["name", "age"], { comment: "This is a comment" });
@@ -1701,7 +1701,7 @@ AND query LIKE '%${lockId}%'`;
         }),
       );
 
-      await assertQueriesCount(expectedQueryCount, false, async () => {
+      await assertQueriesCount(expectedQueryCount, async () => {
         await withBulkChangeTable((t) => {
           t.removeIndex("name");
           t.index("name", { name: "new_name_index", unique: true });
@@ -1732,7 +1732,7 @@ AND query LIKE '%${lockId}%'`;
         }),
       );
 
-      await assertQueriesCount(expectedQueryCount, false, async () => {
+      await assertQueriesCount(expectedQueryCount, async () => {
         await withBulkChangeTable((t) => {
           t.removeIndex({ name: "username_index" });
           t.index("username", { name: "username_index", unique: true });
@@ -1779,7 +1779,7 @@ AND query LIKE '%${lockId}%'`;
       }
       const migration = new BulkRevert();
 
-      await assertQueriesCount(1, false, () => migration.migrate("down"));
+      await assertQueriesCount(1, () => migration.migrate("down"));
 
       await self().assertNoColumn(Person, "column1");
       await self().assertNoColumn(Person, "column2");
@@ -2285,7 +2285,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
         throw new Error(`need an expected query count for ${classname}`);
       }),
     );
-    await assertQueriesCount(expectedQueryCount, true, async () => {
+    await assertQueriesCount(expectedQueryCount, { includeSchema: true }, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
         t.change("birthdate", "datetime", { comment: "This is a comment" });
@@ -2318,7 +2318,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
         throw new Error(`need an expected query count for ${classname}`);
       }),
     );
-    await assertQueriesCount(expectedQueryCount, true, async () => {
+    await assertQueriesCount(expectedQueryCount, { includeSchema: true }, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
         t.change("birthdate", "datetime");

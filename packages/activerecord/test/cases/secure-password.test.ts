@@ -69,13 +69,13 @@ describe("SecurePasswordTest", () => {
   }, 120_000);
 
   it("authenticate_by short circuits when password is nil", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await User.authenticateBy({ token: user.token, password: null })).toBeNull();
     });
   });
 
   it("authenticate_by short circuits when password is an empty string", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await User.authenticateBy({ token: user.token, password: "" })).toBeNull();
     });
   });

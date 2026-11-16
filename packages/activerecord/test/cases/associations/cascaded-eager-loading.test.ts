@@ -92,10 +92,10 @@ describe("CascadedEagerLoadingTest", () => {
       .eagerLoad(":comments")
       .where({ posts: { tags_count: 1 } })
       .order(":id");
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect(authors.length).toBe(3);
     });
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect(targetArr(authors[0], "comments").length).toBe(11);
     });
   });
@@ -151,7 +151,7 @@ describe("CascadedEagerLoadingTest", () => {
   it("eager association loading with join for count", async () => {
     const authorsRel = Author.all().joins(":specialPosts").includes(":posts", ":categorizations");
     await expect(authorsRel.count()).resolves.not.toThrow();
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await authorsRel;
     });
   });
@@ -208,7 +208,7 @@ describe("CascadedEagerLoadingTest", () => {
     const firmAccount = target(target(firstAccount, "firm") as Base, "account") as Base;
     expect(firmAccount.id).toBe(firstAccount.id);
     const expected = (await (companies("first_firm") as Firm).account) as Base;
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
         expected.id,
       );
@@ -216,7 +216,7 @@ describe("CascadedEagerLoadingTest", () => {
     const ffAccount = (await (companies("first_firm") as Firm).account) as Account;
     const ffFirm = (await ffAccount.firm) as Firm;
     const expectedDeep = (await ffFirm.account) as Base;
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect((target(target(firstAccount, "firm") as Base, "account") as Base).id).toBe(
         expectedDeep.id,
       );
@@ -227,7 +227,7 @@ describe("CascadedEagerLoadingTest", () => {
     const loaded = await Topic.all().includes(":replies").order("topics.id");
     const firstSize = (await Reply.where({ parent_id: (topics("first") as any).id })).length;
     const secondSize = (await Reply.where({ parent_id: (topics("second") as any).id })).length;
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect(targetArr(loaded[0], "replies").length).toBe(firstSize);
       expect(targetArr(loaded[1], "replies").length).toBe(secondSize);
     });
@@ -238,7 +238,7 @@ describe("CascadedEagerLoadingTest", () => {
     expect(await reply.save()).toBeTruthy();
 
     const loaded = await Topic.all().includes(":replies").order(["topics.id", "replies_topics.id"]);
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect(targetArr(loaded[0], "replies").length).toBe(2);
       expect(targetArr(loaded[1], "replies").length).toBe(0);
     });
@@ -248,7 +248,7 @@ describe("CascadedEagerLoadingTest", () => {
     const replies = await Reply.all().includes(":topic").order("topics.id");
     expect(replies.map((r) => r.id)).toContain((topics("second") as any).id);
     expect(replies.map((r) => r.id)).not.toContain((topics("first") as any).id);
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect((target(replies[0], "topic") as any)?.id).toBe((topics("first") as any).id);
     });
   });
@@ -260,7 +260,7 @@ describe("CascadedEagerLoadingTest", () => {
       .where("posts.id = 4")
       .first();
     expect(author!.id).toBe((authors("david") as any).id);
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       const post = targetArr(author!, "posts")[0];
       targetArr(post, "specialComments");
       target(post, "verySpecialComment");
@@ -275,7 +275,7 @@ describe("CascadedEagerLoadingTest", () => {
       .order("comments.body, very_special_comments_posts.body")
       .where("posts.id = 4");
     expect(loaded.map((a) => a.id)).toEqual([(authors("david") as any).id]);
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       const post = target(
         targetArr(targetArr(loaded[0], "posts")[0], "specialComments")[0],
         "post",
@@ -294,7 +294,7 @@ describe("CascadedEagerLoadingTest", () => {
       (authors("mary") as any).id,
       (authors("david") as any).id,
     ]);
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       const post = target(loaded[2], "postAboutThinking") as Base;
       void targetArr(post, "comments")[0];
     });
@@ -306,7 +306,7 @@ describe("CascadedEagerLoadingTest", () => {
       .not({ author_id: Author.all().select("id") })
       .preload({ ":author": { ":comments": ":post" } })
       .firstBang();
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect(target(post, "author")).toBeNull();
     });
   });
@@ -324,7 +324,7 @@ describe("CascadedEagerLoadingTest", () => {
         .includes({ ":sinks": { ":sinks": { ":sinks": ":sinks" } } })
         .order("vertices.id")
     )[0];
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect(targetArr(targetArr(targetArr(source, "sinks")[0], "sinks")[0], "sinks")[0].id).toBe(
         (vertices("vertex_4") as any).id,
       );
@@ -337,7 +337,7 @@ describe("CascadedEagerLoadingTest", () => {
         .includes({ ":sources": { ":sources": { ":sources": ":sources" } } })
         .order("vertices.id DESC")
     )[0];
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       expect(
         targetArr(
           targetArr(targetArr(targetArr(sink, "sources")[0], "sources")[0], "sources")[0],

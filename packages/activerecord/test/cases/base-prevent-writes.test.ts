@@ -57,7 +57,7 @@ describe.skipIf(inMemoryDb())("BasePreventWritesTest", () => {
     await Bird.createBang({ name: "Bluejay" });
 
     await Base.whilePreventingWrites(async () => {
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Bird.where({ name: "Bluejay" }).explain().inspect();
       });
     });
@@ -65,7 +65,7 @@ describe.skipIf(inMemoryDb())("BasePreventWritesTest", () => {
 
   it("an empty transaction does not raise if preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      await assertQueriesCount(2, true, async () => {
+      await assertQueriesCount(2, { includeSchema: true }, async () => {
         await Bird.transaction(async () => {
           await (await Base.leaseConnection()).materializeTransactions();
         });
