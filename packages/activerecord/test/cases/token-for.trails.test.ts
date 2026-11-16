@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { User } from "../models/user.js";
 import { Base } from "../../lib/base.js";
 import { Relation } from "../../lib/relation.js";
-import { RelationMethods } from "../../lib/token-for.js";
+import { RelationMethods, type TokenDefinition } from "../../lib/token-for.js";
+import { fetch } from "@blazetrails/ruby-compat";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { fixtures } from "../support/use-fixtures.js";
 
@@ -40,11 +41,14 @@ describe("token-for relation finders", () => {
     expect(await TokenUser.findByTokenFor("token_snapshot", token)).toBeNull();
   });
 
-  it("raises for an id past Number.MAX_SAFE_INTEGER instead of signing a rounded one", () => {
+  it("signs an id past Number.MAX_SAFE_INTEGER as its exact digits, not a rounded number", () => {
     const user = new TokenUser();
     user.id = 2n ** 60n + 1n;
-    expect(user.id).toBe(2n ** 60n + 1n);
-    expect(() => user.generateTokenFor("lookup")).toThrow(TypeError);
+    const token = user.generateTokenFor("lookup");
+    const definition = fetch<TokenDefinition>(TokenUser.tokenDefinitions, "lookup");
+    expect(
+      definition.messageVerifier().verified(token, { purpose: definition.fullPurpose() }),
+    ).toEqual(["1152921504606846977"]);
   });
 
   it("raises Ruby's Hash#fetch KeyError when a relation looks up an unknown purpose", async () => {
