@@ -1787,16 +1787,16 @@ function formatGate(g?: TestGate): string {
 }
 
 /**
- * Extract the relative path of a TS test file within its package src dir.
- */
-/** Each compare package's TS source root, repo-relative with a trailing slash. */
-/**
  * activesupport's cache store behaviors, which another package's store test
  * calls the way its gem's test `include`s its own `behaviors/*_behavior.rb`
  * copy. Their tests are credited to that package's `behaviors/<name>.ts`.
  */
 export const SHARED_CACHE_BEHAVIORS_DIR = "packages/activesupport/test/cache/behaviors/";
 
+/**
+ * Extract the relative path of a TS test file within its package src dir.
+ */
+/** Each compare package's TS source root, repo-relative with a trailing slash. */
 export const PKG_SRC_DIRS: Record<string, string> = {
   arel: "packages/arel/test/",
   activemodel: "packages/activemodel/test/",

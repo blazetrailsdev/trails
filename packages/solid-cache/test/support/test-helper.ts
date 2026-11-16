@@ -17,15 +17,14 @@ export async function waitForBackgroundTasks(cache: Store, { timeout = 2 } = {})
   }
 }
 
-export const SOLID_CACHE_CONFIG: string | null =
-  ENV["SOLID_CACHE_CONFIG"] ?? "config/cache_no_database.yml";
+export const SOLID_CACHE_CONFIG: string | undefined = ENV["SOLID_CACHE_CONFIG"];
 
 export function isSingleDatabase(): boolean {
   return [
     "config/cache_database.yml",
     "config/cache_no_database.yml",
     "config/cache_unprepared_statements.yml",
-  ].includes(SOLID_CACHE_CONFIG!);
+  ].includes(SOLID_CACHE_CONFIG ?? "");
 }
 
 export function isDefaultDatabase(): boolean {
@@ -96,7 +95,11 @@ export function useSolidCache(): {
         );
       }
       const keys = cache.connections().assign(namespacedKeys).get(shard)!;
-      return keys.map((key) => new TextDecoder().decode(key).replace(`${state.namespace}:`, ""));
+      const prefix = `${state.namespace}:`;
+      return keys.map((key) => {
+        const decoded = new TextDecoder().decode(key);
+        return decoded.startsWith(prefix) ? decoded.slice(prefix.length) : decoded;
+      });
     },
     allStores,
 

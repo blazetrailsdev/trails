@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Entry, ExpiryJob, Record, type Store } from "../lib/index.js";
 import {
   firstShardKey,
+  isDefaultDatabase,
   isSingleDatabase,
   secondShardKey,
   useSolidCache,
@@ -21,8 +22,10 @@ describe("SolidCache::ExpiryTest", () => {
   const host = useSolidCache();
   let cache: Store;
   let t: ActiveJobTestHelper;
+  let singleShardCluster: { shards?: string[] };
 
   beforeEach(async () => {
+    singleShardCluster = isDefaultDatabase() ? {} : { shards: [firstShardKey()] };
     t = new ExpiryTest("expiry") as unknown as ActiveJobTestHelper;
     await t.beforeSetup();
   });
@@ -126,7 +129,12 @@ describe("SolidCache::ExpiryTest", () => {
     it(`expires records no shards (${expiryMethod})`, async () => {
       stubRand(0);
 
-      cache = host.lookupStore({ expiryBatchSize: 3, maxEntries: 2, expiryMethod });
+      cache = host.lookupStore({
+        expiryBatchSize: 3,
+        maxEntries: 2,
+        expiryMethod,
+        ...singleShardCluster,
+      });
       const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
       await write(defaultShardKeys, [0, 1], [1, 2]);
 
@@ -229,7 +237,12 @@ describe("SolidCache::ExpiryTest", () => {
   });
 
   it("triggers multiple expiry tasks when there are many writes", async () => {
-    cache = host.lookupStore({ expiryBatchSize: 20, maxEntries: 2, expiryQueue: "cache_expiry" });
+    cache = host.lookupStore({
+      expiryBatchSize: 20,
+      maxEntries: 2,
+      expiryQueue: "cache_expiry",
+      ...singleShardCluster,
+    });
     const background = cache._background;
 
     stubRand(0.25, 0.24);
@@ -282,6 +295,7 @@ describe("SolidCache::ExpiryTest", () => {
       maxEntries: 4,
       expiryQueue: "cache_expiry",
       expiryMethod: "job",
+      ...singleShardCluster,
     });
     stubRand(0.25, 0.24);
     await t.assertEnqueuedJobs(2, { only: ExpiryJob }, () => writeMulti(8));
