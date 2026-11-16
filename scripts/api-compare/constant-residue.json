@@ -1131,12 +1131,13 @@
     "residue": {}
   },
   "solid-cache": {
-    "rows": 25,
+    "rows": 26,
     "excluded": [],
     "unwalked": [],
     "residue": {
       "entry/expiration.ts::ClassMethods": "SolidCache::Entry::Expiration::ClassMethods",
-      "entry/size.ts::ClassMethods": "SolidCache::Entry::Size::ClassMethods"
+      "entry/size.ts::ClassMethods": "SolidCache::Entry::Size::ClassMethods",
+      "maglev-hash.ts::Preferences": "SolidCache::MaglevHash::Preferences"
     }
   },
   "solid-queue": {
