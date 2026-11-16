@@ -34,6 +34,7 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 export class Protocol {
   static readonly VERSION: string = "0.2.2";
 

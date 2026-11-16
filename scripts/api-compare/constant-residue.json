@@ -1008,6 +1008,7 @@
       "protocol.ts::ProtoServerError",
       "protocol.ts::ProtoSyntaxError",
       "protocol.ts::ProtoUnknownError",
+      "protocol.ts::Protocol",
       "protocol.ts::ProtocolError",
       "protocol.ts::ReadTimeout"
     ],
