@@ -1348,6 +1348,31 @@ importers:
         specifier: workspace:*
         version: link:../vitest-matchers
 
+  packages/vite-trails:
+    dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
+      '@blazetrails/vite-assets':
+        specifier: workspace:*
+        version: link:../vite-assets
+    devDependencies:
+      '@blazetrails/actionview':
+        specifier: workspace:*
+        version: link:../actionview
+      '@blazetrails/vitest-matchers':
+        specifier: workspace:*
+        version: link:../vitest-matchers
+
   packages/vitest-matchers:
     dependencies:
       '@blazetrails/ruby-compat':
@@ -1573,6 +1598,9 @@ importers:
       '@blazetrails/vite-assets':
         specifier: workspace:*
         version: link:../../packages/vite-assets
+      '@blazetrails/vite-trails':
+        specifier: workspace:*
+        version: link:../../packages/vite-trails
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../../packages/vitest-matchers

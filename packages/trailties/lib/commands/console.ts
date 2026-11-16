@@ -163,3 +163,5 @@ export class ConsoleCommand extends Base {
     await Console.start(Trails.application as unknown as ConsoleApp, this.options);
   }
 }
+
+Trails.Console = Console;

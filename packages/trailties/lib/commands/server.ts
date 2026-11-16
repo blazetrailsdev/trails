@@ -482,3 +482,5 @@ async function hasViteConfig(root: string): Promise<boolean> {
     (await fs.exists(p.join(root, "vite.config.js")))
   );
 }
+
+Trails.Server = Server;

@@ -80,6 +80,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
   Rails: "Trails",
   RAILS: "TRAILS",
   ViteRuby: "ViteAssets",
+  ViteRails: "ViteTrails",
 };
 
 /**
@@ -103,6 +104,9 @@ export const TOKEN_RENAMES: Record<string, string> = {
  * - `ViteRuby` → `ViteAssets`: vite_ruby is ported as
  *   `@blazetrails/vite-assets`, and no TS name spells Ruby (CLAUDE.md,
  *   "importmap-rails and propshaft are out of scope").
+ * - `ViteRails` → `ViteTrails`: vite_rails is ported as
+ *   `@blazetrails/vite-trails`; the token rename does not split a compound
+ *   constant, so it is spelled here.
  *
  * Both parity tools read this one table: `parity:api` resolves the Ruby class
  * to its TS declaration through it, and `parity:api:extra` admits the renamed
@@ -117,6 +121,7 @@ export const TS_CLASS_RENAMES: Record<string, string> = {
   Rails: "Trails",
   Registry: "TypeRegistry",
   ViteRuby: "ViteAssets",
+  ViteRails: "ViteTrails",
 };
 
 /**
@@ -228,6 +233,7 @@ export const PATH_SEGMENT_ALIASES: Record<string, string> = {
 export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:inflector/methods.rb": "inflector.ts",
   "vite-assets:vite_ruby.rb": "vite-assets.ts",
+  "vite-trails:vite_rails.rb": "vite-trails.ts",
   // Real ports that live under a different file name than the Ruby one, found
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.

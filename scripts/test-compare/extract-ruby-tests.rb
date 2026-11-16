@@ -2896,6 +2896,10 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
     test_files.reject! { |f| %w[helper_test.rb engine_rake_tasks_test.rb].include?(File.basename(f)) }
   end
 
+  if pkg_name == "vite-trails"
+    test_files.select! { |f| %w[helper_test.rb engine_rake_tasks_test.rb].include?(File.basename(f)) }
+  end
+
   test_files.concat(Dir.glob(File.join(pkg_dir, "test.rb"))) if pkg_name == "erubi"
 
   if pkg_name == "tzinfo"

@@ -27,6 +27,7 @@ import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
 import { solidQueue } from "./assertion-receipts/solid-queue.js";
 import { trailties } from "./assertion-receipts/trailties.js";
 import { tzinfo } from "./assertion-receipts/tzinfo.js";
+import { viteTrails } from "./assertion-receipts/vite-trails.js";
 import { zeitwerk } from "./assertion-receipts/zeitwerk.js";
 
 /** One Rails assertion the port cannot make. */
@@ -71,6 +72,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   "solid-queue": solidQueue,
   trailties,
   tzinfo,
+  "vite-trails": viteTrails,
   zeitwerk,
 };
 
