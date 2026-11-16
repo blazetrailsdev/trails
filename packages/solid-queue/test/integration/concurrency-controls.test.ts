@@ -27,6 +27,7 @@ import { JobResult } from "../support/job-result.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Range, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { loadAppSchema } from "../support/queue-schema.js";
+import { DiscardableUpdateResultJob } from "../support/discardable-update-result-job.js";
 import { SequentialUpdateResultJob } from "../support/sequential-update-result-job.js";
 import { ThrottledUpdateResultJob } from "../support/throttled-update-result-job.js";
 import { UpdateResultJob } from "../support/update-result-job.js";
@@ -38,6 +39,7 @@ import {
 import {
   runSupervisor,
   sleep,
+  waitFor,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
 } from "../support/processes-test-helper.js";
@@ -49,6 +51,12 @@ async function assertStoredSequence(result: JobResult, ...sequences: string[][])
   await Record.uncached(async () => {
     expect(expected).toContain((await result.reload()).status);
   });
+}
+
+async function waitForSemaphoresToBeReleasedFor(timeout: number) {
+  await waitWhileWithTimeout(timeout, () =>
+    Record.uncached(async () => await Semaphore.available().invertWhere().isAny()),
+  );
 }
 
 class ConcurrencyControlsTest extends TestCase {
@@ -300,5 +308,59 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
         assert(false, "Transaction state unexpectedly invalid");
       }
     });
+  });
+
+  it("discard jobs when concurrency limit is reached with on_conflict: :discard", async () => {
+    const job1 = await DiscardableUpdateResultJob.performLater(result, { name: "1", pause: 1 });
+    await waitFor({ timeout: 2 }, async () => {
+      const job = await Job.findBy({ active_job_id: job1.jobId });
+      return (await job?.isClaimed()) ?? false;
+    });
+
+    const job2 = await DiscardableUpdateResultJob.performLater(result, { name: "2" });
+    const job3 = await DiscardableUpdateResultJob.performLater(result, { name: "3" });
+
+    await waitForJobsToFinishFor(5);
+    await assertNoUnfinishedJobs();
+
+    await assertStoredSequence(result, ["1"]);
+
+    const jobs = Job.where({ active_job_id: [job1, job2, job3].map((job) => job.jobId) });
+    expect(await jobs.count()).toBe(1);
+
+    expect(job1.providerJobId).toBe(((await jobs.first()) as Job).id);
+    expect(job2.providerJobId).toBeNull();
+    expect(job3.providerJobId).toBeNull();
+  });
+
+  it("discard on conflict across different concurrency keys", async () => {
+    const anotherResult = await JobResult.createBang({ queue_name: "default", status: "seq: " });
+    await DiscardableUpdateResultJob.performLater(result, { name: "1", pause: 2 });
+    await DiscardableUpdateResultJob.performLater(anotherResult, { name: "2", pause: 2 });
+    await sleep(0.1);
+    await DiscardableUpdateResultJob.performLater(result, { name: "3" });
+    await DiscardableUpdateResultJob.performLater(anotherResult, { name: "4" });
+
+    await waitForJobsToFinishFor(5);
+    await assertNoUnfinishedJobs();
+
+    await assertStoredSequence(result, ["1"]);
+    await assertStoredSequence(anotherResult, ["2"]);
+  });
+
+  it("discard on conflict and release semaphore", async () => {
+    await DiscardableUpdateResultJob.performLater(result, { name: "1", pause: 0.1 });
+    await DiscardableUpdateResultJob.performLater(result, { name: "2" });
+
+    await waitForJobsToFinishFor(5);
+    await waitForSemaphoresToBeReleasedFor(2);
+
+    await assertNoUnfinishedJobs();
+
+    await DiscardableUpdateResultJob.performLater(result, { name: "3" });
+    await waitForJobsToFinishFor(5);
+    await assertNoUnfinishedJobs();
+
+    await assertStoredSequence(result, ["1", "3"]);
   });
 });
