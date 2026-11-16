@@ -581,7 +581,7 @@ export class Configuration extends EngineConfiguration {
     return paths;
   }
 
-  /** @missingRailsCall parse — PERMANENT */
+  /** @missingRailsCall parse — CONVERGEABLE database-configuration-reads-config-database-yml */
   async databaseConfiguration(): Promise<DatabaseConfigModule> {
     try {
       const path = (await this.paths().get("config/database")!.existent())[0];

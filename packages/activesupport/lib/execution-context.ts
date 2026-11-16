@@ -43,7 +43,9 @@ function restore(saved: Map<string, { hadKey: boolean; value: unknown }>): void 
   }
 }
 
-const _ExecutionContext = {
+export const ExecutionContext = {
+  TestHelper: undefined as unknown as typeof TestHelper,
+
   afterChange(fn: () => void): void {
     _afterChangeCallbacks.push(fn);
   },
@@ -104,8 +106,4 @@ const _ExecutionContext = {
   clear(): void {
     store().clear();
   },
-};
-
-export const ExecutionContext = _ExecutionContext as typeof _ExecutionContext & {
-  TestHelper: typeof TestHelper;
 };
