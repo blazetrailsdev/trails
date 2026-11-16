@@ -879,6 +879,7 @@ signatures, and the `extends` line carries
 The directive covers that one line only, and reds as unused once TS2417 is
 gone. It is spelled exactly
 that way, so a grep finds every instance. This section is its receipt.
+Ruled by the operator on 2026-11-16 (trails#10171).
 
 ## Call-time constant resolution (Ruby autoload → ES imports)
 
