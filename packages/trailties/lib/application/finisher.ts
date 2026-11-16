@@ -301,10 +301,7 @@ export async function _registerAutoloaded(_cpath: unknown, value: unknown): Prom
 
 const definedControllers = new WeakSet<object>();
 
-/**
- * @noRailsEquivalent PERMANENT
- * @inventedArm eagerLoadDir — PERMANENT
- */
+/** @noRailsEquivalent PERMANENT */
 async function defineController(klass: object): Promise<void> {
   const base = ActionController.Base;
   if (!((klass as { prototype: unknown }).prototype instanceof base)) return;
