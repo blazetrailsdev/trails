@@ -67,7 +67,7 @@ packages/actionpack/test/fixtures/公共/
 # topics are TSE templates, not YAML.
 packages/actionview/test/fixtures/*.yml
 
-# vendor/solid_queue/v1.1.3/test/dummy/config/alternative_configuration.yml with its
+# vendor/solid_queue/v1.7.2/test/dummy/config/alternative_configuration.yml with its
 # loop written in TSE, so it is a template, not YAML.
 packages/solid-queue/test/support/dummy/config/alternative_configuration.yml
 

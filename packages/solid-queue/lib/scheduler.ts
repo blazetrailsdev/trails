@@ -42,7 +42,7 @@ export class Scheduler extends Base {
     return { ...super.metadata(), recurring_schedule: presence(this.recurringSchedule.taskKeys()) };
   }
 
-  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.1.3/lib/solid_queue/processes/runnable.rb:19-24 */
+  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.7.2/lib/solid_queue/processes/runnable.rb:19-24 */
   override async stop(): Promise<void> {
     await super.stop();
 

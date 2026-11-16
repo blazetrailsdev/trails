@@ -150,9 +150,9 @@ export class Job extends Record {
 
   /**
    * @internal
-   * @inlinedFrom SolidQueue::Job::ConcurrencyControls#execution solid_queue/v1.1.3/app/models/solid_queue/job/concurrency_controls.rb:61-63
-   * @inlinedFrom SolidQueue::Job::Schedulable#execution solid_queue/v1.1.3/app/models/solid_queue/job/schedulable.rb:43-45
-   * @inlinedFrom SolidQueue::Job::Executable#execution solid_queue/v1.1.3/app/models/solid_queue/job/executable.rb:107-109
+   * @inlinedFrom SolidQueue::Job::ConcurrencyControls#execution solid_queue/v1.7.2/app/models/solid_queue/job/concurrency_controls.rb:61-63
+   * @inlinedFrom SolidQueue::Job::Schedulable#execution solid_queue/v1.7.2/app/models/solid_queue/job/schedulable.rb:43-45
+   * @inlinedFrom SolidQueue::Job::Executable#execution solid_queue/v1.7.2/app/models/solid_queue/job/executable.rb:107-109
    */
   async execution(): Promise<Execution | null> {
     return ((await this.readyExecution) ??
