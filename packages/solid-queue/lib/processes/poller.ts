@@ -19,16 +19,19 @@ export class Poller extends Base {
     this.pollingInterval = pollingInterval;
   }
 
-  override metadata(): Record<string, unknown> {
-    return { ...super.metadata(), polling_interval: this.pollingInterval };
+  override async metadata(): Promise<Record<string, unknown>> {
+    return { ...(await super.metadata()), polling_interval: this.pollingInterval };
   }
 
-  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.1.3/lib/solid_queue/processes/runnable.rb:19-24 */
+  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.7.2/lib/solid_queue/processes/runnable.rb:18-28 */
   override async stop(): Promise<void> {
     await super.stop();
 
     await this.wakeUp();
-    await this._thread?.join();
+
+    if (!this.isSupervised()) {
+      await this._thread?.join();
+    }
   }
 
   /** @internal */
@@ -73,9 +76,10 @@ export class Poller extends Base {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Runnable` (`processes/poller.rb:5`). */
 export interface Poller {
   mode: unknown;
+  isSupervised(): boolean;
   start(): Promise<void>;
   isShuttingDown(): Promise<boolean>;
   shutdown(): Promise<void>;
-  setProcline(): void;
+  setProcline(): void | Promise<void>;
   isAllWorkCompleted(): Promise<boolean>;
 }

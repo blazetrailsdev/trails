@@ -57,12 +57,12 @@ export class LogSubscriber extends BaseLogSubscriber {
   }
 
   failManyClaimed(event: Event): void {
-    this.warn(
-      this.formattedEvent(event, {
-        action: "Fail claimed jobs",
-        ...slice(event.payload, "job_ids", "process_ids"),
-      }),
-    );
+    const attributes: { [key: string]: unknown } = slice(event.payload, "job_ids", "process_ids");
+    if (event.payload.error != null && event.payload.error !== false) {
+      attributes.error = this.formattedError(event.payload.error as Error);
+    }
+
+    this.warn(this.formattedEvent(event, { action: "Fail claimed jobs", ...attributes }));
   }
 
   releaseClaimed(event: Event): void {
@@ -123,7 +123,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     this.debug(
       this.formattedEvent(event, {
         action: "Release blocked job",
-        ...slice(event.payload, "job_id", "concurrency_key", "released"),
+        ...slice(event.payload, "job_id", "concurrency_key", "released", "failed"),
       }),
     );
   }

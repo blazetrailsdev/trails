@@ -1,7 +1,7 @@
 export { VERSION } from "./version.js";
 export { SolidQueue } from "./solid-queue.js";
 export { Record } from "./record.js";
-export { Job, EnqueueError } from "./job.js";
+export { Job, EnqueueError, ClassMissingError } from "./job.js";
 export { Execution, UndiscardableError } from "./execution.js";
 export { ReadyExecution } from "./ready-execution.js";
 export { ScheduledExecution } from "./scheduled-execution.js";
@@ -19,6 +19,7 @@ export { ConcurrencyControls } from "./active-job/concurrency-controls.js";
 export { SolidQueueAdapter } from "./active-job/queue-adapters/solid-queue-adapter.js";
 export { Process } from "./process.js";
 export { Pool } from "./pool.js";
+export { ThreadPool } from "./thread-pool.js";
 export { Worker } from "./worker.js";
 export { Dispatcher } from "./dispatcher.js";
 export { Scheduler } from "./scheduler.js";

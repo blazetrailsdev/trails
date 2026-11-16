@@ -1,6 +1,7 @@
 import { RecordNotFound } from "@blazetrails/activerecord";
 import { compact, included, isPresent } from "@blazetrails/activesupport";
 import { TimerTask, classModule, rbModAttrReader, rbModAttrWriter } from "@blazetrails/ruby-compat";
+import type { Time } from "@blazetrails/date";
 import type { Process } from "../process.js";
 import { SolidQueue } from "../solid-queue.js";
 import type { ClassMethods as CallbacksClassMethods } from "./callbacks.js";
@@ -13,10 +14,12 @@ interface RegistrableHost {
   pid: number;
   hostname: string;
   supervisor?: unknown;
-  metadata(): Record<string, unknown>;
+  metadata(): Promise<Record<string, unknown>>;
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
   heartbeat(): Promise<void>;
+  isPresumedDead(): boolean;
+  stopToBeReplaced(): Promise<void>;
   wakeUp(): Promise<void>;
 }
 
@@ -28,8 +31,7 @@ export class Registrable {
   static [included](base: RegistrableIncludingClass): void {
     base.afterBoot(":register", ":launchHeartbeat");
 
-    base.beforeShutdown(":stopHeartbeat");
-    base.afterShutdown(":deregister");
+    base.afterShutdown(":stopHeartbeat", ":deregister");
 
     rbModAttrReader(base, "process");
     rbModAttrWriter(base, "process");
@@ -41,19 +43,21 @@ export class Registrable {
 
   /** @internal */
   async register(this: RegistrableHost): Promise<void> {
-    this.process = await SolidQueue.Process!.register({
-      kind: this.kind,
-      name: this.name,
-      pid: this.pid,
-      hostname: this.hostname,
-      supervisor: this.supervisor ?? null,
-      metadata: compact(this.metadata()),
+    await this.wrapInAppExecutor(async () => {
+      this.process = await SolidQueue.Process!.register({
+        kind: this.kind,
+        name: this.name,
+        pid: this.pid,
+        hostname: this.hostname,
+        supervisor: this.supervisor ?? null,
+        metadata: compact(await this.metadata()),
+      });
     });
   }
 
   /** @internal */
   async deregister(this: RegistrableHost): Promise<void> {
-    await this.process?.deregister();
+    await this.wrapInAppExecutor(async () => await this.process?.deregister());
   }
 
   /** @internal */
@@ -83,11 +87,35 @@ export class Registrable {
   /** @internal */
   async heartbeat(this: RegistrableHost): Promise<void> {
     try {
-      await this.process!.heartbeat();
-    } catch (e) {
-      if (!(e instanceof RecordNotFound)) throw e;
-      this.process = null;
-      await this.wakeUp();
+      await this.process?.heartbeat();
+    } catch (error) {
+      if (error instanceof RecordNotFound) {
+        await this.stopToBeReplaced();
+      } else {
+        if (this.isPresumedDead()) await this.stopToBeReplaced();
+        throw error;
+      }
     }
+  }
+
+  /** @internal */
+  isPresumedDead(this: RegistrableHost): boolean {
+    return (
+      this.process != null &&
+      this.process.last_heartbeat_at.compare(SolidQueue.processAliveThreshold.ago() as Time)! <= 0
+    );
+  }
+
+  /** @internal */
+  async stopToBeReplaced(this: RegistrableHost): Promise<void> {
+    this.process = null;
+    await this.wakeUp();
+  }
+
+  /** @internal */
+  async reloadMetadata(this: RegistrableHost): Promise<void> {
+    await this.wrapInAppExecutor(
+      async () => await this.process?.update({ metadata: compact(await this.metadata()) }),
+    );
   }
 }

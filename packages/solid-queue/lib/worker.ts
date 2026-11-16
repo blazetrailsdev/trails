@@ -6,6 +6,7 @@ import {
   type ClassMethods as LifecycleHooksClassMethods,
 } from "./lifecycle-hooks.js";
 import { Pool } from "./pool.js";
+import "./thread-pool.js";
 import { Poller } from "./processes/poller.js";
 import { ReadyExecution } from "./ready-execution.js";
 import { SolidQueue } from "./solid-queue.js";
@@ -13,6 +14,7 @@ import { SolidQueue } from "./solid-queue.js";
 interface WorkerOptions {
   queues?: unknown;
   threads?: number;
+  fibers?: number;
   pollingInterval?: unknown;
   [key: string]: unknown;
 }
@@ -34,18 +36,31 @@ export class Worker extends Poller {
   pool: Pool;
 
   constructor(options: WorkerOptions = {}) {
+    const executionPoolType = Object.hasOwn(options, "fibers") ? "fiber" : "thread";
+
     options = { ...Configuration.WORKER_DEFAULTS, ...options };
+    const executionPoolSize = (
+      executionPoolType === "fiber" ? options.fibers : options.threads
+    ) as number;
 
     super(options as { pollingInterval: unknown });
-    this.queues = rbFArray(options.queues) as string[];
-    this.pool = new Pool(options.threads!, { onIdle: () => this.wakeUp() });
+    this.queues = Object.freeze(
+      (rbFArray(options.queues) as string[]).map((queue) => Object.freeze(queue)),
+    ) as string[];
+    this.pool = Pool.build({
+      type: executionPoolType,
+      size: executionPoolSize,
+      onIdle: () => this.wakeUp(),
+      onUnrecoverableError: () => this.requestTermination(),
+    });
   }
 
-  override metadata(): Record<string, unknown> {
+  override async metadata(): Promise<Record<string, unknown>> {
     return {
-      ...super.metadata(),
+      ...(await super.metadata()),
       queues: this.queues.join(","),
-      thread_pool_size: this.pool.size,
+      pool_type: this.pool.type,
+      pool_size: this.pool.size,
     };
   }
 
@@ -53,17 +68,23 @@ export class Worker extends Poller {
   override async poll(): Promise<unknown> {
     const executions = await this.claimExecutions();
     for (const execution of executions) {
-      this.pool.post(execution);
+      await this.pool.post(execution);
     }
 
-    return this.pool.isIdle() ? this.pollingInterval : minutes(10);
+    return (await this.pool.isIdle()) ? this.pollingInterval : minutes(10);
   }
 
   /** @internal */
   async claimExecutions() {
-    return await this.withPollingVolume(() =>
-      ReadyExecution.claim(this.queues, this.pool.idleThreads, this.processId),
+    return await this.withPollingVolume(async () =>
+      ReadyExecution.claim(this.queues, await this.pool.availableCapacity(), this.processId),
     );
+  }
+
+  /** @internal */
+  async requestTermination(): Promise<void> {
+    this._stopped = true;
+    await this.wakeUp();
   }
 
   /** @internal */

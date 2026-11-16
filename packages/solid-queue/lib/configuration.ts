@@ -1,4 +1,4 @@
-import { Model } from "@blazetrails/activemodel";
+import { BooleanType, Model } from "@blazetrails/activemodel";
 import {
   TopLevel,
   camelize,
@@ -73,11 +73,17 @@ export class Configuration {
     concurrencyMaintenanceInterval: 600,
   };
 
+  static readonly SCHEDULER_DEFAULTS = {
+    pollingInterval: 5,
+    dynamicTasksEnabled: false,
+  };
+
   static readonly DEFAULT_CONFIG_FILE_PATH = "config/queue.yml";
   static readonly DEFAULT_RECURRING_SCHEDULE_FILE_PATH = "config/recurring.yml";
 
   private options: Options;
   private _workersOptions?: Options[];
+  private _schedulerOptions?: Options;
   private _dispatchersOptions?: Options[];
   private _recurringTasks?: RecurringTask[];
   private _processesConfig?: Options;
@@ -90,6 +96,8 @@ export class Configuration {
   async configuredProcesses(): Promise<Process[]> {
     if (this.isOnlyWork()) {
       return await this.workers();
+    } else if (this.isOnlyRecurring()) {
+      return await this.schedulers();
     } else {
       return [
         ...(await this.dispatchers()),
@@ -154,7 +162,8 @@ export class Configuration {
       ),
       onlyWork: false,
       onlyDispatch: false,
-      skipRecurring: false,
+      onlyRecurring: new BooleanType().cast(env.SOLID_QUEUE_ONLY_RECURRING),
+      skipRecurring: new BooleanType().cast(env.SOLID_QUEUE_SKIP_RECURRING),
     };
   }
 
@@ -175,6 +184,11 @@ export class Configuration {
   /** @internal */
   private isOnlyDispatch(): boolean {
     return this.options.onlyDispatch as boolean;
+  }
+
+  /** @internal */
+  private isOnlyRecurring(): boolean {
+    return this.options.onlyRecurring as boolean;
   }
 
   /** @internal */
@@ -210,8 +224,15 @@ export class Configuration {
 
   /** @internal */
   private async schedulers(): Promise<Process[]> {
-    if (!this.isSkipRecurringTasks() && (await this.recurringTasks()).length > 0) {
-      return [new Process("scheduler", { recurringTasks: await this.recurringTasks() })];
+    if (this.isSkipRecurringTasks()) return [];
+
+    if ((await this.recurringTasks()).length > 0 || (await this.isDynamicRecurringTasksEnabled())) {
+      return [
+        new Process("scheduler", {
+          recurringTasks: await this.recurringTasks(),
+          ...reverseMerge(await this.schedulerOptions(), Configuration.SCHEDULER_DEFAULTS),
+        }),
+      ];
     } else {
       return [];
     }
@@ -236,12 +257,35 @@ export class Configuration {
   }
 
   /** @internal */
+  private async schedulerOptions(): Promise<Options> {
+    const processesConfig = await this.processesConfig();
+    return (this._schedulerOptions ??= transformKeys(
+      {
+        ...((Object.hasOwn(processesConfig, "scheduler")
+          ? processesConfig.scheduler
+          : {}) as Options),
+      },
+      (key) => camelize(key, false),
+    ));
+  }
+
+  /** @internal */
+  private async isDynamicRecurringTasksEnabled(): Promise<boolean> {
+    const schedulerOptions = await this.schedulerOptions();
+    return (
+      Object.hasOwn(schedulerOptions, "dynamicTasksEnabled")
+        ? schedulerOptions.dynamicTasksEnabled
+        : Configuration.SCHEDULER_DEFAULTS.dynamicTasksEnabled
+    ) as boolean;
+  }
+
+  /** @internal */
   private async recurringTasks(): Promise<RecurringTask[]> {
     await RecurringTask.loadSchema();
     return (this._recurringTasks ??= Object.entries(await this.recurringTasksConfig())
       .map(([id, options]) =>
         options != null && Object.hasOwn(options as Options, "schedule")
-          ? RecurringTask.fromConfiguration(id, options as Options)
+          ? RecurringTask.fromConfiguration(id, { ...(options as Options), static: true })
           : null,
       )
       .filter((task): task is RecurringTask => task != null));
@@ -250,12 +294,14 @@ export class Configuration {
   /** @internal */
   private async processesConfig(): Promise<Options> {
     return (this._processesConfig ??= await this.configFrom(
-      presence(slice(this.options, "workers", "dispatchers")) || this.options.configFile,
+      presence(slice(this.options, "workers", "dispatchers", "scheduler")) ||
+        this.options.configFile,
       {
-        keys: ["workers", "dispatchers"],
+        keys: ["workers", "dispatchers", "scheduler"],
         fallback: {
           workers: [Configuration.WORKER_DEFAULTS],
           dispatchers: [Configuration.DISPATCHER_DEFAULTS],
+          scheduler: Configuration.SCHEDULER_DEFAULTS,
         },
       },
     ));

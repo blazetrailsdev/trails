@@ -23,7 +23,7 @@ export class Base {
   }
 
   readonly name: string;
-  private _stopped: boolean;
+  protected _stopped: boolean;
   private _hostname?: string;
   private _pid?: number;
 
@@ -44,7 +44,7 @@ export class Base {
     return (this._pid ??= Process.pid);
   }
 
-  metadata(): Record<string, unknown> {
+  async metadata(): Promise<Record<string, unknown>> {
     return {};
   }
 

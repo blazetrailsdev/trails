@@ -29,12 +29,12 @@ async function assertProcesses(
   }
 }
 
-function assertHasRecurringTask(
+async function assertHasRecurringTask(
   scheduler: Scheduler,
   { key, ...attributes }: { key: string; [attr: string]: unknown },
 ) {
-  expect(scheduler.recurringSchedule.configuredTasks.length).toBe(1);
-  const task = scheduler.recurringSchedule.configuredTasks.find((t) => t.key === key)!;
+  expect((await scheduler.recurringSchedule.configuredTasks()).length).toBe(1);
+  const task = (await scheduler.recurringSchedule.configuredTasks()).find((t) => t.key === key)!;
 
   for (const [attr, value] of Object.entries(attributes)) {
     expect((task as unknown as Record<string, unknown>)[attr]).toEqual(value);
@@ -158,7 +158,7 @@ describe("ConfigurationTest", () => {
     await assertProcesses(configuration, "scheduler", 1);
 
     const scheduler = (await configuration.configuredProcesses())[1].instantiate() as Scheduler;
-    assertHasRecurringTask(scheduler, {
+    await assertHasRecurringTask(scheduler, {
       key: "periodic_store_result",
       class_name: "StoreResultJob",
       schedule: "every second",
@@ -171,7 +171,7 @@ describe("ConfigurationTest", () => {
     await assertProcesses(configuration, "scheduler", 1);
 
     const scheduler = (await configuration.configuredProcesses())[0].instantiate() as Scheduler;
-    assertHasRecurringTask(scheduler, {
+    await assertHasRecurringTask(scheduler, {
       key: "periodic_store_result",
       class_name: "StoreResultJob",
       schedule: "every second",

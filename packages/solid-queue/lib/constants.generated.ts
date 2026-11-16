@@ -36,25 +36,27 @@ import * as m32 from "./processes/procline.js";
 import * as m33 from "./processes/registrable.js";
 import * as m34 from "./processes/runnable.js";
 import * as m35 from "./processes/supervised.js";
-import * as m36 from "./queue-selector.js";
-import * as m37 from "./queue.js";
-import * as m38 from "./ready-execution.js";
-import * as m39 from "./record.js";
-import * as m40 from "./recurring-execution.js";
-import * as m41 from "./recurring-job.js";
-import * as m42 from "./recurring-task.js";
-import * as m43 from "./recurring-task/arguments.js";
-import * as m44 from "./scheduled-execution.js";
-import * as m45 from "./scheduler.js";
-import * as m46 from "./scheduler/recurring-schedule.js";
-import * as m47 from "./semaphore.js";
-import * as m48 from "./supervisor.js";
-import * as m49 from "./supervisor/maintenance.js";
-import * as m50 from "./supervisor/pidfile.js";
-import * as m51 from "./supervisor/pidfiled.js";
-import * as m52 from "./supervisor/signals.js";
-import * as m53 from "./timer.js";
-import * as m54 from "./worker.js";
+import * as m36 from "./processes/unrecoverable-error.js";
+import * as m37 from "./queue-selector.js";
+import * as m38 from "./queue.js";
+import * as m39 from "./ready-execution.js";
+import * as m40 from "./record.js";
+import * as m41 from "./recurring-execution.js";
+import * as m42 from "./recurring-job.js";
+import * as m43 from "./recurring-task.js";
+import * as m44 from "./recurring-task/arguments.js";
+import * as m45 from "./scheduled-execution.js";
+import * as m46 from "./scheduler.js";
+import * as m47 from "./scheduler/recurring-schedule.js";
+import * as m48 from "./semaphore.js";
+import * as m49 from "./supervisor.js";
+import * as m50 from "./supervisor/maintenance.js";
+import * as m51 from "./supervisor/pidfile.js";
+import * as m52 from "./supervisor/pidfiled.js";
+import * as m53 from "./supervisor/signals.js";
+import * as m54 from "./thread-pool.js";
+import * as m55 from "./timer.js";
+import * as m56 from "./worker.js";
 
 defineConstants([
   [() => m0.AppExecutor, "SolidQueue::AppExecutor"],
@@ -74,6 +76,7 @@ defineConstants([
   [() => m7.UndiscardableError, "SolidQueue::Execution::UndiscardableError"],
   [() => m10.FailedExecution, "SolidQueue::FailedExecution"],
   [() => m11.Job, "SolidQueue::Job"],
+  [() => m11.ClassMissingError, "SolidQueue::Job::ClassMissingError"],
   [() => m12.Clearable, "SolidQueue::Job::Clearable"],
   [() => m12.ClassMethods, "SolidQueue::Job::Clearable::ClassMethods"],
   [() => m13.ConcurrencyControls, "SolidQueue::Job::ConcurrencyControls"],
@@ -105,25 +108,27 @@ defineConstants([
   [() => m33.Registrable, "SolidQueue::Processes::Registrable"],
   [() => m34.Runnable, "SolidQueue::Processes::Runnable"],
   [() => m35.Supervised, "SolidQueue::Processes::Supervised"],
-  [() => m37.Queue, "SolidQueue::Queue"],
-  [() => m36.QueueSelector, "SolidQueue::QueueSelector"],
-  [() => m38.ReadyExecution, "SolidQueue::ReadyExecution"],
-  [() => m39.Record, "SolidQueue::Record"],
-  [() => m40.RecurringExecution, "SolidQueue::RecurringExecution"],
-  [() => m40.AlreadyRecorded, "SolidQueue::RecurringExecution::AlreadyRecorded"],
-  [() => m41.RecurringJob, "SolidQueue::RecurringJob"],
-  [() => m42.RecurringTask, "SolidQueue::RecurringTask"],
-  [() => m43.Arguments, "SolidQueue::RecurringTask::Arguments"],
-  [() => m44.ScheduledExecution, "SolidQueue::ScheduledExecution"],
-  [() => m45.Scheduler, "SolidQueue::Scheduler"],
-  [() => m46.RecurringSchedule, "SolidQueue::Scheduler::RecurringSchedule"],
-  [() => m47.Semaphore, "SolidQueue::Semaphore"],
-  [() => m47.Proxy, "SolidQueue::Semaphore::Proxy"],
-  [() => m48.Supervisor, "SolidQueue::Supervisor"],
-  [() => m49.Maintenance, "SolidQueue::Supervisor::Maintenance"],
-  [() => m50.Pidfile, "SolidQueue::Supervisor::Pidfile"],
-  [() => m51.Pidfiled, "SolidQueue::Supervisor::Pidfiled"],
-  [() => m52.Signals, "SolidQueue::Supervisor::Signals"],
-  [() => m53.Timer, "SolidQueue::Timer"],
-  [() => m54.Worker, "SolidQueue::Worker"],
+  [() => m36.UnrecoverableError, "SolidQueue::Processes::UnrecoverableError"],
+  [() => m38.Queue, "SolidQueue::Queue"],
+  [() => m37.QueueSelector, "SolidQueue::QueueSelector"],
+  [() => m39.ReadyExecution, "SolidQueue::ReadyExecution"],
+  [() => m40.Record, "SolidQueue::Record"],
+  [() => m41.RecurringExecution, "SolidQueue::RecurringExecution"],
+  [() => m41.AlreadyRecorded, "SolidQueue::RecurringExecution::AlreadyRecorded"],
+  [() => m42.RecurringJob, "SolidQueue::RecurringJob"],
+  [() => m43.RecurringTask, "SolidQueue::RecurringTask"],
+  [() => m44.Arguments, "SolidQueue::RecurringTask::Arguments"],
+  [() => m45.ScheduledExecution, "SolidQueue::ScheduledExecution"],
+  [() => m46.Scheduler, "SolidQueue::Scheduler"],
+  [() => m47.RecurringSchedule, "SolidQueue::Scheduler::RecurringSchedule"],
+  [() => m48.Semaphore, "SolidQueue::Semaphore"],
+  [() => m48.Proxy, "SolidQueue::Semaphore::Proxy"],
+  [() => m49.Supervisor, "SolidQueue::Supervisor"],
+  [() => m50.Maintenance, "SolidQueue::Supervisor::Maintenance"],
+  [() => m51.Pidfile, "SolidQueue::Supervisor::Pidfile"],
+  [() => m52.Pidfiled, "SolidQueue::Supervisor::Pidfiled"],
+  [() => m53.Signals, "SolidQueue::Supervisor::Signals"],
+  [() => m54.ThreadPool, "SolidQueue::ThreadPool"],
+  [() => m55.Timer, "SolidQueue::Timer"],
+  [() => m56.Worker, "SolidQueue::Worker"],
 ]);

@@ -51,9 +51,9 @@ export class Dispatcher extends Poller {
     }
   }
 
-  override metadata(): Record<string, unknown> {
+  override async metadata(): Promise<Record<string, unknown>> {
     return {
-      ...super.metadata(),
+      ...(await super.metadata()),
       batch_size: this.batchSize,
       concurrency_maintenance_interval: this.concurrencyMaintenance?.interval,
     };

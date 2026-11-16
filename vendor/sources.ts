@@ -933,7 +933,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/solid_queue.git",
-      ref: "v1.1.3",
+      ref: "v1.7.2",
     },
     packages: [
       {

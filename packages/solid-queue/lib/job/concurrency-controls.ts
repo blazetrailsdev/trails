@@ -56,7 +56,7 @@ export class ConcurrencyControls {
 
   /** @internal */
   async block(): Promise<Base> {
-    return (await BlockedExecution.createOrFindByBang({ job_id: this.id }))!;
+    return (await BlockedExecution.createOrFindByBang({ job: this }))!;
   }
 
   /** @internal */

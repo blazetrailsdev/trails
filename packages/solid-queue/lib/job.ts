@@ -5,7 +5,9 @@ import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Time } from "@blazetrails/date";
 import {
   constSet,
+  NameError,
   StandardError,
+  rbInspect,
   excBacktrace,
   excSetBacktrace,
   rbModName,
@@ -26,9 +28,16 @@ import type { Duration } from "@blazetrails/activesupport";
 
 export class EnqueueError extends StandardError {}
 
+export class ClassMissingError extends NameError {
+  static for(job: { class_name: string }): ClassMissingError {
+    return new this(`Job class ${rbInspect(job.class_name)} could not be resolved`);
+  }
+}
+
 type ActiveJob = ActiveJobBase & { concurrencyKey(): string | null };
 
 export class Job extends Record {
+  static ClassMissingError = ClassMissingError;
   declare static prepareAllForExecution: typeof ExecutableClassMethods.prepareAllForExecution;
   declare static dispatchAll: typeof ExecutableClassMethods.dispatchAll;
   declare static scheduleAll: typeof SchedulableClassMethods.scheduleAll;
@@ -69,6 +78,8 @@ export class Job extends Record {
   declare concurrencyDuration: () => Duration;
   declare unblockNextBlockedJob: typeof ConcurrencyControls.prototype.unblockNextBlockedJob;
   declare isConcurrencyLimited: typeof ConcurrencyControls.prototype.isConcurrencyLimited;
+  declare acquireConcurrencyLock: typeof ConcurrencyControls.prototype.acquireConcurrencyLock;
+  declare jobClass: typeof ConcurrencyControls.prototype.jobClass;
   declare isBlocked: typeof ConcurrencyControls.prototype.isBlocked;
   declare retry: typeof Retryable.prototype.retry;
   declare failedWith: typeof Retryable.prototype.failedWith;
@@ -107,7 +118,8 @@ export class Job extends Record {
     activeJob.scheduledAt = scheduledAt;
 
     const enqueuedJob = await this.createFromActiveJob(activeJob);
-    activeJob.providerJobId = enqueuedJob.id;
+    if (enqueuedJob.isPersisted()) activeJob.providerJobId = enqueuedJob.id;
+    activeJob.successfullyEnqueued = enqueuedJob.isPersisted();
     return enqueuedJob;
   }
 
@@ -150,9 +162,9 @@ export class Job extends Record {
 
   /**
    * @internal
-   * @inlinedFrom SolidQueue::Job::ConcurrencyControls#execution solid_queue/v1.1.3/app/models/solid_queue/job/concurrency_controls.rb:61-63
-   * @inlinedFrom SolidQueue::Job::Schedulable#execution solid_queue/v1.1.3/app/models/solid_queue/job/schedulable.rb:43-45
-   * @inlinedFrom SolidQueue::Job::Executable#execution solid_queue/v1.1.3/app/models/solid_queue/job/executable.rb:107-109
+   * @inlinedFrom SolidQueue::Job::ConcurrencyControls#execution solid_queue/v1.7.2/app/models/solid_queue/job/concurrency_controls.rb:120-122
+   * @inlinedFrom SolidQueue::Job::Schedulable#execution solid_queue/v1.7.2/app/models/solid_queue/job/schedulable.rb:44-46
+   * @inlinedFrom SolidQueue::Job::Executable#execution solid_queue/v1.7.2/app/models/solid_queue/job/executable.rb:116-118
    */
   async execution(): Promise<Execution | null> {
     return ((await this.readyExecution) ??

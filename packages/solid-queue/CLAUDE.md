@@ -4,10 +4,10 @@
 
 `SolidQueue::Record`'s class body line
 `connects_to(**SolidQueue.connects_to) if SolidQueue.connects_to`
-(`vendor/solid_queue/v1.1.3/app/models/solid_queue/record.rb:7`) runs from the
+(`vendor/solid_queue/v1.7.2/app/models/solid_queue/record.rb:7`) runs from the
 `solid_queue.config` initializer in trails, not from `record.ts`. Rails reads
 it when Zeitwerk first loads the class, which is after the `solid_queue.config`
-initializer (`vendor/solid_queue/v1.1.3/lib/solid_queue/engine.rb:13-17`) has
+initializer (`vendor/solid_queue/v1.7.2/lib/solid_queue/engine.rb:13-17`) has
 copied `config.solid_queue` onto `SolidQueue`. ESM evaluates `record.ts` as
 soon as the package entry is imported, before any initializer, because framework
 packages stay ES modules and only application code goes through Zeitwerk

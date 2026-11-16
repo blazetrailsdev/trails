@@ -77,7 +77,12 @@ export class BlockedExecution extends Execution {
       { job_id: job.id, concurrency_key: this.concurrency_key, released: false },
       async (payload) => {
         return await this.transaction(async () => {
-          if (await this.acquireConcurrencyLock()) {
+          if (job.jobClass() == null) {
+            await job.failedWith(SolidQueue.Job!.ClassMissingError.for(job));
+            await this.destroyBang();
+
+            return (payload["failed"] = true);
+          } else if (await job.acquireConcurrencyLock()) {
             await this.promoteToReady();
             await this.destroyBang();
 
@@ -92,11 +97,6 @@ export class BlockedExecution extends Execution {
   /** @internal */
   private async setExpiresAt(): Promise<void> {
     this.expires_at = (await this.job).concurrencyDuration().fromNow() as Time;
-  }
-
-  /** @internal */
-  private async acquireConcurrencyLock(): Promise<boolean> {
-    return await Semaphore.wait(await this.job);
   }
 
   /** @internal */

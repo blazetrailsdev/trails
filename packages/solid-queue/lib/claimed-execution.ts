@@ -128,9 +128,13 @@ export class ClaimedExecution extends Execution {
   /** @internal */
   private async execute(): Promise<Result> {
     try {
-      await ActiveJobBase.execute(
-        (await this.job).arguments as unknown as Parameters<typeof ActiveJobBase.execute>[0],
-      );
+      const job = await this.job;
+      if (job.jobClass() == null) throw SolidQueue.Job!.ClassMissingError.for(job);
+
+      await ActiveJobBase.execute({
+        ...(job.arguments as object),
+        provider_job_id: job.id,
+      } as unknown as Parameters<typeof ActiveJobBase.execute>[0]);
       return new ClaimedExecution.Result(true, null);
     } catch (e) {
       return new ClaimedExecution.Result(false, e as Error);
