@@ -11,6 +11,8 @@ export class MaglevHash {
 
   /** @internal */
   private readonly lookup: (number | null)[];
+  /** @internal */
+  private readonly nodeCount: number | null = null;
 
   constructor(nodes: string[]) {
     if (nodes.length === 0) throw new ArgumentError("No nodes specified");
@@ -69,7 +71,7 @@ export class MaglevHash {
 }
 
 /** @internal */
-class Preferences {
+export class Preferences {
   /** @internal */
   private readonly preferredSlots: number[];
   /** @internal */

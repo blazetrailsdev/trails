@@ -10,7 +10,7 @@ export const Execution = {
     const currentShard = Entry.currentShard();
     return this._background.append(async () => {
       try {
-        await this.wrapInRailsExecutor(() =>
+        await this.wrapInTrailsExecutor(() =>
           this.connections().with(currentShard, () => this.setupInstrumentation(block)),
         );
       } catch (exception) {
@@ -32,7 +32,7 @@ export const Execution = {
   },
 
   /** @internal */
-  wrapInRailsExecutor<T>(this: StoreHost, block: () => T): T {
+  wrapInTrailsExecutor<T>(this: StoreHost, block: () => T): T {
     if (SolidCache.executor) {
       return (SolidCache.executor as { wrap<U>(block: () => U): U }).wrap(block);
     } else {

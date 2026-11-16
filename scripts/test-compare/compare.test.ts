@@ -253,6 +253,19 @@ describe("rubyToConventionTs", () => {
     expect(rubyToConventionTs("jobs/trim_job_test.rb", "solid-cable")).toBe("trim-job.test.ts");
   });
 
+  it("keeps solid_cache's lib/ dir and maps its behaviors onto -behavior.ts", () => {
+    expect(
+      rubyToConventionTs(
+        "lib/generators/solid_cache/solid_cache/install_generator_test.rb",
+        "solid-cache",
+      ),
+    ).toBe("lib/generators/solid-cache/solid-cache/install-generator.test.ts");
+    expect(rubyToConventionTs("unit/behaviors/cache_store_behavior.rb", "solid-cache")).toBe(
+      "behaviors/cache-store-behavior.ts",
+    );
+    expect(rubyToConventionTs("unit/stats_test.rb", "solid-cache")).toBe("stats.test.ts");
+  });
+
   it("strips raabro's _spec suffix", () => {
     expect(rubyToConventionTs("sample_xel_spec.rb", "raabro")).toBe("sample-xel.test.ts");
   });

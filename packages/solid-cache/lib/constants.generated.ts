@@ -40,6 +40,7 @@ defineConstants([
   [() => m11.MovingAverageEstimate, "SolidCache::Entry::Size::MovingAverageEstimate"],
   [() => m12.ExpiryJob, "SolidCache::ExpiryJob"],
   [() => m13.MaglevHash, "SolidCache::MaglevHash"],
+  [() => m13.Preferences, "SolidCache::MaglevHash::Preferences"],
   [() => m14.Record, "SolidCache::Record"],
   [() => m15.Store, "SolidCache::Store"],
   [() => m16.Api, "SolidCache::Store::Api"],
