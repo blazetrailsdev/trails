@@ -84,9 +84,20 @@ export function getPackageTestFiles(): Record<string, string[]> {
       ...globSync(`packages/${pkg}/test/**/*.test.ts`, { cwd: ROOT_DIR }),
       // Twin of the Ruby side's `test/**/behaviors/*_behavior.rb` glob.
       ...globSync(`packages/${pkg}/test/**/behaviors/*-behavior.ts`, { cwd: ROOT_DIR }),
-    ].sort();
+    ];
+    // A package's store test calls activesupport's shared cache behaviors, as
+    // solid_cache's `solid_cache_test.rb` includes its `behaviors/*` copies.
+    for (const file of [...files]) {
+      const source = fs.readFileSync(path.join(ROOT_DIR, file), "utf-8");
+      for (const m of source.matchAll(
+        /from "@blazetrails\/activesupport\/test\/cache\/behaviors\/([\w-]+)"/g,
+      )) {
+        const shared = `packages/activesupport/test/cache/behaviors/${m[1]}.ts`;
+        if (pkg !== "activesupport" && !files.includes(shared)) files.push(shared);
+      }
+    }
 
-    result[pkg] = files;
+    result[pkg] = files.sort();
   }
 
   // ActionPack special handling

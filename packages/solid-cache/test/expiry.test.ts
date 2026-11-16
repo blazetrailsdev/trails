@@ -5,7 +5,13 @@ import { weeks } from "@blazetrails/activesupport";
 import { Kernel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Entry, ExpiryJob, Record, type Store } from "../lib/index.js";
-import { useSolidCache, waitForBackgroundTasks } from "./support/test-helper.js";
+import {
+  firstShardKey,
+  isSingleDatabase,
+  secondShardKey,
+  useSolidCache,
+  waitForBackgroundTasks,
+} from "./support/test-helper.js";
 
 class ExpiryTest extends ActiveJobTestCase {
   expiry(): void {}
@@ -13,7 +19,6 @@ class ExpiryTest extends ActiveJobTestCase {
 
 describe("SolidCache::ExpiryTest", () => {
   const host = useSolidCache();
-  const firstShardKey = "default";
   let cache: Store;
   let t: ActiveJobTestHelper;
 
@@ -30,19 +35,6 @@ describe("SolidCache::ExpiryTest", () => {
   function stubRand(...values: number[]): void {
     let i = 0;
     vi.spyOn(Kernel, "rand").mockImplementation(() => values[Math.min(i++, values.length - 1)]);
-  }
-
-  async function shardKeys(cache: Store, shard: string): Promise<string[]> {
-    const namespacedKeys: Uint8Array[] = [];
-    for (let i = 0; i < 100; i++) {
-      namespacedKeys.push(
-        await (
-          cache as unknown as { normalizeKey(k: string, o: object): Promise<Uint8Array> }
-        ).normalizeKey(`key${i}`, {}),
-      );
-    }
-    const keys = cache.connections().assign(namespacedKeys).get(shard)!;
-    return keys.map((key) => new TextDecoder().decode(key).replace(`${host.namespace()}:`, ""));
   }
 
   async function sendEntriesBackInTime(distance: ReturnType<typeof weeks>): Promise<void> {
@@ -85,7 +77,7 @@ describe("SolidCache::ExpiryTest", () => {
       stubRand(0);
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxAge: weeks(2).toI(), expiryMethod });
-      const defaultShardKeys = await shardKeys(cache, firstShardKey);
+      const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
       await write(defaultShardKeys, [0, 1], [1, 2]);
       expect(await cache.read(defaultShardKeys[0])).toBe(1);
       expect(await cache.read(defaultShardKeys[1])).toBe(2);
@@ -105,7 +97,7 @@ describe("SolidCache::ExpiryTest", () => {
       stubRand(0);
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxAge: null, maxEntries: 2, expiryMethod });
-      const defaultShardKeys = await shardKeys(cache, firstShardKey);
+      const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
       await write(defaultShardKeys, [0, 1], [1, 2]);
 
       await waitForBackgroundTasks(cache);
@@ -120,7 +112,7 @@ describe("SolidCache::ExpiryTest", () => {
       stubRand(0);
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxAge: null, maxSize: 1000, expiryMethod });
-      const defaultShardKeys = await shardKeys(cache, firstShardKey);
+      const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
       await write(defaultShardKeys, [0, "a".repeat(350)], [1, "a".repeat(350)]);
 
       await drain();
@@ -135,7 +127,7 @@ describe("SolidCache::ExpiryTest", () => {
       stubRand(0);
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxEntries: 2, expiryMethod });
-      const defaultShardKeys = await shardKeys(cache, firstShardKey);
+      const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
       await write(defaultShardKeys, [0, 1], [1, 2]);
 
       await waitForBackgroundTasks(cache);
@@ -150,7 +142,7 @@ describe("SolidCache::ExpiryTest", () => {
       stubRand(0.416);
 
       cache = host.lookupStore({ expiryBatchSize: 3, maxEntries: 1, expiryMethod });
-      const defaultShardKeys = await shardKeys(cache, firstShardKey);
+      const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
       await write(defaultShardKeys, [0, 1], [1, 2]);
 
       await drain();
@@ -162,13 +154,58 @@ describe("SolidCache::ExpiryTest", () => {
       stubRand(0.417);
 
       cache = host.lookupStore({ expiryBatchSize: 6, maxEntries: 1, expiryMethod });
-      const defaultShardKeys = await shardKeys(cache, firstShardKey);
+      const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
       await write(defaultShardKeys, [0, 1], [1, 2]);
 
       await drain();
 
       expect(await entryCount()).toBe(2);
     });
+
+    it.skipIf(isSingleDatabase())(
+      `expires old records multiple shards (${expiryMethod})`,
+      async () => {
+        stubRand(0, 1, 0, 1, 0, 1, 0, 1);
+        cache = host.lookupStore({
+          expiryBatchSize: 2,
+          shards: [firstShardKey(), secondShardKey()],
+          expiryMethod,
+        });
+        const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
+        const shardOneKeys = await host.shardKeys(cache, secondShardKey());
+
+        await write(defaultShardKeys, [0, 1], [1, 2]);
+        await write(shardOneKeys, [0, 3], [1, 4]);
+
+        expect(await cache.read(defaultShardKeys[0])).toBe(1);
+        expect(await cache.read(defaultShardKeys[1])).toBe(2);
+        expect(await cache.read(shardOneKeys[0])).toBe(3);
+        expect(await cache.read(shardOneKeys[1])).toBe(4);
+
+        await waitForBackgroundTasks(cache);
+        await sendEntriesBackInTime(weeks(3));
+
+        await write(defaultShardKeys, [2, 5], [3, 6]);
+        await write(shardOneKeys, [2, 7], [3, 8]);
+
+        await drain();
+
+        expect(await cache.read(defaultShardKeys[0])).toBeNull();
+        expect(await cache.read(defaultShardKeys[1])).toBeNull();
+        expect(await cache.read(shardOneKeys[0])).toBeNull();
+        expect(await cache.read(shardOneKeys[1])).toBeNull();
+        expect(await cache.read(defaultShardKeys[2])).toBe(5);
+        expect(await cache.read(defaultShardKeys[3])).toBe(6);
+        expect(await cache.read(shardOneKeys[2])).toBe(7);
+        expect(await cache.read(shardOneKeys[3])).toBe(8);
+
+        for (const shard of [firstShardKey(), "primary_shard_one"]) {
+          await Record.connectedTo({ shard }, async () => {
+            expect(await Entry.count()).toBe(2);
+          });
+        }
+      },
+    );
   }
 
   it("expires old records with a custom queue", async () => {
@@ -181,7 +218,7 @@ describe("SolidCache::ExpiryTest", () => {
       expiryQueue: "cache_expiry",
     });
 
-    const defaultShardKeys = await shardKeys(cache, firstShardKey);
+    const defaultShardKeys = await host.shardKeys(cache, firstShardKey());
 
     await t.assertEnqueuedJobs(2, { only: ExpiryJob, queue: "cache_expiry" }, async () => {
       await write(defaultShardKeys, [0, 1], [1, 2], [2, 3], [2, 4]);

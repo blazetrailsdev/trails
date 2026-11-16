@@ -8,11 +8,17 @@ import { cacheStoreCoderBehavior } from "@blazetrails/activesupport/test/cache/b
 import { cacheStoreSerializerBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-serializer-behavior";
 import { localCacheBehavior } from "@blazetrails/activesupport/test/cache/behaviors/local-cache-behavior";
 import { cacheStoreVersionBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-version-behavior";
-import { describe, expect, it } from "vitest";
+import { seconds } from "@blazetrails/activesupport";
+import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
+import { afterEach, describe, expect, it } from "vitest";
 import { useSolidCache } from "./support/test-helper.js";
 
 describe("SolidCacheTest", () => {
   const host = useSolidCache();
+
+  afterEach(() => {
+    travelBack();
+  });
 
   cacheStoreBehavior(host);
   cacheStoreVersionBehavior(host);
@@ -52,5 +58,12 @@ describe("SolidCacheTest", () => {
     const cache = host.lookupStore({ expiresIn: 60 });
     expect(await cache.write("foo", 1)).toBe(true);
     expect(await cache.write("foo", 1, { unlessExist: true })).toBe(false);
+  });
+
+  it("write expired value with unless exist", async () => {
+    const cache = host.lookupStore({ expiresIn: 60 });
+    expect(await cache.write(1, "aaaa", { expiresIn: seconds(1) })).toBe(true);
+    travel(seconds(2));
+    expect(await cache.write(1, "bbbb", { expiresIn: seconds(1), unlessExist: true })).toBe(true);
   });
 });

@@ -210,13 +210,10 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "solid-queue" || pkg === "solid-cable" || pkg === "solid-cache") {
     const rest = rubyFile
       .replace(/^unit\/behaviors_rails_8_0\//, "unit/behaviors/")
-      .replace(/^(unit|models\/solid_queue|jobs|lib)\//, "");
+      .replace(pkg === "solid-cache" ? /^unit\// : /^(unit|models\/solid_queue|jobs|lib)\//, "");
     const dir = path.dirname(rest).replace(/_/g, "-");
-    const tsFile =
-      path
-        .basename(rest, ".rb")
-        .replace(/_test$/, "")
-        .replace(/_/g, "-") + ".test.ts";
+    const base = path.basename(rest, ".rb").replace(/_test$/, "");
+    const tsFile = base.replace(/_/g, "-") + (/_behavior$/.test(base) ? ".ts" : ".test.ts");
     return dir === "." ? tsFile : path.join(dir, tsFile);
   }
 
@@ -1793,6 +1790,13 @@ function formatGate(g?: TestGate): string {
  * Extract the relative path of a TS test file within its package src dir.
  */
 /** Each compare package's TS source root, repo-relative with a trailing slash. */
+/**
+ * activesupport's cache store behaviors, which another package's store test
+ * calls the way its gem's test `include`s its own `behaviors/*_behavior.rb`
+ * copy. Their tests are credited to that package's `behaviors/<name>.ts`.
+ */
+export const SHARED_CACHE_BEHAVIORS_DIR = "packages/activesupport/test/cache/behaviors/";
+
 export const PKG_SRC_DIRS: Record<string, string> = {
   arel: "packages/arel/test/",
   activemodel: "packages/activemodel/test/",
@@ -1850,6 +1854,9 @@ export const PKG_SRC_DIRS: Record<string, string> = {
 };
 
 function extractRelativeTsPath(fullPath: string, pkg: string): string {
+  if (pkg !== "activesupport" && fullPath.startsWith(SHARED_CACHE_BEHAVIORS_DIR)) {
+    return path.join("behaviors", path.basename(fullPath));
+  }
   const prefix = PKG_SRC_DIRS[pkg];
   if (prefix && fullPath.startsWith(prefix)) {
     return fullPath.slice(prefix.length);
