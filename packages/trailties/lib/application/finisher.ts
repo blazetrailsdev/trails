@@ -311,6 +311,11 @@ async function defineController(klass: object): Promise<void> {
 
   if (definedControllers.has(klass)) return;
   definedControllers.add(klass);
+  const main = Trails.application!.autoloaders.main;
+  const roots = main.dirs() as readonly string[];
+  for (const path of await Trails.application!.helpersPaths()) {
+    if (roots.includes(path)) await main.eagerLoadDir(path);
+  }
   await ActionController.Trailties.Helpers.inherited(
     klass as ActionController.HelpersPathControllerClass,
   );
