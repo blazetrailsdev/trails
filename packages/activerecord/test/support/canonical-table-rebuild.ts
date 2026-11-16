@@ -1,10 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../../lib/connection-adapters/abstract-adapter.js";
-import {
-  addCanonicalForeignKeys,
-  buildCanonicalRegistry,
-  prepareSchema,
-  runTable,
-} from "./canonical-schema.js";
+import { buildCanonicalRegistry, prepareSchema, runTable } from "./canonical-schema.js";
 
 export async function ensureCanonicalTables(
   adapter: DatabaseAdapter,
@@ -26,7 +21,18 @@ export async function ensureCanonicalTables(
     await runTable(adapter, ss, typeMap, def);
     created.push(def);
   }
-  for (const def of created) await addCanonicalForeignKeys(ss, def);
+  const createdNames = new Set(created.map((d) => d.name));
+  for (const def of registry) {
+    if (!def.foreignKeys) continue;
+    const fromCreated = createdNames.has(def.name);
+    const fks = def.foreignKeys.filter((fk) => fromCreated || createdNames.has(fk.toTable));
+    if (fks.length === 0) continue;
+    if (!fromCreated && !(await ss.tableExists(def.name))) continue;
+    for (const { toTable, opts } of fks) {
+      if (!createdNames.has(toTable) && !(await ss.tableExists(toTable))) continue;
+      await ss.addForeignKey(def.name, toTable, opts);
+    }
+  }
   if (created.length > 0)
     await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
 }

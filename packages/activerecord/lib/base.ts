@@ -2076,6 +2076,8 @@ extend(Base, {
   renderBind: _renderBind,
   buildExplainClause: _buildExplainClause,
 });
+extend(Base, _Reflection.ClassMethods);
+include(Base, _Reflection.Reflection);
 classAttribute.call(Base, "defaultScopes", {
   instanceWriter: false,
   instancePredicate: false,
@@ -2224,6 +2226,9 @@ include(Base, { initAttributes: _Core.initAttributes });
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
+include(Base, JSONSerializer);
+Base.includeRootInJson = false;
+include(Base, { serializableHash: Serialization.serializableHash });
 include(Base, LockingPessimistic.Pessimistic);
 include(Base, Timestamp.Timestamp);
 include(Base, ActiveRecord.Associations);
@@ -2236,11 +2241,6 @@ extend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
-extend(Base, _Reflection.ClassMethods);
-include(Base, _Reflection.Reflection);
-include(Base, JSONSerializer);
-Base.includeRootInJson = false;
-include(Base, { serializableHash: Serialization.serializableHash });
 include(Base, _Validations.Validations);
 include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
