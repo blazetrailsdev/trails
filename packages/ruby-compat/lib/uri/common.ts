@@ -320,8 +320,11 @@ export class URI {
    * @noRailsEquivalent PERMANENT — Ruby stdlib, not Rails: `URI.encode_www_form`
    * (`vendor/ruby/v3.3.11/lib/uri/common.rb:503`).
    */
-  static encodeWwwForm(enum_: Record<string, unknown>, enc: Encoding | null = null): string {
-    return Object.entries(enum_)
+  static encodeWwwForm(
+    enum_: Record<string, unknown> | readonly (readonly [string, unknown, ...unknown[]])[],
+    enc: Encoding | null = null,
+  ): string {
+    return (Array.isArray(enum_) ? enum_ : Object.entries(enum_))
       .map(([k, v]) => {
         if (v == null) {
           return URI.encodeWwwFormComponent(k, enc);

@@ -11,6 +11,12 @@ import { verbose } from "../../verbose.js";
 import { IO } from "../../io.js";
 import { kernelThrow } from "../../kernel-catch.js";
 import { Net, type BufferedIO } from "../protocol.js";
+import { URI } from "../../uri/common.js";
+import { SecureRandom } from "../../secure-random.js";
+import { Tempfile } from "../../tempfile.js";
+import { File } from "../../file.js";
+import { encode } from "../../string/encode.js";
+import { rbObjRespondTo } from "../../object.js";
 
 /** @internal @noRailsEquivalent PERMANENT — `HTTPGenericRequest::Chunker` (`vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:242-257`). */
 class Chunker {
@@ -61,10 +67,14 @@ export class HTTPRequest {
   uri: URIHTTP | null;
   /** @noRailsEquivalent PERMANENT */
   readonly decodeContent: boolean;
+  private _body: string | Uint8Array | null = null;
   /** @noRailsEquivalent PERMANENT */
-  body: string | Uint8Array | null = null;
-  /** @noRailsEquivalent PERMANENT */
-  bodyStream: { read(length?: number): string | Uint8Array | null } | IO | null = null;
+  bodyStream:
+    | { read(length?: number): string | Uint8Array | null | Promise<string | Uint8Array | null> }
+    | IO
+    | null = null;
+  private _bodyData: FormParams | null = null;
+  private _formOption: { boundary?: string; charset?: string } = {};
   private _header: Record<string, string> = {};
   private readonly _requestHasBody: boolean;
   private readonly _responseHasBody: boolean;
@@ -213,6 +223,39 @@ export class HTTPRequest {
     this.setContentType(type);
   }
 
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#set_form_data` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:812-817`). */
+  setFormData(params: Record<string, unknown> | [string, unknown][], sep = "&"): void {
+    let query = URI.encodeWwwForm(params);
+    if (sep !== "&") query = query.replace(/&/g, sep);
+    this.body = query;
+    this.contentType = "application/x-www-form-urlencoded";
+  }
+
+  /** @noRailsEquivalent PERMANENT — `alias form_data= set_form_data` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:819`). */
+  set formData(params: Record<string, unknown> | [string, unknown][]) {
+    this.setFormData(params);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPHeader#set_form` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:928-940`). */
+  setForm(
+    params: FormParams,
+    enctype = "application/x-www-form-urlencoded",
+    formopt: { boundary?: string; charset?: string } = {},
+  ): void {
+    this._bodyData = params;
+    this._body = null;
+    this.bodyStream = null;
+    this._formOption = formopt;
+    if (
+      /^application\/x-www-form-urlencoded$/i.test(enctype) ||
+      /^multipart\/form-data$/i.test(enctype)
+    ) {
+      this.contentType = enctype;
+    } else {
+      throw new ArgumentError(`invalid enctype: ${enctype}`);
+    }
+  }
+
   /** @noRailsEquivalent PERMANENT — `HTTPHeader#basic_auth` (`vendor/ruby/v3.3.11/lib/net/http/header.rb:945-947`). */
   basicAuth(account: string, password: string): void {
     this._header["authorization"] = this.basicEncode(account, password);
@@ -250,20 +293,41 @@ export class HTTPRequest {
 
   /** @noRailsEquivalent PERMANENT — `HTTPGenericRequest#body_stream=` (`vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:179-184`). */
   setBodyStream(
-    input: { read(length?: number): string | Uint8Array | null } | IO | null,
+    input:
+      | { read(length?: number): string | Uint8Array | null | Promise<string | Uint8Array | null> }
+      | IO
+      | null,
   ): typeof input {
-    this.body = null;
+    this._body = null;
     this.bodyStream = input;
+    this._bodyData = null;
     return input;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent PERMANENT — `HTTPGenericRequest#body` (`vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:145`). */
+  get body(): string | Uint8Array | null {
+    return this._body;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `HTTPGenericRequest#body=` (`vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:154-159`). */
+  set body(str: string | Uint8Array | null) {
+    this._body = str;
+    this.bodyStream = null;
+    this._bodyData = null;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:186-192`. */
   setBodyInternal(str: string | Uint8Array | null): void {
-    if (str != null && (this.body != null || this.bodyStream != null)) {
+    if (str != null && (this._body != null || this.bodyStream != null)) {
       throw new ArgumentError("both of body argument and HTTPRequest#body set");
     }
     if (str != null) this.body = str;
-    if (this.body == null && this.bodyStream == null && this.isRequestBodyPermitted()) {
+    if (
+      this._body == null &&
+      this.bodyStream == null &&
+      this._bodyData == null &&
+      this.isRequestBodyPermitted()
+    ) {
       this.body = "";
     }
   }
@@ -344,6 +408,8 @@ export class HTTPRequest {
       await this.sendRequestWithBody(sock, ver, path, this.body);
     } else if (this.bodyStream != null) {
       await this.sendRequestWithBodyStream(sock, ver, path, this.bodyStream);
+    } else if (this._bodyData != null) {
+      await this.sendRequestWithBodyData(sock, ver, path, this._bodyData);
     } else {
       await this.writeHeader(sock, ver, path);
     }
@@ -372,7 +438,9 @@ export class HTTPRequest {
     sock: BufferedIO,
     ver: string,
     path: string,
-    f: { read(length?: number): string | Uint8Array | null } | IO,
+    f:
+      | { read(length?: number): string | Uint8Array | null | Promise<string | Uint8Array | null> }
+      | IO,
   ): Promise<void> {
     if (!(this.contentLength != null || this.isChunked())) {
       throw new ArgumentError("Content-Length not given and Transfer-Encoding is not `chunked'");
@@ -387,6 +455,112 @@ export class HTTPRequest {
     } else {
       await IO.copyStreamAsync(f, sock);
     }
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:285-311`. */
+  private async sendRequestWithBodyData(
+    sock: BufferedIO,
+    ver: string,
+    path: string,
+    params: FormParams,
+  ): Promise<void> {
+    if (!/^multipart\/form-data$/i.test(this.contentType ?? "")) {
+      this.contentType = "application/x-www-form-urlencoded";
+      return this.sendRequestWithBody(sock, ver, path, URI.encodeWwwForm(params));
+    }
+
+    const opt = { ...this._formOption };
+    opt.boundary ||= SecureRandom.urlsafeBase64(40);
+    this.setContentType(this.contentType!, { boundary: opt.boundary });
+    if (this.isChunked()) {
+      await this.writeHeader(sock, ver, path);
+      await this.encodeMultipartFormData(sock, params, opt);
+    } else {
+      const file = Tempfile.new("multipart");
+      file.binmode();
+      await this.encodeMultipartFormData(file, params, opt);
+      file.rewind();
+      this.contentLength = file.size();
+      await this.writeHeader(sock, ver, path);
+      await IO.copyStreamAsync(file, sock);
+      file.close(true);
+    }
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:313-363`. */
+  private async encodeMultipartFormData(
+    out: FormOut,
+    params: FormParams,
+    opt: { boundary?: string; charset?: string },
+  ): Promise<void> {
+    const charset = opt.charset;
+    let boundary = opt.boundary;
+    boundary ||= SecureRandom.urlsafeBase64(40);
+    const chunkedP = this.isChunked();
+
+    const buf: (string | Uint8Array)[] = [];
+    for (const [rawKey, rawValue, h = {}] of Array.isArray(params)
+      ? params
+      : Object.entries(params)) {
+      const key = this.quoteString(rawKey, charset);
+      const value = rawValue as FormIO;
+      let filename = Object.hasOwn(h, "filename")
+        ? h.filename
+        : rbObjRespondTo(value, "toPath")
+          ? File.basename(value.toPath())
+          : null;
+
+      buf.push(`--${boundary}\r\n`);
+      if (filename != null) {
+        filename = this.quoteString(filename, charset);
+        const type = h.contentType ?? "application/octet-stream";
+        buf.push(
+          `Content-Disposition: form-data; name="${key}"; filename="${filename}"\r\n` +
+            `Content-Type: ${type}\r\n\r\n`,
+        );
+        if (!rbObjRespondTo(out, "write") || !rbObjRespondTo(value, "read")) {
+          buf.push(_formValue(rbObjRespondTo(value, "read") ? await value.read() : value));
+        } else if (rbObjRespondTo(value, "size") && chunkedP) {
+          await this.flushBuffer(out, buf, chunkedP);
+          if (chunkedP) await out.write(`${value.size().toString(16)}\r\n`);
+          await IO.copyStreamAsync(value, out as { write(data: Uint8Array): unknown });
+          if (chunkedP) await out.write("\r\n");
+        } else {
+          await this.flushBuffer(out, buf, chunkedP);
+          while (await this.flushBuffer(out, await value.read(4096), chunkedP));
+        }
+      } else {
+        buf.push(`Content-Disposition: form-data; name="${key}"\r\n\r\n`);
+        buf.push(_formValue(rbObjRespondTo(value, "read") ? await value.read() : value));
+      }
+      buf.push("\r\n");
+    }
+    buf.push(`--${boundary}--\r\n`);
+    await this.flushBuffer(out, buf, chunkedP);
+    if (chunkedP) await out.write("0\r\n\r\n");
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:365-368`. */
+  private quoteString(str: string, charset: string | undefined): string {
+    if (charset != null) {
+      str = encode(str, charset, { fallback: (c) => `&#${c.codePointAt(0)};` }) as string;
+    }
+    return str.replace(/[\\"]/g, "\\$&");
+  }
+
+  /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:370-377`. */
+  private async flushBuffer(
+    out: FormOut,
+    buf: (string | Uint8Array)[] | string | Uint8Array | null,
+    chunkedP: boolean,
+  ): Promise<boolean | void> {
+    if (buf == null) return;
+    const bytes = _concatBytes(Array.isArray(buf) ? buf : [buf]);
+    if (chunkedP) await out.write(`${bytes.length.toString(16)}\r\n`);
+    await out.write(bytes);
+    if (chunkedP) await out.write("\r\n");
+    if (Array.isArray(buf)) buf.length = 0;
+    return true;
   }
 
   /** @internal @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http/generic_request.rb:385-390`. */
@@ -429,4 +603,33 @@ export class HTTPRequest {
     buf += "\r\n";
     await sock.write(buf);
   }
+}
+
+/** @noRailsEquivalent PERMANENT — the `params` `set_form` takes (`vendor/ruby/v3.3.11/lib/net/http/header.rb:928`). */
+export type FormParams =
+  | Record<string, unknown>
+  | [string, unknown, { filename?: string; contentType?: string }?][];
+
+type FormOut = { write(str: string | Uint8Array): unknown };
+
+type FormIO = {
+  read(length?: number): string | Uint8Array | null;
+  toPath(): string;
+  size(): number;
+  write(str: string | Uint8Array): unknown;
+};
+
+function _formValue(value: unknown): string | Uint8Array {
+  return value instanceof Uint8Array ? value : String(value);
+}
+
+function _concatBytes(buf: (string | Uint8Array)[]): Uint8Array {
+  const parts = buf.map((x) => (typeof x === "string" ? new TextEncoder().encode(x) : x));
+  const bytes = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let offset = 0;
+  for (const p of parts) {
+    bytes.set(p, offset);
+    offset += p.length;
+  }
+  return bytes;
 }

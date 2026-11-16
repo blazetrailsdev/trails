@@ -1,4 +1,4 @@
-import { createServer, type Server } from "node:http";
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { Socket } from "node:net";
 import { gzipSync } from "node:zlib";
 
@@ -8,9 +8,19 @@ export function gzip(string: string): Uint8Array {
   return gzipSync(string);
 }
 
-function mountRoutes(server: Server): void {
+type Proc = (req: IncomingMessage, res: ServerResponse) => void;
+
+function mountRoutes(server: Server, procs: Map<string, Proc>): void {
   server.on("request", (req, res) => {
+    const proc = procs.get(req.url ?? "");
+    if (proc !== undefined) return proc(req, res);
     switch (req.url) {
+      case "/echo-body": {
+        const chunks: Buffer[] = [];
+        req.on("data", (c: Buffer) => chunks.push(c));
+        req.on("end", () => res.end(Buffer.concat(chunks)));
+        return;
+      }
       case "/no-content":
         res.statusCode = 204;
         res.end();
@@ -48,12 +58,14 @@ function mountRoutes(server: Server): void {
 
 export interface TestServer {
   port: number;
+  mountProc(path: string, proc: Proc): void;
   shutdown(): Promise<void>;
 }
 
 export async function startServer(): Promise<[TestServer, number]> {
   const server = createServer();
-  mountRoutes(server);
+  const procs = new Map<string, Proc>();
+  mountRoutes(server, procs);
   const sockets = new Set<Socket>();
   server.on("connection", (s: Socket) => sockets.add(s));
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -63,5 +75,5 @@ export async function startServer(): Promise<[TestServer, number]> {
       for (const s of sockets) s.destroy();
       server.close(() => resolve());
     });
-  return [{ port, shutdown }, port];
+  return [{ port, mountProc: (path, proc) => procs.set(path, proc), shutdown }, port];
 }

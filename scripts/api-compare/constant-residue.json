@@ -1080,13 +1080,16 @@
     }
   },
   "rack-proxy": {
-    "rows": 4,
+    "rows": 6,
     "excluded": [],
     "unwalked": [
       "http-streaming-response.ts::HttpStreamingResponse.ResponseTooLarge",
       "http-streaming-response.ts::HttpStreamingResponse.StreamAborted"
     ],
-    "residue": {}
+    "residue": {
+      "proxy.ts::InvalidRequest": "Rack::Proxy::InvalidRequest",
+      "proxy.ts::RequestBodyStream": "Rack::Proxy::RequestBodyStream"
+    }
   },
   "rack-session": {
     "rows": 17,
