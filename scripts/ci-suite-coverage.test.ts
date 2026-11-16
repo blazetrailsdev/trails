@@ -1023,6 +1023,44 @@ describe("CI runs every tooling test suite", () => {
     },
   );
 
+  it("keeps the db adapter draft deferral for a ci.yml-only diff", async () => {
+    const yml = await readFile(CI_YML, "utf8");
+    const runGate = await gateRunner(yml);
+    const ciOnly = await runGate(".github/workflows/ci.yml");
+    expect(ciOnly.db_adapter_affected).toBe("false");
+    expect(ciOnly.activerecord_affected).toBe("true");
+    const withAction = await runGate(
+      ".github/workflows/ci.yml\n.github/actions/setup-pnpm/action.yml",
+    );
+    expect(withAction.db_adapter_affected).toBe("true");
+  });
+
+  it("gate-trace.sh reports what the filter step's gate block sets", async () => {
+    const file = "packages/thor/lib/thor.ts";
+    const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
+    const { stdout } = await execFileAsync("bash", [
+      path.join(REPO_ROOT, "scripts/ci/gate-trace.sh"),
+      file,
+    ]);
+    const traced = Object.fromEntries(
+      stdout
+        .split("\n")
+        .filter(Boolean)
+        .map((l) => l.split("=") as [string, string]),
+    );
+    expect(traced).toEqual(await runGate(file));
+    expect(traced.thor_only).toBe("true");
+    expect(traced.db_adapter_affected).toBe("false");
+  });
+
+  it("pr-lanes.sh passes its self-test", async () => {
+    const { stdout } = await execFileAsync("bash", [
+      path.join(REPO_ROOT, "scripts/ci/pr-lanes.sh"),
+      "--self-test",
+    ]);
+    expect(stdout).toContain("ok");
+  });
+
   it("fires only unit_tests_affected for i18n-only changes", { timeout: 60_000 }, async () => {
     const yml = await readFile(CI_YML, "utf8");
     const runGate = await gateRunner(yml);
