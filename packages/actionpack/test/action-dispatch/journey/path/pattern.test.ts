@@ -22,17 +22,17 @@ const pathFromString = (p: string) => buildPath(p, {}, "/.?", true);
 describe("TestPattern", () => {
   const x = /.+/;
   for (const [path, expected] of Object.entries({
-    "/:controller(/:action)": String.raw`^/(${rbRegToS(x)})(?:/([^/.?]+))?$`,
-    "/:controller/foo": String.raw`^/(${rbRegToS(x)})/foo$`,
-    "/:controller/:action": String.raw`^/(${rbRegToS(x)})/([^/.?]+)$`,
-    "/:controller": String.raw`^/(${rbRegToS(x)})$`,
-    "/:controller(/:action(/:id))": String.raw`^/(${rbRegToS(x)})(?:/([^/.?]+)(?:/([^/.?]+))?)?$`,
-    "/:controller/:action.xml": String.raw`^/(${rbRegToS(x)})/([^/.?]+)\.xml$`,
-    "/:controller.:format": String.raw`^/(${rbRegToS(x)})\.([^/.?]+)$`,
-    "/:controller(.:format)": String.raw`^/(${rbRegToS(x)})(?:\.([^/.?]+))?$`,
-    "/:controller/*foo": String.raw`^/(${rbRegToS(x)})/(.+)$`,
-    "/:controller/*foo/bar": String.raw`^/(${rbRegToS(x)})/(.+)/bar$`,
-    "/:foo|*bar": String.raw`^/(?:([^/.?]+)|(.+))$`,
+    "/:controller(/:action)": String.raw`^/(${rbRegToS(x)})(?:/([^/.?]+))?(?=\n?$)`,
+    "/:controller/foo": String.raw`^/(${rbRegToS(x)})/foo(?=\n?$)`,
+    "/:controller/:action": String.raw`^/(${rbRegToS(x)})/([^/.?]+)(?=\n?$)`,
+    "/:controller": String.raw`^/(${rbRegToS(x)})(?=\n?$)`,
+    "/:controller(/:action(/:id))": String.raw`^/(${rbRegToS(x)})(?:/([^/.?]+)(?:/([^/.?]+))?)?(?=\n?$)`,
+    "/:controller/:action.xml": String.raw`^/(${rbRegToS(x)})/([^/.?]+)\.xml(?=\n?$)`,
+    "/:controller.:format": String.raw`^/(${rbRegToS(x)})\.([^/.?]+)(?=\n?$)`,
+    "/:controller(.:format)": String.raw`^/(${rbRegToS(x)})(?:\.([^/.?]+))?(?=\n?$)`,
+    "/:controller/*foo": String.raw`^/(${rbRegToS(x)})/(.+)(?=\n?$)`,
+    "/:controller/*foo/bar": String.raw`^/(${rbRegToS(x)})/(.+)/bar(?=\n?$)`,
+    "/:foo|*bar": String.raw`^/(?:([^/.?]+)|(.+))(?=\n?$)`,
   })) {
     it(`to regexp ${regexpEscape(path)}`, () => {
       const pattern = buildPath(path, { controller: /.+/ }, SEPARATORS, true);
@@ -41,17 +41,17 @@ describe("TestPattern", () => {
   }
 
   for (const [path, expected] of Object.entries({
-    "/:controller(/:action)": String.raw`^/(${rbRegToS(x)})(?:/([^/.?]+))?(?:\b|$|/)`,
-    "/:controller/foo": String.raw`^/(${rbRegToS(x)})/foo(?:\b|$|/)`,
-    "/:controller/:action": String.raw`^/(${rbRegToS(x)})/([^/.?]+)(?:\b|$|/)`,
-    "/:controller": String.raw`^/(${rbRegToS(x)})(?:\b|$|/)`,
-    "/:controller(/:action(/:id))": String.raw`^/(${rbRegToS(x)})(?:/([^/.?]+)(?:/([^/.?]+))?)?(?:\b|$|/)`,
-    "/:controller/:action.xml": String.raw`^/(${rbRegToS(x)})/([^/.?]+)\.xml(?:\b|$|/)`,
-    "/:controller.:format": String.raw`^/(${rbRegToS(x)})\.([^/.?]+)(?:\b|$|/)`,
-    "/:controller(.:format)": String.raw`^/(${rbRegToS(x)})(?:\.([^/.?]+))?(?:\b|$|/)`,
-    "/:controller/*foo": String.raw`^/(${rbRegToS(x)})/(.+)(?:\b|$|/)`,
-    "/:controller/*foo/bar": String.raw`^/(${rbRegToS(x)})/(.+)/bar(?:\b|$|/)`,
-    "/:foo|*bar": String.raw`^/(?:([^/.?]+)|(.+))(?:\b|$|/)`,
+    "/:controller(/:action)": String.raw`^/(${rbRegToS(x)})(?:/([^/.?]+))?(?:\b|(?=\n?$)|/)`,
+    "/:controller/foo": String.raw`^/(${rbRegToS(x)})/foo(?:\b|(?=\n?$)|/)`,
+    "/:controller/:action": String.raw`^/(${rbRegToS(x)})/([^/.?]+)(?:\b|(?=\n?$)|/)`,
+    "/:controller": String.raw`^/(${rbRegToS(x)})(?:\b|(?=\n?$)|/)`,
+    "/:controller(/:action(/:id))": String.raw`^/(${rbRegToS(x)})(?:/([^/.?]+)(?:/([^/.?]+))?)?(?:\b|(?=\n?$)|/)`,
+    "/:controller/:action.xml": String.raw`^/(${rbRegToS(x)})/([^/.?]+)\.xml(?:\b|(?=\n?$)|/)`,
+    "/:controller.:format": String.raw`^/(${rbRegToS(x)})\.([^/.?]+)(?:\b|(?=\n?$)|/)`,
+    "/:controller(.:format)": String.raw`^/(${rbRegToS(x)})(?:\.([^/.?]+))?(?:\b|(?=\n?$)|/)`,
+    "/:controller/*foo": String.raw`^/(${rbRegToS(x)})/(.+)(?:\b|(?=\n?$)|/)`,
+    "/:controller/*foo/bar": String.raw`^/(${rbRegToS(x)})/(.+)/bar(?:\b|(?=\n?$)|/)`,
+    "/:foo|*bar": String.raw`^/(?:([^/.?]+)|(.+))(?:\b|(?=\n?$)|/)`,
   })) {
     it(`to non anchored regexp ${regexpEscape(path)}`, () => {
       const pattern = buildPath(path, { controller: /.+/ }, SEPARATORS, false);
@@ -128,7 +128,7 @@ describe("TestPattern", () => {
   it("star with custom re", () => {
     const z = /\d+/;
     const path = buildPath("/page/*foo", { foo: z }, SEPARATORS, true);
-    expect(path.toRegexp().source).toBe(new RegExp(`^/page/(${rbRegToS(z)})$`).source);
+    expect(path.toRegexp().source).toBe(new RegExp(`^/page/(${rbRegToS(z)})(?=\\n?$)`).source);
   });
 
   it("insensitive regexp with group", () => {
@@ -140,14 +140,14 @@ describe("TestPattern", () => {
 
   it("to regexp with strexp", () => {
     const path = buildPath("/:controller", {}, SEPARATORS, true);
-    const x = /^\/([^/.?]+)$/;
+    const x = /^\/([^/.?]+)(?=\n?$)/;
 
     expect(path.source).toBe(x.source);
   });
 
   it("to regexp defaults", () => {
     const path = pathFromString("/:controller(/:action(/:id))");
-    const expected = /^\/([^/.?]+)(?:\/([^/.?]+)(?:\/([^/.?]+))?)?$/;
+    const expected = /^\/([^/.?]+)(?:\/([^/.?]+)(?:\/([^/.?]+))?)?(?=\n?$)/;
     expect(path.toRegexp().source).toBe(expected.source);
   });
 
@@ -240,7 +240,7 @@ describe("TestPattern", () => {
 
     const transformedRegex = path.requirementsForMissingKeysCheck["name"];
     expect(transformedRegex).toBeDefined();
-    expect(transformedRegex.source).toBe(new RegExp(`^${rbRegToS(nameRegex)}$`).source);
+    expect(transformedRegex.source).toBe(new RegExp(`^${rbRegToS(nameRegex)}(?=\\n?$)`).source);
   });
 
   it("requirements for missing keys check memoization", () => {

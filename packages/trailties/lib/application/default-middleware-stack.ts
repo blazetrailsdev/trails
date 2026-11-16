@@ -58,64 +58,64 @@ export class DefaultMiddlewareStack {
     const config = this.config;
 
     if (config.hosts.length > 0) {
-      stack.use(HostAuthorization as never, config.hosts, config.hostAuthorization);
+      stack.use(HostAuthorization, config.hosts, config.hostAuthorization);
     }
 
     if (config.assumeSsl) {
-      stack.use(AssumeSSL as never);
+      stack.use(AssumeSSL);
     }
 
     if (config.forceSsl) {
-      stack.use(SSL as never, config.sslOptions);
+      stack.use(SSL, config.sslOptions);
     }
 
-    stack.use(Sendfile as never, config.actionDispatch.xSendfileHeader);
+    stack.use(Sendfile, config.actionDispatch.xSendfileHeader);
 
     if (config.publicFileServer.enabled) {
       const headers = config.publicFileServer.headers ?? {};
-      stack.use(Static as never, this.paths.get("public")?.toAry()[0], {
+      stack.use(Static, this.paths.get("public")?.toAry()[0], {
         index: config.publicFileServer.indexName,
         headers,
       });
     }
 
     if (config.allowConcurrency === false) {
-      stack.use(Lock as never);
+      stack.use(Lock);
     }
 
-    stack.use(Executor as never, this.app.executor);
+    stack.use(Executor, this.app.executor);
 
-    if (config.serverTiming) stack.use(ServerTiming as never);
-    stack.use(Runtime as never);
-    if (!config.apiOnly) stack.use(MethodOverride as never);
-    stack.use(RequestId as never, { header: config.actionDispatch.requestIdHeader });
+    if (config.serverTiming) stack.use(ServerTiming);
+    stack.use(Runtime);
+    if (!config.apiOnly) stack.use(MethodOverride);
+    stack.use(RequestId, { header: config.actionDispatch.requestIdHeader });
     stack.use(
-      RemoteIp as never,
+      RemoteIp,
       config.actionDispatch.ipSpoofingCheck,
       config.actionDispatch.trustedProxies,
     );
 
     const path = config.silenceHealthcheckPath;
     if (path != null) {
-      stack.use(SilenceRequest as never, { path });
+      stack.use(SilenceRequest, { path });
     }
 
-    stack.use(Logger as never, { taggers: config.logTags });
-    stack.use(ShowExceptions as never, this._showExceptionsApp());
-    stack.use(DebugExceptions as never, this.app, config.debugExceptionResponseFormat);
+    stack.use(Logger, { taggers: config.logTags });
+    stack.use(ShowExceptions, this._showExceptionsApp());
+    stack.use(DebugExceptions, this.app, config.debugExceptionResponseFormat);
 
     if (config.considerAllRequestsLocal) {
-      stack.use(ActionableExceptions as never);
+      stack.use(ActionableExceptions);
     }
 
     if (config.isReloadingEnabled()) {
-      stack.use(Reloader as never, this.app.reloader);
+      stack.use(Reloader, this.app.reloader);
     }
 
-    stack.use(Callbacks as never);
+    stack.use(Callbacks);
 
     if (!config.apiOnly) {
-      stack.use(Cookies as never);
+      stack.use(Cookies);
     }
 
     if (!config.apiOnly && config.sessionStore() != null) {
@@ -126,20 +126,20 @@ export class DefaultMiddlewareStack {
       ) {
         config.sessionOptions.secure = true;
       }
-      stack.use(config.sessionStore() as never, config.sessionOptions);
+      stack.use(config.sessionStore()!, config.sessionOptions);
     }
 
     if (!config.apiOnly) {
-      stack.use(Flash as never);
-      stack.use(ContentSecurityPolicyMiddleware as never);
-      stack.use(PermissionsPolicyMiddleware as never);
+      stack.use(Flash);
+      stack.use(ContentSecurityPolicyMiddleware);
+      stack.use(PermissionsPolicyMiddleware);
     }
 
-    stack.use(Head as never);
-    stack.use(ConditionalGet as never);
-    stack.use(ETag as never, "no-cache");
+    stack.use(Head);
+    stack.use(ConditionalGet);
+    stack.use(ETag, "no-cache");
 
-    if (!config.apiOnly) stack.use(TempfileReaper as never);
+    if (!config.apiOnly) stack.use(TempfileReaper);
 
     if (config.isRespondTo("activeRecord")) {
       const selectorOptions = config.activeRecord.databaseSelector;
@@ -147,14 +147,14 @@ export class DefaultMiddlewareStack {
         const resolver = config.activeRecord.databaseResolver;
         const context = config.activeRecord.databaseResolverContext;
 
-        stack.use(DatabaseSelector as never, resolver, context, selectorOptions);
+        stack.use(DatabaseSelector, resolver, context, selectorOptions);
       }
 
       const shardResolver = config.activeRecord.shardResolver;
       if (shardResolver != null) {
         const options = config.activeRecord.shardSelector ?? {};
 
-        stack.use(ShardSelector as never, shardResolver, options);
+        stack.use(ShardSelector, shardResolver, options);
       }
     }
 

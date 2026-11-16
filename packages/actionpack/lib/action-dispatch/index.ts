@@ -56,6 +56,7 @@ export {
   Middleware,
   type RackApp,
   type RackAppObject,
+  type MiddlewareFactory,
 } from "./middleware/stack.js";
 export { Mime, MimeType } from "./http/mime-type.js";
 export {

@@ -12,14 +12,6 @@ export abstract class Node {
     this.left = left;
   }
 
-  grep<T extends Node>(klass: abstract new (...args: never[]) => T): T[] {
-    const out: T[] = [];
-    this.each((n) => {
-      if (n instanceof klass) out.push(n);
-    });
-    return out;
-  }
-
   children(): readonly Node[] {
     return [];
   }
@@ -42,6 +34,7 @@ export abstract class Node {
     return this.name;
   }
 
+  declare grep: <T extends Node>(pattern: abstract new (...args: never[]) => T) => T[];
   declare findAll: (block: (node: Node) => unknown) => Node[];
   declare filterMap: <R>(block: (node: Node) => R | false | null | undefined) => R[];
 

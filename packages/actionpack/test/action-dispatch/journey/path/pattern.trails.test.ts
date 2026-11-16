@@ -20,17 +20,17 @@ function buildPath(
 describe("ActionDispatch::Journey::Path::Pattern — anchored to_regexp", () => {
   const x = "(?-ims:.+)";
   const cases: Array<[string, string]> = [
-    ["/:controller(/:action)", `^/(${x})(?:/([^/.?]+))?$`],
-    ["/:controller/foo", `^/(${x})/foo$`],
-    ["/:controller/:action", `^/(${x})/([^/.?]+)$`],
-    ["/:controller", `^/(${x})$`],
-    ["/:controller(/:action(/:id))", `^/(${x})(?:/([^/.?]+)(?:/([^/.?]+))?)?$`],
-    ["/:controller/:action.xml", `^/(${x})/([^/.?]+)\\.xml$`],
-    ["/:controller.:format", `^/(${x})\\.([^/.?]+)$`],
-    ["/:controller(.:format)", `^/(${x})(?:\\.([^/.?]+))?$`],
-    ["/:controller/*foo", `^/(${x})/(.+)$`],
-    ["/:controller/*foo/bar", `^/(${x})/(.+)/bar$`],
-    ["/:foo|*bar", `^/(?:([^/.?]+)|(.+))$`],
+    ["/:controller(/:action)", `^/(${x})(?:/([^/.?]+))?(?=\\n?$)`],
+    ["/:controller/foo", `^/(${x})/foo(?=\\n?$)`],
+    ["/:controller/:action", `^/(${x})/([^/.?]+)(?=\\n?$)`],
+    ["/:controller", `^/(${x})(?=\\n?$)`],
+    ["/:controller(/:action(/:id))", `^/(${x})(?:/([^/.?]+)(?:/([^/.?]+))?)?(?=\\n?$)`],
+    ["/:controller/:action.xml", `^/(${x})/([^/.?]+)\\.xml(?=\\n?$)`],
+    ["/:controller.:format", `^/(${x})\\.([^/.?]+)(?=\\n?$)`],
+    ["/:controller(.:format)", `^/(${x})(?:\\.([^/.?]+))?(?=\\n?$)`],
+    ["/:controller/*foo", `^/(${x})/(.+)(?=\\n?$)`],
+    ["/:controller/*foo/bar", `^/(${x})/(.+)/bar(?=\\n?$)`],
+    ["/:foo|*bar", `^/(?:([^/.?]+)|(.+))(?=\\n?$)`],
   ];
   for (const [path, expected] of cases) {
     it(`to_regexp ${path}`, () => {
@@ -43,11 +43,11 @@ describe("ActionDispatch::Journey::Path::Pattern — anchored to_regexp", () => 
 describe("ActionDispatch::Journey::Path::Pattern — unanchored to_regexp", () => {
   const x = "(?-ims:.+)";
   const cases: Array<[string, string]> = [
-    ["/:controller(/:action)", `^/(${x})(?:/([^/.?]+))?(?:\\b|$|/)`],
-    ["/:controller/foo", `^/(${x})/foo(?:\\b|$|/)`],
-    ["/:controller", `^/(${x})(?:\\b|$|/)`],
-    ["/:controller/*foo", `^/(${x})/(.+)(?:\\b|$|/)`],
-    ["/:foo|*bar", `^/(?:([^/.?]+)|(.+))(?:\\b|$|/)`],
+    ["/:controller(/:action)", `^/(${x})(?:/([^/.?]+))?(?:\\b|(?=\\n?$)|/)`],
+    ["/:controller/foo", `^/(${x})/foo(?:\\b|(?=\\n?$)|/)`],
+    ["/:controller", `^/(${x})(?:\\b|(?=\\n?$)|/)`],
+    ["/:controller/*foo", `^/(${x})/(.+)(?:\\b|(?=\\n?$)|/)`],
+    ["/:foo|*bar", `^/(?:([^/.?]+)|(.+))(?:\\b|(?=\\n?$)|/)`],
   ];
   for (const [path, expected] of cases) {
     it(`to_non_anchored_regexp ${path}`, () => {
@@ -141,7 +141,7 @@ describe("ActionDispatch::Journey::Path::Pattern — leading-optional normalizat
 
   it("leaves paths whose second top-level node isn't a SLASH-led Group alone", () => {
     const p = buildPath("/posts/:id");
-    expect(p.toRegexp().source).toBe("^\\/posts\\/([^/.?]+)$");
+    expect(p.toRegexp().source).toBe("^\\/posts\\/([^/.?]+)(?=\\n?$)");
   });
 
   it("handles the single-group all-optional shape `/(/:locale)`", () => {
@@ -160,5 +160,14 @@ describe("ActionDispatch::Journey::Path::Pattern — flags of unused requirement
   it("does not take flags from a requirement the path does not name", () => {
     const pattern = buildPath("/:id", { other: /x/u });
     expect(pattern.toRegexp().flags).toBe("");
+  });
+});
+
+describe("ActionDispatch::Journey::Path::Pattern — \\Z anchor", () => {
+  it("a missing-keys requirement matches before one trailing newline, as Ruby's \\Z does", () => {
+    const path = buildPath("/page/:name", { name: /test/ });
+    const re = path.requirementsForMissingKeysCheck["name"];
+    expect(re.test("test\n")).toBe(true);
+    expect(re.test("test\n\n")).toBe(false);
   });
 });

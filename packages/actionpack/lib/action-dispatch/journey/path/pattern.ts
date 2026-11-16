@@ -32,7 +32,7 @@ export class AnchoredRegexp extends Visitor {
 
   override accept(node: Node): RegExp {
     return new RegExp(
-      `^${this.visit(node)}$`,
+      `^${this.visit(node)}(?=\\n?$)`,
       unicodeFlag(node.findAll((n) => n.isSymbol()).map((n) => this._matchers[n.toSym()])),
     );
   }
@@ -82,7 +82,7 @@ export class UnanchoredRegexp extends AnchoredRegexp {
     return path === "/"
       ? new RegExp(`^/`)
       : new RegExp(
-          `^${path}(?:\\b|$|/)`,
+          `^${path}(?:\\b|(?=\\n?$)|/)`,
           unicodeFlag(node.findAll((n) => n.isSymbol()).map((n) => this._matchers[n.toSym()])),
         );
   }
@@ -235,7 +235,7 @@ export class Pattern {
       Object.entries(this.requirements).map(([key, regex]) => [
         key,
         new RegExp(
-          `^${regex instanceof RegExp ? rbRegToS(regex) : String(regex)}$`,
+          `^${regex instanceof RegExp ? rbRegToS(regex) : String(regex)}(?=\\n?$)`,
           unicodeFlag([regex]),
         ),
       ]),
