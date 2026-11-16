@@ -107,7 +107,7 @@ Make sure \`bundle exec vite install\` has run successfully before running depen
         const frameworkPackage = File.join(
           Dir.pwd(),
           "node_modules",
-          { trails: "@blazetrails/trailties" }[framework] ?? framework,
+          TopLevel.ViteAssets!.FRAMEWORK_PACKAGES[framework] ?? framework,
           "package.json",
         );
         $stdout.puts(

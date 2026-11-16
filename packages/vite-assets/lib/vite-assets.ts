@@ -58,6 +58,11 @@ export class ViteAssets {
     vite_plugin_legacy: "rack",
   });
 
+  /** @noRailsEquivalent PERMANENT */
+  static readonly FRAMEWORK_PACKAGES: Readonly<Record<string, string>> = Object.freeze({
+    trails: "@blazetrails/trailties",
+  });
+
   /** @internal */
   private static _instance: ViteAssets | undefined;
 
@@ -67,10 +72,11 @@ export class ViteAssets {
     if (!(await File.isExistAsync(appPackage))) return [];
     const app = JSON.parse(await File.readAsync(appPackage)) as {
       dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
     };
     const result: [string, { name: string; version: unknown }][] = [];
     for (const [name, framework] of Object.entries(this.COMPANION_LIBRARIES)) {
-      if (!Object.hasOwn(app.dependencies ?? {}, name)) continue;
+      if (!Object.hasOwn({ ...app.devDependencies, ...app.dependencies }, name)) continue;
       const libraryPackage = File.join(Dir.pwd(), "node_modules", name, "package.json");
       if (!(await File.isExistAsync(libraryPackage))) continue;
       const library = JSON.parse(await File.readAsync(libraryPackage)) as {
