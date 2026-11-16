@@ -165,10 +165,7 @@ export function _generatePathsByDefault(this: Host): boolean {
   return true;
 }
 
-/**
- * @internal
- * @inventedArm instanceof — PERMANENT
- */
+/** @internal */
 export function ensureOnlyPathOption(
   this: Host,
   options: Record<string, unknown> | Parameters,
