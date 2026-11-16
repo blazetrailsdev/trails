@@ -15,12 +15,15 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
     routes.draw(function () {
       this.get("/other", { to: "foo#other" });
     });
-    class FooController extends ActionController.Base {
+    class ApplicationController extends ActionController.Base {}
+    AbstractController.Trailties.RoutesHelpers.with(routes as never)(
+      ApplicationController as never,
+    );
+    class FooController extends ApplicationController {
       async other(): Promise<void> {
         await this.render({ plain: "" });
       }
     }
-    AbstractController.Trailties.RoutesHelpers.with(routes as never)(FooController as never);
     const controller = new FooController();
     await controller.dispatch(
       "other",
