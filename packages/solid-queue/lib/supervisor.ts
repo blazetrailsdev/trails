@@ -286,12 +286,13 @@ export class Supervisor extends Base {
     for (const [pid, instance] of Object.entries(this.forks)) {
       if (instance._thread.isAlive()) continue;
 
-      const exited = instance.isStopped();
+      const exitBang = instance._thread.toKill;
+      const exited = exitBang || instance.isStopped();
       return [
         pid,
         {
           pid: pid,
-          exitstatus: exited ? 0 : null,
+          exitstatus: exitBang ? 1 : exited ? 0 : null,
           isExited: () => exited,
           isSignaled: () => false,
           stopsig: null,
