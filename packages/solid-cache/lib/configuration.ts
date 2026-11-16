@@ -74,7 +74,7 @@ export class Configuration {
     } else if (databases) {
       this.connectsTo = {
         shards: Object.fromEntries(
-          rbFArray(databases).map((database) => [String(database), { writing: String(database) }]),
+          (rbFArray(databases) as string[]).map((database) => [database, { writing: database }]),
         ),
       };
     } else if (connectsTo) {
