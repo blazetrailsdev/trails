@@ -12,7 +12,9 @@ export async function buildTemplates(paths: readonly string[]): Promise<string[]
   for (const path of paths) {
     for (const template of await templatesIn(path)) {
       const source = await getFs().readFile(template, "utf8");
-      await getFs().writeFile!(`${template}.js`, compileTemplate(source, File.basename(template)));
+      const tmp = `${template}.js.${Math.random().toString(36).slice(2)}.tmp`;
+      await getFs().writeFile!(tmp, compileTemplate(source, File.basename(template)));
+      await getFs().rename!(tmp, `${template}.js`);
       built.push(template);
     }
   }

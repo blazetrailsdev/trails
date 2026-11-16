@@ -512,7 +512,14 @@ neither is an error.
 6. **Working in `arel` or `activemodel`?** `pnpm lint --fix` after step 2:
    `rails-file-structure-method-order` needs the manifest `pnpm parity:api`
    builds, and silently passes without it.
-7. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
+7. **Changed the declared type of an exported member?** (a narrowed return
+   type, a removed union arm, a newly typed parameter) Run full-tree
+   `pnpm lint --fix` and commit the casts it removes. The per-PR Lint job
+   lints only changed files, so it cannot see the
+   `@typescript-eslint/no-unnecessary-type-assertion` reports your change
+   raises elsewhere: trails#8307 made 106 casts redundant and left `main`
+   red until trails#8316.
+8. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
 
 ## Module mixins (Ruby `include` → TypeScript)
 
