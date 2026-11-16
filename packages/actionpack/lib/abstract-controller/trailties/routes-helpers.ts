@@ -39,6 +39,32 @@ Object.defineProperty(RoutesHelpers, "with", {
     includePathHelpers = true,
   ): (cls: RoutesHelpersControllerClass) => void {
     return (cls) => {
+      const inheritedDescriptor = (
+        owner: object,
+        key: string,
+        descriptor: PropertyDescriptor,
+      ): PropertyDescriptor => {
+        const previous = Object.getOwnPropertyDescriptor(owner, key);
+        return {
+          configurable: true,
+          enumerable: false,
+          get(this: object) {
+            if (this === cls || (this as { constructor?: unknown }).constructor === cls) {
+              if (previous) return previous.get ? previous.get.call(this) : previous.value;
+              return Reflect.get(Object.getPrototypeOf(owner) as object, key, this);
+            }
+            return descriptor.get ? descriptor.get.call(this) : descriptor.value;
+          },
+          set(this: object, value: unknown) {
+            Object.defineProperty(this, key, {
+              value,
+              writable: true,
+              configurable: true,
+              enumerable: true,
+            });
+          },
+        };
+      };
       const namespaceBuilder = findTrailtieUrlHelpers(cls);
       const urlHelpersModule = (): HelperMethodsModule | ClassModule =>
         namespaceBuilder
@@ -50,7 +76,7 @@ Object.defineProperty(RoutesHelpers, "with", {
       if (!earlier) installedMembers.set(proto, (earlier = []));
       const installed = new Map<string, PropertyDescriptor>();
       const inherited = (key: string, descriptor: PropertyDescriptor): PropertyDescriptor =>
-        inheritedDescriptor(cls, proto, key, descriptor);
+        inheritedDescriptor(proto, key, descriptor);
       for (const [key, descriptor] of includedDescriptors(cls, mod)) {
         if (
           Object.hasOwn(proto, key) &&
@@ -75,7 +101,7 @@ Object.defineProperty(RoutesHelpers, "with", {
         Object.defineProperty(
           cls,
           "_routes",
-          inheritedDescriptor(cls, cls, "_routes", { value: moduleRoutes }),
+          inheritedDescriptor(cls, "_routes", { value: moduleRoutes }),
         );
       }
     };
@@ -86,34 +112,6 @@ Object.defineProperty(RoutesHelpers, "with", {
 
 export interface RoutesHelpersControllerClass extends RoutesHelpersClassMethods {
   prototype: object;
-}
-
-function inheritedDescriptor(
-  klass: object,
-  owner: object,
-  key: string,
-  descriptor: PropertyDescriptor,
-): PropertyDescriptor {
-  const previous = Object.getOwnPropertyDescriptor(owner, key);
-  return {
-    configurable: true,
-    enumerable: false,
-    get(this: object) {
-      if (this === klass || (this as { constructor?: unknown }).constructor === klass) {
-        if (previous) return previous.get ? previous.get.call(this) : previous.value;
-        return Reflect.get(Object.getPrototypeOf(owner) as object, key, this);
-      }
-      return descriptor.get ? descriptor.get.call(this) : descriptor.value;
-    },
-    set(this: object, value: unknown) {
-      Object.defineProperty(this, key, {
-        value,
-        writable: true,
-        configurable: true,
-        enumerable: true,
-      });
-    },
-  };
 }
 
 const installedMembers = new WeakMap<object, Map<string, PropertyDescriptor>[]>();
