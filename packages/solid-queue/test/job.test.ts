@@ -46,6 +46,32 @@ class NonOverlappingJob extends ApplicationJob {
   perform(_jobResult: unknown): void {}
 }
 
+class DiscardableNonOverlappingJob extends NonOverlappingJob {
+  static {
+    this.limitsConcurrency({ key: (jobResult: unknown) => jobResult, onConflict: "discard" });
+  }
+}
+
+class DiscardableNonOverlappingGroupedJob1 extends NonOverlappingJob {
+  static {
+    this.limitsConcurrency({
+      key: (jobResult: unknown) => jobResult,
+      group: "DiscardingGroup",
+      onConflict: "discard",
+    });
+  }
+}
+
+class DiscardableNonOverlappingGroupedJob2 extends NonOverlappingJob {
+  static {
+    this.limitsConcurrency({
+      key: (jobResult: unknown) => jobResult,
+      group: "DiscardingGroup",
+      onConflict: "discard",
+    });
+  }
+}
+
 class NonOverlappingGroupedJob1 extends NonOverlappingJob {
   static {
     this.limitsConcurrency({ key: (jobResult: unknown) => jobResult, group: "MyGroup" });
@@ -64,7 +90,14 @@ class JobTest extends TestCase {
   }
 }
 constSet(constGet(Object, "SolidQueue") as object, "JobTest", JobTest);
-for (const klass of [NonOverlappingJob, NonOverlappingGroupedJob1, NonOverlappingGroupedJob2]) {
+for (const klass of [
+  NonOverlappingJob,
+  DiscardableNonOverlappingJob,
+  DiscardableNonOverlappingGroupedJob1,
+  DiscardableNonOverlappingGroupedJob2,
+  NonOverlappingGroupedJob1,
+  NonOverlappingGroupedJob2,
+]) {
   constSet(JobTest, klass.name, klass);
 }
 
@@ -255,6 +288,27 @@ describe("SolidQueue::JobTest", () => {
     expect(activeJobs.every((activeJob) => activeJob.isSuccessfullyEnqueued())).toBeTruthy();
   });
 
+  it("enqueue jobs in bulk acquiring their concurrency locks by key", async () => {
+    const results: JobResult[] = [];
+    for (let i = 0; i < 3; i++) results.push(await JobResult.createBang({ queue_name: "default" }));
+
+    const acquired: [string, number][] = [];
+    vi.spyOn(Semaphore, "wait").mockImplementation(async (job) => {
+      acquired.push([(job as Job).concurrency_key!, (job as Job).id as number]);
+      return true;
+    });
+
+    const activeJobs = [...results.reverse(), ...results].map(
+      (jobResult) => new NonOverlappingJob(jobResult),
+    );
+    await performAllLater(activeJobs);
+
+    expect(acquired.length).toBe(6);
+    expect(acquired).toEqual(
+      [...acquired].sort(([k1, i1], [k2, i2]) => (k1 < k2 ? -1 : k1 > k2 ? 1 : i1 - i2)),
+    );
+  });
+
   it("block jobs when concurrency limits are reached", async () => {
     await assertReady(() => NonOverlappingJob.performLater(result, { name: "A" }));
 
@@ -265,6 +319,70 @@ describe("SolidQueue::JobTest", () => {
       blockedExecution.expires_at.compare(SolidQueue.defaultConcurrencyControlPeriod.fromNow())! <=
         0,
     ).toBeTruthy();
+  });
+
+  it("skips jobs with on_conflict set to discard when concurrency limits are reached", async () => {
+    await assertJobCounts({ ready: 1 }, async () => {
+      await DiscardableNonOverlappingJob.performLater(result, { name: "A" });
+      await DiscardableNonOverlappingJob.performLater(result, { name: "B" });
+    });
+  });
+
+  it("skips jobs with on_conflict set to discard in the same concurrency group when concurrency limits are reached", async () => {
+    await assertJobCounts({ ready: 1 }, async () => {
+      let activeJob = (await DiscardableNonOverlappingGroupedJob1.performLater(result, {
+        name: "A",
+      })) as NonOverlappingJob;
+      expect(activeJob.concurrencyLimit).toBe(1);
+      expect(activeJob.concurrencyKey()).toBe(`DiscardingGroup/JobResult/${result.id}`);
+
+      activeJob = (await DiscardableNonOverlappingGroupedJob2.performLater(result, {
+        name: "B",
+      })) as NonOverlappingJob;
+      expect(activeJob.concurrencyLimit).toBe(1);
+      expect(activeJob.concurrencyKey()).toBe(`DiscardingGroup/JobResult/${result.id}`);
+    });
+  });
+
+  it("enqueue scheduled job with concurrency controls and on_conflict set to discard", async () => {
+    await assertReady(() => DiscardableNonOverlappingJob.performLater(result, { name: "A" }));
+
+    await assertScheduled(() =>
+      DiscardableNonOverlappingJob.set({ wait: minutes(5) }).performLater(result, { name: "B" }),
+    );
+
+    const scheduledJob = (await Job.last()) as Job;
+
+    travelTo(minutes(10).fromNow() as Time);
+
+    expect(await ScheduledExecution.dispatchNextBatch(10)).toBe(0);
+    expect(await Job.findBy({ id: scheduledJob.id })).toBeNull();
+  });
+
+  it("enqueues jobs in bulk with concurrency controls and some set to discard", async () => {
+    const activeJobs = [
+      new AddToBufferJob(2),
+      new DiscardableNonOverlappingJob(result),
+      new NonOverlappingJob(result),
+      new AddToBufferJob(6).set({ wait: minutes(2) }),
+      new NonOverlappingJob(result),
+      new DiscardableNonOverlappingJob(result),
+    ];
+    const notEnqueued = activeJobs.at(-1)!;
+
+    await assertJobCounts({ ready: 3, scheduled: 1, blocked: 1 }, () =>
+      performAllLater(activeJobs),
+    );
+
+    const jobs = await Job.last(5);
+    const enqueued = activeJobs.filter((activeJob) => activeJob !== notEnqueued);
+    expect(enqueued.map((activeJob) => activeJob.providerJobId as number).sort()).toEqual(
+      jobs.map((job) => job.id as number).sort(),
+    );
+    expect(enqueued.every((activeJob) => activeJob.isSuccessfullyEnqueued())).toBeTruthy();
+
+    expect(notEnqueued.providerJobId).toBeNull();
+    expect(notEnqueued.isSuccessfullyEnqueued()).toBeFalsy();
   });
 
   it("discard ready job", async () => {

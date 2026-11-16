@@ -144,7 +144,9 @@ export class Job extends Record {
   private static async createAllFromActiveJobs(activeJobs: ActiveJob[]): Promise<Base[]> {
     const jobRows = activeJobs.map((job) => this.attributesFromActiveJob(job));
     await this.insertAll(jobRows);
-    return await this.where({ active_job_id: activeJobs.map((job) => job.jobId) }).toArray();
+    return await this.where({ active_job_id: activeJobs.map((job) => job.jobId) })
+      .order({ id: "asc" })
+      .toArray();
   }
 
   /** @internal */

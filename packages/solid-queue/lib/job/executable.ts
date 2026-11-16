@@ -1,7 +1,7 @@
-import { Concern, extend, include, indexBy, isPresent } from "@blazetrails/activesupport";
+import { Concern, extend, include, isPresent } from "@blazetrails/activesupport";
 import type { Base, Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
-import { classModule } from "@blazetrails/ruby-compat";
+import { classModule, sortBy } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import type { Job } from "../job.js";
 import type { Execution } from "../execution.js";
@@ -37,7 +37,7 @@ export class ClassMethods {
 
   /** @internal */
   private static async dispatchAllOneByOne(this: ExecutableClass, jobs: Job[]): Promise<void> {
-    for (const job of jobs) await job.dispatch();
+    for (const job of sortBy(jobs, (job) => [job.concurrency_key, job.id])) await job.dispatch();
   }
 
   /** @internal */
@@ -45,7 +45,7 @@ export class ClassMethods {
     this: ExecutableClass,
     jobs: Base[],
   ): Promise<Base[]> {
-    const jobsById = indexBy(jobs, (job) => job.id as number);
+    const jobsById = new Map(jobs.map((job) => [job.id as number, job]));
     return [
       ...(await ClassMethods.dispatchedAndReady.call(this, jobsById)),
       ...(await ClassMethods.dispatchedAndBlocked.call(this, jobsById)),
@@ -55,21 +55,21 @@ export class ClassMethods {
   /** @internal */
   private static async dispatchedAndReady(
     this: ExecutableClass,
-    jobsById: { [id: number]: Base },
+    jobsById: Map<number, Base>,
   ): Promise<Base[]> {
-    return (
-      await ReadyExecution.where({ job_id: Object.keys(jobsById).map(Number) }).pluck("job_id")
-    ).map((id) => jobsById[id]);
+    return (await ReadyExecution.where({ job_id: [...jobsById.keys()] }).pluck("job_id")).map(
+      (id) => jobsById.get(id)!,
+    );
   }
 
   /** @internal */
   private static async dispatchedAndBlocked(
     this: ExecutableClass,
-    jobsById: { [id: number]: Base },
+    jobsById: Map<number, Base>,
   ): Promise<Base[]> {
-    return (
-      await BlockedExecution.where({ job_id: Object.keys(jobsById).map(Number) }).pluck("job_id")
-    ).map((id) => jobsById[id]);
+    return (await BlockedExecution.where({ job_id: [...jobsById.keys()] }).pluck("job_id")).map(
+      (id) => jobsById.get(id)!,
+    );
   }
 }
 
@@ -83,7 +83,7 @@ export class Executable {
   declare claimedExecution: Promise<Base | null>;
   declare failedExecution: Promise<Base | null>;
   declare acquireConcurrencyLock: () => Promise<boolean>;
-  declare block: () => Promise<Base>;
+  declare handleConcurrencyConflict: () => Promise<unknown>;
   declare isDue: () => boolean;
   declare schedule: () => Promise<Base>;
   declare execution: () => Promise<Execution | null>;
@@ -112,7 +112,7 @@ export class Executable {
   async dispatch(): Promise<unknown> {
     if (await this.acquireConcurrencyLock()) return await this.ready();
     else {
-      return await this.block();
+      return await this.handleConcurrencyConflict();
     }
   }
 
