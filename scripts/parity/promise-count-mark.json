@@ -1,38 +1,19 @@
 {
   "@typescript-eslint/no-floating-promises": {
-    "actioncable": 5,
     "actionmailbox": 1,
-    "actionpack": 2,
     "activerecord": 2,
-    "activesupport": 2,
-    "rackup": 1,
-    "rake": 1,
-    "ruby-compat": 1,
     "scripts": 46,
-    "solid-queue": 1,
-    "trailties": 9,
     "website": 8
   },
   "blazetrails/constructor-creates-no-promise": {
     "actioncable": 1,
     "actiontext": 2,
     "activerecord": 1,
-    "mini-magick": 2,
-    "ruby-compat": 1,
-    "thor": 2,
-    "trailties": 1
+    "ruby-compat": 1
   },
   "blazetrails/no-swallowed-rejection": {
     "actiontext": 1,
-    "activerecord": 1,
-    "activestorage": 2,
-    "mini-magick": 1,
-    "rack": 1,
-    "ruby-compat": 2,
-    "scripts": 3,
-    "thor": 1,
-    "trailties": 1,
-    "website": 1
+    "scripts": 3
   },
   "blazetrails/no-floating-maybe-promise": {
     "actionview": 1,
