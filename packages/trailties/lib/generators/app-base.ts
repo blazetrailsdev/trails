@@ -781,7 +781,7 @@ ${requireStatements.join("\n")}`;
   protected async runKamal(): Promise<void> {
     if (this.options.skipKamal || !this.isInstall()) return;
 
-    await this.template("kamal-secrets", ".kamal/secrets", { force: true });
+    await this.template("kamal-secrets.tt", ".kamal/secrets", { force: true });
     await this.template("config/deploy.yml", { force: true });
   }
 
