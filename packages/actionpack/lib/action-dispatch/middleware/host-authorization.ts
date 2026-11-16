@@ -141,10 +141,10 @@ export class HostAuthorization {
   }
 
   /** @internal */
-  private blockedHosts(request: Request): string[] {
-    const out: string[] = [];
+  private blockedHosts(request: Request): (string | null)[] {
+    const out: (string | null)[] = [];
     const originHost = request.getHeader("HTTP_HOST") as string | null;
-    if (!this.permissions.allows(originHost)) out.push(originHost as string);
+    if (!this.permissions.allows(originHost)) out.push(originHost);
 
     const forwardedHost = request.xForwardedHost?.split(/,\s?/).at(-1);
     if (!(isBlank(forwardedHost) || this.permissions.allows(forwardedHost!)))
@@ -198,7 +198,7 @@ export class DefaultResponseApp {
   private logError(request: Request): void {
     const logger = this.availableLogger(request);
     if (!logger) return;
-    const blocked = (request.env["action_dispatch.blocked_hosts"] as string[]) ?? [];
+    const blocked = (request.env["action_dispatch.blocked_hosts"] as (string | null)[]) ?? [];
     logger.error(
       `[ActionDispatch::HostAuthorization::DefaultResponseApp] Blocked hosts: ${blocked.join(", ")}`,
     );
