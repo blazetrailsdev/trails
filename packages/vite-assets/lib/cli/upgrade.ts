@@ -12,13 +12,19 @@ export class Upgrade extends Install {
     this.upgradeNpmPackages();
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs run_with_capture — PERMANENT
+   */
   protected async upgradeRubyGems(): Promise<void> {
     this.say("Updating gems");
 
     const libraries = (await ViteAssets.frameworkLibraries()).map(([, library]) => library.name);
 
-    await this.runWithCapture(`bundle update --conservative vite_ruby ${libraries.join(" ")}`);
+    const { packageManager } = await ViteAssets.config();
+    await this.runWithCapture(
+      `${packageManager} update @blazetrails/vite-assets ${libraries.join(" ")}`,
+    );
   }
 
   /** @internal */
