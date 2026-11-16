@@ -1,5 +1,4 @@
 import { ArgumentError } from "./argument-error.js";
-import { TopLevel } from "./object.js";
 import { Errno, SystemCallError } from "./errno.js";
 import { Interrupt, SignalException } from "./signal-exception.js";
 import { NotImplementedError } from "./not-implemented-error.js";
@@ -80,8 +79,6 @@ const argvInternal: string[] = [];
 
 export const env = envInternal as Readonly<Record<string, string | undefined>>;
 export const argv = argvInternal as ReadonlyArray<string>;
-
-TopLevel.ENV = env;
 
 const rbArgvInternal: string[] = [];
 let prognameInternal = "";

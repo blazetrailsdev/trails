@@ -597,8 +597,11 @@ export {
 } from "./uri.js";
 
 import { Kernel } from "./include.js";
+import { TopLevel } from "./object.js";
+import { env } from "./process-adapter.js";
 import { kernelRand } from "./kernel-rand.js";
 import { rbFRequireFile } from "./load.js";
 import "./constants.generated.js";
 Kernel.rand = kernelRand;
 Kernel.require = rbFRequireFile;
+TopLevel.ENV = env;
