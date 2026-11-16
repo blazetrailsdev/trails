@@ -23,7 +23,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "node -e \"require('fs').cpSync('lib/generators/solid-cache/install/templates', 'dist/generators/solid-cache/install/templates', { recursive: true })\" && trails-tsc-views build-templates dist/generators"
   },
   "dependencies": {
     "@blazetrails/activejob": "workspace:*",
@@ -32,6 +33,7 @@
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   },
   "engines": {
@@ -43,5 +45,8 @@
       "ref": "v1.0.7",
       "sha": "411771527afdc7b8f91b79b15ff12680d1a628a4"
     }
-  ]
+  ],
+  "devDependencies": {
+    "@blazetrails/trails-tsc": "workspace:*"
+  }
 }

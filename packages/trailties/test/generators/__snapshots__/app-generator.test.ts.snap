@@ -279,6 +279,9 @@ Trails.application.configure(function () {
   // Don't log any deprecations.
   this.config.activeSupport.reportDeprecations = false;
 
+  // Replace the default in-process memory cache store with a durable alternative.
+  // this.config.cacheStore = ":mem_cache_store";
+
   // Replace the default in-process and non-durable queuing backend for Active Job.
   // this.config.activeJob.queueAdapter = "resque";
 

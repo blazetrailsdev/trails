@@ -194,8 +194,7 @@ describe("ProcessesLifecycleTest", () => {
     await assertCleanTermination();
   });
 
-  // BLOCKED: solid-queue-quit-supervisee-exits-like-exit-bang
-  it.skip("quit supervisor while there are jobs in-flight", async () => {
+  it("quit supervisor while there are jobs in-flight", async () => {
     const noPause = await enqueueStoreResultJob("no pause");
     const pause = await enqueueStoreResultJob("pause", "background", { pause: 1 });
 
@@ -252,8 +251,7 @@ describe("ProcessesLifecycleTest", () => {
     await assertCleanTermination();
   });
 
-  // BLOCKED: solid-queue-quit-supervisee-exits-like-exit-bang
-  it.skip(
+  it(
     "term supervisor exceeding timeout while there are jobs in-flight",
     { timeout: 15_000 },
     async () => {
