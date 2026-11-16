@@ -13,13 +13,7 @@ import {
   rbFSend,
   rbDeclareIvar,
 } from "@blazetrails/ruby-compat";
-import {
-  exceptBang,
-  underscore,
-  isBlank,
-  kernelArray as Array,
-  wrap,
-} from "@blazetrails/activesupport";
+import { exceptBang, isBlank, kernelArray as Array, wrap } from "@blazetrails/activesupport";
 import { eachWithObject } from "@blazetrails/ruby-compat";
 import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
@@ -67,17 +61,19 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     if (async)
       // @nie disposition=TODO
       throw new NotImplementedError("No async loading for HasManyThroughAssociation yet");
-    if (!this.targetReflectionHasAssociatedRecord()) return [];
+    if (!this.isTargetReflectionHasAssociatedRecord()) return [];
     if (this.disableJoins) return this.scope().toArray();
     return super.findTarget({ async }) as Promise<Base[]>;
   }
 
-  protected targetReflectionHasAssociatedRecord(): boolean {
-    const throughAssoc = this.owner.constructor._reflectOnAssociation(
-      this.reflection.options.through!,
-    ) as AssociationDefinition | null;
-    if (!throughAssoc) return true;
-    return targetReflectionHasAssociatedRecord(this.owner, throughAssoc);
+  protected isTargetReflectionHasAssociatedRecord(): boolean {
+    const throughReflection = this.throughReflection() as AssociationReflection;
+    return !(
+      throughReflection.isBelongsTo() &&
+      Array(throughReflection.foreignKey()).every((foreignKeyColumn) =>
+        isBlank(this.owner.readAttribute(foreignKeyColumn)),
+      )
+    );
   }
 
   protected override difference(a: Base[], b: Base[]): Base[] {
@@ -298,19 +294,15 @@ function throughScope(this: HasManyThroughAssociation): unknown {
 
 /** @internal */
 function throughScopeAttributes(this: HasManyThroughAssociation): Record<string, unknown> {
-  const throughName = this.reflection.options.through;
-  if (!throughName) return {};
-  const throughAssoc = this.owner.association(throughName);
-  if (!throughAssoc) return {};
   const scope: any = this.throughScope() ?? this.scope();
-  if (!scope || typeof scope.whereValuesHash !== "function") return {};
-  const throughTable = throughAssoc.reflection.klass.tableName;
-  const attrs = scope.whereValuesHash(throughTable) as Record<string, unknown>;
+  const attributes = scope.whereValuesHash(
+    this.throughAssociation().reflection.klass.tableName,
+  ) as Record<string, unknown>;
   const exceptKeys = [
-    ...[throughAssoc.reflection.foreignKey()].flat(),
-    throughAssoc.reflection.klass.inheritanceColumn as string,
+    ...Array(this.throughAssociation().reflection.foreignKey()),
+    this.throughAssociation().reflection.klass.inheritanceColumn as string,
   ];
-  return exceptBang(attrs, ...exceptKeys);
+  return exceptBang(attributes, ...exceptKeys);
 }
 
 /** @internal */
@@ -328,17 +320,6 @@ async function saveThroughRecord(this: HasManyThroughAssociation, record: Base):
   } finally {
     this._throughRecords.delete(record);
   }
-}
-
-/** @internal */
-function isTargetReflectionHasAssociatedRecord(assoc: HasManyThroughAssociation): boolean {
-  const throughRefl = assoc.reflection.options.through;
-  if (!throughRefl) return false;
-  const throughAssoc = assoc.owner.association(throughRefl);
-  if (!throughAssoc) return false;
-  const fk = throughAssoc.reflection.foreignKey();
-  if (!fk) return true;
-  return !!assoc.owner.readAttribute(fk as string);
 }
 
 /** @internal */
@@ -398,17 +379,6 @@ async function deleteThroughRecords(
 
 /** @internal */
 type Distribution = Hash<Base, number>;
-
-/** @internal */
-function targetReflectionHasAssociatedRecord(
-  record: Base,
-  throughAssoc: AssociationDefinition,
-): boolean {
-  if (throughAssoc.macro !== "belongsTo") return true;
-  const fk = throughAssoc.options.foreignKey ?? `${underscore(throughAssoc.name)}_id`;
-  const columns = globalThis.Array.isArray(fk) ? fk : [fk];
-  return !columns.every((column) => isBlank(record._readAttribute(String(column))));
-}
 
 const throughAssociationMethods = {
   buildThroughRecord,

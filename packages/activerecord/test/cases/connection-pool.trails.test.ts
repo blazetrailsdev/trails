@@ -1311,3 +1311,24 @@ describe("NullPool method_missing in the prototype chain", () => {
     expect(Object.getPrototypeOf(pool)).toBe(Sub.prototype);
   });
 });
+
+it("overlapping withConnectionSync promise blocks release the lease after the last settles", async () => {
+  const pool = makePool(1);
+  let finishFirst!: () => void;
+  let finishSecond!: () => void;
+  const first = pool.withConnectionSync(
+    (conn) => new Promise<DatabaseAdapter>((resolve) => (finishFirst = () => resolve(conn))),
+  );
+  const second = pool.withConnectionSync(
+    (conn) => new Promise<DatabaseAdapter>((resolve) => (finishSecond = () => resolve(conn))),
+  );
+
+  finishFirst();
+  const conn = await first;
+  expect(conn.isInUse()).not.toBeNull();
+  expect(pool.stat().busy).toBe(1);
+
+  finishSecond();
+  expect(await second).toBe(conn);
+  expect(pool.stat().busy).toBe(0);
+});

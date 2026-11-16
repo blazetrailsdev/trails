@@ -203,7 +203,7 @@ export class TableRow {
                 this._row[column] = value;
               }
             } else {
-              const fkType = `:${this.reflectionClass.typeForAttribute(fkName)?.type()}`;
+              const fkType = `:${this.reflectionClass.typeForAttribute(fkName).type()}`;
               this._row[fkName] = FixtureSet.identify(String(value), fkType);
             }
           }

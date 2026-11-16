@@ -896,7 +896,7 @@ export async function _createRecord(
         if (!rtest(this._readAttribute(column as string))) {
           this._writeAttribute(
             column as string,
-            this.typeForAttribute(column as string)!.deserialize(value),
+            this.typeForAttribute(column as string).deserialize(value),
           );
         }
       }

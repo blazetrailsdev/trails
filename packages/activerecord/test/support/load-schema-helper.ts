@@ -272,7 +272,6 @@ async function loadPostgresqlSpecificSchema(adapter: PostgreSQLAdapter): Promise
   await adapter.addIndex("companies", ["firm_id", "type"], {
     name: "company_include_index",
     include: ["name", "account_id"],
-    ifNotExists: true,
   });
 
   if (adapter.supportsInsertReturning()) {
@@ -481,7 +480,21 @@ export async function loadAdapterSpecificSchema(adapter: DatabaseAdapter): Promi
   const adapterSpecificSchema = ADAPTER_SPECIFIC_SCHEMAS[typeRegistryKey];
   if (adapterSpecificSchema) {
     noteAdapterSpecificSchemaLoaded();
+    await dropArmIndexesOnCanonicalTables(adapter, typeRegistryKey);
     await adapterSpecificSchema(adapter);
+  }
+}
+
+const ARM_INDEXES_ON_CANONICAL_TABLES: Record<string, [table: string, name: string][]> = {
+  postgresql: [["companies", "company_include_index"]],
+};
+
+async function dropArmIndexesOnCanonicalTables(
+  adapter: DatabaseAdapter,
+  typeRegistryKey: string,
+): Promise<void> {
+  for (const [table, name] of ARM_INDEXES_ON_CANONICAL_TABLES[typeRegistryKey] ?? []) {
+    if (await adapter.indexNameExists(table, name)) await adapter.removeIndex(table, { name });
   }
 }
 

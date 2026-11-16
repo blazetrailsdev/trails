@@ -13,20 +13,20 @@ export interface AttributeRegistrationClassMethods {
   ): void;
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: AttributeDecorator): void;
-  attributeTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null>;
-  typeForAttribute(name: string, block?: () => ValueType): ValueType | null;
+  attributeTypes(): Record<string, ValueType> | Hash<string, ValueType>;
+  typeForAttribute(name: string, block?: () => ValueType): ValueType;
 }
 
 export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
-  _cachedAttributeTypes?: Record<string, ValueType | null> | Hash<string, ValueType | null> | null;
+  _cachedAttributeTypes?: Record<string, ValueType> | Hash<string, ValueType> | null;
   _attributesBuilder?: unknown;
   _pendingAttributeModifications?: PendingModification[];
   attributeAliases?: Record<string, string>;
   /** @internal */
   resolveAttributeName(name: string): string;
 
-  attributeTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null>;
+  attributeTypes(): Record<string, ValueType> | Hash<string, ValueType>;
   /** @internal */
   pendingAttributeModifications(): PendingModification[];
   /** @internal */
@@ -155,13 +155,15 @@ export const ClassMethods = {
   /** @inventedArm if — PERMANENT */
   attributeTypes(
     this: AttributeHostInternals,
-  ): Record<string, ValueType | null> | Hash<string, ValueType | null> {
+  ): Record<string, ValueType> | Hash<string, ValueType> {
     if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
       return this._cachedAttributeTypes;
     }
     const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
-    let hash = host._defaultAttributes().castTypes();
-    if (!(hash instanceof Hash)) hash = new Hash<string, ValueType | null>().replace(hash);
+    let hash = host._defaultAttributes().castTypes() as
+      | Record<string, ValueType>
+      | Hash<string, ValueType>;
+    if (!(hash instanceof Hash)) hash = new Hash<string, ValueType>().replace(hash);
     hash.setDefault(Type.defaultValue());
     this._cachedAttributeTypes = hash;
     return hash;
@@ -171,13 +173,13 @@ export const ClassMethods = {
     this: AttributeHostInternals,
     attributeName: string,
     block?: () => ValueType,
-  ): ValueType | null {
+  ): ValueType {
     attributeName = this.resolveAttributeName(attributeName);
 
     if (block) {
       return fetch(this.attributeTypes(), attributeName, rbBlock(block));
     } else {
-      return hashAref(this.attributeTypes(), attributeName) as ValueType | null;
+      return hashAref(this.attributeTypes(), attributeName) as ValueType;
     }
   },
 

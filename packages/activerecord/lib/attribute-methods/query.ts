@@ -9,7 +9,7 @@ interface QueryIncludeHost {
 
 interface QueryHost {
   _readAttribute(name: string): unknown;
-  typeForAttribute(name: string, block?: () => ValueType): ValueType | null;
+  typeForAttribute(name: string, block?: () => ValueType): ValueType;
 }
 
 export const Query = {

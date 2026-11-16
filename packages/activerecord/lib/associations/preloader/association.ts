@@ -235,11 +235,11 @@ export class Association {
   }
 
   private associationKeyType(): string | undefined {
-    return this.klass.typeForAttribute(this.associationKeyName as string)!.type();
+    return this.klass.typeForAttribute(this.associationKeyName as string).type();
   }
 
   private ownerKeyType(): string | undefined {
-    return this.model!.typeForAttribute(this.ownerKeyName as string)!.type();
+    return this.model!.typeForAttribute(this.ownerKeyName as string).type();
   }
 
   /** @internal */
