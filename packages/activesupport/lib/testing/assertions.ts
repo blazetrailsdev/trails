@@ -406,8 +406,7 @@ export async function assertDifference<T>(
     const beforeValue = before[index];
     const actual = await exp();
     const richMessage = () => {
-      const codeString = typeof exp === "function" ? _callableToSourceString(exp) : exp;
-      let error = `\`${codeString}\` didn't change by ${diff}, but by ${actual - beforeValue}`;
+      let error = `\`${_callableToSourceString(exp)}\` didn't change by ${diff}, but by ${actual - beforeValue}`;
       if (message) error = `${message}.\n${error}`;
       return error;
     };
