@@ -90,7 +90,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("full_address");
       expect(column.isArray()).toBeFalsy();
 
-      const type = PostgresqlComposite.typeForAttribute("address")!;
+      const type = PostgresqlComposite.typeForAttribute("address");
       expect(type.isBinary()).toBeFalsy();
     });
 
@@ -130,7 +130,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("full_address");
       expect(column.isArray()).toBeFalsy();
 
-      const type = PostgresqlComposite.typeForAttribute("address")!;
+      const type = PostgresqlComposite.typeForAttribute("address");
       expect(type.isBinary()).toBeFalsy();
     });
 

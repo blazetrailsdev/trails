@@ -1670,7 +1670,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
         if (size != null) {
           const columnType = this.model.typeForAttribute(timestampColumn);
-          timestamp = columnType!.deserialize(timestamp);
+          timestamp = columnType.deserialize(timestamp);
         } else {
           size = 0;
         }
@@ -1816,7 +1816,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         }
       } else {
         const type = this.model.typeForAttribute(String(attr.name));
-        value = this.predicateBuilder.buildBindAttribute(String(attr.name), type!.cast(value));
+        value = this.predicateBuilder.buildBindAttribute(String(attr.name), type.cast(value));
       }
       return [attr, value];
     });

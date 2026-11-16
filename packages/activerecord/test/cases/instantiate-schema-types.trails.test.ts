@@ -67,13 +67,13 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     await establishConnectionTo(Widget, makeAdapter(colsA) as never);
     await Widget.loadSchema();
 
-    expect(Widget.typeForAttribute("payload")!.type()).toBeUndefined();
+    expect(Widget.typeForAttribute("payload").type()).toBeUndefined();
 
     const colsB = { payload: { sqlType: "doubling", name: "payload", default: null } };
     await establishConnectionTo(Widget, makeAdapter(colsB) as never);
     await Widget.loadSchema();
 
-    expect(Widget.typeForAttribute("payload")!.type()).toBe("doubling");
+    expect(Widget.typeForAttribute("payload").type()).toBe("doubling");
   });
 
   it("drops stale schema-sourced columns on adapter swap", async () => {

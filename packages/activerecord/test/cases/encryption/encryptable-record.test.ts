@@ -645,8 +645,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await freshAdapter();
     const Post = makeEncryptedPost();
     new Post();
-    expect(Book.typeForAttribute("name")!.type()).toBe("string");
-    expect(Post.typeForAttribute("body")!.type()).toBe("text");
+    expect(Book.typeForAttribute("name").type()).toBe("string");
+    expect(Post.typeForAttribute("body").type()).toBe("text");
   });
 
   it("encrypts normalized data", async () => {

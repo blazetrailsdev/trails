@@ -46,7 +46,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("bit(8)");
       assertNotPredicate(column, (c: PgColumn) => c.isArray());
 
-      const type = PostgresqlBitString.typeForAttribute("a_bit")!;
+      const type = PostgresqlBitString.typeForAttribute("a_bit");
       assertNotPredicate(type, (t) => t.isBinary());
     });
 
@@ -56,7 +56,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("bit varying(4)");
       assertNotPredicate(column, (c: PgColumn) => c.isArray());
 
-      const type = PostgresqlBitString.typeForAttribute("a_bit_varying")!;
+      const type = PostgresqlBitString.typeForAttribute("a_bit_varying");
       assertNotPredicate(type, (t) => t.isBinary());
     });
 

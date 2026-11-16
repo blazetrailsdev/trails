@@ -252,14 +252,14 @@ describe("ReflectionTest", () => {
   });
   it("non existent types are identity types", async () => {
     const first = await CanonicalTopic.find(1);
-    let type = first.typeForAttribute("attribute_that_doesnt_exist")!;
+    let type = first.typeForAttribute("attribute_that_doesnt_exist");
     const object = new Object();
 
     expect(type.deserialize(object)).toBe(object);
     expect(type.cast(object)).toBe(object);
     expect(type.serialize(object)).toBe(object);
 
-    type = first.typeForAttribute("attribute_that_doesnt_exist")!;
+    type = first.typeForAttribute("attribute_that_doesnt_exist");
     expect(type.deserialize(object)).toBe(object);
     expect(type.cast(object)).toBe(object);
     expect(type.serialize(object)).toBe(object);
@@ -640,10 +640,10 @@ describe("ReflectionTest", () => {
     const first = await CanonicalTopic.find(1);
     expect(first.columnForAttribute("title").type).toBe("string");
     expect(first.columnForAttribute("title").type).toBe("string");
-    expect(first.typeForAttribute("title")!.type()).toBe("string");
-    expect(first.typeForAttribute("title")!.type()).toBe("string");
-    expect(first.typeForAttribute("heading")!.type()).toBe("string");
-    expect(first.typeForAttribute("heading")!.type()).toBe("string");
+    expect(first.typeForAttribute("title").type()).toBe("string");
+    expect(first.typeForAttribute("title").type()).toBe("string");
+    expect(first.typeForAttribute("heading").type()).toBe("string");
+    expect(first.typeForAttribute("heading").type()).toBe("string");
     expect(first.columnForAttribute("title").limit).toBe(250);
   });
 
@@ -664,8 +664,8 @@ describe("ReflectionTest", () => {
     const first = await CanonicalTopic.find(1);
     expect(first.columnForAttribute("id").type).toBe("integer");
     expect(first.columnForAttribute("id").type).toBe("integer");
-    expect(first.typeForAttribute("id")!.type()).toBe("integer");
-    expect(first.typeForAttribute("id")!.type()).toBe("integer");
+    expect(first.typeForAttribute("id").type()).toBe("integer");
+    expect(first.typeForAttribute("id").type()).toBe("integer");
   });
 
   it("non existent columns return null object", async () => {
