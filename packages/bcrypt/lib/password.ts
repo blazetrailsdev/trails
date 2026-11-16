@@ -21,7 +21,7 @@ export class Password extends String {
     );
   }
 
-  constructor(rawHash: string | Password) {
+  constructor(rawHash: string | Password | null) {
     super(rawHash);
     if (this.isValidHash(rawHash)) {
       [this.version, this.cost, this.salt, this.checksum] = this.splitHash(this);

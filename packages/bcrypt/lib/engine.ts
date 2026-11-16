@@ -54,7 +54,7 @@ export class Engine {
     this._cost = cost;
   }
 
-  static hashSecret(secret: unknown, salt: string | null, _: unknown = null): string {
+  static hashSecret(secret: unknown, salt: string | null, _: unknown = null): string | null {
     if (_ != null) {
       warn(
         "[DEPRECATION] Passing the third argument to " +
@@ -117,11 +117,17 @@ export class Engine {
     return `$2${prefix[2]}$${Math.floor(count / 10)}${count % 10}$${bcryptjs.encodeBase64(input!, 16)}`;
   }
 
-  private static __bcCrypt(key: string, setting: string): string {
+  private static __bcCrypt(key: string, setting: string): string | null {
     if (key.includes("\0") || setting.includes("\0")) {
       throw new ArgumentError("string contains null byte");
     }
-    return _bcHashSync(key, setting);
+    let value: string;
+    try {
+      value = _bcHashSync(key, setting);
+    } catch {
+      return null;
+    }
+    return value;
   }
 
   static calibrate(upperTimeLimitInMs: number): number | Range<number> {
