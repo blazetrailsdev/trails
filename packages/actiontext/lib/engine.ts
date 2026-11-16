@@ -4,7 +4,7 @@ import "@blazetrails/trailties/trailties/action-controller";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import "@blazetrails/activestorage/engine";
-import { File, include, prepend } from "@blazetrails/ruby-compat";
+import { File, include, prepend, rbFRequire } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
 import { Attachable } from "./attachable.js";
 import { Attachment } from "./attachment.js";
@@ -137,9 +137,9 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("action_text.system_test_helper", async () => {
-      const { SystemTestHelper } = await import("@blazetrails/actiontext/system-test-helper");
+      await rbFRequire(ActionText.loadPath, "action_text/system_test_helper");
       onLoad("action_dispatch_system_test_case", function (this: object) {
-        include(this as never, SystemTestHelper);
+        include(this as never, ActionText.SystemTestHelper!);
       });
     });
 
