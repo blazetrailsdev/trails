@@ -650,4 +650,8 @@ describe("fromJson", () => {
     expect(u.isChanged).toBe(true);
     expect(u.changed).toContain("name");
   });
+  it("reads a snake_case serialization key through its camelCase reader", () => {
+    const record = { attachableSgid: () => "sgid" } as unknown as SerializationRecord;
+    expect(readAttributeForSerialization.call(record, "attachable_sgid")).toBe("sgid");
+  });
 });
