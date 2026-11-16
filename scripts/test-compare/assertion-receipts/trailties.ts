@@ -39,14 +39,14 @@ export const trailties: Record<string, AssertionReceipt[]> = {
     [
       {
         kind: "assert_equal",
-        value: null,
+        value: "n:1",
         as: null,
         reason:
           "app_generator_test.rb:709 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
       },
       {
         kind: "assert_equal",
-        value: null,
+        value: "n:1",
         as: null,
         reason:
           "app_generator_test.rb:710 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
@@ -56,14 +56,14 @@ export const trailties: Record<string, AssertionReceipt[]> = {
     [
       {
         kind: "assert_equal",
-        value: null,
+        value: "n:1",
         as: null,
         reason:
           "app_generator_test.rb:719 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
       },
       {
         kind: "assert_equal",
-        value: null,
+        value: "n:1",
         as: null,
         reason:
           "app_generator_test.rb:720 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
