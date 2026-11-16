@@ -211,6 +211,12 @@ function prettyPrintCycle(obj: unknown, q: PP): void | Promise<void> {
   });
 }
 
+/**
+ * `PP::ObjectMixin#pretty_print` (vendor/ruby/v3.3.11/lib/pp.rb:321-334), which `pp.rb`
+ * includes into `Object`, seated on `Kernel` for a `super` to reach. Its
+ * `pp_object` arm prints as {@link rbInspect} renders it, as every other
+ * object does in this file.
+ */
 Kernel.prettyPrint = function prettyPrint(this: object, q: PP): void {
   const inspectMethod = (this as { inspect?: unknown }).inspect;
   if (typeof inspectMethod === "function") {
