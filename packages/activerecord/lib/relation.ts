@@ -1693,7 +1693,9 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   initializeCopy(other: Relation<T, G>): this {
     this._values = { ...this._values };
-    return this.reset();
+    this.reset();
+    this._fromLimitedIds = other._fromLimitedIds;
+    return this;
   }
 
   /** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */
