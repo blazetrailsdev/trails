@@ -24,15 +24,13 @@ export class InboundEmailsController extends BaseController {
   }
 
   /** @internal */
-  private mail(): string | Uint8Array {
-    let rawEmail = this.params.require("body-mime") as string | Uint8Array;
-    if (this.params.isKey("recipient")) {
-      const prefix = `X-Original-To: ${this.params.require("recipient") as string}\n`;
-      rawEmail =
-        rawEmail instanceof Uint8Array
-          ? rbStrPlus(new TextEncoder().encode(prefix), rawEmail)
-          : `${prefix}${rawEmail}`;
-    }
+  private mail(): Uint8Array {
+    let rawEmail = this.params.require("body-mime") as Uint8Array;
+    if (this.params.isKey("recipient"))
+      rawEmail = rbStrPlus(
+        new TextEncoder().encode(`X-Original-To: ${this.params.require("recipient") as string}\n`),
+        rawEmail,
+      ) as Uint8Array;
     return rawEmail;
   }
 

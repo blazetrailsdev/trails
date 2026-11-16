@@ -182,26 +182,24 @@ export class ParamBuilder {
     if (depth === 0 && typeof v === "string") {
       let designatedEncoding: Encoding | string | undefined;
       let validEncoding: boolean;
-      if (
-        encodingTemplate &&
-        (designatedEncoding = encodingTemplate.get(k)) &&
-        Encoding.find(designatedEncoding) === Encoding.ASCII_8BIT
-      ) {
-        v = forceEncoding(Uint8Array.from(bytes(v)), designatedEncoding);
-        validEncoding = true;
-      } else if (encodingTemplate && (designatedEncoding = encodingTemplate.get(k))) {
-        v = bytes(v)
-          .map((b) => String.fromCharCode(b))
-          .join("");
-        validEncoding = isValidEncoding(v, designatedEncoding);
-        v = forceEncoding(v, designatedEncoding);
+      if (encodingTemplate && (designatedEncoding = encodingTemplate.get(k))) {
+        if (Encoding.find(designatedEncoding) === Encoding.ASCII_8BIT) {
+          v = forceEncoding(Uint8Array.from(bytes(v)), designatedEncoding);
+          validEncoding = isValidEncoding(v, designatedEncoding);
+        } else {
+          v = bytes(v)
+            .map((b) => String.fromCharCode(b))
+            .join("");
+          validEncoding = isValidEncoding(v, designatedEncoding);
+          v = forceEncoding(v, designatedEncoding);
+        }
       } else {
         validEncoding = !/\p{Cs}/u.test(v);
       }
 
-      if (!validEncoding) {
+      if (!validEncoding && typeof v === "string") {
         throw new InvalidParameterError(
-          `Invalid encoding for parameter: ${(v as string).replace(/\p{Cs}/gu, "\uFFFD")}`,
+          `Invalid encoding for parameter: ${v.replace(/\p{Cs}/gu, "\uFFFD")}`,
         );
       }
     }
