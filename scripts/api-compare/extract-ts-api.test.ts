@@ -8828,6 +8828,13 @@ describe("extractClass — @inlinedFrom on a static async new", () => {
     expect(ctor.calls).not.toContain("rbClassNewInstance");
   });
 
+  it("leaves an untagged static new building another class apart", () => {
+    const info = extractFromSource(
+      `class Foo {\n  protected constructor() { this.a(); }\n  static async new() { return rbClassNewInstance(Bar); }\n}`,
+    );
+    expect(info.instanceMethods.find((m) => m.name === "constructor")!.callSeq).toEqual(["a"]);
+  });
+
   it("leaves a public constructor and its static new apart", () => {
     const info = extractFromSource(
       `class Foo {\n  constructor() {}\n  /** @inlinedFrom ${api} */\n  static async new() { return new this(); }\n}`,

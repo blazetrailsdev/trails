@@ -5154,6 +5154,8 @@ export function constClassExpression(
   return { seat: decl.name.text, cls: init };
 }
 
+const NEW_CALLS: ReadonlySet<string> = new Set(["constructor", "rbClassNewInstance"]);
+
 /**
  * RFC 0234 § Design 2(a): where `initialize` does async work, the class keeps
  * the synchronous part in a `protected` constructor and the rest in
@@ -5161,11 +5163,11 @@ export function constClassExpression(
  * `rbClassNewInstance(this, ...)`. The two together are Ruby's
  * `ClassMethods#new` then `initialize`, so a `static new` beside a non-public
  * constructor that carries `@inlinedFrom` tags or builds through
- * `rbClassNewInstance` hands its tags and body to the constructor, which the call gates and `parity:api:inlined` pair
- * with `initialize`. The constructor's own body is spliced in where `static new`
- * calls `new this(...)`, so what runs before it is the head of the chain, as a
+ * `rbClassNewInstance(this, ...)` hands its tags and body to the constructor,
+ * which the call gates and `parity:api:inlined` pair with `initialize`. The
+ * constructor's own body is spliced in where `static new` builds the object, so what runs before it is the head of the chain, as a
  * `ClassMethods#new` segment is, and what runs after it is the tail, and the
- * `new this(...)` itself is dropped. The `static new` member keeps no body of
+ * building call itself is dropped. The `static new` member keeps no body of
  * its own to compare.
  */
 export function foldStaticNewIntoConstructor(
@@ -5176,9 +5178,10 @@ export function foldStaticNewIntoConstructor(
   const ctor = instanceMethods.find((m) => m.name === "constructor");
   if (staticNew === undefined || ctor === undefined || ctor.visibility === "public") return;
   const tags = staticNew.inlinedFrom;
-  if (tags === undefined && !staticNew.callArgs?.some((c) => c.name === "rbClassNewInstance")) {
-    return;
-  }
+  const buildsThis = staticNew.callArgs?.some(
+    (c) => c.name === "rbClassNewInstance" && c.args[0] === "id:this",
+  );
+  if (tags === undefined && buildsThis !== true) return;
   if (tags !== undefined) {
     ctor.inlinedFrom = [
       ...tags.filter((tag) => tag.hook === "new"),
@@ -5186,7 +5189,6 @@ export function foldStaticNewIntoConstructor(
       ...tags.filter((tag) => tag.hook !== "new"),
     ];
   }
-  const NEW_CALLS = new Set(["constructor", "rbClassNewInstance"]);
   const splice = <T>(outer: T[] | undefined, inner: T[] | undefined, isNew: (x: T) => boolean) => {
     if (outer === undefined) return inner;
     const at = outer.findIndex(isNew);
