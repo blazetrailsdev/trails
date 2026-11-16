@@ -24,9 +24,10 @@ function attributeNamesForSerialization(this: AttachableHost): string[] {
   return [...(rbCallSuper(this, attributeNamesForSerialization) as string[]), "attachable_sgid"];
 }
 
+/** @missingRailsCall super — CONVERGEABLE serialization-reads-snake-case-serialization-keys */
 function readAttributeForSerialization(this: AttachableHost, key: string): unknown {
   if (key === "attachable_sgid") {
-    return this.isPersisted() ? rbCallSuper(this, readAttributeForSerialization, key) : null;
+    return this.isPersisted() ? this.attachableSgid() : null;
   } else {
     return rbCallSuper(this, readAttributeForSerialization, key);
   }

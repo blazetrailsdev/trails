@@ -1,5 +1,5 @@
 import { Base, Reflection } from "@blazetrails/activerecord";
-import { onLoad } from "@blazetrails/activesupport";
+import { onLoad, TopLevel } from "@blazetrails/activesupport";
 import { ActiveStorage, Model } from "@blazetrails/activestorage";
 import { ActiveRecordExtensions, ReflectionExtension } from "@blazetrails/activestorage/reflection";
 import { File, include, prepend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
@@ -36,3 +36,10 @@ await import("../../lib/encrypted-rich-text.js");
 
 ActionController.Base.prependViewPath([File.expandPath("../../app/views", import.meta.dirname)]);
 (ActionController.Base as unknown as { helper(mod: object): void }).helper(ContentHelper);
+
+const { Engine } = await import("../../lib/engine.js");
+for (const initializer of Engine.initializers) {
+  if (initializer.name === "action_text.system_test_helper") {
+    await initializer.bind(Engine.instance()).run(TopLevel.Trails!.application!);
+  }
+}

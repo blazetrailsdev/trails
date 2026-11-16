@@ -1416,11 +1416,11 @@ jobs:
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
       - if: needs.changes.outputs.ar_scope != ''
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
-        run: pnpm vitest run $AR_SCOPE
+        run: pnpm vitest run $AR_SCOPE --project '!system'
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run packages/activerecord-cli
@@ -1460,7 +1460,7 @@ jobs:
       # is excluded: it owns no `inMemoryDb()` guards, so it has nothing this
       # lane can check.
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --shard=${{ matrix.shard }}/2
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --project '!system' --shard=${{ matrix.shard }}/2
         env:
           ARCONN: sqlite3_mem
 
@@ -1746,7 +1746,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope != ''
-        run: pnpm vitest run $AR_SCOPE
+        run: pnpm vitest run $AR_SCOPE --project '!system'
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
           ARCONN: postgresql
@@ -1755,7 +1755,7 @@ jobs:
           PGUSER: rails
           PG_TEST_URL: postgres://rails@localhost:5432/activerecord_unittest
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           ARCONN: postgresql
           PGHOST: localhost
@@ -1904,7 +1904,7 @@ jobs:
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --project '!system'
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -1986,7 +1986,7 @@ jobs:
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
         uses: ./.github/actions/activestorage-media-binaries
       - if: needs.changes.outputs.ar_scope != ''
-        run: pnpm vitest run $AR_SCOPE
+        run: pnpm vitest run $AR_SCOPE --project '!system'
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
           ARCONN: mysql2
@@ -1994,7 +1994,7 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_TEST_URL: mysql://rails@localhost:3306/activerecord_unittest
       - if: needs.changes.outputs.ar_scope == ''
-        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost
@@ -2055,7 +2055,7 @@ jobs:
             GRANT ALL PRIVILEGES ON *.* TO 'rails'@'localhost';
             FLUSH PRIVILEGES;"
       - uses: ./.github/actions/activestorage-media-binaries
-      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/
+      - run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ --project '!system'
         env:
           ARCONN: mysql2
           MYSQL_HOST: localhost

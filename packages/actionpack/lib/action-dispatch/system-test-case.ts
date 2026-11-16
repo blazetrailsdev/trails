@@ -1,5 +1,5 @@
 import type { Browser, BrowserContext, Locator, Page } from "playwright";
-import { classAttribute, reverseMerge, TopLevel } from "@blazetrails/activesupport";
+import { classAttribute, reverseMerge, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Builder } from "@blazetrails/rack";
 import { include, NoMethodError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -28,7 +28,7 @@ export interface ElementAssertions {
   toBeVisible(): Promise<void>;
   toBeInTheDocument(): Promise<void>;
   toHaveTextContent(text: string | RegExp): Promise<void>;
-  toHaveValue(value: string): Promise<void>;
+  toHaveValue(value: string | RegExp): Promise<void>;
 }
 
 declare module "vitest" {
@@ -90,7 +90,10 @@ export class SystemTestCase extends TestCase {
         typeof text === "string"
           ? expect.poll(() => locator.textContent(), options).toContain(text)
           : expect.poll(() => locator.textContent(), options).toMatch(text),
-      toHaveValue: (value) => expect.poll(() => locator.inputValue(), options).toBe(value),
+      toHaveValue: (value) =>
+        typeof value === "string"
+          ? expect.poll(() => locator.inputValue(), options).toBe(value)
+          : expect.poll(() => locator.inputValue(), options).toMatch(value),
     });
     afterAll(async () => {
       for (const session of sessions.values()) await (await session).browser.close();
@@ -175,3 +178,4 @@ export class SystemTestCase extends TestCase {
 
 include(SystemTestCase, SetupAndTeardown);
 include(SystemTestCase, ScreenshotHelper);
+runLoadHooks("action_dispatch_system_test_case", SystemTestCase);

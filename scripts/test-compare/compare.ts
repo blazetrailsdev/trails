@@ -149,10 +149,22 @@ const RUBY_COMPAT_SPEC_TS_FILES: Record<string, string> = {
  * with its test beside it) because the gem's own package cannot depend on
  * trailties. Without a row the file can only score against a convention path
  * in a package that cannot host it.
+ *
+ * A system test (`test/system/*_test.rb`) is a `*.system.test.ts` in its own
+ * package, so only the `system` Vitest project, which launches a browser,
+ * runs it (packages/actionpack/CLAUDE.md, "System testing runs on Vitest").
  */
 export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile: string }> = {
   "activemodel:railtie_test.rb": { package: "trailties", tsFile: "trailties/active-model.test.ts" },
   "globalid:railtie_test.rb": { package: "trailties", tsFile: "trailties/global-id.test.ts" },
+  "actiontext:system/system_test_helper_test.rb": {
+    package: "actiontext",
+    tsFile: "system/system-test-helper.system.test.ts",
+  },
+  "actiontext:system/rich_text_editor_test.rb": {
+    package: "actiontext",
+    tsFile: "system/rich-text-editor.system.test.ts",
+  },
 };
 
 /**

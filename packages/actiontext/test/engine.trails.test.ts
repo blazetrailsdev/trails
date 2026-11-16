@@ -41,6 +41,7 @@ describe("ActionText::Engine", () => {
       "action_text.attachable",
       "action_text.helper",
       "action_text.renderer",
+      "action_text.system_test_helper",
       "action_text.configure",
     ]);
   });
