@@ -469,6 +469,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   reset(): this {
     this._arel = undefined;
+    this._fromLimitedIds = null;
     this._loaded = false;
     this._delegateToModel = false;
     this._offsets = undefined;
