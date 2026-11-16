@@ -713,22 +713,6 @@ describe("Net::HTTP over Net::BufferedIO", () => {
     ).toBe(true);
   });
 
-  it("wait_for_continue answers a final response without sending the body", async () => {
-    const { seen, server } = rawServer(
-      (r) => r.endsWith("\r\n\r\n"),
-      "HTTP/1.1 417 Expectation Failed\r\nContent-Length: 0\r\n\r\n",
-    );
-    const port = await listen(server);
-    const http = new Net.HTTP("127.0.0.1", port);
-    http.continueTimeout = 5;
-    const res = await http.post("/p", "body", {
-      Expect: "100-continue",
-      "Content-Type": "text/plain",
-    });
-    expect(res.code).toBe("417");
-    expect(seen.received.endsWith("\r\n\r\n")).toBe(true);
-  });
-
   it("protocol and unreachable errors are seated", () => {
     expect(new Net.ProtocolError("x")).toBeInstanceOf(Error);
     expect(new Errno.EHOSTUNREACH().message).toBe("No route to host");

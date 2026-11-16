@@ -63,17 +63,17 @@ describe("RackProxyTest", () => {
   }
   const get = (path: string) => request("GET", path);
 
-  async function assertGetsExampleDomain(streaming: boolean): Promise<void> {
+  async function getsExampleDomain(streaming: boolean): Promise<void> {
     await withWebrickProxy({ streaming }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/");
-      expect(lastResponse.status).toBe(200);
+      expect(lastResponse.status === 200).toBeTruthy();
       expect(lastResponse.body).toMatch(/Example Domain/);
     });
   }
 
-  it("http streaming", () => assertGetsExampleDomain(true));
-  it("http full request", () => assertGetsExampleDomain(false));
+  it("http streaming", () => getsExampleDomain(true));
+  it("http full request", () => getsExampleDomain(false));
 
   it("handles missing content length", async () => {
     await withWebrickProxy({}, async (port, proxy) => {
@@ -83,21 +83,23 @@ describe("RackProxyTest", () => {
       expect(lastResponse.body).toBe("");
     });
   });
-
   it("non rewindable body is forwarded without raising", async () => {
     await withWebrickProxy({ streaming: false }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       const io = new StringIO("hello=world");
       const body = { read: (...args: [number]) => io.read(...args) };
-      expect(!("rewind" in body), "fixture must not be rewindable to exercise the guard").toBe(
-        true,
-      );
+      expect(
+        !("rewind" in body),
+        "fixture must not be rewindable to exercise the guard",
+      ).toBeTruthy();
 
       const env = MockRequest.envFor("/echo-body", { ":method": "POST" });
       env["rack.input"] = body;
       env["CONTENT_LENGTH"] = "11";
       env["CONTENT_TYPE"] = "text/plain";
-      const [status, , response] = (await proxy.call(env)) as unknown as Triplet;
+      const call = proxy.call(env);
+      await expect(call).resolves.not.toThrow();
+      const [status, , response] = (await call) as unknown as Triplet;
       expect(status).toBe(200);
       expect(await bodyString(response), "body must be forwarded intact").toBe("hello=world");
     });
@@ -129,7 +131,7 @@ describe("RackProxyTest", () => {
     await expect(stream.read()).rejects.toThrow(constGet(Proxy, "InvalidRequest") as typeof Error);
   });
 
-  async function assertConnectionRefused(streaming: boolean): Promise<void> {
+  async function connectionRefused(streaming: boolean): Promise<void> {
     const [probe, closedPort] = await startServer();
     await probe.shutdown();
     app = new HostProxy({ allowDynamicBackend: true, streaming });
@@ -139,10 +141,10 @@ describe("RackProxyTest", () => {
     expect(lastResponse.body).toBe("");
   }
 
-  it("connection refused returns 502", () => assertConnectionRefused(false));
-  it("connection refused returns 502 streaming", () => assertConnectionRefused(true));
+  it("connection refused returns 502", () => connectionRefused(false));
+  it("connection refused returns 502 streaming", () => connectionRefused(true));
 
-  async function assertNoEntityBody(path: string, status: number, streaming: boolean) {
+  async function noEntityBody(path: string, status: number, streaming: boolean) {
     await withWebrickProxy({ streaming }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get(path);
@@ -151,10 +153,10 @@ describe("RackProxyTest", () => {
     });
   }
 
-  it("no entity body for 204", () => assertNoEntityBody("/no-content", 204, false));
-  it("no entity body for 304", () => assertNoEntityBody("/not-modified", 304, false));
-  it("no entity body for 204 streaming", () => assertNoEntityBody("/no-content", 204, true));
-  it("no entity body for 304 streaming", () => assertNoEntityBody("/not-modified", 304, true));
+  it("no entity body for 204", () => noEntityBody("/no-content", 204, false));
+  it("no entity body for 304", () => noEntityBody("/not-modified", 304, false));
+  it("no entity body for 204 streaming", () => noEntityBody("/no-content", 204, true));
+  it("no entity body for 304 streaming", () => noEntityBody("/not-modified", 304, true));
 
   it("connect and write timeouts are applied", () => {
     const proxy = new Proxy({ readTimeout: 5, openTimeout: 3, writeTimeout: 7 });
@@ -167,7 +169,6 @@ describe("RackProxyTest", () => {
     expect(http.openTimeout).toBe(3);
     expect(http.writeTimeout).toBe(7);
   });
-
   it("ca file and cert store are applied", () => {
     const store = new OpenSSL.X509.Store();
     const proxy = new Proxy({ caFile: "/tmp/some-ca.pem", certStore: store });
@@ -179,7 +180,6 @@ describe("RackProxyTest", () => {
     expect(http.caFile).toBe("/tmp/some-ca.pem");
     expect(http.certStore).toBe(store);
   });
-
   it("unknown method returns 501", async () => {
     await withWebrickProxy({ streaming: false }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
@@ -189,7 +189,6 @@ describe("RackProxyTest", () => {
       expect(status).toBe(501);
     });
   });
-
   it("disallowed backend returns 502", async () => {
     await withWebrickProxy({ streaming: false }, async (port, proxy) => {
       proxy.isBackendAllowed = () => false;
@@ -198,7 +197,6 @@ describe("RackProxyTest", () => {
       expect(lastResponse.status).toBe(502);
     });
   });
-
   it("dynamic backend refused by default", async () => {
     let port: number;
     [server, port] = await startServer();
@@ -219,7 +217,6 @@ describe("RackProxyTest", () => {
       /allow_dynamic_backend/,
     );
   });
-
   it("static backend requires no opt in", async () => {
     let port: number;
     [server, port] = await startServer();
@@ -228,7 +225,6 @@ describe("RackProxyTest", () => {
     expect(status).toBe(200);
     expect(await bodyString(body)).toMatch(/Example Domain/);
   });
-
   it("rack backend env requires no opt in", async () => {
     let port: number;
     [server, port] = await startServer();
@@ -239,7 +235,6 @@ describe("RackProxyTest", () => {
     expect(status).toBe(200);
     expect(await bodyString(body)).toMatch(/Example Domain/);
   });
-
   it("backend allowed consulted for static backend", async () => {
     let port: number;
     [server, port] = await startServer();
