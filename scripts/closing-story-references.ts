@@ -16,9 +16,9 @@ import { pathToFileURL } from "node:url";
 
 import { scanStoryReferences, type StoryReference } from "./stale-story-references.js";
 
-// The one definition of the trailer shape. `post-merge-findings/run.sh` matches
-// the same shape with `grep -oiE 'Closes-story:[[:space:]]*[a-z0-9][a-z0-9-]*'`,
-// so the gate and the marker can never disagree about what a PR closes.
+// The one definition of the trailer shape. `post-merge-findings/run.sh` reads
+// its ids from `check:closing-story-refs --ids`, so the gate and the marker can
+// never disagree about what a PR closes.
 const CLOSES_STORY = /^[^\S\n]*closes-story:[^\S\n]*([a-z0-9][a-z0-9-]*)[^\S\n]*$/gim;
 
 /**
@@ -94,7 +94,12 @@ async function resolveBody(argv: readonly string[]): Promise<string> {
 }
 
 export async function main(argv: readonly string[], repoRoot: string): Promise<number> {
-  const findings = await scanClosingStoryReferences(repoRoot, await resolveBody(argv));
+  const body = await resolveBody(argv);
+  if (argv.includes("--ids")) {
+    for (const id of closesStoryIds(body)) console.log(id);
+    return 0;
+  }
+  const findings = await scanClosingStoryReferences(repoRoot, body);
   if (findings.length === 0) {
     console.log("No pending citations of a story this PR closes.");
     return 0;

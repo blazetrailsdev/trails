@@ -385,7 +385,7 @@ jobs:
           hosted='"ubuntu-24.04"'
           self_hosted='["self-hosted","debian","ARM64"]'
           sqlite_runs_on=$hosted
-          sqlite_shards='[1, 2]'
+          sqlite_shards='[1, 2, 3]'
           unit_runs_on=$hosted
           unit_shards='[1, 2]'
           postgres_shards='[1, 2, 3]'

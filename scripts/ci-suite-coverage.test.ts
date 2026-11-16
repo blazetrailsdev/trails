@@ -1057,6 +1057,22 @@ describe("CI runs every tooling test suite", () => {
     expect(traced.db_adapter_affected).toBe("false");
   });
 
+  it("self-hosted-watchdog.sh re-runs only runs queued on offline runners", async () => {
+    const fx = path.join(REPO_ROOT, "scripts/ci/__fixtures__/self-hosted-watchdog");
+    const select = async (runners: string) =>
+      (
+        await execFileAsync("bash", [
+          path.join(REPO_ROOT, "scripts/ci/self-hosted-watchdog.sh"),
+          "--dry-run",
+          path.join(fx, runners),
+          path.join(fx, "jobs.json"),
+          "2026-11-16T11:00:00Z",
+        ])
+      ).stdout.trim();
+    expect(await select("runners-offline.json")).toBe("101");
+    expect(await select("runners-busy.json")).toBe("");
+  });
+
   it("pr-lanes.sh passes its self-test", async () => {
     const { stdout } = await execFileAsync("bash", [
       path.join(REPO_ROOT, "scripts/ci/pr-lanes.sh"),

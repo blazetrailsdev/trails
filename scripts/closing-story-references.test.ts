@@ -9,6 +9,11 @@ import {
 import { extractStoryReferences, type StoryReference } from "./stale-story-references.js";
 
 describe("closesStoryIds", () => {
+  it("reads neither a mid-line trailer nor keeps a mixed-case id", () => {
+    expect(closesStoryIds("This PR closes-story: foo\n")).toEqual([]);
+    expect(closesStoryIds("Closes-story: Some-Story\n")).toEqual(["some-story"]);
+  });
+
   it("parses the trailer case-insensitively", () => {
     expect(closesStoryIds("Body text.\n\nCloses-story: some-landed-story\n")).toEqual([
       "some-landed-story",
