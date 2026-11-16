@@ -1,45 +1,45 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import * as m0 from "./attachable.js";
-import * as m1 from "./attachables/content-attachment.js";
-import * as m2 from "./attachables/missing-attachable.js";
-import * as m3 from "./attachables/remote-image.js";
-import * as m4 from "./attachment-gallery.js";
-import * as m5 from "./attachment.js";
-import * as m6 from "./attachments/caching.js";
-import * as m7 from "./attachments/minification.js";
-import * as m8 from "./attachments/trix-conversion.js";
-import * as m9 from "./attribute.js";
-import * as m10 from "./app/helpers/action-text/content-helper.js";
-import * as m11 from "./content.js";
-import * as m12 from "./fragment.js";
-import * as m13 from "./gem-version.js";
-import * as m14 from "./html-conversion.js";
-import * as m15 from "./plain-text-conversion.js";
-import * as m16 from "./rendering.js";
-import * as m17 from "./serialization.js";
-import * as m18 from "./app/helpers/action-text/tag-helper.js";
+import * as m0 from "./app/helpers/action-text/content-helper.js";
+import * as m1 from "./app/helpers/action-text/tag-helper.js";
+import * as m2 from "./attachable.js";
+import * as m3 from "./attachables/content-attachment.js";
+import * as m4 from "./attachables/missing-attachable.js";
+import * as m5 from "./attachables/remote-image.js";
+import * as m6 from "./attachment-gallery.js";
+import * as m7 from "./attachment.js";
+import * as m8 from "./attachments/caching.js";
+import * as m9 from "./attachments/minification.js";
+import * as m10 from "./attachments/trix-conversion.js";
+import * as m11 from "./attribute.js";
+import * as m12 from "./content.js";
+import * as m13 from "./fragment.js";
+import * as m14 from "./gem-version.js";
+import * as m15 from "./html-conversion.js";
+import * as m16 from "./plain-text-conversion.js";
+import * as m17 from "./rendering.js";
+import * as m18 from "./serialization.js";
 import * as m19 from "./trix-attachment.js";
 
 defineConstants([
-  [() => m0.Attachable, "ActionText::Attachable"],
-  [() => m1.ContentAttachment, "ActionText::Attachables::ContentAttachment"],
-  [() => m2.MissingAttachable, "ActionText::Attachables::MissingAttachable"],
-  [() => m3.RemoteImage, "ActionText::Attachables::RemoteImage"],
-  [() => m5.Attachment, "ActionText::Attachment"],
-  [() => m4.AttachmentGallery, "ActionText::AttachmentGallery"],
-  [() => m6.Caching, "ActionText::Attachments::Caching"],
-  [() => m7.Minification, "ActionText::Attachments::Minification"],
-  [() => m8.TrixConversion, "ActionText::Attachments::TrixConversion"],
-  [() => m9.Attribute, "ActionText::Attribute"],
-  [() => m11.Content, "ActionText::Content"],
-  [() => m10.ContentHelper, "ActionText::ContentHelper"],
-  [() => m12.Fragment, "ActionText::Fragment"],
-  [() => m14.HtmlConversion, "ActionText::HtmlConversion"],
-  [() => m15.PlainTextConversion, "ActionText::PlainTextConversion"],
-  [() => m16.Rendering, "ActionText::Rendering"],
-  [() => m17.Serialization, "ActionText::Serialization"],
-  [() => m18.TagHelper, "ActionText::TagHelper"],
+  [() => m2.Attachable, "ActionText::Attachable"],
+  [() => m3.ContentAttachment, "ActionText::Attachables::ContentAttachment"],
+  [() => m4.MissingAttachable, "ActionText::Attachables::MissingAttachable"],
+  [() => m5.RemoteImage, "ActionText::Attachables::RemoteImage"],
+  [() => m7.Attachment, "ActionText::Attachment"],
+  [() => m6.AttachmentGallery, "ActionText::AttachmentGallery"],
+  [() => m8.Caching, "ActionText::Attachments::Caching"],
+  [() => m9.Minification, "ActionText::Attachments::Minification"],
+  [() => m10.TrixConversion, "ActionText::Attachments::TrixConversion"],
+  [() => m11.Attribute, "ActionText::Attribute"],
+  [() => m12.Content, "ActionText::Content"],
+  [() => m0.ContentHelper, "ActionText::ContentHelper"],
+  [() => m13.Fragment, "ActionText::Fragment"],
+  [() => m15.HtmlConversion, "ActionText::HtmlConversion"],
+  [() => m16.PlainTextConversion, "ActionText::PlainTextConversion"],
+  [() => m17.Rendering, "ActionText::Rendering"],
+  [() => m18.Serialization, "ActionText::Serialization"],
+  [() => m1.TagHelper, "ActionText::TagHelper"],
   [() => m19.TrixAttachment, "ActionText::TrixAttachment"],
-  [() => m13.VERSION, "ActionText::VERSION"],
-  [() => m18.ActionText, "ActionView::Helpers::Tags::ActionText"],
+  [() => m14.VERSION, "ActionText::VERSION"],
+  [() => m1.ActionText, "ActionView::Helpers::Tags::ActionText"],
 ]);
