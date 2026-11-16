@@ -214,9 +214,10 @@ describe("MethodCallAssertionsTest", () => {
 
   it("assert changes when assertions are included", async () => {
     const testUnitClass = class extends Test {
-      async testAssertChanges(this: Test & typeof Assertions): Promise<void> {
+      async testAssertChanges(): Promise<void> {
+        const self = this as Test & typeof Assertions;
         let counter = 1;
-        await this.assertChanges(
+        await self.assertChanges(
           () => counter,
           null,
           {},
