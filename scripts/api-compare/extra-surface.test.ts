@@ -17,6 +17,7 @@ import {
   concernHookNames,
   concernHookKey,
   inlinedModuleMembers,
+  countTsInternalNames,
 } from "./extra-surface.js";
 import type { TaggedEntry, TaggedSummary } from "./extra-surface.js";
 import { extractFromProgram } from "./extract-ts-api.js";
@@ -5325,5 +5326,18 @@ describe("thor scoring across lanes", () => {
       ]),
     );
     expect(extras(manifest({ thor: thorRuby, arel }))).toEqual(alone);
+  });
+});
+
+describe("countTsInternalNames", () => {
+  it("counts a non-public member but not a non-public constructor", () => {
+    const cls = {
+      ...rubyClass({
+        name: "Image",
+        file: "image.ts",
+        instance: [method("constructor", true), method("helper", true)],
+      }),
+    };
+    expect(countTsInternalNames("image.ts", [cls], [], undefined, [])).toBe(1);
   });
 });
