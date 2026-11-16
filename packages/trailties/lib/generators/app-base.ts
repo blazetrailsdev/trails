@@ -45,7 +45,7 @@ export type AppBaseOptions = GeneratorOptions & {
 export const NODE_LTS_VERSION = "20.11.1";
 export const BUN_VERSION = "1.0.1";
 
-export const JAVASCRIPT_OPTIONS = ["importmap", "bun", "webpack", "esbuild", "rollup"];
+export const JAVASCRIPT_OPTIONS = ["vite", "bun", "webpack", "esbuild", "rollup"];
 export const CSS_OPTIONS = ["tailwind", "bootstrap", "bulma", "postcss", "sass"];
 
 export interface AppBase extends Included<typeof AppName> {
@@ -531,7 +531,7 @@ ${requireStatements.join("\n")}`;
   protected usingJsRuntime(): boolean {
     const { javascript, css } = this.options;
     return (
-      (!!javascript && javascript !== "importmap") || (!!css && !["tailwind", "sass"].includes(css))
+      (!!javascript && javascript !== "vite") || (!!css && !["tailwind", "sass"].includes(css))
     );
   }
 
@@ -742,8 +742,8 @@ ${requireStatements.join("\n")}`;
     if (this.options.skipJavascript || !this.isInstall()) return;
 
     switch (this.options.javascript) {
-      case "importmap":
-        await this.trailsCommand("importmap:install");
+      case "vite":
+        await this.trailsCommand("vite:install");
         break;
       case "webpack":
       case "bun":
@@ -772,6 +772,17 @@ ${requireStatements.join("\n")}`;
     } else {
       await this.trailsCommand(`css:install:${this.options.css}`);
     }
+  }
+
+  /**
+   * @internal
+   * @missingRailsCall bundle_command — PERMANENT
+   */
+  protected async runKamal(): Promise<void> {
+    if (this.options.skipKamal || !this.isInstall()) return;
+
+    await this.template("kamal-secrets", ".kamal/secrets", { force: true });
+    await this.template("config/deploy.yml", { force: true });
   }
 
   /** @internal */

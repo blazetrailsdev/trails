@@ -522,7 +522,7 @@ export class AppGenerator extends AppBase {
     this.classOption("javascript", {
       type: "string",
       aliases: ["-j", "--js"],
-      default: "importmap",
+      default: "vite",
       enum: JAVASCRIPT_OPTIONS,
       desc: "Choose JavaScript approach",
     });
@@ -596,6 +596,10 @@ export class AppGenerator extends AppBase {
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
     this.publicCommand("generateBundlerBinstub");
+    this.publicCommand("runJavascript");
+    this.publicCommand("runHotwire");
+    this.publicCommand("runCss");
+    this.publicCommand("runKamal");
     this.publicCommand("runSolid");
     this.methodAdded("runAfterBundleCallbacks");
   }

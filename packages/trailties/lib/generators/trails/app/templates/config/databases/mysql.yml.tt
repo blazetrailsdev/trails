@@ -11,8 +11,44 @@ export default {
     host: "localhost",
     port: <%= this.database.port %>,
   },
+<% if (this.options.skipSolid) { -%>
   production: {
     adapter: "mysql2",
-    url: process.env.DATABASE_URL,
+    database: "<%= this.appName() %>_production",
+    username: "<%= this.appName() %>",
+    password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
   },
+<% } else { -%>
+  production: {
+    primary: {
+      adapter: "mysql2",
+      database: "<%= this.appName() %>_production",
+      username: "<%= this.appName() %>",
+      password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
+    },
+    cache: {
+      adapter: "mysql2",
+      database: "<%= this.appName() %>_production_cache",
+      username: "<%= this.appName() %>",
+      password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
+      migrationsPaths: "db/cache_migrate",
+    },
+    queue: {
+      adapter: "mysql2",
+      database: "<%= this.appName() %>_production_queue",
+      username: "<%= this.appName() %>",
+      password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
+      migrationsPaths: "db/queue_migrate",
+    },
+<% if (!this.options.skipActionCable) { -%>
+    cable: {
+      adapter: "mysql2",
+      database: "<%= this.appName() %>_production_cable",
+      username: "<%= this.appName() %>",
+      password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
+      migrationsPaths: "db/cable_migrate",
+    },
+<% } -%>
+  },
+<% } -%>
 };

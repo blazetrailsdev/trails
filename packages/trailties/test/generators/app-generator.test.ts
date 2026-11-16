@@ -856,11 +856,27 @@ describe("AppGenerator", () => {
     await assertNoGem("@blazetrails/solid-cable");
   });
 
+  it("configuration of solid", async () => {
+    await runGeneratorInstance([t.destinationRoot]);
+
+    await assertGem("@blazetrails/solid-cache");
+    await assertGem("@blazetrails/solid-queue");
+    await assertGem("@blazetrails/solid-cable");
+
+    await t.assertFile("config/database.ts", (content: string) => {
+      expect(content).toMatch(/cache:/);
+      expect(content).toMatch(/queue:/);
+      expect(content).toMatch(/cable:/);
+    });
+  });
+
   it("default generator executes all trails commands", async () => {
     const railsCommands = await runGeneratorInstance([t.destinationRoot]);
 
     const expectedCommands = [
       "credentials:diff --enroll",
+      "vite:install",
+      "turbo:install stimulus:install",
       "solid_cache:install solid_queue:install solid_cable:install",
     ];
     expect(railsCommands).toEqual(expectedCommands);
