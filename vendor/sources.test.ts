@@ -233,6 +233,7 @@ describe("vendor/sources.ts", () => {
       "mini-mime",
       "net-smtp",
       "vite-assets",
+      "vite-trails",
     ]);
     expect(apiComparePackages()).toContain("i18n");
     expect(Object.keys(libPathsManifest())).toContain("i18n");
@@ -451,6 +452,7 @@ describe("vendor/sources.ts", () => {
         "tzinfo",
         "zeitwerk",
         "vite-assets",
+        "vite-trails",
       ].sort(),
     );
   });
@@ -525,6 +527,7 @@ describe("vendor/sources.ts", () => {
         "tzinfo",
         "zeitwerk",
         "vite-assets",
+        "vite-trails",
       ].sort(),
     );
     expect(m["thor"].endsWith("vendor/thor/v1.3.2/spec")).toBe(true);
