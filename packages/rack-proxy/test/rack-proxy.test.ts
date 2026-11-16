@@ -403,13 +403,13 @@ describe("RackProxyTest", () => {
     });
   });
 
-  const credentials = { HTTP_COOKIE: "session=s3cr3t", HTTP_AUTHORIZATION: "Bearer tok" };
-  const forwardedFor = { HTTP_X_FORWARDED_FOR: "203.0.113.9", REMOTE_ADDR: "10.0.0.5" };
-
   it("strip credentials removes cookie and authorization", async () => {
     await withWebrickProxy({ stripCredentials: true }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
-      await get("/echo-request-headers", credentials);
+      await get("/echo-request-headers", {
+        HTTP_COOKIE: "session=s3cr3t",
+        HTTP_AUTHORIZATION: "Bearer tok",
+      });
       expect(lastResponse.status === 200).toBeTruthy();
       expect(lastResponse.body, "Cookie must be stripped").not.toMatch(/^cookie:/m);
       expect(lastResponse.body, "Authorization must be stripped").not.toMatch(/^authorization:/m);
@@ -419,7 +419,10 @@ describe("RackProxyTest", () => {
   it("credentials forwarded by default", async () => {
     await withWebrickProxy({}, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
-      await get("/echo-request-headers", credentials);
+      await get("/echo-request-headers", {
+        HTTP_COOKIE: "session=s3cr3t",
+        HTTP_AUTHORIZATION: "Bearer tok",
+      });
       expect(lastResponse.body).toMatch(/^cookie: session=s3cr3t$/m);
       expect(lastResponse.body).toMatch(/^authorization: Bearer tok$/m);
     });
@@ -428,7 +431,10 @@ describe("RackProxyTest", () => {
   it("replace x forwarded for hides inbound chain", async () => {
     await withWebrickProxy({ replaceXForwardedFor: true }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
-      await get("/echo-request-headers", forwardedFor);
+      await get("/echo-request-headers", {
+        HTTP_X_FORWARDED_FOR: "203.0.113.9",
+        REMOTE_ADDR: "10.0.0.5",
+      });
       expect(
         lastResponse.body,
         "inbound X-Forwarded-For must be replaced with REMOTE_ADDR",
@@ -439,7 +445,10 @@ describe("RackProxyTest", () => {
   it("x forwarded for appends by default", async () => {
     await withWebrickProxy({}, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
-      await get("/echo-request-headers", forwardedFor);
+      await get("/echo-request-headers", {
+        HTTP_X_FORWARDED_FOR: "203.0.113.9",
+        REMOTE_ADDR: "10.0.0.5",
+      });
       expect(lastResponse.body).toMatch(/^x-forwarded-for: 203\.0\.113\.9, 10\.0\.0\.5$/m);
     });
   });
@@ -517,9 +526,9 @@ describe("RackProxyTest", () => {
   it("header values are strings streaming", () => assertNoArrayHeaderValues(true));
   it("header values are strings non streaming", () => assertNoArrayHeaderValues(false));
 
-  async function loggerCapturesRequest(streaming: boolean): Promise<void> {
+  it("logger captures request in non streaming", async () => {
     const sink = new StringIO();
-    await withWebrickProxy({ streaming, logger: sink }, async (port, proxy) => {
+    await withWebrickProxy({ streaming: false, logger: sink }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/empty");
       expect(lastResponse.status === 200).toBeTruthy();
@@ -528,10 +537,20 @@ describe("RackProxyTest", () => {
       sink.string(),
       `expected debug output to include request line, got: ${JSON.stringify(sink.string())}`,
     ).toMatch(/GET \/empty/);
-  }
+  });
 
-  it("logger captures request in non streaming", () => loggerCapturesRequest(false));
-  it("logger captures request in streaming", () => loggerCapturesRequest(true));
+  it("logger captures request in streaming", async () => {
+    const sink = new StringIO();
+    await withWebrickProxy({ streaming: true, logger: sink }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      await get("/empty");
+      expect(lastResponse.status === 200).toBeTruthy();
+    });
+    expect(
+      sink.string(),
+      `expected debug output to include request line, got: ${JSON.stringify(sink.string())}`,
+    ).toMatch(/GET \/empty/);
+  });
 
   it("no logger means no debug output", async () => {
     await withWebrickProxy({ streaming: false }, async (port, proxy) => {
@@ -605,18 +624,21 @@ describe("RackProxyTest", () => {
     });
   });
 
-  async function maxResponseLengthRejects(streaming: boolean): Promise<void> {
-    await withWebrickProxy({ streaming, maxResponseLength: 10 }, async (port, proxy) => {
+  it("max response length rejects declared oversize non streaming", async () => {
+    await withWebrickProxy({ streaming: false, maxResponseLength: 10 }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/");
       expect(lastResponse.status).toBe(502);
     });
-  }
+  });
 
-  it("max response length rejects declared oversize non streaming", () =>
-    maxResponseLengthRejects(false));
-  it("max response length rejects declared oversize streaming", () =>
-    maxResponseLengthRejects(true));
+  it("max response length rejects declared oversize streaming", async () => {
+    await withWebrickProxy({ streaming: true, maxResponseLength: 10 }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      await get("/");
+      expect(lastResponse.status).toBe(502);
+    });
+  });
 
   it("max response length enforced while streaming chunked", async () => {
     await withWebrickProxy({ streaming: true, maxResponseLength: 5 }, async (port, proxy) => {
