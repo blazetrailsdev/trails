@@ -54,8 +54,10 @@ async function assertStoredSequence(result: JobResult, ...sequences: string[][])
 }
 
 async function waitForSemaphoresToBeReleasedFor(timeout: number) {
-  await waitWhileWithTimeout(timeout, () =>
-    Record.uncached(async () => await Semaphore.available().invertWhere().isAny()),
+  await waitWhileWithTimeout(
+    timeout,
+    async () =>
+      await Record.uncached(async () => await Semaphore.available().invertWhere().isAny()),
   );
 }
 
@@ -311,14 +313,21 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("discard jobs when concurrency limit is reached with on_conflict: :discard", async () => {
-    const job1 = await DiscardableUpdateResultJob.performLater(result, { name: "1", pause: 1 });
+    const job1 = (await DiscardableUpdateResultJob.performLater(result, {
+      name: "1",
+      pause: 1,
+    })) as DiscardableUpdateResultJob;
     await waitFor({ timeout: 2 }, async () => {
       const job = await Job.findBy({ active_job_id: job1.jobId });
       return (await job?.isClaimed()) ?? false;
     });
 
-    const job2 = await DiscardableUpdateResultJob.performLater(result, { name: "2" });
-    const job3 = await DiscardableUpdateResultJob.performLater(result, { name: "3" });
+    const job2 = (await DiscardableUpdateResultJob.performLater(result, {
+      name: "2",
+    })) as DiscardableUpdateResultJob;
+    const job3 = (await DiscardableUpdateResultJob.performLater(result, {
+      name: "3",
+    })) as DiscardableUpdateResultJob;
 
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
