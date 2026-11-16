@@ -252,7 +252,7 @@ export class Node extends XmlNode {
     };
     const encoding = opts.encoding || opts[0];
     const saveOptions = opts.saveWith || opts[1] || SaveOptions.FORMAT;
-    const indentTimes = opts.indent || 2;
+    const indentTimes = opts.indent ?? 2;
     const indentString = (opts.indentText || " ").repeat(indentTimes);
 
     const config = new SaveOptions(Number(saveOptions));

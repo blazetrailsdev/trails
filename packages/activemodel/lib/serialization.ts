@@ -130,8 +130,13 @@ export interface SerializeOptions {
     | string;
 }
 
+const _SERIALIZATION_READERS: Record<string, string> = { attachable_sgid: "attachableSgid" };
+
 export function readAttributeForSerialization(this: SerializationRecord, key: string): unknown {
-  return rbFSend(this, key);
+  return rbFSend(
+    this,
+    Object.hasOwn(_SERIALIZATION_READERS, key) ? _SERIALIZATION_READERS[key] : key,
+  );
 }
 
 /** @internal */
