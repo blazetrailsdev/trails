@@ -10,10 +10,7 @@ export class Map<V = unknown> {
     this._mutex = new Mutex();
   }
 
-  /**
-   * @inventedArm if — PERMANENT
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   set(cref: Cref, value: V): V {
     let raised = false;
     let result!: V;
@@ -31,10 +28,7 @@ export class Map<V = unknown> {
     return result;
   }
 
-  /**
-   * @inventedArm if — PERMANENT
-   * @noRailsEquivalent PERMANENT
-   */
+  /** @noRailsEquivalent PERMANENT */
   get(cref: Cref): V | null {
     let raised = false;
     let result!: V | null;
