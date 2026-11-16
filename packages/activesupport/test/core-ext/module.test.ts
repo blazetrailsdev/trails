@@ -377,7 +377,7 @@ describe("ModuleTest", () => {
     try {
       someone.foo();
     } catch (e) {
-      const fileAndLine = "module.test.ts";
+      const fileAndLine = `module.test.ts:${Someone.FAILED_DELEGATE_LINE}`;
       assert(
         (e as Error).stack!.split("\n").some((a) => a.includes(fileAndLine)),
         `[${(e as Error).stack}] did not include [${fileAndLine}]`,
@@ -390,7 +390,7 @@ describe("ModuleTest", () => {
     try {
       someone.bar();
     } catch (e) {
-      const fileAndLine = "module.test.ts";
+      const fileAndLine = `module.test.ts:${Someone.FAILED_DELEGATE_LINE_2}`;
       assert(
         (e as Error).stack!.split("\n").some((a) => a.includes(fileAndLine)),
         `[${(e as Error).stack}] did not include [${fileAndLine}]`,

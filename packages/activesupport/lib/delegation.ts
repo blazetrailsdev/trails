@@ -84,7 +84,8 @@ export namespace Delegation {
     options: DelegateOptions = {},
   ): string[] {
     if (owner instanceof Module) {
-      return owner.moduleEval((mod) => generate(mod, methods, options));
+      const located = { ...options, location: options.location ?? callerLocations(1, 1)[0] };
+      return owner.moduleEval((mod) => generate(mod, methods, located));
     }
     const { to = null, prefix = null, allowNil = null, as = null, signature = null } = options;
     let location = options.location ?? null;
@@ -190,7 +191,7 @@ export namespace Delegation {
         continue;
       }
 
-      const value = function (this: Record<string, unknown>, ...args: unknown[]) {
+      const body = function (this: Record<string, unknown>, ...args: unknown[]) {
         const _ = resolve(this);
         if (_ == null && nilable !== false)
           return Object.hasOwn(NilClass, method) ? NilClass[method].apply(null, args) : undefined;
@@ -229,6 +230,7 @@ export namespace Delegation {
         });
         continue;
       }
+      const value = moduleEval(body, file, line);
       const methodObject = descriptor?.value;
       if (signature != null) {
         Object.defineProperty(value, "length", {
@@ -259,6 +261,17 @@ export namespace Delegation {
     }
 
     return methodNames;
+  }
+
+  function moduleEval(
+    body: (this: Record<string, unknown>, ...args: unknown[]) => unknown,
+    file: string,
+    line: number,
+  ): (this: Record<string, unknown>, ...args: unknown[]) => unknown {
+    return new Function(
+      "body",
+      `${"\n".repeat(Math.max(0, line - 3))}return function (...args) { return body.apply(this, args); };\n//# sourceURL=${file.replace(/[^/]*$/, "./$&")}`,
+    )(body) as (this: Record<string, unknown>, ...args: unknown[]) => unknown;
   }
 
   const methodMissingLayers = new WeakSet<object>();
