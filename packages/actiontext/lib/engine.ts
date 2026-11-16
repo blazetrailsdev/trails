@@ -136,9 +136,9 @@ export class Engine extends TrailsEngine {
       }
     });
 
-    this.initializer("action_text.system_test_helper", () => {
-      onLoad("action_dispatch_system_test_case", async function (this: object) {
-        const { SystemTestHelper } = await import("@blazetrails/actiontext/system-test-helper");
+    this.initializer("action_text.system_test_helper", async () => {
+      const { SystemTestHelper } = await import("@blazetrails/actiontext/system-test-helper");
+      onLoad("action_dispatch_system_test_case", function (this: object) {
         include(this as never, SystemTestHelper);
       });
     });
