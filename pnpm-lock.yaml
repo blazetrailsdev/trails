@@ -1347,6 +1347,9 @@ importers:
 
   packages/vite-trails:
     dependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport

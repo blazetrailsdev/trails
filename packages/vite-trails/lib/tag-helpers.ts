@@ -123,7 +123,9 @@ export const TagHelpers = {
     const srcset = options["srcset"];
     if (srcset != null && srcset !== false && typeof srcset !== "string") {
       const entries: string[] = [];
-      for (const [srcName, size] of Object.entries(srcset as Options))
+      for (const [srcName, size] of Array.isArray(srcset)
+        ? (srcset as [string, unknown][])
+        : Object.entries(srcset as Options))
         entries.push(`${await this.viteAssetPath(srcName)} ${String(size)}`);
       options["srcset"] = entries.join(", ");
     }

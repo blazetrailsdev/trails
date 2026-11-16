@@ -1,3 +1,4 @@
+import { ActionController } from "@blazetrails/actionpack";
 import { onLoad, TopLevel } from "@blazetrails/activesupport";
 import { constDefined, include, Pathname } from "@blazetrails/ruby-compat";
 import type { Application } from "@blazetrails/trailties";
@@ -6,10 +7,6 @@ import { ViteAssets } from "@blazetrails/vite-assets";
 import { TagHelpers } from "./tag-helpers.js";
 import { ViteTrails } from "./vite-trails.js";
 
-interface HelperHost {
-  helper(...modules: unknown[]): void;
-}
-
 export class Engine extends TrailsEngine {
   static {
     ViteTrails.Engine = this;
@@ -17,8 +14,8 @@ export class Engine extends TrailsEngine {
     TrailsEngine.register(this, decodeURIComponent(new URL(".", import.meta.url).pathname));
 
     this.initializer("vite_trails.helper", () => {
-      onLoad("action_controller", function (this: HelperHost) {
-        this.helper(TagHelpers);
+      onLoad("action_controller", () => {
+        ActionController.Base.helper(TagHelpers);
       });
 
       onLoad("action_view", function (this: abstract new (...args: never[]) => unknown) {

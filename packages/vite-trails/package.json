@@ -23,6 +23,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
