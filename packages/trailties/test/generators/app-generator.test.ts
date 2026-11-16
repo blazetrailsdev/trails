@@ -57,6 +57,29 @@ function assertNoGem(name: string): Promise<void> {
   });
 }
 
+async function runGeneratorInstance(args: string[]): Promise<string[]> {
+  const railsCommands: string[] = [];
+  const proto = AppGenerator.prototype as unknown as {
+    isInstall(): boolean;
+    runInstall(): Promise<void>;
+    generateBundlerBinstub(): Promise<void>;
+  };
+  const stubs = [
+    vi.spyOn(proto, "isInstall").mockReturnValue(true),
+    vi.spyOn(proto, "runInstall").mockResolvedValue(undefined),
+    vi.spyOn(proto, "generateBundlerBinstub").mockResolvedValue(undefined),
+    vi.spyOn(Actions, "trailsCommand").mockImplementation(async (command: string) => {
+      railsCommands.push(command);
+    }),
+  ];
+  try {
+    await t.runGenerator(args);
+  } finally {
+    for (const stub of stubs) stub.mockRestore();
+  }
+  return railsCommands;
+}
+
 function json(content: string) {
   return JSON.parse(content);
 }
@@ -824,33 +847,25 @@ describe("AppGenerator", () => {
       });
   });
   it("skip solid option", async () => {
-    const trailsCommands: string[] = [];
-    const proto = AppGenerator.prototype as unknown as {
-      isInstall(): boolean;
-      runInstall(): Promise<void>;
-      generateBundlerBinstub(): Promise<void>;
-    };
-    const spies = [
-      vi.spyOn(proto, "isInstall").mockReturnValue(true),
-      vi.spyOn(proto, "runInstall").mockResolvedValue(undefined),
-      vi.spyOn(proto, "generateBundlerBinstub").mockResolvedValue(undefined),
-      vi.spyOn(Actions, "trailsCommand").mockImplementation(async (command: string) => {
-        trailsCommands.push(command);
-      }),
-    ];
-    try {
-      await t.runGenerator([t.destinationRoot, "--skip-solid"]);
-    } finally {
-      for (const spy of spies) spy.mockRestore();
-    }
+    const railsCommands = await runGeneratorInstance([t.destinationRoot, "--skip-solid"]);
 
     expect(
-      trailsCommands,
+      railsCommands,
       "`solid_cache:install solid_queue:install solid_cable:install` expected to not be called.",
     ).not.toContain("solid_cache:install solid_queue:install solid_cable:install");
     await assertNoGem("@blazetrails/solid-cache");
     await assertNoGem("@blazetrails/solid-queue");
     await assertNoGem("@blazetrails/solid-cable");
+  });
+
+  it("default generator executes all trails commands", async () => {
+    const railsCommands = await runGeneratorInstance([t.destinationRoot]);
+
+    const expectedCommands = [
+      "credentials:diff --enroll",
+      "solid_cache:install solid_queue:install solid_cable:install",
+    ];
+    expect(railsCommands).toEqual(expectedCommands);
   });
 
   it("devcontainer include redis skipping solid", async () => {
