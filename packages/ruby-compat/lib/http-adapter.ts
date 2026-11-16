@@ -83,18 +83,25 @@ export interface HttpDebugOutput {
 export interface HttpConnectOptions {
   host: string;
   port: number;
+  localAddress?: string | null;
+  localPort?: number | null;
 }
 
 /** @noRailsEquivalent PERMANENT */
 export interface HttpSslOptions {
   sslHostAddress: string | null;
   verifyPeer: boolean;
+  ca?: string[] | null;
+  defaultPaths?: boolean;
+  minVersion?: "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3";
+  maxVersion?: "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3";
 }
 
 export interface HttpAdapter {
   createServer(handler: (req: HttpRequest, res: HttpResponse) => void): HttpServer;
   connect?(options: HttpConnectOptions): Promise<HttpClientSocket>;
   getaddress?(host: string): Promise<string>;
+  getaddrinfo?(host: string): Promise<string[]>;
 }
 
 const registry = new Map<string, HttpAdapter>();
@@ -151,8 +158,16 @@ type NodeHttp = {
   createServer: (handler: (req: HttpRequest, res: HttpResponse) => void) => HttpServer;
 };
 
-type NodeNet = { connect(options: Record<string, unknown>): NodeSocket };
-type NodeDns = { promises: { lookup(host: string): Promise<{ address: string }> } };
+type NodeNet = {
+  connect(options: Record<string, unknown>): NodeSocket;
+  rootCertificates?: readonly string[];
+};
+type NodeDns = {
+  promises: {
+    lookup(host: string): Promise<{ address: string }>;
+    lookup(host: string, options: { all: true }): Promise<{ address: string }[]>;
+  };
+};
 
 function _nodeWait(
   sock: NodeSocket,
@@ -228,6 +243,11 @@ class _NodeClientSocket implements HttpClientSocket {
         socket: this.io,
         ...(options.sslHostAddress !== null && { servername: options.sslHostAddress }),
         rejectUnauthorized: options.verifyPeer,
+        ...(options.ca != null && {
+          ca: options.defaultPaths ? [...this.tls.rootCertificates!, ...options.ca] : options.ca,
+        }),
+        ...(options.minVersion !== undefined && { minVersion: options.minVersion }),
+        ...(options.maxVersion !== undefined && { maxVersion: options.maxVersion }),
       });
       this.ssl = true;
       this.bind("on");
@@ -275,7 +295,13 @@ class _NodeClientSocket implements HttpClientSocket {
 
 function _nodeConnect(net: NodeNet, tls: NodeNet, options: HttpConnectOptions) {
   return new Promise<HttpClientSocket>((resolve, reject) => {
-    const io = net.connect({ host: options.host, port: options.port, noDelay: true });
+    const io = net.connect({
+      host: options.host,
+      port: options.port,
+      noDelay: true,
+      ...(options.localAddress != null && { localAddress: options.localAddress }),
+      ...(options.localPort != null && { localPort: options.localPort }),
+    });
     io.once("error", reject);
     io.once("connect", () => {
       io.removeListener("error", reject as never);
@@ -303,6 +329,8 @@ function tryAutoRegisterNode(): boolean {
       createServer: (handler) => http.createServer(handler),
       connect: (options) => _nodeConnect(net, tls, options),
       getaddress: async (host) => (await dns.promises.lookup(host)).address,
+      getaddrinfo: async (host) =>
+        (await dns.promises.lookup(host, { all: true })).map((ai) => ai.address),
     });
     return true;
   } catch {

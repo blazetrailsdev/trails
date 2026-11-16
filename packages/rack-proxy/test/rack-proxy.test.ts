@@ -6,6 +6,8 @@ import {
   Net,
   OpenSSL,
   rbModMethodDefined,
+  Addrinfo,
+  SocketError,
   rbObjIvarGet,
   StringIO,
   TopLevel,
@@ -16,6 +18,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { Proxy } from "../lib/index.js";
 import {
+  caFile,
   GZIP_PLAINTEXT,
   startServer,
   withRawBackend,
@@ -55,11 +58,11 @@ describe("RackProxyTest", () => {
   });
 
   async function withWebrickProxy(
-    proxyOpts: Record<string, unknown>,
+    { ssl = false, caSigned = false, ...proxyOpts }: Record<string, unknown>,
     block: (port: number, proxy: HostProxy) => Promise<void>,
   ): Promise<void> {
     let port: number;
-    [server, port] = await startServer();
+    [server, port] = await startServer({ ssl: ssl as boolean, caSigned: caSigned as boolean });
     app = new HostProxy({ allowDynamicBackend: true, ...proxyOpts });
     await block(port, app);
   }
@@ -87,6 +90,63 @@ describe("RackProxyTest", () => {
 
   it("http streaming", () => getsExampleDomain(true));
   it("http full request", () => getsExampleDomain(false));
+
+  async function getsExampleDomainOverTls(opts: Record<string, unknown>): Promise<void> {
+    await withWebrickProxy({ ssl: true, ...opts }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      await get("https://example.com");
+      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.body).toMatch(/Example Domain/);
+    });
+  }
+
+  it("https streaming", () => getsExampleDomainOverTls({ sslVerifyNone: true }));
+  it("https streaming tls", () =>
+    getsExampleDomainOverTls({ sslVerifyNone: true, minVersion: "TLS1_2" }));
+  it("https full request", () =>
+    getsExampleDomainOverTls({ streaming: false, sslVerifyNone: true }));
+  it("https full request tls", () =>
+    getsExampleDomainOverTls({ streaming: false, sslVerifyNone: true, sslVersion: "TLSv1_2" }));
+
+  it("https default rejects invalid certificate", async () => {
+    const sink = new StringIO();
+    await withWebrickProxy({ ssl: true, streaming: false, logger: sink }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      await get("https://example.com/");
+      expect(lastResponse.status).toBe(502);
+      expect(sink.string()).toMatch(/SSLError|certificate verify failed/);
+    });
+  });
+  it("https default rejects invalid certificate streaming", async () => {
+    const sink = new StringIO();
+    await withWebrickProxy({ ssl: true, streaming: true, logger: sink }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      await get("https://example.com/");
+      expect(lastResponse.status).toBe(502);
+      expect(sink.string()).toMatch(/SSLError|certificate verify failed/);
+    });
+  });
+  it("https with ssl verify none accepts invalid certificate", async () => {
+    await withWebrickProxy(
+      { ssl: true, streaming: false, sslVerifyNone: true },
+      async (port, proxy) => {
+        proxy.host = `127.0.0.1:${port}`;
+        await get("https://example.com/");
+        expect(lastResponse.status === 200).toBeTruthy();
+      },
+    );
+  });
+  it("https ca file accepts trusted cert non streaming", () =>
+    getsExampleDomainOverTls({ caSigned: true, streaming: false, caFile: caFile() }));
+  it("https ca file accepts trusted cert streaming", () =>
+    getsExampleDomainOverTls({ caSigned: true, streaming: true, caFile: caFile() }));
+  it("https ca signed cert rejected without ca file", async () => {
+    await withWebrickProxy({ ssl: true, caSigned: true, streaming: false }, async (port, proxy) => {
+      proxy.host = `127.0.0.1:${port}`;
+      await get("https://example.com/");
+      expect(lastResponse.status).toBe(502);
+    });
+  });
 
   it("handles missing content length", async () => {
     await withWebrickProxy({}, async (port, proxy) => {
@@ -156,6 +216,22 @@ describe("RackProxyTest", () => {
 
   it("connection refused returns 502", () => connectionRefused(false));
   it("connection refused returns 502 streaming", () => connectionRefused(true));
+
+  it("unknown host returns 502", async () => {
+    const resolver = Addrinfo.getaddrinfo;
+    Addrinfo.getaddrinfo = (host, ...args) => {
+      if (host === "no-such-host.invalid") throw new SocketError("offline test: host not found");
+      return resolver.call(Addrinfo, host, ...args);
+    };
+    try {
+      app = new HostProxy({ allowDynamicBackend: true, streaming: false });
+      app.host = "no-such-host.invalid";
+      await get("/");
+      expect(lastResponse.status).toBe(502);
+    } finally {
+      Addrinfo.getaddrinfo = resolver;
+    }
+  });
 
   async function noEntityBody(path: string, status: number, streaming: boolean) {
     await withWebrickProxy({ streaming }, async (port, proxy) => {
@@ -369,18 +445,6 @@ describe("RackProxyTest", () => {
     });
   });
 
-  // BLOCKED: rack-proxy-tls-test-fixtures
-  it.skip("https streaming", () => {});
-  it.skip("https streaming tls", () => {});
-  it.skip("https full request", () => {});
-  it.skip("https full request tls", () => {});
-  it.skip("https default rejects invalid certificate", () => {});
-  it.skip("https default rejects invalid certificate streaming", () => {});
-  it.skip("https with ssl verify none accepts invalid certificate", () => {});
-  it.skip("https ca file accepts trusted cert non streaming", () => {});
-  it.skip("https ca file accepts trusted cert streaming", () => {});
-  it.skip("https ca signed cert rejected without ca file", () => {});
-
   it("response header included Hop by hop", async () => {
     await withWebrickProxy({ streaming: true }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
@@ -395,9 +459,6 @@ describe("RackProxyTest", () => {
       expect(lastResponse.body, "chunked body must still be forwarded").toMatch(/chunk-one/);
     });
   });
-
-  // BLOCKED: rack-proxy-unknown-host-addrinfo-stub
-  it.skip("unknown host returns 502", () => {});
 
   it("head request streaming", async () => {
     await withWebrickProxy({ streaming: true }, async (port, proxy) => {

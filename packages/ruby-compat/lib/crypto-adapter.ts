@@ -51,6 +51,14 @@ export interface CryptoAdapter {
   ): Promise<Bytes>;
   timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
   getCipherInfo?(name: string): { keyLength: number; ivLength: number; mode: string } | undefined;
+  generateRsaKeyPair?(modulusLength: number): RsaKeyPair;
+  sign?(algorithm: string, data: Uint8Array, privateKeyPem: string): Bytes;
+}
+
+/** @noRailsEquivalent PERMANENT */
+export interface RsaKeyPair {
+  publicKeyDer: Uint8Array;
+  privateKeyPem: string;
 }
 
 export interface HashAdapter {
@@ -98,6 +106,15 @@ interface NodeCrypto {
   ): void;
   timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean;
   getCipherInfo(name: string): { keyLength?: number; ivLength?: number; mode?: string } | undefined;
+  generateKeyPairSync(
+    type: "rsa",
+    options: {
+      modulusLength: number;
+      publicKeyEncoding: { type: "spki"; format: "der" };
+      privateKeyEncoding: { type: "pkcs8"; format: "pem" };
+    },
+  ): { publicKey: Uint8Array; privateKey: string };
+  sign(algorithm: string, data: Uint8Array, key: string): Bytes;
 }
 
 function wrapNodeCrypto(nodeCrypto: NodeCrypto): CryptoAdapter {
@@ -145,6 +162,17 @@ function wrapNodeCrypto(nodeCrypto: NodeCrypto): CryptoAdapter {
       const info = nodeCrypto.getCipherInfo(name);
       if (!info || info.keyLength == null || info.ivLength == null) return undefined;
       return { keyLength: info.keyLength, ivLength: info.ivLength, mode: info.mode ?? "" };
+    },
+    generateRsaKeyPair(modulusLength: number): RsaKeyPair {
+      const { publicKey, privateKey } = nodeCrypto.generateKeyPairSync("rsa", {
+        modulusLength,
+        publicKeyEncoding: { type: "spki", format: "der" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      });
+      return { publicKeyDer: publicKey, privateKeyPem: privateKey };
+    },
+    sign(algorithm: string, data: Uint8Array, privateKeyPem: string): Bytes {
+      return nodeCrypto.sign(algorithm, data, privateKeyPem);
     },
   };
 }
