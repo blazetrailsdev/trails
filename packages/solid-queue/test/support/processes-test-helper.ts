@@ -1,7 +1,8 @@
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
-import { Errno, SystemExit } from "@blazetrails/ruby-compat";
+import { Errno, SystemExit, Timeout } from "@blazetrails/ruby-compat";
 import { Process } from "../../lib/process.js";
+import { Record as SolidQueueRecord } from "../../lib/record.js";
 import { Supervisor } from "../../lib/supervisor.js";
 
 export const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
@@ -64,6 +65,18 @@ export function signalProcess(
 export async function waitWhileWithTimeout(timeout: number, block: () => Promise<boolean>) {
   const end = Date.now() + timeout * 1000;
   while (Date.now() < end && (await block())) await sleep(0.05);
+}
+
+export async function waitFor(
+  { timeout = 1, interval = 0.05 }: { timeout?: number; interval?: number } = {},
+  block: () => Promise<boolean>,
+) {
+  const end = Date.now() + timeout * 1000;
+  while (Date.now() < end) {
+    if (await SolidQueueRecord.uncached(block)) return;
+    await sleep(interval);
+  }
+  throw new Timeout.Error("execution expired");
 }
 
 export async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {

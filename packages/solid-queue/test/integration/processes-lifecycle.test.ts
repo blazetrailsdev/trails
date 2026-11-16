@@ -27,6 +27,7 @@ import {
   runSupervisor,
   signalProcess,
   sleep,
+  waitFor,
   waitForProcessTerminationWithTimeout,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
@@ -262,16 +263,8 @@ describe("ProcessesLifecycleTest", () => {
       });
 
       await waitForJobsToFinishFor(3, { except: pause });
-      await waitWhileWithTimeout(
-        5,
-        async () =>
-          !(await Record.uncached(() =>
-            JobResult.where({
-              queue_name: "background",
-              status: "started",
-              value: "pause",
-            }).isExists(),
-          )),
+      await waitFor({ timeout: 5 }, () =>
+        JobResult.where({ queue_name: "background", status: "started", value: "pause" }).isExists(),
       );
       await assertStartedJobResult("pause");
 
