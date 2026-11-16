@@ -445,7 +445,8 @@ describe("Trails.application integration (boot-app fixture)", () => {
 
     await Trails.initialize();
 
-    expect(ActionController.Base._routes).toBe(app.routes());
+    expect(ActionController.Base._routes).not.toBe(app.routes());
+    expect(class extends ActionController.Base {}._routes).toBe(app.routes());
     const [status, , body] = await (rbFSend(app.app(), "call", {
       REQUEST_METHOD: "GET",
       PATH_INFO: "/posts/show",

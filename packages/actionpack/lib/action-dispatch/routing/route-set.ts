@@ -718,6 +718,7 @@ export class NamedRouteCollection {
     supportsPath: boolean,
     installed?: Map<string, PropertyDescriptor>,
     includes?: Map<string, PropertyDescriptor>[],
+    wrap?: (name: string, descriptor: PropertyDescriptor) => PropertyDescriptor,
   ): void {
     if (!installed) {
       installed = new Map();
@@ -738,6 +739,7 @@ export class NamedRouteCollection {
       supportsPath,
       installed,
       includes: includes ?? [installed],
+      wrap,
     });
   }
 
@@ -750,7 +752,8 @@ export class NamedRouteCollection {
         continue;
       }
       if (isPath && !includer.supportsPath) continue;
-      const descriptor = { value: method, writable: true, configurable: true, enumerable: false };
+      const raw = { value: method, writable: true, configurable: true, enumerable: false };
+      const descriptor = includer.wrap ? includer.wrap(name, raw) : raw;
       const below = includer.includes.slice(0, includer.includes.indexOf(includer.installed) + 1);
       const isOutranked =
         Object.hasOwn(proto, name) &&
@@ -783,6 +786,7 @@ interface IncludedHelpers {
   supportsPath: boolean;
   installed: Map<string, PropertyDescriptor>;
   includes: Map<string, PropertyDescriptor>[];
+  wrap?: (name: string, descriptor: PropertyDescriptor) => PropertyDescriptor;
 }
 
 export type UrlHelpersModule = { prototype: object } & Record<

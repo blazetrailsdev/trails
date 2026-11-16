@@ -78,7 +78,7 @@ describe("WithMountPoint", () => {
       return Routes;
     }
 
-    override get app(): unknown {
+    override get app() {
       return APP;
     }
   }

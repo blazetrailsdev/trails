@@ -169,7 +169,9 @@ describe("withRoutesHelpers", () => {
       cls as unknown as RoutesHelpersControllerClass,
     );
 
-    expect((new cls() as unknown as { helper(): string }).helper()).toBe("lower");
+    expect((new (class extends cls {})() as unknown as { helper(): string }).helper()).toBe(
+      "lower",
+    );
   });
 
   it("crosses a named route drawn after the first helper read", () => {
@@ -179,7 +181,10 @@ describe("withRoutesHelpers", () => {
     });
     const cls = class {};
     RoutesHelpers.with(routes)(cls as unknown as RoutesHelpersControllerClass);
-    const instance = new cls() as unknown as { postsPath?: unknown; commentsPath?: unknown };
+    const instance = new (class extends cls {})() as unknown as {
+      postsPath?: unknown;
+      commentsPath?: unknown;
+    };
     expect(typeof instance.postsPath).toBe("function");
 
     routes.draw(function () {

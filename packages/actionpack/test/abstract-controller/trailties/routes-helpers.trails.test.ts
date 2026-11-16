@@ -16,7 +16,9 @@ describe("RoutesHelpers.with (trails)", () => {
     const wired = cls as unknown as RoutesHelpersControllerClass;
     RoutesHelpers.with({ urlHelpers: () => ({ rootPath: () => "/a" }) })(wired);
     RoutesHelpers.with({ urlHelpers: () => ({ rootPath: () => "/b" }) })(wired);
-    expect((new cls() as unknown as { rootPath(): string }).rootPath()).toBe("/b");
+    expect((new (class extends cls {})() as unknown as { rootPath(): string }).rootPath()).toBe(
+      "/b",
+    );
   });
 
   it("a route drawn later does not replace a method the class defined after the include", () => {
@@ -34,7 +36,9 @@ describe("RoutesHelpers.with (trails)", () => {
     routes.draw(function () {
       this.get("posts", { to: "posts#index", as: "posts" });
     });
-    expect((new cls() as unknown as { postsPath(): string }).postsPath()).toBe("mine");
+    expect((new (class extends cls {})() as unknown as { postsPath(): string }).postsPath()).toBe(
+      "mine",
+    );
   });
 
   it("a redraw of an earlier route set does not replace a later one's helper", () => {
@@ -50,11 +54,11 @@ describe("RoutesHelpers.with (trails)", () => {
     const wired = cls as unknown as RoutesHelpersControllerClass;
     RoutesHelpers.with(a)(wired);
     RoutesHelpers.with(b)(wired);
-    const own = Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value;
+    const own = Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.get;
     draw(a, "a2");
-    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value).toBe(own);
+    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.get).toBe(own);
     a.namedRoutes.clear();
-    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value).toBe(own);
+    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.get).toBe(own);
   });
 
   it("clearing a later route set falls back to an earlier one's helper", () => {
@@ -68,10 +72,10 @@ describe("RoutesHelpers.with (trails)", () => {
     const cls = class {};
     const wired = cls as unknown as RoutesHelpersControllerClass;
     RoutesHelpers.with(a)(wired);
-    const fromA = Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value;
+    const fromA = Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.get;
     RoutesHelpers.with(b)(wired);
     b.namedRoutes.clear();
-    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.value).toBe(fromA);
+    expect(Object.getOwnPropertyDescriptor(cls.prototype, "postsPath")!.get).toBe(fromA);
   });
 
   it("a route drawn in a later include outranks an earlier include's helper", () => {
@@ -89,7 +93,9 @@ describe("RoutesHelpers.with (trails)", () => {
     later.draw(function () {
       this.get("later_posts", { to: "posts#index", as: "posts" });
     });
-    expect((new cls() as unknown as { postsPath(): string }).postsPath()).toBe("/later_posts");
+    expect((new (class extends cls {})() as unknown as { postsPath(): string }).postsPath()).toBe(
+      "/later_posts",
+    );
   });
 
   it("clearing a later include restores the earlier include's redrawn helper", () => {
@@ -110,7 +116,9 @@ describe("RoutesHelpers.with (trails)", () => {
       this.get("redrawn", { to: "posts#index", as: "posts" });
     });
     later.namedRoutes.clear();
-    expect((new cls() as unknown as { postsPath(): string }).postsPath()).toBe("/redrawn");
+    expect((new (class extends cls {})() as unknown as { postsPath(): string }).postsPath()).toBe(
+      "/redrawn",
+    );
   });
 
   it("splices nothing into the class's prototype chain", () => {
@@ -125,7 +133,9 @@ describe("RoutesHelpers.with (trails)", () => {
     const wired = cls as unknown as RoutesHelpersControllerClass;
     wired.trailtieRoutesUrlHelpers = () => ({ enginePath: () => "/engine" });
     RoutesHelpers.with(new RouteSet())(wired);
-    expect((new cls() as unknown as { enginePath(): string }).enginePath()).toBe("/engine");
+    expect((new (class extends cls {})() as unknown as { enginePath(): string }).enginePath()).toBe(
+      "/engine",
+    );
   });
 
   it("redefines a getter-only _routes the class extended from UrlFor::ClassMethods", () => {
@@ -136,6 +146,7 @@ describe("RoutesHelpers.with (trails)", () => {
       }
     };
     RoutesHelpers.with(routes)(cls as unknown as RoutesHelpersControllerClass);
-    expect((cls as unknown as { _routes: unknown })._routes).toBe(routes);
+    expect((cls as unknown as { _routes: unknown })._routes).toBeNull();
+    expect((class extends cls {} as unknown as { _routes: unknown })._routes).toBe(routes);
   });
 });

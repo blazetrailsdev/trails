@@ -35,7 +35,10 @@ import { CookieStore } from "../../../../lib/action-dispatch/middleware/session/
 import { ShowExceptions } from "../../../../lib/action-dispatch/middleware/show-exceptions.js";
 import type { MiddlewareFactory } from "../../../../lib/action-dispatch/middleware/stack.js";
 import type { RouteSet } from "../../../../lib/action-dispatch/routing/route-set.js";
-import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";
+import {
+  IntegrationTest,
+  type RoutesApp,
+} from "../../../../lib/action-dispatch/testing/integration.js";
 import { CookieAssertions } from "../../../support/abstract-unit.js";
 
 const SessionKey = "_myapp_session";
@@ -171,7 +174,7 @@ class CookieStoreTest extends IntegrationTest {
     return Object.assign((this._cookieOptions ??= { key: SessionKey }), options);
   }
 
-  override get app(): unknown {
+  override get app(): RoutesApp {
     return (this._app ??= IntegrationTest.buildApp(null, (middleware) => {
       middleware.use(CookieStore as MiddlewareFactory, this.cookieOptions());
       middleware.delete(ShowExceptions as MiddlewareFactory);
@@ -179,7 +182,7 @@ class CookieStoreTest extends IntegrationTest {
   }
 
   override set app(value: unknown) {
-    this._app = value;
+    super.app = value;
   }
 
   async withTestRouteSet(block: () => Promise<void>): Promise<void> {

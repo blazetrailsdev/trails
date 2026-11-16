@@ -8,7 +8,10 @@ import { MemoryStore } from "@blazetrails/activesupport";
 import { assertEmpty, assertEqual, assertNil } from "@blazetrails/activesupport/testing/assertions";
 import { Lint, Request as RackRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import { RouteSet } from "../../../../lib/action-dispatch/routing/route-set.js";
-import { IntegrationTest } from "../../../../lib/action-dispatch/testing/integration.js";
+import {
+  IntegrationTest,
+  type RoutesApp,
+} from "../../../../lib/action-dispatch/testing/integration.js";
 import { RoutedRackApp } from "../../../support/abstract-unit.js";
 import { CacheStore } from "../../../../lib/action-dispatch/middleware/session/cache-store.js";
 import type { MiddlewareFactory } from "../../../../lib/action-dispatch/middleware/stack.js";
@@ -220,7 +223,7 @@ describe("Request", () => {
     class SessionIntegrationTest extends IntegrationTest {
       declare cache: MemoryStore;
 
-      override get app(): unknown {
+      override get app(): RoutesApp {
         return (this._app ??= new RoutedRackApp(Router, (middleware) => {
           this.cache = new MemoryStore();
           middleware.use(CacheStore as MiddlewareFactory, {
@@ -232,7 +235,7 @@ describe("Request", () => {
       }
 
       override set app(value: unknown) {
-        this._app = value;
+        super.app = value;
       }
     }
 

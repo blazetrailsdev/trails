@@ -192,19 +192,22 @@ export class PasswordsController extends ApplicationController {
 }
 
 === app/channels/application-cable/connection.ts ===
+import { ActionCable } from "@blazetrails/actioncable";
 import { Session } from "../../models/session.ts";
 
-export class Connection {
+export class Connection extends ActionCable.Connection.Base {
   declare currentUser: unknown;
-  declare cookies: { signed: Record<string, string> };
-  declare rejectUnauthorizedConnection: () => void;
+
+  static {
+    this.identifiedBy("currentUser");
+  }
 
   async connect(): Promise<void> {
     if (!(await this.setCurrentUser())) this.rejectUnauthorizedConnection();
   }
 
   protected async setCurrentUser(): Promise<unknown> {
-    const session = await Session.findBy({ id: this.cookies.signed["session_id"] });
+    const session = await Session.findBy({ id: this.cookies.signed.get("session_id") });
     if (session) return (this.currentUser = await session.user);
   }
 }

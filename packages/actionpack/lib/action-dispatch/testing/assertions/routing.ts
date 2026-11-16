@@ -50,7 +50,7 @@ export const WithIntegrationRouting = {
       let oldIntegrationSession: Session | undefined;
 
       this.setup(function () {
-        oldRoutes = (this.app as { routes(): RouteSet }).routes();
+        oldRoutes = this.app.routes();
         oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
         oldIntegrationSession = this.integrationSession;
         this.createRoutes(block);
@@ -63,7 +63,7 @@ export const WithIntegrationRouting = {
   },
 
   withRouting<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
-    const oldRoutes = (this.app as { routes(): RouteSet }).routes();
+    const oldRoutes = this.app.routes();
     const oldRoutesCallMethod = rbObjMethod(oldRoutes, "call");
     const oldIntegrationSession = this.integrationSession;
     let result: T;
@@ -84,7 +84,7 @@ export const WithIntegrationRouting = {
 
   /** @internal */
   createRoutes<T>(this: IntegrationTest, block: (routes: RouteSet) => T): T {
-    const app = this.app as { routes(): RouteSet; _routes: RouteSet };
+    const app = this.app;
     const routes = new RouteSet();
 
     this._originalRoutes ??= app.routes();
@@ -115,7 +115,7 @@ export const WithIntegrationRouting = {
     oldRoutesCallMethod: Method,
     oldIntegrationSession: Session,
   ): void {
-    (this.app as { _routes: RouteSet })._routes = oldRoutes;
+    this.app._routes = oldRoutes;
     (rbObjSingletonClass(this._originalRoutes!).prototype as { call: unknown }).call = (
       ...args: unknown[]
     ) => oldRoutesCallMethod.call(...args);

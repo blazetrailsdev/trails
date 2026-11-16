@@ -160,7 +160,7 @@ IntegrationTest.buildApp = buildApp;
 
 IntegrationTest.app = IntegrationTest.buildApp();
 
-(IntegrationTest.app as RoutedRackApp).routes().draw(function () {
+IntegrationTest.app.routes().draw(function () {
   deprecator().silence(() => {
     this.get(":controller(/:action)");
   });

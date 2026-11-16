@@ -211,8 +211,8 @@ describe("WithMountedEngine", () => {
   include(AppObject, UrlFor);
   include(AppObject, TrailsApplication.routes().urlHelpers());
 
-  class WithMountedEngine extends IntegrationTest {
-    override get app(): unknown {
+  class WithMountedEngine extends IntegrationTest<unknown> {
+    override get app() {
       return TrailsApplication.instance();
     }
 
@@ -484,8 +484,8 @@ describe("EngineMountedAtRoot", () => {
   include(PostsController, TrailsApplication.routes().mountedHelpers());
   constSet(TopLevel, "PostsController", PostsController);
 
-  class EngineMountedAtRoot extends IntegrationTest {
-    override get app(): unknown {
+  class EngineMountedAtRoot extends IntegrationTest<unknown> {
+    override get app() {
       return TrailsApplication.instance();
     }
   }

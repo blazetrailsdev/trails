@@ -67,7 +67,7 @@ Router.draw(function () {
 const APP = new RoutedRackApp(Router);
 
 class TestRoutingMount extends IntegrationTest {
-  override get app(): unknown {
+  override get app() {
     return APP;
   }
 }

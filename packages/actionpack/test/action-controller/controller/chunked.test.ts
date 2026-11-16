@@ -1,8 +1,7 @@
 import { beforeEach, describe, it } from "vitest";
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import { StringIO } from "@blazetrails/ruby-compat";
-import { ApplicationController, type RoutedRackApp } from "../../support/abstract-unit.js";
+import { ApplicationController } from "../../support/abstract-unit.js";
 import { IntegrationTest } from "../../../lib/action-dispatch/testing/integration.js";
 
 describe("ChunkedTest", () => {
@@ -31,7 +30,7 @@ describe("ChunkedTest", () => {
 
   it("parses request raw_post correctly when request has Transfer-Encoding header without a Content-Length value", async () => {
     t.app = ChunkedTest.buildApp();
-    (t.app as RoutedRackApp).routes().draw(function () {
+    t.app.routes().draw(function () {
       this.post("chunked", { to: ChunkedController.action("chunk") });
     });
 
@@ -40,7 +39,7 @@ describe("ChunkedTest", () => {
       headers: { "Transfer-Encoding": "gzip, chunked;foo=bar" },
     });
 
-    assertEqual(7, (t.response.parsedBody as HashWithIndifferentAccess).get("content_length"));
-    assertEqual("foo=bar", (t.response.parsedBody as HashWithIndifferentAccess).get("raw_post"));
+    assertEqual(7, t.response.parsedBody.get("content_length"));
+    assertEqual("foo=bar", t.response.parsedBody.get("raw_post"));
   });
 });
