@@ -14,14 +14,6 @@ export function setTestOrder(value: string | null): void {
   _testOrder = value;
 }
 
-export function errorReporter(): ErrorReporter {
-  return currentErrorReporter;
-}
-
-export function setErrorReporter(reporter: ErrorReporter): void {
-  _setErrorReporter(reporter);
-}
-
 export function cacheFormatVersion(): number {
   return formatVersion();
 }
@@ -53,8 +45,8 @@ export function setToTimePreservesTimezone(value: boolean | string | null): void
 Object.defineProperties(ActiveSupport, {
   testOrder: { get: testOrder, set: setTestOrder, configurable: true, enumerable: true },
   errorReporter: {
-    get: errorReporter,
-    set: setErrorReporter,
+    get: (): ErrorReporter => currentErrorReporter,
+    set: (reporter: ErrorReporter) => _setErrorReporter(reporter),
     configurable: true,
     enumerable: true,
   },
