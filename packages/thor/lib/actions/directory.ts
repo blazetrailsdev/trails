@@ -54,7 +54,6 @@ export class Directory extends EmptyDirectory {
     this._block = block;
   }
 
-  /** @noRailsEquivalent PERMANENT */
   static async new<T extends Directory>(
     this: { prototype: T },
     base: DirectoryBase,

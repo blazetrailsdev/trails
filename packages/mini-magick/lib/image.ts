@@ -151,7 +151,6 @@ export class Image {
     this._info = new Info(this._path);
   }
 
-  /** @noRailsEquivalent PERMANENT */
   static async new<T extends Image>(
     this: { prototype: T },
     inputPath: string | Pathname,
