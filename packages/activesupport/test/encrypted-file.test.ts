@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile, InvalidKeyLengthError, MissingKeyError } from "../lib/encrypted-file.js";
-import { getFs, getPath, getOsAsync, setEnv } from "@blazetrails/ruby-compat";
+import { getFs, getPath, getOsAsync, env, setEnv } from "@blazetrails/ruby-compat";
 import {
   assert,
   assertNot,
@@ -26,7 +26,7 @@ describe("EncryptedFileTest", () => {
     });
 
   beforeEach(async () => {
-    originalEnv = process.env.CONTENT_KEY;
+    originalEnv = env.CONTENT_KEY;
     setEnv("CONTENT_KEY", undefined);
 
     const fs = getFs();

@@ -146,13 +146,12 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
     .flatMap((line, i) => {
       const m = /\((.*):(\d+):\d+\)$|at (.*):(\d+):\d+$/.exec(line.trim());
       if (!m) return [];
-      const path = m[1] ?? m[3];
+      const raw = m[1] ?? m[3];
+      const path = raw.startsWith("file://")
+        ? decodeURIComponent(raw.slice("file://".length))
+        : raw;
       const callSite = sites[1 + start + i];
-      const absolutePath = callSite?.isEval()
-        ? undefined
-        : path.startsWith("file://")
-          ? decodeURIComponent(path.slice("file://".length))
-          : path;
+      const absolutePath = callSite?.isEval() ? undefined : path;
       const lineno = Number(m[2] ?? m[4]);
       const label = /at ([^ (]+)/.exec(line.trim())?.[1] ?? "";
       return [

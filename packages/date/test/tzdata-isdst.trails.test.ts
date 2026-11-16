@@ -44,6 +44,7 @@ describe("tzdataIsdst", () => {
   it("answers false for a zone that has never observed daylight saving", () => {
     expect(tzdataIsdst("Asia/Tokyo", 1719835200)).toBe(false);
     expect(tzdataIsdst("Etc/UTC", 1719835200)).toBe(false);
+    expect(tzdataIsdst("UTC", 1719835200)).toBe(false);
   });
 
   it("answers for a zone's tzdata link names", () => {

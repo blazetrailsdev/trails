@@ -292,3 +292,20 @@ describe("Delegation.generate to a constant name", () => {
     expect(owner.greet!()).toBe("hi");
   });
 });
+
+describe("Delegation.generate prefix: true", () => {
+  it("raises TypeError for a Module target, as Regexp#match? does in MRI", () => {
+    class Target {}
+    class Host {}
+    expect(() =>
+      Delegation.generate(Host.prototype, ["x"], { to: Target as never, prefix: true }),
+    ).toThrow(/no implicit conversion of Class into String/);
+  });
+
+  it("raises ArgumentError for a non-method-shaped String target", () => {
+    class Host {}
+    expect(() =>
+      Delegation.generate(Host.prototype, ["x"], { to: "Target", prefix: true }),
+    ).toThrow("Can only automatically set the delegation prefix when delegating to a method.");
+  });
+});
