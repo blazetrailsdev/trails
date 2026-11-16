@@ -559,12 +559,65 @@ describe("Net::HTTP over Net::BufferedIO", () => {
       "HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n",
     );
     const port = await listen(server);
-    const http = new Net.HTTP("127.0.0.1", port);
-    expect(http.isProxy()).toBe(false);
-    http.proxyAddress = "127.0.0.1";
-    expect(http.isProxy()).toBe(true);
+    const http = new Net.HTTP("127.0.0.1", port, null);
+    expect(await http.isProxy()).toBe(false);
+    http.setProxyAddress("127.0.0.1");
+    http.setProxyPort(port);
+    expect(await http.isProxy()).toBe(true);
     await http.get("/x");
     expect(seen.received.startsWith(`GET http://127.0.0.1:${port}/x HTTP/1.1\r\n`)).toBe(true);
+  });
+
+  it("connect opens to the proxy address, not the target", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("\r\n\r\n"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok",
+    );
+    const port = await listen(server);
+    const http = new Net.HTTP("backend.invalid", 8080, "127.0.0.1", port);
+    expect(await http.proxyAddress()).toBe("127.0.0.1");
+    const res = await http.get("/x");
+    expect(res.code).toBe("200");
+    expect(seen.received.startsWith("GET http://backend.invalid:8080/x HTTP/1.1\r\n")).toBe(true);
+  });
+
+  it("connect sends CONNECT with Proxy-Authorization for use_ssl and raises on a refusal", async () => {
+    const { seen, server } = rawServer(
+      (r) => r.endsWith("\r\n\r\n"),
+      "HTTP/1.1 407 Proxy Authentication Required\r\nContent-Length: 0\r\n\r\n",
+    );
+    const port = await listen(server);
+    const klass = Net.HTTP.Proxy("127.0.0.1", port, "us er", "pa:ss");
+    expect(klass.isProxyClass()).toBe(true);
+    expect(Net.HTTP.isProxyClass()).toBe(false);
+    const http = new klass("backend.invalid", 443);
+    http.useSsl = true;
+    expect(await http.proxyUser()).toBe("us er");
+    const error = await http.start().catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(Net.HTTPClientException);
+    expect((error as InstanceType<typeof Net.HTTPClientException>).message).toBe(
+      '407 "Proxy Authentication Required"',
+    );
+    expect(seen.received).toBe(
+      "CONNECT backend.invalid:443 HTTP/1.1\r\nHost: backend.invalid:443\r\n" +
+        `Proxy-Authorization: Basic ${btoa("us er:pa:ss")}\r\n\r\n`,
+    );
+  });
+
+  it("find_proxy reads *_proxy and honours no_proxy and loopback", async () => {
+    const uri = URI.parse("http://10.0.0.1/");
+    const env = { http_proxy: "http://proxy.example:3128" };
+    expect(String(await uri.findProxy(env))).toBe("http://proxy.example:3128");
+    expect(await uri.findProxy({})).toBeNull();
+    expect(await uri.findProxy({ ...env, no_proxy: "10.0.0.0/8" })).toBeNull();
+    expect(await uri.findProxy({ ...env, NO_PROXY: "other.example, 10.0.0.1" })).toBeNull();
+    expect(await URI.parse("http://127.0.0.1/").findProxy(env)).toBeNull();
+    expect(
+      String(await URI.parse("https://10.0.0.1/").findProxy({ HTTPS_PROXY: "http://s:1" })),
+    ).toBe("http://s:1");
+    expect(
+      await URI.parse("http://10.0.0.1/").findProxy({ REQUEST_METHOD: "GET", HTTP_PROXY: "x" }),
+    ).toBeNull();
   });
 
   it("wait_for_continue answers a final response without sending the body", async () => {
