@@ -1346,6 +1346,7 @@ it("a withConnectionSync promise block inside withConnection keeps the lease unt
 
   const conn = await outer;
   expect(conn.isInUse()).not.toBeNull();
+  expect(pool.stat().busy).toBe(1);
 
   finishInner();
   expect(await inner).toBe(conn);
