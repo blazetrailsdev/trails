@@ -557,7 +557,7 @@ export {
   RejectedExecutionError,
   ThreadPoolExecutor,
 } from "./thread-pool-executor.js";
-export { BasicSocket, IPSocket, Socket, SocketError, TCPSocket } from "./socket.js";
+export { Addrinfo, BasicSocket, IPSocket, Socket, SocketError, TCPSocket } from "./socket.js";
 export { Net } from "./net/protocol.js";
 import "./net/http.js";
 export { ImmediateExecutor } from "./immediate-executor.js";

@@ -13,13 +13,6 @@ type SSLSocket = InstanceType<
   >
 >;
 
-const TLS_VERSIONS: Record<number, "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3"> = {
-  0x301: "TLSv1",
-  0x302: "TLSv1.1",
-  0x303: "TLSv1.2",
-  0x304: "TLSv1.3",
-};
-
 /** @noRailsEquivalent PERMANENT */
 export const Net: {
   Protocol?: typeof Protocol;
@@ -77,18 +70,13 @@ export class ReadTimeout extends Timeout.Error {}
 async function connect(s: SSLSocket): Promise<void> {
   const { io, context } = s;
   const hostname = s.hostname!;
-  const store = context.certStore;
-  const ca =
-    store == null || store._certs.length === 0
-      ? null
-      : store._defaultPaths
-        ? [...rootCertificates, ...store._certs]
-        : store._certs;
+  const { ca, defaultPaths, minVersion, maxVersion } = await context._setup();
   io.options.tls = {
-    ...(ca != null ? { ca } : {}),
+    ...(ca != null ? { ca: defaultPaths ? [...rootCertificates, ...ca] : ca } : {}),
     rejectUnauthorized: context.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
     secureOptions: context.options,
-    ...(context.minVersion != null ? { minVersion: TLS_VERSIONS[context.minVersion] } : {}),
+    ...(minVersion !== undefined ? { minVersion } : {}),
+    ...(maxVersion !== undefined ? { maxVersion } : {}),
     ...(isIP(hostname) === 0 ? { servername: hostname } : {}),
     checkServerIdentity: (_host: string, cert: PeerCertificate) =>
       context.verifyHostname ? checkServerIdentity(hostname, cert) : undefined,

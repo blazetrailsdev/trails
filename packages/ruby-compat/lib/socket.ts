@@ -1,4 +1,4 @@
-import { getHttpAsync, type HttpSocket } from "./http-adapter.js";
+import { getHttpAsync, type HttpClientSocket, type HttpSocket } from "./http-adapter.js";
 import { ArgumentError } from "./argument-error.js";
 import { StandardError } from "./standard-error.js";
 import { EOFError } from "./eof-error.js";
@@ -393,7 +393,96 @@ export class IPSocket extends BasicSocket {
  *
  * @noRailsEquivalent PERMANENT
  */
-export class TCPSocket extends IPSocket {}
+export class TCPSocket extends IPSocket {
+  /**
+   * `TCPSocket.open` (`vendor/ruby/v3.3.11/ext/socket/tcpsocket.c:24-37`), whose
+   * `rsock_init_inetsock` resolves the remote host and tries each address in
+   * turn, as `Socket.tcp` does over `Addrinfo.getaddrinfo`
+   * (`vendor/ruby/v3.3.11/ext/socket/lib/socket.rb:628-676`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static async open(
+    remoteHost: string,
+    remotePort: number,
+    localHost: string | null = null,
+    localPort: number | null = null,
+  ): Promise<HttpClientSocket> {
+    const adapter = await getHttpAsync();
+    if (adapter.connect === undefined) {
+      throw new NotImplementedError("the HTTP adapter has no client connect");
+    }
+    let lastError: Error | null = null;
+    for (const ai of await Addrinfo.getaddrinfo(remoteHost, remotePort)) {
+      try {
+        return await adapter.connect({
+          host: ai.ipAddress,
+          port: ai.ipPort,
+          localAddress: localHost,
+          localPort,
+        });
+      } catch (e) {
+        lastError = _rsockSysFail(e, remoteHost, remotePort);
+      }
+    }
+    throw lastError!;
+  }
+}
+
+/**
+ * `rsock_syserr_fail_host_port` (`vendor/ruby/v3.3.11/ext/socket/socket.c:24-36`)
+ * and `rsock_raise_resolution_error` (`ext/socket/raddrinfo.c`), the Ruby
+ * error `TCPSocket.open` raises for the host's own.
+ */
+function _rsockSysFail(e: unknown, host: string, port: number): Error {
+  if (!(e instanceof Error)) throw e;
+  const code = (e as { code?: unknown }).code;
+  if (code === "ECONNREFUSED") {
+    return new Errno.ECONNREFUSED(`connect(2) for "${host}" port ${port}`);
+  }
+  if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_NONAME") {
+    return new ResolutionError("getaddrinfo: Name or service not known");
+  }
+  return e;
+}
+
+/**
+ * Ruby's `Addrinfo` (`vendor/ruby/v3.3.11/ext/socket/raddrinfo.c:2687`), the
+ * resolved address `TCPSocket.open` connects to.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class Addrinfo {
+  constructor(
+    /** @noRailsEquivalent PERMANENT */
+    readonly ipAddress: string,
+    /** @noRailsEquivalent PERMANENT */
+    readonly ipPort: number,
+  ) {}
+
+  /**
+   * `Addrinfo.getaddrinfo` (`vendor/ruby/v3.3.11/ext/socket/raddrinfo.c:2155-2162`),
+   * over the HTTP adapter's resolver. A test replaces it to resolve offline.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static async getaddrinfo(nodename: string, service: number): Promise<Addrinfo[]> {
+    const adapter = await getHttpAsync();
+    if (adapter.getaddrinfo === undefined) {
+      return [new Addrinfo(await IPSocket.getaddress(nodename), service)];
+    }
+    let addresses: string[];
+    try {
+      addresses = await adapter.getaddrinfo(nodename);
+    } catch (e) {
+      if (typeof (e as { code?: unknown }).code === "string") {
+        throw new ResolutionError("getaddrinfo: Name or service not known");
+      }
+      throw e;
+    }
+    return addresses.map((address) => new Addrinfo(address, service));
+  }
+}
 
 /**
  * @noRailsEquivalent PERMANENT — Ruby core `Socket`

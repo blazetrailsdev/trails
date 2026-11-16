@@ -3,12 +3,11 @@ import { StandardError } from "../standard-error.js";
 import { ArgumentError } from "../argument-error.js";
 import { EOFError } from "../eof-error.js";
 import { Errno } from "../errno.js";
-import { getHttpAsync, type HttpClientSocket, type HttpDebugOutput } from "../http-adapter.js";
+import type { HttpClientSocket, HttpDebugOutput } from "../http-adapter.js";
 import { IOError } from "../io-error.js";
-import { NotImplementedError } from "../not-implemented-error.js";
 import { OpenSSL } from "../openssl.js";
 import { Resolv } from "../resolv.js";
-import { Socket } from "../socket.js";
+import { TCPSocket } from "../socket.js";
 import { Timeout } from "../timeout.js";
 import { kernelCatch } from "../kernel-catch.js";
 import { HTTP as URIHTTP } from "../uri/http.js";
@@ -132,6 +131,25 @@ export class HTTP {
   minVersion: string | number | null = null;
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1516`. */
   maxVersion: string | number | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1483`. */
+  caPath: string | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1494`. */
+  ciphers: string | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1498`. */
+  extraChainCert: unknown = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1504`. */
+  sslTimeout: number | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1519`. */
+  verifyCallback: unknown = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1522`. */
+  verifyDepth: number | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1532`. */
+  verifyHostname: boolean | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1201`. */
+  localHost: string | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1205`. */
+  localPort: number | null = null;
+  private _sslContext: InstanceType<typeof OpenSSL.SSL.SSLContext> | null = null;
   private _writeTimeout: number | null = 60;
   private _debugOutput: HttpDebugOutput | null = null;
   private _readTimeout: number | null = 60;
@@ -157,6 +175,43 @@ export class HTTP {
   private _started = false;
   private _ipaddr: string | null = null;
   private _socket: BufferedIO | null = null;
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1443-1459`. */
+  static SSL_IVNAMES = [
+    "caFile",
+    "caPath",
+    "cert",
+    "certStore",
+    "ciphers",
+    "extraChainCert",
+    "key",
+    "sslTimeout",
+    "sslVersion",
+    "minVersion",
+    "maxVersion",
+    "verifyCallback",
+    "verifyDepth",
+    "verifyMode",
+    "verifyHostname",
+  ] as const;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1460-1476`. */
+  static SSL_ATTRIBUTES = [
+    "caFile",
+    "caPath",
+    "cert",
+    "certStore",
+    "ciphers",
+    "extraChainCert",
+    "key",
+    "sslTimeout",
+    "sslVersion",
+    "minVersion",
+    "maxVersion",
+    "verifyCallback",
+    "verifyDepth",
+    "verifyMode",
+    "verifyHostname",
+  ] as const;
 
   /** @noRailsEquivalent PERMANENT */
   static _isProxyClass = false;
@@ -455,6 +510,10 @@ export class HTTP {
 
   /** @noRailsEquivalent PERMANENT */
   async connect(): Promise<void> {
+    if (this.isUseSsl()) {
+      this._sslContext = new OpenSSL.SSL.SSLContext();
+    }
+
     let connAddr: string;
     let connPort: number;
     if (await this.isProxy()) {
@@ -473,15 +532,11 @@ export class HTTP {
     let s: HttpClientSocket | null = null;
     try {
       this.debug(`opening connection to ${connAddr}:${connPort}...`);
-      const adapter = await getHttpAsync();
-      if (adapter.connect === undefined) {
-        throw new NotImplementedError("the HTTP adapter has no client connect");
-      }
       s = await Timeout.timeout(this.openTimeout, OpenTimeout, null, async () => {
         try {
-          return await adapter.connect!({ host: connAddr, port: connPort });
+          return await TCPSocket.open(connAddr, connPort, this.localHost, this.localPort);
         } catch (e) {
-          const error = _rsockSysFail(e, connAddr, connPort);
+          const error = e as Error;
           error.message = `Failed to open TCP connection to ${connAddr}:${connPort} (${error.message})`;
           throw error;
         }
@@ -507,10 +562,17 @@ export class HTTP {
           await plainSock.write(buf);
           (await HTTPResponse.readNew(plainSock)).value();
         }
+        const sslParameters: Record<string, unknown> = {};
+        HTTP.SSL_IVNAMES.forEach((ivname, i) => {
+          const value = this[ivname];
+          if (value != null) sslParameters[HTTP.SSL_ATTRIBUTES[i]] = value;
+        });
+        this._sslContext!.setParams(sslParameters);
         this.debug(`starting SSL for ${connAddr}:${connPort}...`);
         await this.sslSocketConnect(s, this.openTimeout, {
           sslHostAddress,
-          verifyPeer: this.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
+          verifyPeer: this._sslContext!.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
+          ...(await this._sslContext!._setup()),
         });
         this.debug(`SSL established, protocol: ${s.sslVersion}, cipher: ${s.cipher![0]}`);
       }
@@ -542,11 +604,15 @@ export class HTTP {
     timeout: number | null,
     sslParameters: Parameters<HttpClientSocket["startSsl"]>[0],
   ): Promise<void> {
-    if (timeout != null) {
-      if (timeout <= 0) throw new OpenTimeout("execution expired");
-      await Timeout.timeout(timeout, OpenTimeout, null, () => s.startSsl(sslParameters));
-    } else {
-      await s.startSsl(sslParameters);
+    try {
+      if (timeout != null) {
+        if (timeout <= 0) throw new OpenTimeout("execution expired");
+        await Timeout.timeout(timeout, OpenTimeout, null, () => s.startSsl(sslParameters));
+      } else {
+        await s.startSsl(sslParameters);
+      }
+    } catch (e) {
+      throw _osslStartSslError(e, s);
     }
   }
 
@@ -805,22 +871,31 @@ export class HTTP {
 }
 
 /**
- * `rsock_syserr_fail_host_port` (`vendor/ruby/v3.3.11/ext/socket/socket.c:24-36`)
- * and `rsock_raise_resolution_error` (`ext/socket/raddrinfo.c`), the Ruby
- * error `TCPSocket.open` raises for the host's own.
- *
- * @noRailsEquivalent PERMANENT
+ * `ossl_start_ssl`'s raise (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:1797-1821`):
+ * the host's TLS failure as the `OpenSSL::SSL::SSLError` Ruby raises. A
+ * certificate-verify failure carries the host's verify code (the
+ * `SSL_VERIFY_CODES` `SSLError` matches) and `X509_verify_cert_error_string`'s
+ * text as its message, and is appended as `: certificate verify failed (...)`;
+ * any other failure appends OpenSSL's `ERR_reason_error_string`, the host
+ * error's `reason`, as `ossl_make_error` does (`ext/openssl/ossl.c:272-297`).
  */
-function _rsockSysFail(e: unknown, host: string, port: number): Error {
-  if (!(e instanceof Error)) throw e;
-  const code = (e as { code?: unknown }).code;
-  if (code === "ECONNREFUSED") {
-    return new Errno.ECONNREFUSED(`connect(2) for "${host}" port ${port}`);
+function _osslStartSslError(e: unknown, s: HttpClientSocket): unknown {
+  if (!(e instanceof OpenSSL.SSL.SSLError)) return e;
+  if (Function.prototype[Symbol.hasInstance].call(OpenSSL.SSL.SSLError, e)) return e;
+  const host = e as unknown as Error & { code: string; reason?: string };
+  const errorAppend = OpenSSL.SSL.SSL_VERIFY_CODES.includes(host.code)
+    ? `: certificate verify failed (${host.message.replace(/; if the root CA .*$/s, "")})`
+    : `: ${host.reason ?? host.message}`;
+  let peeraddr: string;
+  try {
+    const [, port, addr] = s.peeraddr();
+    peeraddr = `${addr}:${port}`;
+  } catch {
+    peeraddr = "(null)";
   }
-  if (code === "ENOTFOUND" || code === "EAI_AGAIN" || code === "EAI_NONAME") {
-    return new Socket.ResolutionError("getaddrinfo: Name or service not known");
-  }
-  return e;
+  return new OpenSSL.SSL.SSLError(
+    `SSL_connect returned=1 errno=0 peeraddr=${peeraddr} state=error${errorAppend}`,
+  );
 }
 
 Net.HTTP = HTTP;

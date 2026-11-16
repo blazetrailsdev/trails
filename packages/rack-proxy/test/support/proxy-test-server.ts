@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { createServer as createTcpServer, type Socket } from "node:net";
+import { createServer as createHttpsServer } from "node:https";
+import { OpenSSL, Tempfile } from "@blazetrails/ruby-compat";
 import { gzipSync } from "node:zlib";
 
 export async function withRawBackend(
@@ -116,8 +118,17 @@ export interface TestServer {
   shutdown(): Promise<void>;
 }
 
-export async function startServer(): Promise<[TestServer, number]> {
-  const server = createServer();
+export async function startServer({
+  ssl = false,
+  caSigned = false,
+}: { ssl?: boolean; caSigned?: boolean } = {}): Promise<[TestServer, number]> {
+  let server: Server;
+  if (ssl) {
+    const [cert, key] = caSigned ? caSignedCert() : selfSignedCert();
+    server = createHttpsServer({ cert: cert.toPem(), key: key.toPem() }) as unknown as Server;
+  } else {
+    server = createServer();
+  }
   const procs = new Map<string, Proc>();
   mountRoutes(server, procs);
   const sockets = new Set<Socket>();
@@ -130,4 +141,96 @@ export async function startServer(): Promise<[TestServer, number]> {
       server.close(() => resolve());
     });
   return [{ port, mountProc: (path, proc) => procs.set(path, proc), shutdown }, port];
+}
+
+type Certificate = InstanceType<typeof OpenSSL.X509.Certificate>;
+type RSA = InstanceType<typeof OpenSSL.PKey.RSA>;
+let _selfSignedCert: [Certificate, RSA] | undefined;
+let _certificateAuthority: [Certificate, RSA] | undefined;
+let _caSignedCert: [Certificate, RSA] | undefined;
+let _caFile: string | undefined;
+
+export function selfSignedCert(): [Certificate, RSA] {
+  return (_selfSignedCert ??= (() => {
+    const key = new OpenSSL.PKey.RSA(2048);
+    const cert = new OpenSSL.X509.Certificate();
+    const name = OpenSSL.X509.Name.parse("/CN=127.0.0.1");
+    cert.version = 2;
+    cert.serial = 1;
+    cert.subject = name;
+    cert.issuer = name;
+    cert.publicKey = key.publicKey;
+    cert.notBefore = new Date(Date.now() - 3600 * 1000);
+    cert.notAfter = new Date(Date.now() + 365 * 24 * 3600 * 1000);
+
+    const ef = new OpenSSL.X509.ExtensionFactory();
+    ef.subjectCertificate = cert;
+    ef.issuerCertificate = cert;
+    cert.addExtension(ef.createExtension("basicConstraints", "CA:TRUE", true));
+    cert.addExtension(ef.createExtension("subjectAltName", "IP:127.0.0.1,DNS:localhost", false));
+    cert.sign(key, OpenSSL.Digest.SHA256);
+
+    return [cert, key] as [Certificate, RSA];
+  })());
+}
+
+export function certificateAuthority(): [Certificate, RSA] {
+  return (_certificateAuthority ??= (() => {
+    const key = new OpenSSL.PKey.RSA(2048);
+    const cert = new OpenSSL.X509.Certificate();
+    const name = OpenSSL.X509.Name.parse("/CN=rack-proxy-test-ca");
+    cert.version = 2;
+    cert.serial = 1;
+    cert.subject = name;
+    cert.issuer = name;
+    cert.publicKey = key.publicKey;
+    cert.notBefore = new Date(Date.now() - 3600 * 1000);
+    cert.notAfter = new Date(Date.now() + 365 * 24 * 3600 * 1000);
+
+    const ef = new OpenSSL.X509.ExtensionFactory();
+    ef.subjectCertificate = cert;
+    ef.issuerCertificate = cert;
+    cert.addExtension(ef.createExtension("basicConstraints", "CA:TRUE", true));
+    cert.addExtension(ef.createExtension("keyUsage", "keyCertSign, cRLSign", true));
+    cert.sign(key, OpenSSL.Digest.SHA256);
+
+    return [cert, key] as [Certificate, RSA];
+  })());
+}
+
+export function caSignedCert(): [Certificate, RSA] {
+  return (_caSignedCert ??= (() => {
+    const [caCert, caKey] = certificateAuthority();
+    const key = new OpenSSL.PKey.RSA(2048);
+    const cert = new OpenSSL.X509.Certificate();
+    cert.version = 2;
+    cert.serial = 2;
+    cert.subject = OpenSSL.X509.Name.parse("/CN=127.0.0.1");
+    cert.issuer = caCert.subject;
+    cert.publicKey = key.publicKey;
+    cert.notBefore = new Date(Date.now() - 3600 * 1000);
+    cert.notAfter = new Date(Date.now() + 365 * 24 * 3600 * 1000);
+
+    const ef = new OpenSSL.X509.ExtensionFactory();
+    ef.subjectCertificate = cert;
+    ef.issuerCertificate = caCert;
+    cert.addExtension(ef.createExtension("basicConstraints", "CA:FALSE", true));
+    cert.addExtension(ef.createExtension("subjectAltName", "IP:127.0.0.1,DNS:localhost", false));
+    cert.sign(caKey, OpenSSL.Digest.SHA256);
+
+    return [cert, key] as [Certificate, RSA];
+  })());
+}
+
+let _caFileTempfile: Tempfile | undefined;
+
+export function caFile(): string {
+  return (_caFile ??= (() => {
+    const [caCert] = certificateAuthority();
+    const file = Tempfile.new(["rack-proxy-test-ca", ".pem"]);
+    file.write(caCert.toPem());
+    file.flush();
+    _caFileTempfile = file;
+    return file.path()!;
+  })());
 }

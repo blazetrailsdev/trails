@@ -26,4 +26,36 @@ describe("OpenSSL::SSL::SSLContext", () => {
     context.setParams();
     expect(context.options).toBe(0x80020050);
   });
+
+  it("set_params hands min_version and ssl_version to the handshake as protocol bounds", async () => {
+    const context = new OpenSSL.SSL.SSLContext();
+    context.setParams({ minVersion: "TLS1_2", verifyMode: OpenSSL.SSL.VERIFY_NONE });
+    expect(await context._setup()).toEqual({
+      ca: null,
+      defaultPaths: false,
+      minVersion: "TLSv1.2",
+    });
+
+    const pinned = new OpenSSL.SSL.SSLContext();
+    pinned.setParams({ sslVersion: "TLSv1_2", verifyMode: OpenSSL.SSL.VERIFY_NONE });
+    expect(await pinned._setup()).toEqual({
+      ca: null,
+      defaultPaths: false,
+      minVersion: "TLSv1.2",
+      maxVersion: "TLSv1.2",
+    });
+  });
+
+  it("ssl_version= raises ArgumentError for an unknown method", () => {
+    const context = new OpenSSL.SSL.SSLContext();
+    expect(() => (context.sslVersion = "TLSv9")).toThrow("unknown SSL method `TLSv9'");
+  });
+});
+
+describe("OpenSSL::X509::Name", () => {
+  it("parse encodes C as a PrintableString and CN as a UTF8String", () => {
+    const der = OpenSSL.X509.Name.parse("/C=US/CN=x")._toDer();
+    expect([...der.slice(11, 13)]).toEqual([0x13, 2]);
+    expect(der.at(-3)).toBe(0x0c);
+  });
 });
