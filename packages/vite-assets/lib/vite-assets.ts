@@ -1,7 +1,7 @@
 import {
   env as ENV,
+  Dir,
   File,
-  Gem,
   getHttpAsync,
   Logger,
   rbFLoad,
@@ -50,7 +50,7 @@ export class ViteAssets {
   static readonly ENV_PREFIX = "VITE_RUBY";
 
   static readonly COMPANION_LIBRARIES: Readonly<Record<string, string>> = Object.freeze({
-    vite_rails: "rails",
+    "@blazetrails/vite-trails": "trails",
     vite_hanami: "hanami",
     vite_padrino: "padrino",
     "jekyll-vite": "jekyll",
@@ -58,14 +58,34 @@ export class ViteAssets {
     vite_plugin_legacy: "rack",
   });
 
+  /** @noRailsEquivalent PERMANENT */
+  static readonly FRAMEWORK_PACKAGES: Readonly<Record<string, string>> = Object.freeze({
+    trails: "@blazetrails/trailties",
+  });
+
   /** @internal */
   private static _instance: ViteAssets | undefined;
 
-  static frameworkLibraries(): [string, { name: string; version: unknown }][] {
-    return Object.entries(this.COMPANION_LIBRARIES).flatMap(([name, framework]) => {
-      const library = Gem.loadedSpecs[name] as { name: string; version: unknown } | undefined;
-      return library ? [[framework, library] as [string, { name: string; version: unknown }]] : [];
-    });
+  /** @inventedArm readAsync — PERMANENT */
+  static async frameworkLibraries(): Promise<[string, { name: string; version: unknown }][]> {
+    const appPackage = File.join(Dir.pwd(), "package.json");
+    if (!(await File.isExistAsync(appPackage))) return [];
+    const app = JSON.parse(await File.readAsync(appPackage)) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const result: [string, { name: string; version: unknown }][] = [];
+    for (const [name, framework] of Object.entries(this.COMPANION_LIBRARIES)) {
+      if (!Object.hasOwn({ ...app.devDependencies, ...app.dependencies }, name)) continue;
+      const libraryPackage = File.join(Dir.pwd(), "node_modules", name, "package.json");
+      if (!(await File.isExistAsync(libraryPackage))) continue;
+      const library = JSON.parse(await File.readAsync(libraryPackage)) as {
+        name: string;
+        version: unknown;
+      };
+      result.push([framework, library]);
+    }
+    return result;
   }
 
   static instance(): ViteAssets {

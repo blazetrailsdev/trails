@@ -1,9 +1,9 @@
 import {
+  Dir,
   env as ENV,
   exitBang,
   File,
   FileUtils,
-  Gem,
   Logger,
   rbFBackquote,
   setEnv,
@@ -102,9 +102,17 @@ Make sure \`bundle exec vite install\` has run successfully before running depen
       $stdout.puts(`bin/vite present?: ${await File.isExistAsync("bin/vite")}`);
 
       $stdout.puts(`vite_ruby: ${TopLevel.ViteAssets!.VERSION}`);
-      for (const [framework, library] of TopLevel.ViteAssets!.frameworkLibraries()) {
+      for (const [framework, library] of await TopLevel.ViteAssets!.frameworkLibraries()) {
         $stdout.puts(`${library.name}: ${library.version}`);
-        $stdout.puts(`${framework}: ${Gem.loadedSpecs[framework]?.version ?? ""}`);
+        const frameworkPackage = File.join(
+          Dir.pwd(),
+          "node_modules",
+          TopLevel.ViteAssets!.FRAMEWORK_PACKAGES[framework] ?? framework,
+          "package.json",
+        );
+        $stdout.puts(
+          `${framework}: ${(await File.isExistAsync(frameworkPackage)) ? (JSON.parse(await File.readAsync(frameworkPackage)) as { version: string }).version : ""}`,
+        );
       }
 
       $stdout.puts(`ruby: ${await rbFBackquote("ruby --version")}`);

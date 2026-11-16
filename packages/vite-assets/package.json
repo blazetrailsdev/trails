@@ -32,6 +32,14 @@
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/thor": "workspace:*"
   },
+  "peerDependencies": {
+    "@blazetrails/vite-trails": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@blazetrails/vite-trails": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@blazetrails/rack-test": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
