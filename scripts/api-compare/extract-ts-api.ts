@@ -243,6 +243,14 @@ const fileHasInventedArmTag = new WeakMap<ts.SourceFile, boolean>();
 const fileHasInlinedFromTag = new WeakMap<ts.SourceFile, boolean>();
 
 /**
+ * The calls a `static new` builds its object through, which
+ * `foldStaticNewIntoConstructor` splices the constructor's body in at.
+ * Declared above the `!isMainThread` block for the reason
+ * `TAGS_ALLOWED_AFTER_NO_RAILS_EQUIVALENT` gives.
+ */
+const NEW_CALLS: ReadonlySet<string> = new Set(["constructor", "rbClassNewInstance"]);
+
+/**
  * Tags a deliberate JSDoc block may legitimately carry *after*
  * `@noRailsEquivalent`: the structural ones that document the signature and
  * conventionally trail the description. Every other tag name after the reason
@@ -5153,8 +5161,6 @@ export function constClassExpression(
   if (!init || !ts.isClassExpression(init) || !init.name) return undefined;
   return { seat: decl.name.text, cls: init };
 }
-
-const NEW_CALLS: ReadonlySet<string> = new Set(["constructor", "rbClassNewInstance"]);
 
 /**
  * RFC 0234 § Design 2(a): where `initialize` does async work, the class keeps
