@@ -269,21 +269,10 @@ export class VfsMigrationGenerator extends MigrationGenerator {
 }
 
 export class VfsModelGenerator extends ModelGenerator {
-  private _vfs: VirtualFS;
-
   constructor(args: unknown[], localOptions: unknown, config: VfsGeneratorConfig) {
     ensureVfsAdapter(config.vfs);
     super(args, localOptions, { ...config, destinationRoot: "/" });
-    this._vfs = config.vfs;
     applyVfsOverrides(this);
-  }
-
-  protected override createMigrationGenerator(): MigrationGenerator {
-    return new VfsMigrationGenerator(
-      [`create_${this.tableName()}`],
-      Object.fromEntries(this.options as unknown as Iterable<[string, unknown]>),
-      { vfs: this._vfs, shell: this.shell, behavior: this.behavior },
-    );
   }
 }
 
