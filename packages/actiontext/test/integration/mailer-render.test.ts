@@ -29,8 +29,7 @@ describe("ActionText::MailerRenderTest", () => {
     await t.afterTeardown();
   });
 
-  // BLOCKED: mailer-view-ivar-collides-with-attr-internal-message
-  it.skip("uses default_url_options", async () => {
+  it("uses default_url_options", async () => {
     const originalDefaultUrlOptions = (
       ActionMailerBase as unknown as { defaultUrlOptions: unknown }
     ).defaultUrlOptions;

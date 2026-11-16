@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Base, Migration } from "@blazetrails/activerecord";
 import { fixtures } from "../../activerecord/test/support/use-fixtures.js";
 import "./test-helper.js";
+import { RichText } from "../lib/rich-text.js";
 import { CreateActionTextTables } from "../lib/db/migrate/20180528164100_create_action_text_tables.js";
 import { Message } from "./dummy/app/models/message.js";
 import { Review } from "./dummy/app/models/review.js";
@@ -34,7 +35,7 @@ describe("ActionText dummy database", () => {
       Migration.verbose = verbose;
     }
     const connection = await Base.leaseConnection();
-    const columns = (await connection.columns("action_text_rich_texts")).map((c) => c.name);
+    const columns = (await connection.columns(RichText.tableName!)).map((c) => c.name);
     expect(columns).toEqual([
       "id",
       "name",

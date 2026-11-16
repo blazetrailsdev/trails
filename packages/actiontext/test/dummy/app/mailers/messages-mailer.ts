@@ -3,6 +3,8 @@ import type { Message } from "../models/message.js";
 import { ApplicationMailer } from "./application-mailer.js";
 
 export class MessagesMailer extends ApplicationMailer {
+  override message: never = null as never;
+
   notification() {
     this.message = this.params.message as never;
     return this.mail({

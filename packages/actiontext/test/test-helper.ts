@@ -1,76 +1,32 @@
 import { afterAll } from "vitest";
-import "./support/engine.js";
-import { I18n, Logger, TopLevel, runLoadHooks, setTrailsRoot } from "@blazetrails/activesupport";
+import { I18n, Logger, TopLevel, setTrailsRoot } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, Migration, Migrator } from "@blazetrails/activerecord";
-import { Application, Trails } from "@blazetrails/trailties";
-import { Trailtie as ActiveSupportRailtie } from "@blazetrails/trailties/trailties/active-support";
-import { Trailtie as ActiveRecordRailtie } from "@blazetrails/trailties/trailties/active-record";
-import { Trailtie as GlobalIDRailtie } from "@blazetrails/trailties/trailties/global-id";
-import { Trailtie as ActionViewRailtie } from "@blazetrails/trailties/trailties/action-view";
-import { Trailtie as ActionControllerRailtie } from "@blazetrails/trailties/trailties/action-controller";
+import { Trails } from "@blazetrails/trailties";
 import { ActionController } from "@blazetrails/actionpack";
 import { Base as ActionMailerBase } from "@blazetrails/actionmailer";
-import { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { Dir, File } from "@blazetrails/ruby-compat";
-import { ActiveStorage, Registry } from "@blazetrails/activestorage";
+import { File } from "@blazetrails/ruby-compat";
+import { ActiveStorage } from "@blazetrails/activestorage";
 import { FixtureSet } from "@blazetrails/activestorage/testing/fixture-set";
 import { fixtures } from "../../activerecord/test/support/use-fixtures.js";
-import { RichText } from "../lib/rich-text.js";
 import { richTexts } from "./fixtures/action_text/rich_texts.js";
 import { messages } from "./fixtures/messages.js";
 import { people } from "./fixtures/people.js";
 import { reviews } from "./fixtures/reviews.js";
-import { Message } from "./dummy/app/models/message.js";
-import "./dummy/app/models/message-without-blanks-with-content-validation.js";
-import "./dummy/app/models/encrypted-message.js";
-import "./dummy/app/models/page.js";
-import { Person } from "./dummy/app/models/person.js";
-import { Review } from "./dummy/app/models/review.js";
 
-class Dummy extends Application {}
-Application.register(Dummy, File.expandPath("dummy", import.meta.dirname));
-export const app = Dummy.instance();
-Trails.application = app;
-Trails.logger = new Logger(null);
-app.config.setRoot(File.expandPath("dummy", import.meta.dirname));
-app.config.loadDefaults("8.0");
-setTrailsRoot(TopLevel.Trails!.root()!);
 const configurations = Base.configurations();
-
-for (const railtie of [
-  ActiveSupportRailtie,
-  GlobalIDRailtie,
-  ActiveRecordRailtie,
-  ActionViewRailtie,
-  ActionControllerRailtie,
-]) {
-  for (const initializer of railtie.initializers) {
-    await initializer.bind(railtie.instance()).run(app);
-  }
-}
-const routes = app.routes();
-routes.clearBang();
-routes.disableClearAndFinalize = true;
-await import("./dummy/config/routes.js");
-await import("@blazetrails/activestorage/config/routes.js");
-routes.disableClearAndFinalize = false;
-routes.finalizeBang();
-app.routes().defineMountedHelper("main_app");
-const { Engine: ActiveStorageEngine } = await import("@blazetrails/activestorage/engine");
-await import("@blazetrails/activestorage/variant-record");
-for (const initializer of ActiveStorageEngine.initializers) {
-  if (["active_storage.configs", "active_storage.verifier"].includes(initializer.name)) {
-    await initializer.bind(ActiveStorageEngine.instance()).run(app);
-  }
-}
-runLoadHooks("after_initialize", app);
-
-const { Engine } = await import("../lib/engine.js");
-for (const initializer of Engine.initializers) {
-  if (["action_text.helper", "action_text.renderer"].includes(initializer.name)) {
-    await initializer.bind(Engine.instance()).run(app);
-  }
-}
+Trails.env = "test";
+await import("./dummy/config/environment.js");
+export const app = Trails.application!;
+await import("./support/engine.js");
+const { RichText } = await import("../lib/rich-text.js");
+const { Message } = await import("./dummy/app/models/message.js");
+await import("./dummy/app/models/message-without-blanks-with-content-validation.js");
+await import("./dummy/app/models/encrypted-message.js");
+await import("./dummy/app/models/page.js");
+const { Person } = await import("./dummy/app/models/person.js");
+const { Review } = await import("./dummy/app/models/review.js");
+Trails.logger = new Logger(null);
+setTrailsRoot(TopLevel.Trails!.root()!);
 ActionController.Base.prependViewPath([File.expandPath("dummy/app/views", import.meta.dirname)]);
 ActionMailerBase.prependViewPath([File.expandPath("dummy/app/views", import.meta.dirname)]);
 await import("./dummy/app/controllers/messages-controller.js");
@@ -91,8 +47,6 @@ await Base.connectionPool().migrationContext.migrate();
 await Migration.maintainTestSchemaBang();
 await RichText.loadSchema();
 
-ActiveJobBase.queueAdapter = "test";
-
 I18n.config().enforceAvailableLocales = false;
 
 FixtureSet.fileFixturePath = File.expandPath("fixtures", import.meta.dirname) + "/files";
@@ -103,13 +57,6 @@ ActiveRecord.Encryption.configure({
   keyDerivationSalt: "testing key derivation salt",
   supportUnencryptedData: true,
 });
-
-(Trails.configuration as unknown as { activeStorage: unknown }).activeStorage = {
-  service: "local",
-};
-const blob = ActiveStorage.Blob as unknown as { services: Registry; service: unknown };
-blob.services = new Registry({ local: { service: "Disk", root: Dir.mktmpdir("action_text") } });
-blob.service = blob.services.fetch("local");
 
 afterAll(async () => {
   await Base.establishConnection(configurations.configsFor({ envName: "arunit", name: "primary" }));
