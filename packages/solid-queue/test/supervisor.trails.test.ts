@@ -4,7 +4,7 @@ import { Supervisor } from "../lib/supervisor.js";
 
 describe("Supervisor#reap_terminated_forks", () => {
   it("fails the claimed jobs of a supervisee stopped by TERM and then killed by QUIT", async () => {
-    const supervisor = Object.create(Supervisor.prototype) as Supervisor & {
+    const supervisor = Object.create(Supervisor.prototype) as {
       forks: Record<string, unknown>;
       configuredProcesses: Record<string, unknown>;
       handleClaimedJobsBy(fork: unknown, status: { exitstatus: number | null }): Promise<void>;

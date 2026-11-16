@@ -16,7 +16,7 @@ import { Timer } from "./timer.js";
 interface Supervisee {
   name: string;
   mode: unknown;
-  _thread: { isAlive(): boolean; kill(): unknown };
+  _thread: { isAlive(): boolean; kill(): unknown; toKill: boolean };
   supervisedBy(process: unknown): void;
   start(): Promise<void>;
   stop(): Promise<void>;
