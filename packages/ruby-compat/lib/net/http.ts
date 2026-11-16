@@ -14,7 +14,7 @@ import { HTTP as URIHTTP } from "../uri/http.js";
 import { Generic as URIGeneric } from "../uri/generic.js";
 import { CGI } from "../cgi.js";
 import { Base64 } from "../base64.js";
-import { BufferedIO, Net, OpenTimeout, ReadTimeout } from "./protocol.js";
+import { BufferedIO, Net, OpenTimeout, Protocol, ReadTimeout } from "./protocol.js";
 import type { HTTPRequest } from "./http/request.js";
 import {
   Get,
@@ -56,7 +56,7 @@ HTTPHeaderSyntaxError.prototype.name = "Net::HTTPHeaderSyntaxError";
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib, which Rails calls without defining.
  */
-export class HTTP {
+export class HTTP extends Protocol {
   /** @noRailsEquivalent PERMANENT */
   static Get = Get;
   /** @noRailsEquivalent PERMANENT */
@@ -283,6 +283,7 @@ export class HTTP {
     pPass: string | null = null,
     pNoProxy: string | null = null,
   ) {
+    super();
     this.address = address;
     this.port = port ?? HTTP.defaultPort();
 
@@ -574,11 +575,10 @@ export class HTTP {
         });
         this._sslContext!.setParams(sslParameters);
         this.debug(`starting SSL for ${connAddr}:${connPort}...`);
-        await this.sslSocketConnect(s, this.openTimeout, {
-          sslHostAddress,
-          verifyPeer: this._sslContext!.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
-          ...(await this._sslContext!._setup()),
-        });
+        const ssl = new OpenSSL.SSL.SSLSocket(s, this._sslContext!);
+        ssl.syncClose = true;
+        if (sslHostAddress) ssl.hostname = sslHostAddress;
+        await this.sslSocketConnect(ssl, this.openTimeout);
         this.debug(`SSL established, protocol: ${s.sslVersion}, cipher: ${s.cipher![0]}`);
       }
       this._socket = new BufferedIO(s, {
@@ -594,30 +594,6 @@ export class HTTP {
         s.close();
       }
       throw exception;
-    }
-  }
-
-  /**
-   * `Net::Protocol#ssl_socket_connect` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:41-56`).
-   * The handshake's `connect_nonblock` / `wait_readable` loop is the adapter's
-   * `start_ssl`, raced against the remaining `timeout`.
-   *
-   * @internal @noRailsEquivalent PERMANENT
-   */
-  private async sslSocketConnect(
-    s: HttpClientSocket,
-    timeout: number | null,
-    sslParameters: Parameters<HttpClientSocket["startSsl"]>[0],
-  ): Promise<void> {
-    try {
-      if (timeout != null) {
-        if (timeout <= 0) throw new OpenTimeout("execution expired");
-        await Timeout.timeout(timeout, OpenTimeout, null, () => s.startSsl(sslParameters));
-      } else {
-        await s.startSsl(sslParameters);
-      }
-    } catch (e) {
-      throw _osslStartSslError(e, s);
     }
   }
 
@@ -873,34 +849,6 @@ export class HTTP {
     this._debugOutput.write(msg);
     this._debugOutput.write("\n");
   }
-}
-
-/**
- * `ossl_start_ssl`'s raise (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:1797-1821`):
- * the host's TLS failure as the `OpenSSL::SSL::SSLError` Ruby raises. A
- * certificate-verify failure carries the host's verify code (the
- * `SSL_VERIFY_CODES` `SSLError` matches) and `X509_verify_cert_error_string`'s
- * text as its message, and is appended as `: certificate verify failed (...)`;
- * any other failure appends OpenSSL's `ERR_reason_error_string`, the host
- * error's `reason`, as `ossl_make_error` does (`ext/openssl/ossl.c:272-297`).
- */
-function _osslStartSslError(e: unknown, s: HttpClientSocket): unknown {
-  if (!(e instanceof OpenSSL.SSL.SSLError)) return e;
-  if (Function.prototype[Symbol.hasInstance].call(OpenSSL.SSL.SSLError, e)) return e;
-  const host = e as unknown as Error & { code: string; reason?: string };
-  const errorAppend = OpenSSL.SSL.SSL_VERIFY_CODES.includes(host.code)
-    ? `: certificate verify failed (${host.message.replace(/; if the root CA .*$/s, "")})`
-    : `: ${host.reason ?? host.message}`;
-  let peeraddr: string;
-  try {
-    const [, port, addr] = s.peeraddr();
-    peeraddr = `${addr}:${port}`;
-  } catch {
-    peeraddr = "(null)";
-  }
-  return new OpenSSL.SSL.SSLError(
-    `SSL_connect returned=1 errno=0 peeraddr=${peeraddr} state=error${errorAppend}`,
-  );
 }
 
 Net.HTTP = HTTP;

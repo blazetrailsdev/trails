@@ -91,6 +91,8 @@ export interface HttpConnectOptions {
 export interface HttpSslOptions {
   sslHostAddress: string | null;
   verifyPeer: boolean;
+  verifyHostname?: boolean;
+  options?: number;
   ca?: string[] | null;
   defaultPaths?: boolean;
   minVersion?: "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3";

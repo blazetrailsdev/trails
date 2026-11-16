@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+import { checkServerIdentity, rootCertificates, type PeerCertificate } from "node:tls";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import {
   binaryBytes,
@@ -11,6 +13,7 @@ import {
   rbBlockGivenP,
   rbFArray,
   rbModName,
+  type HttpSslOptions,
 } from "@blazetrails/ruby-compat";
 import { Authenticator } from "./authenticator.js";
 import {
@@ -37,6 +40,7 @@ type Connection = SMTPConnection & {
   _onConnect(): void;
   _connectionDeadline: number | null;
   _upgradeConnection(callback: (err: Error | null) => void): void;
+  startSsl(options: HttpSslOptions): Promise<void>;
 };
 
 type ConnectionError = Error & { code?: string };
@@ -505,6 +509,7 @@ export class SMTP extends Protocol {
       greetingTimeout: this._readTimeout * 1000,
       socketTimeout: this._readTimeout * 1000,
     }) as Connection;
+    s.startSsl = (options) => _startSsl(s, options);
     this._socket = s;
     const onConnect = s._onConnect;
     try {
@@ -844,6 +849,41 @@ export class SMTP extends Protocol {
 
 Net.SMTP = SMTP;
 export const SMTPSession = SMTP;
+
+/** @noRailsEquivalent PERMANENT */
+async function _startSsl(io: Connection, options: HttpSslOptions): Promise<void> {
+  const hostname = options.sslHostAddress!;
+  const { ca, defaultPaths, minVersion, maxVersion } = options;
+  io.options.tls = {
+    ...(ca != null ? { ca: defaultPaths ? [...rootCertificates, ...ca] : ca } : {}),
+    rejectUnauthorized: options.verifyPeer,
+    secureOptions: options.options,
+    ...(minVersion !== undefined ? { minVersion } : {}),
+    ...(maxVersion !== undefined ? { maxVersion } : {}),
+    ...(isIP(hostname) === 0 ? { servername: hostname } : {}),
+    checkServerIdentity: (_host: string, cert: PeerCertificate) =>
+      options.verifyHostname ? checkServerIdentity(hostname, cert) : undefined,
+  };
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const cleanup = (): void => {
+        io.removeListener("error", reject);
+        io.removeListener("end", cleanup);
+      };
+      io.once("error", reject);
+      io.once("end", cleanup);
+      io._upgradeConnection((err) => {
+        cleanup();
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+  } catch (e) {
+    const err = e as Error & { code?: string; originalCode?: string };
+    if (err.originalCode != null) err.code = err.originalCode;
+    throw err;
+  }
+}
 
 import "./auth-plain.js";
 import "./auth-login.js";
