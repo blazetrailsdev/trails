@@ -1104,6 +1104,10 @@ importers:
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties
+    devDependencies:
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
 
   packages/solid-queue:
     dependencies:

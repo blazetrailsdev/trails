@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { Thread } from "./thread.js";
 import { ThreadError } from "./thread-error.js";
 
 interface QueueData<T> {
@@ -52,9 +53,14 @@ function queueDoPop<T>(
     }
 
     const end = timeout == null ? null : Date.now() + timeout * 1000;
+    const th = Thread.current();
     return (async () => {
       while (q.que.length === 0) {
         await queueSleep(q.waitq, end);
+        if (!th.isAlive()) {
+          if (q.que.length > 0) wakeupOne(q.waitq);
+          await new Promise<never>(() => {});
+        }
         if (end != null && Date.now() >= end) break;
       }
 
@@ -71,7 +77,8 @@ function queueDoPop<T>(
  * the waking `push` resolves. Only the members trails calls are ported
  * (`packages/ruby-compat/README.md` rule 1): there is no `close`, `closed?`,
  * `num_waiting` or `SizedQueue#max=`, so no queue is ever
- * closed and `push` never raises `ClosedQueueError`.
+ * closed and `push` never raises `ClosedQueueError`. A thread killed while it
+ * waits in `pop` never resumes, as MRI interrupts it in its sleep.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue`
  * (`vendor/ruby/v3.3.11/thread_sync.c:1677`).

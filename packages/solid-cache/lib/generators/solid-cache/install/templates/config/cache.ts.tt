@@ -1,0 +1,25 @@
+import { Trails } from "@blazetrails/trailties";
+
+const defaults = {
+  storeOptions: {
+    // Cap age of oldest cache entry to fulfill retention policies
+    // maxAge: 60 * 24 * 60 * 60,
+    maxSize: 256 * 1024 * 1024,
+    namespace: Trails.env.toString(),
+  },
+};
+
+export default {
+  development: {
+    ...defaults,
+  },
+
+  test: {
+    ...defaults,
+  },
+
+  production: {
+    database: <%= JSON.stringify(Object.hasOwn(ENV, "DATABASE") ? ENV.DATABASE : "cache") %>,
+    ...defaults,
+  },
+};

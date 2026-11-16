@@ -2,11 +2,39 @@ import { describe, expect, it } from "vitest";
 
 import { ArgumentError } from "../lib/argument-error.js";
 import { Queue, SizedQueue } from "../lib/queue.js";
+import { Thread } from "../lib/thread.js";
 import { ThreadError } from "../lib/thread-error.js";
 
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("Thread::Queue", () => {
+  it("a push wakes a live waiter when the first waiter was killed", async () => {
+    const q = new Queue<number>();
+    const killed = new Thread(async () => await q.pop());
+    let received: number | null = null;
+    await tick();
+    const live = new Thread(async () => (received = await q.pop()));
+    await tick();
+    killed.kill();
+    await q.push(1);
+    await live.join();
+    expect(received).toBe(1);
+  });
+
+  it("a thread killed while it waits in pop never resumes", async () => {
+    const q = new Queue<number>();
+    let resumed = false;
+    const th = new Thread(async () => {
+      await q.pop();
+      resumed = true;
+    });
+    await tick();
+    th.kill();
+    await q.push(1);
+    await tick();
+    expect(resumed).toBe(false);
+  });
+
   it("pop returns pushed objects in order", async () => {
     const q = new Queue<number>();
     await q.push(1);
