@@ -242,14 +242,16 @@ export class Node extends XmlNode {
         ? (options.pop() as (config: SaveOptions) => void)
         : undefined;
     const opts = (options[0] !== null && typeof options[0] === "object" ? options.shift() : {}) as {
+      0?: string | null;
+      1?: number;
       encoding?: string | null;
       saveWith?: number;
       indent?: number;
       indentText?: string;
       preserveNewline?: boolean;
     };
-    const encoding = opts.encoding || (options[0] as string | null | undefined);
-    const saveOptions = opts.saveWith || (options[1] as number | undefined) || SaveOptions.FORMAT;
+    const encoding = opts.encoding || opts[0];
+    const saveOptions = opts.saveWith || opts[1] || SaveOptions.FORMAT;
     const indentTimes = opts.indent || 2;
     const indentString = (opts.indentText || " ").repeat(indentTimes);
 

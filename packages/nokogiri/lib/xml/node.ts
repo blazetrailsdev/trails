@@ -167,16 +167,16 @@ export class XmlNode {
         ? (options.pop() as (config: SaveOptions) => void)
         : undefined;
     const opts = (options[0] !== null && typeof options[0] === "object" ? options.shift() : {}) as {
+      0?: string | null;
+      1?: number;
       encoding?: string | null;
       saveWith?: number;
       indent?: number;
       indentText?: string;
     };
     const encoding =
-      opts.encoding ||
-      (options[0] as string | null | undefined) ||
-      (this.document as { encoding?: string | null } | null)?.encoding;
-    const saveOptions = opts.saveWith || (options[1] as number | undefined) || SaveOptions.FORMAT;
+      opts.encoding || opts[0] || (this.document as { encoding?: string | null } | null)?.encoding;
+    const saveOptions = opts.saveWith || opts[1] || SaveOptions.FORMAT;
     const indentTimes = opts.indent ?? 2;
     const indentText = opts.indentText || " ";
 

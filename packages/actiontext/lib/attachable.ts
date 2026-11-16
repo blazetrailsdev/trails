@@ -33,6 +33,11 @@ function readAttributeForSerialization(this: AttachableHost, key: string): unkno
 }
 
 export const Attachable = {
+  /** @noRailsEquivalent PERMANENT */
+  attachable_sgid(this: AttachableHost): string {
+    return this.attachableSgid();
+  },
+
   attachableSgid(this: AttachableHost): string {
     return this.toSgid({ expiresIn: null, for: Attachable.LOCATOR_NAME }).toString();
   },
@@ -87,6 +92,7 @@ export const Attachable = {
   readAttributeForSerialization,
 } as Extended<typeof Concern> & {
   attachableSgid(this: AttachableHost): string;
+  attachable_sgid(this: AttachableHost): string;
   attachableContentType(this: AttachableHost): unknown;
   attachableFilename(this: AttachableHost): string | null;
   attachableFilesize(this: AttachableHost): unknown;
