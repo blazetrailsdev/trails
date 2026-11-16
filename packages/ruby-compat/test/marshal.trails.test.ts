@@ -15,6 +15,7 @@ import {
   TopLevel,
 } from "../lib/object.js";
 import { Rational, ZeroDivisionError } from "../lib/rational.js";
+import { Range } from "../lib/range.js";
 import { RuntimeError } from "../lib/runtime-error.js";
 import { Set as RbSet } from "../lib/set.js";
 import { Struct } from "../lib/struct.js";
@@ -435,6 +436,22 @@ describe("Marshal.load", () => {
       "(-3/4)",
       "(1180591620717411303424/3)",
     ]);
+  });
+
+  it("loads a Range through range_loader, frozen", () => {
+    const r = Marshal.load("\x04\bo:\nRange\b:\texclT:\nbegini\x06:\bendi\n") as Range<number>;
+    expect(r).toBeInstanceOf(Range);
+    expect([r.begin, r.end, r.excludeEnd]).toEqual([1, 5, true]);
+    expect(Object.isFrozen(r)).toBe(true);
+  });
+
+  it("round-trips a Range through range_dumper", () => {
+    const dumped = Marshal.dump(new Range(1, 5, true));
+    expect(hex(dumped)).toBe(
+      "04086f3a0a52616e6765083a096578636c543a0a626567696e69063a08656e64690a",
+    );
+    const r = Marshal.load(dumped) as Range<number>;
+    expect([r.begin, r.end, r.excludeEnd]).toEqual([1, 5, true]);
   });
 
   it("paths the compat class under Rational", () => {

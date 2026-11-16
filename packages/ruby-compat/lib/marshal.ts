@@ -2,7 +2,15 @@ import { ArgumentError } from "./argument-error.js";
 import { classpaths } from "./classpath.js";
 import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
-import { Module, extend, prepend, rbGetAllocFunc, rbObjIsKindOf } from "./include.js";
+import {
+  Module,
+  extend,
+  prepend,
+  rbDefineAllocFunc,
+  rbGetAllocFunc,
+  rbObjIsKindOf,
+} from "./include.js";
+import { Range, rangeDumper, rangeLoader } from "./range.js";
 
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
@@ -23,6 +31,9 @@ import {
   rbObjIvarDefined,
   rbObjIvarGet,
   rbObjIvarSet,
+  RObject,
+  rbIvarForeach,
+  rbIvarSet,
   rbObjRespondTo,
   rbObjSingletonClass,
   rtest,
@@ -492,10 +503,10 @@ function wIvarEach(obj: object, num: number, arg: DumpArg, limit: number): void 
     wObject(true, arg, limit);
     return;
   }
-  for (const id of rbObjInstanceVariables(obj)) {
+  rbIvarForeach(obj, (id, value) => {
     wSymbol(`:${id}`, arg);
-    wObject(rbObjIvarGet(obj, id), arg, limit);
-  }
+    wObject(value, arg, limit);
+  });
 }
 
 /** `w_ivar` (`vendor/ruby/v3.3.11/marshal.c:763`). */
@@ -515,7 +526,8 @@ function wIvar(
 
 /** `w_objivar` (`vendor/ruby/v3.3.11/marshal.c:780`). */
 function wObjivar(obj: object, arg: DumpArg, limit: number): void {
-  const num = rbObjInstanceVariables(obj).length;
+  let num = 0;
+  rbIvarForeach(obj, () => num++);
 
   wLong(num, arg);
   wIvarEach(obj, num, arg, limit);
@@ -1085,7 +1097,7 @@ function rIvar(
       } else if (obj instanceof String) {
         (obj as unknown as Record<string, unknown>)[sym] = val;
       } else {
-        rbObjIvarSet(obj as object, sym, val);
+        rbIvarSet(obj as object, sym, val);
       }
     } while (--len > 0);
   }
@@ -1666,3 +1678,5 @@ export const Marshal = {
 };
 
 rbMarshalDefineCompat(Rational, Rational.compatible, nuratDumper, nuratLoader);
+rbDefineAllocFunc(Range, (klass) => Object.create(klass.prototype) as Range);
+rbMarshalDefineCompat(Range, RObject, rangeDumper, rangeLoader);
