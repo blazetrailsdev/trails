@@ -897,7 +897,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/rails/solid_cache.git",
-      ref: "v1.0.7",
+      ref: "v1.0.9",
     },
     packages: [
       {

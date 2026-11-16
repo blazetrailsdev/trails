@@ -20,22 +20,23 @@ export class Record extends Base {
   }
 
   static async withInstrumenter<T>(instrumenter: unknown, block: () => T | Promise<T>): Promise<T> {
-    const connection = await this.leaseConnection();
-    if (rbObjRespondTo(connection, "withInstrumenter")) {
-      return await (
-        connection as unknown as {
-          withInstrumenter(instrumenter: unknown, block: () => T | Promise<T>): Promise<T>;
+    return await this.withConnection(async (connection) => {
+      if (rbObjRespondTo(connection, "withInstrumenter")) {
+        return await (
+          connection as unknown as {
+            withInstrumenter(instrumenter: unknown, block: () => T | Promise<T>): Promise<T>;
+          }
+        ).withInstrumenter(instrumenter, block);
+      } else {
+        const oldInstrumenter = IsolatedExecutionState.get("active_record_instrumenter");
+        IsolatedExecutionState.set("active_record_instrumenter", instrumenter);
+        try {
+          return await block();
+        } finally {
+          IsolatedExecutionState.set("active_record_instrumenter", oldInstrumenter);
         }
-      ).withInstrumenter(instrumenter, block);
-    } else {
-      const oldInstrumenter = IsolatedExecutionState.get("active_record_instrumenter");
-      IsolatedExecutionState.set("active_record_instrumenter", instrumenter);
-      try {
-        return await block();
-      } finally {
-        IsolatedExecutionState.set("active_record_instrumenter", oldInstrumenter);
       }
-    }
+    });
   }
 
   static withShard<T>(shard: string | null | undefined, block: () => T): T {

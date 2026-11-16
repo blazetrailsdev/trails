@@ -33,6 +33,7 @@
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   },
   "engines": {
@@ -41,8 +42,8 @@
   "mirrors": [
     {
       "source": "solid_cache",
-      "ref": "v1.0.7",
-      "sha": "411771527afdc7b8f91b79b15ff12680d1a628a4"
+      "ref": "v1.0.9",
+      "sha": "7e4bc0cbe2a5bc8f30546f27a8fc074ce8b484aa"
     }
   ],
   "devDependencies": {

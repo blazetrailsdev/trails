@@ -161,7 +161,7 @@ export default defineConfig(
       "packages/actionpack/test/fixtures/公共/**",
       // Byte-for-byte copies of vendor/marcel/v1.0.4/test/fixtures.
       "packages/marcel/test/fixtures/**",
-      // Generator destination fixtures, mirroring vendor/solid_cache/v1.0.7/test/fixtures/generators.
+      // Generator destination fixtures, mirroring vendor/solid_cache/v1.0.9/test/fixtures/generators.
       "packages/solid-cache/test/fixtures/generators/**",
       // Byte-for-byte copies of vendor/mini_magick/v5.2.0/spec/fixtures.
       "packages/mini-magick/test/fixtures/**",

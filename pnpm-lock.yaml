@@ -1110,6 +1110,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/thor':
+        specifier: workspace:*
+        version: link:../thor
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties

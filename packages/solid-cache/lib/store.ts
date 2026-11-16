@@ -129,13 +129,13 @@ export class Store extends CacheStore {
   _connections?: ReturnType<typeof SolidCacheConnections.fromConfig>;
 
   /**
-   * @inlinedFrom SolidCache::Store::Api#initialize solid_cache/v1.0.7/lib/solid_cache/store/api.rb:11-15
-   * @inlinedFrom SolidCache::Store::Connections#initialize solid_cache/v1.0.7/lib/solid_cache/store/connections.rb:8-27
-   * @inlinedFrom SolidCache::Store::Entries#initialize solid_cache/v1.0.7/lib/solid_cache/store/entries.rb:8-17
-   * @inlinedFrom SolidCache::Store::Execution#initialize solid_cache/v1.0.7/lib/solid_cache/store/execution.rb:6-10
-   * @inlinedFrom SolidCache::Store::Expiry#initialize solid_cache/v1.0.7/lib/solid_cache/store/expiry.rb:12-23
-   * @inlinedFrom SolidCache::Store::Failsafe#initialize solid_cache/v1.0.7/lib/solid_cache/store/failsafe.rb:21-25
-   * @inlinedFrom SolidCache::Store::Stats#initialize solid_cache/v1.0.7/lib/solid_cache/store/stats.rb:6-8
+   * @inlinedFrom SolidCache::Store::Api#initialize solid_cache/v1.0.9/lib/solid_cache/store/api.rb:11-15
+   * @inlinedFrom SolidCache::Store::Connections#initialize solid_cache/v1.0.9/lib/solid_cache/store/connections.rb:8-27
+   * @inlinedFrom SolidCache::Store::Entries#initialize solid_cache/v1.0.9/lib/solid_cache/store/entries.rb:8-17
+   * @inlinedFrom SolidCache::Store::Execution#initialize solid_cache/v1.0.9/lib/solid_cache/store/execution.rb:6-10
+   * @inlinedFrom SolidCache::Store::Expiry#initialize solid_cache/v1.0.9/lib/solid_cache/store/expiry.rb:12-23
+   * @inlinedFrom SolidCache::Store::Failsafe#initialize solid_cache/v1.0.9/lib/solid_cache/store/failsafe.rb:21-25
+   * @inlinedFrom SolidCache::Store::Stats#initialize solid_cache/v1.0.9/lib/solid_cache/store/stats.rb:6-8
    */
   constructor(options: StoreOptions = {}) {
     options = { ...SolidCache.configuration.storeOptions, ...options };
@@ -216,7 +216,7 @@ export class Store extends CacheStore {
     return true;
   }
 
-  /** @inlinedFrom SolidCache::Store::Connections#setup! solid_cache/v1.0.7/lib/solid_cache/store/connections.rb:42-44 */
+  /** @inlinedFrom SolidCache::Store::Connections#setup! solid_cache/v1.0.9/lib/solid_cache/store/connections.rb:42-44 */
   setupBang(): void {
     this.connections();
   }

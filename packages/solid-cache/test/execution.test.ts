@@ -181,7 +181,7 @@ describe("SolidCache::ExecutionTest", () => {
   it("no connections uninstrumented", async () => {
     vi.spyOn(
       ActiveRecord.ConnectionAdapters.ConnectionPool.prototype,
-      "leaseConnection",
+      "withConnection",
     ).mockRejectedValue(new StatementTimeout());
 
     const cache = host.lookupStore({ expiresIn: 60, activeRecordInstrumentation: false });
@@ -198,7 +198,7 @@ describe("SolidCache::ExecutionTest", () => {
   it("no connections instrumented", async () => {
     vi.spyOn(
       ActiveRecord.ConnectionAdapters.ConnectionPool.prototype,
-      "leaseConnection",
+      "withConnection",
     ).mockRejectedValue(new StatementTimeout());
 
     const cache = host.lookupStore({ expiresIn: 60 });

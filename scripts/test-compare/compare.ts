@@ -208,7 +208,9 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   }
 
   if (pkg === "solid-queue" || pkg === "solid-cable" || pkg === "solid-cache") {
-    const rest = rubyFile.replace(/^(unit|models\/solid_queue|jobs|lib)\//, "");
+    const rest = rubyFile
+      .replace(/^unit\/behaviors_rails_8_0\//, "unit/behaviors/")
+      .replace(/^(unit|models\/solid_queue|jobs|lib)\//, "");
     const dir = path.dirname(rest).replace(/_/g, "-");
     const tsFile =
       path
