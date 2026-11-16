@@ -61,13 +61,11 @@ async function runGeneratorInstance(args: string[]): Promise<string[]> {
   const railsCommands: string[] = [];
   const proto = AppGenerator.prototype as unknown as {
     isInstall(): boolean;
-    runInstall(): Promise<void>;
-    generateBundlerBinstub(): Promise<void>;
+    installCommand(command: string): void;
   };
   const stubs = [
     vi.spyOn(proto, "isInstall").mockReturnValue(true),
-    vi.spyOn(proto, "runInstall").mockResolvedValue(undefined),
-    vi.spyOn(proto, "generateBundlerBinstub").mockResolvedValue(undefined),
+    vi.spyOn(proto, "installCommand").mockImplementation(() => {}),
     vi.spyOn(Actions, "trailsCommand").mockImplementation(async (command: string) => {
       railsCommands.push(command);
     }),
