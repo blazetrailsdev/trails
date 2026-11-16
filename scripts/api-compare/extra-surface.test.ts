@@ -2081,17 +2081,31 @@ describe("buildReport — novel vs moved classification", () => {
 });
 
 describe("collectTsFileNames — static new beside a protected constructor", () => {
-  const cls = (visibility: "public" | "protected"): ClassInfo =>
+  const cls = (visibility: "public" | "protected", folded = false): ClassInfo =>
     ({
       name: "Server",
       file: "server.ts",
       instanceMethods: [{ name: "constructor", visibility, params: [] }],
-      classMethods: [{ name: "new", visibility: "public", params: [], isStatic: true }],
+      classMethods: [
+        {
+          name: "new",
+          visibility: "public",
+          params: [],
+          isStatic: true,
+          ...(folded ? { foldedIntoConstructor: true } : {}),
+        },
+      ],
     }) as unknown as ClassInfo;
 
-  it("is not surface beside a protected constructor", () => {
+  it("is not surface once folded into its constructor", () => {
+    expect(
+      collectTsFileNames("server.ts", [cls("protected", true)], [], undefined).has("new"),
+    ).toBe(false);
+  });
+
+  it("is surface beside a protected constructor when not folded", () => {
     expect(collectTsFileNames("server.ts", [cls("protected")], [], undefined).has("new")).toBe(
-      false,
+      true,
     );
   });
 

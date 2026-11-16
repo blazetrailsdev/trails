@@ -1159,9 +1159,9 @@ interface SurfaceName {
 /**
  * The single walk both collectors read, so what counts as surface and what
  * counts as an interface-only name can never disagree about a file. A
- * `static new` beside a non-public constructor is not surface: under RFC 0234
- * § Design 2(a) it is the class's own `Klass.new`, the async remainder of
- * `initialize`.
+ * `static new` that `foldStaticNewIntoConstructor` folded is not surface:
+ * under RFC 0234 § Design 2(a) it is the class's own `Klass.new`, the async
+ * remainder of `initialize`.
  */
 function walkTsFileSurface(
   file: string,
@@ -1197,11 +1197,8 @@ function walkTsFileSurface(
       });
     }
     const interfaceMembers = c.interfaceMembers;
-    const hidesConstructor = c.instanceMethods.some(
-      (m) => m.name === "constructor" && m.visibility !== "public",
-    );
     for (const m of [...c.instanceMethods, ...c.classMethods]) {
-      if (hidesConstructor && m.isStatic === true && m.name === "new") continue;
+      if (m.foldedIntoConstructor === true) continue;
       // `declaredIn` marks a member the extractor pulled in from another file —
       // a synthesized mixin's base surface, or an `interface X extends Y`'s
       // inherited properties. Either way it is that file's surface, scored

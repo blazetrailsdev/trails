@@ -8817,6 +8817,7 @@ describe("extractClass — @inlinedFrom on a static async new", () => {
     expect(ctor.inlinedFrom).toBeUndefined();
     expect(ctor.callSeq).toEqual(["a", "post"]);
     expect(ctor.calls).not.toContain("rbClassNewInstance");
+    expect(info.classMethods.find((m) => m.name === "new")!.foldedIntoConstructor).toBe(true);
   });
 
   it("keeps a new expression beside the rbClassNewInstance a static new builds through", () => {

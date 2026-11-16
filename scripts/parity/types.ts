@@ -246,6 +246,9 @@ export interface MethodInfo {
   /** TS-side only (RFC 0188, RFC 0197): the Ruby bodies a constructor or
    *  method names as inlined into it, via `@inlinedFrom`, in written order. */
   inlinedFrom?: InlinedFrom[];
+  /** TS-side only (RFC 0234 § Design 2(a)): a `static new` whose body
+   *  `foldStaticNewIntoConstructor` handed to its non-public constructor. */
+  foldedIntoConstructor?: boolean;
   /** Ruby-side only (RFC 0188): the line an `initialize` / `new` `def` closes
    *  on, so an `@inlinedFrom` citation's span can be derived. */
   endLine?: number;

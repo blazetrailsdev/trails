@@ -5220,6 +5220,7 @@ export function foldStaticNewIntoConstructor(
   for (const key of ["inlinedFrom", "calls", "callSeq", "callArgs", "skeleton"] as const) {
     delete staticNew[key];
   }
+  staticNew.foldedIntoConstructor = true;
 }
 
 export function extractClass(
