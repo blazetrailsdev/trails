@@ -1695,7 +1695,7 @@ export interface PostgreSQLAdapter {
   ): string;
   foreignTables(): Promise<string[]>;
   foreignTableExists(tableName: string): Promise<boolean | undefined>;
-  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper;
+  createSchemaDumper(options: Record<string, unknown>): Promise<PgSchemaDumper>;
   addIndexOptions(
     tableName: string,
     columnName: string | string[],

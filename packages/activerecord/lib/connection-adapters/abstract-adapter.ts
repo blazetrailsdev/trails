@@ -447,7 +447,7 @@ export interface AbstractAdapter
   indexes(tableName: string): Promise<IndexDefinition[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
   foreignKeyColumnFor(tableName: string, columnName?: string): string;
-  createSchemaDumper(options: Record<string, unknown>): SchemaDumper;
+  createSchemaDumper(options: Record<string, unknown>): Promise<SchemaDumper>;
   foreignKeyExists(
     fromTable: string,
     toTable?: string | null,

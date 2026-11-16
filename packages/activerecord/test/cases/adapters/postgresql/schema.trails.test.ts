@@ -116,7 +116,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       await adapter.execute(`COMMENT ON TABLE commented_table IS 'a test table'`);
       const lines = new StringIO();
-      await adapter.createSchemaDumper({}).table("commented_table", lines);
+      await (await adapter.createSchemaDumper({})).table("commented_table", lines);
       expect(lines.string()).toContain(`comment: "a test table"`);
       await adapter.execute(`DROP TABLE IF EXISTS commented_table`);
 

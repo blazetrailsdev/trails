@@ -869,7 +869,7 @@ describe("schema dump and load", () => {
       setSchemaFormat("js");
       let schema: string;
       try {
-        schema = (await sourceAdapter.createSchemaDumper({}).dump(new StringIO())).string();
+        schema = (await (await sourceAdapter.createSchemaDumper({})).dump(new StringIO())).string();
       } finally {
         setSchemaFormat(schemaFormatWas);
       }

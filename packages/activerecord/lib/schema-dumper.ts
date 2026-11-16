@@ -1,4 +1,5 @@
 import {
+  rbClassNewInstance,
   STDOUT,
   StandardError,
   StringIO,
@@ -66,27 +67,34 @@ export abstract class SchemaDumper {
   }
 
   protected connection: DatabaseAdapter;
-  protected _options: Record<string, unknown>;
+  protected _options!: Record<string, unknown>;
   private _tableName?: string;
-  private _version: Promise<number | null | undefined> | null;
-  private _ignoreTables: (string | RegExp)[];
+  private _version!: number | null | undefined;
+  private _ignoreTables!: (string | RegExp)[];
 
   /** @internal */
-  constructor(connection: DatabaseAdapter, options: Record<string, unknown> = {}) {
+  protected constructor(connection: DatabaseAdapter, _options: Record<string, unknown> = {}) {
     this.connection = connection;
+  }
+
+  static async new<T extends SchemaDumper>(
+    this: { prototype: T },
+    connection: DatabaseAdapter,
+    options: Record<string, unknown> = {},
+  ): Promise<T> {
+    const obj = rbClassNewInstance(this, connection, options);
     try {
-      this._version = (connection.pool as ConnectionPool).migrationContext
-        .currentVersion()
-        .then(null, () => null);
+      obj._version = await (connection.pool as ConnectionPool).migrationContext.currentVersion();
     } catch {
-      this._version = null;
+      obj._version = null;
     }
-    this._options = options;
-    this._ignoreTables = [
+    obj._options = options;
+    obj._ignoreTables = [
       baseClass().schemaMigrationsTableName,
       baseClass().internalMetadataTableName,
-      (this.constructor as typeof SchemaDumper).ignoreTables,
+      (obj.constructor as typeof SchemaDumper).ignoreTables,
     ].flat();
+    return obj;
   }
 
   /** @internal */
@@ -103,14 +111,14 @@ export abstract class SchemaDumper {
    * @missingRailsCall insert — CONVERGEABLE schema-dumper-formatted-version-inserts-through-string-insert
    */
   async formattedVersion(): Promise<string> {
-    const stringified = toS(await this._version);
+    const stringified = toS(this._version);
     if (stringified.length !== 14) return stringified;
     return `${stringified.slice(0, 4)}_${stringified.slice(4, 6)}_${stringified.slice(6, 8)}_${stringified.slice(8)}`;
   }
 
   /** @internal */
   async defineParams(): Promise<string> {
-    return (await this._version) != null ? `version: ${await this.formattedVersion()}` : "";
+    return this._version != null ? `version: ${await this.formattedVersion()}` : "";
   }
 
   /** @internal */
@@ -122,15 +130,12 @@ export abstract class SchemaDumper {
     };
   }
 
-  protected static create<T extends typeof SchemaDumper>(
-    this: T,
+  protected static create<T extends SchemaDumper>(
+    this: { prototype: T },
     connection: DatabaseAdapter,
     options: Record<string, unknown> = {},
-  ): InstanceType<T> {
-    return new (this as unknown as new (
-      connection: DatabaseAdapter,
-      options: Record<string, unknown>,
-    ) => InstanceType<T>)(connection, options);
+  ): Promise<T> {
+    return (this as unknown as typeof SchemaDumper).new(connection, options) as Promise<T>;
   }
 
   static async dump<S extends IO | StringIO = IO>(
@@ -139,7 +144,7 @@ export abstract class SchemaDumper {
     config: SchemaDumperConfig = baseClass(),
   ): Promise<S> {
     await pool.withConnection(async (connection) => {
-      await connection.createSchemaDumper(this.generateOptions(config)).dump(stream);
+      await (await connection.createSchemaDumper(this.generateOptions(config))).dump(stream);
     });
     return stream;
   }

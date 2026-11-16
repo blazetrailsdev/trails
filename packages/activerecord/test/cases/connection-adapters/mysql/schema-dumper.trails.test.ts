@@ -85,56 +85,60 @@ const col = (
 
 describe("MySQL::SchemaDumper", () => {
   describe("schemaType", () => {
-    it("timestamp → 'timestamp'", () =>
-      expect((make() as any).schemaType(col({ sqlType: "timestamp" }))).toBe(":timestamp"));
-    it("enum → full sql_type", () =>
-      expect((make() as any).schemaType(col({ sqlType: "enum('a','b')" }))).toBe("enum('a','b')"));
-    it("set → full sql_type", () =>
-      expect((make() as any).schemaType(col({ sqlType: "set('x')" }))).toBe("set('x')"));
-    it("standard → delegates to super", () =>
-      expect((make() as any).schemaType(col({ type: "string" }))).toBe(":string"));
+    it("timestamp → 'timestamp'", async () =>
+      expect(((await make()) as any).schemaType(col({ sqlType: "timestamp" }))).toBe(":timestamp"));
+    it("enum → full sql_type", async () =>
+      expect(((await make()) as any).schemaType(col({ sqlType: "enum('a','b')" }))).toBe(
+        "enum('a','b')",
+      ));
+    it("set → full sql_type", async () =>
+      expect(((await make()) as any).schemaType(col({ sqlType: "set('x')" }))).toBe("set('x')"));
+    it("standard → delegates to super", async () =>
+      expect(((await make()) as any).schemaType(col({ type: "string" }))).toBe(":string"));
   });
 
   describe("schemaLimit", () => {
-    it("suppresses limit for text/blob family", () => {
+    it("suppresses limit for text/blob family", async () => {
       for (const t of ["tinytext", "text", "longblob", "mediumblob"]) {
-        expect((make() as any).schemaLimit(col({ sqlType: t }))).toBeUndefined();
+        expect(((await make()) as any).schemaLimit(col({ sqlType: t }))).toBeUndefined();
       }
     });
-    it("returns limit for varchar", () =>
-      expect((make() as any).schemaLimit(col({ sqlType: "varchar(100)", limit: 100 }))).toBe(
-        "100",
-      ));
-    it("suppresses default limit 24 for float", () =>
+    it("returns limit for varchar", async () =>
       expect(
-        (make() as any).schemaLimit(col({ type: "float", sqlType: "float", limit: 24 })),
+        ((await make()) as any).schemaLimit(col({ sqlType: "varchar(100)", limit: 100 })),
+      ).toBe("100"));
+    it("suppresses default limit 24 for float", async () =>
+      expect(
+        ((await make()) as any).schemaLimit(col({ type: "float", sqlType: "float", limit: 24 })),
       ).toBeUndefined());
-    it("emits non-default limit for float (double precision)", () =>
+    it("emits non-default limit for float (double precision)", async () =>
       expect(
-        (make() as any).schemaLimit(col({ type: "float", sqlType: "double", limit: 53 })),
+        ((await make()) as any).schemaLimit(col({ type: "float", sqlType: "double", limit: 53 })),
       ).toBe("53"));
   });
 
   describe("schemaPrecision", () => {
-    it("time precision 0 → undefined", () =>
+    it("time precision 0 → undefined", async () =>
       expect(
-        (make() as any).schemaPrecision(col({ type: "time", sqlType: "time", precision: 0 })),
+        ((await make()) as any).schemaPrecision(
+          col({ type: "time", sqlType: "time", precision: 0 }),
+        ),
       ).toBeUndefined());
-    it("timestamp (datetime type) precision 0 → undefined", () =>
+    it("timestamp (datetime type) precision 0 → undefined", async () =>
       expect(
-        (make() as any).schemaPrecision(
+        ((await make()) as any).schemaPrecision(
           col({ type: "datetime", sqlType: "timestamp", precision: 0 }),
         ),
       ).toBeUndefined());
-    it("datetime precision 0 → 'null'", () =>
+    it("datetime precision 0 → 'null'", async () =>
       expect(
-        (make() as any).schemaPrecision(
+        ((await make()) as any).schemaPrecision(
           col({ type: "datetime", sqlType: "datetime", precision: 0 }),
         ),
       ).toBe("null"));
-    it("datetime precision 3 → '3'", () =>
+    it("datetime precision 3 → '3'", async () =>
       expect(
-        (make() as any).schemaPrecision(
+        ((await make()) as any).schemaPrecision(
           col({ type: "datetime", sqlType: "datetime(3)", precision: 3 }),
         ),
       ).toBe("3"));
@@ -142,9 +146,11 @@ describe("MySQL::SchemaDumper", () => {
 
   describe("schemaCollation", () => {
     it("returns undefined when no collation", async () =>
-      expect(await (make() as any).schemaCollation(col({ collation: null }))).toBeUndefined());
+      expect(
+        await ((await make()) as any).schemaCollation(col({ collation: null })),
+      ).toBeUndefined());
     it("omits when matching table default", async () => {
-      const d = make();
+      const d = await make();
       d.setConnection(stubConnection({ collation: "utf8mb4_unicode_ci" }));
       d.tableName = "users";
       expect(
@@ -152,7 +158,7 @@ describe("MySQL::SchemaDumper", () => {
       ).toBeUndefined();
     });
     it("emits when differing from table default", async () => {
-      const d = make();
+      const d = await make();
       d.setConnection(stubConnection({ collation: "utf8mb4_general_ci" }));
       d.tableName = "users";
       expect(await (d as any).schemaCollation(col({ collation: "utf8mb4_unicode_ci" }))).toBe(
@@ -160,7 +166,7 @@ describe("MySQL::SchemaDumper", () => {
       );
     });
     it("queries SHOW TABLE STATUS once per table", async () => {
-      const d = make();
+      const d = await make();
       const queries: string[] = [];
       d.setConnection(
         stubConnection({ collation: "utf8mb4_general_ci", onQuery: (q) => queries.push(q) }),
@@ -173,49 +179,57 @@ describe("MySQL::SchemaDumper", () => {
   });
 
   describe("isDefaultPrimaryKey", () => {
-    it("true: bigint + autoIncrement + non-unsigned", () =>
-      expect((make() as any).isDefaultPrimaryKey(col({ bigint: true, autoIncrement: true }))).toBe(
-        true,
-      ));
-    it("false: unsigned", () =>
+    it("true: bigint + autoIncrement + non-unsigned", async () =>
       expect(
-        (make() as any).isDefaultPrimaryKey(
+        ((await make()) as any).isDefaultPrimaryKey(col({ bigint: true, autoIncrement: true })),
+      ).toBe(true));
+    it("false: unsigned", async () =>
+      expect(
+        ((await make()) as any).isDefaultPrimaryKey(
           col({ bigint: true, autoIncrement: true, unsigned: true }),
         ),
       ).toBe(false));
-    it("false: no autoIncrement", () =>
-      expect((make() as any).isDefaultPrimaryKey(col({ bigint: true }))).toBe(false));
+    it("false: no autoIncrement", async () =>
+      expect(((await make()) as any).isDefaultPrimaryKey(col({ bigint: true }))).toBe(false));
   });
 
   describe("isExplicitPrimaryKeyDefault", () => {
-    it("true when integer + autoIncrement explicitly false", () =>
+    it("true when integer + autoIncrement explicitly false", async () =>
       expect(
-        (make() as any).isExplicitPrimaryKeyDefault(col({ type: "integer", autoIncrement: false })),
+        ((await make()) as any).isExplicitPrimaryKeyDefault(
+          col({ type: "integer", autoIncrement: false }),
+        ),
       ).toBe(true));
-    it("false when autoIncrement true", () =>
+    it("false when autoIncrement true", async () =>
       expect(
-        (make() as any).isExplicitPrimaryKeyDefault(col({ type: "integer", autoIncrement: true })),
+        ((await make()) as any).isExplicitPrimaryKeyDefault(
+          col({ type: "integer", autoIncrement: true }),
+        ),
       ).toBe(false));
-    it("true when autoIncrement undefined (not auto_increment)", () =>
-      expect((make() as any).isExplicitPrimaryKeyDefault(col({ type: "integer" }))).toBe(true));
+    it("true when autoIncrement undefined (not auto_increment)", async () =>
+      expect(((await make()) as any).isExplicitPrimaryKeyDefault(col({ type: "integer" }))).toBe(
+        true,
+      ));
   });
 
   describe("prepareColumnOptions", () => {
     it("adds unsigned", async () =>
       expect(
-        (await (make() as any).prepareColumnOptions(col({ unsigned: true })))["unsigned"],
+        (await ((await make()) as any).prepareColumnOptions(col({ unsigned: true })))["unsigned"],
       ).toBe("true"));
     it("adds autoIncrement", async () =>
       expect(
-        (await (make() as any).prepareColumnOptions(col({ autoIncrement: true })))["autoIncrement"],
+        (await ((await make()) as any).prepareColumnOptions(col({ autoIncrement: true })))[
+          "autoIncrement"
+        ],
       ).toBe("true"));
     it("prepends size key for tinytext", async () => {
-      const opts = await (make() as any).prepareColumnOptions(col({ sqlType: "tinytext" }));
+      const opts = await ((await make()) as any).prepareColumnOptions(col({ sqlType: "tinytext" }));
       expect(Object.keys(opts)[0]).toBe("size");
       expect(opts["size"]).toBe('"tiny"');
     });
     it("virtual column: emits type prefix, as, and stored", async () => {
-      const d = make();
+      const d = await make();
       d.tableName = "t";
       d.setConnection(stubConnection({ expression: "CONCAT(a, b)" }));
       const opts = await (d as any).prepareColumnOptions(
@@ -239,7 +253,7 @@ describe("MySQL::SchemaDumper", () => {
     it("removes autoIncrement for integer pk", async () => {
       expect(
         (
-          await (make() as any).columnSpecForPrimaryKey(
+          await ((await make()) as any).columnSpecForPrimaryKey(
             col({ type: "integer", autoIncrement: true }),
           )
         )["autoIncrement"],
@@ -249,7 +263,7 @@ describe("MySQL::SchemaDumper", () => {
 
   describe("extractExpressionForVirtualColumn", () => {
     it("queries information_schema for the column's generation expression", async () => {
-      const d = make();
+      const d = await make();
       const queries: string[] = [];
       d.setConnection(
         stubConnection({ expression: "upper(`name`)", onQuery: (q) => queries.push(q) }),
@@ -267,7 +281,7 @@ describe("MySQL::SchemaDumper", () => {
     });
 
     it('strips escaped single quotes (mirrors Rails gsub("\\\\\'", "\'"))', async () => {
-      const d = make();
+      const d = await make();
       d.setConnection(
         stubConnection({ expression: "json_extract(`profile`,_utf8mb4\\'$.email\\')" }),
       );

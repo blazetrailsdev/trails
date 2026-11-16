@@ -880,7 +880,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.execute(`CREATE TABLE wagons (id serial primary key, train_id integer)`);
         await adapter.addForeignKey("wagons", "my_schema.trains");
         const lines = new StringIO();
-        await adapter.createSchemaDumper({}).foreignKeys("wagons", lines);
+        await (await adapter.createSchemaDumper({})).foreignKeys("wagons", lines);
         const output = lines.string();
         expect(output).toMatch(/addForeignKey\("wagons", "my_schema\.trains"/);
       } finally {

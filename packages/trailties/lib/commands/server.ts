@@ -74,7 +74,7 @@ export class Server extends RackupServer<ServerOptions> {
   /** @internal */
   _defaultOptions: ServerOptions;
 
-  constructor(options: ServerOptions | null = null) {
+  protected constructor(options: ServerOptions | null = null) {
     const defaultOptions = options ?? {};
     super(defaultOptions);
     this._defaultOptions = defaultOptions;
@@ -288,7 +288,7 @@ export class ServerCommand extends Base {
     this.setApplicationDirectoryBang();
     this.prepareRestart();
 
-    const server = new Server(this.serverOptions());
+    const server = await Server.new(this.serverOptions());
     await requireApplicationBang();
     Dir.chdir(Trails.application!.root()!);
 

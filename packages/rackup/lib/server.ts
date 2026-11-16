@@ -27,6 +27,7 @@ import {
   createTmpname,
   FileUtils,
   rbFRequireFile,
+  rbClassNewInstance,
   rbGvSet,
   rbInspect,
   LOAD_PATH,
@@ -270,7 +271,16 @@ export class Server<TOptions extends ServerOptions = ServerOptions> {
   static Options = Options;
 
   static async start(options: ServerOptions | null = null): Promise<unknown> {
-    return new this(options).start();
+    return (await this.new(options)).start();
+  }
+
+  static async new<T extends Server>(
+    this: { prototype: T },
+    options: ServerOptions | null = null,
+  ): Promise<T> {
+    const obj = rbClassNewInstance(this, options);
+    if (obj._useDefaultOptions) obj._options = await obj.parseOptions(ARGV);
+    return obj;
   }
 
   /** @internal */
@@ -285,10 +295,7 @@ export class Server<TOptions extends ServerOptions = ServerOptions> {
   _server: HandlerLike | null = null;
   /** @internal */
   _wrappedApp: unknown = null;
-  /** @internal */
-  _ready: Promise<void> = Promise.resolve();
-
-  constructor(options: ServerOptions | null = null) {
+  protected constructor(options: ServerOptions | null = null) {
     this._ignoreOptions = [];
 
     if (options != null) {
@@ -297,9 +304,6 @@ export class Server<TOptions extends ServerOptions = ServerOptions> {
       if (options.app != null) this._app = options.app;
     } else {
       this._useDefaultOptions = true;
-      this._ready = this.parseOptions(ARGV).then((parsed) => {
-        this._options = parsed;
-      });
     }
   }
 
@@ -370,7 +374,6 @@ export class Server<TOptions extends ServerOptions = ServerOptions> {
   }
 
   async start(block: ((...args: unknown[]) => unknown) | null = null): Promise<unknown> {
-    await this._ready;
     const options = this.options;
 
     if (options.warn) {

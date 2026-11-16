@@ -111,14 +111,14 @@ describe("Rackup::Server", () => {
     return async () => [200, { "content-type": "text/plain" }, ["success"]];
   }
 
-  async function newServer(klass: new () => Server = Server): Promise<Server> {
-    const server = new klass();
-    await server._ready;
-    return server;
+  async function newServer(
+    klass: { prototype: Server; new: typeof Server.new } = Server,
+  ): Promise<Server> {
+    return klass.new();
   }
 
   it("overrides :config if :app is passed in", async () => {
-    const server = new Server({ app: "FOO" });
+    const server = await Server.new({ app: "FOO" });
     expect(await server.app()).toBe("FOO");
   });
 
@@ -231,7 +231,7 @@ describe("Rackup::Server", () => {
   });
 
   it("prefer to use :builder when it is passed in", async () => {
-    const server = new Server({
+    const server = await Server.new({
       builder:
         "builder.run(function (env) { return [200, { 'content-type': 'text/plain' }, ['success']]; });",
     });
@@ -240,24 +240,24 @@ describe("Rackup::Server", () => {
     );
   });
 
-  it("allow subclasses to override middleware", () => {
+  it("allow subclasses to override middleware", async () => {
     const server = class extends Server {
       override middleware() {
         return new Hash<string, never[]>([]);
       }
     };
     expect(server.middleware().get("deployment")).not.toEqual([]);
-    expect(new server({ app: "foo" }).middleware().get("deployment")).toEqual([]);
+    expect((await server.new({ app: "foo" })).middleware().get("deployment")).toEqual([]);
   });
 
-  it("allow subclasses to override default middleware", () => {
+  it("allow subclasses to override default middleware", async () => {
     const server = class extends Server {
       static override defaultMiddlewareByEnvironment() {
         return new Hash<string, never[]>([]);
       }
     };
     expect(server.middleware().get("deployment")).toEqual([]);
-    expect(new server({ app: "foo" }).middleware().get("deployment")).toEqual([]);
+    expect((await server.new({ app: "foo" })).middleware().get("deployment")).toEqual([]);
   });
 
   it("only provide default middleware for development and deployment environments", () => {
@@ -267,28 +267,28 @@ describe("Rackup::Server", () => {
     ]);
   });
 
-  it("always return an empty array for unknown environments", () => {
-    const server = new Server({ app: "foo" });
+  it("always return an empty array for unknown environments", async () => {
+    const server = await Server.new({ app: "foo" });
     expect(server.middleware().get("production")).toEqual([]);
   });
 
-  it("not include Rack::Lint in deployment environment", () => {
-    const server = new Server({ app: "foo" });
+  it("not include Rack::Lint in deployment environment", async () => {
+    const server = await Server.new({ app: "foo" });
     expect(server.middleware().get("deployment")!.flat()).not.toContain(Lint);
   });
 
-  it("not include Rack::ShowExceptions in deployment environment", () => {
-    const server = new Server({ app: "foo" });
+  it("not include Rack::ShowExceptions in deployment environment", async () => {
+    const server = await Server.new({ app: "foo" });
     expect(server.middleware().get("deployment")!.flat()).not.toContain(ShowExceptions);
   });
 
-  it("include Rack::TempfileReaper in deployment environment", () => {
-    const server = new Server({ app: "foo" });
+  it("include Rack::TempfileReaper in deployment environment", async () => {
+    const server = await Server.new({ app: "foo" });
     expect(server.middleware().get("deployment")!.flat()).toContain(TempfileReaper);
   });
 
   it("be quiet if said so", async () => {
-    const server = new Server({ app: "FOO", quiet: true });
+    const server = await Server.new({ app: "FOO", quiet: true });
     expect(await Server.loggingMiddleware()(server)).toBeNull();
   });
 
@@ -480,7 +480,7 @@ describe("Rackup::Server", () => {
 
   it("run a server", async () => {
     const pidfile = await tempPidfile();
-    const server = new Server({
+    const server = await Server.new({
       app: app(),
       environment: "none",
       pid: pidfile,
@@ -506,7 +506,7 @@ describe("Rackup::Server", () => {
 
   it("check pid file presence and running process", async () => {
     const pidfile = await tempPidfile(`${Process.pid}`);
-    const server = new Server({ pid: pidfile });
+    const server = await Server.new({ pid: pidfile });
     const output = await withStderr(async () => {
       await expect(server["checkPidBang"]()).rejects.toThrow(SystemExit);
     });
@@ -518,14 +518,14 @@ describe("Rackup::Server", () => {
 
   it("check pid file presence and dead process", async () => {
     const pidfile = await tempPidfile("999999999");
-    const server = new Server({ pid: pidfile });
+    const server = await Server.new({ pid: pidfile });
     await server["checkPidBang"]();
     expect(await File.isExistAsync(pidfile)).toBe(false);
   });
 
   it("check pid file presence and exited process", async () => {
     const pidfile = await tempPidfile();
-    const server = new Server({ pid: pidfile });
+    const server = await Server.new({ pid: pidfile });
     await server["checkPidBang"]();
   });
 
@@ -538,7 +538,7 @@ describe("Rackup::Server", () => {
     }
     ctx.skip(ownsPid1, "cannot test if pid 1 owner matches current process (eg. docker/lxc)");
     const pidfile = await tempPidfile("1");
-    const server = new Server({ pid: pidfile });
+    const server = await Server.new({ pid: pidfile });
     const output = await withStderr(async () => {
       await expect(server["checkPidBang"]()).rejects.toThrow(SystemExit);
     });
@@ -548,7 +548,7 @@ describe("Rackup::Server", () => {
 
   it("rewrite pid file when it does not reference a running process", async () => {
     const pidfile = await tempPidfile();
-    const server = new Server({ pid: pidfile });
+    const server = await Server.new({ pid: pidfile });
     await File.writeAsync(pidfile, "");
     await server["writePid"]();
     expect(parseInt(await File.readAsync(pidfile), 10)).toBe(Process.pid);
@@ -557,7 +557,7 @@ describe("Rackup::Server", () => {
 
   it("not write pid file when it references a running process", async () => {
     const pidfile = await tempPidfile();
-    const server = new Server({ pid: pidfile });
+    const server = await Server.new({ pid: pidfile });
     await File.writeAsync(pidfile, "1");
     const output = await withStderr(async () => {
       await expect(server["writePid"]()).rejects.toThrow(SystemExit);
@@ -568,7 +568,7 @@ describe("Rackup::Server", () => {
 
   it("inform the user about existing pidfiles with running processes", async () => {
     const pidfile = await tempPidfile("1");
-    const server = new Server({ pid: pidfile });
+    const server = await Server.new({ pid: pidfile });
     const output = await withStderr(async () => {
       await expect(server.start()).rejects.toThrow(SystemExit);
     });

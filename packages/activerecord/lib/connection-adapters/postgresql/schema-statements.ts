@@ -1186,7 +1186,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }
 
-  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper {
+  createSchemaDumper(options: Record<string, unknown>): Promise<PgSchemaDumper> {
     return PgSchemaDumper.create(
       this as unknown as Parameters<typeof PgSchemaDumper.create>[0],
       options,

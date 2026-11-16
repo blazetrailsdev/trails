@@ -18,7 +18,7 @@ function col(
   );
 }
 
-const dumper = SchemaDumper.create({
+const dumper = await SchemaDumper.create({
   tables: () => [],
   columns: () => [],
   indexes: () => [],

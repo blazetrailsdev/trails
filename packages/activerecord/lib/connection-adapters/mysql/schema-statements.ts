@@ -41,7 +41,7 @@ type CreateTableArgs = Parameters<BaseSchemaStatements["createTable"]>;
 type CreateTableOptions = Extract<CreateTableArgs[1], { options?: string }>;
 
 export class SchemaStatements extends BaseSchemaStatements {
-  override createSchemaDumper(options: Record<string, unknown>): MysqlSchemaDumper {
+  override createSchemaDumper(options: Record<string, unknown>): Promise<MysqlSchemaDumper> {
     return MysqlSchemaDumper.create(
       this as unknown as Parameters<typeof MysqlSchemaDumper.create>[0],
       options,

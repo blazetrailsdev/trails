@@ -42,74 +42,74 @@ function makeColumn(
 }
 
 describe("PostgreSQL::SchemaDumper", () => {
-  it("create returns a PG SchemaDumper instance", () => {
-    const dumper = SchemaDumper.create(emptySource);
+  it("create returns a PG SchemaDumper instance", async () => {
+    const dumper = await SchemaDumper.create(emptySource);
     expect(dumper).toBeInstanceOf(SchemaDumper);
   });
 
   describe("schemaType", () => {
-    it("returns bigserial for a serial bigint column", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns bigserial for a serial bigint column", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ sqlType: "bigint", type: "integer", serial: true });
       expect(dumper.schemaType(col)).toBe(":bigserial");
     });
 
-    it("returns serial for a serial non-bigint column", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns serial for a serial non-bigint column", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
       expect(dumper.schemaType(col)).toBe(":serial");
     });
 
-    it("returns bigint for bigint array columns (strips [] before returning)", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns bigint for bigint array columns (strips [] before returning)", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ sqlType: "bigint[]", type: "integer", array: true });
       expect(dumper.schemaType(col)).toBe(":bigint");
     });
 
-    it("returns semantic type for non-serial non-bigint columns", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns semantic type for non-serial non-bigint columns", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ sqlType: "character varying", type: "string" });
       expect(dumper.schemaType(col)).toBe(":string");
     });
   });
 
   describe("isDefaultPrimaryKey", () => {
-    it("returns true when schemaType is bigserial", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns true when schemaType is bigserial", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ sqlType: "bigint", type: "integer", serial: true });
       expect(dumper.isDefaultPrimaryKey(col)).toBe(true);
     });
 
-    it("returns false for serial (only bigserial is the default PK)", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns false for serial (only bigserial is the default PK)", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
       expect(dumper.isDefaultPrimaryKey(col)).toBe(false);
     });
   });
 
   describe("isExplicitPrimaryKeyDefault", () => {
-    it("returns true for uuid type", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns true for uuid type", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ type: "uuid", sqlType: "uuid" });
       expect(dumper.isExplicitPrimaryKeyDefault(col)).toBe(true);
     });
 
-    it("returns true for integer without serial", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns true for integer without serial", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ type: "integer", sqlType: "integer", serial: false });
       expect(dumper.isExplicitPrimaryKeyDefault(col)).toBe(true);
     });
 
-    it("returns false for serial integer", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns false for serial integer", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ type: "integer", sqlType: "integer", serial: true });
       expect(dumper.isExplicitPrimaryKeyDefault(col)).toBe(false);
     });
   });
 
   describe("schemaExpression", () => {
-    it("returns undefined for serial columns (suppresses default)", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns undefined for serial columns (suppresses default)", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ type: "integer", serial: true });
       expect(dumper.schemaExpression(col)).toBeUndefined();
     });
@@ -117,14 +117,14 @@ describe("PostgreSQL::SchemaDumper", () => {
 
   describe("prepareColumnOptions", () => {
     it("adds array: true for array columns", async () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ type: "string", sqlType: "character varying[]", array: true });
       const spec = await dumper.prepareColumnOptions(col);
       expect(spec["array"]).toBe(true);
     });
 
     it("does not add array for non-array columns", async () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ type: "string", sqlType: "character varying" });
       const spec = await dumper.prepareColumnOptions(col);
       expect(spec["array"]).toBeUndefined();
@@ -137,7 +137,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         indexes: async () => [],
         supportsVirtualColumns: () => true,
       };
-      const dumper = new (SchemaDumper as any)(mockAdapter);
+      const dumper = await (SchemaDumper as any).new(mockAdapter);
       const col = new Column(
         "computed",
         null,
@@ -161,7 +161,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         indexes: async () => [],
         supportsVirtualColumns: () => true,
       };
-      const dumper = new (SchemaDumper as any)(mockAdapter);
+      const dumper = await (SchemaDumper as any).new(mockAdapter);
       const col = new Column(
         "status",
         null,
@@ -178,7 +178,7 @@ describe("PostgreSQL::SchemaDumper", () => {
     });
 
     it("keeps the bit_varying type key for a virtual column's type option", async () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       dumper.connection = { ...emptySource, supportsVirtualColumns: async () => true };
       const col = new Column(
         "flags",
@@ -199,7 +199,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         indexes: async () => [],
         supportsVirtualColumns: () => false,
       };
-      const dumper = new (SchemaDumper as any)(mockAdapter);
+      const dumper = await (SchemaDumper as any).new(mockAdapter);
       const col = new Column(
         "computed",
         null,
@@ -215,7 +215,7 @@ describe("PostgreSQL::SchemaDumper", () => {
     });
 
     it("adds enum_type for enum columns", async () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = new Column(
         "status",
         null,
@@ -230,7 +230,7 @@ describe("PostgreSQL::SchemaDumper", () => {
 
   describe("schemaTypeWithVirtual", () => {
     it("returns virtual for generated (stored) PG columns", async () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       dumper.connection = { ...emptySource, supportsVirtualColumns: async () => true };
       const col = new Column(
         "computed",
@@ -246,15 +246,15 @@ describe("PostgreSQL::SchemaDumper", () => {
     });
 
     it("returns schemaType for non-virtual columns", async () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
       expect(await dumper.schemaTypeWithVirtual(col)).toBe(":serial");
     });
   });
 
   describe("extractExpressionForVirtualColumn", () => {
-    it("returns JSON-stringified defaultFunction", () => {
-      const dumper = SchemaDumper.create(emptySource) as any;
+    it("returns JSON-stringified defaultFunction", async () => {
+      const dumper = (await SchemaDumper.create(emptySource)) as any;
       const col = new Column(
         "full_name",
         null,
@@ -287,7 +287,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         nativeDatabaseTypes: () => ({ bit_varying: { name: "bit varying" } }),
         tableOptions: async () => ({}),
       };
-      const dumper = new (SchemaDumper as any)(
+      const dumper = await (SchemaDumper as any).new(
         Object.assign(Object.create(AbstractAdapter.prototype), source),
       );
       const io = new StringIO();
@@ -302,7 +302,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         ...emptySource,
         extensions: async () => ["plpgsql", "hstore"],
       };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.extensions(io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -314,7 +314,7 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("emits nothing when extensions list is empty", async () => {
       const adapter = { ...emptySource, extensions: async () => [] };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.extensions(io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -332,7 +332,7 @@ describe("PostgreSQL::SchemaDumper", () => {
             ["mood", ["happy", "sad"]],
           ] as [string, string[]][],
       };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.types(io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -344,7 +344,7 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("emits nothing when enum types list is empty", async () => {
       const adapter = { ...emptySource, enumTypes: async () => [] };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.types(io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -358,7 +358,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         ...emptySource,
         schemaNames: async () => ["public", "myschema", "analytics"],
       };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.schemas(io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -384,7 +384,7 @@ describe("PostgreSQL::SchemaDumper", () => {
           }),
         ],
       };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.exclusionConstraintsInCreate("rooms", io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -406,7 +406,7 @@ describe("PostgreSQL::SchemaDumper", () => {
           }),
         ],
       };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.exclusionConstraintsInCreate("rooms", io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -428,7 +428,7 @@ describe("PostgreSQL::SchemaDumper", () => {
           }),
         ],
       };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.uniqueConstraintsInCreate("users", io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -448,7 +448,7 @@ describe("PostgreSQL::SchemaDumper", () => {
           }),
         ],
       };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.uniqueConstraintsInCreate("users", io);
       const lines = io.string().split("\n").slice(0, -1);
@@ -458,7 +458,7 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("emits nothing when no unique constraints", async () => {
       const adapter = { ...emptySource, uniqueConstraints: async () => [] };
-      const dumper = new (SchemaDumper as any)(adapter);
+      const dumper = await (SchemaDumper as any).new(adapter);
       const io = new StringIO();
       await dumper.uniqueConstraintsInCreate("users", io);
       const lines = io.string().split("\n").slice(0, -1);

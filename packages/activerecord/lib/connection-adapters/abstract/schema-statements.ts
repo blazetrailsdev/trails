@@ -1270,7 +1270,7 @@ export class SchemaStatements {
     );
   }
 
-  createSchemaDumper(options: Record<string, unknown>): SchemaDumper {
+  createSchemaDumper(options: Record<string, unknown>): Promise<SchemaDumper> {
     return SchemaDumper.create(
       this as unknown as Parameters<typeof SchemaDumper.create>[0],
       options,

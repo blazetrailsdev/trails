@@ -195,3 +195,17 @@ describe("ConsoleCommand (trails)", () => {
     }
   });
 });
+
+describe("Console.new", () => {
+  it("rejects with the error load_console raises", async () => {
+    const app = {
+      sandbox: null,
+      config: { sandboxByDefault: false },
+      name: () => "app",
+      loadConsole: async () => {
+        throw new Error("load failed");
+      },
+    };
+    await expect(Console.new(app, { sandbox: false })).rejects.toThrow("load failed");
+  });
+});
