@@ -1153,15 +1153,10 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
       "reopen another package's class, so the member lands at that class rather " +
       "than at this Rails path. (2) The remaining receivers — " +
       "`Temporal.PlainDate` / `PlainDateTime` / `ZonedDateTime` / `Instant` and " +
-      "a JS `Date` — are built-ins the port does not monkey-patch, so there is " +
-      "no reopening to define a marker in at all, and RFC 0098 " +
-      "(`time-with-zone-residue-structural-blockers`) landed the decision that " +
-      "`@blazetrails/date` answers for them with the `actsLikeDate` / " +
-      "`actsLikeTime` predicates (packages/date/lib/acts-like.ts) that " +
-      "`Object.actsLike` calls (core-ext/object/acts-like.ts:20-30). Installing " +
-      "markers on the `Temporal` polyfill prototypes at import time was rejected " +
-      "as a global side effect on a third-party package; the cost recorded there " +
-      "is the Rails file path for these members. Scoped to the three " +
+      "a JS `Date` — are built-ins the port does not monkey-patch, so their " +
+      "markers are `TEMPORAL_METHOD_TABLE` seats (packages/date/lib/acts-like.ts) " +
+      "that `Object.actsLike`'s `respond_to?` finds, seated by the package that " +
+      "owns the Temporal receivers rather than at this Rails path. Scoped to the three " +
       "acts_like.rb files: `TimeWithZone#acts_like_time?` is a real method on a " +
       "trails-owned class and IS ported (time-with-zone.ts:858).",
     names: ["acts_like_date?", "acts_like_time?"],
