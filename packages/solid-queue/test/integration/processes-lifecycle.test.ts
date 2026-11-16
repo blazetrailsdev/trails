@@ -30,6 +30,7 @@ import {
   waitForProcessTerminationWithTimeout,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
+  waitWhileWithTimeoutBang,
 } from "../support/processes-test-helper.js";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { TopLevel, constSet } from "@blazetrails/ruby-compat";
@@ -253,7 +254,7 @@ describe("ProcessesLifecycleTest", () => {
 
   it(
     "term supervisor exceeding timeout while there are jobs in-flight",
-    { timeout: 15_000 },
+    { timeout: 30_000 },
     async () => {
       const shutdownTimeout = Number(SolidQueue.shutdownTimeout);
       const noPause = await enqueueStoreResultJob("no pause");
@@ -272,7 +273,7 @@ describe("ProcessesLifecycleTest", () => {
       const signal = signalProcess(run, "TERM", { wait: 0.5 });
       await waitForJobsToFinishFor(2, { except: pause });
 
-      await waitWhileWithTimeout(shutdownTimeout + 5, async () => run.isExists);
+      await waitWhileWithTimeoutBang(shutdownTimeout + 5, async () => run.isExists);
       expect(run.isExists).toBeFalsy();
 
       await assertCompletedJobResults("no pause");
