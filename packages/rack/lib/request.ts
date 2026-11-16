@@ -151,7 +151,7 @@ export abstract class Env {
     return (this.env[name] = v);
   }
 
-  addHeader(key: string, v: string | null): any {
+  addHeader(key: string, v: unknown): any {
     if (v == null) {
       return this.getHeader(key);
     } else if (this.hasHeader(key)) {

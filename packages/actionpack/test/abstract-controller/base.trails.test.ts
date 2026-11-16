@@ -8,9 +8,7 @@ describe("AbstractController::Base, a controller's non-action helper", () => {
       this.ran.push(this._ringoFailure());
       this.ran.push(this.#crew());
     }
-    _ringoFailure(): string {
-      return "_ringoFailure";
-    }
+    _ringoFailure = (): string => "_ringoFailure";
     #crew(): string {
       return "#crew";
     }

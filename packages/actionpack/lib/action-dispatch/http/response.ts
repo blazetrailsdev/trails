@@ -445,16 +445,12 @@ export class Response {
   /** @internal */
   setCookie(name: string, value: string | CookieOptions): void {
     const header = this.getHeader(SET_COOKIE);
-    const cookie = setCookieHeader(name, rackCookieValue(value));
+    const cookie = setCookieHeader(name, value);
     this.setHeader(SET_COOKIE, header === undefined ? cookie : `${header}\n${cookie}`);
   }
 
   deleteCookie(name: string, options: Partial<CookieOptions> = {}): void {
-    const header = deleteSetCookieHeaderBang(
-      this.getHeader(SET_COOKIE) ?? null,
-      name,
-      rackCookieValue({ value: "", ...options }),
-    );
+    const header = deleteSetCookieHeaderBang(this.getHeader(SET_COOKIE) ?? null, name, options);
     this.setHeader(SET_COOKIE, Array.isArray(header) ? header.join("\n") : header);
   }
 
@@ -803,23 +799,6 @@ export interface CookieOptions {
   secure?: boolean;
   httpOnly?: boolean;
   sameSite?: SetCookieOptions["sameSite"];
-}
-
-function rackCookieValue(value: string | Partial<CookieOptions>): Record<string, unknown> {
-  const opts = typeof value === "string" ? { value } : value;
-  return {
-    value: opts.value ?? "",
-    path: opts.path,
-    domain: opts.domain,
-    // boundary: `Rack::Utils.set_cookie_header` formats `expires` through
-    expires:
-      opts.expires === undefined || !("epochMilliseconds" in opts.expires)
-        ? opts.expires
-        : new Date(opts.expires.epochMilliseconds),
-    secure: opts.secure,
-    httpOnly: opts.httpOnly,
-    sameSite: opts.sameSite,
-  };
 }
 
 runLoadHooks("action_dispatch_response", Response);

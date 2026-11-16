@@ -311,7 +311,7 @@ async function defineController(klass: object): Promise<void> {
 
   if (definedControllers.has(klass)) return;
   definedControllers.add(klass);
-  await ActionController.Railties.Helpers.inherited(
+  await ActionController.Trailties.Helpers.inherited(
     klass as ActionController.HelpersPathControllerClass,
   );
 }

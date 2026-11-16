@@ -385,32 +385,13 @@ export class Request {
     return m != null ? m[1].toLowerCase() : null;
   }
 
-  getHeader(name: string): any {
-    return this.env[name];
-  }
-
-  hasHeader(key: string): boolean {
-    return Object.hasOwn(this.env, key);
-  }
-
-  setHeader(key: string, value: unknown): unknown {
-    this.env[key] = value;
-    return value;
-  }
-
-  addHeader(key: string, v: unknown): unknown {
-    if (v == null) {
-      return this.getHeader(key);
-    } else if (this.hasHeader(key)) {
-      return this.setHeader(key, `${this.getHeader(key)},${v}`);
-    } else {
-      return this.setHeader(key, v);
-    }
-  }
-
-  eachHeader(block: (key: string, value: unknown) => void): void {
-    for (const [key, value] of Object.entries(this.env)) block(key, value);
-  }
+  declare getHeader: RequestEnv["getHeader"];
+  declare hasHeader: RequestEnv["hasHeader"];
+  declare setHeader: RequestEnv["setHeader"];
+  declare addHeader: RequestEnv["addHeader"];
+  declare eachHeader: RequestEnv["eachHeader"];
+  declare deleteHeader: RequestEnv["deleteHeader"];
+  declare fetchHeader: RequestEnv["fetchHeader"];
 
   /** @internal */
   get controllerInstance(): unknown {
@@ -420,18 +401,6 @@ export class Request {
   /** @internal */
   set controllerInstance(controller: unknown) {
     this.setHeader("action_controller.instance", controller);
-  }
-
-  deleteHeader(key: string): void {
-    delete this.env[key];
-  }
-
-  fetchHeader(key: string): unknown;
-  fetchHeader<T>(key: string, fallback: (key: string) => T): unknown | T;
-  fetchHeader<T>(key: string, fallback?: (key: string) => T): unknown | T {
-    if (Object.hasOwn(this.env, key)) return this.env[key];
-    if (fallback) return fallback(key);
-    throw new Error(`key not found: ${key}`);
   }
 
   inspect(): string {
