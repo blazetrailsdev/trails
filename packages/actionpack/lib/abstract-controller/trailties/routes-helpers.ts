@@ -26,6 +26,7 @@ export interface RoutesHelpersClassMethods extends HelpersClassMethods {
 }
 
 interface RoutesHelpersModule {
+  /** @inventedArm if — PERMANENT */
   with(
     routes: UrlHelpersRouteSet,
     includePathHelpers?: boolean,
@@ -60,7 +61,7 @@ Object.defineProperty(RoutesHelpers, "with", {
               value,
               writable: true,
               configurable: true,
-              enumerable: true,
+              enumerable: false,
             });
           },
         };
@@ -97,13 +98,11 @@ Object.defineProperty(RoutesHelpers, "with", {
         earlier,
         inherited,
       );
-      if (moduleRoutes !== undefined) {
-        Object.defineProperty(
-          cls,
-          "_routes",
-          inheritedDescriptor(cls, "_routes", { value: moduleRoutes }),
-        );
-      }
+      Object.defineProperty(
+        cls,
+        "_routes",
+        inheritedDescriptor(cls, "_routes", { value: moduleRoutes ?? routes }),
+      );
     };
   },
   writable: true,
