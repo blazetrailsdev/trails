@@ -469,7 +469,6 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   reset(): this {
     this._arel = undefined;
-    this._fromLimitedIds = null;
     this._loaded = false;
     this._delegateToModel = false;
     this._offsets = undefined;
@@ -1693,9 +1692,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   initializeCopy(other: Relation<T, G>): this {
     this._values = { ...this._values };
-    this.reset();
-    this._fromLimitedIds = other._fromLimitedIds;
-    return this;
+    return this.reset();
   }
 
   /** @perf 3% — CONVERGEABLE rb-obj-clone-fast-path-for-plain-data-fields */

@@ -28,7 +28,7 @@ export class Filename implements Comparable {
   }
 
   extensionWithoutDelimiter(): string {
-    return from(this.extensionWithDelimiter(), 1).toString();
+    return rbObjAsString(from(this.extensionWithDelimiter(), 1));
   }
 
   extension(): string {

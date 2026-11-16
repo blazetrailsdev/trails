@@ -1,4 +1,5 @@
 import { rbEnsure } from "./ensure.js";
+import { Kernel } from "./include.js";
 import { STDOUT } from "./io.js";
 import { SystemCallError } from "./errno.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -209,3 +210,12 @@ function prettyPrintCycle(obj: unknown, q: PP): void | Promise<void> {
     q.text("...");
   });
 }
+
+Kernel.prettyPrint = function prettyPrint(this: object, q: PP): void {
+  const inspectMethod = (this as { inspect?: unknown }).inspect;
+  if (typeof inspectMethod === "function") {
+    q.text(String(inspectMethod.call(this)));
+  } else {
+    q.text(rbInspect(this));
+  }
+};

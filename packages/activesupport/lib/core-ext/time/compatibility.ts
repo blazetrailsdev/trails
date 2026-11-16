@@ -11,9 +11,12 @@ export function preserveTimezone(time: RubyTime): boolean | string {
   return isSystemLocalTime(time) || compatibilityPreserveTimezone();
 }
 
-export function isSystemLocalTime(time: RubyTime): boolean {
-  const zone = time.zone;
-  return typeof zone === "string" && (zone !== "UTC" || activeSupportLocalZone() === "UTC");
+export function isSystemLocalTime(time: RubyTime): boolean | null {
+  if (RubyTime === time.constructor) {
+    const zone = time.zone;
+    return typeof zone === "string" && (zone !== "UTC" || activeSupportLocalZone() === "UTC");
+  }
+  return null;
 }
 
 let _activeSupportLocalTz: string | null = null;

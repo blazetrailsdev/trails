@@ -11,7 +11,6 @@ import {
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
 export interface SerializationRecord {
-  _attributes?: unknown;
   attributes?: Record<string, unknown>;
   constructor: { name: string };
   readAttributeForSerialization(key: string): unknown;
@@ -136,30 +135,8 @@ export function readAttributeForSerialization(this: SerializationRecord, key: st
 
 /** @internal */
 export function attributeNamesForSerialization(this: SerializationRecord): string[] {
-  const attrStore = this._attributes as AttributeStore;
-  let keys: string[];
-  if (
-    attrStore &&
-    typeof (attrStore as { keys?: unknown }).keys === "function" &&
-    !(attrStore instanceof Map)
-  ) {
-    keys = (attrStore as { keys(): string[] }).keys();
-  } else if (attrStore instanceof Map) {
-    keys = Array.from(attrStore.keys());
-  } else if (this.attributes) {
-    keys = Object.keys(this.attributes);
-  } else {
-    keys = [];
-  }
-  return keys;
+  return Object.keys(this.attributes!);
 }
-
-/** @internal */
-type AttributeStore =
-  | { keys(): string[]; fetchValue(key: string): unknown }
-  | Map<string, unknown>
-  | null
-  | undefined;
 
 /** @internal */
 export function serializableAttributes(

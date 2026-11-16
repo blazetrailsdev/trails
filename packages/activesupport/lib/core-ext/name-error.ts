@@ -1,4 +1,4 @@
-import { ArgumentError, rbModName } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
 
 declare module "@blazetrails/ruby-compat/name-error" {
@@ -9,7 +9,9 @@ declare module "@blazetrails/ruby-compat/name-error" {
 }
 
 export function missingName(this: NameError): string | null {
-  const message = this.message;
+  const message = rbObjRespondTo(this, "originalMessage")
+    ? (this as NameError & { originalMessage(): string }).originalMessage()
+    : this.message;
   if (!message.startsWith("uninitialized constant ")) return null;
 
   let receiver: unknown;

@@ -1,4 +1,4 @@
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, type Range, strSlice } from "@blazetrails/ruby-compat";
 export { isBlank, isPresent } from "./core-ext/object/blank.js";
 
 export function squish(str: string): string {
@@ -108,49 +108,33 @@ export function stripHeredoc(str: string): string {
   return lines.map((l) => l.slice(minIndent)).join("\n");
 }
 
-export function at(str: string, pos: number | [number, number] | RegExp): string | undefined {
-  if (pos instanceof RegExp) {
-    const m = str.match(pos);
-    return m ? m[0] : undefined;
-  }
-  if (Array.isArray(pos)) {
-    const [start, end] = pos;
-    const s = start < 0 ? str.length + start : start;
-    const e = end < 0 ? str.length + end : end;
-    if (s < 0 || s >= str.length) return undefined;
-    return str.slice(s, e + 1);
-  }
-  const idx = pos < 0 ? str.length + pos : pos;
-  if (idx < 0 || idx >= str.length) return undefined;
-  return str[idx];
+export function at(str: string, position: number | Range<number | null> | RegExp): string | null {
+  return strSlice(str, position as number);
 }
 
 export function exclude(str: string, search: string): boolean {
   return !str.includes(search);
 }
 
-export function first(str: string, n?: number): string {
-  if (n === undefined) return str.slice(0, 1);
-  if (n < 0) throw new Error("negative length");
-  return str.slice(0, n);
+export function first(str: string, limit = 1): string {
+  const result = strSlice(str, 0, limit);
+  if (result == null) throw new ArgumentError("negative limit");
+  return result;
 }
 
-export function last(str: string, n?: number): string {
-  if (n === undefined) return str.slice(-1);
-  if (n < 0) throw new Error("negative length");
-  if (n === 0) return "";
-  return str.slice(-n);
+export function last(str: string, limit = 1): string {
+  const result = strSlice(str, Math.max(str.length - limit, 0), limit);
+  if (result == null) throw new ArgumentError("negative limit");
+  return result;
 }
 
-export function from(str: string, pos: number): string {
-  const idx = pos < 0 ? Math.max(0, str.length + pos) : pos;
-  return str.slice(idx);
+export function from(str: string, position: number): string | null {
+  return strSlice(str, position, str.length);
 }
 
-export function to(str: string, pos: number): string {
-  const idx = pos < 0 ? str.length + pos : pos;
-  if (idx < 0) return "";
-  return str.slice(0, idx + 1);
+export function to(str: string, position: number): string {
+  if (position < 0) position += str.length;
+  return strSlice(str, 0, position + 1) ?? "";
 }
 
 export function indentBang(
