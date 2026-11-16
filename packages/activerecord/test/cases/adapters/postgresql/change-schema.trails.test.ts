@@ -5,7 +5,7 @@ describeIfPg("Migration", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
-    await adapter.createTable("strings", { force: true }, (t: any) => {
+    await adapter.createTable("strings", { force: true }, (t) => {
       t.string("somedate");
     });
   });

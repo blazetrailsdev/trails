@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlRenameTableTest", () => {
     it("rename table with index", async () => {
-      await adapter.createTable("before_rename", { force: true }, (t: any) => {
+      await adapter.createTable("before_rename", { force: true }, (t) => {
         t.text("name");
       });
       await adapter.addIndex("before_rename", "name");
@@ -23,7 +23,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("rename table with sequence", async () => {
-      await adapter.createTable("before_rename", { force: true }, (t: any) => {
+      await adapter.createTable("before_rename", { force: true }, (t) => {
         t.text("name");
       });
       await adapter.renameTable("before_rename", "after_rename");
@@ -33,7 +33,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("rename table preserves data", async () => {
-      await adapter.createTable("before_rename", { force: true }, (t: any) => {
+      await adapter.createTable("before_rename", { force: true }, (t) => {
         t.text("name");
       });
       await adapter.execute(`INSERT INTO before_rename (name) VALUES ('alice')`);

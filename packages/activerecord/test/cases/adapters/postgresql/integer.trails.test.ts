@@ -13,7 +13,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlIntegerTest", () => {
     beforeEach(async () => {
-      await adapter.createTable("pg_integers", { force: true }, (t: any) => {
+      await adapter.createTable("pg_integers", { force: true }, (t) => {
         t.integer("small", { limit: 2, default: 1 });
         t.integer("medium", { default: 2 });
         t.integer("big", { limit: 8, default: 9007199254740993n });
@@ -38,7 +38,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     const BIG = 2n ** 62n;
 
     beforeEach(async () => {
-      await adapter.createTable("pg_integers", { force: true }, (t: any) => {
+      await adapter.createTable("pg_integers", { force: true }, (t) => {
         t.integer("quota", { limit: 8, null: false });
       });
     });

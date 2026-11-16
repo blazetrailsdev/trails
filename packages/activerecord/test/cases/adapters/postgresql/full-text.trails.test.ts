@@ -9,7 +9,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
-    await adapter.createTable("tsvectors", { force: true }, (t: any) => {
+    await adapter.createTable("tsvectors", { force: true }, (t) => {
       t.tsvector("text_vector");
     });
   });
