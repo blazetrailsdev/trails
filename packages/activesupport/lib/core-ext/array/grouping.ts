@@ -1,4 +1,9 @@
-import { ARRAY_METHOD_TABLE, eachSlice, rbInspect as inspect, rtest } from "@blazetrails/ruby-compat";
+import {
+  ARRAY_METHOD_TABLE,
+  eachSlice,
+  rbInspect as inspect,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 
 export function inGroupsOf<T>(

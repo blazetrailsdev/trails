@@ -6,15 +6,13 @@ import {
   stringSuperclass,
 } from "@blazetrails/ruby-compat";
 
-/** @noRailsEquivalent PERMANENT */
-export class Object {
+class Object {
   static isHtmlSafe(_self: unknown): false {
     return false;
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
-export class Numeric {
+class Numeric {
   static isHtmlSafe(_self: number | bigint): true {
     return true;
   }
