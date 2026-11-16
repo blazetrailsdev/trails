@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { type RouteSet } from "@blazetrails/actionpack";
 import { IntegrationTest } from "@blazetrails/actionpack/testing";
-import { type HashWithIndifferentAccess, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import { block } from "@blazetrails/ruby-compat";
 import { createFileBlob, fixturesAll } from "../test-helper.js";
 import { ActionText } from "../../lib/action-text.js";
@@ -53,7 +53,7 @@ describe("ActionText::ControllerRenderTest", () => {
     t.hostBang("loocalhoost");
     await t.get(urlHelpers().messagePath(message, { format: "json" }));
     const content = ActionText.htmlDocumentFragmentClass().parse(
-      (t.response.parsedBody as HashWithIndifferentAccess).get("content") as string,
+      t.response.parsedBody.get("content") as string,
     );
     t.assertSelect(content, "img:match('src', ?)", /\/\/loocalhoost\/.+\/racecar/);
   });
@@ -63,7 +63,7 @@ describe("ActionText::ControllerRenderTest", () => {
 
     await t.get(urlHelpers().editMessagePath(messageWithPersonAttachment, { format: "json" }));
 
-    const formHtml = (t.response.parsedBody as HashWithIndifferentAccess).get("form") as string;
+    const formHtml = t.response.parsedBody.get("form") as string;
     expect(formHtml).toMatch(/ class=\S+mentionable-person\b/);
   });
 

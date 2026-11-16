@@ -69,7 +69,7 @@ describe("ActiveStorage::DiskDirectUploadsControllerTest", () => {
       },
     });
 
-    const details = session.response.parsedBody as HashWithIndifferentAccess;
+    const details = session.response.parsedBody;
     expect(await Blob.findSignedBang(details.get("signed_id") as string)).toEqual(
       await Blob.find(details.get("id") as number),
     );
@@ -114,7 +114,7 @@ describe("ActiveStorage::DiskDirectUploadsControllerTest", () => {
       });
     });
 
-    const details = session.response.parsedBody as HashWithIndifferentAccess;
+    const details = session.response.parsedBody;
     expect(details.get("blob")).toBeUndefined();
     expect(details.get("id")).not.toBeNull();
   });
