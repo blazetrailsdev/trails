@@ -7,6 +7,10 @@ import { Post } from "../models/post.js";
 import { Bird } from "../models/bird.js";
 import { Pirate } from "../models/pirate.js";
 import { Ship } from "../models/ship.js";
+import { Car } from "../models/car.js";
+import { Bulb } from "../models/bulb.js";
+import { ActionController } from "@blazetrails/actionpack";
+import type { HasOneAssociation } from "../../lib/associations/has-one-association.js";
 import { User } from "../models/user.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { ProtectedParams } from "../support/stubs/strong-parameters.js";
@@ -206,5 +210,52 @@ describe("ForbiddenAttributesProtectionRelationTest", () => {
     expect(() => pirate.birds.build(new ProtectedParams({ name: "Posideons Killer" }))).toThrow(
       ForbiddenAttributesError,
     );
+  });
+});
+
+describe("ForbiddenAttributesProtectionActionControllerParametersTest", () => {
+  fixtures({ authors: [Author, {}], posts: [Post, {}], cars: [Car, {}], bulbs: [Bulb, {}] });
+
+  it("permitted ActionController::Parameters win over scope_for_create in a scoped collection build", async () => {
+    const author = await Author.create({ name: "David" });
+    const post = author.thinkingPosts.build(
+      new ActionController.Parameters({ title: "Not thinking", body: "b" }).permitBang(),
+    );
+    expect(post.title).toBe("Not thinking");
+    expect(post.author_id).toBe(author.id);
+
+    const car = await Car.create({ name: "honda" });
+    const bulb = car.fooBulbs.build(
+      new ActionController.Parameters({ name: "brighty" }).permitBang(),
+    );
+    expect(bulb.name).toBe("brighty");
+  });
+
+  it("permitted ActionController::Parameters win over scope_for_create in a has-one build", async () => {
+    const car = await Car.create({ name: "honda" });
+    const bulb = (await (car.association("bulb") as HasOneAssociation).build(
+      new ActionController.Parameters({ name: "brighty" }).permitBang(),
+    )) as Bulb;
+    expect(bulb.name).toBe("brighty");
+    expect(bulb.car_id).toBe(car.id);
+  });
+
+  it("unpermitted ActionController::Parameters raise in a scoped collection build and a has-one build", async () => {
+    const car = await Car.create({ name: "honda" });
+    expect(() => car.fooBulbs.build(new ActionController.Parameters({ name: "brighty" }))).toThrow(
+      ForbiddenAttributesError,
+    );
+    expect(() =>
+      (car.association("bulb") as HasOneAssociation).build(
+        new ActionController.Parameters({ name: "brighty" }),
+      ),
+    ).toThrow(ForbiddenAttributesError);
+  });
+
+  it("unpermitted ActionController::Parameters raise UnfilteredParameters from an STI model's subclass_from_attributes", async () => {
+    const author = await Author.create({ name: "David" });
+    expect(() =>
+      author.thinkingPosts.build(new ActionController.Parameters({ title: "Not thinking" })),
+    ).toThrow(ActionController.UnfilteredParameters);
   });
 });

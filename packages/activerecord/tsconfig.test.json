@@ -12,6 +12,9 @@
     },
     {
       "path": "../arel/tsconfig.test.json"
+    },
+    {
+      "path": "../actionpack"
     }
   ]
 }
