@@ -11,6 +11,7 @@ import {
 import { TestCase } from "@blazetrails/actionview/test-case.js";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { ViteAssets } from "@blazetrails/vite-assets";
+import "../lib/config.js";
 import { TagHelpers } from "../lib/tag-helpers.js";
 
 type Tc = {

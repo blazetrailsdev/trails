@@ -51,6 +51,8 @@ export class Trails {
   declare static Paths: typeof Paths;
   declare static SourceAnnotationExtractor: typeof SourceAnnotationExtractor;
   declare static Rack?: typeof import("./rack.js");
+  declare static Server?: typeof import("./commands/server.js").Server;
+  declare static Console?: typeof import("./commands/console.js").Console;
   declare static Generators?: typeof Generators;
   declare static TestUnitRailtie?: typeof import("./test-unit/trailtie.js").TestUnitRailtie;
   /** @noRailsEquivalent PERMANENT */

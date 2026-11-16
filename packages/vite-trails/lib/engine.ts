@@ -29,7 +29,11 @@ export class Engine extends TrailsEngine {
       });
     });
 
-    /** @missingRailsCall after_fork — PERMANENT */
+    /**
+     * @missingRailsCall require — PERMANENT
+     * @missingRailsCall after_fork — PERMANENT
+     * @missingRailsCall watch — PERMANENT
+     */
     this.initializer("vite_trails.bootstrap", async () => {
       if (constDefined(TopLevel, "Trails::Server") || constDefined(TopLevel, "Trails::Console")) {
         await ViteAssets.bootstrap();
