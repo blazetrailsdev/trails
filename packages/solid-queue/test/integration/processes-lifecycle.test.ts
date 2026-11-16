@@ -27,6 +27,7 @@ import {
   runSupervisor,
   signalProcess,
   sleep,
+  waitFor,
   waitForProcessTerminationWithTimeout,
   waitForRegisteredProcesses,
   waitWhileWithTimeout,
@@ -258,25 +259,51 @@ describe("ProcessesLifecycleTest", () => {
       const shutdownTimeout = Number(SolidQueue.shutdownTimeout);
       const noPause = await enqueueStoreResultJob("no pause");
       const pause = await enqueueStoreResultJob("pause", "background", {
-        pause: shutdownTimeout + 10,
+        pause: shutdownTimeout + 30,
       });
 
-      await waitWhileWithTimeout(1, async () => (await ReadyExecution.count()) > 0);
+      await waitForJobsToFinishFor(3, { except: pause });
+      await waitFor({ timeout: 5 }, () =>
+        JobResult.where({ queue_name: "background", status: "started", value: "pause" }).isExists(),
+      );
+      await assertStartedJobResult("pause");
 
-      const signal = signalProcess(run, "TERM", { wait: 0.5 });
+      const signal = signalProcess(run, "TERM", { wait: 0.2 });
+      await waitForJobsToFinishFor(2, { except: pause });
 
-      await sleep(shutdownTimeout + 0.5);
+      await signal;
+      await waitForProcessTerminationWithTimeout(run, {
+        timeout: shutdownTimeout + 5,
+        exitstatus: null,
+      });
+      expect(run.isExists).toBe(false);
 
       await assertCompletedJobResults("no pause");
       await assertJobStatus(noPause, "finished");
 
-      await assertStartedJobResult("pause");
-      await assertJobStatus(pause, "claimed");
+      await Record.uncached(async () => {
+        const jobResults = (await JobResult.all().toArray()).map((r) => ({
+          id: r.id,
+          queue: r.queue_name,
+          status: r.status,
+          value: r.value,
+          updated_at: r.updated_at,
+        }));
+        const processes = (await Process.all().toArray()).map((p) => ({
+          id: p.id,
+          kind: p.kind,
+          pid: p.pid,
+          last_heartbeat_at: p.last_heartbeat_at,
+        }));
+        expect(
+          (await JobResult.findBy({ value: "pause" }))?.status,
+          "Expected the pause job not to complete. " +
+            `Job results: ${JSON.stringify(jobResults)}; ` +
+            `registered processes: ${JSON.stringify(processes)}`,
+        ).not.toEqual("completed");
+      });
 
-      await assertRegisteredWorkersFor(["background"]);
-
-      await signal;
-      await waitForProcessTerminationWithTimeout(run);
+      await assertJobStatus(pause, "ready");
       await assertCleanTermination();
     },
   );

@@ -1,7 +1,8 @@
 import { expect, vi } from "vitest";
 import { isPresent, TopLevel } from "@blazetrails/activesupport";
-import { Errno, SystemExit } from "@blazetrails/ruby-compat";
+import { Errno, SystemExit, Timeout } from "@blazetrails/ruby-compat";
 import { Process } from "../../lib/process.js";
+import { Record as SolidQueueRecord } from "../../lib/record.js";
 import { Supervisor } from "../../lib/supervisor.js";
 
 export const sleep = (s: number) => new Promise((resolve) => setTimeout(resolve, s * 1000));
@@ -66,6 +67,18 @@ export async function waitWhileWithTimeout(timeout: number, block: () => Promise
   while (Date.now() < end && (await block())) await sleep(0.05);
 }
 
+export async function waitFor(
+  { timeout = 1, interval = 0.05 }: { timeout?: number; interval?: number } = {},
+  block: () => Promise<boolean>,
+) {
+  const end = Date.now() + timeout * 1000;
+  while (Date.now() < end) {
+    if (await SolidQueueRecord.uncached(block)) return;
+    await sleep(interval);
+  }
+  throw new Timeout.Error("execution expired");
+}
+
 export async function waitForRegisteredProcesses(count: number, { timeout = 1 } = {}) {
   await waitWhileWithTimeout(timeout, async () => (await Process.count()) !== count);
 }
@@ -118,12 +131,26 @@ export function findProcessesRegisteredAs(kind: string) {
 
 export async function waitForProcessTerminationWithTimeout(
   run: ReturnType<typeof runSupervisor>,
-  { exitstatus = 0 }: { exitstatus?: number } = {},
+  { timeout = 10, exitstatus = 0 }: { timeout?: number; exitstatus?: number | null } = {},
 ) {
-  const error = await run.terminate().then(
-    () => null,
-    (e: unknown) => e,
-  );
-  if (error !== null && !(error instanceof SystemExit)) throw error;
-  expect(exitstatus != null, String(error?.status ?? 0)).toBe(true);
+  try {
+    await Timeout.timeout(timeout, null, null, async () => {
+      if (run.isExists) {
+        const error = await run.terminate().then(
+          () => null,
+          (e: unknown) => e,
+        );
+        if (error !== null && !(error instanceof SystemExit)) throw error;
+        const status = error?.status ?? 0;
+        if (exitstatus != null) {
+          expect(status, `Expected supervisor to exit with status ${exitstatus}`).toEqual(
+            exitstatus,
+          );
+        }
+      }
+    });
+  } catch (error) {
+    if (error instanceof Timeout.Error) await signalProcess(run, "KILL");
+    throw error;
+  }
 }
