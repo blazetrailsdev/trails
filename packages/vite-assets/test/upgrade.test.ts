@@ -13,7 +13,7 @@ describe("UpgradeTest", () => {
     ];
     const status = new Process.Status({ status: 0 } as never);
 
-    const librariesSpy = vi.spyOn(ViteAssets, "frameworkLibraries").mockReturnValue(libraries);
+    const librariesSpy = vi.spyOn(ViteAssets, "frameworkLibraries").mockResolvedValue(libraries);
     const captureSpy = vi.spyOn(IO, "capture").mockImplementation(async (...command) => {
       expect(command[0]).toEqual(
         "bundle update --conservative vite_ruby vite_rails vite_plugin_legacy",

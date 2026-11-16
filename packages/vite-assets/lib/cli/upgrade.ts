@@ -16,7 +16,7 @@ export class Upgrade extends Install {
   protected async upgradeRubyGems(): Promise<void> {
     this.say("Updating gems");
 
-    const libraries = ViteAssets.frameworkLibraries().map(([, library]) => library.name);
+    const libraries = (await ViteAssets.frameworkLibraries()).map(([, library]) => library.name);
 
     await this.runWithCapture(`bundle update --conservative vite_ruby ${libraries.join(" ")}`);
   }

@@ -1340,6 +1340,9 @@ importers:
       '@blazetrails/thor':
         specifier: workspace:*
         version: link:../thor
+      '@blazetrails/vite-trails':
+        specifier: workspace:*
+        version: link:../vite-trails
     devDependencies:
       '@blazetrails/rack-test':
         specifier: workspace:*

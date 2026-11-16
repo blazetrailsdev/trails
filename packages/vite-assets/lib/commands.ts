@@ -1,9 +1,9 @@
 import {
+  Dir,
   env as ENV,
   exitBang,
   File,
   FileUtils,
-  Gem,
   Logger,
   rbFBackquote,
   setEnv,
@@ -17,6 +17,17 @@ import { CompatibilityCheck } from "./compatibility-check.js";
 import type { Config } from "./config.js";
 import type { Manifest } from "./manifest.js";
 import type { ViteAssets } from "./vite-assets.js";
+
+const FRAMEWORK_PACKAGES: Readonly<Record<string, string>> = { trails: "@blazetrails/trailties" };
+
+/** @noRailsEquivalent PERMANENT */
+async function frameworkVersion(framework: string): Promise<string> {
+  const name = FRAMEWORK_PACKAGES[framework];
+  if (name == null) return "";
+  const pkg = Dir.pwd() + `/node_modules/${name}/package.json`;
+  if (!(await File.isExistAsync(pkg))) return "";
+  return (JSON.parse(await File.readAsync(pkg)) as { version: string }).version;
+}
 
 export class Commands {
   /** @internal */
@@ -102,9 +113,9 @@ Make sure \`bundle exec vite install\` has run successfully before running depen
       $stdout.puts(`bin/vite present?: ${await File.isExistAsync("bin/vite")}`);
 
       $stdout.puts(`vite_ruby: ${TopLevel.ViteAssets!.VERSION}`);
-      for (const [framework, library] of TopLevel.ViteAssets!.frameworkLibraries()) {
+      for (const [framework, library] of await TopLevel.ViteAssets!.frameworkLibraries()) {
         $stdout.puts(`${library.name}: ${library.version}`);
-        $stdout.puts(`${framework}: ${Gem.loadedSpecs[framework]?.version ?? ""}`);
+        $stdout.puts(`${framework}: ${await frameworkVersion(framework)}`);
       }
 
       $stdout.puts(`ruby: ${await rbFBackquote("ruby --version")}`);

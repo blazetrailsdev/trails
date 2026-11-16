@@ -85,8 +85,8 @@ export class CLI extends Thor {
 
   static async requireFrameworkLibraries(path: string | null = "cli"): Promise<void> {
     try {
-      for (const [, library] of ViteAssets.frameworkLibraries()) {
-        await import([library.name.replaceAll("-", "/"), path].filter((x) => x != null).join("/"));
+      for (const [, library] of await ViteAssets.frameworkLibraries()) {
+        await import(`${[library.name, path].filter((x) => x != null).join("/")}.js`);
       }
     } catch (error) {
       if ((error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw error;
