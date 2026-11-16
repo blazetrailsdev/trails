@@ -18,10 +18,7 @@ export class ClassMethods {
     return await ScheduledExecution.createAllFromJobs(jobs);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall index_by — CONVERGEABLE index-by-keeps-hash-insertion-order
-   */
+  /** @internal */
   private static async successfullyScheduled(
     this: SchedulableClass,
     jobs: Base[],

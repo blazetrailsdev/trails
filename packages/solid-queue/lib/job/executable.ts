@@ -40,10 +40,7 @@ export class ClassMethods {
     for (const job of sortBy(jobs, (job) => [job.concurrency_key, job.id])) await job.dispatch();
   }
 
-  /**
-   * @internal
-   * @missingRailsCall index_by — CONVERGEABLE index-by-keeps-hash-insertion-order
-   */
+  /** @internal */
   private static async successfullyDispatched(
     this: ExecutableClass,
     jobs: Base[],
