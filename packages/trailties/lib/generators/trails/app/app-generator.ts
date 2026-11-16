@@ -20,6 +20,7 @@ import { type DatabaseName } from "../../database.js";
 import { LOAD_DEFAULTS_VERSION } from "../../../application/configuration.js";
 import { VERSION } from "../../../gem-version.js";
 import { CredentialsGenerator } from "../credentials/credentials-generator.js";
+import { DevcontainerGenerator } from "../devcontainer/devcontainer-generator.js";
 import { MasterKeyGenerator } from "../master-key/master-key-generator.js";
 
 const UNPORTED_SUBSYSTEM_SKIP_DEFAULTS: Readonly<Record<string, boolean>> = {
@@ -192,6 +193,12 @@ export class AppBuilder extends ActionMethods {
   declare private readonly removeFile: (path: string) => Promise<unknown>;
   /** @internal */
   declare private readonly skipAssetPipeline: () => boolean | undefined;
+  /** @internal */
+  declare private readonly usingNode: () => boolean;
+  /** @internal */
+  declare private readonly dependsOnSystemTest: () => boolean;
+  /** @internal */
+  declare private readonly appName: () => string;
   /** @internal */
   private _configTargetVersion: string | null = null;
 
@@ -444,6 +451,23 @@ export class AppBuilder extends ActionMethods {
     await this.emptyDirectoryWithKeepFile("vendor");
   }
 
+  async devcontainer(): Promise<void> {
+    const devcontainerOptions = {
+      database: this.options.database,
+      redis:
+        this.options.skipSolid && !(this.options.skipActionCable && this.options.skipActiveJob),
+      kamal: !this.options.skipKamal,
+      systemTest: this.dependsOnSystemTest(),
+      activeStorage: !this.options.skipActiveStorage,
+      dev: this.options.dev,
+      node: this.usingNode(),
+      appName: this.appName(),
+      skipSolid: this.options.skipSolid,
+    };
+
+    await new DevcontainerGenerator([], devcontainerOptions).invokeAll();
+  }
+
   configTargetVersion(): string {
     return this._configTargetVersion ?? LOAD_DEFAULTS_VERSION;
   }
@@ -559,6 +583,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("createTestFiles");
     this.methodAdded("createSystemTestFiles");
     this.methodAdded("createStorageFiles");
+    this.methodAdded("createDevcontainerFiles");
     this.methodAdded("deleteAppAssetsIfApiOption");
     this.methodAdded("deleteAppHelpersIfApiOption");
     this.methodAdded("deleteAppViewsIfApiOption");
@@ -571,6 +596,7 @@ export class AppGenerator extends AppBase {
     this.methodAdded("applyTrailsTemplate");
     this.publicCommand("runInstall");
     this.publicCommand("generateBundlerBinstub");
+    this.publicCommand("runSolid");
     this.methodAdded("runAfterBundleCallbacks");
   }
 
@@ -738,6 +764,11 @@ export class AppGenerator extends AppBase {
 
   async createStorageFiles(): Promise<void> {
     if (!this.skipStorage()) await this.build("storage");
+  }
+
+  async createDevcontainerFiles(): Promise<void> {
+    if (this.skipDevcontainer() || this.options.dummyApp) return;
+    await this.build("devcontainer");
   }
 
   async deleteAppAssetsIfApiOption(): Promise<void> {

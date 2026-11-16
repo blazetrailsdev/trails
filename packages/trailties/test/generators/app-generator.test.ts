@@ -3,9 +3,14 @@ import { assertNoChanges, assertNoMatch } from "@blazetrails/activesupport/testi
 import { capture } from "@blazetrails/activesupport/testing/stream";
 import { registerSpecType } from "@blazetrails/activesupport/testing/autorun";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import * as Actions from "../../lib/generators/actions.js";
 import { AppGenerator } from "../../lib/generators/trails/app/app-generator.js";
 import { TestCase } from "../../lib/generators/test-case.js";
-import { runAppUpdate } from "./generators-test-helper.js";
+import {
+  assertComposeFile,
+  assertDevcontainerJsonFile,
+  runAppUpdate,
+} from "./generators-test-helper.js";
 import { VERSION } from "../../lib/gem-version.js";
 import { Application } from "../../lib/application.js";
 import { Trails } from "../../lib/trails.js";
@@ -817,5 +822,88 @@ describe("AppGenerator", () => {
       await t.assertFile(`my-app/${path}`, (content: string) => {
         expect(content).toMatchSnapshot(name);
       });
+  });
+  it("skip solid option", async () => {
+    const trailsCommands: string[] = [];
+    const proto = AppGenerator.prototype as unknown as {
+      isInstall(): boolean;
+      runInstall(): Promise<void>;
+      generateBundlerBinstub(): Promise<void>;
+    };
+    const spies = [
+      vi.spyOn(proto, "isInstall").mockReturnValue(true),
+      vi.spyOn(proto, "runInstall").mockResolvedValue(undefined),
+      vi.spyOn(proto, "generateBundlerBinstub").mockResolvedValue(undefined),
+      vi.spyOn(Actions, "trailsCommand").mockImplementation(async (command: string) => {
+        trailsCommands.push(command);
+      }),
+    ];
+    try {
+      await t.runGenerator([t.destinationRoot, "--skip-solid"]);
+    } finally {
+      for (const spy of spies) spy.mockRestore();
+    }
+
+    expect(
+      trailsCommands,
+      "`solid_cache:install solid_queue:install solid_cable:install` expected to not be called.",
+    ).not.toContain("solid_cache:install solid_queue:install solid_cable:install");
+    await assertNoGem("@blazetrails/solid-cache");
+    await assertNoGem("@blazetrails/solid-queue");
+    await assertNoGem("@blazetrails/solid-cable");
+  });
+
+  it("devcontainer include redis skipping solid", async () => {
+    await t.runGenerator([t.destinationRoot, "--devcontainer", "--name=my-app", "--skip-solid"]);
+
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.containerEnv.REDIS_URL).toBe("redis://redis:6379/1");
+      expect(content.forwardPorts).toContain(6379);
+    });
+
+    await assertComposeFile.call(t, (composeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on")).toContain("redis");
+
+      const expectedRedisConfig = {
+        image: "redis:7.2",
+        restart: "unless-stopped",
+        volumes: ["redis-data:/data"],
+      };
+
+      expect(JSON.parse(JSON.stringify(composeConfig.get("services").get("redis")))).toEqual(
+        expectedRedisConfig,
+      );
+      expect(composeConfig.get("volumes").keys()).toContain("redis-data");
+    });
+  });
+
+  it("devcontainer no redis skipping solid action cable and active job", async () => {
+    await t.runGenerator([
+      t.destinationRoot,
+      "--devcontainer",
+      "--skip-action-cable",
+      "--skip-active-job",
+      "--skip-solid",
+    ]);
+
+    await assertComposeFile.call(t, (composeConfig) => {
+      expect(composeConfig.get("services").get("trails-app").get("depends_on") ?? []).not.toContain(
+        "redis",
+      );
+      expect(composeConfig.get("services").get("redis")).toBeUndefined();
+      expect(composeConfig.get("volumes")).toBeUndefined();
+    });
+
+    await assertDevcontainerJsonFile.call(t, (content) => {
+      expect(content.forwardPorts).not.toContain(6379);
+    });
+  });
+
+  it("no devcontainer by default", async () => {
+    await t.runGenerator([t.destinationRoot]);
+
+    t.assertNoFile(".devcontainer/devcontainer.json");
+    t.assertNoFile(".devcontainer/Dockerfile");
+    t.assertNoFile(".devcontainer/compose.yaml");
   });
 });
