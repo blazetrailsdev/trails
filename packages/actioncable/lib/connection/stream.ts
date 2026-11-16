@@ -91,7 +91,7 @@ export class Stream {
         }
       }
 
-      void this._writeBuffer.push(data);
+      this._writeBuffer.push(data);
       this.eventLoop.writesPending(this.rackHijackIo!);
 
       return bytes.length;

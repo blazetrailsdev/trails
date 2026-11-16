@@ -456,12 +456,10 @@ export const Predications: PredicationsModule = {
     return Nodes.buildQuoted(other, this);
   },
   isInfinity(this: PredicationHost, value: unknown): 1 | -1 | null | false {
-    void this;
     return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
   },
 
   isUnboundable(this: PredicationHost, value: unknown): 1 | -1 | false {
-    void this;
     return (
       rbObjRespondTo(value, "isUnboundable") &&
       (value as { isUnboundable(): 1 | -1 | false }).isUnboundable()

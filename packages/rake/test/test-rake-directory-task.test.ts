@@ -78,7 +78,7 @@ describe("TestRakeDirectoryTask", () => {
   });
 
   it("can use filelist", async () => {
-    await dsl.directory(FileList.get("a", "b", "c"));
+    await dsl.directory(await FileList.get("a", "b", "c").resolve());
 
     expect((await rake.tm.get("a")).constructor).toEqual(FileCreationTask);
 

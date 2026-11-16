@@ -35,9 +35,8 @@ export function diagnose(source: string, options: DiagnoseOptions = {}): string[
       const results = real
         ? real.call(defaultHost, moduleNames, containingFile, _, __, opts)
         : moduleNames.map(() => undefined);
-      return results.map((r, i) => {
+      return results.map((r) => {
         if (r) return r;
-        void moduleNames[i];
         return { resolvedFileName: stubPath, isExternalLibraryImport: true };
       });
     },

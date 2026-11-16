@@ -187,16 +187,16 @@ export class Listener extends SubscriberMap {
   }
 
   async shutdown(): Promise<void> {
-    await this._queue.push(["shutdown"]);
+    this._queue.push(["shutdown"]);
     while (this._thread.isAlive()) await Thread.pass();
   }
 
   override addChannel(channel: string, onSuccess: (() => unknown) | null): void {
-    void this._queue.push(["listen", channel, onSuccess ?? undefined]);
+    this._queue.push(["listen", channel, onSuccess ?? undefined]);
   }
 
   override removeChannel(channel: string): void {
-    void this._queue.push(["unlisten", channel]);
+    this._queue.push(["unlisten", channel]);
   }
 
   override invokeCallback(callback: Callback, message: unknown): void {

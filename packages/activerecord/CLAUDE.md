@@ -794,6 +794,10 @@ As a consequence:
   constructor with `_suppressAbstractCheck` and `_suppressStiNewDispatch` set.
 - `Relation#new` and `CollectionProxy#new` are instance methods with no `new`
   expression to stand in for them, and stay.
+- This rule bounds root `CLAUDE.md` § "Every promise has an owner; async
+  `initialize` is an awaited `static new`": a class whose `initialize` does
+  async work gets a protected constructor and `static async new`, but a record
+  never does. Records stay `new Klass`.
 - A record loaded from the database is built with `new` too. Rails'
   `instantiate_instance_of` is `klass.allocate.init_with_attributes(attributes,
 &block)` (`persistence.rb:313`), which skips `initialize`. The JS spelling of

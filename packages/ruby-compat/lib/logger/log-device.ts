@@ -73,8 +73,8 @@ export class LogDevice {
   close(): void {
     try {
       this.dev!.close!();
-    } catch (error) {
-      void error;
+    } catch {
+      return;
     }
   }
 
@@ -86,11 +86,7 @@ export class LogDevice {
     if (this.filename != null) log ??= this.filename;
     if (log != null) {
       if (this.filename != null && this.dev != null) {
-        try {
-          this.dev.close!();
-        } catch (error) {
-          void error;
-        }
+        this.close();
         this.filename = null;
       }
       this.setDev(log);

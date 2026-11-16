@@ -81,8 +81,7 @@ export function benchmark<T>(
       return (result as Promise<Awaited<T>>).then((val) => {
         result = val as T;
         ms = monotonicNow() - start;
-        finish();
-        return val;
+        return finish() as Awaited<T>;
       });
     }
     return finish();

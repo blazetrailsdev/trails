@@ -1,5 +1,11 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { KERNEL_METHODS, PROTOCOL_PROBES, RuntimeError, rbFSend } from "@blazetrails/ruby-compat";
+import {
+  KERNEL_METHODS,
+  PROTOCOL_PROBES,
+  RuntimeError,
+  Thread,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import { Attached } from "../attached.js";
 import type { Attachment } from "../attachment.js";
 import type { CreateOne } from "./changes/create-one.js";
@@ -59,7 +65,7 @@ export class One extends Attached {
   loadedAttachment(method: string): Attachment | null {
     const attachment = this.attachment;
     if (!(attachment instanceof Promise)) return attachment;
-    void attachment.catch(() => {});
+    new Thread(() => attachment);
     throw new RuntimeError(
       `${method} needs ${this.name}'s attachment loaded; \`await ${this.name}.load()\` first.`,
     );

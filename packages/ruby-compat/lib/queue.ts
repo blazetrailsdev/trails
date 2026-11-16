@@ -95,7 +95,9 @@ export class Queue<T = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue#push`
    * (`vendor/ruby/v3.3.11/thread_sync.c:1068`).
    */
-  async push(obj: T): Promise<this> {
+  push(this: SizedQueue<T>, obj: T): Promise<this>;
+  push(obj: T): this;
+  push(obj: T): this | Promise<this> {
     return queueDoPush(this, queuePtr<T>(this), obj) as this;
   }
 
@@ -203,6 +205,8 @@ export class SizedQueue<T = unknown> extends Queue<T> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread::SizedQueue#push`
    * (`vendor/ruby/v3.3.11/thread_sync.c:1338`).
    */
+  override push(this: SizedQueue<T>, object: T): Promise<this>;
+  override push(object: T): never;
   override push(object: T): Promise<this> {
     const sq = queuePtr<T>(this);
 

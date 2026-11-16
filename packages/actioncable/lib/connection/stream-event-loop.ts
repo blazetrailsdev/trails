@@ -1,4 +1,4 @@
-import { ThreadPoolExecutor, TimerTask, rbDeclareIvar } from "@blazetrails/ruby-compat";
+import { Thread, ThreadPoolExecutor, TimerTask, rbDeclareIvar } from "@blazetrails/ruby-compat";
 
 interface Io {
   waitReadable(): Promise<unknown>;
@@ -46,7 +46,7 @@ export class StreamEventLoop {
 
   attach(io: Io, stream: Stream): void {
     const selectWritable = (monitor: Monitor) => {
-      void (async () => {
+      new Thread(async () => {
         while (!this._stopping && this._map.get(io) === monitor && monitor.interests === "rw") {
           let stream: Stream | null = null;
           try {
@@ -65,7 +65,7 @@ export class StreamEventLoop {
             }
           }
         }
-      })();
+      });
     };
     let interests: "r" | "rw" = "r";
     this._map.set(io, {
@@ -81,7 +81,7 @@ export class StreamEventLoop {
     });
     this._map.get(io)!.value = stream;
     const monitor = this._map.get(io)!;
-    void (async () => {
+    new Thread(async () => {
       while (!this._stopping && this._map.get(io) === monitor) {
         let stream: Stream | null = null;
         try {
@@ -105,7 +105,7 @@ export class StreamEventLoop {
           }
         }
       }
-    })();
+    });
   }
 
   detach(io: Io, _stream: Stream): void {

@@ -152,22 +152,25 @@ describe("ImageProcessing::MiniMagick", () => {
     await assertDimensions([150, 200], result);
 
     result = await MiniMagick.loader({ strip: true }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
+    expect(await (await MiniMagickImage.new(result.path())).exif()).toBeEmpty();
 
     result = await MiniMagick.loader({ strip: null }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
+    expect(await (await MiniMagickImage.new(result.path())).exif()).toBeEmpty();
 
     result = await MiniMagick.loader({ strip: false }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
+    expect(await (await MiniMagickImage.new(result.path())).exif()).toBeEmpty();
 
     result = await MiniMagick.loader({ colorspace: "Gray" }).call(portrait);
-    expect((await new MiniMagickImage(result.path()).data())["colorspace"]).toEqual("Gray");
+    expect((await (await MiniMagickImage.new(result.path())).data())["colorspace"]).toEqual("Gray");
 
     result = await MiniMagick.loader({ set: ["comment", "This is a comment"] }).call(portrait);
     expect(
-      ((await new MiniMagickImage(result.path()).data())["properties"] as Record<string, string>)[
-        "comment"
-      ],
+      (
+        (await (await MiniMagickImage.new(result.path())).data())["properties"] as Record<
+          string,
+          string
+        >
+      )["comment"],
     ).toEqual("This is a comment");
   });
 
@@ -178,22 +181,25 @@ describe("ImageProcessing::MiniMagick", () => {
     expect(result.size()).toBeLessThan(20 * 1024);
 
     result = await MiniMagick.saver({ strip: true }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
+    expect(await (await MiniMagickImage.new(result.path())).exif()).toBeEmpty();
 
     result = await MiniMagick.saver({ strip: null }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
+    expect(await (await MiniMagickImage.new(result.path())).exif()).toBeEmpty();
 
     result = await MiniMagick.saver({ strip: false }).call(portrait);
-    expect(await new MiniMagickImage(result.path()).exif()).toBeEmpty();
+    expect(await (await MiniMagickImage.new(result.path())).exif()).toBeEmpty();
 
     result = await MiniMagick.saver({ colorspace: "Gray" }).call(portrait);
-    expect((await new MiniMagickImage(result.path()).data())["colorspace"]).toEqual("Gray");
+    expect((await (await MiniMagickImage.new(result.path())).data())["colorspace"]).toEqual("Gray");
 
     result = await MiniMagick.saver({ set: ["comment", "This is a comment"] }).call(portrait);
     expect(
-      ((await new MiniMagickImage(result.path()).data())["properties"] as Record<string, string>)[
-        "comment"
-      ],
+      (
+        (await (await MiniMagickImage.new(result.path())).data())["properties"] as Record<
+          string,
+          string
+        >
+      )["comment"],
     ).toEqual("This is a comment");
   });
 

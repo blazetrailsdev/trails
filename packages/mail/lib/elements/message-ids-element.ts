@@ -3,9 +3,7 @@ import { Utilities } from "../utilities.js";
 
 export class MessageIdsElement {
   static parse(string: string | null): MessageIdsElement {
-    const element = new this(string);
-    void element.messageIds;
-    return element;
+    return new this(string);
   }
 
   readonly messageIds: string[];

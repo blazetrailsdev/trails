@@ -9100,3 +9100,31 @@ describe("object-literal modules and Struct.new constants", () => {
     ]);
   });
 });
+
+describe("extractClass — a static async new built by rbClassNewInstance", () => {
+  const source = `declare function rbClassNewInstance<T>(klass: { prototype: T }, ...args: unknown[]): T;
+    class Foo {
+      protected constructor(path: string) {
+        this.setPath(path);
+      }
+      setPath(path: string): void {}
+      combineOptions(block: unknown): Promise<void> { return Promise.resolve(); }
+      static async new(path: string, block?: unknown): Promise<Foo> {
+        const obj = rbClassNewInstance(this, path);
+        if (block != null) await obj.combineOptions(block);
+        return obj;
+      }
+    }`;
+
+  it("folds the static new into the constructor in place of the rbClassNewInstance call", () => {
+    const cls = extractFromSource(source);
+    const ctor = cls.instanceMethods.find((m) => m.name === "constructor")!;
+    expect(ctor.calls).toContain("combineOptions");
+    expect(ctor.calls).toContain("setPath");
+    expect(ctor.calls).not.toContain("rbClassNewInstance");
+    expect(ctor.callSeq).toEqual(["setPath", "combineOptions"]);
+    expect(ctor.callArgs?.map((c) => c.name)).toEqual(["setPath", "combineOptions"]);
+    expect(ctor.skeleton).toEqual(["ref:setPath", "if", "ref:combineOptions"]);
+    expect(ctor.inlinedFrom).toBeUndefined();
+  });
+});

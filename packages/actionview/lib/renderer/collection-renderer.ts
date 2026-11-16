@@ -252,9 +252,9 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
     path: string | null,
     template: RenderableTemplate | null,
     layout: RenderableTemplate | null,
+    // eslint-disable-next-line unused-imports/no-unused-vars
     block: unknown,
   ): RenderedCollection | EmptyCollection | Promise<RenderedCollection | EmptyCollection> {
-    void block;
     const identifier = (template && template.identifier) || path;
     return Notifications.instrument<
       RenderedCollection | EmptyCollection | Promise<RenderedCollection | EmptyCollection>

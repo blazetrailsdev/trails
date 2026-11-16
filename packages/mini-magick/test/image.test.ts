@@ -185,7 +185,7 @@ describe("MiniMagick::Image", () => {
 
   describe(".create", () => {
     it("creates an image", async () => {
-      const image = Image.create();
+      const image = await Image.create();
       expect(File.isExist(image.path)).toEqual(true);
     });
 
@@ -204,7 +204,7 @@ describe("MiniMagick::Image", () => {
 
       it("uses the tmpdir to create the file", async () => {
         vi.spyOn(MiniMagick, "tmpdir", "get").mockReturnValue(newTmpDir);
-        const image = Image.create();
+        const image = await Image.create();
         expect(File.dirname(image.path)).toEqualRuby(newTmpDir);
       });
     });
@@ -212,32 +212,32 @@ describe("MiniMagick::Image", () => {
 
   describe("#initialize", () => {
     it("initializes a new image", async () => {
-      const image = new Image(imagePath());
+      const image = await Image.new(imagePath());
       expect(await image.isValid()).toBeRubyTruthy();
     });
 
     it("accepts a Pathname", async () => {
-      const image = new Image(new Pathname(imagePath()));
+      const image = await Image.new(new Pathname(imagePath()));
       expect(image.path).toBeTypeOf("string");
     });
 
     it("accepts a block which it passes on to #combine_options", async () => {
-      const image = new Image(subject.path, null, (b) => b.resize("100x100!"));
+      const image = await Image.new(subject.path, null, (b) => b.resize("100x100!"));
       expect(await image.dimensions()).toEqual([100, 100]);
     });
   });
 
   describe("equivalence", () => {
-    beforeEach(() => {
-      image = new Image(imagePath());
+    beforeEach(async () => {
+      image = await Image.new(imagePath());
     });
 
-    beforeEach(() => {
-      sameImage = new Image(imagePath());
+    beforeEach(async () => {
+      sameImage = await Image.new(imagePath());
     });
 
-    beforeEach(() => {
-      otherImage = new Image(imagePath("exif"));
+    beforeEach(async () => {
+      otherImage = await Image.new(imagePath("exif"));
     });
 
     beforeEach(async () => {
@@ -314,7 +314,7 @@ describe("MiniMagick::Image", () => {
     });
 
     it("works without an extension with .new", async () => {
-      const subject = new Image(imagePath("jpg_without_extension"));
+      const subject = await Image.new(imagePath("jpg_without_extension"));
       await subject.format("png");
       expect(File.extname(subject.path)).toEqual(".png");
       expect(await subject.type()).toEqual("PNG");
@@ -403,7 +403,7 @@ describe("MiniMagick::Image", () => {
     it("writes the image", async () => {
       const outputPath = randomPath("test output");
       await subject.write(outputPath);
-      expect(await new Image(outputPath).isValid()).toBeRubyTruthy();
+      expect(await (await Image.new(outputPath)).isValid()).toBeRubyTruthy();
     });
 
     it("writes an image with stream", async () => {
@@ -414,15 +414,15 @@ describe("MiniMagick::Image", () => {
 
     it("writes layers", async () => {
       const outputPath = randomPath(["", `.${(await subject.type()).toLowerCase()}`]);
-      const subject2 = new Image(imagePath("gif"));
+      const subject2 = await Image.new(imagePath("gif"));
       await (await subject2.frames())[0].write(outputPath);
-      expect(await new Image(outputPath).isValid()).toBeRubyTruthy();
+      expect(await (await Image.new(outputPath)).isValid()).toBeRubyTruthy();
     });
 
     it("accepts a Pathname", async () => {
       const outputPath = new Pathname(randomPath());
       await subject.write(outputPath);
-      expect(await new Image(await rbObjAsString(outputPath)).isValid()).toBeRubyTruthy();
+      expect(await (await Image.new(await rbObjAsString(outputPath))).isValid()).toBeRubyTruthy();
     });
 
     it("works when writing to the same path", async () => {
@@ -433,12 +433,12 @@ describe("MiniMagick::Image", () => {
 
   describe("#valid?", () => {
     it("returns true when image is valid", async () => {
-      const image = new Image(imagePath());
+      const image = await Image.new(imagePath());
       expect(await image.isValid()).toBeRubyTruthy();
     });
 
     it("returns false when image is not valid", async () => {
-      const image = new Image(imagePath("not"));
+      const image = await Image.new(imagePath("not"));
       expect(await image.isValid()).toBeRubyFalsy();
     });
   });
@@ -467,7 +467,7 @@ describe("MiniMagick::Image", () => {
     });
 
     it("reads exif", async () => {
-      const subject = new Image(imagePath("exif"));
+      const subject = await Image.new(imagePath("exif"));
       expect(await subject.get("EXIF:Flash")).toEqual("0");
     });
 
@@ -513,25 +513,25 @@ describe("MiniMagick::Image", () => {
 
   describe("#size", () => {
     it("returns the correct value even if the log contains unit prefixes", async () => {
-      const subject = new Image(imagePath("large_webp"));
+      const subject = await Image.new(imagePath("large_webp"));
       expect(await subject.size()).toBeTypeOf("number");
     });
   });
 
   describe("#exif", () => {
     it("returns a hash of EXIF data", async () => {
-      const subject = new Image(imagePath("exif"));
+      const subject = await Image.new(imagePath("exif"));
       expect((await subject.exif())["DateTimeOriginal"]).toBeTypeOf("string");
     });
 
     it("decodes the ExifVersion", async (ctx) => {
       ctx.skip(env.CI != null);
-      const subject = new Image(imagePath("exif"));
+      const subject = await Image.new(imagePath("exif"));
       expect((await subject.exif())["ExifVersion"]).toEqual("0220");
     });
 
     it("handles no EXIF data", async () => {
-      const subject = new Image(imagePath("no_exif"));
+      const subject = await Image.new(imagePath("no_exif"));
       expect(await subject.exif()).toEqualRuby({});
     });
   });
@@ -546,8 +546,8 @@ describe("MiniMagick::Image", () => {
 
   describe("#data", () => {
     describe("when the data return is not an array", () => {
-      beforeEach(() => {
-        subject = new Image(imagePath("jpg"));
+      beforeEach(async () => {
+        subject = await Image.new(imagePath("jpg"));
       });
 
       it("returns image JSON data", async (ctx) => {
@@ -558,8 +558,8 @@ describe("MiniMagick::Image", () => {
     });
 
     describe("when the data return is an array (ex png)", () => {
-      beforeEach(() => {
-        subject = new Image(imagePath("png"));
+      beforeEach(async () => {
+        subject = await Image.new(imagePath("png"));
       });
 
       it("returns image JSON data", async (ctx) => {
@@ -579,14 +579,14 @@ describe("MiniMagick::Image", () => {
     });
 
     it("returns multiple images for GIFs, PDFs and PSDs", async () => {
-      const gif = new Image(imagePath("gif"));
+      const gif = await Image.new(imagePath("gif"));
       expect(await (await gif.layers()).length).toBeGreaterThan(1);
       expect(await (await gif.frames()).length).toBeGreaterThan(1);
       expect(await (await gif.pages()).length).toBeGreaterThan(1);
     });
 
     it("returns one image for other formats", async () => {
-      const jpg = new Image(imagePath("jpg"));
+      const jpg = await Image.new(imagePath("jpg"));
       expect(await (await jpg.layers()).length).toEqual(1);
     });
   });
@@ -879,7 +879,7 @@ describe("MiniMagick::Image", () => {
     });
 
     it("doesn't delete when there is no tempfile", async () => {
-      const image = new Image(imagePath());
+      const image = await Image.new(imagePath());
       await image.destroyBang();
       expect(File.isExist(image.path)).toEqual(true);
     });

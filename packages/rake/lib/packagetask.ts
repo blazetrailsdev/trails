@@ -114,7 +114,7 @@ export class PackageTask extends TaskLib {
       );
     }
 
-    void self.directory(
+    self.directory(
       { [this.packageDirPath()]: this.packageFiles.toAry() },
       block(async () => {
         for (const fn of (await this.packageFiles.toA()) as string[]) {

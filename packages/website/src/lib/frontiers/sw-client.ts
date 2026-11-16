@@ -164,11 +164,10 @@ export async function createSwClient(options: SwClientOptions = {}): Promise<SwC
     const initRequest = client.send({ type: "init" as const });
     const initResponse = await new Promise<Awaited<typeof initRequest>>((resolve, reject) => {
       const timer = setTimeout(() => {
-        void initRequest.catch(() => {});
         reject(new Error("SW init timed out"));
       }, INIT_TIMEOUT);
 
-      void initRequest.then(
+      initRequest.then(
         (response) => {
           clearTimeout(timer);
           resolve(response);

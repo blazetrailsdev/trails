@@ -151,7 +151,6 @@ export class GzipStream {
           gzip.write(typeof part === "string" ? new TextEncoder().encode(part) : part);
           if (this.sync) {
             flushed = flushed ? flushed.then(() => gzip.flush()) : gzip.flush();
-            flushed.catch(() => {});
             return flushed;
           }
         };

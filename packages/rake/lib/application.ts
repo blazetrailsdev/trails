@@ -241,8 +241,10 @@ export class Application {
   }
 
   /** @internal */
-  exitBecauseOfException(ex: Error): never {
-    void ex;
+  exitBecauseOfException(
+    // eslint-disable-next-line unused-imports/no-unused-vars
+    ex: Error,
+  ): never {
     exit(false);
   }
 
