@@ -1056,7 +1056,7 @@ describe("Callbacks — async propagation", () => {
     Target.defineCallbacks("v", {
       terminator: async (_t: object, fn: () => unknown) => {
         fn();
-        return true;
+        throw new Error("rejected halt");
       },
     });
     Target.setCallback("v", "before", (x: any) => x.log.push("first"));

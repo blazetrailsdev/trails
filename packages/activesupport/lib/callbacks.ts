@@ -7,6 +7,7 @@ import {
   rbClassSuperclass,
   rbModSingletonP,
   RuntimeError,
+  Thread,
   Struct,
 } from "@blazetrails/ruby-compat";
 
@@ -354,6 +355,7 @@ export class Before {
       const r = resultLambda();
       if (!isThenable(r)) return env;
       if (syncChain !== undefined) {
+        new Thread(() => r);
         throw new RuntimeError(
           `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
@@ -369,6 +371,7 @@ export class Before {
       });
       if (isThenable(halt)) {
         if (syncChain !== undefined) {
+          new Thread(() => halt);
           throw new RuntimeError(
             `Async callback on sync chain "${syncChain}" — before returned a Promise`,
           );
@@ -379,11 +382,13 @@ export class Before {
         });
       }
       if (isThenable(cbResult)) {
+        new Thread(() => cbResult);
         if (syncChain !== undefined) {
           throw new RuntimeError(
             `Async callback on sync chain "${syncChain}" — before returned a Promise`,
           );
         }
+        new Thread(() => cbResult);
         throw new RuntimeError(
           `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
             `Custom terminators cannot evaluate Promise-returning callbacks. ` +
@@ -402,6 +407,7 @@ export class Before {
         return;
       }
       if (syncChain !== undefined) {
+        new Thread(() => cbResult);
         throw new RuntimeError(
           `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
@@ -474,6 +480,7 @@ export class After {
       const r = this.userCallback(target, value);
       if (isThenable(r)) {
         if (syncChain !== undefined) {
+          new Thread(() => r);
           throw new RuntimeError(
             `Async callback on sync chain "${syncChain}" — after returned a Promise`,
           );
@@ -936,6 +943,7 @@ interface InvokeSequenceState {
 
 interface ProceedTracker {
   settled: Promise<PromiseSettledResult<unknown>[]>[];
+  proceeded: Promise<PromiseSettledResult<unknown>[]>[];
   observed: boolean;
 }
 
@@ -945,6 +953,7 @@ function assignYield(env: Environment, y: unknown): void | Promise<void> {
     return;
   }
   if (env.syncChain !== undefined) {
+    new Thread(() => y);
     throw new RuntimeError(
       `Async callback on sync chain "${env.syncChain}" — block returned a Promise`,
     );
@@ -960,7 +969,9 @@ function observeProceed(
   env: Environment,
 ): unknown {
   const pending = Promise.resolve(r);
-  tracker.settled.push(Promise.allSettled([pending]));
+  const proceeded = Promise.allSettled([pending]);
+  tracker.proceeded.push(proceeded);
+  tracker.settled.push(proceeded);
   const observed = () => pending.then(() => env.value);
   const settle = <T>(p: Promise<T>): Promise<T> => {
     tracker.settled.push(Promise.allSettled([p]));
@@ -1179,6 +1190,7 @@ function runCallbacks(
     const r = block?.();
     if (!isThenable(r)) return r;
     if (strict === "sync") {
+      new Thread(() => r);
       throw new RuntimeError("Async block on chain with no callbacks");
     }
     return r;
@@ -1229,7 +1241,7 @@ function runCallbacks(
         } else {
           nextSequence = nextSequence.nested!;
           const proceeding = tracker;
-          const own: ProceedTracker = (tracker = { settled: [], observed: false });
+          const own: ProceedTracker = (tracker = { settled: [], proceeded: [], observed: false });
           let cbResult: unknown;
           try {
             const [receiver, blk, method, ...args] = current.expandCallTemplate(
@@ -1268,6 +1280,7 @@ function runCallbacks(
           }
           if (isThenable(cbResult) || own.settled.length > 0) {
             if (env.syncChain !== undefined) {
+              new Thread(() => cbResult);
               throw new RuntimeError(
                 `Async callback on sync chain "${env.syncChain}" — around callback or block returned a Promise`,
               );
@@ -1280,8 +1293,10 @@ function runCallbacks(
                   await Promise.all(own.settled);
                   throw err;
                 }
-                const [[proceeded] = []] = await Promise.all(own.settled);
-                if (!own.observed && proceeded?.status === "rejected") throw proceeded.reason;
+                await Promise.all(own.settled);
+                for (const [proceeded] of await Promise.all(own.proceeded)) {
+                  if (!own.observed && proceeded.status === "rejected") throw proceeded.reason;
+                }
               } finally {
                 nextSequence = current;
                 tracker = proceeding;
