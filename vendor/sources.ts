@@ -1132,6 +1132,17 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "net-protocol",
+    origin: {
+      type: "git",
+      url: "https://github.com/ruby/net-protocol.git",
+      // vendor/net-smtp/v0.5.1/net-smtp.gemspec:30 declares an unbounded
+      // `net-protocol`; vendor/rails/v8.0.2/Gemfile.lock:388 resolves 0.2.2.
+      ref: "v0.2.2",
+    },
+    packages: [],
+  },
+  {
     name: "turbo-rails",
     origin: {
       type: "git",

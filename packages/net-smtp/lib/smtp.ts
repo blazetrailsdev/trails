@@ -1,5 +1,3 @@
-import { isIP } from "node:net";
-import { checkServerIdentity, rootCertificates, type PeerCertificate } from "node:tls";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import {
   binaryBytes,
@@ -18,6 +16,7 @@ import { Authenticator } from "./authenticator.js";
 import {
   Net,
   OpenTimeout,
+  Protocol,
   ReadTimeout,
   ProtoAuthError,
   ProtoFatalError,
@@ -41,13 +40,6 @@ type Connection = SMTPConnection & {
 };
 
 type ConnectionError = Error & { code?: string };
-
-const TLS_VERSIONS: Record<number, "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3"> = {
-  0x301: "TLSv1",
-  0x302: "TLSv1.1",
-  0x303: "TLSv1.2",
-  0x304: "TLSv1.3",
-};
 
 type SSLContext = InstanceType<typeof OpenSSL.SSL.SSLContext>;
 type SSLSocket = InstanceType<typeof OpenSSL.SSL.SSLSocket<Connection>>;
@@ -230,7 +222,7 @@ export class Address {
   }
 }
 
-export class SMTP {
+export class SMTP extends Protocol {
   static readonly VERSION = "0.5.1";
   static readonly DEFAULT_AUTH_TYPE = "plain";
   static readonly Response = Response;
@@ -321,6 +313,7 @@ export class SMTP {
       sslContextParams = null,
     }: NewOptions = {},
   ) {
+    super();
     this.address = address;
     this.port = port ?? SMTP.defaultPort();
     this._tls = tls;
@@ -605,55 +598,6 @@ export class SMTP {
     } finally {
       if (!verified) ssl.close();
     }
-  }
-
-  /** @internal */
-  private async sslSocketConnect(s: SSLSocket, timeout: number | null): Promise<void> {
-    const { io, context } = s;
-    const hostname = s.hostname!;
-    const store = context.certStore;
-    const ca =
-      store == null || store._certs.length === 0
-        ? null
-        : store._defaultPaths
-          ? [...rootCertificates, ...store._certs]
-          : store._certs;
-    io.options.tls = {
-      ...(ca != null ? { ca } : {}),
-      rejectUnauthorized: context.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
-      secureOptions: context.options,
-      ...(context.minVersion != null ? { minVersion: TLS_VERSIONS[context.minVersion] } : {}),
-      ...(isIP(hostname) === 0 ? { servername: hostname } : {}),
-      checkServerIdentity: (_host: string, cert: PeerCertificate) =>
-        context.verifyHostname ? checkServerIdentity(hostname, cert) : undefined,
-    };
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let onError: ((err: Error) => void) | undefined;
-    await Promise.race([
-      new Promise<void>((resolve, reject) => {
-        onError = reject;
-        io.once("error", reject);
-        io._upgradeConnection((err) => {
-          io.removeListener("error", reject);
-          if (err) reject(err);
-          else resolve();
-        });
-      }),
-      new Promise<never>((_resolve, reject) => {
-        if (timeout != null) {
-          timer = setTimeout(() => reject(new OpenTimeout("execution expired")), timeout * 1000);
-        }
-      }),
-    ])
-      .catch((err: ConnectionError & { originalCode?: string }) => {
-        if (err.originalCode != null) err.code = err.originalCode;
-        s._setVerifyResult(err.code);
-        throw err;
-      })
-      .finally(() => {
-        clearTimeout(timer);
-        if (onError) io.removeListener("error", onError);
-      });
   }
 
   /** @internal */
