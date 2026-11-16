@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { Time } from "@blazetrails/date";
 import {
   Gem,
@@ -76,7 +77,7 @@ export function renderNozoneTime(seconds: number): string {
 /** @internal */
 export function tzinfoVersion(): string {
   try {
-    return String(Gem.loadedSpecs["tzinfo"]!.version);
+    return String(createRequire(import.meta.url)("@blazetrails/tzinfo/package.json").version);
   } catch (err) {
     return rbInspect(err);
   }
@@ -85,7 +86,7 @@ export function tzinfoVersion(): string {
 /** @internal */
 export function tzinfoDataVersion(): string | null {
   try {
-    return String(Gem.loadedSpecs["tzinfo-data"]!.version);
+    return String(createRequire(import.meta.url)("@blazetrails/tzinfo-data/package.json").version);
   } catch {
     return null;
   }
