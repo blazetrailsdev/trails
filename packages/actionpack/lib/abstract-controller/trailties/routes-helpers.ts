@@ -46,14 +46,29 @@ Object.defineProperty(RoutesHelpers, "with", {
         descriptor: PropertyDescriptor,
       ): PropertyDescriptor => {
         const previous = Object.getOwnPropertyDescriptor(owner, key);
+        const isWired = (self: object): boolean =>
+          self === cls || (self as { constructor?: unknown }).constructor === cls;
+        const fallback = (self: object): unknown => {
+          if (previous) return previous.get ? previous.get.call(self) : previous.value;
+          return Reflect.get(Object.getPrototypeOf(owner) as object, key, self);
+        };
+        if (typeof descriptor.value === "function") {
+          const method = descriptor.value as (...args: unknown[]) => unknown;
+          return {
+            configurable: true,
+            enumerable: false,
+            writable: true,
+            value: function (this: object, ...args: unknown[]): unknown {
+              if (!isWired(this)) return method.apply(this, args);
+              return (fallback(this) as (...args: unknown[]) => unknown).apply(this, args);
+            },
+          };
+        }
         return {
           configurable: true,
           enumerable: false,
           get(this: object) {
-            if (this === cls || (this as { constructor?: unknown }).constructor === cls) {
-              if (previous) return previous.get ? previous.get.call(this) : previous.value;
-              return Reflect.get(Object.getPrototypeOf(owner) as object, key, this);
-            }
+            if (isWired(this)) return fallback(this);
             return descriptor.get ? descriptor.get.call(this) : descriptor.value;
           },
           set(this: object, value: unknown) {
