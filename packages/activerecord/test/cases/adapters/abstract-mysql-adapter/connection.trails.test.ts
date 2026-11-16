@@ -40,7 +40,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         }
       )?.connection?.stream;
       expect(await adapter.active()).toBe(true);
-      adapter.discardBang();
+      await adapter.discardBang();
       expect(await adapter.active()).toBe(false);
       socket?.destroy?.();
     });
@@ -57,7 +57,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         }
       )?.connection?.stream;
       try {
-        adapter.discardBang();
+        await adapter.discardBang();
         expect(endSpy).not.toHaveBeenCalled();
         expect(await adapter.active()).toBe(false);
       } finally {

@@ -32,8 +32,8 @@ export class Face extends Base {
       inverseOf: "puzzledPolymorphicFace",
     });
 
-    this.validate((face: Face) => {
-      void face.human;
+    this.validate(async (face: Face) => {
+      await face.human;
     });
   }
 }

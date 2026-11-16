@@ -40,31 +40,31 @@ export class StatementPool<T = unknown> {
     return size(this.cache);
   }
 
-  set(sql: string, stmt: T): T {
+  async set(sql: string, stmt: T): Promise<T> {
     while (this._statementLimit <= size(this.cache)) {
       const shifted = Object.entries(this.cache)[0];
       delete this.cache[shifted[0]];
-      void this.dealloc((shifted.at(-1) ?? null) as T);
+      await this.dealloc((shifted.at(-1) ?? null) as T);
     }
     hashAset(this.cache, sql, stmt);
     return stmt;
   }
 
-  clear(): void {
+  async clear(): Promise<void> {
     for (const stmt of Object.values(this.cache)) {
-      void this.dealloc(stmt);
+      await this.dealloc(stmt);
     }
     for (const key of Object.keys(this.cache)) delete this.cache[key];
   }
 
-  reset(): void {
+  reset(): void | Promise<void> {
     for (const key of Object.keys(this.cache)) delete this.cache[key];
   }
 
-  delete(key: string): T | null {
+  async delete(key: string): Promise<T | null> {
     const stmt = hashDelete(this.cache, key);
     if (rtest(stmt)) {
-      void this.dealloc(stmt);
+      await this.dealloc(stmt);
     }
     return stmt;
   }

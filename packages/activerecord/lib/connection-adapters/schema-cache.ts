@@ -15,7 +15,7 @@ import {
   toH,
   synchronize,
 } from "@blazetrails/ruby-compat";
-import { atomicWrite, indexBy } from "@blazetrails/activesupport";
+import { ActiveSupport, atomicWrite, indexBy } from "@blazetrails/activesupport";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import type { Column } from "./column.js";
 import { Deduplicable } from "./deduplicable.js";
@@ -193,7 +193,9 @@ export class SchemaReflection {
     if (typeof connection?.columns !== "function") return undefined;
     const columns = connection.columns(tableName);
     if (columns instanceof Promise) {
-      void columns.catch(() => {});
+      columns.catch((error: Error) => {
+        ActiveSupport.errorReporter.report(error, { handled: true });
+      });
       return undefined;
     }
     if (!Array.isArray(columns)) return undefined;

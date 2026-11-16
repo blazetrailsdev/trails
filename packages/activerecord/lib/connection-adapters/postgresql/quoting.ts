@@ -1,6 +1,6 @@
 import "../../constants.postgresql-quoting.generated.js";
 import { BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { ActiveSupport, BigDecimal } from "@blazetrails/activesupport";
 import {
   quote as abstractQuote,
   lookupCastType as abstractLookupCastType,
@@ -173,7 +173,11 @@ export function lookupCastTypeFromColumn(
   this: { typeMap: LookupableTypeMap; verifyBang(): Promise<void> },
   column: CastableColumn,
 ): ValueType {
-  if (this.typeMap == null) this.verifyBang().catch(() => {});
+  if (this.typeMap == null) {
+    this.verifyBang().catch((reason: Error) => {
+      ActiveSupport.errorReporter.report(reason, { handled: true });
+    });
+  }
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 

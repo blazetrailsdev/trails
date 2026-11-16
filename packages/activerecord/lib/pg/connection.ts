@@ -40,7 +40,7 @@ export class Connection {
   prepared = new Map<string, string>();
   readyForQuery = "I";
   bad = false;
-  pendingResult: Promise<PG.Result> | null = null;
+  pendingResult: Promise<{ result: PG.Result } | { error: unknown }> | null = null;
   pendingResultTaken = false;
   typeMapForResults = new PGTypeMapByOid();
   notifies: pg.Notification[] = [];
@@ -232,9 +232,10 @@ export class Connection {
     if (this.pendingResult != null) {
       throw new UnableToSend("another command is already in progress\n", { connection: this });
     }
-    const pending = this.asyncExec(sql);
-    pending.catch(() => undefined);
-    this.pendingResult = pending;
+    this.pendingResult = this.asyncExec(sql).then(
+      (result) => ({ result }),
+      (error: unknown) => ({ error }),
+    );
     this.pendingResultTaken = false;
   }
 
@@ -242,12 +243,14 @@ export class Connection {
     const pending = this.pendingResult;
     if (pending == null) return null;
     if (this.pendingResultTaken) {
-      await pending.catch(() => undefined);
+      await pending;
       return null;
     }
     this.pendingResultTaken = true;
     try {
-      return await pending;
+      const settled = await pending;
+      if ("error" in settled) throw settled.error;
+      return settled.result;
     } finally {
       if (this.pendingResult === pending) this.pendingResult = null;
     }

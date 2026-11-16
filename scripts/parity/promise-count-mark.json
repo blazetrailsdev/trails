@@ -3,7 +3,7 @@
     "actioncable": 5,
     "actionmailbox": 1,
     "actionpack": 2,
-    "activerecord": 26,
+    "activerecord": 19,
     "activesupport": 2,
     "rackup": 1,
     "rake": 1,
@@ -25,7 +25,7 @@
   },
   "blazetrails/no-swallowed-rejection": {
     "actiontext": 1,
-    "activerecord": 13,
+    "activerecord": 5,
     "activestorage": 2,
     "activesupport": 5,
     "mini-magick": 1,

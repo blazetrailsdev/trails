@@ -20,6 +20,7 @@ import { NotImplementedError } from "../errors.js";
 import {
   Module,
   Mutex,
+  ThreadError,
   NoMethodError,
   ARRAY_METHOD_TABLE,
   Range,
@@ -122,8 +123,11 @@ export class DelegateCache {
 export class GeneratedRelationMethods extends Module {
   static MUTEX = new Mutex();
 
+  /** @inventedArm if — PERMANENT */
   generateMethod(method: string): void {
-    void GeneratedRelationMethods.MUTEX.synchronize(() => {
+    let raised = false;
+    const synchronized = GeneratedRelationMethods.MUTEX.synchronize(() => {
+      if (raised) return;
       if (this.isMethodDefined(method)) return;
 
       if (
@@ -141,6 +145,10 @@ export class GeneratedRelationMethods extends Module {
         });
       }
     });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
   }
 }
 

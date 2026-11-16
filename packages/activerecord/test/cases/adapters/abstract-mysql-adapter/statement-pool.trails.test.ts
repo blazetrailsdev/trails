@@ -104,7 +104,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       const pool = closable._statements;
       await closable.rollbackDbTransaction();
       await closable.disconnectBang();
-      expect(() => pool.clear()).not.toThrow();
+      await expect(pool.clear()).resolves.not.toThrow();
     });
 
     it("reads statementLimit from the config hash (database.yml shape)", async () => {

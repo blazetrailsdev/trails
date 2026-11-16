@@ -80,11 +80,13 @@ export class QueryAttribute extends Attribute {
 
   isUnboundable(): 1 | -1 | null | undefined {
     if (!Object.hasOwn(this, "_unboundable")) {
-      void (
+      if (
         this.isSerializable((value) => {
           this._unboundable = compareToZero(value);
-        }) && (this._unboundable = null)
-      );
+        })
+      ) {
+        this._unboundable = null;
+      }
     }
     return this._unboundable;
   }

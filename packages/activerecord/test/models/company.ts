@@ -608,8 +608,8 @@ export class Client extends Company {
     this.hasMany("accounts", { through: "firm", source: "accounts" });
     this.belongsTo("account");
 
-    this.validate(function (this: Client) {
-      void (this as { firm?: unknown }).firm;
+    this.validate(async function (this: Client) {
+      await (this as { firm?: unknown }).firm;
     });
 
     this.beforeSave(async function (this: Client) {

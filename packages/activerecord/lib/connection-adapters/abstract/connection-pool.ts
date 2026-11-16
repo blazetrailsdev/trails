@@ -19,7 +19,7 @@ import {
   ThreadPoolExecutor,
 } from "@blazetrails/ruby-compat";
 import { include, prepend } from "@blazetrails/ruby-compat/include";
-import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import { ActiveSupport, IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import {
   asyncQueryExecutor,
@@ -489,7 +489,7 @@ export class ConnectionPool implements ReapablePool {
     await synchronize.call(this, async () => {
       if (this.isDiscarded()) return;
       for (const conn of this._connections ?? []) {
-        conn.discardBang?.();
+        await conn.discardBang?.();
       }
       this._connections = null;
       this._available?.clear();
@@ -736,10 +736,13 @@ export class ConnectionPool implements ReapablePool {
         if (borrowed) {
           const value = fn(borrowed);
           if (value instanceof Promise) {
-            value.catch(() => {});
-            throw new RuntimeError(
+            const error = new RuntimeError(
               "withConnectionSync borrowed a busy connection; its block must not go async",
             );
+            value.catch((reason: Error) => {
+              ActiveSupport.errorReporter.report(reason, { handled: true });
+            });
+            throw error;
           }
           return ensure(false, value);
         }
@@ -785,7 +788,7 @@ export class ConnectionPool implements ReapablePool {
     };
     let conn = this._available?.poll() ?? tryToCheckoutNewConnection();
     if (!conn) {
-      void this.reap().catch((err) => {
+      this.reap().catch((err) => {
         console.warn(`[trails] reap failed: ${err instanceof Error ? err.message : String(err)}`);
       });
       conn = this._available?.poll() ?? tryToCheckoutNewConnection();
@@ -801,8 +804,13 @@ export class ConnectionPool implements ReapablePool {
         conn.cleanBang();
       });
       if (ran instanceof Promise) {
-        ran.catch(() => {});
-        throw new RuntimeError("Async :checkout callback on a synchronous connection lease");
+        const error = new RuntimeError(
+          "Async :checkout callback on a synchronous connection lease",
+        );
+        ran.catch((reason: Error) => {
+          ActiveSupport.errorReporter.report(reason, { handled: true });
+        });
+        throw error;
       }
       conn._queryCache ||= this.queryCache;
       return conn;

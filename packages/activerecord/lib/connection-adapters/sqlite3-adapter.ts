@@ -1167,7 +1167,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     if (!stmt) {
       stmt = await rawConnection.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
-      this._statements.set(sql, stmt);
+      await this._statements.set(sql, stmt);
     }
     return stmt;
   }
@@ -1268,16 +1268,13 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 }
 
 export class StatementPool extends GenericStatementPool<SqliteStatement> {
-  override reset(): void {
+  override async reset(): Promise<void> {
     return this.clear();
   }
 
-  /**
-   * @internal
-   * @inventedArm try — CONVERGEABLE sqlite3-statement-pool-dealloc-drops-an-async-close-rejection
-   */
-  protected override dealloc(stmt: SqliteStatement): void {
-    if (!stmt.closed) void Promise.resolve(stmt.close()).catch(() => {});
+  /** @internal */
+  protected override async dealloc(stmt: SqliteStatement): Promise<void> {
+    if (!stmt.closed) await stmt.close();
   }
 }
 
