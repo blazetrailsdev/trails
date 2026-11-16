@@ -1,4 +1,5 @@
-import { constGet, rbProcCall } from "@blazetrails/ruby-compat";
+import { constGet, rbFRequire, rbProcCall } from "@blazetrails/ruby-compat";
+import { ActiveSupport } from "../../namespaces.js";
 import { LocalCacheRegistry, LocalStore } from "./local-cache.js";
 
 type RackEnv = Record<string, unknown>;
@@ -29,6 +30,8 @@ export class Middleware {
   }
 
   async call(env: RackEnv): Promise<RackResponse> {
+    await rbFRequire(ActiveSupport.loadPath, "rack/body_proxy");
+    await rbFRequire(ActiveSupport.loadPath, "rack/utils");
     let cleanupOnBodyClose = false;
     try {
       LocalCacheRegistry.setCacheFor(this.localCacheKey, new LocalStore());
