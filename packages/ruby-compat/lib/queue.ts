@@ -57,7 +57,10 @@ function queueDoPop<T>(
     return (async () => {
       while (q.que.length === 0) {
         await queueSleep(q.waitq, end);
-        if (!th.isAlive()) await new Promise<never>(() => {});
+        if (!th.isAlive()) {
+          if (q.que.length > 0) wakeupOne(q.waitq);
+          await new Promise<never>(() => {});
+        }
         if (end != null && Date.now() >= end) break;
       }
 

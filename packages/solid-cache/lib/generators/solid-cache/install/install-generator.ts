@@ -1,5 +1,4 @@
 import { File } from "@blazetrails/ruby-compat";
-import { gsubFile } from "@blazetrails/thor/actions/file-manipulation";
 import { Base } from "@blazetrails/trailties/generators";
 
 export class InstallGenerator extends Base {
@@ -17,8 +16,7 @@ export class InstallGenerator extends Base {
   }
 
   async configureCacheStoreAdapter(): Promise<void> {
-    await gsubFile.call(
-      this as never,
+    await this.gsubFile(
       File.join(this.destinationRoot, "config/environments/production.ts"),
       /(\/\/ )?this\.config\.cacheStore = (".*")/,
       'this.config.cacheStore = ":solid_cache_store"',
