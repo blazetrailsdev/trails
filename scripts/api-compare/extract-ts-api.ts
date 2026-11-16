@@ -5165,10 +5165,10 @@ const NEW_CALLS: ReadonlySet<string> = new Set(["constructor", "rbClassNewInstan
  * constructor that carries `@inlinedFrom` tags or builds through
  * `rbClassNewInstance(this, ...)` hands its tags and body to the constructor,
  * which the call gates and `parity:api:inlined` pair with `initialize`. The
- * constructor's own body is spliced in where `static new` builds the object, so what runs before it is the head of the chain, as a
- * `ClassMethods#new` segment is, and what runs after it is the tail, and the
- * building call itself is dropped. The `static new` member keeps no body of
- * its own to compare.
+ * constructor's own body is spliced in where `static new` builds the object,
+ * so what runs before it is the head of the chain, as a `ClassMethods#new`
+ * segment is, and what runs after it is the tail, and the building call itself
+ * is dropped. The `static new` member keeps no body of its own to compare.
  */
 export function foldStaticNewIntoConstructor(
   instanceMethods: MethodInfo[],
