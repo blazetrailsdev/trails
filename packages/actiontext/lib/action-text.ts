@@ -23,8 +23,8 @@ import type { Content } from "./content.js";
 import type { Fragment } from "./fragment.js";
 import type { HtmlConversion } from "./html-conversion.js";
 import type { PlainTextConversion } from "./plain-text-conversion.js";
-import type { ContentHelper } from "./content-helper.js";
-import type { TagHelper } from "./tag-helper.js";
+import type { ContentHelper } from "./app/helpers/action-text/content-helper.js";
+import type { TagHelper } from "./app/helpers/action-text/tag-helper.js";
 import type { Rendering } from "./rendering.js";
 import type { TrixAttachment } from "./trix-attachment.js";
 

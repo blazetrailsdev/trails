@@ -234,6 +234,8 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:inflector/methods.rb": "inflector.ts",
   "vite-assets:vite_ruby.rb": "vite-assets.ts",
   "vite-trails:vite_rails.rb": "vite-trails.ts",
+  "actiontext:content_helper.rb": "app/helpers/action-text/content-helper.ts",
+  "actiontext:tag_helper.rb": "app/helpers/action-text/tag-helper.ts",
   // Real ports that live under a different file name than the Ruby one, found
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.

@@ -25,7 +25,7 @@
   ],
   "scripts": {
     "build": "tsc && pnpm build:templates",
-    "build:templates": "rm -rf dist/app dist/.trails && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place && cp -R lib/generators/action-text/install/templates dist/generators/action-text/install/ && cp -R lib/trails/generators/test-unit/install/templates dist/trails/generators/test-unit/install/ && trails-tsc-views build-templates dist/generators dist/trails/generators"
+    "build:templates": "rm -rf dist/app/views dist/.trails && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place && cp -R lib/generators/action-text/install/templates dist/generators/action-text/install/ && cp -R lib/trails/generators/test-unit/install/templates dist/trails/generators/test-unit/install/ && trails-tsc-views build-templates dist/generators dist/trails/generators"
   },
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import "@blazetrails/trailties/generators";
 import { Trails } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
-import { LOAD_PATH } from "@blazetrails/ruby-compat";
+import { LOAD_PATH, include } from "@blazetrails/ruby-compat";
 import { Engine } from "../lib/engine.js";
 import { InstallGenerator } from "../lib/generators/action-text/install/install-generator.js";
 import { InstallGenerator as TestUnitInstallGenerator } from "../lib/trails/generators/test-unit/install/install-generator.js";
@@ -24,6 +24,14 @@ describe("ActionText::Engine", () => {
     expect(await Trails.Generators!.findByNamespace("test_unit:install")).toBe(
       TestUnitInstallGenerator,
     );
+  });
+
+  it("collects ContentHelper and TagHelper from app/helpers", async () => {
+    class Host {}
+    include(Host, await Engine.instance().helpers());
+    const proto = Host.prototype as Record<string, unknown>;
+    expect(typeof proto.renderActionTextContent).toBe("function");
+    expect(typeof proto.richTextareaTag).toBe("function");
   });
 
   it("registers lib/tasks", async () => {

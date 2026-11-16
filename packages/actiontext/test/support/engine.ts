@@ -4,7 +4,7 @@ import { ActiveStorage, Model } from "@blazetrails/activestorage";
 import { ActiveRecordExtensions, ReflectionExtension } from "@blazetrails/activestorage/reflection";
 import { File, include, prepend, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { ActionController } from "@blazetrails/actionpack";
-import { ContentHelper } from "../../lib/content-helper.js";
+import { ContentHelper } from "../../lib/app/helpers/action-text/content-helper.js";
 import { ActionText } from "../../lib/action-text.js";
 import { Attachable } from "../../lib/attachable.js";
 import { Attribute } from "../../lib/attribute.js";

@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { TagHelper } from "../../lib/tag-helper.js";
+import { TagHelper } from "../../lib/app/helpers/action-text/tag-helper.js";
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { I18n } from "@blazetrails/activesupport";
 import { TestCase } from "@blazetrails/actionview/test-case.js";

@@ -1,10 +1,10 @@
 import { htmlSafe, mattrAccessor, type SafeBuffer } from "@blazetrails/activesupport";
 import { HTML4, type SanitizeOptions, type Sanitizer } from "@blazetrails/html-sanitizer";
 import { chomp, classModule, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { ActionText } from "./action-text.js";
-import { Attachment } from "./attachment.js";
-import type { AttachmentGallery } from "./attachment-gallery.js";
-import type { Content } from "./content.js";
+import { ActionText } from "../../../action-text.js";
+import { Attachment } from "../../../attachment.js";
+import type { AttachmentGallery } from "../../../attachment-gallery.js";
+import type { Content } from "../../../content.js";
 
 type SanitizerClass = { allowedTags: Set<string>; allowedAttributes: Set<string> };
 

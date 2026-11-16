@@ -233,6 +233,9 @@
     "excluded": [],
     "unwalked": [],
     "residue": {
+      "app/helpers/action-text/content-helper.ts::ContentHelper": "ActionText::ContentHelper",
+      "app/helpers/action-text/tag-helper.ts::ActionText": "ActionView::Helpers::Tags::ActionText",
+      "app/helpers/action-text/tag-helper.ts::TagHelper": "ActionText::TagHelper",
       "attachable.ts::Attachable": "ActionText::Attachable",
       "attachables/content-attachment.ts::ContentAttachment": "ActionText::Attachables::ContentAttachment",
       "attachables/missing-attachable.ts::MissingAttachable": "ActionText::Attachables::MissingAttachable",
@@ -243,7 +246,6 @@
       "attachments/minification.ts::Minification": "ActionText::Attachments::Minification",
       "attachments/trix-conversion.ts::TrixConversion": "ActionText::Attachments::TrixConversion",
       "attribute.ts::Attribute": "ActionText::Attribute",
-      "content-helper.ts::ContentHelper": "ActionText::ContentHelper",
       "content.ts::Content": "ActionText::Content",
       "encrypted-rich-text.ts::EncryptedRichText": "ActionText::EncryptedRichText",
       "fragment.ts::Fragment": "ActionText::Fragment",
@@ -253,8 +255,6 @@
       "rendering.ts::Rendering": "ActionText::Rendering",
       "rich-text.ts::RichText": "ActionText::RichText",
       "serialization.ts::Serialization": "ActionText::Serialization",
-      "tag-helper.ts::ActionText": "ActionView::Helpers::Tags::ActionText",
-      "tag-helper.ts::TagHelper": "ActionText::TagHelper",
       "trix-attachment.ts::TrixAttachment": "ActionText::TrixAttachment"
     }
   },
