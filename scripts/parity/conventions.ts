@@ -234,8 +234,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:inflector/methods.rb": "inflector.ts",
   "vite-assets:vite_ruby.rb": "vite-assets.ts",
   "vite-trails:vite_rails.rb": "vite-trails.ts",
-  // actiontext ships its helpers under the engine's `app/helpers` path, as
-  // the gem does (`actiontext/app/helpers/action_text/`), below `lib/`.
   "actiontext:content_helper.rb": "app/helpers/action-text/content-helper.ts",
   "actiontext:tag_helper.rb": "app/helpers/action-text/tag-helper.ts",
   // Real ports that live under a different file name than the Ruby one, found
