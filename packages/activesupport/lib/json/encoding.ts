@@ -1,5 +1,5 @@
 import { fetch, rbObjDup, toS } from "@blazetrails/ruby-compat";
-import { asJson, Float, isPlainObject } from "../core-ext/object/json.js";
+import { asJson, Float, isPlainObject, Numeric } from "../core-ext/object/json.js";
 
 export interface EncodeOptions {
   only?: string | number | Array<string | number>;
@@ -37,16 +37,12 @@ export class JSONGemEncoder {
   }
 
   private jsonify(value: unknown): unknown {
-    if (
-      typeof value === "string" ||
-      typeof value === "bigint" ||
-      value == null ||
-      value === true ||
-      value === false
-    ) {
+    if (typeof value === "string" || value == null || value === true || value === false) {
       return value;
     } else if (typeof value === "number" || value instanceof Number) {
       return Float.asJson(value as number);
+    } else if (typeof value === "bigint") {
+      return Numeric.asJson(value);
     } else if (value instanceof Map) {
       const result: Record<string, unknown> = {};
       for (const [k, v] of value) {

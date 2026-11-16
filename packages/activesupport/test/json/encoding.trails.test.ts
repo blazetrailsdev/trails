@@ -91,3 +91,12 @@ describe("JSONGemEncoder#jsonify copy-on-write (trails)", () => {
     expect(ActiveSupportJSON.encode([1, , NaN])).toBe("[1,null,null]");
   });
 });
+
+describe("JSON Encoding a bigint (trails)", () => {
+  it("encodes a bigint through Numeric#as_json at the root and nested", () => {
+    expect(ActiveSupportJSON.encode(1n)).toBe('"1"');
+    expect(ActiveSupportJSON.encode({ id: 99999999999999999999n })).toBe(
+      '{"id":"99999999999999999999"}',
+    );
+  });
+});
