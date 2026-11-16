@@ -14,6 +14,8 @@ import type { Autoloaders } from "./autoloaders.js";
 import type { Generators } from "./generators.js";
 import type * as TrailsTsc from "@blazetrails/trails-tsc";
 import type { Configuration } from "./application/configuration.js";
+import type { Console } from "./commands/console.js";
+import type { Server } from "./commands/server.js";
 import { resolveEnv } from "./database.js";
 import type { InitializerGroup } from "./initializable.js";
 import type { ActionMethods } from "./generators/trails/app/app-generator.js";
@@ -51,8 +53,8 @@ export class Trails {
   declare static Paths: typeof Paths;
   declare static SourceAnnotationExtractor: typeof SourceAnnotationExtractor;
   declare static Rack?: typeof import("./rack.js");
-  declare static Server?: typeof import("./commands/server.js").Server;
-  declare static Console?: typeof import("./commands/console.js").Console;
+  declare static Server?: typeof Server;
+  declare static Console?: typeof Console;
   declare static Generators?: typeof Generators;
   declare static TestUnitRailtie?: typeof import("./test-unit/trailtie.js").TestUnitRailtie;
   /** @noRailsEquivalent PERMANENT */
