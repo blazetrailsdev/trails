@@ -140,7 +140,12 @@ export class Image {
   }
 
   /** @missingRailsName path — PERMANENT */
-  protected constructor(inputPath: string | Pathname, tempfile: Tempfile | null = null) {
+  protected constructor(
+    inputPath: string | Pathname,
+    tempfile: Tempfile | null = null,
+    // eslint-disable-next-line unused-imports/no-unused-vars
+    block?: (builder: CliTool) => unknown,
+  ) {
     this._path = String(inputPath);
     this._tempfile = tempfile;
     this._info = new Info(this._path);
@@ -153,7 +158,7 @@ export class Image {
     tempfile: Tempfile | null = null,
     block?: (builder: CliTool) => unknown,
   ): Promise<T> {
-    const obj = rbClassNewInstance(this, inputPath, tempfile);
+    const obj = rbClassNewInstance(this, inputPath, tempfile, block);
     if (block != null) await obj.combineOptions(block);
     return obj;
   }
