@@ -32,7 +32,7 @@ describe("DisableJoinsAssociationScope", () => {
     await createComment(post, "c1");
     await createComment(post, "c2");
 
-    const reflection = (Author as any)._reflectOnAssociation("noJoinsComments");
+    const reflection = Author.reflectOnAssociation("noJoinsComments")!;
     const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
@@ -50,7 +50,7 @@ describe("DisableJoinsAssociationScope", () => {
     const post = await createPost(author.id, "p");
     await createComment(post, "c1");
 
-    const reflection = (Author as any)._reflectOnAssociation("noJoinsComments");
+    const reflection = Author.reflectOnAssociation("noJoinsComments")!;
     const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
@@ -80,7 +80,7 @@ describe("DisableJoinsAssociationScope", () => {
     await createComment(post, "include-me");
     await createComment(post, "exclude-me");
 
-    const reflection = (Author as any)._reflectOnAssociation("noJoinsComments");
+    const reflection = Author.reflectOnAssociation("noJoinsComments")!;
     const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
@@ -96,7 +96,7 @@ describe("DisableJoinsAssociationScope", () => {
     const post = await createPost(author.id, "p");
     await createComment(post, "hi");
 
-    const reflection = (Author as any)._reflectOnAssociation("noJoinsComments");
+    const reflection = Author.reflectOnAssociation("noJoinsComments")!;
     const comments = (await author.association("noJoinsComments").loadTarget()) as Base[];
     expect(comments.map((c: any) => c.body)).toEqual(["hi"]);
   });
@@ -108,7 +108,7 @@ describe("DisableJoinsAssociationScope", () => {
     await createComment(postB, "b", await Member.create({ name: "from-b" }));
     await createComment(postA, "a", await Member.create({ name: "from-a" }));
 
-    const reflection = (Author as any)._reflectOnAssociation("noJoinsMembers");
+    const reflection = Author.reflectOnAssociation("noJoinsMembers")!;
     const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,
@@ -126,7 +126,7 @@ describe("DisableJoinsAssociationScope", () => {
     await createComment(postB, "b", await Member.create({ name: "from-b" }));
     await createComment(postA, "a", await Member.create({ name: "from-a" }));
 
-    const reflection = (Author as any)._reflectOnAssociation("noJoinsMembers");
+    const reflection = Author.reflectOnAssociation("noJoinsMembers")!;
     const built = DisableJoinsAssociationScope.create().scope({
       owner: author,
       reflection,

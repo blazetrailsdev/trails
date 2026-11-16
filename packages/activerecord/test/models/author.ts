@@ -928,7 +928,7 @@ export class Author extends Base {
   }
 
   /** @internal */
-  private raiseException(_object: unknown): never {
+  private raiseException(object: unknown): never {
     throw new Exception("You can't add a post");
   }
 }
