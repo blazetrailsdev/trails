@@ -1,3 +1,4 @@
+import { ActionText } from "./action-text.js";
 import { ArgumentError, toS } from "@blazetrails/ruby-compat";
 
 type SystemTestHost = {
@@ -50,3 +51,5 @@ export const SystemTestHelper = {
   fillInRichTextarea,
   fillInRichTextArea: fillInRichTextarea,
 };
+
+ActionText.SystemTestHelper = SystemTestHelper;

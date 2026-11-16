@@ -14,6 +14,7 @@ import type { FixtureSet } from "./fixture-set.js";
 import type { Record as ActionTextRecord } from "./record.js";
 import type { RichText } from "./rich-text.js";
 import type { Serialization } from "./serialization.js";
+import type { SystemTestHelper } from "./system-test-helper.js";
 import type { AttachmentGallery } from "./attachment-gallery.js";
 import type { Caching } from "./attachments/caching.js";
 import type { Minification } from "./attachments/minification.js";
@@ -48,6 +49,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_text/plain_text_conversion": () => import("./plain-text-conversion.js"),
   "action_text/rendering": () => import("./rendering.js"),
   "action_text/serialization": () => import("./serialization.js"),
+  "action_text/system_test_helper": () => import("@blazetrails/actiontext/system-test-helper"),
   "action_text/trix_attachment": () => import("./trix-attachment.js"),
 };
 
@@ -101,6 +103,7 @@ export const ActionText = {
   Rendering?: typeof Rendering;
   RichText?: typeof RichText;
   Serialization?: typeof Serialization;
+  SystemTestHelper?: typeof SystemTestHelper;
   TagHelper?: typeof TagHelper;
   TrixAttachment?: typeof TrixAttachment;
 };
