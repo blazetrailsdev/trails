@@ -22,6 +22,7 @@ import {
 } from "./numeric.js";
 import { rbCheckFuncall, rbFSend, rbObjClassname, rbProcCall } from "./object.js";
 import { Enumerator } from "./enumerator.js";
+import { Thread } from "./thread.js";
 import { Rational } from "./rational.js";
 import { checkArity } from "./string/support.js";
 import { cmp, rbCmpint } from "./comparable.js";
@@ -1022,6 +1023,7 @@ export function isInclude<T, E = unknown>(
 function iterator<T, E = unknown>(this: Each<T, E>): IterableIterator<T> {
   const ary: unknown = enumToA(this);
   if (ary instanceof Promise) {
+    new Thread(() => ary);
     throw new TypeError("each is asynchronous: await it before iterating");
   }
   return (ary as T[])[Symbol.iterator]();

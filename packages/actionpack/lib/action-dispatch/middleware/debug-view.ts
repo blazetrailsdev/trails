@@ -25,7 +25,8 @@ export class DebugView extends Base {
     return this.constructor as typeof DebugView;
   }
 
-  debugParams(params: Record<string, unknown>): string | Promise<string> {
+  /** @inventedArm if — PERMANENT */
+  debugParams(params: Record<string, unknown>): string {
     const cleanParams = { ...params };
     delete cleanParams["action"];
     delete cleanParams["controller"];
@@ -34,8 +35,10 @@ export class DebugView extends Base {
       return "None";
     }
     const out = new StringIO();
-    const printed = PP.pp(cleanParams, out, 200);
-    return printed instanceof Promise ? printed.then(() => out.string()) : out.string();
+    if (PP.pp(cleanParams, out, 200) instanceof Promise) {
+      throw new TypeError("debug_params needs a synchronous pretty_print");
+    }
+    return out.string();
   }
 
   debugHeaders(headers: Record<string, unknown> | null | undefined): string {

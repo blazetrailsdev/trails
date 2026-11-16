@@ -46,10 +46,7 @@ export class Supervised {
   registerSignalHandlers(this: SupervisedHost): void {
     for (const signal of ["SIGINT", "SIGTERM"] as const) {
       onSignal(signal, () => {
-        new Thread(() => {
-          Thread.current().abortOnException = true;
-          return this.stop();
-        });
+        new Thread(() => this.stop());
       });
     }
 

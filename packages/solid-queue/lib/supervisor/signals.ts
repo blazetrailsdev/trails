@@ -34,10 +34,7 @@ export class Signals {
     this._signalHandlers = SIGNALS.map((signal) =>
       onSignal(`SIG${signal}`, () => {
         this.signalQueue().push(signal);
-        new Thread(() => {
-          Thread.current().abortOnException = true;
-          return this.interrupt();
-        });
+        new Thread(() => this.interrupt());
       }),
     );
   }
