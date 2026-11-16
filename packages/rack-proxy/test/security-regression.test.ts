@@ -50,7 +50,7 @@ async function withResponse(
   block: (proxy: Proxy) => Promise<void>,
 ): Promise<void> {
   await withRawBackend(
-    (socket) => socket.end(wire),
+    (socket) => socket.write(wire),
     (backend) => block(new Proxy({ backend, ...options })),
   );
 }
@@ -81,20 +81,19 @@ describe("SecurityRegressionTest", () => {
   it("content length bounds bytes written to backend", async () => {
     for (const streaming of [true, false]) {
       let received!: Promise<string>;
-      const handler = (socket: Socket) => {
-        received = new Promise((resolve) => {
+      const handler = (socket: Socket) =>
+        (received = new Promise((resolve) => {
           const chunks: Buffer[] = [];
           let timer: ReturnType<typeof setTimeout> | undefined;
           socket.on("data", (c: Buffer) => {
             chunks.push(c);
             timer ??= setTimeout(() => {
-              resolve(Buffer.concat(chunks).toString("latin1"));
               socket.write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok");
+              resolve(Buffer.concat(chunks).toString("latin1"));
             }, 20);
           });
           socket.resume();
-        });
-      };
+        }));
       await withRawBackend(handler, async (backend) => {
         const env = MockRequest.envFor("/", { ":method": "POST" });
         env["CONTENT_LENGTH"] = "5";
@@ -223,7 +222,7 @@ describe("SecurityRegressionTest", () => {
     ]) {
       const handler = (socket: Socket) => {
         socket.write(`HTTP/1.1 200 OK\r\n${prefix}`);
-        void readAll(socket);
+        return readAll(socket);
       };
       await withRawBackend(handler, async (backend) => {
         const proxy = new Proxy({ backend, streaming: false, maxResponseLength: 10 });
@@ -257,6 +256,7 @@ describe("SecurityRegressionTest", () => {
       const handler = (socket: Socket) => {
         socket.write(`HTTP/1.1 200 OK\r\n${headers}\r\n\r\n`);
         closed = readAll(socket);
+        return closed;
       };
       await withRawBackend(handler, async (backend) => {
         const proxy = new Proxy({ backend, maxResponseLength: 10 });

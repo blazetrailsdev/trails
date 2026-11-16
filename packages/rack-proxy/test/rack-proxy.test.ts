@@ -5,12 +5,13 @@ import {
   kernelURI,
   Net,
   OpenSSL,
+  rbModMethodDefined,
   rbObjIvarGet,
   StringIO,
   TopLevel,
   Zlib,
 } from "@blazetrails/ruby-compat";
-import { MockRequest, Rack, type Headers } from "@blazetrails/rack";
+import { MockRequest, MockResponse, Rack, type Headers } from "@blazetrails/rack";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Proxy } from "../lib/index.js";
@@ -46,7 +47,7 @@ async function bodyString(body: unknown): Promise<string> {
 describe("RackProxyTest", () => {
   let server: TestServer | null = null;
   let app: HostProxy | null = null;
-  let lastResponse: { status: number; headers: Headers; body: string };
+  let lastResponse: MockResponse;
   afterEach(async () => {
     await server?.shutdown();
     server = null;
@@ -66,16 +67,20 @@ describe("RackProxyTest", () => {
   async function request(method: string, path: string, opts: Env = {}): Promise<void> {
     const env = MockRequest.envFor(path, { ":method": method, ...opts });
     const [status, headers, body] = (await app!.call(env)) as unknown as Triplet;
-    lastResponse = { status, headers, body: await bodyString(body) };
+    lastResponse = new MockResponse(
+      status,
+      "toA" in headers ? Object.fromEntries(headers.toA()) : headers,
+      [await bodyString(body)],
+    );
   }
   const get = (path: string, opts: Env = {}) => request("GET", path, opts);
-  const lastHeader = (name: string) => lastResponse.headers.get(name) ?? null;
+  const lastHeader = (name: string) => lastResponse.getHeader(name) ?? null;
 
   async function getsExampleDomain(streaming: boolean): Promise<void> {
     await withWebrickProxy({ streaming }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/");
-      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.isOk).toBe(true);
       expect(lastResponse.body).toMatch(/Example Domain/);
     });
   }
@@ -380,9 +385,9 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: true }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/chunked");
-      const transferEncodingEmitted = lastResponse.headers
-        .toA()
-        .some(([k]) => k.toLowerCase() === "transfer-encoding");
+      const transferEncodingEmitted = Object.entries(lastResponse.headers).some(
+        ([k]) => k.toLowerCase() === "transfer-encoding",
+      );
       expect(
         !transferEncodingEmitted,
         "hop-by-hop Transfer-Encoding must be stripped from the proxied response",
@@ -398,7 +403,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: true }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await request("HEAD", "/");
-      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.isOk).toBe(true);
       expect(lastResponse.body, "HEAD must not stream an entity body").toBe("");
     });
   });
@@ -410,7 +415,7 @@ describe("RackProxyTest", () => {
         HTTP_COOKIE: "session=s3cr3t",
         HTTP_AUTHORIZATION: "Bearer tok",
       });
-      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.isOk).toBe(true);
       expect(lastResponse.body, "Cookie must be stripped").not.toMatch(/^cookie:/m);
       expect(lastResponse.body, "Authorization must be stripped").not.toMatch(/^authorization:/m);
     });
@@ -464,7 +469,7 @@ describe("RackProxyTest", () => {
         };
         proxy.host = `127.0.0.1:${port}`;
         await get("/echo-request-headers");
-        expect(lastResponse.status === 200).toBeTruthy();
+        expect(lastResponse.isOk).toBe(true);
         expect(
           lastResponse.body,
           "a credential injected in rewrite_env is stripped like any other",
@@ -494,7 +499,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: true }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await request("POST", "/echo-body", { ":input": "hello=streaming-world" });
-      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.isOk).toBe(true);
       expect(lastResponse.body).toBe("hello=streaming-world");
     });
   });
@@ -531,7 +536,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: false, logger: sink }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/empty");
-      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.isOk).toBe(true);
     });
     expect(
       sink.string(),
@@ -544,7 +549,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: true, logger: sink }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/empty");
-      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.isOk).toBe(true);
     });
     expect(
       sink.string(),
@@ -556,7 +561,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: false }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/empty");
-      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.isOk).toBe(true);
     });
   });
 
@@ -583,12 +588,11 @@ describe("RackProxyTest", () => {
       "Proxy-Authorization",
       "Upgrade",
     ]) {
-      expect(!headers.hasKey(h), `${h} is hop-by-hop and must not be forwarded`).toBeTruthy();
+      expect(headers.hasKey(h), `${h} is hop-by-hop and must not be forwarded`).toBe(false);
     }
-    expect(
-      !headers.hasKey("X-Purge-Me"),
-      "a header named in Connection must be dropped",
-    ).toBeTruthy();
+    expect(headers.hasKey("X-Purge-Me"), "a header named in Connection must be dropped").toBe(
+      false,
+    );
     expect(headers.get("Accept"), "end-to-end headers must survive").toBe("text/html");
     expect(headers.get("Authorization"), "end-to-end Authorization must survive").toBe(
       "Bearer keep-me",
@@ -610,8 +614,13 @@ describe("RackProxyTest", () => {
     expect(status).toBe(200);
   });
 
-  // PERMANENT-SKIP: the test spawns `RbConfig.ruby` to require rack/proxy in a clean Ruby interpreter, and trails has none.
-  it.skip("library loads cleanly without the old monkey patch", () => {});
+  it("library loads cleanly without the old monkey patch", () => {
+    const out = rbModMethodDefined(Net.HTTP, "beginRequestHacked") ? "PATCHED" : "CLEAN";
+    expect(
+      out,
+      `requiring rack/proxy must not define the old net_http_hacked methods; got: ${JSON.stringify(out)}`,
+    ).toMatch(/CLEAN$/);
+  });
 
   it("early hints 103 is skipped streaming", async () => {
     await withEarlyHintsBackend(async (port) => {
@@ -657,7 +666,7 @@ describe("RackProxyTest", () => {
       async (port, proxy) => {
         proxy.host = `127.0.0.1:${port}`;
         await get("/");
-        expect(lastResponse.status === 200).toBeTruthy();
+        expect(lastResponse.isOk).toBe(true);
         expect(lastResponse.body).toMatch(/Example Domain/);
       },
     );
@@ -667,7 +676,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/gzip");
-      expect(lastResponse.status === 200).toBeTruthy();
+      expect(lastResponse.isOk).toBe(true);
       const body = Uint8Array.from(lastResponse.body, (c) => c.charCodeAt(0));
       expect(lastHeader("content-encoding"), "Content-Encoding must be preserved").toBe("gzip");
       const inflated = new Zlib.GzipReader(new StringIO(body)).read();
@@ -686,7 +695,7 @@ describe("RackProxyTest", () => {
 
   const withMalformedBackend = (block: (port: number) => Promise<void>) =>
     withRawBackend(
-      (client) => client.end("garbage nonsense\r\n\r\n"),
+      (client) => client.write("garbage nonsense\r\n\r\n"),
       (backend) => block(Number(new URL(backend).port)),
     );
 
@@ -694,7 +703,7 @@ describe("RackProxyTest", () => {
     withRawBackend(
       (client) => {
         client.write("HTTP/1.1 103 Early Hints\r\nLink: </s.css>; rel=preload\r\n\r\n");
-        client.end(
+        client.write(
           "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 11\r\nConnection: close\r\n\r\nhello world",
         );
       },
@@ -705,7 +714,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/echo-headers");
-      const arrayValued = lastResponse.headers.toA().filter(([, v]) => Array.isArray(v));
+      const arrayValued = Object.entries(lastResponse.headers).filter(([, v]) => Array.isArray(v));
       expect(
         arrayValued,
         `expected no Array-valued headers (#65), got: ${JSON.stringify(arrayValued)}`,
