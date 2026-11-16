@@ -36,6 +36,7 @@ export class JSONGemEncoder {
     return json;
   }
 
+  /** @inventedArm if — PERMANENT */
   private jsonify(value: unknown): unknown {
     if (typeof value === "string" || value == null || value === true || value === false) {
       return value;
