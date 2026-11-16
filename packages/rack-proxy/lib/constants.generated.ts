@@ -10,6 +10,6 @@ defineConstants([
   ],
   [() => m0.HttpStreamingResponse.StreamAborted, "Rack::HttpStreamingResponse::StreamAborted"],
   [() => m1.Proxy, "Rack::Proxy"],
-  [() => m1.InvalidRequest, "Rack::Proxy::InvalidRequest"],
-  [() => m1.RequestBodyStream, "Rack::Proxy::RequestBodyStream"],
+  [() => m1.Proxy.InvalidRequest, "Rack::Proxy::InvalidRequest"],
+  [() => m1.Proxy.RequestBodyStream, "Rack::Proxy::RequestBodyStream"],
 ]);

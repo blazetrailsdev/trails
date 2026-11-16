@@ -1085,12 +1085,11 @@
     "excluded": [],
     "unwalked": [
       "http-streaming-response.ts::HttpStreamingResponse.ResponseTooLarge",
-      "http-streaming-response.ts::HttpStreamingResponse.StreamAborted"
+      "http-streaming-response.ts::HttpStreamingResponse.StreamAborted",
+      "proxy.ts::Proxy.InvalidRequest",
+      "proxy.ts::Proxy.RequestBodyStream"
     ],
-    "residue": {
-      "proxy.ts::InvalidRequest": "Rack::Proxy::InvalidRequest",
-      "proxy.ts::RequestBodyStream": "Rack::Proxy::RequestBodyStream"
-    }
+    "residue": {}
   },
   "rack-session": {
     "rows": 17,
