@@ -1,6 +1,8 @@
 import "./action-dispatch.js";
 import "./action-view.js";
 import {
+  camelize,
+  demodulize,
   include,
   isAnonymous,
   onLoad,
@@ -11,7 +13,19 @@ import {
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import type { TestCase } from "@blazetrails/actionpack/testing";
-import { except, rbFSend, rbObjRespondTo, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  constSet,
+  Dir,
+  except,
+  File,
+  getPath,
+  loadIseqEval,
+  Module,
+  rbFSend,
+  rbObjIsKindOf,
+  rbObjRespondTo,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import { QueryLogs } from "@blazetrails/activerecord";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
@@ -68,9 +82,28 @@ export class Trailtie extends BaseTrailtie {
       app.config.actionController.assetsDir ??= await app.config.paths().get("public")!.first();
     });
 
-    this.initializer("action_controller.set_helpers_path", async (app) => {
-      ActionController.setHelpersPath(await app.helpersPaths());
-    });
+    this.initializer(
+      "action_controller.set_helpers_path",
+      { after: "prepend_helpers_path" },
+      async (app) => {
+        const helpersPaths = app.config.helpersPaths;
+        ActionController.setHelpersPath(helpersPaths);
+
+        for (const [name, mod] of await helperConstants(helpersPaths)) {
+          let owner: object = TopLevel;
+          for (const part of name.split("::").slice(0, -1)) {
+            const tbl = owner as Record<string, unknown>;
+            owner = (Object.hasOwn(tbl, part) ? tbl[part] : constSet(owner, part, {})) as object;
+          }
+          constSet(owner, demodulize(name), mod);
+        }
+
+        onLoad("action_controller", (base: unknown) => {
+          (base as ActionController.HelpersPathControllerClass).helpersPath =
+            ActionController.helpersPath();
+        });
+      },
+    );
 
     this.initializer("action_controller.parameters_config", (app) => {
       const options = app.config.actionController;
@@ -201,6 +234,45 @@ export class Trailtie extends BaseTrailtie {
       });
     });
   }
+}
+
+/** @noRailsEquivalent PERMANENT */
+async function helperConstants(
+  paths: readonly string[],
+): Promise<Map<string, AbstractController.HelperMethodsModule>> {
+  const path = getPath();
+  const constants = new Map<string, AbstractController.HelperMethodsModule>();
+  if (!path.pathToFileURL) return constants;
+
+  const walk = async (dir: string, namespace: readonly string[]): Promise<void> => {
+    for (const entry of Dir.children(dir).slice().sort()) {
+      const full = path.join(dir, entry);
+      if (File.isDirectory(full)) {
+        await walk(full, [...namespace, entry]);
+        continue;
+      }
+      if (!/[-_]helper\.[cm]?[tj]s$/.test(entry) || /\.(test|d)\./.test(entry)) continue;
+
+      const stem = entry
+        .replace(/\.[cm]?[tj]s$/, "")
+        .replace(/[-_]helper$/, "")
+        .replaceAll("-", "_");
+      const name = `${camelize([...namespace, stem].join("/"))}Helper`;
+      const mod = await loadIseqEval(full);
+
+      const exported = mod[demodulize(name)];
+      if (rbObjIsKindOf(exported, Module)) {
+        constants.set(name, exported as AbstractController.HelperMethodsModule);
+      } else if (exported && typeof exported === "object") {
+        constants.set(name, exported);
+      }
+    }
+  };
+
+  for (const root of paths) {
+    if (File.isDirectory(root)) await walk(root, []);
+  }
+  return constants;
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActionController::Railtie" });
