@@ -108,7 +108,8 @@ export class Unpacker {
       useBigInt64: true,
       mapKeyConverter: (key) => {
         if (key instanceof Number) return key.valueOf();
-        if (typeof key === "string" || typeof key === "number") return key;
+        if (typeof key === "string") return this.symbolizeKeys ? `:${key}` : key;
+        if (typeof key === "number") return key;
         throw new DecodeError("The type of key must be string or number but " + typeof key);
       },
       extensionCodec: {

@@ -54,6 +54,7 @@ export class Packer<Io = unknown> {
   hasBigintExtType = false;
   /** @internal */
   hasSymbolExtType = false;
+  private compatibilityMode = false;
   readonly buffer: Buffer;
 
   constructor(io: unknown = null, options: object | null = null) {
@@ -68,6 +69,15 @@ export class Packer<Io = unknown> {
 
     this.buffer = new Buffer();
     this.buffer.setOptions(io, options);
+
+    if (options != null) {
+      const v = (options as Record<string, unknown>).compatibilityMode;
+      this.compatibilityMode = v != null && v !== false;
+    }
+  }
+
+  isCompatibilityMode(): boolean {
+    return this.compatibilityMode ? true : false;
   }
 
   registerType(
@@ -404,7 +414,21 @@ export class Packer<Io = unknown> {
   }
 
   private writeStringValue(v: string | Uint8Array): void {
+    if (this.compatibilityMode) {
+      const bytes = typeof v === "string" ? new TextEncoder().encode(v) : v;
+      this.writeRawHeader(bytes.length);
+      this.buffer.write(bytes);
+      return;
+    }
+
     this.buffer.write(encoder.encodeSharedRef(v));
+  }
+
+  private writeRawHeader(n: number): void {
+    if (n < 32) this.buffer.write(Uint8Array.of(0xa0 | n));
+    else if (n < 256 && !this.compatibilityMode) this.buffer.write(Uint8Array.of(0xd9, n));
+    else if (n < 65536) this.buffer.write(Uint8Array.of(0xda, n >> 8, n));
+    else this.buffer.write(Uint8Array.of(0xdb, n >>> 24, n >> 16, n >> 8, n));
   }
 
   private writeSymbolStringValue(v: string): void {

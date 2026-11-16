@@ -2,16 +2,29 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
+  defineModule,
   FrozenError,
   Hash,
+  include,
   NoMethodError,
   NotImplementedError,
   RangeError,
   rbCInteger,
   rbCSymbol,
   rbEqual,
+  Struct,
+  fetch,
 } from "@blazetrails/ruby-compat";
-import { Factory, MessagePack, Packer, UnknownExtTypeError, Unpacker } from "../lib/index.js";
+import {
+  ExtensionValue,
+  Factory,
+  MessagePack,
+  Packer,
+  UnknownExtTypeError,
+  Unpacker,
+} from "../lib/index.js";
+
+const bin = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
 
 class MyType {
   constructor(
@@ -132,6 +145,24 @@ describe("MessagePack::Factory", () => {
       expect(subject.unpacker()).not.toBe(subject.unpacker());
     });
 
+    it("creates unpacker with symbolize_keys option", () => {
+      const unpacker = subject.unpacker({ symbolizeKeys: true });
+      unpacker.feed(MessagePack.pack({ k: "v" }));
+      expect(unpacker.read()).toEqual({ ":k": "v" });
+    });
+
+    it("creates unpacker with allow_unknown_ext option", () => {
+      const unpacker = subject.unpacker({ allowUnknownExt: true });
+      unpacker.feed(new ExtensionValue(1, "a").toMsgpack() as Uint8Array);
+      expect(rbEqual(unpacker.read(), new ExtensionValue(1, "a"))).toBe(true);
+    });
+
+    it("creates unpacker without allow_unknown_ext option", () => {
+      const unpacker = subject.unpacker();
+      unpacker.feed(new ExtensionValue(1, "a").toMsgpack() as Uint8Array);
+      expect(() => unpacker.read()).toThrow(UnknownExtTypeError);
+    });
+
     it("does not share the extension registry with unpackers", () => {
       subject.registerType(0x00, rbCSymbol);
       expectNotToChange(
@@ -154,6 +185,19 @@ describe("MessagePack::Factory", () => {
         },
         () => subject.registeredTypes(),
       );
+    });
+  });
+
+  describe("#dump and #load", () => {
+    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+    it.skip("can be used like a standard coder", () => {});
+
+    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+    it.skip("is alias as pack and unpack", () => {});
+
+    it("accept options", () => {
+      const hash = subject.unpack(MessagePack.pack({ k: "v" }), { symbolizeKeys: true });
+      expect(hash).toEqual({ ":k": "v" });
     });
   });
 
@@ -332,6 +376,57 @@ describe("MessagePack::Factory", () => {
       expect(my.b).toEqual(2);
     });
 
+    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+    it.skip("handles Symbol type with `packer: nil`", () => {});
+
+    describe("registering multiple ext type for the same class", () => {
+      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+      it.skip("select the type based on code for deserialization", () => {});
+
+      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+      it.skip("uses the last registered packer for serialization", () => {});
+    });
+
+    describe("registering an ext type for a module", () => {
+      const Mod = defineModule({
+        toMsgpackExt(): string {
+          return "value_msgpacked";
+        },
+      });
+      Object.defineProperty(Mod, "fromMsgpackExt", {
+        value: (data: Uint8Array) => `unpacked ${new TextDecoder().decode(data)}`,
+        enumerable: false,
+      });
+      let factory: Factory;
+      beforeEach(() => {
+        factory = new Factory();
+        factory.registerType(0x01, Mod);
+      });
+
+      describe("packing an object whose class included the module", () => {
+        it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked".force_encoding(Encoding::BINARY)', () => {
+          class Value {}
+          include(Value, Mod);
+          expect(factory.packer().pack(new Value()).toS()).toEqual(
+            bin("\xC7\x0F\x01value_msgpacked"),
+          );
+        });
+      });
+
+      describe("packing an object which has been extended by the module", () => {
+        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it.skip('is expected to eq "\\xC7\\x0F\\x01value_msgpacked".force_encoding(Encoding::BINARY)', () => {});
+      });
+
+      describe("unpacking with the module", () => {
+        it('is expected to eq "unpacked module"', () => {
+          expect(factory.unpacker().feed(bin("\xC7\x06\x01module")).unpack()).toBe(
+            "unpacked module",
+          );
+        });
+      });
+    });
+
     describe("registering an ext type for Integer", () => {
       let factory: Factory;
       const bigint = 10n ** 150n;
@@ -384,6 +479,101 @@ describe("MessagePack::Factory", () => {
     });
 
     describe("registering ext type with recursive serialization", () => {
+      const Point = Struct.new("x", "y", "z");
+      type Point = InstanceType<typeof Point> & { x: number; y: number; z: number };
+
+      it("can receive the packer as argument (proc)", () => {
+        const factory = new Factory();
+        factory.registerType(0x00, rbCSymbol);
+        factory.registerType(0x01, Point, {
+          packer: (point: Point, packer: Packer) => {
+            packer.write(point.toH());
+            return null;
+          },
+          unpacker: (unpacker: Unpacker) => {
+            const attrs = unpacker.read() as Record<string, unknown>;
+            return new Point(fetch(attrs, "x"), fetch(attrs, "y"), fetch(attrs, "z"));
+          },
+          recursive: true,
+        });
+
+        const point = new Point(1, 2, 3);
+        const payload = factory.dump(point);
+        expect(rbEqual(factory.load(payload), point)).toBe(true);
+      });
+
+      it("can receive the packer as argument (Method)", () => {
+        const mod = {
+          packer(point: Point, packer: Packer) {
+            packer.write(point.toH());
+            return null;
+          },
+          unpacker(unpacker: Unpacker) {
+            const attrs = unpacker.read() as Record<string, unknown>;
+            return new Point(fetch(attrs, "x"), fetch(attrs, "y"), fetch(attrs, "z"));
+          },
+        };
+
+        const factory = new Factory();
+        factory.registerType(0x00, rbCSymbol);
+        factory.registerType(0x01, Point, {
+          packer: mod.packer.bind(mod),
+          unpacker: mod.unpacker.bind(mod),
+          recursive: true,
+        });
+
+        const point = new Point(1, 2, 3);
+        const payload = factory.dump(point);
+        expect(rbEqual(factory.load(payload), point)).toBe(true);
+      });
+
+      it("respect message pack format", () => {
+        const factory = new Factory();
+        factory.registerType(0x00, rbCSymbol);
+        factory.registerType(0x01, Point, {
+          packer: (point: Point, packer: Packer) => {
+            packer.write(Object.values(point.toH()));
+            return null;
+          },
+          unpacker: (unpacker: Unpacker) => {
+            const attrs = unpacker.read() as unknown[];
+            return new Point(...attrs);
+          },
+          recursive: true,
+        });
+
+        const point = new Point(1, 2, 3);
+        expect(factory.dump(point)).toEqual(
+          Uint8Array.of(0xd6, 0x01, ...MessagePack.dump([1, 2, 3])),
+        );
+      });
+
+      it("sets the correct length", () => {
+        const factory = new Factory();
+        factory.registerType(0x00, rbCSymbol);
+        factory.registerType(0x01, Point, {
+          packer: (point: Point, packer: Packer) => {
+            packer.write(point.toH());
+            return null;
+          },
+          unpacker: (unpacker: Unpacker) => {
+            const attrs = unpacker.read() as Record<string, unknown>;
+            return new Point(fetch(attrs, "x"), fetch(attrs, "y"), fetch(attrs, "z"));
+          },
+          recursive: true,
+        });
+
+        const point = new Point(1, 2, 3);
+        const payload = factory.dump([1, point, 3]);
+
+        const obj = new Factory().load(payload, { allowUnknownExt: true });
+        expect(
+          rbEqual(obj, [1, new ExtensionValue(1, factory.dump({ x: 1, y: 2, z: 3 })), 3]),
+        ).toBe(true);
+
+        expect(rbEqual(factory.load(payload), [1, new Point(1, 2, 3), 3])).toBe(true);
+      });
+
       it("can be nested", () => {
         const factory = new Factory();
         factory.registerType(0x02, Set, {
@@ -418,6 +608,62 @@ describe("MessagePack::Factory", () => {
         expect(factory.load(factory.dump(expected))).toEqual(expected);
       });
     });
+  });
+
+  describe("the special treatment of symbols with ext type", () => {
+    describe("using the optimized symbol unpacker", () => {
+      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+      it.skip("lets symbols survive a roundtrip", () => {});
+
+      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+      it.skip("works with empty symbol", () => {});
+
+      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+      it.skip("preserves encoding for ASCII symbols", () => {});
+
+      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+      it.skip("preserves encoding for UTF-8 symbols", () => {});
+    });
+
+    describe("if no ext type is registered for symbols", () => {
+      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+      it.skip("converts symbols to string", () => {});
+    });
+
+    describe("if an ext type is registered for symbols", () => {
+      describe("if using the default serializer", () => {
+        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it.skip("lets symbols survive a roundtrip", () => {});
+
+        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it.skip("works with hash keys", () => {});
+
+        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it.skip("works with frozen: true option", () => {});
+
+        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it.skip("preserves encoding for ASCII symbols", () => {});
+
+        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it.skip("preserves encoding for UTF-8 symbols", () => {});
+
+        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it.skip("does not handle symbols in other encodings", () => {});
+      });
+
+      describe("if using a custom serializer", () => {
+        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it.skip("lets symbols survive a roundtrip", () => {});
+      });
+    });
+  });
+
+  describe("memsize", () => {
+    // PERMANENT-SKIP: V8 exposes no per-object allocation size, as on JRuby (factory_spec.rb:668).
+    it.skip("works on a fresh factory", () => {});
+
+    // PERMANENT-SKIP: V8 exposes no per-object allocation size, as on JRuby (factory_spec.rb:675).
+    it.skip("works on a factory with registered types", () => {});
   });
 
   describe("under stressful GC", () => {
@@ -512,6 +758,9 @@ describe("MessagePack::Factory", () => {
       }).toThrow(new FrozenError("can't modify frozen MessagePack::Unpacker"));
     });
 
+    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+    it.skip("types can be registered before the pool is created", () => {});
+
     it("types cannot be registered after the pool is created", () => {
       const pool = factory.pool(1);
       factory.registerType(0x20, MyType);
@@ -524,6 +773,16 @@ describe("MessagePack::Factory", () => {
       expect(() => {
         pool.load(payload);
       }).toThrow(UnknownExtTypeError);
+    });
+
+    it("support symbolize_keys: true", () => {
+      const pool = factory.pool(1, { symbolizeKeys: true });
+      expect(pool.load(pool.dump({ foo: 1 }))).toEqual({ ":foo": 1 });
+    });
+
+    it("support freeze: true", () => {
+      const pool = factory.pool(1, { freeze: true });
+      expect(Object.isFrozen(pool.load(pool.dump("foo")))).toBe(true);
     });
 
     it("is thread safe", async () => {
