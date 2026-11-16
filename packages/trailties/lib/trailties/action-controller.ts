@@ -1,29 +1,18 @@
 import "./action-dispatch.js";
 import "./action-view.js";
 import {
-  camelize,
-  demodulize,
   include,
+  isAnonymous,
   onLoad,
   TopLevel,
+  underscore,
   type CacheStore,
   type Logger,
 } from "@blazetrails/activesupport";
 import { ActionController, AbstractController } from "@blazetrails/actionpack";
 import type { TestCase } from "@blazetrails/actionpack/testing";
-import {
-  Dir,
-  except,
-  File,
-  getPath,
-  loadIseqEval,
-  Module,
-  rbFSend,
-  rbObjIsKindOf,
-  rbObjRespondTo,
-  RuntimeError,
-  constSet,
-} from "@blazetrails/ruby-compat";
+import { except, rbFSend, rbObjRespondTo, RuntimeError } from "@blazetrails/ruby-compat";
+import { QueryLogs } from "@blazetrails/activerecord";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 
 export interface ActionControllerConfig {
@@ -42,7 +31,13 @@ export interface ActionControllerConfig {
   stylesheetsDir?: string | null;
   assetHost?: string | null;
   relativeUrlRoot?: string | null;
+  assetsDir?: string | null;
+  permitAllParameters?: boolean;
+  alwaysPermittedParameters?: string[] | null;
+  actionOnUnpermittedParameters?: false | "log" | "raise" | null;
 }
+
+type QueryLogsController = { controllerName: string; actionName: string };
 
 declare module "../trailtie/configuration.js" {
   interface Configuration {
@@ -69,28 +64,33 @@ export class Trailtie extends BaseTrailtie {
       },
     );
 
-    this.initializer(
-      "action_controller.set_helpers_path",
-      { after: "prepend_helpers_path" },
-      async (app) => {
-        const helpersPaths = app.config.helpersPaths;
-        ActionController.setHelpersPath(helpersPaths);
+    this.initializer("action_controller.assets_config", { group: "all" }, async (app) => {
+      app.config.actionController.assetsDir ??= await app.config.paths().get("public")!.first();
+    });
 
-        for (const [name, mod] of await helperConstants(helpersPaths)) {
-          let owner: object = TopLevel;
-          for (const part of name.split("::").slice(0, -1)) {
-            const tbl = owner as Record<string, unknown>;
-            owner = (Object.hasOwn(tbl, part) ? tbl[part] : constSet(owner, part, {})) as object;
-          }
-          constSet(owner, demodulize(name), mod);
+    this.initializer("action_controller.set_helpers_path", async (app) => {
+      ActionController.setHelpersPath(await app.helpersPaths());
+    });
+
+    this.initializer("action_controller.parameters_config", (app) => {
+      const options = app.config.actionController;
+
+      onLoad("action_controller", { runOnce: true }, () => {
+        ActionController.Parameters.permitAllParameters = options.permitAllParameters || false;
+        if (app.config.actionController.alwaysPermittedParameters != null) {
+          ActionController.Parameters.alwaysPermittedParameters =
+            app.config.actionController.alwaysPermittedParameters;
         }
 
-        onLoad("action_controller", (base: unknown) => {
-          (base as ActionController.HelpersPathControllerClass).helpersPath =
-            ActionController.helpersPath();
-        });
-      },
-    );
+        let actionOnUnpermittedParameters = options.actionOnUnpermittedParameters;
+
+        if (actionOnUnpermittedParameters == null) {
+          actionOnUnpermittedParameters = TopLevel.Trails!.env["local?"]() ? "log" : false;
+        }
+
+        ActionController.Parameters.actionOnUnpermittedParameters = actionOnUnpermittedParameters;
+      });
+    });
 
     this.initializer("action_controller.set_configs", async (app) => {
       const paths = app.config.paths();
@@ -135,6 +135,13 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
+    this.initializer("action_controller.compile_config_methods", () => {
+      onLoad("action_controller", function (this: { config: object }) {
+        const config = this.config as { compileMethodsBang?: () => void };
+        if (rbObjRespondTo(config, "compileMethodsBang")) config.compileMethodsBang!();
+      });
+    });
+
     this.initializer("action_controller.request_forgery_protection", () => {
       const options = this.config.actionController;
 
@@ -145,51 +152,55 @@ export class Trailtie extends BaseTrailtie {
       });
     });
 
+    this.initializer("action_controller.query_log_tags", (app) => {
+      const queryLogsTagsEnabled =
+        rbObjRespondTo(app.config, "activeRecord") &&
+        app.config.activeRecord.queryLogTagsEnabled &&
+        app.config.actionController.logQueryTagsAroundActions;
+
+      if (queryLogsTagsEnabled) {
+        if (!app.config.activeRecord.queryLogTags.includes("namespaced_controller")) {
+          app.config.activeRecord.queryLogTags = [
+            ...new Set([...app.config.activeRecord.queryLogTags, "controller"]),
+          ];
+        }
+        app.config.activeRecord.queryLogTags = [
+          ...new Set([...app.config.activeRecord.queryLogTags, "action"]),
+        ];
+
+        onLoad("active_record", () => {
+          QueryLogs.taggings = {
+            ...QueryLogs.taggings,
+            controller: (context) =>
+              (context?.controller as QueryLogsController | null | undefined)?.controllerName ??
+              null,
+            action: (context) =>
+              (context?.controller as QueryLogsController | null | undefined)?.actionName ?? null,
+            namespaced_controller: (context) => {
+              if (context?.controller != null) {
+                const controllerClass = (context.controller as unknown as object).constructor as {
+                  name: string;
+                };
+                if (!isAnonymous(controllerClass)) {
+                  const name = controllerClass.name;
+                  return underscore(
+                    name.endsWith("Controller") ? name.slice(0, -"Controller".length) : name,
+                  );
+                }
+              }
+              return null;
+            },
+          };
+        });
+      }
+    });
+
     this.initializer("action_controller.test_case", (app) => {
       onLoad("action_controller_test_case", (testCase: typeof TestCase) => {
         testCase.executorAroundEachRequest = app.config.activeSupport.executorAroundTestCase;
       });
     });
   }
-}
-
-/** @noRailsEquivalent PERMANENT */
-async function helperConstants(
-  paths: readonly string[],
-): Promise<Map<string, AbstractController.HelperMethodsModule>> {
-  const path = getPath();
-  const constants = new Map<string, AbstractController.HelperMethodsModule>();
-  if (!path.pathToFileURL) return constants;
-
-  const walk = async (dir: string, namespace: readonly string[]): Promise<void> => {
-    for (const entry of Dir.children(dir).slice().sort()) {
-      const full = path.join(dir, entry);
-      if (File.isDirectory(full)) {
-        await walk(full, [...namespace, entry]);
-        continue;
-      }
-      if (!/[-_]helper\.[cm]?[tj]s$/.test(entry) || /\.(test|d)\./.test(entry)) continue;
-
-      const stem = entry
-        .replace(/\.[cm]?[tj]s$/, "")
-        .replace(/[-_]helper$/, "")
-        .replaceAll("-", "_");
-      const name = `${camelize([...namespace, stem].join("/"))}Helper`;
-      const mod = await loadIseqEval(full);
-
-      const exported = mod[demodulize(name)];
-      if (rbObjIsKindOf(exported, Module)) {
-        constants.set(name, exported as AbstractController.HelperMethodsModule);
-      } else if (exported && typeof exported === "object") {
-        constants.set(name, exported);
-      }
-    }
-  };
-
-  for (const root of paths) {
-    if (File.isDirectory(root)) await walk(root, []);
-  }
-  return constants;
 }
 
 Object.defineProperty(Trailtie, "name", { value: "ActionController::Railtie" });

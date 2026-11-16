@@ -9,12 +9,14 @@ import { Trailtie, type ActionControllerConfig } from "../../lib/trailties/actio
 import { Deprecators, resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
 import { AbstractController, ActionController, RouteSet } from "@blazetrails/actionpack";
-import { extend, registerCompiledFiles } from "@blazetrails/ruby-compat";
+import { extend } from "@blazetrails/ruby-compat";
+import { Loader } from "@blazetrails/zeitwerk";
 
 let deprecators: Deprecators;
 let app: {
   deprecators: Deprecators;
   routes(): RouteSet;
+  helpersPaths(): Promise<string[]>;
   config: Configuration;
 };
 
@@ -27,6 +29,9 @@ describe("ActionController::Trailtie", () => {
     app = {
       deprecators,
       routes: () => routes,
+      async helpersPaths() {
+        return this.config.helpersPaths;
+      },
       config: Object.assign(new Configuration("/app"), { helpersPaths: [] }),
     };
     savedConfig = structuredClone(
@@ -78,6 +83,9 @@ describe("action_controller.set_helpers_path", () => {
     app = {
       deprecators,
       routes: () => routes,
+      async helpersPaths() {
+        return this.config.helpersPaths;
+      },
       config: Object.assign(new Configuration("/app"), { helpersPaths: [root] }),
     };
     savedConfig = structuredClone(
@@ -85,7 +93,10 @@ describe("action_controller.set_helpers_path", () => {
     );
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await loader?.unload();
+    loader?.unregister();
+    loader = null;
     Trailtie.config.set("actionController", savedConfig);
     rmSync(root, { recursive: true, force: true });
   });
@@ -95,7 +106,17 @@ describe("action_controller.set_helpers_path", () => {
     return HelpersReceiver as unknown as AbstractController.HelpersClassMethods;
   }
 
+  let loader: Loader | null = null;
+
+  async function autoload(dirs: string[]): Promise<void> {
+    loader = new Loader();
+    for (const dir of dirs) await loader.pushDir(dir);
+    await loader.setup();
+    await loader.eagerLoad();
+  }
+
   async function bootAndInstantiate(klass: AbstractController.HelpersClassMethods): Promise<void> {
+    await autoload(app.config.helpersPaths);
     runLoadHooks("action_controller", klass);
     await ActionController.Trailties.Helpers.inherited(
       klass as ActionController.HelpersPathControllerClass,
@@ -151,42 +172,6 @@ describe("action_controller.set_helpers_path", () => {
     } finally {
       rmSync(alternate, { recursive: true, force: true });
     }
-  });
-
-  it("reads each helper file's own export for a namespaced and a top-level helper of one short name", async () => {
-    mkdirSync(join(root, "admin"), { recursive: true });
-    writeFileSync(
-      join(root, "admin", "users-helper.ts"),
-      "export const UsersHelper = { adminUsers: () => 'admin' };",
-    );
-    writeFileSync(
-      join(root, "users-helper.ts"),
-      "export const UsersHelper = { users: () => 'top' };",
-    );
-    registerCompiledFiles(root, {
-      "users-helper.ts": async () => ({ UsersHelper: { compiledUsers: () => "compiled" } }),
-    });
-
-    for (let i = 0; i < 2; i++) {
-      const base = receivingController();
-      await runTrailtieInitializers(Trailtie, app);
-      await bootAndInstantiate(base);
-
-      const methods = extend({}, base._helpers!);
-      expect("adminUsers" in methods).toBe(true);
-      expect("compiledUsers" in methods).toBe(true);
-      expect("users" in methods).toBe(false);
-    }
-  });
-
-  it("raises when the file does not export the helper constant Rails would name", async () => {
-    writeFileSync(join(root, "typo-helper.ts"), "export const TypoHelpeR = { oops: () => 1 };");
-    const base = receivingController();
-
-    await runTrailtieInitializers(Trailtie, app);
-
-    await expect(bootAndInstantiate(base)).rejects.toThrow("uninitialized constant TypoHelper");
-    expect("oops" in extend({}, base._helpers!)).toBe(false);
   });
 
   it("includes nothing when includeAllHelpers is false", async () => {
