@@ -197,9 +197,9 @@ export class ParamBuilder {
         validEncoding = !/\p{Cs}/u.test(v);
       }
 
-      if (!validEncoding && typeof v === "string") {
+      if (!validEncoding) {
         throw new InvalidParameterError(
-          `Invalid encoding for parameter: ${v.replace(/\p{Cs}/gu, "\uFFFD")}`,
+          `Invalid encoding for parameter: ${typeof v === "string" ? v.replace(/\p{Cs}/gu, "\uFFFD") : new TextDecoder().decode(v)}`,
         );
       }
     }
