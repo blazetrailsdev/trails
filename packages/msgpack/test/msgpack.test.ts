@@ -114,7 +114,7 @@ describe("MessagePack", () => {
   });
 
   describe("with symbols", () => {
-    // PERMANENT-SKIP: Packer#write cannot tell a ":"-prefixed String (an IPv6 "::1") from a Symbol (CLAUDE.md, "A Ruby Symbol is a JS string, never a JS `Symbol`").
+    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
     it.skip("encodes symbols as strings", () => {});
   });
 
@@ -125,8 +125,11 @@ describe("MessagePack", () => {
 
   describe("with other things", () => {
     it("raises an error on #pack with an unsupported type", () => {
-      expect(() => MessagePack.pack(new (class {})())).toThrow(NoMethodError);
-      expect(() => MessagePack.pack(new (class {})())).toThrow(/undefined method .*toMsgpack/);
+      expect(() => MessagePack.pack(new (class {})())).toThrow(
+        expect.toSatisfy(
+          (e) => e instanceof NoMethodError && /undefined method .*toMsgpack/.test(e.message),
+        ),
+      );
     });
 
     it.skip("raises an error on #unpack with garbage", () => {});

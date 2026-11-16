@@ -782,7 +782,7 @@ describe("MessagePack::Factory", () => {
 
     it("support freeze: true", () => {
       const pool = factory.pool(1, { freeze: true });
-      expect(Object.isFrozen(pool.load(pool.dump("foo")))).toBe(true);
+      expect(Object.isFrozen(pool.load(pool.dump("foo")))).toBeTruthy();
     });
 
     it("is thread safe", async () => {

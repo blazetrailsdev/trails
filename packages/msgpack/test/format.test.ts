@@ -146,7 +146,7 @@ describe("MessagePack", () => {
   });
 
   it("bin encoding is ASCII_8BIT", () => {
-    expect(packUnpack(bytes("string"))).toBeInstanceOf(Uint8Array);
+    expect(packUnpack(bytes("string")) instanceof Uint8Array).toBe(true);
   });
 
   it("fixarray", () => {

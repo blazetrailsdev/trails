@@ -2278,9 +2278,12 @@ class TestExtractor
        MSPEC_SHOULD.include?(ident_name(node[1][3]))
       "#{ident_name(node[1][3])}_#{node[2]}"
     elsif node[0] == :command_call && MSPEC_SHOULD.include?(ident_name(node[3]))
-      matcher = positional_args(node[4])&.first
+      args = node[4]
+      matcher = args.is_a?(Array) && args[0].is_a?(Array) ? args[0] : positional_args(args)&.first
       matcher = matcher[1] if matcher.is_a?(Array) && matcher[0] == :method_add_arg
-      name = matcher.is_a?(Array) && %i[fcall vcall].include?(matcher[0]) ? ident_name(matcher[1]) : nil
+      name = matcher.is_a?(Array) && %i[fcall vcall command].include?(matcher[0]) ? ident_name(matcher[1]) : nil
+      name = "be_#{matcher.dig(2, 1, 0, 1, 1)}" if name == "be" && matcher[0] == :command &&
+        %w[true false].include?(matcher.dig(2, 1, 0, 1, 1))
       name ? "#{ident_name(node[3])}_#{name}" : nil
     end
   end
