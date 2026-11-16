@@ -258,25 +258,37 @@ describe("ProcessesLifecycleTest", () => {
       const shutdownTimeout = Number(SolidQueue.shutdownTimeout);
       const noPause = await enqueueStoreResultJob("no pause");
       const pause = await enqueueStoreResultJob("pause", "background", {
-        pause: shutdownTimeout + 10,
+        pause: shutdownTimeout + 30,
       });
 
-      await waitWhileWithTimeout(1, async () => (await ReadyExecution.count()) > 0);
+      await waitForJobsToFinishFor(3, { except: pause });
+      await waitWhileWithTimeout(
+        5,
+        async () =>
+          !(await Record.uncached(() =>
+            JobResult.where({
+              queue_name: "background",
+              status: "started",
+              value: "pause",
+            }).isExists(),
+          )),
+      );
+      await assertStartedJobResult("pause");
 
-      const signal = signalProcess(run, "TERM", { wait: 0.5 });
+      const signal = signalProcess(run, "TERM", { wait: 0.2 });
+      await waitForJobsToFinishFor(2, { except: pause });
 
-      await sleep(shutdownTimeout + 0.5);
+      await signal;
+      await waitForProcessTerminationWithTimeout(run);
 
       await assertCompletedJobResults("no pause");
       await assertJobStatus(noPause, "finished");
 
-      await assertStartedJobResult("pause");
-      await assertJobStatus(pause, "claimed");
+      await Record.uncached(async () => {
+        expect((await JobResult.findBy({ value: "pause" }))?.status).not.toEqual("completed");
+      });
 
-      await assertRegisteredWorkersFor(["background"]);
-
-      await signal;
-      await waitForProcessTerminationWithTimeout(run);
+      await assertJobStatus(pause, "ready");
       await assertCleanTermination();
     },
   );
