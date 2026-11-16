@@ -409,7 +409,10 @@ jobs:
   # a string, so a comma-separated value like `self-hosted,Linux,X64` will
   # NOT match any runner. If a multi-label selector is ever needed, switch
   # this expression to `fromJSON(vars.RUNNER)` and store the variable as a
-  # JSON array. Today the plan is to set it to exactly `self-hosted`.
+  # JSON array. Do not set it to `self-hosted`: that queues every job below on
+  # any self-hosted runner with no fallback (closed trails#8240 measured it
+  # slower than the hosted pool). Use the idle-checked routing in the
+  # `changes` job's `self_hosted` step instead.
   build-and-typecheck:
     name: Build & Type Check
     needs: changes
@@ -1062,7 +1065,7 @@ jobs:
       - uses: ./.github/actions/cache-build
       - name: Install ImageMagick
         run: |
-          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
+          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq -o Acquire::Retries=5 && sudo apt-get install -y -qq -o Acquire::Retries=5 imagemagick; }
           { magick -version 2>/dev/null || convert -version; } | head -1
       - run: pnpm build
       - if: needs.changes.outputs.unit_packages == '' || contains(needs.changes.outputs.unit_packages, 'packages/mini-mime')
@@ -1302,7 +1305,7 @@ jobs:
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Install ImageMagick
         run: |
-          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick; }
+          command -v magick >/dev/null || command -v convert >/dev/null || { sudo apt-get update -qq -o Acquire::Retries=5 && sudo apt-get install -y -qq -o Acquire::Retries=5 imagemagick; }
           { magick -version 2>/dev/null || convert -version; } | head -1
       - name: Run vitest with coverage (non-AR packages)
         run: >
@@ -1731,13 +1734,19 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
             https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
-          sudo apt-get update \
-            -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/pgdg.list \
-            -o Dir::Etc::sourceparts=- \
-            -o APT::Get::List-Cleanup=0 \
-            -o Acquire::Retries=5 \
-            -qq
-          sudo apt-get install -y -qq -o Acquire::Retries=5 postgresql-client-17
+          for attempt in 1 2 3; do
+            timeout 180 sudo apt-get update \
+              -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/pgdg.list \
+              -o Dir::Etc::sourceparts=- \
+              -o APT::Get::List-Cleanup=0 \
+              -o Acquire::Retries=5 \
+              -qq &&
+              timeout 180 sudo apt-get install -y -qq -o Acquire::Retries=5 postgresql-client-17 &&
+              installed=1 && break
+            echo "apt attempt $attempt timed out or failed; retrying" >&2
+            sleep 15
+          done
+          [ -n "${installed:-}" ]
           pg_dump --version
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
