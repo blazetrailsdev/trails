@@ -247,31 +247,28 @@ export async function prettyPrint(
   },
   pp: PP,
 ): Promise<void> {
-  if (isCustomInspectMethodDefined.call(this)) {
-    pp.text(this.inspect());
-    return;
-  }
+  if (isCustomInspectMethodDefined.call(this)) return rbCallSuper(this, prettyPrint, pp) as void;
   await pp.objectAddressGroup(this as object, async () => {
-    if (!this._attributes) {
+    if (this._attributes != null) {
+      const attrNames = attributesForInspect.call(this).filter((name) => this._hasAttribute(name));
+      await pp.seplist(
+        attrNames,
+        () => pp.text(","),
+        async (attrName) => {
+          pp.breakable(" ");
+          await pp.group(1, "", "", () => {
+            pp.text(attrName);
+            pp.text(":");
+            pp.breakable();
+            const value = this.attributeForInspect(attrName);
+            pp.text(String(value));
+          });
+        },
+      );
+    } else {
       pp.breakable(" ");
       pp.text("not initialized");
-      return;
     }
-    const attrNames = attributesForInspect.call(this).filter((name) => this._hasAttribute(name));
-    await pp.seplist(
-      attrNames,
-      () => pp.text(","),
-      async (attrName) => {
-        pp.breakable(" ");
-        await pp.group(1, "", "", () => {
-          pp.text(attrName);
-          pp.text(":");
-          pp.breakable();
-          const value = this.attributeForInspect(attrName);
-          pp.text(String(value));
-        });
-      },
-    );
   });
 }
 

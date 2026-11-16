@@ -3,7 +3,7 @@ import { I18n } from "./i18n.js";
 import { camelize, pluralize, singularize, underscore } from "./inflector.js";
 import * as XmlMini from "./xml-mini.js";
 import { rbInspect as inspect, rbObjAsString as toS } from "@blazetrails/ruby-compat";
-import { ARRAY_METHOD_TABLE, eachSlice } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, eachSlice, rtest } from "@blazetrails/ruby-compat";
 import {
   Hash,
   isSymbol,
@@ -132,23 +132,30 @@ export function inGroups<T>(
   return groups;
 }
 
-export function split<T>(array: T[], valueOrFn: T | ((item: T) => boolean)): T[][] {
-  const predicate =
-    typeof valueOrFn === "function"
-      ? (valueOrFn as (item: T) => boolean)
-      : (item: T) => item === valueOrFn;
-
+export function split<T>(
+  array: T[],
+  value: T | ((item: T) => unknown) | null = null,
+  block?: (item: T) => unknown,
+): T[][] {
+  if (typeof value === "function" && block === undefined) {
+    block = value as (item: T) => unknown;
+    value = null;
+  }
+  const arr = [...array];
   const result: T[][] = [];
-  let current: T[] = [];
-  for (const item of array) {
-    if (predicate(item)) {
-      result.push(current);
-      current = [];
-    } else {
-      current.push(item);
+  let idx: number;
+  if (block !== undefined) {
+    while ((idx = arr.findIndex((item) => rtest(block(item)))) !== -1) {
+      result.push(arr.splice(0, idx));
+      arr.shift();
+    }
+  } else {
+    while ((idx = arr.indexOf(value as T)) !== -1) {
+      result.push(arr.splice(0, idx));
+      arr.shift();
     }
   }
-  result.push(current);
+  result.push(arr);
   return result;
 }
 

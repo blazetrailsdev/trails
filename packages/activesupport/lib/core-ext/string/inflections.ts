@@ -6,7 +6,12 @@ import {
   pluralize as inflectorPluralize,
 } from "../../inflector.js";
 
-export function pluralize(str: string, count?: number, locale = "en"): string {
+export function pluralize(
+  str: string,
+  count: number | string | null = null,
+  locale = "en",
+): string {
+  if (typeof count === "string") locale = count;
   if (count === 1) {
     return str;
   } else {

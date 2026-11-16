@@ -2264,6 +2264,7 @@ export interface KernelModule {
   rand: typeof kernelRand;
   srand: typeof kernelSrand;
   require: typeof rbFRequireFile;
+  prettyPrint(this: object, q: unknown): void;
 }
 
 /**

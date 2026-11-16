@@ -1,4 +1,5 @@
 import { rbEnsure } from "./ensure.js";
+import { Kernel } from "./include.js";
 import { STDOUT } from "./io.js";
 import { SystemCallError } from "./errno.js";
 import { NoMethodError } from "./no-method-error.js";
@@ -209,3 +210,18 @@ function prettyPrintCycle(obj: unknown, q: PP): void | Promise<void> {
     q.text("...");
   });
 }
+
+/**
+ * `PP::ObjectMixin#pretty_print` (vendor/ruby/v3.3.11/lib/pp.rb:321-334), which `pp.rb`
+ * includes into `Object`, seated on `Kernel` for a `super` to reach. Its
+ * `pp_object` arm prints as {@link rbInspect} renders it, as every other
+ * object does in this file.
+ */
+Kernel.prettyPrint = function prettyPrint(this: object, q: PP): void {
+  const inspectMethod = (this as { inspect?: unknown }).inspect;
+  if (typeof inspectMethod === "function") {
+    q.text(String(inspectMethod.call(this)));
+  } else {
+    q.text(rbInspect(this));
+  }
+};

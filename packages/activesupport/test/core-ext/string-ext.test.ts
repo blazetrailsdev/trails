@@ -84,12 +84,12 @@ describe("StringAccessTest", () => {
   });
 
   it("#at with Range, returns a substring containing characters at offsets", () => {
-    expect(at("hello", [-2, -1])).toEqual("lo");
+    expect(at("hello", new Range(-2, -1))).toEqual("lo");
   });
 
   it("#at with Regex, returns the matching portion of the string", () => {
     expect(at("hello", /lo/)).toEqual("lo");
-    expect(at("hello", /nonexisting/)).toBeUndefined();
+    expect(at("hello", /nonexisting/)).toBeNull();
   });
 
   it("#from with positive Integer, returns substring from the given position to the end", () => {
@@ -111,8 +111,8 @@ describe("StringAccessTest", () => {
   });
 
   it("#from and #to can be combined", () => {
-    expect(to(from("hello", 0), -1)).toEqual("hello");
-    expect(to(from("hello", 1), -2)).toEqual("ell");
+    expect(to(from("hello", 0)!, -1)).toEqual("hello");
+    expect(to(from("hello", 1)!, -2)).toEqual("ell");
   });
 
   it("#first returns the first character", () => {
@@ -181,7 +181,7 @@ describe("StringAccessTest", () => {
 
     hash = {};
     hash["llo"] = true;
-    hash[from("hello", 2)] = true;
+    hash[from("hello", 2)!] = true;
     expect(Object.keys(hash)).toEqual(["llo"]);
 
     hash = {};
