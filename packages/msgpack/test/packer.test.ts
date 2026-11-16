@@ -2,16 +2,21 @@ import { beforeEach, describe, expect, it } from "vitest";
 import {
   ArgumentError,
   defineModule,
+  Hash,
   StringIO,
   extend,
   include,
   rbCString,
   rbFSend,
   rbObjClass,
+  rbObjRespondTo,
   Tempfile,
+  TypeError,
   Zlib,
 } from "@blazetrails/ruby-compat";
-import { ExtensionValue, MessagePack, Packer } from "../lib/index.js";
+import { ExtensionValue, Factory, MessagePack, Packer, Unpacker } from "../lib/index.js";
+
+const bin = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
 
 class DummyIO {
   private buf = new Uint8Array(0);
@@ -108,6 +113,14 @@ describe("MessagePack::Packer", () => {
     p4.write(sampleData);
     p4.flush();
     expect(dio4.read()).toEqual(samplePacked);
+  });
+
+  it("gets options to specify how to pack values", () => {
+    const u1 = new Packer();
+    expect(u1.isCompatibilityMode()).toBe(false);
+
+    const u2 = new Packer({ compatibilityMode: true });
+    expect(u2.isCompatibilityMode()).toBe(true);
   });
 
   it("write", () => {
@@ -218,6 +231,18 @@ describe("MessagePack::Packer", () => {
     expect(toStr(rbFSend([], "toMsgpack", new Packer()))).toEqual(rbFSend([], "toMsgpack"));
   });
 
+  it("raises type error on wrong type", () => {
+    const packer = new Packer();
+    expect(() => packer.writeFloat("hello")).toThrow(TypeError);
+    expect(() => packer.writeString(1)).toThrow(TypeError);
+    expect(() => packer.writeBin(1)).toThrow(TypeError);
+    expect(() => packer.writeArray("hello")).toThrow(TypeError);
+    expect(() => packer.writeHash("hello")).toThrow(TypeError);
+    expect(() => packer.writeSymbol("hello")).toThrow(TypeError);
+    expect(() => packer.writeInt("hello")).toThrow(TypeError);
+    expect(() => packer.writeExtension("hello")).toThrow(TypeError);
+  });
+
   class CustomPack01 {
     toMsgpack(pk: unknown = null): unknown {
       if (!(pk instanceof Packer)) return MessagePack.pack(this, pk);
@@ -239,6 +264,42 @@ describe("MessagePack::Packer", () => {
     expect(MessagePack.pack(new CustomPack02())).toEqual(rbFSend([1, 2], "toMsgpack"));
     expect(new CustomPack01().toMsgpack()).toEqual(rbFSend([1, 2], "toMsgpack"));
     expect(new CustomPack02().toMsgpack()).toEqual(rbFSend([1, 2], "toMsgpack"));
+  });
+
+  it("calls custom to_msgpack method with io", () => {
+    const s01 = new StringIO();
+    MessagePack.pack(new CustomPack01(), s01);
+    expect(bin(s01.string())).toEqual(rbFSend([1, 2], "toMsgpack"));
+
+    const s02 = new StringIO();
+    MessagePack.pack(new CustomPack02(), s02);
+    expect(bin(s02.string())).toEqual(rbFSend([1, 2], "toMsgpack"));
+
+    const s03 = new StringIO();
+    new CustomPack01().toMsgpack(s03);
+    expect(bin(s03.string())).toEqual(rbFSend([1, 2], "toMsgpack"));
+
+    const s04 = new StringIO();
+    new CustomPack02().toMsgpack(s04);
+    expect(bin(s04.string())).toEqual(rbFSend([1, 2], "toMsgpack"));
+  });
+
+  describe("in compatibility mode", () => {
+    it("does not use the bin types", () => {
+      let packed = MessagePack.pack(bin("hello"), { compatibilityMode: true });
+      expect(packed).toEqual(bin("\xA5hello"));
+      packed = MessagePack.pack(bin("hello".repeat(100)), { compatibilityMode: true });
+      expect(packed!.subarray(0, 3)).toEqual(bin("\xDA\x01\xF4"));
+
+      const packer = new Packer({ compatibilityMode: 1 });
+      const packed2 = packer.pack(bin("hello".repeat(100)));
+      expect(packed2.toStr().subarray(0, 3)).toEqual(bin("\xDA\x01\xF4"));
+    });
+
+    it("does not use the str8 type", () => {
+      const packed = MessagePack.pack("x".repeat(32), { compatibilityMode: true });
+      expect(packed!.subarray(0, 3)).toEqual(bin("\xDA\x00\x20"));
+    });
   });
 
   describe("#type_registered?", () => {
@@ -263,6 +324,20 @@ describe("MessagePack::Packer", () => {
   });
 
   describe("#register_type", () => {
+    it("get type and class mapping for packing", () => {
+      let packer = new Packer();
+      packer.registerType(0x01, ValueOne, null, (obj: ValueOne) => obj.toMsgpackExt());
+      packer.registerType(0x02, ValueTwo, null, (obj: ValueTwo) => obj.toMsgpackExt());
+
+      packer = new Packer();
+      packer.registerType(0x01, ValueOne, "toMsgpackExt");
+      packer.registerType(0x02, ValueTwo, "toMsgpackExt");
+
+      packer = new Packer();
+      packer.registerType(0x01, ValueOne, null, (obj: ValueOne) => obj.toMsgpackExt());
+      packer.registerType(0x02, ValueTwo, null, (obj: ValueTwo) => obj.toMsgpackExt());
+    });
+
     it("returns a Hash which contains map of Class and type", () => {
       const packer = new Packer();
       packer.registerType(0x01, ValueOne, "toMsgpackExt");
@@ -379,6 +454,55 @@ describe("MessagePack::Packer", () => {
         expect(packer.pack(object).toS()).toEqual(valueMsgpacked);
       });
     });
+
+    for (const klass of [Hash, Array] as (new () => object)[]) {
+      const Value = class extends klass {};
+      const subject = () => packer.pack(new Value()).toS();
+
+      it(`defaults to ${klass.name} packer if no extension is present`, () => {
+        expect(subject()).toEqual(MessagePack.dump(new klass()));
+      });
+
+      it(`uses core type extension for ${klass.name}`, () => {
+        packer.registerType(0x01, Value, null, () => "value_msgpacked");
+        expect(subject()).toEqual(bin("\xC7\x0F\x01value_msgpacked"));
+      });
+    }
+
+    describe("when registering a type for symbols", () => {
+      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+      it.skip("packs symbols in an ext type", () => {});
+    });
+  });
+
+  describe("fixnum and bignum", () => {
+    it("fixnum.to_msgpack", () => {
+      expect(rbFSend(23, "toMsgpack")).toEqual(bin("\x17"));
+    });
+
+    it("fixnum.to_msgpack(packer)", () => {
+      rbFSend(23, "toMsgpack", packer);
+      expect(packer.toS()).toEqual(bin("\x17"));
+    });
+
+    it("bignum.to_msgpack", () => {
+      expect(rbFSend(-4294967296, "toMsgpack")).toEqual(
+        bin("\xD3\xFF\xFF\xFF\xFF\x00\x00\x00\x00"),
+      );
+    });
+
+    it("bignum.to_msgpack(packer)", () => {
+      rbFSend(-4294967296, "toMsgpack", packer);
+      expect(packer.toS()).toEqual(bin("\xD3\xFF\xFF\xFF\xFF\x00\x00\x00\x00"));
+    });
+
+    it("unpack(fixnum)", () => {
+      expect(MessagePack.unpack(bin("\x17"))).toBe(23);
+    });
+
+    it("unpack(bignum)", () => {
+      expect(MessagePack.unpack(bin("\xD3\xFF\xFF\xFF\xFF\x00\x00\x00\x00"))).toBe(-4294967296);
+    });
   });
 
   describe("ext formats", () => {
@@ -423,5 +547,40 @@ describe("MessagePack::Packer", () => {
         ext([0xc9, 0, 0x01, 0x00, 0x02], -1, 65538),
       );
     });
+  });
+
+  it("doesn't allow #dup or #clone", () => {
+    expect(rbObjRespondTo(packer, "dup")).toBe(false);
+    expect(rbObjRespondTo(packer, "clone")).toBe(false);
+  });
+
+  it("doesn't crash when marking an uninitialized buffer", () => {
+    void new Packer().buffer;
+  });
+
+  it("doesn't crash when using recursive packers concurrently", () => {
+    class HashWithIndifferentAccess extends Hash<unknown, unknown> {}
+    const msgpack = new Factory();
+    msgpack.registerType(0x02, HashWithIndifferentAccess, {
+      packer: (value: HashWithIndifferentAccess, packer: Packer) => {
+        packer.write(new Uint8Array(600_0000).fill(0x61));
+        packer.write(value.toH());
+      },
+      unpacker: (unpacker: Unpacker) => new HashWithIndifferentAccess(unpacker.read()),
+      recursive: true,
+    });
+
+    const packer = msgpack.packer();
+
+    const topHash = new HashWithIndifferentAccess();
+    let hash = topHash;
+    for (let i = 0; i < 10; i++) {
+      const newHash = new HashWithIndifferentAccess();
+      hash.set("a", newHash);
+      hash = newHash;
+    }
+    packer.write(topHash);
+    packer.write(topHash);
+    packer.fullPack();
   });
 });
