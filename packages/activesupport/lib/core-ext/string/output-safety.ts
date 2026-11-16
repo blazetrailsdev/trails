@@ -330,6 +330,7 @@ export function htmlSafe(str: string): SafeBuffer {
   return new SafeBuffer(str, true);
 }
 
+/** @inventedArm if — PERMANENT */
 export function isHtmlSafe(self: unknown): boolean {
   if (self instanceof SafeBuffer) return self.htmlSafe;
   if (typeof self === "number" || typeof self === "bigint") return Numeric.isHtmlSafe(self);
