@@ -166,7 +166,7 @@ describe("FragmentCachingTest", () => {
     buffer.concat(
       await (
         viewContext as unknown as {
-          fragmentFor(name: unknown, options: unknown, block: () => unknown): Promise<unknown>;
+          fragmentFor: OmitThisParameter<(typeof CacheHelper)["fragmentFor"]>;
         }
       ).fragmentFor("expensive", undefined, () => {
         fragmentComputed = true;
@@ -418,7 +418,7 @@ describe("CacheHelperOutputBufferTest", () => {
         await assertNothingRaised(async () => {
           await (
             cacheHelper as unknown as {
-              fragmentFor(name: unknown, options: unknown, block: () => unknown): Promise<unknown>;
+              fragmentFor: OmitThisParameter<(typeof CacheHelper)["fragmentFor"]>;
             }
           ).fragmentFor("Test fragment name", "Test fragment", () => null);
         });
