@@ -67,8 +67,8 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model.typeForAttribute("guid")!.type()).toBe("uuid");
-    expect(Model.typeForAttribute("payload")!.type()).toBe("jsonb");
+    expect(Model.typeForAttribute("guid").type()).toBe("uuid");
+    expect(Model.typeForAttribute("payload").type()).toBe("jsonb");
   });
 
   it("does not overwrite user-declared attributes", async () => {
@@ -78,7 +78,7 @@ describe("loadSchemaFromAdapter", () => {
 
     await loadSchemaFromAdapter.call(Model);
 
-    expect(Model.typeForAttribute("guid")!.type()).toBe("string");
+    expect(Model.typeForAttribute("guid").type()).toBe("string");
   });
 
   it("is a no-op for abstract classes", async () => {
@@ -266,7 +266,7 @@ describe("loadSchemaFromAdapter integration details", () => {
     await establishConnectionTo(Post, adapter as never);
     await Post.loadSchema();
 
-    expect(Post.typeForAttribute("age")!.type()).toBe("integer");
+    expect(Post.typeForAttribute("age").type()).toBe("integer");
     expect(Object.getOwnPropertyDescriptor(Post.prototype, "age")).toBeUndefined();
   });
 
@@ -382,7 +382,7 @@ describe("a schema cache loaded from a dump", () => {
 
     await Post.loadSchema();
 
-    expect(Post.typeForAttribute("guid")!.type()).toBe("uuid");
+    expect(Post.typeForAttribute("guid").type()).toBe("uuid");
   });
 });
 
@@ -397,7 +397,7 @@ describe("set adapter auto-loads schema", () => {
 
     await Post.loadSchema();
 
-    expect(Post.typeForAttribute("guid")!.type()).toBe("uuid");
+    expect(Post.typeForAttribute("guid").type()).toBe("uuid");
   });
 });
 

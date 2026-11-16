@@ -438,7 +438,7 @@ describe("AdapterTest", () => {
   });
 
   it("select all insert update delete with casted binds", async () => {
-    const binds = [Event.typeForAttribute("id")!.serialize(1)];
+    const binds = [Event.typeForAttribute("id").serialize(1)];
     await roundTripBinds(connection, binds);
   });
 

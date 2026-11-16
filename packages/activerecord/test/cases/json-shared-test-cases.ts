@@ -45,7 +45,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     expect(column.type).toBe(columnType);
     await assertTypeMatch(columnType, column.sqlType);
 
-    const type = klass().typeForAttribute("payload")!;
+    const type = klass().typeForAttribute("payload");
     expect(type.isBinary()).toBe(false);
   });
 
@@ -76,7 +76,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_type_cast_json", () => {
-    const type = klass().typeForAttribute("payload")!;
+    const type = klass().typeForAttribute("payload");
 
     const data = '{"a_key":"a_value"}';
     const hash = type.deserialize(data);

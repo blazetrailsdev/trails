@@ -80,7 +80,7 @@ describe("DefineAttributeTest", () => {
     Post.defineAttribute("score", intType);
     expect(Post._defaultAttributes()).toBe(before);
     expect(before.getAttribute("score").type!.type()).toBe("integer");
-    expect(Post.typeForAttribute("score")!.type()).toBe("integer");
+    expect(Post.typeForAttribute("score").type()).toBe("integer");
   });
 });
 

@@ -62,7 +62,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("point");
       assertNotPredicate(column, (c) => c.isArray());
 
-      const type = PostgresqlPoint.typeForAttribute("x")!;
+      const type = PostgresqlPoint.typeForAttribute("x");
       assertNotPredicate(type, (t) => t.isBinary());
     });
 
@@ -147,7 +147,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(column.sqlType).toBe("point");
       assertNotPredicate(column, (c) => c.isArray());
 
-      const type = PostgresqlPoint.typeForAttribute("legacy_x")!;
+      const type = PostgresqlPoint.typeForAttribute("legacy_x");
       assertNotPredicate(type, (t) => t.isBinary());
     });
 
