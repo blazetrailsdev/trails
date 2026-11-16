@@ -16,7 +16,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "templates"
   ],
   "scripts": {
     "build": "tsc"
@@ -25,13 +26,16 @@
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
     "@blazetrails/vite-assets": "workspace:*"
   },
   "devDependencies": {
     "@blazetrails/actionview": "workspace:*",
-    "@blazetrails/vitest-matchers": "workspace:*"
+    "@blazetrails/vitest-matchers": "workspace:*",
+    "vite": "^7.3.1",
+    "vite-plugin-ruby": "^5.2.6"
   },
   "engines": {
     "node": ">=26"

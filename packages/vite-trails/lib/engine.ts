@@ -1,6 +1,6 @@
 import { ActionController } from "@blazetrails/actionpack";
 import { onLoad, TopLevel } from "@blazetrails/activesupport";
-import { constDefined, include, Pathname } from "@blazetrails/ruby-compat";
+import { constDefined, File, include, Pathname } from "@blazetrails/ruby-compat";
 import type { Application } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ViteAssets } from "@blazetrails/vite-assets";
@@ -12,6 +12,11 @@ export class Engine extends TrailsEngine {
     ViteTrails.Engine = this;
 
     TrailsEngine.register(this, decodeURIComponent(new URL(".", import.meta.url).pathname));
+
+    this.config.paths().add("lib/tasks", {
+      with: decodeURIComponent(new URL("./tasks", import.meta.url).pathname),
+      glob: `*${File.extname(decodeURIComponent(new URL(import.meta.url).pathname))}`,
+    });
 
     this.initializer("vite_trails.helper", () => {
       onLoad("action_controller", () => {
