@@ -104,10 +104,11 @@ cattrAccessor.call(Redis, "redisConnector", {
   default: (config: Record<string, unknown>) => {
     const options = except(config, "adapter", "channelPrefix");
     const conn = new IORedis(options.url as string, options as RedisOptions);
-    const confirmations = new Queue<[string, string, unknown]>();
+    const confirmations = new Queue<[string, string, unknown] | null>();
     new Thread(async () => {
-      for (;;) conn.emit(...(await confirmations.pop()));
+      for (let event; (event = await confirmations.pop()) !== null; ) conn.emit(...event);
     });
+    conn.on("end", () => confirmations.push(null));
     for (const command of ["subscribe", "unsubscribe"] as const) {
       const send = conn[command].bind(conn) as (...channel: string[]) => Promise<unknown>;
       conn[command] = (async (...channel: string[]) => {
