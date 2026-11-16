@@ -2,6 +2,7 @@ import { mattrAccessor } from "@blazetrails/activesupport";
 import {
   bytes,
   compactBang,
+  Encoding,
   eachPair,
   forceEncoding,
   Hash,
@@ -21,6 +22,7 @@ export type ParamValue =
   | number
   | boolean
   | null
+  | Uint8Array
   | ParamValue[]
   | { [key: string]: ParamValue };
 export type ParamHash = { [key: string]: ParamValue };
@@ -73,6 +75,9 @@ export class CustomParamEncoder {
       const replaced = Utils.eachParamValue(value, (param) => {
         if (encodingTemplate.get(toS(key))) {
           const b = bytes(param);
+          if (Encoding.find(encodingTemplate.get(toS(key))!) === Encoding.ASCII_8BIT) {
+            return forceEncoding(Uint8Array.from(b), Encoding.ASCII_8BIT);
+          }
           const forced = b.map((byte) => String.fromCharCode(byte)).join("");
           if (!isValidEncoding(forced, encodingTemplate.get(toS(key))!)) {
             return b
@@ -138,7 +143,7 @@ export class Utils {
   /** @inventedArm if — PERMANENT */
   static eachParamValue<P extends ParamInput>(
     params: P,
-    block: (param: string) => string | void,
+    block: (param: string) => string | Uint8Array | void,
   ): P {
     if (Array.isArray(params)) {
       params.forEach((element, i) => {

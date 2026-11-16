@@ -10,7 +10,7 @@ type MessageIdHost = typeof Base & typeof ClassMethods;
 class ClassMethods {
   static async createAndExtractMessageIdBang(
     this: MessageIdHost,
-    source: string,
+    source: string | Uint8Array,
     options: Record<string, unknown> = {},
   ): Promise<Base | null> {
     try {
@@ -31,7 +31,7 @@ class ClassMethods {
   }
 
   /** @internal */
-  private static extractMessageId(source: string): string | null {
+  private static extractMessageId(source: string | Uint8Array): string | null {
     try {
       return Mail.fromSource(source).messageId() as string | null;
     } catch {
@@ -51,7 +51,7 @@ class ClassMethods {
   }
 
   /** @internal */
-  private static async createAndUploadRawEmailBang(source: string): Promise<Blob> {
+  private static async createAndUploadRawEmailBang(source: string | Uint8Array): Promise<Blob> {
     return await Blob.createAndUploadBang({
       io: new StringIO(source),
       filename: "message.eml",

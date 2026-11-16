@@ -2,7 +2,7 @@ import {
   bytes,
   forceEncoding,
   isValidEncoding,
-  type Encoding,
+  Encoding,
   type Hash,
 } from "@blazetrails/ruby-compat";
 import { cattrAccessor } from "@blazetrails/activesupport";
@@ -179,7 +179,14 @@ export class ParamBuilder {
     if (depth === 0 && typeof v === "string") {
       let designatedEncoding: Encoding | string | undefined;
       let validEncoding: boolean;
-      if (encodingTemplate && (designatedEncoding = encodingTemplate.get(k))) {
+      if (
+        encodingTemplate &&
+        (designatedEncoding = encodingTemplate.get(k)) &&
+        Encoding.find(designatedEncoding) === Encoding.ASCII_8BIT
+      ) {
+        v = forceEncoding(Uint8Array.from(bytes(v)), designatedEncoding);
+        validEncoding = true;
+      } else if (encodingTemplate && (designatedEncoding = encodingTemplate.get(k))) {
         v = bytes(v)
           .map((b) => String.fromCharCode(b))
           .join("");
@@ -191,7 +198,7 @@ export class ParamBuilder {
 
       if (!validEncoding) {
         throw new InvalidParameterError(
-          `Invalid encoding for parameter: ${v.replace(/\p{Cs}/gu, "\uFFFD")}`,
+          `Invalid encoding for parameter: ${(v as string).replace(/\p{Cs}/gu, "\uFFFD")}`,
         );
       }
     }

@@ -130,7 +130,9 @@ describe("Request", () => {
     });
 
     it("GET leaves every parameter of a skip_parameter_encoding action as bytes", () => {
-      expect(get("raw", "bar=bar%E2baz")).toEqual({ bar: "bar\u00e2baz" });
+      expect(get("raw", "bar=bar%E2baz")).toEqual({
+        bar: Uint8Array.from([98, 97, 114, 0xe2, 98, 97, 122]),
+      });
       expect(() => get("index", "bar=bar%E2baz")).toThrow();
     });
 

@@ -26,7 +26,7 @@ export class InboundEmail extends Record {
   declare static Routable: typeof Routable;
 
   declare static createAndExtractMessageIdBang: (
-    source: string,
+    source: string | Uint8Array,
     options?: { [k: string]: unknown },
   ) => Promise<InboundEmail | null>;
 
