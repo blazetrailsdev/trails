@@ -59,10 +59,17 @@ describe("Zeitwerk synchronous Mutex#synchronize callers", () => {
       expect(() => map.deleteByValue(1)).toThrow(ThreadError);
       expect(() => map.eachKey((c) => seen.push(c))).toThrow(ThreadError);
       expect(() => map.clear()).toThrow(ThreadError);
+      expect(() => map.set(cref, 2)).toThrow(ThreadError);
+      expect(() => map.get(cref)).toThrow(ThreadError);
+      expect(() => map.getOrSet(new Cref(Object, "Y"), () => 3)).toThrow(ThreadError);
+      expect(() => map.delete(cref)).toThrow(ThreadError);
+      expect(() => map.isEmpty()).toThrow(ThreadError);
     });
     await new Promise((r) => setTimeout(r, 0));
 
     expect(seen).toEqual([]);
     expect(map.get(cref)).toBe(1);
+    expect(map.get(new Cref(Object, "Y"))).toBe(null);
+    expect(map.isEmpty()).toBe(false);
   });
 });

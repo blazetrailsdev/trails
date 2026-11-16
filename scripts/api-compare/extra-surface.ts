@@ -1224,7 +1224,8 @@ function walkTsFileSurface(
  * The public names a file declares that `internal: true` keeps out of
  * {@link walkTsFileSurface} — counted, not scored, so `@internal` is never a
  * silent hiding place (RFC 0120). A constructor is not one: it ports Ruby's
- * `initialize`, which is always private, and declares no name.
+ * `initialize`, which is always private, and declares no name (RFC 0234
+ * § Design 2(a), ruled by the operator on 2026-11-16).
  */
 export function countTsInternalNames(
   file: string,
