@@ -15,6 +15,8 @@ import "../../support/database/setup.js";
 import { ActiveStorage } from "../../../lib/active-storage.js";
 import { Blob } from "../../../lib/blob.js";
 import type { Preview } from "../../../lib/preview.js";
+import type { Variant } from "../../../lib/variant.js";
+import type { VariantWithRecord } from "../../../lib/variant-with-record.js";
 import { PreviewImageJob } from "../../../lib/preview-image-job.js";
 import { PurgeJob } from "../../../lib/purge-job.js";
 import { TransformJob } from "../../../lib/transform-job.js";
@@ -904,9 +906,28 @@ describe("ActiveStorage::OneAttachedTest", () => {
     );
   });
 
-  // BLOCKED: activestorage-variation-and-variants
-  it.skip("creating variation by variation name", () => {});
-  it.skip("raises error when unknown variant name is used to generate variant", () => {});
+  it("creating variation by variation name", async () => {
+    await user.avatarWithVariants.attach(fixtureFileUpload("racecar.jpg"));
+    const variant = await (user.avatarWithVariants as unknown as Attachment)
+      .variant("thumb")
+      .processed();
+
+    const image = await readImage(variant);
+    expect(await image.type()).toBe("JPEG");
+    expect(await image.width()).toBe(100);
+    expect(await image.height()).toBe(67);
+  });
+
+  it("raises error when unknown variant name is used to generate variant", async () => {
+    await user.avatarWithVariants.attach(fixtureFileUpload("racecar.jpg"));
+
+    const error = await assertRaises([ArgumentError], {}, async () => {
+      await (user.avatarWithVariants as unknown as Attachment).variant("unknown").processed();
+    });
+
+    expect(error.message).toMatch(/Cannot find variant :unknown for User#avatarWithVariants/);
+  });
+
   it("creating preview by variation name", async () => {
     await t.assertNoEnqueuedJobs({ only: TransformJob }, () =>
       user.avatarWithVariants.attach(fixtureFileUpload("report.pdf")),
@@ -932,12 +953,72 @@ describe("ActiveStorage::OneAttachedTest", () => {
 
     expect(error.message).toMatch(/Cannot find variant :unknown for User#avatarWithVariants/);
   });
-  // BLOCKED: activestorage-variation-and-variants
-  it.skip("creating representation by variation name", () => {});
-  it.skip("raises error when unknown variant name is used to generate representation", () => {});
-  it.skip("transforms variants later", () => {});
-  it.skip("transforms variants later conditionally via proc", () => {});
-  it.skip("transforms variants later conditionally via method", () => {});
+
+  it("creating representation by variation name", async () => {
+    await user.avatarWithVariants.attach(fixtureFileUpload("racecar.jpg"));
+    const variant = await (
+      (user.avatarWithVariants as unknown as Attachment).representation("thumb") as
+        | Variant
+        | VariantWithRecord
+    ).processed();
+
+    const image = await readImage(variant);
+    expect(await image.type()).toBe("JPEG");
+    expect(await image.width()).toBe(100);
+    expect(await image.height()).toBe(67);
+  });
+
+  it("raises error when unknown variant name is used to generate representation", async () => {
+    await user.avatarWithVariants.attach(fixtureFileUpload("racecar.jpg"));
+
+    const error = await assertRaises([ArgumentError], {}, async () => {
+      await (
+        (user.avatarWithVariants as unknown as Attachment).representation("unknown") as
+          | Variant
+          | VariantWithRecord
+      ).processed();
+    });
+
+    expect(error.message).toMatch(/Cannot find variant :unknown for User#avatarWithVariants/);
+  });
+
+  it("transforms variants later", async () => {
+    const blob = await createFileBlob({ filename: "racecar.jpg" });
+
+    await t.assertEnqueuedWith({ job: TransformJob, args: [blob, { resizeToLimit: [1, 1] }] }, () =>
+      user.avatarWithPreprocessed.attach(blob),
+    );
+  });
+
+  it("transforms variants later conditionally via proc", async () => {
+    await t.assertNoEnqueuedJobs({ only: [TransformJob, PreviewImageJob] }, async () =>
+      user.avatarWithConditionalPreprocessed.attach(
+        await createFileBlob({ filename: "racecar.jpg" }),
+      ),
+    );
+
+    const blob = await createFileBlob({ filename: "racecar.jpg" });
+    await user.update({ name: "transform via proc" });
+
+    await t.assertEnqueuedWith({ job: TransformJob, args: [blob, { resizeToLimit: [2, 2] }] }, () =>
+      user.avatarWithConditionalPreprocessed.attach(blob),
+    );
+  });
+
+  it("transforms variants later conditionally via method", async () => {
+    await t.assertNoEnqueuedJobs({ only: [TransformJob, PreviewImageJob] }, async () =>
+      user.avatarWithConditionalPreprocessed.attach(
+        await createFileBlob({ filename: "racecar.jpg" }),
+      ),
+    );
+
+    const blob = await createFileBlob({ filename: "racecar.jpg" });
+    await user.update({ name: "transform via method" });
+
+    await t.assertEnqueuedWith({ job: TransformJob, args: [blob, { resizeToLimit: [3, 3] }] }, () =>
+      user.avatarWithConditionalPreprocessed.attach(blob),
+    );
+  });
 
   it("avoids enqueuing transform later job or preview image job when blob is not representable", async () => {
     const unrepresentableBlob = await createBlob({ filename: "hello.txt" });
