@@ -259,7 +259,7 @@ describe("ReflectionTest", () => {
     expect(type.cast(object)).toBe(object);
     expect(type.serialize(object)).toBe(object);
 
-    type = first.typeForAttribute("attribute_that_doesnt_exist")!;
+    type = first.typeForAttribute("attribute_that_doesnt_exist");
     expect(type.deserialize(object)).toBe(object);
     expect(type.cast(object)).toBe(object);
     expect(type.serialize(object)).toBe(object);
