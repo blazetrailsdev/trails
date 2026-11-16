@@ -206,9 +206,14 @@ function randInt(mt: MT, vmax: bigint): bigint | null {
     if (max < 0n) max = -max;
     return limitedRand(mt, max - 1n);
   }
+  if (vmax === 0n) return null;
   if (vmax < 0n) vmax = -vmax;
   vmax = vmax - 1n;
-  if (vmax <= FIXNUM_MAX) return limitedRand(mt, vmax);
+  if (vmax <= FIXNUM_MAX) {
+    const max = vmax;
+    if (max === -1n) return null;
+    return limitedRand(mt, max);
+  }
   return limitedBigRand(mt, vmax);
 }
 
