@@ -5,21 +5,15 @@ import {
   File,
   Hash,
   hashAref,
+  IO,
   IOError,
+  Marshal,
   NoMethodError,
   pack,
+  rbEqq,
   unpack,
 } from "@blazetrails/ruby-compat";
 import { EncodingError } from "./encoding-error.js";
-import {
-  CODEPOINTS,
-  COMBINING_CLASS,
-  COMPOSITION_EXCLUSION,
-  COMPOSITION_MAP,
-  DECOMPOSITION,
-  LOWERCASE_MAPPING,
-  UPPERCASE_MAPPING,
-} from "./simple-case-mappings.generated.js";
 
 export class Codepoint {
   code: number | null = null;
@@ -65,26 +59,6 @@ function codepointsToPattern(arrayOfCodepoints: readonly number[]): string {
     .join("|");
 }
 
-type BoundaryClass = "cr" | "lf" | "l" | "v" | "lv" | "lvt" | "t" | "extend";
-
-function inRanges(...ranges: [number, number][]): (cp: number) => boolean {
-  return (cp) => ranges.some(([a, b]) => a <= cp && cp <= b);
-}
-
-function isHangulSyllable(cp: number, lv: boolean): boolean {
-  return 0xac00 <= cp && cp <= 0xd7a3 && ((cp - 0xac00) % 28 === 0) === lv;
-}
-
-function caseEq(
-  matcher: number | ((cp: number) => boolean),
-  codepoint: number | undefined,
-): boolean {
-  if (codepoint === undefined) return false;
-  return typeof matcher === "number" ? matcher === codepoint : matcher(codepoint);
-}
-
-type Boundary = Record<BoundaryClass, number | ((cp: number) => boolean)>;
-
 export class UnicodeDatabase {
   static ATTRIBUTES = [
     "codepoints",
@@ -96,16 +70,16 @@ export class UnicodeDatabase {
 
   private _codepoints: Hash<number, Codepoint>;
   private _compositionExclusion: number[];
-  private _compositionMap: Record<number, Record<number, number>>;
-  private _boundary: Boundary;
-  private _cp1252: Record<number, number>;
+  private _compositionMap: Hash<number, Hash<number, number>>;
+  private _boundary: Hash<string, unknown>;
+  private _cp1252: Hash<number, number>;
 
   constructor() {
     this._codepoints = new Hash<number, Codepoint>(new Codepoint());
     this._compositionExclusion = [];
-    this._compositionMap = {};
-    this._boundary = {} as Boundary;
-    this._cp1252 = {};
+    this._compositionMap = new Hash();
+    this._boundary = new Hash();
+    this._cp1252 = new Hash();
   }
 
   get codepoints(): Hash<number, Codepoint> {
@@ -122,53 +96,58 @@ export class UnicodeDatabase {
   set compositionExclusion(value: number[]) {
     this._compositionExclusion = value;
   }
-  get compositionMap(): Record<number, Record<number, number>> {
+  get compositionMap(): Hash<number, Hash<number, number>> {
     this.load();
     return this._compositionMap;
   }
-  set compositionMap(value: Record<number, Record<number, number>>) {
+  set compositionMap(value: Hash<number, Hash<number, number>>) {
     this._compositionMap = value;
   }
-  get boundary(): Boundary {
+  get boundary(): Hash<string, unknown> {
     this.load();
     return this._boundary;
   }
-  set boundary(value: Boundary) {
+  set boundary(value: Hash<string, unknown>) {
     this._boundary = value;
   }
-  get cp1252(): Record<number, number> {
+  get cp1252(): Hash<number, number> {
     this.load();
     return this._cp1252;
   }
-  set cp1252(value: Record<number, number>) {
+  set cp1252(value: Hash<number, number>) {
     this._cp1252 = value;
   }
 
   load(): void {
     try {
       /** @missingRailsCall open — PERMANENT */
-      /** @missingRailsCall load — PERMANENT */
-      const codepoints = new Hash<number, Codepoint>(new Codepoint());
-      for (const cp of CODEPOINTS) {
-        const codepoint = new Codepoint();
-        codepoint.code = cp;
-        codepoint.combiningClass = COMBINING_CLASS.get(cp) ?? 0;
-        codepoint.uppercaseMapping = UPPERCASE_MAPPING.get(cp) ?? 0;
-        codepoint.lowercaseMapping = LOWERCASE_MAPPING.get(cp) ?? 0;
-        [codepoint.decompType, codepoint.decompMapping] = DECOMPOSITION.get(cp) ?? [null, null];
-        codepoints.set(cp, codepoint);
-      }
       [
         this._codepoints,
         this._compositionExclusion,
         this._compositionMap,
         this._boundary,
         this._cp1252,
-      ] = [codepoints, COMPOSITION_EXCLUSION, COMPOSITION_MAP, BOUNDARY, CP1252];
+      ] = Marshal.load(_unicodeTables) as [
+        Hash<number, Codepoint>,
+        number[],
+        Hash<number, Hash<number, number>>,
+        Hash<string, unknown>,
+        Hash<number, number>,
+      ];
     } catch (e) {
       throw new IOError(
         `Couldn't load the Unicode tables for UTF8Handler (${(e as Error).message}), Mail::Multibyte is unusable`,
       );
+    }
+
+    for (const [k] of this._boundary.entries()) {
+      if (Array.isArray(this._boundary.get(k))) {
+        Object.defineProperty(this._boundary.get(k), "caseEquals", {
+          value(this: unknown[], other: unknown): boolean {
+            return this.find((i) => rbEqq(i, other)) !== undefined ? true : false;
+          },
+        });
+      }
     }
 
     for (const attrName of UnicodeDatabase.ATTRIBUTES) {
@@ -192,23 +171,7 @@ export class UnicodeDatabase {
   }
 }
 
-const BOUNDARY: Boundary = {
-  cr: 0x0d,
-  lf: 0x0a,
-  l: inRanges([0x1100, 0x115f], [0xa960, 0xa97c]),
-  v: inRanges([0x1160, 0x11a7], [0xd7b0, 0xd7c6]),
-  t: inRanges([0x11a8, 0x11ff], [0xd7cb, 0xd7fb]),
-  lv: (cp: number) => isHangulSyllable(cp, true),
-  lvt: (cp: number) => isHangulSyllable(cp, false),
-  extend: (cp: number) => /\p{Grapheme_Extend}/u.test(String.fromCodePoint(cp)),
-};
-
-const CP1252: Record<number, number> = Object.fromEntries(
-  Array.from({ length: 32 }, (_, i) => [
-    0x80 + i,
-    new TextDecoder("windows-1252").decode(Uint8Array.of(0x80 + i)).codePointAt(0)!,
-  ]),
-) as Record<number, number>;
+const _unicodeTables = await IO.binreadAsync(UnicodeDatabase.filename());
 
 let _defaultNormalizationForm = ":kc";
 
@@ -263,8 +226,8 @@ export const Unicode = {
     return Array.from(string, (c) => c.codePointAt(0)!);
   },
 
-  isInCharClass(codepoint: number | undefined, classes: BoundaryClass[]): boolean {
-    return classes.find((c) => caseEq(database().boundary[c], codepoint)) ? true : false;
+  isInCharClass(codepoint: number | undefined, classes: string[]): boolean {
+    return classes.find((c) => rbEqq(hashAref(database().boundary, c), codepoint)) ? true : false;
   },
 
   gUnpack(string: string): number[][] {
@@ -279,14 +242,15 @@ export const Unicode = {
       const current = codepoints[pos];
       if (
         !(
-          (previous === database().boundary.cr && current === database().boundary.lf) ||
-          (caseEq(database().boundary.l, previous) &&
-            Unicode.isInCharClass(current, ["l", "v", "lv", "lvt"])) ||
-          (Unicode.isInCharClass(previous, ["lv", "v"]) &&
-            Unicode.isInCharClass(current, ["v", "t"])) ||
-          (Unicode.isInCharClass(previous, ["lvt", "t"]) &&
-            caseEq(database().boundary.t, current)) ||
-          caseEq(database().boundary.extend, current)
+          (previous === hashAref(database().boundary, ":cr") &&
+            current === hashAref(database().boundary, ":lf")) ||
+          (rbEqq(hashAref(database().boundary, ":l"), previous) &&
+            Unicode.isInCharClass(current, [":l", ":v", ":lv", ":lvt"])) ||
+          (Unicode.isInCharClass(previous, [":lv", ":v"]) &&
+            Unicode.isInCharClass(current, [":v", ":t"])) ||
+          (Unicode.isInCharClass(previous, [":lvt", ":t"]) &&
+            rbEqq(hashAref(database().boundary, ":t"), current)) ||
+          rbEqq(hashAref(database().boundary, ":extend"), current)
         )
       ) {
         unpacked.push(codepoints.slice(marker, pos));
@@ -423,10 +387,14 @@ export const Unicode = {
   applyMapping(string: string, mapping: ":uppercase_mapping" | ":lowercase_mapping"): string {
     return pack(
       Unicode.uUnpack(string).map((codepoint) => {
-        const ncp = (mapping === ":uppercase_mapping" ? UPPERCASE_MAPPING : LOWERCASE_MAPPING).get(
-          codepoint,
-        );
-        if (ncp != null && ncp > 0) {
+        const cp = hashAref(database().codepoints, codepoint) as Codepoint | null;
+        let ncp: number | null;
+        if (
+          cp != null &&
+          (ncp = mapping === ":uppercase_mapping" ? cp.uppercaseMapping : cp.lowercaseMapping) !=
+            null &&
+          ncp > 0
+        ) {
           return ncp;
         } else {
           return codepoint;
@@ -444,7 +412,9 @@ function tidyByte(byte: number | number[]): number[] {
   }
   if (byte < 160) {
     return unpack(
-      Uint8Array.from(rbBytes(pack([database().cp1252[byte] || byte], "U"))),
+      Uint8Array.from(
+        rbBytes(pack([(hashAref(database().cp1252, byte) as number | null) || byte], "U")),
+      ),
       "C*",
     ) as number[];
   } else if (byte < 192) {

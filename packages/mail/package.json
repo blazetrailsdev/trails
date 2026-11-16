@@ -27,7 +27,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && mkdir -p dist/values && cp lib/values/unicode_tables.dat dist/values/"
   },
   "license": "MIT",
   "dependencies": {
