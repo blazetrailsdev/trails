@@ -11,7 +11,6 @@ import { assertNothingRaised } from "@blazetrails/activesupport/testing/assertio
 import { stub } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { CacheHelper, Digestor, OutputBuffer } from "@blazetrails/actionview";
 import { Time } from "@blazetrails/date";
-import { rbFSend } from "@blazetrails/ruby-compat";
 import type { Message } from "@blazetrails/mail";
 import { Base } from "../lib/base.js";
 import { CachingMailer } from "./support/mailers/caching-mailer.js";
@@ -118,7 +117,11 @@ describe("FragmentCachingTest", () => {
 
     const buffer = htmlSafe("generated till now -> ");
     buffer.concat(
-      await rbFSend(viewContext, "fragmentFor", "expensive", undefined, () => {
+      await (
+        viewContext as unknown as {
+          fragmentFor: OmitThisParameter<(typeof CacheHelper)["fragmentFor"]>;
+        }
+      ).fragmentFor("expensive", undefined, () => {
         fragmentComputed = true;
       }),
     );
@@ -265,13 +268,11 @@ describe("CacheHelperOutputBufferTest", () => {
     await stub(cacheHelper, "controller", controller, [], async () => {
       await stub(cacheHelper, "outputBuffer", outputBuffer, [], async () => {
         await assertNothingRaised(async () => {
-          await rbFSend(
-            cacheHelper,
-            "fragmentFor",
-            "Test fragment name",
-            "Test fragment",
-            () => null,
-          );
+          await (
+            cacheHelper as unknown as {
+              fragmentFor: OmitThisParameter<(typeof CacheHelper)["fragmentFor"]>;
+            }
+          ).fragmentFor("Test fragment name", "Test fragment", () => null);
         });
       });
     });

@@ -259,7 +259,7 @@ describe("RequestFilterParameters", () => {
 describe("RequestContentSecurityPolicy", () => {
   it("reads and writes the policy under the env header", () => {
     const req = new Request({});
-    expect(req.contentSecurityPolicy).toBeUndefined();
+    expect(req.contentSecurityPolicy).toBeNull();
     const policy = { build: () => "default-src 'self'" };
 
     req.contentSecurityPolicy = policy as any;
@@ -269,7 +269,7 @@ describe("RequestContentSecurityPolicy", () => {
 
   it("reportOnly toggles the report-only env flag", () => {
     const req = new Request({});
-    expect(req.contentSecurityPolicyReportOnly).toBeUndefined();
+    expect(req.contentSecurityPolicyReportOnly).toBeNull();
     req.contentSecurityPolicyReportOnly = true;
     expect(req.contentSecurityPolicyReportOnly).toBe(true);
   });
@@ -285,7 +285,7 @@ describe("RequestContentSecurityPolicy", () => {
 
   it("nonce directives default to undefined and round-trip arrays", () => {
     const req = new Request({});
-    expect(req.contentSecurityPolicyNonceDirectives).toBeUndefined();
+    expect(req.contentSecurityPolicyNonceDirectives).toBeNull();
     req.contentSecurityPolicyNonceDirectives = ["script-src"];
     expect(req.contentSecurityPolicyNonceDirectives).toEqual(["script-src"]);
   });
@@ -369,7 +369,7 @@ describe("RequestParametersList", () => {
 describe("RequestPermissionsPolicy", () => {
   it("round-trips through the env header", () => {
     const req = new Request({});
-    expect(req.permissionsPolicy).toBeUndefined();
+    expect(req.permissionsPolicy).toBeNull();
     const policy = { build: () => "geolocation=()" };
 
     req.permissionsPolicy = policy as any;
@@ -381,6 +381,6 @@ describe("RequestPermissionsPolicy", () => {
 describe("RequestMimeType", () => {
   it("has_content_type?", () => {
     expect(new Request({ CONTENT_TYPE: "text/html" }).hasContentType()).toBe("text/html");
-    expect(new Request({}).hasContentType()).toBeUndefined();
+    expect(new Request({}).hasContentType()).toBeNull();
   });
 });

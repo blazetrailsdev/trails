@@ -150,7 +150,7 @@ function fragmentNameWithDigest(
 async function fragmentFor(
   this: CacheHelperHost,
   name: unknown = {},
-  options?: Record<string, unknown> | null,
+  options?: unknown,
   block?: () => unknown,
 ): Promise<unknown> {
   const content = await readFragmentFor.call(this, name, options);
@@ -169,7 +169,7 @@ async function fragmentFor(
 async function readFragmentFor(
   this: CacheHelperHost,
   name: unknown,
-  options?: Record<string, unknown> | null,
+  options?: unknown,
 ): Promise<unknown> {
   return await this.controller.readFragment(name, options ?? undefined);
 }
@@ -178,7 +178,7 @@ async function readFragmentFor(
 async function writeFragmentFor(
   this: CacheHelperHost,
   name: unknown,
-  options: Record<string, unknown> | null | undefined,
+  options: unknown,
   block: () => unknown,
 ): Promise<unknown> {
   const fragment: SafeBuffer = await this.outputBuffer.capture(block);

@@ -37,7 +37,7 @@ describe("Request ENV_METHODS readers", () => {
     expect(req.xForwardedHost).toBe("proxy.example.com");
     expect(req.acceptCharset).toBe("utf-8");
     expect(req.serverName).toBe("example.com");
-    expect(req.xRequestId).toBeUndefined();
+    expect(req.xRequestId).toBeNull();
   });
 
   it("raw_host_with_port skips a blank X-Forwarded-Host, as presence does", () => {

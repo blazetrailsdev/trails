@@ -63,7 +63,7 @@ export { assertTemplate, TemplateAssertions } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { type HelpersPathControllerClass } from "./trailties/helpers.js";
 import * as RailtiesHelpers from "./trailties/helpers.js";
-export const Railties = { Helpers: RailtiesHelpers };
+export const Trailties = { Helpers: RailtiesHelpers };
 export { helperAttr, helpersPath, setHelpersPath, modulesForHelpers } from "./metal/helpers.js";
 export { ParameterEncoding } from "./metal/parameter-encoding.js";
 export { DataStreaming } from "./metal/data-streaming.js";

@@ -128,7 +128,7 @@ describe("TestRequestTest", () => {
     expect(req.getHeader("HTTP_IF_NONE_MATCH")).toBe(get);
     expect(req.getHeader("REMOTE_ADDR")).toBe(get);
     expect(req.getHeader("HTTP_USER_AGENT")).toBe(get);
-    expect(req.getHeader("action_dispatch.request.accepts")).toBeUndefined();
+    expect(req.getHeader("action_dispatch.request.accepts")).toBeNull();
     expect(req.getHeader("HTTP_ACCEPT")).toBe("hello goodbye");
   });
 });

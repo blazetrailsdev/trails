@@ -97,7 +97,7 @@ describe("action_controller.set_helpers_path", () => {
 
   async function bootAndInstantiate(klass: AbstractController.HelpersClassMethods): Promise<void> {
     runLoadHooks("action_controller", klass);
-    await ActionController.Railties.Helpers.inherited(
+    await ActionController.Trailties.Helpers.inherited(
       klass as ActionController.HelpersPathControllerClass,
     );
   }
