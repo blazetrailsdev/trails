@@ -1742,11 +1742,12 @@ jobs:
               -o Acquire::Retries=5 \
               -qq &&
               timeout 180 sudo apt-get install -y -qq -o Acquire::Retries=5 postgresql-client-17 &&
-              break
+              installed=1 && break
             echo "apt attempt $attempt timed out or failed; retrying" >&2
             sleep 15
           done
-          pg_dump --version | grep -E ' 17\.'
+          [ -n "${installed:-}" ]
+          pg_dump --version
       # Trailing slash is load-bearing: the bare `packages/activerecord` filter
       # is a substring match that also sweeps in packages/activerecord-cli/**.
       # Those already run in the dedicated step below, so the slash avoids a
