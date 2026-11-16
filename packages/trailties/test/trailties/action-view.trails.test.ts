@@ -280,6 +280,15 @@ describe("action_view.setup_action_pack", () => {
         new ActionController.Parameters({ controller: "foo", action: "other" }).permitBang(),
       ),
     ).toBe("/foo/other");
+    expect(
+      view.urlFor(
+        new ActionController.Parameters({
+          controller: "foo",
+          action: "other",
+          only_path: false,
+        }).permitBang(),
+      ),
+    ).toBe("http://example.com/foo/other");
   });
 });
 

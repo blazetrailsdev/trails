@@ -170,9 +170,11 @@ export function ensureOnlyPathOption(
   this: Host,
   options: Record<string, unknown> | Parameters,
 ): void {
-  if (!hasKey(options, "onlyPath")) {
+  const onlyPath =
+    options instanceof TopLevel.ActionController!.Parameters ? "only_path" : "onlyPath";
+  if (!hasKey(options, onlyPath)) {
     if (!rtest(hashAref(options, "host")))
-      hashAset(options, "onlyPath", this._generatePathsByDefault());
+      hashAset(options, onlyPath, this._generatePathsByDefault());
   }
 }
 

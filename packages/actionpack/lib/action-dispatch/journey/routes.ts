@@ -2,11 +2,7 @@ import { Or, Node } from "./nodes/node.js";
 import { Builder } from "./gtg/builder.js";
 import { Simulator } from "./gtg/simulator.js";
 import type { Route } from "./route.js";
-
-/** @noRailsEquivalent CONVERGEABLE converge-journey-mapping-onto-ported-mapper-mapping */
-export interface Mapping {
-  makeRoute(name: string | null, index: number): Route;
-}
+import type { Mapping } from "../routing/mapper.js";
 
 export class Routes implements Iterable<Route> {
   readonly routes: Route[];

@@ -16,7 +16,7 @@ export {
   type VerbRequest,
   type RouteOptions,
 } from "./route.js";
-export { Routes, type Mapping } from "./routes.js";
+export { Routes } from "./routes.js";
 export {
   Formatter,
   RouteWithParams,

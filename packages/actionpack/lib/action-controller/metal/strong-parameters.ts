@@ -623,22 +623,6 @@ export class Parameters {
     return value == null ? null : (rbFSend(value, "split", delimiter, -1) as string[]);
   }
 
-  private _hashFilter(
-    params: Parameters,
-    filter: Record<string, unknown>,
-    {
-      onUnpermitted = Parameters.actionOnUnpermittedParameters,
-      explicitArrays = false,
-    }: { onUnpermitted?: OnUnpermitted; explicitArrays?: boolean } = {},
-  ): void {
-    this.slice(...Object.keys(filter)).each(([key, value]) => {
-      if (value == null || value === false) return;
-      if (!this.hasKey(key)) return;
-      const result = this.permitValue(value, filter[key], { onUnpermitted, explicitArrays });
-      if (result != null) params.set(key, result);
-    });
-  }
-
   private _convertParametersToHashes(
     value: unknown,
     using: "toH" | "toUnsafeH",
@@ -699,7 +683,7 @@ export class Parameters {
       if (typeof filter === "string") {
         this.permittedScalarFilter(params, filter);
       } else if (typeof filter === "object" && filter !== null) {
-        this._hashFilter(params, filter, { onUnpermitted, explicitArrays });
+        this.hashFilter(params, filter, { onUnpermitted, explicitArrays });
       }
     }
 
@@ -860,7 +844,15 @@ export class Parameters {
       explicitArrays = false,
     }: { onUnpermitted?: OnUnpermitted; explicitArrays?: boolean } = {},
   ): void {
-    this._hashFilter(params, filter, { onUnpermitted, explicitArrays });
+    this.slice(...Object.keys(filter)).each(([key, value]) => {
+      if (value == null || value === false) return;
+      if (!this.hasKey(key)) return;
+      const result = this.permitValue(value, filter[key], {
+        onUnpermitted,
+        explicitArrays,
+      });
+      if (result != null) params.set(key, result);
+    });
   }
 
   /** @internal */
