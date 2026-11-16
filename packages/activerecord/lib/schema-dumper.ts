@@ -73,7 +73,7 @@ export abstract class SchemaDumper {
   private _ignoreTables!: (string | RegExp)[];
 
   /** @internal */
-  protected constructor(connection: DatabaseAdapter, _options: Record<string, unknown> = {}) {
+  protected constructor(connection: DatabaseAdapter, options: Record<string, unknown> = {}) {
     this.connection = connection;
   }
 

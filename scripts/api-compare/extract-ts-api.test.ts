@@ -8809,6 +8809,25 @@ describe("extractClass — @inlinedFrom on a static async new", () => {
     ]);
   });
 
+  it("folds an untagged static new into a protected constructor at its rbClassNewInstance call", () => {
+    const info = extractFromSource(
+      `class Foo {\n  protected constructor() { this.a(); }\n  static async new() { const obj = rbClassNewInstance(this); await obj.post(1); return obj; }\n}`,
+    );
+    const ctor = info.instanceMethods.find((m) => m.name === "constructor")!;
+    expect(ctor.inlinedFrom).toBeUndefined();
+    expect(ctor.callSeq).toEqual(["a", "post"]);
+    expect(ctor.calls).not.toContain("rbClassNewInstance");
+  });
+
+  it("keeps a new expression beside the rbClassNewInstance a static new builds through", () => {
+    const info = extractFromSource(
+      `class Foo {\n  protected constructor() {}\n  static async new() { const obj = rbClassNewInstance(this); obj.b = new Bar(); return obj; }\n}`,
+    );
+    const ctor = info.instanceMethods.find((m) => m.name === "constructor")!;
+    expect(ctor.callArgs?.map((c) => c.name)).toEqual(["constructor"]);
+    expect(ctor.calls).not.toContain("rbClassNewInstance");
+  });
+
   it("leaves a public constructor and its static new apart", () => {
     const info = extractFromSource(
       `class Foo {\n  constructor() {}\n  /** @inlinedFrom ${api} */\n  static async new() { return new this(); }\n}`,

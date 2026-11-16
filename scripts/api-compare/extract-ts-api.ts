@@ -5157,10 +5157,11 @@ export function constClassExpression(
 /**
  * RFC 0234 § Design 2(a): where `initialize` does async work, the class keeps
  * the synchronous part in a `protected` constructor and the rest in
- * `static async new`, which builds the object with `new this(...)`. The two
- * together are Ruby's `ClassMethods#new` then `initialize`, so a `static new`
- * carrying `@inlinedFrom` tags beside a non-public constructor hands its tags and
- * body to the constructor, which the call gates and `parity:api:inlined` pair
+ * `static async new`, which builds the object with `new this(...)` or
+ * `rbClassNewInstance(this, ...)`. The two together are Ruby's
+ * `ClassMethods#new` then `initialize`, so a `static new` beside a non-public
+ * constructor that carries `@inlinedFrom` tags or builds through
+ * `rbClassNewInstance` hands its tags and body to the constructor, which the call gates and `parity:api:inlined` pair
  * with `initialize`. The constructor's own body is spliced in where `static new`
  * calls `new this(...)`, so what runs before it is the head of the chain, as a
  * `ClassMethods#new` segment is, and what runs after it is the tail, and the
@@ -5171,15 +5172,21 @@ export function foldStaticNewIntoConstructor(
   instanceMethods: MethodInfo[],
   classMethods: MethodInfo[],
 ): void {
-  const staticNew = classMethods.find((m) => m.name === "new" && m.inlinedFrom !== undefined);
+  const staticNew = classMethods.find((m) => m.name === "new");
   const ctor = instanceMethods.find((m) => m.name === "constructor");
   if (staticNew === undefined || ctor === undefined || ctor.visibility === "public") return;
-  const tags = staticNew.inlinedFrom!;
-  ctor.inlinedFrom = [
-    ...tags.filter((tag) => tag.hook === "new"),
-    ...(ctor.inlinedFrom ?? []),
-    ...tags.filter((tag) => tag.hook !== "new"),
-  ];
+  const tags = staticNew.inlinedFrom;
+  if (tags === undefined && !staticNew.callArgs?.some((c) => c.name === "rbClassNewInstance")) {
+    return;
+  }
+  if (tags !== undefined) {
+    ctor.inlinedFrom = [
+      ...tags.filter((tag) => tag.hook === "new"),
+      ...(ctor.inlinedFrom ?? []),
+      ...tags.filter((tag) => tag.hook !== "new"),
+    ];
+  }
+  const NEW_CALLS = new Set(["constructor", "rbClassNewInstance"]);
   const splice = <T>(outer: T[] | undefined, inner: T[] | undefined, isNew: (x: T) => boolean) => {
     if (outer === undefined) return inner;
     const at = outer.findIndex(isNew);
@@ -5188,12 +5195,20 @@ export function foldStaticNewIntoConstructor(
   };
   if (staticNew.calls !== undefined) {
     const own = new Set(ctor.calls ?? []);
-    const added = staticNew.calls.filter((c) => c !== "constructor" || own.has(c));
+    const args = staticNew.callArgs ?? [];
+    const at = args.findIndex((c) => NEW_CALLS.has(c.name));
+    const builder = at < 0 ? undefined : args[at].name;
+    const again = args.some((c, i) => i !== at && c.name === builder);
+    const added = staticNew.calls.filter((c) => c !== builder || again || own.has(c));
     ctor.calls = [...new Set([...own, ...added])].sort();
   }
-  ctor.callSeq = splice(staticNew.callSeq, ctor.callSeq, (c) => c === "constructor");
-  ctor.callArgs = splice(staticNew.callArgs, ctor.callArgs, (c) => c.name === "constructor");
-  ctor.skeleton = splice(staticNew.skeleton, ctor.skeleton, (t) => t.startsWith("new:"));
+  ctor.callSeq = splice(staticNew.callSeq, ctor.callSeq, (c) => NEW_CALLS.has(c));
+  ctor.callArgs = splice(staticNew.callArgs, ctor.callArgs, (c) => NEW_CALLS.has(c.name));
+  ctor.skeleton = splice(
+    staticNew.skeleton,
+    ctor.skeleton,
+    (t) => t.startsWith("new:") || t.startsWith("call:rbClassNewInstance"),
+  );
   for (const key of ["inlinedFrom", "calls", "callSeq", "callArgs", "skeleton"] as const) {
     delete staticNew[key];
   }
