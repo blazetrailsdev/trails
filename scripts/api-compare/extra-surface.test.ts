@@ -7,6 +7,7 @@ import {
   buildReport,
   parseArgs,
   collectTsFileNames,
+  countTsInternalNames,
   collectTaggedEntries,
   classifyReason,
   printClassificationBlock,
@@ -2076,6 +2077,32 @@ describe("buildReport — novel vs moved classification", () => {
     expect(report.topN[0].novelCount).toBe(2);
     expect(report.topN[1].novelCount).toBe(0);
     expect(report.topN[1].movedCount).toBe(5);
+  });
+});
+
+describe("collectTsFileNames — static new beside a protected constructor", () => {
+  const cls = (visibility: "public" | "protected"): ClassInfo =>
+    ({
+      name: "Server",
+      file: "server.ts",
+      instanceMethods: [{ name: "constructor", visibility, params: [] }],
+      classMethods: [{ name: "new", visibility: "public", params: [], isStatic: true }],
+    }) as unknown as ClassInfo;
+
+  it("is not surface beside a protected constructor", () => {
+    expect(collectTsFileNames("server.ts", [cls("protected")], [], undefined).has("new")).toBe(
+      false,
+    );
+  });
+
+  it("does not count the protected constructor as an internal name", () => {
+    const c = cls("protected");
+    c.instanceMethods[0].internal = true;
+    expect(countTsInternalNames("server.ts", [c], [], undefined, [])).toBe(0);
+  });
+
+  it("is surface beside a public constructor", () => {
+    expect(collectTsFileNames("server.ts", [cls("public")], [], undefined).has("new")).toBe(true);
   });
 });
 

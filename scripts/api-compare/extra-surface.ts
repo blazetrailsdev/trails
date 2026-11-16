@@ -1158,7 +1158,10 @@ interface SurfaceName {
 
 /**
  * The single walk both collectors read, so what counts as surface and what
- * counts as an interface-only name can never disagree about a file.
+ * counts as an interface-only name can never disagree about a file. A
+ * `static new` beside a non-public constructor is not surface: under RFC 0234
+ * § Design 2(a) it is the class's own `Klass.new`, the async remainder of
+ * `initialize`.
  */
 function walkTsFileSurface(
   file: string,
@@ -1194,7 +1197,11 @@ function walkTsFileSurface(
       });
     }
     const interfaceMembers = c.interfaceMembers;
+    const hidesConstructor = c.instanceMethods.some(
+      (m) => m.name === "constructor" && m.visibility !== "public",
+    );
     for (const m of [...c.instanceMethods, ...c.classMethods]) {
+      if (hidesConstructor && m.isStatic === true && m.name === "new") continue;
       // `declaredIn` marks a member the extractor pulled in from another file —
       // a synthesized mixin's base surface, or an `interface X extends Y`'s
       // inherited properties. Either way it is that file's surface, scored
@@ -1219,7 +1226,8 @@ function walkTsFileSurface(
 /**
  * The public names a file declares that `internal: true` keeps out of
  * {@link walkTsFileSurface} — counted, not scored, so `@internal` is never a
- * silent hiding place (RFC 0120).
+ * silent hiding place (RFC 0120). A constructor is not one: it ports Ruby's
+ * `initialize`, which is always private, and declares no name.
  */
 export function countTsInternalNames(
   file: string,
@@ -1229,7 +1237,10 @@ export function countTsInternalNames(
   internalConstants: string[],
 ): number {
   const isInternal = (m: MethodInfo): boolean =>
-    m.internal === true && m.declaredIn === undefined && !m.name.startsWith("_");
+    m.internal === true &&
+    m.declaredIn === undefined &&
+    !m.name.startsWith("_") &&
+    m.name !== "constructor";
   const functionNames = new Set((fileFunctions ?? []).map((fn) => fn.name));
   const fileFunctionKey = (m: MethodInfo): string => `${m.name}:${m.line}:${m.isStatic === true}`;
   const fileFunctionEntries = new Set((fileFunctions ?? []).map(fileFunctionKey));
