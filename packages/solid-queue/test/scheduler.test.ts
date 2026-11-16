@@ -198,7 +198,7 @@ describe("SchedulerTest", () => {
       await waitForRegisteredProcesses(1, { timeout: 1 });
       await waitWhileWithTimeout(3, async () => (await Job.count()) < 1);
 
-      expect(await Job.count()).toBeGreaterThanOrEqual(1);
+      expect((await Job.count()) >= 1).toBeTruthy();
       expect(await Job.count()).toBe(await RecurringExecution.count());
     } finally {
       await scheduler.stop();
@@ -217,7 +217,7 @@ describe("SchedulerTest", () => {
       await waitForRegisteredProcesses(1, { timeout: 1 });
 
       const process = (await Process.first()) as Process;
-      expect(process.metadata.isEmpty()).toBe(true);
+      expect(process.metadata).toBeEmpty();
 
       await RecurringTask.createBang({
         key: "new_dynamic_task",
@@ -259,7 +259,7 @@ describe("SchedulerTest", () => {
       await oldDynamicTask.destroy();
 
       await waitWhileWithTimeout(3, async () => !(await process.reload()).metadata.isEmpty());
-      expect(process.metadata.isEmpty()).toBe(true);
+      expect(process.metadata).toBeEmpty();
     } finally {
       await scheduler.stop();
     }
