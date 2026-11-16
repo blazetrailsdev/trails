@@ -74,10 +74,7 @@ export function renderNozoneTime(seconds: number): string {
   return `(secs:${seconds},utc~:${rbInspect(ts)},ltz~:${rbInspect(z)})`;
 }
 
-/**
- * @internal
- * @missingRailsCall loaded_specs — PERMANENT
- */
+/** @internal */
 export function tzinfoVersion(): string {
   try {
     return String(createRequire(import.meta.url)("@blazetrails/tzinfo/package.json").version);
@@ -86,10 +83,7 @@ export function tzinfoVersion(): string {
   }
 }
 
-/**
- * @internal
- * @missingRailsCall loaded_specs — PERMANENT
- */
+/** @internal */
 export function tzinfoDataVersion(): string | null {
   try {
     return String(createRequire(import.meta.url)("@blazetrails/tzinfo-data/package.json").version);
