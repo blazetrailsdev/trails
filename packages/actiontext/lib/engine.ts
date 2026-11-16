@@ -54,6 +54,7 @@ export class Engine extends TrailsEngine {
       glob: `*${File.extname(import.meta.filename)}`,
     });
 
+    /** @inventedArm add — PERMANENT */
     this.config.paths().add("app/helpers", {
       with: File.join(import.meta.dirname, "app", "helpers"),
       eagerLoad: true,
@@ -122,6 +123,7 @@ export class Engine extends TrailsEngine {
       });
     });
 
+    /** @inventedArm await — PERMANENT */
     this.initializer("action_text.helper", async () => {
       const helpers = await Engine.instance().helpers();
       for (const base of ["action_controller_base", "action_mailer"]) {
