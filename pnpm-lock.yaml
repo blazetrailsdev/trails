@@ -1356,6 +1356,9 @@ importers:
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

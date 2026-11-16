@@ -443,6 +443,7 @@ const alias = {
   "@blazetrails/et-orbi": path.resolve(__dirname, "packages/et-orbi/lib/et-orbi.ts"),
   "@blazetrails/raabro": path.resolve(__dirname, "packages/raabro/lib/raabro.ts"),
   "@blazetrails/zeitwerk": path.resolve(__dirname, "packages/zeitwerk/lib/zeitwerk.ts"),
+  "@blazetrails/vite-assets/": path.resolve(__dirname, "packages/vite-assets/lib") + "/",
   "@blazetrails/vite-assets": path.resolve(__dirname, "packages/vite-assets/lib/index.ts"),
   "@blazetrails/vite-trails": path.resolve(__dirname, "packages/vite-trails/lib/index.ts"),
   "@blazetrails/fugit": path.resolve(__dirname, "packages/fugit/lib/fugit.ts"),

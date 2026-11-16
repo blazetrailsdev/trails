@@ -16,7 +16,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "templates"
   ],
   "scripts": {
     "build": "tsc"
@@ -25,6 +26,7 @@
   "dependencies": {
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
+    "@blazetrails/rake": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*",
     "@blazetrails/vite-assets": "workspace:*"
