@@ -1001,17 +1001,7 @@
   },
   "net-smtp": {
     "rows": 15,
-    "excluded": [
-      "protocol.ts::OpenTimeout",
-      "protocol.ts::ProtoAuthError",
-      "protocol.ts::ProtoFatalError",
-      "protocol.ts::ProtoServerError",
-      "protocol.ts::ProtoSyntaxError",
-      "protocol.ts::ProtoUnknownError",
-      "protocol.ts::Protocol",
-      "protocol.ts::ProtocolError",
-      "protocol.ts::ReadTimeout"
-    ],
+    "excluded": [],
     "unwalked": [],
     "residue": {
       "auth-cram-md5.ts::AuthCramMD5": "Net::SMTP::AuthCramMD5",
