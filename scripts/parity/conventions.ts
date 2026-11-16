@@ -766,6 +766,15 @@ export interface ScopedSkipGroup {
 export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   {
     reason:
+      "`ViteRuby::Commands#legacy_yarn_version?` (vite_ruby/lib/vite_ruby/commands.rb:44-46) and its " +
+      "`YARN_PRODUCTION` arm (lib/tasks/vite.rake:92-94) are not ported: trails apps use pnpm, never yarn " +
+      '(CLAUDE.md, "importmap-rails and propshaft are out of scope"). PERMANENT.',
+    names: ["legacy_yarn_version?"],
+    rubyFiles: ["commands.rb"],
+    packages: ["vite-assets"],
+  },
+  {
+    reason:
       "Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no " +
       "hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, " +
       '"`Module#autoload` is a build step"). PERMANENT.',

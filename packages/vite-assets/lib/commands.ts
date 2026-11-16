@@ -20,10 +20,10 @@ import type { ViteAssets } from "./vite-assets.js";
 
 export class Commands {
   /** @internal */
-  private readonly _viteRuby: ViteAssets;
+  private readonly _viteAssets: ViteAssets;
 
-  constructor(viteRuby: ViteAssets) {
-    this._viteRuby = viteRuby;
+  constructor(viteAssets: ViteAssets) {
+    this._viteAssets = viteAssets;
   }
 
   buildFromTask(...args: string[]): Promise<unknown> {
@@ -70,15 +70,6 @@ export class Commands {
   async isLegacyNpmVersion(): Promise<boolean> {
     try {
       return (parseInt(await rbFBackquote("npm --version"), 10) || 0) < 7;
-    } catch (error) {
-      if (!(error instanceof StandardError)) throw error;
-      return false;
-    }
-  }
-
-  async isLegacyYarnVersion(): Promise<boolean> {
-    try {
-      return (parseInt(await rbFBackquote("yarn --version"), 10) || 0) < 2;
     } catch (error) {
       if (!(error instanceof StandardError)) throw error;
       return false;
@@ -141,27 +132,27 @@ Make sure \`bundle exec vite install\` has run successfully before running depen
 
   /** @internal */
   private config(): Promise<Config> {
-    return this._viteRuby.config();
+    return this._viteAssets.config();
   }
 
   /** @internal */
   private builder(): Builder {
-    return this._viteRuby.builder();
+    return this._viteAssets.builder();
   }
 
   /** @internal */
   private manifest(): Manifest {
-    return this._viteRuby.manifest();
+    return this._viteAssets.manifest();
   }
 
   /** @internal */
   private get logger(): Logger {
-    return this._viteRuby.logger;
+    return this._viteAssets.logger;
   }
 
   /** @internal */
   private set logger(logger: Logger) {
-    this._viteRuby.logger = logger;
+    this._viteAssets.logger = logger;
   }
 
   /** @internal */

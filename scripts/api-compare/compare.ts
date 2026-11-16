@@ -3294,6 +3294,7 @@ const TS_ROOT_INTERMEDIATE = new Map<string, string>([
   // calls `super`. Ruby's include puts the module in the ancestor chain, so TS
   // `Codec extends Metadata` reproduces both the chain and that `super`.
   ["Codec", "Metadata"],
+  ["CLI", "Thor"],
 ]);
 
 /**

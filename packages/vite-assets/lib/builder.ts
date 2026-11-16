@@ -16,7 +16,7 @@ type Signature = [mtime: number, size: number];
 
 export class Builder {
   /** @internal */
-  private readonly _viteRuby: ViteAssets;
+  private readonly _viteAssets: ViteAssets;
   /** @internal */
   private _fileDigests: Record<string, [Signature, string]> = Object.create(null);
   /** @internal */
@@ -24,8 +24,8 @@ export class Builder {
   /** @internal */
   private _lastDigestAt: number | undefined;
 
-  constructor(viteRuby: ViteAssets) {
-    this._viteRuby = viteRuby;
+  constructor(viteAssets: ViteAssets) {
+    this._viteAssets = viteAssets;
   }
 
   async build(...args: string[]): Promise<boolean> {
@@ -61,17 +61,17 @@ export class Builder {
 
   /** @internal */
   private config(): Promise<Config> {
-    return this._viteRuby.config();
+    return this._viteAssets.config();
   }
 
   /** @internal */
   private get logger() {
-    return this._viteRuby.logger;
+    return this._viteAssets.logger;
   }
 
   /** @internal */
   private run(argv: string[]) {
-    return this._viteRuby.run(argv);
+    return this._viteAssets.run(argv);
   }
 
   /** @internal */
