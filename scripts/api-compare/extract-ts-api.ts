@@ -5215,7 +5215,7 @@ export function foldStaticNewIntoConstructor(
   ctor.skeleton = splice(
     staticNew.skeleton,
     ctor.skeleton,
-    (t) => t.startsWith("new:") || t.startsWith("call:rbClassNewInstance"),
+    (t) => t.startsWith("new:") || t === "ref:rbClassNewInstance",
   );
   for (const key of ["inlinedFrom", "calls", "callSeq", "callArgs", "skeleton"] as const) {
     delete staticNew[key];
