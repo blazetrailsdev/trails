@@ -35,8 +35,8 @@
   },
   "devDependencies": {
     "@blazetrails/chronic": "workspace:*",
-    "@types/node": "25.3.5",
-    "@blazetrails/vitest-matchers": "workspace:*"
+    "@blazetrails/vitest-matchers": "workspace:*",
+    "@types/node": "25.3.5"
   },
   "mirrors": [
     {
