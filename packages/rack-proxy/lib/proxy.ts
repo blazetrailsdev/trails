@@ -39,58 +39,6 @@ type RackInput = {
 };
 type Backend = { host: string | null; port: number | string | null; scheme: string | null };
 
-/** @internal */
-export class InvalidRequest extends StandardError {}
-InvalidRequest.prototype.name = "Rack::Proxy::InvalidRequest";
-
-/** @internal */
-export class RequestBodyStream {
-  /** @internal */
-  private input: RackInput;
-  /** @internal */
-  private remaining: number;
-
-  constructor(input: RackInput, length: number) {
-    [this.input, this.remaining] = [input, length];
-  }
-
-  async read(
-    length: number | null = null,
-    buffer: Uint8Array | null = null,
-  ): Promise<Uint8Array | null> {
-    if (length == null) return this.readRemaining(buffer);
-    if (this.remaining === 0) {
-      buffer?.fill(0);
-      return null;
-    }
-    let data = (await this.input.read(Math.min(length, this.remaining), buffer)) as
-      | string
-      | Uint8Array
-      | null;
-    if (data == null || data.length === 0) {
-      throw new InvalidRequest("request body is shorter than Content-Length");
-    }
-    if (typeof data === "string") data = new TextEncoder().encode(data);
-    this.remaining -= data.length;
-    return data;
-  }
-
-  /** @internal */
-  private async readRemaining(buffer: Uint8Array | null): Promise<Uint8Array> {
-    const data: Uint8Array[] = [];
-    let chunk: Uint8Array | null;
-    while ((chunk = await this.read(16_384)) != null) {
-      data.push(chunk);
-    }
-    const bytes = _concat(
-      data,
-      data.reduce((n, c) => n + c.length, 0),
-    );
-    buffer?.set(bytes.subarray(0, buffer.length));
-    return bytes;
-  }
-}
-
 export class Proxy {
   static readonly HOP_BY_HOP_HEADERS: Readonly<Record<string, boolean>> = Object.freeze({
     connection: true,
@@ -124,9 +72,54 @@ export class Proxy {
     ]);
 
   /** @internal */
-  static readonly InvalidRequest = InvalidRequest;
+  static readonly InvalidRequest = class InvalidRequest extends StandardError {};
   /** @internal */
-  static readonly RequestBodyStream = RequestBodyStream;
+  static readonly RequestBodyStream = class RequestBodyStream {
+    /** @internal */
+    input: RackInput;
+    /** @internal */
+    remaining: number;
+
+    constructor(input: RackInput, length: number) {
+      [this.input, this.remaining] = [input, length];
+    }
+
+    async read(
+      length: number | null = null,
+      buffer: Uint8Array | null = null,
+    ): Promise<Uint8Array | null> {
+      if (length == null) return this.readRemaining(buffer);
+      if (this.remaining === 0) {
+        buffer?.fill(0);
+        return null;
+      }
+      let data = (await this.input.read(Math.min(length, this.remaining), buffer)) as
+        | string
+        | Uint8Array
+        | null;
+      if (data == null || data.length === 0) {
+        throw new Proxy.InvalidRequest("request body is shorter than Content-Length");
+      }
+      if (typeof data === "string") data = new TextEncoder().encode(data);
+      this.remaining -= data.length;
+      return data;
+    }
+
+    /** @internal */
+    async readRemaining(buffer: Uint8Array | null): Promise<Uint8Array> {
+      const data: Uint8Array[] = [];
+      let chunk: Uint8Array | null;
+      while ((chunk = await this.read(16_384)) != null) {
+        data.push(chunk);
+      }
+      const bytes = _concat(
+        data,
+        data.reduce((n, c) => n + c.length, 0),
+      );
+      buffer?.set(bytes.subarray(0, buffer.length));
+      return bytes;
+    }
+  };
 
   static extractHttpRequestHeaders(env: RackEnv): Headers {
     const headers = this.buildHeaderHash(
@@ -343,9 +336,11 @@ export class Proxy {
         if (rbObjRespondTo(input, "rewind")) await input.rewind!();
         const length = sourceRequest.contentLength;
         if (length != null) {
-          if (!/^[0-9]+$/.test(length)) throw new InvalidRequest("invalid Content-Length");
+          if (!/^[0-9]+$/.test(length)) throw new Proxy.InvalidRequest("invalid Content-Length");
           targetRequest.contentLength = Number.parseInt(length, 10);
-          targetRequest.setBodyStream(new RequestBodyStream(input, Number.parseInt(length, 10)));
+          targetRequest.setBodyStream(
+            new Proxy.RequestBodyStream(input, Number.parseInt(length, 10)),
+          );
         } else {
           targetRequest.delete("Content-Length");
           targetRequest.set("Transfer-Encoding", "chunked");
@@ -439,7 +434,7 @@ export class Proxy {
         });
       }
     } catch (e) {
-      if (e instanceof InvalidURIError || e instanceof InvalidRequest) {
+      if (e instanceof InvalidURIError || e instanceof Proxy.InvalidRequest) {
         await targetResponse?.close();
         return [400, {}, []];
       }
