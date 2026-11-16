@@ -850,7 +850,6 @@ export class SMTP extends Protocol {
 Net.SMTP = SMTP;
 export const SMTPSession = SMTP;
 
-/** @noRailsEquivalent PERMANENT */
 async function _startSsl(io: Connection, options: HttpSslOptions): Promise<void> {
   const hostname = options.sslHostAddress!;
   const { ca, defaultPaths, minVersion, maxVersion } = options;
