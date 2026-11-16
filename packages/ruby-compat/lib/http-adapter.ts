@@ -1,3 +1,5 @@
+import { IOError } from "./io-error.js";
+
 export interface HttpRequest {
   method?: string | undefined;
   url?: string | undefined;
@@ -251,6 +253,7 @@ class _NodeClientSocket implements HttpClientSocket {
   }
 
   peeraddr(): [string, number, string, string] {
+    if (this.io.destroyed) throw new IOError("closed stream");
     const addr = this.io.remoteAddress!;
     const family = this.io.remoteFamily === "IPv6" ? "AF_INET6" : "AF_INET";
     return [family, this.io.remotePort!, addr, addr];
