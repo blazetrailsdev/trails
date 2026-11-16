@@ -24,9 +24,10 @@ function attributeNamesForSerialization(this: AttachableHost): string[] {
   return [...(rbCallSuper(this, attributeNamesForSerialization) as string[]), "attachable_sgid"];
 }
 
+/** @missingRailsCall super — PERMANENT */
 function readAttributeForSerialization(this: AttachableHost, key: string): unknown {
   if (key === "attachable_sgid") {
-    return this.isPersisted() ? rbCallSuper(this, readAttributeForSerialization, key) : null;
+    return this.isPersisted() ? this.attachableSgid() : null;
   } else {
     return rbCallSuper(this, readAttributeForSerialization, key);
   }
@@ -81,11 +82,6 @@ export const Attachable = {
     return Object.fromEntries(Object.entries(attrs).filter(([, v]) => v != null));
   },
 
-  /** @noRailsEquivalent CONVERGEABLE attachable-sgid-ruby-named-alias-converges */
-  get attachable_sgid(): string {
-    return (this as unknown as AttachableHost).attachableSgid();
-  },
-
   /** @internal */
   attributeNamesForSerialization,
   /** @internal */
@@ -93,7 +89,6 @@ export const Attachable = {
 } as Extended<typeof Concern> & {
   attachableSgid(this: AttachableHost): string;
   attachableContentType(this: AttachableHost): unknown;
-  readonly attachable_sgid: string;
   attachableFilename(this: AttachableHost): string | null;
   attachableFilesize(this: AttachableHost): unknown;
   attachableMetadata(this: AttachableHost): Record<string, unknown>;
