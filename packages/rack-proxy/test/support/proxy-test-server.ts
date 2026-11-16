@@ -7,6 +7,7 @@ export async function withRawBackend(
   block: (backend: string) => Promise<void>,
 ): Promise<void> {
   const clients = new Set<Socket>();
+  const threads: Promise<void>[] = [];
   const server = createTcpServer((client) => {
     clients.add(client);
     let head = Buffer.alloc(0);
@@ -18,7 +19,7 @@ export async function withRawBackend(
       client.pause();
       client.unshift(head.subarray(end + 4));
       client.on("error", () => {});
-      void Promise.resolve(handler(client)).finally(() => client.end());
+      threads.push(Promise.resolve(handler(client)).finally(() => client.end()) as Promise<void>);
     };
     client.on("data", onData);
   });
@@ -27,6 +28,7 @@ export async function withRawBackend(
     await block(`http://127.0.0.1:${(server.address() as { port: number }).port}`);
   } finally {
     for (const client of clients) client.destroy();
+    await Promise.allSettled(threads);
     server.close();
   }
 }

@@ -80,7 +80,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/");
-      expect(lastResponse.isOk).toBe(true);
+      expect(lastResponse.isOk).toBeTruthy();
       expect(lastResponse.body).toMatch(/Example Domain/);
     });
   }
@@ -403,7 +403,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: true }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await request("HEAD", "/");
-      expect(lastResponse.isOk).toBe(true);
+      expect(lastResponse.isOk).toBeTruthy();
       expect(lastResponse.body, "HEAD must not stream an entity body").toBe("");
     });
   });
@@ -415,7 +415,7 @@ describe("RackProxyTest", () => {
         HTTP_COOKIE: "session=s3cr3t",
         HTTP_AUTHORIZATION: "Bearer tok",
       });
-      expect(lastResponse.isOk).toBe(true);
+      expect(lastResponse.isOk).toBeTruthy();
       expect(lastResponse.body, "Cookie must be stripped").not.toMatch(/^cookie:/m);
       expect(lastResponse.body, "Authorization must be stripped").not.toMatch(/^authorization:/m);
     });
@@ -469,7 +469,7 @@ describe("RackProxyTest", () => {
         };
         proxy.host = `127.0.0.1:${port}`;
         await get("/echo-request-headers");
-        expect(lastResponse.isOk).toBe(true);
+        expect(lastResponse.isOk).toBeTruthy();
         expect(
           lastResponse.body,
           "a credential injected in rewrite_env is stripped like any other",
@@ -499,7 +499,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: true }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await request("POST", "/echo-body", { ":input": "hello=streaming-world" });
-      expect(lastResponse.isOk).toBe(true);
+      expect(lastResponse.isOk).toBeTruthy();
       expect(lastResponse.body).toBe("hello=streaming-world");
     });
   });
@@ -536,7 +536,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: false, logger: sink }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/empty");
-      expect(lastResponse.isOk).toBe(true);
+      expect(lastResponse.isOk).toBeTruthy();
     });
     expect(
       sink.string(),
@@ -549,7 +549,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: true, logger: sink }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/empty");
-      expect(lastResponse.isOk).toBe(true);
+      expect(lastResponse.isOk).toBeTruthy();
     });
     expect(
       sink.string(),
@@ -561,7 +561,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming: false }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/empty");
-      expect(lastResponse.isOk).toBe(true);
+      expect(lastResponse.isOk).toBeTruthy();
     });
   });
 
@@ -588,11 +588,12 @@ describe("RackProxyTest", () => {
       "Proxy-Authorization",
       "Upgrade",
     ]) {
-      expect(headers.hasKey(h), `${h} is hop-by-hop and must not be forwarded`).toBe(false);
+      expect(!headers.hasKey(h), `${h} is hop-by-hop and must not be forwarded`).toBeTruthy();
     }
-    expect(headers.hasKey("X-Purge-Me"), "a header named in Connection must be dropped").toBe(
-      false,
-    );
+    expect(
+      !headers.hasKey("X-Purge-Me"),
+      "a header named in Connection must be dropped",
+    ).toBeTruthy();
     expect(headers.get("Accept"), "end-to-end headers must survive").toBe("text/html");
     expect(headers.get("Authorization"), "end-to-end Authorization must survive").toBe(
       "Bearer keep-me",
@@ -620,6 +621,9 @@ describe("RackProxyTest", () => {
       out,
       `requiring rack/proxy must not define the old net_http_hacked methods; got: ${JSON.stringify(out)}`,
     ).toMatch(/CLEAN$/);
+    expect(out, "requiring rack/proxy must not load or warn about the deleted shim").not.toMatch(
+      /net_http_hacked|DEPRECATION/,
+    );
   });
 
   it("early hints 103 is skipped streaming", async () => {
@@ -666,7 +670,7 @@ describe("RackProxyTest", () => {
       async (port, proxy) => {
         proxy.host = `127.0.0.1:${port}`;
         await get("/");
-        expect(lastResponse.isOk).toBe(true);
+        expect(lastResponse.isOk).toBeTruthy();
         expect(lastResponse.body).toMatch(/Example Domain/);
       },
     );
@@ -676,7 +680,7 @@ describe("RackProxyTest", () => {
     await withWebrickProxy({ streaming }, async (port, proxy) => {
       proxy.host = `127.0.0.1:${port}`;
       await get("/gzip");
-      expect(lastResponse.isOk).toBe(true);
+      expect(lastResponse.isOk).toBeTruthy();
       const body = Uint8Array.from(lastResponse.body, (c) => c.charCodeAt(0));
       expect(lastHeader("content-encoding"), "Content-Encoding must be preserved").toBe("gzip");
       const inflated = new Zlib.GzipReader(new StringIO(body)).read();
