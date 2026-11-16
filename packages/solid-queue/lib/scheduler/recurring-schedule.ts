@@ -34,12 +34,12 @@ export class RecurringSchedule {
     this.scheduledTasks = new Map<PrimaryKeyValue, ScheduledTask>();
   }
 
-  configuredTasks(): RecurringTask[] {
-    return [...this.staticTasks, ...this.dynamicTasks()];
+  async configuredTasks(): Promise<RecurringTask[]> {
+    return [...this.staticTasks, ...(await this.dynamicTasks())];
   }
 
-  isEmpty(): boolean {
-    return this.scheduledTasks.size === 0 && this.dynamicTasks().length === 0;
+  async isEmpty(): Promise<boolean> {
+    return this.scheduledTasks.size === 0 && (await this.dynamicTasks()).length === 0;
   }
 
   async scheduleTasks(): Promise<void> {
@@ -50,7 +50,7 @@ export class RecurringSchedule {
     });
 
     await this.scheduleLock.synchronize(async () => {
-      for (const task of this.configuredTasks()) this.scheduleTask(task);
+      for (const task of await this.configuredTasks()) this.scheduleTask(task);
     });
   }
 
@@ -61,8 +61,8 @@ export class RecurringSchedule {
     });
   }
 
-  taskKeys(): string[] {
-    return this.configuredTasks().map((task) => task.key);
+  async taskKeys(): Promise<string[]> {
+    return (await this.configuredTasks()).map((task) => task.key);
   }
 
   async rescheduleDynamicTasks(): Promise<void> {
@@ -81,12 +81,9 @@ export class RecurringSchedule {
     return this.staticTasks.map((task) => task.key);
   }
 
-  /**
-   * @internal
-   * @inventedArm ?? — CONVERGEABLE solid-queue-scheduler-dynamic-tasks
-   */
-  dynamicTasks(): RecurringTask[] {
-    return this._dynamicTasks ?? [];
+  /** @internal */
+  async dynamicTasks(): Promise<RecurringTask[]> {
+    return (this._dynamicTasks ??= await this.loadDynamicTasks());
   }
 
   /** @internal */
@@ -96,7 +93,9 @@ export class RecurringSchedule {
 
   /** @internal */
   async scheduleCreatedDynamicTasks(): Promise<void> {
-    for (const task of this.dynamicTasks().filter((task) => !this.scheduledTasks.has(task.id))) {
+    for (const task of (await this.dynamicTasks()).filter(
+      (task) => !this.scheduledTasks.has(task.id),
+    )) {
       this.scheduleTask(task);
     }
   }
@@ -105,7 +104,7 @@ export class RecurringSchedule {
   async unscheduleDeletedDynamicTasks(): Promise<void> {
     const ids = new Set([
       ...this.staticTasks.map((task) => task.id),
-      ...this.dynamicTasks().map((task) => task.id),
+      ...(await this.dynamicTasks()).map((task) => task.id),
     ]);
     for (const id of [...this.scheduledTasks.keys()].filter((id) => !ids.has(id))) {
       const scheduledTask = this.scheduledTasks.get(id)!;

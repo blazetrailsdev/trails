@@ -41,9 +41,9 @@ export class Worker extends Poller {
     this.pool = new Pool(options.threads!, { onIdle: () => this.wakeUp() });
   }
 
-  override metadata(): Record<string, unknown> {
+  override async metadata(): Promise<Record<string, unknown>> {
     return {
-      ...super.metadata(),
+      ...(await super.metadata()),
       queues: this.queues.join(","),
       thread_pool_size: this.pool.size,
     };

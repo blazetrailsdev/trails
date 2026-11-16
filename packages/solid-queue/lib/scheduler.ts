@@ -1,4 +1,5 @@
-import { include, presence } from "@blazetrails/activesupport";
+import { include, presence, reverseMerge } from "@blazetrails/activesupport";
+import { Configuration } from "./configuration.js";
 import { SolidQueue } from "./solid-queue.js";
 import {
   LifecycleHooks,
@@ -28,18 +29,35 @@ export class Scheduler extends Base {
     this.beforeShutdown(":runStopHooks");
   }
 
-  recurringSchedule: RecurringSchedule;
+  readonly recurringSchedule: RecurringSchedule;
+  readonly pollingInterval: number;
+  declare private _dynamicTasksEnabled: boolean;
   declare _thread?: Thread;
 
-  constructor({ recurringTasks, ...options }: { recurringTasks: unknown } & object) {
-    const recurringSchedule = new RecurringSchedule(recurringTasks);
+  constructor({
+    recurringTasks,
+    ...options
+  }: {
+    recurringTasks: unknown;
+    dynamicTasksEnabled?: boolean;
+    pollingInterval?: number;
+  } & object) {
+    options = reverseMerge({ ...options }, Configuration.SCHEDULER_DEFAULTS);
+    const dynamicTasksEnabled = options.dynamicTasksEnabled!;
+    const pollingInterval = options.pollingInterval!;
+    const recurringSchedule = new RecurringSchedule(recurringTasks, { dynamicTasksEnabled });
 
     super(options);
+    this._dynamicTasksEnabled = dynamicTasksEnabled;
+    this.pollingInterval = pollingInterval;
     this.recurringSchedule = recurringSchedule;
   }
 
-  override metadata(): Record<string, unknown> {
-    return { ...super.metadata(), recurring_schedule: presence(this.recurringSchedule.taskKeys()) };
+  override async metadata(): Promise<Record<string, unknown>> {
+    return {
+      ...(await super.metadata()),
+      recurring_schedule: presence(await this.recurringSchedule.taskKeys()),
+    };
   }
 
   /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.7.2/lib/solid_queue/processes/runnable.rb:18-28 */
@@ -54,7 +72,7 @@ export class Scheduler extends Base {
   }
 
   /** @internal */
-  static readonly SLEEP_INTERVAL = 60;
+  static readonly STATIC_SLEEP_INTERVAL = 60;
 
   /** @internal */
   async run(): Promise<void> {
@@ -62,7 +80,9 @@ export class Scheduler extends Base {
       while (true) {
         if (await this.isShuttingDown()) break;
 
-        await this.interruptibleSleep(Scheduler.SLEEP_INTERVAL);
+        if (this.isDynamicTasksEnabled()) await this.reloadDynamicSchedule();
+
+        await this.interruptibleSleep(this.sleepInterval());
       }
     } finally {
       await SolidQueue.instrument("shutdown_process", { process: this }, async () => {
@@ -82,13 +102,29 @@ export class Scheduler extends Base {
   }
 
   /** @internal */
+  async reloadDynamicSchedule(): Promise<void> {
+    await this.recurringSchedule.rescheduleDynamicTasks();
+    await this.reloadMetadata();
+  }
+
+  /** @internal */
+  isDynamicTasksEnabled(): boolean {
+    return this._dynamicTasksEnabled;
+  }
+
+  /** @internal */
   async isAllWorkCompleted(): Promise<boolean> {
     return this.recurringSchedule.isEmpty();
   }
 
   /** @internal */
-  setProcline(): void {
-    this.procline(`scheduling ${this.recurringSchedule.taskKeys().join(",")}`);
+  sleepInterval(): number {
+    return this.isDynamicTasksEnabled() ? this.pollingInterval : Scheduler.STATIC_SLEEP_INTERVAL;
+  }
+
+  /** @internal */
+  async setProcline(): Promise<void> {
+    this.procline(`scheduling ${(await this.recurringSchedule.taskKeys()).join(",")}`);
   }
 }
 
@@ -99,6 +135,7 @@ export interface Scheduler {
   start(): Promise<void>;
   isShuttingDown(): Promise<boolean>;
   shutdown(): Promise<void>;
+  reloadMetadata(): Promise<void>;
 }
 
 SolidQueue.Scheduler = Scheduler;

@@ -19,8 +19,8 @@ export class Poller extends Base {
     this.pollingInterval = pollingInterval;
   }
 
-  override metadata(): Record<string, unknown> {
-    return { ...super.metadata(), polling_interval: this.pollingInterval };
+  override async metadata(): Promise<Record<string, unknown>> {
+    return { ...(await super.metadata()), polling_interval: this.pollingInterval };
   }
 
   /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.7.2/lib/solid_queue/processes/runnable.rb:18-28 */
@@ -80,6 +80,6 @@ export interface Poller {
   start(): Promise<void>;
   isShuttingDown(): Promise<boolean>;
   shutdown(): Promise<void>;
-  setProcline(): void;
+  setProcline(): void | Promise<void>;
   isAllWorkCompleted(): Promise<boolean>;
 }

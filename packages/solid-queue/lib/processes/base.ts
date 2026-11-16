@@ -44,7 +44,7 @@ export class Base {
     return (this._pid ??= Process.pid);
   }
 
-  metadata(): Record<string, unknown> {
+  async metadata(): Promise<Record<string, unknown>> {
     return {};
   }
 

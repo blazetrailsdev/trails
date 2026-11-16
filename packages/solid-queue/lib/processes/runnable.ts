@@ -16,7 +16,7 @@ interface RunnableHost {
   run(): Promise<void>;
   runCallbacks(kind: string, block: () => unknown): Promise<unknown>;
   registerSignalHandlers(): void;
-  setProcline(): void;
+  setProcline(): void | Promise<void>;
   isStopped(): boolean;
   isSupervisorWentAway(): boolean;
   isFinished(): Promise<boolean>;
@@ -54,10 +54,10 @@ export class Runnable {
   /** @internal */
   async boot(this: RunnableHost): Promise<void> {
     await SolidQueue.instrument("start_process", { process: this }, async () => {
-      await this.runCallbacks("boot", () => {
+      await this.runCallbacks("boot", async () => {
         if (this.isRunningAsFork()) {
           this.registerSignalHandlers();
-          this.setProcline();
+          await this.setProcline();
         }
       });
     });
