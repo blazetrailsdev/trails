@@ -9,6 +9,7 @@ export class JobResult extends ApplicationRecord {
   declare queue_name: string | null;
   declare status: string | null;
   declare value: string | null;
+  declare updated_at: Date;
 }
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
 export interface JobResult extends Included<typeof Identification> {}

@@ -272,13 +272,35 @@ describe("ProcessesLifecycleTest", () => {
       await waitForJobsToFinishFor(2, { except: pause });
 
       await signal;
-      await waitForProcessTerminationWithTimeout(run);
+      await waitForProcessTerminationWithTimeout(run, {
+        timeout: shutdownTimeout + 5,
+        exitstatus: null,
+      });
+      expect(run.isExists).toBe(false);
 
       await assertCompletedJobResults("no pause");
       await assertJobStatus(noPause, "finished");
 
       await Record.uncached(async () => {
-        expect((await JobResult.findBy({ value: "pause" }))?.status).not.toEqual("completed");
+        const jobResults = (await JobResult.all().toArray()).map((r) => ({
+          id: r.id,
+          queue: r.queue_name,
+          status: r.status,
+          value: r.value,
+          updated_at: r.updated_at,
+        }));
+        const processes = (await Process.all().toArray()).map((p) => ({
+          id: p.id,
+          kind: p.kind,
+          pid: p.pid,
+          last_heartbeat_at: p.last_heartbeat_at,
+        }));
+        expect(
+          (await JobResult.findBy({ value: "pause" }))?.status,
+          "Expected the pause job not to complete. " +
+            `Job results: ${JSON.stringify(jobResults)}; ` +
+            `registered processes: ${JSON.stringify(processes)}`,
+        ).not.toEqual("completed");
       });
 
       await assertJobStatus(pause, "ready");

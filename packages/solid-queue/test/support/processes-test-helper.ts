@@ -131,12 +131,26 @@ export function findProcessesRegisteredAs(kind: string) {
 
 export async function waitForProcessTerminationWithTimeout(
   run: ReturnType<typeof runSupervisor>,
-  { exitstatus = 0 }: { exitstatus?: number } = {},
+  { timeout = 10, exitstatus = 0 }: { timeout?: number; exitstatus?: number | null } = {},
 ) {
-  const error = await run.terminate().then(
-    () => null,
-    (e: unknown) => e,
-  );
-  if (error !== null && !(error instanceof SystemExit)) throw error;
-  expect(exitstatus != null, String(error?.status ?? 0)).toBe(true);
+  try {
+    await Timeout.timeout(timeout, null, null, async () => {
+      if (run.isExists) {
+        const error = await run.terminate().then(
+          () => null,
+          (e: unknown) => e,
+        );
+        if (error !== null && !(error instanceof SystemExit)) throw error;
+        const status = error?.status ?? 0;
+        if (exitstatus != null) {
+          expect(status, `Expected supervisor to exit with status ${exitstatus}`).toEqual(
+            exitstatus,
+          );
+        }
+      }
+    });
+  } catch (error) {
+    if (error instanceof Timeout.Error) await signalProcess(run, "KILL");
+    throw error;
+  }
 }
