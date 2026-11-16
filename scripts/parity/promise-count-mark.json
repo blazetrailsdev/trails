@@ -16,12 +16,11 @@
   "blazetrails/constructor-creates-no-promise": {
     "actioncable": 1,
     "actiontext": 2,
-    "activerecord": 2,
+    "activerecord": 1,
     "mini-magick": 2,
-    "rackup": 1,
     "ruby-compat": 1,
     "thor": 2,
-    "trailties": 2
+    "trailties": 1
   },
   "blazetrails/no-swallowed-rejection": {
     "actiontext": 1,
