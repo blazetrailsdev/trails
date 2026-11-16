@@ -1,5 +1,6 @@
 import { rbObjDup } from "@blazetrails/ruby-compat";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
+import type { TestHelper } from "./execution-context/test-helper.js";
 
 const ACTIVE_SUPPORT_EXECUTION_CONTEXT = "active_support_execution_context";
 
@@ -42,7 +43,7 @@ function restore(saved: Map<string, { hadKey: boolean; value: unknown }>): void 
   }
 }
 
-export const ExecutionContext = {
+const _ExecutionContext = {
   afterChange(fn: () => void): void {
     _afterChangeCallbacks.push(fn);
   },
@@ -103,4 +104,8 @@ export const ExecutionContext = {
   clear(): void {
     store().clear();
   },
+};
+
+export const ExecutionContext = _ExecutionContext as typeof _ExecutionContext & {
+  TestHelper: typeof TestHelper;
 };

@@ -10,6 +10,7 @@ import { CodeGenerator } from "./code-generator.js";
 import { objectWith } from "./core-ext/object/with.js";
 import { include, Module, type Extended, type Included } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
+import type { TestHelper } from "./current-attributes/test-helper.js";
 
 const __FILE__ = import.meta.url;
 const __LINE__ = 0;
@@ -41,6 +42,7 @@ export interface CurrentAttributes extends Included<typeof Callbacks> {}
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class CurrentAttributes {
+  declare static TestHelper: typeof TestHelper;
   declare static defaults: Record<string, AttributeValue>;
   declare static isDefaults: boolean;
 
