@@ -11,11 +11,8 @@ describe("MiddlewareTest", () => {
       expect(LocalCacheRegistry.cacheFor(key)).toBeTruthy();
       return [200, {}, []];
     });
-    const [, , body] = (await middleware.call({})) as unknown as [
-      number,
-      unknown,
-      { each(fn: () => void): void; close(): void },
-    ];
+    const [, , rackBody] = await middleware.call({});
+    const body = rackBody as unknown as { each(fn: () => void): void; close(): void };
     expect(LocalCacheRegistry.cacheFor(key)).toBeTruthy();
     body.each(() => {});
     expect(LocalCacheRegistry.cacheFor(key)).toBeTruthy();
