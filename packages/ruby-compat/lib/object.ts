@@ -195,6 +195,7 @@ export function rbSetClassPathString(
 
 /** @noRailsEquivalent PERMANENT */
 export interface TopLevelConstants {
+  ENV?: typeof import("./process-adapter.js").env;
   Object?: ObjectConstructor;
   Psych?: typeof import("./psych.js").Psych;
   URI?: typeof import("./uri/common.js").URI;
