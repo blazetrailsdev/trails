@@ -7,6 +7,7 @@ import {
   include,
   FileUpdateChecker,
   Logger,
+  MemoryStore,
   Reloader,
   runLoadHooks,
   resetLoadHooks,
@@ -15,6 +16,7 @@ import { ActionController, RouteSet } from "@blazetrails/actionpack";
 import {
   Base,
   DetailsKey,
+  PartialRenderer,
   PathRegistry,
   Resolver,
   ViewReloader,
@@ -135,7 +137,10 @@ describe("ActionView::Railtie asset tag wiring (trails)", () => {
 
   it("after_initialize applies apply_stylesheet_media_default so stylesheet_link_tag emits media=screen", () => {
     const app = {
-      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      config: Object.assign(Object.create(Trailtie.config), {
+        isReloadingEnabled: () => false,
+        actionController: {},
+      }),
       reloaders: [],
     };
     runLoadHooks("after_initialize", app);
@@ -160,6 +165,25 @@ describe("ActionView::Railtie asset tag wiring (trails)", () => {
   });
 });
 
+describe("action_view.collection_caching", () => {
+  it("assigns PartialRenderer's collection cache from the action controller cache store", async () => {
+    const previous = PartialRenderer.collectionCache();
+    const cacheStore = new MemoryStore();
+    try {
+      await runTrailtieInitializers(Trailtie, {
+        config: Object.assign(Object.create(Trailtie.config), {
+          isReloadingEnabled: () => false,
+          actionController: { cacheStore },
+        }),
+        deprecators: new Deprecators(),
+      });
+      expect(PartialRenderer.collectionCache()).toBe(cacheStore);
+    } finally {
+      PartialRenderer.setCollectionCache(previous);
+    }
+  });
+});
+
 describe("action_view.setup_action_pack", () => {
   afterEach(() => {
     resetLoadHooks();
@@ -167,7 +191,10 @@ describe("action_view.setup_action_pack", () => {
 
   it("includes ActionDispatch::Routing::UrlFor into ActionView::RoutingUrlFor", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      config: Object.assign(Object.create(Trailtie.config), {
+        isReloadingEnabled: () => false,
+        actionController: {},
+      }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);
@@ -188,7 +215,10 @@ describe("action_view.setup_action_pack", () => {
     try {
       Base.logger = null;
       await runTrailtieInitializers(Trailtie, {
-        config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+        config: Object.assign(Object.create(Trailtie.config), {
+          isReloadingEnabled: () => false,
+          actionController: {},
+        }),
         deprecators: new Deprecators(),
       });
       runLoadHooks("action_view", Base);
@@ -206,7 +236,10 @@ describe("action_view.setup_action_pack", () => {
 
   it("leaves RoutingUrlFor's own overrides on top of the included module", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      config: Object.assign(Object.create(Trailtie.config), {
+        isReloadingEnabled: () => false,
+        actionController: {},
+      }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);
@@ -219,7 +252,10 @@ describe("action_view.setup_action_pack", () => {
 
   it("url_for with a Hash from a view generates a path, not a full URL, by default", async () => {
     await runTrailtieInitializers(Trailtie, {
-      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      config: Object.assign(Object.create(Trailtie.config), {
+        isReloadingEnabled: () => false,
+        actionController: {},
+      }),
       deprecators: new Deprecators(),
     });
     runLoadHooks("action_controller", ActionController.Base);

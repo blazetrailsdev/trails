@@ -7,7 +7,6 @@ export { ActionCableHelper } from "./helpers/action-cable-helper.js";
 export { Inline } from "./subscription-adapter/inline.js";
 export { Async } from "./subscription-adapter/async.js";
 import "./action-cable.js";
-export { ENGINE_CALLED_FROM } from "./action-cable.js";
 import "./channel/naming.js";
 import "./channel/callbacks.js";
 import "./channel/periodic-timers.js";

@@ -196,6 +196,9 @@ importers:
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
       pg:
         specifier: '>=8.19.0'
         version: 8.20.0
@@ -1204,9 +1207,6 @@ importers:
 
   packages/trailties:
     dependencies:
-      '@blazetrails/actioncable':
-        specifier: workspace:*
-        version: link:../actioncable
       '@blazetrails/actionmailer':
         specifier: workspace:*
         version: link:../actionmailer
@@ -1274,6 +1274,9 @@ importers:
         specifier: ^7.0.0
         version: 7.3.1(@types/node@25.3.5)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.47.1)(tsx@4.21.0)(yaml@2.8.3)
     devDependencies:
+      '@blazetrails/actioncable':
+        specifier: workspace:*
+        version: link:../actioncable
       '@blazetrails/actionmailbox':
         specifier: workspace:*
         version: link:../actionmailbox

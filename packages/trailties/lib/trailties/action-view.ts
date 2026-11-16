@@ -1,9 +1,10 @@
-import { onLoad, TopLevel, type Reloader } from "@blazetrails/activesupport";
+import { onLoad, TopLevel, type CacheStore, type Reloader } from "@blazetrails/activesupport";
 import { Trails } from "../trails.js";
 import { UrlFor } from "@blazetrails/actionpack";
 import {
   Base,
   DetailsKey,
+  PartialRenderer,
   deprecator,
   Resolver,
   RoutingUrlFor,
@@ -199,6 +200,14 @@ export class Trailtie extends BaseTrailtie {
         RoutingUrlFor.include(UrlFor);
       });
     });
+    this.initializer(
+      "action_view.collection_caching",
+      { after: "action_controller.set_configs" },
+      (app) => {
+        PartialRenderer.setCollectionCache(app.config.actionController.cacheStore as CacheStore);
+      },
+    );
+
     this.server(watchViews);
   }
 }
