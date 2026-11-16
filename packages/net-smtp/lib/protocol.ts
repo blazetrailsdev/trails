@@ -22,6 +22,7 @@ const TLS_VERSIONS: Record<number, "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3"> 
 
 /** @noRailsEquivalent PERMANENT */
 export const Net: {
+  Protocol?: typeof Protocol;
   SMTP?: typeof SMTP;
   SMTPAuthenticationError?: typeof SMTPAuthenticationError;
 } = {};
@@ -32,6 +33,27 @@ declare module "@blazetrails/ruby-compat" {
     Net?: typeof Net;
   }
 }
+
+export class Protocol {
+  static readonly VERSION: string = "0.2.2";
+
+  /** @internal */
+  protected async sslSocketConnect(s: SSLSocket, timeout: number | null): Promise<void> {
+    if (timeout != null) {
+      if (timeout <= 0) throw new OpenTimeout();
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        connect(s),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new OpenTimeout()), timeout * 1000);
+        }),
+      ]).finally(() => clearTimeout(timer));
+    } else {
+      await connect(s);
+    }
+  }
+}
+Net.Protocol = Protocol;
 
 /** @noRailsEquivalent PERMANENT */
 export class ProtocolError extends StandardError {}
@@ -50,21 +72,7 @@ export class OpenTimeout extends Timeout.Error {}
 /** @noRailsEquivalent PERMANENT */
 export class ReadTimeout extends Timeout.Error {}
 
-export class Protocol {
-  static readonly VERSION: string = "0.2.2";
-
-  /** @internal */
-  protected async sslSocketConnect(s: SSLSocket, timeout: number | null): Promise<void> {
-    if (timeout != null) {
-      if (timeout <= 0) throw new OpenTimeout();
-      await Timeout.timeout(timeout, OpenTimeout, null, () => connect(s));
-    } else {
-      await connect(s);
-    }
-  }
-}
-
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE ruby-compat-ssl-socket-connect */
 async function connect(s: SSLSocket): Promise<void> {
   const { io, context } = s;
   const hostname = s.hostname!;
@@ -86,9 +94,14 @@ async function connect(s: SSLSocket): Promise<void> {
   };
   try {
     await new Promise<void>((resolve, reject) => {
-      io.once("error", reject);
-      io._upgradeConnection((err) => {
+      const cleanup = (): void => {
         io.removeListener("error", reject);
+        io.removeListener("end", cleanup);
+      };
+      io.once("error", reject);
+      io.once("end", cleanup);
+      io._upgradeConnection((err) => {
+        cleanup();
         if (err) reject(err);
         else resolve();
       });
