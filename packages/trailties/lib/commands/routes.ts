@@ -51,8 +51,6 @@ export class RoutesCommand extends Base {
 
   async perform(..._args: string[]): Promise<void> {
     await this.bootApplicationBang();
-    await Trails.application!.reloadRoutesUnlessLoaded();
-
     this.say(this.inspector().format(this.formatter(), this.routesFilter()));
   }
 

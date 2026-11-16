@@ -3,6 +3,7 @@ import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import {
   CurrentAttributes,
   deprecator,
+  ExecutionContext,
   Executor,
   findZoneBang,
   include,
@@ -50,21 +51,27 @@ export class Trailtie extends BaseTrailtie {
       app.deprecators.set("activeSupport", deprecator());
     });
 
-    this.initializer(
-      "active_support.reset_all_current_attributes_instances",
-      /** @missingRailsCall include — CONVERGEABLE active-support-railtie-test-helper-else-arm */
-      (app) => {
-        app.reloader.beforeClassUnload(() => CurrentAttributes.clearAll());
-        app.executor.toRun(() => CurrentAttributes.resetAll());
-        app.executor.toComplete(() => CurrentAttributes.resetAll());
+    this.initializer("active_support.reset_execution_context", (app) => {
+      app.reloader.beforeClassUnload(() => ExecutionContext.clear());
+      app.executor.toRun(() => ExecutionContext.clear());
+      app.executor.toComplete(() => ExecutionContext.clear());
+    });
 
-        onLoad("active_support_test_case", function (this: typeof TestCase) {
-          if (app.config.activeSupport.executorAroundTestCase) {
-            include(this, Executor.TestHelper);
-          }
-        });
-      },
-    );
+    this.initializer("active_support.reset_all_current_attributes_instances", (app) => {
+      app.reloader.beforeClassUnload(() => CurrentAttributes.clearAll());
+      app.executor.toRun(() => CurrentAttributes.resetAll());
+      app.executor.toComplete(() => CurrentAttributes.resetAll());
+
+      onLoad("active_support_test_case", function (this: typeof TestCase) {
+        if (app.config.activeSupport.executorAroundTestCase) {
+          include(this, Executor.TestHelper);
+        } else {
+          include(this, CurrentAttributes.TestHelper);
+
+          include(this, ExecutionContext.TestHelper);
+        }
+      });
+    });
 
     this.initializer("active_support.deprecation_behavior", (app) => {
       const activeSupport = app.config.activeSupport;

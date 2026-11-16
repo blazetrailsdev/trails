@@ -21,6 +21,6 @@ if ("fixturePaths" in ActiveSupport.TestCase) {
   ActiveSupport.TestCase.fixturePaths = [File.expandPath("fixtures", import.meta.dirname)];
   ActionDispatch.IntegrationTest.fixturePaths = ActiveSupport.TestCase.fixturePaths;
   ActiveSupport.TestCase.fileFixturePath = File.expandPath("fixtures", import.meta.dirname) + "/files";
-  ActiveSupport.TestCase.fixtures("all");
+  ActiveSupport.TestCase.fixtures(":all");
 }
 <% } -%>

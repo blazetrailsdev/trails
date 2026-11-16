@@ -149,6 +149,12 @@ describe("PluginBuilder", () => {
     expect(test).toContain('"../../lib/blog/admin/version.js"');
   });
 
+  it("loads every fixture set from the test helper", async () => {
+    const g = generator("full");
+    await g["build"]("test");
+    expect(await File.readAsync(`${root}/test/test_helper.ts`)).toContain('fixtures(":all")');
+  });
+
   it("renders the root files", async () => {
     const g = generator("plain");
     for (const meth of ["readme", "gitignore", "cifiles", "rakefile"]) await g["build"](meth);

@@ -29,7 +29,7 @@ describe("ActionDispatch::Executor around a request (trails)", () => {
   beforeAll(async () => {
     await runTrailtieInitializers(Trailtie, {
       deprecators: new Deprecators(),
-      config: { filterParameters: [] },
+      config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
       credentials: async () => ({ config: async () => ({}), dig: () => undefined }),
     });
   });

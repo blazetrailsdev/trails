@@ -52,7 +52,7 @@ import * as os from "node:os";
 import { lookupBang } from "../../lib/command/behavior.js";
 import { DSL, Rake } from "@blazetrails/rake";
 import { rbFLoad } from "@blazetrails/ruby-compat";
-import { databaseConfiguration } from "../../lib/database.js";
+import { Configuration } from "../../lib/application/configuration.js";
 import { Actions } from "../../lib/command/actions.js";
 import { block, getPath } from "@blazetrails/ruby-compat";
 
@@ -87,7 +87,9 @@ async function runTask(task: string, vars: Record<string, string> = {}): Promise
   for (const [k, v] of Object.entries(vars)) setEnv(k, v);
   try {
     Base.configurations(
-      (await databaseConfiguration()) as Parameters<typeof Base.configurations>[0],
+      (await new Configuration(process.cwd()).databaseConfiguration()) as Parameters<
+        typeof Base.configurations
+      >[0],
     );
     DatabaseTasks.root = process.cwd();
     DatabaseTasks.dbDir = "db";

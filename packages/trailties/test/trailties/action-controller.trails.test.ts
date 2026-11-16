@@ -6,7 +6,12 @@ import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { Configuration } from "../../lib/application/configuration.js";
 import { Trailtie, type ActionControllerConfig } from "../../lib/trailties/action-controller.js";
 
-let app: { deprecators: Deprecators; routes(): RouteSet; config: Configuration };
+let app: {
+  deprecators: Deprecators;
+  routes(): RouteSet;
+  helpersPaths(): Promise<string[]>;
+  config: Configuration;
+};
 let savedConfig: ActionControllerConfig;
 
 beforeEach(() => {
@@ -15,6 +20,9 @@ beforeEach(() => {
   app = {
     deprecators: new Deprecators(),
     routes: () => routes,
+    async helpersPaths() {
+      return this.config.helpersPaths;
+    },
     config: Object.assign(new Configuration("/app"), { helpersPaths: [] }),
   };
   savedConfig = structuredClone(Trailtie.config.get("actionController") as ActionControllerConfig);

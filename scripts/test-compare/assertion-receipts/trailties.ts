@@ -7,7 +7,7 @@ export const trailties: Record<string, AssertionReceipt[]> = {
       value: "s:FOO custom_bin",
       as: "assert_equal",
       reason:
-        "command/base_test.rb:13 asserts the snake_case name; RFC 0171 decision 6 makes a command name kebab-case on the command line",
+        "command/base_test.rb:94 asserts the snake_case name; RFC 0171 decision 6 makes a command name kebab-case on the command line",
     },
   ],
   "trailties:generators/api_app_generator_test.rb › ApiAppGeneratorTest › api modified files": [

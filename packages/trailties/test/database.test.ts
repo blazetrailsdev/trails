@@ -1,13 +1,15 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { setTrailsRoot } from "@blazetrails/activesupport";
 import { Base } from "@blazetrails/activerecord";
 import * as nodeFs from "node:fs";
 import * as nodeOs from "node:os";
 import * as nodePath from "node:path";
-import { databaseConfiguration, loadDatabaseConfig } from "../lib/database.js";
+import { loadDatabaseConfig } from "../lib/database.js";
+import { Configuration } from "../lib/application/configuration.js";
 import { Trails } from "../lib/trails.js";
 
-describe("databaseConfiguration", () => {
+const exportDefault = (value: unknown) => `export default ${JSON.stringify(value)};`;
+
+describe("Configuration#databaseConfiguration", () => {
   let tmpRoot: string;
 
   class RootConfigModel extends Base {}
@@ -15,23 +17,23 @@ describe("databaseConfiguration", () => {
   const originalConfigurations = Base.configurations();
 
   afterEach(async () => {
-    setTrailsRoot(null);
     Base.configurations(originalConfigurations);
     await RootConfigModel.removeConnection();
     if (tmpRoot) nodeFs.rmSync(tmpRoot, { recursive: true, force: true });
   });
 
-  it("loads config/database.json from the injected root", async () => {
+  it("loads config/database from the application root, not the cwd", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
     nodeFs.writeFileSync(
-      nodePath.join(tmpRoot, "config", "database.json"),
-      JSON.stringify({ test: { adapter: "sqlite3", database: "storage/primary.sqlite3" } }),
+      nodePath.join(tmpRoot, "config", "database.ts"),
+      exportDefault({ test: { adapter: "sqlite3", database: "storage/primary.sqlite3" } }),
     );
-    setTrailsRoot(tmpRoot);
 
     Base.configurations(
-      (await databaseConfiguration()) as unknown as Parameters<typeof Base.configurations>[0],
+      (await new Configuration(tmpRoot).databaseConfiguration()) as unknown as Parameters<
+        typeof Base.configurations
+      >[0],
     );
     await RootConfigModel.establishConnection();
 
@@ -42,24 +44,27 @@ describe("databaseConfiguration", () => {
 
   it("raises when no config file exists and DATABASE_URL is unset", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
-    setTrailsRoot(tmpRoot);
 
-    await expect(databaseConfiguration()).rejects.toThrow(/Could not load database configuration/);
+    await expect(new Configuration(tmpRoot).databaseConfiguration()).rejects.toThrow(
+      /Could not load database configuration/,
+    );
   });
 
   it("reverse merges the shared key into each environment", async () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
     nodeFs.writeFileSync(
-      nodePath.join(tmpRoot, "config", "database.json"),
-      JSON.stringify({
+      nodePath.join(tmpRoot, "config", "database.ts"),
+      exportDefault({
         shared: { adapter: "sqlite3", pool: 5 },
         test: { database: "storage/test.sqlite3", pool: 9 },
       }),
     );
-    setTrailsRoot(tmpRoot);
 
-    const config = (await databaseConfiguration()) as Record<string, Record<string, unknown>>;
+    const config = (await new Configuration(tmpRoot).databaseConfiguration()) as Record<
+      string,
+      Record<string, unknown>
+    >;
     expect(Object.keys(config)).toEqual(["test"]);
     expect(config.test).toEqual({ adapter: "sqlite3", database: "storage/test.sqlite3", pool: 9 });
   });
@@ -68,8 +73,8 @@ describe("databaseConfiguration", () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
     nodeFs.writeFileSync(
-      nodePath.join(tmpRoot, "config", "database.json"),
-      JSON.stringify({
+      nodePath.join(tmpRoot, "config", "database.ts"),
+      exportDefault({
         shared: { primary: { adapter: "sqlite3" }, animals: { adapter: "postgresql" } },
         test: {
           primary: { database: "storage/test.sqlite3" },
@@ -77,9 +82,8 @@ describe("databaseConfiguration", () => {
         },
       }),
     );
-    setTrailsRoot(tmpRoot);
 
-    const config = (await databaseConfiguration()) as Record<
+    const config = (await new Configuration(tmpRoot).databaseConfiguration()) as Record<
       string,
       Record<string, Record<string, unknown>>
     >;
@@ -91,15 +95,17 @@ describe("databaseConfiguration", () => {
     tmpRoot = nodeFs.mkdtempSync(nodePath.join(nodeOs.tmpdir(), "trailties-root-"));
     nodeFs.mkdirSync(nodePath.join(tmpRoot, "config"));
     nodeFs.writeFileSync(
-      nodePath.join(tmpRoot, "config", "database.json"),
-      JSON.stringify({
+      nodePath.join(tmpRoot, "config", "database.ts"),
+      exportDefault({
         shared: { adapter: "sqlite3", database: "storage/shared.sqlite3" },
         test: { database: "storage/test.sqlite3" },
       }),
     );
-    setTrailsRoot(tmpRoot);
 
-    const config = (await databaseConfiguration()) as Record<string, Record<string, unknown>>;
+    const config = (await new Configuration(tmpRoot).databaseConfiguration()) as Record<
+      string,
+      Record<string, unknown>
+    >;
     expect(config.staging).toEqual({ adapter: "sqlite3", database: "storage/shared.sqlite3" });
     expect(Object.keys(config)).toEqual(["test"]);
   });

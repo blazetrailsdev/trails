@@ -16,9 +16,18 @@ import {
 } from "@blazetrails/activesupport";
 import { HTML } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
-import { ArgumentError, File, getPath, OpenSSL, SecureRandom } from "@blazetrails/ruby-compat";
-import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
-import { LogSubscriber, wrap } from "@blazetrails/activesupport";
+import {
+  ArgumentError,
+  File,
+  getPath,
+  loadIseqEval,
+  OpenSSL,
+  rbInspect,
+  SecureRandom,
+} from "@blazetrails/ruby-compat";
+import { FileUtils, isPlainHash, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
+import { LogSubscriber, reverseMergeBang, wrap } from "@blazetrails/activesupport";
+import type { DatabaseConfigModule } from "../database.js";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { SourceAnnotationExtractor, type Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../trails.js";
@@ -570,6 +579,60 @@ export class Configuration extends EngineConfiguration {
     if (!paths.get("public/javascripts")) paths.add("public/javascripts");
     if (!paths.get("public/stylesheets")) paths.add("public/stylesheets");
     return paths;
+  }
+
+  /** @missingRailsCall parse — CONVERGEABLE database-configuration-reads-config-database-yml */
+  async databaseConfiguration(): Promise<DatabaseConfigModule> {
+    try {
+      const path = (await this.paths().get("config/database")!.existent())[0];
+      const yaml = path;
+
+      let config: DatabaseConfigModule;
+      if (yaml != null && (await File.isExistAsync(yaml))) {
+        const mod = (await loadIseqEval(yaml)) as { default?: unknown };
+        const loadedYaml = { ...((mod.default ?? mod) as Record<string, unknown>) };
+        const shared = loadedYaml.shared as Record<string, unknown> | null | undefined;
+        delete loadedYaml.shared;
+        if (shared != null && (shared as unknown) !== false) {
+          for (const [, config] of Object.entries(loadedYaml)) {
+            if (isPlainHash(config) && Object.values(config).every((v) => isPlainHash(v))) {
+              if (isPlainHash(shared) && Object.values(shared).every((v) => isPlainHash(v))) {
+                for (const [name, subConfig] of Object.entries(config)) {
+                  reverseMergeBang(
+                    subConfig as Record<string, unknown>,
+                    shared[name] as Record<string, unknown>,
+                  );
+                }
+              } else {
+                for (const [, subConfig] of Object.entries(config)) {
+                  reverseMergeBang(subConfig as Record<string, unknown>, shared);
+                }
+              }
+            } else {
+              reverseMergeBang(config as Record<string, unknown>, shared);
+            }
+          }
+        }
+        config = new Proxy(loadedYaml, {
+          get(target, key, receiver) {
+            if (typeof key === "string" && !Reflect.has(target, key)) return shared;
+            return Reflect.get(target, key, receiver);
+          },
+        });
+      } else if (getEnv("DATABASE_URL")) {
+        config = {};
+      } else {
+        throw new RuntimeError(
+          `Could not load database configuration. No such file - ${rbInspect(this.paths().get("config/database")!.toAry())}`,
+        );
+      }
+
+      return config;
+    } catch (e) {
+      if (!(e instanceof Error)) throw e;
+      e.message = `Cannot load database configuration:\n${e.message}`;
+      throw e;
+    }
   }
 
   /** @missingRailsCall parse — PERMANENT */

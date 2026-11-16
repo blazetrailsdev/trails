@@ -20,9 +20,9 @@ import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";
 import { APP_PATH } from "../app-path.js";
+import { Trails } from "../trails.js";
 import { Base } from "../command/base.js";
 import { EnvironmentArgument } from "../command/environment-argument.js";
-import { databaseConfiguration } from "../database.js";
 
 interface DBConsoleOptions {
   environment?: string;
@@ -116,14 +116,13 @@ export class DBConsole {
     }
   }
 
-  /**
-   * @internal
-   * @missingRailsCall application — CONVERGEABLE database-configuration-reads-config-database-yml
-   */
+  /** @internal */
   protected async configurations(): Promise<DatabaseConfigurations> {
     if (APP_PATH != null) await import(getPath().pathToFileURL!(APP_PATH).href);
     ActiveRecordBase.configurations(
-      (await databaseConfiguration()) as Parameters<typeof ActiveRecordBase.configurations>[0],
+      (await Trails.application!.config.databaseConfiguration()) as Parameters<
+        typeof ActiveRecordBase.configurations
+      >[0],
     );
     return ActiveRecordBase.configurations();
   }

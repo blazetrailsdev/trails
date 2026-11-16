@@ -1,6 +1,5 @@
 import { Dir, File, TopLevel, getFs, getPath } from "@blazetrails/ruby-compat";
 import { Registry, writeArtifacts } from "@blazetrails/zeitwerk";
-import { setTrailsRoot } from "@blazetrails/activesupport";
 
 interface BootInitializer {
   name: string;
@@ -54,7 +53,6 @@ export async function buildAutoload({ cwd = Dir.pwd() }: { cwd?: string } = {}):
     );
     const own = loaders.map((loader) => Object.getOwnPropertyDescriptors(loader));
     for (const loader of loaders) loader.setup = loader.eagerLoad = async () => {};
-    setTrailsRoot(() => application.config.root);
     try {
       for (const initializer of application.initializers.tsort()) {
         if (initializer.belongsTo("default")) await initializer.run(application);

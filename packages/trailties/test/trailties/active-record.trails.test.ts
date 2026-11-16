@@ -60,12 +60,12 @@ const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration
 };
 
 const blogApp = (): {
-  config: { filterParameters: Array<string | RegExp> };
+  config: Configuration;
   deprecators: Deprecators;
   credentials: typeof credentials;
 } => ({
   deprecators: new Deprecators(),
-  config: { filterParameters: [] },
+  config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
   credentials,
 });
 
@@ -223,7 +223,10 @@ describe("RailtieTest (trails-only)", () => {
         const fileWatcher = class {};
         await runTrailtieInitializers(Trailtie, {
           ...blogApp(),
-          config: { filterParameters: [], fileWatcher },
+          config: Object.assign(new Configuration("/nonexistent-app"), {
+            filterParameters: [],
+            fileWatcher,
+          }),
         });
         const stack = new MiddlewareStack();
         stack.use(Callbacks as never);
@@ -259,13 +262,14 @@ describe("RailtieTest (trails-only)", () => {
       const savedTaggings = QueryLogs.taggings;
       setQueryTransformers([]);
       resetLoadHooks();
+      const config = new Configuration("/app");
       class BlogApplication {
         autoloaders = { main: { onUnload() {} } };
+        config = config;
       }
       Trails.application = new BlogApplication() as never;
       try {
         Trailtie.config.set("activeRecord", { ...saved, ...cfg });
-        const config = new Configuration("/app");
         if (loadDefaults) config.loadDefaults(loadDefaults);
         const app = { deprecators: new Deprecators(), config, credentials };
         await runTrailtieInitializers(Trailtie, app);

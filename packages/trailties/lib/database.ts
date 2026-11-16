@@ -1,4 +1,4 @@
-import { presence, reverseMerge, TopLevel, trailsRoot } from "@blazetrails/activesupport";
+import { presence, TopLevel } from "@blazetrails/activesupport";
 import { getFs, getPath, loadIseqEval } from "@blazetrails/ruby-compat";
 import { env } from "@blazetrails/ruby-compat";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
@@ -89,58 +89,6 @@ export async function loadDatabaseConfigModule(
     );
   }
   return { path: configPath, module: candidateVal as DatabaseConfigModule };
-}
-
-type AnyHash = Record<string, unknown>;
-
-export async function databaseConfiguration(root?: string): Promise<DatabaseConfigModule> {
-  const fs = getFs();
-  const path = getPath();
-  const resolvedRoot = root ?? trailsRoot() ?? fs.cwd();
-
-  const loaded = await loadDatabaseConfigModule(resolvedRoot);
-  const jsonPath = path.join(resolvedRoot, "config", "database.json");
-  let loadedYaml: DatabaseConfigModule | null = null;
-  if (loaded) {
-    loadedYaml = loaded.module;
-  } else if (await fs.exists(jsonPath)) {
-    if (!fs.readFile)
-      throw new Error("Config loading requires an fs adapter with readFile support.");
-    loadedYaml = JSON.parse(await fs.readFile(jsonPath, "utf-8")) as DatabaseConfigModule;
-  }
-
-  if (loadedYaml) {
-    const shared = loadedYaml.shared;
-    if (shared == null || shared === false) return loadedYaml;
-
-    const merged: Record<string, unknown> = { ...loadedYaml };
-    delete merged.shared;
-    for (const [env, config] of Object.entries(merged)) {
-      if (isMultiDatabaseEnv(config)) {
-        const subConfigs: Record<string, unknown> = {};
-        for (const [name, subConfig] of Object.entries(config)) {
-          subConfigs[name] = isMultiDatabaseEnv(shared)
-            ? reverseMerge(subConfig as AnyHash, (shared as Record<string, AnyHash>)[name] ?? {})
-            : reverseMerge(subConfig as AnyHash, shared as AnyHash);
-        }
-        merged[env] = subConfigs;
-      } else if (config !== null && typeof config === "object") {
-        merged[env] = reverseMerge(config as AnyHash, shared as AnyHash);
-      }
-    }
-    return new Proxy(merged, {
-      get(target, key, receiver) {
-        if (typeof key === "string" && !Reflect.has(target, key)) return shared;
-        return Reflect.get(target, key, receiver);
-      },
-    }) as DatabaseConfigModule;
-  }
-
-  if (env.DATABASE_URL) return {};
-
-  throw new Error(
-    `Could not load database configuration. No such file - ${path.join(resolvedRoot, "config", "database.*")}`,
-  );
 }
 
 export async function loadDatabaseConfig(env?: string, cwd?: string): Promise<DatabaseConfig> {

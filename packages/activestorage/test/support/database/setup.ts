@@ -81,6 +81,7 @@ TopLevel.Trails = {
 class Dummy extends Application {}
 Application.register(Dummy, import.meta.dirname);
 export const app = Dummy.instance();
+app.config.setRoot(TopLevel.Trails!.root()!);
 app.config.loadDefaults("8.0");
 setTrailsRoot(TopLevel.Trails!.root()!);
 const configurations = Base.configurations();

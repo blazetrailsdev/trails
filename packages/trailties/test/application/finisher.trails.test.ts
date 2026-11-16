@@ -342,8 +342,14 @@ describe("Finisher", () => {
     const base = ActionController.Base as unknown as { includeAllHelpers: boolean };
     const include = base.includeAllHelpers;
     base.includeAllHelpers = false;
+    const application = Trails.application;
+    Trails.application = {
+      autoloaders: { main: { dirs: () => [] } },
+      helpersPaths: async () => [],
+    } as never;
     onTestFinished(() => {
       base.includeAllHelpers = include;
+      Trails.application = application;
     });
     class OnLoadedController extends ActionController.Base {}
     let assigned: unknown = null;

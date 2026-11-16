@@ -1,3 +1,4 @@
+import { Configuration } from "../../lib/application/configuration.js";
 import { Trailtie as BaseTrailtie } from "../../lib/trailtie.js";
 import { runTrailtieInitializers } from "../support/trailtie-initializers.js";
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
@@ -37,12 +38,12 @@ const credentials = async (dir = "/nonexistent"): Promise<EncryptedConfiguration
 };
 
 const blogApp = (): {
-  config: { filterParameters: Array<string | RegExp> };
+  config: Configuration;
   deprecators: Deprecators;
   credentials: typeof credentials;
 } => ({
   deprecators: new Deprecators(),
-  config: { filterParameters: [] },
+  config: Object.assign(new Configuration("/nonexistent-app"), { filterParameters: [] }),
   credentials,
 });
 
@@ -186,7 +187,9 @@ describe("RailtieTest", () => {
   it("runInitializers enables auto filtered parameters when add_to_filter_parameters is set", async () => {
     const app = {
       deprecators: new Deprecators(),
-      config: { filterParameters: [] as Array<string | RegExp> },
+      config: Object.assign(new Configuration("/nonexistent-app"), {
+        filterParameters: [] as Array<string | RegExp>,
+      }),
       credentials,
     };
     Encryption.config.addToFilterParameters = true;
@@ -200,7 +203,9 @@ describe("RailtieTest", () => {
   it("runInitializers does not enable auto filtered parameters when add_to_filter_parameters is unset", async () => {
     const app = {
       deprecators: new Deprecators(),
-      config: { filterParameters: [] as Array<string | RegExp> },
+      config: Object.assign(new Configuration("/nonexistent-app"), {
+        filterParameters: [] as Array<string | RegExp>,
+      }),
       credentials,
     };
     Encryption.config.addToFilterParameters = false;
