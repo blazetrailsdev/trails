@@ -527,7 +527,7 @@ export async function assertNoChanges<T>(
     return error;
   };
 
-  if (before === null || before === undefined) {
+  if (before == null) {
     assertNil(after, richMessage);
   } else {
     assertEqual(before, after, richMessage);
