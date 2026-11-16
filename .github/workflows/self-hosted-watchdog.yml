@@ -1,6 +1,3 @@
-# Cancels and re-runs CI runs stuck queued on offline self-hosted runners
-# (scripts/ci/self-hosted-watchdog.sh). Uses the runner-status credential the
-# `changes` job's `self_hosted` routing step reads.
 name: Self-hosted watchdog
 
 on:

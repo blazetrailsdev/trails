@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 # Trace which `changes`-job gates a given set of changed paths would flip.
 #
-# Replays the filter step's gate block verbatim out of .github/workflows/ci.yml
-# (the `*_RE` definitions, `is_additive_registration`, and the region from
-# `infra_files=$(` through the `scoped-only.sh` call), the same slice
-# `gateRunner` in scripts/ci-suite-coverage.test.ts runs, so there is no hand
-# copy to drift. `base` / `head` feed the additive-registration narrowing and
-# default to origin/main and HEAD.
-#
 # Usage:
 #   scripts/ci/gate-trace.sh path [path...]
 #   printf '%s\n' path1 path2 | scripts/ci/gate-trace.sh

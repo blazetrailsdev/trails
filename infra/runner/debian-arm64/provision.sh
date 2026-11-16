@@ -1,14 +1,4 @@
 #!/usr/bin/env bash
-# Provision a Debian 13 arm64 VM as a `debian-arm64*` self-hosted runner host.
-# Idempotent: every step checks before it changes anything, so re-running it
-# after a partial failure or a pin bump is safe.
-#
-#   sudo infra/runner/debian-arm64/provision.sh root <runner-user>
-#   infra/runner/debian-arm64/provision.sh user [instance...]   # as <runner-user>
-#   infra/runner/debian-arm64/provision.sh actions               # list archive cache misses
-#
-# Runner registration is NOT done here (see README.md): it takes a
-# registration token and is what grants the host code execution.
 set -euo pipefail
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,16 +10,12 @@ archive_cache="$HOME/actions-archive-cache"
 root_part() {
   local user="$1"
   [ "$(id -u)" = 0 ] || { echo "provision.sh root: run as root" >&2; exit 1; }
-  # A netinst image ships with only a cdrom apt source.
   if ! grep -rqs '^deb .*deb.debian.org' /etc/apt/sources.list /etc/apt/sources.list.d/; then
     echo "deb http://deb.debian.org/debian trixie main" >/etc/apt/sources.list.d/debian.list
   fi
   apt-get update
-  # ruby: scripts/api-compare/* tests spawn it. sqlite3: `db schema:dump
-  # --format=sql` shells out to the CLI.
   apt-get install -y git curl libicu76 build-essential python3 jq unzip xz-utils vnstat ruby sqlite3
   loginctl enable-linger "$user"
-  # A dead first nameserver makes every lookup take 10s (README.md, "DNS").
   local t0 t1
   t0=$(date +%s); getent hosts github.com >/dev/null; t1=$(date +%s)
   if [ $((t1 - t0)) -ge 2 ]; then
@@ -37,8 +23,6 @@ root_part() {
   fi
 }
 
-# `owner/repo[/path]@ref` for every action the workflows use, resolved to the
-# commit sha the runner's archive cache is keyed by.
 action_pins() {
   grep -rhoE 'uses: [A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[^@ ]+)?@[^ #]+' "$repo/.github" \
     | sed -E 's/^uses: //; s|^([^/]+/[^/@]+)(/[^@]+)?@|\1@|' | sort -u \
@@ -79,7 +63,6 @@ user_part() {
   for instance in "${@:-actions-runner}"; do
     local dir="$HOME/$instance"
     [ -d "$dir" ] || { echo "skip $instance: $dir is not registered yet (README.md)"; continue; }
-    # The runner's `.path` file does not reach job steps; `.env` does.
     {
       echo "PATH=$prefix/bin:/usr/local/bin:/usr/bin:/bin"
       echo "ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=$archive_cache"
@@ -114,5 +97,5 @@ case "${1:-}" in
       [ -s "$archive_cache/${action/\//_}/$sha.tar.gz" ] || echo "missing $action@$sha"
     done
     ;;
-  *) sed -n '2,12p' "$0"; exit 2 ;;
+  *) echo "usage: provision.sh root <runner-user> | user [instance...] | actions" >&2; exit 2 ;;
 esac

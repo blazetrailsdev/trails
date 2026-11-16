@@ -1,20 +1,4 @@
 #!/usr/bin/env bash
-# Cancel and re-run CI runs whose jobs sit queued on the self-hosted
-# `debian-arm64*` labels while no matching runner is online. The `changes`
-# job's `self_hosted` step routes a lane there only after seeing an idle
-# runner; if every runner drops offline before pickup the job waits up to 24h
-# (`timeout-minutes` does not count queue time). A re-run re-checks the
-# runners and routes to hosted.
-#
-# A job queued behind a busy but ONLINE runner is left alone: it will be
-# picked up.
-#
-# Usage:
-#   scripts/ci/self-hosted-watchdog.sh [--max-queued-minutes N]
-#   scripts/ci/self-hosted-watchdog.sh --dry-run <runners.json> <jobs.json> <now-iso>
-#
-# `jobs.json` in dry-run mode is an array of `{run_id, jobs: [...]}`, the
-# shape the live mode assembles from `/actions/runs/{id}/jobs`.
 set -euo pipefail
 
 LABELS='["self-hosted","debian","ARM64"]'
@@ -25,8 +9,6 @@ online_runners() {
     '[.runners[] | select(.status == "online" and ([.labels[].name] as $l | all($want[]; IN($l[]))))] | length'
 }
 
-# Prints the run id of every run holding a job queued on the self-hosted
-# labels for longer than max_minutes.
 stuck_runs() {
   local now="$1"
   jq -r --argjson want "$LABELS" --arg now "$now" --argjson max "$max_minutes" '
@@ -63,8 +45,6 @@ if [ "$(online_runners <<<"$runners")" -gt 0 ]; then
   echo "self-hosted-watchdog: a matching runner is online; nothing to do"
   exit 0
 fi
-# The runner-status token can only list runners; runs and jobs are read and
-# cancelled / re-run with the workflow's own token.
 export GH_TOKEN="${RERUN_TOKEN:-$GH_TOKEN}"
 jobs="[]"
 for status in queued in_progress; do

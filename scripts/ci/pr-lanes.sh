@@ -1,15 +1,4 @@
 #!/usr/bin/env bash
-# Path-triggered pull_request lanes that the `changes` job's filter step has no
-# room for (its `run:` script sits at the Actions size limit).
-#
-#   parity_inputs — the diff touches the query/schema parity pipeline or a
-#     `lib/` of the `@blazetrails/activerecord...` build closure the trails-side
-#     dump builds, so the run-parity-sqlite jobs run without the label.
-#   sqlite_mem — an added or removed line under packages/activerecord/ names
-#     `inMemoryDb`, an arm only the ARCONN=sqlite3_mem lane reaches.
-#
-# Usage: scripts/ci/pr-lanes.sh <base> <head>   (prints name=value lines)
-#        scripts/ci/pr-lanes.sh --self-test
 set -euo pipefail
 
 PARITY_INPUTS_RE='^(scripts/parity/pipeline/|packages/(actionpack|actionview|activejob|activemodel|activerecord|activesupport|arel|bcrypt|builder|date|did-you-mean|globalid|html-sanitizer|i18n|msgpack|nokogiri|rack|rack-session|rack-test|rackup|rake|ruby-compat|trails-tsc|tse-compiler|tzinfo|vitest-matchers|zeitwerk)/lib/)'

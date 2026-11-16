@@ -79,8 +79,6 @@ jobs:
       unit_packages: ${{ steps.filter.outputs.unit_packages }}
       actioncable_only: ${{ steps.filter.outputs.actioncable_only }}
       website_label: ${{ steps.filter.outputs.website_label }}
-      # A PR touching the parity pipeline's inputs runs the sqlite parity jobs
-      # without the run-parity-sqlite label (scripts/ci/pr-lanes.sh).
       parity_sqlite: ${{ steps.filter.outputs.parity_sqlite == 'true' || steps.pr_lanes.outputs.parity_inputs == 'true' }}
       sqlite_mem_affected: ${{ steps.pr_lanes.outputs.sqlite_mem == 'true' }}
       parity_postgres: ${{ steps.filter.outputs.parity_postgres }}
@@ -122,7 +120,6 @@ jobs:
           # Gate rationale: scripts/ci-suite-coverage.test.ts ("Gate reference").
           # Additive-registration narrowing: see the gate reference.
           ADDITIVE_CANDIDATE_RE='^(pnpm-lock\.yaml|tsconfig[^/]*\.json|vitest[^/]*\.config\.ts)$'
-          # INFRA_RE forces every gate; ci.yml alone is exempt from db_adapter_affected (draft deferral).
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
           INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|rails-file-structure-collisions|strip-asany|ci-suite-coverage|deprecated-manifest-diff|mixin-declaration-drift|mysql-grant-namespaces|stale-story-references|closing-story-references)(\.test)?\.ts$)'
           AR_PKGS_RE='^packages/(activerecord|actionmailbox|actiontext|activerecord-cli|arel|activejob|activemodel|activestorage|bcrypt|activesupport|globalid|date|did-you-mean|i18n|msgpack|nokogiri|ruby-compat|solid-cable|solid-cache|solid-queue|trails-tsc|tzinfo|vitest-matchers)/'
@@ -304,7 +301,6 @@ jobs:
                     fi
                   }
                   set_gate activerecord_affected "$AR_PKGS_RE"
-                  # ci.yml alone does not force db_adapter_affected, so a CI-infra draft keeps the adapter draft deferral.
                   infra_all="$infra_files"
                   infra_files=$(grep -vxF .github/workflows/ci.yml <<<"$infra_all" || true)
                   set_gate db_adapter_affected   "$DB_ADAPTER_RE"
@@ -385,7 +381,7 @@ jobs:
           hosted='"ubuntu-24.04"'
           self_hosted='["self-hosted","debian","ARM64"]'
           sqlite_runs_on=$hosted
-          sqlite_shards='[1, 2, 3]'
+          sqlite_shards='[1, 2]'
           unit_runs_on=$hosted
           unit_shards='[1, 2]'
           postgres_shards='[1, 2, 3]'
@@ -653,8 +649,6 @@ jobs:
               | xargs -r -d '\n' npx --yes prettier@3.8.1 --check --ignore-unknown
           fi
 
-      # Self-test split from the scan for the reason given at the merge-conflict
-      # pair above: a red self-test is a scanner bug, a red scan is the PR's.
       - name: Raw control bytes (self-test)
         id: control-bytes-self-test
         if: ${{ !cancelled() }}

@@ -1023,8 +1023,6 @@ describe("CI runs every tooling test suite", () => {
     },
   );
 
-  // A ci.yml edit forces every gate but db_adapter_affected, so a CI-infra
-  // draft still defers the PG/MariaDB matrix to ready / run-db-adapters.
   it("keeps the db adapter draft deferral for a ci.yml-only diff", async () => {
     const yml = await readFile(CI_YML, "utf8");
     const runGate = await gateRunner(yml);
@@ -1037,8 +1035,6 @@ describe("CI runs every tooling test suite", () => {
     expect(withAction.db_adapter_affected).toBe("true");
   });
 
-  // gate-trace.sh replays the same slice of the filter step as gateRunner; if
-  // either drifts from ci.yml the two answers part.
   it("gate-trace.sh reports what the filter step's gate block sets", async () => {
     const file = "packages/thor/lib/thor.ts";
     const runGate = await gateRunner(await readFile(CI_YML, "utf8"));
