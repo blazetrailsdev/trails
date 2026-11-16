@@ -594,3 +594,20 @@ describe("Delegation#encodeWith", () => {
     expect(Psych.dump(posts)).toMatch(/^---\n- !ruby\/object:Post\n/);
   });
 });
+
+describe("Relation#each with an async block", () => {
+  fixtures(["posts"]);
+
+  it("runs each block to completion before yielding the next record, as records.each does", async () => {
+    const log: string[] = [];
+    await Post.order("id")
+      .limit(3)
+      .each(async (post) => {
+        log.push(`start ${post.id}`);
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        log.push(`end ${post.id}`);
+      });
+    const ids = (await Post.order("id").limit(3).pluck("id")) as unknown[];
+    expect(log).toEqual(ids.flatMap((id) => [`start ${id}`, `end ${id}`]));
+  });
+});

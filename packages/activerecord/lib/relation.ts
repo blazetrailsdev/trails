@@ -2115,7 +2115,7 @@ export interface Relation<T extends Base, G extends boolean = false> {
 
 export interface Relation<T extends Base, G extends boolean = false> {
   length(): Promise<number>;
-  each(fn: (record: T, index: number) => void): Promise<T[]>;
+  each(fn: (record: T, index: number) => unknown): Promise<T[]>;
   join(separator?: string): Promise<string>;
   at(index: number | Range<number>, length?: number): Promise<T | T[] | null>;
   intersection(other: T[]): Promise<T[]>;

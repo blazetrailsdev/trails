@@ -8,6 +8,7 @@ import {
   rbDeclareIvar,
   rbModName,
   shadowsIncluded,
+  toS,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { NotImplementedError } from "./errors.js";
@@ -137,12 +138,7 @@ import {
 } from "./token-for.js";
 import type { TokenDefinitionsHash as _TokenDefinitionsHash } from "./token-for.js";
 import type { MessageVerifier as _MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import {
-  DescendantsTracker,
-  ReloadedClassesFiltering,
-  camelize,
-  type CallbackChain,
-} from "@blazetrails/activesupport";
+import { DescendantsTracker, ReloadedClassesFiltering } from "@blazetrails/activesupport";
 import * as LockingOptimistic from "./locking/optimistic.js";
 import * as LockingPessimistic from "./locking/pessimistic.js";
 import {
@@ -366,75 +362,6 @@ export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 
-function beforeOrAroundCallbackSources(
-  proto: object,
-  event: string,
-): { sources: string[]; opaque: boolean } {
-  const chain = (proto as Record<string, CallbackChain | undefined>)[
-    `_${camelize(event, false)}Callbacks`
-  ];
-  if (!chain) return { sources: [], opaque: false };
-  const sources: string[] = [];
-  let opaque = false;
-  for (const e of chain.entries) {
-    if (e.kind !== "before" && e.kind !== "around") continue;
-    if (typeof e.filter !== "function") {
-      opaque = true;
-      continue;
-    }
-    const src = e.filter.toString();
-    if (src.includes("[native code]")) opaque = true;
-    else sources.push(src);
-  }
-  return { sources, opaque };
-}
-
-function referencesAssociationName(sources: string[], name: string): boolean {
-  const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
-  return sources.some((src) => pattern.test(src));
-}
-
-function expandCallbackSourcesWithHelpers(
-  sources: string[],
-  ctor: typeof Base,
-  record?: InstanceType<typeof Base>,
-): string[] {
-  const methods = new Map<string, string>();
-  if (record) {
-    for (const key of Object.getOwnPropertyNames(record)) {
-      if (key === "constructor" || methods.has(key)) continue;
-      const desc = Object.getOwnPropertyDescriptor(record, key);
-      if (typeof desc?.value === "function") methods.set(key, desc.value.toString());
-    }
-  }
-  for (
-    let proto = ctor.prototype;
-    proto && proto !== Base.prototype;
-    proto = Object.getPrototypeOf(proto)
-  ) {
-    for (const key of Object.getOwnPropertyNames(proto)) {
-      if (key === "constructor" || methods.has(key)) continue;
-      const desc = Object.getOwnPropertyDescriptor(proto, key);
-      if (typeof desc?.value === "function") methods.set(key, desc.value.toString());
-    }
-  }
-  const result = [...sources];
-  const seen = new Set<string>();
-  const queue = [...sources];
-  while (queue.length > 0) {
-    const src = queue.pop()!;
-    for (const [name, body] of methods) {
-      if (seen.has(name)) continue;
-      if (new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(src)) {
-        seen.add(name);
-        result.push(body);
-        queue.push(body);
-      }
-    }
-  }
-  return result;
-}
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends Model {
   /** @noRailsEquivalent PERMANENT */
@@ -590,9 +517,10 @@ export class Base extends Model {
     );
   }
 
-  static typeForAttribute(name: string, block?: () => ValueType): ValueType | null {
+  static typeForAttribute(name: unknown, block?: () => ValueType): ValueType | null {
     ModelSchema.loadSchema.call(this);
-    const resolved = this.attributeAliases?.[name] ?? name;
+    const attributeName = toS(name);
+    const resolved = this.attributeAliases?.[attributeName] ?? attributeName;
     if (block) {
       return fetch(this.attributeTypes(), resolved, rbBlock(block));
     }
@@ -1521,31 +1449,6 @@ export class Base extends Model {
   _touchRecord: boolean | null = null;
   declare recordTimestamps: boolean;
 
-  /** @internal */
-  private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
-    const ctor = this.constructor;
-    if (typeof this.association !== "function") return;
-    const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
-    if (!opaque && sources.length === 0) return;
-    const expanded = opaque ? sources : expandCallbackSourcesWithHelpers(sources, ctor, this);
-    const useSavepoint = ctor.currentTransaction().isOpen();
-    for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
-      if (!opaque && !referencesAssociationName(expanded, ref.name)) continue;
-      let assoc: any;
-      try {
-        assoc = this.association(ref.name);
-        if (!assoc || assoc.isLoaded()) continue;
-        if (useSavepoint) {
-          await _transaction(ctor, () => assoc.loadTarget(), { requiresNew: true });
-        } else {
-          await assoc.loadTarget();
-        }
-      } catch {
-        assoc?.setTarget?.(null);
-      }
-    }
-  }
-
   static async delete(id: unknown): Promise<number> {
     if (id === null || id === undefined || (Array.isArray(id) && id.length === 0)) {
       return 0;
@@ -2473,10 +2376,9 @@ for (const [name, fn] of [
   [
     "destroy",
     function (this: Base): Promise<unknown> {
-      return _Transactions.destroy.call(this, async () => {
-        await this["_preloadBelongsToForDestroyCallbacks"]();
-        return callbacksDestroy.call(this, () => _Persistence.destroy.call(this));
-      });
+      return _Transactions.destroy.call(this, () =>
+        callbacksDestroy.call(this, () => _Persistence.destroy.call(this)),
+      );
     },
   ],
   [

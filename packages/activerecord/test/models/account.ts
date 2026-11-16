@@ -47,9 +47,9 @@ export class Account extends Base {
       return this.open();
     });
 
-    this.beforeDestroy(function (this: Account, record?: Account) {
+    this.beforeDestroy(async function (this: Account, record?: Account) {
       const self = (record ?? this) as any;
-      const firm = self?.firm;
+      const firm = await self?.firm;
       if (firm) {
         const ids = Account.destroyedAccountIds();
         if (!ids.has(firm.id)) ids.set(firm.id, []);

@@ -624,10 +624,9 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
     (arySlice(ids, this.offsetValue ?? 0, this.limitValue ?? ids.length) as unknown[] | null) ?? [];
 
   let relation = this.except("limit", "offset");
-  const pk = this.model.primaryKey;
-  relation = relation.where(new Map([[pk, ids]]));
+  relation = relation.where(new Map([[this.primaryKey, ids]]));
   if (this.selectValues.length > 0) {
-    relation = relation.select(this.table.get(this.model.primaryKey as string));
+    relation = relation.select(this.table.get(this.primaryKey as string));
   }
   const result: any[] = await relation.records();
 
@@ -635,7 +634,7 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
     return inOrderOf(
       result,
       (record: any) => record.id,
-      ids.map((id) => (this.model as any).typeForAttribute(String(pk)).cast(id)),
+      ids.map((id) => (this.model as any).typeForAttribute(this.primaryKey).cast(id)),
     );
   } else {
     this.raiseRecordNotFoundExceptionBang(ids, result.length, ids.length);

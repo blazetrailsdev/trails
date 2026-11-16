@@ -226,10 +226,6 @@ export type ToXmlOptions = SerializeOptions &
 
 const RECORD_DELEGATES: Record<string, RecordDelegate> = {
   length: (records) => records.length,
-  each: (records, fn: (record: Base) => void) => {
-    for (const record of records) fn(record);
-    return records;
-  },
   join: (records, separator?: string) => records.join(separator),
   at: (records, ...args: [index: number | Range<number>, length?: number]) =>
     arySlice(records, ...args),
@@ -278,8 +274,20 @@ export class Delegation {
     return withRecords(this, (records) => RECORD_DELEGATES.length(records) as number);
   }
 
-  each(this: DelegationHost, fn: (record: Base) => void): Base[] | Promise<Base[]> {
-    return withRecords(this, (records) => RECORD_DELEGATES.each(records, fn) as Base[]);
+  each(this: DelegationHost, fn: (record: Base) => unknown): Base[] | Promise<Base[]> {
+    return withRecords(this, (records): Base[] | Promise<Base[]> => {
+      for (let i = 0; i < records.length; i++) {
+        const yielded = fn(records[i]);
+        if (typeof (yielded as PromiseLike<unknown> | null)?.then === "function") {
+          return (async () => {
+            await yielded;
+            for (i++; i < records.length; i++) await fn(records[i]);
+            return records;
+          })();
+        }
+      }
+      return records;
+    }) as Base[] | Promise<Base[]>;
   }
 
   join(this: DelegationHost, separator?: string): string | Promise<string> {

@@ -223,7 +223,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         if (scope.model.primaryKey != null) {
           count = ((await scope.destroyAll()) as Base[]).filter((r) => r.isDestroyed()).length;
         } else {
-          for (const r of (await scope.toArray()) as Base[]) await r._runDestroyCallbacks();
+          await scope.each((r: Base) => r._runDestroyCallbacks());
           count = await scope.deleteAll();
         }
         break;
