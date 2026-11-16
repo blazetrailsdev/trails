@@ -186,19 +186,21 @@ describe("Trails::Command::ServerTest", () => {
     );
   });
 
-  it("test_default_options", () => {
-    const server = new Server();
+  it("test_default_options", async () => {
+    const server = await Server.new();
     const oldDefaultOptions = server.defaultOptions();
     expect(server.defaultOptions()).toEqual(oldDefaultOptions);
   });
 
   it("test_served_url", async () => {
-    const server = new Server(parseArguments(["-b", "127.0.0.1", "-p", "4567"]));
+    const server = await Server.new(parseArguments(["-b", "127.0.0.1", "-p", "4567"]));
     expect(await server.servedUrl()).toBe("http://127.0.0.1:4567");
   });
 
   it("test_served_url_when_server_prints_it", async () => {
-    const server = new Server(parseArguments(["-u", "puma", "-b", "127.0.0.1", "-p", "4567"]));
+    const server = await Server.new(
+      parseArguments(["-u", "puma", "-b", "127.0.0.1", "-p", "4567"]),
+    );
     vi.spyOn(server, "server").mockResolvedValue({ name: "Rack::Handler::Puma" } as never);
     expect(await server.servedUrl()).toBeUndefined();
   });

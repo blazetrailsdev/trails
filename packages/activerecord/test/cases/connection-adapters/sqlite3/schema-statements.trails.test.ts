@@ -25,9 +25,9 @@ const quoter = {
 
 describe("SQLite3::SchemaStatements", () => {
   describe("createSchemaDumper", () => {
-    it("returns a SchemaDumper instance", () => {
+    it("returns a SchemaDumper instance", async () => {
       const fakeAdapter = {} as any;
-      expect(createSchemaDumper.call(fakeAdapter, {})).toBeInstanceOf(SchemaDumper);
+      expect(await createSchemaDumper.call(fakeAdapter, {})).toBeInstanceOf(SchemaDumper);
     });
   });
 

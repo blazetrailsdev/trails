@@ -46,7 +46,7 @@ describeIfPg("PostgresqlExtensionMigrationTest (trails)", () => {
     }
     await new EnableCitext().execMigration(adapter, "up");
     expect(await adapter.extensionEnabled("citext")).toBe(true);
-    const dump = (await adapter.createSchemaDumper({}).dump(new StringIO())).string();
+    const dump = (await (await adapter.createSchemaDumper({})).dump(new StringIO())).string();
     expect(dump).toContain(`await ctx.enableExtension("citext");`);
   }, 60000);
 });

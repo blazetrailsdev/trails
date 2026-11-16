@@ -1,6 +1,13 @@
 import "../constants.console.generated.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { STDOUT, exit, include, rbArgv, type Included } from "@blazetrails/ruby-compat";
+import {
+  STDOUT,
+  exit,
+  include,
+  rbArgv,
+  rbClassNewInstance,
+  type Included,
+} from "@blazetrails/ruby-compat";
 import type { ThorClass } from "@blazetrails/thor";
 import type { ThorOptions } from "@blazetrails/thor/core-ext/hash-with-indifferent-access";
 import { environment } from "../command.js";
@@ -30,20 +37,27 @@ interface ConsoleApp {
 }
 
 export class Console {
-  static start(...args: [app: ConsoleApp, options?: ConsoleOptions]): Promise<void> {
-    return new this(...args).start();
+  static async start(...args: [app: ConsoleApp, options?: ConsoleOptions]): Promise<void> {
+    return (await this.new(...args)).start();
+  }
+
+  static async new<T extends Console>(
+    this: { prototype: T },
+    app: ConsoleApp,
+    options: ConsoleOptions = {},
+  ): Promise<T> {
+    const obj = rbClassNewInstance(this, app, options);
+    await app.loadConsole();
+
+    obj.console = app.config.console || new TSREPLConsole(app);
+    return obj;
   }
 
   readonly options: ConsoleOptions;
   readonly app: ConsoleApp;
-  readonly console: ConsoleRunner;
-  /**
-   * @internal
-   * @noRailsEquivalent PERMANENT
-   */
-  private _loadConsole: Promise<unknown>;
+  console!: ConsoleRunner;
 
-  constructor(app: ConsoleApp, options: ConsoleOptions = {}) {
+  protected constructor(app: ConsoleApp, options: ConsoleOptions = {}) {
     this.app = app;
     this.options = options;
 
@@ -55,11 +69,6 @@ export class Console {
       );
       exit(1);
     }
-
-    this._loadConsole = Promise.resolve(app.loadConsole());
-    this._loadConsole.catch(() => {});
-
-    this.console = app.config.console || new TSREPLConsole(app);
   }
 
   isSandbox(): boolean | undefined {
@@ -83,7 +92,6 @@ export class Console {
   }
 
   async start(): Promise<void> {
-    await this._loadConsole;
     if (this.isEnvironment()) this.setEnvironmentBang();
 
     if (this.isSandbox()) {

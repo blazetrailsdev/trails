@@ -171,7 +171,7 @@ describe("SchemaDumper trails-only cases", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("../../lib/connection-adapters/abstract/schema-dumper.js");
     const emptySource = { ...EMPTY_SOURCE };
-    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const dumper = await (TopLevelDumper as any).new(connection(emptySource));
     const parts = dumper.indexParts({ columns: ["a"], unique: false, include: ["b", "c"] });
     expect(parts.join(", ")).toContain(`include: ["b","c"]`);
   });
@@ -180,7 +180,7 @@ describe("SchemaDumper trails-only cases", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("../../lib/connection-adapters/abstract/schema-dumper.js");
     const emptySource = { ...EMPTY_SOURCE };
-    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const dumper = await (TopLevelDumper as any).new(connection(emptySource));
     const parts = dumper.indexParts({
       columns: ["created_at"],
       unique: false,
@@ -193,7 +193,7 @@ describe("SchemaDumper trails-only cases", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("../../lib/connection-adapters/abstract/schema-dumper.js");
     const emptySource = { ...EMPTY_SOURCE };
-    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const dumper = await (TopLevelDumper as any).new(connection(emptySource));
     const parts = dumper.indexParts(
       new IndexDefinition("t", "i", false, ["name", "rating"], {
         orders: { name: "desc", rating: "desc" },
@@ -206,7 +206,7 @@ describe("SchemaDumper trails-only cases", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("../../lib/connection-adapters/abstract/schema-dumper.js");
     const emptySource = { ...EMPTY_SOURCE };
-    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const dumper = await (TopLevelDumper as any).new(connection(emptySource));
     const parts = dumper.indexParts({
       columns: ["name", "rating"],
       unique: false,
@@ -219,7 +219,7 @@ describe("SchemaDumper trails-only cases", () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("../../lib/connection-adapters/abstract/schema-dumper.js");
     const emptySource = { ...EMPTY_SOURCE };
-    const dumper = new (TopLevelDumper as any)(connection(emptySource));
+    const dumper = await (TopLevelDumper as any).new(connection(emptySource));
     const parts = dumper.indexParts(
       new IndexDefinition("t", "i", false, ["name", "description"], {
         opclasses: { name: "varchar_pattern_ops", description: "varchar_pattern_ops" },
@@ -235,10 +235,10 @@ describe("SchemaDumper trails-only cases", () => {
       await import("../../lib/connection-adapters/abstract-mysql-adapter.js");
     const index = { columns: ["name"], unique: false, using: "btree" };
 
-    const sqliteLike = new (TopLevelDumper as any)(connection(EMPTY_SOURCE));
+    const sqliteLike = await (TopLevelDumper as any).new(connection(EMPTY_SOURCE));
     expect(sqliteLike.indexParts(index).join(", ")).toContain(`using: "btree"`);
 
-    const mysqlLike = new (TopLevelDumper as any)(
+    const mysqlLike = await (TopLevelDumper as any).new(
       connection({ defaultIndexType: AbstractMysqlAdapter.prototype.defaultIndexType }),
     );
     expect(mysqlLike.indexParts(index).join(", ")).not.toContain("using:");
@@ -448,7 +448,7 @@ describe("SchemaDumperAdapterTest", () => {
       tableOptions: async () => ({ comment: "user accounts" }),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const dumper = TopLevelDumper.create(connection(source));
+    const dumper = await TopLevelDumper.create(connection(source));
     const lines = new StringIO();
     await (dumper as any).table("users", lines);
     expect(lines.string()).toContain(`comment: "user accounts"`);
@@ -465,7 +465,7 @@ describe("SchemaDumperAdapterTest", () => {
       tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    const dumper = TopLevelDumper.create(connection(source));
+    const dumper = await TopLevelDumper.create(connection(source));
     const lines = new StringIO();
     await (dumper as any).table("t", lines);
     const header = lines.string().split("\n")[0];
@@ -484,7 +484,7 @@ describe("SchemaDumperAdapterTest", () => {
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: { ...PRIMARY_KEY_ADAPTER, primaryKey: async () => ["id", "account_id"] },
     };
-    const dumper = TopLevelDumper.create(connection(source));
+    const dumper = await TopLevelDumper.create(connection(source));
     const lines = new StringIO();
     await (dumper as any).table("t", lines);
     expect(lines.string().split("\n")[0]).toContain(`primaryKey: ["id","account_id"]`);
@@ -529,7 +529,7 @@ describe("SchemaDumper async header ordering", () => {
       columns: async () => [],
       indexes: async () => [],
     };
-    const dumper = new (OrderedDumper as any)(connection(source));
+    const dumper = await (OrderedDumper as any).new(connection(source));
     const result = (await dumper.dump(new StringIO())).string();
     expect(log).toEqual(["schemas", "extensions", "types"]);
     const schemasIdx = result.indexOf("SCHEMAS");
@@ -540,8 +540,8 @@ describe("SchemaDumper async header ordering", () => {
   });
 });
 
-describe("formatColspec", () => {
-  const dumper = SchemaDumper.create(
+describe("formatColspec", async () => {
+  const dumper = await SchemaDumper.create(
     connection({
       tables: async () => [],
       supportsForeignKeys: () => false,
@@ -574,7 +574,7 @@ describe("SchemaDumper#indexes", () => {
   it("emits sorted addIndex statements for a table", async () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("../../lib/connection-adapters/abstract/schema-dumper.js");
-    const dumper = new (TopLevelDumper as any)({
+    const dumper = await (TopLevelDumper as any).new({
       tables: async () => ["posts"],
       columns: async () => [],
       indexes: async () => [
@@ -595,7 +595,7 @@ describe("SchemaDumper#indexes", () => {
   it("writes nothing when the table has no indexes", async () => {
     const { SchemaDumper: TopLevelDumper } =
       await import("../../lib/connection-adapters/abstract/schema-dumper.js");
-    const dumper = new TopLevelDumper({
+    const dumper = await TopLevelDumper.create({
       ...EMPTY_SOURCE,
       lookupCastTypeFromColumn: () => new ValueType(),
       adapter: PRIMARY_KEY_ADAPTER,
@@ -603,5 +603,17 @@ describe("SchemaDumper#indexes", () => {
     const stream = new StringIO();
     await dumper.indexes("posts", stream);
     expect(stream.string()).toBe("");
+  });
+});
+
+describe("SchemaDumper.new", () => {
+  it("rescues a rejected current_version to nil, as initialize does", async () => {
+    const pool = {
+      migrationContext: { currentVersion: () => Promise.reject(new Error("no table")) },
+    };
+    const dumper = await SchemaDumper.create({ pool } as never);
+    expect(await (dumper as unknown as { defineParams(): Promise<string> }).defineParams()).toBe(
+      "",
+    );
   });
 });

@@ -7,15 +7,12 @@ import { rbInspect, rtest } from "@blazetrails/ruby-compat";
 export class SchemaDumper extends BaseSchemaDumper {
   static readonly DEFAULT_DATETIME_PRECISION = 6;
 
-  static override create<T extends typeof BaseSchemaDumper>(
-    this: T,
+  static override create<T extends BaseSchemaDumper>(
+    this: { prototype: T },
     connection: DatabaseAdapter,
     options: Record<string, unknown> = {},
-  ): InstanceType<T> {
-    return new (this as unknown as new (
-      connection: DatabaseAdapter,
-      options: Record<string, unknown>,
-    ) => InstanceType<T>)(connection, options);
+  ): Promise<T> {
+    return (this as unknown as typeof BaseSchemaDumper).new(connection, options) as Promise<T>;
   }
 
   /** @internal */

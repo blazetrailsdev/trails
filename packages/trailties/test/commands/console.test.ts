@@ -49,7 +49,7 @@ describe("Trails::ConsoleTest", () => {
   });
 
   async function start(argv: string[] = []) {
-    const trailsConsole = new Console(app, parseArguments(argv));
+    const trailsConsole = await Console.new(app, parseArguments(argv));
     output = await capture(":stdout", () => trailsConsole.start());
   }
 
@@ -64,16 +64,16 @@ describe("Trails::ConsoleTest", () => {
     await block();
   }
 
-  it("sandbox option", () => {
-    expect(new Console(app, parseArguments(["--sandbox"])).isSandbox()).toBeTruthy();
+  it("sandbox option", async () => {
+    expect((await Console.new(app, parseArguments(["--sandbox"]))).isSandbox()).toBeTruthy();
   });
 
-  it("short version of sandbox option", () => {
-    expect(new Console(app, parseArguments(["-s"])).isSandbox()).toBeTruthy();
+  it("short version of sandbox option", async () => {
+    expect((await Console.new(app, parseArguments(["-s"]))).isSandbox()).toBeTruthy();
   });
 
-  it("no options", () => {
-    expect(new Console(app, parseArguments([])).isSandbox()).toBeFalsy();
+  it("no options", async () => {
+    expect((await Console.new(app, parseArguments([]))).isSandbox()).toBeFalsy();
   });
 
   it("start", async () => {
@@ -94,12 +94,12 @@ describe("Trails::ConsoleTest", () => {
     expect(output).toMatch(/\sproduction\s/);
   });
 
-  it("console defaults to TSREPL", () => {
-    expect((new Console(buildApp(null)).console as TSREPLConsole).name()).toBe("TSREPL");
+  it("console defaults to TSREPL", async () => {
+    expect(((await Console.new(buildApp(null))).console as TSREPLConsole).name()).toBe("TSREPL");
   });
 
-  it("prompt env colorization", () => {
-    const tsreplConsole = new Console(buildApp(null)).console as TSREPLConsole;
+  it("prompt env colorization", async () => {
+    const tsreplConsole = (await Console.new(buildApp(null))).console as TSREPLConsole;
     const red = "\u001b[31m";
     const blue = "\u001b[34m";
     const clear = "\u001b[0m";

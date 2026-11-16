@@ -32,13 +32,13 @@ const emptySource: any = {
 };
 
 describe("SchemaDumper", () => {
-  it("create returns a SchemaDumper instance", () => {
-    const dumper = SchemaDumper.create(emptySource);
+  it("create returns a SchemaDumper instance", async () => {
+    const dumper = await SchemaDumper.create(emptySource);
     expect(dumper).toBeInstanceOf(SchemaDumper);
   });
 
-  it("create accepts options", () => {
-    const dumper = SchemaDumper.create(emptySource, { tableNamePrefix: "app_" });
+  it("create accepts options", async () => {
+    const dumper = await SchemaDumper.create(emptySource, { tableNamePrefix: "app_" });
     expect(dumper).toBeInstanceOf(SchemaDumper);
   });
 
@@ -48,7 +48,7 @@ describe("SchemaDumper", () => {
 });
 
 describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
-  function makeAdapterDumper(
+  async function makeAdapterDumper(
     column: Record<string, unknown>,
     type:
       | InstanceType<typeof IntegerType>
@@ -57,44 +57,44 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
       | InstanceType<typeof StringType>,
   ) {
     const adapter = { lookupCastTypeFromColumn: () => type };
-    const dumper = SchemaDumper.create(adapter as any);
+    const dumper = await SchemaDumper.create(adapter as any);
     return (dumper as any).schemaDefault(column) as string | undefined;
   }
 
-  it("integer column with raw string default deserializes to number literal", () => {
-    const result = makeAdapterDumper(
+  it("integer column with raw string default deserializes to number literal", async () => {
+    const result = await makeAdapterDumper(
       { hasDefault: true, default: "5", type: "integer" },
       new IntegerType(),
     );
     expect(result).toBe("5");
   });
 
-  it("boolean column with raw string default deserializes to true/false literal", () => {
-    const result = makeAdapterDumper(
+  it("boolean column with raw string default deserializes to true/false literal", async () => {
+    const result = await makeAdapterDumper(
       { hasDefault: true, default: "1", type: "boolean" },
       new BooleanType(),
     );
     expect(result).toBe("true");
   });
 
-  it("text column with raw string default keeps quoted string", () => {
-    const result = makeAdapterDumper(
+  it("text column with raw string default keeps quoted string", async () => {
+    const result = await makeAdapterDumper(
       { hasDefault: true, default: "hello", type: "string" },
       new StringType(),
     );
     expect(result).toBe('"hello"');
   });
 
-  it("decimal column with raw string default rounds via type", () => {
-    const result = makeAdapterDumper(
+  it("decimal column with raw string default rounds via type", async () => {
+    const result = await makeAdapterDumper(
       { hasDefault: true, default: "2.789", type: "decimal" },
       new DecimalType({ precision: 5, scale: 2 }),
     );
     expect(result).toBe('"2.79"');
   });
 
-  it("null default falls through to schemaExpression", () => {
-    const result = makeAdapterDumper(
+  it("null default falls through to schemaExpression", async () => {
+    const result = await makeAdapterDumper(
       { hasDefault: true, default: null, defaultFunction: "uuid()" },
       new StringType(),
     );
@@ -102,8 +102,8 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
   });
 });
 
-describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
-  const dumper = SchemaDumper.create(emptySource) as any;
+describe("SchemaDumper columnSpec emits TS-DSL-emittable text", async () => {
+  const dumper = (await SchemaDumper.create(emptySource)) as any;
 
   it("schemaPrecision emits TS `null` (not Ruby `nil`) for datetime without precision", () => {
     expect(dumper.schemaPrecision({ type: "datetime", precision: null })).toBe("null");
@@ -150,7 +150,9 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
   };
 
   it("emits the Could-not-dump comment instead of a fabricated t.column line", async () => {
-    const output = (await connection(source).createSchemaDumper({}).dump(new StringIO())).string();
+    const output = (
+      await (await connection(source).createSchemaDumper({})).dump(new StringIO())
+    ).string();
     expect(output).toContain(`# Could not dump table "widgets" because of following StandardError`);
     expect(output).toContain(`#   Unknown type 'composite_type' for column 'kind'`);
     expect(output).not.toContain("createTable");
@@ -171,7 +173,7 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
       primaryKey: async () => "id",
     };
     const output = (
-      await connection(validSource).createSchemaDumper({}).dump(new StringIO())
+      await (await connection(validSource).createSchemaDumper({})).dump(new StringIO())
     ).string();
     expect(output).not.toContain("# Could not dump table");
     expect(output).toContain(`await ctx.createTable("widgets"`);

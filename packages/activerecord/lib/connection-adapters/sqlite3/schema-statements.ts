@@ -234,7 +234,7 @@ export async function removeCheckConstraint(
 export function createSchemaDumper(
   this: DatabaseAdapter,
   options: Record<string, unknown>,
-): AbstractSchemaDumper {
+): Promise<AbstractSchemaDumper> {
   return SchemaDumper.create(this, options);
 }
 
