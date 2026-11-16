@@ -355,10 +355,10 @@ function _osslStartSslError(e: unknown, io: SSLSocketIO): unknown {
   const errorAppend = SSL_VERIFY_CODES.includes(host.code)
     ? `: certificate verify failed (${host.message.replace(/; if the root CA .*$/s, "")})`
     : `: ${host.reason ?? host.message}`;
-  let peeraddr: string;
+  let peeraddr = "(null)";
   try {
-    const [, port, addr] = io.peeraddr!();
-    peeraddr = `${addr}:${port}`;
+    const addrinfo = io.peeraddr?.();
+    if (addrinfo !== undefined) peeraddr = `${addrinfo[2]}:${addrinfo[1]}`;
   } catch {
     peeraddr = "(null)";
   }
