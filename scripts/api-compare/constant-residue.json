@@ -730,6 +730,8 @@
       "core-ext/object/json.ts::Time",
       "core-ext/object/json.ts::TrueClass",
       "core-ext/object/try.ts::Delegator",
+      "core-ext/string/output-safety.ts::Numeric",
+      "core-ext/string/output-safety.ts::Object",
       "deprecation.ts::DeprecationException",
       "messages/serializer-with-fallback.ts::Thrown",
       "null-logger.ts::NullLogger",
