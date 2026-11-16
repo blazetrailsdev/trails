@@ -1,21 +1,13 @@
-import { Temporal } from "@js-temporal/polyfill";
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
 
-/** @noRailsEquivalent PERMANENT */
-export function actsLikeDate(self: unknown): boolean {
-  return (
-    self instanceof Temporal.PlainDate ||
-    self instanceof Temporal.PlainDateTime ||
-    self instanceof Temporal.ZonedDateTime
-  );
+const actsLikeTrue = () => true;
+Object.assign(TEMPORAL_METHOD_TABLE["Temporal.PlainDate"], { actsLikeDate: actsLikeTrue });
+for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], {
+    actsLikeDate: actsLikeTrue,
+    actsLikeTime: actsLikeTrue,
+  });
 }
-
-/** @noRailsEquivalent PERMANENT */
-export function actsLikeTime(self: unknown): boolean {
-  return (
-    // boundary: a JS `Date` is one of the Ruby-`Time`-shaped values this answers for.
-    self instanceof globalThis.Date ||
-    self instanceof Temporal.Instant ||
-    self instanceof Temporal.PlainDateTime ||
-    self instanceof Temporal.ZonedDateTime
-  );
+for (const seat of ["Temporal.Instant", "Date"]) {
+  (TEMPORAL_METHOD_TABLE[seat] ??= {}).actsLikeTime = actsLikeTrue;
 }

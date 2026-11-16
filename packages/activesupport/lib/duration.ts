@@ -195,6 +195,16 @@ export class Duration {
     return Duration.years(n);
   }
 
+  coerce(other: unknown): [Scalar, Duration] {
+    if (other instanceof Scalar) {
+      return [other, this];
+    }
+    if (other instanceof Duration) {
+      return [new Scalar(other.value), this];
+    }
+    return [new Scalar(other as number), this];
+  }
+
   plus(other: Duration | Scalar | number): Duration {
     if (other instanceof Duration) {
       return new Duration(
@@ -406,6 +416,10 @@ export class Duration {
     );
   }
 
+  asJson(_options: unknown = null): number {
+    return Math.trunc(this.inSeconds());
+  }
+
   equals(other: unknown): boolean {
     if (other instanceof Duration) {
       return rbEqual(other.value, this.value);
@@ -471,20 +485,6 @@ export class Duration {
     if (isDateTime(time) || !(time instanceof Date || time instanceof Temporal.Instant))
       return applyDurationToDate(time, this.parts, this._partKeys, sign);
     return applyDurationPreservingNs(time, this.parts, sign);
-  }
-
-  asJson(_options: unknown = null): number {
-    return Math.trunc(this.inSeconds());
-  }
-
-  coerce(other: unknown): [Scalar, Duration] {
-    if (other instanceof Scalar) {
-      return [other, this];
-    }
-    if (other instanceof Duration) {
-      return [new Scalar(other.value), this];
-    }
-    return [new Scalar(other as number), this];
   }
 
   private respondToMissing(method: string, _includePrivate = false): boolean {

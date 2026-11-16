@@ -780,6 +780,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
           obj instanceof rbCDate ||
           temporalTag(obj) !== null ||
           isPlainHash(obj);
+  if (obj instanceof String && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
   if (core) {
     if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
     if (Array.isArray(obj) && mid === "toAry") return true;
@@ -1418,8 +1419,11 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   const bound = temporalMethod(recv, mid);
   if (bound !== undefined) return bound(recv, ...args);
-  if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
-    return rbStrSend(recv, mid, ...args)[0];
+  if (
+    (typeof recv === "string" || recv instanceof String) &&
+    Object.hasOwn(STRING_METHOD_TABLE, mid)
+  ) {
+    return rbStrSend(recv.valueOf(), mid, ...args)[0];
   }
   if (recv instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];

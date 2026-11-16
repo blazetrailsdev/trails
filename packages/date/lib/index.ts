@@ -1,5 +1,5 @@
 export { Temporal } from "@js-temporal/polyfill";
-export { actsLikeDate, actsLikeTime } from "./acts-like.js";
+import "./acts-like.js";
 export {
   ArgumentError,
   Date,

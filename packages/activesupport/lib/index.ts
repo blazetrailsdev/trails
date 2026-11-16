@@ -456,6 +456,7 @@ export {
   String as BlankString,
   Time as BlankTime,
 } from "./core-ext/object/blank.js";
+import "./core-ext/string/behavior.js";
 export { actsLike } from "./core-ext/object/acts-like.js";
 export { Object as InstanceVariablesObject } from "./core-ext/object/instance-variables.js";
 export { Delegator, Tryable } from "./core-ext/object/try.js";

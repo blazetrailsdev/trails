@@ -45,7 +45,7 @@ import {
   UnderscoresToDashes,
 } from "../../lib/inflector-test-cases.js";
 import { SafeBuffer, htmlSafe, isHtmlSafe } from "../../lib/core-ext/string/output-safety.js";
-import { NoMethodError, Range, resetConstants } from "@blazetrails/ruby-compat";
+import { NoMethodError, Range, rbFSend, resetConstants } from "@blazetrails/ruby-compat";
 import { endsWith, startsWith } from "../../lib/core-ext/string/starts-ends-with.js";
 import { htmlEscape, htmlEscapeOnce, xmlNameEscape } from "../../lib/core-ext/tse/util.js";
 import {
@@ -73,7 +73,7 @@ import {
 } from "../../lib/index.js";
 import { I18n } from "../../lib/i18n.js";
 import { toTimePreservesTimezone } from "../../lib/active-support.js";
-import { actsLikeString } from "../../lib/core-ext/string/behavior.js";
+import "../../lib/core-ext/string/behavior.js";
 import { isUtf8, mbChars } from "../../lib/core-ext/string/multibyte.js";
 import { Multibyte } from "../../lib/multibyte.js";
 import { withEnvTz } from "../../lib/time-zone-test-helpers.js";
@@ -547,7 +547,7 @@ describe("CoreExtStringMultibyteTest", () => {
 
 describe("StringBehaviorTest", () => {
   it("acts like string", () => {
-    assertPredicate("Bambi", actsLikeString);
+    assertPredicate("Bambi", (s) => rbFSend(s, "actsLikeString"));
   });
 });
 

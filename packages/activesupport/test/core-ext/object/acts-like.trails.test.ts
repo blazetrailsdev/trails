@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import "@blazetrails/date";
+import "../../../lib/core-ext/string/behavior.js";
 import { actsLike } from "../../../lib/core-ext/object/acts-like.js";
 
 class Stringish extends String {}
