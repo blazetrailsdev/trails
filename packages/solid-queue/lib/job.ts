@@ -5,7 +5,9 @@ import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Time } from "@blazetrails/date";
 import {
   constSet,
+  NameError,
   StandardError,
+  rbInspect,
   excBacktrace,
   excSetBacktrace,
   rbModName,
@@ -25,6 +27,12 @@ import type { Retryable } from "./job/retryable.js";
 import type { Duration } from "@blazetrails/activesupport";
 
 export class EnqueueError extends StandardError {}
+
+export class ClassMissingError extends NameError {
+  static for(job: { class_name: string }): ClassMissingError {
+    return new this(`Job class ${rbInspect(job.class_name)} could not be resolved`);
+  }
+}
 
 type ActiveJob = ActiveJobBase & { concurrencyKey(): string | null };
 
@@ -69,6 +77,8 @@ export class Job extends Record {
   declare concurrencyDuration: () => Duration;
   declare unblockNextBlockedJob: typeof ConcurrencyControls.prototype.unblockNextBlockedJob;
   declare isConcurrencyLimited: typeof ConcurrencyControls.prototype.isConcurrencyLimited;
+  declare acquireConcurrencyLock: typeof ConcurrencyControls.prototype.acquireConcurrencyLock;
+  declare jobClass: typeof ConcurrencyControls.prototype.jobClass;
   declare isBlocked: typeof ConcurrencyControls.prototype.isBlocked;
   declare retry: typeof Retryable.prototype.retry;
   declare failedWith: typeof Retryable.prototype.failedWith;

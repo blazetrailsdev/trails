@@ -3,6 +3,7 @@ import { slice } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { constSet, Range, rbFArray } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
+import { ClassMissingError } from "./job.js";
 import { SolidQueue } from "./solid-queue.js";
 import { Semaphore } from "./semaphore.js";
 import { ReadyExecution } from "./ready-execution.js";
@@ -77,7 +78,12 @@ export class BlockedExecution extends Execution {
       { job_id: job.id, concurrency_key: this.concurrency_key, released: false },
       async (payload) => {
         return await this.transaction(async () => {
-          if (await this.acquireConcurrencyLock()) {
+          if (job.jobClass() == null) {
+            await job.failedWith(ClassMissingError.for(job));
+            await this.destroyBang();
+
+            return (payload["failed"] = true);
+          } else if (await job.acquireConcurrencyLock()) {
             await this.promoteToReady();
             await this.destroyBang();
 
@@ -92,11 +98,6 @@ export class BlockedExecution extends Execution {
   /** @internal */
   private async setExpiresAt(): Promise<void> {
     this.expires_at = (await this.job).concurrencyDuration().fromNow() as Time;
-  }
-
-  /** @internal */
-  private async acquireConcurrencyLock(): Promise<boolean> {
-    return await Semaphore.wait(await this.job);
   }
 
   /** @internal */

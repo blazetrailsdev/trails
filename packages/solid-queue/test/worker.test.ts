@@ -78,7 +78,12 @@ describe("WorkerTest", () => {
 
     const process = (await Process.first()) as Process;
     expect(process.kind).toBe("Worker");
-    assertMetadata(process, { queues: "background", polling_interval: 0.2, thread_pool_size: 3 });
+    assertMetadata(process, {
+      queues: "background",
+      polling_interval: 0.2,
+      pool_type: "thread",
+      pool_size: 3,
+    });
   });
 
   it("errors on polling are passed to on_thread_error and re-raised", async () => {

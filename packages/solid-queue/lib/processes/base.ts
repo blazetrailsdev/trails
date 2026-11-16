@@ -23,7 +23,7 @@ export class Base {
   }
 
   readonly name: string;
-  private _stopped: boolean;
+  protected _stopped: boolean;
   private _hostname?: string;
   private _pid?: number;
 
