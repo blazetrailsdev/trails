@@ -65,10 +65,6 @@ function isThenable(v: unknown): v is PromiseLike<unknown> {
   );
 }
 
-function swallowRejection(v: unknown): void {
-  if (isThenable(v)) void Promise.resolve(v).catch(() => {});
-}
-
 export class Value {
   private readonly block: (value: unknown) => unknown;
 
@@ -358,7 +354,6 @@ export class Before {
       const r = resultLambda();
       if (!isThenable(r)) return env;
       if (syncChain !== undefined) {
-        swallowRejection(r);
         throw new RuntimeError(
           `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
@@ -374,7 +369,6 @@ export class Before {
       });
       if (isThenable(halt)) {
         if (syncChain !== undefined) {
-          swallowRejection(halt);
           throw new RuntimeError(
             `Async callback on sync chain "${syncChain}" — before returned a Promise`,
           );
@@ -385,7 +379,6 @@ export class Before {
         });
       }
       if (isThenable(cbResult)) {
-        swallowRejection(cbResult);
         if (syncChain !== undefined) {
           throw new RuntimeError(
             `Async callback on sync chain "${syncChain}" — before returned a Promise`,
@@ -409,7 +402,6 @@ export class Before {
         return;
       }
       if (syncChain !== undefined) {
-        swallowRejection(cbResult);
         throw new RuntimeError(
           `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
@@ -482,7 +474,6 @@ export class After {
       const r = this.userCallback(target, value);
       if (isThenable(r)) {
         if (syncChain !== undefined) {
-          swallowRejection(r);
           throw new RuntimeError(
             `Async callback on sync chain "${syncChain}" — after returned a Promise`,
           );
@@ -944,7 +935,7 @@ interface InvokeSequenceState {
 }
 
 interface ProceedTracker {
-  pending: Promise<unknown> | undefined;
+  settled: Promise<PromiseSettledResult<unknown>[]>[];
   observed: boolean;
 }
 
@@ -954,7 +945,6 @@ function assignYield(env: Environment, y: unknown): void | Promise<void> {
     return;
   }
   if (env.syncChain !== undefined) {
-    swallowRejection(y);
     throw new RuntimeError(
       `Async callback on sync chain "${env.syncChain}" — block returned a Promise`,
     );
@@ -969,33 +959,31 @@ function observeProceed(
   r: PromiseLike<unknown>,
   env: Environment,
 ): unknown {
-  tracker.pending = Promise.resolve(r);
-  const observed = tracker.pending.then(() => env.value);
-  observed.catch(() => {});
+  const pending = Promise.resolve(r);
+  tracker.settled.push(Promise.allSettled([pending]));
+  const observed = () => pending.then(() => env.value);
+  const settle = <T>(p: Promise<T>): Promise<T> => {
+    tracker.settled.push(Promise.allSettled([p]));
+    return p;
+  };
   return Object.setPrototypeOf(
     {
       then(onFulfilled?: any, onRejected?: any) {
         if (typeof onRejected === "function") {
           tracker.observed = true;
-          return observed.then(onFulfilled, onRejected);
+          return observed().then(onFulfilled, onRejected);
         }
-        const p = observed.then(onFulfilled);
-        p.catch(() => {});
-        return p;
+        return settle(observed().then(onFulfilled));
       },
       catch(onRejected?: any) {
         if (typeof onRejected === "function") {
           tracker.observed = true;
-          return observed.catch(onRejected);
+          return observed().catch(onRejected);
         }
-        const p = observed.catch(onRejected);
-        p.catch(() => {});
-        return p;
+        return settle(observed().catch(onRejected));
       },
       finally(onFinally?: any) {
-        const p = observed.finally(onFinally);
-        p.catch(() => {});
-        return p;
+        return settle(observed().finally(onFinally));
       },
     },
     Promise.prototype,
@@ -1191,7 +1179,6 @@ function runCallbacks(
     const r = block?.();
     if (!isThenable(r)) return r;
     if (strict === "sync") {
-      swallowRejection(r);
       throw new RuntimeError("Async block on chain with no callbacks");
     }
     return r;
@@ -1242,7 +1229,7 @@ function runCallbacks(
         } else {
           nextSequence = nextSequence.nested!;
           const proceeding = tracker;
-          const own: ProceedTracker = (tracker = { pending: undefined, observed: false });
+          const own: ProceedTracker = (tracker = { settled: [], observed: false });
           let cbResult: unknown;
           try {
             const [receiver, blk, method, ...args] = current.expandCallTemplate(
@@ -1260,11 +1247,10 @@ function runCallbacks(
               );
             }
           } catch (err) {
-            if (own.pending) {
-              const pending = own.pending;
+            if (own.settled.length > 0) {
               result = (async () => {
                 try {
-                  await pending.catch(() => {});
+                  await Promise.all(own.settled);
                 } finally {
                   nextSequence = current;
                   tracker = proceeding;
@@ -1275,15 +1261,13 @@ function runCallbacks(
             }
             throw err;
           } finally {
-            if (env.syncChain !== undefined || !(isThenable(cbResult) || own.pending)) {
+            if (env.syncChain !== undefined || !(isThenable(cbResult) || own.settled.length > 0)) {
               nextSequence = current;
               tracker = proceeding;
             }
           }
-          if (isThenable(cbResult) || own.pending) {
+          if (isThenable(cbResult) || own.settled.length > 0) {
             if (env.syncChain !== undefined) {
-              swallowRejection(cbResult);
-              swallowRejection(own.pending);
               throw new RuntimeError(
                 `Async callback on sync chain "${env.syncChain}" — around callback or block returned a Promise`,
               );
@@ -1293,13 +1277,11 @@ function runCallbacks(
                 try {
                   await cbResult;
                 } catch (err) {
-                  if (own.pending) await own.pending.catch(() => {});
+                  await Promise.all(own.settled);
                   throw err;
                 }
-                if (own.pending) {
-                  if (own.observed) await own.pending.catch(() => {});
-                  else await own.pending;
-                }
+                const [[proceeded] = []] = await Promise.all(own.settled);
+                if (!own.observed && proceeded?.status === "rejected") throw proceeded.reason;
               } finally {
                 nextSequence = current;
                 tracker = proceeding;
