@@ -10,6 +10,23 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "command/base_test.rb:13 asserts the snake_case name; RFC 0171 decision 6 makes a command name kebab-case on the command line",
     },
   ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › kamal files are skipped if required":
+    [
+      {
+        kind: "assert_empty",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:688 greps the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+      {
+        kind: "assert_empty",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:689 greps the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+    ],
   "trailties:generators/api_app_generator_test.rb › ApiAppGeneratorTest › api modified files": [
     {
       kind: "assert_match",

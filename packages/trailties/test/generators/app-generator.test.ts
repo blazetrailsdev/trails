@@ -440,6 +440,44 @@ describe("AppGeneratorTest", () => {
 
     await t.assertFile("after_bundle_callback_ran");
   });
+
+  it("configuration of solid", async () => {
+    await runGeneratorInstance([t.destinationRoot]);
+
+    await assertGem("@blazetrails/solid-cache");
+    await assertGem("@blazetrails/solid-queue");
+    await assertGem("@blazetrails/solid-cable");
+
+    await t.assertFile("config/database.ts", (content: string) => {
+      expect(content).toMatch(/cache:/);
+      expect(content).toMatch(/queue:/);
+      expect(content).toMatch(/cable:/);
+    });
+  });
+
+  it("inclusion of kamal files", async () => {
+    await runGeneratorInstance([t.destinationRoot]);
+
+    await t.assertFile("config/deploy.yml");
+    await t.assertFile(".kamal/secrets");
+  });
+
+  it("kamal files are skipped if required", async () => {
+    await runGeneratorInstance([t.destinationRoot, "--skip-kamal"]);
+
+    t.assertNoFile("config/deploy.yml");
+    t.assertNoFile(".kamal/secrets");
+  });
+
+  it("database yml skip kamal", async () => {
+    await t.runGenerator([t.destinationRoot, "--skip-kamal"]);
+
+    await t.assertFile("config/database.ts", (content: string) => {
+      expect(content).toMatch("db/queue_migrate");
+      expect(content).toMatch("db/cache_migrate");
+      expect(content).toMatch("db/cable_migrate");
+    });
+  });
 });
 
 describe("AppGenerator", () => {
@@ -854,20 +892,6 @@ describe("AppGenerator", () => {
     await assertNoGem("@blazetrails/solid-cache");
     await assertNoGem("@blazetrails/solid-queue");
     await assertNoGem("@blazetrails/solid-cable");
-  });
-
-  it("configuration of solid", async () => {
-    await runGeneratorInstance([t.destinationRoot]);
-
-    await assertGem("@blazetrails/solid-cache");
-    await assertGem("@blazetrails/solid-queue");
-    await assertGem("@blazetrails/solid-cable");
-
-    await t.assertFile("config/database.ts", (content: string) => {
-      expect(content).toMatch(/cache:/);
-      expect(content).toMatch(/queue:/);
-      expect(content).toMatch(/cable:/);
-    });
   });
 
   it("default generator executes all trails commands", async () => {
