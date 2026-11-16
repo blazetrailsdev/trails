@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Range } from "@blazetrails/ruby-compat";
-import { inGroupsOf, kernelArray, toFs } from "../lib/array-utils.js";
+import { kernelArray } from "../lib/array-utils.js";
+import { inGroupsOf } from "../lib/core-ext/array/grouping.js";
+import { toFs } from "../lib/core-ext/array/conversions.js";
 
 describe("KernelArrayTest (trails)", () => {
   it("returns an empty array for nil", () => {

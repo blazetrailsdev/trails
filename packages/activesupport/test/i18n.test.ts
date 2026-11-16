@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { I18n } from "../lib/i18n.js";
-import { toSentence } from "../lib/array-utils.js";
+import { toSentence } from "../lib/core-ext/array/conversions.js";
 import { TimeZone } from "../lib/values/time-zone.js";
 import { Date as RubyDate, Temporal, strftime } from "@blazetrails/date";
 import type { TimeWithZone } from "../lib/time-with-zone.js";

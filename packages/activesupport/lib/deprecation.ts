@@ -1,4 +1,4 @@
-import { wrap } from "./array-utils.js";
+import { wrap } from "./core-ext/array/wrap.js";
 import { currentErrorReporter } from "./error-reporter.js";
 import { deprecateMethods } from "./deprecation/method-wrappers.js";
 import { ArgumentError } from "./hash-utils.js";

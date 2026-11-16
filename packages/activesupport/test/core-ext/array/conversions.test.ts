@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { toFormattedS, toFs, toSentence, toXml } from "../../../lib/array-utils.js";
+import { toFormattedS, toFs, toSentence, toXml } from "../../../lib/core-ext/array/conversions.js";
 import { BigDecimal } from "../../../lib/core-ext/big-decimal/conversions.js";
 import { ArgumentError } from "../../../lib/hash-utils.js";
 import { SafeBuffer } from "../../../lib/core-ext/string/output-safety.js";

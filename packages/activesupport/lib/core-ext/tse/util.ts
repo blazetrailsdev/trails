@@ -132,7 +132,7 @@ export function tokenize(source: string): [string, string][] {
       tokens.push([":CLOSE", scanner.matched()!]);
     } else {
       // @nie disposition=TODO
-      throw new NotImplementedError(scanner.matched());
+      throw new NotImplementedError(scanner.matched()!);
     }
 
     if (

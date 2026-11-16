@@ -38,7 +38,7 @@ import { current as timeCurrent } from "./core-ext/time/calculations.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import { ArgumentError } from "./hash-utils.js";
-import { toSentence } from "./array-utils.js";
+import { toSentence } from "./core-ext/array/conversions.js";
 import { rbHash } from "@blazetrails/ruby-compat";
 import type { TimeWithZone } from "./time-with-zone.js";
 import { actsLike } from "./core-ext/object/acts-like.js";

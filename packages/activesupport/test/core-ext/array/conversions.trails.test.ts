@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { toXml } from "../../../lib/array-utils.js";
+import { toXml } from "../../../lib/core-ext/array/conversions.js";
 import { HashWithIndifferentAccess } from "../../../lib/hash-with-indifferent-access.js";
 
 const root = (array: unknown[]) =>

@@ -226,19 +226,15 @@ export {
   type ToJsonWithActiveSupportEncoderHost,
 } from "./core-ext/object/json.js";
 
+export { kernelArray, min, selectBang } from "./array-utils.js";
+export { wrap } from "./core-ext/array/wrap.js";
+export { inGroupsOf, inGroups, split } from "./core-ext/array/grouping.js";
+export { extractBang } from "./core-ext/array/extract.js";
 export {
-  wrap,
-  kernelArray,
-  inGroupsOf,
-  inGroups,
-  split,
-  extractBang,
-  min,
-  selectBang,
   toSentence,
   toFs as toFsArray,
   toXml as toXmlArray,
-} from "./array-utils.js";
+} from "./core-ext/array/conversions.js";
 
 export {
   sum,
