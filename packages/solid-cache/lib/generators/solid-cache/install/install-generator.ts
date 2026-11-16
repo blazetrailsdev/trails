@@ -60,10 +60,7 @@ export class InstallGenerator extends Base {
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm connectionDbConfig — PERMANENT
-   */
+  /** @internal */
   private raiseUnsupportedAdapterError(): never {
     const errorMessage = `
 ERROR: Unsupported database adapter for SQL schema format: ${rbInspect(ActiveRecordBase.connectionDbConfig().adapter)}
