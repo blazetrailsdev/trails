@@ -1,6 +1,7 @@
 import { Trails } from "@blazetrails/trailties";
 
 const defaults = {
+  database: <%= JSON.stringify(Object.hasOwn(ENV, "DATABASE") ? ENV.DATABASE : "cache") %>,
   storeOptions: {
     // Cap age of oldest cache entry to fulfill retention policies
     // maxAge: 60 * 24 * 60 * 60,
@@ -19,7 +20,6 @@ export default {
   },
 
   production: {
-    database: <%= JSON.stringify(Object.hasOwn(ENV, "DATABASE") ? ENV.DATABASE : "cache") %>,
     ...defaults,
   },
 };

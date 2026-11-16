@@ -82,6 +82,7 @@ export interface ActiveRecordConfig {
   migrationError?: "page_load" | false;
   verboseQueryLogs?: boolean;
   dumpSchemaAfterMigration?: boolean;
+  schemaFormat?: string;
   attributesForInspect?: string[] | "all";
   databaseSelector?: Record<string, unknown> | null;
   databaseResolver?: unknown;

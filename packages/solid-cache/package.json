@@ -33,6 +33,7 @@
     "@blazetrails/arel": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
+    "@blazetrails/thor": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
   },
   "engines": {

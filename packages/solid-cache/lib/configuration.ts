@@ -1,7 +1,7 @@
 import { Encryptor, type EncryptsOptions } from "@blazetrails/activerecord/encryption";
 import { MessagePackMessageSerializer } from "@blazetrails/activerecord/encryption/message-pack-message-serializer";
 import { isPresent } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbFArray } from "@blazetrails/ruby-compat";
 
 type ConnectsTo = { shards?: Record<string, Record<string, string>> } & Record<string, unknown>;
 
@@ -25,7 +25,7 @@ export class Configuration {
   }: {
     storeOptions?: Record<string, unknown>;
     database?: string | null;
-    databases?: string[] | null;
+    databases?: string | string[] | null;
     connectsTo?: ConnectsTo | null;
     executor?: unknown;
     encrypt?: unknown;
@@ -62,7 +62,7 @@ export class Configuration {
     connectsTo,
   }: {
     database: string | null;
-    databases: string[] | null;
+    databases: string | string[] | null;
     connectsTo: ConnectsTo | null;
   }): void {
     if ([database, databases, connectsTo].filter((x) => x != null).length > 1) {
@@ -73,7 +73,9 @@ export class Configuration {
       this.connectsTo = { shards: { [database]: { writing: database } } };
     } else if (databases) {
       this.connectsTo = {
-        shards: Object.fromEntries(databases.map((database) => [database, { writing: database }])),
+        shards: Object.fromEntries(
+          rbFArray(databases).map((database) => [String(database), { writing: String(database) }]),
+        ),
       };
     } else if (connectsTo) {
       this.connectsTo = connectsTo;

@@ -86,11 +86,12 @@ export class Entry extends Record {
       for (const keysBatch of eachSlice(keys, Entry.MULTI_BATCH_SIZE)) {
         const query = sql(this.selectSql(keysBatch), ...this.keyHashesFor(keysBatch));
 
-        const connection = await this.leaseConnection();
-        const rows = (await connection.selectAll(query, "SolidCache::Entry Load")).castValues(
-          this.attributeTypes() as unknown as Parameters<Result["castValues"]>[0],
-        ) as [unknown, unknown][];
-        for (const [key, value] of rows) results.set(key as Uint8Array, value);
+        await this.withConnection(async (connection) => {
+          const rows = (await connection.selectAll(query, "SolidCache::Entry Load")).castValues(
+            this.attributeTypes() as unknown as Parameters<Result["castValues"]>[0],
+          ) as [unknown, unknown][];
+          for (const [key, value] of rows) results.set(key as Uint8Array, value);
+        });
       }
       return results;
     });
@@ -103,7 +104,9 @@ export class Entry extends Record {
   }
 
   static async clearTruncate(): Promise<unknown> {
-    return await (await this.leaseConnection()).truncate(this.tableName!);
+    return await this.withConnection(async (connection) => {
+      return await connection.truncate(this.tableName!);
+    });
   }
 
   static async clearDelete(): Promise<unknown> {
@@ -144,9 +147,9 @@ export class Entry extends Record {
 
   /** @internal */
   private static async upsertUniqueBy(): Promise<string | null> {
-    return (await (await this.leaseConnection()).supportsInsertConflictTarget())
-      ? "key_hash"
-      : null;
+    return await this.withConnection(async (connection) => {
+      return (await connection.supportsInsertConflictTarget()) ? "key_hash" : null;
+    });
   }
 
   /** @internal */

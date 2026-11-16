@@ -2905,6 +2905,13 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
 
   test_files.concat(Dir.glob(File.join(pkg_dir, "test.rb"))) if pkg_name == "erubi"
 
+  # `test/unit/behaviors.rb` requires one of three behavior copies by Rails
+  # version; trails is Rails 8.0, so it loads `behaviors_rails_8_0/`.
+  if pkg_name == "solid-cache"
+    test_files.reject! { |f| f.include?("/unit/behaviors/") }
+    test_files.concat(Dir.glob(File.join(pkg_dir, "unit", "behaviors_rails_8_0", "*_behavior.rb")))
+  end
+
   if pkg_name == "tzinfo"
     test_files.reject! { |f| File.basename(f) == "test_utils.rb" }
     test_files.concat(Dir.glob(File.join(pkg_dir, "**", "tc_*.rb")))
