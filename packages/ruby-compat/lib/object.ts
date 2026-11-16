@@ -2257,8 +2257,7 @@ export function rbObjIvarSet(obj: object, iv: string, val: unknown): unknown {
  */
 export class RObject {}
 
-/** @perf 0ns — PERMANENT */
-const _hiddenIvars = new WeakMap<object, Map<string, unknown>>();
+const hiddenIvars = new WeakMap<object, Map<string, unknown>>();
 
 /**
  * `rb_ivar_set` (`vendor/ruby/v3.3.11/variable.c:1923`). An `@` name is the
@@ -2274,8 +2273,8 @@ export function rbIvarSet(obj: object, id: string, val: unknown): unknown {
       receiver: obj,
     });
   }
-  let ivars = _hiddenIvars.get(obj);
-  if (ivars === undefined) _hiddenIvars.set(obj, (ivars = new Map()));
+  let ivars = hiddenIvars.get(obj);
+  if (ivars === undefined) hiddenIvars.set(obj, (ivars = new Map()));
   ivars.set(id, val);
   return val;
 }
@@ -2288,7 +2287,7 @@ export function rbIvarSet(obj: object, id: string, val: unknown): unknown {
  */
 export function rbIvarGet(obj: object, id: string): unknown {
   if (id[0] === "@") return rbObjIvarGet(obj, id);
-  const ivars = _hiddenIvars.get(obj);
+  const ivars = hiddenIvars.get(obj);
   return ivars !== undefined && ivars.has(id) ? ivars.get(id) : null;
 }
 
@@ -2300,7 +2299,7 @@ export function rbIvarGet(obj: object, id: string): unknown {
  */
 export function rbIvarForeach(obj: object, func: (id: string, val: unknown) => void): void {
   for (const id of rbObjInstanceVariables(obj)) func(id, rbObjIvarGet(obj, id));
-  _hiddenIvars.get(obj)?.forEach((val, id) => func(id, val));
+  hiddenIvars.get(obj)?.forEach((val, id) => func(id, val));
 }
 
 /**
