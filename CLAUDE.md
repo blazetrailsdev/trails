@@ -1465,15 +1465,13 @@ It is a floor, not the rule: it is line-based, so a name on a continuation
 line is uncounted, as is one whose receiver nests parentheses more than one
 deep, and a computed name it never sees is still governed by the order above.
 
-The call gates do not help, which is why the order above has to be a rule.
-For the call SET, `extract-ts-api.ts` credits
-`rbFSend(recv, "literalName")` as a call to `literalName` itself
-(`collectCalls`), so spelling one out changes nothing there. The ARGUMENT
-stream does not follow it: `callSiteName` has no send arm, so the site is
-recorded under `rbFSend` with the receiver and the name occupying argument
-slots — it can never pair with Rails' own `literalName(…)` site, and
-converging it can only improve that pairing. A computed name is credited as
-Ruby's own `send` / `publicSend`, and both sit in `SKIP_CALLS`
+The call gate holds the order too. For the call SET, `extract-ts-api.ts`
+does not credit `rbFSend(recv, "literalName")` as a call to `literalName`
+(`collectCalls`), so a literal-name send leaves the Rails call missing in
+`parity:api:calls` until the body spells it; a send that must stay carries
+`@missingRailsCall`. The ARGUMENT stream records the site under `rbFSend`,
+with the receiver and the name occupying argument slots. A computed name is
+credited as Ruby's own `send` / `publicSend`, and both sit in `SKIP_CALLS`
 (`scripts/api-compare/lint-calls.ts`), so a send converged onto a direct call
 or a registry needs no baseline row and no `@missingRailsCall` receipt.
 

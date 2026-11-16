@@ -42,7 +42,8 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
+import { OUTPUT_DIR, ROOT_DIR, apiComparePackageRoots } from "./config.js";
+import { manifestIsStale } from "./build-freshness.js";
 import type { ApiManifest } from "@blazetrails/parity/types";
 import { buildReport, loadConcernHooks } from "./extra-surface.js";
 import { staleMarkFailure } from "./param-name-mark.js";
@@ -83,6 +84,18 @@ async function readManifest(name: string): Promise<ApiManifest> {
 }
 
 async function main(tighten: boolean, scope: string | null): Promise<number> {
+  // The freshness verdict `parity:api:extra` reaches on the same artifact
+  // (extra-surface.ts), so the report and the gate agree on what they read.
+  if (
+    process.env.API_COMPARE_ALLOW_STALE_BUILD !== "1" &&
+    (await manifestIsStale(path.join(OUTPUT_DIR, "ts-api.json"), apiComparePackageRoots()))
+  ) {
+    console.error(
+      "\nextra-surface gate: output/ts-api.json predates the api-compared package sources.\n" +
+        "Run `pnpm parity:api` to regenerate the manifests before gating.\n",
+    );
+    return 1;
+  }
   const ruby = await readManifest("rails-api.json");
   const ts = await readManifest("ts-api.json");
   if (scope !== null) {

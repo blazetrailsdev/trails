@@ -64,11 +64,11 @@ export class ChannelGenerator extends NamedBase {
     if (this.behavior !== "invoke") return;
 
     await this.copyFile(
-      File.join(__dir__, "templates/application_cable/channel.ts"),
+      `${__dir__}/templates/application_cable/channel.ts`,
       `app/channels/application-cable/channel${this.ext()}`,
     );
     await this.copyFile(
-      File.join(__dir__, "templates/application_cable/connection.ts"),
+      `${__dir__}/templates/application_cable/connection.ts`,
       `app/channels/application-cable/connection${this.ext()}`,
     );
   }

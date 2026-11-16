@@ -156,13 +156,23 @@ export function declaresActsLikeCall(source: string, name: string): boolean {
   return found;
 }
 
-/** Whether any declaration of `name` in `source` guards with `instanceof`. */
-export function declaresInstanceofGuard(source: string, name: string): boolean {
+/**
+ * Whether any declaration of `name` in `source`, or of one of the same-file
+ * `helpers` its skeleton splices in, guards with `instanceof`: a class list
+ * moved behind a local `actsLikeTime(value)` is still the port's guard.
+ */
+export function declaresInstanceofGuard(
+  source: string,
+  name: string,
+  helpers: readonly string[] = [],
+): boolean {
+  const names = new Set([name, ...helpers]);
   const file = ts.createSourceFile("x.ts", source, ts.ScriptTarget.Latest, true);
   let found = false;
   const visit = (n: ts.Node): void => {
     if (found) return;
-    if (declarationName(n) === name && hasGuardInstanceof(n)) {
+    const declared = declarationName(n);
+    if (declared !== undefined && names.has(declared) && hasGuardInstanceof(n)) {
       found = true;
       return;
     }
@@ -187,7 +197,11 @@ export async function duckTypeRows(artifact: SkeletonArtifact): Promise<Skeleton
     const unported = unportedDuckTests(row);
     if (unported.length === 0) continue;
     const source = await read(path.join(packageSrcDir(row.package), row.tsFile));
-    if (source === undefined || !declaresInstanceofGuard(source, row.tsName)) continue;
+    if (
+      source === undefined ||
+      !declaresInstanceofGuard(source, row.tsName, Object.keys(row.tsHelpers ?? {}))
+    )
+      continue;
     if (
       unported.every((ask) => ask === "ref:acts_like?") &&
       declaresActsLikeCall(source, row.tsName)

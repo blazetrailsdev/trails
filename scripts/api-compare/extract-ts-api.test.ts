@@ -2424,6 +2424,7 @@ describe("body call capture", () => {
     const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls ?? [];
     for (const form of [
       "compact",
+      "toA",
       "uniq",
       "union",
       "take",
@@ -2560,7 +2561,7 @@ describe("body call capture", () => {
     expect(local.instanceMethods.find((m) => m.name === "split")!.calls).toContain("constructor");
   });
 
-  it("records rbFSend of a string-literal name as a call to that name", () => {
+  it("does not credit rbFSend of a string-literal name as a call to that name", () => {
     const cls = extractFromSource(
       `class Foo {
         first(records: unknown[], limit: number) {
@@ -2575,8 +2576,9 @@ describe("body call capture", () => {
       }`,
     );
     const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls;
-    expect(calls("first")).toEqual(expect.arrayContaining(["rbFSend", "limit"]));
-    expect(calls("assign")).toEqual(expect.arrayContaining(["rbFSend", "write"]));
+    expect(calls("first")).toContain("rbFSend");
+    expect(calls("first")).not.toContain("limit");
+    expect(calls("assign")).not.toContain("write");
     expect(calls("dispatch")).toEqual(["@invoked:rbFSend", "rbFSend"]);
   });
 

@@ -1338,6 +1338,41 @@ export function comparableRubySites(
   );
 }
 
+/**
+ * Ruby's `x.reader.call(a, b)` reads a Proc and invokes it, two call nodes
+ * (`i18n/interpolate/ruby.rb:43`'s
+ * `config.missing_interpolation_argument_handler.call(key, values, string)`).
+ * JS has no `Proc#call`, so the port invokes the read's result and the two
+ * collapse into one `reader(a, b)` site. Where the TS body holds that collapsed
+ * site, the zero-argument reader takes the `call`'s arguments and the `call`
+ * site is dropped, so the pair compares what the invocation passes.
+ */
+export function foldReaderProcCalls(
+  rubySites: readonly CallSite[],
+  tsSites: readonly CallSite[],
+): CallSite[] {
+  const folded: CallSite[] = [];
+  for (const site of rubySites) {
+    const reader = folded.at(-1);
+    if (
+      site.name === "call" &&
+      site.args.length > 0 &&
+      reader !== undefined &&
+      reader.args.length === 0 &&
+      site.recv === `call:${reader.name}` &&
+      tsSites.some(
+        (ts) =>
+          ts.args.length === site.args.length && tsCallNameKeys(reader.name).includes(ts.name),
+      )
+    ) {
+      folded[folded.length - 1] = { ...reader, args: site.args, flags: site.flags };
+      continue;
+    }
+    folded.push(site);
+  }
+  return folded;
+}
+
 /** A Ruby `String.new` (`parser.rb:161`, `type/string.rb:35`), which ports as
  *  the JS string itself, `""` or the value: no TS call answers it, so it takes
  *  no `new` from the body. */

@@ -127,7 +127,7 @@ import {
   renderSig,
   shouldSkipArity,
   stripThis,
-  threadsSuper,
+  arityCandidates,
   type ArityRange,
 } from "./arity.js";
 import { isNestedConstructorHomonym, matchParamNamesAgainst } from "./param-names.js";
@@ -140,6 +140,7 @@ import {
   CALL_ARG_SKIP_REASONS,
   compareCallArgs,
   comparableRubySites,
+  foldReaderProcCalls,
   pairCallSites,
   resolveCalleeSigs,
   type CallArgClass,
@@ -6031,8 +6032,10 @@ export function main() {
         if (tsSites === undefined) return;
         // `rubyOwnersByName` is built per Ruby FILE, a few lines up: its keys are
         // the names THIS file (with its included modules flattened in) declares.
-        const rubySites = comparableRubySites(rubyReadableSites, tsSites, (name) =>
-          rubyOwnersByName.has(name),
+        const rubySites = comparableRubySites(
+          foldReaderProcCalls(rubyReadableSites, tsSites),
+          tsSites,
+          (name) => rubyOwnersByName.has(name),
         );
         if (rubySites.length === 0) return;
         const bodylessOwners = tsBodylessOwnersByFileName.get(tsFile)?.get(tsName);
@@ -6151,12 +6154,26 @@ export function main() {
         if (rubyName.endsWith("=")) return;
         const rubyParams = rubyParamsByName.get(rubyName);
         if (!rubyParams) return;
-        // Every signature recorded for this TS name; a pair matches when it
-        // overlaps ANY (see tsParamsByName above for why this is global).
-        const threaded = (tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? []).filter(
-          threadsSuper,
+        // The file's own signatures first; the global pool only behind a
+        // 0-argument binding (see tsParamsByName above). A pair matches when it
+        // overlaps ANY candidate.
+        // A constructor is scoped to its owner: a file holds one per class, and
+        // a class with no constructor of its own (`Reflection::MacroReflection`
+        // beside `ThroughReflection`) must not be measured against a sibling's
+        // (the owner scoping `tsParamsByFileOwnerNameInPkg` gives param names).
+        const ownerSigs =
+          tsName === "constructor"
+            ? tsParamsByFileOwnerNameInPkg
+                .get(tsFile)
+                ?.get(`${rubyModule.split("::").at(-1) ?? rubyModule}#${tsName}`)
+            : undefined;
+        const candidates = arityCandidates(
+          tsName === "constructor"
+            ? (ownerSigs ?? [])
+            : (tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? []),
+          tsParamsByName.get(tsName) ?? [],
+          /(^|\/)core_ext\//.test(rubyFile),
         );
-        const candidates = threaded.length > 0 ? threaded : (tsParamsByName.get(tsName) ?? []);
         if (candidates.length === 0) return;
         if (!rubyForwardingNames.has(rubyName) && !guessedFile) {
           for (const blockOwner of rubyBlockOwners.get(`${level}|${rubyName}`) ?? []) {

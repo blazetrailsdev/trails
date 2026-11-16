@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  arityCandidates,
   positionalArity,
   arityMatches,
   matchArityAgainst,
@@ -389,5 +390,23 @@ describe("arityParams", () => {
       req("a"),
     ]);
     expect(arityParams({ params: [] })).toEqual([]);
+  });
+});
+
+describe("arityCandidates", () => {
+  const req = (name: string): ParamInfo => ({ name, kind: "required" });
+  const pooled = [[req("super_"), req("other")]];
+
+  it("prefers the matched file's own signature over an unrelated pooled homonym", () => {
+    expect(arityCandidates([[req("other")]], pooled)).toEqual([[req("other")]]);
+  });
+
+  it("falls back to the pool behind a 0-argument binding or no declaration", () => {
+    expect(arityCandidates([[]], pooled)).toEqual(pooled);
+    expect(arityCandidates([], pooled)).toEqual(pooled);
+  });
+
+  it("tries a core_ext port without its leading receiver", () => {
+    expect(arityCandidates([[req("hash")]], [], true)).toEqual([[req("hash")], []]);
   });
 });

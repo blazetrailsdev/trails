@@ -373,8 +373,13 @@ function hashOf(file: string, cache?: Map<string, Promise<string | null>>): Prom
  */
 const SOURCE_PATH = /(^|\/)(packages|src)\/|\.(m?[jt]sx?|d\.ts|json)$/;
 
-/** A `/`-rooted, multi-segment token, not preceded by a path or URL character. */
-const ABSOLUTE_PATH = /(?:^|[^A-Za-z0-9._@+:/\\-])(\/(?:[A-Za-z0-9._@+-]+\/)+[A-Za-z0-9._@+-]+)/g;
+/**
+ * A `/`-rooted, multi-segment token, not preceded by a path or URL character,
+ * nor by the `}` closing a template literal's interpolation placeholder: the
+ * manifest records `` `${__dir__}/templates/x.ts` `` as `tpl:${}/templates/x.ts`,
+ * a relative tail, not a path.
+ */
+const ABSOLUTE_PATH = /(?:^|[^A-Za-z0-9._@+:/\\}-])(\/(?:[A-Za-z0-9._@+-]+\/)+[A-Za-z0-9._@+-]+)/g;
 
 /**
  * The first checkout-shaped absolute path in `body`, whichever worktree it

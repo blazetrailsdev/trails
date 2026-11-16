@@ -509,6 +509,7 @@ export {
   rbStrScanSubexpCall,
   rbStrStartWith,
   rbStrSub,
+  isMatch,
   strGsub,
   rbRegMatchM,
   rbStrMatchM,
