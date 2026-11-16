@@ -12,47 +12,85 @@ export class Map<V = unknown> {
 
   /** @noRailsEquivalent PERMANENT */
   set(cref: Cref, value: V): V {
-    return this._mutex.synchronize(() => {
+    let raised = false;
+    let result!: V;
+    const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       let cnames = this._map.get(cref.mod);
       if (cnames === undefined) this._map.set(cref.mod, (cnames = new globalThis.Map()));
       cnames.set(cref.cname, value);
-      return value;
-    }) as V;
+      result = value;
+    });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
+    return result;
   }
 
   /** @noRailsEquivalent PERMANENT */
   get(cref: Cref): V | null {
-    return this._mutex.synchronize(() => {
-      return this._map.get(cref.mod)?.get(cref.cname) ?? null;
-    }) as V | null;
+    let raised = false;
+    let result!: V | null;
+    const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
+      result = this._map.get(cref.mod)?.get(cref.cname) ?? null;
+    });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
+    return result;
   }
 
+  /** @inventedArm if — PERMANENT */
   getOrSet(cref: Cref, block: () => V): V {
-    return this._mutex.synchronize(() => {
+    let raised = false;
+    let result!: V;
+    const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       let cnames = this._map.get(cref.mod);
       if (cnames === undefined) this._map.set(cref.mod, (cnames = new globalThis.Map()));
-      if (cnames.has(cref.cname)) return cnames.get(cref.cname) as V;
+      if (cnames.has(cref.cname)) {
+        result = cnames.get(cref.cname) as V;
+        return;
+      }
       const value = block();
       cnames.set(cref.cname, value);
-      return value;
-    }) as V;
+      result = value;
+    });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
+    return result;
   }
 
   delete(cref: Cref): V | null {
     return this.deleteModCname(cref.mod, cref.cname);
   }
 
+  /** @inventedArm if — PERMANENT */
   deleteModCname(mod: object, cname: string): V | null {
-    return this._mutex.synchronize(() => {
+    let raised = false;
+    let result!: V | null;
+    const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
       const cnames = this._map.get(mod);
       if (cnames !== undefined) {
         const value = cnames.get(cname) ?? null;
         cnames.delete(cname);
         if (cnames.size === 0) this._map.delete(mod);
-        return value;
+        result = value;
+        return;
       }
-      return null;
-    }) as V | null;
+      result = null;
+    });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
+    return result;
   }
 
   /** @inventedArm if — PERMANENT */
@@ -99,7 +137,18 @@ export class Map<V = unknown> {
     }
   }
 
+  /** @inventedArm if — PERMANENT */
   isEmpty(): boolean {
-    return this._mutex.synchronize(() => this._map.size === 0) as boolean;
+    let raised = false;
+    let result!: boolean;
+    const synchronized = this._mutex.synchronize(() => {
+      if (raised) return;
+      result = this._map.size === 0;
+    });
+    if (synchronized instanceof Promise) {
+      raised = true;
+      throw new ThreadError("deadlock; synchronize contended in a synchronous caller");
+    }
+    return result;
   }
 }

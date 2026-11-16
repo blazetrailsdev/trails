@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { Mutex } from "@blazetrails/ruby-compat";
+import { Thread, type Mutex } from "@blazetrails/ruby-compat";
 import type { StreamEventLoop } from "../../lib/connection/stream-event-loop.js";
-import { Listener, type Redis } from "../../lib/subscription-adapter/redis.js";
+import { Listener, Redis } from "../../lib/subscription-adapter/redis.js";
 
 describe("Redis::Listener", () => {
   it("removeChannel resolves after its contended critical section has run", async () => {
@@ -45,5 +45,22 @@ describe("Redis::Listener", () => {
     seen.push(internals._subscribedClient);
 
     expect(seen).toEqual([client, null]);
+  });
+
+  it("the default connector's confirmation thread ends with its connection", async () => {
+    const connect = (options: Record<string, unknown>) =>
+      Redis.redisConnector({ url: "redis://127.0.0.1:1", retryStrategy: () => null, ...options });
+    const before = Thread.list().length;
+
+    const lazy = connect({ lazyConnect: true });
+    expect(Thread.list().length).toBe(before + 1);
+    (lazy as unknown as { disconnect(): void }).disconnect();
+
+    const failed = connect({});
+    failed.on("error", () => {});
+    await new Promise((resolve) => failed.on("end", resolve));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(Thread.list().length).toBe(before);
   });
 });

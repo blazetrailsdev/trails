@@ -1,6 +1,6 @@
 import { cattrAccessor } from "@blazetrails/activesupport";
 import { prepend } from "@blazetrails/ruby-compat/include";
-import { Mutex, StandardError, Thread, except } from "@blazetrails/ruby-compat";
+import { Mutex, Queue, StandardError, Thread, except } from "@blazetrails/ruby-compat";
 import { Redis as IORedis, type RedisOptions } from "ioredis";
 import type { StreamEventLoop } from "../connection/stream-event-loop.js";
 import { SubscriptionAdapter } from "../namespaces.js";
@@ -104,11 +104,18 @@ cattrAccessor.call(Redis, "redisConnector", {
   default: (config: Record<string, unknown>) => {
     const options = except(config, "adapter", "channelPrefix");
     const conn = new IORedis(options.url as string, options as RedisOptions);
+    const confirmations = new Queue<[string, string, unknown] | null>();
+    new Thread(async () => {
+      for (let event; (event = await confirmations.pop()) !== null; ) conn.emit(...event);
+    });
+    conn.on("end", () => confirmations.push(null));
     for (const command of ["subscribe", "unsubscribe"] as const) {
       const send = conn[command].bind(conn) as (...channel: string[]) => Promise<unknown>;
       conn[command] = (async (...channel: string[]) => {
         const count = await send(...channel);
-        for (const chan of channel.length === 0 ? [""] : channel) conn.emit(command, chan, count);
+        for (const chan of channel.length === 0 ? [""] : channel) {
+          await confirmations.push([command, chan, count]);
+        }
         return count;
       }) as never;
     }
@@ -152,10 +159,6 @@ export class Listener extends SubscriberMap {
     this._thread = null;
   }
 
-  /**
-   * @inventedArm lock — PERMANENT
-   * @inventedArm unlock — PERMANENT
-   */
   listen(conn: RedisConnection): Promise<void> {
     const retryStrategy = conn.options.retryStrategy;
     conn.options.retryStrategy = () => null;
@@ -164,8 +167,7 @@ export class Listener extends SubscriberMap {
     return new Promise<void>((resolve, reject) => {
       conn.on("subscribe", async (chan: string, count: number) => {
         try {
-          await this._subscriptionLock.lock();
-          try {
+          await this._subscriptionLock.synchronize(async () => {
             if (count === 1) {
               this._reconnectAttempt = 0;
               this._subscribedClient = originalClient;
@@ -181,9 +183,7 @@ export class Listener extends SubscriberMap {
               if (nextCallback) this._eventLoop.post(null, nextCallback);
               if (callbacks.length === 0) this._subscribeCallbacks.delete(chan);
             }
-          } finally {
-            this._subscriptionLock.unlock();
-          }
+          });
         } catch (error) {
           reject(error);
         }
@@ -196,12 +196,9 @@ export class Listener extends SubscriberMap {
       conn.on("unsubscribe", async (_chan: string, count: number) => {
         if (count === 0) {
           try {
-            await this._subscriptionLock.lock();
-            try {
+            await this._subscriptionLock.synchronize(() => {
               this._subscribedClient = null;
-            } finally {
-              this._subscriptionLock.unlock();
-            }
+            });
           } catch (error) {
             return reject(error);
           }

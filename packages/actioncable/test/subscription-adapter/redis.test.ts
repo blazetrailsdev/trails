@@ -24,6 +24,10 @@ vi.mock("ioredis", async (importOriginal) => {
         if (!stubRedisNew.value) return new actual.Redis(url, options) as never;
       }
 
+      on(): this {
+        return this;
+      }
+
       async subscribe(): Promise<number> {
         return 0;
       }
