@@ -81,28 +81,28 @@ async function setupContentSecurityPolicy(this: InstallHost, cspFile: Pathname):
     cspFile,
     "scriptSrc",
     `    // You may need to enable this in production as well depending on your setup.
-//    scriptSrc: [...scriptSrc, "blob:"] if Trails.env.isTest()
+//    ...(Trails.env.isTest() && { scriptSrc: ["'self'", "blob:"] }),
 `,
   );
   await this.injectLineAfter(
     cspFile,
     "connectSrc",
     `    // Allow @vite/client to hot reload changes in development
-//    connectSrc: [...connectSrc, \`ws://\${ViteAssets.config().hostWithPort}\`] if Trails.env.isDevelopment()
+//    ...(Trails.env.isDevelopment() && { connectSrc: ["'self'", \`ws://\${(await ViteAssets.config()).hostWithPort}\`] }),
 `,
   );
   await this.injectLineAfter(
     cspFile,
     "scriptSrc",
     `    // Allow @vite/client to hot reload javascript changes in development
-//    scriptSrc: [...scriptSrc, "'unsafe-eval'", \`http://\${ViteAssets.config().hostWithPort}\`] if Trails.env.isDevelopment()
+//    ...(Trails.env.isDevelopment() && { scriptSrc: ["'self'", "'unsafe-eval'", \`http://\${(await ViteAssets.config()).hostWithPort}\`] }),
 `,
   );
   await this.injectLineAfter(
     cspFile,
     "styleSrc",
     `    // Allow @vite/client to hot reload style changes in development
-//    styleSrc: [...styleSrc, "'unsafe-inline'"] if Trails.env.isDevelopment()
+//    ...(Trails.env.isDevelopment() && { styleSrc: ["'self'", "'unsafe-inline'"] }),
 `,
   );
 }
