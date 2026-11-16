@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { include } from "@blazetrails/ruby-compat/include";
+import { block } from "@blazetrails/ruby-compat";
 import { Configurable } from "../lib/configurable.js";
 import { NameError } from "../lib/core-ext/name-error.js";
 
@@ -90,9 +91,11 @@ describe("ConfigurableActiveSupport", () => {
       static config = Configurable.ClassMethods.config;
       static configAccessor = Configurable.ClassMethods.configAccessor;
     };
-    parent.configAccessor("hairColors", "tshirtColors", {
-      default: () => ["black", "blue", "white"],
-    });
+    parent.configAccessor(
+      "hairColors",
+      "tshirtColors",
+      block(() => ["black", "blue", "white"]),
+    );
 
     expect(parent.hairColors).toEqual(["black", "blue", "white"]);
     expect(parent.tshirtColors).toEqual(["black", "blue", "white"]);
