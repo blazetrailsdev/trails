@@ -42,12 +42,15 @@ export class Scheduler extends Base {
     return { ...super.metadata(), recurring_schedule: presence(this.recurringSchedule.taskKeys()) };
   }
 
-  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.7.2/lib/solid_queue/processes/runnable.rb:19-24 */
+  /** @inlinedFrom SolidQueue::Processes::Runnable#stop solid_queue/v1.7.2/lib/solid_queue/processes/runnable.rb:18-28 */
   override async stop(): Promise<void> {
     await super.stop();
 
     await this.wakeUp();
-    await this._thread?.join();
+
+    if (!this.isSupervised()) {
+      await this._thread?.join();
+    }
   }
 
   /** @internal */
@@ -92,6 +95,7 @@ export class Scheduler extends Base {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Processes::Runnable` (`scheduler.rb:5`). */
 export interface Scheduler {
   mode: unknown;
+  isSupervised(): boolean;
   start(): Promise<void>;
   isShuttingDown(): Promise<boolean>;
   shutdown(): Promise<void>;
