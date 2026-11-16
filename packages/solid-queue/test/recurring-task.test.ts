@@ -268,6 +268,20 @@ describe("SolidQueue::RecurringTaskTest", () => {
       }).isValid(),
     ).toBeFalsy();
 
+    task = recurringTaskWith({ class_name: "JobWithoutArguments", schedule: "every day at 00:40" });
+    expect(await task.isValid()).toBeTruthy();
+    expect(task.toString().endsWith("[ 40 0 * * * ]")).toBeTruthy();
+
+    task = recurringTaskWith({ class_name: "JobWithoutArguments", schedule: "40 0 * * *" });
+    expect(await task.isValid()).toBeTruthy();
+
+    task = recurringTaskWith({
+      class_name: "JobWithoutArguments",
+      schedule: "every day at 00:40 and 15:40",
+    });
+    expect(await task.isValid()).toBeTruthy();
+    expect(task.toString().endsWith("[ 40 0,15 * * * ]")).toBeTruthy();
+
     task = recurringTaskWith({
       class_name: "JobWithoutArguments",
       schedule: "every day at 00:40 and 15:20",

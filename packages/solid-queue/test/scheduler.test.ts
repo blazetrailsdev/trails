@@ -20,7 +20,6 @@ import { ApplicationJob } from "./support/application-job.js";
 import "./support/add-to-buffer-job.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import {
-  sleep,
   waitWhileWithTimeout,
   waitForRegisteredProcesses,
   assertMetadata,
@@ -160,21 +159,20 @@ describe("SchedulerTest", () => {
     );
 
     for (const scheduler of schedulers) await scheduler.start();
-    await sleep(2);
+    await waitWhileWithTimeout(3, async () => (await RecurringExecution.count()) < 2);
     for (const scheduler of schedulers) await scheduler.stop();
-    let counts = "";
-    await waitWhileWithTimeout(1, async () => {
-      const previous = counts;
-      counts = `${await Job.count()}/${await RecurringExecution.count()}`;
-      return counts !== previous;
-    });
 
+    expect(
+      (await RecurringExecution.count()) >= 2,
+      `Expected at least 2 recurring executions, got ${await RecurringExecution.count()}`,
+    ).toBeTruthy();
     expect(await Job.count()).toBe(await RecurringExecution.count());
     const runAtTimes = (await RecurringExecution.all().toArray())
       .map((execution) => (execution.run_at as Time).toF())
       .sort((a, b) => a - b);
     for (let i = 0; i <= runAtTimes.length - 2; i++) {
-      expect(runAtTimes[i + 1] - runAtTimes[i]).toBe(1);
+      const timeDiff = runAtTimes[i + 1] - runAtTimes[i];
+      expect(timeDiff).toBeWithinDelta(1, 0.001);
     }
   });
 
