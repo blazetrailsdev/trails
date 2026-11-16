@@ -155,6 +155,7 @@ export class HTTP {
   private _proxyPass: string | null = null;
   private _useSsl = false;
   private _started = false;
+  private _ipaddr: string | null = null;
   private _socket: BufferedIO | null = null;
 
   /** @noRailsEquivalent PERMANENT */
@@ -402,6 +403,17 @@ export class HTTP {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  get ipaddr(): string | null {
+    return this.isStarted() ? this._socket!.io.peeraddr()[3] : this._ipaddr;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  set ipaddr(addr: string | null) {
+    if (this.isStarted()) throw new IOError("ipaddr value changed, but session already started");
+    this._ipaddr = addr;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   isStarted(): boolean {
     return this._started;
   }
@@ -449,7 +461,7 @@ export class HTTP {
       connAddr = (await this.proxyAddress())!;
       connPort = (await this.proxyPort())!;
     } else {
-      connAddr = this.address;
+      connAddr = this.connAddress();
       connPort = this.port;
     }
 
@@ -484,7 +496,7 @@ export class HTTP {
             debugOutput: this._debugOutput,
           });
           let buf =
-            `CONNECT ${this.address}:${this.port} HTTP/${HTTP.HTTPVersion}\r\n` +
+            `CONNECT ${this.connAddress()}:${this.port} HTTP/${HTTP.HTTPVersion}\r\n` +
             `Host: ${this.address}:${this.port}\r\n`;
           const proxyUser = await this.proxyUser();
           if (proxyUser) {
@@ -766,6 +778,14 @@ export class HTTP {
     } else {
       return path;
     }
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  private connAddress(): string {
+    return this._ipaddr ?? this.address;
   }
 
   /** @noRailsEquivalent PERMANENT */
