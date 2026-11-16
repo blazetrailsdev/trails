@@ -195,7 +195,9 @@ export class Node extends XmlNode {
   }
 
   /** @missingRailsArgs join — PERMANENT */
-  innerHtml(options: { preserveNewline?: boolean; saveWith?: number } = {}): string {
+  override innerHtml(options: { preserveNewline?: boolean; saveWith?: number } = {}): string {
+    if (!(this.document instanceof HTML5.Document)) return super.innerHtml(options);
+
     let result = options.preserveNewline && this.isPrependNewline() ? "\n" : "";
     result += this.children.map((child) => child.toHtml(options)).join("");
     return result;
@@ -232,33 +234,9 @@ export class Node extends XmlNode {
     return this.pointerId === (other as Node).pointerId;
   }
 
-  serialize(...args: unknown[]): string {
-    const block =
-      typeof args.at(-1) === "function" ? (args.pop() as (config: SaveOptions) => void) : undefined;
-    const options = (
-      args[0] !== null && typeof args[0] === "object"
-        ? args.shift()
-        : { encoding: args[0], saveWith: args[1] }
-    ) as { encoding?: string | null; saveWith?: number };
+  override writeTo(io: StringIO, ...options: unknown[]): void {
+    if (!(this.document instanceof HTML5.Document)) return super.writeTo(io, ...options);
 
-    options.encoding ||= (this.document as { encoding?: string | null } | null)?.encoding;
-
-    const io = new StringIO();
-
-    this.writeTo(io, options, block);
-    return io.string();
-  }
-
-  toHtml(options: { saveWith?: number } = {}): string {
-    return this.toFormat(SaveOptions.DEFAULT_HTML, options);
-  }
-
-  toXml(options: { saveWith?: number; encoding?: string | null } = {}): string {
-    options.saveWith ||= SaveOptions.DEFAULT_XML;
-    return this.serialize(options);
-  }
-
-  writeTo(io: StringIO, ...options: unknown[]): void {
     const block =
       typeof options.at(-1) === "function"
         ? (options.pop() as (config: SaveOptions) => void)
@@ -294,7 +272,7 @@ export class Node extends XmlNode {
   }
 
   /** @internal */
-  private nativeWriteTo(
+  protected override nativeWriteTo(
     io: StringIO,
     encoding: string | null,
     indentString: string,
@@ -530,12 +508,6 @@ export class Node extends XmlNode {
       defaultTreeAdapter.insertBefore(parent, n._node, ref as Parse5Node);
     }
     return coerced;
-  }
-
-  /** @internal */
-  private toFormat(saveOption: number, options: { saveWith?: number }): string {
-    if (!options.saveWith) options.saveWith = saveOption;
-    return this.serialize(options);
   }
 
   /** @internal */

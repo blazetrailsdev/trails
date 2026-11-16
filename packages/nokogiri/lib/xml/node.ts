@@ -7,7 +7,7 @@ import {
 } from "libxml2-wasm";
 import { xmlAddChild, xmlUnlinkNode } from "libxml2-wasm/lib/libxml2.mjs";
 import type { DefaultTreeAdapterMap } from "parse5";
-import { ArgumentError, include, rbObjClassname } from "@blazetrails/ruby-compat";
+import { ArgumentError, StringIO, include, rbObjClassname } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
 
@@ -127,6 +127,90 @@ export class XmlNode {
 
   fragment(tags: string): DocumentFragment {
     return new XML.DocumentFragment(this.document as XmlDocument, tags, this);
+  }
+
+  /** @missingRailsArgs join — PERMANENT */
+  innerHtml(...args: unknown[]): string {
+    return this.children.map((x) => x.toHtml(...(args as [{ saveWith?: number }?]))).join("");
+  }
+
+  /** @missingRailsArgs new — PERMANENT */
+  serialize(...args: unknown[]): string {
+    const block =
+      typeof args.at(-1) === "function" ? (args.pop() as (config: SaveOptions) => void) : undefined;
+    const options = (
+      args[0] !== null && typeof args[0] === "object"
+        ? args.shift()
+        : { encoding: args[0], saveWith: args[1] }
+    ) as { encoding?: string | null; saveWith?: number };
+
+    options.encoding ||= (this.document as { encoding?: string | null } | null)?.encoding;
+
+    const io = new StringIO("");
+
+    this.writeTo(io, options, block);
+    return io.string();
+  }
+
+  toHtml(options: { saveWith?: number } = {}): string {
+    return this.toFormat(SaveOptions.DEFAULT_HTML, options);
+  }
+
+  toXml(options: { saveWith?: number; encoding?: string | null } = {}): string {
+    options.saveWith ||= SaveOptions.DEFAULT_XML;
+    return this.serialize(options);
+  }
+
+  writeTo(io: StringIO, ...options: unknown[]): void {
+    const block =
+      typeof options.at(-1) === "function"
+        ? (options.pop() as (config: SaveOptions) => void)
+        : undefined;
+    const opts = (options[0] !== null && typeof options[0] === "object" ? options.shift() : {}) as {
+      encoding?: string | null;
+      saveWith?: number;
+      indent?: number;
+      indentText?: string;
+    };
+    const encoding =
+      opts.encoding ||
+      (options[0] as string | null | undefined) ||
+      (this.document as { encoding?: string | null } | null)?.encoding;
+    const saveOptions = opts.saveWith || (options[1] as number | undefined) || SaveOptions.FORMAT;
+    const indentTimes = opts.indent ?? 2;
+    const indentText = opts.indentText || " ";
+
+    const indentation = indentTimes === 0 ? "" : indentText.repeat(indentTimes);
+
+    const config = new SaveOptions(Number(saveOptions));
+    if (block) block(config);
+
+    this.nativeWriteTo(io, encoding ?? null, indentation, config.options);
+  }
+
+  /** @internal */
+  protected nativeWriteTo(
+    io: StringIO,
+    _encoding: string | null,
+    indentString: string,
+    options: number,
+  ): StringIO {
+    io.write(
+      this._node instanceof LibXmlElement
+        ? this._node.toString({
+            format: (options & SaveOptions.FORMAT) !== 0,
+            noEmptyTags: (options & SaveOptions.NO_EMPTY_TAGS) !== 0,
+            indentString,
+          })
+        : (this._node as XmlTreeNode).toString(),
+    );
+    return io;
+  }
+
+  /** @internal */
+  protected toFormat(saveOption: number, options: { saveWith?: number }): string {
+    if (!options.saveWith) options.saveWith = saveOption;
+    return this.serialize(options);
   }
 
   /** @internal */

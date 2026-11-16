@@ -861,6 +861,25 @@ the rest parameter exists ONLY to admit an override's wider list — never to le
 a caller pass arguments Rails has no parameter for — and it is spelled
 `..._rest: unknown[]`, so a grep finds every instance.
 
+### Override signature on the static side
+
+A Ruby class method may also replace its parent's parameter types outright.
+`HTML5::DocumentFragment.parse(input, encoding_ = nil, positional_options_hash = nil, **options)`
+(`vendor/nokogiri/v1.18.3/lib/nokogiri/html5/document_fragment.rb:69-73`)
+overrides `XML::DocumentFragment.parse(tags, options_ = ParseOptions::DEFAULT_XML, &block)`
+(`vendor/nokogiri/v1.18.3/lib/nokogiri/xml/document_fragment.rb:35`). TypeScript
+checks the constructor side of `extends` and rejects it (TS2417), and the
+`_rest` shape above cannot help: the positions exist in both lists with
+unrelated types. An alias of the parent constructor typed without its statics
+was tried and drops every inherited static along with the one that conflicts.
+
+So the subclass extends the parent directly, both methods keep their Rails
+signatures, and the `extends` line carries
+`// @ts-expect-error TS2417: CLAUDE.md, "Override signature on the static side".`
+The directive covers that one line only, and reds as unused once TS2417 is
+gone. It is spelled exactly
+that way, so a grep finds every instance. This section is its receipt.
+
 ## Call-time constant resolution (Ruby autoload → ES imports)
 
 Ruby resolves a constant named inside a method body when the method **runs**,

@@ -131,7 +131,7 @@ export interface SerializeOptions {
 }
 
 export function readAttributeForSerialization(this: SerializationRecord, key: string): unknown {
-  return rbFSend(this, key);
+  return rbFSend(this, rbObjRespondTo(this, key) ? key : camelized(key));
 }
 
 /** @internal */
