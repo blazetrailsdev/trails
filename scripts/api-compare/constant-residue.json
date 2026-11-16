@@ -1417,5 +1417,15 @@
       "runner.ts::Runner": "ViteAssets::Runner"
     }
   },
+  "vite-trails": {
+    "rows": 3,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "config.ts::Config": "ViteTrails::Config",
+      "engine.ts::Engine": "ViteTrails::Engine",
+      "tag-helpers.ts::TagHelpers": "ViteTrails::TagHelpers"
+    }
+  },
   "zeitwerk": { "rows": 18, "excluded": [], "unwalked": [], "residue": {} }
 }

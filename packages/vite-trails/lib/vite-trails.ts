@@ -1,3 +1,4 @@
+import { TopLevel } from "@blazetrails/ruby-compat";
 import { VERSION } from "./version.js";
 import type { Config } from "./config.js";
 import type { Engine } from "./engine.js";
@@ -9,4 +10,12 @@ export class ViteTrails {
   declare static TagHelpers: typeof TagHelpers;
 
   static readonly VERSION = VERSION;
+}
+
+TopLevel.ViteTrails = ViteTrails;
+
+declare module "@blazetrails/ruby-compat" {
+  interface TopLevelConstants {
+    ViteTrails?: typeof ViteTrails;
+  }
 }

@@ -136,26 +136,27 @@ underscore, and ends at an underscore, the end, or the next capital — so
 `verb_name` and `Herbert` are left alone. There is no `erb` anywhere in
 trails:
 
-| Ruby token | trails token |
-| ---------- | ------------ |
-| `erb`      | `tse`        |
-| `rb`       | `js`         |
-| `ERB`      | `TSE`        |
-| `Erb`      | `Tse`        |
-| `irb`      | `tsrepl`     |
-| `IRB`      | `TSREPL`     |
-| `Irb`      | `Tsrepl`     |
-| `rubocop`  | `eslint`     |
-| `RuboCop`  | `ESLint`     |
-| `Rubocop`  | `Eslint`     |
-| `capybara` | `vitest`     |
-| `Capybara` | `Vitest`     |
-| `yarn`     | `pnpm`       |
-| `Yarn`     | `Pnpm`       |
-| `rails`    | `trails`     |
-| `Rails`    | `Trails`     |
-| `RAILS`    | `TRAILS`     |
-| `ViteRuby` | `ViteAssets` |
+| Ruby token  | trails token |
+| ----------- | ------------ |
+| `erb`       | `tse`        |
+| `rb`        | `js`         |
+| `ERB`       | `TSE`        |
+| `Erb`       | `Tse`        |
+| `irb`       | `tsrepl`     |
+| `IRB`       | `TSREPL`     |
+| `Irb`       | `Tsrepl`     |
+| `rubocop`   | `eslint`     |
+| `RuboCop`   | `ESLint`     |
+| `Rubocop`   | `Eslint`     |
+| `capybara`  | `vitest`     |
+| `Capybara`  | `Vitest`     |
+| `yarn`      | `pnpm`       |
+| `Yarn`      | `Pnpm`       |
+| `rails`     | `trails`     |
+| `Rails`     | `Trails`     |
+| `RAILS`     | `TRAILS`     |
+| `ViteRuby`  | `ViteAssets` |
+| `ViteRails` | `ViteTrails` |
 
 Test names are not an exception. Rails'
 `test "ERB::Util.html_escape should escape unsafe characters"`

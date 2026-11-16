@@ -80,6 +80,7 @@ export const TOKEN_RENAMES: Record<string, string> = {
   Rails: "Trails",
   RAILS: "TRAILS",
   ViteRuby: "ViteAssets",
+  ViteRails: "ViteTrails",
 };
 
 /**
@@ -103,6 +104,9 @@ export const TOKEN_RENAMES: Record<string, string> = {
  * - `ViteRuby` → `ViteAssets`: vite_ruby is ported as
  *   `@blazetrails/vite-assets`, and no TS name spells Ruby (CLAUDE.md,
  *   "importmap-rails and propshaft are out of scope").
+ * - `ViteRails` → `ViteTrails`: vite_rails is ported as
+ *   `@blazetrails/vite-trails`; the token rename does not split a compound
+ *   constant, so it is spelled here.
  *
  * Both parity tools read this one table: `parity:api` resolves the Ruby class
  * to its TS declaration through it, and `parity:api:extra` admits the renamed
@@ -117,6 +121,7 @@ export const TS_CLASS_RENAMES: Record<string, string> = {
   Rails: "Trails",
   Registry: "TypeRegistry",
   ViteRuby: "ViteAssets",
+  ViteRails: "ViteTrails",
 };
 
 /**
