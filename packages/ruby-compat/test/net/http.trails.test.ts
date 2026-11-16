@@ -568,6 +568,24 @@ describe("Net::HTTP over Net::BufferedIO", () => {
     expect(seen.received.startsWith(`GET http://127.0.0.1:${port}/x HTTP/1.1\r\n`)).toBe(true);
   });
 
+  it("ipaddr= sets the address connect opens to, and raises once started", async () => {
+    const { server } = rawServer(
+      (r) => r.endsWith("\r\n\r\n"),
+      "HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok",
+    );
+    const port = await listen(server);
+    const http = new Net.HTTP("backend.invalid", port, null);
+    expect(http.ipaddr).toBeNull();
+    http.ipaddr = "127.0.0.1";
+    expect(http.ipaddr).toBe("127.0.0.1");
+    await http.start();
+    expect(http.ipaddr).toBe("127.0.0.1");
+    expect(() => (http.ipaddr = "10.0.0.1")).toThrow(
+      "ipaddr value changed, but session already started",
+    );
+    http.finish();
+  });
+
   it("connect opens to the proxy address, not the target", async () => {
     const { seen, server } = rawServer(
       (r) => r.endsWith("\r\n\r\n"),

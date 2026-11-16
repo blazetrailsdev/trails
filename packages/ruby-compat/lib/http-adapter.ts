@@ -1,3 +1,5 @@
+import { IOError } from "./io-error.js";
+
 export interface HttpRequest {
   method?: string | undefined;
   url?: string | undefined;
@@ -67,6 +69,7 @@ export interface HttpClientSocket {
   isClosed(): boolean;
   isEof(): boolean;
   inspect(): string;
+  peeraddr(): [string, number, string, string];
   readonly sslVersion: string | null;
   readonly cipher: string[] | null;
 }
@@ -137,6 +140,9 @@ type NodeSocket = {
   write(chunk: Uint8Array): boolean;
   destroy(): unknown;
   readonly destroyed: boolean;
+  readonly remoteAddress?: string | undefined;
+  readonly remotePort?: number | undefined;
+  readonly remoteFamily?: string | undefined;
   getProtocol?(): string | null;
   getCipher?(): { name: string };
 };
@@ -244,6 +250,13 @@ class _NodeClientSocket implements HttpClientSocket {
 
   isEof(): boolean {
     return this.eof && this.rbuf.length === 0;
+  }
+
+  peeraddr(): [string, number, string, string] {
+    if (this.io.destroyed) throw new IOError("closed stream");
+    const addr = this.io.remoteAddress!;
+    const family = this.io.remoteFamily === "IPv6" ? "AF_INET6" : "AF_INET";
+    return [family, this.io.remotePort!, addr, addr];
   }
 
   inspect(): string {
