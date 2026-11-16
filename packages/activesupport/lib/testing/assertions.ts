@@ -366,7 +366,6 @@ export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promi
   }
 }
 
-/** @missingRailsCall map — PERMANENT */
 export async function assertDifference<T>(
   expression: Map<Expression<number> | string, number>,
   ...args: [message?: string | null, block?: () => T | Promise<T>]
@@ -380,7 +379,6 @@ export async function assertDifference<T>(
   difference: number,
   block: () => T | Promise<T>,
 ): Promise<T | undefined>;
-/** @missingRailsArgs eval — PERMANENT */
 export async function assertDifference<T>(
   expression:
     | Expression<number>
@@ -445,7 +443,6 @@ export async function assertNoDifference<T>(
   );
 }
 
-/** @missingRailsArgs eval — PERMANENT */
 export async function assertChanges<T>(
   expression: Expression<unknown> | string,
   message: string | null = null,
@@ -493,7 +490,6 @@ export async function assertChanges<T>(
   return retval;
 }
 
-/** @missingRailsArgs eval — PERMANENT */
 export async function assertNoChanges<T>(
   expression: Expression<unknown> | string,
   message: string | null = null,
