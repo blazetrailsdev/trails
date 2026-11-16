@@ -262,13 +262,11 @@ describe("ProcessesLifecycleTest", () => {
       });
 
       await waitWhileWithTimeout(5, async () =>
-        ReadyExecution.joins(":job")
-          .where({ solid_queue_jobs: { active_job_id: pause.jobId } })
-          .isExists(),
+        ReadyExecution.joins(":job").isExists({ solid_queue_jobs: { active_job_id: pause.jobId } }),
       );
       await waitWhileWithTimeout(
         5,
-        async () => !(await JobResult.where({ status: "started", value: "pause" }).isExists()),
+        async () => !(await JobResult.isExists({ status: "started", value: "pause" })),
       );
 
       const signal = signalProcess(run, "TERM", { wait: 0.5 });
