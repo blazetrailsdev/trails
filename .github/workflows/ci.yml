@@ -1734,8 +1734,6 @@ jobs:
           echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
             https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
             | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
-          # `timeout` turns a stalled mirror into a fast non-zero exit, so a
-          # stall costs one attempt rather than the job's whole budget.
           for attempt in 1 2 3; do
             timeout 180 sudo apt-get update \
               -o Dir::Etc::sourcelist=/etc/apt/sources.list.d/pgdg.list \
