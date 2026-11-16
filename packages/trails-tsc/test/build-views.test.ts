@@ -41,7 +41,7 @@ function write(root: string, rel: string, body: string): void {
   fs.writeFileSync(abs, body);
 }
 
-describe("buildViews", () => {
+describe("buildViews", { timeout: 30_000 }, () => {
   it("reports a file with no registered handler as skipped", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/users/show.html.tse", "show");
@@ -163,7 +163,7 @@ describe("buildViews", () => {
     const { count } = await buildViews({ cwd });
     expect(count).toBe(1);
     expect(fs.existsSync(path.join(cwd, ".trails/views/users/gone.html.tse.ts"))).toBe(false);
-  }, 30_000);
+  });
 
   it("deletes a views-manifest.ts left behind by an older build", async () => {
     const cwd = mkScratch();
@@ -175,7 +175,7 @@ describe("buildViews", () => {
     await buildViews({ cwd });
 
     expect(fs.existsSync(manifest)).toBe(false);
-  }, 30_000);
+  });
 
   it("refuses to build when outDir is a symlink escaping cwd", async () => {
     const cwd = mkScratch();
@@ -277,7 +277,7 @@ describe("buildViews", () => {
     expect(
       check("const a: R extends { name: unknown } ? 1 : 2 = 2; void a;").length,
     ).toBeGreaterThan(0);
-  }, 30_000);
+  });
 
   it("emits an empty augmentation when no partials have a locals directive", async () => {
     const cwd = mkScratch();
@@ -385,7 +385,7 @@ describe("buildViews", () => {
         (rel) => `${rel}.html.tse.ts: Property 'title' does not exist on type 'never'.`,
       ),
     );
-  }, 30_000);
+  });
 
   it("keeps the any fallback for a partial some unresolved render site may reach", async () => {
     const cwd = mkScratch();
@@ -417,7 +417,7 @@ describe("buildViews", () => {
     for (const partial of ["_post", "_form", "_row"])
       expect(shim(partial)).toContain("      : any;");
     expect(shim("show")).toContain("      : never;");
-  }, 30_000);
+  });
 
   it("reads a hash render's second argument as a block only when it is a function", async () => {
     const cwd = mkScratch();
@@ -434,7 +434,7 @@ describe("buildViews", () => {
     expect(shim("_row")).toContain("type ObjectLocals = {};");
     expect(shim("_row")).toContain("      : never;");
     expect(shim("_boxed")).toContain("type ObjectLocals = { post: number };");
-  }, 30_000);
+  });
 
   it("keeps the any fallback for a template a controller render passes locals to", async () => {
     const cwd = mkScratch();
@@ -460,10 +460,10 @@ describe("buildViews", () => {
     expect(shim("edit")).toContain("      : never;");
     expect(shim("_row")).toContain("      : any;");
     expect(shim("_form")).toContain("      : never;");
-  }, 30_000);
+  });
 });
 
-describe("runCli", () => {
+describe("runCli", { timeout: 30_000 }, () => {
   it("dispatches `build` to buildViews with --cwd", async () => {
     const cwd = mkScratch();
     write(cwd, "app/views/home.html.tse", "x");
@@ -584,7 +584,7 @@ describe("runCli", () => {
       "utf8",
     );
     expect(notCollection).toContain("type ObjectLocals = {};");
-  }, 30_000);
+  });
 
   it("exposes helperMethod names only from class-level macro positions", async () => {
     const cwd = mkScratch();
@@ -658,7 +658,7 @@ describe("runCli", () => {
     expect(shim).toContain('"inherited": () => undefined');
     expect(shim).not.toContain('"hidden"');
     expect(shim).not.toContain('"foreign"');
-  }, 30_000);
+  });
 
   it("writes a source map pointing each shim line at its .tse line", async () => {
     const cwd = mkScratch();
@@ -700,7 +700,7 @@ describe("runCli", () => {
       "utf8",
     );
     expect(strict).toContain("type ObjectLocals = {};");
-  }, 30_000);
+  });
 
   it("resolves a controller render with no template name to the action's template", async () => {
     const cwd = mkScratch();
@@ -767,7 +767,7 @@ describe("runCli", () => {
       "layouts/application.html.tse.ts",
       "posts/show-all.html.tse.ts",
     ]);
-  }, 30_000);
+  });
 
   it("types a template's locals from view and controller renders that pass a hash", async () => {
     const cwd = mkScratch();
@@ -794,7 +794,7 @@ describe("runCli", () => {
       "type ObjectLocals = { foo: number | string; bar: boolean | undefined };",
     );
     expect(show).toContain("      : never;");
-  }, 30_000);
+  });
 
   it("types the kebab-case template a camelCase action renders, named implicitly or by action:", async () => {
     const cwd = mkScratch();
@@ -817,7 +817,7 @@ describe("runCli", () => {
     );
     expect(view).toContain("foo: number | undefined");
     expect(view).toContain("bar: boolean | undefined");
-  }, 30_000);
+  });
 
   it("declares the object, counter and iteration locals of collection:, object: and as: renders", async () => {
     const cwd = mkScratch();
@@ -839,7 +839,7 @@ describe("runCli", () => {
     );
     expect(shim("_row")).toContain("      : never;");
     expect(shim("_cell")).toContain("type ObjectLocals = { value: number };");
-  }, 30_000);
+  });
 
   it("types the locals an object render and a helper module pass", async () => {
     const cwd = mkScratch();
@@ -902,7 +902,7 @@ describe("runCli", () => {
       "utf8",
     );
     expect(comments).toContain("type ObjectLocals = { label: string };");
-  }, 30_000);
+  });
 
   it("types a local a partial forwards to another partial", async () => {
     const cwd = mkScratch();
@@ -912,7 +912,7 @@ describe("runCli", () => {
     await buildViews({ cwd });
     const line = fs.readFileSync(path.join(cwd, ".trails/views/posts/_line.html.tse.ts"), "utf8");
     expect(line).toContain("type ObjectLocals = { post: number };");
-  }, 30_000);
+  });
 
   it("types a shared layout from every controller that falls back to it", async () => {
     const cwd = mkScratch();
@@ -948,7 +948,7 @@ describe("runCli", () => {
     expect(read("layouts/admin/posts.html.tse")).toContain('{ "items": boolean[] }');
     expect(read("layouts/story-pages.html.tse")).toContain('{ "items": Date[] }');
     expect(fs.existsSync(path.join(cwd, "app/controllers/posts-controller.d.ts"))).toBe(false);
-  }, 30_000);
+  });
 
   it("types a layout from explicit layout() and render layout: choices before the implied name", async () => {
     const cwd = mkScratch();
@@ -1006,7 +1006,7 @@ describe("runCli", () => {
     expect(fields("admin")).toEqual(["comments", "drafts", "picked"]);
     expect(fields("drafts")).toEqual(["drafts", "picked"]);
     expect(fields("plain")).toEqual(["picked"]);
-  }, 30_000);
+  });
 
   it("reads a per-render layout from non-literal render options and layout.call(this, ...)", async () => {
     const cwd = mkScratch();
@@ -1051,7 +1051,7 @@ describe("runCli", () => {
     expect(fields("admin")).toEqual(["comments", "drafts", "either", "wide"]);
     expect(fields("application")).toEqual(["comments", "drafts", "either", "posts", "wide"]);
     expect(fields("posts")).toEqual(["wide"]);
-  }, 30_000);
+  });
 
   it("types addFlashTypes readers in a controller's views and layout", async () => {
     const cwd = mkScratch();
@@ -1072,7 +1072,7 @@ describe("runCli", () => {
       fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.ts`), "utf8");
     expect(read("posts/index.html.tse")).toContain('{ "warning": unknown; "info": unknown }');
     expect(read("layouts/posts.html.tse")).toContain('{ "warning": unknown; "info": unknown }');
-  }, 30_000);
+  });
 
   it("types a partial's locals from each hash of a conditional render", async () => {
     const cwd = mkScratch();
@@ -1090,5 +1090,5 @@ describe("runCli", () => {
     expect(choice).toMatch(
       /type ObjectLocals = \{ post: [^;]*number[^;]*undefined[^;]*; title: [^}]*string[^}]*undefined/,
     );
-  }, 30_000);
+  });
 });
