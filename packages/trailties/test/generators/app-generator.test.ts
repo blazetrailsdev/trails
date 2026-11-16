@@ -477,6 +477,14 @@ describe("AppGeneratorTest", () => {
     });
   });
 
+  it("inclusion of kamal storage volume if only skip active storage is given", async () => {
+    await runGeneratorInstance([t.destinationRoot, "--skip-active-storage"]);
+
+    await t.assertFile("config/deploy.yml", (content: string) => {
+      expect(content).toMatch(/storage:\/app\/storage/);
+    });
+  });
+
   it("database yml skip kamal", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-kamal"]);
 

@@ -10,6 +10,40 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "command/base_test.rb:13 asserts the snake_case name; RFC 0171 decision 6 makes a command name kebab-case on the command line",
     },
   ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › inclusion of kamal storage volume":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:709 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:710 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+    ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › inclusion of kamal storage volume if only skip active storage is given":
+    [
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:719 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+      {
+        kind: "assert_equal",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:720 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+    ],
   "trailties:generators/app_generator_test.rb › AppGeneratorTest › kamal files are skipped if required":
     [
       {
