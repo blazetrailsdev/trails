@@ -112,7 +112,10 @@ export class ParamBuilder {
     return hash;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   storeNestedParam(
     params: ParamHash,
     name: string | null,

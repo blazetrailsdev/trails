@@ -65,6 +65,7 @@ export class NoNilParamEncoder extends ParamEncoder {
 }
 
 export class CustomParamEncoder {
+  /** @inventedArm if — PERMANENT */
   static encodeForTemplate<P extends ParamHash | Hash<string, ParamValue>>(
     params: P,
     encodingTemplate: EncodingTemplate | false | null | undefined,
