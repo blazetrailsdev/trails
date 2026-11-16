@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isAbsentHalf, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { block, isAbsentHalf, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   delegate,
   mattrAccessor,
@@ -219,12 +219,14 @@ describe("ModuleAttributeAccessorTest", () => {
   it("should use default value if block passed", () => {
     class MyModule {}
     let callCount = 0;
-    mattrAccessor.call(MyModule, "computed", {
-      default: () => {
+    mattrAccessor.call(
+      MyModule,
+      "computed",
+      block(() => {
         callCount++;
         return "computed_val";
-      },
-    });
+      }),
+    );
     expect((MyModule as any).computed).toBe("computed_val");
     expect(callCount).toBe(1);
   });
@@ -232,12 +234,14 @@ describe("ModuleAttributeAccessorTest", () => {
   it("method invocation should not invoke the default block", () => {
     class MyModule {}
     let callCount = 0;
-    mattrAccessor.call(MyModule, "lazy", {
-      default: () => {
+    mattrAccessor.call(
+      MyModule,
+      "lazy",
+      block(() => {
         callCount++;
         return "result";
-      },
-    });
+      }),
+    );
     expect((MyModule as any).lazy).toBe("result");
     expect((MyModule as any).lazy).toBe("result");
     expect(callCount).toBe(1);
@@ -250,7 +254,7 @@ describe("ModuleAttributeAccessorTest", () => {
       callCount++;
       return "val";
     };
-    mattrAccessor.call(MyModule, "a", "b", "c", { default: makeDefault });
+    mattrAccessor.call(MyModule, "a", "b", "c", block(makeDefault));
     expect(callCount).toBe(3);
   });
 

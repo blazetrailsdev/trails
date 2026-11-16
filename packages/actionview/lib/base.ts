@@ -100,10 +100,9 @@ export class Base {
   static {
     for (const name of CONTROLLER_DELEGATES) rbDeclareIvar(this, `@${name}`, `_${name}`);
     cattrAccessor.call(this, "fieldErrorProc", {
-      default: () =>
-        function (this: Base, htmlTag: unknown, _instance: unknown) {
-          return this.contentTag("div", htmlTag, { class: "field_with_errors" });
-        },
+      default: function (this: Base, htmlTag: unknown, _instance: unknown) {
+        return this.contentTag("div", htmlTag, { class: "field_with_errors" });
+      },
     });
     cattrAccessor.call(this, "streamingCompletionOnException", {
       default: `"><script>window.location = "/500.html"</script></html>`,

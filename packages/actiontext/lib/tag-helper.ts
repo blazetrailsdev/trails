@@ -38,7 +38,7 @@ export class TagHelper {
   declare static id: number;
 
   static {
-    mattrAccessor.call(this, "id", { instanceAccessor: false, default: () => 0 });
+    mattrAccessor.call(this, "id", { instanceAccessor: false, default: 0 });
   }
 
   /** @missingRailsArgs rails_service_blob_url — PERMANENT */
