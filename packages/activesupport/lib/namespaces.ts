@@ -15,6 +15,8 @@ import type { MessagePack } from "./message-pack.js";
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
+  "rack/body_proxy": () => import("@blazetrails/rack"),
+  "rack/utils": () => import("@blazetrails/rack"),
   "active_support/message_pack": async () => {
     try {
       return await import("./message-pack.js");

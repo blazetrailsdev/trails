@@ -187,6 +187,12 @@ export class Thread<R = unknown> {
    * `vendor/ruby/v3.3.11/thread.c:704-709`). Ruby's default is `true`.
    */
   reportOnException = true;
+  /**
+   * @noRailsEquivalent PERMANENT — MRI's `rb_thread_t#to_kill` bit
+   * (`vendor/ruby/v3.3.11/vm_core.h:1097`), set by `rb_threadptr_to_kill`
+   * (`vendor/ruby/v3.3.11/thread.c:2387-2391`) when the thread is killed.
+   */
+  toKill = false;
   #value!: R;
   #error: { raised: unknown } | null = null;
   #kill!: () => void;
@@ -382,6 +388,7 @@ export class Thread<R = unknown> {
    */
   exit(): this {
     if (this.status === "dead") return this;
+    this.toKill = true;
     this.status = "dead";
     _threads.delete(this as Thread);
     this.#kill();

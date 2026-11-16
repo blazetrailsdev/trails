@@ -29,6 +29,7 @@
       "@blazetrails/builder": ["../../builder/lib/builder.ts"],
       "@blazetrails/html-sanitizer": ["../../html-sanitizer/lib/index.ts"],
       "@blazetrails/msgpack": ["../../msgpack/lib/index.ts"],
+      "@blazetrails/rack": ["../../rack/lib/index.ts"],
       "@blazetrails/nokogiri": ["../../nokogiri/lib/index.ts"],
       "@blazetrails/actionview/tse-modules": ["../types/tse-modules.d.ts"]
     }

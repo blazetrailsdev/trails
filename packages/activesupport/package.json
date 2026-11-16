@@ -132,7 +132,8 @@
   "license": "MIT",
   "devDependencies": {
     "@blazetrails/msgpack": "workspace:*",
-    "@blazetrails/nokogiri": "workspace:*"
+    "@blazetrails/nokogiri": "workspace:*",
+    "@blazetrails/rack": "workspace:*"
   },
   "dependencies": {
     "@blazetrails/ruby-compat": "workspace:*",
@@ -144,13 +145,17 @@
   },
   "peerDependencies": {
     "@blazetrails/msgpack": "workspace:*",
-    "@blazetrails/nokogiri": "workspace:*"
+    "@blazetrails/nokogiri": "workspace:*",
+    "@blazetrails/rack": "workspace:*"
   },
   "peerDependenciesMeta": {
     "@blazetrails/msgpack": {
       "optional": true
     },
     "@blazetrails/nokogiri": {
+      "optional": true
+    },
+    "@blazetrails/rack": {
       "optional": true
     }
   },

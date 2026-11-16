@@ -13,6 +13,7 @@
     { "path": "../i18n" },
     { "path": "../msgpack" },
     { "path": "../nokogiri" },
+    { "path": "../rack" },
     { "path": "../tse-compiler" }
   ]
 }
