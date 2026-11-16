@@ -5,28 +5,28 @@ import { imagePath } from "./support/helpers.js";
 
 describe("MiniMagick::Image signature cache", () => {
   it("answers #signature with a promise until identify has run, then synchronously", async () => {
-    const image = new Image(imagePath());
+    const image = await Image.new(imagePath());
     const cold = image.signature();
     expect(cold).toBeInstanceOf(Promise);
-    expect(image.equals(new Image(imagePath()))).toBe(false);
+    expect(image.equals(await Image.new(imagePath()))).toBe(false);
     const signature = await cold;
     expect(image.signature()).toEqual(signature);
     expect(rbHash(image)).toEqual(rbHash(signature));
-    const other = new Image(imagePath());
+    const other = await Image.new(imagePath());
     await other.signature();
     expect(image.equals(other)).toBe(true);
   });
 });
 
 describe("prototype-chain method_missing", () => {
-  it("a subclass with a #private field still answers the dynamic names", () => {
+  it("a subclass with a #private field still answers the dynamic names", async () => {
     class Sub extends Image {
       #secret = 1;
       secret(): number {
         return this.#secret;
       }
     }
-    const sub = new Sub("/tmp/none.png");
+    const sub = await Sub.new("/tmp/none.png");
     expect(sub.secret()).toBe(1);
     expect(typeof (sub as unknown as Record<string, unknown>).resize).toBe("function");
     expect((sub as unknown as Record<string, unknown>).then).toBeUndefined();

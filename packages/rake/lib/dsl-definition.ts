@@ -31,13 +31,13 @@ export const DSL = {
     return FileCreationTask.defineTask(...args);
   },
 
-  async directory(
+  directory(
     this: typeof FileUtilsExt & { fileCreate(...args: unknown[]): Task },
     ...args: unknown[]
-  ): Promise<Task> {
+  ): Task {
     const flat: unknown[] = [];
     for (const arg of args) {
-      if (arg instanceof FileList) flat.push(...flatten(await arg.toA()));
+      if (arg instanceof FileList) flat.push(...flatten(arg.toAry()));
       else flat.push(...[arg].flat());
     }
     args = flat;

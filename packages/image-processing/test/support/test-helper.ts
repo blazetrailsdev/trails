@@ -34,7 +34,7 @@ export async function assertDimensions(dimensions: [number, number], file: PathL
 }
 
 export async function assertType(type: string, file: PathLike) {
-  expect(await new MiniMagickImage(file.path()!).type()).toEqual(type);
+  expect(await (await MiniMagickImage.new(file.path()!)).type()).toEqual(type);
 }
 
 export async function distance(image1: PathLike, image2: PathLike): Promise<number> {

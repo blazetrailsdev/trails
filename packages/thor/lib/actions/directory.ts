@@ -1,4 +1,13 @@
-import { Dir, File, Hash, rbObjIsKindOf, rtest, sort, toS } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  Hash,
+  rbClassNewInstance,
+  rbObjIsKindOf,
+  rtest,
+  sort,
+  toS,
+} from "@blazetrails/ruby-compat";
 import type { ActionsHost } from "../actions.js";
 import { TEMPLATE_EXTNAME } from "../base.js";
 import { escapeGlobs } from "../util.js";
@@ -11,7 +20,11 @@ type DirectoryBase = ActionsHost & {
   copyFile(source: string, ...args: unknown[]): Promise<unknown>;
 };
 
-export function directory(this: ActionsHost, source: string, ...args: unknown[]): unknown {
+export async function directory(
+  this: ActionsHost,
+  source: string,
+  ...args: unknown[]
+): Promise<unknown> {
   const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
     | Block
     | undefined;
@@ -21,34 +34,42 @@ export function directory(this: ActionsHost, source: string, ...args: unknown[])
   >;
   const destination = (args[0] as string | undefined) ?? source;
   return this.action(
-    new Directory(this as DirectoryBase, source, destination ?? source, config, block),
+    await Directory.new(this as DirectoryBase, source, destination ?? source, config, block),
   );
 }
 
 export class Directory extends EmptyDirectory {
-  source: Promise<string>;
+  source!: string;
   /** @internal */
   private _block: Block | undefined;
 
-  constructor(
+  protected constructor(
     base: DirectoryBase,
     source: string,
     destination: string | null = null,
     config: Record<string, unknown> = {},
     block?: Block,
   ) {
-    const resolved = (async () =>
-      File.expandPath(
-        (await Dir.globAsync(escapeGlobs(await base.findInSourcePaths(toS(source)))))[0] ?? null!,
-      ))();
-    resolved.catch(() => {});
     super(base, destination, { recursive: true, ...config });
-    this.source = resolved;
     this._block = block;
   }
 
+  static async new<T extends Directory>(
+    this: { prototype: T },
+    base: DirectoryBase,
+    source: string,
+    destination: string | null = null,
+    config: Record<string, unknown> = {},
+    block?: Block,
+  ): Promise<T> {
+    const obj = rbClassNewInstance(this, base, source, destination, config, block);
+    obj.source = File.expandPath(
+      (await Dir.globAsync(escapeGlobs(await base.findInSourcePaths(toS(source)))))[0] ?? null!,
+    );
+    return obj;
+  }
+
   override async invokeBang(): Promise<unknown> {
-    await this.source;
     await (this.base as DirectoryBase).emptyDirectory(this.givenDestination, this.config);
     return this.executeBang();
   }
@@ -62,7 +83,7 @@ export class Directory extends EmptyDirectory {
    * @inventedArm if — PERMANENT
    */
   protected async executeBang(): Promise<unknown> {
-    const source = await this.source;
+    const source = this.source;
     let lookup = escapeGlobs(source);
     lookup = rtest(this.config["recursive"]) ? File.join(lookup, "**") : lookup;
     lookup = this.fileLevelLookup(lookup);

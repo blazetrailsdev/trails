@@ -20,11 +20,18 @@ export function trailsPlugin(options: TrailsPluginOptions): Plugin {
       server.httpServer?.on("upgrade", (req, socket, head) => {
         const protocol = req.headers["sec-websocket-protocol"];
         if (protocol === "vite-hmr" || protocol === "vite-ping") return;
-        void handler.upgrade(
-          req as unknown as HttpRequest,
-          socket as unknown as HttpSocket,
-          head as Uint8Array,
-        );
+        handler
+          .upgrade(
+            req as unknown as HttpRequest,
+            socket as unknown as HttpSocket,
+            head as Uint8Array,
+          )
+          .catch((error: unknown) => {
+            server.config.logger.error(
+              error instanceof Error ? (error.stack ?? error.message) : String(error),
+            );
+            socket.destroy();
+          });
       });
       return () => {
         server.middlewares.use(async (req, res, next) => {

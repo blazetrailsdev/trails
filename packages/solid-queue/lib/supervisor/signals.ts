@@ -1,5 +1,5 @@
 import { Concern, extend } from "@blazetrails/activesupport";
-import { classModule, onSignal } from "@blazetrails/ruby-compat";
+import { Thread, classModule, onSignal } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import type { ClassMethods as CallbacksClassMethods } from "../processes/callbacks.js";
 
@@ -34,7 +34,10 @@ export class Signals {
     this._signalHandlers = SIGNALS.map((signal) =>
       onSignal(`SIG${signal}`, () => {
         this.signalQueue().push(signal);
-        void this.interrupt();
+        new Thread(() => {
+          Thread.current().abortOnException = true;
+          return this.interrupt();
+        });
       }),
     );
   }

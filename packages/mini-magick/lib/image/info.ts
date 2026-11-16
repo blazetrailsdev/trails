@@ -21,7 +21,6 @@ import { MiniMagick } from "../mini-magick.js";
 export class Info {
   declare _path: string;
   declare _info: Record<string, unknown>;
-  _pending: Promise<unknown> | null = null;
   static ASCII_ENCODED_EXIF_KEYS: string[] = ["ExifVersion", "FlashPixVersion"];
 
   constructor(path: string) {
@@ -162,7 +161,6 @@ export class Info {
   }
 
   async data() {
-    await this._pending;
     if (!((this._info["data"] ?? false) !== false))
       this._info["data"] = await (async () => {
         const json = (await MiniMagick.convert(
@@ -181,7 +179,6 @@ export class Info {
   }
 
   async identify(block?: (builder: CliTool) => unknown): Promise<string> {
-    await this._pending;
     return (await MiniMagick.identify(
       blockPass((builder: CliTool) => {
         if (block != null) {

@@ -59,7 +59,6 @@ export class One extends Attached {
   loadedAttachment(method: string): Attachment | null {
     const attachment = this.attachment;
     if (!(attachment instanceof Promise)) return attachment;
-    void attachment.catch(() => {});
     throw new RuntimeError(
       `${method} needs ${this.name}'s attachment loaded; \`await ${this.name}.load()\` first.`,
     );

@@ -64,6 +64,12 @@ export class Base extends Thor {
   }
 
   static desc(
+    usage: string | string[],
+    description?: string | null,
+    options?: Record<string, unknown>,
+  ): void;
+  static desc(usage?: null): Promise<string | null>;
+  static desc(
     usage: string | string[] | null = null,
     description: string | null = null,
     options: Record<string, unknown> = {},

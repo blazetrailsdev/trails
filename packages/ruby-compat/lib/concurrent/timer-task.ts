@@ -1,6 +1,7 @@
 import { ArgumentError } from "../argument-error.js";
 import { constSet } from "../include.js";
 import { ScheduledTask } from "../scheduled-task.js";
+import { Thread } from "../thread.js";
 import { globalIoExecutor } from "../thread-pool-executor.js";
 import { Concurrent } from "./map.js";
 
@@ -35,7 +36,7 @@ export class TimerTask {
   private _running = false;
   private _scheduled: ScheduledTask<[number]> | undefined;
   private _generation = 0;
-  private _inFlight: Promise<unknown> | null = null;
+  private _inFlight: Promise<[unknown, unknown]> | null = null;
   private readonly _observers: ((time: Date, result: unknown, error: unknown) => unknown)[] = [];
 
   /** @noRailsEquivalent PERMANENT */
@@ -66,8 +67,10 @@ export class TimerTask {
     if (!this._running) {
       this._running = true;
       const generation = this._generation;
-      if (this._inFlight) {
-        void this._inFlight.then(() => {
+      const inFlight = this._inFlight;
+      if (inFlight) {
+        new Thread(async () => {
+          await inFlight;
           if (generation === this._generation) this._scheduleNextTask();
         });
       } else {
@@ -110,17 +113,20 @@ export class TimerTask {
     this._inFlight = Promise.resolve()
       .then(() => this._task(this))
       .then(
-        (result) => this._notifyObservers(result, null),
-        (error: unknown) => this._notifyObservers(null, error),
-      )
-      .catch(() => null);
-    await this._inFlight;
+        (result): [unknown, unknown] => [result, null],
+        (error: unknown): [unknown, unknown] => [null, error],
+      );
+    const [result, error] = await this._inFlight;
     this._inFlight = null;
-    await new Promise((resolve) => {
-      const timer: unknown = setTimeout(resolve, 0);
-      (timer as { unref?: () => unknown }).unref?.();
-    });
-    if (this._running && generation === this._generation) this._scheduleNextTask();
+    try {
+      this._notifyObservers(result, error);
+    } finally {
+      await new Promise((resolve) => {
+        const timer: unknown = setTimeout(resolve, 0);
+        (timer as { unref?: () => unknown }).unref?.();
+      });
+      if (this._running && generation === this._generation) this._scheduleNextTask();
+    }
   }
 }
 

@@ -518,13 +518,13 @@ export class Around {
     return callbackSequence.around(this.userCallback, this.userConditions);
   }
 
-  static build(callback: Callback): (target: object, block: () => void) => void {
+  static build(callback: Callback): (target: object, block: () => void) => unknown {
     return (target: object, block: () => void) => {
       if (!Value.check(callback, target)) {
         block();
         return;
       }
-      (callback.filter as AroundCallback).call(target, target, block);
+      return (callback.filter as AroundCallback).call(target, target, block);
     };
   }
 }

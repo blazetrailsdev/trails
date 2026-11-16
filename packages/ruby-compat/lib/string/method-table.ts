@@ -445,8 +445,8 @@ export function rbStrSend(
  *
  * @noRailsEquivalent PERMANENT
  */
+// eslint-disable-next-line unused-imports/no-unused-vars
 export function rbStrRespondTo(str: string, method: string, includeAll: boolean = false): boolean {
-  void includeAll;
   if (method in STRING_METHOD_TABLE) return true;
   return (
     Object.hasOwn(Object.getPrototypeOf(Object(str)), method) && !JS_STRING_METHODS.has(method)

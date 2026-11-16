@@ -12,8 +12,8 @@ export class EarlyTime implements Comparable {
 
   private constructor() {}
 
+  // eslint-disable-next-line unused-imports/no-unused-vars
   compareTo(other: unknown): number {
-    void other;
     return -1;
   }
 

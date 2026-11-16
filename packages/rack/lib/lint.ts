@@ -760,30 +760,28 @@ export class Wrapper {
     const chunks: (string | Uint8Array)[] = [];
     let wake: (() => void) | null = null;
     let done = false;
-    let failed = false;
-    let failure: unknown;
-    void Promise.resolve()
-      .then(() =>
-        this.each((chunk) => {
+    const pump = async (): Promise<void> => {
+      try {
+        await this.each((chunk) => {
           chunks.push(chunk);
           wake?.();
-        }),
-      )
-      .catch((error: unknown) => {
-        failed = true;
-        failure = error;
-      })
-      .finally(() => {
+        });
+      } finally {
         done = true;
         wake?.();
-      });
-    for (;;) {
-      while (chunks.length > 0) yield chunks.shift()!;
-      if (done) break;
-      await new Promise<void>((resolve) => (wake = resolve));
-      wake = null;
+      }
+    };
+    const each = pump();
+    try {
+      for (;;) {
+        while (chunks.length > 0) yield chunks.shift()!;
+        if (done) break;
+        await new Promise<void>((resolve) => (wake = resolve));
+        wake = null;
+      }
+    } finally {
+      await each;
     }
-    if (failed) throw failure;
   }
 }
 

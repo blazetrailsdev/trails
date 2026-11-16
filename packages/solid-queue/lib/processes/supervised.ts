@@ -1,6 +1,7 @@
 import { included, isPresent } from "@blazetrails/activesupport";
 import {
   Process,
+  Thread,
   classModule,
   exitBang,
   onSignal,
@@ -45,7 +46,10 @@ export class Supervised {
   registerSignalHandlers(this: SupervisedHost): void {
     for (const signal of ["SIGINT", "SIGTERM"] as const) {
       onSignal(signal, () => {
-        void this.stop();
+        new Thread(() => {
+          Thread.current().abortOnException = true;
+          return this.stop();
+        });
       });
     }
 

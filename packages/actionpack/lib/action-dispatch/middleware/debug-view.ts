@@ -25,7 +25,7 @@ export class DebugView extends Base {
     return this.constructor as typeof DebugView;
   }
 
-  debugParams(params: Record<string, unknown>): string {
+  debugParams(params: Record<string, unknown>): string | Promise<string> {
     const cleanParams = { ...params };
     delete cleanParams["action"];
     delete cleanParams["controller"];
@@ -34,8 +34,8 @@ export class DebugView extends Base {
       return "None";
     }
     const out = new StringIO();
-    PP.pp(cleanParams, out, 200);
-    return out.string();
+    const printed = PP.pp(cleanParams, out, 200);
+    return printed instanceof Promise ? printed.then(() => out.string()) : out.string();
   }
 
   debugHeaders(headers: Record<string, unknown> | null | undefined): string {

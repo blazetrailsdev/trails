@@ -22,8 +22,8 @@ export class HasSentEmailMatcher {
 
   constructor(_context: unknown) {}
 
+  // eslint-disable-next-line unused-imports/no-unused-vars
   isMatches(subject: unknown): boolean {
-    void subject;
     const matchingDeliveries = this.filterMatchedDeliveries(Mail.TestMailer.deliveries);
     return !(matchingDeliveries.length === 0);
   }

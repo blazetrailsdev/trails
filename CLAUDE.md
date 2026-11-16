@@ -698,9 +698,12 @@ constructor(attributes = null) { … }
 
 `@inlinedFrom` names the Ruby body a segment of a constructor came from:
 
-- **Where.** On a class constructor's JSDoc, or on the JSDoc of a class
-  method that inlines a module method's `super` (below), and nowhere else, one
-  tag per inlined segment, in chain order.
+- **Where.** On a class constructor's JSDoc, on a `static async new` that
+  holds the async segments of `initialize` (§ "Every promise has an owner"),
+  or on the JSDoc of a class method that inlines a module method's `super`
+  (below), and nowhere else, one tag per inlined segment, in chain order. An
+  inlined segment whose work is async in JS goes in `static async new`, never
+  in the constructor.
 - **Value.** Exactly one shape: a Ruby `Module#initialize` or
   `Mod::ClassMethods#new` on a constructor, or the `Module#<method>` the method
   is named after, whose Rails body calls `super`, then its citation
@@ -1008,6 +1011,65 @@ a plain `TypeError` at the call site — the JS analogue of that `NameError`. A
 `throw` explaining that the caller deep-imported the module is invented
 surface. The two guarded reads of `ActiveRecord.Base?.` on a standalone
 adapter's own path are the one exception, recorded in the activerecord file.
+
+## Every promise has an owner; async `initialize` is an awaited `static new` (RFC 0234)
+
+An unawaited promise loses ordering, since the caller runs on before the work
+finishes, and loses errors, since a rejection has no handler or an empty one.
+**Every promise-valued expression is awaited, returned, an element of an array
+handed to an awaited or returned `Promise.all` / `Promise.allSettled`, or owned
+by a ruby-compat `Thread`.** There is no fifth shape and no receipt tag for one.
+
+- **No `void <promise>`.** `no-floating-promises` runs with
+  `ignoreVoid: false`.
+- **No unawaited empty rejection handler.** `blazetrails/no-swallowed-rejection`
+  reports a `.catch(fn)` or `.then(_, fn)` whose `fn` is empty or only returns a
+  constant, unless the whole expression is awaited:
+  `await p.catch(() => null)` is Ruby's `rescue nil`, and
+  `p.catch(() => {})` as a statement is not. "Pre-observe now, await later"
+  converges to awaiting in order, or to an awaited `Promise.allSettled` over
+  the set with each rejection re-raised.
+- **A sync caller of an async method becomes async**, up to the first caller
+  that already is. Where Rails' entry point must stay synchronous, it raises
+  when handed a promise; it never drops one. A member that is async only by
+  accident of the port is made synchronous first, as Rails has it.
+- **A callback boundary that cannot be awaited** (a Node `http` handler, a
+  signal handler, an event listener) hands its rejection to a real handler
+  that logs or re-raises, or runs the work on a `Thread`.
+- **Background work is a `Thread`.** Where Rails runs work on a thread
+  (`Thread.new`, a nio4r loop, a supervised process), the port constructs
+  ruby-compat's `Thread` where Rails does. The `Thread` owns the promise and
+  reports a raise as `report_on_exception` does; a waiter calls
+  `thread.join()` / `thread.value()`.
+- **A constructor creates no promise.**
+  `blazetrails/constructor-creates-no-promise` reports a dropped, voided,
+  stored or chained thenable, any `.then` / `.catch` / `.finally`, and an
+  `async` IIFE inside a `constructor`. A constructor may create a `Thread`; it
+  may not hold the `Thread`'s promise.
+- **Async `initialize` is `protected constructor` + `static async new`.** The
+  constructor holds the synchronous part of `initialize`; `static async new`
+  builds the object with `rbClassNewInstance(this, ...args)` (MRI
+  `rb_class_new_instance`, `vendor/ruby/v3.3.11/object.c:2158`), runs the async
+  remainder in Rails' order, and returns it. Every caller writes
+  `await Klass.new(...)`, the Rails call, and the protected constructor leaves
+  no second spelling. A subclass inherits `new` through `this`, typed as
+  itself; one whose `initialize` adds async work overrides `static async new`
+  and calls `super.new(...)`. `@inlinedFrom` tags for segments that move into
+  `static new` move with them. There is no `ready` field, no `whenReady()`, no
+  factory under another name and no lazy first-call initialisation.
+
+Scope: only a class whose `initialize` does async work. `ActiveRecord::Base`,
+its models, and every class with a synchronous `initialize` keep a public
+constructor and `new Klass`
+([packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#a-record-is-built-with-new-klass-only-inheritanceclassmethodsnew)).
+A record class with async `initialize` work is an operator decision filed as a
+story, not a `static new` on a record.
+
+`pnpm parity:promises` holds the three rules at per-package `floating`,
+`swallowed` and `constructor` marks, only-shrink with no reseed
+([docs/parity-gates.md](docs/parity-gates.md)). An `eslint-disable`, a receipt
+tag or a raised mark never closes a finding. Ruled by the operator on
+2026-11-12 (RFC 0234).
 
 ## A thread-local block stack forks per async block (`IsolatedExecutionState.fork`)
 

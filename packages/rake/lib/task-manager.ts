@@ -357,8 +357,8 @@ export class TaskManager {
   }
 
   /** @internal */
+  // eslint-disable-next-line unused-imports/no-unused-vars
   getDescription(task: Task): string | null {
-    void task;
     const desc = this.lastDescription;
     this.lastDescription = null;
     return desc;

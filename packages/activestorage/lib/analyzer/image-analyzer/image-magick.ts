@@ -31,7 +31,9 @@ export class ImageMagick extends ImageAnalyzer<ReadImage> {
 
     return await this.downloadBlobToTempfile(async (file) => {
       try {
-        const image = this.instrument("mini_magick", () => new MiniMagick.Image(file.path()!));
+        const image = await this.instrument("mini_magick", () =>
+          MiniMagick.Image.new(file.path()!),
+        );
 
         if (await image.isValid()) {
           return await block({

@@ -122,7 +122,8 @@ export class MirrorService extends Service {
           });
         }),
     );
-    for (const task of tasks) task.catch(() => {});
-    for (const task of tasks) await task;
+    for (const result of await Promise.allSettled(tasks)) {
+      if (result.status === "rejected") throw result.reason;
+    }
   }
 }

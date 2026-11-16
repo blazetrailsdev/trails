@@ -61,7 +61,7 @@ export class Node {
     const handler = new Node(app);
     const http = await getHttpAsync();
     const server = http.createServer((req, res) => {
-      void handler.service(req, res).catch((error: unknown) => {
+      handler.service(req, res).catch((error: unknown) => {
         stderr.write(
           `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
         );
@@ -75,7 +75,12 @@ export class Node {
       });
     });
     server.on("upgrade", (req, socket, head) => {
-      void handler.upgrade(req, socket, head);
+      handler.upgrade(req, socket, head).catch((error: unknown) => {
+        stderr.write(
+          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
+        socket.destroy();
+      });
     });
     Node.server = server;
     return new Promise<HttpServer>((resolve) => {

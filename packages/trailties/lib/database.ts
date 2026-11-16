@@ -314,9 +314,6 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
         });
       }
       const { adapter: _a, database: _d, url: _u, ...rest } = config;
-      void _a;
-      void _d;
-      void _u;
       return new SQLiteAdapter({ ...rest, database: config.database ?? ":memory:" }).connectBang();
     }
     case "postgresql":

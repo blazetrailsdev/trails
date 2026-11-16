@@ -21,6 +21,7 @@ import {
   block as blockPass,
   matchOperator,
   rbObjAsString,
+  rbClassNewInstance,
 } from "@blazetrails/ruby-compat";
 import type { CliTool } from "./tool.js";
 import { Invalid, Error } from "./mini-magick.js";
@@ -78,7 +79,7 @@ export class Image {
       );
       image._path = image._info._path = outputPath;
       return image;
-    })(this.read(blob, ".dat"));
+    })(await this.read(blob, ".dat"));
   }
 
   static open(
@@ -109,9 +110,9 @@ export class Image {
     }
   }
 
-  static create(ext: string | null = null, block?: (file: Tempfile) => unknown) {
+  static async create(ext: string | null = null, block?: (file: Tempfile) => unknown) {
     const tempfile = Utilities.tempfile((ext ?? "").toLowerCase(), block);
-    return new this(tempfile.path()!, tempfile);
+    return await this.new(tempfile.path()!, tempfile);
   }
 
   /** @inventedArm finally — PERMANENT */
@@ -139,17 +140,21 @@ export class Image {
   }
 
   /** @missingRailsName path — PERMANENT */
-  constructor(
-    inputPath: string | Pathname,
-    tempfile: Tempfile | null = null,
-    block?: (builder: CliTool) => unknown,
-  ) {
+  protected constructor(inputPath: string | Pathname, tempfile: Tempfile | null = null) {
     this._path = String(inputPath);
     this._tempfile = tempfile;
     this._info = new Info(this._path);
-    if (block != null) {
-      (this._info._pending = this.combineOptions(block)).catch(() => {});
-    }
+  }
+
+  static async new<T extends Image>(
+    this: { prototype: T },
+    inputPath: string | Pathname,
+    tempfile: Tempfile | null = null,
+    block?: (builder: CliTool) => unknown,
+  ): Promise<T> {
+    const obj = rbClassNewInstance(this, inputPath, tempfile);
+    if (block != null) await obj.combineOptions(block);
+    return obj;
   }
 
   equals(other: Image) {
@@ -165,7 +170,6 @@ export class Image {
   }
 
   async toBlob() {
-    await this._info._pending;
     return File.binread(this.path);
   }
 
@@ -204,7 +208,9 @@ export class Image {
 
   async layers() {
     const layersCount = rbStrEnumerateLines(await this.identify(), []).length;
-    return Array.from({ length: layersCount }, (_, idx) => new Image(`${this.path}[${idx}]`));
+    return await Promise.all(
+      Array.from({ length: layersCount }, (_, idx) => Image.new(`${this.path}[${idx}]`)),
+    );
   }
 
   pages() {
@@ -219,7 +225,6 @@ export class Image {
     if (!["RGB", "RGBA"].includes(map)) {
       throw new ArgumentError("Invalid map value");
     }
-    await this._info._pending;
     const convert = MiniMagick.convert() as CliTool;
     convert.append(this.path);
     convert.depth(8);
@@ -250,7 +255,6 @@ export class Image {
     readOpts: Record<string, unknown> = {},
     block?: (convert: CliTool) => unknown,
   ) {
-    await this._info._pending;
     let newTempfile: Tempfile | null = null,
       newPath: string;
     try {
@@ -308,7 +312,6 @@ export class Image {
   }
 
   async write(outputTo: string | Pathname | IO | StringIO<string | Uint8Array>) {
-    await this._info._pending;
     if (typeof outputTo === "string" || outputTo instanceof Pathname) {
       if (this.isLayer() != null) {
         return await MiniMagick.convert(
@@ -332,9 +335,6 @@ export class Image {
     mask: Image | null = null,
     block?: (composite: CliTool) => unknown,
   ) {
-    await this._info._pending;
-    await otherImage._info._pending;
-    await mask?._info._pending;
     if (outputExtension === undefined) outputExtension = (await this.type()).toLowerCase();
     const outputTempfile = Utilities.tempfile(`.${outputExtension}`);
     await MiniMagick.composite(
@@ -348,7 +348,7 @@ export class Image {
         composite.append(outputTempfile.path());
       }),
     );
-    return new Image(outputTempfile.path()!, outputTempfile);
+    return await Image.new(outputTempfile.path()!, outputTempfile);
   }
 
   collapseBang(frame: number = 0) {
@@ -357,7 +357,6 @@ export class Image {
 
   /** @missingRailsName sub — PERMANENT */
   async destroyBang() {
-    await this._info._pending;
     if (this._tempfile != null) {
       if (this._tempfile.path()!.endsWith(".mpc")) {
         FileUtils.rmF(this._tempfile.path()!.replace(/mpc$/m, "cache"));
@@ -368,7 +367,6 @@ export class Image {
   }
 
   async identify(block?: (builder: CliTool) => unknown): Promise<string> {
-    await this._info._pending;
     return (await MiniMagick.identify(
       blockPass((builder: CliTool) => {
         if (block != null) {
@@ -380,7 +378,6 @@ export class Image {
   }
 
   async mogrify(page: number | null = null, block?: (builder: CliTool) => unknown) {
-    await this._info._pending;
     await MiniMagick.mogrify(
       blockPass(async (builder: CliTool) => {
         if (block != null) {

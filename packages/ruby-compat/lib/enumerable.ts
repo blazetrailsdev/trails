@@ -1022,7 +1022,6 @@ export function isInclude<T, E = unknown>(
 function iterator<T, E = unknown>(this: Each<T, E>): IterableIterator<T> {
   const ary: unknown = enumToA(this);
   if (ary instanceof Promise) {
-    ary.catch(() => {});
     throw new TypeError("each is asynchronous: await it before iterating");
   }
   return (ary as T[])[Symbol.iterator]();
