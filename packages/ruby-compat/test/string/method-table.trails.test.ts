@@ -187,6 +187,8 @@ describe("STRING_METHOD_TABLE", () => {
   it("String#match? answers as MRI does", () => {
     const rows: Row[] = [
       ["héllo", "isMatch", [new RegExp("L", "i")], { res: true, recv: { s: "héllo" } }],
+      ["héllo", "isMatch", ["l+"], { res: true, recv: { s: "héllo" } }],
+      ["héllo", "isMatch", ["x"], { res: false, recv: { s: "héllo" } }],
     ];
     for (const [recv, method, args, want] of rows) expect(send(recv, method, args)).toEqual(want);
   });

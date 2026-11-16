@@ -1048,7 +1048,7 @@ WHERE fk.referenced_column_name IS NOT NULL
         sql,
         this.pool,
       );
-      if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
+      if (this.isWarningIgnored(warning as unknown as { level?: string; message: string }))
         continue;
 
       dbWarningsAction()!.call(this, warning);
@@ -1056,7 +1056,11 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /** @internal */
-  override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
+  override isWarningIgnored(warning: {
+    level?: string;
+    message: string;
+    [k: string]: unknown;
+  }): boolean {
     return warning.level === "Note" || super.isWarningIgnored(warning);
   }
 

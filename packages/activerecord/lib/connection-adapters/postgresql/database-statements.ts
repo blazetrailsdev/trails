@@ -460,13 +460,13 @@ type SqlWarning = SQLWarning;
 interface HandleWarningsHost {
   _noticeReceiverSqlWarnings?: SqlWarning[];
   /** @internal */
-  isWarningIgnored(warning: { message?: string; code?: string | number }): boolean;
+  isWarningIgnored(warning: { message: string; code?: string | number }): boolean;
 }
 
 /** @internal */
 export function handleWarnings(this: HandleWarningsHost, sql: unknown): void {
   for (const warning of this._noticeReceiverSqlWarnings ?? []) {
-    if (this.isWarningIgnored(warning as unknown as { message?: string })) continue;
+    if (this.isWarningIgnored(warning as unknown as { message: string })) continue;
 
     warning.sql = sql;
     dbWarningsAction()!.call(this, warning as unknown as SQLWarning);

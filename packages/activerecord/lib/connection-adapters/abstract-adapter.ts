@@ -1960,14 +1960,13 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   isWarningIgnored(warning: {
-    message?: string;
+    message: string;
     code?: string | number;
     [k: string]: unknown;
   }): boolean {
     return dbWarningsIgnore().some(
       (warningMatcher) =>
-        isMatch(warning.message as string, warningMatcher) ||
-        isMatch(toS(warning.code), warningMatcher),
+        isMatch(warning.message, warningMatcher) || isMatch(toS(warning.code), warningMatcher),
     );
   }
 
