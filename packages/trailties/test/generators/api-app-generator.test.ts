@@ -120,7 +120,10 @@ describe("ApiAppGeneratorTest", () => {
 
   it("generator if skip action cable is given", async () => {
     await t.runGenerator([t.destinationRoot, "--api", "--skip-install", "--skip-action-cable"]);
-    await t.assertFile("config/application.ts", /\/\/\s*import\s+"[^"]*action-cable/);
+    await t.assertFile(
+      "config/application.ts",
+      /\/\/\s*import\s+"@blazetrails\/actioncable\/engine"/,
+    );
     t.assertNoFile("config/cable.ts");
     await t.assertFile("package.json", (content: string) => {
       assertNoMatch(/"redis"/, content);

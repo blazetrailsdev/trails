@@ -305,7 +305,7 @@ describe("AppGeneratorTest", () => {
     await t.runGenerator([t.destinationRoot, "--skip-action-cable"]);
     await t.assertFile(
       "config/application.ts",
-      /^\/\/\s+import\s+"@blazetrails\/trailties\/trailties\/action-cable";/m,
+      /^\/\/\s+import\s+"@blazetrails\/actioncable\/engine";/m,
     );
     t.assertNoFile("config/cable.ts");
     await t.assertFile("package.json", (content: string) => {
