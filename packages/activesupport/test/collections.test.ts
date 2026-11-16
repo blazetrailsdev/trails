@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Hash } from "@blazetrails/ruby-compat";
-import { toXml as toXmlArray } from "../lib/array-utils.js";
+import { toXml as toXmlArray } from "../lib/core-ext/array/conversions.js";
 import {
   deepMerge,
   deepDup,

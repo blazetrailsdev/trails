@@ -35,10 +35,8 @@
     "byFile": {}
   },
   "activesupport": {
-    "total": 8,
+    "total": 4,
     "byFile": {
-      "configurable.rb": 1,
-      "core_ext/module/attribute_accessors.rb": 3,
       "core_ext/object/try.rb": 4
     }
   },

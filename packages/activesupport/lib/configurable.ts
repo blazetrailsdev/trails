@@ -1,5 +1,5 @@
 import { extend, included, rbClearMethodCache } from "@blazetrails/ruby-compat/include";
-import { rbModMethodDefined } from "@blazetrails/ruby-compat";
+import { type Block, rbBlockGivenP, rbModMethodDefined } from "@blazetrails/ruby-compat";
 import { NameError } from "./core-ext/name-error.js";
 import { InheritableOptions } from "./ordered-options.js";
 
@@ -49,8 +49,11 @@ export namespace Configurable {
 
     export function configAccessor(
       this: any,
-      ...namesAndOptions: (string | ConfigAccessorOptions)[]
+      ...namesAndOptions: (string | ConfigAccessorOptions | Block<unknown>)[]
     ): void {
+      const block = rbBlockGivenP(namesAndOptions[namesAndOptions.length - 1])
+        ? (namesAndOptions.pop() as () => unknown)
+        : null;
       const last = namesAndOptions[namesAndOptions.length - 1];
       const options: ConfigAccessorOptions =
         typeof last === "object" && last !== null
@@ -92,7 +95,7 @@ export namespace Configurable {
           }
         }
 
-        this[name] = typeof options.default === "function" ? options.default() : options.default;
+        this[name] = block !== null ? block() : options.default;
       }
     }
   }

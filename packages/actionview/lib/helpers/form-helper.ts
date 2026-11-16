@@ -1142,7 +1142,7 @@ onLoad("action_view", (base: unknown) => {
   cattrAccessor.call(base, "defaultFormBuilder", {
     instanceWriter: false,
     instanceReader: false,
-    default: () => FormBuilder,
+    default: FormBuilder,
   });
 });
 

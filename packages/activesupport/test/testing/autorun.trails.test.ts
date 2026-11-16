@@ -63,8 +63,21 @@ describe("autorun captures the body's exception (minitest/test.rb:190-198)", () 
     const testCase = ran.get("fails a soft expectation, then raises")!;
     expect(testCase.failures.length).toBe(2);
     expect((testCase.failures[0] as UnexpectedError).error).toBe(raised);
-    expect(testCase.failures[1]).toBeInstanceOf(UnexpectedError);
-    expect((testCase.failures[1] as UnexpectedError).error.message).toMatch(/expected 1 to be 2/);
+    expect(testCase.failures[1]).toBeInstanceOf(Assertion);
+    expect(testCase.failures[1]).not.toBeInstanceOf(UnexpectedError);
+    expect(testCase.failures[1].message).toMatch(/expected 1 to be 2/);
+  });
+
+  it.fails("fails a vitest expect", () => {
+    expect(1).toBe(2);
+  });
+
+  it("keeps the failed expect as an Assertion", () => {
+    const testCase = ran.get("fails a vitest expect")!;
+    expect(testCase.failures.length).toBe(1);
+    expect(testCase.failures[0]).toBeInstanceOf(Assertion);
+    expect(testCase.failures[0]).not.toBeInstanceOf(UnexpectedError);
+    expect(testCase.isError()).toBe(false);
   });
 
   describe("when a beforeEach hook raises", () => {

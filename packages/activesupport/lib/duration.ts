@@ -38,7 +38,7 @@ import { current as timeCurrent } from "./core-ext/time/calculations.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "./namespaces.js";
 import { ArgumentError } from "./hash-utils.js";
-import { toSentence } from "./array-utils.js";
+import { toSentence } from "./core-ext/array/conversions.js";
 import { rbHash } from "@blazetrails/ruby-compat";
 import type { TimeWithZone } from "./time-with-zone.js";
 import { actsLike } from "./core-ext/object/acts-like.js";
@@ -66,7 +66,7 @@ export type DurationParts = {
 const SECONDS_PER_MINUTE = 60;
 const SECONDS_PER_HOUR = 3600;
 export const SECONDS_PER_DAY = 86400;
-export const SECONDS_PER_WEEK = 7 * SECONDS_PER_DAY;
+export const SECONDS_PER_WEEK = 604800;
 const SECONDS_PER_MONTH = 2629746;
 const SECONDS_PER_YEAR = 31556952;
 

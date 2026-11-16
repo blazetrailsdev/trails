@@ -1,4 +1,11 @@
-import { defineAccessorHalf, Module, NameError, rbModName } from "@blazetrails/ruby-compat";
+import {
+  type Block,
+  defineAccessorHalf,
+  Module,
+  NameError,
+  rbBlockGivenP,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -38,6 +45,7 @@ export interface MattrOptions {
   instanceWriter?: boolean;
   instanceReader?: boolean;
   instanceAccessor?: boolean;
+  location?: unknown;
 }
 
 const VALID_ATTR_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*[!?]?$/;
@@ -53,17 +61,20 @@ function setMattrDefault(
   name: string,
   storageKey: string,
   options: MattrOptions,
+  blk: (() => unknown) | null,
 ): void {
-  const rawDefault = options.default ?? null;
-  const symDefaultValue = typeof rawDefault === "function" ? rawDefault() : rawDefault;
+  const defaultValue = options.default ?? null;
+  const symDefaultValue = blk !== null && defaultValue == null ? blk() : defaultValue;
   if (!(symDefaultValue == null && Object.hasOwn(target, storageKey))) {
     target[storageKey] = symDefaultValue;
   }
 }
 
-export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void {
+export function mattrReader(this: any, ...syms: (string | MattrOptions | Block<unknown>)[]): void {
   const target = this;
+  const blk = rbBlockGivenP(syms[syms.length - 1]) ? (syms.pop() as () => unknown) : null;
   const options = extractOptionsBang(syms) as MattrOptions;
+  options.location ??= callerLocations(1, 1)[0];
   const names = syms as string[];
   const instanceReader = options.instanceReader !== false;
   const instanceAccessor = options.instanceAccessor !== false;
@@ -84,15 +95,17 @@ export function mattrReader(this: any, ...syms: (string | MattrOptions)[]): void
       }
     }
 
-    setMattrDefault(target, sym, storageKey, options);
+    setMattrDefault(target, sym, storageKey, options, blk);
   }
 }
 
 export const cattrReader = mattrReader;
 
-export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void {
+export function mattrWriter(this: any, ...syms: (string | MattrOptions | Block<unknown>)[]): void {
   const target = this;
+  const blk = rbBlockGivenP(syms[syms.length - 1]) ? (syms.pop() as () => unknown) : null;
   const options = extractOptionsBang(syms) as MattrOptions;
+  options.location ??= callerLocations(1, 1)[0];
   const names = syms as string[];
   const instanceWriter = options.instanceWriter !== false;
   const instanceAccessor = options.instanceAccessor !== false;
@@ -121,19 +134,27 @@ export function mattrWriter(this: any, ...syms: (string | MattrOptions)[]): void
       }
     }
 
-    setMattrDefault(target, sym, storageKey, options);
+    setMattrDefault(target, sym, storageKey, options, blk);
   }
 }
 
 export const cattrWriter = mattrWriter;
 
-export function mattrAccessor(this: any, ...syms: (string | MattrOptions)[]): void {
+export function mattrAccessor(
+  this: any,
+  ...syms: (string | MattrOptions | Block<unknown>)[]
+): void {
+  const blk = rbBlockGivenP(syms[syms.length - 1]) ? (syms.pop() as Block<unknown>) : null;
   const options = extractOptionsBang(syms) as MattrOptions;
   const names = syms as string[];
-  const writerOptions: MattrOptions = { ...options };
-  delete writerOptions.default;
+  const location = callerLocations(1, 1)[0];
+  const readerOptions: MattrOptions = { ...options, location };
+  delete readerOptions.instanceWriter;
+  const writerOptions: MattrOptions = { ...options, location };
+  delete writerOptions.instanceReader;
 
-  mattrReader.call(this, ...names, options);
+  if (blk !== null) mattrReader.call(this, ...names, readerOptions, blk);
+  else mattrReader.call(this, ...names, readerOptions);
   mattrWriter.call(this, ...names, writerOptions);
 }
 

@@ -322,7 +322,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // `object/duplicable.rb` for Hash, …), so every other file's methods are
   // measured against a TS counterpart that defines none of them. trails collapses
   // each class's core_ext surface into one module — `hash-utils.ts`,
-  // `string-utils.ts`, `module-ext.ts`, `array-utils.ts` — so the mapping is
+  // `string-utils.ts`, `module-ext.ts` — so the mapping is
   // many Ruby files to the one TS file, the same shape as `inflector.ts` above.
   "activesupport:core_ext/hash/keys.rb": "hash-utils.ts",
   "activesupport:core_ext/hash/reverse_merge.rb": "hash-utils.ts",
@@ -348,9 +348,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/module/introspection.rb": "module-ext.ts",
   "activesupport:core_ext/module/delegation.rb": "module-ext.ts",
   "activesupport:core_ext/module/anonymous.rb": "module-ext.ts",
-  "activesupport:core_ext/array/grouping.rb": "array-utils.ts",
-  "activesupport:core_ext/array/extract.rb": "array-utils.ts",
-  "activesupport:core_ext/array/wrap.rb": "array-utils.ts",
   // Range keeps Rails' per-concern file layout in trails, so these map by the
   // default rule — but Range's home bucket is `core_ext/range/each.rb`, so the
   // reopening still needs the entry.
@@ -395,7 +392,6 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "activesupport:core_ext/hash/slice.rb": "core-ext/hash/slice.ts",
   "activesupport:core_ext/hash/except.rb": "hash-utils.ts",
   "activesupport:core_ext/hash/deep_merge.rb": "hash-utils.ts",
-  "activesupport:core_ext/array/conversions.rb": "array-utils.ts",
   "activesupport:core_ext/string/exclude.rb": "string-utils.ts",
   "activesupport:core_ext/object/with.rb": "core-ext/object/with.ts",
   "activesupport:core_ext/class/subclasses.rb": "module-ext.ts",

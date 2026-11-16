@@ -6,6 +6,18 @@ import {
   stringSuperclass,
 } from "@blazetrails/ruby-compat";
 
+class Object {
+  static isHtmlSafe(_self: unknown): false {
+    return false;
+  }
+}
+
+class Numeric {
+  static isHtmlSafe(_self: number | bigint): true {
+    return true;
+  }
+}
+
 const HTML_ESCAPE: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
@@ -246,7 +258,7 @@ export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJs
     ) {
       const escapedArgs = args as Record<string, unknown>;
       result = this._value.replace(/%\{(\w+)\}/g, (_, key) => {
-        if (!Object.hasOwn(escapedArgs, key)) throw new Error(`key{${key}} not found`);
+        if (!globalThis.Object.hasOwn(escapedArgs, key)) throw new Error(`key{${key}} not found`);
         return String(this.explicitHtmlEscapeInterpolatedArgument(escapedArgs[key]));
       });
     } else {
@@ -318,11 +330,11 @@ export function htmlSafe(str: string): SafeBuffer {
   return new SafeBuffer(str, true);
 }
 
-export function isHtmlSafe(value: unknown): boolean {
-  if (value instanceof SafeBuffer) return value.htmlSafe;
-  if (typeof value === "number") return true;
-  if (value !== null && typeof value === "object" && "htmlSafe" in value) {
-    return (value as { htmlSafe: unknown }).htmlSafe === true;
+export function isHtmlSafe(self: unknown): boolean {
+  if (self instanceof SafeBuffer) return self.htmlSafe;
+  if (typeof self === "number" || typeof self === "bigint") return Numeric.isHtmlSafe(self);
+  if (self !== null && typeof self === "object" && "htmlSafe" in self) {
+    return (self as { htmlSafe: unknown }).htmlSafe === true;
   }
-  return false;
+  return Object.isHtmlSafe(self);
 }

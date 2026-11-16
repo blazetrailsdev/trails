@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
+import { include } from "@blazetrails/ruby-compat/include";
 import {
   Assertion,
-  assertChanges,
+  Assertions,
   assertPredicate,
   assertRaises,
+  Test,
 } from "../../lib/testing/assertions.js";
 import {
   MockExpectationError,
@@ -211,18 +213,23 @@ describe("MethodCallAssertionsTest", () => {
   });
 
   it("assert changes when assertions are included", async () => {
-    let counter = 1;
-    const testResults = { passed: false };
-    await assertChanges(
-      () => counter,
-      null,
-      {},
-      () => {
-        counter = 2;
-      },
-    );
-    testResults.passed = true;
+    const testUnitClass = class extends Test {
+      async testAssertChanges(this: Test & typeof Assertions): Promise<void> {
+        const self = this;
+        let counter = 1;
+        await self.assertChanges(
+          () => counter,
+          null,
+          {},
+          () => {
+            counter = 2;
+          },
+        );
+      }
+    };
+    include(testUnitClass, Assertions);
 
-    assertPredicate(testResults, (results) => results.passed);
+    const testResults = await new testUnitClass("testAssertChanges").run();
+    assertPredicate(testResults, (results) => results.isPassed());
   });
 });

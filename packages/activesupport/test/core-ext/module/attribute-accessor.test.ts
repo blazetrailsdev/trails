@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { classModule, include, NameError } from "@blazetrails/ruby-compat";
+import { block, classModule, include, NameError } from "@blazetrails/ruby-compat";
 
 import {
   cattrAccessor,
@@ -29,11 +29,15 @@ describe("ModuleAttributeAccessorTest", () => {
     mattrReader.call(m, "shaq", { instanceReader: false });
     mattrAccessor.call(m, "camp", { instanceAccessor: false });
 
-    cattrAccessor.call(m, "defa", { default: () => "default_accessor_value" });
-    cattrReader.call(m, "defr", { default: () => "default_reader_value" });
-    cattrWriter.call(m, "defw", { default: () => "default_writer_value" });
-    cattrAccessor.call(m, "deff", { default: () => false });
-    cattrAccessor.call(m, "quux", { default: () => "quux" });
+    cattrAccessor.call(m, "defa", { default: "default_accessor_value" });
+    cattrReader.call(m, "defr", { default: "default_reader_value" });
+    cattrWriter.call(m, "defw", { default: "default_writer_value" });
+    cattrAccessor.call(m, "deff", { default: false });
+    cattrAccessor.call(
+      m,
+      "quux",
+      block(() => "quux"),
+    );
 
     cattrAccessor.call(m, "defAccessor", { default: "default_accessor_value" });
     cattrReader.call(m, "defReader", { default: "default_reader_value" });
@@ -125,7 +129,11 @@ describe("ModuleAttributeAccessorTest", () => {
   it("method invocation should not invoke the default block", async () => {
     let count = 0;
 
-    cattrAccessor.call(module, "defcount", { default: () => (count += 1) });
+    cattrAccessor.call(
+      module,
+      "defcount",
+      block(() => (count += 1)),
+    );
 
     expect(count).toEqual(1);
     await assertNoDifference(
@@ -138,7 +146,12 @@ describe("ModuleAttributeAccessorTest", () => {
   it("declaring multiple attributes at once invokes the block multiple times", () => {
     let count = 0;
 
-    cattrAccessor.call(module, "defn1", "defn2", { default: () => (count += 1) });
+    cattrAccessor.call(
+      module,
+      "defn1",
+      "defn2",
+      block(() => (count += 1)),
+    );
 
     expect(module.defn1).toEqual(1);
     expect(module.defn2).toEqual(2);
