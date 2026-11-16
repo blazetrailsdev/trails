@@ -134,9 +134,7 @@ export function sanitizeSqlForOrder(
 
 export function sanitizeSqlHashForAssignment(
   this: QuoterHost & {
-    typeForAttribute(
-      name: string,
-    ): { cast(v: unknown): unknown; serialize(v: unknown): unknown } | null;
+    typeForAttribute(name: string): { cast(v: unknown): unknown; serialize(v: unknown): unknown };
   },
   attrs: Record<string, unknown>,
   table: string,
@@ -144,7 +142,7 @@ export function sanitizeSqlHashForAssignment(
   return this.connectionPool().withConnectionSync((c) =>
     Object.entries(attrs)
       .map(([attr, value]) => {
-        const type = this.typeForAttribute(attr)!;
+        const type = this.typeForAttribute(attr);
         value = type.serialize(type.cast(value));
         return `${c.quoteTableNameForAssignment(table, attr)} = ${c.quote(value)}`;
       })

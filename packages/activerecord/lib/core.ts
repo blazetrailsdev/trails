@@ -488,7 +488,7 @@ interface CoreHost {
   prototype: any;
   all(): any;
   isScopeAttributes(): boolean;
-  typeForAttribute(name: string): { cast(value: unknown): unknown } | null;
+  typeForAttribute(name: string): { cast(value: unknown): unknown };
   ensureSchemaLoaded(): Promise<void>;
   generatedAttributeMethods(): Module;
   attributeAliases?: Record<string, string>;

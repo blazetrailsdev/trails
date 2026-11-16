@@ -109,7 +109,7 @@ export abstract class CollectionAssociation extends Association {
   async idsWriter(ids: unknown[]): Promise<void> {
     const primaryKey = this.reflection.associationPrimaryKey();
     const klass = this.klass;
-    const pkType = klass.typeForAttribute(primaryKey as string)!;
+    const pkType = klass.typeForAttribute(primaryKey as string);
     ids = compactBlank(kernelArray(ids));
     ids = ids.map((id) => pkType.cast(id));
 

@@ -705,6 +705,25 @@ export class ConnectionPool implements ReapablePool {
     if (preventPermanentCheckout) lease.sticky = false;
 
     const ensure = (release: boolean, result?: T): T => {
+      if (result instanceof Promise) {
+        const pending = pendingCheckouts.get(lease);
+        const checkout = release
+          ? pending
+            ? null
+            : { connection: Promise.resolve(lease.connection!), holders: 0 }
+          : (pending ?? null);
+        if (checkout) {
+          if (!pending) pendingCheckouts.set(lease, checkout);
+          checkout.holders++;
+          return result.finally(() => {
+            if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
+            if (--checkout.holders === 0) {
+              if (pendingCheckouts.get(lease) === checkout) pendingCheckouts.delete(lease);
+              if (!lease.sticky) this.releaseConnection(lease);
+            }
+          }) as T;
+        }
+      }
       const restore = () => {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
         if (release && !lease.sticky) this.releaseConnection(lease);

@@ -14,7 +14,7 @@ interface NormalizationClass {
     names: string[],
     decorator: (name: string, castType: ValueType) => ValueType,
   ): void;
-  typeForAttribute(name: string): ValueType | null;
+  typeForAttribute(name: string): ValueType;
 }
 
 /** @internal */
@@ -51,7 +51,7 @@ export const ClassMethods = {
   },
 
   normalizeValueFor(this: NormalizationClass, name: string, value: unknown): unknown {
-    return this.typeForAttribute(name)!.cast(value);
+    return this.typeForAttribute(name).cast(value);
   },
 };
 

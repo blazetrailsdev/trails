@@ -517,14 +517,14 @@ export class Base extends Model {
     );
   }
 
-  static typeForAttribute(name: unknown, block?: () => ValueType): ValueType | null {
+  static typeForAttribute(name: unknown, block?: () => ValueType): ValueType {
     ModelSchema.loadSchema.call(this);
     const attributeName = toS(name);
     const resolved = this.attributeAliases?.[attributeName] ?? attributeName;
     if (block) {
       return fetch(this.attributeTypes(), resolved, rbBlock(block));
     }
-    return hashAref(this.attributeTypes(), resolved) as ValueType | null;
+    return hashAref(this.attributeTypes(), resolved) as ValueType;
   }
 
   declare static readonly arelTable: Table;
@@ -1505,7 +1505,7 @@ export class Base extends Model {
   declare attributes: Record<string, unknown>;
   declare attributesBeforeTypeCast: () => Record<string, unknown> | Hash<string, unknown>;
   declare attributesForDatabase: () => Record<string, unknown> | Hash<string, unknown>;
-  declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType | null;
+  declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
   declare accessedFields: () => string[];
@@ -2077,7 +2077,6 @@ extend(Base, {
   buildExplainClause: _buildExplainClause,
 });
 extend(Base, _Reflection.ClassMethods);
-include(Base, _Reflection.Reflection);
 classAttribute.call(Base, "defaultScopes", {
   instanceWriter: false,
   instancePredicate: false,
@@ -2226,14 +2225,15 @@ include(Base, { initAttributes: _Core.initAttributes });
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
-include(Base, JSONSerializer);
-Base.includeRootInJson = false;
-include(Base, { serializableHash: Serialization.serializableHash });
 include(Base, LockingPessimistic.Pessimistic);
 include(Base, Timestamp.Timestamp);
 include(Base, ActiveRecord.Associations);
 include(Base, _TouchLater.TouchLater);
 include(Base, _NoTouching.NoTouching);
+include(Base, _Reflection.Reflection);
+include(Base, JSONSerializer);
+Base.includeRootInJson = false;
+include(Base, { serializableHash: Serialization.serializableHash });
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 extend(Base, { loadSchemaBang: CounterCache.loadSchemaBang });
