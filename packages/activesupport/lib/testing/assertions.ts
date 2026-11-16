@@ -1024,3 +1024,14 @@ function inspect(value: unknown): string {
     return JSON.stringify(value) ?? Object.prototype.toString.call(value);
   }
 }
+
+export const Assertions = {
+  assertNot,
+  assertRaises,
+  assertRaise,
+  assertNothingRaised,
+  assertDifference,
+  assertNoDifference,
+  assertChanges,
+  assertNoChanges,
+};
