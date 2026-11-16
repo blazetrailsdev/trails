@@ -37,6 +37,7 @@ export class ClassMissingError extends NameError {
 type ActiveJob = ActiveJobBase & { concurrencyKey(): string | null };
 
 export class Job extends Record {
+  static ClassMissingError = ClassMissingError;
   declare static prepareAllForExecution: typeof ExecutableClassMethods.prepareAllForExecution;
   declare static dispatchAll: typeof ExecutableClassMethods.dispatchAll;
   declare static scheduleAll: typeof SchedulableClassMethods.scheduleAll;

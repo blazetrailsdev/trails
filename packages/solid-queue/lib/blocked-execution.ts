@@ -3,7 +3,6 @@ import { slice } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
 import { constSet, Range, rbFArray } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
-import { ClassMissingError } from "./job.js";
 import { SolidQueue } from "./solid-queue.js";
 import { Semaphore } from "./semaphore.js";
 import { ReadyExecution } from "./ready-execution.js";
@@ -79,7 +78,7 @@ export class BlockedExecution extends Execution {
       async (payload) => {
         return await this.transaction(async () => {
           if (job.jobClass() == null) {
-            await job.failedWith(ClassMissingError.for(job));
+            await job.failedWith(SolidQueue.Job!.ClassMissingError.for(job));
             await this.destroyBang();
 
             return (payload["failed"] = true);
