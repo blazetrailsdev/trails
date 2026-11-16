@@ -6161,9 +6161,10 @@ export function main() {
                 ?.get(`${rubyModule.split("::").at(-1) ?? rubyModule}#${tsName}`)
             : undefined;
         const candidates = arityCandidates(
-          tsName === "constructor"
+          (tsName === "constructor"
             ? (ownerSigs ?? [])
-            : (tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? []),
+            : (tsParamsByFileNameInPkg.get(tsFile)?.get(tsName) ?? [])
+          ).filter((sig) => !tsWriterSigs.has(sig)),
           tsParamsByName.get(tsName) ?? [],
           /(^|\/)core_ext\//.test(rubyFile),
         );

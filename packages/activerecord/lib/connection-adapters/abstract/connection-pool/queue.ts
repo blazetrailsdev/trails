@@ -176,7 +176,7 @@ export class Queue {
   }
 
   /** @internal */
-  get any(): boolean {
+  isAny(): boolean {
     return this._queue.length > 0;
   }
 
@@ -204,7 +204,7 @@ export class Queue {
       for (;;) {
         await this._cond.wait(timeout - elapsed);
 
-        if (this.any) return this.remove()!;
+        if (this.isAny()) return this.remove()!;
 
         elapsed = Process.clockGettime(Process.CLOCK_MONOTONIC) - t0;
         if (elapsed >= timeout) {
@@ -244,9 +244,4 @@ include(ConnectionLeasingQueue, BiasableQueue);
 /** @internal */
 function synchronize<R>(_queue: unknown, block: () => R): R {
   return block();
-}
-
-/** @internal */
-function isAny(queue: Queue): boolean {
-  return queue.any;
 }
