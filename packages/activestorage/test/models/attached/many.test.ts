@@ -18,6 +18,7 @@ import type { Attachment } from "../../../lib/attachment.js";
 import { Blob } from "../../../lib/blob.js";
 import type { Preview } from "../../../lib/preview.js";
 import type { Variant } from "../../../lib/variant.js";
+import type { VariantWithRecord } from "../../../lib/variant-with-record.js";
 import { PreviewImageJob } from "../../../lib/preview-image-job.js";
 import { PurgeJob } from "../../../lib/purge-job.js";
 import { TransformJob } from "../../../lib/transform-job.js";
@@ -1074,7 +1075,9 @@ describe("ActiveStorage::ManyAttachedTest", () => {
   it("creating representation by variation name", async () => {
     await user.highlightsWithVariants.attach(fixtureFileUpload("racecar.jpg"));
     const variant = await (
-      (await attachmentAt(user.highlightsWithVariants, 0)).representation("thumb") as Variant
+      (await attachmentAt(user.highlightsWithVariants, 0)).representation("thumb") as
+        | Variant
+        | VariantWithRecord
     ).processed();
 
     const image = await readImage(variant);
@@ -1088,7 +1091,9 @@ describe("ActiveStorage::ManyAttachedTest", () => {
 
     const error = await assertRaises([ArgumentError], {}, async () => {
       await (
-        (await attachmentAt(user.highlightsWithVariants, 0)).representation("unknown") as Variant
+        (await attachmentAt(user.highlightsWithVariants, 0)).representation("unknown") as
+          | Variant
+          | VariantWithRecord
       ).processed();
     });
 
