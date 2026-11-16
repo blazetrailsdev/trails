@@ -187,7 +187,7 @@ describe("LoadAsyncTest", () => {
         expect(deferredPosts.isScheduled).toBeTruthy();
       }
       expect(await deferredPosts).toEqual(expectedRecords);
-      await assertQueriesCount(0, false, async () => {
+      await assertQueriesCount(0, async () => {
         for (const post of await deferredPosts) await post.comments;
       });
       const connection = await Post.leaseConnection();
@@ -197,7 +197,7 @@ describe("LoadAsyncTest", () => {
     }
   });
   it("contradiction", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Post.where({ id: [] }).loadAsync()).toEqual([]);
     });
 
@@ -318,7 +318,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncNullExecutorTest", () => {
 
       expect(deferredPosts.isScheduled).toBeFalsy();
       expect(await deferredPosts).toEqual(expectedRecords);
-      await assertQueriesCount(0, false, async () => {
+      await assertQueriesCount(0, async () => {
         for (const post of await deferredPosts) await post.comments;
       });
 
@@ -330,7 +330,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncNullExecutorTest", () => {
     }
   });
   it("contradiction", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Post.where({ id: [] }).loadAsync()).toEqual([]);
     });
 
@@ -462,7 +462,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncMultiThreadPoolExecutorTest", () => {
       expect(deferredPosts.isScheduled).toBeTruthy();
 
       expect(await deferredPosts).toEqual(expectedRecords);
-      await assertQueriesCount(0, false, async () => {
+      await assertQueriesCount(0, async () => {
         for (const post of await deferredPosts) await post.comments;
       });
       const connection = await Post.leaseConnection();
@@ -472,7 +472,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncMultiThreadPoolExecutorTest", () => {
     }
   });
   it("contradiction", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Post.where({ id: [] }).loadAsync()).toEqual([]);
     });
 

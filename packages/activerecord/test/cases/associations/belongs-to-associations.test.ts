@@ -745,11 +745,11 @@ describe("BelongsToAssociationsTest", () => {
     await Company.where({ id: (odegyAccount as any).firm_id }).updateAll({ name: "ODEGY" });
     expect((await odegyAccount.firm)!.name).toBe("Odegy");
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await (odegyAccount as any).reloadFirm();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await odegyAccount.firm;
     });
     expect((await odegyAccount.firm)!.name).toBe("ODEGY");
@@ -768,11 +768,11 @@ describe("BelongsToAssociationsTest", () => {
 
       expect(connection.queryCache.size).toBe(2);
 
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await (odegyAccount as any).reloadFirm();
       });
 
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Account.find(odegyAccountId);
       });
     } finally {
@@ -787,10 +787,10 @@ describe("BelongsToAssociationsTest", () => {
     await Company.where({ id: (odegyAccount as any).firm_id }).updateAll({ name: "ODEGY" });
     expect((await odegyAccount.firm)!.name).toBe("Odegy");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await (odegyAccount as any).resetFirm();
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await odegyAccount.firm;
     });
     expect((await odegyAccount.firm)!.name).toBe("ODEGY");
@@ -963,7 +963,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await debate.reload()).replies_count).toBe(1);
     expect((await debate2.reload()).replies_count).toBe(0);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       (reply as any).topicWithPrimaryKey = debate;
     });
 
@@ -995,7 +995,7 @@ describe("BelongsToAssociationsTest", () => {
 
     (reply1 as any).topic = await Topic.find(topic2.id!);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       (reply1 as any).topic = topic2;
     });
 
@@ -1041,7 +1041,7 @@ describe("BelongsToAssociationsTest", () => {
   it("belongs to counter after save", async () => {
     const topic = await Topic.create({ title: "monday night" });
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await topic.replies.create({ title: "re: monday night", content: "football" });
     });
 
@@ -1085,7 +1085,7 @@ describe("BelongsToAssociationsTest", () => {
     await debate.touch({ time });
     await debate2.touch({ time });
 
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       (reply as any).parent_title = "debate";
       await reply.save();
     });
@@ -1098,7 +1098,7 @@ describe("BelongsToAssociationsTest", () => {
     await debate.touch({ time });
     await debate2.touch({ time });
 
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       (reply as any).topicWithPrimaryKey = debate2;
       await reply.save();
     });
@@ -1113,7 +1113,7 @@ describe("BelongsToAssociationsTest", () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await lineItem.touch();
     });
   });
@@ -1123,14 +1123,14 @@ describe("BelongsToAssociationsTest", () => {
     const lineItem2 = await LineItem.create({ amount: 2 });
     await Invoice.create({ lineItems: [lineItem, lineItem2] });
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await LineItem.transaction(async () => {
         await lineItem.touch();
         await lineItem2.touch();
       });
     });
 
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       await lineItem.touch();
       await lineItem2.touch();
     });
@@ -1159,7 +1159,7 @@ describe("BelongsToAssociationsTest", () => {
 
     (lineItem as any).invoice = null;
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await lineItem.touch();
     });
   });
@@ -1168,7 +1168,7 @@ describe("BelongsToAssociationsTest", () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await lineItem.update({ amount: 10 });
     });
   });
@@ -1177,7 +1177,7 @@ describe("BelongsToAssociationsTest", () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await lineItem.save();
     });
   });
@@ -1186,7 +1186,7 @@ describe("BelongsToAssociationsTest", () => {
     const lineItem = await LineItem.create({});
     await Invoice.create({ lineItems: [lineItem] });
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await lineItem.destroy();
     });
   });
@@ -1196,7 +1196,7 @@ describe("BelongsToAssociationsTest", () => {
     const invoice = await Invoice.create({ lineItems: [lineItem] });
     await invoice.destroy();
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await lineItem.destroy();
     });
   });
@@ -1206,7 +1206,7 @@ describe("BelongsToAssociationsTest", () => {
     await Invoice.create({ lineItems: [lineItem] });
     (lineItem as any).invoice = await Invoice.create({});
 
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       await lineItem.touch();
     });
   });
@@ -1278,7 +1278,7 @@ describe("BelongsToAssociationsTest", () => {
 
   it("dont find target when foreign key is null", async () => {
     const tagging = taggings("thinking_general");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await (tagging as any).superTag;
     });
   });
@@ -1289,7 +1289,7 @@ describe("BelongsToAssociationsTest", () => {
       firmWithBasicId: await Firm.find(1),
     });
     (client as any).firm_id = (await Firm.create({ name: "Test firm" })).id;
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await client.saveBang();
     });
   });
@@ -2170,14 +2170,14 @@ describe("BelongsToAssociationsTest", () => {
     const ship = await ShipRequired.create({ name: "Medusa", developer_id: david.id });
     expect(Number((ship as any).developer_id)).toBe(Number(david.id));
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await ship.update({ developer_id: jamis.id });
     });
 
     await ship.updateColumns({ developer_id: null });
     await ship.reload();
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await ship.update({ developer_id: david.id });
     });
   });
@@ -2202,7 +2202,7 @@ describe("BelongsToAssociationsTest", () => {
     const ship = await ShipRequired.create({ name: "Medusa", developer_id: david.id });
     await ship.reload();
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await ship.update({ name: "Leviathan" });
     });
   });
@@ -2231,7 +2231,7 @@ describe("BelongsToAssociationsTest", () => {
       const ship = await TempShip.create({ name: "Medusa", developer_id: david.id });
       await ship.reload();
 
-      await assertQueriesCount(4, false, async () => {
+      await assertQueriesCount(4, async () => {
         await ship.update({ name: "Leviathan" });
       });
     } finally {
@@ -2298,7 +2298,7 @@ describe("AsyncBelongsToAssociationsTest", () => {
     };
     await Notifications.subscribed(callback, "sql.active_record", () => client.firm);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await client.firm).id).toEqual(firstFirm.id);
       expect((await client.firm).name).toEqual(firstFirm.name);
     });

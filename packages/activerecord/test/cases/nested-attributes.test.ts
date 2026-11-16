@@ -347,7 +347,7 @@ describe("TestNestedAttributesInGeneral", () => {
   it("updating models with cpk provided as strings", async () => {
     const book = await CpkBook.createBang({ id: [1, 2], shop_id: 3 });
     await (book as any).chapters.createBang({ id: [1, 3], title: "Title" });
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await book.updateBang({ chapters_attributes: { id: ["1", "3"], title: "New title" } });
     });
     await book.reload();
@@ -1423,7 +1423,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
     trinket.name = "changed";
     await Ship.createBang({ pirate_id: pirate.id, name: "The Black Rock" });
     await ShipPart.createBang({ ship_id: ship.id, name: "Stern" });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await pirate.isValid();
     });
   });
@@ -1516,7 +1516,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     const ship = new Ship({ name: "The Black Rock" });
     const part = (ship.association("parts") as any).build({ name: "Stern" });
     (ship.association("treasures") as any).build({ looter: part });
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       await ship.saveBang();
     });
   });
@@ -1532,7 +1532,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
     trinket.name = "changed";
     await Ship.createBang({ name: "The Black Rock" });
     await ShipPart.createBang({ ship_id: ship.id, name: "Stern" });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await ship.isValid();
     });
   });

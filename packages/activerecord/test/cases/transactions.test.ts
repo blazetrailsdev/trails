@@ -1502,7 +1502,7 @@ describe("TransactionTest", () => {
   });
 
   it("empty transaction is not materialized", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await Topic.transaction(async () => {});
     });
   });
@@ -1589,7 +1589,7 @@ describe("TransactionTest", () => {
   });
 
   it("savepoint does not materialize transaction", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await Topic.transaction(async () => {
         await Topic.transaction(async () => {}, { requiresNew: true });
       });
@@ -1597,7 +1597,7 @@ describe("TransactionTest", () => {
   });
 
   it("raising does not materialize transaction", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertRaises([RuntimeError], {}, () =>
         Topic.transaction(async () => {
           throw new RuntimeError("Expected");
@@ -1627,7 +1627,7 @@ describe("TransactionTest", () => {
     const connection = await (Topic as any).leaseConnection();
     await connection.rawConnection();
     connection._runCheckinCallbacks(() => {});
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await Topic.transaction(async () => {});
     });
   });

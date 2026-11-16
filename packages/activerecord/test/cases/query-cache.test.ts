@@ -280,7 +280,7 @@ describe("QueryCacheTest", () => {
   });
 
   it("find queries", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await Task.find(1);
       await Task.find(1);
     });
@@ -288,7 +288,7 @@ describe("QueryCacheTest", () => {
 
   it("find queries with cache", async () => {
     await Task.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Task.find(1);
         await Task.find(1);
       });
@@ -297,7 +297,7 @@ describe("QueryCacheTest", () => {
 
   it("find queries with cache multi record", async () => {
     await Task.cache(async () => {
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Task.find(1);
         await Task.find(1);
         await Task.find(2);
@@ -308,12 +308,12 @@ describe("QueryCacheTest", () => {
   it("find queries with multi cache blocks", async () => {
     await Task.cache(async () => {
       await Task.cache(async () => {
-        await assertQueriesCount(2, false, async () => {
+        await assertQueriesCount(2, async () => {
           await Task.find(1);
           await Task.find(2);
         });
       });
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await Task.find(1);
         await Task.find(1);
         await Task.find(2);
@@ -323,7 +323,7 @@ describe("QueryCacheTest", () => {
 
   it("count queries with cache", async () => {
     await Task.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Task.count();
         await Task.count();
       });
@@ -332,7 +332,7 @@ describe("QueryCacheTest", () => {
 
   it("exists queries with cache", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Post.isExists();
         await Post.isExists();
       });
@@ -341,7 +341,7 @@ describe("QueryCacheTest", () => {
 
   it("select all with cache", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await (await Post.leaseConnection()).selectAll(Post.all() as never);
         await (await Post.leaseConnection()).selectAll(Post.all() as never);
       });
@@ -350,7 +350,7 @@ describe("QueryCacheTest", () => {
 
   it("select one with cache", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await (await Post.leaseConnection()).selectOne(Post.all() as never);
         await (await Post.leaseConnection()).selectOne(Post.all() as never);
       });
@@ -359,7 +359,7 @@ describe("QueryCacheTest", () => {
 
   it("select value with cache", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await (await Post.leaseConnection()).selectValue(Post.all() as never);
         await (await Post.leaseConnection()).selectValue(Post.all() as never);
       });
@@ -368,7 +368,7 @@ describe("QueryCacheTest", () => {
 
   it("select values with cache", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await (await Post.leaseConnection()).selectValues(Post.all() as never);
         await (await Post.leaseConnection()).selectValues(Post.all() as never);
       });
@@ -377,7 +377,7 @@ describe("QueryCacheTest", () => {
 
   it("select rows with cache", async () => {
     await Post.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await (await Post.leaseConnection()).selectRows(Post.all() as never);
         await (await Post.leaseConnection()).selectRows(Post.all() as never);
       });
@@ -446,7 +446,7 @@ describe("QueryCacheTest", () => {
     const sub = Notifications.subscribe("sql.active_record", (e) => logger.sql(e));
     try {
       await Base.cache(async () => {
-        await assertQueriesCount(1, false, async () => {
+        await assertQueriesCount(1, async () => {
           await Task.find(1);
           await Task.find(1);
         });
@@ -465,14 +465,14 @@ describe("QueryCacheTest", () => {
 
   it("cache is flat", async () => {
     await Task.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Topic.find(1);
         await Topic.find(1);
       });
     });
 
     await Base.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Task.find(1);
         await Task.find(1);
       });
@@ -492,7 +492,7 @@ describe("QueryCacheTest", () => {
     const task = (await Task.find(1)) as never as { lockBang(): Promise<unknown> };
 
     await Task.cache(async () => {
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await task.lockBang();
         await task.lockBang();
       });
@@ -501,7 +501,7 @@ describe("QueryCacheTest", () => {
 
   it("cache is available when connection is connected", async () => {
     await Task.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Task.find(1);
         await Task.find(1);
       });
@@ -517,10 +517,10 @@ describe("QueryCacheTest", () => {
 
     await Task.cache(async () => {
       try {
-        await assertQueriesCount(1, false, async () => {
+        await assertQueriesCount(1, async () => {
           await Task.find(1);
         });
-        await assertNoQueries(false, async () => {
+        await assertNoQueries(async () => {
           await Task.find(1);
         });
       } finally {
@@ -532,18 +532,18 @@ describe("QueryCacheTest", () => {
   it("query cache executes new queries within block", async () => {
     (await Base.leaseConnection()).enableQueryCacheBang();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await Post.where({ title: "test" }).then((r) => r.length)).toBe(0);
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Post.where({ title: "test" }).then((r) => r.length)).toBe(0);
     });
 
     await (
       await Base.leaseConnection()
     ).uncached(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         expect(await Post.where({ title: "test" }).then((r) => r.length)).toBe(0);
       });
     });
@@ -590,7 +590,7 @@ describe("QueryCacheTest", () => {
 
       await (Task as never as { resetColumnInformation(): Promise<void> }).resetColumnInformation();
 
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await Task.find(1);
       });
     });
@@ -1050,22 +1050,22 @@ describe("QueryCacheExpiryTest", () => {
     connection.queryCache = store;
     try {
       await Post.cache(async () => {
-        await assertQueriesCount(2, false, async () => {
+        await assertQueriesCount(2, async () => {
           await connection.selectAll("SELECT 1");
           await connection.selectAll("SELECT 2");
           await connection.selectAll("SELECT 1");
         });
 
-        await assertQueriesCount(1, false, async () => {
+        await assertQueriesCount(1, async () => {
           await connection.selectAll("SELECT 3");
           await connection.selectAll("SELECT 3");
         });
 
-        await assertNoQueries(false, async () => {
+        await assertNoQueries(async () => {
           await connection.selectAll("SELECT 1");
         });
 
-        await assertQueriesCount(1, false, async () => {
+        await assertQueriesCount(1, async () => {
           await connection.selectAll("SELECT 2");
         });
       });

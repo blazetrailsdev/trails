@@ -203,7 +203,7 @@ describe("schema reflection does not dirty the query cache (trails)", () => {
       await conn.columns("tasks");
 
       expect(conn.queryCache?.size).toBe(cachedBefore);
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         await Task.find(1);
       });
     });

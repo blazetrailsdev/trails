@@ -1364,7 +1364,7 @@ describe("FasterFixturesTest", () => {
     expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "categories")).toBeTruthy();
     expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "authors")).toBeTruthy();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await self().createFixtures("categories");
       await self().createFixtures("authors");
     });

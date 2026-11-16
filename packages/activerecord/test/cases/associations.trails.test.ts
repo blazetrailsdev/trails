@@ -259,10 +259,10 @@ describe("association(name).reader", () => {
     const author = authors("mary");
     await author.posts.create({ title: "title", body: "body" });
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await author.noJoinsComments.count();
     });
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await author.noJoinsComments.count();
     });
   });

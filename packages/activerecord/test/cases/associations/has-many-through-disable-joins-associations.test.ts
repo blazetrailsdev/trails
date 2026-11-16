@@ -72,7 +72,7 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   const q = async <T>(n: number, fn: () => PromiseLike<T>): Promise<T> => {
     let result!: T;
-    await assertQueriesCount(n, false, async () => {
+    await assertQueriesCount(n, async () => {
       result = await fn();
     });
     return result;
@@ -80,10 +80,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
 
   it("counting on disable joins through", async () => {
     expect(await author.noJoinsComments.count()).toEqual(await author.comments.count());
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await author.noJoinsComments.count();
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await author.comments.count();
     });
   });
@@ -92,10 +92,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect(await author.noJoinsCommentsWithForeignKey.count()).toEqual(
       await author.commentsWithForeignKey.count(),
     );
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await author.noJoinsCommentsWithForeignKey.count();
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await author.commentsWithForeignKey.count();
     });
   });
@@ -104,10 +104,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect((await author.noJoinsComments.pluck("id")).sort(sortIds)).toEqual(
       (await author.comments.pluck("id")).sort(sortIds),
     );
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await author.noJoinsComments.pluck("id");
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await author.comments.pluck("id");
     });
   });
@@ -116,10 +116,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect((await author.noJoinsCommentsWithForeignKey.pluck("id")).sort(sortIds)).toEqual(
       (await author.commentsWithForeignKey.pluck("id")).sort(sortIds),
     );
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await author.noJoinsCommentsWithForeignKey.pluck("id");
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await author.commentsWithForeignKey.pluck("id");
     });
   });
@@ -128,10 +128,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect((await (author as any).noJoinsComments.first())!.id).toBe(
       (await (author as any).comments.first())!.id,
     );
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       void (await (author as any).noJoinsComments.first())!.id;
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       void (await (author as any).comments.first())!.id;
     });
   });
@@ -140,10 +140,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
     expect((await (author as any).noJoinsCommentsWithForeignKey.first())!.id).toBe(
       (await (author as any).commentsWithForeignKey.first())!.id,
     );
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       void (await (author as any).noJoinsCommentsWithForeignKey.first())!.id;
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       void (await (author as any).commentsWithForeignKey.first())!.id;
     });
   });
@@ -154,10 +154,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
       (await (author as any).comments.toArray()).sort(byId),
     );
     await author.reload();
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await (author as any).noJoinsComments;
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await (author as any).comments;
     });
   });
@@ -171,10 +171,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
         await (post as any).comments.create({ body: "text" });
       },
     );
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await (author as any).noJoinsComments.reload();
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await (author as any).comments.reload();
     });
   });
@@ -188,10 +188,10 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
         await (post as any).comments.create({ body: "text" });
       },
     );
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await (author as any).noJoinsCommentsWithForeignKey.reload();
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await (author as any).commentsWithForeignKey.reload();
     });
   });
@@ -200,11 +200,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   it.skip("empty on disable joins through", async () => {
     const emptyAuthor = await Author.find(authors("bob").id);
     let comments: unknown;
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       comments = emptyAuthor.comments.all();
     });
     expect(await comments).toEqual([]);
-    await assertQueriesCount(1, false, () => {
+    await assertQueriesCount(1, () => {
       comments = emptyAuthor.noJoinsComments.all();
     });
     expect(await comments).toEqual([]);
@@ -214,11 +214,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   it.skip("empty on disable joins through using custom foreign key", async () => {
     const emptyAuthor = await Author.find(authors("bob").id);
     let comments: unknown;
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       comments = emptyAuthor.commentsWithForeignKey.all();
     });
     expect(await comments).toEqual([]);
-    await assertQueriesCount(1, false, () => {
+    await assertQueriesCount(1, () => {
       comments = emptyAuthor.noJoinsCommentsWithForeignKey.all();
     });
     expect(await comments).toEqual([]);
@@ -247,11 +247,11 @@ describe("HasManyThroughDisableJoinsAssociationsTest", () => {
   });
 
   it("preloading has many through disable joins", async () => {
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       const authorsList = await Author.all().preload(":goodRatings");
       authorsList.map((a: any) => a.goodRatings);
     });
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       const authorsList = await Author.all().preload(":noJoinsGoodRatings");
       authorsList.map((a: any) => a.goodRatings);
     });

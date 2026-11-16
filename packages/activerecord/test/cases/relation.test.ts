@@ -122,7 +122,7 @@ describe("RelationTest", () => {
   });
 
   it("no queries on empty relation exists?", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       await CanonPost.where({ id: [] }).isExists(123);
     });
   });
@@ -146,7 +146,7 @@ describe("RelationTest", () => {
   });
 
   it("no queries on empty condition exists?", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       await CanonPost.all().isExists({ id: [] });
     });
   });
@@ -425,13 +425,13 @@ describe("RelationTest", () => {
   });
 
   it("no queries on empty IN", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       await CanonPost.where({ id: [] }).load();
     });
   });
 
   it("can unscope empty IN", async () => {
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await CanonPost.where({ id: [] }).unscope({ ":where": "id" }).load();
     });
   });

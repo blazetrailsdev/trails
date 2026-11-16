@@ -100,12 +100,12 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
     const s = await DirectSubscriber.createBang({ nick: "direct-abc" });
     s.writeAttribute("name", "John");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await s.isValid();
     });
 
     s.writeAttribute("nick", "direct-abc v2");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await s.isValid();
     });
   });

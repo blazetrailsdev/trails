@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect } from "vitest";
 import { assertNot, assertRaises } from "@blazetrails/activesupport/testing/assertions";
 import { Base } from "../../lib/index.js";
 import { StatementInvalid } from "../../lib/errors.js";
+import { Book } from "../models/book.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { adapterType } from "../support/test-adapter.js";
 
@@ -13,19 +14,8 @@ function mockDatabaseError(): Error {
   return new MockDatabaseError();
 }
 
-class Book extends Base {
-  static override _tableName = "books";
-  static {
-    this.attribute("author_id", "integer");
-    this.attribute("cover", "string");
-  }
-}
-
 describe("StatementInvalidTest", () => {
-  fixtures({}, { useTransactionalTests: false });
-  beforeAll(async () => {
-    await Book.loadSchema();
-  });
+  fixtures(["books"], { useTransactionalTests: false });
 
   it("message contains no sql", async () => {
     const conn = (await Base.leaseConnection()) as any;

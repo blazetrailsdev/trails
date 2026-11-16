@@ -171,7 +171,7 @@ it.skipIf(inMemoryDb())("new connection no query", async () => {
   await pool.flush(0);
   expect(pool.stat().connections).toBe(0);
 
-  await assertNoQueries(false, async () => {
+  await assertNoQueries(async () => {
     await pool.withConnection(() => {});
   });
 });

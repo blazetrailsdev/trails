@@ -278,22 +278,22 @@ describe("HasOneThroughAssociationsTest", () => {
 
   it("has one through eager loading", async () => {
     let loaded: any[] = [];
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       loaded = await Member.all().includes(":club").where("name = ?", "Groucho Marx");
     });
     expect(loaded.length).toBe(1);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(loaded[0].association("club").target).not.toBeNull();
     });
   });
 
   it("has one through eager loading through polymorphic", async () => {
     let loaded: any[] = [];
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       loaded = await Member.all().includes(":sponsorClub").where("name = ?", "Groucho Marx");
     });
     expect(loaded.length).toBe(1);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(loaded[0].association("sponsorClub").target).not.toBeNull();
     });
   });
@@ -330,14 +330,14 @@ describe("HasOneThroughAssociationsTest", () => {
     const loaded = await Club.all()
       .includes(":sponsoredMember")
       .where("name = ?", "Moustache and Eyebrow Fancier Club");
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect(loaded[0].association("sponsoredMember").target).not.toBeNull();
     });
   });
 
   it("has one through nonpreload eagerloading", async () => {
     let loaded: any[] = [];
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       loaded = await Member.all()
         .includes(":club")
         .where("members.name = ?", "Groucho Marx")
@@ -345,14 +345,14 @@ describe("HasOneThroughAssociationsTest", () => {
         .references("clubs");
     });
     expect(loaded.length).toBe(1);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect(loaded[0].association("club").target).not.toBeNull();
     });
   });
 
   it("has one through nonpreload eager loading through polymorphic", async () => {
     let loaded: any[] = [];
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       loaded = await Member.all()
         .includes(":sponsorClub")
         .where("members.name = ?", "Groucho Marx")
@@ -360,7 +360,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .references("clubs");
     });
     expect(loaded.length).toBe(1);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect(loaded[0].association("sponsorClub").target).not.toBeNull();
     });
   });
@@ -369,7 +369,7 @@ describe("HasOneThroughAssociationsTest", () => {
     const member = members("groucho");
     await new Sponsor({ sponsorClub: clubs("outrageous_club"), sponsorable: member }).save();
     let loaded: any[] = [];
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       loaded = await Member.all()
         .includes(":sponsorClub")
         .where("members.name = ?", "Groucho Marx")
@@ -377,7 +377,7 @@ describe("HasOneThroughAssociationsTest", () => {
         .references("clubs");
     });
     expect(loaded.length).toBe(1);
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       expect(loaded[0].association("sponsorClub").target).not.toBeNull();
     });
     expect(loaded[0].association("sponsorClub").target?.id).toBe(clubs("outrageous_club").id);
@@ -480,12 +480,12 @@ describe("HasOneThroughAssociationsTest", () => {
     await member.save();
     await member.reload();
     let loaded: any[] = [];
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       loaded = await MemberDetail.all().includes(":memberType");
     });
     const newDetail = loaded[0];
     assertPredicate(newDetail.association("memberType"), (a: any) => a.isLoaded());
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await readHasOne(newDetail, "memberType");
     });
   });
@@ -516,13 +516,13 @@ describe("HasOneThroughAssociationsTest", () => {
 
     expect(await readHasOne(memberDetail, "memberType")).not.toBeNull();
     await memberDetail.destroy();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await memberDetail.association("memberType").reload();
       expect(await readHasOne(memberDetail, "memberType")).not.toBeNull();
     });
 
     await (await readHasOne(memberDetail, "member")).destroy();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await memberDetail.association("memberType").reload();
       expect(memberDetail.association("memberType").target).toBeNull();
     });

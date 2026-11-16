@@ -46,18 +46,33 @@ export class SQLCounter {
   }
 }
 
+type Block<T> = () => T | Promise<T>;
+
+export async function assertQueriesCount<T>(block: Block<T>): Promise<T>;
 export async function assertQueriesCount<T>(
-  count: number | undefined,
-  includeSchema = false,
-  fn: () => T | Promise<T>,
+  count: number | null | undefined,
+  block: Block<T>,
+): Promise<T>;
+export async function assertQueriesCount<T>(
+  count: number | null | undefined,
+  options: { includeSchema?: boolean },
+  block: Block<T>,
+): Promise<T>;
+export async function assertQueriesCount<T>(
+  count: number | null | undefined | Block<T> = null,
+  options: { includeSchema?: boolean } | Block<T> = {},
+  block?: Block<T>,
 ): Promise<T> {
+  if (typeof count === "function") [count, options, block] = [null, {}, count];
+  if (typeof options === "function") [options, block] = [{}, options];
+  const { includeSchema = false } = options;
   await (await Base.leaseConnection()).materializeTransactions();
 
   const counter = new SQLCounter();
   return await Notifications.subscribed(counter, "sql.active_record", async () => {
-    const result = (await _assertNothingRaisedOrWarn("assert_queries_count", fn)) as T;
+    const result = (await _assertNothingRaisedOrWarn("assert_queries_count", block)) as T;
     const queries = includeSchema ? counter.logAll : counter.log;
-    if (count !== undefined) {
+    if (count != null) {
       assert(
         queries.length === count,
         `${queries.length} instead of ${count} queries were executed. Queries: ${queries.join("\n\n")}`,
@@ -72,28 +87,42 @@ export async function assertQueriesCount<T>(
   });
 }
 
+export async function assertNoQueries<T>(block: Block<T>): Promise<T>;
 export async function assertNoQueries<T>(
-  includeSchema = false,
-  fn: () => T | Promise<T>,
+  options: { includeSchema?: boolean },
+  block: Block<T>,
+): Promise<T>;
+export async function assertNoQueries<T>(
+  options: { includeSchema?: boolean } | Block<T> = {},
+  block?: Block<T>,
 ): Promise<T> {
-  return await assertQueriesCount(0, includeSchema, fn);
+  if (typeof options === "function") [options, block] = [{}, options];
+  const { includeSchema = false } = options;
+  return await assertQueriesCount(0, { includeSchema }, block!);
 }
 
+export async function assertQueriesMatch<T>(match: RegExp | string, block: Block<T>): Promise<T>;
 export async function assertQueriesMatch<T>(
   match: RegExp | string,
-  count: number | undefined,
-  includeSchema = false,
-  fn: () => T | Promise<T>,
+  options: { count?: number | null; includeSchema?: boolean },
+  block: Block<T>,
+): Promise<T>;
+export async function assertQueriesMatch<T>(
+  match: RegExp | string,
+  options: { count?: number | null; includeSchema?: boolean } | Block<T> = {},
+  block?: Block<T>,
 ): Promise<T> {
+  if (typeof options === "function") [options, block] = [{}, options];
+  const { count = null, includeSchema = false } = options;
   await (await Base.leaseConnection()).materializeTransactions();
 
   const counter = new SQLCounter();
   return await Notifications.subscribed(counter, "sql.active_record", async () => {
-    const result = (await _assertNothingRaisedOrWarn("assert_queries_match", fn)) as T;
+    const result = (await _assertNothingRaisedOrWarn("assert_queries_match", block)) as T;
     const queries = includeSchema ? counter.logAll : counter.log;
     const matchedQueries = queries.filter((query) => rbEqq(match, query));
 
-    if (count !== undefined) {
+    if (count != null) {
       assert(
         matchedQueries.length === count,
         `${matchedQueries.length} instead of ${count} queries were executed.${queries.length === 0 ? "" : `\nQueries:\n${queries.join("\n")}`}`,
@@ -109,12 +138,20 @@ export async function assertQueriesMatch<T>(
   });
 }
 
+export async function assertNoQueriesMatch<T>(match: RegExp | string, block: Block<T>): Promise<T>;
 export async function assertNoQueriesMatch<T>(
   match: RegExp | string,
-  includeSchema = false,
-  fn: () => T | Promise<T>,
+  options: { includeSchema?: boolean },
+  block: Block<T>,
+): Promise<T>;
+export async function assertNoQueriesMatch<T>(
+  match: RegExp | string,
+  options: { includeSchema?: boolean } | Block<T> = {},
+  block?: Block<T>,
 ): Promise<T> {
-  return await assertQueriesMatch(match, 0, includeSchema, fn);
+  if (typeof options === "function") [options, block] = [{}, options];
+  const { includeSchema = false } = options;
+  return await assertQueriesMatch(match, { count: 0, includeSchema }, block!);
 }
 
 export const QueryAssertions = {

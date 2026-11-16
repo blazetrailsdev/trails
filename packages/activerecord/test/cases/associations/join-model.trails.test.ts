@@ -69,7 +69,7 @@ describe("AssociationsJoinModelTest", () => {
     const general = await ScopedSourceTag.all()
       .includes(":welcomeTaggedPosts")
       .find(tags("general").id);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(general.association("welcomeTaggedPosts").target).toEqual([posts("welcome")]);
     });
   });
@@ -77,7 +77,7 @@ describe("AssociationsJoinModelTest", () => {
   it("eager has many through uses conditions specified on the has many association", async () => {
     const author = (await Author.all().includes(":nonexistentComments").first())!;
     expect(author.association("nonexistentComments").loaded).toBe(true);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await author.nonexistentComments).length).toBe(0);
     });
   });

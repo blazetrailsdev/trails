@@ -604,7 +604,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await import("../../../../lib/connection-adapters/postgresql/oid/enum.js");
       await adapter.createEnum("feeling", ["good", "bad"]);
       try {
-        await assertQueriesCount(1, true, async () => {
+        await assertQueriesCount(1, { includeSchema: true }, async () => {
           const result = await adapter.selectAll("SELECT 'good'::feeling");
           expect(result.columnTypes["feeling"]).toBeInstanceOf(OidEnum);
         });
@@ -619,13 +619,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.selectAll("SELECT 1");
       const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
       try {
-        await assertQueriesCount(2, true, async () => {
+        await assertQueriesCount(2, { includeSchema: true }, async () => {
           await adapter.selectAll("select 'pg_catalog.pg_class'::regclass");
         });
-        await assertQueriesCount(1, true, async () => {
+        await assertQueriesCount(1, { includeSchema: true }, async () => {
           await adapter.selectAll("select 'pg_catalog.pg_class'::regclass");
         });
-        await assertQueriesCount(2, true, async () => {
+        await assertQueriesCount(2, { includeSchema: true }, async () => {
           await adapter.selectAll("SELECT NULL::anyarray");
         });
       } finally {
@@ -681,10 +681,10 @@ describeIfPg("PostgreSQLAdapter", () => {
             static tableName = "ex";
           }
           const attribute = NumberKlass.arelTable.get("number");
-          await assertQueriesCount(undefined, true, async () => {
+          await assertQueriesCount(null, { includeSchema: true }, async () => {
             await adapter.caseInsensitiveComparison(attribute, "foo");
           });
-          await assertNoQueries(false, async () => {
+          await assertNoQueries(async () => {
             await adapter.caseInsensitiveComparison(attribute, "foo");
           });
         });

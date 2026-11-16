@@ -402,7 +402,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const devel = await Developer.find(1);
 
     let proj!: Project;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       proj = devel.projects.build({ name: "Projekt" });
     });
     assertNotPredicate(devel.projects, (r) => r.loaded);
@@ -424,7 +424,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const devel = await Developer.find(1);
 
     let proj!: Project;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       proj = devel.projects.new({ name: "Projekt" });
     });
     assertNotPredicate(devel.projects, (r) => r.loaded);
@@ -705,7 +705,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const proxy = activeRecord.developers;
     const loaded = await proxy.loadTarget();
     const developer = loaded[0];
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       assertPredicate(proxy, (r) => r.loaded);
       expect(await proxy).toContain(developer);
     });
@@ -716,7 +716,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const david = developers("david");
     const proxy = activeRecord.developers;
     assertNotPredicate(proxy, (r) => r.loaded);
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await assertIncludes(proxy, david);
     });
     assertNotPredicate(proxy, (r) => r.loaded);
@@ -977,7 +977,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("get ids for loaded associations", async () => {
     const developer = developers("david");
     await developer.projects.reload();
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       await (developer as any).projectIds;
       await (developer as any).projectIds;
     });
@@ -1127,7 +1127,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("has and belongs to many associations on new records use null relations", async () => {
     const dev = new Developer({});
     const proxy = dev.projects;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await proxy).toEqual([]);
       expect(await proxy.where({ title: "omg" })).toEqual([]);
       expect(await proxy.pluck("title")).toEqual([]);

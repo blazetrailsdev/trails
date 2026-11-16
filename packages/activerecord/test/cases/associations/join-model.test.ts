@@ -402,7 +402,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(postsWithAuthors.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).authors.toArray()) as Base[]).length;
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         expect(await (postsWithAuthors[i] as any).authors.length()).toBe(expected);
       });
     }
@@ -411,7 +411,7 @@ describe("AssociationsJoinModelTest", () => {
   it("include polymorphic has one", async () => {
     const post = await Post.includes(":tagging").find(posts("welcome").id);
     const tagging = taggings("welcome_general");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const target = (post as any).association("tagging").target as Base;
       expect(target).toEqual(tagging);
     });
@@ -420,7 +420,7 @@ describe("AssociationsJoinModelTest", () => {
   it("include polymorphic has one defined in abstract parent", async () => {
     const item = await Item.includes(":tagging").find(items("dvd").id);
     const tagging = taggings("godfather");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const target = (item as any).association("tagging").target as Base;
       expect(target).toEqual(tagging);
     });
@@ -432,7 +432,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(postsWithTags.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         expect(await (postsWithTags[i] as any).tags.length()).toBe(expected);
       });
     }
@@ -444,7 +444,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(postsWithTaggings.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         expect(await (postsWithTaggings[i] as any).taggings.length()).toBe(expected);
       });
     }
@@ -537,7 +537,7 @@ describe("AssociationsJoinModelTest", () => {
   it("eager has many polymorphic with source type", async () => {
     const tagWithInclude = await Tag.all().includes(":taggedPosts").find(tags("general").id);
     const desired = sortById([posts("welcome"), posts("thinking")]);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const target = (tagWithInclude as any).association("taggedPosts").target as Base[];
       expect(sortById(target)).toEqual(desired);
     });
@@ -796,7 +796,7 @@ describe("AssociationsJoinModelTest", () => {
   it("polymorphic has many", async () => {
     const expected = taggings("welcome_general");
     const p = await Post.includes(":taggings").find(posts("welcome").id);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const target = (p as any).association("taggings").target as Base[];
       expect(target).toContainEqual(expected);
     });
@@ -809,7 +809,7 @@ describe("AssociationsJoinModelTest", () => {
   it("polymorphic has one", async () => {
     const expected = await Post.find(posts("welcome").id);
     const tagging = await Tagging.includes(":taggable").find(taggings("welcome_general").id);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const taggable = (tagging as any).association("taggable").target as Base;
       expect(taggable).toEqual(expected);
     });
@@ -817,7 +817,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("polymorphic belongs to", async () => {
     const p = await Post.includes({ ":taggings": ":taggable" }).find(posts("welcome").id);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const firstTagging = ((p as any).association("taggings").target as Base[])[0];
       const taggable = (firstTagging as any).association("taggable").target as Base;
       expect(taggable).toEqual(posts("welcome"));
@@ -828,7 +828,7 @@ describe("AssociationsJoinModelTest", () => {
     const taggingList = (await Tagging.where("taggable_type != ?", "FakeModel")
       .includes(":taggable")
       .order("taggings.id")) as Base[];
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       void ((taggingList[0] as any).association("taggable").target as Base).id;
       void ((taggingList[1] as any).association("taggable").target as Base).id;
     });
@@ -853,7 +853,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(postsWithTaggings.length).toBe(allPosts.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expected = ((await (allPosts[i] as any).taggings.toArray()) as Base[]).length;
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         expect(await (postsWithTaggings[i] as any).taggings.length()).toBe(expected);
       });
     }
@@ -863,7 +863,7 @@ describe("AssociationsJoinModelTest", () => {
     const commentList = (await Comment.where(`post_id = ${posts("welcome").id}`).includes(
       ":post",
     )) as Base[];
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const p0 = (commentList[0] as any).association("post").target as Base;
       const p1 = (commentList[1] as any).association("post").target as Base;
       expect(p0).toEqual(p1);
@@ -874,7 +874,7 @@ describe("AssociationsJoinModelTest", () => {
     const david = await Author.find(authors("david").id);
     await (david as any).categories.loadTarget();
     const category = await (david as any).categories.first();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((david as any).categories.loaded).toBeTruthy();
       const members = (await (david as any).categories.isInclude(category)) ? [category] : [];
       expect(members).toContain(category);
@@ -887,7 +887,7 @@ describe("AssociationsJoinModelTest", () => {
 
     await (david as any).reload();
     expect((david as any).categories.loaded).toBeFalsy();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       const members = (await (david as any).categories.isInclude(category)) ? [category] : [];
       expect(members).toContain(category);
     });
@@ -910,13 +910,13 @@ describe("AssociationsJoinModelTest", () => {
   it("has many distinct through count", async () => {
     const author = await Author.find(authors("mary").id);
     expect((author as any).uniqueCategorizedPosts.loaded).toBeFalsy();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await (author as any).uniqueCategorizedPosts.count()).toBe(1);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await (author as any).uniqueCategorizedPosts.count("title")).toBe(1);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(
         await (author as any).uniqueCategorizedPosts.where({ title: null }).count("title"),
       ).toBe(0);
@@ -928,7 +928,7 @@ describe("AssociationsJoinModelTest", () => {
     const post = await Post.includes(":tags").find(posts("welcome").id);
     const tag = ((post as any).tags.target as Base[])[0];
     expect(tag).toEqual(tags("general"));
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       void (tag as any).tagging;
     });
   });
@@ -937,7 +937,7 @@ describe("AssociationsJoinModelTest", () => {
     const post = await Post.includes(":tags").find(posts("welcome").id);
     const tag = ((post as any).tags.target as Base[])[0];
     expect(tag).toEqual(tags("general"));
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       void (tag as any).tagging;
     });
   });
@@ -946,7 +946,7 @@ describe("AssociationsJoinModelTest", () => {
     const post = await Post.includes(":funkyTags").find(posts("welcome").id);
     const tag = ((post as any).funkyTags.target as Base[])[0];
     expect(tag).toEqual(tags("general"));
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       void (tag as any).tagging;
     });
   });
@@ -955,7 +955,7 @@ describe("AssociationsJoinModelTest", () => {
     const post = await Post.includes(":funkyTags").find(posts("welcome").id);
     const tag = ((post as any).funkyTags.target as Base[])[0];
     expect(tag).toEqual(tags("general"));
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       void (tag as any).tagging;
     });
   });
@@ -982,7 +982,7 @@ describe("AssociationsJoinModelTest", () => {
     const expectedIds = [taggings("welcome_general").id, taggings("thinking_general").id]
       .map(Number)
       .sort((a, b) => a - b);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const seen = new Set<number>();
       const actual = ((author as any).taggings.target as Base[])
         .map((t) => Number(t.id))
@@ -999,7 +999,7 @@ describe("AssociationsJoinModelTest", () => {
       .first()) as Author;
     new SpecialComment();
     new VerySpecialComment();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       const ids = ((author as any).comments.target as Base[]).map((c) => Number(c.id));
       expect(ids).toEqual([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 13]);
     });
@@ -1007,7 +1007,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("eager load has many through has many with conditions", async () => {
     const post = (await Post.includes(":invalidTags").first()) as Post;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await (post as any).invalidTags.toArray();
     });
   });
@@ -1099,7 +1099,7 @@ describe("AssociationsJoinModelTest", () => {
     expect(allPosts.length).toBe(postsWithTags.length);
     for (let i = 0; i < allPosts.length; i++) {
       const expectedLen = ((await (allPosts[i] as any).tags.toArray()) as Base[]).length;
-      await assertNoQueries(false, async () => {
+      await assertNoQueries(async () => {
         expect(await (postsWithTags[i] as any).tags.length()).toBe(expectedLen);
       });
     }

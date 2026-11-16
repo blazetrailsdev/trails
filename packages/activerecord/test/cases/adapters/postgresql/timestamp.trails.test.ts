@@ -37,38 +37,25 @@ describeIfPg("PostgreSQLAdapter OID::DateTime", () => {
 });
 
 describeIfPg("PostgreSQLAdapter", () => {
-  fixtures({}, { useTransactionalTests: false });
+  fixtures([]);
 
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
-    await adapter.execute(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
-    await adapter.execute(`
-      CREATE TABLE "postgresql_timestamps" (
-        "id" SERIAL PRIMARY KEY,
-        "created_at" timestamp without time zone,
-        "updated_at" timestamp without time zone DEFAULT NOW(),
-        "occurred_at" timestamp with time zone,
-        "precise_at" timestamp(3) without time zone
-      )
-    `);
-  });
-  afterEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS "postgresql_timestamps"`);
   });
 
   describe("PostgreSQLTimestampTest", () => {
     it("timestamp column", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "created_at");
+      const cols = await adapter.columns("defaults");
+      const col = cols.find((c) => c.name === "modified_time_without_precision");
       expect(col).toBeDefined();
       expect(col!.type).toBe("datetime");
       expect(col!.sqlType).toBe("timestamp without time zone");
     });
 
     it("timestamp default", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "updated_at");
+      const cols = await adapter.columns("defaults");
+      const col = cols.find((c) => c.name === "modified_time_function");
       expect(col).toBeDefined();
       expect(col!.defaultFunction).toContain("now");
     });
@@ -81,24 +68,24 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("timestamp with time zone", async () => {
       const id = await adapter.insert(
-        `INSERT INTO "postgresql_timestamps" ("occurred_at") VALUES ('2023-06-15 14:30:00+00')`,
+        `INSERT INTO "defaults" ("fixed_time_with_time_zone") VALUES ('2023-06-15 14:30:00+00')`,
       );
       const rows = (
         await adapter.execQuery(
-          `SELECT "occurred_at" FROM "postgresql_timestamps" WHERE "id" = $1`,
+          `SELECT "fixed_time_with_time_zone" FROM "defaults" WHERE "id" = $1`,
           "SQL",
           [id],
         )
       ).toArray();
-      expect(rows[0].occurred_at).toBeInstanceOf(RubyTime);
+      expect(rows[0].fixed_time_with_time_zone).toBeInstanceOf(RubyTime);
     });
 
     it("timestamp precision", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "precise_at");
+      const cols = await adapter.columns("defaults");
+      const col = cols.find((c) => c.name === "modified_time_with_precision_0");
       expect(col).toBeDefined();
       expect(col!.type).toBe("datetime");
-      expect(col!.precision).toBe(3);
+      expect(col!.precision).toBe(0);
     });
 
     it("timestamp infinity", async () => {
@@ -113,21 +100,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("timestamp schema dump", async () => {
-      const output = await dumpTableSchema("postgresql_timestamps");
-      expect(output).toContain("postgresql_timestamps");
-      expect(output).toMatch(/t\.datetime\s*\("created_at"/);
+      const output = await dumpTableSchema("defaults");
+      expect(output).toContain("defaults");
+      expect(output).toMatch(/t\.datetime\s*\("modified_time_without_precision"/);
     });
 
     it("datetime column", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "created_at");
+      const cols = await adapter.columns("defaults");
+      const col = cols.find((c) => c.name === "modified_time_without_precision");
       expect(col).toBeDefined();
       expect(col!.type).toBe("datetime");
     });
 
     it("datetime default", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "updated_at");
+      const cols = await adapter.columns("defaults");
+      const col = cols.find((c) => c.name === "modified_time_function");
       expect(col!.defaultFunction).toBeTruthy();
     });
 
@@ -137,15 +124,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("datetime precision", async () => {
-      const cols = await adapter.columns("postgresql_timestamps");
-      const col = cols.find((c) => c.name === "precise_at");
+      const cols = await adapter.columns("defaults");
+      const col = cols.find((c) => c.name === "modified_time_with_precision_0");
       expect(col).toBeDefined();
-      expect(col!.precision).toBe(3);
+      expect(col!.precision).toBe(0);
     });
 
     it("datetime schema dump", async () => {
-      const output = await dumpTableSchema("postgresql_timestamps");
-      expect(output).toContain("postgresql_timestamps");
+      const output = await dumpTableSchema("defaults");
+      expect(output).toContain("defaults");
       expect(output).toMatch(/t\.datetime/);
     });
   });

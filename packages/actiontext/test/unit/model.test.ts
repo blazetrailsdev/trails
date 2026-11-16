@@ -173,8 +173,8 @@ describe("ActionText::ModelTest", () => {
   it("eager loading", async () => {
     await Messages.createBang({ subject: "Subject", content: "<h1>Content</h1>" });
 
-    const message = await assertQueriesCount(2, false, () => Messages.withRichTextContent().last());
-    await assertNoQueries(false, async () => {
+    const message = await assertQueriesCount(2, () => Messages.withRichTextContent().last());
+    await assertNoQueries(async () => {
       expect(await message.content.toPlainText()).toEqual("Content");
     });
   });
@@ -188,11 +188,11 @@ describe("ActionText::ModelTest", () => {
       });
     }
 
-    const message = await assertQueriesCount(3, false, async () => {
+    const message = await assertQueriesCount(3, async () => {
       return (await Messages.withAllRichText().toArray()).at(-1)!;
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await message.content.toPlainText()).toEqual("Content");
       expect(await message.body.toPlainText()).toEqual("Body");
     });

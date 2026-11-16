@@ -354,7 +354,7 @@ describe("FinderTest", () => {
 
   it("last with integer and order should use sql limit", async () => {
     const relation = Topic.order("title");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await relation.last(5);
     });
     expect(relation.isLoaded).toBeFalsy();
@@ -362,7 +362,7 @@ describe("FinderTest", () => {
 
   it("last with integer and reorder should use sql limit", async () => {
     const relation = Topic.reorder("title");
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await relation.last(5);
     });
     expect(relation.isLoaded).toBeFalsy();
@@ -371,7 +371,7 @@ describe("FinderTest", () => {
   it("last on loaded relation should not use sql", async () => {
     const relation = Topic.limit(10);
     await relation.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await relation.last();
       await relation.last(2);
     });
@@ -696,19 +696,19 @@ describe("FinderTest", () => {
   });
 
   it("find with large number", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       await expect(Topic.find("9999999999999999999999999999999")).rejects.toThrow(RecordNotFound);
     });
   });
 
   it("find by with large number", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await Topic.findBy({ id: "9999999999999999999999999999999" as never })).toBeNull();
     });
   });
 
   it("find by id with large number", async () => {
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await (Topic as any).findById("9999999999999999999999999999999")).toBeNull();
     });
   });
@@ -1158,12 +1158,12 @@ describe("FinderTest", () => {
 
   it("#skip_query_cache! for #exists?", async () => {
     await Topic.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Topic.isExists();
         await Topic.isExists();
       });
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Topic.all().skipQueryCacheBang().isExists();
         await Topic.all().skipQueryCacheBang().isExists();
       });
@@ -1172,12 +1172,12 @@ describe("FinderTest", () => {
 
   it("#skip_query_cache! for #exists? with a limited eager load", async () => {
     await Topic.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Topic.eagerLoad(":replies").limit(1).isExists();
         await Topic.eagerLoad(":replies").limit(1).isExists();
       });
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         await Topic.eagerLoad(":replies").limit(1).skipQueryCacheBang().isExists();
         await Topic.eagerLoad(":replies").limit(1).skipQueryCacheBang().isExists();
       });
@@ -1219,7 +1219,7 @@ describe("FinderTest", () => {
     const book = cpkBooks("cpk_book_with_generated_pk");
 
     await CpkReview.cache(async () => {
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await CpkReview.findBy({ book });
         await CpkReview.findBy({ book });
       });
@@ -1903,7 +1903,7 @@ describe("FinderTest", () => {
   const oneLimitRe = /1 AS one.*LIMIT/;
 
   it("include when non AR object passed on unloaded relation", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(
         await Customer.where({ name: "David" }).isInclude("I'm not an AR object" as never),
       ).toBe(false);
@@ -1912,13 +1912,13 @@ describe("FinderTest", () => {
 
   it("include when non AR object passed on loaded relation", async () => {
     const custs = await Customer.where({ name: "David" }).load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await custs.isInclude("I'm not an AR object" as never)).toBe(false);
     });
   });
 
   it("member when non AR object passed on unloaded relation", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(
         await Customer.where({ name: "David" }).isMember("I'm not an AR object" as never),
       ).toBe(false);
@@ -1927,7 +1927,7 @@ describe("FinderTest", () => {
 
   it("member when non AR object passed on loaded relation", async () => {
     const custs = await Customer.where({ name: "David" }).load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await custs.isMember("I'm not an AR object" as never)).toBe(false);
     });
   });
@@ -1948,7 +1948,7 @@ describe("FinderTest", () => {
     const topic = topics("first");
     expect(await Customer.isExists(topic.id)).toBeTruthy();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Customer.where({ name: "David" }).isInclude(topic as never)).toBe(false);
     });
   });
@@ -1996,7 +1996,7 @@ describe("FinderTest", () => {
     const custs = await Customer.where({ name: "David" }).load();
     const david = customers("david");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await custs.isInclude(david)).toBe(true);
     });
   });
@@ -2005,7 +2005,7 @@ describe("FinderTest", () => {
     const custs = await Customer.where({ name: "David" }).load();
     const mary = customers("mary");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await custs.isInclude(mary)).toBe(false);
     });
   });
@@ -2021,7 +2021,7 @@ describe("FinderTest", () => {
     const books = await CpkBook.where({ title: "The first book" }).load();
     const greatAuthorBook = cpkBooks("cpk_great_author_first_book");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await books.isInclude(greatAuthorBook)).toBeTruthy();
     });
   });
@@ -2042,7 +2042,7 @@ describe("FinderTest", () => {
     const topic = topics("first");
     expect(await Customer.isExists(topic.id)).toBeTruthy();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Customer.where({ name: "David" }).isMember(topic as never)).toBe(false);
     });
   });
@@ -2067,7 +2067,7 @@ describe("FinderTest", () => {
     const custs = await Customer.where({ name: "David" }).load();
     const david = customers("david");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await custs.isMember(david)).toBe(true);
     });
   });
@@ -2076,7 +2076,7 @@ describe("FinderTest", () => {
     const custs = await Customer.where({ name: "David" }).load();
     const mary = customers("mary");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await custs.isMember(mary)).toBe(false);
     });
   });
@@ -2092,7 +2092,7 @@ describe("FinderTest", () => {
     const books = await CpkBook.where({ title: "The first book" }).load();
     const greatAuthorBook = cpkBooks("cpk_great_author_first_book");
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await books.isMember(greatAuthorBook)).toBeTruthy();
     });
   });
@@ -2308,7 +2308,7 @@ describe("FinderTest", () => {
       await post.saveBang();
     }
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await author.posts.isExists()).toBeFalsy();
     });
   });
@@ -2388,10 +2388,10 @@ describe("FinderTest", () => {
   });
 
   it("exists with includes limit and empty result", async () => {
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await Topic.includes(":replies").limit(0).isExists()).toBe(false);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await Topic.includes(":replies").limit(1).where("0 = 1").isExists()).toBe(false);
     });
   });
@@ -2401,10 +2401,10 @@ describe("FinderTest", () => {
     const uniqueCategorizedPosts = (author as any).uniqueCategorizedPosts.includes(
       ":specialComments",
     );
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await uniqueCategorizedPosts.limit(0).isExists()).toBe(false);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await uniqueCategorizedPosts.limit(1).isExists()).toBe(true);
     });
   });
@@ -2414,10 +2414,10 @@ describe("FinderTest", () => {
     const uniqueCategorizedPosts = (author as any).uniqueCategorizedPosts
       .includes(":specialComments")
       .order("comments.tags_count DESC");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await uniqueCategorizedPosts.limit(0).isExists()).toBe(false);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await uniqueCategorizedPosts.limit(1).isExists()).toBe(true);
     });
   });
@@ -2426,7 +2426,7 @@ describe("FinderTest", () => {
     const ratings = (developers("david") as any).ratings
       .includes({ ":comment": ":post" })
       .where({ posts: { id: 1 } });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await ratings.limit(1).isExists()).toBeFalsy();
     });
   });

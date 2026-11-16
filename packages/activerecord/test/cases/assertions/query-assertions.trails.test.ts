@@ -12,7 +12,7 @@ describe("QueryAssertionsTest", () => {
   });
 
   it("assert queries match global regex does not alternate due to lastIndex statefulness", async () => {
-    await assertQueriesMatch(/SELECT/gi, 3, false, async () => {
+    await assertQueriesMatch(/SELECT/gi, { count: 3 }, async () => {
       instrumentSql("SELECT 1");
       instrumentSql("SELECT 2");
       instrumentSql("SELECT 3");

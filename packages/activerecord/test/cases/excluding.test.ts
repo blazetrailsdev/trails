@@ -63,7 +63,7 @@ describe("ExcludingTest", () => {
     const query = await Post.where({ id: post }).load();
 
     let records: Post[] = [];
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       records = await Post.excluding(query);
     });
 
@@ -75,7 +75,7 @@ describe("ExcludingTest", () => {
     const thinking = posts("thinking");
 
     let records: Post[] = [];
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       records = await Post.excluding(post, Post.where({ id: thinking }));
     });
 
@@ -129,7 +129,7 @@ describe("ExcludingTest", () => {
     const relation = await post.comments.load();
 
     let records: Comment[] = [];
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       records = await Comment.excluding(relation);
     });
 

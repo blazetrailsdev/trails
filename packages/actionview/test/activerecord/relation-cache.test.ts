@@ -53,7 +53,7 @@ describe("RelationCacheTest", () => {
   });
 
   it("cache relation other", async () => {
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await tc.cache(Project.all(), {}, () => {
         tc.concat("Hello World");
       });

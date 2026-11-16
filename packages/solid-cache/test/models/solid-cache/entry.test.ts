@@ -75,7 +75,7 @@ describe("EntryTest", () => {
 
   it("batching multi queries", async () => {
     await stubConst(Entry as never, "MULTI_BATCH_SIZE", 2, async () => {
-      await assertQueriesCount(2, false, () =>
+      await assertQueriesCount(2, () =>
         Entry.writeMulti([
           { key: b("hello"), value: "there" },
           { key: b("foo"), value: "bar" },
@@ -83,7 +83,7 @@ describe("EntryTest", () => {
         ]),
       );
 
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         expect(utf8Hash(await Entry.readMulti([b("hello"), b("foo"), b("baz"), b("bar")]))).toEqual(
           {
             foo: "bar",

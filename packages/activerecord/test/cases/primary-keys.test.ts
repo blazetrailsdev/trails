@@ -287,7 +287,7 @@ describe("PrimaryKeysTest", () => {
       }
     }
     await AnonDashboard.createBang();
-    await assertQueriesCount(3, true, async () => {
+    await assertQueriesCount(3, { includeSchema: true }, async () => {
       await AnonDashboard.createBang();
     });
   });

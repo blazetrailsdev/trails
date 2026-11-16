@@ -90,7 +90,7 @@ describe("SchemaCacheTest", () => {
 
     cache = await loadBoundReflection(tempfile.path()!);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await cache.columns("courses")).length).toBe(3);
       expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
@@ -121,7 +121,7 @@ describe("SchemaCacheTest", () => {
 
     cache = (await SchemaCache._loadFrom(tempfile.path()!))!;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await (cache as SchemaCache).columns(pool, "courses")).length).toBe(3);
       expect(Object.keys(await (cache as SchemaCache).columnsHash(pool, "courses")).length).toBe(3);
       expect(await (cache as SchemaCache).dataSourceExists(pool, "courses")).toBeTruthy();
@@ -131,7 +131,7 @@ describe("SchemaCacheTest", () => {
 
     cache = await loadBoundReflection(tempfile.path()!);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await cache.columns("courses")).length).toBe(3);
       expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
@@ -142,7 +142,7 @@ describe("SchemaCacheTest", () => {
   it("yaml loads 5 1 dump", async () => {
     const cache = await loadBoundReflection(schemaDumpPath());
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await cache.columns("posts")).length).toBe(11);
       expect(Object.keys(await cache.columnsHash("posts")).length).toBe(11);
       expect(await cache.dataSourceExists("posts")).toBeTruthy();
@@ -153,7 +153,7 @@ describe("SchemaCacheTest", () => {
   it("yaml loads 5 1 dump without indexes still queries for indexes", async () => {
     const cache = await loadBoundReflection(schemaDumpPath());
 
-    await assertQueriesCount(undefined, true, async () => {
+    await assertQueriesCount(null, { includeSchema: true }, async () => {
       expect((await cache.indexes("courses")).length).toBe(1);
     });
   });
@@ -217,7 +217,7 @@ describe("SchemaCacheTest", () => {
       ),
     ) as SchemaCache;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await cache.columns(pool, "courses")).length).toBe(3);
       expect(Object.keys(await cache.columnsHash(pool, "courses")).length).toBe(3);
       expect(await cache.dataSourceExists(pool, "courses")).toBeTruthy();
@@ -234,7 +234,7 @@ describe("SchemaCacheTest", () => {
 
     cache = await loadBoundReflection(tempfile.path()!);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await cache.columns("courses")).length).toBe(3);
       expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
@@ -285,7 +285,7 @@ describe("SchemaCacheTest", () => {
 
     cache = (await SchemaCache._loadFrom(tempfile.path()!))!;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await (cache as SchemaCache).columns(pool, "courses")).length).toBe(3);
       expect(Object.keys(await (cache as SchemaCache).columnsHash(pool, "courses")).length).toBe(3);
       expect(await (cache as SchemaCache).dataSourceExists(pool, "courses")).toBeTruthy();
@@ -295,7 +295,7 @@ describe("SchemaCacheTest", () => {
 
     cache = await loadBoundReflection(tempfile.path()!);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await cache.columns("courses")).length).toBe(3);
       expect(Object.keys(await cache.columnsHash("courses")).length).toBe(3);
       expect(await cache.dataSourceExists("courses")).toBeTruthy();
@@ -327,7 +327,7 @@ describe("SchemaCacheTest", () => {
     expect(await cache.dataSourceExists("courses")).toBeTruthy();
 
     await cache.clearDataSourceCacheBang("courses");
-    await assertQueriesCount(1, true, async () => {
+    await assertQueriesCount(1, { includeSchema: true }, async () => {
       await cache.dataSourceExists("courses");
     });
   });

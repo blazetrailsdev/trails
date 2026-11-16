@@ -550,7 +550,7 @@ describe("Migration#removeColumns forwards to the connection", () => {
       })();
 
       const expectedQueryCount = adapterType === "sqlite" ? 14 : 1;
-      await assertQueriesCount(expectedQueryCount, false, async () => {
+      await assertQueriesCount(expectedQueryCount, async () => {
         await mig.removeColumns("my_table", "col_one", "col_two");
       });
 

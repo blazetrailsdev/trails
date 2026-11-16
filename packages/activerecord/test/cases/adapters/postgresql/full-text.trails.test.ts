@@ -9,11 +9,12 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
     adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
-    await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
-    await adapter.execute(`CREATE TABLE tsvectors (id serial primary key, text_vector tsvector)`);
+    await adapter.createTable("tsvectors", { force: true }, (t: any) => {
+      t.tsvector("text_vector");
+    });
   });
   afterEach(async () => {
-    await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
+    await adapter.dropTable("tsvectors", { ifExists: true });
   });
 
   describe("PostgresqlFullTextTest", () => {

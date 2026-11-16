@@ -301,7 +301,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("foreign keys can be created in one query when index is not added", async () => {
       const conn = await ambientConnection();
       await withTestingTables(conn, async () => {
-        await assertQueriesCount(1, false, async () => {
+        await assertQueriesCount(1, async () => {
           await conn.createTable("testings", (t) => {
             t.references("testing_parent", { foreignKey: true, index: false });
           });

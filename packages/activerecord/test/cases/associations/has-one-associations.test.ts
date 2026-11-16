@@ -222,15 +222,15 @@ describe("HasOneAssociationsTest", () => {
 
   it("has one cache nils", async () => {
     const firm = companies("another_firm") as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await readHasOne(firm, "account")).toBeNull();
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await readHasOne(firm, "account")).toBeNull();
     });
 
     const firms = await Firm.includes(":account");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       for (const f of firms) await readHasOne(f, "account");
     });
   });
@@ -465,7 +465,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("build association dont create transaction", async () => {
     const firm = new Firm();
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       (firm as any).buildAccount();
     });
   });
@@ -574,10 +574,10 @@ describe("HasOneAssociationsTest", () => {
       credit_limit: 80,
     });
     expect((await readHasOne(odegy, "account")).credit_limit).toBe(53);
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await odegy.reloadAccount();
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       void odegy.account;
     });
     expect((await readHasOne(odegy, "account")).credit_limit).toBe(80);
@@ -595,11 +595,11 @@ describe("HasOneAssociationsTest", () => {
 
       expect(connection.queryCache!.size).toBe(2);
 
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await odegy.reloadAccount();
       });
 
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await Company.find(odegyId);
       });
     } finally {
@@ -614,10 +614,10 @@ describe("HasOneAssociationsTest", () => {
       credit_limit: 80,
     });
     expect((await readHasOne(odegy, "account")).credit_limit).toBe(53);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       odegy.resetAccount();
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await readHasOne(odegy, "account");
     });
     expect((await readHasOne(odegy, "account")).credit_limit).toBe(80);
@@ -886,21 +886,21 @@ describe("HasOneAssociationsTest", () => {
     const company = companies("first_firm") as any;
     const account = await Account.find(1);
     await readHasOne(company, "account");
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await company.setAccount(account);
     });
 
     await company.association("account").writer(null);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await company.setAccount(null);
     });
 
     const account2 = await Account.find(2);
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await company.association("account").writer(account2);
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await (new Firm() as any).setAccount(account2);
     });
   });
@@ -912,7 +912,7 @@ describe("HasOneAssociationsTest", () => {
 
     ship.name = "new name";
     assertPredicate(ship, (r: any) => r.isChanged);
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await (pirate as any).setShip(ship);
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
@@ -924,7 +924,7 @@ describe("HasOneAssociationsTest", () => {
     await ship.save();
 
     const newShip = await Ship.create({ name: "new name" });
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await (pirate as any).setShip(newShip);
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
@@ -978,13 +978,13 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("has one with touch option on create", async () => {
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       await Club.create({ name: "1000 Oaks", membership_attributes: { favorite: true } });
     });
   });
 
   it("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", async () => {
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       const chef = await Chef.create({ employable: new DrinkDesignerWithPolymorphicTouchChef() });
       const employable = await chef.association("employable").loadTarget();
       expect((await readHasOne(employable, "chef")).id).toBe(chef.id);
@@ -995,7 +995,7 @@ describe("HasOneAssociationsTest", () => {
     await DrinkDesignerWithPolymorphicTouchChef.create({ chef: new Chef() });
     const designer = (await DrinkDesignerWithPolymorphicTouchChef.last()) as any;
 
-    await assertQueriesCount(5, false, async () => {
+    await assertQueriesCount(5, async () => {
       await designer.update({ name: "foo" });
     });
   });
@@ -1004,7 +1004,7 @@ describe("HasOneAssociationsTest", () => {
     const newClub = (await Club.create({ name: "1000 Oaks" })) as any;
     await newClub.createMembership();
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await newClub.update({ name: "Effingut" });
     });
   });
@@ -1013,7 +1013,7 @@ describe("HasOneAssociationsTest", () => {
     const newClub = (await Club.create({ name: "1000 Oaks" })) as any;
     await newClub.createMembership();
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await newClub.touch();
     });
   });
@@ -1022,7 +1022,7 @@ describe("HasOneAssociationsTest", () => {
     const newClub = (await Club.create({ name: "1000 Oaks" })) as any;
     await newClub.createMembership();
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       await newClub.destroy();
     });
   });
@@ -1031,14 +1031,14 @@ describe("HasOneAssociationsTest", () => {
     const newClub = (await Club.create({ name: "1000 Oaks" })) as any;
     await newClub.createMembership();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await newClub.save();
     });
   });
 
   it("has one with touch option on nonpersisted built associations doesnt update parent", async () => {
     const car = await (SpecialCar as any).create({ name: "honda" });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await car.buildSpecialBulb();
       await car.buildSpecialBulb();
     });
@@ -1235,7 +1235,7 @@ describe("AsyncHasOneAssociationsTest", () => {
       readHasOne(firm, "account"),
     );
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await readHasOne(firm, "account")).id).toEqual(firstAccount.id);
       expect((await readHasOne(firm, "account")).credit_limit).toEqual(firstAccount.credit_limit);
     });

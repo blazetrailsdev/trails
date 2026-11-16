@@ -168,7 +168,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       () => VariantRecord.count(),
       null,
       async () => {
-        await assertQueriesCount(11, false, async () => {
+        await assertQueriesCount(11, async () => {
           for (const u of await users) {
             await u.coverPhoto.load();
             const rep = await representationOf(u.coverPhoto, { resizeToLimit: [100, 100] });
@@ -186,7 +186,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       () => VariantRecord.count(),
       null,
       async () => {
-        await assertQueriesCount(6, false, async () => {
+        await assertQueriesCount(6, async () => {
           for (const u of await (
             users as unknown as { withAttachedCoverPhoto(): typeof users }
           ).withAttachedCoverPhoto()) {
@@ -219,7 +219,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       .findBy({ name: "Justin" })) as User;
     const highlights = await found.highlightsWithVariants.attachments;
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       for (const highlight of highlights) {
         await (
           await representationOf(highlight, "thumb")
@@ -260,7 +260,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       .withAllVariantRecords()
       .toArray();
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       for (const highlight of highlights) {
         await (
           await representationOf(highlight, "thumb")
@@ -323,7 +323,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       () => VariantRecord.count(),
       null,
       async () => {
-        await assertQueriesCount(9, false, async () => {
+        await assertQueriesCount(9, async () => {
           await eachRep(await vlogs().attachments, { resizeToLimit: [100, 100] });
         });
       },
@@ -335,7 +335,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       () => VariantRecord.count(),
       null,
       async () => {
-        await assertQueriesCount(7, false, async () => {
+        await assertQueriesCount(7, async () => {
           await eachRep(await vlogs().includes({ blob: "variantRecords" }), {
             resizeToLimit: [100, 100],
           });
@@ -349,7 +349,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       () => VariantRecord.count(),
       null,
       async () => {
-        await assertQueriesCount(5, false, async () => {
+        await assertQueriesCount(5, async () => {
           await eachRep(
             await vlogs().includes({ blob: { variantRecords: { imageAttachment: "blob" } } }),
             { resizeToLimit: [100, 100] },
@@ -364,7 +364,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       () => VariantRecord.count(),
       null,
       async () => {
-        await assertQueriesCount(6, false, async () => {
+        await assertQueriesCount(6, async () => {
           await eachRep(await vlogs().withAllVariantRecords(), { resizeToLimit: [100, 100] });
         });
       },
@@ -376,7 +376,7 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       () => VariantRecord.count(),
       null,
       async () => {
-        await assertQueriesCount(7, false, async () => {
+        await assertQueriesCount(7, async () => {
           for (const u of await (
             User.where({ id: user.id }) as unknown as { withAttachedVlogs(): Promise<User[]> }
           ).withAttachedVlogs()) {
@@ -393,13 +393,13 @@ describe("ActiveStorage::VariantWithRecordTest", { timeout: 60_000 }, () => {
       +2,
       null,
       async () => {
-        await assertQueriesMatch(/SELECT/i, 10, false, async () => {
+        await assertQueriesMatch(/SELECT/i, { count: 10 }, async () => {
           await eachRep(await vlogs().withAllVariantRecords(), { resizeToLimit: [200, 200] });
         });
 
         await user.reload();
 
-        await assertQueriesCount(6, false, async () => {
+        await assertQueriesCount(6, async () => {
           await eachRep(await vlogs().withAllVariantRecords(), { resizeToLimit: [200, 200] });
         });
       },

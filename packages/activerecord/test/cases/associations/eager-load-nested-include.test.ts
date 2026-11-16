@@ -161,7 +161,7 @@ describe("EagerLoadPolyAssocsTest", () => {
 
     const res = await ShapeExpression.all().includes(":shape", { ":paint": ":nonPoly" });
     expect(res.length).toBe(NUM_SHAPE_EXPRESSIONS);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       for (const se of res) {
         const paint = se.association("paint").target as Base;
         expect(paint.association("nonPoly").target).not.toBeNull();

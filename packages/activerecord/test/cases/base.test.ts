@@ -1638,11 +1638,11 @@ describe("BasicsTest", async () => {
   it("assert queries count", async () => {
     const query = async () =>
       ((await Base.leaseConnection()) as any).execute("select count(*) from developers");
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       for (let i = 0; i < 2; i++) await query();
     });
-    await assertQueriesCount(1, false, query);
-    await assertNoQueries(false, () => {
+    await assertQueriesCount(1, query);
+    await assertNoQueries(() => {
       assert(true);
     });
   });
@@ -1944,13 +1944,13 @@ describe("BasicsTest", async () => {
   it("#present? and #blank? on ActiveRecord::Base classes", async () => {
     const { isPresent, isBlank } = await import("@blazetrails/activesupport");
     assertNotEmpty(await Topic.all());
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       assertPredicate(Topic, (t) => isPresent(t));
       assertNot(isBlank(Topic));
     });
 
     await Topic.deleteAll();
-    await assertNoQueries(false, () => {
+    await assertNoQueries(() => {
       assertPredicate(Topic, (t) => isPresent(t));
       assertNot(isBlank(Topic));
     });

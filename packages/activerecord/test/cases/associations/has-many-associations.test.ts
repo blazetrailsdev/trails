@@ -136,7 +136,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     const subscriptions = subscriber.subscriptions;
     expect(subscriptions.loaded).toBeFalsy();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await subscriptions.size()).toBe(2);
     });
 
@@ -150,7 +150,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     const essays = author.essays;
     expect(essays.loaded).toBeFalsy();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await essays.size()).toBe(1);
     });
 
@@ -199,7 +199,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
     const essays = author.essays;
     expect(essays.loaded).toBeFalsy();
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       expect(await essays.size()).toBe(0);
     });
   });
@@ -700,39 +700,39 @@ describe("HasManyAssociationsTest", () => {
     const bulbs = (await Car.first())!.bulbs as any;
     await bulbs.toArray();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.first();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.second();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.third();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.fourth();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.fifth();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.fortyTwo();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.thirdToLast();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.secondToLast();
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await bulbs.last();
     });
   });
@@ -741,14 +741,14 @@ describe("HasManyAssociationsTest", () => {
     const company = companies("first_firm") as any;
     const newClients: any[] = [];
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       newClients.push(company.clientsOfFirm.build({ name: "Another Client" }));
       newClients.push(company.clientsOfFirm.build({ name: "Another Client II" }));
       newClients.push(company.clientsOfFirm.build({ name: "Another Client III" }));
     });
 
     expect(company.clientsOfFirm.loaded).toBeFalsy();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await company.clientsOfFirm.third()).toBe(newClients[0]);
       expect(await company.clientsOfFirm.fourth()).toBe(newClients[1]);
       expect(await company.clientsOfFirm.fifth()).toBe(newClients[2]);
@@ -762,7 +762,7 @@ describe("HasManyAssociationsTest", () => {
     const company = companies("first_firm") as any;
     const newClients: any[] = [];
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       newClients.push(company.clientsOfFirm.build({ name: "Another Client" }));
       newClients.push(company.clientsOfFirm.build({ name: "Another Client II" }));
       newClients.push(company.clientsOfFirm.build({ name: "Another Client III" }));
@@ -770,7 +770,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect(company.clientsOfFirm.loaded).toBeFalsy();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await company.clientsOfFirm.thirdBang()).toBe(newClients[0]);
       expect(await company.clientsOfFirm.fourthBang()).toBe(newClients[1]);
       expect(await company.clientsOfFirm.fifthBang()).toBe(newClients[2]);
@@ -1067,7 +1067,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = companies("first_firm") as any;
     expect(firm.clients.loaded).toBeFalsy();
 
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(4, async () => {
       for await (const c of firm.clients.findEach({ batchSize: 1 })) {
         expect(c.firm_id).toBe(firm.id);
       }
@@ -1079,7 +1079,7 @@ describe("HasManyAssociationsTest", () => {
   it("find each with conditions", async () => {
     const firm = companies("first_firm") as any;
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       for await (const c of firm.clients.where({ name: "Microsoft" }).findEach({ batchSize: 1 })) {
         expect(c.firm_id).toBe(firm.id);
         expect(c.name).toBe("Microsoft");
@@ -1094,7 +1094,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect(firm.clients.loaded).toBeFalsy();
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       for await (const clients of firm.clients.findInBatches({ batchSize: 2 })) {
         for (const c of clients) expect(c.firm_id).toBe(firm.id);
       }
@@ -1181,10 +1181,10 @@ describe("HasManyAssociationsTest", () => {
 
       expect(connection.queryCache.size).toBe(2);
 
-      await assertQueriesCount(1, false, async () => {
+      await assertQueriesCount(1, async () => {
         await firm.clients.reload();
       });
-      await assertQueriesCount(0, false, async () => {
+      await assertQueriesCount(0, async () => {
         await firm.clients.load();
       });
 
@@ -1395,14 +1395,14 @@ describe("HasManyAssociationsTest", () => {
 
   it("transactions when adding to new record", async () => {
     const firm = new HmFirm() as any;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       await firm.clientsOfFirm.concat(new Client({ name: "Natural Company" }));
     });
   });
 
   it("inverse on before validate", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await firm.clientsOfFirm.push(new Client({ name: "Natural Company" }));
     });
   });
@@ -1410,7 +1410,7 @@ describe("HasManyAssociationsTest", () => {
   it("new aliased to build", async () => {
     const company = companies("first_firm") as any;
 
-    const newClient = await assertQueriesCount(0, false, () =>
+    const newClient = await assertQueriesCount(0, () =>
       company.clientsOfFirm.new({ name: "Another Client" }),
     );
     expect(company.clientsOfFirm.loaded).toBeFalsy();
@@ -1423,7 +1423,7 @@ describe("HasManyAssociationsTest", () => {
   it("build", async () => {
     const company = companies("first_firm") as any;
 
-    const newClient = await assertQueriesCount(0, false, () =>
+    const newClient = await assertQueriesCount(0, () =>
       company.clientsOfFirm.build({ name: "Another Client" }),
     );
     expect(company.clientsOfFirm.loaded).toBeFalsy();
@@ -1482,7 +1482,7 @@ describe("HasManyAssociationsTest", () => {
     const company = companies("first_firm") as any;
 
     let newClients: any;
-    await assertQueriesCount(0, false, () => {
+    await assertQueriesCount(0, () => {
       newClients = company.clientsOfFirm.build([
         { name: "Another Client" },
         { name: "Another Client II" },
@@ -1502,7 +1502,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect((await firstTopic.replies.toArray()).length).toBe(1);
 
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       firstTopic.replies.build({ title: "Not saved", content: "Superstars" });
       expect(await firstTopic.replies.size()).toBe(2);
     });
@@ -1514,7 +1514,7 @@ describe("HasManyAssociationsTest", () => {
     const company = companies("first_firm") as any;
 
     let newClient: any;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       newClient = company.clientsOfFirm.build(undefined, (client: any) => {
         client.name = "Another Client";
       });
@@ -1530,7 +1530,7 @@ describe("HasManyAssociationsTest", () => {
     const company = companies("first_firm") as any;
 
     let newClients: any[] = [];
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       newClients = company.clientsOfFirm.build(
         [{ name: "Another Client" }, { name: "Another Client II" }],
         (client: any) => {
@@ -1550,7 +1550,7 @@ describe("HasManyAssociationsTest", () => {
     expect(await firstFirm.clientsOfFirm.size()).toBe(2);
     firstFirm.clientsOfFirm.reset();
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await firstFirm.clientsOfFirm.create({ name: "Superstars" });
     });
 
@@ -1713,7 +1713,7 @@ describe("HasManyAssociationsTest", () => {
     const reply1 = await HmReply.create({ title: "re: zoom", content: "speedy quick!" });
     const reply2 = await HmReply.create({ title: "re: zoom 2", content: "OMG lol!" });
 
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       await topic.replies.push(reply1, reply2);
     });
 
@@ -1767,7 +1767,7 @@ describe("HasManyAssociationsTest", () => {
     const categorization1 = await Categorization.create({});
     const categorization2 = await Categorization.create({});
 
-    await assertQueriesCount(6, false, async () => {
+    await assertQueriesCount(6, async () => {
       await category.categorizations.push(categorization1, categorization2);
     });
 
@@ -1832,7 +1832,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling empty with counter cache", async () => {
     const post = posts("welcome") as any;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertNotEmpty(post.comments);
     });
   });
@@ -1973,7 +1973,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("transaction when deleting new record", async () => {
     const firm = new HmFirm() as any;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       const client = new Client({ name: "New Client" });
       await firm.clientsOfFirm.concat(client);
       await firm.clientsOfFirm.destroy(client);
@@ -2555,7 +2555,7 @@ describe("HasManyAssociationsTest", () => {
     await firm.clients.replace([]);
     await firm.save();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await firm.clients.replace([]);
     });
 
@@ -2582,7 +2582,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("transactions when replacing on new record", async () => {
     const firm = new HmFirm() as any;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       await firm.clientsOfFirm.replace([new Client({ name: "New Client" })]);
     });
   });
@@ -2598,7 +2598,7 @@ describe("HasManyAssociationsTest", () => {
   it("get ids for loaded associations", async () => {
     const company = companies("first_firm") as any;
     await company.clients.reload();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await company.clientIds;
       await company.clientIds;
     });
@@ -2651,7 +2651,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("get ids for association on new record does not try to find records", async () => {
     const company = new Company() as any;
-    await assertQueriesCount(0, false, async () => {
+    await assertQueriesCount(0, async () => {
       await company.contractIds;
     });
 
@@ -2758,7 +2758,7 @@ describe("HasManyAssociationsTest", () => {
 
     const client = await firm.clients.first();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(firm.clients.loaded).toBeTruthy();
       expect(await firm.clients.isInclude(client)).toBe(true);
     });
@@ -2770,7 +2770,7 @@ describe("HasManyAssociationsTest", () => {
 
     await firm.reload();
     expect(firm.clients.loaded).toBeFalsy();
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await firm.clients.isInclude(client)).toBe(true);
     });
     expect(firm.clients.loaded).toBeFalsy();
@@ -2797,7 +2797,7 @@ describe("HasManyAssociationsTest", () => {
     await firm.clients.load();
     expect(firm.clients.loaded).toBeTruthy();
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await firm.clients.first();
       expect((await firm.clients.first(2)).length).toBe(2);
       await firm.clients.last();
@@ -2810,7 +2810,7 @@ describe("HasManyAssociationsTest", () => {
     firm.clients.build({ name: "Foo" });
     expect(firm.clients.loaded).toBeFalsy();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await firm.clients.first();
       await firm.clients.second();
       await firm.clients.last();
@@ -2825,7 +2825,7 @@ describe("HasManyAssociationsTest", () => {
     const newTopic = author.topicsWithoutType.build();
     expect(author.topicsWithoutType.loaded).toBeFalsy();
 
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       if (currentAdapter("Mysql2Adapter", "TrilogyAdapter", "SQLite3Adapter")) {
         expect((await author.topicsWithoutType.first()).id).toBe(fourth.id);
         expect((await author.topicsWithoutType.second()).id).toBe(third.id);
@@ -2841,7 +2841,7 @@ describe("HasManyAssociationsTest", () => {
     await firm.clients.create({ name: "Foo" });
     expect(firm.clients.loaded).toBeFalsy();
 
-    await assertQueriesCount(3, false, async () => {
+    await assertQueriesCount(3, async () => {
       await firm.clients.first();
       await firm.clients.second();
       await firm.clients.last();
@@ -2853,7 +2853,7 @@ describe("HasManyAssociationsTest", () => {
   it("calling first nth or last on new record should not run queries", async () => {
     const firm = new HmFirm() as any;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await firm.clients.first();
       await firm.clients.second();
       await firm.clients.last();
@@ -2865,7 +2865,7 @@ describe("HasManyAssociationsTest", () => {
     await firm.clients.create({ name: "Foo" });
     expect(firm.clients.loaded).toBeFalsy();
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await firm.clients.first(2);
       await firm.clients.last(2);
     });
@@ -2875,7 +2875,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling many should count instead of loading association", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await firm.clients.isMany();
     });
     expect(firm.clients.loaded).toBeFalsy();
@@ -2884,14 +2884,14 @@ describe("HasManyAssociationsTest", () => {
   it("calling many on loaded association should not use query", async () => {
     const firm = companies("first_firm") as any;
     await firm.clients.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await firm.clients.isMany()).toBeTruthy();
     });
   });
 
   it("subsequent calls to many should use query", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await firm.clients.isMany();
       await firm.clients.isMany();
     });
@@ -2899,7 +2899,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling many should defer to collection if using a block", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await assertNotCalled(firm.clients, "size", null, async () => {
         await firm.clients.isMany(() => true);
       });
@@ -2925,7 +2925,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling none should count instead of loading association", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await firm.clients.isNone();
     });
     expect(firm.clients.loaded).toBeFalsy();
@@ -2934,14 +2934,14 @@ describe("HasManyAssociationsTest", () => {
   it("calling none on loaded association should not use query", async () => {
     const firm = companies("first_firm") as any;
     await firm.clients.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await firm.clients.isNone()).toBeFalsy();
     });
   });
 
   it("calling none should defer to collection if using a block", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await assertNotCalled(firm.clients, "size", null, async () => {
         await firm.clients.isNone(() => true);
       });
@@ -2963,7 +2963,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling one should count instead of loading association", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await firm.clients.isOne();
     });
     expect(firm.clients.loaded).toBeFalsy();
@@ -2972,14 +2972,14 @@ describe("HasManyAssociationsTest", () => {
   it("calling one on loaded association should not use query", async () => {
     const firm = companies("first_firm") as any;
     await firm.clients.load();
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await firm.clients.isOne()).toBeFalsy();
     });
   });
 
   it("subsequent calls to one should use query", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await firm.clients.isOne();
       await firm.clients.isOne();
     });
@@ -2987,7 +2987,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("calling one should defer to collection if using a block", async () => {
     const firm = companies("first_firm") as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await assertNotCalled(firm.clients, "size", null, async () => {
         await firm.clients.isOne(() => true);
       });
@@ -3295,7 +3295,7 @@ describe("HasManyAssociationsTest", () => {
     expect(Number(await post.taggingsWithDeleteAll.count()) > 0).toBeTruthy();
     expect(post.taggingsWithDeleteAll.loaded).toBeFalsy();
 
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       await post.taggingsWithDeleteAll.deleteAll();
     });
   });
@@ -3303,7 +3303,7 @@ describe("HasManyAssociationsTest", () => {
   it("has many associations on new records use null relations", async () => {
     const post = new HmPost() as any;
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await post.comments.toArray()).toEqual([]);
       expect(await post.comments.where({ body: "omg" }).toArray()).toEqual([]);
       expect(await post.comments.pluck("body")).toEqual([]);
@@ -3537,7 +3537,7 @@ describe("HasManyAssociationsTest", () => {
 
     const newBulb = await HmBulb.find(bulb.id);
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await car.association("bulbs").writer([newBulb]);
     });
   });
@@ -3637,10 +3637,10 @@ describe("HasManyAssociationsTest", () => {
     const car = (await Car.create({})) as any;
     await Bulb.create({ car_id: car.id });
     const carTwo = (await Car.create({})) as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await car.bulbs.size()).toBe(1);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       expect(await carTwo.bulbs.size()).toBe(0);
     });
   });
@@ -3651,10 +3651,10 @@ describe("HasManyAssociationsTest", () => {
     await car.bulbIds;
     const carTwo = (await Car.create({})) as any;
     await carTwo.bulbIds;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await car.bulbs.size()).toBe(1);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect(await carTwo.bulbs.size()).toBe(0);
     });
   });
@@ -3663,10 +3663,10 @@ describe("HasManyAssociationsTest", () => {
     const car = (await Car.create({})) as any;
     await Bulb.create({ car_id: car.id });
     const carTwo = (await Car.create({})) as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await assertNotEmpty(car.bulbs);
     });
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await assertEmpty(carTwo.bulbs);
     });
   });
@@ -3677,10 +3677,10 @@ describe("HasManyAssociationsTest", () => {
     await car.bulbIds;
     const carTwo = (await Car.create({})) as any;
     await carTwo.bulbIds;
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertNotEmpty(car.bulbs);
     });
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await assertEmpty(carTwo.bulbs);
     });
   });
@@ -3735,14 +3735,14 @@ describe("HasManyAssociationsTest", () => {
     const bulb = (await HmBulb.createBang({ car })) as any;
 
     expect(await car.bulbIds).toEqual([bulb.id]);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await car.bulbIds;
     });
 
     const bulb2 = await car.bulbs.createBang();
 
     expect((await car.bulbIds).sort((a: number, b: number) => a - b)).toEqual([bulb.id, bulb2.id]);
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       await car.bulbIds;
     });
   });
@@ -3895,7 +3895,7 @@ describe("AsyncHasManyAssociationsTest", () => {
       expect(await firm.clients.size()).toEqual(3);
     });
 
-    await assertNoQueries(false, async () => {
+    await assertNoQueries(async () => {
       expect((await firm.clients.toArray())[2] ?? null).not.toBeNull();
     });
 

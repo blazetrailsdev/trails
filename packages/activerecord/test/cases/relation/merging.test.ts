@@ -260,7 +260,7 @@ describe("RelationMergingTest", () => {
       Post.preload(":author").merge(Post.all()),
     ];
     for (const posts of relations) {
-      await assertQueriesCount(2, false, async () => {
+      await assertQueriesCount(2, async () => {
         const first = await posts.first();
         expect((first as any).author).toBeTruthy();
       });
@@ -286,7 +286,7 @@ describe("RelationMergingTest", () => {
   });
 
   it("relation merging with association", async () => {
-    await assertQueriesCount(2, false, async () => {
+    await assertQueriesCount(2, async () => {
       const post = await Post.where({ body: "Such a lovely day" }).first();
       const comments = Comment.where({ body: "Thank you for the welcome" }).merge(
         (post as any).comments,

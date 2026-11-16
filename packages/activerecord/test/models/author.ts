@@ -544,25 +544,17 @@ export class Author extends Base {
     this.hasMany("otherPosts", { className: "Post" });
     this.hasMany("postsWithCallbacks", {
       className: "Post",
-      beforeAdd: (owner: any, r: any) => owner.postLog.push(`before_adding${r.id ?? "<new>"}`),
-      afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
-      beforeRemove: (owner: any, r: any) => owner.postLog.push(`before_removing${r.id ?? ""}`),
-      afterRemove: (owner: any, r: any) => owner.postLog.push(`after_removing${r.id ?? ""}`),
+      beforeAdd: "logBeforeAdding",
+      afterAdd: "logAfterAdding",
+      beforeRemove: "logBeforeRemoving",
+      afterRemove: "logAfterRemoving",
     });
     this.hasMany("postsWithThrownCallbacks", {
       className: "Post",
-      beforeAdd: (_owner: any, _r: any) => {
-        kernelThrow(":abort");
-      },
-      afterAdd: (_owner: any, _r: any) => {
-        throw new RuntimeError("unhandled exception");
-      },
-      beforeRemove: (_owner: any, _r: any) => {
-        kernelThrow(":abort");
-      },
-      afterRemove: (_owner: any, _r: any) => {
-        throw new RuntimeError("unhandled exception");
-      },
+      beforeAdd: "throwAbort",
+      afterAdd: "ensureNotCalled",
+      beforeRemove: "throwAbort",
+      afterRemove: "ensureNotCalled",
     });
     this.hasMany("postsWithProcCallbacks", {
       className: "Post",
@@ -574,20 +566,18 @@ export class Author extends Base {
     this.hasMany("postsWithMultipleCallbacks", {
       className: "Post",
       beforeAdd: [
-        (owner: any, r: any) => owner.postLog.push(`before_adding${r.id ?? "<new>"}`),
+        "logBeforeAdding",
         (o: any, r: any) => o.postLog.push(`before_adding_proc${r.id ?? "<new>"}`),
       ],
       afterAdd: [
-        (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
+        "logAfterAdding",
         (o: any, r: any) => o.postLog.push(`after_adding_proc${r.id ?? "<new>"}`),
       ],
     });
     this.hasMany("unchangeablePosts", {
       className: "Post",
-      beforeAdd: (_owner: any, _object: any) => {
-        throw new Exception("You can't add a post");
-      },
-      afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
+      beforeAdd: "raiseException",
+      afterAdd: "logAfterAdding",
     });
 
     this.hasMany("categorizations", function () {});
@@ -905,6 +895,41 @@ export class Author extends Base {
 
   social() {
     return ["twitter", "github"];
+  }
+
+  /** @internal */
+  private throwAbort(_: unknown): void {
+    kernelThrow(":abort");
+  }
+
+  /** @internal */
+  private ensureNotCalled(_: unknown): never {
+    throw new RuntimeError("unhandled exception");
+  }
+
+  /** @internal */
+  private logBeforeAdding(object: Base): void {
+    this.postLog.push(`before_adding${object.id ?? "<new>"}`);
+  }
+
+  /** @internal */
+  private logAfterAdding(object: Base): void {
+    this.postLog.push(`after_adding${object.id ?? ""}`);
+  }
+
+  /** @internal */
+  private logBeforeRemoving(object: Base): void {
+    this.postLog.push(`before_removing${object.id ?? ""}`);
+  }
+
+  /** @internal */
+  private logAfterRemoving(object: Base): void {
+    this.postLog.push(`after_removing${object.id ?? ""}`);
+  }
+
+  /** @internal */
+  private raiseException(_object: unknown): never {
+    throw new Exception("You can't add a post");
   }
 }
 constSet(TopLevel, "Author", Author);

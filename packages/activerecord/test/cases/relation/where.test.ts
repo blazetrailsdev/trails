@@ -556,7 +556,7 @@ describe("WhereTest", () => {
 
   it("where on association with relation performs subselect not two queries", async () => {
     const author = authors("david") as any;
-    await assertQueriesCount(1, false, async () => {
+    await assertQueriesCount(1, async () => {
       await Essay.where({ writer: Author.where({ id: author.id }) });
     });
   });

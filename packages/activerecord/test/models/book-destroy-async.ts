@@ -23,7 +23,6 @@ export class BookDestroyAsync extends Base {
   declare static written: () => Relation<BookDestroyAsync>;
   declare static notWritten: () => Relation<BookDestroyAsync>;
   declare isPublished: () => boolean;
-  declare publishedBang: () => Promise<true | undefined>;
   declare static published: () => Relation<BookDestroyAsync>;
   declare static notPublished: () => Relation<BookDestroyAsync>;
 
@@ -39,6 +38,12 @@ export class BookDestroyAsync extends Base {
     });
     this.hasOne("content", { dependent: "destroyAsync" });
     this.enum("status", ["proposed", "written", "published"]);
+  }
+
+  async publishedBang(): Promise<string> {
+    // @ts-expect-error — generated bang lives on the interposed carrier.
+    await super.publishedBang();
+    return "do publish work...";
   }
 }
 constSet(TopLevel, "BookDestroyAsync", BookDestroyAsync);
