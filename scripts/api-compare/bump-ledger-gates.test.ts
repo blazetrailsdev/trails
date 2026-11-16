@@ -192,6 +192,23 @@ describe("lint-call-args main", () => {
     [LEDGERED, 0],
     [UNLEDGERED, 1],
   ] as const) {
+    it(`gates a naming row on ${rubyName} with exit ${code}`, async () => {
+      const lint = await import("./lint-call-args.js");
+      const [row] = argArtifact([rubyName]).mismatches;
+      await output("call-arg-mismatches.json", {
+        ...argArtifact([]),
+        mismatches: [{ ...row, class: "naming" }],
+      });
+      expect(await lint.main(false)).toBe(code);
+    });
+
+    it(`gates a STALE name tag on ${rubyName} with exit ${code}`, async () => {
+      const lint = await import("./lint-call-args.js");
+      const tag = { package: "activerecord", tsFile: TS_FILE, tsName: rubyName, call: "spawn" };
+      await output("call-arg-mismatches.json", { ...argArtifact([]), staleNameTags: [tag] });
+      expect(await lint.main(false)).toBe(code);
+    });
+
     it(`gates a STALE tag on ${rubyName} with exit ${code}`, async () => {
       const lint = await import("./lint-call-args.js");
       const tag = { package: "activerecord", tsFile: TS_FILE, tsName: rubyName, call: "spawn" };
