@@ -1,32 +1,5 @@
 import type { DurationParts } from "../duration.js";
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
-
-class StringScanner {
-  matched: string | null = null;
-  private groups: (string | undefined)[] = [];
-  private pos = 0;
-
-  constructor(readonly string: string) {}
-
-  isEos(): boolean {
-    return this.pos >= this.string.length;
-  }
-
-  /** @internal */
-  scan(pattern: RegExp): string | null {
-    const re = new RegExp(pattern.source, `${pattern.flags.replace(/[gy]/g, "")}y`);
-    re.lastIndex = this.pos;
-    const m = re.exec(this.string);
-    this.matched = m === null ? null : m[0];
-    this.groups = m === null ? [] : Array.from(m);
-    if (m !== null) this.pos = m.index + m[0].length;
-    return this.matched;
-  }
-
-  group(n: number): string | undefined {
-    return this.groups[n];
-  }
-}
+import { rbInspect as inspect, StringScanner } from "@blazetrails/ruby-compat";
 
 export class ParsingError extends Error {
   override name = "ParsingError";
@@ -76,7 +49,7 @@ export class ISO8601Parser {
       switch (this.mode) {
         case "start":
           if (this.scan(SIGN_MARKER) != null) {
-            this.sign = this.scanner.matched === "-" ? -1 : 1;
+            this.sign = this.scanner.matched() === "-" ? -1 : 1;
             this.mode = "sign";
           } else {
             this.raiseParsingError();
@@ -95,7 +68,7 @@ export class ISO8601Parser {
           if (this.scan(TIME_MARKER) != null) {
             this.mode = "time";
           } else if (this.scan(DATE_COMPONENT) != null) {
-            this.parts[DATE_TO_PART[this.scanner.group(2) as string]] = this.number() * this.sign;
+            this.parts[DATE_TO_PART[this.scanner.get(2) as string]] = this.number() * this.sign;
           } else {
             this.raiseParsingError();
           }
@@ -103,7 +76,7 @@ export class ISO8601Parser {
 
         case "time":
           if (this.scan(TIME_COMPONENT) != null) {
-            this.parts[TIME_TO_PART[this.scanner.group(2) as string]] = this.number() * this.sign;
+            this.parts[TIME_TO_PART[this.scanner.get(2) as string]] = this.number() * this.sign;
           } else {
             this.raiseParsingError();
           }
@@ -120,7 +93,7 @@ export class ISO8601Parser {
   }
 
   private number(): number {
-    const captured = this.scanner.group(1) as string;
+    const captured = this.scanner.get(1) as string;
     return PERIOD_OR_COMMA.test(captured)
       ? parseFloat(captured.split(COMMA).join(PERIOD))
       : parseInt(captured, 10);

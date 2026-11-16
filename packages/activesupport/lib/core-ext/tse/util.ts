@@ -1,5 +1,11 @@
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
-import { NotImplementedError, rbObjAsString, TSE, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  NotImplementedError,
+  rbObjAsString,
+  StringScanner,
+  TSE,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { Unicode } from "../../multibyte/unicode.js";
 
 const HTML_ESCAPE: Record<string, string> = {
@@ -94,47 +100,6 @@ export function xmlNameEscape(name: unknown): string {
   return startingChar + followingChars;
 }
 
-class StringScanner {
-  pos = 0;
-  matched: string | null = null;
-
-  constructor(readonly string: string) {}
-
-  isEos(): boolean {
-    return this.pos >= this.string.length;
-  }
-
-  get rest(): string {
-    return this.string.slice(this.pos);
-  }
-
-  terminate(): void {
-    this.pos = this.string.length;
-  }
-
-  scan(re: RegExp): string | null {
-    return this._match(new RegExp(re.source, `${re.flags.replace(/[gy]/g, "")}y`));
-  }
-
-  scanUntil(re: RegExp): string | null {
-    return this._match(new RegExp(re.source, `${re.flags.replace(/[gy]/g, "")}g`));
-  }
-
-  exist(re: RegExp): boolean {
-    const search = new RegExp(re.source, `${re.flags.replace(/[gy]/g, "")}g`);
-    search.lastIndex = this.pos;
-    return search.exec(this.string) !== null;
-  }
-
-  private _match(re: RegExp): string | null {
-    re.lastIndex = this.pos;
-    const m = re.exec(this.string);
-    this.matched = m === null ? null : m[0];
-    if (m !== null) this.pos = m.index + m[0].length;
-    return this.matched;
-  }
-}
-
 const START_RE = /<%(?:={1,2}|-|#|%)?/s;
 const FINISH_RE = /(?:[-=])?%>/s;
 const START_OR_FINISH_RE = new RegExp(`(?:${START_RE.source}|${FINISH_RE.source})`, "s");
@@ -147,31 +112,35 @@ export function tokenize(source: string): [string, string][] {
   while (!scanner.isEos()) {
     const pos = scanner.pos;
     scanner.scanUntil(START_OR_FINISH_RE);
-    if (scanner.matched === null)
+    if (scanner.matched() === null)
       // @nie disposition=TODO
       throw new NotImplementedError();
-    const len = scanner.pos - scanner.matched.length - pos;
+    const len = scanner.pos - scanner.matched()!.length - pos;
 
-    if (START_RE.test(scanner.matched)) {
+    if (START_RE.test(scanner.matched()!)) {
       if (len > 0) tokens.push([":TEXT", scanner.string.slice(pos, pos + len)]);
-      tokens.push([":OPEN", scanner.matched]);
+      tokens.push([":OPEN", scanner.matched()!]);
       if (scanner.scan(CODE_RE) !== null) {
-        if (scanner.matched.length !== 0) tokens.push([":CODE", scanner.matched]);
+        if (scanner.matched()!.length !== 0) tokens.push([":CODE", scanner.matched()!]);
         if (!scanner.isEos()) tokens.push([":CLOSE", scanner.scan(FINISH_RE)!]);
       } else {
         // @nie disposition=TODO
         throw new NotImplementedError();
       }
-    } else if (FINISH_RE.test(scanner.matched)) {
+    } else if (FINISH_RE.test(scanner.matched()!)) {
       if (len > 0) tokens.push([":CODE", scanner.string.slice(pos, pos + len)]);
-      tokens.push([":CLOSE", scanner.matched]);
+      tokens.push([":CLOSE", scanner.matched()!]);
     } else {
       // @nie disposition=TODO
-      throw new NotImplementedError(scanner.matched);
+      throw new NotImplementedError(scanner.matched());
     }
 
-    if (!scanner.isEos() && !scanner.exist(START_RE) && !scanner.exist(FINISH_RE)) {
-      tokens.push([":TEXT", scanner.rest]);
+    if (
+      !scanner.isEos() &&
+      scanner.isExist(START_RE) == null &&
+      scanner.isExist(FINISH_RE) == null
+    ) {
+      tokens.push([":TEXT", scanner.rest()]);
       scanner.terminate();
     }
   }

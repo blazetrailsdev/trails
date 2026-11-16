@@ -136,6 +136,27 @@ export class StringScanner {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:797` `strscan_exist_p`: a
+   * search over the rest of the string (`strscan_do_scan` with `succptr` and
+   * `getstr` false) that records the match but leaves the scan pointer, and
+   * answers the distance from it to the end of the match.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  isExist(pattern: RegExp): number | null {
+    let re = SEARCH.get(pattern);
+    if (re === undefined) {
+      re = new RegExp(pattern.source, `${pattern.flags.replace(/[gy]/g, "")}g`);
+      SEARCH.set(pattern, re);
+    }
+    re.lastIndex = 0;
+    const m = re.exec(this.#str.slice(this.#curr));
+    REGS.set(this, m);
+    if (m === null) return null;
+    return m.index + m[0].length;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1132` `strscan_matched_size`.
    *
    * @noRailsEquivalent PERMANENT

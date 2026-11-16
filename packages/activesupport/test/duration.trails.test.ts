@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
 import { Rational, rbCInteger, rbCNumeric, rbFloatTypeP } from "@blazetrails/ruby-compat";
-import { Scalar, days, hours, seconds } from "../lib/duration.js";
+import { Duration, Scalar, days, hours, seconds } from "../lib/duration.js";
 
 describe("Scalar", () => {
   it("<=> orders against a Scalar, a Duration and a Numeric", () => {
@@ -154,5 +154,12 @@ describe("Duration", () => {
     expect(rbFloatTypeP(hours(2).toF())).toBe(true);
     expect(Number(hours(2).toF())).toBe(7200);
     expect(rbFloatTypeP(new Scalar(3).toF())).toBe(true);
+  });
+});
+
+describe("SECONDS_PER_MONTH / SECONDS_PER_YEAR", () => {
+  it("are the Gregorian values of duration.rb:117-118", () => {
+    expect(Number(Duration.months(1).inSeconds())).toBe(2629746);
+    expect(Number(Duration.years(1).inSeconds())).toBe(31556952);
   });
 });
