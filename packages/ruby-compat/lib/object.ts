@@ -2248,6 +2248,61 @@ export function rbObjIvarSet(obj: object, iv: string, val: unknown): unknown {
 }
 
 /**
+ * A T_OBJECT of class `Object` (`struct RObject`,
+ * `vendor/ruby/v3.3.11/include/ruby/internal/core/robject.h:83`). A plain JS
+ * object reads as a Hash, so `rb_obj_alloc(rb_cObject)` is one of these where
+ * a compat dumper builds it (`range_dumper`, `vendor/ruby/v3.3.11/range.c:2180`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class RObject {}
+
+const hiddenIvars = new WeakMap<object, Map<string, unknown>>();
+
+/**
+ * `rb_ivar_set` (`vendor/ruby/v3.3.11/variable.c:1923`). An `@` name is the
+ * object's own field; any other ID is a hidden ivar (`id_excl`, `id_beg`,
+ * `id_end`), which `instance_variables` never lists.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbIvarSet(obj: object, id: string, val: unknown): unknown {
+  if (id[0] === "@") return rbObjIvarSet(obj, id, val);
+  if (Object.isFrozen(obj)) {
+    throw new FrozenError(`can't modify frozen ${rbObjClassname(obj)}: ${rbInspect(obj)}`, {
+      receiver: obj,
+    });
+  }
+  let ivars = hiddenIvars.get(obj);
+  if (ivars === undefined) hiddenIvars.set(obj, (ivars = new Map()));
+  ivars.set(id, val);
+  return val;
+}
+
+/**
+ * `rb_ivar_get` (`vendor/ruby/v3.3.11/variable.c:1405`), reading a hidden ivar
+ * {@link rbIvarSet} wrote as well as an `@` one.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbIvarGet(obj: object, id: string): unknown {
+  if (id[0] === "@") return rbObjIvarGet(obj, id);
+  const ivars = hiddenIvars.get(obj);
+  return ivars !== undefined && ivars.has(id) ? ivars.get(id) : null;
+}
+
+/**
+ * `rb_ivar_foreach` (`vendor/ruby/v3.3.11/variable.c:2182`): every ivar of
+ * `obj`, the hidden ones included.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbIvarForeach(obj: object, func: (id: string, val: unknown) => void): void {
+  for (const id of rbObjInstanceVariables(obj)) func(id, rbObjIvarGet(obj, id));
+  hiddenIvars.get(obj)?.forEach((val, id) => func(id, val));
+}
+
+/**
  * `Kernel#remove_instance_variable` (`rb_obj_remove_instance_variable`,
  * `vendor/ruby/v3.3.11/variable.c:2314`): deletes `obj`'s own field for ivar
  * `iv` and answers its value, raising `NameError` when it is not defined.

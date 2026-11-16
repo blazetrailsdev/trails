@@ -6,6 +6,7 @@ import { ArgumentError } from "./argument-error.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { NoMethodError } from "./no-method-error.js";
 import { StandardError } from "./standard-error.js";
+import type { HttpSslOptions } from "./http-adapter.js";
 
 const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
 
@@ -254,14 +255,20 @@ function _hostProtoVersion(version: string | number | null): TlsVersion | undefi
   return v >= 0x301 ? (`TLSv1${v === 0x301 ? "" : `.${v - 0x301}`}` as TlsVersion) : undefined;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export interface SSLSocketIO {
+  close(): void;
+  startSsl(options: HttpSslOptions): Promise<void>;
+  peeraddr?(): [string, number, string, string];
+}
+
 /**
  * `OpenSSL::SSL::SSLSocket` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2963`,
- * `lib/openssl/ssl.rb:359`). The handshake is the host's, run over `io` by
- * its owner, which records `verifyResult` from the failure's code.
+ * `lib/openssl/ssl.rb:359`). The handshake is the host's, run over `io`.
  *
  * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:359
  */
-export class SSLSocket<IO extends { close(): void } = { close(): void }> {
+export class SSLSocket<IO extends SSLSocketIO = SSLSocketIO> {
   /** @noRailsEquivalent PERMANENT */
   hostname: string | null = null;
   /** @noRailsEquivalent PERMANENT */
@@ -293,6 +300,32 @@ export class SSLSocket<IO extends { close(): void } = { close(): void }> {
     if (result !== undefined) this._verifyResult = result;
   }
 
+  /**
+   * `ossl_ssl_connect` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:1847-1855`):
+   * `ossl_ssl_setup` and `ossl_start_ssl` over the host's handshake.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  async connect(): Promise<this> {
+    const { ca, defaultPaths, minVersion, maxVersion } = await this.context._setup();
+    try {
+      await this.io.startSsl({
+        sslHostAddress: this.hostname,
+        verifyPeer: this.context.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
+        verifyHostname: this.context.verifyHostname,
+        options: this.context.options,
+        ca,
+        defaultPaths,
+        ...(minVersion !== undefined && { minVersion }),
+        ...(maxVersion !== undefined && { maxVersion }),
+      });
+    } catch (e) {
+      this._setVerifyResult((e as { code?: unknown } | null)?.code);
+      throw _osslStartSslError(e, this.io);
+    }
+    return this;
+  }
+
   /** @noRailsEquivalent PERMANENT */
   close(): void {
     if (this._closed) return;
@@ -304,6 +337,34 @@ export class SSLSocket<IO extends { close(): void } = { close(): void }> {
   isClosed(): boolean {
     return this._closed;
   }
+}
+
+/**
+ * `ossl_start_ssl`'s raise (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:1797-1821`):
+ * the host's TLS failure as the `OpenSSL::SSL::SSLError` Ruby raises. A
+ * certificate-verify failure carries the host's verify code (the
+ * `SSL_VERIFY_CODES` `SSLError` matches) and `X509_verify_cert_error_string`'s
+ * text as its message, and is appended as `: certificate verify failed (...)`;
+ * any other failure appends OpenSSL's `ERR_reason_error_string`, the host
+ * error's `reason`, as `ossl_make_error` does (`ext/openssl/ossl.c:272-297`).
+ */
+function _osslStartSslError(e: unknown, io: SSLSocketIO): unknown {
+  if (!(e instanceof SSLError)) return e;
+  if (Function.prototype[Symbol.hasInstance].call(SSLError, e)) return e;
+  const host = e as unknown as Error & { code: string; reason?: string };
+  const errorAppend = SSL_VERIFY_CODES.includes(host.code)
+    ? `: certificate verify failed (${host.message.replace(/; if the root CA .*$/s, "")})`
+    : `: ${host.reason ?? host.message}`;
+  let peeraddr = "(null)";
+  try {
+    const addrinfo = io.peeraddr?.();
+    if (addrinfo !== undefined) peeraddr = `${addrinfo[2]}:${addrinfo[1]}`;
+  } catch {
+    peeraddr = "(null)";
+  }
+  return new SSLError(
+    `SSL_connect returned=1 errno=0 peeraddr=${peeraddr} state=error${errorAppend}`,
+  );
 }
 
 /**

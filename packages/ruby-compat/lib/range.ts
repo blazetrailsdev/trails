@@ -13,7 +13,9 @@ import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { succ } from "./string/succ.js";
 import { rbEqual } from "./rb-equal.js";
-import { rbInspect } from "./object.js";
+import { NameError } from "./name-error.js";
+import { FrozenError } from "./frozen-error.js";
+import { RObject, rbInspect, rbIvarGet, rbIvarSet, rbObjClassname } from "./object.js";
 import { rubyNumIntervalStepSize } from "./numeric.js";
 
 const inspectRecursing = new Set<object>();
@@ -353,4 +355,72 @@ export class Range<T = unknown> {
     for (const v of values.call(this)) block(v);
     return this;
   }
+}
+
+/**
+ * `range_init` (`vendor/ruby/v3.3.11/range.c:47-64`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rangeInit(range: Range, beg: unknown, end: unknown, excludeEnd: boolean): void {
+  if ((!Number.isInteger(beg) || !Number.isInteger(end)) && beg != null && end != null) {
+    const v = cmp(beg, end);
+    if (v == null) throw new ArgumentError("bad value for range");
+  }
+
+  Object.assign(range, { excludeEnd, begin: beg, end });
+
+  if (range.constructor === Range) {
+    Object.freeze(range);
+  }
+}
+
+/**
+ * `range_modify` (`vendor/ruby/v3.3.11/range.c:76-83`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rangeModify(range: Range): void {
+  if (Object.isFrozen(range)) {
+    throw new FrozenError(`can't modify frozen ${rbObjClassname(range)}: ${rbInspect(range)}`, {
+      receiver: range,
+    });
+  }
+  if (range.excludeEnd != null) {
+    throw new NameError("`initialize' called twice", "initialize", { receiver: range });
+  }
+}
+
+/**
+ * `range_dumper` (`vendor/ruby/v3.3.11/range.c:2179-2188`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rangeDumper(range: Range): RObject {
+  const v = new RObject();
+
+  rbIvarSet(v, "excl", range.excludeEnd);
+  rbIvarSet(v, "begin", range.begin);
+  rbIvarSet(v, "end", range.end);
+  return v;
+}
+
+/**
+ * `range_loader` (`vendor/ruby/v3.3.11/range.c:2190-2206`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rangeLoader(range: Range, obj: RObject): Range {
+  if (!(obj instanceof RObject) || obj.constructor !== RObject) {
+    throw new TypeError("not a dumped range object");
+  }
+
+  rangeModify(range);
+  const beg = rbIvarGet(obj, "begin");
+  const end = rbIvarGet(obj, "end");
+  const excl = rbIvarGet(obj, "excl");
+  if (excl != null) {
+    rangeInit(range, beg, end, excl !== false);
+  }
+  return range;
 }

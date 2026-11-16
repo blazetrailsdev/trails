@@ -217,6 +217,7 @@ export type {
   HttpResponse,
   HttpServer,
   HttpSocket,
+  HttpSslOptions,
   HttpUpgradeListener,
 } from "./http-adapter.js";
 export { registerOsAdapter, getOs, getOsAsync, osAdapterConfig } from "./os-adapter.js";
@@ -558,7 +559,18 @@ export {
   ThreadPoolExecutor,
 } from "./thread-pool-executor.js";
 export { Addrinfo, BasicSocket, IPSocket, Socket, SocketError, TCPSocket } from "./socket.js";
-export { Net } from "./net/protocol.js";
+export {
+  Net,
+  Protocol,
+  ProtocolError,
+  ProtoSyntaxError,
+  ProtoFatalError,
+  ProtoUnknownError,
+  ProtoServerError,
+  ProtoAuthError,
+  OpenTimeout,
+  ReadTimeout,
+} from "./net/protocol.js";
 import "./net/http.js";
 export { ImmediateExecutor } from "./immediate-executor.js";
 export { CancelledOperationError, ScheduledTask } from "./scheduled-task.js";

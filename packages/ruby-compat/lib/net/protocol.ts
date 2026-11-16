@@ -7,6 +7,7 @@ import { StandardError } from "../standard-error.js";
 import { strNew } from "../string/bytes.js";
 import { rbStrDump } from "../string/convert.js";
 import type { HttpClientSocket, HttpDebugOutput } from "../http-adapter.js";
+import type { SSLSocket } from "../openssl.js";
 import type { HTTP, HTTPBadResponse, HTTPHeaderSyntaxError } from "./http.js";
 import type { HTTPResponse } from "./http/response.js";
 import type * as Responses from "./http/responses.js";
@@ -89,6 +90,33 @@ export class ReadAdapter {
 
 /** @noRailsEquivalent PERMANENT */
 type BufferedIODest = { append(str: Uint8Array): unknown } | Uint8Array[];
+
+/**
+ * `Net::Protocol` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:28-57`), the
+ * superclass of `Net::HTTP` and `Net::SMTP`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class Protocol {
+  /** @noRailsEquivalent PERMANENT */
+  static readonly VERSION: string = "0.2.2";
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/net/protocol.rb:40-56`. The
+   * `connect_nonblock` / `wait_readable` loop against the remaining `timeout`
+   * is `connect` raced against it.
+   *
+   * @internal @noRailsEquivalent PERMANENT
+   */
+  protected async sslSocketConnect(s: SSLSocket, timeout: number | null): Promise<void> {
+    if (timeout != null) {
+      if (timeout <= 0) throw new OpenTimeout();
+      await Timeout.timeout(timeout, OpenTimeout, null, () => s.connect());
+    } else {
+      await s.connect();
+    }
+  }
+}
 
 /**
  * `Net::BufferedIO` (`vendor/ruby/v3.3.11/lib/net/protocol.rb:116-375`), the
@@ -379,6 +407,7 @@ ProtoRetriableError.prototype.name = "Net::ProtoRetriableError";
  */
 export const Net = {
   name: "Net",
+  Protocol,
   OpenTimeout,
   ReadTimeout,
   WriteTimeout,
@@ -393,6 +422,8 @@ export const Net = {
   ProtoCommandError,
   ProtoRetriableError,
 } as {
+  /** @noRailsEquivalent PERMANENT */
+  Protocol: typeof Protocol;
   /** @noRailsEquivalent PERMANENT */
   ProtocolError: typeof ProtocolError;
   /** @noRailsEquivalent PERMANENT */
