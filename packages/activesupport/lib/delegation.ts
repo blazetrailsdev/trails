@@ -96,7 +96,7 @@ export namespace Delegation {
     if (prefix === true && typeof to !== "string") {
       throw new TypeError(`no implicit conversion of ${rbModName(rbObjClass(to))} into String`);
     }
-    if (prefix === true && /^[^a-z_]/.test(to)) {
+    if (prefix === true && /^[^a-z_]/.test(to as string)) {
       throw new ArgumentError(
         "Can only automatically set the delegation prefix when delegating to a method.",
       );

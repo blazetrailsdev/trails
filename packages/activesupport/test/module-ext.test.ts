@@ -4,7 +4,6 @@ import {
   delegate,
   mattrAccessor,
   cattrAccessor,
-  configAccessor,
   attrInternal,
   isAnonymous,
   moduleParentName,
@@ -276,44 +275,5 @@ describe("KernelSuppressTest", () => {
         throw new RangeError("out of range");
       }, TypeError);
     }).toThrow(RangeError);
-  });
-});
-describe("ConfigurableActiveSupport", () => {
-  it("adds a configuration hash", () => {
-    class MyApp {}
-    configAccessor.call(MyApp, "log_level", { default: "info" });
-    expect((MyApp as any).log_level).toBe("info");
-  });
-
-  it("adds a configuration hash to a module as well", () => {
-    class MyModule {}
-    configAccessor.call(MyModule, "setting");
-    expect((MyModule as any).setting).toBeNull();
-  });
-
-  it("configuration hash is inheritable", () => {
-    class Base {}
-    configAccessor.call(Base, "timeout", { default: 30 });
-    class Child extends Base {}
-    expect((Base as any).timeout).toBe(30);
-  });
-
-  it("configuration accessors can take a default value as an option", () => {
-    class Base {}
-    configAccessor.call(Base, "max_connections", { default: 100 });
-    expect((Base as any).max_connections).toBe(100);
-  });
-
-  it("configuration hash is available on instance", () => {
-    class Base {}
-    configAccessor.call(Base, "verbose", { default: false });
-    (Base as any).verbose = true;
-    const instance = new Base() as any;
-    expect(instance.verbose).toBe(true);
-  });
-
-  it("should raise name error if attribute name is invalid", () => {
-    class Base {}
-    expect(() => configAccessor.call(Base, "1bad")).toThrow();
   });
 });

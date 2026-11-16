@@ -288,7 +288,6 @@ export {
   cattrAccessor,
   cattrReader,
   cattrWriter,
-  configAccessor,
   attrInternal,
   attrInternalAccessor,
   attrInternalReader,
