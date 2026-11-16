@@ -11,6 +11,7 @@ import {
 import { Time } from "@blazetrails/date";
 import { Cron, Fugit } from "@blazetrails/fugit";
 import {
+  ArgumentError,
   constSet,
   rbHashSRuby2KeywordsHash,
   rbInspect,
@@ -171,10 +172,20 @@ export class RecurringTask extends Record {
 
   /** @internal */
   ensureScheduleSupported(): void {
-    if (rbObjClass(this.parsedSchedule()) !== Cron) {
-      this.errors.add("schedule", ":unsupported", {
-        message: "is not a supported recurring schedule",
-      });
+    try {
+      if (rbObjClass(this.parsedSchedule()) !== Cron) {
+        this.errors.add("schedule", ":unsupported", {
+          message: "is not a supported recurring schedule",
+        });
+      }
+    } catch (error) {
+      if (!(error instanceof ArgumentError)) throw error;
+      const message = error.message.includes("multiple crons")
+        ? "generates multiple cron schedules. Please use separate recurring tasks for each schedule, " +
+          "or use explicit cron syntax (e.g., '40 0,15 * * *' for multiple times with the same minutes)"
+        : error.message;
+
+      this.errors.add("schedule", ":unsupported", { message: message });
     }
   }
 
@@ -243,7 +254,7 @@ export class RecurringTask extends Record {
 
   /** @internal */
   parsedSchedule(): ReturnType<typeof Fugit.parse> {
-    return (this._parsedSchedule ??= Fugit.parse(this.schedule));
+    return (this._parsedSchedule ??= Fugit.parse(this.schedule, { multi: ":fail" }));
   }
 
   /** @internal */

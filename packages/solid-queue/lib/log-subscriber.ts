@@ -123,7 +123,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     this.debug(
       this.formattedEvent(event, {
         action: "Release blocked job",
-        ...slice(event.payload, "job_id", "concurrency_key", "released"),
+        ...slice(event.payload, "job_id", "concurrency_key", "released", "failed"),
       }),
     );
   }

@@ -267,6 +267,15 @@ describe("SolidQueue::RecurringTaskTest", () => {
         class_name: "SolidQueue::RecurringTaskTest::JobWithoutArguments",
       }).isValid(),
     ).toBeFalsy();
+
+    task = recurringTaskWith({
+      class_name: "JobWithoutArguments",
+      schedule: "every day at 00:40 and 15:20",
+    });
+    expect(await task.isValid()).toBeFalsy();
+    const errorMessage = task.errors.get("schedule")[0];
+    expect(errorMessage).toContain("generates multiple cron schedules");
+    expect(errorMessage).toContain("Please use separate recurring tasks");
   });
 
   it("valid and invalid job class and command", async () => {

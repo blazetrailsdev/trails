@@ -1,4 +1,4 @@
-import { Concern, extend, include, isPresent } from "@blazetrails/activesupport";
+import { Concern, extend, include, indexBy, isPresent } from "@blazetrails/activesupport";
 import type { Base, Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
@@ -45,24 +45,31 @@ export class ClassMethods {
     this: ExecutableClass,
     jobs: Base[],
   ): Promise<Base[]> {
+    const jobsById = indexBy(jobs, (job) => job.id as number);
     return [
-      ...(await ClassMethods.dispatchedAndReady.call(this, jobs)),
-      ...(await ClassMethods.dispatchedAndBlocked.call(this, jobs)),
+      ...(await ClassMethods.dispatchedAndReady.call(this, jobsById)),
+      ...(await ClassMethods.dispatchedAndBlocked.call(this, jobsById)),
     ];
   }
 
   /** @internal */
-  private static async dispatchedAndReady(this: ExecutableClass, jobs: Base[]): Promise<Base[]> {
-    return await this.where({
-      id: await ReadyExecution.where({ job_id: jobs.map((job) => job.id) }).pluck("job_id"),
-    }).toArray();
+  private static async dispatchedAndReady(
+    this: ExecutableClass,
+    jobsById: { [id: number]: Base },
+  ): Promise<Base[]> {
+    return (
+      await ReadyExecution.where({ job_id: Object.keys(jobsById).map(Number) }).pluck("job_id")
+    ).map((id) => jobsById[id]);
   }
 
   /** @internal */
-  private static async dispatchedAndBlocked(this: ExecutableClass, jobs: Base[]): Promise<Base[]> {
-    return await this.where({
-      id: await BlockedExecution.where({ job_id: jobs.map((job) => job.id) }).pluck("job_id"),
-    }).toArray();
+  private static async dispatchedAndBlocked(
+    this: ExecutableClass,
+    jobsById: { [id: number]: Base },
+  ): Promise<Base[]> {
+    return (
+      await BlockedExecution.where({ job_id: Object.keys(jobsById).map(Number) }).pluck("job_id")
+    ).map((id) => jobsById[id]);
   }
 }
 
@@ -141,7 +148,7 @@ export class Executable {
 
   /** @internal */
   async ready(): Promise<Base> {
-    return (await ReadyExecution.createOrFindByBang({ job_id: this.id }))!;
+    return (await ReadyExecution.createOrFindByBang({ job: this }))!;
   }
 }
 extend(Executable, Concern);

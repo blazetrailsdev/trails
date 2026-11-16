@@ -1,4 +1,4 @@
-import { Model } from "@blazetrails/activemodel";
+import { BooleanType, Model } from "@blazetrails/activemodel";
 import {
   TopLevel,
   camelize,
@@ -96,6 +96,8 @@ export class Configuration {
   async configuredProcesses(): Promise<Process[]> {
     if (this.isOnlyWork()) {
       return await this.workers();
+    } else if (this.isOnlyRecurring()) {
+      return await this.schedulers();
     } else {
       return [
         ...(await this.dispatchers()),
@@ -160,7 +162,8 @@ export class Configuration {
       ),
       onlyWork: false,
       onlyDispatch: false,
-      skipRecurring: false,
+      onlyRecurring: new BooleanType().cast(env.SOLID_QUEUE_ONLY_RECURRING),
+      skipRecurring: new BooleanType().cast(env.SOLID_QUEUE_SKIP_RECURRING),
     };
   }
 
@@ -181,6 +184,11 @@ export class Configuration {
   /** @internal */
   private isOnlyDispatch(): boolean {
     return this.options.onlyDispatch as boolean;
+  }
+
+  /** @internal */
+  private isOnlyRecurring(): boolean {
+    return this.options.onlyRecurring as boolean;
   }
 
   /** @internal */

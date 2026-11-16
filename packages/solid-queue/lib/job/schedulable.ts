@@ -1,4 +1,4 @@
-import { Concern, extend, isPresent } from "@blazetrails/activesupport";
+import { Concern, extend, indexBy, isPresent } from "@blazetrails/activesupport";
 import type { Base, Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
@@ -23,9 +23,10 @@ export class ClassMethods {
     this: SchedulableClass,
     jobs: Base[],
   ): Promise<Base[]> {
-    return await this.where({
-      id: await ScheduledExecution.where({ job_id: jobs.map((job) => job.id) }).pluck("job_id"),
-    }).toArray();
+    const jobsById = indexBy(jobs, (job) => job.id as number);
+    return (
+      await ScheduledExecution.where({ job_id: Object.keys(jobsById).map(Number) }).pluck("job_id")
+    ).map((id) => jobsById[id]);
   }
 }
 
@@ -47,7 +48,7 @@ export class Schedulable {
 
   /** @internal */
   async schedule(): Promise<Base> {
-    return (await ScheduledExecution.createOrFindByBang({ job_id: this.id }))!;
+    return (await ScheduledExecution.createOrFindByBang({ job: this }))!;
   }
 }
 extend(Schedulable, Concern);

@@ -2,6 +2,7 @@ import { type Base, type Relation } from "@blazetrails/activerecord";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Struct, constSet, rbFArray } from "@blazetrails/ruby-compat";
 import { Execution, UndiscardableError } from "./execution.js";
+import { ClassMissingError } from "./job.js";
 import { SolidQueue } from "./solid-queue.js";
 
 export class Result extends Struct.new("success", "error") {
@@ -128,9 +129,13 @@ export class ClaimedExecution extends Execution {
   /** @internal */
   private async execute(): Promise<Result> {
     try {
-      await ActiveJobBase.execute(
-        (await this.job).arguments as unknown as Parameters<typeof ActiveJobBase.execute>[0],
-      );
+      const job = await this.job;
+      if (job.jobClass() == null) throw ClassMissingError.for(job);
+
+      await ActiveJobBase.execute({
+        ...(job.arguments as object),
+        provider_job_id: job.id,
+      } as unknown as Parameters<typeof ActiveJobBase.execute>[0]);
       return new ClaimedExecution.Result(true, null);
     } catch (e) {
       return new ClaimedExecution.Result(false, e as Error);
