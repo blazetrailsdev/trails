@@ -420,7 +420,7 @@ export class HTTP {
   async proxyUser(): Promise<string | null> {
     if (this._proxyFromEnv) {
       const user = (await this.proxyUri())?.user;
-      return user ? CGI.unescape(user) : null;
+      return user != null ? this.unescape(user) : null;
     } else {
       return this._proxyUser;
     }
@@ -430,10 +430,15 @@ export class HTTP {
   async proxyPass(): Promise<string | null> {
     if (this._proxyFromEnv) {
       const pass = (await this.proxyUri())?.password;
-      return pass ? CGI.unescape(pass) : null;
+      return pass != null ? this.unescape(pass) : null;
     } else {
       return this._proxyPass;
     }
+  }
+
+  /** @internal */
+  private unescape(value: string): string {
+    return CGI.unescape(value);
   }
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1188-1191`. */

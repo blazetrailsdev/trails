@@ -197,12 +197,14 @@ export class BigDecimal {
         : BigDecimal.INFINITY.vpAsgn(mx);
     }
     const negative = (this._sign === "-") !== (other._sign === "-");
-    return BigDecimal.fromUnscaled(
-      this.unscaled() * other.unscaled(),
-      this.scale() + other.scale(),
-      negative,
-      mx,
-    );
+    const [a, b] = [this, other].map((v) => {
+      const magnitude =
+        v.digits === ""
+          ? 0n
+          : BigInt(v.digits) * 10n ** BigInt(Math.max(v.exp - v.digits.length, 0));
+      return v._sign === "-" ? -magnitude : magnitude;
+    });
+    return BigDecimal.fromUnscaled(a * b, this.scale() + other.scale(), negative, mx);
   }
 
   /**
@@ -342,14 +344,6 @@ export class BigDecimal {
       pv.#maxPrec = m + 1;
     }
     return pv;
-  }
-
-  private unscaled(signum = 1): bigint {
-    const magnitude =
-      this.digits === ""
-        ? 0n
-        : BigInt(this.digits) * 10n ** BigInt(Math.max(this.exp - this.digits.length, 0));
-    return this._sign === "-" && signum > 0 ? -magnitude : magnitude;
   }
 
   private scale(): number {
