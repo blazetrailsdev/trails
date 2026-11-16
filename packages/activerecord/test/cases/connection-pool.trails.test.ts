@@ -1332,3 +1332,22 @@ it("overlapping withConnectionSync promise blocks release the lease after the la
   expect(await second).toBe(conn);
   expect(pool.stat().busy).toBe(0);
 });
+
+it("a withConnectionSync promise block inside withConnection keeps the lease until both settle", async () => {
+  const pool = makePool(1);
+  let finishInner!: () => void;
+  let inner!: Promise<DatabaseAdapter>;
+  const outer = pool.withConnection((conn) => {
+    inner = pool.withConnectionSync(
+      () => new Promise<DatabaseAdapter>((resolve) => (finishInner = () => resolve(conn))),
+    );
+    return conn;
+  });
+
+  const conn = await outer;
+  expect(conn.isInUse()).not.toBeNull();
+
+  finishInner();
+  expect(await inner).toBe(conn);
+  expect(pool.stat().busy).toBe(0);
+});

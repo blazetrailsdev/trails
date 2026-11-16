@@ -44,7 +44,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare deleteThroughRecords: (records: Base[]) => Promise<void>;
   /** @internal */
-  declare throughReflection: () => unknown;
+  declare throughReflection: () => AssociationReflection;
   /** @internal */
   declare throughAssociation: () => Association;
   /** @internal */
@@ -67,7 +67,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   protected isTargetReflectionHasAssociatedRecord(): boolean {
-    const throughReflection = this.throughReflection() as AssociationReflection;
+    const throughReflection = this.throughReflection();
     return !(
       throughReflection.isBelongsTo() &&
       Array(throughReflection.foreignKey()).every((foreignKeyColumn) =>
@@ -365,7 +365,7 @@ async function deleteThroughRecords(
   for (const record of records) {
     const throughRecords = await this.throughRecordsFor(record);
 
-    if ((this.throughReflection() as AssociationReflection).isCollection()) {
+    if (this.throughReflection().isCollection()) {
       for (const r of throughRecords) aryDelete(throughAssociation.target as Base[], r);
     } else {
       if (throughRecords.some((r) => rbEqual(r, throughAssociation.target))) {
