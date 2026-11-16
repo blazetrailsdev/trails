@@ -18,17 +18,6 @@ import type { Config } from "./config.js";
 import type { Manifest } from "./manifest.js";
 import type { ViteAssets } from "./vite-assets.js";
 
-const FRAMEWORK_PACKAGES: Readonly<Record<string, string>> = { trails: "@blazetrails/trailties" };
-
-/** @noRailsEquivalent PERMANENT */
-async function frameworkVersion(framework: string): Promise<string> {
-  const name = FRAMEWORK_PACKAGES[framework];
-  if (name == null) return "";
-  const pkg = Dir.pwd() + `/node_modules/${name}/package.json`;
-  if (!(await File.isExistAsync(pkg))) return "";
-  return (JSON.parse(await File.readAsync(pkg)) as { version: string }).version;
-}
-
 export class Commands {
   /** @internal */
   private readonly _viteAssets: ViteAssets;
@@ -115,7 +104,15 @@ Make sure \`bundle exec vite install\` has run successfully before running depen
       $stdout.puts(`vite_ruby: ${TopLevel.ViteAssets!.VERSION}`);
       for (const [framework, library] of await TopLevel.ViteAssets!.frameworkLibraries()) {
         $stdout.puts(`${library.name}: ${library.version}`);
-        $stdout.puts(`${framework}: ${await frameworkVersion(framework)}`);
+        const frameworkPackage = File.join(
+          Dir.pwd(),
+          "node_modules",
+          { trails: "@blazetrails/trailties" }[framework] ?? framework,
+          "package.json",
+        );
+        $stdout.puts(
+          `${framework}: ${(await File.isExistAsync(frameworkPackage)) ? (JSON.parse(await File.readAsync(frameworkPackage)) as { version: string }).version : ""}`,
+        );
       }
 
       $stdout.puts(`ruby: ${await rbFBackquote("ruby --version")}`);
