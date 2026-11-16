@@ -36,7 +36,7 @@ import {
   classModule,
 } from "@blazetrails/ruby-compat";
 import { Routing } from "../../namespaces.js";
-import { Mapper } from "./mapper.js";
+import { Mapper, type Mapping } from "./mapper.js";
 import { isIncludedMember } from "../../abstract-controller/trailties/routes-helpers.js";
 import { deprecator } from "../deprecator.js";
 import {
@@ -1185,10 +1185,7 @@ export class RouteSet {
     return this.routes().isEmpty();
   }
 
-  addRoute(
-    mapping: { makeRoute(name: string | null, precedence: number): Route },
-    name?: string | null | false,
-  ): Route {
+  addRoute(mapping: Mapping, name?: string | null | false): Route {
     if (!(isBlank(name) || String(name).match(/^[_a-z]\w*$/i))) {
       throw new ArgumentError(`Invalid route name: '${name}'`);
     }

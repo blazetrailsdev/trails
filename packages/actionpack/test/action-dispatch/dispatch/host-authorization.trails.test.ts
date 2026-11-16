@@ -20,6 +20,12 @@ describe("HostAuthorization (trails)", () => {
     expect(status).toBe(200);
   });
 
+  it("blocks a request with no HTTP_HOST and no SERVER_NAME", async () => {
+    const mw = new HostAuthorization(okApp, ["localhost"]);
+    const [status] = await mw.call({ REQUEST_METHOD: "GET", PATH_INFO: "/" });
+    expect(status).toBe(403);
+  });
+
   it("blocks request when host does not match", async () => {
     const mw = new HostAuthorization(okApp, ["example.com"]);
     const [status, headers, body] = await mw.call({
@@ -194,16 +200,6 @@ describe("HostAuthorization (trails)", () => {
     });
     expect(status).toBe(503);
     expect([...(body as Iterable<string>)].join("")).toBe("Service Unavailable");
-  });
-
-  it("falls back to SERVER_NAME when HTTP_HOST is absent", async () => {
-    const mw = new HostAuthorization(okApp, ["example.com"]);
-    const [status] = await mw.call({
-      SERVER_NAME: "example.com",
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-    });
-    expect(status).toBe(200);
   });
 
   it("IPv4 address matching", async () => {

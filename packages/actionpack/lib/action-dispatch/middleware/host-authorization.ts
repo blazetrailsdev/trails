@@ -49,11 +49,11 @@ export class Permissions {
     return this.hosts.length === 0;
   }
 
-  allows(host: string): boolean {
+  allows(host: string | null): boolean {
     return this.hosts.some((allowed) => {
       if (allowed instanceof IPAddr) {
         try {
-          return rbEqq(allowed, extractHostname(host));
+          return rbEqq(allowed, extractHostname(host as string));
         } catch {
           return false;
         }
@@ -143,12 +143,8 @@ export class HostAuthorization {
   /** @internal */
   private blockedHosts(request: Request): string[] {
     const out: string[] = [];
-    const env = request.env;
-    const originHost =
-      (env["HTTP_HOST"] as string | undefined) ??
-      (env["SERVER_NAME"] as string | undefined) ??
-      "localhost";
-    if (!this.permissions.allows(originHost)) out.push(originHost);
+    const originHost = request.getHeader("HTTP_HOST") as string | null;
+    if (!this.permissions.allows(originHost)) out.push(originHost as string);
 
     const forwardedHost = request.xForwardedHost?.split(/,\s?/).at(-1);
     if (!(isBlank(forwardedHost) || this.permissions.allows(forwardedHost!)))

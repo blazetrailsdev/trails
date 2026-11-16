@@ -3,7 +3,8 @@ import { Parser } from "../../../lib/action-dispatch/journey/parser.js";
 import { Ast } from "../../../lib/action-dispatch/journey/nodes/node.js";
 import { Pattern } from "../../../lib/action-dispatch/journey/path/pattern.js";
 import { Route } from "../../../lib/action-dispatch/journey/route.js";
-import { Routes, type Mapping } from "../../../lib/action-dispatch/journey/routes.js";
+import { Routes } from "../../../lib/action-dispatch/journey/routes.js";
+import type { Mapping } from "../../../lib/action-dispatch/routing/mapper.js";
 
 function makePattern(path: string): Pattern {
   const tree = new Parser().parse(path)!;
@@ -13,8 +14,8 @@ function makePattern(path: string): Pattern {
 
 function mappingFor(path: string): Mapping {
   return {
-    makeRoute: (name) => new Route({ name, path: makePattern(path) }),
-  };
+    makeRoute: (name: string | null) => new Route({ name, path: makePattern(path) }),
+  } as unknown as Mapping;
 }
 
 describe("ActionDispatch::Journey::Routes", () => {

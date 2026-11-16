@@ -3,7 +3,8 @@ import { Parser } from "../../../lib/action-dispatch/journey/parser.js";
 import { Ast } from "../../../lib/action-dispatch/journey/nodes/node.js";
 import { Pattern } from "../../../lib/action-dispatch/journey/path/pattern.js";
 import { Route } from "../../../lib/action-dispatch/journey/route.js";
-import { Routes, type Mapping } from "../../../lib/action-dispatch/journey/routes.js";
+import { Routes } from "../../../lib/action-dispatch/journey/routes.js";
+import type { Mapping } from "../../../lib/action-dispatch/routing/mapper.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { assertEmpty, assertNotEmpty } from "@blazetrails/activesupport/testing/assertions";
@@ -24,8 +25,9 @@ function mappingFor(
   requirements: Record<string, RegExp> = {},
 ): Mapping {
   return {
-    makeRoute: (name) => new Route({ name, path: makePattern(path, requirements, anchored) }),
-  };
+    makeRoute: (name: string | null) =>
+      new Route({ name, path: makePattern(path, requirements, anchored) }),
+  } as unknown as Mapping;
 }
 
 describe("TestRoutes", () => {
