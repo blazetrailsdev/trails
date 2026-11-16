@@ -32,7 +32,7 @@ export class Bird extends Base {
 
     this.afterInitialize(function (this: Bird) {
       if (this.enableCount) {
-        return Bird.count().then((c) => {
+        void Bird.count().then((c) => {
           this.totalCount = c;
         });
       }

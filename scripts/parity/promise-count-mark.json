@@ -3,7 +3,7 @@
     "actioncable": 5,
     "actionmailbox": 1,
     "actionpack": 2,
-    "activerecord": 1,
+    "activerecord": 2,
     "activesupport": 2,
     "rackup": 1,
     "rake": 1,
