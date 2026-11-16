@@ -63,13 +63,13 @@ class VmThrowData {
 }
 
 const _detachedThrows = new WeakSet<object>();
-let _detachedCatches = 0;
+const _detachedCatches = new Map<unknown, number>();
 
 /**
  * `THROW_DATA_P` (`vendor/ruby/v3.3.11/internal/imemo.h:118`): a `throw` in
  * flight is not an exception, so no `rescue` clause sees it. A JS `catch`
  * does, and asks this before treating what it caught as one. A throw raised
- * after an `await` while an async block's catch is pending is in flight too:
+ * after an `await` while an async block's catch for its tag is pending is in flight too:
  * it may yet reach that catch through the block's promise.
  *
  * @noRailsEquivalent PERMANENT
@@ -106,7 +106,7 @@ function rbThrowObj(tag: unknown, value: unknown): never {
   }
   if (!tt) {
     const err = new UncaughtThrowError(tag, value, "uncaught throw %p");
-    if (_detachedCatches > 0) _detachedThrows.add(err);
+    if (_detachedCatches.has(tag)) _detachedThrows.add(err);
     throw err;
   }
 
@@ -173,38 +173,14 @@ function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
     _syncTag = outer;
   }
   if (val !== null && typeof (val as PromiseLike<unknown>)?.then === "function") {
-    _detachedCatches++;
+    _detachedCatches.set(tag, (_detachedCatches.get(tag) ?? 0) + 1);
     return Promise.resolve(val as PromiseLike<unknown>)
       .finally(() => {
-        _detachedCatches--;
+        const n = _detachedCatches.get(tag)! - 1;
+        if (n === 0) _detachedCatches.delete(tag);
+        else _detachedCatches.set(tag, n);
       })
       .then(undefined, rescue);
   }
   return val;
-}
-
-/**
- * `Kernel#catch` (`vendor/ruby/v3.3.11/vm_eval.c:2342` `rb_f_catch`) for a
- * block its caller knows is synchronous: the tag is
- * pushed on a stack popped when the block returns, with no async-context
- * frame, which only a block that can `await` needs. The block must not
- * return a thenable: its tag is popped when it returns, so a `throw` after
- * an `await` inside it finds no tag and raises `UncaughtThrowError`.
- *
- * @noRailsEquivalent PERMANENT
- * @perf 4.6% — PERMANENT
- */
-export function kernelCatchSync<T>(tag: unknown, block: (tag: unknown) => T): T | unknown {
-  const outer = _syncTag;
-  const tt: RbVmTag = { tag, retval: null, prev: outer, popped: false };
-  _syncTag = tt;
-  try {
-    return block(tag);
-  } catch (errinfo) {
-    if (errinfo instanceof VmThrowData && errinfo.tag === tag) return tt.retval;
-    throw errinfo;
-  } finally {
-    tt.popped = true;
-    _syncTag = outer;
-  }
 }

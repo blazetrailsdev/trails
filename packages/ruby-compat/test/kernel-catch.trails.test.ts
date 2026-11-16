@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "../lib/argument-error.js";
-import {
-  kernelCatch,
-  kernelCatchSync,
-  kernelThrow,
-  throwDataP,
-  UncaughtThrowError,
-} from "../lib/kernel-catch.js";
+import { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "../lib/kernel-catch.js";
 
 describe("kernelCatch", () => {
   it("raises UncaughtThrowError at the throw site with the inspected tag and value", () => {
@@ -117,32 +111,24 @@ describe("kernelCatch", () => {
   });
 
   it("unwinds a sync catch to its thrown value and pops its tag", () => {
-    expect(kernelCatchSync(":abort", () => kernelThrow(":abort", ":halted"))).toBe(":halted");
+    expect(kernelCatch(":abort", () => kernelThrow(":abort", ":halted"))).toBe(":halted");
     expect(() => kernelThrow(":abort")).toThrow(UncaughtThrowError);
   });
 
   it("unwinds through a sync catch to an enclosing async catch", async () => {
     const res = kernelCatch(":outer", async () => {
       await Promise.resolve();
-      return kernelCatchSync(":inner", () => kernelThrow(":outer", ":unwound"));
+      return kernelCatch(":inner", () => kernelThrow(":outer", ":unwound"));
     });
     expect(await res).toBe(":unwound");
   });
 
   it("unwinds from an async catch nested in a sync catch to the sync tag", () => {
-    const res = kernelCatchSync(":outer", () => {
+    const res = kernelCatch(":outer", () => {
       kernelCatch(":inner", () => kernelThrow(":outer", ":unwound"));
       return ":ran";
     });
     expect(res).toBe(":unwound");
-  });
-
-  it("pops a sync catch's tag before a thenable its block returns settles", async () => {
-    const later = kernelCatchSync(":abort", async () => {
-      await Promise.resolve();
-      kernelThrow(":abort");
-    }) as Promise<unknown>;
-    await expect(later).rejects.toBeInstanceOf(UncaughtThrowError);
   });
 
   it("catches a throw after an await through a nested catch of another tag", async () => {
@@ -155,5 +141,20 @@ describe("kernelCatch", () => {
       return ":ran";
     });
     expect(await res).toBe(":halted");
+  });
+
+  it("does not mark an unmatched throw as throw data while a catch for another tag is pending", async () => {
+    let release!: () => void;
+    const pending = kernelCatch(":abort", () => new Promise<void>((r) => (release = r)));
+    let error: unknown;
+    try {
+      kernelThrow(":stray");
+    } catch (e) {
+      error = e;
+    }
+    release();
+    await pending;
+    expect(error).toBeInstanceOf(UncaughtThrowError);
+    expect(throwDataP(error)).toBe(false);
   });
 });

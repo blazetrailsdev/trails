@@ -1,7 +1,6 @@
 import {
   extend,
   kernelCatch,
-  kernelCatchSync,
   NoMethodError,
   rbBlockGivenP,
   rbClassSuperclass,
@@ -415,8 +414,7 @@ export class Before {
         terminate = false;
       });
     };
-    const caught =
-      syncChain !== undefined ? kernelCatchSync(":abort", block) : kernelCatch(":abort", block);
+    const caught = kernelCatch(":abort", block);
     if (isThenable(caught)) {
       return Promise.resolve(caught).then(() => {
         if (terminate) this.halt(env);
