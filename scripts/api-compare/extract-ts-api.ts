@@ -474,8 +474,6 @@ export async function main(packages: readonly string[] = TS_EXTRACT_PACKAGES) {
     const stale = await staleBuilds(apiComparePackageRoots());
     if (stale.length > 0) throw new Error(staleBuildMessage(stale));
   }
-  // Taken before any source is read, so an edit made mid-run leaves the
-  // recorded digest older than the tree and the manifest reads stale.
   const digest = await sourceDigest(apiComparePackageRoots());
   const force = process.env.API_COMPARE_FORCE === "1";
   // Output-schema token folded into every cache key (local + shared). Stale

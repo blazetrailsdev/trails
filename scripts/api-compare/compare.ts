@@ -6154,13 +6154,6 @@ export function main() {
         if (rubyName.endsWith("=")) return;
         const rubyParams = rubyParamsByName.get(rubyName);
         if (!rubyParams) return;
-        // The file's own signatures first; the global pool only behind a
-        // 0-argument binding (see tsParamsByName above). A pair matches when it
-        // overlaps ANY candidate.
-        // A constructor is scoped to its owner: a file holds one per class, and
-        // a class with no constructor of its own (`Reflection::MacroReflection`
-        // beside `ThroughReflection`) must not be measured against a sibling's
-        // (the owner scoping `tsParamsByFileOwnerNameInPkg` gives param names).
         const ownerSigs =
           tsName === "constructor"
             ? tsParamsByFileOwnerNameInPkg

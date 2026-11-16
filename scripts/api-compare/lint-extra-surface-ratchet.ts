@@ -84,8 +84,6 @@ async function readManifest(name: string): Promise<ApiManifest> {
 }
 
 async function main(tighten: boolean, scope: string | null): Promise<number> {
-  // The freshness verdict `parity:api:extra` reaches on the same artifact
-  // (extra-surface.ts), so the report and the gate agree on what they read.
   if (
     process.env.API_COMPARE_ALLOW_STALE_BUILD !== "1" &&
     (await manifestIsStale(path.join(OUTPUT_DIR, "ts-api.json"), apiComparePackageRoots()))

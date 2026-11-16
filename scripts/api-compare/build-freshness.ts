@@ -271,10 +271,6 @@ export async function manifestIsStale(
   const newest = await Promise.all(roots.map((root) => newestSourceMtime(root.srcDir)));
   const newestSource = newest.reduce((a, b) => (b > a ? b : a), 0);
   if (newestSource <= manifestMtime) return false;
-  // An mtime moves without the content moving: a `git mv`, lint-staged's
-  // stash-and-restore, a checkout away and back (trails#9436). The extractor
-  // left the digest of the sources it read beside the manifest, so a source
-  // tree whose digest still matches is the tree the manifest describes.
   let recorded: string;
   try {
     recorded = (await fs.readFile(sourceDigestPath(manifestPath), "utf-8")).trim();

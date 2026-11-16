@@ -496,10 +496,6 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["drop", { form: "drop", receivers: "explicit", creditedKinds: ARRAY }],
   ["count", { form: "count", receivers: "explicit", creditedKinds: ARRAY }],
   ["to_h", { form: "toH", receivers: "explicit", creditedKinds: ARRAY }],
-  // `[...x]` / `Array.from(x)`: an Array, a Hash's pairs (`rb_hash_to_a`,
-  // hash.c:3428) or a constant Set (`VALID_DIRECTIONS.to_a`,
-  // query_methods.rb:2071). Never an unproven receiver, which may be a
-  // Relation whose `to_a` loads records.
   [
     "to_a",
     {
