@@ -875,8 +875,13 @@ export function main(
       const pathAliasIdx = new Map<string, number[]>();
       const descAliasIdx = new Map<string, number[]>();
 
-      for (let i = 0; i < file.testCases.length; i++) {
-        const tc = file.testCases[i];
+      const testCases = file.file.startsWith(SHARED_CACHE_BEHAVIORS_DIR)
+        ? file.testCases.filter(
+            (tc) => !UNCREDITED_SHARED_BEHAVIOR_TESTS[pkg]?.includes(tc.description),
+          )
+        : file.testCases;
+      for (let i = 0; i < testCases.length; i++) {
+        const tc = testCases[i];
         const description = tc.dynamic ? collapseDynamicTitle(tc.description) : tc.description;
         const np = normPath(tc.ancestors, description);
         const nd = normalizeErb(description);
@@ -1792,6 +1797,16 @@ function formatGate(g?: TestGate): string {
  * copy. Their tests are credited to that package's `behaviors/<name>.ts`.
  */
 export const SHARED_CACHE_BEHAVIORS_DIR = "packages/activesupport/test/cache/behaviors/";
+
+/**
+ * Shared behavior tests a package does not get credit for, because its gem's
+ * copy of the test is a different revision from the Rails body that the
+ * shared behavior ports.
+ */
+export const UNCREDITED_SHARED_BEHAVIOR_TESTS: Record<string, string[]> = {
+  /** CONVERGEABLE solid-cache-local-cache-of-fetch-multi-rails-8-0-body */
+  "solid-cache": ["local cache of fetch multi"],
+};
 
 /**
  * Extract the relative path of a TS test file within its package src dir.
