@@ -1,13 +1,27 @@
 import { Configurable, include, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import {
-  StandardError,
-  publicInstanceMethods,
-  rbFSend,
-  rbModName,
-  rbObjId,
-  sprintf,
-} from "@blazetrails/ruby-compat";
+import { StandardError, rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
+
+function ownPublicMethodNames(proto: object | null | undefined): string[] {
+  if (!proto) return [];
+  const out: string[] = [];
+  for (const name of Object.getOwnPropertyNames(proto)) {
+    if (name === "constructor" || name.startsWith("_")) continue;
+    const d = Object.getOwnPropertyDescriptor(proto, name);
+    if (d && typeof d.value === "function") out.push(name);
+  }
+  return out;
+}
+
+function allPublicMethodNames(proto: object | null | undefined): string[] {
+  const out = new Set<string>();
+  let cur: object | null = proto ?? null;
+  while (cur && cur !== Object.prototype) {
+    for (const name of ownPublicMethodNames(cur)) out.add(name);
+    cur = Object.getPrototypeOf(cur);
+  }
+  return [...out];
+}
 
 export type {
   ActionCallback,
@@ -147,16 +161,18 @@ export class Base {
 
   /** @internal */
   static internalMethods(): string[] {
+    const collected = new Set<string>();
     // eslint-disable-next-line @typescript-eslint/no-this-alias
-    let controller: typeof Base = this;
-    const methods = new Set<string>();
-
-    while (!controller.isAbstract()) {
-      for (const name of publicInstanceMethods(controller, false)) methods.add(name);
-      controller = Object.getPrototypeOf(controller) as typeof Base;
+    let cursor: typeof Base = this;
+    while (cursor && !cursor.isAbstract()) {
+      for (const name of ownPublicMethodNames(cursor.prototype)) collected.add(name);
+      const next = Object.getPrototypeOf(cursor);
+      if (!next || next === Function.prototype) break;
+      cursor = next as typeof Base;
     }
-
-    const all = new Set(publicInstanceMethods(controller, true).filter((m) => !methods.has(m)));
+    const abstractProto = cursor?.prototype ?? Base.prototype;
+    const all = new Set<string>(allPublicMethodNames(abstractProto));
+    for (const name of collected) all.delete(name);
     for (const name of Base._internalMethods) all.add(name);
     return [...all];
   }
@@ -179,10 +195,10 @@ export class Base {
   static actionMethods(): ReadonlySet<string> {
     if (!Object.hasOwn(this, "_actionMethodCache") || !this._actionMethodCache) {
       const internalMethods = new Set(this.internalMethods());
-      const methods = publicInstanceMethods(this, true).filter(
+      const methods = allPublicMethodNames(this.prototype).filter(
         (name) => !internalMethods.has(name),
       );
-      methods.push(...publicInstanceMethods(this, false));
+      methods.push(...ownPublicMethodNames(this.prototype));
       this._actionMethodCache = new Set(methods);
     }
     return this._actionMethodCache;
