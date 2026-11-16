@@ -452,6 +452,13 @@ describe("foreignAbsolutePath", () => {
     expect(foreignAbsolutePath(body, root)).toBeNull();
   });
 
+  it("ignores an interpolation-headed template literal's tail", () => {
+    const body = JSON.stringify({
+      shape: ["tpl:${}/templates/application_cable/channel.ts"],
+    });
+    expect(foreignAbsolutePath(body, root)).toBeNull();
+  });
+
   it("ignores an absolute-looking token in prose", () => {
     const body = JSON.stringify({ doc: "See //guides.rubyonrails.org/routing.html." });
     expect(foreignAbsolutePath(body, root)).toBeNull();

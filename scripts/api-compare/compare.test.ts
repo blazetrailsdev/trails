@@ -762,6 +762,8 @@ describe("significantMissingCalls", () => {
       ["drop", "drop", "array"],
       ["count", "count", "array"],
       ["to_h", "toH", "array"],
+      ["to_a", "toA", "array"],
+      ["to_a", "toA", "const"],
       ["zip", "zip", "array"],
       ["keys", "keys", "hash"],
       ["values", "values", "hash"],

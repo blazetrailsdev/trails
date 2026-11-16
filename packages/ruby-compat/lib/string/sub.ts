@@ -269,6 +269,17 @@ export function rbStrMatchMP(self: StringReceiver, ...args: unknown[]): boolean 
 }
 
 /**
+ * `String#match?` (`vendor/ruby/v3.3.11/string.c:4616` `rb_str_match_m_p`)
+ * called on a JS string by name, as `stringDelete` is `String#delete`: {@link rbStrMatchMP} over `str`, a Regexp or a String
+ * pattern (`get_pat`), with the optional `pos`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isMatch(str: string, ...args: unknown[]): boolean {
+  return rbStrMatchMP({ string: str }, ...args);
+}
+
+/**
  * `Regexp#match` (`vendor/ruby/v3.3.11/re.c:3763` `rb_reg_match_m`) with no
  * `pos`: a `MatchData`, or `nil` for a `nil` String. An ASCII-8BIT String, a
  * `Uint8Array`, is searched a byte per character.

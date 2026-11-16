@@ -86,10 +86,7 @@ export class Redis extends Base {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs redis_connector — PERMANENT
-   */
+  /** @internal */
   private redisConnection(): RedisConnection {
     return (this.constructor as typeof Redis).redisConnector(this.configOptions());
   }

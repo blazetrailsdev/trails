@@ -51,10 +51,10 @@ import {
   exec,
   fetch,
   isEmpty,
+  isMatch,
   isNil,
   rbDefineInspectCustom,
   rbEnsure,
-  rbFSend,
   toI,
   rbObjAsString as toS,
   Thread,
@@ -1966,8 +1966,8 @@ export class AbstractAdapter implements Quoting {
   }): boolean {
     return dbWarningsIgnore().some(
       (warningMatcher) =>
-        rbFSend(warning.message, "isMatch", warningMatcher) ||
-        rbFSend(toS(warning.code), "isMatch", warningMatcher),
+        isMatch(warning.message as string, warningMatcher) ||
+        isMatch(toS(warning.code), warningMatcher),
     );
   }
 

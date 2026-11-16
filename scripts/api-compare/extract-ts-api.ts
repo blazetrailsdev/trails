@@ -72,7 +72,12 @@ import {
   type ReadSet,
 } from "@blazetrails/parity/shared-cache";
 import { extractorSchemaToken } from "./extractor-schema.js";
-import { staleBuilds, staleBuildMessage } from "./build-freshness.js";
+import {
+  sourceDigest,
+  sourceDigestPath,
+  staleBuilds,
+  staleBuildMessage,
+} from "./build-freshness.js";
 import {
   EVAL_CALLBACK_PREFIX,
   FOREIGN_READ_PREFIX,
@@ -105,9 +110,11 @@ const OPTION_READER_FUNCTIONS = new Set([
 ]);
 /**
  * ruby-compat's `Kernel#send` (`rb_f_send`,
- * vendor/ruby/v3.3.11/vm_eval.c:1330). Called with a string-literal name, it
- * is a call to that method; a computed name is Ruby's own `send(name)`. In
- * ARGUMENT position the same literal names the descriptor (`call:usec` for
+ * vendor/ruby/v3.3.11/vm_eval.c:1330). The call SET does not credit a
+ * string-literal name as a call to that method: a name known where the call is
+ * written is spelled as the direct call (CLAUDE.md, "A dispatch by name is
+ * spelled directly"), so a literal-name send leaves the Rails call missing. A
+ * computed name is Ruby's own `send(name)`. In ARGUMENT position the same literal names the descriptor (`call:usec` for
  * `rbFSend(value, "usec")`), as `dispatchedCallName` does for `X.call`.
  */
 const SEND_CALLEES = new Set(["rbFSend"]);
@@ -467,6 +474,7 @@ export async function main(packages: readonly string[] = TS_EXTRACT_PACKAGES) {
     const stale = await staleBuilds(apiComparePackageRoots());
     if (stale.length > 0) throw new Error(staleBuildMessage(stale));
   }
+  const digest = await sourceDigest(apiComparePackageRoots());
   const force = process.env.API_COMPARE_FORCE === "1";
   // Output-schema token folded into every cache key (local + shared). Stale
   // entries from a prior output shape carry a different token and are re-extracted.
@@ -652,6 +660,7 @@ export async function main(packages: readonly string[] = TS_EXTRACT_PACKAGES) {
   const serialized = JSON.stringify(manifest, null, 2);
   const foreign = foreignAbsolutePath(serialized, ROOT_DIR);
   if (foreign !== null) throw new Error(foreignManifestMessage(outputPath, foreign, ROOT_DIR));
+  fs.writeFileSync(sourceDigestPath(outputPath), `${digest}\n`);
   fs.writeFileSync(outputPath, serialized);
   console.log(`Written to ${outputPath}`);
 }
@@ -8023,10 +8032,6 @@ function collectCalls(
         // original imported name so it matches the ported call set.
         called.push(resolve(callee.text));
         negated.push(callee.text, resolve(callee.text));
-        const sent = n.arguments[1];
-        if (SEND_CALLEES.has(resolve(callee.text)) && sent && ts.isStringLiteralLike(sent)) {
-          called.push(sent.text);
-        }
         const kernel = KERNEL_CALLEES.get(resolve(callee.text));
         if (kernel !== undefined) called.push(kernel);
         if (!skipHoistedClosures && isSuspensionTimer(callee.text, n, promiseSettlers)) {
@@ -8422,7 +8427,7 @@ function nativeValueForms(n: ts.Node): string[] {
   if (ts.isArrayLiteralExpression(n)) {
     const [only] = n.elements;
     if (n.elements.length === 1 && only !== undefined && ts.isSpreadElement(only)) {
-      return setRoundTripForms(setOperand(only.expression));
+      return ["toA", ...setRoundTripForms(setOperand(only.expression))];
     }
     return isTypedValuesAtLiteral(n) ? [TYPED_NATIVE_FORM.valuesAt] : [];
   }
@@ -8511,7 +8516,7 @@ function nativeValueForms(n: ts.Node): string[] {
   const args = n.arguments;
   switch (callee) {
     case "Array.from":
-      return args.length === 1 ? setRoundTripForms(setOperand(args[0])) : [];
+      return args.length === 1 ? ["toA", ...setRoundTripForms(setOperand(args[0]))] : [];
     case "Object.keys":
       return ["keys"];
     case "Object.values":

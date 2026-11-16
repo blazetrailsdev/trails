@@ -49,6 +49,7 @@ import * as path from "path";
 import { execFile } from "child_process";
 import { createRequire } from "module";
 import { promisify } from "util";
+import { createHash } from "crypto";
 import ts from "typescript-5";
 import type { PackageRoots } from "./config.js";
 
@@ -269,7 +270,56 @@ export async function manifestIsStale(
   }
   const newest = await Promise.all(roots.map((root) => newestSourceMtime(root.srcDir)));
   const newestSource = newest.reduce((a, b) => (b > a ? b : a), 0);
-  return newestSource > manifestMtime;
+  if (newestSource <= manifestMtime) return false;
+  let recorded: string;
+  try {
+    recorded = (await fs.readFile(sourceDigestPath(manifestPath), "utf-8")).trim();
+  } catch {
+    return true;
+  }
+  return recorded !== (await sourceDigest(roots));
+}
+
+/** Where `extract-ts-api.ts` records the {@link sourceDigest} a manifest was built from. */
+export function sourceDigestPath(manifestPath: string): string {
+  return `${manifestPath}.sources`;
+}
+
+/**
+ * A content digest over the same `.ts` sources {@link manifestIsStale} reads
+ * mtimes from, keyed by repo-independent relative path, so a renamed, added or
+ * deleted file moves it and a touched one does not.
+ */
+export async function sourceDigest(roots: readonly PackageRoots[]): Promise<string> {
+  const files = (await Promise.all(roots.map((root) => sourceFiles(root.srcDir, root.dir)))).flat();
+  const entries = await Promise.all(
+    files.map(async ([rel, full]) => {
+      const content = await fs.readFile(full).catch(() => null);
+      const digest = content === null ? "-" : createHash("sha1").update(content).digest("hex");
+      return `${rel}\t${digest}`;
+    }),
+  );
+  entries.sort();
+  return createHash("sha1").update(entries.join("\n")).digest("hex");
+}
+
+async function sourceFiles(dir: string, rel: string): Promise<[string, string][]> {
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const found = await Promise.all(
+    entries.map(async (entry): Promise<[string, string][]> => {
+      const full = path.join(dir, entry.name);
+      const childRel = `${rel}/${entry.name}`;
+      if (entry.isDirectory()) return sourceFiles(full, childRel);
+      if (!entry.name.endsWith(".ts") || entry.name.endsWith(".d.ts")) return [];
+      return [[childRel, full]];
+    }),
+  );
+  return found.flat();
 }
 
 /**

@@ -158,6 +158,42 @@ export function threadsSuper(params: ParamInfo[]): boolean {
   return stripThis(params)[0]?.name === "super_";
 }
 
+/**
+ * The signatures the arity check compares a pair against: the matched file's
+ * own, whenever one of them declares a positional parameter. The package-wide
+ * `pool` is the fallback only where the file holds nothing but a 0-argument
+ * re-export binding (`_writeAttribute: ReadonlyAttributes._write…`) or no
+ * declaration, so an unrelated same-named method elsewhere cannot credit a
+ * wrong port (`Errors#initializeDup(other)` crediting
+ * `Dirty#initializeDup(super_, other)`, trails#8408).
+ */
+export function arityCandidates(
+  fileSigs: readonly ParamInfo[][],
+  pool: readonly ParamInfo[][],
+  receiverFirst = false,
+): ParamInfo[][] {
+  const threaded = fileSigs.filter(threadsSuper);
+  if (threaded.length > 0) return threaded;
+  const positional = fileSigs.some((sig) => stripThis(sig).some(isPositional));
+  const chosen = positional ? fileSigs : pool;
+  return receiverFirst ? chosen.flatMap((sig) => [sig, withoutReceiver(sig)]) : [...chosen];
+}
+
+function isPositional(p: ParamInfo): boolean {
+  return p.kind === "required" || p.kind === "optional" || p.kind === "rest";
+}
+
+/**
+ * A `core_ext/` method (`Hash#stringify_keys`, `Integer#months`) is a free
+ * function taking its receiver first (CLAUDE.md, "Array, String and Enumerable
+ * calls on a native value"): `stringifyKeys(hash)`, `months(n)`. Its first
+ * positional is Ruby's `self`, not an argument.
+ */
+function withoutReceiver(sig: ParamInfo[]): ParamInfo[] {
+  const params = stripThis(sig);
+  return params[0] !== undefined && isPositional(params[0]) ? params.slice(1) : params;
+}
+
 /** Is this leading param an explicit receiver — a known/`*Host` type, a `*Class`
  *  receiver, or a conventional receiver name? */
 export function isReceiverParam(first: ParamInfo): boolean {

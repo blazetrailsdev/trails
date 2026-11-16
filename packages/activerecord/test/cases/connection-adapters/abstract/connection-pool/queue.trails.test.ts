@@ -133,9 +133,9 @@ describe("ConnectionPool::Queue", () => {
 
   it("any reflects queue state", () => {
     const q = new Queue();
-    expect(q.any).toBe(false);
+    expect(q.isAny()).toBe(false);
     q.add(fakeConn());
-    expect(q.any).toBe(true);
+    expect(q.isAny()).toBe(true);
   });
 });
 

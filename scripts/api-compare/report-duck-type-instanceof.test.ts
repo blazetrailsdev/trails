@@ -63,6 +63,17 @@ describe("report-duck-type-instanceof", () => {
     expect(declaresInstanceofGuard(source, "translate")).toBe(false);
   });
 
+  it("reads an instanceof list behind a spliced same-file helper", () => {
+    const source = `
+      function actsLikeTime(value: unknown) {
+        return value instanceof Date || value instanceof Temporal.Instant;
+      }
+      function quotedDate(value: unknown) { return actsLikeTime(value) ? 1 : 0; }
+    `;
+    expect(declaresInstanceofGuard(source, "quotedDate")).toBe(false);
+    expect(declaresInstanceofGuard(source, "quotedDate", ["actsLikeTime"])).toBe(true);
+  });
+
   it("lists a body that asks both duck tests and ports only one", () => {
     const both = ["ref:acts_like?", "ref:respond_to?"];
     expect(unportedDuckTests(row(both, ["ref:rbObjRespondTo"]))).toEqual(["ref:acts_like?"]);

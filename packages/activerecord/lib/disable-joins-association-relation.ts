@@ -26,6 +26,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
     return take(records, value as number);
   }
 
+  /** @missingRailsCall limit — PERMANENT */
   override first(): Promise<T | null>;
   override first(n: number): Promise<T[]>;
   override async first(limit?: number): Promise<T | T[] | null> {

@@ -496,6 +496,15 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["drop", { form: "drop", receivers: "explicit", creditedKinds: ARRAY }],
   ["count", { form: "count", receivers: "explicit", creditedKinds: ARRAY }],
   ["to_h", { form: "toH", receivers: "explicit", creditedKinds: ARRAY }],
+  [
+    "to_a",
+    {
+      form: "toA",
+      receivers: "explicit",
+      uncreditedKinds: new Set(["self", "ivar"]),
+      creditedKinds: new Set(["array", "hash", "const"]),
+    },
+  ],
   ["zip", { form: "zip", receivers: "explicit", creditedKinds: ARRAY }],
   ["keys", { form: "keys", receivers: "explicit", creditedKinds: HASH }],
   ["values", { form: "values", receivers: "explicit", creditedKinds: HASH }],

@@ -748,7 +748,7 @@ export class ConnectionPool implements ReapablePool {
           !pinned &&
           !this.isDiscarded() &&
           conns &&
-          !this._available?.any &&
+          !this._available?.isAny() &&
           conns.length + this._nowConnecting >= this.size
             ? conns.find((c) => c.isInUse() && !c.isTransactionOpen())
             : undefined;

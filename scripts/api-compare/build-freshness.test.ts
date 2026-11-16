@@ -21,6 +21,8 @@ import {
   staleBuilds,
   staleBuildMessage,
   manifestIsStale,
+  sourceDigest,
+  sourceDigestPath,
 } from "./build-freshness.js";
 import type { PackageRoots } from "./config.js";
 
@@ -375,6 +377,30 @@ describe("manifestIsStale", () => {
     fs.utimesSync(path.join(pkg, "src", "index.ts"), 6000, 6000);
 
     expect(await manifestIsStale(manifest, [rootFor(packagesDir, "activesupport")])).toBe(true);
+  });
+
+  it("is false when only an mtime moved and the recorded source digest still matches", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    const pkg = agedPackage(packagesDir, "activesupport", 1000);
+    const roots = [rootFor(packagesDir, "activesupport")];
+    const manifest = writeManifest(root, 5000);
+    fs.writeFileSync(sourceDigestPath(manifest), `${await sourceDigest(roots)}\n`);
+    fs.utimesSync(path.join(pkg, "src", "index.ts"), 6000, 6000);
+
+    expect(await manifestIsStale(manifest, roots)).toBe(false);
+  });
+
+  it("is true when the content moved since the recorded source digest", async () => {
+    const root = mkTmp();
+    const packagesDir = path.join(root, "packages");
+    const pkg = agedPackage(packagesDir, "activesupport", 1000);
+    const roots = [rootFor(packagesDir, "activesupport")];
+    const manifest = writeManifest(root, 5000);
+    fs.writeFileSync(sourceDigestPath(manifest), `${await sourceDigest(roots)}\n`);
+    fs.writeFileSync(path.join(pkg, "src", "other.ts"), "export const b = 2;\n");
+
+    expect(await manifestIsStale(manifest, roots)).toBe(true);
   });
 
   it("is false when the manifest does not exist", async () => {

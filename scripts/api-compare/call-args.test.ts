@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { CallSite, ParamInfo } from "@blazetrails/parity/types";
 import {
   comparableRubySites,
+  foldReaderProcCalls,
   compareCallArgs,
   normalizeArg,
   normalizeArgs,
@@ -1279,6 +1280,30 @@ describe("compareCallArgs Symbol-discriminated arguments", () => {
         params,
       ).verdict,
     ).toBe("match");
+  });
+});
+
+describe("foldReaderProcCalls", () => {
+  const reader = { ...site("missing_interpolation_argument_handler", []), recv: "id:config" };
+  const call = {
+    ...site("call", ["ref:key", "ref:values", "ref:string"]),
+    recv: "call:missing_interpolation_argument_handler",
+  };
+  const collapsed = site("missingInterpolationArgumentHandler", [
+    "ref:key",
+    "ref:values",
+    "ref:string",
+  ]);
+
+  it("hands a Proc's .call arguments to the reader the port invokes", () => {
+    expect(foldReaderProcCalls([reader, call], [collapsed])).toEqual([
+      { ...reader, args: call.args },
+    ]);
+  });
+
+  it("keeps both sites where the port reads and calls separately", () => {
+    const bareRead = site("missingInterpolationArgumentHandler", []);
+    expect(foldReaderProcCalls([reader, call], [bareRead])).toEqual([reader, call]);
   });
 });
 
