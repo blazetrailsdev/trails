@@ -26,7 +26,9 @@ function attributeNamesForSerialization(this: AttachableHost): string[] {
 
 function readAttributeForSerialization(this: AttachableHost, key: string): unknown {
   if (key === "attachable_sgid") {
-    return this.isPersisted() ? rbCallSuper(this, readAttributeForSerialization, key) : null;
+    return this.isPersisted()
+      ? rbCallSuper(this, readAttributeForSerialization, "attachableSgid")
+      : null;
   } else {
     return rbCallSuper(this, readAttributeForSerialization, key);
   }
