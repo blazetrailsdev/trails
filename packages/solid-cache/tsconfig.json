@@ -26,9 +26,6 @@
       "path": "../ruby-compat"
     },
     {
-      "path": "../thor"
-    },
-    {
       "path": "../trailties"
     }
   ]
