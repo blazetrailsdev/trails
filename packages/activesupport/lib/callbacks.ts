@@ -388,7 +388,6 @@ export class Before {
             `Async callback on sync chain "${syncChain}" — before returned a Promise`,
           );
         }
-        new Thread(() => cbResult);
         throw new RuntimeError(
           `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
             `Custom terminators cannot evaluate Promise-returning callbacks. ` +
@@ -1280,7 +1279,13 @@ function runCallbacks(
           }
           if (isThenable(cbResult) || own.settled.length > 0) {
             if (env.syncChain !== undefined) {
-              new Thread(() => cbResult);
+              if (isThenable(cbResult)) new Thread(() => cbResult);
+              for (const proceeded of own.proceeded) {
+                new Thread(async () => {
+                  const [outcome] = await proceeded;
+                  if (outcome.status === "rejected") throw outcome.reason;
+                });
+              }
               throw new RuntimeError(
                 `Async callback on sync chain "${env.syncChain}" — around callback or block returned a Promise`,
               );
