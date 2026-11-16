@@ -299,9 +299,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         const pidRows = await adapter.execute(`SELECT pg_backend_pid() AS pid`);
         const pid = (pidRows[0] as { pid: number }).pid;
-        const sleepPromise = adapter.execute(`SELECT pg_sleep(10)`);
-
-        sleepPromise.catch(() => {});
+        const sleepPromise = adapter.execute(`SELECT pg_sleep(10)`).then(
+          () => null,
+          (error: unknown) => error,
+        );
 
         await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
           const deadline = Date.now() + 2000;
@@ -314,7 +315,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           }
           await adapter2.execute(`SELECT pg_cancel_backend(${pid})`);
         });
-        await expect(sleepPromise).rejects.toBeInstanceOf(QueryCanceled);
+        expect(await sleepPromise).toBeInstanceOf(QueryCanceled);
       } finally {
         await adapter.rollbackTransaction().catch(() => {});
       }
@@ -451,7 +452,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         await other.beginDbTransaction();
-        const sleep = other.execute("SELECT pg_sleep(2)").catch(() => {});
+        const sleep = other.execute("SELECT pg_sleep(2)").then(
+          () => null,
+          (error: unknown) => error,
+        );
         await new Promise<void>((r) => setTimeout(r, 200));
         expect(other._rawConnection!.transactionStatus()).toBe(PQTRANS_ACTIVE);
 
@@ -475,7 +479,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await cancel;
         expect(other._rawConnection!.transactionStatus()).not.toBe(PQTRANS_ACTIVE);
 
-        await sleep;
+        expect(await sleep).toBeInstanceOf(QueryCanceled);
         await other.rollbackDbTransaction();
       } finally {
         await other.disconnectBang();
@@ -489,12 +493,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         other.preparedStatements = true;
         await other.execQuery("SELECT $1::integer AS n", "SQL", [1]);
         await other.beginDbTransaction();
-        void other.clearCacheBang();
+        const cleared = other.clearCacheBang();
         await new Promise<void>((r) => setTimeout(r, 0));
         const status = await other.lock.synchronize(() =>
           other._rawConnection!.transactionStatus(),
         );
         expect(status).toBe(PQTRANS_INTRANS);
+        await cleared;
         await other.rollbackDbTransaction();
       } finally {
         await other.disconnectBang();

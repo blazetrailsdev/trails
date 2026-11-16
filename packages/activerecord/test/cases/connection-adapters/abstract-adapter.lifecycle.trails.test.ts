@@ -49,11 +49,12 @@ describe("AbstractAdapter connection lifecycle privates", () => {
     try {
       const a = new AbstractAdapter({});
       let resolved = false;
-      void a.backoff(2).then(() => (resolved = true));
+      const backedOff = a.backoff(2).then(() => (resolved = true));
       await vi.advanceTimersByTimeAsync(150);
       expect(resolved).toBe(false);
       await vi.advanceTimersByTimeAsync(60);
       expect(resolved).toBe(true);
+      await backedOff;
     } finally {
       vi.useRealTimers();
     }

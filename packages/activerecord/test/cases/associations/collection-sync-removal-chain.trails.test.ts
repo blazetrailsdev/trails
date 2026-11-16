@@ -26,16 +26,17 @@ describe("CollectionSyncRemovalChain", () => {
     expect(assoc.target).toEqual([post]);
   });
 
-  it("delete on a new owner prunes the record before the next statement", () => {
+  it("delete on a new owner prunes the record before the next statement", async () => {
     const author = new Author({ name: "Kelly" });
     const post = new Post({ title: "Welcome", body: "hi" });
     const assoc = postsAssociation(author);
-    void assoc.concat(post);
+    const concatenated = assoc.concat(post);
 
     const result = assoc.delete(post);
 
     expect(result).not.toBeInstanceOf(Promise);
     expect(assoc.target).toEqual([]);
+    await concatenated;
   });
 
   it("buffers every record after an async insert fails", async () => {

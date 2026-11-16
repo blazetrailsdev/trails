@@ -77,7 +77,7 @@ describe("Reaper", () => {
       flush: async () => {},
       isDiscarded: () => discarded,
     };
-    void Reaper.registerPool(pool, FREQUENCY);
+    await Reaper.registerPool(pool, FREQUENCY);
     expect(Reaper.registerPool(pool, FREQUENCY)).toHaveLength(2);
 
     discarded = true;
