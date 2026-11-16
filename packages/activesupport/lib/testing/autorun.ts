@@ -189,7 +189,7 @@ afterEach(async (context: TestContext) => {
   const { from, at, count } = captured.get(testCase) ?? { from: 0, at: -1, count: 0 };
   (task.result?.errors ?? []).forEach((e, i) => {
     if (i < from || (i >= at && i < at + count)) return;
-    testCase.failures.push(new UnexpectedError(e as Error));
+    testCase.failures.push(e instanceof Assertion ? e : new UnexpectedError(e as Error));
   });
   if (task.mode === "skip" || task.mode === "todo" || task.result?.state === "skip") {
     testCase.failures.push(new Skip());

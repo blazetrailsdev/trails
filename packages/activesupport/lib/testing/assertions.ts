@@ -32,6 +32,16 @@ import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
 /** @noRailsEquivalent PERMANENT */
 export class Assertion extends Error {
   override name = "Assertion";
+
+  static [Symbol.hasInstance](instance: unknown): boolean {
+    if (Function.prototype[Symbol.hasInstance].call(this, instance)) return true;
+    return (
+      this === Assertion &&
+      instance !== null &&
+      typeof instance === "object" &&
+      (instance as { name?: unknown }).name === "AssertionError"
+    );
+  }
 }
 
 /** @noRailsEquivalent PERMANENT */
