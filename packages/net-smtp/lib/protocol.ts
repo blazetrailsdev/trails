@@ -34,7 +34,7 @@ declare module "@blazetrails/ruby-compat" {
   }
 }
 
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE net-protocol-single-protocol-class-in-ruby-compat */
 export class Protocol {
   static readonly VERSION: string = "0.2.2";
 
