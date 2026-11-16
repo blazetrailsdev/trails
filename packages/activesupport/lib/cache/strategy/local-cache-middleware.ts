@@ -29,7 +29,6 @@ export class Middleware {
     return this;
   }
 
-  /** @inventedArm rbFRequire — PERMANENT */
   async call(env: RackEnv): Promise<RackResponse> {
     await rbFRequire(ActiveSupport.loadPath, "rack/body_proxy");
     await rbFRequire(ActiveSupport.loadPath, "rack/utils");
