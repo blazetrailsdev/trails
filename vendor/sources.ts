@@ -1213,15 +1213,12 @@ export const SOURCES: readonly UpstreamSource[] = [
         compareTests: true,
       },
       {
-        name: "vite-rails",
+        name: "vite-trails",
         libPath: "vite_rails/lib/vite_rails",
         libEntryFile: "vite_rails/lib/vite_rails.rb",
-        compareApi: false,
-        apiExcludedReason:
-          "packages/vite-rails does not exist yet; story vite-rails-package-and-tag-helpers creates it and enrolls it.",
-        compareTests: false,
-        testsExcludedReason:
-          "helper_test.rb and engine_rake_tasks_test.rb in the monorepo's shared test/ dir are vite_rails'; story vite-rails-package-and-tag-helpers enrolls them.",
+        testPath: "test",
+        compareApi: true,
+        compareTests: true,
       },
     ],
   },

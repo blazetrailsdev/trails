@@ -54,6 +54,7 @@
     "@blazetrails/net-smtp": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/vite-assets": "workspace:*",
+    "@blazetrails/vite-trails": "workspace:*",
     "@blazetrails/vitest-matchers": "workspace:*"
   }
 }

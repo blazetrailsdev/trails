@@ -1109,6 +1109,7 @@ jobs:
           packages/ruby-compat
           packages/tzinfo
           packages/vite-assets
+          packages/vite-trails
           packages/vitest-matchers
           packages/zeitwerk
       - if: needs.changes.outputs.unit_packages != ''
@@ -1344,6 +1345,7 @@ jobs:
           packages/tse-compiler
           packages/tzinfo
           packages/vite-assets
+          packages/vite-trails
           packages/vitest-matchers
           packages/zeitwerk
           --coverage --coverage.all

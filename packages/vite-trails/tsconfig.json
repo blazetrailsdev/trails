@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "lib"
+  },
+  "include": ["lib"],
+  "references": [
+    { "path": "../activesupport" },
+    { "path": "../ruby-compat" },
+    { "path": "../trailties" },
+    { "path": "../vite-assets" }
+  ]
+}
