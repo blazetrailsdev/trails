@@ -8,10 +8,8 @@ import { HTML5 } from "../namespaces.js";
 
 type Parse5Parent = DefaultTreeAdapterMap["parentNode"];
 
-/** @noRailsEquivalent CONVERGEABLE nokogiri-html5-fragment-parse-static-override */
-const _XmlDocumentFragment: new (document: Document) => XmlDocumentFragment = XmlDocumentFragment;
-
-export class DocumentFragment extends _XmlDocumentFragment {
+// @ts-expect-error TS2417: CLAUDE.md, "Override signature on the static side".
+export class DocumentFragment extends XmlDocumentFragment {
   declare document: Document;
   /**
    * @internal

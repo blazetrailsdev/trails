@@ -22,3 +22,10 @@ describe("Nokogiri::XML::DocumentFragment (trails)", () => {
     expect(doc.xpath("/root/a1/node()").map((n) => n.name)).toEqual(["b1", "b2"]);
   });
 });
+
+describe("Nokogiri::XML::Node#inner_html (trails)", () => {
+  it("serializes the children of a node in an XML document", () => {
+    const doc = XmlDocument.parse("<root><a1><b1>foo</b1><b2/></a1></root>");
+    expect(doc.atXpath("/root/a1")!.innerHtml()).toBe("<b1>foo</b1><b2></b2>");
+  });
+});
