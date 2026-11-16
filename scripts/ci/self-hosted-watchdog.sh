@@ -33,7 +33,12 @@ if [ "${1:-}" = --dry-run ]; then
   select_runs "$(cat "$2")" "$(cat "$3")" "$4"
   exit 0
 fi
-if [ "${1:-}" = --max-queued-minutes ]; then max_minutes="$2"; fi
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --max-queued-minutes) max_minutes="${2:?}"; shift 2 ;;
+    *) echo "self-hosted-watchdog: unknown argument $1" >&2; exit 2 ;;
+  esac
+done
 
 : "${GITHUB_REPOSITORY:?}"
 if [ -z "${GH_TOKEN:-}" ]; then
@@ -53,12 +58,16 @@ for status in queued in_progress; do
     jobs=$(jq --argjson id "$run" --argjson j "$run_jobs" '. + [{run_id: $id, jobs: $j}]' <<<"$jobs")
   done
 done
-for run in $(select_runs "$runners" "$jobs" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"); do
-  echo "self-hosted-watchdog: run $run is queued on offline self-hosted runners; cancelling and re-running"
+stuck=$(select_runs "$runners" "$jobs" "$(date -u +%Y-%m-%dT%H:%M:%SZ)")
+for run in $stuck; do
+  echo "self-hosted-watchdog: run $run is queued on offline self-hosted runners; cancelling"
   gh run cancel "$run" --repo "$GITHUB_REPOSITORY"
+done
+for run in $stuck; do
   for _ in $(seq 30); do
     [ "$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json status --jq .status)" = completed ] && break
     sleep 10
   done
+  echo "self-hosted-watchdog: re-running $run"
   gh run rerun "$run" --repo "$GITHUB_REPOSITORY"
 done
