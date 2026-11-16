@@ -130,7 +130,7 @@ export async function loadDatabaseConfig(env?: string, cwd?: string): Promise<Da
   );
 }
 
-export function isMultiDatabaseEnv(value: unknown): value is Record<string, object> {
+function isMultiDatabaseEnv(value: unknown): value is Record<string, object> {
   if (value === null || typeof value !== "object") return false;
   return Object.values(value).every(
     (v) => v !== null && typeof v === "object" && !Array.isArray(v),

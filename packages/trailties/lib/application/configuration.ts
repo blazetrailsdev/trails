@@ -25,9 +25,9 @@ import {
   rbInspect,
   SecureRandom,
 } from "@blazetrails/ruby-compat";
-import { FileUtils, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
+import { FileUtils, isPlainHash, rbObjId, RuntimeError } from "@blazetrails/ruby-compat";
 import { LogSubscriber, reverseMergeBang, wrap } from "@blazetrails/activesupport";
-import { isMultiDatabaseEnv, type DatabaseConfigModule } from "../database.js";
+import type { DatabaseConfigModule } from "../database.js";
 import { EngineConfiguration } from "../engine/configuration.js";
 import { SourceAnnotationExtractor, type Annotation } from "../source-annotation-extractor.js";
 import { Trails } from "../trails.js";
@@ -595,8 +595,8 @@ export class Configuration extends EngineConfiguration {
         delete loadedYaml.shared;
         if (shared != null && (shared as unknown) !== false) {
           for (const [, config] of Object.entries(loadedYaml)) {
-            if (isMultiDatabaseEnv(config)) {
-              if (isMultiDatabaseEnv(shared)) {
+            if (isPlainHash(config) && Object.values(config).every((v) => isPlainHash(v))) {
+              if (isPlainHash(shared) && Object.values(shared).every((v) => isPlainHash(v))) {
                 for (const [name, subConfig] of Object.entries(config)) {
                   reverseMergeBang(
                     subConfig as Record<string, unknown>,
