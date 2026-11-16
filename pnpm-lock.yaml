@@ -535,6 +535,9 @@ importers:
         specifier: ^8.19.0
         version: 8.20.0
     devDependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview

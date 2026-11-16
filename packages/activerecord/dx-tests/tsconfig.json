@@ -77,7 +77,13 @@
       "@blazetrails/solid-cable": ["../../solid-cable/lib/index.ts"],
       "@blazetrails/activestorage": ["../../activestorage/lib/index.ts"],
       "@blazetrails/actionmailbox": ["../../actionmailbox/lib/index.ts"],
-      "@blazetrails/actiontext": ["../../actiontext/lib/index.ts"]
+      "@blazetrails/actiontext": ["../../actiontext/lib/index.ts"],
+      "@blazetrails/actionpack": ["../../actionpack/lib/index.ts"],
+      "@blazetrails/actionview": ["../../actionview/lib/index.ts"],
+      "@blazetrails/actionview/*": ["../../actionview/lib/*.ts"],
+      "@blazetrails/activesupport/*": ["../../activesupport/lib/*.ts"],
+      "@blazetrails/rack-test": ["../../rack-test/lib/index.ts"],
+      "@blazetrails/rackup": ["../../rackup/lib/index.ts"]
     }
   },
   "include": ["."]
