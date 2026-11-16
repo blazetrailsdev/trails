@@ -15,7 +15,10 @@ describe("RailtieTest", () => {
     deprecators = new Deprecators();
     app = {
       deprecators,
-      config: Object.assign(Object.create(Trailtie.config), { isReloadingEnabled: () => false }),
+      config: Object.assign(Object.create(Trailtie.config), {
+        isReloadingEnabled: () => false,
+        actionController: {},
+      }),
     };
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { getPath } from "@blazetrails/ruby-compat";
-import { Engine } from "../../lib/trailties/action-cable.js";
+import { Engine } from "@blazetrails/actioncable/engine";
 
 describe("ActionCable::Engine", () => {
   it("is rooted at the actioncable package, as Rails roots it at the actioncable gem", () => {

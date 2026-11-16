@@ -401,7 +401,7 @@ export abstract class AppBase extends Base {
       "@blazetrails/trailties/trailties/action-mailbox": !this.options.skipActionMailbox,
       "@blazetrails/trailties/trailties/action-text": !this.options.skipActionText,
       "@blazetrails/trailties/trailties/action-view": true,
-      "@blazetrails/trailties/trailties/action-cable": !this.options.skipActionCable,
+      "@blazetrails/actioncable/engine": !this.options.skipActionCable,
       "@blazetrails/trailties/test-unit/trailtie": !this.options.skipTest,
     });
   }

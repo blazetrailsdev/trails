@@ -12,7 +12,7 @@ import { Base, Resolver, SanitizeHelper } from "@blazetrails/actionview";
 import { HTML, HTML4 } from "@blazetrails/html-sanitizer";
 import * as Nokogiri from "@blazetrails/nokogiri";
 import { Trailtie as ActionViewTrailtie } from "../../lib/trailties/action-view.js";
-import "../../lib/trailties/action-cable.js";
+import "@blazetrails/actioncable/engine";
 import { Engine as ActionMailboxEngine } from "@blazetrails/actionmailbox/engine";
 import { ActionMailbox } from "@blazetrails/actionmailbox";
 import { ActionCable } from "@blazetrails/actioncable";

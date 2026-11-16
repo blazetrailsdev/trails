@@ -7,7 +7,7 @@ import { getFs, getPath, setEnv } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Application } from "../../lib/application.js";
 import { _resetTrailsEnv } from "../../lib/trails.js";
-import { Engine } from "../../lib/trailties/action-cable.js";
+import { Engine } from "@blazetrails/actioncable/engine";
 
 await Handler.get("node");
 

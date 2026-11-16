@@ -81,6 +81,10 @@
       "types": "./dist/engine.d.ts",
       "default": "./dist/engine.js"
     },
+    "./health-controller": {
+      "types": "./dist/health-controller.d.ts",
+      "default": "./dist/health-controller.js"
+    },
     "./trailtie": {
       "types": "./dist/trailtie.d.ts",
       "default": "./dist/trailtie.js"
@@ -119,7 +123,6 @@
     "bin"
   ],
   "dependencies": {
-    "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
     "@blazetrails/actionmailer": "workspace:*",
@@ -144,6 +147,7 @@
     "vite": "^7.0.0"
   },
   "devDependencies": {
+    "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/actionmailbox": "workspace:*",
     "@blazetrails/actiontext": "workspace:*",
     "@blazetrails/activerecord-cli": "workspace:*",
@@ -155,12 +159,16 @@
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependencies": {
+    "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/actionmailbox": "workspace:*",
     "@blazetrails/actiontext": "workspace:*",
     "@blazetrails/activestorage": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/actioncable": {
+      "optional": true
+    },
     "@blazetrails/actionmailbox": {
       "optional": true
     },

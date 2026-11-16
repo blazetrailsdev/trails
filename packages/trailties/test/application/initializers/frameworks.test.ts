@@ -80,10 +80,7 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
     );
 
     await (t as unknown as Rack).app("development");
-    expect(
-      (ActionMailerBase as unknown as { defaultUrlOptions: { host: string } }).defaultUrlOptions
-        .host,
-    ).toBe("test.rails");
+    expect(ActionMailerBase.defaultUrlOptions.host).toBe("test.rails");
   });
 
   it("action_dispatch extensions are applied to ActionDispatch", async () => {

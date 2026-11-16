@@ -1,12 +1,3 @@
-import {
-  ActionCable,
-  ActionCableHelper,
-  ENGINE_CALLED_FROM,
-  deprecator as actionCableDeprecator,
-} from "@blazetrails/actioncable";
-import { Worker } from "@blazetrails/actioncable/server/worker";
-import type { Base as Server } from "@blazetrails/actioncable/server/base";
-import type { Configuration } from "@blazetrails/actioncable/server/configuration";
 import type { RackApp } from "@blazetrails/actionpack";
 import type { RackEnv } from "@blazetrails/rack";
 import {
@@ -17,14 +8,20 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { File, Pathname, block, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { Engine as BaseEngine } from "../engine.js";
-import { HealthController } from "../health-controller.js";
+import { Engine as BaseEngine } from "@blazetrails/trailties/engine";
+import { HealthController } from "@blazetrails/trailties/health-controller";
+import { ActionCable } from "./index.js";
+import { ActionCableHelper } from "./helpers/action-cable-helper.js";
+import { deprecator as actionCableDeprecator } from "./deprecator.js";
+import { Worker } from "./server/worker.js";
+import type { Base as Server } from "./server/base.js";
+import type { Configuration } from "./server/configuration.js";
 
 type Options = OrderedOptions & Record<string, unknown>;
 
 export class Engine extends BaseEngine {
   static {
-    BaseEngine.register(this, ENGINE_CALLED_FROM);
+    BaseEngine.register(this, import.meta.dirname);
 
     this.config.set("actionCable", new OrderedOptions());
     (this.config.get("actionCable") as Options).mountPath = ActionCable.INTERNAL.defaultMountPath;
