@@ -95,7 +95,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     }, 10_000);
     it("execute after disconnect reconnects", async () => {
       await adapter.disconnectBang();
-      const result = (await adapter.execute("SELECT 1+2 AS v")) as Mysql2Result;
+      const result = (await adapter.execute("SELECT 1+2 AS v")) as Mysql2Result<unknown[]>;
       expect(result.toA()[0][0]).toBe(3);
     });
 
@@ -114,7 +114,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         const result = (await testAdapter.execute(
           "SELECT @@SESSION.wait_timeout AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(parseInt(result.toA()[0][0] as string, 10)).toBe(60);
       } finally {
         await testAdapter.disconnectBang();
@@ -127,7 +127,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         const result = (await testAdapter.execute(
           "SELECT @@SESSION.wait_timeout AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(parseInt(result.toA()[0][0] as string, 10)).toBe(60);
       } finally {
         await testAdapter.disconnectBang();
@@ -157,7 +157,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       expect(await arunit2.queryValue("SELECT 'こんにちは' = 'コンニチハ'")).toBe(0);
     });
     it("mysql default in strict mode", async () => {
-      const result = (await adapter.execute("SELECT @@SESSION.sql_mode AS v")) as Mysql2Result;
+      const result = (await adapter.execute("SELECT @@SESSION.sql_mode AS v")) as Mysql2Result<
+        unknown[]
+      >;
       expect(String(result.toA()[0][0])).toMatch(/STRICT_ALL_TABLES/);
     });
     it("mysql strict mode disabled", async () => {
@@ -165,7 +167,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         const result = (await testAdapter.execute(
           "SELECT @@SESSION.sql_mode AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(String(result.toA()[0][0])).not.toMatch(/STRICT_ALL_TABLES/);
       } finally {
         await testAdapter.disconnectBang();
@@ -176,10 +178,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         const globalResult = (await testAdapter.execute(
           "SELECT @@GLOBAL.sql_mode AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         const sessionResult = (await testAdapter.execute(
           "SELECT @@SESSION.sql_mode AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(sessionResult.toA()[0][0]).toBe(globalResult.toA()[0][0]);
       } finally {
         await testAdapter.disconnectBang();
@@ -193,7 +195,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         const result = (await testAdapter.execute(
           "SELECT @@SESSION.sql_mode AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(String(result.toA()[0][0])).not.toMatch(/STRICT_ALL_TABLES/);
       } finally {
         await testAdapter.disconnectBang();
@@ -226,7 +228,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         const result = (await testAdapter.execute(
           "SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(parseInt(result.toA()[0][0] as string, 10)).toBe(3);
       } finally {
         await testAdapter.disconnectBang();
@@ -240,10 +242,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       try {
         const globalResult = (await testAdapter.execute(
           "SELECT @@GLOBAL.DEFAULT_WEEK_FORMAT AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         const sessionResult = (await testAdapter.execute(
           "SELECT @@SESSION.DEFAULT_WEEK_FORMAT AS v",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(sessionResult.toA()[0][0]).toBe(globalResult.toA()[0][0]);
       } finally {
         await testAdapter.disconnectBang();

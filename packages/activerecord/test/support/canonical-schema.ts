@@ -184,10 +184,16 @@ export async function emitTableIndexes(
   }
 }
 
+interface CanonicalForeignKey {
+  toTable: string;
+  opts: Partial<AddForeignKeyOptions>;
+}
+
 interface CanonicalTableDef {
   name: string;
   meta: TableMeta;
   fn: (t: TableBuilder) => void;
+  foreignKeys?: CanonicalForeignKey[];
 }
 
 let _registry: CanonicalTableDef[] | null = null;
@@ -243,6 +249,14 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     fn: (t: TableBuilder) => void,
   ): Promise<void> => {
     tables.push({ name, meta, fn });
+  };
+  const addForeignKey = async (
+    fromTable: string,
+    toTable: string,
+    opts: Partial<AddForeignKeyOptions> = {},
+  ): Promise<void> => {
+    const def = tables.find((d) => d.name === fromTable)!;
+    (def.foreignKeys ??= []).push({ toTable, opts });
   };
 
   await define("1_need_quoting", {}, (t) => {
@@ -325,11 +339,9 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.references("author_address_extra");
     t.string("organization_id");
     t.string("owned_essay_id");
-    t.foreignKey("author_addresses", {
-      column: "author_address_id",
-      deferrable: "immediate",
-    });
   });
+
+  await addForeignKey("authors", "author_addresses", { deferrable: "immediate" });
 
   await define("author_favorites", {}, (t) => {
     t.integer("author_id");
@@ -939,20 +951,20 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name");
   });
 
+  await define("lessons_students", { id: false }, (t) => {
+    t.references("lesson");
+    t.references("student");
+  });
+
   await define("students", {}, (t) => {
     t.string("name");
     t.boolean("active");
     t.integer("college_id");
   });
 
-  await define("lessons_students", { id: false }, (t) => {
-    t.references("lesson");
-    t.references("student");
-    t.foreignKey("students", {
-      column: "student_id",
-      onDelete: "cascade",
-      deferrable: "immediate",
-    });
+  await addForeignKey("lessons_students", "students", {
+    onDelete: "cascade",
+    deferrable: "immediate",
   });
 
   await define("lint_models", {}, (t) => {});
@@ -1716,6 +1728,10 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
     if (def.meta.arunit2) continue;
     await runTable(adapter, ss, typeMap, def);
   }
+  for (const def of await buildCanonicalRegistry()) {
+    if (def.meta.arunit2) continue;
+    await addCanonicalForeignKeys(ss, def);
+  }
   await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
 }
 
@@ -1727,6 +1743,19 @@ export async function loadCanonicalArunit2Schema(adapter: DatabaseAdapter): Prom
     await runTable(adapter, ss, typeMap, def);
   }
   await (adapter as { clearCacheBang?: () => void | Promise<void> }).clearCacheBang?.();
+}
+
+export async function addCanonicalForeignKeys(
+  ss: SchemaStatements,
+  def: CanonicalTableDef,
+): Promise<void> {
+  for (const { toTable, opts } of def.foreignKeys ?? []) {
+    await ss.addForeignKey(def.name, toTable, opts);
+  }
+}
+
+function replayForeignKeys(def: CanonicalTableDef, probe: TableDefinition): void {
+  for (const { toTable, opts } of def.foreignKeys ?? []) probe.foreignKey(toTable, opts);
 }
 
 let _dependents: Map<string, string[]> | null = null;
@@ -1748,6 +1777,7 @@ export async function canonicalForeignKeyDependents(): Promise<Map<string, strin
       },
     } as unknown as TableDefinition;
     def.fn(new TableBuilder(probe, "sqlite3", COLUMN_TYPE_MAP_SQLITE, null));
+    replayForeignKeys(def, probe);
   }
   _dependents = dependents;
   return dependents;
@@ -1786,6 +1816,7 @@ export async function canonicalRegistrySchema(): Promise<Schema> {
     } as unknown as TableDefinition;
     const builder = new TableBuilder(probe, "sqlite3", COLUMN_TYPE_MAP_SQLITE, null);
     def.fn(builder);
+    replayForeignKeys(def, probe);
     if (def.meta.serialPk !== undefined) {
       assertSerialPkIsPlainIntegral(def.name, def.meta.serialPk, columns[def.meta.serialPk]);
     }

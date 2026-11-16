@@ -187,7 +187,7 @@ export async function performQuery(
 }
 
 /** @internal */
-export function castResult(rawResult: Mysql2Result | null): Result {
+export function castResult(rawResult: Mysql2Result<unknown[]> | null): Result {
   if (rawResult == null) return Result.empty();
 
   const fields = rawResult.fields;

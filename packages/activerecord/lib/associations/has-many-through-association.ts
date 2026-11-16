@@ -147,7 +147,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     this.ensureNotNested();
     this._throughScope = this.scope();
     try {
-      attributes ??= {};
       if (this.sourceReflection().isCollection()) {
         const inverse = this.sourceReflection().inverseOf();
         const target = this.throughAssociation().target;

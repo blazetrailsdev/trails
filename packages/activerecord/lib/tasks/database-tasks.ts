@@ -261,7 +261,7 @@ export class DatabaseTasks {
         },
       );
       if (isPresent(scope) && migrationsRan.length === 0) {
-        rbFSend(Migration, "write", `No migrations ran. (using ${scope} scope)`);
+        Migration.nearestDelegate!.write(`No migrations ran. (using ${scope} scope)`);
       }
 
       this.migrationConnectionPool().schemaCache.clearBang();

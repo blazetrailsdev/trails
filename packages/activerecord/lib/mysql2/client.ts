@@ -29,10 +29,12 @@ export interface QueryOptions {
 
 type Native = [unknown, mysql.FieldPacket[] | undefined];
 
-export interface Mysql2Result {
+export interface Mysql2Result<
+  Row extends unknown[] | Record<string, unknown> = unknown[] | Record<string, unknown>,
+> {
   readonly fields: string[];
   readonly size: number;
-  toA(): unknown[][];
+  toA(): Row[];
   free(): void;
 }
 
@@ -113,10 +115,10 @@ export function storeResult(
   client: Mysql2Client,
   [rawResult, rawFields]: Native,
 ): Mysql2Result | null {
-  let result = rawResult as unknown[][] | mysql.ResultSetHeader;
+  let result = rawResult as Array<unknown[] | Record<string, unknown>> | mysql.ResultSetHeader;
   let fields = rawFields;
   if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
-    result = (rawResult as unknown[])[0] as unknown[][];
+    result = (rawResult as unknown[])[0] as Array<unknown[] | Record<string, unknown>>;
     fields = rawFields[0] as mysql.FieldPacket[];
   } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
     result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
@@ -208,7 +210,6 @@ export function defaultQueryOptions(): QueryOptions {
     symbolizeKeys: false,
     databaseTimezone: "local",
     applicationTimezone: null,
-    cacheRows: true,
     connectFlags:
       CLIENT_FLAGS.REMEMBER_OPTIONS |
       CLIENT_FLAGS.LONG_PASSWORD |

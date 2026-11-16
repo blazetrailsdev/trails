@@ -32,14 +32,18 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("preserves exact value above Number.MAX_SAFE_INTEGER via BigIntegerType", async () => {
       const unsafe = 9007199254740993n;
       await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [unsafe]);
-      const result = (await adapter.execute(`SELECT \`score\` FROM \`bigint_rt\``)) as Mysql2Result;
+      const result = (await adapter.execute(`SELECT \`score\` FROM \`bigint_rt\``)) as Mysql2Result<
+        unknown[]
+      >;
       expect(type.cast(result.toA()[0][0])).toBe(unsafe);
     });
 
     it("update round-trip preserves value", async () => {
       await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [BIG]);
       await adapter.execUpdate(`UPDATE \`bigint_rt\` SET \`score\` = ?`, null, [BIG + 1n]);
-      const result = (await adapter.execute(`SELECT \`score\` FROM \`bigint_rt\``)) as Mysql2Result;
+      const result = (await adapter.execute(`SELECT \`score\` FROM \`bigint_rt\``)) as Mysql2Result<
+        unknown[]
+      >;
       expect(type.cast(result.toA()[0][0])).toBe(BIG + 1n);
     });
 
@@ -47,7 +51,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [42]);
       const result = (await adapter.execute(
         `SELECT \`id\`, \`score\` FROM \`bigint_rt\``,
-      )) as Mysql2Result;
+      )) as Mysql2Result<unknown[]>;
       expect(typeof result.toA()[0][0]).toBe("number");
       expect(typeof result.toA()[0][1]).toBe("number");
     });
@@ -58,7 +62,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         null,
         [BIG, 42],
       );
-      const result = (await adapter.execute(`SELECT \`count\` FROM \`bigint_rt\``)) as Mysql2Result;
+      const result = (await adapter.execute(`SELECT \`count\` FROM \`bigint_rt\``)) as Mysql2Result<
+        unknown[]
+      >;
       expect(typeof result.toA()[0][0]).toBe("number");
       expect(result.toA()[0][0]).toBe(42);
     });

@@ -849,12 +849,6 @@ export const TEST_SCHEMA: Schema = {
     name: "string",
   },
 
-  students: {
-    name: "string",
-    active: "boolean",
-    college_id: "integer",
-  },
-
   lessons_students: {
     columns: {
       lesson_id: "big_integer",
@@ -870,6 +864,12 @@ export const TEST_SCHEMA: Schema = {
       },
     ],
     primaryKey: false,
+  },
+
+  students: {
+    name: "string",
+    active: "boolean",
+    college_id: "integer",
   },
 
   lint_models: {},
