@@ -54,6 +54,7 @@ export class Packer<Io = unknown> {
   hasBigintExtType = false;
   /** @internal */
   hasSymbolExtType = false;
+  /** @internal */
   private compatibilityMode = false;
   readonly buffer: Buffer;
 
@@ -77,7 +78,7 @@ export class Packer<Io = unknown> {
   }
 
   isCompatibilityMode(): boolean {
-    return this.compatibilityMode ? true : false;
+    return this.compatibilityMode;
   }
 
   registerType(
@@ -426,9 +427,10 @@ export class Packer<Io = unknown> {
 
   private writeRawHeader(n: number): void {
     if (n < 32) this.buffer.write(Uint8Array.of(0xa0 | n));
-    else if (n < 256 && !this.compatibilityMode) this.buffer.write(Uint8Array.of(0xd9, n));
-    else if (n < 65536) this.buffer.write(Uint8Array.of(0xda, n >> 8, n));
-    else this.buffer.write(Uint8Array.of(0xdb, n >>> 24, n >> 16, n >> 8, n));
+    else if (n < 256 && !this.compatibilityMode) this.buffer.write(Uint8Array.of(0xd9, n & 0xff));
+    else if (n < 65536) this.buffer.write(Uint8Array.of(0xda, (n >> 8) & 0xff, n & 0xff));
+    else
+      this.buffer.write(Uint8Array.of(0xdb, n >>> 24, (n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff));
   }
 
   private writeSymbolStringValue(v: string): void {
