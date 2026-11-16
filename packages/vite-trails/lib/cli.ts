@@ -47,6 +47,7 @@ const TRAILS_TEMPLATES = new Pathname(
   decodeURIComponent(new URL("../templates", import.meta.url).pathname),
 );
 
+/** @missingRailsArgs join — PERMANENT */
 async function setupAppFiles(this: InstallHost): Promise<void> {
   const config = await this.config();
   const root = await this.root();
@@ -73,7 +74,10 @@ async function setupAppFiles(this: InstallHost): Promise<void> {
   });
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsArgs inject_line_after — PERMANENT
+ */
 async function setupContentSecurityPolicy(this: InstallHost, cspFile: Pathname): Promise<void> {
   if (!(await File.isExistAsync(cspFile.toString()))) return;
 
@@ -107,6 +111,7 @@ async function setupContentSecurityPolicy(this: InstallHost, cspFile: Pathname):
   );
 }
 
+/** @missingRailsArgs inject_line_before — PERMANENT */
 async function installSampleFiles(this: InstallHost): Promise<void> {
   const config = await this.config();
   if (

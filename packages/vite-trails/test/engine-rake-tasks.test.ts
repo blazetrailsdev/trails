@@ -179,7 +179,11 @@ describe("EngineRakeTasksTest", () => {
       await new CLI.Install().call();
       await ViteAssets.commands().verifyInstall();
       await new CLI.Version().call();
+      const runWithCapture = vi
+        .spyOn(CLI.Install.prototype as unknown as { runWithCapture(): unknown }, "runWithCapture")
+        .mockResolvedValue(undefined);
       await new CLI.Upgrade().call();
+      expect(runWithCapture).toHaveBeenCalledOnce();
       expect(exec).toHaveBeenLastCalledWith("bundle exec vite upgrade_packages");
       await new CLI.UpgradePackages().call();
       expect(installJsPackages).toHaveBeenCalledTimes(2);
