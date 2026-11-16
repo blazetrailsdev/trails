@@ -4,6 +4,7 @@ import {
   classAttribute,
   extend,
   isPresent,
+  presenceIn,
   type Duration,
 } from "@blazetrails/activesupport";
 import { classModule, rbModName } from "@blazetrails/ruby-compat";
@@ -16,11 +17,13 @@ interface ConcurrencyControlsClass {
   concurrencyGroup: unknown;
   concurrencyLimit: number | null;
   concurrencyDuration: Duration;
+  concurrencyOnConflict: string;
 }
 
 const DEFAULT_CONCURRENCY_GROUP = function (this: ConcurrencyControls): unknown {
   return rbModName(this.constructor);
 };
+const CONCURRENCY_ON_CONFLICT_BEHAVIOUR = ["block", "discard"];
 
 declare module "@blazetrails/activejob/base" {
   // eslint-disable-next-line @typescript-eslint/no-namespace
@@ -29,6 +32,7 @@ declare module "@blazetrails/activejob/base" {
     let concurrencyGroup: unknown;
     let concurrencyLimit: number | null;
     let concurrencyDuration: Duration;
+    let concurrencyOnConflict: string;
     const limitsConcurrency: typeof ClassMethods.limitsConcurrency;
   }
   interface Base {
@@ -46,12 +50,21 @@ export class ClassMethods {
       to = 1,
       group = DEFAULT_CONCURRENCY_GROUP,
       duration = SolidQueue.defaultConcurrencyControlPeriod,
-    }: { key: ConcurrencyOption; to?: number; group?: ConcurrencyOption; duration?: Duration },
+      onConflict = "block",
+    }: {
+      key: ConcurrencyOption;
+      to?: number;
+      group?: ConcurrencyOption;
+      duration?: Duration;
+      onConflict?: string;
+    },
   ): void {
     this.concurrencyKey = key;
     this.concurrencyLimit = to;
     this.concurrencyGroup = group;
     this.concurrencyDuration = duration;
+    this.concurrencyOnConflict =
+      presenceIn(onConflict, CONCURRENCY_ON_CONFLICT_BEHAVIOUR) ?? "block";
   }
 }
 
@@ -59,6 +72,7 @@ export class ConcurrencyControls {
   static readonly [classModule] = true;
   declare static ClassMethods: typeof ClassMethods;
   declare static DEFAULT_CONCURRENCY_GROUP: typeof DEFAULT_CONCURRENCY_GROUP;
+  declare static CONCURRENCY_ON_CONFLICT_BEHAVIOUR: typeof CONCURRENCY_ON_CONFLICT_BEHAVIOUR;
   declare arguments: unknown[];
 
   concurrencyKey(): string | null {
@@ -104,6 +118,9 @@ Object.defineProperty(ConcurrencyControls, "ClassMethods", { value: ClassMethods
 Object.defineProperty(ConcurrencyControls, "DEFAULT_CONCURRENCY_GROUP", {
   value: DEFAULT_CONCURRENCY_GROUP,
 });
+Object.defineProperty(ConcurrencyControls, "CONCURRENCY_ON_CONFLICT_BEHAVIOUR", {
+  value: CONCURRENCY_ON_CONFLICT_BEHAVIOUR,
+});
 (
   ConcurrencyControls as unknown as {
     included(base: null, block: (this: ConcurrencyControlsClass) => void): void;
@@ -119,4 +136,5 @@ Object.defineProperty(ConcurrencyControls, "DEFAULT_CONCURRENCY_GROUP", {
   classAttribute.call(this, "concurrencyDuration", {
     default: SolidQueue.defaultConcurrencyControlPeriod,
   });
+  classAttribute.call(this, "concurrencyOnConflict", { default: "block" });
 });

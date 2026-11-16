@@ -1,12 +1,7 @@
 import { constGet, rbFRequire, rbProcCall } from "@blazetrails/ruby-compat";
 import { ActiveSupport } from "../../namespaces.js";
+import type { RackApp, RackBody, RackEnv, RackMiddleware, RackResponse } from "@blazetrails/rack";
 import { LocalCacheRegistry, LocalStore } from "./local-cache.js";
-
-type RackEnv = Record<string, unknown>;
-type RackResponse = [number, Record<string, unknown>, unknown];
-type RackApp =
-  | ((env: RackEnv) => RackResponse | Promise<RackResponse>)
-  | { call(env: RackEnv): RackResponse | Promise<RackResponse> };
 
 export class Middleware {
   static toString(): string {
@@ -16,7 +11,7 @@ export class Middleware {
   readonly name: string;
   readonly localCacheKey: string;
   /** @internal */
-  private app: RackApp | null;
+  private app: RackApp | RackMiddleware | null;
 
   constructor(name: string, localCacheKey: string) {
     this.name = name;
@@ -24,7 +19,7 @@ export class Middleware {
     this.app = null;
   }
 
-  new(app: RackApp): this {
+  new(app: RackApp | RackMiddleware): this {
     this.app = app;
     return this;
   }
@@ -39,7 +34,7 @@ export class Middleware {
       const BodyProxy = constGet(Object, "::Rack::BodyProxy") as new (
         body: unknown,
         block: () => void,
-      ) => unknown;
+      ) => RackBody;
       response[2] = new BodyProxy(response[2], () => {
         LocalCacheRegistry.setCacheFor(this.localCacheKey, null);
       });

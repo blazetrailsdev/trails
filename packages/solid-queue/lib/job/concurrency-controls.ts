@@ -1,4 +1,11 @@
-import { Concern, delegate, extend, isPresent, safeConstantize } from "@blazetrails/activesupport";
+import {
+  Concern,
+  delegate,
+  extend,
+  inquiry,
+  isPresent,
+  safeConstantize,
+} from "@blazetrails/activesupport";
 import type { Base } from "@blazetrails/activerecord";
 import { classModule } from "@blazetrails/ruby-compat";
 import type { Job } from "../job.js";
@@ -24,6 +31,7 @@ export class ConcurrencyControls {
   declare concurrency_key: string | null;
   declare blockedExecution: Promise<Base | null>;
   declare private _jobClass: unknown;
+  declare destroy: () => Promise<unknown>;
 
   async unblockNextBlockedJob(): Promise<unknown> {
     if (await this.releaseConcurrencyLock()) {
@@ -52,6 +60,22 @@ export class ConcurrencyControls {
     if (!this.isConcurrencyLimited()) return false;
 
     return await Semaphore.signal(this as unknown as Job);
+  }
+
+  /** @internal */
+  async handleConcurrencyConflict(): Promise<unknown> {
+    if (this.concurrencyOnConflict().isDiscard()) {
+      return await this.destroy();
+    } else {
+      return await this.block();
+    }
+  }
+
+  /** @internal */
+  concurrencyOnConflict(): ReturnType<typeof inquiry> {
+    return inquiry.call(
+      String((this.jobClass() as { concurrencyOnConflict: unknown }).concurrencyOnConflict),
+    );
   }
 
   /** @internal */
