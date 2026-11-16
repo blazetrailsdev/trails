@@ -357,8 +357,12 @@ export class Range<T = unknown> {
   }
 }
 
-/** `range_init` (`vendor/ruby/v3.3.11/range.c:47-64`). */
-function rangeInit(range: Range, beg: unknown, end: unknown, excludeEnd: boolean): void {
+/**
+ * `range_init` (`vendor/ruby/v3.3.11/range.c:47-64`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rangeInit(range: Range, beg: unknown, end: unknown, excludeEnd: boolean): void {
   if ((!Number.isInteger(beg) || !Number.isInteger(end)) && beg != null && end != null) {
     const v = cmp(beg, end);
     if (v == null) throw new ArgumentError("bad value for range");
@@ -371,8 +375,12 @@ function rangeInit(range: Range, beg: unknown, end: unknown, excludeEnd: boolean
   }
 }
 
-/** `range_modify` (`vendor/ruby/v3.3.11/range.c:76-83`). */
-function rangeModify(range: Range): void {
+/**
+ * `range_modify` (`vendor/ruby/v3.3.11/range.c:76-83`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rangeModify(range: Range): void {
   if (Object.isFrozen(range)) {
     throw new FrozenError(`can't modify frozen ${rbObjClassname(range)}: ${rbInspect(range)}`, {
       receiver: range,
