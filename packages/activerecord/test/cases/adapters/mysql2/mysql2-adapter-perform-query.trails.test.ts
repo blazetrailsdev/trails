@@ -42,7 +42,9 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
 
   it("execute still returns rows for a row-returning statement", async () => {
     await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`);
-    expect(((await adapter.execute(`SELECT nick FROM pq`)) as Mysql2Result).toA()).toEqual([["a"]]);
+    expect(
+      ((await adapter.execute(`SELECT nick FROM pq`)) as Mysql2Result<unknown[]>).toA(),
+    ).toEqual([["a"]]);
   });
 
   it("the driver casts numerics, so castResult reports no column types", async () => {
@@ -86,7 +88,9 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
 
   it("does not prevent a read routed through execute while preventing writes", async () => {
     await Base.whilePreventingWrites(async () => {
-      expect(((await adapter.execute(`SELECT * FROM pq`)) as Mysql2Result).toA()).toEqual([]);
+      expect(
+        ((await adapter.execute(`SELECT * FROM pq`)) as Mysql2Result<unknown[]>).toA(),
+      ).toEqual([]);
     });
   });
   it("internalExecute prepares when prepare is true", async () => {
@@ -105,7 +109,9 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
     const closed = async () =>
       Number(
         (
-          (await adapter.execute(`SHOW SESSION STATUS LIKE 'Com_stmt_close'`)) as Mysql2Result
+          (await adapter.execute(`SHOW SESSION STATUS LIKE 'Com_stmt_close'`)) as Mysql2Result<
+            unknown[]
+          >
         ).toA()[0][1],
       );
     const sql = "INSERT INTO pq (id, nick) VALUES (?, ?)";

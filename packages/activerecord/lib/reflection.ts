@@ -943,7 +943,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   /** @internal */
-  protected actualSourceReflection(): this {
+  actualSourceReflection(): this {
     return this;
   }
 
@@ -1250,15 +1250,14 @@ export class ThroughReflection extends AbstractReflection {
     return (
       !!this.scope ||
       !!this.options.sourceType ||
-      !!this.sourceReflection?.hasScope() ||
-      !!this.throughReflection?.hasScope()
+      this.sourceReflection!.hasScope() ||
+      this.throughReflection!.hasScope()
     );
   }
 
   isNested(): boolean {
     return (
-      !!this.sourceReflection?.isThroughReflection() ||
-      !!this.throughReflection?.isThroughReflection()
+      this.sourceReflection!.isThroughReflection() || this.throughReflection!.isThroughReflection()
     );
   }
 
@@ -1419,10 +1418,8 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   /** @internal */
-  protected actualSourceReflection(): AbstractReflection {
-    const src = this.sourceReflection;
-    if (!src) return this;
-    return (src as any).actualSourceReflection?.() ?? src;
+  actualSourceReflection(): AssociationReflection {
+    return this.sourceReflection!.actualSourceReflection();
   }
 
   /** @internal */

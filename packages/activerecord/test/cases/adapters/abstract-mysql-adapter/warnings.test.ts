@@ -35,7 +35,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action :ignore on warning", async () => {
       await self().withDbWarningsAction("ignore", undefined, async () => {
-        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result<unknown[]>;
         expect(result.toA()[0]).toEqual([1]);
       });
     });
@@ -98,14 +98,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action allows a list of warnings to ignore", async () => {
       await self().withDbWarningsAction("raise", [/Truncated incorrect DOUBLE value/], async () => {
-        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result<unknown[]>;
         expect(result.toA()[0]).toEqual([1]);
       });
     });
 
     it("db_warnings_action allows a list of codes to ignore", async () => {
       await self().withDbWarningsAction("raise", ["1292"], async () => {
-        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result<unknown[]>;
         expect(result.toA()[0]).toEqual([1]);
       });
     });

@@ -1,10 +1,10 @@
 export class Result {
   readonly fields: string[];
-  private rows: unknown[][];
+  private rows: Array<unknown[] | Record<string, unknown>>;
 
   constructor(
     fields: string[],
-    rows: unknown[][],
+    rows: Array<unknown[] | Record<string, unknown>>,
     private error?: Error,
   ) {
     this.fields = fields;
@@ -15,7 +15,7 @@ export class Result {
     return this.rows.length;
   }
 
-  toA(): unknown[][] {
+  toA(): Array<unknown[] | Record<string, unknown>> {
     if (this.error) throw this.error;
     return this.rows;
   }

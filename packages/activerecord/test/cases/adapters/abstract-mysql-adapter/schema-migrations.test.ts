@@ -59,7 +59,7 @@ async function withEncodingUtf8mb4(adapter: Mysql2Adapter, fn: () => Promise<voi
   const result = (await adapter.execute(
     "SELECT DEFAULT_CHARACTER_SET_NAME, DEFAULT_COLLATION_NAME " +
       "FROM information_schema.schemata WHERE schema_name = DATABASE()",
-  )) as Mysql2Result;
+  )) as Mysql2Result<unknown[]>;
   const row = result.toA()[0];
   if (!row) throw new Error("Could not read database charset from information_schema.schemata");
   const originalCharset = row[0] as string;

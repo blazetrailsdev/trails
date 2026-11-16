@@ -41,7 +41,7 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
 
     const rawResult = (await adapter.internalExecute("SELECT 1 AS a, 2 AS a", "SQL", [], {
       materializeTransactions: false,
-    })) as Mysql2Result;
+    })) as Mysql2Result<unknown[]>;
 
     expect(rawResult.fields).toEqual(["a", "a"]);
     expect(rawResult.toA()).toEqual([[1, 2]]);

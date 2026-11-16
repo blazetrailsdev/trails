@@ -62,14 +62,16 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await Base.whilePreventingWrites(async () => {
         const result = (await conn.execute(
           "SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594'",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(result.size).toEqual(1);
       });
     });
 
     it("doesnt error when a show query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const result = (await conn.execute("SHOW FULL FIELDS FROM `engines`")) as Mysql2Result;
+        const result = (await conn.execute("SHOW FULL FIELDS FROM `engines`")) as Mysql2Result<
+          unknown[]
+        >;
         expect(result.size).toEqual(2);
       });
     });
@@ -84,14 +86,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("doesnt error when a describe query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const result = (await conn.execute("DESCRIBE engines")) as Mysql2Result;
+        const result = (await conn.execute("DESCRIBE engines")) as Mysql2Result<unknown[]>;
         expect(result.size).toEqual(2);
       });
     });
 
     it("doesnt error when a desc query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const result = (await conn.execute("DESC engines")) as Mysql2Result;
+        const result = (await conn.execute("DESC engines")) as Mysql2Result<unknown[]>;
         expect(result.size).toEqual(2);
       });
     });
@@ -102,7 +104,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await Base.whilePreventingWrites(async () => {
         const result = (await conn.execute(
           "/*action:index*/(\n( SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594' ) )",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         expect(result.size).toEqual(1);
       });
     });
@@ -120,7 +122,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await Base.whilePreventingWrites(async () => {
         const result = (await conn.execute(
           "SELECT CONNECTION_ID() as connection_id",
-        )) as Mysql2Result;
+        )) as Mysql2Result<unknown[]>;
         const connId = result.toA()[0][0];
         await assertRaises([QueryCanceled], {}, async () => {
           await conn.execute(`KILL QUERY ${connId}`);

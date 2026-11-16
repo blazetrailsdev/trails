@@ -21,6 +21,10 @@ const NON_EMITTING: ReadonlyMap<string, string> = new Map([
   ],
   ["schemaCache", "cache-bust — clearDataSourceCacheBang around a create"],
   ["pool", "argument to clearDataSourceCacheBang, not a DDL emitter"],
+  [
+    "stripTableNamePrefixAndSuffix",
+    "name read — derives the foreign key column from the target table name",
+  ],
   ["clearCacheBang", "post-lay prepared-statement reset (PG stale-plan 0A000)"],
   ["supportsComments", "capability read — decides whether a table comment rides inline"],
   [
