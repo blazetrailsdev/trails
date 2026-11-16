@@ -57,13 +57,7 @@ export class Protocol {
   protected async sslSocketConnect(s: SSLSocket, timeout: number | null): Promise<void> {
     if (timeout != null) {
       if (timeout <= 0) throw new OpenTimeout();
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      await Promise.race([
-        connect(s),
-        new Promise<never>((_resolve, reject) => {
-          timer = setTimeout(() => reject(new OpenTimeout()), timeout * 1000);
-        }),
-      ]).finally(() => clearTimeout(timer));
+      await Timeout.timeout(timeout, OpenTimeout, null, () => connect(s));
     } else {
       await connect(s);
     }
