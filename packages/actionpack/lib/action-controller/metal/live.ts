@@ -106,7 +106,10 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
           popped.push(str);
         }
       } catch (e) {
-        if (e instanceof ThreadError) for (const str of popped) void this._buf.push(str);
+        if (e instanceof ThreadError) {
+          const pushes = popped.map((str) => this._buf.push(str));
+          new Thread(() => Promise.all(pushes));
+        }
         throw e;
       }
       if (!block) return toEnum(popped, "each");

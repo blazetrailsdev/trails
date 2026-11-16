@@ -286,9 +286,9 @@ describe("HasOneAssociationsTest", () => {
 
   it("type mismatch", async () => {
     const firm = companies("first_firm") as any;
-    await expect(firm.setAccount(1)).rejects.toThrow(AssociationTypeMismatch);
+    expect(() => firm.setAccount(1)).toThrow(AssociationTypeMismatch);
     const project = await (await import("../../models/project.js")).Project.find(1);
-    await expect(firm.setAccount(project)).rejects.toThrow(AssociationTypeMismatch);
+    expect(() => firm.setAccount(project)).toThrow(AssociationTypeMismatch);
   });
 
   it("natural assignment", async () => {

@@ -125,9 +125,17 @@ export class HasOneAssociation extends SingularAssociation {
   /** @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */
   protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     if (save) {
+      if (record) this.raiseOnTypeMismatchBang(record);
+      const loaded = this.loadTarget();
+      if (
+        !(loaded instanceof Promise) &&
+        !this.owner.isPersisted() &&
+        !(this.target && !this.target.isDestroyed() && !rbEqual(this.target, record))
+      ) {
+        return this.replace(record, false);
+      }
       return (async () => {
-        if (record) this.raiseOnTypeMismatchBang(record);
-        if (!((await this.loadTarget()) || record)) return this.target;
+        if (!((await loaded) || record)) return this.target;
         const assigningAnotherRecord = !rbEqual(this.target, record);
         if (assigningAnotherRecord || record!.hasChangesToSave) {
           save &&= this.owner.isPersisted();

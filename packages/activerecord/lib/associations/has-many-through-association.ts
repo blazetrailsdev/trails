@@ -1,4 +1,4 @@
-import type { PermittedAttributes } from "@blazetrails/activemodel";
+import { assertAssignedSynchronously, type PermittedAttributes } from "@blazetrails/activemodel";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection } from "../reflection.js";
@@ -168,8 +168,11 @@ export class HasManyThroughAssociation extends HasManyAssociation {
             this.buildThroughRecord(record),
           );
         } else if (inverse.isHasOne()) {
-          void (record.association(inverse.name) as HasOneAssociation).writer(
-            this.buildThroughRecord(record),
+          assertAssignedSynchronously(
+            (record.association(inverse.name) as HasOneAssociation).writer(
+              this.buildThroughRecord(record),
+            ),
+            `${inverse.name}=`,
           );
         }
       }

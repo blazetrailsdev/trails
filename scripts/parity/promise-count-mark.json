@@ -1,7 +1,7 @@
 {
   "@typescript-eslint/no-floating-promises": {
     "actionmailbox": 1,
-    "activerecord": 2,
+    "activerecord": 1,
     "scripts": 46,
     "website": 8
   },
