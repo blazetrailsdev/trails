@@ -469,6 +469,14 @@ describe("AppGeneratorTest", () => {
     t.assertNoFile(".kamal/secrets");
   });
 
+  it("inclusion of kamal storage volume", async () => {
+    await runGeneratorInstance([t.destinationRoot]);
+
+    await t.assertFile("config/deploy.yml", (content: string) => {
+      expect(content).toMatch(/storage:\/app\/storage/);
+    });
+  });
+
   it("database yml skip kamal", async () => {
     await t.runGenerator([t.destinationRoot, "--skip-kamal"]);
 
