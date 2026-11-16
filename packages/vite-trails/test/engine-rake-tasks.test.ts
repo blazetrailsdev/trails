@@ -9,6 +9,12 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ViteAssets } from "@blazetrails/vite-assets";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const exec = vi.hoisted(() => vi.fn());
+vi.mock("@blazetrails/ruby-compat", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  exec,
+}));
 import { Commands } from "@blazetrails/vite-assets/commands.js";
 import "../lib/cli.js";
 
@@ -151,5 +157,52 @@ describe("EngineRakeTasksTest", () => {
       expect(await new CLI.Build().call({ mode: "development" })).toBeTruthy();
     });
     expect(buildFromTask).toHaveBeenCalledOnce();
+  });
+
+  it("cli commands", { timeout: 60_000 }, async () => {
+    await File.writeAsync(
+      rootDir.join("config/vite.json").toString(),
+      JSON.stringify({ all: { sourceCodeDir: "app/frontend", ssrBuildEnabled: true } }),
+    );
+    await withinMountedAppRoot(async () => {
+      ViteAssets.reloadWith({ root: Dir.pwd() });
+      await ViteAssets.commands().verifyInstall();
+
+      ViteAssets.reloadWith({ root: Dir.pwd() });
+
+      const installJsPackages = vi
+        .spyOn(
+          CLI.Install.prototype as unknown as { installJsPackages(): unknown },
+          "installJsPackages",
+        )
+        .mockResolvedValue(undefined);
+      await new CLI.Install().call();
+      await ViteAssets.commands().verifyInstall();
+      await new CLI.Version().call();
+      await new CLI.Upgrade().call();
+      expect(exec).toHaveBeenLastCalledWith("bundle exec vite upgrade_packages");
+      await new CLI.UpgradePackages().call();
+      expect(installJsPackages).toHaveBeenCalledTimes(2);
+
+      const { mode, ssrOutputDir } = await ViteAssets.config();
+      const run = vi
+        .spyOn(ViteAssets.instance(), "run")
+        .mockResolvedValue(["stdout", "stderr", { isSuccess: () => true }]);
+      expect(await new CLI.Build().call({ mode })).toBeTruthy();
+      expect(run).toHaveBeenLastCalledWith(["build"]);
+      expect(await new CLI.Build().call({ mode, ssr: true })).toBeTruthy();
+      expect(run).toHaveBeenLastCalledWith(["build", "--ssr"]);
+
+      await RbFileUtils.mkdirPAsync(ssrOutputDir.toString());
+      const ssrPath = ssrOutputDir.join("ssr.js");
+      await File.writeAsync(ssrPath.toString(), "");
+      await new CLI.SSR().call({ mode });
+      expect(exec).toHaveBeenLastCalledWith("node", ssrPath.toString());
+
+      expect(await new CLI.Dev().call({ mode, args: ["--wat"] })).toBeTruthy();
+      expect(run).toHaveBeenLastCalledWith(["--wat"], { exec: true });
+
+      await new CLI.Clobber().call({ mode });
+    });
   });
 });

@@ -26,12 +26,12 @@ interface InstallHost {
 }
 
 async function call(this: object, options: Record<string, unknown>): Promise<unknown> {
-  await (this as { ensureRailsInit(): Promise<void> }).ensureRailsInit();
+  await (this as { ensureTrailsInit(): Promise<void> }).ensureTrailsInit();
   return rbCallSuper(this, call, options);
 }
 
 /** @internal */
-async function ensureRailsInit(): Promise<void> {
+async function ensureTrailsInit(): Promise<void> {
   try {
     await rbFRequireFile(File.expandPath("config/environment", Dir.pwd()));
   } catch (error) {
@@ -41,7 +41,7 @@ async function ensureRailsInit(): Promise<void> {
   }
 }
 
-const Build = defineModule({ call }, {}, { ensureRailsInit });
+const Build = defineModule({ call }, {}, { ensureTrailsInit });
 
 const TRAILS_TEMPLATES = new Pathname(
   decodeURIComponent(new URL("../templates", import.meta.url).pathname),
@@ -50,7 +50,7 @@ const TRAILS_TEMPLATES = new Pathname(
 async function setupAppFiles(this: InstallHost): Promise<void> {
   const config = await this.config();
   const root = await this.root();
-  await this.cp(TRAILS_TEMPLATES.join("config/trails-vite.json"), config.configPath);
+  await this.cp(Install.TRAILS_TEMPLATES.join("config/trails-vite.json"), config.configPath);
   let dir: string | undefined;
   for (const path of ["app/javascript", "app/packs"]) {
     if (await File.isExistAsync(root.join(path).toString())) {
@@ -113,7 +113,7 @@ async function installSampleFiles(this: InstallHost): Promise<void> {
     !(await File.isExistAsync(config.resolvedEntrypointsDir().join("application.js").toString()))
   ) {
     await this.cp(
-      TRAILS_TEMPLATES.join("entrypoints/application.js"),
+      Install.TRAILS_TEMPLATES.join("entrypoints/application.js"),
       config.resolvedEntrypointsDir().join("application.js"),
     );
   }
@@ -140,7 +140,7 @@ async function installSampleFiles(this: InstallHost): Promise<void> {
 }
 
 const Install = defineModule(
-  { setupAppFiles, installSampleFiles },
+  { TRAILS_TEMPLATES, setupAppFiles, installSampleFiles },
   {},
   { setupContentSecurityPolicy },
 );
