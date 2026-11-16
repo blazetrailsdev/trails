@@ -3,7 +3,7 @@ import { Duration } from "../../duration.js";
 import { IsolatedExecutionState } from "../../isolated-execution-state.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { ArgumentError, zone as timeZone } from "../../time-zone-config.js";
-import { TEMPORAL_METHOD_TABLE, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import { Rational, TEMPORAL_METHOD_TABLE, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 import { DAYS_INTO_WEEK } from "../date-and-time/calculations.js";
 import { inTimeZone } from "../date-and-time/zones.js";
 
@@ -112,7 +112,7 @@ export function plusWithoutDuration(date: Temporal.PlainDate, other: number): Te
 export function minusWithDuration(
   date: Temporal.PlainDate,
   other: Duration | number | Temporal.PlainDate,
-): Temporal.PlainDate | TimeWithZone | RubyTime | number {
+): Temporal.PlainDate | TimeWithZone | RubyTime | Rational {
   if (other instanceof Duration) {
     return plusWithDuration.call(date, other.negate());
   } else {
@@ -123,9 +123,9 @@ export function minusWithDuration(
 export function minusWithoutDuration(
   date: Temporal.PlainDate,
   other: number | Temporal.PlainDate,
-): Temporal.PlainDate | number {
+): Temporal.PlainDate | Rational {
   if (other instanceof Temporal.PlainDate) {
-    return date.since(other, { largestUnit: "day" }).days;
+    return new Rational(date.since(other, { largestUnit: "day" }).days, 1);
   }
   return date.subtract({ days: other });
 }

@@ -160,14 +160,6 @@ export function mattrAccessor(
 
 export const cattrAccessor = mattrAccessor;
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE config-accessor-belongs-in-configurable-not-module-ext
- */
-export function configAccessor(this: any, ...syms: (string | MattrOptions)[]): void {
-  mattrAccessor.call(this, ...syms);
-}
-
 let _attrInternalNamingFormat = "_%s";
 
 export function getAttrInternalNamingFormat(): string {

@@ -1615,7 +1615,7 @@ export class Time extends rbCTime {
 
   get isdst(): boolean {
     if (this.#isdstMemo != null) return this.#isdstMemo;
-    if (this.#timeZoneId == null || this.#timeZoneId === "UTC") return false;
+    if (this.#timeZoneId == null) return false;
     return tzdataIsdst(this.#timeZoneId, Math.floor(this.#instant.epochMilliseconds / 1000));
   }
 

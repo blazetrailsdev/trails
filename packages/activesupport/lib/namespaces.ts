@@ -66,6 +66,20 @@ export const ActiveSupport = {
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
   Inflector: typeof Inflector;
   MessagePack?: typeof MessagePack;
+  testOrder: string | null;
+  errorReporter: ErrorReporter;
+  cacheFormatVersion(): number;
+  setCacheFormatVersion(value: number): void;
+  toTimePreservesTimezone(): boolean | string;
+  setToTimePreservesTimezone(value: boolean | string | null): void;
+  fsAdapter: string | null;
+  cryptoAdapter: string | null;
+  asyncContextAdapter: string | null;
+  childProcessAdapter: string | null;
+  httpAdapter: string | null;
+  osAdapter: string | null;
+  zlibAdapter: string | null;
+  readonly processAdapter: string | null;
 };
 extend(ActiveSupport, Autoload);
 

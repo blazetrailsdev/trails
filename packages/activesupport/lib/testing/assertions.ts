@@ -373,6 +373,11 @@ export async function assertDifference<T>(
   ...args: [difference?: number, message?: string | null, block?: () => T | Promise<T>]
 ): Promise<T | undefined>;
 export async function assertDifference<T>(
+  expression: Expression<number> | Expression<number>[],
+  difference: number,
+  block: () => T | Promise<T>,
+): Promise<T | undefined>;
+export async function assertDifference<T>(
   expression: Expression<number> | Expression<number>[] | Map<Expression<number>, number>,
   ...args: unknown[]
 ): Promise<T | undefined> {
@@ -413,9 +418,13 @@ export async function assertDifference<T>(
 
 export async function assertNoDifference<T>(
   expression: Expression<number> | Expression<number>[] | Map<Expression<number>, number>,
-  message: string | null = null,
+  message: string | null | (() => T | Promise<T>) = null,
   block?: () => T | Promise<T>,
 ): Promise<T | undefined> {
+  if (typeof message === "function") {
+    block = message;
+    message = null;
+  }
   return assertDifference(
     expression as Expression<number>,
     0,

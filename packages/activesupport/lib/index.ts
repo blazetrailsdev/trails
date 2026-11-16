@@ -31,85 +31,67 @@ import {
   processAdapterConfig,
   zlibAdapterConfig,
 } from "@blazetrails/ruby-compat";
-import { ErrorReporter, currentErrorReporter, _setErrorReporter } from "./error-reporter.js";
-import {
-  cacheFormatVersion,
-  setCacheFormatVersion,
-  testOrder,
-  setTestOrder,
-} from "./active-support.js";
+import { ActiveSupport } from "./active-support.js";
 
-export const ActiveSupport = {
-  get errorReporter(): ErrorReporter {
-    return currentErrorReporter;
-  },
-  set errorReporter(reporter: ErrorReporter) {
-    _setErrorReporter(reporter);
-  },
+Object.defineProperties(
+  ActiveSupport,
+  Object.getOwnPropertyDescriptors({
+    get fsAdapter(): string | null {
+      return fsAdapterConfig.adapter;
+    },
+    set fsAdapter(name: string | null) {
+      fsAdapterConfig.adapter = name;
+    },
 
-  get fsAdapter(): string | null {
-    return fsAdapterConfig.adapter;
-  },
-  set fsAdapter(name: string | null) {
-    fsAdapterConfig.adapter = name;
-  },
+    get cryptoAdapter(): string | null {
+      return cryptoAdapterConfig.adapter;
+    },
+    set cryptoAdapter(name: string | null) {
+      cryptoAdapterConfig.adapter = name;
+    },
 
-  get cryptoAdapter(): string | null {
-    return cryptoAdapterConfig.adapter;
-  },
-  set cryptoAdapter(name: string | null) {
-    cryptoAdapterConfig.adapter = name;
-  },
+    get asyncContextAdapter(): string | null {
+      return asyncContextAdapterConfig.adapter;
+    },
+    set asyncContextAdapter(name: string | null) {
+      asyncContextAdapterConfig.adapter = name;
+    },
 
-  get asyncContextAdapter(): string | null {
-    return asyncContextAdapterConfig.adapter;
-  },
-  set asyncContextAdapter(name: string | null) {
-    asyncContextAdapterConfig.adapter = name;
-  },
+    get childProcessAdapter(): string | null {
+      return childProcessAdapterConfig.adapter;
+    },
+    set childProcessAdapter(name: string | null) {
+      childProcessAdapterConfig.adapter = name;
+    },
 
-  get childProcessAdapter(): string | null {
-    return childProcessAdapterConfig.adapter;
-  },
-  set childProcessAdapter(name: string | null) {
-    childProcessAdapterConfig.adapter = name;
-  },
+    get httpAdapter(): string | null {
+      return httpAdapterConfig.adapter;
+    },
+    set httpAdapter(name: string | null) {
+      httpAdapterConfig.adapter = name;
+    },
 
-  get httpAdapter(): string | null {
-    return httpAdapterConfig.adapter;
-  },
-  set httpAdapter(name: string | null) {
-    httpAdapterConfig.adapter = name;
-  },
+    get osAdapter(): string | null {
+      return osAdapterConfig.adapter;
+    },
+    set osAdapter(name: string | null) {
+      osAdapterConfig.adapter = name;
+    },
 
-  get osAdapter(): string | null {
-    return osAdapterConfig.adapter;
-  },
-  set osAdapter(name: string | null) {
-    osAdapterConfig.adapter = name;
-  },
+    get zlibAdapter(): string | null {
+      return zlibAdapterConfig.adapter;
+    },
+    set zlibAdapter(name: string | null) {
+      zlibAdapterConfig.adapter = name;
+    },
 
-  get zlibAdapter(): string | null {
-    return zlibAdapterConfig.adapter;
-  },
-  set zlibAdapter(name: string | null) {
-    zlibAdapterConfig.adapter = name;
-  },
+    get processAdapter(): string | null {
+      return processAdapterConfig.adapter;
+    },
+  }),
+);
 
-  get processAdapter(): string | null {
-    return processAdapterConfig.adapter;
-  },
-
-  get testOrder(): string | null {
-    return testOrder();
-  },
-  set testOrder(value: string | null) {
-    setTestOrder(value);
-  },
-
-  cacheFormatVersion,
-  setCacheFormatVersion,
-};
+export { ActiveSupport };
 
 export {
   pluralize,
@@ -288,7 +270,6 @@ export {
   cattrAccessor,
   cattrReader,
   cattrWriter,
-  configAccessor,
   attrInternal,
   attrInternalAccessor,
   attrInternalReader,

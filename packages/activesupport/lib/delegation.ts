@@ -11,6 +11,7 @@ import {
   rbObjRespondTo,
   nameErrMesgReceiver,
   constGet,
+  TypeError,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import { constantize, safeConstantize } from "./inflector.js";
@@ -73,7 +74,10 @@ export namespace Delegation {
     "block",
   ]);
 
-  /** @inventedArm if — PERMANENT */
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm throw — PERMANENT
+   */
   export function generate<T extends object>(
     owner: T,
     methods: string[],
@@ -92,7 +96,10 @@ export namespace Delegation {
       );
     }
 
-    if (prefix === true && (typeof to !== "string" || /^[^a-z_]/.test(to))) {
+    if (prefix === true && typeof to !== "string") {
+      throw new TypeError(`no implicit conversion of ${rbModName(rbObjClass(to))} into String`);
+    }
+    if (prefix === true && /^[^a-z_]/.test(to as string)) {
       throw new ArgumentError(
         "Can only automatically set the delegation prefix when delegating to a method.",
       );
