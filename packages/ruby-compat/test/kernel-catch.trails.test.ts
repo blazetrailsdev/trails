@@ -144,4 +144,16 @@ describe("kernelCatch", () => {
     }) as Promise<unknown>;
     await expect(later).rejects.toBeInstanceOf(UncaughtThrowError);
   });
+
+  it("catches a throw after an await through a nested catch of another tag", async () => {
+    const res = kernelCatch(":abort", async () => {
+      await Promise.resolve();
+      await kernelCatch(":other", async () => {
+        await Promise.resolve();
+        kernelThrow(":abort", ":halted");
+      });
+      return ":ran";
+    });
+    expect(await res).toBe(":halted");
+  });
 });

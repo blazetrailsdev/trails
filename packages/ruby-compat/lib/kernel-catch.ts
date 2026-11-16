@@ -1,9 +1,4 @@
 import { ArgumentError } from "./argument-error.js";
-import {
-  getAsyncContext,
-  type AsyncContext,
-  type AsyncContextAdapter,
-} from "./async-context-adapter.js";
 import { format } from "./kernel-format.js";
 import { LocalJumpError } from "./local-jump-error.js";
 import { rbBuiltinClassName } from "./object.js";
@@ -67,27 +62,20 @@ class VmThrowData {
   constructor(readonly tag: unknown) {}
 }
 
+const _detachedThrows = new WeakSet<object>();
+let _detachedCatches = 0;
+
 /**
  * `THROW_DATA_P` (`vendor/ruby/v3.3.11/internal/imemo.h:118`): a `throw` in
  * flight is not an exception, so no `rescue` clause sees it. A JS `catch`
- * does, and asks this before treating what it caught as one.
+ * does, and asks this before treating what it caught as one. A throw raised
+ * after an `await` while an async block's catch is pending is in flight too:
+ * it may yet reach that catch through the block's promise.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function throwDataP(err: unknown): boolean {
-  return err instanceof VmThrowData;
-}
-
-let _ecTag: AsyncContext<RbVmTag> | null = null;
-let _adapter: AsyncContextAdapter | null = null;
-
-function ecTagSlot(): AsyncContext<RbVmTag> {
-  const adapter = getAsyncContext();
-  if (!_ecTag || _adapter !== adapter) {
-    _adapter = adapter;
-    _ecTag = adapter.create<RbVmTag>();
-  }
-  return _ecTag;
+  return err instanceof VmThrowData || (err instanceof Object && _detachedThrows.has(err));
 }
 
 let _syncTag: RbVmTag | undefined;
@@ -107,7 +95,7 @@ export function kernelThrow(tag: unknown, value: unknown = null): never {
 }
 
 function rbThrowObj(tag: unknown, value: unknown): never {
-  let tt = _syncTag ?? ecTagSlot().getStore();
+  let tt = _syncTag;
 
   while (tt) {
     if (!tt.popped && tt.tag === tag) {
@@ -117,7 +105,9 @@ function rbThrowObj(tag: unknown, value: unknown): never {
     tt = tt.prev;
   }
   if (!tt) {
-    throw new UncaughtThrowError(tag, value, "uncaught throw %p");
+    const err = new UncaughtThrowError(tag, value, "uncaught throw %p");
+    if (_detachedCatches > 0) _detachedThrows.add(err);
+    throw err;
   }
 
   throw new VmThrowData(tag);
@@ -136,10 +126,12 @@ export function kernelCatch<T>(tag: unknown, block: (tag: unknown) => T): T | un
  * defaults to a fresh `Object.new`, and a missing block raises
  * `LocalJumpError` at `catch_i`'s `rb_yield_0`.
  *
- * A block returning a thenable keeps its tag pushed until it settles, and a
- * rejection carrying a matching throw resolves to the thrown value — the
- * `EC_POP_TAG` Ruby runs after the block returns, moved to where an async
- * block actually returns. A sync block stays sync.
+ * The tag is pushed on a stack popped when the block returns, so a sync block
+ * stays sync and enters no async-context frame. A block returning a thenable
+ * has no tag on the stack once it awaits: a throw there raises
+ * `UncaughtThrowError`, and a rejection of the block's promise carrying one
+ * with a matching tag resolves to its value — the `EC_POP_TAG` Ruby runs
+ * after the block returns, moved to where an async block actually returns.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Kernel#catch`, which Rails calls
  * without defining.
@@ -157,36 +149,38 @@ export function kernelCatch(...argv: unknown[]): unknown {
 }
 
 function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
-  const context = ecTagSlot();
   const outer = _syncTag;
-  const tt: RbVmTag = { tag, retval: null, prev: outer ?? context.getStore(), popped: false };
+  const tt: RbVmTag = { tag, retval: null, prev: outer, popped: false };
   const rescue = (errinfo: unknown): unknown => {
     if (errinfo instanceof VmThrowData && errinfo.tag === tag) return tt.retval;
+    if (
+      errinfo instanceof UncaughtThrowError &&
+      _detachedThrows.has(errinfo) &&
+      errinfo.tag === tag
+    ) {
+      return errinfo.value;
+    }
     throw errinfo;
   };
-  _syncTag = undefined;
+  let val: unknown;
+  _syncTag = tt;
   try {
-    return context.run(tt, () => {
-      let val: unknown;
-      try {
-        val = func(tag);
-      } catch (errinfo) {
-        tt.popped = true;
-        return rescue(errinfo);
-      }
-      if (val !== null && typeof (val as PromiseLike<unknown>)?.then === "function") {
-        return Promise.resolve(val as PromiseLike<unknown>)
-          .finally(() => {
-            tt.popped = true;
-          })
-          .then(undefined, rescue);
-      }
-      tt.popped = true;
-      return val;
-    });
+    val = func(tag);
+  } catch (errinfo) {
+    return rescue(errinfo);
   } finally {
+    tt.popped = true;
     _syncTag = outer;
   }
+  if (val !== null && typeof (val as PromiseLike<unknown>)?.then === "function") {
+    _detachedCatches++;
+    return Promise.resolve(val as PromiseLike<unknown>)
+      .finally(() => {
+        _detachedCatches--;
+      })
+      .then(undefined, rescue);
+  }
+  return val;
 }
 
 /**
@@ -202,7 +196,7 @@ function rbCatchObj(tag: unknown, func: (tag: unknown) => unknown): unknown {
  */
 export function kernelCatchSync<T>(tag: unknown, block: (tag: unknown) => T): T | unknown {
   const outer = _syncTag;
-  const tt: RbVmTag = { tag, retval: null, prev: outer ?? ecTagSlot().getStore(), popped: false };
+  const tt: RbVmTag = { tag, retval: null, prev: outer, popped: false };
   _syncTag = tt;
   try {
     return block(tag);
