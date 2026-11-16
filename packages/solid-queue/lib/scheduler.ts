@@ -74,8 +74,8 @@ export class Scheduler extends Base {
   }
 
   /** @internal */
-  unscheduleRecurringTasks(): void {
-    this.recurringSchedule.unscheduleTasks();
+  async unscheduleRecurringTasks(): Promise<void> {
+    await this.recurringSchedule.unscheduleTasks();
   }
 
   /** @internal */

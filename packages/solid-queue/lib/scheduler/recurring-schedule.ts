@@ -1,5 +1,5 @@
 import { include } from "@blazetrails/activesupport";
-import { CancelledOperationError, ScheduledTask, rbFArray } from "@blazetrails/ruby-compat";
+import { CancelledOperationError, Mutex, ScheduledTask, rbFArray } from "@blazetrails/ruby-compat";
 import { AppExecutor } from "../app-executor.js";
 import { RecurringTask } from "../recurring-task.js";
 import { Time } from "@blazetrails/date";
@@ -12,61 +12,138 @@ export class RecurringSchedule {
     include(this, AppExecutor);
   }
 
-  configuredTasks: RecurringTask[];
-  readonly scheduledTasks: Map<string, ScheduledTask>;
+  readonly scheduledTasks: Map<unknown, ScheduledTask>;
+  /** @internal */
+  staticTasks: RecurringTask[];
+  /** @internal */
+  readonly scheduleLock: Mutex;
+  declare private _dynamicTasksEnabled: boolean;
+  declare private _dynamicTasks: RecurringTask[] | undefined;
 
-  constructor(tasks: unknown) {
-    this.configuredTasks = (rbFArray(tasks) as TaskConfiguration[]).map((task) =>
+  constructor(
+    staticTasks: unknown,
+    { dynamicTasksEnabled = false }: { dynamicTasksEnabled?: boolean } = {},
+  ) {
+    this.staticTasks = (rbFArray(staticTasks) as TaskConfiguration[]).map((task) =>
       RecurringTask.wrap(task),
     );
-    this.scheduledTasks = new Map<string, ScheduledTask>();
+    this._dynamicTasksEnabled = dynamicTasksEnabled;
+
+    this.scheduleLock = new Mutex();
+    this.scheduledTasks = new Map<unknown, ScheduledTask>();
+  }
+
+  configuredTasks(): RecurringTask[] {
+    return [...this.staticTasks, ...this.dynamicTasks()];
   }
 
   isEmpty(): boolean {
-    return this.configuredTasks.length === 0;
+    return this.scheduledTasks.size === 0 && this.dynamicTasks().length === 0;
   }
 
   async scheduleTasks(): Promise<void> {
     await this.wrapInAppExecutor(async () => {
-      await this.persistTasks();
-      await this.reloadTasks();
+      await this.persistStaticTasks();
+      await this.reloadStaticTasks();
+      await this.reloadDynamicTasks();
     });
 
-    for (const task of this.configuredTasks) {
+    await this.scheduleLock.synchronize(async () => {
+      for (const task of this.configuredTasks()) this.scheduleTask(task);
+    });
+  }
+
+  async unscheduleTasks(): Promise<void> {
+    await this.scheduleLock.synchronize(() => {
+      for (const task of [...this.scheduledTasks.values()]) task.cancel();
+      this.scheduledTasks.clear();
+    });
+  }
+
+  taskKeys(): string[] {
+    return this.configuredTasks().map((task) => task.key);
+  }
+
+  async rescheduleDynamicTasks(): Promise<void> {
+    await this.wrapInAppExecutor(async () => {
+      await this.reloadDynamicTasks();
+
+      await this.scheduleLock.synchronize(async () => {
+        await this.scheduleCreatedDynamicTasks();
+        await this.unscheduleDeletedDynamicTasks();
+      });
+    });
+  }
+
+  /** @internal */
+  staticTaskKeys(): string[] {
+    return this.staticTasks.map((task) => task.key);
+  }
+
+  /**
+   * @internal
+   * @inventedArm ?? — CONVERGEABLE solid-queue-scheduler-dynamic-tasks
+   */
+  dynamicTasks(): RecurringTask[] {
+    return this._dynamicTasks ?? [];
+  }
+
+  /** @internal */
+  isDynamicTasksEnabled(): boolean {
+    return this._dynamicTasksEnabled;
+  }
+
+  /** @internal */
+  async scheduleCreatedDynamicTasks(): Promise<void> {
+    for (const task of this.dynamicTasks().filter((task) => !this.scheduledTasks.has(task.id))) {
       this.scheduleTask(task);
     }
   }
 
-  /** @missingRailsArgs schedule — CONVERGEABLE solid-queue-recurring-schedule-v1-7-2 */
+  /** @internal */
+  async unscheduleDeletedDynamicTasks(): Promise<void> {
+    const ids = new Set([
+      ...this.staticTasks.map((task) => task.id),
+      ...this.dynamicTasks().map((task) => task.id),
+    ]);
+    for (const id of [...this.scheduledTasks.keys()].filter((id) => !ids.has(id))) {
+      const scheduledTask = this.scheduledTasks.get(id)!;
+      this.scheduledTasks.delete(id);
+      scheduledTask.cancel();
+    }
+  }
+
+  /** @internal */
   scheduleTask(task: RecurringTask, { runAt = task.nextTime() }: { runAt?: Time } = {}): void {
-    this.scheduledTasks.set(task.key, this.schedule(task, { runAt }));
-  }
-
-  unscheduleTasks(): void {
-    for (const task of [...this.scheduledTasks.values()]) task.cancel();
-    this.scheduledTasks.clear();
-  }
-
-  taskKeys(): string[] {
-    return this.configuredTasks.map((task) => task.key);
+    this.scheduledTasks.set(task.id, this.schedule(task, { runAt }));
   }
 
   /**
    * @internal
    * @inventedArm isValid — CONVERGEABLE recurring-schedule-selects-valid-tasks-on-construction
    */
-  async persistTasks(): Promise<void> {
+  async persistStaticTasks(): Promise<void> {
     const valid: RecurringTask[] = [];
-    for (const task of this.configuredTasks) if (await task.isValid()) valid.push(task);
-    this.configuredTasks = valid;
+    for (const task of this.staticTasks) if (await task.isValid()) valid.push(task);
+    this.staticTasks = valid;
 
-    await RecurringTask.static().where().not({ key: this.taskKeys() }).deleteAll();
-    await RecurringTask.createOrUpdateAll(this.configuredTasks);
+    await RecurringTask.static().where().not({ key: this.staticTaskKeys() }).deleteAll();
+    await RecurringTask.createOrUpdateAll(this.staticTasks);
   }
 
   /** @internal */
-  async reloadTasks(): Promise<void> {
-    this.configuredTasks = await RecurringTask.where({ key: this.taskKeys() }).toArray();
+  async reloadStaticTasks(): Promise<void> {
+    this.staticTasks = await RecurringTask.static().where({ key: this.staticTaskKeys() }).toArray();
+  }
+
+  /** @internal */
+  async reloadDynamicTasks(): Promise<void> {
+    this._dynamicTasks = await this.loadDynamicTasks();
+  }
+
+  /** @internal */
+  async loadDynamicTasks(): Promise<RecurringTask[]> {
+    return this.isDynamicTasksEnabled() ? await RecurringTask.dynamic().toArray() : [];
   }
 
   /** @internal */
@@ -77,7 +154,9 @@ export class RecurringSchedule {
       delay,
       { args: [task, runAt] as const },
       async (threadTask, threadTaskRunAt) => {
-        this.scheduleNextRun(threadTask, { runAt: threadTask.nextTimeAfter(threadTaskRunAt) });
+        await this.scheduleNextRun(threadTask, {
+          runAt: threadTask.nextTimeAfter(threadTaskRunAt),
+        });
 
         await this.wrapInAppExecutor(() => threadTask.enqueue({ at: threadTaskRunAt }));
       },
@@ -91,12 +170,11 @@ export class RecurringSchedule {
     return scheduledTask;
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE solid-queue-recurring-schedule-v1-7-2
-   */
-  scheduleNextRun(task: RecurringTask, { runAt }: { runAt: Time }): void {
-    if (this.scheduledTasks.has(task.key)) this.scheduleTask(task, { runAt });
+  /** @internal */
+  async scheduleNextRun(task: RecurringTask, { runAt }: { runAt: Time }): Promise<void> {
+    await this.scheduleLock.synchronize(() => {
+      if (this.scheduledTasks.has(task.id)) this.scheduleTask(task, { runAt });
+    });
   }
 }
 

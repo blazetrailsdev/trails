@@ -29,6 +29,7 @@ type JobClass = (new (...args: unknown[]) => ActiveJobBase) & { queueAdapterName
 
 export class RecurringTask extends Record {
   declare static static: () => Relation<RecurringTask>;
+  declare static dynamic: () => Relation<RecurringTask>;
   declare static defaultJobClass: JobClass | null;
   declare key: string;
   declare schedule: string;
@@ -50,12 +51,15 @@ export class RecurringTask extends Record {
 
     this.serialize("arguments", { coder: Arguments, default: [] });
 
-    this.validate(":supportedSchedule");
+    this.validate(":ensureScheduleSupported");
     this.validate(":ensureCommandOrClassPresent");
-    this.validate(":existingJobClass");
+    this.validate(":ensureExistingJobClass");
 
     this.scope("static", function () {
       return this.where({ static: true });
+    });
+    this.scope("dynamic", function () {
+      return this.where({ static: false });
     });
 
     this.hasMany("recurringExecutions", { foreignKey: "task_key", primaryKey: "key" });
@@ -78,7 +82,7 @@ export class RecurringTask extends Record {
       queue_name: presence(options.queue),
       priority: presence(options.priority),
       description: options.description,
-      static: true,
+      static: Object.hasOwn(options, "static") ? options.static : true,
     });
   }
 
@@ -93,11 +97,6 @@ export class RecurringTask extends Record {
     }
   }
 
-  delayFromNow(): number {
-    return Math.max(Number(this.nextTime().minus(Time.current() as Time)), 0);
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE solid-queue-recurring-schedule-v1-7-2 */
   nextTimeAfter(time: Time): Time {
     return (this.parsedSchedule() as Cron).nextTime(time).utc();
   }
@@ -171,7 +170,7 @@ export class RecurringTask extends Record {
   }
 
   /** @internal */
-  supportedSchedule(): void {
+  ensureScheduleSupported(): void {
     if (rbObjClass(this.parsedSchedule()) !== Cron) {
       this.errors.add("schedule", ":unsupported", {
         message: "is not a supported recurring schedule",
@@ -183,13 +182,13 @@ export class RecurringTask extends Record {
   ensureCommandOrClassPresent(): void {
     if (!(isPresent(this.command) || isPresent(this.class_name))) {
       this.errors.add("base", ":command_and_class_blank", {
-        message: "either command or class_name must be present",
+        message: "either command or class must be present",
       });
     }
   }
 
   /** @internal */
-  existingJobClass(): void {
+  ensureExistingJobClass(): void {
     if (isPresent(this.class_name) && this.jobClass() == null) {
       this.errors.add("class_name", ":undefined", {
         message: "doesn't correspond to an existing class",

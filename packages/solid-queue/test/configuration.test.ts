@@ -33,8 +33,8 @@ function assertHasRecurringTask(
   scheduler: Scheduler,
   { key, ...attributes }: { key: string; [attr: string]: unknown },
 ) {
-  expect(scheduler.recurringSchedule.configuredTasks.length).toBe(1);
-  const task = scheduler.recurringSchedule.configuredTasks.find((t) => t.key === key)!;
+  expect(scheduler.recurringSchedule.configuredTasks().length).toBe(1);
+  const task = scheduler.recurringSchedule.configuredTasks().find((t) => t.key === key)!;
 
   for (const [attr, value] of Object.entries(attributes)) {
     expect((task as unknown as Record<string, unknown>)[attr]).toEqual(value);
