@@ -11,8 +11,8 @@ export class Map<V = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT
    * @inventedArm if — PERMANENT
+   * @noRailsEquivalent PERMANENT
    */
   set(cref: Cref, value: V): V {
     let raised = false;
@@ -32,8 +32,8 @@ export class Map<V = unknown> {
   }
 
   /**
-   * @noRailsEquivalent PERMANENT
    * @inventedArm if — PERMANENT
+   * @noRailsEquivalent PERMANENT
    */
   get(cref: Cref): V | null {
     let raised = false;
