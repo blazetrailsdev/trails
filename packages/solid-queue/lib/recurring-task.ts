@@ -224,7 +224,6 @@ export class RecurringTask extends Record {
         this.enqueueOptions(),
       );
       await activeJob.runCallbacks("enqueue", () => Job.enqueue(activeJob as never));
-      activeJob.successfullyEnqueued = true;
       return activeJob;
     });
   }

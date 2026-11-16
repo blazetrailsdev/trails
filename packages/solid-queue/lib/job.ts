@@ -117,7 +117,8 @@ export class Job extends Record {
     activeJob.scheduledAt = scheduledAt;
 
     const enqueuedJob = await this.createFromActiveJob(activeJob);
-    activeJob.providerJobId = enqueuedJob.id;
+    if (enqueuedJob.isPersisted()) activeJob.providerJobId = enqueuedJob.id;
+    activeJob.successfullyEnqueued = enqueuedJob.isPersisted();
     return enqueuedJob;
   }
 
