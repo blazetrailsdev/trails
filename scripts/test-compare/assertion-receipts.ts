@@ -24,6 +24,7 @@ import { rack } from "./assertion-receipts/rack.js";
 import { railsDomTesting } from "./assertion-receipts/rails-dom-testing.js";
 import { rake } from "./assertion-receipts/rake.js";
 import { rubyCompat } from "./assertion-receipts/ruby-compat.js";
+import { solidCache } from "./assertion-receipts/solid-cache.js";
 import { solidQueue } from "./assertion-receipts/solid-queue.js";
 import { trailties } from "./assertion-receipts/trailties.js";
 import { tzinfo } from "./assertion-receipts/tzinfo.js";
@@ -69,6 +70,7 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   "rails-dom-testing": railsDomTesting,
   rake,
   "ruby-compat": rubyCompat,
+  "solid-cache": solidCache,
   "solid-queue": solidQueue,
   trailties,
   tzinfo,
