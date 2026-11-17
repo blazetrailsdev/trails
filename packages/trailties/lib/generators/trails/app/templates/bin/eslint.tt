@@ -10,7 +10,6 @@ const { status } = spawnSync(
   ["--config", join(root, "eslint.config.mjs"), ...args],
   { stdio: "inherit" },
 );
-// Prettier is the layout half of the omakase style, as rubocop -a corrects Layout cops.
 const fix = args.includes("--fix");
 const prettier = spawnSync(
   join(root, "node_modules", ".bin", "prettier"),

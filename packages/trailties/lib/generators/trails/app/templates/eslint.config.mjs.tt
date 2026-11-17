@@ -13,7 +13,5 @@ export default defineConfig([
   //
   // // Allow `let` for bindings that are never reassigned
   // { rules: { "prefer-const": "off" } },
-  //
-  // Formatting is Prettier's, configured in .prettierrc.json; keep this entry last
   eslintConfigPrettier,
 ]);
