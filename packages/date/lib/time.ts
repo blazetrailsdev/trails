@@ -79,8 +79,8 @@ function isZoneIdentifier(zone: string): boolean {
   return !/^([+-]|[A-IK-Z]$)/.test(zone);
 }
 
-function utcOffsetArgument(zone: string | number | Rational): "UTC" | number {
-  if (zone instanceof Rational) zone = zone.toF();
+function utcOffsetArgument(zone: string | number | Rational | object): "UTC" | number {
+  if (typeof zone === "object") zone = numExact(zone).toF();
   if (typeof zone === "number") {
     if (!Number.isFinite(zone) || Math.abs(zone) >= 86400) {
       throw new ArgumentError("utc_offset out of range");
@@ -213,14 +213,13 @@ function isTimeNewOptions(arg: unknown): arg is TimeNewOptions {
   return (
     typeof arg === "object" &&
     arg !== null &&
-    !(arg instanceof Rational) &&
-    !(arg instanceof Timezone)
+    [Object.prototype, null].includes(Object.getPrototypeOf(arg))
   );
 }
 
 /** @noRailsEquivalent PERMANENT */
 export interface TimeAtOptions {
-  in?: string | number | Timezone | null;
+  in?: string | number | Timezone | object | null;
 }
 
 function getScale(unit: string): number {
@@ -348,7 +347,7 @@ function timeInitParse(
 
 /** @noRailsEquivalent PERMANENT */
 export interface TimeNewOptions {
-  in?: string | number | Timezone | null;
+  in?: string | number | Timezone | object | null;
   precision?: number | null;
 }
 
@@ -562,15 +561,15 @@ export function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
 export class Time extends rbCTime {
   #vtmMemo: Vtm | null;
   /** @internal */
-  #instantMemo: Temporal.Instant | null;
+  #instantMemo!: Temporal.Instant | null;
   /** @internal */
-  #timeZoneId: string | null;
+  #timeZoneId!: string | null;
   /** @internal */
-  #tzmodeUtc: boolean;
+  #tzmodeUtc!: boolean;
   /** @internal */
-  #localZone: boolean;
+  #localZone!: boolean;
   /** @internal */
-  #utcOffsetMemo: number | null;
+  #utcOffsetMemo!: number | null;
   /** @internal */
   #subnano: Rational;
   /** @internal */
@@ -620,7 +619,9 @@ export class Time extends rbCTime {
         : zoneOffsetAt(this.#timeZoneId!, this.#epochNs, this.#localZone));
   }
 
-  static now({ in: inZone = null }: { in?: string | number | Timezone | null } = {}): Time {
+  static now({
+    in: inZone = null,
+  }: { in?: string | number | Timezone | object | null } = {}): Time {
     return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(systemEpochNs()), inZone);
   }
 
@@ -631,7 +632,7 @@ export class Time extends rbCTime {
     hour: number | string | TimeNewOptions | null = 0,
     min: number | string | TimeNewOptions | null = 0,
     sec: number | string | Rational | TimeNewOptions | null = 0,
-    zone: string | number | Rational | Timezone | TimeNewOptions | null = null,
+    zone: string | number | Rational | Timezone | object | TimeNewOptions | null = null,
     options: TimeNewOptions = {},
   ): Time {
     const given = [year, month, day, hour, min, sec, zone];
@@ -666,7 +667,7 @@ export class Time extends rbCTime {
       hour as number | string | null,
       min as number | string | null,
       sec as number | string | Rational | null,
-      zone as string | number | Rational | Timezone | null,
+      zone as string | number | Rational | Timezone | object | null,
       options,
     );
   }
@@ -735,10 +736,7 @@ export class Time extends rbCTime {
       time.#subnano,
     );
     t.#zoneObject = zone;
-    const dst = rbObjRespondTo(zone, "isDst")
-      ? (zone as { isDst(tm: Time): unknown }).isDst(time)
-      : undefined;
-    t.#isdstMemo = dst !== undefined && dst != null && dst !== false;
+    Time.#zoneSetDst(zone, t, time);
     return t;
   }
 
@@ -1446,7 +1444,7 @@ export class Time extends rbCTime {
     hour: number | string | null = 0,
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
-    zone: string | number | Rational | Timezone | null = null,
+    zone: string | number | Rational | Timezone | object | null = null,
     options: TimeNewOptions = {},
   ) {
     super();
@@ -1489,6 +1487,12 @@ export class Time extends rbCTime {
     d.setUTCHours(hour, min, wholeSec);
     this.#vtmMemo = vtmFromDate(d, nsec);
     const zoneArgument = zone ?? options.in ?? null;
+    if (
+      maybeTzobjP(zoneArgument) &&
+      !(zoneArgument instanceof Timezone) &&
+      this.#zoneTimelocal(zoneArgument)
+    )
+      return;
     const zoneObject =
       zoneArgument instanceof Timezone
         ? zoneArgument.identifier
@@ -1496,10 +1500,7 @@ export class Time extends rbCTime {
           ? zoneArgument
           : null;
     const utcOffset =
-      zoneObject ??
-      (zoneArgument == null
-        ? nowTimeZoneId()
-        : utcOffsetArgument(zoneArgument as string | number | Rational));
+      zoneObject ?? (zoneArgument == null ? nowTimeZoneId() : utcOffsetArgument(zoneArgument));
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
     this.#tzmodeUtc = zoneArgument != null && this.#timeZoneId === "UTC";
     this.#localZone = zoneArgument == null;
@@ -1533,6 +1534,55 @@ export class Time extends rbCTime {
         }
       }
     }
+  }
+
+  /**
+   * `zone_timelocal` (`vendor/ruby/v3.3.11/time.c:2387-2411`).
+   *
+   * @internal
+   */
+  #zoneTimelocal(zone: object): boolean {
+    if (!rbObjRespondTo(zone, "localToUtc")) return false;
+    const nsec = BigInt(this.#vtm.nsec);
+    const t = utcEpochNanoseconds(this.#vtm) - nsec;
+    const tm = Time.#atInstant(t, "UTC", false);
+    const utc = (zone as { localToUtc(tm: Time): unknown }).localToUtc(tm);
+    const s =
+      utc instanceof Time
+        ? utc.#epochNs
+        : (utc as Temporal.ZonedDateTime | Temporal.Instant).epochNanoseconds;
+    Time.#zoneSetOffset(zone, this, t, s);
+    this.#epochNsMemo = s + nsec;
+    this.#instantMemo = null;
+    Time.#zoneSetDst(zone, this, tm);
+    return true;
+  }
+
+  /**
+   * `zone_set_offset` (`vendor/ruby/v3.3.11/time.c:2277-2287`).
+   *
+   * @internal
+   */
+  static #zoneSetOffset(zone: object, time: Time, tlocal: bigint, tutc: bigint): void {
+    const off = Number(tlocal - tutc) / 1_000_000_000;
+    if (off <= -86400 || off >= 86400) throw new ArgumentError("utc_offset out of range");
+    time.#utcOffsetMemo = off;
+    time.#zoneObject = zone;
+    time.#timeZoneId = null;
+    time.#tzmodeUtc = false;
+    time.#localZone = false;
+  }
+
+  /**
+   * `zone_set_dst` (`vendor/ruby/v3.3.11/time.c:2377-2385`).
+   *
+   * @internal
+   */
+  static #zoneSetDst(zone: object, time: Time, tm: Time): void {
+    const dst = rbObjRespondTo(zone, "isDst")
+      ? (zone as { isDst(tm: Time): unknown }).isDst(tm)
+      : undefined;
+    time.#isdstMemo = dst !== undefined && dst != null && dst !== false;
   }
 
   get year(): number {

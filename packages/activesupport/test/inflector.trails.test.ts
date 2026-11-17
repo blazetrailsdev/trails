@@ -3,6 +3,7 @@ import { NameError } from "@blazetrails/ruby-compat/name-error";
 import { NotImplementedError } from "@blazetrails/ruby-compat/not-implemented-error";
 import { StopIteration } from "@blazetrails/ruby-compat/stop-iteration";
 import { constantize, safeConstantize } from "../lib/inflector.js";
+import { Inflections } from "../lib/inflector/inflections.js";
 import { constSet, TopLevel, constDefined, rbModRemoveConst } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat" {
@@ -79,5 +80,29 @@ describe("constantize walks seated constants like Object.const_get", () => {
     } finally {
       if (constDefined(Object, "Foo", false)) rbModRemoveConst(Object, "Foo");
     }
+  });
+});
+
+describe("Inflections#irregular emits inflections.rb's singular rules", () => {
+  const singularize = (inflect: Inflections, word: string) => {
+    const rule = inflect.singulars.find(({ rule }) => rule.test(word));
+    return rule ? word.replace(rule.rule, rule.replacement) : word;
+  };
+
+  it("keeps an already-singular word when the first letters share case", () => {
+    const inflect = new Inflections();
+    inflect.irregular("cactus", "cacti");
+    expect(inflect.singulars.map(({ rule }) => rule.source)).toEqual(["(c)acti$", "(c)actus$"]);
+    expect(singularize(inflect, "cactus")).toBe("cactus");
+    expect(singularize(inflect, "Cacti")).toBe("Cactus");
+  });
+
+  it("keeps an already-singular word when the first letters differ", () => {
+    const inflect = new Inflections();
+    inflect.irregular("ox", "boxen");
+    expect(inflect.singulars).toHaveLength(4);
+    expect(singularize(inflect, "Ox")).toBe("Ox");
+    expect(singularize(inflect, "ox")).toBe("ox");
+    expect(singularize(inflect, "boxen")).toBe("ox");
   });
 });

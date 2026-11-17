@@ -569,6 +569,37 @@ describe("Time", () => {
       expect(Time.utc(2020, 1, 1).getlocal(new Rational(3600, 1)).utcOffset).toBe(3600);
       expect(() => Time.utc(2020, 1, 1).getlocal({})).toThrow(TypeError);
     });
+
+    it("seats a timezone object answering localToUtc from Time.new (`zone_timelocal`)", () => {
+      const tz = new (class {
+        localToUtc = (tm: Time) => Time.at(tm.toI() - 9 * 3600, { in: "UTC" });
+        utcToLocal = (tm: Time) => tm.getlocal(9 * 3600);
+        isDst = () => false;
+      })();
+      const t = Time.new(2020, 1, 1, 12, 0, 0, tz);
+      expect(t.zone).toBe(tz);
+      expect([t.hour, t.utcOffset, t.isdst]).toEqual([12, 32400, false]);
+      expect(t.getutc().hour).toBe(3);
+      expect(t.toS()).toBe("2020-01-01 12:00:00 +0900");
+      const later = t.plus(3600);
+      expect(later.zone).toBe(tz);
+      expect([later.hour, later.utcOffset]).toEqual([13, 32400]);
+      const keyword = Time.new(2020, 1, 1, 12, 0, 0, { in: tz });
+      expect(keyword.zone).toBe(tz);
+      expect(keyword.eql(t)).toBe(true);
+      expect(Time.at(0, { in: tz }).zone).toBe(tz);
+      expect(Time.at(0, { in: tz }).hour).toBe(9);
+    });
+
+    it("raises for a zone object out of range or answering neither protocol (`time_init_vtm`)", () => {
+      const far = new (class {
+        localToUtc = (tm: Time) => Time.at(tm.toI() - 90000, { in: "UTC" });
+      })();
+      expect(() => Time.new(2020, 1, 1, 0, 0, 0, far)).toThrow(
+        expect.objectContaining({ name: "ArgumentError", message: "utc_offset out of range" }),
+      );
+      expect(() => Time.new(2020, 1, 1, 0, 0, 0, new (class {})())).toThrow(TypeError);
+    });
   });
   describe("Time.new given a String", () => {
     it("parses MRI's `time_init_parse` grammar", () => {
