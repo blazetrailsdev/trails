@@ -114,16 +114,17 @@ export class FiberPool extends Pool {
     })();
   }
 
-  /** @internal */
+  /**
+   * @missingRailsArgs new — PERMANENT
+   * @internal
+   */
   private startReactor(): Thread<Promise<void>> {
     return this.createThread(async () => {
       try {
         const semaphore = new Semaphore(this.size);
-        const children = new Set<Promise<void>>();
         this.bootQueue.push("ready");
 
-        await this.waitForExecutions(semaphore, children);
-        await Promise.all(children);
+        await this.waitForExecutions(semaphore);
       } catch (error) {
         await this.registerFatalError(error);
         throw error;
@@ -132,10 +133,8 @@ export class FiberPool extends Pool {
   }
 
   /** @internal */
-  private async waitForExecutions(
-    semaphore: Semaphore,
-    children: Set<Promise<void>>,
-  ): Promise<void> {
+  private async waitForExecutions(semaphore: Semaphore): Promise<void> {
+    const children = new Set<Promise<void>>();
     let execution: ClaimedExecution | null;
     while ((execution = await this.pendingExecutions.pop()) != null) {
       await semaphore.acquire();
@@ -148,11 +147,12 @@ export class FiberPool extends Pool {
         });
       children.add(child);
     }
+    await Promise.all(children);
   }
 
   /** @internal */
   private async registerFatalError(error: unknown): Promise<void> {
-    this.stateMutex.synchronize(() => {
+    await this.stateMutex.synchronize(() => {
       this._fatalError ??= error;
     });
 
