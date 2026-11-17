@@ -14,9 +14,8 @@ import {
   Deprecation,
   extend,
   type Extended,
-  underscore,
 } from "@blazetrails/activesupport";
-import { ArgumentError, block, fetch, rbHash, TopLevel } from "@blazetrails/ruby-compat";
+import { ArgumentError, block, except, fetch, rbHash, TopLevel } from "@blazetrails/ruby-compat";
 
 let _deprecator: Deprecation | undefined;
 
@@ -67,7 +66,6 @@ export class GlobalID {
     return this.uri.deconstructKeys(keys);
   }
 
-  /** @inventedArm underscore — PERMANENT */
   static create<T extends GlobalID, O extends GlobalIDOptions>(
     this: new (gid: string | GID, options?: O) => T,
     model: GlobalIDModel,
@@ -84,9 +82,7 @@ export class GlobalID {
         "An app is required to create a GlobalID. Pass the :app option or set the default GlobalID.app.",
       );
     }
-    const { app: _a, verifier: _v, for: _f, ...rest } = opts;
-    const params: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(rest)) params[underscore(k)] = v;
+    const params = except(opts as Record<string, unknown>, "app", "verifier", "for");
     return new this(GID.create(app, model, params), options);
   }
 
