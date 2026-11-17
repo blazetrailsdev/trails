@@ -320,6 +320,7 @@ export class Parser {
   private bodyRegexAtEnd: RegExp;
   private endBoundarySize: number;
   private rxMaxSize: number;
+  /** @perf 300s — PERMANENT */
   private headRegex: RegExp;
   private _bodyRetained: boolean | null;
   private _retainedSize: number;
