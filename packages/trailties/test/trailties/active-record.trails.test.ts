@@ -271,7 +271,12 @@ describe("RailtieTest (trails-only)", () => {
       try {
         Trailtie.config.set("activeRecord", { ...saved, ...cfg });
         if (loadDefaults) config.loadDefaults(loadDefaults);
-        const app = { deprecators: new Deprecators(), config, credentials };
+        const app = {
+          deprecators: new Deprecators(),
+          config,
+          credentials,
+          executor: { toRun() {} },
+        };
         await runTrailtieInitializers(Trailtie, app);
         runLoadHooks("after_initialize", app);
         return {
