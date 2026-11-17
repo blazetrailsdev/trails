@@ -736,10 +736,7 @@ export class Time extends rbCTime {
       time.#subnano,
     );
     t.#zoneObject = zone;
-    const dst = rbObjRespondTo(zone, "isDst")
-      ? (zone as { isDst(tm: Time): unknown }).isDst(time)
-      : undefined;
-    t.#isdstMemo = dst !== undefined && dst != null && dst !== false;
+    Time.#zoneSetDst(zone, t, time);
     return t;
   }
 
@@ -1564,11 +1561,20 @@ export class Time extends rbCTime {
     this.#tzmodeUtc = false;
     this.#localZone = false;
     this.#zoneObject = zone;
+    Time.#zoneSetDst(zone, this, tm);
+    return true;
+  }
+
+  /**
+   * `zone_set_dst` (`vendor/ruby/v3.3.11/time.c:2377-2385`).
+   *
+   * @internal
+   */
+  static #zoneSetDst(zone: object, time: Time, tm: Time): void {
     const dst = rbObjRespondTo(zone, "isDst")
       ? (zone as { isDst(tm: Time): unknown }).isDst(tm)
       : undefined;
-    this.#isdstMemo = dst !== undefined && dst != null && dst !== false;
-    return true;
+    time.#isdstMemo = dst !== undefined && dst != null && dst !== false;
   }
 
   get year(): number {
