@@ -200,8 +200,8 @@ describe("stub with a value", () => {
 describe("assertCalledWith kwargs", () => {
   const target = { greet: (_name: string, _opts?: object) => "" };
 
-  it("passes when positional args and kwargs both match", () => {
-    assertCalledWith(target, "greet", ["a"], { returns: "ok", loud: true }, () => {
+  it("passes when positional args and kwargs both match", async () => {
+    await assertCalledWith(target, "greet", ["a"], { returns: "ok", loud: true }, () => {
       expect(target.greet("a", { loud: true })).toBe("ok");
     });
   });
