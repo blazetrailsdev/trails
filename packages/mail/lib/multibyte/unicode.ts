@@ -120,6 +120,8 @@ export class UnicodeDatabase {
 
   load(): void {
     try {
+      /** @inventedArm if — PERMANENT */
+      if (_unicodeTables instanceof Error) throw _unicodeTables;
       /** @missingRailsCall open — PERMANENT */
       [
         this._codepoints,
@@ -171,7 +173,9 @@ export class UnicodeDatabase {
   }
 }
 
-const _unicodeTables = await IO.binreadAsync(UnicodeDatabase.filename());
+const _unicodeTables: Uint8Array | Error = await IO.binreadAsync(UnicodeDatabase.filename()).catch(
+  (e: Error) => e,
+);
 
 let _defaultNormalizationForm = ":kc";
 

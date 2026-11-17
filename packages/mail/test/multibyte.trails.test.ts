@@ -51,6 +51,11 @@ describe("Mail::Multibyte::Chars (trails)", () => {
     expect(new Chars("क्षि").gLength()).toBe(3);
     expect(Unicode.gUnpack("क्षि")).toEqual([[2325, 2381], [2359], [2367]]);
     expect(Unicode.gUnpack("\r\n각")).toEqual([[13, 10], [44033]]);
+    expect(Unicode.gUnpack("\u1100\u1161\u11A8a\u1100\uAC00")).toEqual([
+      [4352, 4449, 4520],
+      [97],
+      [4352, 44032],
+    ]);
   });
 
   it("strips with the LEADERS_PAT / TRAILERS_PAT whitespace set", () => {
