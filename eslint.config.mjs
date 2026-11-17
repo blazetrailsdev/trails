@@ -1260,8 +1260,6 @@ export default defineConfig(
       "blazetrails/no-floating-maybe-promise": "warn",
     },
   },
-  // The app-asset boundary: CLAUDE.md, "importmap-rails and propshaft are out
-  // of scope; JavaScript is served by Vite (`vite_rails`)".
   {
     files: ["packages/**/*.{ts,mts,js,mjs}", "scripts/**/*.{ts,mts,js,mjs}"],
     ignores: [
