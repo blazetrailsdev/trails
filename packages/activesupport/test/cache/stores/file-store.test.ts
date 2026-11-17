@@ -20,7 +20,7 @@ import {
   assertPredicate,
 } from "../../../lib/testing/assertions.js";
 import { Store } from "../../../lib/cache/store.js";
-import { File, regexpEscape, TypeError } from "@blazetrails/ruby-compat";
+import { File, Pathname, regexpEscape, TypeError } from "@blazetrails/ruby-compat";
 import { isPresent } from "../../../lib/core-ext/object/blank.js";
 import { cacheInstrumentationBehavior } from "../behaviors/cache-instrumentation-behavior.js";
 import { cacheLoggingBehavior } from "../behaviors/cache-logging-behavior.js";
@@ -74,7 +74,7 @@ describe("FileStoreTest", () => {
 
   it("key transformation with pathname", async () => {
     writeFileSync(join(cacheDir, "foo"), "");
-    const cacheWithPathname = new FileStore(cacheDir, { expiresIn: 60 });
+    const cacheWithPathname = new FileStore(new Pathname(cacheDir), { expiresIn: 60 });
     const key = await pathFor(cacheWithPathname, "views/index?id=1");
     expect(filePathKey(cacheWithPathname, key)).toEqual("views/index?id=1");
   });

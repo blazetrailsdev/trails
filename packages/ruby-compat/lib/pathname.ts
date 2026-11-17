@@ -65,6 +65,13 @@ export class Pathname {
     }
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:803` `path_expand_path` */
+  expandPath(dname?: string): Pathname {
+    const str =
+      dname === undefined ? File.expandPath(this._path) : File.expandPath(this._path, dname);
+    return new (this.constructor as typeof Pathname)(str);
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:778` `path_dirname` */
   dirname(): Pathname {
     return new Pathname(File.dirname(this._path));

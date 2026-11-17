@@ -1,5 +1,5 @@
 import { RouteSet, type MiddlewareStack } from "@blazetrails/actionpack";
-import { File } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat";
 import { Configuration as RailtieConfiguration } from "../trailtie/configuration.js";
 import { Root } from "../paths.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";
@@ -32,12 +32,8 @@ export class EngineConfiguration extends RailtieConfiguration {
     return this._root;
   }
 
-  /**
-   * @missingRailsCall new — PERMANENT
-   * @missingRailsArgs expand_path — PERMANENT
-   */
   setRoot(value: string | null): void {
-    const expanded = value === null ? null : File.expandPath(value);
+    const expanded = value === null ? null : new Pathname(value).expandPath().toString();
     this._root = expanded;
     if (this._paths) this._paths.path = expanded;
   }
