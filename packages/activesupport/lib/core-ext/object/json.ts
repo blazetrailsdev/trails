@@ -1,4 +1,4 @@
-import { isStruct, type StructInstance } from "@blazetrails/ruby-compat/struct";
+import { isStruct, type StructInstance } from "@blazetrails/ruby-compat";
 import {
   Date as RubyDate,
   DateTime as RubyDateTime,

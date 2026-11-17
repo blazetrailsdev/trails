@@ -732,6 +732,7 @@
       "core-ext/object/json.ts::Range",
       "core-ext/object/json.ts::Regexp",
       "core-ext/object/json.ts::String",
+      "core-ext/object/json.ts::Struct",
       "core-ext/object/json.ts::Time",
       "core-ext/object/json.ts::TrueClass",
       "core-ext/object/try.ts::Delegator",

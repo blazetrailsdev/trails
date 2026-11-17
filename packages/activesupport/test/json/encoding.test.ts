@@ -8,7 +8,7 @@ import { Encoding, type EncodeOptions } from "../../lib/json/encoding.js";
 import { asJson, ToJsonWithActiveSupportEncoder } from "../../lib/core-ext/object/json.js";
 import { BigDecimal } from "../../lib/core-ext/big-decimal/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
-import { Struct } from "@blazetrails/ruby-compat/struct";
+import { Struct } from "@blazetrails/ruby-compat";
 import { Date as RubyDate } from "@blazetrails/date";
 import { assertNil } from "../../lib/testing/assertions.js";
 import { withEnvTz } from "../../lib/time-zone-test-helpers.js";
