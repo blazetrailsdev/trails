@@ -209,26 +209,31 @@ export class InstanceExec1 implements CallTemplate {
 }
 
 export class InstanceExec2 implements CallTemplate {
-  constructor(readonly fn: (target: object, block: (() => unknown) | null) => unknown) {}
+  /** @internal */
+  private readonly overrideBlock:
+    | ((target: object, block: (() => unknown) | null) => unknown)
+    | null;
+
+  constructor(block: ((target: object, block: (() => unknown) | null) => unknown) | null) {
+    this.overrideBlock = block;
+  }
 
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
     if (!block) throw new ArgumentError();
-    return [target, this.fn, "instanceExec", target, block];
+    return [target, this.overrideBlock ?? block, "instanceExec", target, block];
   }
 
   makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
-    const f = this.fn;
     return (target: object, _value: unknown, block?: (() => unknown) | null) => {
       if (!block) throw new ArgumentError();
-      return f.call(target, target, block);
+      return this.overrideBlock!.call(target, target, block);
     };
   }
 
   invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
-    const f = this.fn;
     return (target: object, _value: unknown, block?: (() => unknown) | null) => {
       if (!block) throw new ArgumentError();
-      return !f.call(target, target, block);
+      return !this.overrideBlock!.call(target, target, block);
     };
   }
 }
@@ -611,7 +616,6 @@ export class Callback {
     return this.filter === filter;
   }
 
-  /** @missingRailsCall concat — PERMANENT */
   mergeConditionalOptions(
     chain: { name: string; config: DefineCallbacksOptions },
     { ifOption, unlessOption }: { ifOption?: unknown; unlessOption?: unknown },
