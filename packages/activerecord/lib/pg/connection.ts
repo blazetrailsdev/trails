@@ -48,6 +48,7 @@ export class Connection {
   parameterStatuses: Record<string, string> = {};
 
   static conndefaultsHash = conndefaultsHash;
+  static connect = connect;
 
   constructor(client: object, connParams?: pg.ClientConfig) {
     this.client = client as Client;
