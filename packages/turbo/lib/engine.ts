@@ -92,7 +92,7 @@ export class Engine extends TrailsEngine {
     this.initializer("turbo.renderer", () => {
       ActionController.Renderers.add(
         "turbo_stream",
-        function (this: RendererHost, turboStreamsHtml: unknown, _options: unknown) {
+        function (this: RendererHost, turboStreamsHtml: unknown) {
           if (this.mediaType == null) this.contentType = Mime.get("turbo_stream")!.toString();
           return turboStreamsHtml;
         },
