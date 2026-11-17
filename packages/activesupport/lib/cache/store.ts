@@ -34,6 +34,10 @@ export function setFormatVersion(value: number): void {
 
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
+export const OPTION_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  expiresIn: Object.freeze(["expireIn", "expiredIn"]),
+});
+
 const DEFAULT_POOL_OPTIONS: StoreOptions = { size: 5, timeout: 5 };
 
 const Zlib: CoderCompressor = { deflate, inflate };
@@ -606,12 +610,19 @@ export abstract class Store {
   }
 
   static normalizeOptions(options: StoreOptions): StoreOptions {
-    const opts = { ...options };
-    const aliasKey = "expireIn" in opts ? "expireIn" : "expiredIn" in opts ? "expiredIn" : null;
-    if (aliasKey != null && opts.expiresIn == null) opts.expiresIn = opts[aliasKey];
-    delete opts.expireIn;
-    delete opts.expiredIn;
-    return opts;
+    options = { ...options };
+    for (const [canonicalName, aliases] of Object.entries(OPTION_ALIASES)) {
+      const aliasKey = aliases.find((key) => Object.hasOwn(options, key));
+      if (
+        aliasKey !== undefined &&
+        (options[canonicalName] == null || options[canonicalName] === false)
+      ) {
+        options[canonicalName] = options[aliasKey];
+      }
+      for (const key of aliases) delete options[key];
+    }
+
+    return options;
   }
 
   private validateOptions(options: StoreOptions): StoreOptions {

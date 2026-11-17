@@ -4,7 +4,7 @@ import type { TimeWithZone } from "../time-with-zone.js";
 export { DeserializationError } from "./deserialization-error.js";
 
 export interface CacheOptions {
-  expiresIn?: number | Duration;
+  expiresIn?: number | Duration | Time | TimeWithZone;
   expiresAt?: Time | TimeWithZone;
   expireIn?: number;
   expiredIn?: number;

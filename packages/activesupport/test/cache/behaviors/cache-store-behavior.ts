@@ -698,7 +698,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
 
     const key = crypto.randomUUID();
     const error = await assertRaises([ArgumentError], {}, async () => {
-      await cache.write(key, "bar", { expiresIn: time as unknown as number });
+      await cache.write(key, "bar", { expiresIn: time });
     });
     expect(error.message).toBe(
       `expires_in parameter should not be a Time. Did you mean to use expires_at? Got: ${time}`,
