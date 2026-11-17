@@ -87,6 +87,7 @@ export const Attachable = {
   /** @internal */
   readAttributeForSerialization,
 } as Extended<typeof Concern> & {
+  ClassMethods: Record<string, unknown>;
   attachableSgid(this: AttachableHost): string;
   attachableContentType(this: AttachableHost): unknown;
   attachableFilename(this: AttachableHost): string | null;

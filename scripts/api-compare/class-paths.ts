@@ -420,6 +420,14 @@ export async function collectClassPaths(only?: string): Promise<Map<string, Clas
     const tsPath = async (entry: ClassPathEntry): Promise<string | null> => {
       const source = await read(entry.file);
       if (isExported(source, entry.tsName)) return entry.tsName;
+      if (entry.tsName === "ClassMethods") {
+        const owner = byFqn.get(`${entry.file}::${entry.fqn.split("::").slice(0, -1).join("::")}`);
+        const ownerPath = owner ? await tsPath(owner) : null;
+        const host = ownerPath?.split(".").at(-1);
+        if (host && new RegExp(`^${host}\\.classMethods\\(`, "m").test(source)) {
+          return `${ownerPath}.ClassMethods`;
+        }
+      }
       const member = new RegExp(
         `^\\s*(?:public\\s+)?static\\s+(?:override\\s+)?(?:readonly\\s+)?${entry.tsName}\\b|^\\s+export\\s+(?:class|namespace)\\s+${entry.tsName}\\b`,
         "m",
