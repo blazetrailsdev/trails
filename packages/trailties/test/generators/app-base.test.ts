@@ -174,6 +174,16 @@ describe("AppBase run tasks", () => {
     expect(await commandsFor({ css: "bulma" }, "runCss")).toEqual(["css:install:bulma"]);
   });
 
+  it("run_css installs through cssbundling when vite is the JS runtime", async () => {
+    expect(await commandsFor({ javascript: "vite", css: "tailwind" }, "runCss")).toEqual([
+      "css:install:tailwind",
+    ]);
+    const g = build({ javascript: "vite" });
+    expect(g["usingJsRuntime"]()).toBe(true);
+    expect(g["usingNode"]()).toBe(true);
+    expect(build({ javascript: "importmap" })["usingJsRuntime"]()).toBe(false);
+  });
+
   it("run_solid leaves out solid_cable when Action Cable is skipped", async () => {
     expect(await commandsFor({ skipActionCable: true }, "runSolid")).toEqual([
       "solid_cache:install solid_queue:install",

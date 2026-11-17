@@ -531,7 +531,8 @@ ${requireStatements.join("\n")}`;
   protected usingJsRuntime(): boolean {
     const { javascript, css } = this.options;
     return (
-      (!!javascript && javascript !== "vite") || (!!css && !["tailwind", "sass"].includes(css))
+      (!!javascript && !["importmap"].includes(javascript)) ||
+      (!!css && !["tailwind", "sass"].includes(css))
     );
   }
 
