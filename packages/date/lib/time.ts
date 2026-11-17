@@ -1551,17 +1551,26 @@ export class Time extends rbCTime {
       utc instanceof Time
         ? utc.#epochNs
         : (utc as Temporal.ZonedDateTime | Temporal.Instant).epochNanoseconds;
-    const off = Number(t - s) / 1_000_000_000;
-    if (off <= -86400 || off >= 86400) throw new ArgumentError("utc_offset out of range");
-    this.#utcOffsetMemo = off;
+    Time.#zoneSetOffset(zone, this, t, s);
     this.#epochNsMemo = s + nsec;
     this.#instantMemo = null;
-    this.#timeZoneId = null;
-    this.#tzmodeUtc = false;
-    this.#localZone = false;
-    this.#zoneObject = zone;
     Time.#zoneSetDst(zone, this, tm);
     return true;
+  }
+
+  /**
+   * `zone_set_offset` (`vendor/ruby/v3.3.11/time.c:2277-2287`).
+   *
+   * @internal
+   */
+  static #zoneSetOffset(zone: object, time: Time, tlocal: bigint, tutc: bigint): void {
+    const off = Number(tlocal - tutc) / 1_000_000_000;
+    if (off <= -86400 || off >= 86400) throw new ArgumentError("utc_offset out of range");
+    time.#utcOffsetMemo = off;
+    time.#zoneObject = zone;
+    time.#timeZoneId = null;
+    time.#tzmodeUtc = false;
+    time.#localZone = false;
   }
 
   /**
