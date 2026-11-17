@@ -232,6 +232,7 @@ describe("vendor/sources.ts", () => {
       "mail",
       "mini-mime",
       "net-smtp",
+      "turbo-rails",
       "vite-assets",
       "vite-trails",
     ]);
@@ -449,6 +450,7 @@ describe("vendor/sources.ts", () => {
         "solid-queue",
         "thor",
         "trailties",
+        "turbo-rails",
         "tzinfo",
         "zeitwerk",
         "vite-assets",
@@ -524,6 +526,7 @@ describe("vendor/sources.ts", () => {
         "solid-queue",
         "thor",
         "trailties",
+        "turbo-rails",
         "tzinfo",
         "zeitwerk",
         "vite-assets",
