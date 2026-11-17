@@ -86,7 +86,7 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("turbo.mimetype", () => {
-      MimeType.register("text/vnd.turbo-stream.html", "turbo_stream");
+      MimeType.register("text/vnd.turbo-stream.html", ":turbo_stream");
     });
 
     this.initializer("turbo.renderer", () => {

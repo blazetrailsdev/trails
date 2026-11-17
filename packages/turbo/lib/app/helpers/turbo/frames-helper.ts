@@ -18,6 +18,7 @@ interface FramesHelperHost {
 }
 
 export const FramesHelper = {
+  /** @inventedArm if — CONVERGEABLE tag-builder-trailing-undefined-block */
   turboFrameTag(this: FramesHelperHost, ...ids: unknown[]): SafeBuffer | Promise<SafeBuffer> {
     const block = rbBlockGivenP(ids.at(-1)) ? (ids.pop() as Block<unknown>) : undefined;
     const {

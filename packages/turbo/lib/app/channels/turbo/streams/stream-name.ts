@@ -29,7 +29,8 @@ export const StreamName = {
       return streamables.map((streamable) => this.streamNameFrom(streamable)).join(":");
     } else {
       const streamable = streamables as object;
-      return String(tryCall(streamable, "toGidParam") ?? toParam(streamable) ?? "");
+      const gidParam = tryCall(streamable, "toGidParam");
+      return (gidParam != null && gidParam !== false ? gidParam : toParam(streamable)) as string;
     }
   },
 };
