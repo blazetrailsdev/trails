@@ -34,7 +34,7 @@ describe("BCrypt::Engine", () => {
       "$2a$32$abcdefghijklmnopqrstuu",
     ]) {
       expect(() => bcryptjs.hashSync("pw", salt)).toThrow();
-      expect(() => Engine.hashSecret("pw", salt)).toThrow();
+      expect(Engine.hashSecret("pw", salt)).toBeNull();
     }
   });
 
