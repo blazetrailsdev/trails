@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { FlashHash } from "../../../lib/action-dispatch/middleware/flash.js";
 import { CookieJar } from "../../../lib/action-dispatch/middleware/cookies.js";
+import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Session } from "../../../lib/action-dispatch/request/session.js";
 import {
   TestProcess,
@@ -25,7 +26,7 @@ function makeHost(overrides: Partial<TestProcessHost> = {}): TestProcessHost {
       hasHeader: () => false,
       fetchHeader: (_name: string, block: (name: string) => unknown) => block(_name),
       setHeader: () => undefined,
-      session: new Session(null, { env: {} }),
+      session: new Session(null, new Request({})),
       flash: new FlashHash(),
       cookies: { a: "1" },
     },

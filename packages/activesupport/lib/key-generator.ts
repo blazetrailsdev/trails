@@ -3,7 +3,10 @@ import {
   DigestClass,
   getCrypto,
   OpenSSL,
+  format,
+  rbModName,
   rbObjAsString,
+  rbObjId,
   type Bytes,
 } from "@blazetrails/ruby-compat";
 
@@ -48,7 +51,7 @@ export class KeyGenerator {
   }
 
   inspect(): string {
-    return `#<${this.constructor.name}:0x${((objectId(this) << 1) >>> 0).toString(16).padStart(14, "0")}>`;
+    return `#<${rbModName(this.constructor)}:${format("%#016x", rbObjId(this) * 2)}>`;
   }
 }
 
@@ -69,16 +72,4 @@ export class CachingKeyGenerator {
     }
     return cached;
   }
-}
-
-const objectIds = new WeakMap<object, number>();
-let nextObjectId = 1;
-
-function objectId(object: object): number {
-  let id = objectIds.get(object);
-  if (id == null) {
-    id = nextObjectId++;
-    objectIds.set(object, id);
-  }
-  return id;
 }

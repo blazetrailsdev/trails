@@ -27,7 +27,7 @@ import {
 } from "../../action-dispatch/middleware/cookies.js";
 import { SessionHash } from "@blazetrails/rack-session";
 import type { Persisted, PersistedRequest } from "@blazetrails/rack-session";
-import type { Req } from "../../action-dispatch/request/session.js";
+import type { Request as Req } from "../../action-dispatch/http/request.js";
 import { ActionControllerError } from "./exceptions.js";
 import type {
   afterAction,
@@ -54,7 +54,7 @@ export interface ProtectionMethods {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export type NullSessionRequest = Req &
+export type NullSessionRequest = Omit<Req, "session" | "flash" | "sessionOptions"> &
   PersistedRequest &
   RequestCookieMethodsHost & {
     session: unknown;

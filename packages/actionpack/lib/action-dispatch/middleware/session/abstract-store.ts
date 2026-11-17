@@ -112,7 +112,7 @@ export const SessionObject = {
     return await Persisted.prototype.commitSession.call(this, req, res);
   },
 
-  prepareSession(this: Persisted, req: { env: Record<string, unknown> }): RequestSession {
+  prepareSession(this: Persisted, req: Request): RequestSession {
     return RequestSession.create(this as any, req, this.defaultOptions);
   },
 

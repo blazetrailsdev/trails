@@ -1,8 +1,16 @@
-import { block, deleteIf, fetch, hashReplace, KeyError, rbModName } from "@blazetrails/ruby-compat";
+import {
+  block,
+  deleteIf,
+  fetch,
+  hashReplace,
+  KeyError,
+  rbModName,
+  rbObjId,
+  rbObjInspect,
+} from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
-/** @noRailsEquivalent PERMANENT */
-export type Req = { env: Record<string, unknown> };
+import type { Request as Req } from "../http/request.js";
 
 /** @noRailsEquivalent PERMANENT */
 export interface SessionStore {
@@ -31,11 +39,11 @@ export class Options {
   private delegate: Record<string, unknown>;
 
   static set(req: Req, options: unknown): void {
-    req.env[ENV_SESSION_OPTIONS_KEY] = options;
+    req.setHeader(ENV_SESSION_OPTIONS_KEY, options);
   }
 
   static find(req: Req): unknown {
-    return req.env[ENV_SESSION_OPTIONS_KEY];
+    return req.getHeader(ENV_SESSION_OPTIONS_KEY);
   }
 
   constructor(by: SessionStore | null, defaultOptions: Record<string, unknown>) {
@@ -75,18 +83,6 @@ function classNameOf(value: unknown): string {
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
-const objectIds = new WeakMap<object, number>();
-let nextObjectId = 1;
-
-function objectIdHex(object: object): string {
-  let id = objectIds.get(object);
-  if (id == null) {
-    id = nextObjectId++;
-    objectIds.set(object, id);
-  }
-  return ((id << 1) >>> 0).toString(16).padStart(14, "0");
-}
-
 export class Session {
   private by: SessionStore | null;
   private req: Req;
@@ -115,17 +111,17 @@ export class Session {
   }
 
   static find(req: Req): Session | null {
-    const session = req.env[ENV_SESSION_KEY];
+    const session = req.getHeader(ENV_SESSION_KEY);
     if (session instanceof Session) return session;
     return null;
   }
 
   static set(req: Req, session: unknown): void {
-    req.env[ENV_SESSION_KEY] = session;
+    req.setHeader(ENV_SESSION_KEY, session);
   }
 
   static delete(req: Req): void {
-    delete req.env[ENV_SESSION_KEY];
+    req.deleteHeader(ENV_SESSION_KEY);
   }
 
   static Options = Options;
@@ -282,9 +278,9 @@ export class Session {
 
   inspect(): string {
     if (this.isLoaded()) {
-      return `#<${rbModName(this.constructor)}:0x${objectIdHex(this)}>`;
+      return rbObjInspect(this);
     } else {
-      return `#<${rbModName(this.constructor)}:0x${objectIdHex(this)} not yet loaded>`;
+      return `#<${rbModName(this.constructor)}:0x${(rbObjId(this) * 2).toString(16)} not yet loaded>`;
     }
   }
 

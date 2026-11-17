@@ -49,6 +49,7 @@ import {
 } from "@blazetrails/rack-test";
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
+import { Buffer } from "../action-dispatch/http/response.js";
 import { Assertions } from "../action-dispatch/testing/assertions.js";
 import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import type { Html5Document, XmlDocument } from "@blazetrails/nokogiri";
@@ -432,6 +433,8 @@ async function processControllerResponse(
     this.controller.recycleBang();
 
     await this.wrapExecution(() => this.controller.dispatch(action, this.request, this.response));
+    const stream = this.controller.response.stream;
+    if (stream instanceof Buffer && !(stream instanceof LiveBuffer)) await stream.awaitBody();
   } finally {
     rbObjIvarSet(this, "@request", this.controller.request);
     rbObjIvarSet(this, "@response", this.controller.response);

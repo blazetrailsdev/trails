@@ -1,3 +1,4 @@
+import { Request } from "../../../../lib/action-dispatch/http/request.js";
 import { describe, it, expect, vi } from "vitest";
 import {
   DisabledSessionError,
@@ -5,8 +6,8 @@ import {
   Session,
 } from "../../../../lib/action-dispatch/request/session.js";
 
-function makeReq(): { env: Record<string, unknown> } {
-  return { env: {} };
+function makeReq(): Request {
+  return new Request({});
 }
 
 describe("Session::Options", () => {
@@ -95,7 +96,7 @@ describe("Session", () => {
 
   it("inspect reports a not yet loaded session without loading it", async () => {
     const req = makeReq();
-    const loadSession = vi.fn(() => [1, {}] as [unknown, Record<string, unknown>]);
+    const loadSession = vi.fn(() => [1, { a: 1 }] as [unknown, Record<string, unknown>]);
     const store = {
       loadSession,
       sessionExists: () => true,
@@ -111,7 +112,9 @@ describe("Session", () => {
     expect(session.isLoaded()).toBe(false);
 
     session.get("foo");
-    expect(session.inspect()).toMatch(/^#<ActionDispatch::Request::Session:0x[0-9a-f]+>$/);
+    const inspected = session.inspect();
+    expect(inspected).toMatch(/^#<ActionDispatch::Request::Session:0x[0-9a-f]+ @by=/);
+    expect(inspected).toContain(', @delegate={"a"=>1}, @loaded=true, ');
   });
 
   it("inspect renders a subclass's own class rather than Session's", async () => {

@@ -223,12 +223,13 @@ export function strongEtag(this: R, strongValidators: unknown) {
 export function isEtag(this: R): string | undefined {
   return this.getHeader(ETAG);
 }
-export function isWeakEtag(this: R) {
+export function isWeakEtag(this: R): boolean | undefined {
   const etag = isEtag.call(this);
-  return etag !== undefined && etag.startsWith('W/"');
+  return etag === undefined ? etag : etag.startsWith('W/"');
 }
-export function isStrongEtag(this: R) {
-  return isEtag.call(this) !== undefined && !isWeakEtag.call(this);
+export function isStrongEtag(this: R): boolean | undefined {
+  const etag = isEtag.call(this);
+  return etag === undefined ? etag : !isWeakEtag.call(this);
 }
 
 /** @internal */

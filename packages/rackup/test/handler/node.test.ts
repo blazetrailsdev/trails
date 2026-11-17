@@ -214,6 +214,73 @@ describe("Rack::Handler::Node", () => {
     expect(closed).toBe(true);
   });
 
+  function streamingRes() {
+    const listeners: Record<string, (() => void)[]> = {};
+    const written: unknown[] = [];
+    const res = {
+      writable: true,
+      writeHead() {},
+      write(chunk: unknown) {
+        written.push(chunk);
+        return res.writable;
+      },
+      end() {},
+      on(event: string, listener: () => void) {
+        (listeners[event] ??= []).push(listener);
+      },
+      removeListener() {},
+      emit(event: string) {
+        for (const listener of listeners[event] ?? []) listener();
+      },
+    };
+    return { res, written };
+  }
+
+  it("closes a stalled streamed body once the client disconnects", async () => {
+    let closed = false;
+    let release: () => void = () => {};
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        yield "first";
+        await new Promise<void>((resolve) => (release = resolve));
+      },
+      close() {
+        closed = true;
+        release();
+      },
+    };
+    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const { res, written } = streamingRes();
+    const serving = new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
+    await vi.waitFor(() => expect(written).toEqual(["first"]));
+    res.emit("close");
+    await serving;
+    expect(closed).toBe(true);
+  });
+
+  it("waits for drain before reading the next chunk of a streamed body", async () => {
+    let pulled = 0;
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        for (const chunk of ["a", "b"]) {
+          pulled += 1;
+          yield chunk;
+        }
+      },
+    };
+    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const { res, written } = streamingRes();
+    res.writable = false;
+    const serving = new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
+    await vi.waitFor(() => expect(written).toEqual(["a"]));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(pulled).toBe(1);
+    res.writable = true;
+    res.emit("drain");
+    await serving;
+    expect(written).toEqual(["a", "b"]);
+  });
+
   function captureStderr(): { lines: string[]; restore: () => void } {
     const lines: string[] = [];
     const spy = vi.spyOn(stderr, "write").mockImplementation((chunk) => {
