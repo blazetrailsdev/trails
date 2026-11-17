@@ -11,6 +11,7 @@ function load(this: SerializationHost, content: unknown): unknown {
   return null;
 }
 
+/** @inventedArm then — PERMANENT */
 function dump(this: SerializationHost, content: unknown): string | null | Promise<string | null> {
   if (content == null) {
     return null;

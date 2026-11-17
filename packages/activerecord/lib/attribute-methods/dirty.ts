@@ -143,7 +143,10 @@ export async function reload<T extends DirtyPrivateHost>(this: T, ...args: unkno
   return record;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm _loadSerializedAttributes — PERMANENT
+ */
 export async function _touchRow(
   this: DirtyPrivateHost,
   attributeNames: string[],
@@ -185,7 +188,10 @@ export async function _touchRow(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm _loadSerializedAttributes — PERMANENT
+ */
 export async function _updateRecord(
   this: DirtyPrivateHost,
   attributeNames: string[] | undefined,
@@ -198,7 +204,10 @@ export async function _updateRecord(
   return affectedRows;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm _loadSerializedAttributes — PERMANENT
+ */
 export async function _createRecord(
   this: DirtyPrivateHost,
   attributeNames: string[] | undefined,

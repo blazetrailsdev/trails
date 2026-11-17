@@ -139,6 +139,7 @@ export const QUERYING_METHODS = [
   "upsertAll",
 ] as const;
 
+/** @inventedArm _loadSerializedAttributes — PERMANENT */
 export async function findBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
@@ -165,6 +166,7 @@ export async function findBySql<T extends typeof Base>(
   return records;
 }
 
+/** @inventedArm _loadSerializedAttributes — PERMANENT */
 export async function asyncFindBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],

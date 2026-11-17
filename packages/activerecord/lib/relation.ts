@@ -715,7 +715,10 @@ export class Relation<T extends Base, G extends boolean = false> {
     return [...(await this.records())];
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm _loadSerializedAttributes — PERMANENT
+   */
   async execQueries(block?: (record: T) => void): Promise<T[]> {
     return this.skipQueryCacheIfNecessary(async () => {
       await this._model.ensureSchemaLoaded();
