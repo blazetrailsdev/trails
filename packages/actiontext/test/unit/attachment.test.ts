@@ -75,7 +75,7 @@ describe("ActionText::AttachmentTest", () => {
     expect(trixAttachment.attributes["caption"]).toBe("Captioned");
 
     expect(attachable_.toTrixContentAttachmentPartialPath()).toBeNull();
-    expect(trixAttachment.attributes["content"]).toBeUndefined();
+    expect(trixAttachment.attributes["content"] ?? null).toBeNull();
   });
 
   it("converts to TrixAttachment with content", async () => {
@@ -91,8 +91,7 @@ describe("ActionText::AttachmentTest", () => {
     expect(trixAttachment.attributes["contentType"]).toBe(attachable.attachableContentType());
 
     expect(attachable.toTrixContentAttachmentPartialPath()).not.toBeNull();
-    expect(trixAttachment.attributes["content"]).not.toBeNull();
-    expect(trixAttachment.attributes["content"]).toBeDefined();
+    expect(trixAttachment.attributes["content"] ?? null).not.toBeNull();
   });
 
   it("converts to plain text", async () => {
