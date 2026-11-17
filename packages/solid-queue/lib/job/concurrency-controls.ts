@@ -68,7 +68,7 @@ export class ConcurrencyControls {
 
   concurrencyLimit(): number | null {
     if (this.isConcurrencyLimited()) {
-      return (this.jobClass() as { concurrencyLimit: number | null } | null)?.concurrencyLimit ?? 1;
+      return (this.jobClass() as { concurrencyLimit: number | null }).concurrencyLimit ?? 1;
     }
     return null;
   }

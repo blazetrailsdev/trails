@@ -96,11 +96,11 @@ export class Configuration {
   }
 
   mode(): StringInquirer & { [predicate: string]: () => boolean } {
-    return inquiry.call(String(this.options.mode));
+    return inquiry.call(String(this.options.mode ?? ""));
   }
 
-  isStandalone(): boolean {
-    return this.mode().isFork() || this.options.standalone === true;
+  isStandalone(): unknown {
+    return this.mode().isFork() || this.options.standalone;
   }
 
   async configuredProcesses(): Promise<Process[]> {

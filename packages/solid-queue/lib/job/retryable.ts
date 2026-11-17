@@ -17,19 +17,23 @@ export class Retryable {
   }
 
   async failedWith(exception: Error): Promise<unknown> {
-    try {
-      return await FailedExecution.transaction(
-        async () => await FailedExecution.createBang({ job_id: this.id, exception: exception }),
-        { requiresNew: true },
-      );
-    } catch (e) {
-      if (!(e instanceof RecordNotUnique)) throw e;
-      let failedExecution: FailedExecution | null;
-      if ((failedExecution = await FailedExecution.findBy({ job_id: this.id }))) {
-        failedExecution.exception = exception;
-        return await failedExecution.saveBang();
-      } else {
-        return await this.retry();
+    while (true) {
+      try {
+        return await FailedExecution.transaction(
+          async () => await FailedExecution.createBang({ job_id: this.id, exception: exception }),
+          { requiresNew: true },
+        );
+      } catch (e) {
+        if (!(e instanceof RecordNotUnique)) throw e;
+        let failedExecution: FailedExecution | null;
+        if (
+          (failedExecution = await FailedExecution.findBy({
+            job_id: this.id,
+          }))
+        ) {
+          failedExecution.exception = exception;
+          return await failedExecution.saveBang();
+        }
       }
     }
   }
