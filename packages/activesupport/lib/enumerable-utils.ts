@@ -65,6 +65,7 @@ export function indexBy<T, K extends string>(
 ): Record<K, T>;
 export function indexBy<T, K>(collection: Iterable<T> | Each<T>, fn: (item: T) => K): Hash<K, T>;
 export function indexBy<T>(collection: Iterable<T> | Each<T>): Enumerator<T>;
+/** @inventedArm if — PERMANENT */
 export function indexBy<T, K>(
   collection: Iterable<T> | Each<T>,
   fn?: (item: T) => K,
