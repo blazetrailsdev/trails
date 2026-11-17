@@ -13,5 +13,6 @@ Trails.application!.routes().draw(function () {
   this.get("up", { to: "trails/health#show", as: "trails_health_check" });
   this.get("/legacy", { to: "legacy#index", as: "legacy" });
   this.get("/ping", { to: "pings#show" });
+  this.get("/setting", { to: "pings#setting" });
   this.get("/posts/likes", { to: "posts/likes#show" });
 });

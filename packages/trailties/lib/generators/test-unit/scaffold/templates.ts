@@ -12,7 +12,7 @@ function header(this: ScaffoldGenerator) {
   const fixtureName = this.fixtureName();
   const root = "../".repeat(this.controllerClassPath().length + 1);
   const preamble = `import { describe, it } from "vitest";
-import { IntegrationTest } from "@blazetrails/actionpack";
+import { IntegrationTest } from "@blazetrails/actionpack/testing";
 import { assertDifference } from "@blazetrails/activesupport/testing/assertions";
 import { constGet, constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { ${modelClassName} } from "../${root}app/models/${this.filePath()}.js";

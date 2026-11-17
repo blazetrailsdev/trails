@@ -1297,6 +1297,25 @@ jobs:
       - run: pnpm build
       - run: scripts/generated-app-smoke.sh "$RUNNER_TEMP/generated-app"
 
+  # The root README's Quickstart, run as written against this checkout, with
+  # its printed and generated blocks compared to what the run produces.
+  quickstart:
+    name: Quickstart
+    needs: changes
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.trailties_affected == 'true' ||
+      needs.changes.outputs.activerecord_affected == 'true')
+    runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      - uses: ./.github/actions/cache-build
+      - run: pnpm build
+      - run: scripts/quickstart/run.sh
+
   # Reporting-only code coverage. Runs the light (non-AR) packages together
   # with v8 coverage and `--coverage.all` so untested files count toward the
   # denominator, producing an honest baseline. There is NO threshold gate —
@@ -2841,6 +2860,7 @@ jobs:
       - system-tests
       - trailties-tests
       - generated-app-tests
+      - quickstart
       - sqlite-tests
       - sqlite-mem-tests
       - maria-prepared-tests
@@ -2983,7 +3003,7 @@ jobs:
                     continue
                   fi
                   ;;
-                generated-app-tests)
+                generated-app-tests|quickstart)
                   if [ "$TRAILTIES_AFFECTED" = "false" ] && [ "$AR_AFFECTED" = "false" ]; then
                     continue
                   fi

@@ -30,8 +30,8 @@ checkout of this repository.
 
 ## Quickstart
 
-Every command and every output block in this section was run on 2026-10-23
-against `main` at `4837c7ba7a`, on Linux with Node 24.16.0 and SQLite, with
+CI runs every command in this section and compares every output block with what
+the run prints (`scripts/quickstart/run.sh`), on Linux with SQLite and with
 `TRAILS_ENV` and `NODE_ENV` unset. No step needs a workaround.
 
 ### 1. Build the framework from a checkout
@@ -58,8 +58,6 @@ cd blog
 ```
 
 ```text
-Creating new trails application: blog
-
       create  package.json
       create  tsconfig.json
       ...
@@ -94,25 +92,29 @@ bin/trails generate scaffold Post title:string body:text
 
 ```text
       invoke  active_record
-      create  db/migrate/20261023194933_create_posts.ts
-      create  app/models/post.ts
-      invoke  test_unit
-      create  test/models/post.test.ts
-      create  test/fixtures/posts.yml
+      create    db/migrate/20261023194933_create_posts.ts
+      create    app/models/post.ts
+      invoke    test_unit
+      create      test/models/post.test.ts
+      create      test/fixtures/posts.yml
       invoke  resource_route
-       route  this.resources("posts");
-      invoke  scaffold_controller
-      create  app/controllers/posts-controller.ts
-      create  app/views/posts
-      create  app/views/posts/index.html.tse
-      create  app/views/posts/edit.html.tse
-      create  app/views/posts/show.html.tse
-      create  app/views/posts/new.html.tse
-      create  app/views/posts/_form.html.tse
-      create  app/views/posts/_post.html.tse
-      create  test/controllers/posts-controller.test.ts
-      create  app/helpers/posts-helper.ts
-      invoke  resource_route
+       route    this.resources("posts");
+      invoke  scaffold-controller
+      create    app/controllers/posts-controller.ts
+      invoke    tse
+      create      app/views/posts
+      create      app/views/posts/index.html.tse
+      create      app/views/posts/edit.html.tse
+      create      app/views/posts/show.html.tse
+      create      app/views/posts/new.html.tse
+      create      app/views/posts/_form.html.tse
+      create      app/views/posts/_post.html.tse
+      invoke    resource_route
+      invoke    test_unit
+      create      test/controllers/posts-controller.test.ts
+      invoke    helper
+      create      app/helpers/posts-helper.ts
+      invoke      test_unit
 ```
 
 ```sh
@@ -139,6 +141,7 @@ export class CreatePosts extends Migration.get(8.0) {
     await this.createTable("posts", (t) => {
       t.string("title");
       t.text("body");
+
       t.timestamps();
     });
   }
@@ -153,7 +156,7 @@ does.
 
 ```ts
 // app/models/post.ts (generated)
-import { ApplicationRecord } from "./application-record.js";
+import { ApplicationRecord } from "./application-record.ts";
 
 export class Post extends ApplicationRecord {
   static toString(): string {
@@ -164,8 +167,8 @@ export class Post extends ApplicationRecord {
 
 ```ts
 // script/hello.ts
-import "../config/environment.js";
-import { Post } from "../app/models/post.js";
+import "../config/environment.ts";
+import { Post } from "../app/models/post.ts";
 
 const post = await Post.create({ title: "Hello", body: "First post" });
 console.log(post.id, post.isPersisted());
@@ -176,7 +179,7 @@ console.log(Post.where({ title: "Hello" }).order("created_at").limit(10).toSql()
 ```
 
 ```sh
-npx tsx script/hello.ts
+node script/hello.ts
 ```
 
 ```text
@@ -191,16 +194,16 @@ bin/trails routes
 ```
 
 ```text
-            Prefix Verb   URI Pattern               Controller#Action
-             posts GET    /posts(.:format)          posts#index
-                   POST   /posts(.:format)          posts#create
-          new_post GET    /posts/new(.:format)      posts#new
-         edit_post GET    /posts/:id/edit(.:format) posts#edit
-              post GET    /posts/:id(.:format)      posts#show
-                   PATCH  /posts/:id(.:format)      posts#update
-                   PUT    /posts/:id(.:format)      posts#update
-                   DELETE /posts/:id(.:format)      posts#destroy
-rails_health_check GET    /up(.:format)             rails/health#show
+             Prefix Verb   URI Pattern               Controller#Action
+              posts GET    /posts(.:format)          posts#index
+                    POST   /posts(.:format)          posts#create
+           new_post GET    /posts/new(.:format)      posts#new
+          edit_post GET    /posts/:id/edit(.:format) posts#edit
+               post GET    /posts/:id(.:format)      posts#show
+                    PATCH  /posts/:id(.:format)      posts#update
+                    PUT    /posts/:id(.:format)      posts#update
+                    DELETE /posts/:id(.:format)      posts#destroy
+trails_health_check GET    /up(.:format)             trails/health#show
 ```
 
 The console loads every model before it prompts:
@@ -297,14 +300,21 @@ template comments and blank lines stripped:
 The model is typed from the schema with no `declare` lines. This file:
 
 ```ts
-const post = await Post.find(1);
-const n: number = post.title;
+// app/models/check.ts
+import { Post } from "./post.ts";
+
+export class Check {
+  static async run(): Promise<void> {
+    const post = await Post.find(1);
+    const n: number = post.title;
+  }
+}
 ```
 
 fails the build with:
 
 ```text
-app/models/check.ts(4,7): error TS2322: Type 'string | null' is not assignable to type 'number'.
+app/models/check.ts(6,11): error TS2322: Type 'string | null' is not assignable to type 'number'.
   Type 'null' is not assignable to type 'number'.
 ```
 

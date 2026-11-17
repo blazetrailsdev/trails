@@ -328,26 +328,36 @@ export class Trailtie extends BaseTrailtie {
     onLoad("active_record", (base: typeof Base) => {
       activeRecord = base;
     });
-    /** @noRailsEquivalent PERMANENT */
-    this.config.toPrepare(async () => {
-      if (Trails.env["test?"]()) return;
-      if (activeRecord === undefined) return;
-      for (const pool of activeRecord.connectionHandler.connectionPoolList("all")) {
+    const coldPools = new Set<ConnectionPool>();
+    const warmSchemaCache = async (pools: Iterable<ConnectionPool>): Promise<void> => {
+      for (const pool of [...pools]) {
         try {
           await pool.schemaReflection.loadAllBang(pool);
+          coldPools.delete(pool);
         } catch (error) {
           if (!(error instanceof ActiveRecordError)) throw error;
+          coldPools.add(pool);
           console.warn(
             `Failed to load the schema cache because of ${error.constructor.name}: ${error.message}`,
           );
         }
       }
+    };
+    /** @noRailsEquivalent PERMANENT */
+    this.config.toPrepare(async () => {
+      if (Trails.env["test?"]()) return;
+      if (activeRecord === undefined) return;
+      await warmSchemaCache(activeRecord.connectionHandler.connectionPoolList("all"));
     });
 
     this.initializer("active_record.set_executor_hooks", () => {
       QueryCache.installExecutorHooks();
       AsynchronousQueriesTracker.installExecutorHooks();
       ConnectionPool.installExecutorHooks();
+      /** @noRailsEquivalent PERMANENT */
+      Trails.application!.executor.toRun(() =>
+        coldPools.size === 0 ? undefined : warmSchemaCache(coldPools),
+      );
     });
 
     this.initializer("active_record.clear_active_connections", () => {
