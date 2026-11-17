@@ -1,5 +1,5 @@
 import { autoloadGet } from "../lib/core-ext/kernel.js";
-import { File, FileUtils, Kernel, LOAD_PATH, TopLevel } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Kernel, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "../lib/cref.js";
 import {
@@ -10,7 +10,7 @@ import {
 } from "../lib/error.js";
 import { Loader } from "../lib/loader.js";
 import { Registry } from "../lib/registry.js";
-import { newLoader, teardown, withFiles, withSetup } from "./support/loader-test.js";
+import { newLoader, teardown, withFiles, withLoadPath, withSetup } from "./support/loader-test.js";
 
 const get = (mod: object, cname: string) => autoloadGet(new Cref(mod, cname)) as Promise<never>;
 
@@ -106,8 +106,7 @@ describe("TestReloading", () => {
 
     try {
       await withFiles([...gemFiles, ...appFiles], async () => {
-        LOAD_PATH.push(File.expandPath("lib"));
-        try {
+        await withLoadPath("lib", async () => {
           await Kernel.require("my_gem");
 
           await loader.pushDir("app");
@@ -118,9 +117,7 @@ describe("TestReloading", () => {
           expect(await get(myGem, "Foo")).toBeTruthy();
           await loader.reload();
           expect(await get(myGem, "Foo")).toBeTruthy();
-        } finally {
-          LOAD_PATH.pop();
-        }
+        });
       });
     } finally {
       delete g.$Loader;

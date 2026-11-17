@@ -1,12 +1,19 @@
 import { autoloadGet } from "../lib/core-ext/kernel.js";
-import { Dir, Kernel, LOAD_PATH, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { Kernel, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "../lib/cref.js";
 import { NameError, SetupRequired } from "../lib/error.js";
 import { Loader } from "../lib/loader.js";
 import { Inceptions } from "../lib/registry/inceptions.js";
 import { ExplicitNamespaces } from "../lib/registry/explicit-namespaces.js";
-import { isRequired, newLoader, teardown, withFiles, withSetup } from "./support/loader-test.js";
+import {
+  isRequired,
+  newLoader,
+  teardown,
+  withFiles,
+  withLoadPath,
+  withSetup,
+} from "./support/loader-test.js";
 
 const get = (mod: object, cname: string) => autoloadGet(new Cref(mod, cname)) as Promise<object>;
 const defined = (mod: object, cname: string) => new Cref(mod, cname).isDefined();
@@ -87,12 +94,9 @@ describe("TestUnload", () => {
     ];
     try {
       await withFiles(files, async () => {
-        LOAD_PATH.push(Dir.pwd());
-        try {
+        await withLoadPath(".", async () => {
           await Kernel.require("my_gem");
-        } finally {
-          LOAD_PATH.pop();
-        }
+        });
         const $loader = g.$loader as Loader;
 
         expect(await get(Object, "User")).toBeTruthy();
@@ -207,13 +211,10 @@ describe("TestUnload", () => {
 
     try {
       await withFiles(files, async () => {
-        LOAD_PATH.push(Dir.pwd());
-        try {
+        await withLoadPath(".", async () => {
           await Kernel.require("gem1/my_gem1");
           await Kernel.require("gem2/my_gem2");
-        } finally {
-          LOAD_PATH.pop();
-        }
+        });
 
         expect(await get(Object, "MyGem1")).toBeTruthy();
         expect(await get(Object, "MyGem2")).toBeTruthy();

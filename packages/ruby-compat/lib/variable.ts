@@ -441,7 +441,11 @@ export function autoloadDelete(module: object, name: string): void {
  * `Module#autoload?` (`rb_autoload_p`, `vendor/ruby/v3.3.11/variable.c:3083`)
  * with `recur` false: the feature still pending for `name`, or `null`.
  * `check_autoload_required` (`vendor/ruby/v3.3.11/variable.c:2787`) answers
- * `null` for a feature already provided or being required.
+ * `null` for a feature already provided or being required. Its
+ * `autoload_by_someone_else` arm, which keeps the feature while another
+ * thread holds the autoload's mutex, has no port: the loading table is
+ * process-wide, and zeitwerk's `autoloadGet` waits on an in-flight load
+ * before it reads `autoload?`.
  *
  * @noRailsEquivalent PERMANENT
  */

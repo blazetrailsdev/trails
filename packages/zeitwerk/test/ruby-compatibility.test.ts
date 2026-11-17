@@ -3,7 +3,6 @@ import {
   File,
   Kernel,
   LOADED_FEATURES,
-  LOAD_PATH,
   NameError,
   TopLevel,
   constDefined,
@@ -15,19 +14,17 @@ import {
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "../lib/cref.js";
 import type { Loader } from "../lib/loader.js";
-import { get, newLoader, teardown, withFiles, withSetup } from "./support/loader-test.js";
+import {
+  get,
+  newLoader,
+  teardown,
+  withFiles,
+  withLoadPath,
+  withSetup,
+} from "./support/loader-test.js";
 
 const g = globalThis as Record<string, unknown>;
 
-async function withLoadPath(dirs: readonly string[], block: () => Promise<void>): Promise<void> {
-  const expanded = dirs.map((dir) => File.expandPath(dir));
-  LOAD_PATH.push(...expanded);
-  try {
-    await block();
-  } finally {
-    for (const dir of expanded) LOAD_PATH.splice(LOAD_PATH.indexOf(dir), 1);
-  }
-}
 const failureMessage = (fn: () => unknown) => {
   try {
     return String(fn());
