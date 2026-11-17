@@ -23,6 +23,11 @@ describe("inventedArmsIn", () => {
     expect(inventedArmsIn(comment)).toEqual(["if", "rbObjRespondTo"]);
   });
 
+  it("returns one entry per tag, so a repeated token counts its arms", () => {
+    const comment = `/**\n * ${TAG} if — PERMANENT\n * ${TAG} loop — PERMANENT\n * ${TAG} if — PERMANENT\n */`;
+    expect(inventedArmsIn(comment)).toEqual(["if", "if", "loop"]);
+  });
+
   it("rejects a receipt with no permanence token", () => {
     expect(() => inventedArmsIn(block(`${TAG} if — readers are properties`))).toThrow(
       /@inventedArm needs a permanence claim/,
@@ -57,6 +62,17 @@ describe("an @inventedArm receipt on a skeleton row", () => {
     const reordered = row(["if", "loop"], ["loop", "if"], ["if"]);
     expect(compareArms(reordered)?.kind).toBe("order");
     expect(staleArmReceipts(reordered)).toEqual(["if"]);
+  });
+
+  it("discharges only as many invented arms as the receipt has tags", () => {
+    const threeIfs = [...ts, "if", "if"];
+    expect(compareArms(row(ruby, threeIfs, ["if"]))?.invented).toEqual(["if", "if"]);
+    expect(compareArms(row(ruby, threeIfs, ["if", "if", "if"]))).toBeUndefined();
+  });
+
+  it("reports one receipt too many as stale", () => {
+    expect(staleArmReceipts(row(ruby, ts, ["if", "if"]))).toEqual(["if"]);
+    expect(staleArmReceipts(row(ruby, [...ts, "if"], ["if", "if"]))).toEqual([]);
   });
 
   it("reports a receipt for a call the body does not make", () => {

@@ -21,7 +21,7 @@ interface RenderingClass {
   actionControllerRenderer(): RendererLike;
 }
 
-export const Rendering = {} as Extended<typeof Concern>;
+export const Rendering = {} as { ClassMethods: Record<string, unknown> } & Extended<typeof Concern>;
 extend(Rendering, Concern);
 
 (Rendering as unknown as { included(base: null, block: (this: object) => void): void }).included(

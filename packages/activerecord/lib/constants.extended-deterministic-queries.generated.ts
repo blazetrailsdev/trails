@@ -8,6 +8,10 @@ defineConstants([
     "ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValue",
   ],
   [
+    () => m0.CoreQueries.ClassMethods,
+    "ActiveRecord::Encryption::ExtendedDeterministicQueries::CoreQueries::ClassMethods",
+  ],
+  [
     () => m0.EncryptedQuery,
     "ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery",
   ],

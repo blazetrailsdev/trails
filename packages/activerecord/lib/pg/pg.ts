@@ -1,5 +1,5 @@
 import { TopLevel } from "@blazetrails/activesupport";
-import { Connection, connect } from "./connection.js";
+import { Connection } from "./connection.js";
 import {
   ConnectionBad,
   Error as PGError,
@@ -35,7 +35,9 @@ export const PG = {
   get Connection(): typeof Connection {
     return Connection;
   },
-  connect,
+  connect(connParams: Record<string, unknown>): Promise<Connection> {
+    return Connection.connect(connParams);
+  },
   Error: PGError,
   ConnectionBad,
   ServerError,

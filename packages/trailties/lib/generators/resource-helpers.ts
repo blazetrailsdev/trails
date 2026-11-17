@@ -1,6 +1,6 @@
 import "../constants.resource-helpers.generated.js";
 import { NameError, camelize, constantize, underscore } from "@blazetrails/activesupport";
-import { include, included } from "@blazetrails/ruby-compat";
+import { include, included, rbModAttrReader } from "@blazetrails/ruby-compat";
 import { ActiveModel } from "./active-model.js";
 import { ModelHelpers } from "./model-helpers.js";
 import type { Base } from "./base.js";
@@ -8,8 +8,12 @@ import type { NamedBase } from "./named-base.js";
 
 export interface ResourceHelpersHost extends NamedBase {
   options: NamedBase["options"] & { modelName?: string; orm?: unknown };
-  controllerName: string;
-  controllerFileName: string;
+  /** @internal */
+  readonly controllerName: string;
+  /** @internal */
+  readonly controllerFileName: string;
+  _controllerName: string;
+  _controllerFileName: string;
   _controllerClassPath: string[];
   _controllerFilePath?: string;
   _controllerI18nScope?: string;
@@ -33,10 +37,10 @@ function controllerClassPath(this: ResourceHelpersHost): string[] {
 
 /** @internal */
 function assignControllerNamesBang(this: ResourceHelpersHost, name: string): void {
-  this.controllerName = name;
+  this._controllerName = name;
   this._controllerClassPath = name.includes("/") ? name.split("/") : name.split("::");
   this._controllerClassPath = this._controllerClassPath.map((p) => underscore(p));
-  this.controllerFileName = this._controllerClassPath.pop()!;
+  this._controllerFileName = this._controllerClassPath.pop()!;
 }
 
 /** @internal */
@@ -100,3 +104,4 @@ export const ResourceHelpers = {
     klass.classOption("modelName", { type: "string", desc: "ModelName to be used" });
   },
 };
+rbModAttrReader({ prototype: ResourceHelpers }, "controllerName", "controllerFileName");

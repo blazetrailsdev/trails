@@ -18,10 +18,6 @@ export class UpdateGenerator extends Base {
     this.methodAdded("copyFiles");
   }
 
-  migrationNumber = "";
-  migrationFileName = "";
-  migrationClassName = "";
-
   declare static migrationLookupAt: Extended<typeof ClassMethods>["migrationLookupAt"];
   declare static isMigrationExists: Extended<typeof ClassMethods>["isMigrationExists"];
   declare static currentMigrationNumber: Extended<typeof ClassMethods>["currentMigrationNumber"];

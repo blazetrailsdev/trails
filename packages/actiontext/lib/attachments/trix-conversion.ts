@@ -40,6 +40,7 @@ export const TrixConversion = {
     return null;
   },
 } as Extended<typeof Concern> & {
+  ClassMethods: Record<string, unknown>;
   toTrixAttachment(this: TrixConversionHost, content?: unknown): Promise<TrixAttachment>;
   trixAttachmentContent(this: TrixConversionHost): unknown;
 };

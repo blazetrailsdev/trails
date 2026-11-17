@@ -110,7 +110,12 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
  * the directory passed to {@link extractorSchemaToken}. Any edit busts the
  * token (content-keyed, so it's mtime-independent and matches cross-worktree).
  */
-export const EXTRACTOR_SOURCES = ["extract-ts-api.ts", "extract-ts-api-worker.mjs"];
+export const EXTRACTOR_SOURCES = [
+  "extract-ts-api.ts",
+  "extract-ts-api-worker.mjs",
+  "invented-arm-tags.ts",
+  "missing-rails-name-tags.ts",
+];
 
 /** sha1 of one extractor source's contents, or "" if it can't be read. */
 async function sourceHash(file: string): Promise<string> {

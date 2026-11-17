@@ -11,6 +11,7 @@
  * seeded, and call-mismatches.json / call-arg-mismatches.json and their two
  * ratchets read exactly what they read before.
  */
+import { receiptCounts } from "./invented-arm-tags.js";
 import * as path from "path";
 import { readFile } from "fs/promises";
 import { fileURLToPath } from "url";
@@ -291,7 +292,13 @@ function armVerdict(
 export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
   const verdict = unreceiptedArms(row);
   if (verdict?.kind !== "count" || row.inventedArms === undefined) return verdict;
-  const invented = verdict.invented.filter((token) => !row.inventedArms!.includes(token));
+  const receipts = receiptCounts(row.inventedArms);
+  const invented = verdict.invented.filter((token) => {
+    const left = receipts.get(token) ?? 0;
+    if (left === 0) return true;
+    receipts.set(token, left - 1);
+    return false;
+  });
   if (verdict.missing.length === 0 && invented.length === 0) return undefined;
   return { ...verdict, invented };
 }
@@ -309,18 +316,21 @@ function unreceiptedArms(row: SkeletonRow): ArmMismatch | undefined {
 
 /**
  * The `@inventedArm` receipts on `row` that receipt nothing: a control token
- * the pair does not file as invented, or a call name the TS body does not
+ * receipted more times than the pair files it as invented (one tag per arm), or a call name the TS body does not
  * reach or the Ruby body reaches too. A receipt is debt the gate must be able
  * to retire, so one that outlives its arm is an error rather than a no-op.
  */
 export function staleArmReceipts(row: SkeletonRow): string[] {
   if (row.inventedArms === undefined) return [];
-  const invented = unreceiptedArms(row)?.invented ?? [];
-  return row.inventedArms.filter((token) =>
-    CONTROL_TOKENS.has(token)
-      ? !invented.includes(token)
-      : !row.ts.includes(`ref:${token}`) || row.ruby.includes(`ref:${token}`),
-  );
+  const invented = receiptCounts(unreceiptedArms(row)?.invented ?? []);
+  return row.inventedArms.filter((token) => {
+    if (!CONTROL_TOKENS.has(token)) {
+      return !row.ts.includes(`ref:${token}`) || row.ruby.includes(`ref:${token}`);
+    }
+    const left = invented.get(token) ?? 0;
+    invented.set(token, left - 1);
+    return left <= 0;
+  });
 }
 
 /** The RFC 0113 cluster a `count` row belongs to; an `order` row is `arm-order`. */

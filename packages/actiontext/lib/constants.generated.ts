@@ -22,6 +22,7 @@ import * as m19 from "./trix-attachment.js";
 
 defineConstants([
   [() => m2.Attachable, "ActionText::Attachable"],
+  [() => m2.Attachable.ClassMethods, "ActionText::Attachable::ClassMethods"],
   [() => m3.ContentAttachment, "ActionText::Attachables::ContentAttachment"],
   [() => m4.MissingAttachable, "ActionText::Attachables::MissingAttachable"],
   [() => m5.RemoteImage, "ActionText::Attachables::RemoteImage"],
@@ -29,7 +30,9 @@ defineConstants([
   [() => m6.AttachmentGallery, "ActionText::AttachmentGallery"],
   [() => m8.Caching, "ActionText::Attachments::Caching"],
   [() => m9.Minification, "ActionText::Attachments::Minification"],
+  [() => m9.Minification.ClassMethods, "ActionText::Attachments::Minification::ClassMethods"],
   [() => m10.TrixConversion, "ActionText::Attachments::TrixConversion"],
+  [() => m10.TrixConversion.ClassMethods, "ActionText::Attachments::TrixConversion::ClassMethods"],
   [() => m11.Attribute, "ActionText::Attribute"],
   [() => m12.Content, "ActionText::Content"],
   [() => m0.ContentHelper, "ActionText::ContentHelper"],
@@ -37,6 +40,7 @@ defineConstants([
   [() => m15.HtmlConversion, "ActionText::HtmlConversion"],
   [() => m16.PlainTextConversion, "ActionText::PlainTextConversion"],
   [() => m17.Rendering, "ActionText::Rendering"],
+  [() => m17.Rendering.ClassMethods, "ActionText::Rendering::ClassMethods"],
   [() => m18.Serialization, "ActionText::Serialization"],
   [() => m1.TagHelper, "ActionText::TagHelper"],
   [() => m19.TrixAttachment, "ActionText::TrixAttachment"],

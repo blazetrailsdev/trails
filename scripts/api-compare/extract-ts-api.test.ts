@@ -3708,6 +3708,47 @@ describe("extractFromProgram — include() detection", () => {
     expect(info.modules["core-queries.ts:Other"]).toBeUndefined();
   });
 
+  it("records the object literal a Module's block includes", () => {
+    const info = extractFromFiles("/p", {
+      "through-association.ts": `
+        declare class Module {
+          constructor(block?: (mod: Module) => void);
+          include(mod: object): this;
+        }
+        export const ThroughAssociation = new Module((mod) =>
+          mod.include({
+            sourceReflection(): unknown { return null; },
+          }),
+        );
+      `,
+    });
+    const methods = info.modules["through-association.ts:ThroughAssociation"].instanceMethods;
+    expect(methods.map((m) => m.name)).toEqual(["sourceReflection"]);
+  });
+
+  it("records a Concern's classMethods block as its nested ClassMethods module", () => {
+    // activerecord/lib/active_record/encryption/extended_deterministic_queries.rb's
+    // CoreQueries::ClassMethods; actiontext/lib/action_text/rendering.rb's class_methods.
+    const info = extractFromFiles("/p", {
+      "rendering.ts": `
+        declare const Concern: { classMethods(block: (mod: Record<string, unknown>) => void): void };
+        export const Rendering = {} as typeof Concern;
+        export function findBy(...args: unknown[]): unknown { return args; }
+        Rendering.classMethods((mod) => {
+          mod.findBy = findBy;
+          mod.withRenderer = function (renderer: unknown, block: () => unknown) { return block(); };
+        });
+      `,
+    });
+    const mod = info.modules["rendering.ts:Rendering.ClassMethods"];
+    expect(mod.name).toBe("ClassMethods");
+    expect(mod.instanceMethods.map((m) => [m.name, m.bodyless === true])).toEqual([
+      ["findBy", true],
+      ["withRenderer", false],
+    ]);
+    expect(mod.instanceMethods[1].params.map((p) => p.name)).toEqual(["renderer", "block"]);
+  });
+
   it("records the methods a Module's block generates with delegate", () => {
     // activesupport/lib/active_support/message_pack/serializer.rb:40.
     const info = extractFromFiles("/p", {

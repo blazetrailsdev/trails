@@ -88,11 +88,12 @@ catches a class of drift a reviewer would otherwise spend a cycle on.
    flag only what Rails does and the port omits. Converge it away; where a
    ratified language shortcoming forces it, receipt it on the declaration with
    `@inventedArm <token> — PERMANENT|CONVERGEABLE <story-id>`, one tag per
-   token: a control token the arms report files as invented for the pair (`if`,
-   `loop`, `try`, `rescue`, `throw`), or the name of the call only the TS body
-   makes. A receipt is per TOKEN, not per occurrence: one `if` receipt speaks
-   for every invented `if` on the pair, and goes stale only when the pair
-   invents no `if` at all. A call-name receipt discharges nothing, since no
+   invented arm: a control token the arms report files as invented for the pair
+   (`if`, `loop`, `try`, `rescue`, `throw`), or the name of the call only the TS
+   body makes. A control-token receipt is per OCCURRENCE: a body that invents
+   three `if` arms carries three `@inventedArm if` tags, the report discharges
+   at most that many, and a tag goes stale when the pair invents fewer `if`s
+   than it has tags. A call-name receipt discharges nothing, since no
    gate flags an extra call; it records the deviation at the declaration and
    goes stale when the body stops making the call. `pnpm parity:api:arms:throws`
    reds on a stale receipt and on one sitting on a declaration no skeleton row
