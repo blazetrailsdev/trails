@@ -49,8 +49,12 @@ describe("a ReadableStream response body", () => {
         cancelled = true;
       },
     });
-    const [, , body] = res.toA() as [number, unknown, AsyncIterable<unknown>];
-    expect(Array.isArray((body as { toAry(): unknown }).toAry())).toBe(false);
+    const [, , body] = res.toA() as [
+      number,
+      unknown,
+      AsyncIterable<unknown> & { toAry(): unknown },
+    ];
+    expect(Array.isArray(body.toAry())).toBe(false);
     for await (const chunk of body) {
       expect(chunk).toEqual(new Uint8Array([1]));
       break;
