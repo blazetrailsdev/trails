@@ -40,6 +40,7 @@ interface EnqueueOptions {
   [extraMetadata: string]: unknown;
 }
 
+/** @missingRailsCall include — CONVERGEABLE solid-queue-batch-callbacks-and-lifecycle-v1-7-2 */
 export class Batch extends Record {
   static AlreadyFinished = AlreadyFinished;
   static PendingMigrations = PendingMigrations;
@@ -102,6 +103,7 @@ export class Batch extends Record {
 
   /** @inventedArm ensureSchemaLoaded — CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts */
   static async isMigrated(): Promise<boolean> {
+    await this.ensureSchemaLoaded();
     await SolidQueue.Job!.ensureSchemaLoaded();
     return (this._migrated ||=
       (await this.tableExists()) &&
@@ -122,7 +124,6 @@ export class Batch extends Record {
   ): Promise<Batch> {
     if (!(await this.isMigrated())) throw new PendingMigrations();
 
-    await this.ensureSchemaLoaded();
     const batch = new this();
     batch.assignAttributes({
       description,

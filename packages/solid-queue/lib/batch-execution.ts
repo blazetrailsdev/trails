@@ -1,5 +1,5 @@
 import type { Base, Relation } from "@blazetrails/activerecord";
-import { constSet } from "@blazetrails/ruby-compat";
+import { StandardError, constSet, toI } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
 import { SolidQueue } from "./solid-queue.js";
 import type { Job } from "./job.js";
@@ -58,9 +58,7 @@ export class BatchExecution extends Execution {
   /** @internal */
   private static countNewJobsAmong(jobs: Job[]): number {
     return new Set(
-      jobs
-        .filter((job) => !(Math.trunc(Number(job.arguments["executions"] ?? 0)) > 0))
-        .map((job) => job.active_job_id),
+      jobs.filter((job) => !(toI(job.arguments["executions"]) > 0)).map((job) => job.active_job_id),
     ).size;
   }
 
@@ -74,6 +72,7 @@ export class BatchExecution extends Execution {
         await batch.finish();
       }
     } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
       await SolidQueue.instrument("batch_progress_error", {
         batch_id: this.batch_id,
         job_id: this.job_id,
