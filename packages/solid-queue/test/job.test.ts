@@ -192,7 +192,7 @@ describe("SolidQueue::JobTest", () => {
     const jobSelects = payloads
       .filter(({ name, sql }) => name !== "SCHEMA" && /^SELECT .*solid_queue_jobs/i.test(sql))
       .map(({ sql }) => sql);
-    expect(jobSelects).toHaveLength(0);
+    expect(jobSelects).toBeEmpty();
   });
 
   it("enqueue active job to be executed right away", async () => {
