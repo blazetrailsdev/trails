@@ -1264,6 +1264,7 @@ export default defineConfig(
     files: [
       "packages/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
       "scripts/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
+      "*.config.{ts,mts,cts,js,mjs,cjs}",
     ],
     ignores: ["packages/vite-assets/**", "packages/vite-trails/**"],
     rules: {
