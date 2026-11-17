@@ -140,6 +140,9 @@ typescriptEslintRules["no-misused-promises"] = prefilterNoMisusedPromises(
   typescriptEslintRules["no-misused-promises"],
 );
 
+const VITE_APP_ASSETS_MESSAGE =
+  "@blazetrails/vite-assets and @blazetrails/vite-trails serve only an app's browser assets and never mix with trails' toolchain Vite (see CLAUDE.md, \"importmap-rails and propshaft are out of scope; JavaScript is served by Vite (`vite_rails`)\").";
+
 export default defineConfig(
   {
     ignores: [
@@ -1255,6 +1258,64 @@ export default defineConfig(
       "blazetrails/constructor-creates-no-promise": "warn",
       "blazetrails/no-swallowed-rejection": "warn",
       "blazetrails/no-floating-maybe-promise": "warn",
+    },
+  },
+  // The app-asset boundary: CLAUDE.md, "importmap-rails and propshaft are out
+  // of scope; JavaScript is served by Vite (`vite_rails`)".
+  {
+    files: ["packages/**/*.{ts,mts,js,mjs}", "scripts/**/*.{ts,mts,js,mjs}"],
+    ignores: [
+      "packages/vite-assets/**",
+      "packages/vite-trails/**",
+      "packages/turbo/**",
+      "packages/stimulus/**",
+      "packages/trailties/lib/generators/**",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "@blazetrails/vite-assets",
+                "@blazetrails/vite-assets/*",
+                "@blazetrails/vite-trails",
+                "@blazetrails/vite-trails/*",
+                "**/vite-assets/lib/**",
+                "**/vite-trails/lib/**",
+              ],
+              message: VITE_APP_ASSETS_MESSAGE,
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: [
+      "packages/vite-assets/**/*.{ts,mts,js,mjs}",
+      "packages/vite-trails/**/*.{ts,mts,js,mjs}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: [
+                "**/trailties/lib/server/vite-plugin*",
+                "**/trailties/lib/server/dev-server*",
+                "@blazetrails/trailties/server/vite-plugin*",
+                "@blazetrails/trailties/server/dev-server*",
+                "@blazetrails/trailties/lib/server/vite-plugin*",
+                "@blazetrails/trailties/lib/server/dev-server*",
+              ],
+              message: VITE_APP_ASSETS_MESSAGE,
+            },
+          ],
+        },
+      ],
     },
   },
 );
