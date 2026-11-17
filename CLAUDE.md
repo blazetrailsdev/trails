@@ -645,8 +645,13 @@ carrier is spliced into the prototype chain. Ruled by the operator on
 late-defined modules: `NamedRouteCollection`'s path / url helper class
 modules record every includer the `url_helpers` module's `included` hook,
 its own singleton and its proxy class reach, and `MountedHelpers` records its
-includers for `define_mounted_helper`. It licenses an includer list for no
-other module.
+includers for `define_mounted_helper`. On 2026-11-17 the operator widened it
+to ActionText's reopen of `ActionView::Helpers::FormHelper` and `FormBuilder`
+(`actiontext/app/helpers/action_text/tag_helper.rb`): `ActionView::Base`
+includes `Helpers` when its module is evaluated, before any engine can reopen
+`FormHelper`, so `FormHelper` and `FormBuilder` record the prototypes that
+copied them and ActionText's `rich_textarea` / `rich_text_area` write through.
+It licenses an includer list for no other module.
 
 `pnpm parity:modules` (`scripts/parity/module-count.ts`) counts, per package,
 the `new Module` expressions, `superMethod(` calls and `Module` imports from
