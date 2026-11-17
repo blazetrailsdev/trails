@@ -2,8 +2,7 @@ import type { Base, Relation } from "@blazetrails/activerecord";
 import { constSet } from "@blazetrails/ruby-compat";
 import { Execution } from "./execution.js";
 import { SolidQueue } from "./solid-queue.js";
-import { Job } from "./job.js";
-import { Batch } from "./batch.js";
+import type { Job } from "./job.js";
 
 export class BatchExecution extends Execution {
   declare batch_id: number;
@@ -18,7 +17,7 @@ export class BatchExecution extends Execution {
     this.belongsTo("batch");
 
     this.scope("withFinishedJobs", function () {
-      return this.joins("job").merge(Job.finished());
+      return this.joins("job").merge(SolidQueue.Job!.finished());
     });
     this.scope("withFailedJobs", function () {
       return this.joins({ job: "failedExecution" });
@@ -39,7 +38,9 @@ export class BatchExecution extends Execution {
       if (await this.attemptToUpdateTotalJobs(batchId, jobsInBatch)) {
         await super.createAllFromJobs(jobsInBatch);
       } else {
-        throw new Batch.AlreadyFinished("Can't add jobs into an already finished batch");
+        throw new SolidQueue.Batch!.AlreadyFinished(
+          "Can't add jobs into an already finished batch",
+        );
       }
     }
     return jobsByBatchId;
@@ -48,7 +49,7 @@ export class BatchExecution extends Execution {
   /** @internal */
   private static async attemptToUpdateTotalJobs(batchId: number, jobs: Job[]): Promise<boolean> {
     const newJobsCount = this.countNewJobsAmong(jobs);
-    const updated = await Batch.where({ id: batchId })
+    const updated = await SolidQueue.Batch!.where({ id: batchId })
       .unfinished()
       .updateAll(["total_jobs = total_jobs + ?", newJobsCount]);
     return updated > 0;
@@ -66,7 +67,7 @@ export class BatchExecution extends Execution {
   /** @internal */
   private async finishBatch(): Promise<void> {
     try {
-      const batch = await Batch.select("id", "finished_at", "enqueued_at").findBy({
+      const batch = await SolidQueue.Batch!.select("id", "finished_at", "enqueued_at").findBy({
         id: this.batch_id,
       });
       if (batch != null) {

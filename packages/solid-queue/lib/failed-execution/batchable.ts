@@ -2,7 +2,6 @@ import { Concern, extend } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "@blazetrails/activerecord";
 import { classModule } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
-import { Batch } from "../batch.js";
 import type { FailedExecution } from "../failed-execution.js";
 import type { Job } from "../job.js";
 
@@ -33,7 +32,7 @@ extend(Batchable, Concern);
 ).included(null, function (this: typeof FailedExecution) {
   /** @inventedArm if — CONVERGEABLE solid-queue-batchable-callback-guards-async-migrated */
   this.afterCreate(async function (this: Batchable) {
-    if ((await Batch.isMigrated()) && (await this.job).queryAttribute("batch_id")) {
+    if ((await SolidQueue.Batch!.isMigrated()) && (await this.job).queryAttribute("batch_id")) {
       await this.destroyJobBatchExecution();
     }
   });

@@ -24,7 +24,6 @@ import {
 } from "./job/concurrency-controls.js";
 import { Recurrable } from "./job/recurrable.js";
 import { Batchable, type ClassMethods as BatchableClassMethods } from "./job/batchable.js";
-import { Batch } from "./batch.js";
 import type { Retryable } from "./job/retryable.js";
 import type { Duration } from "@blazetrails/activesupport";
 
@@ -103,7 +102,7 @@ export class Job extends Record {
   }
 
   static async enqueueAll(activeJobs: ActiveJob[]): Promise<number> {
-    const currentBatchId = Batch.currentBatchId();
+    const currentBatchId = SolidQueue.Batch!.currentBatchId();
 
     for (const job of activeJobs) {
       job.scheduledAt ??= Time.current();
@@ -176,7 +175,7 @@ export class Job extends Record {
       arguments: activeJob.serialize(),
       concurrency_key: activeJob.concurrencyKey(),
     };
-    if (await Batch.isMigrated()) attributes["batch_id"] = activeJob.batchId;
+    if (await SolidQueue.Batch!.isMigrated()) attributes["batch_id"] = activeJob.batchId;
     return attributes;
   }
 

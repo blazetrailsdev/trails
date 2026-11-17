@@ -14,9 +14,9 @@ import {
 import { Time } from "@blazetrails/date";
 import { SecureRandom, StandardError, constSet } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
+import type { BatchExecution } from "./batch-execution.js";
+import type { Job } from "./job.js";
 import { SolidQueue } from "./solid-queue.js";
-import { BatchExecution } from "./batch-execution.js";
-import { Job } from "./job.js";
 import { Callbacks } from "./batch/callbacks.js";
 import { Status } from "./batch/status.js";
 import { Clearable, type ClassMethods as ClearableClassMethods } from "./batch/clearable.js";
@@ -90,7 +90,7 @@ export class Batch extends Record {
     this.store("metadata", { coder: JSON });
 
     this.scope("withoutExecutions", function () {
-      return this.where().not({ id: BatchExecution.select("batch_id") });
+      return this.where().not({ id: SolidQueue.BatchExecution!.select("batch_id") });
     });
 
     this.beforeCreate(":setActiveJobBatchId");
@@ -102,11 +102,11 @@ export class Batch extends Record {
 
   /** @inventedArm ensureSchemaLoaded — CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts */
   static async isMigrated(): Promise<boolean> {
-    await Job.ensureSchemaLoaded();
+    await SolidQueue.Job!.ensureSchemaLoaded();
     return (this._migrated ||=
       (await this.tableExists()) &&
-      (await BatchExecution.tableExists()) &&
-      Job.columnNames().includes("batch_id"));
+      (await SolidQueue.BatchExecution!.tableExists()) &&
+      SolidQueue.Job!.columnNames().includes("batch_id"));
   }
 
   /** @inventedArm ensureSchemaLoaded — CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts */

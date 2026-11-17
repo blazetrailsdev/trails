@@ -3,7 +3,7 @@ import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
 import type { Batch } from "../batch.js";
-import { Job } from "../job.js";
+import { SolidQueue } from "../solid-queue.js";
 
 type CallbackName = "on_finish" | "on_success" | "on_failure";
 type BatchedActiveJob = ActiveJobBase & {
@@ -46,12 +46,15 @@ export class Callbacks {
   async enqueueCallbackJob(callbackName: CallbackName): Promise<void> {
     const callback = this[callbackName];
     if (callback != null) {
-      const activeJob = ActiveJobBase.deserialize(callback as never);
+      const activeJob = ActiveJobBase.deserialize<BatchedActiveJob>(callback as never);
       activeJob.callbackBatchId = this.id;
       await activeJob.runCallbacks("enqueue", async () => {
-        await Job.enqueue(activeJob as Parameters<typeof Job.enqueue>[0], {
-          scheduledAt: activeJob.scheduledAt ?? Time.current(),
-        });
+        await SolidQueue.Job!.enqueue(
+          activeJob as Parameters<typeof import("../job.js").Job.enqueue>[0],
+          {
+            scheduledAt: activeJob.scheduledAt ?? Time.current(),
+          },
+        );
       });
     }
   }

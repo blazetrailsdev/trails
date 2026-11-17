@@ -3,13 +3,13 @@ import { ActiveRecordError, type Base } from "@blazetrails/activerecord";
 import type { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
-import { Batch } from "../batch.js";
-import { BatchExecution } from "../batch-execution.js";
 import type { Job } from "../job.js";
+import type { BatchExecution } from "../batch-execution.js";
 
 export class ClassMethods {
   static async batchAll(this: typeof Job, jobs: Job[]): Promise<unknown> {
-    if (await Batch.isMigrated()) return await BatchExecution.createAllFromJobs(jobs);
+    if (await SolidQueue.Batch!.isMigrated())
+      return await SolidQueue.BatchExecution!.createAllFromJobs(jobs);
     return null;
   }
 }
@@ -25,12 +25,12 @@ export class Batchable {
   declare isSavedChangeToAttribute: (name: string) => boolean;
 
   async isBatched(): Promise<boolean> {
-    return (await Batch.isMigrated()) && this.queryAttribute("batch_id");
+    return (await SolidQueue.Batch!.isMigrated()) && this.queryAttribute("batch_id");
   }
 
   /** @internal */
   async createBatchExecution(): Promise<void> {
-    await BatchExecution.createAllFromJobs([this as unknown as Base]);
+    await SolidQueue.BatchExecution!.createAllFromJobs([this as unknown as Base]);
   }
 
   /** @internal */
