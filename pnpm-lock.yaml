@@ -1646,6 +1646,9 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../../packages/tse-compiler
+      '@blazetrails/turbo':
+        specifier: workspace:*
+        version: link:../../packages/turbo
       '@blazetrails/tzinfo':
         specifier: workspace:*
         version: link:../../packages/tzinfo
