@@ -320,6 +320,7 @@ export class Parser {
   private bodyRegexAtEnd: RegExp;
   private endBoundarySize: number;
   private rxMaxSize: number;
+  /** @perf 28000x — PERMANENT */
   private headRegex: RegExp;
   private _bodyRetained: boolean | null;
   private _retainedSize: number;
@@ -396,7 +397,7 @@ export class Parser {
     this.bodyRegexAtEnd = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)$`, "s");
     this.endBoundarySize = boundary.length + 4;
     this.rxMaxSize = boundary.length + 6;
-    this.headRegex = new RegExp(`(.*?${EOL})${EOL}`, "s");
+    this.headRegex = new RegExp(`^(.*?${EOL})${EOL}`, "s");
   }
 
   parse(io: { read(n: number, outbuf?: string): string | Uint8Array | null }) {

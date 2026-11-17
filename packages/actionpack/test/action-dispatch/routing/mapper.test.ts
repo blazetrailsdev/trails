@@ -4,7 +4,7 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { registerCompiledFiles } from "@blazetrails/ruby-compat";
+import { loadIseqEval, registerCompiledFiles } from "@blazetrails/ruby-compat";
 import { Mapper } from "../../../lib/action-dispatch/routing/mapper.js";
 import { RouteSet } from "../../../lib/action-dispatch/routing/route-set.js";
 
@@ -128,8 +128,9 @@ describe("Mapper public DSL additions", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
     m._drawPaths.push(dir);
+    await loadIseqEval(join(dir, "external.ts"), true);
 
-    await m.draw("external");
+    m.draw("external");
 
     expect(set.routes().routes.map((r) => r.path.spec.toString())).toContain("/external(.:format)");
   });
@@ -150,14 +151,16 @@ describe("Mapper public DSL additions", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
     m._drawPaths.push(dir);
+    await loadIseqEval(join(dir, "compiled.ts"), true);
 
-    await m.draw("compiled");
+    m.draw("compiled");
 
     const specs = () => set.routes().routes.map((r) => r.path.spec.toString());
     expect(specs()).toContain("/compiled(.:format)");
     expect(specs()).not.toContain("/disk(.:format)");
 
-    await m.draw("compiled");
+    await loadIseqEval(join(dir, "compiled.ts"), true);
+    m.draw("compiled");
     expect(specs()).toContain("/disk(.:format)");
   });
 
@@ -173,9 +176,10 @@ describe("Mapper public DSL additions", () => {
     const set = new RouteSet();
     const m = new Mapper(set);
     m._drawPaths.push(dir);
+    await loadIseqEval(join(dir, "sourceless.ts"), true);
 
-    await m.draw("sourceless");
-    await m.draw("sourceless");
+    m.draw("sourceless");
+    m.draw("sourceless");
 
     const specs = set.routes().routes.map((r) => r.path.spec.toString());
     expect(specs.filter((s) => s === "/sourceless(.:format)")).toHaveLength(2);
@@ -195,9 +199,7 @@ describe("Mapper public DSL additions", () => {
     const m = new Mapper(set);
     m._drawPaths.push("/nonexistent/config/routes");
 
-    await expect(m.draw("external")).rejects.toThrow(
-      /tried to #draw the external file external\.ts/,
-    );
+    expect(() => m.draw("external")).toThrow(/tried to #draw the external file external\.ts/);
   });
 
   it("defaultUrlOptions getter/setter round-trip", () => {

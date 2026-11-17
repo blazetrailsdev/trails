@@ -109,7 +109,7 @@ export const StaleSessionCheck = {
 export const SessionObject = {
   async commitSession(this: Persisted, req: any, res: any): Promise<unknown> {
     await req.commitCsrfToken?.();
-    return await Persisted.prototype.commitSession.call(this, req, res);
+    return await rbCallSuper(this, SessionObject.commitSession, req, res);
   },
 
   prepareSession(this: Persisted, req: Request): RequestSession {

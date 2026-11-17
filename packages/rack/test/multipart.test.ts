@@ -20,6 +20,8 @@ import { ArgumentError, Errno, StringIO, b } from "@blazetrails/ruby-compat";
 import { MockRequest } from "../lib/mock-request.js";
 import { Params, QueryParser } from "../lib/query-parser.js";
 import { Request } from "../lib/request.js";
+import { Error as MultipartError, Parser } from "../lib/multipart/parser.js";
+import { defaultQueryParser } from "../lib/utils.js";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -1184,3 +1186,356 @@ Content-Type: application/octet-stream;\r
 
 // PERMANENT-SKIP: asserts an ISO-2022-JP String encoding; CLAUDE.md, "A String has no encoding tag either".
 it.skip("supports ISO-2022-JP-encoded part", () => {});
+
+function withMultipartLimit(limit: number | null, block: () => void): void {
+  const parser = Parser as { PARSER_BYTESIZE_LIMIT: number | null };
+  const previous = parser.PARSER_BYTESIZE_LIMIT;
+  try {
+    parser.PARSER_BYTESIZE_LIMIT = limit;
+    block();
+  } finally {
+    parser.PARSER_BYTESIZE_LIMIT = previous;
+  }
+}
+
+function pipeReader(thr: Generator<string, unknown, void>) {
+  let pending = "";
+  const rd = {
+    done: false,
+    value: undefined as unknown,
+    threadValue(): unknown {
+      return rd.done ? rd.value : thr.throw(new Errno.EPIPE()).value;
+    },
+    read(size: number): string | null {
+      while (pending.length < size) {
+        const chunk = thr.next();
+        if (chunk.done) {
+          rd.done = true;
+          rd.value = chunk.value;
+          break;
+        }
+        pending += chunk.value;
+      }
+      if (pending.length === 0) return null;
+      const out = pending.slice(0, size);
+      pending = pending.slice(size);
+      return out;
+    },
+    rewind(): void {},
+    close(): void {},
+  };
+  return rd;
+}
+
+it("raises an exception if Content-Length exceeds total bytesize limit", () => {
+  withMultipartLimit(1024, () => {
+    const env = MockRequest.envFor("/", {
+      CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+      CONTENT_LENGTH: "2048",
+      ":input": new StringIO("--AaB03x--\r\n"),
+    });
+
+    expect(() => parseMultipart(env)).toThrow(MultipartError);
+  });
+});
+
+it("allows requests within the total bytesize limit", () => {
+  withMultipartLimit(1024 * 1024, () => {
+    const env = MockRequest.envFor("/", multipartFixture("text"));
+    const params = parseMultipart(env)!;
+    expect(params["submit-name"]).toBe("Larry");
+  });
+});
+
+it("skips total bytesize check when there is no limit", () => {
+  withMultipartLimit(null, () => {
+    const env = MockRequest.envFor("/", multipartFixture("text"));
+    const params = parseMultipart(env)!;
+    expect(params["submit-name"]).toBe("Larry");
+  });
+});
+
+it("enforces total bytesize limit during streaming when Content-Length is absent", () => {
+  withMultipartLimit(1, () => {
+    const fixture = multipartFixture("text");
+    delete fixture.CONTENT_LENGTH;
+    const env = MockRequest.envFor("/", fixture);
+    delete env.CONTENT_LENGTH;
+
+    expect(() => parseMultipart(env)).toThrow(MultipartError);
+  });
+});
+
+it("parses multipart content when called using Rack::Request#parse_multipart", () => {
+  const request = new Request(
+    MockRequest.envFor("/", multipartFixture("content_type_and_no_disposition")),
+  );
+  const params = request.parseMultipart()!;
+  expect(params["text/plain; charset=US-ASCII"]).toEqual(["contents"]);
+});
+
+it("rejects excessive data before boundary", () => {
+  const thr = (function* (): Generator<string, unknown, void> {
+    try {
+      const longer = "0123456789".repeat(1024 * 1024);
+      for (let i = 0; i < 1024 * 1024; i++) {
+        yield longer;
+      }
+
+      yield "\r\n\r\n--AaB03x";
+      yield "\r\n";
+      yield 'content-disposition: form-data; name="a"; filename="a.txt"';
+      yield "\r\n";
+      yield "content-type: text/plain\r\n";
+      yield "\r\na";
+      yield "--AaB03x--\r\n";
+    } catch (err) {
+      return err;
+    }
+  })();
+  const rd = pipeReader(thr);
+
+  const fixture = {
+    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    CONTENT_LENGTH: String(1024 * 1024 * 8),
+    ":input": rd,
+  };
+
+  const env = MockRequest.envFor("/", fixture);
+  let error!: Error;
+  expect(() => {
+    try {
+      parseMultipart(env);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(MultipartError);
+  expect(error.message).toBe("multipart boundary not found within limit");
+  rd.close();
+
+  const err = rd.threadValue();
+  expect(err).toBeInstanceOf(Errno.EPIPE);
+});
+
+it("rejects excessive mime header size", () => {
+  const thr = (function* (): Generator<string, unknown, void> {
+    try {
+      yield "\r\n\r\n--AaB03x";
+      yield "\r\n";
+      yield 'content-disposition: form-data; name="a"; filename="a.txt"';
+      yield "\r\n";
+      yield "content-type: text/plain\r\n";
+      const longer = "0123456789".repeat(1024 * 1024);
+      for (let i = 0; i < 1024 * 1024; i++) {
+        yield longer;
+      }
+      yield "\r\na";
+      yield "--AaB03x--\r\n";
+    } catch (err) {
+      return err;
+    }
+  })();
+  const rd = pipeReader(thr);
+
+  const fixture = {
+    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    CONTENT_LENGTH: String(1024 * 1024 * 8),
+    ":input": rd,
+  };
+
+  const env = MockRequest.envFor("/", fixture);
+  let error!: Error;
+  expect(() => {
+    try {
+      parseMultipart(env);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(MultipartError);
+  expect(error.message).toBe("multipart mime part header too large");
+  rd.close();
+
+  const err = rd.threadValue();
+  expect(err).toBeInstanceOf(Errno.EPIPE);
+});
+
+it("parses when the MIME head terminator straddles the BUFSIZE boundary", () => {
+  const boundary = "------WebKitFormBoundaryysVLFAjttLkewYBx";
+
+  const data = new StringIO();
+  data.write(`--${boundary}`);
+  data.write("\r\n");
+
+  data.write('content-disposition: form-data; name="a"');
+  data.write("\r\n");
+  data.write("\r\n");
+  data.write("0".repeat(1024 * 1024 - 174));
+  data.write("\r\n");
+  data.write(`--${boundary}`);
+  data.write("\r\n");
+  data.write('content-disposition: form-data; name="b"');
+  data.write("\r\n");
+  data.write("\r\n");
+  data.write("0".repeat(1024 * 1024 - 88));
+  data.write("\r\n");
+  data.write(`--${boundary}`);
+  data.write("\r\n");
+  data.write('content-disposition: form-data; name="c"');
+  data.write("\r\n");
+  data.write("\r\n");
+  data.write("hello");
+  data.write("\r\n");
+  data.write(`--${boundary}--\r\n`);
+  data.rewind();
+
+  const fixture = {
+    CONTENT_TYPE: `multipart/form-data; boundary=${boundary}`,
+    CONTENT_LENGTH: String(data.size()),
+    ":input": data,
+  };
+
+  const env = MockRequest.envFor("/", fixture);
+  expect(Object.keys(parseMultipart(env)!)).toEqual(["a", "b", "c"]);
+});
+
+for (const [position, offset] of Object.entries({
+  "inside a MIME head": 10,
+  "at the start of a MIME body": 0,
+})) {
+  it(`does not retain parsed parts when reads end ${position}`, () => {
+    const boundary = "AaB03x";
+    const bufsize = 1024;
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const names = Array.from({ length: 64 }, (_, i) => `a${String(i).padStart(2, "0")}`);
+    const heads = names.map((name) => `content-disposition: form-data; name="${name}"\r\n\r\n`);
+    const body = "0".repeat(bufsize - delimiter.length - heads[0].length);
+
+    let data = "x".repeat(bufsize - delimiter.length - heads[0].length + offset);
+    for (const head of heads) data += delimiter + head + body;
+    data += `\r\n--${boundary}--\r\n`;
+
+    const parser = new Parser(boundary, Parser.TEMPFILE_FACTORY, bufsize, defaultQueryParser());
+    parser.parse(new StringIO(data));
+    expect(Object.keys(parser.result().params!)).toEqual(names);
+    expect((parser as unknown as { sbuf: { string: string } }).sbuf.string.length).toBeLessThan(
+      2 * bufsize,
+    );
+  });
+}
+
+it("rejects excessive buffered mime data size in a single parameter", () => {
+  const thr = (function* (): Generator<string, unknown, void> {
+    try {
+      yield "--AaB03x";
+      yield "\r\n";
+      yield 'content-disposition: form-data; name="a"';
+      yield "\r\n";
+      yield "content-type: text/plain\r\n";
+      yield "\r\n";
+      for (let i = 0; i < 17; i++) {
+        yield "0".repeat(1024 * 1024);
+      }
+      yield "--AaB03x--\r\n";
+      return true;
+    } catch (err) {
+      if (err instanceof Errno.EPIPE) return true;
+      throw err;
+    }
+  })();
+  const rd = pipeReader(thr);
+
+  const fixture = {
+    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    CONTENT_LENGTH: String(18 * 1024 * 1024),
+    ":input": rd,
+  };
+
+  const env = MockRequest.envFor("/", fixture);
+  let error!: Error;
+  expect(() => {
+    try {
+      parseMultipart(env);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(MultipartError);
+  expect(error.message).toBe("multipart data over retained size limit");
+  rd.close();
+
+  expect(rd.threadValue()).toBe(true);
+});
+
+it("rejects excessive buffered mime data size when split into multiple parameters", () => {
+  const thr = (function* (): Generator<string, unknown, void> {
+    try {
+      for (let i = 0; i < 4; i++) {
+        yield "\r\n--AaB03x";
+        yield "\r\n";
+        yield `content-disposition: form-data; name="a${i}"`;
+        yield "\r\n";
+        yield "content-type: text/plain\r\n";
+        yield "\r\n";
+        for (let j = 0; j < 4; j++) {
+          yield "0".repeat(1024 * 1024);
+        }
+      }
+      yield "\r\n--AaB03x--\r\n";
+      return true;
+    } catch (err) {
+      if (err instanceof Errno.EPIPE) return true;
+      throw err;
+    }
+  })();
+  const rd = pipeReader(thr);
+
+  const fixture = {
+    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    CONTENT_LENGTH: String(17 * 1024 * 1024),
+    ":input": rd,
+  };
+
+  const env = MockRequest.envFor("/", fixture);
+  let error!: Error;
+  expect(() => {
+    try {
+      Object.keys(parseMultipart(env)!);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(MultipartError);
+  expect(error.message).toBe("multipart data over retained size limit");
+  rd.close();
+
+  expect(rd.threadValue()).toBe(true);
+});
+
+it("allows large nonbuffered mime parameters", () => {
+  const thr = (function* (): Generator<string, unknown, void> {
+    yield "\r\n\r\n--AaB03x";
+    yield "\r\n";
+    yield 'content-disposition: form-data; name="a"; filename="a.txt"';
+    yield "\r\n";
+    yield "content-type: text/plain\r\n";
+    yield "\r\n";
+    for (let i = 0; i < 16; i++) yield "0".repeat(1024 * 1024);
+    yield "\r\n--AaB03x--\r\n";
+    return true;
+  })();
+  const rd = pipeReader(thr);
+
+  const fixture = {
+    CONTENT_TYPE: "multipart/form-data; boundary=AaB03x",
+    CONTENT_LENGTH: String(17 * 1024 * 1024),
+    ":input": rd,
+  };
+
+  const env = MockRequest.envFor("/", fixture);
+  expect(parseMultipart(env)!["a"].tempfile.read().length).toBe(16 * 1024 * 1024);
+  rd.close();
+
+  expect(rd.threadValue()).toBe(true);
+});

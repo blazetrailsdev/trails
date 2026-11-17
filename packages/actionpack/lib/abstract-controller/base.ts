@@ -54,7 +54,7 @@ export class ActionNotFound extends StandardError {
     }
     const ctor = this.controller.constructor as typeof Base;
     this.#cachedCorrections = new SpellChecker({
-      dictionary: [...ctor.actionMethods()],
+      dictionary: ctor.actionMethods(),
     }).correct(this.action);
     return this.#cachedCorrections;
   }

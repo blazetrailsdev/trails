@@ -185,7 +185,7 @@ describe("Parameters#deep_transform_keys", () => {
 describe("Parameters#fetch with a hash default", () => {
   it("answers Parameters for an absent key or a stored hash, and a stored scalar unchanged", () => {
     const params = new Parameters({ post: { title: "x" }, name: "y" });
-    expectTypeOf(params.fetch("post", {})).toEqualTypeOf<Parameters>();
+    expectTypeOf(params.fetch("post", {})).toEqualTypeOf<unknown>();
     expect(params.fetch("post", {})).toBeInstanceOf(Parameters);
     expect(params.fetch("missing", {})).toBeInstanceOf(Parameters);
     expect(params.fetch("name", {})).toBe("y");

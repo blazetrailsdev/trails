@@ -29,8 +29,7 @@ import {
 import {
   Enumerable,
   extend,
-  isCompiledFile,
-  loadIseqEval,
+  loadedFileExports,
   hashAref,
   hashAset,
   include,
@@ -1387,19 +1386,11 @@ export class Mapper {
     }
   }
 
-  /**
-   * @missingRailsCall find — PERMANENT
-   * @missingRailsCall read — PERMANENT
-   */
-  async draw(name: string): Promise<void> {
-    let path: string | undefined;
-    for (const _path of this._drawPaths) {
-      const file = `${_path}/${name}.ts`;
-      if (isCompiledFile(file) || (await File.isExistAsync(file))) {
-        path = _path;
-        break;
-      }
-    }
+  /** @missingRailsCall read — PERMANENT */
+  draw(name: string): void {
+    const path = this._drawPaths.find(
+      (_path) => loadedFileExports(`${_path}/${name}.ts`) !== undefined,
+    );
 
     if (path == null) {
       let msg =
@@ -1410,7 +1401,7 @@ export class Mapper {
     }
 
     const routePath = `${path}/${name}.ts`;
-    const { drawRoutes } = await loadIseqEval(routePath, true);
+    const { drawRoutes } = loadedFileExports(routePath)!;
     (drawRoutes as DrawCallback | undefined)?.call(this);
   }
 
