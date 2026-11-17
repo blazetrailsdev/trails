@@ -230,7 +230,7 @@ export namespace Delegation {
         });
         continue;
       }
-      const value = moduleEval(body, file, line);
+      const value = _compileAtCallSite(body, file, line);
       const methodObject = descriptor?.value;
       if (signature != null) {
         Object.defineProperty(value, "length", {
@@ -263,7 +263,8 @@ export namespace Delegation {
     return methodNames;
   }
 
-  function moduleEval(
+  /** @noRailsEquivalent PERMANENT */
+  function _compileAtCallSite(
     body: (this: Record<string, unknown>, ...args: unknown[]) => unknown,
     file: string,
     line: number,

@@ -1,4 +1,5 @@
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { camelize } from "../../inflector.js";
 
 export function actsLike(this: unknown, duck: string): boolean {
   switch (duck) {
@@ -9,9 +10,6 @@ export function actsLike(this: unknown, duck: string): boolean {
     case "string":
       return rbObjRespondTo(this, "actsLikeString");
     default:
-      return rbObjRespondTo(
-        this,
-        `actsLike_${duck}`.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase()),
-      );
+      return rbObjRespondTo(this, camelize(`acts_like_${duck}`, false));
   }
 }

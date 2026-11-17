@@ -405,7 +405,7 @@ export async function assertDifference<T>(
     rbObjRespondTo(e, "call") ? (e as Expression<number>) : () => (0, eval)(e as string) as number,
   );
   const before: number[] = [];
-  for (const exp of exps) before.push(await exp());
+  for (const exp of exps) before.push((await rbProcCall(exp)) as number);
 
   const retval = await _assertNothingRaisedOrWarn("assert_difference", block);
 
@@ -413,7 +413,7 @@ export async function assertDifference<T>(
     const diff = hashAref(expressions, code) as number;
     const exp = exps[index];
     const beforeValue = before[index];
-    const actual = await exp();
+    const actual = (await rbProcCall(exp)) as number;
     const richMessage = () => {
       const codeString = rbObjRespondTo(code, "call") ? _callableToSourceString(code) : code;
       let error = `\`${codeString}\` didn't change by ${diff}, but by ${actual - beforeValue}`;
