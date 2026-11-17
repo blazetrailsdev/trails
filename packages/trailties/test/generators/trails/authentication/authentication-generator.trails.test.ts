@@ -35,6 +35,18 @@ const APP_FILES: Record<string, string> = {
   "app/models/application-record.ts": `import { Base } from "@blazetrails/activerecord";\nexport class ApplicationRecord extends Base {}\n`,
   "app/mailers/application-mailer.ts": "export class ApplicationMailer { mail(h: object) {} }",
   "config/routes.ts": "Trails.application!.routes().draw(function () {\n});\n",
+  "app/routes.generated.d.ts": [
+    "export {};",
+    'declare module "@blazetrails/actionpack" {',
+    "  namespace ActionController {",
+    "    interface Base {",
+    ...["newSessionPath", "newSessionUrl", "newPasswordPath", "editPasswordPath"].map(
+      (name) => `      ${name}(...args: unknown[]): string;`,
+    ),
+    "    }",
+    "  }",
+    "}",
+  ].join("\n"),
 };
 
 describe("AuthenticationGenerator", () => {

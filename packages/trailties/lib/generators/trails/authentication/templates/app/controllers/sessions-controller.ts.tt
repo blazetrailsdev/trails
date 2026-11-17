@@ -8,7 +8,7 @@ export class SessionsController extends ApplicationController {
     this.rateLimit({
       to: 10, within: minutes(3), only: "create",
       with: function (this: SessionsController) {
-        this.redirectTo("/session/new", { alert: "Try again later." });
+        this.redirectTo(this.newSessionUrl(), { alert: "Try again later." });
       },
     });
   }
@@ -21,12 +21,12 @@ export class SessionsController extends ApplicationController {
       await this.startNewSessionFor(user);
       this.redirectTo(this.afterAuthenticationUrl());
     } else {
-      this.redirectTo("/session/new", { alert: "Try another email address or password." });
+      this.redirectTo(this.newSessionPath(), { alert: "Try another email address or password." });
     }
   }
 
   async destroy(): Promise<void> {
     await this.terminateSession();
-    this.redirectTo("/session/new");
+    this.redirectTo(this.newSessionPath());
   }
 }

@@ -14,6 +14,13 @@ describe("normalizeRailsKind", () => {
     expect(normalizeRailsKind("assert_not")).toBe("falsy");
   });
 
+  it("credits CONTRIBUTING.md's assert_predicate row (toBeTruthy / not.toBeTruthy) with the predicate's kind", () => {
+    expect(normalizeRailsKind("assert_predicate")).toBe(normalizeTrailsKind("toBeTruthy"));
+    expect(normalizeRailsKind("assert_predicate")).toBe(normalizeTrailsKind("toBeRubyTruthy"));
+    expect(normalizeRailsKind("assert_not_predicate")).toBe(normalizeTrailsKind("not:toBeTruthy"));
+    expect(normalizeRailsKind("refute_predicate")).toBe(normalizeTrailsKind("toBeFalsy"));
+  });
+
   it("maps refute_* to the negated kind", () => {
     expect(normalizeRailsKind("refute_equal")).toBe("notEqual");
     expect(normalizeRailsKind("refute_nil")).toBe("notNil");
