@@ -7,6 +7,7 @@ import { NotImplementedError } from "./not-implemented-error.js";
 import { NoMethodError } from "./no-method-error.js";
 import { StandardError } from "./standard-error.js";
 import { IPAddr } from "./ipaddr.js";
+import { stringSplit } from "./string/split.js";
 import type { HttpSslOptions } from "./http-adapter.js";
 
 const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
@@ -340,11 +341,11 @@ function verifyHostname(hostname: string, san: string): boolean {
   if (!_isAsciiOnly(san)) return false;
   if (!_isAsciiOnly(hostname)) return false;
 
-  const sanParts = san.toLowerCase().split(".");
+  const sanParts = stringSplit(san.toLowerCase(), ".");
 
   if (sanParts.length < 2) return san === hostname;
 
-  const hostParts = hostname.toLowerCase().split(".");
+  const hostParts = stringSplit(hostname.toLowerCase(), ".");
 
   if (sanParts.length !== hostParts.length) return false;
 

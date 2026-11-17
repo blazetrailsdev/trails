@@ -137,6 +137,7 @@ describe("OpenSSL::SSL::SSLSocket", () => {
     const { verifyHostname, verifyWildcard } = OpenSSL.SSL;
     expect(verifyHostname("www.example.com", "*.example.com")).toBe(true);
     expect(verifyHostname("example.com", "*.example.com")).toBe(false);
+    expect(verifyHostname("foo.example.com.", "*.example.com")).toBe(true);
     expect(verifyHostname("foo.example.com", "f*.example.com")).toBe(true);
     expect(verifyHostname("xn--abc.example.com", "x*.example.com")).toBe(false);
     expect(verifyWildcard("foo", "*")).toBe(true);
