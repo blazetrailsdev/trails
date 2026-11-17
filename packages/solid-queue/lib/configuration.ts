@@ -3,6 +3,7 @@ import {
   TopLevel,
   camelize,
   include,
+  inquiry,
   isPlainObject,
   isPresent,
   presence,
@@ -11,6 +12,7 @@ import {
   slice,
   titleize,
   transformKeys,
+  type StringInquirer,
 } from "@blazetrails/activesupport";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 import {
@@ -93,6 +95,14 @@ export class Configuration {
     this.options = reverseMerge(options, this.defaultOptions());
   }
 
+  mode(): StringInquirer & { [predicate: string]: () => boolean } {
+    return inquiry.call(String(this.options.mode));
+  }
+
+  isStandalone(): boolean {
+    return this.mode().isFork() || this.options.standalone === true;
+  }
+
   async configuredProcesses(): Promise<Process[]> {
     if (this.isOnlyWork()) {
       return await this.workers();
@@ -156,6 +166,8 @@ export class Configuration {
   private defaultOptions(): Options {
     const root = new Pathname(TopLevel.Trails!.root()!);
     return {
+      mode: env.SOLID_QUEUE_SUPERVISOR_MODE || "fork",
+      standalone: true,
       configFile: root.join(env.SOLID_QUEUE_CONFIG || Configuration.DEFAULT_CONFIG_FILE_PATH),
       recurringScheduleFile: root.join(
         env.SOLID_QUEUE_RECURRING_SCHEDULE || Configuration.DEFAULT_RECURRING_SCHEDULE_FILE_PATH,
