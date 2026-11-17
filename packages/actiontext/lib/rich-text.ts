@@ -27,11 +27,10 @@ export class RichText extends Record {
     /** @inventedArm toPlainText — PERMANENT */
     this.beforeSave(async (record: RichText) => {
       if (record.body != null && record.body.isPresent()) {
-        const body = record.body;
         await record.toPlainText();
         await (record as unknown as { setEmbeds(attachables: unknown): Promise<void> }).setEmbeds(
           uniq(
-            (await body.attachables()).filter(
+            (await record.body.attachables()).filter(
               (attachable) => attachable instanceof ActiveStorage.Blob!,
             ),
           ),

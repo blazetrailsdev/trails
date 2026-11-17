@@ -6,7 +6,15 @@ import {
   type AttributeSet,
 } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual, rbObjInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  DelegateClass,
+  type Hash,
+  hashAref,
+  keys,
+  rbEqual,
+  rbObjInspect,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
 import { ColumnSerializer } from "../coders/column-serializer.js";
@@ -101,18 +109,22 @@ include(Serialized, Mutable);
 /** @noRailsEquivalent PERMANENT */
 export async function _loadSerializedAttributes(record: {
   _attributes: AttributeSet;
+  constructor: unknown;
 }): Promise<void> {
-  const attributes = record._attributes;
-  for (const name of attributes.keys()) {
-    const attribute = attributes.getAttribute(name) as Attribute & {
-      _value?: unknown;
-      typeCast(value: unknown): unknown;
-    };
-    const type = attribute.type;
+  const attributeTypes = (
+    record.constructor as { attributeTypes(): Record<string, unknown> | Hash<string, unknown> }
+  ).attributeTypes();
+  for (const name of keys(attributeTypes)) {
+    const type = hashAref(attributeTypes, name);
     const castType = type instanceof EncryptedAttributeType ? type.castType : type;
     if (!(castType instanceof Serialized)) continue;
     if (castType.coder instanceof ColumnSerializer || castType.coder === JSON) continue;
+    if (!record._attributes.isKey(name)) continue;
 
+    const attribute = record._attributes.getAttribute(name) as Attribute & {
+      _value?: unknown;
+      typeCast(value: unknown): unknown;
+    };
     let value: unknown;
     if (Object.hasOwn(attribute, "_value")) {
       value = attribute._value;

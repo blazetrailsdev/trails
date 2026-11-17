@@ -43,6 +43,25 @@ class AsyncCoderTopic extends Base {
   }
 }
 
+const AsyncDumpCoder = {
+  load(value: unknown): Promise<Loaded> | null {
+    return value == null ? null : Promise.resolve(new Loaded(String(value)));
+  },
+  dump(value: unknown): string | null | Promise<string> {
+    if (value == null) return null;
+    if (value instanceof Loaded) return value.text;
+    return Promise.resolve(String(value).toUpperCase());
+  },
+};
+
+class AsyncDumpTopic extends Base {
+  declare content: Loaded | null;
+  static {
+    this.tableName = "topics";
+    this.serialize("content", { coder: AsyncDumpCoder });
+  }
+}
+
 describe("SerializedAttributeTest with an async coder", () => {
   fixtures(["topics"]);
 
@@ -75,5 +94,17 @@ describe("SerializedAttributeTest with an async coder", () => {
     } finally {
       AsyncCoder.rejectNext = false;
     }
+  });
+
+  it("writes the value an async dump produced once the writer has awaited it", async () => {
+    const topic = new AsyncDumpTopic();
+    (topic as unknown as { content: unknown }).content = "shout";
+    await _loadSerializedAttributes(topic);
+    expect(topic.content).toEqual(new Loaded("SHOUT"));
+
+    await topic.saveBang();
+    const found = await AsyncDumpTopic.find(topic.id);
+    expect(found.content).toEqual(new Loaded("SHOUT"));
+    expect(found.content!.text).toBe("SHOUT");
   });
 });
