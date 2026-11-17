@@ -1158,10 +1158,14 @@ export class FormHelper {
    * table. CLAUDE.md, "A Ruby module is a JS object or a JS class".
    *
    * @internal
+   * @noRailsEquivalent PERMANENT
    */
   static readonly _includers = new Set<WeakRef<object>>();
 
-  /** @internal */
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   static [included](base: unknown): void {
     if (typeof base !== "function" || Object.hasOwn(base, "_dependencies")) return;
     FormHelper._includers.add(new WeakRef(base.prototype as object));
@@ -1172,15 +1176,16 @@ export class FormHelper {
    * @noRailsEquivalent PERMANENT
    */
   static _defineMethods(members: Record<string, unknown>): void {
+    const previous: Record<string, unknown> = { ...FormHelper.prototype };
     Object.assign(FormHelper.prototype, members);
     for (const ref of FormHelper._includers) {
-      const proto = ref.deref();
+      const proto = ref.deref() as Record<string, unknown> | undefined;
       if (!proto) {
         FormHelper._includers.delete(ref);
         continue;
       }
       for (const [name, method] of Object.entries(members)) {
-        if (!Object.hasOwn(proto, name)) (proto as Record<string, unknown>)[name] = method;
+        if (!Object.hasOwn(proto, name) || proto[name] === previous[name]) proto[name] = method;
       }
     }
   }
