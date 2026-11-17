@@ -2065,6 +2065,7 @@ export function rbObjAsString(value: unknown): string;
 export function rbObjAsString(value: unknown): string | Uint8Array {
   if (value == null) return "";
   if (typeof value === "string") return value;
+  if (value instanceof String) return value.valueOf();
   if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map || value instanceof Set) return rbInspect(value);
