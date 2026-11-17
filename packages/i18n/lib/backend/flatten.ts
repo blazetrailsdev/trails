@@ -50,10 +50,10 @@ export class Flatten {
       const fromStr = `${FLATTEN_SEPARATOR}${separator}`;
       const toStr = `${SEPARATOR_ESCAPE_CHAR}${FLATTEN_SEPARATOR}`;
 
-      keys = keys.map((k) => trTrans(String(k), fromStr, toStr, false));
+      keys = keys.map((k) => trTrans(toS(k), fromStr, toStr, false));
     }
 
-    return keys.join(".");
+    return keys.map(toS).join(".");
   }
 
   static escapeDefaultSeparator(key: unknown): string {
