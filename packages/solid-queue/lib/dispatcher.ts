@@ -18,9 +18,13 @@ interface DispatcherOptions {
 }
 
 export class Dispatcher extends Poller {
-  declare static lifecycleHooks: Record<"start" | "stop", (() => unknown)[]>;
+  declare static lifecycleHooks: Record<
+    "start" | "stop" | "exit",
+    ((process: unknown) => unknown)[]
+  >;
   declare static onStart: typeof LifecycleHooksClassMethods.onStart;
   declare static onStop: typeof LifecycleHooksClassMethods.onStop;
+  declare static onExit: typeof LifecycleHooksClassMethods.onExit;
   declare static clearHooks: typeof LifecycleHooksClassMethods.clearHooks;
 
   static ConcurrencyMaintenance = ConcurrencyMaintenance;
@@ -31,7 +35,8 @@ export class Dispatcher extends Poller {
     this.afterBoot(":runStartHooks");
     this.afterBoot(":startConcurrencyMaintenance");
     this.beforeShutdown(":stopConcurrencyMaintenance");
-    this.afterShutdown(":runStopHooks");
+    this.beforeShutdown(":runStopHooks");
+    this.afterShutdown(":runExitHooks");
   }
 
   batchSize: number;

@@ -34,9 +34,13 @@ interface Status {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below. */
 export class Supervisor extends Base {
-  declare static lifecycleHooks: Record<"start" | "stop", (() => unknown)[]>;
+  declare static lifecycleHooks: Record<
+    "start" | "stop" | "exit",
+    ((process: unknown) => unknown)[]
+  >;
   declare static onStart: typeof LifecycleHooksClassMethods.onStart;
   declare static onStop: typeof LifecycleHooksClassMethods.onStop;
+  declare static onExit: typeof LifecycleHooksClassMethods.onExit;
   declare static clearHooks: typeof LifecycleHooksClassMethods.clearHooks;
 
   static {
@@ -44,6 +48,8 @@ export class Supervisor extends Base {
     include(this, Maintenance);
     include(this, Signals);
     include(this, Pidfiled);
+
+    this.afterShutdown(":runExitHooks");
   }
 
   static async start(options: { [key: string]: unknown } = {}): Promise<Supervisor> {

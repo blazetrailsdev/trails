@@ -29,6 +29,10 @@ export const SolidQueue = {
     SolidQueue.Worker!.onStop(block);
   },
 
+  onWorkerExit(block: () => unknown): void {
+    SolidQueue.Worker!.onExit(block);
+  },
+
   onDispatcherStart(block: () => unknown): void {
     SolidQueue.Dispatcher!.onStart(block);
   },
@@ -37,12 +41,20 @@ export const SolidQueue = {
     SolidQueue.Dispatcher!.onStop(block);
   },
 
+  onDispatcherExit(block: () => unknown): void {
+    SolidQueue.Dispatcher!.onExit(block);
+  },
+
   onSchedulerStart(block: () => unknown): void {
     SolidQueue.Scheduler!.onStart(block);
   },
 
   onSchedulerStop(block: () => unknown): void {
     SolidQueue.Scheduler!.onStop(block);
+  },
+
+  onSchedulerExit(block: () => unknown): void {
+    SolidQueue.Scheduler!.onExit(block);
   },
 
   get timeZone(): string | null {
@@ -109,14 +121,30 @@ export const SolidQueue = {
   preserveFinishedJobs: boolean;
   clearFinishedJobsAfter: Duration;
   defaultConcurrencyControlPeriod: Duration;
-  Worker?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  Worker?: {
+    onStart(block: () => unknown): void;
+    onStop(block: () => unknown): void;
+    onExit(block: () => unknown): void;
+  };
+  onWorkerExit(block: () => unknown): void;
   onWorkerStart(block: () => unknown): void;
   onWorkerStop(block: () => unknown): void;
-  Dispatcher?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
-  Scheduler?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  Dispatcher?: {
+    onStart(block: () => unknown): void;
+    onStop(block: () => unknown): void;
+    onExit(block: () => unknown): void;
+  };
+  onDispatcherExit(block: () => unknown): void;
+  Scheduler?: {
+    onStart(block: () => unknown): void;
+    onStop(block: () => unknown): void;
+    onExit(block: () => unknown): void;
+  };
+  onSchedulerExit(block: () => unknown): void;
   Supervisor?: typeof import("./supervisor.js").Supervisor;
   onStart(block: () => unknown): void;
   onStop(block: () => unknown): void;
+  onExit(block: () => unknown): void;
   Process?: typeof import("./process.js").Process;
   Job?: typeof import("./job.js").Job;
   Batch?: typeof import("./batch.js").Batch;
@@ -155,7 +183,7 @@ mattrAccessor.call(SolidQueue, "preserveFinishedJobs", { default: true });
 mattrAccessor.call(SolidQueue, "clearFinishedJobsAfter", { default: days(1) });
 mattrAccessor.call(SolidQueue, "defaultConcurrencyControlPeriod", { default: minutes(3) });
 
-delegate.call(SolidQueue, "onStart", "onStop", { to: "Supervisor" });
+delegate.call(SolidQueue, "onStart", "onStop", "onExit", { to: "Supervisor" });
 
 constSet(TopLevel, "SolidQueue", SolidQueue);
 
