@@ -8,7 +8,9 @@ import type { NamedBase } from "./named-base.js";
 
 export interface ResourceHelpersHost extends NamedBase {
   options: NamedBase["options"] & { modelName?: string; orm?: unknown };
+  /** @internal */
   readonly controllerName: string;
+  /** @internal */
   readonly controllerFileName: string;
   _controllerName: string;
   _controllerFileName: string;
