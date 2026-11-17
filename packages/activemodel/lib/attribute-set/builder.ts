@@ -83,7 +83,7 @@ export class LazyAttributeSet extends AttributeSet {
   /**
    * @inventedArm if — PERMANENT
    * @inventedArm hasKey — PERMANENT
-   * @perf 3.9% — PERMANENT
+   * @perf 26% — PERMANENT
    */
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
     const attr = hashAref(this._attributes, name) as Attribute | null;
