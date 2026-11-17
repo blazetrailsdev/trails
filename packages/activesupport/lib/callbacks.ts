@@ -17,6 +17,7 @@ import { Concern } from "./concern.js";
 import { ArgumentError, extractOptionsBang } from "./hash-utils.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { camelize } from "./inflector.js";
+import { isBlank, squish } from "./string-utils.js";
 
 export type CallbackKind = "before" | "after" | "around";
 
@@ -211,6 +212,7 @@ export class InstanceExec2 implements CallTemplate {
   constructor(readonly fn: (target: object, block: (() => unknown) | null) => unknown) {}
 
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
+    if (!block) throw new ArgumentError();
     return [target, this.fn, "instanceExec", target, block];
   }
 
@@ -269,13 +271,7 @@ export namespace CallTemplate {
     filter: AnyCallback | string | symbol | CallbackObject | Value,
     callback: Callback,
   ): CallTemplate {
-    if (typeof filter === "string" || typeof filter === "symbol") {
-      if (typeof filter === "string" && !filter.startsWith(":")) {
-        throw new ArgumentError(
-          "Passing string to define a callback is not supported. See the `.set_callback` " +
-            "documentation to see supported values.",
-        );
-      }
+    if (typeof filter === "symbol" || (typeof filter === "string" && filter.startsWith(":"))) {
       return new MethodCall(typeof filter === "string" ? filter.slice(1) : filter);
     } else if (filter instanceof Value) {
       return new ProcCall(filter);
@@ -303,7 +299,7 @@ export namespace CallTemplate {
     } else {
       const [head, ...rest] = callback.currentScopes();
       return new ObjectCall(
-        filter,
+        filter as object,
         head + rest.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(""),
       );
     }
@@ -550,10 +546,32 @@ export class Callback {
     this.name = name;
     this.filter = filter;
     this.kind = kind;
-    this.options = options;
+    this.options = {
+      ...options,
+      if: this.checkConditionals(options.if),
+      unless: this.checkConditionals(options.unless),
+    };
     this.chainConfig = chainConfig;
     this.originalObject = originalObject;
     void this.compiled;
+  }
+
+  /** @internal */
+  private checkConditionals(conditionals: CallbackOptions["if"] | undefined): CallbackCondition[] {
+    if (isBlank(conditionals)) return [];
+
+    conditionals = kernelArray(conditionals as CallbackCondition | CallbackCondition[]);
+    if (conditionals.some((c) => typeof c === "string" && !c.startsWith(":"))) {
+      throw new ArgumentError(
+        squish(`
+          Passing string to be evaluated in :if and :unless conditional
+          options is not supported. Pass a symbol for an instance method,
+          or a lambda, proc or block, instead.
+        `),
+      );
+    }
+
+    return Object.freeze(conditionals) as CallbackCondition[];
   }
 
   static build(
@@ -562,6 +580,15 @@ export class Callback {
     kind: CallbackKind,
     options: CallbackOptions,
   ): Callback {
+    if (typeof filter === "string" && !filter.startsWith(":")) {
+      throw new ArgumentError(
+        squish(`
+          Passing string to define a callback is not supported. See the \`.set_callback\`
+          documentation to see supported values.
+        `),
+      );
+    }
+
     const isObj = typeof filter === "object" && filter !== null;
     return new Callback(
       chain.name,

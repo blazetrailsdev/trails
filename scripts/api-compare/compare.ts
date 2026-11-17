@@ -2332,14 +2332,14 @@ export function skeletonIsAnotherOwners(
 }
 
 /** One name's bodies in one file, keyed by declaration site (`file:line`). */
-export type SkeletonBodies = Map<string, { owner: string; skeleton: string[] }>;
+export type SkeletonBodies = Map<string, { owners: Set<string>; skeleton: string[] }>;
 
 /**
- * Records a body under the owner that declares it.
+ * Records a body under every owner that declares it.
  *
  * A namespace entity re-lists the file's top-level functions, so one
- * declaration arrives under two owners. It is the top-level function's
- * (owner `""`) whichever arrives first; otherwise the first owner keeps it.
+ * declaration arrives under two owners (`Inflector` and `""` for
+ * `inflector.ts`'s `camelize`). The body is kept once, and each owner reads it.
  */
 export function recordSkeletonBody(
   bodies: SkeletonBodies,
@@ -2347,37 +2347,39 @@ export function recordSkeletonBody(
   owner: string,
   skeleton: string[],
 ): void {
-  if (!bodies.has(site) || owner === "") bodies.set(site, { owner, skeleton });
+  const body = bodies.get(site);
+  if (body === undefined) bodies.set(site, { owners: new Set([owner]), skeleton });
+  else body.owners.add(owner);
 }
 
-/** {@link SkeletonBodies} grouped by owner, each body once. */
+/** {@link SkeletonBodies} grouped by owner; a shared body is the same array under each. */
 export function skeletonsByOwner(
   bodies: SkeletonBodies | undefined,
 ): Map<string, string[][]> | undefined {
   if (bodies === undefined) return undefined;
   const byOwner = new Map<string, string[][]>();
-  for (const { owner, skeleton } of bodies.values())
-    byOwner.set(owner, [...(byOwner.get(owner) ?? []), skeleton]);
+  for (const { owners, skeleton } of bodies.values())
+    for (const owner of owners) byOwner.set(owner, [...(byOwner.get(owner) ?? []), skeleton]);
   return byOwner;
 }
 
 /**
- * The skeletons a matched pair compares against: the resolved owner's own where
- * the file holds the name as SEVERAL module or top-level bodies, else every one
- * the file records under the name.
+ * The skeletons a matched pair compares against: the resolved owner's own
+ * wherever the file records that owner a body, else every one the file records
+ * under the name.
  *
  * `validations/with.ts` holds `validatesWith` twice, on the `ClassMethods`
- * object literal and as the top-level instance function, and each carries a
- * skeleton. Read by name that is two bodies for one pair, which compares
- * neither; read by owner each Rails `validates_with`
+ * object literal and as the top-level instance function; `callbacks.ts` holds
+ * six `expand`s, one per class. Read by name that is several bodies for one
+ * pair, which compares none; read by owner each Rails method
  * (`activemodel/lib/active_model/validations/with.rb:88`, `:144`) meets its own
  * port.
  *
- * `byOwner` is {@link skeletonsByOwner}'s, which holds each body once. Where
- * that is ONE body it answers whatever the by-name list holds: the extractor's
- * synthesized file module re-lists every top-level function, so the by-name
- * list carries a lone `export function` twice. Otherwise a class owner still
- * reads by name, and so does a name whose owners share one body.
+ * `byOwner` is {@link skeletonsByOwner}'s, which holds each body once however
+ * many owners re-list it. Where that is ONE body it answers whatever the
+ * by-name list holds: the extractor's synthesized file module re-lists every
+ * top-level function, so the by-name list carries a lone `export function`
+ * twice.
  *
  * The caller reads these maps for the file the `.rb` path mirrors where that
  * file holds the name's one body, past a `RUBY_FILE_TS_OVERRIDES` entry:
@@ -2388,13 +2390,11 @@ export function skeletonsOfOwner(
   byName: string[][] | undefined,
   byOwner: ReadonlyMap<string, string[][]> | undefined,
   tsClass: string | undefined,
-  classOwners: ReadonlySet<string> | undefined,
 ): string[][] | undefined {
-  const declared = [...(byOwner?.values() ?? [])].flat();
-  if (declared.length === 1) return declared;
-  const bodies = [...(byOwner?.keys() ?? [])].filter((o) => classOwners?.has(o) !== true);
-  if (tsClass === undefined || bodies.length < 2 || !bodies.includes(tsClass)) return byName;
-  return byOwner?.get(tsClass);
+  const declared = new Set([...(byOwner?.values() ?? [])].flat());
+  if (declared.size === 1) return [...declared];
+  if (tsClass === undefined || byOwner?.has(tsClass) !== true) return byName;
+  return byOwner.get(tsClass);
 }
 
 /**
@@ -4659,7 +4659,6 @@ export function main() {
     const tsSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsSkeletonOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     const tsSkeletonBodiesByFileName = new Map<string, Map<string, SkeletonBodies>>();
-    const tsClassOwnersByFile = new Map<string, Set<string>>();
     const tsLocalSkeletonByFileName = new Map<string, Map<string, string[][]>>();
     const tsCallArgsByFileName = new Map<string, Map<string, CallSite[][]>>();
     // The same two populations narrowed by declaring class (file → name → owner
@@ -4971,11 +4970,7 @@ export function main() {
         tsMethodsByFile.set(file, methods);
       };
 
-      for (const cls of Object.values(tsPkg.classes)) {
-        addMethods(cls);
-        const file = cls.file || "";
-        tsClassOwnersByFile.set(file, (tsClassOwnersByFile.get(file) ?? new Set()).add(cls.name));
-      }
+      for (const cls of Object.values(tsPkg.classes)) addMethods(cls);
       for (const mod of Object.values(tsPkg.modules)) addMethods(mod);
       recordTsSeatOwners(
         tsStaticOwnersByFileName,
@@ -5840,10 +5835,14 @@ export function main() {
           mirrorFile === tsFile
             ? []
             : [
-                ...(skeletonsByOwner(
-                  tsSkeletonBodiesByFileName.get(mirrorFile)?.get(tsName),
-                )?.values() ?? []),
-              ].flat();
+                ...new Set(
+                  [
+                    ...(skeletonsByOwner(
+                      tsSkeletonBodiesByFileName.get(mirrorFile)?.get(tsName),
+                    )?.values() ?? []),
+                  ].flat(),
+                ),
+              ];
         const skeletonFile = mirrored.length === 1 ? mirrorFile : tsFile;
         const tsSkeletonsByOwner = skeletonsByOwner(
           tsSkeletonBodiesByFileName.get(skeletonFile)?.get(tsName),
@@ -5852,7 +5851,6 @@ export function main() {
           tsSkeletonByFileName.get(skeletonFile)?.get(tsName),
           tsSkeletonsByOwner,
           tsClass,
-          tsClassOwnersByFile.get(skeletonFile),
         );
         if (
           rubySkeleton !== undefined &&

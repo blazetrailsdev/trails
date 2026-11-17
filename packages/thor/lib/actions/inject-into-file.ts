@@ -27,7 +27,7 @@ export function insertIntoFile(
   destination: string,
   ...args: unknown[]
 ): unknown {
-  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
   const data = block ? block : args.shift();
 
   const config = (args.shift() || {}) as Record<string, unknown>;

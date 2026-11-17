@@ -18,7 +18,7 @@ type Block = () => unknown;
 type Data = string | Uint8Array | (() => unknown);
 
 export function createFile(this: ActionsHost, destination: string, ...args: unknown[]): unknown {
-  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
+  const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
     | (() => unknown)
     | undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<

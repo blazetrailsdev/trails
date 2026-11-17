@@ -1,5 +1,5 @@
-import { defineModule } from "@blazetrails/ruby-compat";
-import { SafeBuffer, htmlSafe, isPlainObject } from "@blazetrails/activesupport";
+import { defineModule, toS } from "@blazetrails/ruby-compat";
+import { SafeBuffer, htmlSafe, isHtmlSafe, isPlainObject } from "@blazetrails/activesupport";
 
 import { capture } from "./capture-helper.js";
 import { cdataSection, contentTag, type TagHelperHost } from "./tag-helper.js";
@@ -21,11 +21,14 @@ export const JS_ESCAPE_MAP: Record<string, string> = {
 const JS_ESCAPE_PATTERN = /(\\|<\/|\r\n|\u2028|\u2029|[\n\r"']|[`]|[$])/g;
 
 export function escapeJavascript(javascript: unknown): string | SafeBuffer {
-  const str = javascript == null ? "" : String(javascript);
-  const result =
-    str === "" ? "" : str.replace(JS_ESCAPE_PATTERN, (match) => JS_ESCAPE_MAP[match] ?? match);
-  const wasSafe = javascript instanceof SafeBuffer && javascript.htmlSafe;
-  return wasSafe ? htmlSafe(result) : result;
+  const str = toS(javascript);
+  let result: string;
+  if (str === "") {
+    result = "";
+  } else {
+    result = str.replace(JS_ESCAPE_PATTERN, (match) => JS_ESCAPE_MAP[match]);
+  }
+  return isHtmlSafe(javascript) ? htmlSafe(result) : result;
 }
 
 export const j = escapeJavascript;

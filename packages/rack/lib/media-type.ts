@@ -1,3 +1,4 @@
+import { stringSplit } from "@blazetrails/ruby-compat";
 import { Rack } from "./namespaces.js";
 export class MediaType {
   static SPLIT_PATTERN = /[;,]/;
@@ -12,11 +13,10 @@ export class MediaType {
     if (contentType == null || contentType.length === 0) return {};
 
     const hsh: Record<string, string> = {};
-    for (let s of contentType.split(MediaType.SPLIT_PATTERN).slice(1)) {
+    for (let s of stringSplit(contentType, MediaType.SPLIT_PATTERN).slice(1)) {
       s = s.trim();
-      const i = s.indexOf("=");
-      const kv = i === -1 ? [s, undefined] : [s.slice(0, i), s.slice(i + 1)];
-      let k = kv[0]!;
+      const kv = stringSplit(s, "=", 2);
+      let k = kv[0];
       const v = kv[1];
       k = k.toLowerCase();
       hsh[k] = MediaType.stripDoublequotes(v);

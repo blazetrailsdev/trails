@@ -19,7 +19,7 @@ export async function assertFile(
   ...contents: Contents
 ): Promise<void> {
   const block =
-    typeof contents.at(-1) === "function"
+    typeof contents[contents.length - 1] === "function"
       ? (contents.pop() as (read: string) => unknown)
       : undefined;
   const absolute = File.expandPath(relative, this.destinationRoot);

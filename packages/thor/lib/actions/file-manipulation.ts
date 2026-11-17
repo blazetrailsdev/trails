@@ -34,7 +34,7 @@ type FileHost = ActionsHost & {
 type BufferHost = { outputBuffer: StringIO | null; _outputBuffer?: StringIO | null };
 
 export async function copyFile(this: FileHost, source: string, ...args: unknown[]): Promise<void> {
-  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
+  const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
     | ContentBlock
     | undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
@@ -75,7 +75,7 @@ export async function linkFile(
  * @inventedArm throw — PERMANENT
  */
 export async function get(this: FileHost, source: string, ...args: unknown[]): Promise<unknown> {
-  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
+  const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
     | ((render?: Uint8Array) => unknown)
     | undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
@@ -112,7 +112,7 @@ export async function template(
   source: string,
   ...args: unknown[]
 ): Promise<unknown> {
-  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
+  const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
     | ContentBlock
     | undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
@@ -159,7 +159,7 @@ export async function chmod(
 }
 
 export function prependToFile(this: InsertHost, path: string, ...args: unknown[]): unknown {
-  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
     string,
     unknown
@@ -171,7 +171,7 @@ export function prependToFile(this: InsertHost, path: string, ...args: unknown[]
 export const prependFile = prependToFile;
 
 export function appendToFile(this: InsertHost, path: string, ...args: unknown[]): unknown {
-  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
     string,
     unknown
@@ -188,7 +188,7 @@ export function injectIntoClass(
   klass: unknown,
   ...args: unknown[]
 ): unknown {
-  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
     string,
     unknown
@@ -204,7 +204,7 @@ export function injectIntoModule(
   moduleName: unknown,
   ...args: unknown[]
 ): unknown {
-  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
     string,
     unknown
@@ -220,7 +220,7 @@ export async function gsubFile(
   flag: RegExp | string,
   ...args: unknown[]
 ): Promise<void> {
-  const block = typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined;
+  const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<
     string,
     unknown

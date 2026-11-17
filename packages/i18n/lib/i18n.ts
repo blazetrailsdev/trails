@@ -42,10 +42,7 @@ export function reserveKey(key: string): void {
 }
 
 export function reservedKeysPattern(): RegExp {
-  if (!reservedKeysPatternCache) {
-    reservedKeysPatternCache = new RegExp(`(?<!%)%\\{(${RESERVED_KEYS.join("|")})\\}`);
-  }
-  return reservedKeysPatternCache;
+  return (reservedKeysPatternCache ??= new RegExp(`(?<!%)%\\{(${RESERVED_KEYS.join("|")})\\}`));
 }
 
 export function config(): Config {
@@ -210,7 +207,7 @@ export function transliterate(
   } catch (exception) {
     if (!(exception instanceof ArgumentError)) throw exception;
     return handleException(
-      truthy(throw_) ? "throw" : truthy(raise) ? "raise" : false,
+      (truthy(throw_) && "throw") || (truthy(raise) && "raise"),
       exception,
       locale as Locale,
       key,
@@ -227,7 +224,7 @@ export function localize(
   if (locale === false) throw new Disabled("l");
   enforceAvailableLocalesBang(locale as Locale);
 
-  if (!truthy(format)) format = ":default";
+  if (format == null || format === false) format = ":default";
   return config().backend.localize(locale as Locale, object, format, options);
 }
 

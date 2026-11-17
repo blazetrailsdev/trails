@@ -663,7 +663,7 @@ export const ClassMethods = {
     relation: string,
     ...args: unknown[]
   ): void {
-    const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
+    const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
       | RelationBlock
       | undefined;
     let opt = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : undefined) as
