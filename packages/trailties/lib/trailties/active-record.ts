@@ -324,6 +324,7 @@ export class Trailtie extends BaseTrailtie {
       await initializeDatabase;
     });
 
+    /** @noRailsEquivalent PERMANENT */
     this.initializer(
       "active_record.load_schema_cache",
       { after: "setup_main_autoloader" },
