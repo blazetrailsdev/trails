@@ -150,7 +150,7 @@ describe("ScaffoldControllerGenerator (route helper declarations)", () => {
 
     const content = controller();
     expect(content).toContain(
-      '  private postParams() {\n    return this.params.fetch("post", {});',
+      '  private _postParams() {\n    return this.params.fetch("post", {});',
     );
     expect(content).not.toContain("Record<string, unknown>");
   });
@@ -219,7 +219,16 @@ describe("ScaffoldControllerGenerator (emitted source)", () => {
     expect(c).toContain("class PostsController");
     expect(c).toContain("Post.all()");
     expect(c).toContain('this.params.expect({ post: ["title"] })');
-    expect(c).toContain("postParams()");
+    expect(c).toContain("_postParams()");
+  });
+
+  it("emits its callback and params helpers as non-actions", async () => {
+    await runGenerator("posts", ["title:string"]);
+    const c = read("app/controllers/posts-controller.ts");
+    expect(c).toContain('this.beforeAction(":_setPost"');
+    expect(c).toContain("private async _setPost(): Promise<void> {");
+    expect(c).toContain("private _postParams() {");
+    expect(c).not.toMatch(/\b(?:setPost|postParams)\(/);
   });
 
   it("uses underscored namespace in routes (not dasherized)", async () => {
