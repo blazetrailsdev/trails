@@ -7,5 +7,24 @@
     "rootDir": "lib"
   },
   "include": ["lib"],
-  "references": []
+  "references": [
+    {
+      "path": "../actioncable"
+    },
+    {
+      "path": "../actionpack"
+    },
+    {
+      "path": "../actionview"
+    },
+    {
+      "path": "../activesupport"
+    },
+    {
+      "path": "../ruby-compat"
+    },
+    {
+      "path": "../trailties"
+    }
+  ]
 }

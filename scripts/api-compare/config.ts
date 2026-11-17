@@ -52,6 +52,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   loofah: "html-sanitizer",
   crass: "html-sanitizer",
   erubi: "tse-compiler",
+  "turbo-rails": "turbo",
 };
 
 /**

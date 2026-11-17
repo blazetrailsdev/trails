@@ -236,6 +236,13 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   "vite-trails:vite_rails.rb": "vite-trails.ts",
   "actiontext:content_helper.rb": "app/helpers/action-text/content-helper.ts",
   "actiontext:tag_helper.rb": "app/helpers/action-text/tag-helper.ts",
+  "turbo-rails:drive_helper.rb": "app/helpers/turbo/drive-helper.ts",
+  "turbo-rails:frames_helper.rb": "app/helpers/turbo/frames-helper.ts",
+  "turbo-rails:includes_helper.rb": "app/helpers/turbo/includes-helper.ts",
+  "turbo-rails:streams_helper.rb": "app/helpers/turbo/streams-helper.ts",
+  "turbo-rails:streams/action_helper.rb": "app/helpers/turbo/streams/action-helper.ts",
+  "turbo-rails:streams/stream_name.rb": "app/channels/turbo/streams/stream-name.ts",
+  "turbo-rails:streams_channel.rb": "app/channels/turbo/streams-channel.ts",
   // Real ports that live under a different file name than the Ruby one, found
   // by triaging the buckets #6414 un-hid (RFC 0072). Without these the members
   // read as missing while the TS file next door defines them.

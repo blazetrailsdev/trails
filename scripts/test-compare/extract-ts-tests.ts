@@ -76,6 +76,7 @@ export function getPackageTestFiles(): Record<string, string[]> {
     "rails-html-sanitizer": ["html-sanitizer", "*.test.ts"],
     loofah: ["html-sanitizer", "loofah/**/*.test.ts"],
     crass: ["html-sanitizer", "crass/**/*.test.ts"],
+    "turbo-rails": ["turbo", "**/*.test.ts"],
   };
   const result: Record<string, string[]> = {};
 

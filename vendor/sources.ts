@@ -1165,12 +1165,8 @@ export const SOURCES: readonly UpstreamSource[] = [
           "app/models/concerns/turbo",
         ],
         testPath: "test",
-        compareApi: false,
-        apiExcludedReason:
-          "packages/turbo holds only the dummy test app; story turbo-rails-package-helpers-and-turbo-stream-format ports lib/ and enrolls it.",
-        compareTests: false,
-        testsExcludedReason:
-          "packages/turbo holds only the dummy test app; story turbo-rails-package-helpers-and-turbo-stream-format ports lib/ and enrolls it.",
+        compareApi: true,
+        compareTests: true,
       },
     ],
   },
