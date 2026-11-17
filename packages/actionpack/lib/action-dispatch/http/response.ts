@@ -90,7 +90,6 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     this._buf = buf;
   }
 
-  /** @inventedArm ReadableStream — PERMANENT */
   toAry(): unknown {
     if (this._buf instanceof ReadableStream) return this.eachChunk();
     return rbObjRespondTo(this._buf, "toAry")
@@ -206,7 +205,6 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     }
   }
 
-  /** @inventedArm ReadableStream — PERMANENT */
   abort(): unknown {
     if (this._buf instanceof ReadableStream)
       return (this._reader ?? (this._buf as unknown as ReadableStream<unknown>)).cancel();
@@ -221,10 +219,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     return this._closed;
   }
 
-  /**
-   * @internal
-   * @inventedArm ReadableStream — PERMANENT
-   */
+  /** @internal */
   protected eachChunk(block?: (chunk: unknown) => unknown): unknown {
     if (this._buf instanceof ReadableStream) {
       if (!block) return toEnum(this, "each");
@@ -692,10 +687,7 @@ export class Response {
     return new Buffer(response as Response, body as { push(obj: unknown): unknown });
   }
 
-  /**
-   * @internal
-   * @inventedArm ReadableStream — PERMANENT
-   */
+  /** @internal */
   mungeBodyObject(body: unknown): unknown {
     return rbObjRespondTo(body, "each") || body instanceof ReadableStream ? body : [body];
   }
