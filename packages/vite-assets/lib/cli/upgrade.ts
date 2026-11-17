@@ -14,7 +14,6 @@ export class Upgrade extends Install {
 
   /**
    * @internal
-   * @missingRailsArgs run_with_capture — PERMANENT
    * @inventedArm switch — PERMANENT
    */
   protected async upgradeRubyGems(): Promise<void> {
