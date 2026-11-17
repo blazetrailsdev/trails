@@ -39,5 +39,9 @@ describe("the development server", () => {
     const response = await fetch(`http://127.0.0.1:${address.port}/setting`);
     expect(response.status).toBe(200);
     expect(await response.text()).toBe("set at boot");
+
+    await Trails.application!.reloader.reloadBang();
+    const reloaded = await fetch(`http://127.0.0.1:${address.port}/setting`);
+    expect(await reloaded.text()).toBe("set at boot");
   }, 30_000);
 });
