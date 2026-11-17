@@ -430,6 +430,8 @@ export const ClassMethods = {
   /**
    * @internal
    * @inventedArm if — PERMANENT
+   * @inventedArm if — PERMANENT
+   * @inventedArm if — PERMANENT
    * @inventedArm rbObjRespondTo — PERMANENT
    * @inventedArm slice — PERMANENT
    */

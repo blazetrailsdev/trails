@@ -77,6 +77,7 @@
  * `(node).eq(...)` failed at runtime despite a "100%" compare result.
  */
 
+import { receiptCounts } from "./invented-arm-tags.js";
 import * as fs from "fs";
 import * as path from "path";
 import { EXTERNAL_DECL_FILE, PKG_DECL_PREFIX } from "@blazetrails/parity/types";
@@ -4873,8 +4874,10 @@ export function main() {
           file,
           m.name,
           owner,
-          m.inventedArms,
-          undefined,
+          [...new Set(m.inventedArms)],
+          Object.fromEntries(
+            [...receiptCounts(m.inventedArms)].map(([token, n]) => [token, String(n)]),
+          ),
           scope,
         );
       }
@@ -5903,7 +5906,13 @@ export function main() {
               "ts",
               tsOwnNameDelegate,
             ),
-            ...(armTags ? { inventedArms: [...armTags.keys()].sort() } : {}),
+            ...(armTags
+              ? {
+                  inventedArms: [...armTags]
+                    .flatMap(([token, n]) => Array<string>(Number(n) || 1).fill(token))
+                    .sort(),
+                }
+              : {}),
           });
         }
         const seqSets = tsCallSeqByFileName.get(tsFile)?.get(tsName);

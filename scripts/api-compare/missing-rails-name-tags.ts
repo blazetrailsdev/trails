@@ -27,6 +27,7 @@ export function suppressedNamesIn(
   comment: string,
   origin?: JsdocOrigin,
   tag: string = TAG,
+  unique = true,
 ): string[] {
   const { entries } = parseJsdoc(comment, origin, tag);
   const where = origin ? ` in ${origin.fileName}` : "";
@@ -45,5 +46,6 @@ export function suppressedNamesIn(
       );
     }
   }
-  return [...new Set(entries.map((e) => e.call))].sort();
+  const names = entries.map((e) => e.call);
+  return (unique ? [...new Set(names)] : names).sort();
 }
