@@ -174,7 +174,7 @@ describe("SolidQueue::BatchTest", () => {
     await staleA.start();
     const startedAt = (await batch.reload()).enqueued_at;
 
-    expect(batch.isFinished()).toBe(true);
+    expect(batch.isFinished()).toBeTruthy();
     expect(batch.total_jobs).toBe(0);
     expect(await Job.where({ class_name: "BatchCompletionJob" }).count()).toBe(1);
 
