@@ -204,7 +204,10 @@ export class Response extends DispatchResponse {
     if (!this.committed) jar.write(this as unknown as CookieResponse);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm Thread — CONVERGEABLE response-body-setter-awaits-live-build-buffer-writes
+   */
   buildBuffer(response: DispatchResponse, body: Iterable<string>): Buffer {
     const buf = new Buffer(response);
     new Thread(async () => {
