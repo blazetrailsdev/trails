@@ -31,6 +31,7 @@ import {
   rbObjRespondTo,
   slice,
   classModule,
+  included,
   include,
 } from "@blazetrails/ruby-compat";
 
@@ -1149,6 +1150,40 @@ onLoad("action_view", (base: unknown) => {
 export class FormHelper {
   /** @noRailsEquivalent PERMANENT */
   static readonly [classModule] = true;
+
+  /**
+   * The prototypes that copied this module's members, so a reopen after
+   * `ActionView::Base` includes `Helpers` reaches them, as
+   * `rb_include_module` (vendor/ruby/v3.3.11/class.c:1179) shares one method
+   * table. CLAUDE.md, "A Ruby module is a JS object or a JS class".
+   *
+   * @internal
+   */
+  static readonly _includers = new Set<WeakRef<object>>();
+
+  /** @internal */
+  static [included](base: unknown): void {
+    if (typeof base !== "function" || Object.hasOwn(base, "_dependencies")) return;
+    FormHelper._includers.add(new WeakRef(base.prototype as object));
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  static _defineMethods(members: Record<string, unknown>): void {
+    Object.assign(FormHelper.prototype, members);
+    for (const ref of FormHelper._includers) {
+      const proto = ref.deref();
+      if (!proto) {
+        FormHelper._includers.delete(ref);
+        continue;
+      }
+      for (const [name, method] of Object.entries(members)) {
+        if (!Object.hasOwn(proto, name)) (proto as Record<string, unknown>)[name] = method;
+      }
+    }
+  }
 }
 
 extend(FormHelper, Concern);

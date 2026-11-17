@@ -166,7 +166,8 @@ const FormHelperRichTextarea = {
     ).render();
   },
 };
-Object.assign(FormHelper.prototype, FormHelperRichTextarea, {
+FormHelper._defineMethods({
+  ...FormHelperRichTextarea,
   richTextArea: FormHelperRichTextarea.richTextarea,
 });
 
