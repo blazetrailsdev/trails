@@ -20,7 +20,9 @@ describe("ActionText::TagHelper FormHelper reopen", () => {
       (FormHelper.prototype as Record<string, unknown>).richTextarea,
     );
     expect(earlier.richTextArea).toBeTypeOf("function");
-    expect((Base.prototype as Record<string, unknown>).richTextarea).toBeTypeOf("function");
+    expect((Base.prototype as unknown as Record<string, unknown>).richTextarea).toBeTypeOf(
+      "function",
+    );
     expect((Overriding.prototype as Record<string, unknown>).richTextarea).toBe(own);
   });
 });
