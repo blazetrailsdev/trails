@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import SMTPConnection from "nodemailer/lib/smtp-connection/index.js";
 import { createServer } from "node:net";
 import { SMTPServer, type SMTPServerOptions } from "smtp-server";
-import { constGet } from "@blazetrails/ruby-compat";
+import { constGet, Net } from "@blazetrails/ruby-compat";
 import { ReadTimeout } from "../lib/protocol.js";
 import { SMTP, SMTPAuthenticationError, SMTPFatalError } from "../lib/smtp.js";
 
@@ -170,5 +170,11 @@ describe("Net seat", () => {
   it("walks Net::SMTP from the top level", () => {
     expect(constGet(Object, "Net::SMTP")).toBe(SMTP);
     expect(constGet(Object, "Net::SMTPAuthenticationError")).toBe(SMTPAuthenticationError);
+  });
+
+  it("seats SMTP on ruby-compat's one Net module beside HTTP", () => {
+    expect(constGet(Object, "Net")).toBe(Net);
+    expect(Net.SMTP).toBe(SMTP);
+    expect(constGet(Object, "Net::HTTP")).toBe(Net.HTTP);
   });
 });

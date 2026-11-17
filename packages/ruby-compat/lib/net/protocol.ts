@@ -421,7 +421,14 @@ export const Net = {
   ProtoAuthError,
   ProtoCommandError,
   ProtoRetriableError,
-} as {
+} as NetModule;
+constSet(TopLevel, "Net", Net);
+
+type _Responses = typeof Responses;
+type _Exceptions = typeof Exceptions;
+
+/** @noRailsEquivalent PERMANENT */
+export interface NetModule extends _Responses, _Exceptions {
   /** @noRailsEquivalent PERMANENT */
   Protocol: typeof Protocol;
   /** @noRailsEquivalent PERMANENT */
@@ -460,6 +467,4 @@ export const Net = {
   HTTPResponse: typeof HTTPResponse;
   /** @noRailsEquivalent PERMANENT */
   HTTPHeaderSyntaxError: typeof HTTPHeaderSyntaxError;
-} & typeof Responses &
-  typeof Exceptions;
-constSet(TopLevel, "Net", Net);
+}

@@ -150,6 +150,7 @@ export class HTTP extends Protocol {
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1205`. */
   localPort: number | null = null;
   private _sslContext: InstanceType<typeof OpenSSL.SSL.SSLContext> | null = null;
+  private _sslSession: InstanceType<typeof OpenSSL.SSL.Session> | null = null;
   private _writeTimeout: number | null = 60;
   private _debugOutput: HttpDebugOutput | null = null;
   private _readTimeout: number | null = 60;
@@ -530,11 +531,6 @@ export class HTTP extends Protocol {
       connPort = this.port;
     }
 
-    let sslHostAddress: string | null = null;
-    if (!(Resolv.IPv4.Regex.test(connAddr) || Resolv.IPv6.Regex.test(connAddr))) {
-      sslHostAddress = connAddr;
-    }
-
     let s: HttpClientSocket | null = null;
     try {
       this.debug(`opening connection to ${connAddr}:${connPort}...`);
@@ -574,11 +570,35 @@ export class HTTP extends Protocol {
           if (value != null) sslParameters[HTTP.SSL_ATTRIBUTES[i]] = value;
         });
         this._sslContext!.setParams(sslParameters);
+        this._sslContext!.sessionCacheMode =
+          OpenSSL.SSL.SSLContext.SESSION_CACHE_CLIENT |
+          OpenSSL.SSL.SSLContext.SESSION_CACHE_NO_INTERNAL_STORE;
+        this._sslContext!.sessionNewCb = (sock, sess) => {
+          this._sslSession = sess;
+        };
+
+        const verifyHostname = this._sslContext!.verifyHostname;
+
+        let sslHostAddress: string | null = null;
+        if (Resolv.IPv4.Regex.test(this.address) || Resolv.IPv6.Regex.test(this.address)) {
+          this._sslContext!.verifyHostname = false;
+        } else {
+          sslHostAddress = this.address;
+        }
         this.debug(`starting SSL for ${connAddr}:${connPort}...`);
         const ssl = new OpenSSL.SSL.SSLSocket(s, this._sslContext!);
         ssl.syncClose = true;
         if (sslHostAddress) ssl.hostname = sslHostAddress;
+        if (
+          this._sslSession &&
+          Date.now() / 1000 < this._sslSession.time.getTime() / 1000 + this._sslSession.timeout
+        ) {
+          ssl.session = this._sslSession;
+        }
         await this.sslSocketConnect(ssl, this.openTimeout);
+        if (this._sslContext!.verifyMode !== OpenSSL.SSL.VERIFY_NONE && verifyHostname) {
+          ssl.postConnectionCheck(this.address);
+        }
         this.debug(`SSL established, protocol: ${s.sslVersion}, cipher: ${s.cipher![0]}`);
       }
       this._socket = new BufferedIO(s, {
