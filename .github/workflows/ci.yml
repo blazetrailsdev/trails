@@ -1302,10 +1302,7 @@ jobs:
   quickstart:
     name: Quickstart
     needs: changes
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      (needs.changes.outputs.trailties_affected == 'true' ||
-      needs.changes.outputs.activerecord_affected == 'true')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ${{ vars.RUNNER || 'ubuntu-24.04' }}
     timeout-minutes: 20
     steps:
@@ -2912,6 +2909,7 @@ jobs:
           SQLITE_MEM_NOT_REQUIRED: ${{ github.event_name == 'push' || (github.event_name == 'pull_request' && needs.changes.outputs.sqlite_mem_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-sqlite-mem')) }}
           MYSQL_PREPARED_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' && !(github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-mysql-prepared')) }}
           DB_ADAPTERS_DRAFT_DEFERRED: ${{ github.event_name == 'pull_request' && github.event.pull_request.draft && needs.changes.outputs.db_adapter_affected != 'true' && !contains(github.event.pull_request.labels.*.name, 'run-db-adapters') }}
+          QUICKSTART_NOT_REQUIRED: ${{ github.event_name != 'schedule' && github.event_name != 'workflow_dispatch' }}
           PROMISE_COUNTS_NOT_REQUIRED: ${{ github.event_name != 'pull_request' || needs.changes.outputs.docs_only == 'true' }}
           GUIDES_UNLABELLED: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'run-guides') }}
         run: |
@@ -3003,7 +3001,12 @@ jobs:
                     continue
                   fi
                   ;;
-                generated-app-tests|quickstart)
+                quickstart)
+                  if [ "$QUICKSTART_NOT_REQUIRED" = "true" ]; then
+                    continue
+                  fi
+                  ;;
+                generated-app-tests)
                   if [ "$TRAILTIES_AFFECTED" = "false" ] && [ "$AR_AFFECTED" = "false" ]; then
                     continue
                   fi
