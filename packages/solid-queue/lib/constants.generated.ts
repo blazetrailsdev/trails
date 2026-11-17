@@ -77,6 +77,7 @@ defineConstants([
   [() => m1.BatchExecution, "SolidQueue::BatchExecution"],
   [() => m6.BlockedExecution, "SolidQueue::BlockedExecution"],
   [() => m7.ClaimedExecution, "SolidQueue::ClaimedExecution"],
+  [() => m7.FinalizationError, "SolidQueue::ClaimedExecution::FinalizationError"],
   [() => m7.Result, "SolidQueue::ClaimedExecution::Result"],
   [() => m8.Configuration, "SolidQueue::Configuration"],
   [() => m8.Process, "SolidQueue::Configuration::Process"],

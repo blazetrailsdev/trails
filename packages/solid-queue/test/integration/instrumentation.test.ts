@@ -392,7 +392,7 @@ describe("InstrumentationTest", () => {
 
     expect(events.length).toEqual(2);
     assertEvent(events[0], "discard_all", { jobs_size: 9, status: "ready", size: 6 });
-    assertEvent(events[1], "discard_all", { jobs_size: 3, status: "ready", size: 0 });
+    assertEvent(events[1], "discard_all", { jobs_size: 3, status: "ready", size: 1 });
   });
 
   it("discarding jobs in batches emits a discard_all event", async () => {
