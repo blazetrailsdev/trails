@@ -6,7 +6,7 @@ import {
   fetch,
   hasKey,
   keys as hashKeys,
-  type Hash,
+  Hash,
   hashAref,
   KeyError,
   last,
@@ -84,7 +84,7 @@ export class IndexedRow {
   }
 
   equals(other: unknown): boolean {
-    if (isPlainObject(other)) {
+    if (isPlainObject(other) || other instanceof Hash) {
       return rbEqual(this.toHash(), other);
     } else {
       return this === other;
