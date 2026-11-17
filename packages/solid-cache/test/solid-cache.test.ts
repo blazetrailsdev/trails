@@ -6,12 +6,16 @@ import { cacheIncrementDecrementBehavior } from "@blazetrails/activesupport/test
 import { cacheStoreBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-behavior";
 import { cacheStoreCoderBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-coder-behavior";
 import { cacheStoreSerializerBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-serializer-behavior";
+import { encodedKeyCacheBehavior } from "@blazetrails/activesupport/test/cache/behaviors/encoded-key-cache-behavior";
+import { failureRaisingBehavior } from "@blazetrails/activesupport/test/cache/behaviors/failure-raising-behavior";
+import { failureSafetyBehavior } from "@blazetrails/activesupport/test/cache/behaviors/failure-safety-behavior";
 import { localCacheBehavior } from "@blazetrails/activesupport/test/cache/behaviors/local-cache-behavior";
 import { cacheStoreVersionBehavior } from "@blazetrails/activesupport/test/cache/behaviors/cache-store-version-behavior";
 import { seconds } from "@blazetrails/activesupport";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { afterEach, describe, expect, it } from "vitest";
-import { useSolidCache } from "./support/test-helper.js";
+import { StatementTimeout } from "@blazetrails/activerecord";
+import { emulatingTimeouts, useSolidCache, waitForBackgroundTasks } from "./support/test-helper.js";
 
 describe("SolidCacheTest", () => {
   const host = useSolidCache();
@@ -30,6 +34,7 @@ describe("SolidCacheTest", () => {
   cacheIncrementDecrementBehavior(host);
   cacheInstrumentationBehavior({ ...host, storeName: "Store" });
   cacheLoggingBehavior(host);
+  encodedKeyCacheBehavior(host);
 
   it("max key bytesize", async () => {
     const cache = host.lookupStore({ maxKeyBytesize: 100 }) as unknown as {
@@ -65,5 +70,39 @@ describe("SolidCacheTest", () => {
     expect(await cache.write(1, "aaaa", { expiresIn: seconds(1) })).toBe(true);
     travel(seconds(2));
     expect(await cache.write(1, "bbbb", { expiresIn: seconds(1), unlessExist: true })).toBe(true);
+  });
+});
+
+describe("SolidCacheFailsafeTest", () => {
+  const host = useSolidCache();
+
+  failureSafetyBehavior({
+    lookupStore: host.lookupStore,
+    async emulatingUnavailability(block) {
+      await waitForBackgroundTasks(host.allStores[0]);
+      await emulatingTimeouts(() => block(host.lookupStore({ namespace: host.namespace() })));
+    },
+  });
+});
+
+describe("SolidCacheRaisingTest", () => {
+  const host = useSolidCache();
+
+  failureRaisingBehavior({
+    lookupStore: host.lookupStore,
+    unavailableError: StatementTimeout,
+    async emulatingUnavailability(block) {
+      await waitForBackgroundTasks(host.allStores[0]);
+      await emulatingTimeouts(() =>
+        block(
+          host.lookupStore({
+            namespace: host.namespace(),
+            errorHandler: ({ exception }: { exception: Error }) => {
+              throw exception;
+            },
+          }),
+        ),
+      );
+    },
   });
 });
