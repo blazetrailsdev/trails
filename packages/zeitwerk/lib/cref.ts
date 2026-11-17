@@ -62,11 +62,7 @@ export class Cref {
     return rbConstGet(_seat(this.mod), this.cname, true, false);
   }
 
-  /** @inventedArm if — PERMANENT */
   remove(): unknown {
-    const autoloadPath = this.isAutoload();
-    autoloadDelete(this.mod, this.cname);
-    if (autoloadPath != null) return null;
     return rbModRemoveConst(this.mod, this.cname);
   }
 }

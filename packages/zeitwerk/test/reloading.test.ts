@@ -1,5 +1,5 @@
 import { autoloadGet } from "../lib/core-ext/kernel.js";
-import { File, FileUtils, TopLevel } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Kernel, LOAD_PATH, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "../lib/cref.js";
 import {
@@ -88,8 +88,44 @@ describe("TestReloading", () => {
     });
   });
 
-  // PERMANENT-SKIP: `Registry::Inceptions` has no port (RFC 0213 § "What is ported").
-  it.skip("reloading namespaces that are inceptions in other projects", () => {});
+  it("reloading namespaces that are inceptions in other projects", async () => {
+    const g = globalThis as unknown as Record<string, unknown>;
+    g.$Loader = Loader;
+
+    const gemFiles: [string, string][] = [
+      [
+        "lib/my_gem.ts",
+        `const loader = new globalThis.$Loader();
+        await loader.pushDir(import.meta.dirname);
+        await loader.setup();
+        export class MyGem {}`,
+      ],
+    ];
+
+    const appFiles: [string, string][] = [["app/my_gem/foo.ts", "export const Foo = true;"]];
+
+    try {
+      await withFiles([...gemFiles, ...appFiles], async () => {
+        LOAD_PATH.push(File.expandPath("lib"));
+        try {
+          await Kernel.require("my_gem");
+
+          await loader.pushDir("app");
+          loader.enableReloading();
+          await loader.setup();
+
+          const myGem = (TopLevel as unknown as Record<string, object>).MyGem;
+          expect(await get(myGem, "Foo")).toBeTruthy();
+          await loader.reload();
+          expect(await get(myGem, "Foo")).toBeTruthy();
+        } finally {
+          LOAD_PATH.pop();
+        }
+      });
+    } finally {
+      delete g.$Loader;
+    }
+  });
 
   it("reloading raises if the flag is not set", async () => {
     const other = new Loader();

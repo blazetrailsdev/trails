@@ -2,6 +2,7 @@ import {
   Kernel,
   LOADED_FEATURES,
   NotImplementedError,
+  loadingTable,
   getAsyncContext,
   getPath,
   getProcessAdapter,
@@ -90,10 +91,15 @@ export async function require(path: string): Promise<boolean> {
       const url = getPath().pathToFileURL!(path);
       if (loader._generation > 1) url.searchParams.set("zeitwerk", String(loader._generation));
       let exports: Record<string, unknown>;
-      if (thunk !== undefined) exports = (await thunk()) as Record<string, unknown>;
-      else if (loader.importer !== null)
-        exports = (await loader.importer(url.href)) as Record<string, unknown>;
-      else exports = (await import(url.href)) as Record<string, unknown>;
+      loadingTable.add(path);
+      try {
+        if (thunk !== undefined) exports = (await thunk()) as Record<string, unknown>;
+        else if (loader.importer !== null)
+          exports = (await loader.importer(url.href)) as Record<string, unknown>;
+        else exports = (await import(url.href)) as Record<string, unknown>;
+      } finally {
+        loadingTable.delete(path);
+      }
       LOADED_FEATURES.push(path);
       await loader.__onFileAutoloaded(path, exports);
     } else {
