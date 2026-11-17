@@ -102,11 +102,11 @@ describe("Delegation.generate", () => {
     }
     class Order {
       customer = new Customer();
-      declare job: () => unknown;
+      declare job: unknown;
     }
     Delegation.generate(Order.prototype, ["job"], { to: "customer" });
 
-    expect(new Order().job()).toBe(Job);
+    expect(new Order().job).toBe(Job);
   });
 
   it("looks the method up on a module named by as", () => {

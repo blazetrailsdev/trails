@@ -19,7 +19,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   declare ensureMutable: () => void;
   /** @internal */
   declare ensureNotNested: () => void;
-  declare sourceReflection: () => unknown;
+  declare sourceReflection: unknown;
 
   /** @internal */
   protected override loadTargetForBuild(): Promise<unknown> {

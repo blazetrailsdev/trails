@@ -139,6 +139,7 @@ export function rbObjMethod(obj: unknown, vid: unknown): Method {
     if (entry && typeof entry.value === "function") {
       return new Method(obj, id, entry.value as (...args: unknown[]) => unknown);
     }
+    if (entry?.get) return new Method(obj, id, entry.get as (...args: unknown[]) => unknown);
     if (entry) break;
   }
   if (id === "new" && rbObjClass(obj) === rbCClass) {

@@ -104,7 +104,7 @@ describe("GeneralViewTest", () => {
   });
 
   it("exposes params", () => {
-    assert(tc().params() instanceof ActionController.Parameters);
+    assert(tc().params instanceof ActionController.Parameters);
   });
 
   it("exposes request", () => {

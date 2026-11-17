@@ -53,7 +53,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   declare ensureMutable: () => void;
   /** @internal */
   declare ensureNotNested: () => void;
-  declare sourceReflection: () => AssociationReflection;
+  declare sourceReflection: AssociationReflection;
 
   protected override async findTarget({ async = false }: { async?: boolean } = {}): Promise<
     Base[]
@@ -143,8 +143,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     this.ensureNotNested();
     this._throughScope = this.scope();
     try {
-      if (this.sourceReflection().isCollection()) {
-        const inverse = this.sourceReflection().inverseOf();
+      if (this.sourceReflection.isCollection()) {
+        const inverse = this.sourceReflection.inverseOf();
         const target = this.throughAssociation().target;
 
         if (inverse != null && target != null && !globalThis.Array.isArray(target)) {
@@ -158,9 +158,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
       const record = super.buildRecord(attributes, block)!;
 
-      const inverse = this.sourceReflection().isPolymorphic()
-        ? this.sourceReflection().polymorphicInverseOf(record.constructor)
-        : this.sourceReflection().inverseOf();
+      const inverse = this.sourceReflection.isPolymorphic()
+        ? this.sourceReflection.polymorphicInverseOf(record.constructor)
+        : this.sourceReflection.inverseOf();
 
       if (inverse) {
         if (inverse.isCollection()) {
@@ -226,7 +226,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         }
         break;
       case "nullify":
-        count = await scope.updateAll({ [this.sourceReflection().foreignKey() as string]: null });
+        count = await scope.updateAll({ [this.sourceReflection.foreignKey() as string]: null });
         break;
       default:
         count = await scope.deleteAll();
@@ -234,8 +234,8 @@ export class HasManyThroughAssociation extends HasManyAssociation {
 
     await this.deleteThroughRecords(records);
 
-    if (this.sourceReflection().options.counterCache && method !== "destroy") {
-      const counter = this.sourceReflection().counterCacheColumn();
+    if (this.sourceReflection.options.counterCache && method !== "destroy") {
+      const counter = this.sourceReflection.counterCacheColumn();
       await this.klass.decrementCounter(
         counter!,
         records.map((record) => record.id),
@@ -276,15 +276,11 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
   this.ensureMutable();
 
   const attributes = this.throughScopeAttributes();
-  attributes[this.sourceReflection().name] = record;
+  attributes[this.sourceReflection.name] = record;
 
   const newRecord = (this.throughAssociation() as CollectionAssociation).build(attributes);
   if (this.reflection.options.sourceType) {
-    rbFSend(
-      newRecord,
-      `${this.sourceReflection().foreignType}=`,
-      this.reflection.options.sourceType,
-    );
+    rbFSend(newRecord, `${this.sourceReflection.foreignType}=`, this.reflection.options.sourceType);
   }
   cache.set(record, newRecord);
   return newRecord;
