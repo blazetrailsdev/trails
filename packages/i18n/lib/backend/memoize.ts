@@ -9,6 +9,7 @@ import { Flatten } from "./flatten.js";
 interface MemoizeHost {
   memoizedLocales?: Locale[] | null;
   memoizedLookupStore?: Map<string, Map<string, unknown>>;
+  availableLocales(): Locale[];
   memoizedLookup(): Map<string, Map<string, unknown>>;
   resetMemoizationsBang(locale?: Locale | null): void;
 }
@@ -34,10 +35,11 @@ async function reloadBang(this: MemoizeHost): Promise<void> {
 
 async function eagerLoadBang(this: MemoizeHost): Promise<void> {
   this.memoizedLookup();
-  (this as unknown as { availableLocales(): Locale[] }).availableLocales();
+  this.availableLocales();
   await rbCallSuper(this, eagerLoadBang);
 }
 
+/** @internal */
 function lookup(
   this: MemoizeHost,
   locale: Locale,
@@ -60,10 +62,12 @@ function lookup(
   return result;
 }
 
+/** @internal */
 function memoizedLookup(this: MemoizeHost): Map<string, Map<string, unknown>> {
   return (this.memoizedLookupStore ||= newDoubleNestedCache<string, unknown>());
 }
 
+/** @internal */
 function resetMemoizationsBang(this: MemoizeHost, locale: Locale | null = null): void {
   this.memoizedLocales = null;
   if (locale != null) this.memoizedLookup().get(toSym(locale))?.clear();
