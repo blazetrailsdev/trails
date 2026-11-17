@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ActionController, Mime } from "@blazetrails/actionpack";
+import { rbModAncestors } from "@blazetrails/ruby-compat";
 import "./test-helper.js";
+import { Engine } from "../lib/engine.js";
+import { StreamsChannel } from "../lib/app/channels/turbo/streams-channel.js";
+import { StreamsHelper } from "../lib/app/helpers/turbo/streams-helper.js";
 
 type Renderer = (this: object, html: string, options: object) => unknown;
 
@@ -18,6 +22,15 @@ describe("Turbo::Engine", () => {
     expect(render.call(controller, "<turbo-stream></turbo-stream>", {})).toBe(
       "<turbo-stream></turbo-stream>",
     );
-    expect(controller.contentType).toBe("text/vnd.turbo-stream.html");
+    expect(controller.contentType).toBe(Mime.get("turbo_stream"));
+  });
+
+  it("finds the helpers under lib/app/helpers", async () => {
+    const helpers = await Engine.instance().helpers();
+    expect(rbModAncestors(helpers)).toContain(StreamsHelper);
+  });
+
+  it("extends StreamName onto StreamsChannel without its ClassMethods constant", () => {
+    expect(Object.hasOwn(StreamsChannel, "ClassMethods")).toBe(false);
   });
 });

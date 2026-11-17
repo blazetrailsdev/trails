@@ -1,9 +1,9 @@
 import { ActionController, Mime, MimeType } from "@blazetrails/actionpack";
 import { OrderedOptions, TopLevel, onLoad } from "@blazetrails/activesupport";
 import "@blazetrails/trailties/trailties/action-controller";
-import type { Application } from "@blazetrails/trailties";
+import { Trails, type Application } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
-import { File } from "@blazetrails/ruby-compat";
+import { File, constDefined } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
 import "./app/channels/turbo/streams-channel.js";
 import "./app/helpers/turbo/drive-helper.js";
@@ -31,7 +31,7 @@ declare module "@blazetrails/ruby-compat" {
 }
 
 type HelperHost = { helper(...mods: object[]): void };
-type RendererHost = { mediaType: string | null; contentType: string | null };
+type RendererHost = { mediaType: string | null; contentType: MimeType | string | null };
 
 export class Engine extends TrailsEngine {
   static readonly PRECOMPILE_ASSETS = ["turbo.js", "turbo.min.js", "turbo.min.js.map"];
@@ -59,6 +59,18 @@ export class Engine extends TrailsEngine {
       File.join(import.meta.dirname, "app", "models", "concerns"),
       File.join(import.meta.dirname, "app", "jobs"),
     ];
+
+    this.initializer("turbo.no_active_job", { before: "set_eager_load_paths" }, () => {
+      if (!constDefined(TopLevel, "ActiveJob")) {
+        Trails.autoloaders.once.doNotEagerLoad(File.join(import.meta.dirname, "app", "jobs"));
+      }
+    });
+
+    this.initializer("turbo.no_action_cable", { before: "set_eager_load_paths" }, () => {
+      if (!constDefined(TopLevel, "ActionCable")) {
+        Trails.autoloaders.once.doNotEagerLoad(File.join(import.meta.dirname, "app", "channels"));
+      }
+    });
 
     this.initializer("turbo.assets", () => {
       const config = TopLevel.Trails!.application!.config as unknown as {
@@ -93,7 +105,7 @@ export class Engine extends TrailsEngine {
       ActionController.Renderers.add(
         "turbo_stream",
         function (this: RendererHost, turboStreamsHtml: unknown) {
-          if (this.mediaType == null) this.contentType = Mime.get("turbo_stream")!.toString();
+          if (this.mediaType == null) this.contentType = Mime.get("turbo_stream")!;
           return turboStreamsHtml;
         },
       );
