@@ -67,7 +67,10 @@ export class FileStore extends Store implements CacheStore {
         (f) => !GITKEEP_FILES.includes(f),
       );
       await FileUtils.rmRAsync(rootDirs.map((f) => File.join(this.cachePath, f)));
-    } catch {}
+    } catch (error) {
+      const code = (error as { code?: string }).code;
+      if (code !== "ENOENT" && code !== "ENOTEMPTY") throw error;
+    }
   }
 
   override async cleanup(options?: CacheOptions): Promise<void> {

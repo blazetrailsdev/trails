@@ -112,7 +112,7 @@ export class MessageVerifier extends Codec {
   }
 
   private extractEncoded(signed: string): string {
-    if (signed == null || typeof signed !== "string") {
+    if (signed == null || typeof signed !== "string" || /\p{Cs}/u.test(signed)) {
       throw new Thrown("invalid_message_format", "invalid message string");
     }
 
@@ -121,7 +121,10 @@ export class MessageVerifier extends Codec {
     const separatorIndex = this.separatorIndexFor(signed);
     if (separatorIndex != null) {
       encoded = signed.slice(0, separatorIndex);
-      digest = signed.substr(separatorIndex + SEPARATOR_LENGTH, this.digestLengthInHex());
+      digest = signed.slice(
+        separatorIndex + SEPARATOR_LENGTH,
+        separatorIndex + SEPARATOR_LENGTH + this.digestLengthInHex(),
+      );
     }
 
     if (!this.isDigestMatchesData(digest, encoded)) {
@@ -142,7 +145,7 @@ export class MessageVerifier extends Codec {
   }
 
   private isSeparatorAt(signedMessage: string, index: number): boolean {
-    return signedMessage.substr(index, SEPARATOR_LENGTH) === SEPARATOR;
+    return signedMessage.slice(index, index + SEPARATOR_LENGTH) === SEPARATOR;
   }
 
   private separatorIndexFor(signedMessage: string): number | undefined {

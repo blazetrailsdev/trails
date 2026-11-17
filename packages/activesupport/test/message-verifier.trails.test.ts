@@ -22,4 +22,10 @@ describe("MessageVerifier separator index", () => {
     const verifier = new MessageVerifier("Hey, I'm a secret!");
     expect(verifier.validMessage("abc--")).toBe(false);
   });
+
+  it("rejects a message that is not well-formed UTF-16", () => {
+    const verifier = new MessageVerifier("Hey, I'm a secret!");
+    const message = verifier.generate("data");
+    expect(verifier.validMessage(`\uD800${message}`)).toBe(false);
+  });
 });
