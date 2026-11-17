@@ -32,6 +32,7 @@ export class EngineConfiguration extends RailtieConfiguration {
     return this._root;
   }
 
+  /** @inventedArm toString — CONVERGEABLE trails-root-is-a-pathname */
   setRoot(value: string | null): void {
     const expanded = value === null ? null : new Pathname(value).expandPath().toString();
     this._root = expanded;
