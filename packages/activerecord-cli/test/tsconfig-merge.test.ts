@@ -133,6 +133,35 @@ describe("mergeTsconfig", () => {
   });
 });
 
+describe("mergeTsconfig types", () => {
+  const typesOf = (compilerOptions: Record<string, unknown>) => {
+    const result = mergeTsconfig(JSON.stringify({ compilerOptions }));
+    return {
+      types: (JSON.parse(result.content) as { compilerOptions: { types: unknown } }).compilerOptions
+        .types,
+      added: result.added,
+    };
+  };
+
+  it("adds types: [node] when types is absent", () => {
+    const { types, added } = typesOf({});
+    expect(types).toEqual(["node"]);
+    expect(added).toContain("types");
+  });
+
+  it("appends node to a types array without it", () => {
+    const { types, added } = typesOf({ types: ["vitest/globals"] });
+    expect(types).toEqual(["vitest/globals", "node"]);
+    expect(added).toContain("types");
+  });
+
+  it("leaves a types array that already lists node alone", () => {
+    const { types, added } = typesOf({ types: ["node", "vite/client"] });
+    expect(types).toEqual(["node", "vite/client"]);
+    expect(added).not.toContain("types");
+  });
+});
+
 describe("FRESH_TSCONFIG", () => {
   it("is valid JSON containing all AR-required options", () => {
     const cfg = JSON.parse(FRESH_TSCONFIG) as {
@@ -214,6 +243,7 @@ describe("ar init tsconfig integration", () => {
             strict: true,
             esModuleInterop: true,
             skipLibCheck: true,
+            types: ["node"],
             plugins: [{ name: "@blazetrails/trails-tsc/ts-plugin" }],
           },
           include: ["app/models/**/*.ts", "db/migrate/**/*.ts"],

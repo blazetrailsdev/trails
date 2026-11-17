@@ -201,12 +201,6 @@ export class Application extends Engine {
   }
 
   /** @internal */
-  override async runConsoleBlocks(app: unknown): Promise<void> {
-    for (const r of this.railties()) await r.runConsoleBlocks(app);
-    await super.runConsoleBlocks(app);
-  }
-
-  /** @internal */
   override async runTasksBlocks(app: unknown): Promise<void> {
     for (const r of this.railties()) await r.runTasksBlocks(app);
     await super.runTasksBlocks(app);
@@ -220,6 +214,24 @@ export class Application extends Engine {
         await this.requireEnvironmentBang();
       }),
     );
+  }
+
+  /** @internal */
+  override runGeneratorsBlocks(app: unknown): void {
+    for (const r of this.railties()) r.runGeneratorsBlocks(app);
+    super.runGeneratorsBlocks(app);
+  }
+
+  /** @internal */
+  override runRunnerBlocks(app: unknown): void {
+    for (const r of this.railties()) r.runRunnerBlocks(app);
+    super.runRunnerBlocks(app);
+  }
+
+  /** @internal */
+  override async runConsoleBlocks(app: unknown): Promise<void> {
+    for (const r of this.railties()) await r.runConsoleBlocks(app);
+    await super.runConsoleBlocks(app);
   }
 
   /** @internal */

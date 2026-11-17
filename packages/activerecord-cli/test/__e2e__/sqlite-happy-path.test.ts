@@ -174,4 +174,41 @@ const product = await Product.createBang({ name: "Widget" });
     expect(typecheckCode, exitReason("ar typecheck should exit 0", errors)).toBe(0);
     await expect(access(join(appDir, "dist", "db.js"))).resolves.toBeUndefined();
   });
+
+  it("init into an existing tsconfig → typecheck exits 0", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const errors = captureConsoleErrors();
+
+    const appDir = join(tmpDir, "existing");
+    await mkdir(appDir, { recursive: true });
+    await writeFile(
+      join(appDir, "package.json"),
+      JSON.stringify({ name: "existing", type: "module" }),
+    );
+    await writeFile(
+      join(appDir, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: { outDir: "dist", rootDir: "." },
+        include: ["./**/*.ts"],
+        exclude: ["node_modules", "dist"],
+      }),
+    );
+
+    const initCode = await run(["init", "--driver", "better-sqlite3"], appDir);
+    expect(initCode, exitReason("ar init should exit 0", errors)).toBe(0);
+
+    const packagesDir = fileURLToPath(new URL("../../../", import.meta.url));
+    await mkdir(join(appDir, "node_modules", "@blazetrails"), { recursive: true });
+    for (const pkg of ["activerecord", "activerecord-cli", "trails-tsc"]) {
+      await symlink(join(packagesDir, pkg), join(appDir, "node_modules", "@blazetrails", pkg));
+    }
+    await mkdir(join(appDir, "node_modules", "@types"), { recursive: true });
+    await symlink(
+      join(packagesDir, "activerecord-cli", "node_modules", "@types", "node"),
+      join(appDir, "node_modules", "@types", "node"),
+    );
+
+    const typecheckCode = await run(["typecheck", "-p", join(appDir, "tsconfig.json")], appDir);
+    expect(typecheckCode, exitReason("ar typecheck should exit 0", errors)).toBe(0);
+  });
 });
