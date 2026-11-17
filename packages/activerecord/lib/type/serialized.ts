@@ -136,6 +136,7 @@ export async function _loadSerializedAttributes(
       try {
         value = attribute.typeCast(attribute.valueBeforeTypeCast);
       } catch {
+        castType._coderLoadsAsync = false;
         continue;
       }
       if (attribute.valueBeforeTypeCast != null) {
