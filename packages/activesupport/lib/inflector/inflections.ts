@@ -118,12 +118,15 @@ export class Inflections {
     if (s0.toUpperCase() === p0.toUpperCase()) {
       this.plural(new RegExp(`(${s0})${sRest}$`, "i"), `$1${pRest}`);
       this.plural(new RegExp(`(${p0})${pRest}$`, "i"), `$1${pRest}`);
+      this.singular(new RegExp(`(${s0})${sRest}$`, "i"), `$1${sRest}`);
       this.singular(new RegExp(`(${p0})${pRest}$`, "i"), `$1${sRest}`);
     } else {
       this.plural(new RegExp(`${s0.toUpperCase()}(?i:${sRest})$`), p0.toUpperCase() + pRest);
       this.plural(new RegExp(`${s0.toLowerCase()}(?i:${sRest})$`), p0.toLowerCase() + pRest);
       this.plural(new RegExp(`${p0.toUpperCase()}(?i:${pRest})$`), p0.toUpperCase() + pRest);
       this.plural(new RegExp(`${p0.toLowerCase()}(?i:${pRest})$`), p0.toLowerCase() + pRest);
+      this.singular(new RegExp(`${s0.toUpperCase()}(?i:${sRest})$`), s0.toUpperCase() + sRest);
+      this.singular(new RegExp(`${s0.toLowerCase()}(?i:${sRest})$`), s0.toLowerCase() + sRest);
       this.singular(new RegExp(`${p0.toUpperCase()}(?i:${pRest})$`), s0.toUpperCase() + sRest);
       this.singular(new RegExp(`${p0.toLowerCase()}(?i:${pRest})$`), s0.toLowerCase() + sRest);
     }
