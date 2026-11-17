@@ -84,6 +84,10 @@ export class MockPOP3 {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
+export interface NetPOP3 extends MockPOP3 {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class NetPOP3 {
   static new(..._args: unknown[]): MockPOP3 {
     return new MockPOP3();
@@ -94,4 +98,4 @@ export class NetPOP3 {
   }
 }
 
-(TopLevel.Net as { POP3?: unknown }).POP3 = NetPOP3;
+TopLevel.Net!.POP3 = NetPOP3;

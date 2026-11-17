@@ -25,7 +25,12 @@ interface NetPOP3Class {
   new (addr: unknown, port: unknown, isapop: unknown): NetPOP3Session;
 }
 
-type NetWithPOP3 = { POP3?: NetPOP3Class };
+declare module "@blazetrails/ruby-compat" {
+  interface NetModule {
+    /** @noRailsEquivalent PERMANENT */
+    POP3?: NetPOP3Class;
+  }
+}
 
 export class POP3 extends Retriever {
   settings: Record<string, unknown>;
@@ -125,11 +130,7 @@ export class POP3 extends Retriever {
     try {
       if (!block) throw new ArgumentError("Mail::Retrievable#pop3_start takes a block");
 
-      pop3 = new (TopLevel.Net as NetWithPOP3).POP3!(
-        this.settings.address,
-        this.settings.port,
-        false,
-      );
+      pop3 = new TopLevel.Net!.POP3!(this.settings.address, this.settings.port, false);
       if (this.settings.enableSsl != null && this.settings.enableSsl !== false)
         pop3.enableSsl(OpenSSL.SSL.VERIFY_NONE);
       if (this.settings.readTimeout != null && this.settings.readTimeout !== false)

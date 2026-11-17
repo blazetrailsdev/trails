@@ -1,4 +1,3 @@
-import { Unicode as ActiveSupportUnicode } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   bytes as rbBytes,
@@ -287,14 +286,100 @@ export const Unicode = {
   },
 
   decomposeCodepoints(type: string, codepoints: number[]): number[] {
-    return ActiveSupportUnicode.decompose(
-      type === ":compatability" ? ":compatibility" : type,
-      codepoints,
-    );
+    return codepoints.reduce<number[]>((decomposed, cp) => {
+      let ncp: number[] | null;
+      if (Unicode.HANGUL_SBASE <= cp && cp < Unicode.HANGUL_SLAST) {
+        const sindex = cp - Unicode.HANGUL_SBASE;
+        ncp = [];
+        ncp.push(Unicode.HANGUL_LBASE + Math.floor(sindex / Unicode.HANGUL_NCOUNT));
+        ncp.push(
+          Unicode.HANGUL_VBASE +
+            Math.floor((sindex % Unicode.HANGUL_NCOUNT) / Unicode.HANGUL_TCOUNT),
+        );
+        const tindex = sindex % Unicode.HANGUL_TCOUNT;
+        if (tindex !== 0) ncp.push(Unicode.HANGUL_TBASE + tindex);
+        decomposed.push(...ncp);
+      } else if (
+        (ncp = (hashAref(database().codepoints, cp) as Codepoint).decompMapping) != null &&
+        ((hashAref(database().codepoints, cp) as Codepoint).decompType == null ||
+          type === ":compatability")
+      ) {
+        decomposed.push(...Unicode.decomposeCodepoints(type, [...ncp]));
+      } else {
+        decomposed.push(cp);
+      }
+      return decomposed;
+    }, []);
   },
 
   composeCodepoints(codepoints: number[]): number[] {
-    return ActiveSupportUnicode.compose(codepoints);
+    let pos = 0;
+    let eoa = codepoints.length - 1;
+    let starterPos = 0;
+    let starterChar = codepoints[0];
+    let previousCombiningClass = -1;
+    while (pos < eoa) {
+      pos += 1;
+      const lindex = starterChar - Unicode.HANGUL_LBASE;
+      if (0 <= lindex && lindex < Unicode.HANGUL_LCOUNT) {
+        const vcp = codepoints[starterPos + 1];
+        const vindex = vcp == null ? -1 : vcp - Unicode.HANGUL_VBASE;
+        if (0 <= vindex && vindex < Unicode.HANGUL_VCOUNT) {
+          const tcp = codepoints[starterPos + 2];
+          let tindex = tcp == null ? -1 : tcp - Unicode.HANGUL_TBASE;
+          let j: number;
+          if (0 <= tindex && tindex < Unicode.HANGUL_TCOUNT) {
+            j = starterPos + 2;
+            eoa -= 2;
+          } else {
+            tindex = 0;
+            j = starterPos + 1;
+            eoa -= 1;
+          }
+          codepoints.splice(
+            starterPos,
+            j - starterPos + 1,
+            (lindex * Unicode.HANGUL_VCOUNT + vindex) * Unicode.HANGUL_TCOUNT +
+              tindex +
+              Unicode.HANGUL_SBASE,
+          );
+        }
+        starterPos += 1;
+        starterChar = codepoints[starterPos];
+      } else {
+        const currentChar = codepoints[pos];
+        const current = hashAref(database().codepoints, currentChar) as Codepoint;
+        if (current.combiningClass > previousCombiningClass) {
+          let composition: number | null;
+          const ref = hashAref(database().compositionMap, starterChar) as Hash<
+            number,
+            number
+          > | null;
+          if (ref != null) {
+            composition = (hashAref(ref, currentChar) as number | null) ?? null;
+          } else {
+            composition = null;
+          }
+          if (composition != null) {
+            codepoints[starterPos] = composition;
+            starterChar = composition;
+            codepoints.splice(pos, 1);
+            eoa -= 1;
+            pos -= 1;
+            previousCombiningClass = -1;
+          } else {
+            previousCombiningClass = current.combiningClass;
+          }
+        } else {
+          previousCombiningClass = current.combiningClass;
+        }
+        if (current.combiningClass === 0) {
+          starterPos = pos;
+          starterChar = codepoints[pos];
+        }
+      }
+    }
+    return codepoints;
   },
 
   tidyBytes(string: string, force: boolean = false): string {

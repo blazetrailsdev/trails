@@ -98,6 +98,10 @@ export class MockIMAP {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
+export interface NetIMAP extends MockIMAP {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class NetIMAP {
   static DELETED = "Deleted";
 
@@ -130,4 +134,4 @@ export class NetIMAP {
   }
 }
 
-(TopLevel.Net as { IMAP?: unknown }).IMAP = NetIMAP;
+TopLevel.Net!.IMAP = NetIMAP;

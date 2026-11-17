@@ -8,7 +8,7 @@ import { MockIMAP, NetIMAP } from "../../support/mock-imap.js";
 const raw = (m: unknown) => (m as Message).rawSource;
 const list = (ms: unknown) => (ms as Message[]).map(raw);
 const examples = () => MockIMAP.examples().map((m) => m.attr["RFC822"]);
-const Net = TopLevel.Net as { IMAP?: unknown };
+const Net = TopLevel.Net!;
 
 describe("IMAP Retriever", () => {
   beforeEach(() => {
