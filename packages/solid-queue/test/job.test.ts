@@ -1,13 +1,14 @@
+import type {} from "@blazetrails/vitest-matchers";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
-import { minutes } from "@blazetrails/activesupport";
+import { Notifications, minutes } from "@blazetrails/activesupport";
 import {
   assertChanges,
   assertDifference,
   assertNoChanges,
   assertNoDifference,
 } from "@blazetrails/activesupport/testing/assertions";
-import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
+import { freezeTime, travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { Deadlocked, Rollback } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { performAllLater } from "@blazetrails/activejob";
@@ -170,6 +171,30 @@ describe("SolidQueue::JobTest", () => {
     expect(await ((await Job.last()) as Job).isBlocked()).toBeTruthy();
   }
 
+  it("enqueue does not reload the job to create its execution", async () => {
+    const payloads: { sql: string; name: string }[] = [];
+    const callback = (
+      _name: unknown,
+      _start: unknown,
+      _finish: unknown,
+      _id: unknown,
+      payload: { sql: string; name: string },
+    ) => payloads.push(payload);
+
+    await Notifications.subscribed(callback, "sql.active_record", async () => {
+      await AddToBufferJob.performLater(1);
+      await AddToBufferJob.set({ wait: minutes(1) }).performLater(2);
+      for (let i = 0; i < 2; i++) await NonOverlappingJob.performLater(result);
+    });
+
+    expect(await BlockedExecution.isExists()).toBeTruthy();
+
+    const jobSelects = payloads
+      .filter(({ name, sql }) => name !== "SCHEMA" && /^SELECT .*solid_queue_jobs/i.test(sql))
+      .map(({ sql }) => sql);
+    expect(jobSelects).toHaveLength(0);
+  });
+
   it("enqueue active job to be executed right away", async () => {
     const activeJob = new AddToBufferJob(1).set({ priority: 8, queue: "test" });
 
@@ -246,7 +271,7 @@ describe("SolidQueue::JobTest", () => {
     expect(job.concurrency_key).toBe(activeJob.concurrencyKey());
   });
 
-  it("enqueue jobs with concurrency controls in the same concurrency group", async () => {
+  it("block jobs in the same concurrency group when concurrency limits are reached", async () => {
     await assertReady(async () => {
       const activeJob = (await NonOverlappingGroupedJob1.performLater(result, {
         name: "A",
@@ -264,7 +289,7 @@ describe("SolidQueue::JobTest", () => {
     });
   });
 
-  it("enqueue multiple jobs", async () => {
+  it("enqueue jobs in bulk", async () => {
     const activeJobs = [
       new AddToBufferJob(2),
       new AddToBufferJob(6).set({ wait: minutes(2) }),
@@ -521,5 +546,19 @@ describe("SolidQueue::JobTest", () => {
     await expect(Job.enqueue(activeJob)).rejects.toThrow(EnqueueError);
 
     await expect(AddToBufferJob.performLater(1)).rejects.toThrow(EnqueueError);
+  });
+
+  it("enqueue_all assigns scheduled_at if missing", async () => {
+    freezeTime();
+    const activeJobs = [new AddToBufferJob(1), new AddToBufferJob(2).set({ wait: minutes(5) })];
+
+    await performAllLater(activeJobs);
+
+    const jobs = await Job.where({ active_job_id: activeJobs.map((job) => job.jobId) })
+      .order("id")
+      .toArray();
+
+    expect(jobs[0].scheduled_at).toEqualRuby(Time.current());
+    expect(jobs[1].scheduled_at).toEqualRuby(minutes(5).fromNow());
   });
 });
