@@ -163,3 +163,17 @@ describe("SECONDS_PER_MONTH / SECONDS_PER_YEAR", () => {
     expect(Number(Duration.years(1).inSeconds())).toBe(31556952);
   });
 });
+
+describe("Duration#sum over a JS Date receiver", () => {
+  it("folds the parts in their merge order", () => {
+    const d = new Date(2026, 2, 7, 2, 30, 0);
+    const secondThenDay = seconds(1).plus(days(1)).since(d);
+    const dayThenSecond = days(1).plus(seconds(1)).since(d);
+    expect(secondThenDay.epochMilliseconds).toBe(
+      days(1).since(seconds(1).since(d)).epochMilliseconds,
+    );
+    expect(dayThenSecond.epochMilliseconds).toBe(
+      seconds(1).since(days(1).since(d)).epochMilliseconds,
+    );
+  });
+});

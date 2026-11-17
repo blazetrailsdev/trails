@@ -479,12 +479,12 @@ export class Duration {
       if (isDateTime(time)) return datetimeSince(time, sign * this.inSeconds());
       if (!(time instanceof Date || time instanceof Temporal.Instant))
         return time.since(sign * this.inSeconds());
-      return applyDurationPreservingNs(time, this.parts, sign);
+      return applyDurationPreservingNs(time, this.parts, PARTS, sign);
     }
 
     if (isDateTime(time) || !(time instanceof Date || time instanceof Temporal.Instant))
       return applyDurationToDate(time, this.parts, this._partKeys, sign);
-    return applyDurationPreservingNs(time, this.parts, sign);
+    return applyDurationPreservingNs(time, this.parts, this._partKeys, sign);
   }
 
   private respondToMissing(method: string, _includePrivate = false): boolean {
@@ -647,64 +647,57 @@ function dateOrTimeAdvance(
 function applyDurationPreservingNs(
   date: Date | Temporal.Instant,
   parts: DurationParts,
+  partKeys: readonly (keyof DurationParts)[],
   direction: 1 | -1,
 ): Temporal.Instant {
   const nsRemainder = date instanceof Temporal.Instant ? date.epochNanoseconds % 1_000_000n : 0n;
-  const result = instantFrom(applyDuration(toDateInput(date), parts, direction));
+  const result = instantFrom(applyDuration(toDateInput(date), parts, partKeys, direction));
   return nsRemainder === 0n ? result : result.add({ nanoseconds: Number(nsRemainder) });
 }
 
-function applyDuration(date: Date, parts: DurationParts, direction: 1 | -1): Date {
+function applyDuration(
+  date: Date,
+  parts: DurationParts,
+  partKeys: readonly (keyof DurationParts)[],
+  direction: 1 | -1,
+): Date {
   if (!(date instanceof Date)) {
     throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
   }
 
-  let d = new Date(date.getTime());
+  let time = new Date(date.getTime());
 
-  const years = parts.years * direction;
-  const months = parts.months * direction;
-  const weeks = parts.weeks * direction;
-  const days = parts.days * direction;
-  const hours = parts.hours * direction;
-  const minutes = parts.minutes * direction;
-  const seconds = parts.seconds * direction;
-
-  if (Number.isInteger(years) && years !== 0) {
-    d.setFullYear(d.getFullYear() + years);
-  } else if (years !== 0) {
-    d = new Date(d.getTime() + years * SECONDS_PER_YEAR * 1000);
+  for (const type of partKeys) {
+    const number = direction * parts[type];
+    const t = time;
+    if (type === "seconds") {
+      time = new Date(t.getTime() + number * 1000);
+    } else if (type === "minutes") {
+      time = new Date(t.getTime() + number * SECONDS_PER_MINUTE * 1000);
+    } else if (type === "hours") {
+      time = new Date(t.getTime() + number * SECONDS_PER_HOUR * 1000);
+    } else if (number === 0) {
+      continue;
+    } else if (type === "years" && !Number.isInteger(number)) {
+      time = new Date(t.getTime() + number * SECONDS_PER_YEAR * 1000);
+    } else if (type === "years") {
+      time = new Date(t.getTime());
+      time.setFullYear(t.getFullYear() + number);
+    } else if (type === "months" && !Number.isInteger(number)) {
+      time = new Date(t.getTime() + number * SECONDS_PER_MONTH * 1000);
+    } else if (type === "months") {
+      time = new Date(t.getTime());
+      time.setMonth(t.getMonth() + number);
+    } else {
+      const days = type === "weeks" ? number * 7 : number;
+      const intDays = Math.trunc(days);
+      time = new Date(t.getTime());
+      time.setDate(t.getDate() + intDays);
+      time = new Date(time.getTime() + (days - intDays) * SECONDS_PER_DAY * 1000);
+    }
   }
 
-  if (Number.isInteger(months) && months !== 0) {
-    d.setMonth(d.getMonth() + months);
-  } else if (months !== 0) {
-    d = new Date(d.getTime() + months * SECONDS_PER_MONTH * 1000);
-  }
-
-  const intWeeks = Math.trunc(weeks);
-  const fracWeeks = weeks - intWeeks;
-  if (intWeeks !== 0) {
-    d.setDate(d.getDate() + intWeeks * 7);
-  }
-
-  const intDays = Math.trunc(days);
-  const fracDays = days - intDays;
-  if (intDays !== 0) {
-    d.setDate(d.getDate() + intDays);
-  }
-
-  const extraMs =
-    fracWeeks * 7 * SECONDS_PER_DAY * 1000 +
-    fracDays * SECONDS_PER_DAY * 1000 +
-    hours * SECONDS_PER_HOUR * 1000 +
-    minutes * SECONDS_PER_MINUTE * 1000 +
-    seconds * 1000;
-
-  if (extraMs !== 0) {
-    d = new Date(d.getTime() + extraMs);
-  }
-
-  return d;
+  return time;
 }
 
 export class Scalar {

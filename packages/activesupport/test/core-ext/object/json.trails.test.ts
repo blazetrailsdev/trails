@@ -32,6 +32,18 @@ describe("asJson (TypeScript-only arms)", () => {
     expect(asJson(arr)).toEqual([1, 2, null]);
   });
 
+  it("Object#as_json answers null for a cycle through instance values", () => {
+    class Node {
+      ref: Node | null = null;
+      constructor(public name: string) {}
+    }
+    const a = new Node("a");
+    const b = new Node("b");
+    a.ref = b;
+    b.ref = a;
+    expect(asJson(a)).toEqual({ ref: { ref: null, name: "b" }, name: "a" });
+  });
+
   it("a repeated reference is not a cycle and answers the same result", () => {
     const shared = { kind: "tag", count: 5 };
     const out = asJson({ a: shared, b: shared }) as { a: unknown; b: unknown };

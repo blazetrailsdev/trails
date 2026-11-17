@@ -569,7 +569,7 @@ class TestExtractor
   # owns the cases and its TS twin ports them. Enrolled by module name, as
   # `LIB_TEST_MODULES` is: activesupport's cache `behaviors/` modules take the
   # same shape and are not yet ported to match.
-  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests].freeze
+  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests FileUpdateCheckerSharedTests].freeze
 
   def collect_required_modules(sexp, filepath)
     missing = @module_includes.keys.select do |name|

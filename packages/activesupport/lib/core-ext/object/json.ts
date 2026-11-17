@@ -49,10 +49,16 @@ export class Module {
 
 export class Object {
   static asJson(value: object, options: EncodeOptions | null = null): unknown {
-    if (typeof (value as { toHash?: unknown }).toHash === "function") {
-      return Hash.asJson((value as { toHash(): unknown }).toHash(), options);
+    const frame = enterCycle(value);
+    if (frame === null) return null;
+    try {
+      if (typeof (value as { toHash?: unknown }).toHash === "function") {
+        return Hash.asJson((value as { toHash(): unknown }).toHash(), options);
+      }
+      return Hash.asJson(instanceVariables.Object.instanceValues(value), options);
+    } finally {
+      frame.leave();
     }
-    return Hash.asJson(instanceVariables.Object.instanceValues(value), options);
   }
 }
 
