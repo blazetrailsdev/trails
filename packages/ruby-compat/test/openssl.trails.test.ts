@@ -61,31 +61,43 @@ describe("OpenSSL::X509::Name", () => {
 });
 
 describe("OpenSSL::SSL::SSLSocket", () => {
-  function fakeIo(
-    peer: { subject: Record<string, string> | null; subjectaltname: string | null },
-    seen: { session?: Uint8Array | null } = {},
-  ) {
+  function signedDer(cn: string, san: string | null): Uint8Array {
+    const key = new OpenSSL.PKey.RSA(2048);
+    const cert = new OpenSSL.X509.Certificate();
+    cert.version = 2;
+    cert.serial = 1;
+    cert.subject = cert.issuer = OpenSSL.X509.Name.parse(`/CN=${cn}`);
+    cert.publicKey = key.publicKey;
+    cert.notBefore = new Date(Date.now() - 3600 * 1000);
+    cert.notAfter = new Date(Date.now() + 3600 * 1000);
+    if (san !== null) {
+      cert.addExtension(new OpenSSL.X509.ExtensionFactory().createExtension("subjectAltName", san));
+    }
+    cert.sign(key, OpenSSL.Digest.SHA256);
+    return cert._der!;
+  }
+
+  function fakeIo(der: Uint8Array | null, seen: { session?: Uint8Array | null } = {}) {
     return {
       cipher: ["TLS_AES_128_GCM_SHA256", "TLSv1.3", 128, 128],
       close() {},
       async startSsl(options: import("../lib/http-adapter.js").HttpSslOptions) {
         seen.session = options.session;
         options.sessionNewCb!(Uint8Array.of(1, 2, 3));
-        options.peerCertCb!(peer.subject, peer.subjectaltname);
+        options.peerCertCb!(der);
       },
     } as never;
   }
 
-  it("post_connection_check matches a subjectAltName dNSName, wildcard and iPAddress", async () => {
+  function verifyNone() {
     const context = new OpenSSL.SSL.SSLContext();
     context.setParams({ verifyMode: OpenSSL.SSL.VERIFY_NONE });
-    const ssl = new OpenSSL.SSL.SSLSocket(
-      fakeIo({
-        subject: { CN: "ignored" },
-        subjectaltname: "DNS:*.example.com, IP Address:10.0.0.1",
-      }),
-      context,
-    );
+    return context;
+  }
+
+  it("post_connection_check matches a subjectAltName dNSName, wildcard and iPAddress", async () => {
+    const der = signedDer("ignored", "DNS:*.example.com,IP:10.0.0.1");
+    const ssl = new OpenSSL.SSL.SSLSocket(fakeIo(der), verifyNone());
     await ssl.connect();
     expect(ssl.postConnectionCheck("www.example.com")).toBe(true);
     expect(ssl.postConnectionCheck("10.0.0.1")).toBe(true);
@@ -96,19 +108,11 @@ describe("OpenSSL::SSL::SSLSocket", () => {
   });
 
   it("post_connection_check falls back to the subject CN and raises without a peer cert", async () => {
-    const context = new OpenSSL.SSL.SSLContext();
-    context.setParams({ verifyMode: OpenSSL.SSL.VERIFY_NONE });
-    const ssl = new OpenSSL.SSL.SSLSocket(
-      fakeIo({ subject: { CN: "Host.Example" }, subjectaltname: null }),
-      context,
-    );
+    const ssl = new OpenSSL.SSL.SSLSocket(fakeIo(signedDer("Host.Example", null)), verifyNone());
     await ssl.connect();
     expect(ssl.postConnectionCheck("host.example")).toBe(true);
 
-    const none = new OpenSSL.SSL.SSLSocket(
-      fakeIo({ subject: null, subjectaltname: null }),
-      context,
-    );
+    const none = new OpenSSL.SSL.SSLSocket(fakeIo(null), verifyNone());
     await none.connect();
     expect(() => none.postConnectionCheck("host.example")).toThrow(
       "Peer verification enabled, but no certificate received.",
@@ -116,16 +120,14 @@ describe("OpenSSL::SSL::SSLSocket", () => {
   });
 
   it("session= resumes the session the context's session_new_cb received", async () => {
-    const context = new OpenSSL.SSL.SSLContext();
-    context.setParams({ verifyMode: OpenSSL.SSL.VERIFY_NONE });
+    const context = verifyNone();
     let cached: InstanceType<typeof OpenSSL.SSL.Session> | null = null;
     context.sessionNewCb = (_sock, sess) => (cached = sess);
-    const peer = { subject: null, subjectaltname: null };
-    await new OpenSSL.SSL.SSLSocket(fakeIo(peer), context).connect();
+    await new OpenSSL.SSL.SSLSocket(fakeIo(null), context).connect();
     expect(cached!._der).toEqual(Uint8Array.of(1, 2, 3));
 
     const seen: { session?: Uint8Array | null } = {};
-    const ssl = new OpenSSL.SSL.SSLSocket(fakeIo(peer, seen), context);
+    const ssl = new OpenSSL.SSL.SSLSocket(fakeIo(null, seen), context);
     ssl.session = cached!;
     await ssl.connect();
     expect(seen.session).toEqual(Uint8Array.of(1, 2, 3));

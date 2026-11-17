@@ -6,6 +6,7 @@ import { ArgumentError } from "./argument-error.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { NoMethodError } from "./no-method-error.js";
 import { StandardError } from "./standard-error.js";
+import { IPAddr } from "./ipaddr.js";
 import type { HttpSslOptions } from "./http-adapter.js";
 
 const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
@@ -118,6 +119,12 @@ export class Store {
  * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:22
  */
 export class SSLContext {
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2910` */
+  static readonly SESSION_CACHE_CLIENT = 0x0001;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2915` */
+  static readonly SESSION_CACHE_SERVER = 0x0002;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2941` */
+  static readonly SESSION_CACHE_NO_INTERNAL_STORE = 0x0300;
   /** @noRailsEquivalent PERMANENT */
   static DEFAULT_PARAMS: Record<string, unknown> = {
     minVersion: 0x301,
@@ -165,6 +172,8 @@ export class SSLContext {
   verifyDepth: number | null = null;
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2722` */
   sessionNewCb: ((sock: SSLSocket, sess: Session) => unknown) | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2898` */
+  sessionCacheMode: number = SSLContext.SESSION_CACHE_SERVER;
 
   /**
    * `ssl_timeout=`, the alias of `timeout=` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2880`).
@@ -265,12 +274,14 @@ export interface SSLSocketIO {
   readonly cipher?: string[] | null;
 }
 
+const TLS1_DEFAULT_TIMEOUT = 7200;
+
 /**
  * `OpenSSL::SSL::Session` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl_session.c:301-330`):
  * the host's serialized session, with the time it was established and its
  * lifetime in seconds. The host reports neither, so `time` is the moment the
- * session arrived and `timeout` is OpenSSL's TLS default, `tls1_default_timeout`'s
- * 7200 seconds.
+ * host handed the session over and `timeout` is `TLS1_DEFAULT_TIMEOUT`, OpenSSL's
+ * `tls1_default_timeout` (`ssl/t1_lib.c`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -281,7 +292,7 @@ export class Session {
     /** @noRailsEquivalent PERMANENT */
     readonly time: Date = new Date(),
     /** @noRailsEquivalent PERMANENT */
-    readonly timeout: number = 7200,
+    readonly timeout: number = TLS1_DEFAULT_TIMEOUT,
   ) {}
 }
 
@@ -294,7 +305,8 @@ function verifyCertificateIdentity(cert: Certificate, hostname: string): boolean
   let shouldVerifyCommonName = true;
   for (const ext of cert.extensions) {
     if (ext.oid !== "subjectAltName") continue;
-    for (const san of _derChildren(ext._value)) {
+    const sequence = _derSeq(_derRead(ext._value, 0).value);
+    for (const san of sequence) {
       switch (san.tag & 0x1f) {
         case 2:
           shouldVerifyCommonName = false;
@@ -303,9 +315,10 @@ function verifyCertificateIdentity(cert: Certificate, hostname: string): boolean
         case 7:
           shouldVerifyCommonName = false;
           if (san.value.length === 4 || san.value.length === 16) {
-            const hton = _ipaddrHton(hostname);
-            if (hton !== null && hton.length === san.value.length) {
-              if (hton.every((b, i) => b === san.value[i])) return true;
+            try {
+              if (_bytesEqual(san.value, new IPAddr(hostname).hton())) return true;
+            } catch (e) {
+              if (!(e instanceof IPAddr.InvalidAddressError)) throw e;
             }
           }
           break;
@@ -360,44 +373,44 @@ function _isAsciiOnly(str: string): boolean {
   return [...str].every((c) => c.charCodeAt(0) < 0x80);
 }
 
-function _ipaddrHton(hostname: string): number[] | null {
-  const v4 = hostname.split(".");
-  if (v4.length === 4 && v4.every((p) => /^\d{1,3}$/.test(p) && Number(p) < 256)) {
-    return v4.map(Number);
-  }
-  if (!hostname.includes(":")) return null;
-  const [head, tail = null, ...rest] = hostname.split("::");
-  if (rest.length > 0) return null;
-  const words = (part: string) => (part === "" ? [] : part.split(":"));
-  const h = words(head);
-  const t = tail === null ? [] : words(tail);
-  const fill = 8 - h.length - t.length;
-  if (tail === null ? fill !== 0 : fill < 1) return null;
-  const all = [...h, ...Array<string>(fill).fill("0"), ...t];
-  if (!all.every((w) => /^[0-9a-f]{1,4}$/i.test(w))) return null;
-  return all.flatMap((w) => [parseInt(w, 16) >> 8, parseInt(w, 16) & 0xff]);
+function _bytesEqual(a: Uint8Array, b: Uint8Array): boolean {
+  return a.length === b.length && a.every((byte, i) => byte === b[i]);
 }
 
-function _derChildren(der: Uint8Array): { tag: number; value: Uint8Array }[] {
+function _derRead(der: Uint8Array, at: number): { tag: number; value: Uint8Array; end: number } {
+  let length = der[at + 1];
+  let start = at + 2;
+  if (length & 0x80) {
+    const n = length & 0x7f;
+    length = 0;
+    for (let i = 0; i < n; i++) length = length * 256 + der[start + i];
+    start += n;
+  }
+  return { tag: der[at], value: der.subarray(start, start + length), end: start + length };
+}
+
+function _derSeq(contents: Uint8Array): { tag: number; value: Uint8Array }[] {
   const children: { tag: number; value: Uint8Array }[] = [];
-  const read = (at: number): [number, number] => {
-    let length = der[at];
-    let start = at + 1;
-    if (length & 0x80) {
-      const n = length & 0x7f;
-      length = 0;
-      for (let i = 0; i < n; i++) length = length * 256 + der[start + i];
-      start += n;
-    }
-    return [length, start];
-  };
-  const [outer, first] = read(1);
-  for (let at = first; at < first + outer; ) {
-    const [length, start] = read(at + 1);
-    children.push({ tag: der[at], value: der.subarray(start, start + length) });
-    at = start + length;
+  for (let at = 0; at < contents.length; ) {
+    const child = _derRead(contents, at);
+    children.push(child);
+    at = child.end;
   }
   return children;
+}
+
+function _derToOid(value: Uint8Array): string {
+  const arcs = [Math.floor(value[0] / 40), value[0] % 40];
+  let arc = 0;
+  for (const byte of value.subarray(1)) {
+    arc = arc * 128 + (byte & 0x7f);
+    if (!(byte & 0x80)) {
+      arcs.push(arc);
+      arc = 0;
+    }
+  }
+  const oid = arcs.join(".");
+  return Object.keys(OIDS).find((name) => OIDS[name] === oid) ?? oid;
 }
 
 /**
@@ -460,8 +473,8 @@ export class SSLSocket<IO extends SSLSocketIO = SSLSocketIO> {
         sessionNewCb: (der) => {
           if (this.context.sessionNewCb !== null) this.context.sessionNewCb(this, new Session(der));
         },
-        peerCertCb: (subject, subjectaltname) => {
-          this._peerCert = _peerCertificate(subject, subjectaltname);
+        peerCertCb: (der) => {
+          this._peerCert = der === null ? null : new Certificate(der);
         },
         ca,
         defaultPaths,
@@ -1007,6 +1020,30 @@ export class Certificate {
   /** @internal */
   _der: Uint8Array | null = null;
 
+  /**
+   * `ossl_x509_initialize` (`vendor/ruby/v3.3.11/ext/openssl/ossl_x509cert.c:110-137`)
+   * over a DER string, read for the subject and extensions of its `TBSCertificate`.
+   */
+  constructor(der: Uint8Array | null = null) {
+    if (der === null) return;
+    this._der = der;
+    const tbs = _derSeq(_derSeq(_derRead(der, 0).value)[0].value);
+    const offset = tbs[0].tag === 0xa0 ? 1 : 0;
+    this.subject = new Name(
+      _derSeq(tbs[offset + 4].value).map((rdn) => {
+        const [oid, value] = _derSeq(_derSeq(rdn.value)[0].value);
+        return [_derToOid(oid.value), new TextDecoder().decode(value.value)];
+      }),
+    );
+    const extensions = tbs.find((field) => field.tag === 0xa3);
+    if (extensions === undefined) return;
+    for (const ext of _derSeq(_derRead(extensions.value, 0).value)) {
+      const parts = _derSeq(ext.value);
+      const critical = parts.length === 3 && parts[1].value[0] !== 0;
+      this.extensions.push(new Extension(_derToOid(parts[0].value), parts.at(-1)!.value, critical));
+    }
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_x509cert.c:681` */
   addExtension(extension: Extension): Extension {
     this.extensions.push(extension);
@@ -1045,24 +1082,6 @@ export class Certificate {
   toPem(): string {
     return _pem("CERTIFICATE", this._der!);
   }
-}
-
-function _peerCertificate(
-  subject: Record<string, string> | null,
-  subjectaltname: string | null,
-): Certificate | null {
-  if (subject === null) return null;
-  const cert = new Certificate();
-  cert.subject = new Name(Object.entries(subject));
-  if (subjectaltname != null) {
-    const names = subjectaltname.split(", ").flatMap((item) => {
-      if (item.startsWith("DNS:")) return [_der(0x82, _utf8(item.slice(4)))];
-      const hton = item.startsWith("IP Address:") ? _ipaddrHton(item.slice(11)) : null;
-      return hton === null ? [] : [_der(0x87, Uint8Array.from(hton))];
-    });
-    cert.extensions.push(new Extension("subjectAltName", _der(0x30, ...names)));
-  }
-  return cert;
 }
 
 /**

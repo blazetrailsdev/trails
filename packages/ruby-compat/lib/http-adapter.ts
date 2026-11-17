@@ -99,7 +99,7 @@ export interface HttpSslOptions {
   maxVersion?: "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3";
   session?: Uint8Array | null;
   sessionNewCb?: (session: Uint8Array) => void;
-  peerCertCb?: (subject: Record<string, string> | null, subjectaltname: string | null) => void;
+  peerCertCb?: (der: Uint8Array | null) => void;
 }
 
 export interface HttpAdapter {
@@ -157,7 +157,7 @@ type NodeSocket = {
   readonly remoteFamily?: string | undefined;
   getProtocol?(): string | null;
   getCipher?(): { name: string };
-  getPeerCertificate?(): { subject?: Record<string, string>; subjectaltname?: string } | null;
+  getPeerCertificate?(): { raw?: Uint8Array } | null;
 };
 
 type NodeHttp = {
@@ -265,11 +265,7 @@ class _NodeClientSocket implements HttpClientSocket {
         this.io.removeListener("error", reject as never);
         if (options.peerCertCb) {
           const cert = this.io.getPeerCertificate!();
-          const present = cert != null && Object.keys(cert).length > 0;
-          options.peerCertCb(
-            present ? { ...cert.subject } : null,
-            present ? (cert.subjectaltname ?? null) : null,
-          );
+          options.peerCertCb(cert?.raw != null ? new Uint8Array(cert.raw) : null);
         }
         resolve();
       });

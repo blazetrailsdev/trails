@@ -531,11 +531,6 @@ export class HTTP extends Protocol {
       connPort = this.port;
     }
 
-    let sslHostAddress: string | null = null;
-    if (!(Resolv.IPv4.Regex.test(connAddr) || Resolv.IPv6.Regex.test(connAddr))) {
-      sslHostAddress = connAddr;
-    }
-
     let s: HttpClientSocket | null = null;
     try {
       this.debug(`opening connection to ${connAddr}:${connPort}...`);
@@ -575,9 +570,21 @@ export class HTTP extends Protocol {
           if (value != null) sslParameters[HTTP.SSL_ATTRIBUTES[i]] = value;
         });
         this._sslContext!.setParams(sslParameters);
+        this._sslContext!.sessionCacheMode =
+          OpenSSL.SSL.SSLContext.SESSION_CACHE_CLIENT |
+          OpenSSL.SSL.SSLContext.SESSION_CACHE_NO_INTERNAL_STORE;
         this._sslContext!.sessionNewCb = (sock, sess) => {
           this._sslSession = sess;
         };
+
+        const verifyHostname = this._sslContext!.verifyHostname;
+
+        let sslHostAddress: string | null = null;
+        if (Resolv.IPv4.Regex.test(this.address) || Resolv.IPv6.Regex.test(this.address)) {
+          this._sslContext!.verifyHostname = false;
+        } else {
+          sslHostAddress = this.address;
+        }
         this.debug(`starting SSL for ${connAddr}:${connPort}...`);
         const ssl = new OpenSSL.SSL.SSLSocket(s, this._sslContext!);
         ssl.syncClose = true;
@@ -589,11 +596,7 @@ export class HTTP extends Protocol {
           ssl.session = this._sslSession;
         }
         await this.sslSocketConnect(ssl, this.openTimeout);
-        if (
-          this._sslContext!.verifyMode !== OpenSSL.SSL.VERIFY_NONE &&
-          this.verifyHostname != null &&
-          this.verifyHostname !== false
-        ) {
+        if (this._sslContext!.verifyMode !== OpenSSL.SSL.VERIFY_NONE && verifyHostname) {
           ssl.postConnectionCheck(this.address);
         }
         this.debug(`SSL established, protocol: ${s.sslVersion}, cipher: ${s.cipher![0]}`);

@@ -75,6 +75,22 @@ export class IPAddr {
     return this._addr!;
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:226-237` */
+  hton(): Uint8Array {
+    switch (this.family) {
+      case AF_INET:
+        return Uint8Array.from([24, 16, 8, 0], (shift) =>
+          Number((this._addr! >> BigInt(shift)) & 0xffn),
+        );
+      case AF_INET6:
+        return Uint8Array.from({ length: 16 }, (_, i) =>
+          Number((this._addr! >> BigInt(120 - 8 * i)) & 0xffn),
+        );
+      default:
+        throw new IPAddr.AddressFamilyError("unsupported address family");
+    }
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:189` */
   toString(): string {
     let str = this._toString(this._addr!);
