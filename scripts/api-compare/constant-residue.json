@@ -1171,8 +1171,6 @@
     "rows": 158,
     "excluded": [
       "application/dummy-config.ts::DummyConfig",
-      "assets/trailtie.ts::Trailtie",
-      "assets/vite-manifest.ts::ViteManifest",
       "commands/build.ts::BuildCommand",
       "info.ts::PropertyList",
       "trailties/action-dispatch.ts::Trailtie",

@@ -42,7 +42,6 @@ import { DefaultMiddlewareStack } from "./application/default-middleware-stack.j
 import { Finisher } from "./application/finisher.js";
 import { Configuration } from "./application/configuration.js";
 import { RoutesReloader } from "./application/routes-reloader.js";
-import "./assets/trailtie.js";
 import { Trails } from "./trails.js";
 import { Collection, type InitializerGroup } from "./initializable.js";
 import { Logger } from "@blazetrails/activesupport";
