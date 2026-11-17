@@ -16,6 +16,7 @@ export default defineConfig({
     alias: resolveEntries(packageEntries).map(([name, entry]) => pkgAlias(name, entry)),
   },
   build: {
+    target: "es2022",
     rollupOptions: {
       external: (id: string) =>
         id.startsWith("node:") ||

@@ -41,7 +41,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/activemodel", "../activemodel/lib/index.ts"),
       pkgAlias("@blazetrails/activerecord/migration", "../activerecord/lib/migration.ts"),
       {
-        find: /^@blazetrails\/activerecord\/(.+)$/,
+        find: /^@blazetrails\/activerecord\/(.+?)(?:\.js)?$/,
         replacement: path.resolve(__dirname, "../activerecord/lib/$1.ts"),
       },
       pkgAlias("@blazetrails/activerecord", "../activerecord/lib/index.ts"),
