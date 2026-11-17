@@ -28,16 +28,16 @@ export class PermitScrubber extends Scrubber {
     return this._tags;
   }
 
-  set tags(tags: Iterable<string>) {
-    this._tags = this.validateBang(rbObjDup(tags) as Enumerable, "tags");
+  set tags(tags: Iterable<string> | null) {
+    this._tags = this.validateBang(rbObjDup(tags) as Enumerable | null, "tags");
   }
 
   get attributes(): Enumerable | null {
     return this._attributes;
   }
 
-  set attributes(attributes: Iterable<string>) {
-    this._attributes = this.validateBang(rbObjDup(attributes) as Enumerable, "attributes");
+  set attributes(attributes: Iterable<string> | null) {
+    this._attributes = this.validateBang(rbObjDup(attributes) as Enumerable | null, "attributes");
   }
 
   override scrub(node: Html5Node): unknown {
@@ -58,7 +58,7 @@ export class PermitScrubber extends Scrubber {
 
   /** @internal */
   protected isAllowedNode(node: Html5Node): boolean {
-    return [...this._tags!].includes(node.name);
+    return this._tags instanceof Set ? this._tags.has(node.name) : this._tags!.includes(node.name);
   }
 
   /** @internal */
@@ -68,7 +68,9 @@ export class PermitScrubber extends Scrubber {
 
   /** @internal */
   protected isScrubAttribute(name: string): boolean {
-    return ![...this._attributes!].includes(name);
+    return !(this._attributes instanceof Set
+      ? this._attributes.has(name)
+      : this._attributes!.includes(name));
   }
 
   /** @internal */
@@ -116,19 +118,19 @@ export class PermitScrubber extends Scrubber {
   }
 
   /** @internal */
-  protected validateBang(var_: Enumerable, name: string): Enumerable {
+  protected validateBang(var_: Enumerable | null, name: string): Enumerable | null {
     if (var_ != null && (typeof var_ === "string" || typeof var_[Symbol.iterator] !== "function")) {
       throw new ArgumentError(`You should pass :${name} as an Enumerable`);
     }
 
     if (var_ != null && name === "tags") {
-      if ([...var_].includes("mglyph")) {
+      if (var_ instanceof Set ? var_.has("mglyph") : var_.includes("mglyph")) {
         warn("WARNING: 'mglyph' tags cannot be allowed by the PermitScrubber and will be scrubbed");
         if (var_ instanceof Set) var_.delete("mglyph");
         else aryDelete(var_, "mglyph");
       }
 
-      if ([...var_].includes("malignmark")) {
+      if (var_ instanceof Set ? var_.has("malignmark") : var_.includes("malignmark")) {
         warn(
           "WARNING: 'malignmark' tags cannot be allowed by the PermitScrubber and will be scrubbed",
         );
@@ -136,7 +138,7 @@ export class PermitScrubber extends Scrubber {
         else aryDelete(var_, "malignmark");
       }
 
-      if ([...var_].includes("noscript")) {
+      if (var_ instanceof Set ? var_.has("noscript") : var_.includes("noscript")) {
         warn(
           "WARNING: 'noscript' tags cannot be allowed by the PermitScrubber and will be scrubbed",
         );

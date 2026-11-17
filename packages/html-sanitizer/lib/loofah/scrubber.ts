@@ -1,5 +1,5 @@
 import { HTML5, type Html5Node } from "@blazetrails/nokogiri";
-import { ArgumentError, RuntimeError, rbModName } from "@blazetrails/ruby-compat";
+import { ArgumentError, RuntimeError, rbModName, stringSplit } from "@blazetrails/ruby-compat";
 
 import { Scrub } from "./html5/scrub.js";
 
@@ -17,9 +17,13 @@ export class Scrubber {
   block: ((node: Html5Node) => unknown) | null;
 
   constructor(
-    options: { direction?: Direction } = {},
+    options: { direction?: Direction } | ((node: Html5Node) => unknown) = {},
     block: ((node: Html5Node) => unknown) | null = null,
   ) {
+    if (typeof options === "function") {
+      block = options;
+      options = {};
+    }
     const direction = options.direction ?? "top_down";
     if (!["top_down", "bottom_up"].includes(direction)) {
       throw new ArgumentError(`direction ${direction} must be one of :top_down or :bottom_up`);
@@ -45,7 +49,7 @@ export class Scrubber {
 
   appendAttribute(node: Html5Node, attribute: string, value: string): void {
     const currentValue = node.get(attribute) ?? "";
-    const currentValues = currentValue.split(/\s+/);
+    const currentValues = stringSplit(currentValue, /\s+/);
     const updatedValue = [...new Set([...currentValues, value])];
     node.set(attribute, updatedValue.join(" "));
   }
