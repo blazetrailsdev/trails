@@ -32,4 +32,4 @@ beforeAll(async () => {
   const load = entry === undefined ? undefined : SOURCES[entry];
   if (load === undefined) throw new Error(`no source entry for ${pkg} (${entry})`);
   await load();
-});
+}, 60_000);

@@ -1,4 +1,4 @@
-import { exec } from "@blazetrails/ruby-compat";
+import { ArgumentError, exec, rbInspect } from "@blazetrails/ruby-compat";
 import { ViteAssets } from "../vite-assets.js";
 import { Install } from "./install.js";
 
@@ -18,11 +18,31 @@ export class Upgrade extends Install {
 
     const libraries = (await ViteAssets.frameworkLibraries()).map(([, library]) => library.name);
 
-    await this.runWithCapture(`bundle update --conservative vite_ruby ${libraries.join(" ")}`);
+    const { packageManager } = await ViteAssets.config();
+    let update: string;
+    switch (packageManager) {
+      case "npm":
+      case "pnpm":
+      case "bun":
+        update = "update";
+        break;
+      case "yarn":
+        update = "upgrade";
+        break;
+      default:
+        throw new ArgumentError(`Unknown package manager ${rbInspect(packageManager)}`);
+    }
+
+    await this.runWithCapture(
+      `${packageManager} ${update} @blazetrails/vite-assets ${libraries.join(" ")}`,
+    );
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsArgs exec — PERMANENT
+   */
   protected upgradeNpmPackages(): never {
-    return exec("bundle exec vite upgrade_packages");
+    return exec("bin/vite upgrade_packages");
   }
 }

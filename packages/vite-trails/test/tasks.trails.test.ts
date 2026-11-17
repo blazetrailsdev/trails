@@ -1,4 +1,3 @@
-import "@blazetrails/vite-assets/cli.js";
 import { Task } from "@blazetrails/rake";
 import { Dir, File, FileUtils, Pathname } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";

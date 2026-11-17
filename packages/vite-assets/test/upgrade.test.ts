@@ -1,4 +1,4 @@
-import { Process } from "@blazetrails/ruby-compat";
+import { Dir, Pathname, Process } from "@blazetrails/ruby-compat";
 import { describe, expect, it, vi } from "vitest";
 import { CLI } from "../lib/cli.js";
 import { IO } from "../lib/io.js";
@@ -8,16 +8,16 @@ import "./support/test-helper.js";
 describe("UpgradeTest", () => {
   it("updates gems conservatively", async () => {
     const libraries: [string, { name: string; version: unknown }][] = [
-      ["rails", { name: "vite_rails", version: null }],
-      ["rack", { name: "vite_plugin_legacy", version: null }],
+      ["trails", { name: "@blazetrails/vite-trails", version: null }],
     ];
     const status = new Process.Status({ status: 0 } as never);
 
+    const configSpy = vi
+      .spyOn(ViteAssets, "config")
+      .mockResolvedValue({ packageManager: "pnpm", root: new Pathname(Dir.pwd()) } as never);
     const librariesSpy = vi.spyOn(ViteAssets, "frameworkLibraries").mockResolvedValue(libraries);
     const captureSpy = vi.spyOn(IO, "capture").mockImplementation(async (...command) => {
-      expect(command[0]).toEqual(
-        "bundle update --conservative vite_ruby vite_rails vite_plugin_legacy",
-      );
+      expect(command[0]).toEqual("pnpm update @blazetrails/vite-assets @blazetrails/vite-trails");
       return ["", "", status];
     });
     try {
@@ -25,6 +25,7 @@ describe("UpgradeTest", () => {
         new CLI.Upgrade() as unknown as { upgradeRubyGems(): Promise<void> }
       ).upgradeRubyGems();
     } finally {
+      configSpy.mockRestore();
       librariesSpy.mockRestore();
       captureSpy.mockRestore();
     }
