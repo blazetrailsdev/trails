@@ -864,8 +864,6 @@ export function main(
     const pathToFileCounts = new Map<string, Map<string, number>>();
     const descToFileCounts = new Map<string, Map<string, number>>();
 
-    // A package's own behaviors/<name>.ts is its gem's copy of the behavior:
-    // its tests replace the shared ones of the same name, on one relPath.
     const ownBehaviorFiles = new Map<string, (typeof pkgInfo.files)[number]>();
     for (const file of pkgInfo.files) {
       if (file.file.startsWith(SHARED_CACHE_BEHAVIORS_DIR)) continue;
