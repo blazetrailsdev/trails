@@ -3769,7 +3769,6 @@ describe("extractFromProgram — include() detection", () => {
   });
 
   it("credits a top-level delegate on a type-asserted plain-object module", () => {
-    // solid_queue/v1.7.2/lib/solid_queue.rb:57, inside `module SolidQueue; extend self`.
     const info = extractFromFiles("/p", {
       "solid-queue.ts": `
         declare function delegate(this: object, ...methods: unknown[]): string[];

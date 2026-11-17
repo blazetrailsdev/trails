@@ -106,14 +106,12 @@ export class FiberPool extends Pool {
 
   /** @internal */
   private async startReactorIfNeeded(): Promise<void> {
-    if (this._reactorThread != null) return;
-
-    this._reactorThread = this.startReactor();
-    const bootResult = await this.bootQueue.pop();
-    if (bootResult instanceof Error) {
-      this._reactorThread = null;
-      throw bootResult;
-    }
+    this._reactorThread ??= await (async () => {
+      const reactorThread = this.startReactor();
+      const bootResult = await this.bootQueue.pop();
+      if (bootResult instanceof Error) throw bootResult;
+      return reactorThread;
+    })();
   }
 
   /** @internal */
