@@ -109,7 +109,6 @@ export class Batch extends Record {
       SolidQueue.Job!.columnNames().includes("batch_id"));
   }
 
-  /** @inventedArm ensureSchemaLoaded — CONVERGEABLE activerecord-converge-schema-load-and-primary-key-convergeable-receipts */
   static async enqueue(
     {
       description = null,
