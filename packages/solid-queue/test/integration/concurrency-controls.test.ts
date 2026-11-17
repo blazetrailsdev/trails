@@ -206,8 +206,11 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
   it("rely on dispatcher to unblock blocked executions with an available semaphore", async () => {
     const job = await Job.findByBang({
-      active_job_id: (await NonOverlappingUpdateResultJob.performLater(result, { name: "A" }))!
-        .jobId,
+      active_job_id: (
+        (await NonOverlappingUpdateResultJob.performLater(result, {
+          name: "A",
+        })) as ApplicationJob
+      ).jobId,
     });
 
     await waitForJobsToFinishFor(5);
@@ -247,8 +250,11 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
   it("rely on dispatcher to unblock blocked executions with an expired semaphore", async () => {
     const job = await Job.findByBang({
-      active_job_id: (await NonOverlappingUpdateResultJob.performLater(result, { name: "A" }))!
-        .jobId,
+      active_job_id: (
+        (await NonOverlappingUpdateResultJob.performLater(result, {
+          name: "A",
+        })) as ApplicationJob
+      ).jobId,
     });
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();

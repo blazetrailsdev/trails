@@ -184,7 +184,9 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
     await NonOverlappingUpdateResultJob.performLater(jobResult, { name: "B" });
     await NonOverlappingUpdateResultJob.performLater(jobResult, { name: "C" });
 
-    const firstJob = await Job.findByBang({ active_job_id: firstActiveJob!.jobId });
+    const firstJob = await Job.findByBang({
+      active_job_id: (firstActiveJob as ApplicationJob).jobId,
+    });
     const claimedExecution = await claimJob(firstJob);
     await process.prune();
 
@@ -352,7 +354,7 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
   });
 
   it("provider_job_id is available within job execution", async () => {
-    const job = (await ProviderJobIdJob.performLater())!;
+    const job = (await ProviderJobIdJob.performLater()) as ApplicationJob;
     const claimedExecution = await prepareAndClaimJob(job);
     await claimedExecution.perform();
 

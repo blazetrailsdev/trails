@@ -95,7 +95,7 @@ export class Worker extends Poller {
   /** @internal */
   override async shutdown(): Promise<void> {
     this.pool.shutdown();
-    await this.pool.waitForTermination(Number(SolidQueue.shutdownTimeout));
+    await this.pool.waitForTermination(SolidQueue.shutdownTimeout.toF());
 
     await super.shutdown();
   }

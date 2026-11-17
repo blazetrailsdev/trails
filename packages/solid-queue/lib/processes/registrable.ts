@@ -68,7 +68,7 @@ export class Registrable {
   /** @internal */
   launchHeartbeat(this: RegistrableHost): void {
     this._heartbeatTask = new TimerTask(
-      { executionInterval: Number(SolidQueue.processHeartbeatInterval) },
+      { executionInterval: SolidQueue.processHeartbeatInterval.toF() },
       () => this.wrapInAppExecutor(() => this.heartbeat()),
     );
 

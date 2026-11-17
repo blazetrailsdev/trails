@@ -1,6 +1,6 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
-import { Base as ARBase } from "@blazetrails/activerecord";
+import { Base as ARBase, StatementInvalid } from "@blazetrails/activerecord";
 import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
@@ -72,7 +72,7 @@ describe("WorkerTest", () => {
     SolidQueue.appExecutor = null;
   });
 
-  it("worker is registered as process", async () => {
+  it("worker is registered as process in thread mode", async () => {
     await worker.start();
     await waitForRegisteredProcesses(1, { timeout: 1 });
 
@@ -157,7 +157,7 @@ describe("WorkerTest", () => {
     }
   });
 
-  it("claim and process more enqueued jobs than the pool size allows to process at once", async () => {
+  it("claim and process more enqueued jobs than the pool size allows to process at once in thread mode", async () => {
     for (let i = 0; i < 5; i++) {
       await StoreResultJob.performLater("paused", { pause: 0.1 });
     }
@@ -185,6 +185,78 @@ describe("WorkerTest", () => {
         value: "immediate",
       }).count(),
     ).toBe(3);
+  });
+
+  it("defaults thread workers to the configured thread pool size", async () => {
+    const defaultWorker = new Worker({ queues: "background", pollingInterval: 0.2 });
+    try {
+      await defaultWorker.start();
+      await waitForRegisteredProcesses(1, { timeout: 1 });
+
+      expect(defaultWorker.pool.size).toEqual(3);
+      assertMetadata((await Process.first()) as Process, { pool_type: "thread", pool_size: 3 });
+    } finally {
+      await defaultWorker.stop();
+      await waitForRegisteredProcesses(0, { timeout: 1 });
+    }
+  });
+
+  it("worker stops and releases the claim when finishing a job fails", async () => {
+    SolidQueue.onThreadError = () => {};
+
+    vi.spyOn(ClaimedExecution.prototype as never, "finished").mockRejectedValue(
+      new StatementInvalid("transient DB glitch"),
+    );
+
+    await AddToBufferJob.performLater("hey!");
+
+    await worker.start();
+
+    await waitWhileWithTimeout(2, async () => !worker.pool.isShutdown());
+    expect(worker.pool.isShutdown()).toBe(true);
+
+    await waitForRegisteredProcesses(0, { timeout: 1 });
+    await assertNoRegisteredProcesses();
+
+    expect(await ClaimedExecution.count()).toEqual(0);
+    expect(await (await ((await Job.last()) as Job).reload()).isReady()).toBe(true);
+  });
+
+  it("worker keeps running after a regular job failure", async () => {
+    await RaisingJob.performLater(ExpectedTestError, "B");
+    await AddToBufferJob.performLater("ok");
+
+    await worker.start();
+
+    await waitForJobsToFinishFor(2);
+    await worker.wakeUp();
+
+    expect(worker.pool.isShutdown()).toBe(false);
+    expect(JobBuffer.values).toContain("ok");
+    expect(await ClaimedExecution.count()).toEqual(0);
+  });
+
+  it("terminate when heartbeats have been failing for longer than the alive threshold", async () => {
+    const oldHeartbeatInterval = SolidQueue.processHeartbeatInterval;
+    const oldAliveThreshold = SolidQueue.processAliveThreshold;
+    SolidQueue.processHeartbeatInterval = seconds(0.2);
+    SolidQueue.processAliveThreshold = seconds(0.5);
+    try {
+      vi.spyOn(Process.prototype, "heartbeat").mockRejectedValue(
+        new StatementInvalid("connection lost"),
+      );
+
+      await worker.start();
+      await waitForRegisteredProcesses(1, { timeout: 1 });
+
+      expect(worker.pool.isShutdown()).toBe(false);
+
+      await waitWhileWithTimeout(3, async () => !worker.pool.isShutdown());
+      expect(worker.pool.isShutdown()).toBe(true);
+    } finally {
+      SolidQueue.processHeartbeatInterval = oldHeartbeatInterval;
+      SolidQueue.processAliveThreshold = oldAliveThreshold;
+    }
   });
 
   async function withPolling(silence: boolean, block: () => Promise<void>) {

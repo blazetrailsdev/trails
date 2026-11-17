@@ -162,7 +162,7 @@ export class Supervisor extends Base {
         this.termForks();
 
         await Timer.waitUntil(
-          Number(SolidQueue.shutdownTimeout),
+          SolidQueue.shutdownTimeout.toF(),
           () => this.isAllForksTerminated(),
           () => this.reapTerminatedForks(),
         );

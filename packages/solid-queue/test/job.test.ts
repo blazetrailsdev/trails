@@ -295,7 +295,7 @@ describe("SolidQueue::JobTest", () => {
     const acquired: [string, number][] = [];
     vi.spyOn(Semaphore, "wait").mockImplementation(async (job) => {
       acquired.push([job.concurrency_key!, job.id as number]);
-      return true;
+      return 1;
     });
 
     const activeJobs = [...results.reverse(), ...results].map(
