@@ -64,8 +64,10 @@ export class FileStore extends Store implements CacheStore {
   /** @missingRailsName collect — PERMANENT */
   override async clear(): Promise<void> {
     try {
-      const rootDirs = Dir.children(this.cachePath).filter((f) => !GITKEEP_FILES.includes(f));
-      FileUtils.rmR(rootDirs.map((f) => File.join(this.cachePath, f)));
+      const rootDirs = (await Dir.childrenAsync(this.cachePath)).filter(
+        (f) => !GITKEEP_FILES.includes(f),
+      );
+      await FileUtils.rmRAsync(rootDirs.map((f) => File.join(this.cachePath, f)));
     } catch {}
   }
 
@@ -131,7 +133,7 @@ export class FileStore extends Store implements CacheStore {
 
   protected async readSerializedEntry(key: string): Promise<Uint8Array | null> {
     try {
-      return File.isExist(key) ? File.binread(key) : null;
+      return (await File.isExistAsync(key)) ? await File.binreadAsync(key) : null;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       Store.logger?.error?.(`FileStoreError (${message}): ${message}`);
@@ -156,20 +158,20 @@ export class FileStore extends Store implements CacheStore {
     payload: string,
     options: StoreOptions,
   ): Promise<boolean> {
-    if (options.unlessExist && File.isExist(key)) return false;
-    this.ensureCachePath(File.dirname(key));
+    if (options.unlessExist && (await File.isExistAsync(key))) return false;
+    await this.ensureCachePath(File.dirname(key));
     atomicWrite(key, this.cachePath, (f) => f.write(Buffer.from(payload, "latin1")));
     return true;
   }
 
   protected async deleteEntry(key: string, _options: StoreOptions): Promise<boolean> {
-    if (File.isExist(key)) {
+    if (await File.isExistAsync(key)) {
       try {
-        File.delete(key);
-        this.deleteEmptyDirectories(File.dirname(key));
+        await File.deleteAsync(key);
+        await this.deleteEmptyDirectories(File.dirname(key));
         return true;
       } catch (error) {
-        if (File.isExist(key)) throw error;
+        if (await File.isExistAsync(key)) throw error;
         return false;
       }
     } else {
@@ -178,8 +180,8 @@ export class FileStore extends Store implements CacheStore {
   }
 
   protected async lockFile<T>(fileName: string, block: () => Promise<T>): Promise<T> {
-    if (File.isExist(fileName)) {
-      return await File.open(fileName, "r+", async (f) => {
+    if (await File.isExistAsync(fileName)) {
+      return await File.openAsync(fileName, "r+", async (f) => {
         try {
           while (f.flock(File.LOCK_EX | File.LOCK_NB) === false) {
             await new Promise((resolve) => setTimeout(resolve, LOCK_RETRY_MS));
@@ -228,25 +230,25 @@ export class FileStore extends Store implements CacheStore {
     return decodeWwwFormComponent(fname);
   }
 
-  private deleteEmptyDirectories(dir: string): void {
-    if (File.realpath(dir) === File.realpath(this.cachePath)) return;
-    if (isEmpty(Dir.children(dir))) {
+  private async deleteEmptyDirectories(dir: string): Promise<void> {
+    if ((await File.realpathAsync(dir)) === (await File.realpathAsync(this.cachePath))) return;
+    if (isEmpty(await Dir.childrenAsync(dir))) {
       try {
-        Dir.delete(dir);
+        await Dir.deleteAsync(dir);
       } catch {}
-      this.deleteEmptyDirectories(File.dirname(dir));
+      await this.deleteEmptyDirectories(File.dirname(dir));
     }
   }
 
-  protected ensureCachePath(path: string): void {
-    if (!File.isExist(path)) FileUtils.makedirs(path);
+  protected async ensureCachePath(path: string): Promise<void> {
+    if (!(await File.isExistAsync(path))) await FileUtils.makedirsAsync(path);
   }
 
   protected async searchDir(dir: string, callback: (path: string) => Promise<void>): Promise<void> {
     if (!(await File.isExistAsync(dir))) return;
     for (const d of await Dir.childrenAsync(dir)) {
       const name = File.join(dir, d);
-      if (File.isDirectory(name)) {
+      if (await File.isDirectoryAsync(name)) {
         await this.searchDir(name, callback);
       } else {
         await callback(name);

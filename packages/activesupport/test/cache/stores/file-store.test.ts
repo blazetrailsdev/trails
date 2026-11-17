@@ -168,11 +168,14 @@ describe("FileStoreTest", () => {
       warn: (message: string) => (buffer.string += message),
       error: (message: string) => (buffer.string += message),
     };
-    const isExist = vi.spyOn(File, "isExist").mockImplementation(() => {
+    const isExist = vi.spyOn(File, "isExistAsync").mockImplementation(() => {
       throw new Error("failed");
     });
     try {
-      (store as unknown as { readEntry(k: string, o: object): unknown }).readEntry("winston", {});
+      await (store as unknown as { readEntry(k: string, o: object): unknown }).readEntry(
+        "winston",
+        {},
+      );
       assertPredicate(buffer.string, isPresent);
     } finally {
       isExist.mockRestore();
