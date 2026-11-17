@@ -4435,6 +4435,53 @@ describe("extractFromProgram — name-list prototype generator", () => {
   });
 });
 
+describe("extractFromProgram — onLoad defineProperty and looped aliases", () => {
+  it("credits defineProperty(this.prototype) in an onLoad callback to the enclosing class", () => {
+    const info = extractFromFiles("/p", {
+      "engine.ts": `
+        declare function onLoad(hook: string, fn: (this: any) => void): void;
+        export class Engine {
+          boot() {
+            onLoad("active_storage_blob", function (this: any) {
+              Object.defineProperty(this.prototype, "isPreviewableAttachable", {
+                value: function (): boolean { return true; },
+              });
+              /** @internal */
+              Object.defineProperty(this.prototype, "hidden", { value: function () {} });
+              [1].forEach(function (this: any) {
+                Object.defineProperty(this.prototype, "nested", { value: function () {} });
+              });
+            });
+          }
+        }
+      `,
+    });
+    const methods = info.classes["engine.ts:Engine"].instanceMethods;
+    const credited = methods.find((m) => m.name === "isPreviewableAttachable")!;
+    expect(credited.visibility).toBe("public");
+    expect(methods.find((m) => m.name === "hidden")?.internal).toBe(true);
+    expect(methods.map((m) => m.name)).not.toContain("nested");
+  });
+
+  it("credits a looped camelize alias assignment on a plain-object module", () => {
+    const info = extractFromFiles("/p", {
+      "conversion.ts": `
+        declare function camelize(s: string): string;
+        export const Conversion = {
+          plainTextForBlock(node: unknown): string { return ""; },
+        };
+        for (const element of ["h1", "p"]) {
+          (Conversion as Record<string, unknown>)[\`plainTextFor\${camelize(element)}Node\`] =
+            Conversion.plainTextForBlock;
+        }
+      `,
+    });
+    const methods = info.modules["conversion.ts:Conversion"].instanceMethods;
+    expect(methods.find((m) => m.name === "plainTextForH1Node")?.aliasOf).toBe("plainTextForBlock");
+    expect(methods.find((m) => m.name === "plainTextForPNode")?.aliasOf).toBe("plainTextForBlock");
+  });
+});
+
 describe("extractFromProgram — defineProperty accessor generator", () => {
   const relationFiles = {
     "relation.ts": `

@@ -1329,6 +1329,26 @@ export function extractFromProgram(
       }
     }
 
+    // `for (const element of ["h1", "p"]) (Mod as …)[`plainTextFor${camelize(element)}Node`] = Mod.plainTextForBlock;`
+    // — Ruby's `%i[ h1 p ].each { |e| alias_method :"plain_text_for_#{e}_node", :plain_text_for_block }`
+    // (actiontext/lib/action_text/plain_text_conversion.rb:38-40), unrolled per element.
+    for (const statement of sourceFile.statements) {
+      for (const alias of loopedAliasAssignments(statement)) {
+        const mod = info.modules[`${relPath}:${alias.receiver}`];
+        if (!mod) continue;
+        const original = mod.instanceMethods.find((m) => m.name === alias.original && !m.bodyless);
+        if (!original || mod.instanceMethods.some((m) => m.name === alias.name)) continue;
+        const { internal: _internal, inventedArms: _inventedArms, ...body } = original;
+        mod.instanceMethods.push({
+          ...body,
+          name: alias.name,
+          aliasOf: alias.original,
+          line: sourceFile.getLineAndCharacterOfPosition(statement.getStart()).line + 1,
+          ...(original.internal !== undefined ? { internal: original.internal } : {}),
+        });
+      }
+    }
+
     for (const generated of collectAttributeMacroMembers(sourceFile.statements)) {
       if (!ATTRIBUTE_MACRO_CLASSES.has(`${relPath}:${generated.receiver}`)) continue;
       const entity = info.classes[`${relPath}:${generated.receiver}`];
@@ -2219,6 +2239,50 @@ function extractDefinePropertyDirect(
 }
 
 /**
+ * The aliases a `for (const x of ["a", "b"]) Recv[`pre${camelize(x)}post`] = Recv.orig;`
+ * loop defines: one `{ receiver, name, original }` per string element.
+ */
+export function loopedAliasAssignments(
+  statement: ts.Statement,
+): { receiver: string; name: string; original: string }[] {
+  if (!ts.isForOfStatement(statement)) return [];
+  const init = statement.initializer;
+  if (!ts.isVariableDeclarationList(init) || init.declarations.length !== 1) return [];
+  const loopVar = init.declarations[0].name;
+  if (!ts.isIdentifier(loopVar)) return [];
+  if (!ts.isArrayLiteralExpression(statement.expression)) return [];
+  const elements = statement.expression.elements;
+  if (!elements.every(ts.isStringLiteralLike)) return [];
+  let body: ts.Statement = statement.statement;
+  if (ts.isBlock(body)) {
+    if (body.statements.length !== 1) return [];
+    body = body.statements[0];
+  }
+  if (!ts.isExpressionStatement(body) || !ts.isBinaryExpression(body.expression)) return [];
+  const { left, right, operatorToken } = body.expression;
+  if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return [];
+  if (!ts.isElementAccessExpression(left) || !ts.isPropertyAccessExpression(right)) return [];
+  const receiver = identifierChain(unwrapTsExpression(left.expression));
+  if (receiver === undefined || receiver !== identifierChain(right.expression)) return [];
+  const key = left.argumentExpression;
+  if (!ts.isTemplateExpression(key) || key.templateSpans.length !== 1) return [];
+  const [span] = key.templateSpans;
+  const call = span.expression;
+  if (!ts.isCallExpression(call) || !ts.isIdentifier(call.expression)) return [];
+  if (call.expression.text !== "camelize" || call.arguments.length !== 1) return [];
+  const [arg] = call.arguments;
+  if (!ts.isIdentifier(arg) || arg.text !== loopVar.text) return [];
+  return elements.map((el) => ({
+    receiver,
+    name: `${key.head.text}${(el as ts.StringLiteral).text
+      .split("_")
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join("")}${span.literal.text}`,
+    original: right.name.text,
+  }));
+}
+
+/**
  * `Object.defineProperty(this.prototype, "name", { value: fn })` inside an
  * `onLoad(hook, function () { ... })` callback: the port of a `def` written in
  * an `ActiveSupport.on_load` block (actiontext/lib/action_text/engine.rb:45-55).
@@ -2236,30 +2300,35 @@ function extractOnLoadDefineProperty(expr: ts.Expression, info: PackageInfo, src
   if (target.expression.kind !== ts.SyntaxKind.ThisKeyword) return;
   const value = definePropertyValue(descriptor);
   if (!value || !(ts.isFunctionExpression(value) || ts.isArrowFunction(value))) return;
-  let inOnLoad = false;
+  let fn: ts.Node | undefined = expr.parent;
+  while (fn && !ts.isFunctionLike(fn)) fn = fn.parent;
+  if (!fn || !ts.isFunctionExpression(fn)) return;
+  const onLoadCall = fn.parent;
+  if (
+    !ts.isCallExpression(onLoadCall) ||
+    !ts.isIdentifier(onLoadCall.expression) ||
+    onLoadCall.expression.text !== "onLoad" ||
+    !onLoadCall.arguments.includes(fn)
+  ) {
+    return;
+  }
   let klass: ts.ClassDeclaration | undefined;
-  for (let cur: ts.Node | undefined = expr.parent; cur; cur = cur.parent) {
-    if (
-      !inOnLoad &&
-      ts.isCallExpression(cur) &&
-      ts.isIdentifier(cur.expression) &&
-      cur.expression.text === "onLoad"
-    ) {
-      inOnLoad = true;
-    }
-    if (ts.isClassDeclaration(cur) && cur.name) {
+  for (let cur: ts.Node | undefined = onLoadCall.parent; cur; cur = cur.parent) {
+    if (ts.isClassDeclaration(cur)) {
       klass = cur;
       break;
     }
   }
-  if (!inOnLoad || !klass?.name) return;
+  if (!klass?.name) return;
   const file = path.relative(srcDir, expr.getSourceFile().fileName).replace(/\\/g, "/");
   const classInfo = info.classes[`${file}:${klass.name.text}`];
   if (!classInfo || classInfo.instanceMethods.some((m) => m.name === propNameExpr.text)) return;
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
+  const internal = internalJsDocTagApplies(expr.parent);
   classInfo.instanceMethods.push({
     name: propNameExpr.text,
-    visibility: "public",
+    visibility: internal ? "private" : "public",
+    ...(internal ? { internal: true } : {}),
     params: extractParameters(value.parameters),
     line,
     file: classInfo.file,
