@@ -39,12 +39,5 @@
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
-  },
-  "mirrors": [
-    {
-      "source": "turbo-rails",
-      "ref": "v2.0.23",
-      "sha": "435135b26a4b62e49d2f55bb4b1fd419e3bfb228"
-    }
-  ]
+  }
 }
