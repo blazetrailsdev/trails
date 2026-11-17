@@ -2079,48 +2079,20 @@ extend(Base, {
   deterministicEncryptedAttributes: _deterministicEncryptedAttributes,
   sourceAttributeFromPreservedAttribute: _sourceAttributeFromPreservedAttribute,
 });
-include(Base, {
-  isEncryptedAttribute: _isEncryptedAttribute,
-  ciphertextFor: _ciphertextFor,
-  encrypt: _encrypt,
-  decrypt: _decrypt,
-  cantModifyEncryptedAttributesWhenFrozen: _cantModifyEncryptedAttributesWhenFrozen,
-});
 extend(Base, {
   defaultScope: _defaultScope,
   unscoped: _unscoped,
 });
 extend(Base, ModelSchema.ClassMethods);
 
+include(Base, _Core.Core);
+include(Base, { initAttributes: _Core.initAttributes });
 include(Base, {
-  writeAttribute: _writeAttributeMethod,
-  isNewRecord: _Persistence.isNewRecord,
-  isPersisted: _Persistence.isPersisted,
-  isDestroyed: _Persistence.isDestroyed,
-  isPreviouslyNewRecord: _Persistence.isPreviouslyNewRecord,
-  isPreviouslyPersisted: _Persistence.isPreviouslyPersisted,
-  increment: _Persistence.increment,
-  decrement: _Persistence.decrement,
-  toggle: _Persistence.toggle,
-  decrementBang: _Persistence.decrementBang,
-  toggleBang: _Persistence.toggleBang,
-  destroyBang: _Persistence.destroyBang,
-  update: _Persistence.update,
-  updateBang: _Persistence.updateBang,
-  delete: _Persistence.delete,
-  _updateRow: _Persistence._updateRow,
   slice: Access.prototype.slice,
   valuesAt: Access.prototype.valuesAt,
-  updateAttribute: _Persistence.updateAttribute,
-  updateAttributeBang: _Persistence.updateAttributeBang,
-  updateColumn: _Persistence.updateColumn,
-  updateColumns: _Persistence.updateColumns,
   clone: _Core.clone,
-  becomes: _Persistence.becomes,
-  becomesBang: _Persistence.becomesBang,
   inspect: _inspect,
   prettyPrint: _Core.prettyPrint,
-  attributeForInspect: _attributeForInspect,
   equals: _equals,
   eql: _eql,
   compare: _compare,
@@ -2136,12 +2108,59 @@ include(Base, {
   isStrictLoadingNPlusOneOnly: _Core.isStrictLoadingNPlusOneOnly,
   isFrozen: _Core.isFrozen,
   freeze: _Core.freeze,
-  isNoTouching: _isNoTouching,
+});
+include(Base, _Persistence.Persistence);
+include(Base, {
+  isNewRecord: _Persistence.isNewRecord,
+  isPersisted: _Persistence.isPersisted,
+  isDestroyed: _Persistence.isDestroyed,
+  isPreviouslyNewRecord: _Persistence.isPreviouslyNewRecord,
+  isPreviouslyPersisted: _Persistence.isPreviouslyPersisted,
+  increment: _Persistence.increment,
+  decrement: _Persistence.decrement,
+  toggle: _Persistence.toggle,
+  decrementBang: _Persistence.decrementBang,
+  toggleBang: _Persistence.toggleBang,
+  destroyBang: _Persistence.destroyBang,
+  update: _Persistence.update,
+  updateBang: _Persistence.updateBang,
+  delete: _Persistence.delete,
+  _updateRow: _Persistence._updateRow,
+  updateAttribute: _Persistence.updateAttribute,
+  updateAttributeBang: _Persistence.updateAttributeBang,
+  updateColumn: _Persistence.updateColumn,
+  updateColumns: _Persistence.updateColumns,
+  becomes: _Persistence.becomes,
+  becomesBang: _Persistence.becomesBang,
+});
+include(Base, ReadonlyAttributes.ReadonlyAttributes);
+include(Base, ModelSchema.ModelSchema);
+include(Base, Inheritance.Inheritance);
+include(Base, ActiveRecord.Scoping);
+include(Base, _AttributeAssignment.AttributeAssignment);
+include(Base, _Integration);
+include(Base, {
   toParam: _toParam,
   cacheKey: _cacheKey,
   cacheKeyWithVersion: _cacheKeyWithVersion,
   cacheVersion: _cacheVersion,
-  readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
+});
+include(Base, _Validations.Validations);
+include(Base, CounterCache.CounterCache);
+include(Base, AttributeRegistration);
+include(Base, LockingOptimistic.Optimistic);
+include(Base, LockingPessimistic.Pessimistic);
+include(Base, _EncryptableRecord);
+include(Base, {
+  isEncryptedAttribute: _isEncryptedAttribute,
+  ciphertextFor: _ciphertextFor,
+  encrypt: _encrypt,
+  decrypt: _decrypt,
+  cantModifyEncryptedAttributesWhenFrozen: _cantModifyEncryptedAttributesWhenFrozen,
+});
+include(Base, AMAttributeMethods.AttributeMethods);
+include(Base, {
+  attributeForInspect: _attributeForInspect,
   isRespondTo: _isRespondTo,
   respondToMissing: _respondToMissing,
   methodMissing: _methodMissing,
@@ -2150,34 +2169,23 @@ include(Base, {
   accessedFields: _accessedFields,
   get: _get,
   set: _set,
-  _writeAttribute: _writeAttributeLowLevel,
-  "attribute=": _writeAttributeLowLevel,
-  toKey: _toKey,
-  readStoreAttribute: _readStoreAttribute,
-  writeStoreAttribute: _writeStoreAttribute,
-  storeAccessorFor: _storeAccessorFor,
 });
-include(Base, _Core.Core);
-include(Base, { initAttributes: _Core.initAttributes });
-include(Base, _Persistence.Persistence);
-include(Base, ReadonlyAttributes.ReadonlyAttributes);
-include(Base, ModelSchema.ModelSchema);
-include(Base, Inheritance.Inheritance);
-include(Base, ActiveRecord.Scoping);
-include(Base, _AttributeAssignment.AttributeAssignment);
-include(Base, _Integration);
-include(Base, _Validations.Validations);
-include(Base, CounterCache.CounterCache);
-include(Base, AttributeRegistration);
-include(Base, LockingOptimistic.Optimistic);
-include(Base, LockingPessimistic.Pessimistic);
-include(Base, _EncryptableRecord);
-include(Base, AMAttributeMethods.AttributeMethods);
 include(Base, _Read);
 include(Base, _Write);
+include(Base, {
+  writeAttribute: _writeAttributeMethod,
+  _writeAttribute: _writeAttributeLowLevel,
+  "attribute=": _writeAttributeLowLevel,
+});
 include(Base, _BeforeTypeCast);
+include(Base, {
+  readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
+});
 include(Base, _Query);
 include(Base, _PrimaryKey);
+include(Base, {
+  toKey: _toKey,
+});
 include(Base, _TimeZoneConversion);
 include(Base, AMDirty);
 include(Base, _Dirty);
@@ -2185,15 +2193,27 @@ include(Base, _AttrSerialization);
 include(Base, _Callbacks.Callbacks);
 include(Base, Timestamp.Timestamp);
 include(Base, ActiveRecord.Associations);
+include(Base, { association: _association });
 include(Base, AutosaveAssociation);
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, _Transactions.Transactions);
 include(Base, _TouchLater.TouchLater);
 include(Base, _NoTouching.NoTouching);
+include(Base, {
+  isNoTouching: _isNoTouching,
+});
 include(Base, _Reflection.Reflection);
 include(Base, JSONSerializer);
 Base.includeRootInJson = false;
 include(Base, { serializableHash: Serialization.serializableHash });
+include(Base, {
+  attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
+});
+include(Base, {
+  readStoreAttribute: _readStoreAttribute,
+  writeStoreAttribute: _writeStoreAttribute,
+  storeAccessorFor: _storeAccessorFor,
+});
 include(Base, _TokenFor);
 include(Base, SignedId.SignedId);
 include(Base, Normalization.Normalization);
@@ -2240,10 +2260,6 @@ extend(Base, _AggregationsClassMethods);
 extend(Base, { loadSchemaBang: CounterCache.loadSchemaBang });
 extend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
-include(Base, { association: _association });
-include(Base, {
-  attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
-});
 include(Base, {
   initWith: _Core.initWith,
   initWithAttributes: _Core.initWithAttributes,
