@@ -40,7 +40,7 @@ export class Reloader extends ExecutionWrapper {
 
   static {
     this.toRun("after", function (this: Reloader) {
-      (this.constructor as typeof Reloader).prepareBang();
+      return (this.constructor as typeof Reloader).prepareBang();
     });
   }
 
@@ -56,7 +56,7 @@ export class Reloader extends ExecutionWrapper {
       if (isThenable(ran)) return Promise.resolve(ran).finally(() => instance.completeBang());
     });
     if (isThenable(wrapped)) return Promise.resolve(wrapped).then(() => this.prepareBang());
-    this.prepareBang();
+    return this.prepareBang();
   }
 
   static runBang({ reset = false }: { reset?: boolean } = {}):
@@ -109,8 +109,8 @@ export class Reloader extends ExecutionWrapper {
     this._shouldReload = false;
   }
 
-  static prepareBang(): void {
-    new this().runCallbacks("prepare");
+  static prepareBang(): void | Promise<void> {
+    return new this().runCallbacks("prepare") as void | Promise<void>;
   }
 
   requireUnloadLockBang(): void {

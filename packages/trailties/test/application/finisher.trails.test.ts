@@ -128,7 +128,9 @@ class TestApp extends Finisher {
     toPrepare: (block) => this.toPrepared.push(block),
     toRun: (block) => this.toRun.push(block),
     toComplete: (block) => this.toComplete.push(block),
-    prepareBang: () => this.calls.push("prepare!"),
+    prepareBang: () => {
+      this.calls.push("prepare!");
+    },
   };
   watchableArgs(): [string[], Record<string, string[]>] {
     return [this.watchableFiles, {}];
@@ -216,6 +218,24 @@ describe("Finisher", () => {
     app.config.toPrepareBlocks.push(block);
     await run(app, "add_to_prepare_blocks");
     expect(app.toPrepared).toEqual([block]);
+  });
+
+  it("run_prepare_callbacks awaits a to_prepare block's promise, and its rejection fails boot", async () => {
+    class PrepareReloader extends Reloader {}
+    const app = new TestApp();
+    app.reloader = PrepareReloader as unknown as FinisherReloader;
+    const ran: string[] = [];
+    PrepareReloader.toPrepare(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      ran.push("connected");
+    });
+    await run(app, "run_prepare_callbacks");
+    expect(ran).toEqual(["connected"]);
+
+    PrepareReloader.toPrepare(async () => {
+      throw new Error("bad config");
+    });
+    await expect(run(app, "run_prepare_callbacks")).rejects.toThrow("bad config");
   });
 
   it("run_prepare_callbacks runs reloader.prepare!", async () => {

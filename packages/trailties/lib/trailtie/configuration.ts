@@ -4,7 +4,7 @@ import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 import type { Application } from "../application.js";
 import { Generators, MiddlewareStackProxy } from "../configuration.js";
 
-export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => void;
+export type ConfigurationBlock = (this: unknown, ...args: unknown[]) => unknown;
 
 function hasWriter(target: object, name: string): boolean {
   for (let proto = Object.getPrototypeOf(target); proto; proto = Object.getPrototypeOf(proto)) {
