@@ -80,13 +80,16 @@ export async function invoke(
   args: string[] = [],
   config: Record<string, unknown> = {},
 ): Promise<void> {
-  if (isTrailsNewWithNoPath(args)) args = ["--help"];
-
-  const [namespace, commandName] = splitNamespace(fullNamespace);
-  const command = await findByNamespace(namespace, commandName);
-  const name = commandName.replaceAll("_", "-");
-
+  let commandName: string | undefined;
+  let command: Awaited<ReturnType<typeof findByNamespace>> | undefined;
   try {
+    if (isTrailsNewWithNoPath(args)) args = ["--help"];
+
+    let namespace: string;
+    [namespace, commandName] = splitNamespace(fullNamespace);
+    command = await findByNamespace(namespace, commandName);
+    const name = commandName.replaceAll("_", "-");
+
     await withArgv(args, async () => {
       if (command && Object.hasOwn((command as unknown as ThorClass).allCommands(), name)) {
         await command.perform(name, args, config);

@@ -4377,25 +4377,32 @@ describe("skeletonsOfOwner", () => {
   ]);
 
   it("pairs a module member and the top-level function each with its own body", () => {
-    expect(skeletonsOfOwner(byName, byOwner, "ClassMethods", undefined)).toEqual([classMethod]);
-    expect(skeletonsOfOwner(byName, byOwner, "", undefined)).toEqual([instance]);
+    expect(skeletonsOfOwner(byName, byOwner, "ClassMethods")).toEqual([classMethod]);
+    expect(skeletonsOfOwner(byName, byOwner, "")).toEqual([instance]);
   });
 
-  it("reads by name for an unresolved owner, a class owner and a single body", () => {
-    expect(skeletonsOfOwner(byName, byOwner, undefined, undefined)).toBe(byName);
-    expect(skeletonsOfOwner(byName, byOwner, "ClassMethods", new Set(["ClassMethods"]))).toBe(
-      byName,
-    );
-    expect(skeletonsOfOwner([instance], new Map([["", [instance]]]), "", undefined)).toEqual([
-      instance,
+  it("reads by name for an unresolved owner and answers a single body", () => {
+    expect(skeletonsOfOwner(byName, byOwner, undefined)).toBe(byName);
+    expect(skeletonsOfOwner(byName, byOwner, "Other")).toBe(byName);
+    expect(skeletonsOfOwner([instance], new Map([["", [instance]]]), "")).toEqual([instance]);
+  });
+
+  it("pairs each of several classes declaring the name with its own body", () => {
+    const expand = ["if", "throw:ArgumentError"];
+    const other = ["ref:call"];
+    const classes = new Map([
+      ["Filters.Before", [other]],
+      ["CallTemplate.MethodCall", [expand]],
     ]);
+    expect(skeletonsOfOwner([other, expand], classes, "CallTemplate.MethodCall")).toEqual([expand]);
+    expect(skeletonsOfOwner([other, expand], classes, "Filters.Before")).toEqual([other]);
   });
 
   it("answers the one body a synthesized file module re-listed, for any owner", () => {
     const relisted = [instance, instance];
     const one = new Map([["", [instance]]]);
-    expect(skeletonsOfOwner(relisted, one, undefined, undefined)).toEqual([instance]);
-    expect(skeletonsOfOwner(relisted, one, "Deprecator", undefined)).toEqual([instance]);
+    expect(skeletonsOfOwner(relisted, one, undefined)).toEqual([instance]);
+    expect(skeletonsOfOwner(relisted, one, "Deprecator")).toEqual([instance]);
   });
 });
 
@@ -4407,39 +4414,35 @@ describe("recordSkeletonBody", () => {
     for (const [site, owner, skeleton] of order) recordSkeletonBody(bodies, site, owner, skeleton);
     return skeletonsByOwner(bodies);
   };
-  const expected = new Map([
-    ["", [instance]],
-    ["ClassMethods", [classMethod]],
-  ]);
 
-  it("keeps a re-listed top-level body under the top level when the namespace entity comes first", () => {
+  it("pairs a re-listed top-level body under the top level and the namespace entity alike", () => {
     const byOwner = record([
       ["with.ts:148", "With", instance],
       ["with.ts:88", "ClassMethods", classMethod],
       ["with.ts:148", "", instance],
     ]);
-    expect(byOwner).toEqual(expected);
-    expect(skeletonsOfOwner([instance, classMethod, instance], byOwner, "", undefined)).toEqual([
+    expect(byOwner).toEqual(
+      new Map([
+        ["With", [instance]],
+        ["ClassMethods", [classMethod]],
+        ["", [instance]],
+      ]),
+    );
+    expect(skeletonsOfOwner([instance, classMethod, instance], byOwner, "")).toEqual([instance]);
+    expect(skeletonsOfOwner([instance, classMethod, instance], byOwner, "With")).toEqual([
       instance,
     ]);
   });
 
-  it("keeps it there when the top-level function comes first", () => {
-    expect(
-      record([
-        ["with.ts:148", "", instance],
-        ["with.ts:148", "With", instance],
-        ["with.ts:88", "ClassMethods", classMethod],
-      ]),
-    ).toEqual(expected);
-  });
-
-  it("holds a body shared by two owners once, so the pair compares one body", () => {
+  it("holds a body shared by two owners once, so either owner's pair compares it", () => {
+    const shared = [...instance];
     const byOwner = record([
-      ["inflector.ts:42", "Inflector", instance],
-      ["inflector.ts:42", "", instance],
+      ["inflector.ts:42", "Inflector", shared],
+      ["inflector.ts:42", "", shared],
+      ["inflector.ts:90", "Inflections", classMethod],
     ]);
-    expect(skeletonsOfOwner([instance, instance], byOwner, "", undefined)).toEqual([instance]);
+    expect(skeletonsOfOwner([shared, shared, classMethod], byOwner, "Inflector")).toEqual([shared]);
+    expect(skeletonsOfOwner([shared, shared, classMethod], byOwner, "")).toEqual([shared]);
   });
 });
 

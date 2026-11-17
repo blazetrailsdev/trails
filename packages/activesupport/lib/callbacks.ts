@@ -17,6 +17,7 @@ import { Concern } from "./concern.js";
 import { ArgumentError, extractOptionsBang } from "./hash-utils.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { camelize } from "./inflector.js";
+import { isBlank, squish } from "./string-utils.js";
 
 export type CallbackKind = "before" | "after" | "around";
 
@@ -208,25 +209,31 @@ export class InstanceExec1 implements CallTemplate {
 }
 
 export class InstanceExec2 implements CallTemplate {
-  constructor(readonly fn: (target: object, block: (() => unknown) | null) => unknown) {}
+  /** @internal */
+  private readonly overrideBlock:
+    | ((target: object, block: (() => unknown) | null) => unknown)
+    | null;
+
+  constructor(block: ((target: object, block: (() => unknown) | null) => unknown) | null) {
+    this.overrideBlock = block;
+  }
 
   expand(target: object, value: unknown, block: (() => unknown) | null): unknown[] {
-    return [target, this.fn, "instanceExec", target, block];
+    if (!block) throw new ArgumentError();
+    return [target, this.overrideBlock ?? block, "instanceExec", target, block];
   }
 
   makeLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => unknown {
-    const f = this.fn;
     return (target: object, _value: unknown, block?: (() => unknown) | null) => {
       if (!block) throw new ArgumentError();
-      return f.call(target, target, block);
+      return this.overrideBlock!.call(target, target, block);
     };
   }
 
   invertedLambda(): (target: object, value: unknown, block?: (() => unknown) | null) => boolean {
-    const f = this.fn;
     return (target: object, _value: unknown, block?: (() => unknown) | null) => {
       if (!block) throw new ArgumentError();
-      return !f.call(target, target, block);
+      return !this.overrideBlock!.call(target, target, block);
     };
   }
 }
@@ -269,13 +276,7 @@ export namespace CallTemplate {
     filter: AnyCallback | string | symbol | CallbackObject | Value,
     callback: Callback,
   ): CallTemplate {
-    if (typeof filter === "string" || typeof filter === "symbol") {
-      if (typeof filter === "string" && !filter.startsWith(":")) {
-        throw new ArgumentError(
-          "Passing string to define a callback is not supported. See the `.set_callback` " +
-            "documentation to see supported values.",
-        );
-      }
+    if (typeof filter === "symbol" || (typeof filter === "string" && filter.startsWith(":"))) {
       return new MethodCall(typeof filter === "string" ? filter.slice(1) : filter);
     } else if (filter instanceof Value) {
       return new ProcCall(filter);
@@ -303,7 +304,7 @@ export namespace CallTemplate {
     } else {
       const [head, ...rest] = callback.currentScopes();
       return new ObjectCall(
-        filter,
+        filter as object,
         head + rest.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(""),
       );
     }
@@ -529,11 +530,16 @@ export class Around {
   }
 }
 
+const EMPTY_ARRAY: readonly CallbackCondition[] = Object.freeze([]);
+
 export class Callback {
   kind: CallbackKind;
   name: string;
   readonly filter: AnyCallback | string | symbol | CallbackObject;
-  readonly options: CallbackOptions;
+  /** @internal */
+  private readonly if: readonly CallbackCondition[];
+  /** @internal */
+  private readonly unless: readonly CallbackCondition[];
   readonly chainConfig: DefineCallbacksOptions;
   readonly originalObject?: CallbackObject;
 
@@ -550,10 +556,31 @@ export class Callback {
     this.name = name;
     this.filter = filter;
     this.kind = kind;
-    this.options = options;
+    this.if = this.checkConditionals(options.if);
+    this.unless = this.checkConditionals(options.unless);
     this.chainConfig = chainConfig;
     this.originalObject = originalObject;
     void this.compiled;
+  }
+
+  /** @internal */
+  private checkConditionals(
+    conditionals: CallbackOptions["if"] | undefined,
+  ): readonly CallbackCondition[] {
+    if (isBlank(conditionals)) return EMPTY_ARRAY;
+
+    conditionals = kernelArray(conditionals as CallbackCondition | CallbackCondition[]);
+    if (conditionals.some((c) => typeof c === "string" && !c.startsWith(":"))) {
+      throw new ArgumentError(
+        squish(`
+          Passing string to be evaluated in :if and :unless conditional
+          options is not supported. Pass a symbol for an instance method,
+          or a lambda, proc or block, instead.
+        `),
+      );
+    }
+
+    return Object.freeze(conditionals);
   }
 
   static build(
@@ -562,6 +589,15 @@ export class Callback {
     kind: CallbackKind,
     options: CallbackOptions,
   ): Callback {
+    if (typeof filter === "string" && !filter.startsWith(":")) {
+      throw new ArgumentError(
+        squish(`
+          Passing string to define a callback is not supported. See the \`.set_callback\`
+          documentation to see supported values.
+        `),
+      );
+    }
+
     const isObj = typeof filter === "object" && filter !== null;
     return new Callback(
       chain.name,
@@ -580,25 +616,19 @@ export class Callback {
     return this.filter === filter;
   }
 
-  /** @missingRailsCall concat — PERMANENT */
   mergeConditionalOptions(
     chain: { name: string; config: DefineCallbacksOptions },
     { ifOption, unlessOption }: { ifOption?: unknown; unlessOption?: unknown },
   ): Callback {
-    const existingIf = Array.isArray(this.options.if)
-      ? this.options.if
-      : this.options.if
-        ? [this.options.if]
-        : [];
-    const existingUnless = Array.isArray(this.options.unless)
-      ? this.options.unless
-      : this.options.unless
-        ? [this.options.unless]
-        : [];
-    return Callback.build(chain, this.filter, this.kind, {
-      if: [...existingIf, ...kernelArray(unlessOption as CallbackCondition)],
-      unless: [...existingUnless, ...kernelArray(ifOption as CallbackCondition)],
-    });
+    const options = {
+      if: [...this.if],
+      unless: [...this.unless],
+    };
+
+    options.if.push(...kernelArray(unlessOption as CallbackCondition));
+    options.unless.push(...kernelArray(ifOption as CallbackCondition));
+
+    return Callback.build(chain, this.filter, this.kind, options);
   }
 
   /** @missingRailsCall matches? — PERMANENT */
@@ -612,12 +642,10 @@ export class Callback {
   /** @internal */
   conditionsLambdas(): Array<(target: object, value: unknown) => boolean> {
     const conditions = [
-      ...kernelArray(this.options.if as CallbackCondition | CallbackCondition[]).map(
+      ...this.if.map(
         (c) => CallTemplate.build(c, this).makeLambda() as (t: object, v: unknown) => boolean,
       ),
-      ...kernelArray(this.options.unless as CallbackCondition | CallbackCondition[]).map((c) =>
-        CallTemplate.build(c, this).invertedLambda(),
-      ),
+      ...this.unless.map((c) => CallTemplate.build(c, this).invertedLambda()),
     ];
     return conditions;
   }

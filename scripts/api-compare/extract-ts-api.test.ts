@@ -8358,6 +8358,38 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(countTsInternalNames("testing.ts", [], [testing], fileFunctions, [])).toBe(2);
   });
 
+  it("marks every member of an @internal mattrAccessor call internal, counted on the file module", () => {
+    const info = extractFromFiles("/p", {
+      "testing.ts": `
+        import { mattrAccessor, mattrReader } from "@blazetrails/activesupport";
+        export const Testing = {} as { secret: string; open: string; hidden: string };
+        /** @internal */
+        mattrAccessor.call(Testing, "secret");
+        mattrAccessor.call(Testing, "open");
+        /** @internal */
+        mattrReader.call(Testing, "hidden");
+        export function isHtml5Support(): boolean {
+          return true;
+        }
+      `,
+    });
+    const mod = info.modules["testing.ts:Testing"];
+    expect(mod.synthesizedFileModule).toBe(true);
+    const internal = (ms: MethodInfo[]): string[] =>
+      ms.filter((m) => m.internal === true).map((m) => `${m.name}${m.writer ? "=" : ""}`);
+    expect(internal(mod.classMethods)).toEqual(["secret", "secret=", "hidden"]);
+    expect(internal(mod.instanceMethods)).toEqual(["secret", "secret=", "hidden"]);
+    expect(
+      countTsInternalNames(
+        "testing.ts",
+        [],
+        Object.values(info.modules),
+        info.fileFunctions?.["testing.ts"],
+        [],
+      ),
+    ).toBe(6);
+  });
+
   it("credits attrInternal on a moduleEval carrier as the module's instance reader and writer", () => {
     const info = extractFromFiles("/p", {
       "form-helper.ts": `

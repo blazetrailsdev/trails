@@ -25,7 +25,7 @@ export async function directory(
   source: string,
   ...args: unknown[]
 ): Promise<unknown> {
-  const block = (typeof (args.at(-1) ?? null) === "function" ? args.pop() : undefined) as
+  const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
     | Block
     | undefined;
   const config = (rbObjIsKindOf(args.at(-1) ?? null, Hash) ? args.pop() : {}) as Record<

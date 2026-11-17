@@ -51,6 +51,7 @@ export function deepMergeBang(
   ) as unknown as TranslationData;
 }
 
+/** @inventedArm if — CONVERGEABLE invented-arms-on-class-owned-and-shared-body-pairs */
 export function deepSymbolizeKeys(hash: object): TranslationData {
   const result: TranslationData = new Hash();
   for (const [key, value] of hash instanceof Map ? hash : Object.entries(hash)) {

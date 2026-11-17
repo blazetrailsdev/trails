@@ -3942,6 +3942,7 @@ function readClassAttributeCall(
   return {
     ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
     ...(enclosing?.seatsModule === true ? { enclosingSeatsModule: true } : {}),
+    ...(macro.predicate === false && internalStatement(node) ? { internal: true } : {}),
     ...(ts.isIdentifier(recv) ? { receiver: recv.text } : {}),
     names,
     reader: macro.reader,
@@ -7316,6 +7317,13 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         }
         if (isKwargsCapture(n as ts.ConditionalExpression)) return;
         if (isOwnIvarRead(n as ts.ConditionalExpression)) return;
+        if (
+          nativeHashForms(n).some(
+            ([form, receiver]) => form === "fetch" && receiver?.kind !== ts.SyntaxKind.ThisKeyword,
+          )
+        ) {
+          break;
+        }
         const fallback = rtestFallback(n as ts.ConditionalExpression);
         if (fallback !== undefined) {
           visit((n as ts.ConditionalExpression).condition);

@@ -54,7 +54,6 @@ export class Engine {
   protected bufferOnStack: boolean;
   protected escapefunc: string;
 
-  /** @inventedArm if — PERMANENT */
   constructor(input: string, properties: EngineProperties = {}) {
     const escape = (this.escape = Object.hasOwn(properties, "escape")
       ? properties.escape!
