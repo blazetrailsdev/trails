@@ -19,14 +19,13 @@ import { compactBlank as hashCompactBlank, compactBlankBang } from "../../lib/ha
 import {
   Complex,
   Enumerator,
-  type Hash,
+  Hash,
   TypeError,
   complex,
   rational,
   rbEqual,
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
-import { Hash } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { assertEqual, assertRaise, assertRaises } from "../../lib/testing/assertions.js";
 import "../../lib/core-ext/enumerable.js";
