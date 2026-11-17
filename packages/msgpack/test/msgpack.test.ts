@@ -125,7 +125,9 @@ describe("MessagePack", () => {
       );
     });
 
-    it.skip("raises an error on #unpack with garbage", () => {});
+    it("raises an error on #unpack with garbage", () => {
+      expect(() => MessagePack.unpack("asdka;sd")).toThrow(MessagePack.UnpackError);
+    });
   });
 
   describe("extensions", () => {
