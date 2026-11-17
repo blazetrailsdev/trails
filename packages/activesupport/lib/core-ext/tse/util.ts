@@ -1,5 +1,6 @@
 import { SafeBuffer, htmlSafe } from "../string/output-safety.js";
 import {
+  binaryString,
   NotImplementedError,
   rbObjAsString,
   StringScanner,
@@ -22,7 +23,10 @@ const HTML_ESCAPE_ONCE_REGEXP = /["><']|&(?!([a-zA-Z]+|(#\d+)|(#[xX][\dA-Fa-f]+)
 
 export function unwrappedHtmlEscape(s: unknown): string | SafeBuffer {
   if (s instanceof SafeBuffer && s.htmlSafe) return s;
-  return Unicode.tidyBytes(rbObjAsString(s)).replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
+  const str = rbObjAsString(s);
+  /** @inventedArm binaryString — PERMANENT */
+  const text = typeof str === "string" ? str : binaryString(str);
+  return Unicode.tidyBytes(text).replace(HTML_ESCAPE_PATTERN, (c) => HTML_ESCAPE[c]);
 }
 
 export function htmlEscape(s: unknown): SafeBuffer {
@@ -62,8 +66,11 @@ const SAFE_XML_TAG_NAME_REGEXP = new RegExp(
 const TAG_NAME_REPLACEMENT_CHAR = "_";
 
 export function htmlEscapeOnce(s: unknown): SafeBuffer {
+  const str = rbObjAsString(s);
+  /** @inventedArm binaryString — PERMANENT */
+  const text = typeof str === "string" ? str : binaryString(str);
   return htmlSafe(
-    Unicode.tidyBytes(rbObjAsString(s)).replace(HTML_ESCAPE_ONCE_REGEXP, (c) =>
+    Unicode.tidyBytes(text).replace(HTML_ESCAPE_ONCE_REGEXP, (c) =>
       c === "&" ? "&amp;" : HTML_ESCAPE[c],
     ),
   );

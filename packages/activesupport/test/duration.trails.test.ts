@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
 import { Rational, rbCInteger, rbCNumeric, rbFloatTypeP } from "@blazetrails/ruby-compat";
-import { Duration, Scalar, days, hours, seconds } from "../lib/duration.js";
+import { Duration, Scalar, days, hours, months, seconds } from "../lib/duration.js";
 
 describe("Scalar", () => {
   it("<=> orders against a Scalar, a Duration and a Numeric", () => {
@@ -161,5 +161,35 @@ describe("SECONDS_PER_MONTH / SECONDS_PER_YEAR", () => {
   it("are the Gregorian values of duration.rb:117-118", () => {
     expect(Number(Duration.months(1).inSeconds())).toBe(2629746);
     expect(Number(Duration.years(1).inSeconds())).toBe(31556952);
+  });
+});
+
+describe("Duration#sum over a JS Date receiver", () => {
+  it("folds the parts in their merge order", () => {
+    const d = new Date(2026, 2, 7, 2, 30, 0);
+    const secondThenDay = seconds(1).plus(days(1)).since(d);
+    const dayThenSecond = days(1).plus(seconds(1)).since(d);
+    expect(secondThenDay.epochMilliseconds).toBe(
+      days(1).since(seconds(1).since(d)).epochMilliseconds,
+    );
+    expect(dayThenSecond.epochMilliseconds).toBe(
+      seconds(1).since(days(1).since(d)).epochMilliseconds,
+    );
+  });
+
+  it("clamps the day when advancing by a month", () => {
+    const result = months(1).since(new Date(2026, 0, 31));
+    const back = new Date(result.epochMilliseconds);
+    expect([back.getMonth(), back.getDate()]).toEqual([1, 28]);
+  });
+
+  it("applies the value of a Duration with no parts", () => {
+    const d = new Date(2026, 0, 1);
+    expect(new Duration(5, {}).since(d).epochMilliseconds).toBe(d.getTime() + 5000);
+  });
+
+  it("keeps the sub-second part of a pre-epoch instant", () => {
+    const t = Temporal.Instant.fromEpochNanoseconds(-1_500_000_123n);
+    expect(seconds(1).since(t).epochNanoseconds).toBe(-500_000_123n);
   });
 });

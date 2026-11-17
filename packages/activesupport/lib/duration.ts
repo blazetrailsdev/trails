@@ -28,7 +28,6 @@ import {
   rbFSend,
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
-import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import {
   advance as datetimeAdvance,
@@ -479,12 +478,17 @@ export class Duration {
       if (isDateTime(time)) return datetimeSince(time, sign * this.inSeconds());
       if (!(time instanceof Date || time instanceof Temporal.Instant))
         return time.since(sign * this.inSeconds());
-      return applyDurationPreservingNs(time, this.parts, sign);
+      return applyDurationPreservingNs(
+        time,
+        { ...this.parts, seconds: this.inSeconds() },
+        ["seconds"],
+        sign,
+      );
     }
 
     if (isDateTime(time) || !(time instanceof Date || time instanceof Temporal.Instant))
       return applyDurationToDate(time, this.parts, this._partKeys, sign);
-    return applyDurationPreservingNs(time, this.parts, sign);
+    return applyDurationPreservingNs(time, this.parts, this._partKeys, sign);
   }
 
   private respondToMissing(method: string, _includePrivate = false): boolean {
@@ -647,64 +651,16 @@ function dateOrTimeAdvance(
 function applyDurationPreservingNs(
   date: Date | Temporal.Instant,
   parts: DurationParts,
-  direction: 1 | -1,
+  partKeys: readonly (keyof DurationParts)[],
+  sign: 1 | -1,
 ): Temporal.Instant {
-  const nsRemainder = date instanceof Temporal.Instant ? date.epochNanoseconds % 1_000_000n : 0n;
-  const result = instantFrom(applyDuration(toDateInput(date), parts, direction));
-  return nsRemainder === 0n ? result : result.add({ nanoseconds: Number(nsRemainder) });
-}
-
-function applyDuration(date: Date, parts: DurationParts, direction: 1 | -1): Date {
-  if (!(date instanceof Date)) {
-    throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
-  }
-
-  let d = new Date(date.getTime());
-
-  const years = parts.years * direction;
-  const months = parts.months * direction;
-  const weeks = parts.weeks * direction;
-  const days = parts.days * direction;
-  const hours = parts.hours * direction;
-  const minutes = parts.minutes * direction;
-  const seconds = parts.seconds * direction;
-
-  if (Number.isInteger(years) && years !== 0) {
-    d.setFullYear(d.getFullYear() + years);
-  } else if (years !== 0) {
-    d = new Date(d.getTime() + years * SECONDS_PER_YEAR * 1000);
-  }
-
-  if (Number.isInteger(months) && months !== 0) {
-    d.setMonth(d.getMonth() + months);
-  } else if (months !== 0) {
-    d = new Date(d.getTime() + months * SECONDS_PER_MONTH * 1000);
-  }
-
-  const intWeeks = Math.trunc(weeks);
-  const fracWeeks = weeks - intWeeks;
-  if (intWeeks !== 0) {
-    d.setDate(d.getDate() + intWeeks * 7);
-  }
-
-  const intDays = Math.trunc(days);
-  const fracDays = days - intDays;
-  if (intDays !== 0) {
-    d.setDate(d.getDate() + intDays);
-  }
-
-  const extraMs =
-    fracWeeks * 7 * SECONDS_PER_DAY * 1000 +
-    fracDays * SECONDS_PER_DAY * 1000 +
-    hours * SECONDS_PER_HOUR * 1000 +
-    minutes * SECONDS_PER_MINUTE * 1000 +
-    seconds * 1000;
-
-  if (extraMs !== 0) {
-    d = new Date(d.getTime() + extraMs);
-  }
-
-  return d;
+  const ns =
+    date instanceof Temporal.Instant ? date.epochNanoseconds : BigInt(date.getTime()) * 1_000_000n;
+  const time = RubyTime.at(ns / 1_000_000_000n, ns % 1_000_000_000n, "nanosecond");
+  const result = applyDurationToDate(time, parts, partKeys, sign) as RubyTime;
+  return Temporal.Instant.fromEpochNanoseconds(
+    BigInt(result.toI()) * 1_000_000_000n + BigInt(result.nsec),
+  );
 }
 
 export class Scalar {
