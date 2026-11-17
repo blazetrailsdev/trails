@@ -381,7 +381,7 @@ jobs:
           hosted='"ubuntu-24.04"'
           self_hosted='["self-hosted","debian","ARM64"]'
           sqlite_runs_on=$hosted
-          sqlite_shards='[1, 2]'
+          sqlite_shards='[1, 2, 3]'
           unit_runs_on=$hosted
           unit_shards='[1, 2]'
           postgres_shards='[1, 2, 3]'
@@ -1396,7 +1396,7 @@ jobs:
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.sqlite_runs_on) }}
     timeout-minutes: 20
-    # 2-way file-level shard on hosted (RFC 0028 shard-ar-adapter-suites) — see the
+    # 3-way file-level shard on hosted (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job below for the rationale. That story left this lane
     # unsharded as "not on the critical path"; sharding the other two made it
     # the critical path, so the exemption no longer holds. No service

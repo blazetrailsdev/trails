@@ -30,7 +30,7 @@ export default {
   parametersFormat: "table",
   enumMembersFormat: "table",
   packageOptions: {
-    entryPoints: ["src/index.ts"],
+    entryPoints: ["lib/index.ts"],
     excludeInternal: true,
   },
 };
