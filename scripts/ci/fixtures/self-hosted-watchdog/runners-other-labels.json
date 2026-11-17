@@ -1,0 +1,10 @@
+{
+  "runners": [
+    {
+      "name": "gh-runner",
+      "status": "online",
+      "busy": false,
+      "labels": [{ "name": "self-hosted" }, { "name": "X64" }]
+    }
+  ]
+}

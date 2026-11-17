@@ -1,0 +1,50 @@
+name: Self-hosted watchdog
+
+# Re-routes ci.yml runs stranded on offline debian-arm64 runners: see
+# scripts/ci/self-hosted-watchdog.sh.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: List the runs it would cancel and re-run, and touch none
+        type: boolean
+        default: true
+
+permissions:
+  actions: write
+
+concurrency:
+  group: self-hosted-watchdog
+  cancel-in-progress: false
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # A step's `if:` cannot read secrets, or its own `env:`.
+    env:
+      RUNNER_STATUS_APP_ID: ${{ secrets.RUNNER_STATUS_APP_ID }}
+    steps:
+      - uses: actions/checkout@v5
+      - run: scripts/ci/self-hosted-watchdog.sh --self-test
+      # The same runner-status credential as ci.yml's `self_hosted` step.
+      - id: runner_status_token
+        if: env.RUNNER_STATUS_APP_ID != ''
+        continue-on-error: true
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.RUNNER_STATUS_APP_ID }}
+          private-key: ${{ secrets.RUNNER_STATUS_APP_PRIVATE_KEY }}
+          permission-administration: read
+      - env:
+          GH_TOKEN: ${{ steps.runner_status_token.outputs.token || secrets.RUNNER_STATUS_TOKEN }}
+          ACTIONS_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "no runner-status credential; nothing to check"
+            exit 0
+          fi
+          scripts/ci/self-hosted-watchdog.sh $DRY_RUN

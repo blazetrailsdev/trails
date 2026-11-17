@@ -1,0 +1,15 @@
+{
+  "runners": [
+    {
+      "name": "debian-arm64",
+      "status": "offline",
+      "busy": false,
+      "labels": [
+        { "name": "self-hosted" },
+        { "name": "Linux" },
+        { "name": "ARM64" },
+        { "name": "debian" }
+      ]
+    }
+  ]
+}

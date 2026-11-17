@@ -58,6 +58,9 @@ jobs:
   changes:
     name: Detect changed paths
     runs-on: ubuntu-24.04
+    # A step's `if:` cannot read secrets, or its own `env:`.
+    env:
+      RUNNER_STATUS_APP_ID: ${{ secrets.RUNNER_STATUS_APP_ID }}
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       activerecord_affected: ${{ steps.filter.outputs.activerecord_affected }}
@@ -370,9 +373,21 @@ jobs:
           set -euo pipefail
           scripts/ci/pr-lanes.sh --self-test
           scripts/ci/pr-lanes.sh "$BASE" "$HEAD" | tee -a "$GITHUB_OUTPUT"
+      # Runner-status credential: a 1-hour GitHub App installation token
+      # (Administration: read-only). Skipped where the app's secrets are
+      # absent (fork PRs, or before the app is installed); the step below then
+      # falls back to RUNNER_STATUS_TOKEN, and with neither it routes hosted.
+      - id: runner_status_token
+        if: env.RUNNER_STATUS_APP_ID != ''
+        continue-on-error: true
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
+        with:
+          app-id: ${{ secrets.RUNNER_STATUS_APP_ID }}
+          private-key: ${{ secrets.RUNNER_STATUS_APP_PRIVATE_KEY }}
+          permission-administration: read
       - id: self_hosted
         env:
-          GH_TOKEN: ${{ secrets.RUNNER_STATUS_TOKEN }}
+          GH_TOKEN: ${{ steps.runner_status_token.outputs.token || secrets.RUNNER_STATUS_TOKEN }}
           SAME_REPO: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           AR_AFFECTED: ${{ steps.filter.outputs.activerecord_affected }}
           AR_SCOPE: ${{ steps.filter.outputs.ar_scope }}
@@ -381,7 +396,7 @@ jobs:
           hosted='"ubuntu-24.04"'
           self_hosted='["self-hosted","debian","ARM64"]'
           sqlite_runs_on=$hosted
-          sqlite_shards='[1, 2]'
+          sqlite_shards='[1, 2, 3]'
           unit_runs_on=$hosted
           unit_shards='[1, 2]'
           postgres_shards='[1, 2, 3]'
@@ -1396,12 +1411,12 @@ jobs:
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ${{ fromJSON(needs.changes.outputs.sqlite_runs_on) }}
     timeout-minutes: 20
-    # 2-way file-level shard on hosted (RFC 0028 shard-ar-adapter-suites) — see the
+    # 3-way file-level shard on hosted (RFC 0028 shard-ar-adapter-suites) — see the
     # postgres-tests job below for the rationale. That story left this lane
     # unsharded as "not on the critical path"; sharding the other two made it
     # the critical path, so the exemption no longer holds. No service
     # container to duplicate here, and the `needs` graph keys on the job id,
-    # so the `ci` aggregator still sees one merged result for both legs.
+    # so the `ci` aggregator still sees one merged result for every leg.
     strategy:
       fail-fast: false
       matrix:
@@ -1433,7 +1448,7 @@ jobs:
       # activerecord PR.
       # (Guard: scripts/ci-suite-coverage.test.ts.)
       # Not sharded — run once, on shard 1 only, to avoid a redundant
-      # double-run across the two legs.
+      # double-run across the legs.
       - if: ${{ matrix.shard == 1 && needs.changes.outputs.ar_scope == '' }}
         run: pnpm vitest run scripts/test-deps scripts/parity/pipeline/query/node scripts/mixin-declaration-drift.test.ts
       - if: needs.changes.outputs.ar_scope == '' || contains(needs.changes.outputs.ar_scope, 'packages/activestorage')
