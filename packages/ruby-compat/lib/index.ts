@@ -332,6 +332,7 @@ export { kernelRand, kernelSrand } from "./kernel-rand.js";
 export { rbFBackquote, rbFSystem } from "./kernel-system.js";
 export { IndexError } from "./index-error.js";
 export { StopIteration } from "./stop-iteration.js";
+export { ClosedQueueError } from "./closed-queue-error.js";
 export { RangeError } from "./range-error.js";
 export { KeyError } from "./key-error.js";
 export { LocalJumpError } from "./local-jump-error.js";

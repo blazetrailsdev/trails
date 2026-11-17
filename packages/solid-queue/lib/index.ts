@@ -22,6 +22,7 @@ export { SolidQueueAdapter } from "./active-job/queue-adapters/solid-queue-adapt
 export { Process } from "./process.js";
 export { Pool } from "./pool.js";
 export { ThreadPool } from "./thread-pool.js";
+export { FiberPool } from "./fiber-pool.js";
 export { Worker } from "./worker.js";
 export { Dispatcher } from "./dispatcher.js";
 export { Scheduler } from "./scheduler.js";

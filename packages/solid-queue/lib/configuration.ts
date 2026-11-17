@@ -1,5 +1,7 @@
 import { BooleanType, Model } from "@blazetrails/activemodel";
+import { gemVersion } from "@blazetrails/activerecord";
 import {
+  IsolatedExecutionState,
   TopLevel,
   camelize,
   include,
@@ -17,6 +19,7 @@ import {
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 import {
   File,
+  Gem,
   Pathname,
   RuntimeError,
   Struct,
@@ -56,6 +59,8 @@ export class Configuration {
 
     this.validate(":ensureConfiguredProcesses");
     this.validate(":ensureValidRecurringTasks");
+    this.validate(":ensureValidWorkerExecutionOptions");
+    this.validate(":ensureFiberWorkersUseSupportedIsolationLevel");
     this.validate(":ensureCorrectlySizedThreadPool");
 
     constSet(this, "Process", Process);
@@ -82,6 +87,7 @@ export class Configuration {
 
   static readonly DEFAULT_CONFIG_FILE_PATH = "config/queue.yml";
   static readonly DEFAULT_RECURRING_SCHEDULE_FILE_PATH = "config/recurring.yml";
+  static readonly FIBER_QUERY_SCOPED_CONNECTIONS_VERSION = new Gem.Version("7.2.0");
 
   private options: Options;
   private _workersOptions?: Options[];
@@ -151,6 +157,29 @@ export class Configuration {
   }
 
   /** @internal */
+  private async ensureValidWorkerExecutionOptions(): Promise<void> {
+    for (const options of await this.workersOptions()) {
+      if (Object.hasOwn(options, "threads") && Object.hasOwn(options, "fibers")) {
+        this.errors.add("base", "Workers can specify either `threads` or `fibers`, but not both.");
+      }
+    }
+  }
+
+  /** @internal */
+  private async ensureFiberWorkersUseSupportedIsolationLevel(): Promise<void> {
+    if (!(await this.workersOptions()).some((options) => this.isFiberWorker(options))) return;
+
+    if (IsolatedExecutionState.isolationLevel !== "fiber") {
+      this.errors.add(
+        "base",
+        "Fiber workers require fiber-scoped isolated execution state. " +
+          "Set `config.active_support.isolation_level = :fiber` in your Rails configuration " +
+          "(or `ActiveSupport::IsolatedExecutionState.isolation_level = :fiber` outside Rails).",
+      );
+    }
+  }
+
+  /** @internal */
   private async ensureCorrectlySizedThreadPool(): Promise<void> {
     const dbPoolSize = Record.connectionPool()?.size;
     if (dbPoolSize != null && dbPoolSize < (await this.estimatedNumberOfThreads())) {
@@ -216,9 +245,10 @@ export class Configuration {
           ? workerOptions.processes
           : Configuration.WORKER_DEFAULTS.processes
       ) as number;
+      const defaults = this.workerDefaultsFor(workerOptions);
       return Array.from(
         { length: processes },
-        () => new Process("worker", reverseMerge(workerOptions, Configuration.WORKER_DEFAULTS)),
+        () => new Process("worker", reverseMerge(workerOptions, defaults)),
       );
     });
   }
@@ -370,13 +400,47 @@ export class Configuration {
 
   /** @internal */
   private async estimatedNumberOfThreads(): Promise<number> {
-    const threadCounts = (await this.workersOptions()).map(
-      (options) =>
-        (Object.hasOwn(options, "threads")
-          ? options.threads
-          : Configuration.WORKER_DEFAULTS.threads) as number,
+    const threadCounts = (await this.workersOptions()).map((options) =>
+      this.estimatedExecutionConnectionsForWorker(options),
     );
     const threadCount = threadCounts.length > 0 ? Math.max(...threadCounts) : null;
     return (threadCount ?? 1) + 2;
+  }
+
+  /** @internal */
+  private workerCapacity(options: Options): number {
+    return (options.fibers ?? options.threads ?? Configuration.WORKER_DEFAULTS.threads) as number;
+  }
+
+  /** @internal */
+  private estimatedExecutionConnectionsForWorker(options: Options): number {
+    return this.isFiberWorker(options)
+      ? this.fiberExecutionConnectionsForWorker(options)
+      : this.workerCapacity(options);
+  }
+
+  /** @internal */
+  private fiberExecutionConnectionsForWorker(options: Options): number {
+    return this.isFiberJobsReleaseConnectionsBetweenQueries() ? 1 : this.workerCapacity(options);
+  }
+
+  /** @internal */
+  private isFiberJobsReleaseConnectionsBetweenQueries(): boolean {
+    return gemVersion().compare(Configuration.FIBER_QUERY_SCOPED_CONNECTIONS_VERSION)! >= 0;
+  }
+
+  /** @internal */
+  private isFiberWorker(options: Options): boolean {
+    return Object.hasOwn(options, "fibers");
+  }
+
+  /** @internal */
+  private workerDefaultsFor(options: Options): Options {
+    if (this.isFiberWorker(options)) {
+      const { threads: _threads, ...defaults } = Configuration.WORKER_DEFAULTS;
+      return defaults;
+    } else {
+      return Configuration.WORKER_DEFAULTS;
+    }
   }
 }

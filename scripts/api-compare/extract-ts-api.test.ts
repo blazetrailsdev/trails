@@ -3768,6 +3768,20 @@ describe("extractFromProgram — include() detection", () => {
     expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([["registerType", false]]);
   });
 
+  it("credits a top-level delegate on a type-asserted plain-object module", () => {
+    const info = extractFromFiles("/p", {
+      "solid-queue.ts": `
+        declare function delegate(this: object, ...methods: unknown[]): string[];
+        export const SolidQueue = {
+          isSupervisor(): boolean { return false; },
+        } as { isSupervisor(): boolean; onStart?: unknown };
+        delegate.call(SolidQueue, "onStart", "onStop", { to: "Supervisor" });
+      `,
+    });
+    const methods = info.modules["solid-queue.ts:SolidQueue"].instanceMethods;
+    expect(methods.map((m) => m.name)).toEqual(["isSupervisor", "onStart", "onStop"]);
+  });
+
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {
     // `ActiveSupport::Deprecation::DEFAULT_BEHAVIORS`
     // (deprecation/behaviors.rb:13-63) is a Ruby Hash, not a module. Counting

@@ -1,6 +1,6 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
-import { TopLevel } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, TopLevel } from "@blazetrails/activesupport";
 import { Configuration, RecurringTask, type Scheduler } from "../lib/index.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import "./support/job-result.js";
@@ -26,6 +26,16 @@ async function assertProcesses(
 
     if (expectedValue == null) expect(value ?? null).toBeNull();
     else expect(value).toEqual(expectedValue);
+  }
+}
+
+async function withExecutionIsolation(level: "thread" | "fiber", block: () => Promise<void>) {
+  const previousLevel = IsolatedExecutionState.isolationLevel;
+  IsolatedExecutionState.isolationLevel = level;
+  try {
+    await block();
+  } finally {
+    if (previousLevel != null) IsolatedExecutionState.isolationLevel = previousLevel;
   }
 }
 
@@ -139,6 +149,38 @@ describe("ConfigurationTest", () => {
 
     await assertProcesses(configuration, "dispatcher", 0);
     await assertProcesses(configuration, "worker", 2);
+  });
+
+  it("fibers configure workers to execute jobs in fibers", async () => {
+    await withExecutionIsolation("fiber", async () => {
+      const configuration = new Configuration({
+        workers: [
+          { queues: "llm*", fibers: 10 },
+          { queues: "*", threads: 3 },
+        ],
+        dispatchers: [],
+        skipRecurring: true,
+      });
+
+      expect(await configuration.isValid()).toBeTruthy();
+      await assertProcesses(configuration, "worker", 2, {
+        fibers: [10, undefined],
+        threads: [undefined, 3],
+      });
+    });
+  });
+
+  it("workers reject threads and fibers together", async () => {
+    await withExecutionIsolation("fiber", async () => {
+      const configuration = new Configuration({
+        workers: [{ queues: "llm*", threads: 1, fibers: 1 }],
+        dispatchers: [],
+        skipRecurring: true,
+      });
+
+      expect(await configuration.isValid()).toBeFalsy();
+      expect(configuration.errors.fullMessages[0]).toMatch(/either `threads` or `fibers`/);
+    });
   });
 
   it("mulitple workers with the same configuration", async () => {

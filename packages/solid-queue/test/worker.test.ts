@@ -5,7 +5,14 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { ActiveSupport, Executor, Logger, minutes, seconds } from "@blazetrails/activesupport";
+import {
+  ActiveSupport,
+  Executor,
+  IsolatedExecutionState,
+  Logger,
+  minutes,
+  seconds,
+} from "@blazetrails/activesupport";
 import { StringIO } from "@blazetrails/ruby-compat";
 import {
   ClaimedExecution,
@@ -72,19 +79,89 @@ describe("WorkerTest", () => {
     SolidQueue.appExecutor = null;
   });
 
-  it("worker is registered as process in thread mode", async () => {
-    await worker.start();
-    await waitForRegisteredProcesses(1, { timeout: 1 });
+  const EXECUTION_MODES = [
+    { name: "thread", options: { threads: 3 } },
+    { name: "fiber", options: { fibers: 3 } },
+  ] as const;
 
-    const process = (await Process.first()) as Process;
-    expect(process.kind).toBe("Worker");
-    assertMetadata(process, {
-      queues: "background",
-      polling_interval: 0.2,
-      pool_type: "thread",
-      pool_size: 3,
+  async function withWorkerExecutionSupport(
+    options: { threads: number } | { fibers: number },
+    block: () => Promise<void>,
+  ) {
+    if (Object.hasOwn(options, "fibers")) {
+      const previousLevel = IsolatedExecutionState.isolationLevel;
+      IsolatedExecutionState.isolationLevel = "fiber";
+      try {
+        await block();
+      } finally {
+        if (previousLevel != null) IsolatedExecutionState.isolationLevel = previousLevel;
+      }
+    } else {
+      await block();
+    }
+  }
+
+  for (const mode of EXECUTION_MODES) {
+    it(`worker is registered as process in ${mode.name} mode`, async () => {
+      await withWorkerExecutionSupport(mode.options, async () => {
+        const worker = new Worker({ queues: "background", pollingInterval: 0.2, ...mode.options });
+        try {
+          await worker.start();
+          await waitForRegisteredProcesses(1, { timeout: 1 });
+
+          const process = (await Process.first()) as Process;
+          expect(process.kind).toBe("Worker");
+          assertMetadata(process, {
+            queues: "background",
+            polling_interval: 0.2,
+            pool_type: mode.name,
+            pool_size: 3,
+          });
+        } finally {
+          await worker.stop();
+          await waitForRegisteredProcesses(0, { timeout: 1 });
+        }
+      });
     });
-  });
+
+    it(`claim and process more enqueued jobs than the pool size allows to process at once in ${mode.name} mode`, async () => {
+      for (let i = 0; i < 5; i++) {
+        await StoreResultJob.performLater("paused", { pause: 0.1 });
+      }
+
+      for (let i = 0; i < 3; i++) {
+        await StoreResultJob.performLater("immediate");
+      }
+
+      await withWorkerExecutionSupport(mode.options, async () => {
+        const worker = new Worker({ queues: "background", pollingInterval: 0.2, ...mode.options });
+        try {
+          await worker.start();
+
+          await waitForJobsToFinishFor(5);
+          await worker.wakeUp();
+
+          expect(
+            await JobResult.where({
+              queue_name: "background",
+              status: "completed",
+              value: "paused",
+            }).count(),
+          ).toBe(5);
+          expect(
+            await JobResult.where({
+              queue_name: "background",
+              status: "completed",
+              value: "immediate",
+            }).count(),
+          ).toBe(3);
+        } finally {
+          await worker.stop();
+          await waitForRegisteredProcesses(0, { timeout: 1 });
+        }
+      });
+    });
+  }
 
   it("errors on polling are passed to on_thread_error and re-raised", async () => {
     const errors: string[] = [];
@@ -155,36 +232,6 @@ describe("WorkerTest", () => {
       ActiveSupport.errorReporter.unsubscribe(subscriber);
       SolidQueue.appExecutor = null;
     }
-  });
-
-  it("claim and process more enqueued jobs than the pool size allows to process at once in thread mode", async () => {
-    for (let i = 0; i < 5; i++) {
-      await StoreResultJob.performLater("paused", { pause: 0.1 });
-    }
-
-    for (let i = 0; i < 3; i++) {
-      await StoreResultJob.performLater("immediate");
-    }
-
-    await worker.start();
-
-    await waitForJobsToFinishFor(2);
-    await worker.wakeUp();
-
-    expect(
-      await JobResult.where({
-        queue_name: "background",
-        status: "completed",
-        value: "paused",
-      }).count(),
-    ).toBe(5);
-    expect(
-      await JobResult.where({
-        queue_name: "background",
-        status: "completed",
-        value: "immediate",
-      }).count(),
-    ).toBe(3);
   });
 
   it("defaults thread workers to the configured thread pool size", async () => {

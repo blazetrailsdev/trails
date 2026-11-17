@@ -4120,7 +4120,8 @@ function sameFileObjectModule(name: string, sourceFile: ts.SourceFile): string |
     if (!ts.isVariableStatement(statement)) continue;
     for (const decl of statement.declarationList.declarations) {
       if (!ts.isIdentifier(decl.name) || decl.name.text !== name) continue;
-      return decl.initializer !== undefined && ts.isObjectLiteralExpression(decl.initializer)
+      return decl.initializer !== undefined &&
+        ts.isObjectLiteralExpression(unwrapAssertions(decl.initializer))
         ? name
         : undefined;
     }
