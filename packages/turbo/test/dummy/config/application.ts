@@ -2,6 +2,7 @@ import { Application } from "@blazetrails/trailties";
 import "@blazetrails/trailties/trailties/action-controller";
 import "@blazetrails/trailties/trailties/active-job";
 import "@blazetrails/trailties/trailties/active-record";
+import "@blazetrails/turbo/engine";
 
 export class Dummy extends Application {
   static {

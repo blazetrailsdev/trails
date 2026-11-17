@@ -28,6 +28,9 @@
     },
     {
       "path": "../actioncable"
+    },
+    {
+      "path": "../actionview/tsconfig.test-case.json"
     }
   ]
 }
