@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import type { DrawCallback, Mapper } from "@blazetrails/actionpack";
+import { RouteSet, type DrawCallback, type Mapper } from "@blazetrails/actionpack";
 import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
 import { RoutesReloader, type RouteSetLike } from "../../lib/application/routes-reloader.js";
 import { Trails } from "../../lib/trails.js";
@@ -93,6 +93,38 @@ describe("RoutesReloader", () => {
 
       expect(a.calls).toEqual(["clear", "get /posts", "finalize"]);
       expect(Object.hasOwn(a, "draw")).toBe(true);
+    } finally {
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("draws a nested config/routes file in line after execute_unless_loaded", async () => {
+    const tmp = Dir.mktmpdir("routes_reloader");
+    try {
+      const routes = `${tmp}/routes.ts`;
+      FileUtils.mkdirP(`${tmp}/routes`);
+      File.write(
+        `${tmp}/routes/admin.ts`,
+        'export function drawRoutes() { this.get("/admin", { to: "admin#index" }); }\n',
+      );
+      File.write(
+        routes,
+        `import { Trails } from "${trails}";\n` +
+          'Trails.application.routes().draw(function () { this.draw("admin"); });\n',
+      );
+      const set = new RouteSet();
+      set.drawPaths.push(`${tmp}/routes`);
+      Trails.application = { routes: () => set } as never;
+      const r = new RoutesReloader();
+      r.routeSets.push(set);
+      r.paths.push(routes);
+
+      await r.prefetchBang();
+      r.executeUnlessLoaded();
+
+      expect(set.routes().routes.map((route) => route.path.spec.toString())).toContain(
+        "/admin(.:format)",
+      );
     } finally {
       FileUtils.rmRf(tmp);
     }

@@ -1275,10 +1275,7 @@ export class Base extends Model {
    * @inlinedFrom ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84
    * @inventedArm if — PERMANENT
    */
-  constructor(
-    attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes | null = {},
-    initBlock?: (record: Base) => void,
-  ) {
+  constructor(attributes: unknown = {}, initBlock?: (record: Base) => void) {
     const allocating = _Core._allocation.klass === new.target;
     if (allocating) _Core._allocation.klass = null;
     if (!allocating) {
@@ -1946,9 +1943,7 @@ export interface Base
   _updateRecord(attributeNames?: string[], block?: (record: this) => void): Promise<unknown>;
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
   valuesAt(...keys: string[]): unknown[];
-  assignAttributes(
-    attrs: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
-  ): void;
+  assignAttributes(attrs: unknown): void;
   setAttributes(
     attrs: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
   ): Promise<void> | void;

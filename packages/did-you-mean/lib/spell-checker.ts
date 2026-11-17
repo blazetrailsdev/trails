@@ -2,7 +2,7 @@ import { JaroWinkler } from "./jaro-winkler.js";
 import { Levenshtein } from "./levenshtein.js";
 
 export interface SpellCheckerOptions {
-  dictionary: ReadonlyArray<string>;
+  dictionary: Iterable<string>;
 }
 
 /** @internal */
@@ -18,7 +18,7 @@ function codepointLength(s: string): number {
 }
 
 export class SpellChecker {
-  readonly #dictionary: ReadonlyArray<string>;
+  readonly #dictionary: Iterable<string>;
 
   constructor(options: SpellCheckerOptions) {
     this.#dictionary = options.dictionary;
@@ -28,7 +28,7 @@ export class SpellChecker {
     const normalizedInput = normalize(input);
     let threshold = codepointLength(normalizedInput) > 3 ? 0.834 : 0.77;
 
-    let words = this.#dictionary.filter(
+    let words = Array.from(this.#dictionary).filter(
       (word) => JaroWinkler.distance(normalize(word), normalizedInput) >= threshold,
     );
     words = words.filter((word) => String(input) !== String(word));

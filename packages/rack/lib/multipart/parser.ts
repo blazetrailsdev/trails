@@ -396,7 +396,7 @@ export class Parser {
     this.bodyRegexAtEnd = new RegExp(`(?:${EOL}|^)--${qb}(?:${EOL}|--)$`, "s");
     this.endBoundarySize = boundary.length + 4;
     this.rxMaxSize = boundary.length + 6;
-    this.headRegex = new RegExp(`(.*?${EOL})${EOL}`, "s");
+    this.headRegex = new RegExp(`^(.*?${EOL})${EOL}`, "s");
   }
 
   parse(io: { read(n: number, outbuf?: string): string | Uint8Array | null }) {

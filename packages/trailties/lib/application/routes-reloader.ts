@@ -1,5 +1,11 @@
 import { FileUpdateChecker, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
-import { rbFLoad, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  compiledFilesIn,
+  Dir,
+  loadIseqEval,
+  rbFLoad,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import type { DrawCallback } from "@blazetrails/actionpack";
 
 export interface RouteSetLike {
@@ -8,6 +14,7 @@ export interface RouteSetLike {
   finalizeBang(): void;
   eagerLoadBang(): void;
   draw(block: DrawCallback): void;
+  drawPaths?: string[];
 }
 
 export class RoutesReloader {
@@ -83,6 +90,15 @@ export class RoutesReloader {
     }
     try {
       for (const path of this.paths) await rbFLoad(path);
+      for (const routes of this.routeSets) {
+        for (const dir of routes.drawPaths ?? []) {
+          const files = new Set([
+            ...(await Dir.globAsync(`${dir}/**/*.ts`)),
+            ...compiledFilesIn(dir),
+          ]);
+          for (const file of files) await loadIseqEval(file, true);
+        }
+      }
     } catch (error) {
       this._drawn = null;
       throw error;

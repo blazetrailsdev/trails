@@ -223,7 +223,7 @@ export class QueryParser {
       } else {
         for (const p of pairs) {
           if (p.length === 0) continue;
-          const [k, v = null] = stringSplit(p, "=", 2).map((s) => unescape(s));
+          const [k, v = null] = stringSplit(p, "=", 2).map((s) => this.unescape(s));
           block!(k, v);
         }
       }
@@ -233,6 +233,11 @@ export class QueryParser {
       }
       throw e;
     }
+  }
+
+  /** @internal */
+  protected unescape(string: string, encoding: Encoding = Encoding.UTF_8): string {
+    return URI.decodeWwwFormComponent(string, encoding);
   }
 
   private _normalizeParams(params: any, name: string | null, v: unknown, depth: number): any {
@@ -334,13 +339,4 @@ export class QueryParser {
     }
     return true;
   }
-}
-
-/**
- * `URI.decode_www_form_component` (`vendor/ruby/v3.3.11/lib/uri/common.rb:370-372`, `:399-402`).
- *
- * @internal
- */
-function unescape(string: string, encoding: Encoding = Encoding.UTF_8): string {
-  return URI.decodeWwwFormComponent(string, encoding);
 }

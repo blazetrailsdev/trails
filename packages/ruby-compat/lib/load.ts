@@ -7,7 +7,7 @@ import { TopLevel } from "./object.js";
 
 let loads = 0;
 const compiledFiles = new Map<string, () => Promise<unknown>>();
-const loadedFiles = new Set<string>();
+const loadedFiles = new Map<string, Record<string, unknown>>();
 let importer: ((url: string) => Promise<unknown>) | null = null;
 
 /**
@@ -50,6 +50,31 @@ export function registerCompiledFiles(
  */
 export function isCompiledFile(fname: string): boolean {
   return compiledFiles.has(File.expandPath(fname));
+}
+
+/**
+ * `Dir.glob` (`vendor/ruby/v3.3.11/dir.c:3227`) of `dir` for the files a
+ * compiled build registered through {@link registerCompiledFiles} and ships
+ * no source for.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function compiledFilesIn(dir: string): string[] {
+  const prefix = `${File.expandPath(dir)}/`;
+  return [...compiledFiles.keys()].filter((full) => full.startsWith(prefix));
+}
+
+/**
+ * The exports `load_iseq_eval` (`vendor/ruby/v3.3.11/load.c:744`) last
+ * answered for `fname` through {@link loadIseqEval}, read where a Rails body
+ * evaluates the file synchronously (`Mapper#draw`'s
+ * `instance_eval(File.read(route_path))`) after an awaited step loaded it.
+ * `undefined` for a file no load has reached.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function loadedFileExports(fname: string): Record<string, unknown> | undefined {
+  return loadedFiles.get(File.expandPath(fname));
 }
 
 /**
@@ -103,7 +128,7 @@ export async function loadIseqEval(fname: string, fresh = false): Promise<Record
       unknown
     >;
   }
-  loadedFiles.add(full);
+  loadedFiles.set(full, exports);
   return exports;
 }
 

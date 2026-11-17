@@ -330,10 +330,7 @@ export function typeCondition(modelClass: typeof Base, table: any = modelClass.a
 }
 
 /** @internal */
-export function subclassFromAttributes(
-  this: typeof Base,
-  attrs: Record<string, unknown> | Map<string, unknown> | PermittedAttributes | null | undefined,
-): typeof Base | null {
+export function subclassFromAttributes(this: typeof Base, attrs: unknown): typeof Base | null {
   if (rbObjRespondTo(attrs, "isPermitted")) {
     attrs = (attrs as PermittedAttributes).toH();
   }
