@@ -302,7 +302,7 @@ export class Session {
  *
  * @noRailsEquivalent PERMANENT
  */
-function verifyCertificateIdentity(cert: Certificate, hostname: string): boolean {
+export function verifyCertificateIdentity(cert: Certificate, hostname: string): boolean {
   let shouldVerifyCommonName = true;
   for (const ext of cert.extensions) {
     if (ext.oid !== "subjectAltName") continue;
@@ -336,8 +336,12 @@ function verifyCertificateIdentity(cert: Certificate, hostname: string): boolean
   return false;
 }
 
-/** `OpenSSL::SSL.verify_hostname` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:308-338`). @noRailsEquivalent PERMANENT */
-function verifyHostname(hostname: string, san: string): boolean {
+/**
+ * `OpenSSL::SSL.verify_hostname` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:308-338`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function verifyHostname(hostname: string, san: string): boolean {
   if (!_isAsciiOnly(san)) return false;
   if (!_isAsciiOnly(hostname)) return false;
 
@@ -354,8 +358,12 @@ function verifyHostname(hostname: string, san: string): boolean {
   return sanParts.join(".") === hostParts.join(".");
 }
 
-/** `OpenSSL::SSL.verify_wildcard` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:341-357`). @noRailsEquivalent PERMANENT */
-function verifyWildcard(domainComponent: string, sanComponent: string): boolean {
+/**
+ * `OpenSSL::SSL.verify_wildcard` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:341-357`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function verifyWildcard(domainComponent: string, sanComponent: string): boolean {
   const parts = sanComponent.split("*");
 
   if (parts.length > 2) return false;
@@ -526,9 +534,9 @@ export class SSLSocket<IO extends SSLSocketIO = SSLSocketIO> {
    * `using_anon_cipher?` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:425-429`):
    * the `aNULL` cipher list, OpenSSL's `ADH-` and `AECDH-` suites.
    *
-   * @internal
+   * @noRailsEquivalent PERMANENT
    */
-  private isUsingAnonCipher(): boolean {
+  isUsingAnonCipher(): boolean {
     const name = this.cipher?.[0];
     return name != null && /^A(EC)?DH-/.test(name);
   }
