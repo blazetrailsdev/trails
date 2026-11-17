@@ -1,4 +1,5 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { isStruct, type StructInstance } from "@blazetrails/ruby-compat/struct";
+import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
@@ -301,6 +302,12 @@ export class Generic {
   }
 }
 
+export class Struct {
+  static asJson(value: StructInstance, options: EncodeOptions | null = null): unknown {
+    return Hash.asJson(value.toH(), options);
+  }
+}
+
 export class Exception {
   static asJson(value: Error, options: EncodeOptions | null = null): string {
     return value.message;
@@ -349,9 +356,11 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   ) {
     return Time.asJson(value, options);
   }
+  if (value instanceof RubyDate) return Date.asJson(value.toDate(), options);
   if (value instanceof Temporal.PlainDate) return Date.asJson(value, options);
   if (value instanceof Temporal.PlainDateTime) return DateTime.asJson(value, options);
   if (value instanceof BigDecimalValue) return BigDecimal.asJson(value, options);
+  if (isStruct(value)) return Struct.asJson(value, options);
   if (value instanceof RegExp) return Regexp.asJson(value, options);
   if (value instanceof Error) return Exception.asJson(value, options);
   if (value instanceof URL) return Generic.asJson(value, options);

@@ -42,7 +42,7 @@ export class MockLogger {
   declare static readonly UNKNOWN: number;
 
   private _flushCount: number;
-  level: number;
+  private _level: unknown;
   private _logged: Hash<LogLevel, unknown[]>;
 
   /** @noRailsEquivalent PERMANENT */
@@ -72,12 +72,20 @@ export class MockLogger {
 
   constructor(level: number = MockLogger.DEBUG) {
     this._flushCount = 0;
-    this.level = level;
+    this._level = level;
     this._logged = new Hash<LogLevel, unknown[]>((h, k) => {
       const v: unknown[] = [];
       h.set(k, v);
       return v;
     });
+  }
+
+  get level(): unknown {
+    return this._level;
+  }
+
+  set level(value: unknown) {
+    this._level = value;
   }
 
   get flushCount(): number {
@@ -116,7 +124,7 @@ for (const [severity, value] of Object.entries(LOG_LEVELS) as [LogLevel, number]
   });
   Object.defineProperty(MockLogger.prototype, `${severity.slice(1)}?`, {
     get(this: MockLogger): boolean {
-      return value >= this.level;
+      return value >= (this._level as number);
     },
     configurable: true,
   });

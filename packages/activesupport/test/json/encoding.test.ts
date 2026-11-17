@@ -8,6 +8,8 @@ import { Encoding, type EncodeOptions } from "../../lib/json/encoding.js";
 import { asJson, ToJsonWithActiveSupportEncoder } from "../../lib/core-ext/object/json.js";
 import { BigDecimal } from "../../lib/core-ext/big-decimal/conversions.js";
 import { Range } from "@blazetrails/ruby-compat/range";
+import { Struct } from "@blazetrails/ruby-compat/struct";
+import { Date as RubyDate } from "@blazetrails/date";
 import { assertNil } from "../../lib/testing/assertions.js";
 import { withEnvTz } from "../../lib/time-zone-test-helpers.js";
 
@@ -361,4 +363,64 @@ describe("TestJSONEncoding", () => {
   it("to json works when as json returns NaN number", () => {
     expect(new NaNNumber().toJSON()).toBe('{"number":null}');
   });
+
+  // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" — `$?` is a `Process::Status` of a spawned child.
+  it.skip("process status", () => {});
+
+  // PERMANENT-SKIP: CLAUDE.md, "A String has no encoding tag either".
+  it.skip("non utf8 string transcodes", () => {});
+
+  it("struct to json with options", () => {
+    const struct = new (Struct.new("foo", "bar"))() as unknown as { foo: unknown; bar: unknown };
+    struct.foo = "hello";
+    struct.bar = "world";
+    const json = ActiveSupportJSON.encode(struct, { only: ["foo"] });
+
+    expect(JSON.parse(json)).toEqual({ foo: "hello" });
+  });
+
+  it("struct to json with options nested", () => {
+    const klass = Struct.new("foo", "bar");
+    const struct = new klass("hello", "world");
+    const parentStruct = new klass(struct, "world");
+    const json = ActiveSupportJSON.encode(parentStruct, { only: ["foo"] });
+
+    expect(JSON.parse(json)).toEqual({ foo: { foo: "hello" } });
+  });
+
+  it("struct encoding", () => {
+    const UserNameAndEmail = Struct.new("name", "email");
+    const UserNameAndDate = Struct.new("name", "date");
+    const Custom = Struct.new("name", "sub");
+    const userEmail = new UserNameAndEmail("David", "sample@example.com");
+    const userBirthday = new UserNameAndDate("David", new RubyDate(2010, 1, 1));
+    const custom = new Custom("David", userBirthday);
+
+    const jsonStrings = ActiveSupportJSON.encode(userEmail);
+    const jsonStringAndDate = ActiveSupportJSON.encode(userBirthday);
+    const jsonCustom = ActiveSupportJSON.encode(custom);
+
+    expect(ActiveSupportJSON.decode(jsonCustom)).toEqual({
+      name: "David",
+      sub: { name: "David", date: "2010-01-01" },
+    });
+    expect(ActiveSupportJSON.decode(jsonStrings)).toEqual({
+      name: "David",
+      email: "sample@example.com",
+    });
+    expect(ActiveSupportJSON.decode(jsonStringAndDate)).toEqual({
+      name: "David",
+      date: "2010-01-01",
+    });
+  });
+
+  it.skip("data encoding", () => {});
+
+  it.skip("json gem dump by passing active support encoder", () => {});
+
+  it.skip("json gem generate by passing active support encoder", () => {});
+
+  it.skip("json gem pretty generate by passing active support encoder", () => {});
+
+  it.skip("to json works on io objects", () => {});
 });

@@ -186,8 +186,20 @@ describe("SyncLogSubscriberTest", () => {
     assertNotEmpty(logger.logged(":debug"));
   });
 
+  class MockSemanticLogger extends MockLogger {
+    static readonly LEVELS = [":debug", ":info"];
+
+    override get level(): unknown {
+      return MockSemanticLogger.LEVELS[super.level as number];
+    }
+
+    override set level(value: unknown) {
+      super.level = value;
+    }
+  }
+
   it("subscribe log level with non numeric levels", () => {
-    const semanticLogger = new MockLogger();
+    const semanticLogger = new MockSemanticLogger();
     setLogger.call(t, semanticLogger);
     MyLogSubscriber.logger = semanticLogger as unknown as Logger;
     semanticLogger.level = Logger.INFO;
