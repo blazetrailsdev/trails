@@ -220,7 +220,7 @@ describe("EngineRakeTasksTest", () => {
         "runWithCapture",
       ).mockResolvedValue(undefined);
       await new CLI.Upgrade().call();
-      expect(exec).toHaveBeenLastCalledWith("bundle exec vite upgrade_packages");
+      expect(exec).toHaveBeenLastCalledWith("bin/vite upgrade_packages");
       await new CLI.UpgradePackages().call();
 
       const { mode, ssrOutputDir } = await ViteAssets.config();
