@@ -393,7 +393,6 @@ export class Unpacker {
     this.uk.headByte = HEAD_BYTE_REQUIRED;
   }
 
-  /** @inventedArm if — PERMANENT */
   private objectComplete(object: unknown): number {
     if (
       this.freeze &&

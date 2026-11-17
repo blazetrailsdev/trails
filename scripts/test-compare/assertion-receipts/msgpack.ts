@@ -1,49 +1,22 @@
 import type { AssertionReceipt } from "../assertion-receipts.js";
 
 export const msgpack: Record<string, AssertionReceipt[]> = {
-  "msgpack:unpacker_spec.rb › feed_each enumerator": [
+  "msgpack:cruby/buffer_spec.rb › doesn't allow #dup or #clone": [
     {
-      kind: "should_be_instance_of",
-      value: null,
-      as: "assert_instance_of",
+      kind: "expect_not_to_respond_to",
+      value: "s:dup",
+      as: "assert_equal",
       reason:
-        "unpacker_spec.rb:222 `should be_instance_of(Enumerator)` — the RSpec matcher has no test-compare twin; the port's enumerator is a JS generator, asserted with `toBeInstanceOf(Iterator)`",
+        "cruby/buffer_spec.rb:594 `expect(subject).to_not respond_to :dup` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
+    },
+    {
+      kind: "expect_not_to_respond_to",
+      value: "s:clone",
+      as: "assert_equal",
+      reason:
+        "cruby/buffer_spec.rb:595 `expect(subject).to_not respond_to :clone` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
     },
   ],
-  "msgpack:factory_spec.rb › the special treatment of symbols with ext type › using the optimized symbol unpacker › preserves encoding for ASCII symbols":
-    [
-      {
-        kind: "expect_to_be",
-        value: null,
-        as: null,
-        reason:
-          'factory_spec.rb:532 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
-      },
-      {
-        kind: "expect_to_be",
-        value: null,
-        as: null,
-        reason:
-          'factory_spec.rb:534 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
-      },
-    ],
-  "msgpack:factory_spec.rb › the special treatment of symbols with ext type › using the optimized symbol unpacker › preserves encoding for UTF-8 symbols":
-    [
-      {
-        kind: "expect_to_be",
-        value: null,
-        as: null,
-        reason:
-          'factory_spec.rb:538 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
-      },
-      {
-        kind: "expect_to_be",
-        value: null,
-        as: null,
-        reason:
-          'factory_spec.rb:539 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
-      },
-    ],
   "msgpack:factory_spec.rb › the special treatment of symbols with ext type › if an ext type is registered for symbols › if using the default serializer › preserves encoding for ASCII symbols":
     [
       {
@@ -78,22 +51,40 @@ export const msgpack: Record<string, AssertionReceipt[]> = {
           'factory_spec.rb:575 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
       },
     ],
-  "msgpack:cruby/buffer_spec.rb › doesn't allow #dup or #clone": [
-    {
-      kind: "expect_not_to_respond_to",
-      value: "s:dup",
-      as: "assert_equal",
-      reason:
-        "cruby/buffer_spec.rb:594 `expect(subject).to_not respond_to :dup` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
-    },
-    {
-      kind: "expect_not_to_respond_to",
-      value: "s:clone",
-      as: "assert_equal",
-      reason:
-        "cruby/buffer_spec.rb:595 `expect(subject).to_not respond_to :clone` — vitest has no respond_to matcher, and ActiveSupport's `assertNotRespondTo` is out of reach because activesupport depends on msgpack; the port asserts `rbObjRespondTo(...)` equals false",
-    },
-  ],
+  "msgpack:factory_spec.rb › the special treatment of symbols with ext type › using the optimized symbol unpacker › preserves encoding for ASCII symbols":
+    [
+      {
+        kind: "expect_to_be",
+        value: null,
+        as: null,
+        reason:
+          'factory_spec.rb:532 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+      {
+        kind: "expect_to_be",
+        value: null,
+        as: null,
+        reason:
+          'factory_spec.rb:534 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
+  "msgpack:factory_spec.rb › the special treatment of symbols with ext type › using the optimized symbol unpacker › preserves encoding for UTF-8 symbols":
+    [
+      {
+        kind: "expect_to_be",
+        value: null,
+        as: null,
+        reason:
+          'factory_spec.rb:538 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+      {
+        kind: "expect_to_be",
+        value: null,
+        as: null,
+        reason:
+          'factory_spec.rb:539 asserts a Symbol\'s `encoding` — a Ruby Symbol is a JS string, which carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+      },
+    ],
   "msgpack:msgpack_spec.rb › in compatibility mode › does not use the bin types": [
     {
       kind: "should_start_with",
@@ -444,4 +435,13 @@ export const msgpack: Record<string, AssertionReceipt[]> = {
           'unpacker_spec.rb:868 `.encoding.should ==` — a JS string has no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
       },
     ],
+  "msgpack:unpacker_spec.rb › feed_each enumerator": [
+    {
+      kind: "should_be_instance_of",
+      value: null,
+      as: "assert_instance_of",
+      reason:
+        "unpacker_spec.rb:222 `should be_instance_of(Enumerator)` — the RSpec matcher has no test-compare twin; the port's enumerator is a JS generator, asserted with `toBeInstanceOf(Iterator)`",
+    },
+  ],
 };
