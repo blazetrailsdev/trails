@@ -253,7 +253,7 @@ describe("SolidQueue::JobTest", () => {
     expect(activeJob.concurrencyKey()).toBeNull();
 
     const job = (await Job.last()) as Job;
-    expect(job.concurrencyLimit).toBeNull();
+    expect(job.concurrencyLimit()).toBeNull();
     expect(job.isConcurrencyLimited()).toBeFalsy();
   });
 
@@ -267,7 +267,7 @@ describe("SolidQueue::JobTest", () => {
     );
 
     const job = (await Job.last()) as Job;
-    expect(job.concurrencyLimit).toBe(activeJob.concurrencyLimit);
+    expect(job.concurrencyLimit()).toBe(activeJob.concurrencyLimit);
     expect(job.concurrency_key).toBe(activeJob.concurrencyKey());
   });
 

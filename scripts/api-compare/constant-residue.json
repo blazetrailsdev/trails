@@ -1147,15 +1147,11 @@
     }
   },
   "solid-queue": {
-    "rows": 80,
+    "rows": 84,
     "excluded": [
       "active-job/concurrency-controls.ts::ClassMethods",
       "active-job/concurrency-controls.ts::ConcurrencyControls",
-      "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter",
-      "batch-execution.ts::BatchExecution",
-      "batch.ts::AlreadyFinished",
-      "batch.ts::Batch",
-      "batch.ts::PendingMigrations"
+      "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter"
     ],
     "unwalked": [],
     "residue": {}
