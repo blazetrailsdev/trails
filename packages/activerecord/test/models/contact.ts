@@ -65,6 +65,7 @@ export interface Contact {
 }
 
 await extended(Contact);
+await Contact.connectionPool().schemaCache.columnsHash(Contact.tableName!);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ContactSti extends Base {
@@ -84,3 +85,4 @@ export interface ContactSti {
 
 await extended(ContactSti);
 await ContactSti.column("type", "string");
+await ContactSti.connectionPool().schemaCache.columnsHash(ContactSti.tableName!);

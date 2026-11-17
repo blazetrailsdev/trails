@@ -373,7 +373,6 @@ function clearAdapterDataSourceCache(host: SchemaKlass): void {
   };
   type Reflection = {
     loadedCache: Cache | null;
-    clearCachedColumnsHash?: (tableName: string) => void;
   };
   let schemaReflection: Reflection | undefined;
   let table: string | null | undefined;
@@ -389,7 +388,6 @@ function clearAdapterDataSourceCache(host: SchemaKlass): void {
     return;
   }
   if (!table) return;
-  schemaReflection?.clearCachedColumnsHash?.(table);
   const cache = schemaReflection?.loadedCache;
   if (typeof cache?.clearDataSourceCacheBang === "function") {
     cache.clearDataSourceCacheBang(null, table);
