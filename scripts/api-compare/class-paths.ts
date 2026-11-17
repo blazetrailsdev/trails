@@ -977,12 +977,15 @@ async function checkConstantResidue(
 async function requireRailsManifest(): Promise<void> {
   const file = path.join(OUTPUT_DIR, "rails-api.json");
   const source = await fs.readFile(file, "utf8").catch(() => null);
-  const extractor = await fs.readFile(
-    path.join(ROOT_DIR, "scripts/api-compare/extract-ruby-api.rb"),
+  const inputs = await Promise.all(
+    [
+      "vendor/sources.lock.json",
+      "vendor/sources.ts",
+      "scripts/api-compare/extract-ruby-api.rb",
+    ].map((p) => fs.readFile(path.join(ROOT_DIR, p))),
   );
-  const current = createHash("sha256").update(extractor).digest("hex").slice(0, 16);
-  const built =
-    source === null ? null : (JSON.parse(source) as { extractorHash?: string }).extractorHash;
+  const current = createHash("sha256").update(Buffer.concat(inputs)).digest("hex").slice(0, 16);
+  const built = source === null ? null : (JSON.parse(source) as { inputsHash?: string }).inputsHash;
   if (built === current) return;
   throw new globalThis.Error(
     `${path.relative(ROOT_DIR, file)} is ${source === null ? "missing" : "stale"}: run \`pnpm parity:api\` before \`pnpm parity:class-paths\``,

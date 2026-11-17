@@ -5473,6 +5473,9 @@ def run
     source: "ruby",
     generatedAt: Time.now.utc.iso8601,
     extractorHash: EXTRACTOR_HASH,
+    inputsHash: Digest::SHA256.hexdigest(
+      [ENV.fetch("LOCKFILE_PATH"), File.join(File.dirname(ENV.fetch("LOCKFILE_PATH")), "sources.ts"), __FILE__].map { |f| File.binread(f) }.join
+    )[0, 16],
     packages: {},
   }
 
