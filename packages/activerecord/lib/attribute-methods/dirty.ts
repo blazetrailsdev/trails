@@ -1,3 +1,4 @@
+import { _loadSerializedAttributes } from "../type/serialized.js";
 import { RuntimeError, rbObjAsString, rbCallSuper } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
@@ -172,6 +173,7 @@ export async function _touchRow(
     }
 
     this.changesApplied();
+    await _loadSerializedAttributes(this as never);
     for (const [attrName, value] of changes) {
       this._writeAttribute(attrName, value);
     }
@@ -192,6 +194,7 @@ export async function _updateRecord(
   attributeNames ??= attributeNamesForPartialUpdates.call(this);
   const affectedRows = await superFn(attributeNames);
   this.changesApplied();
+  await _loadSerializedAttributes(this as never);
   return affectedRows;
 }
 
@@ -204,6 +207,7 @@ export async function _createRecord(
   attributeNames ??= attributeNamesForPartialInserts.call(this);
   const id = await superFn(attributeNames);
   this.changesApplied();
+  await _loadSerializedAttributes(this as never);
   return id;
 }
 

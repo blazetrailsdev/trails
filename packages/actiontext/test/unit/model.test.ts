@@ -44,14 +44,16 @@ describe("ActionText::ModelTest", () => {
   fixturesAll();
 
   it("html conversion", async () => {
-    const message = new Messages({ subject: "Greetings", content: "<h1>Hello world</h1>" });
+    const message = new Messages();
+    await message.setAttributes({ subject: "Greetings", content: "<h1>Hello world</h1>" });
     expect(`${await message.content.toString()}`).toEqual(
       `<div class="trix-content">\n  <h1>Hello world</h1>\n</div>\n`,
     );
   });
 
   it("plain text conversion", async () => {
-    const message = new Messages({ subject: "Greetings", content: "<h1>Hello world</h1>" });
+    const message = new Messages();
+    await message.setAttributes({ subject: "Greetings", content: "<h1>Hello world</h1>" });
     expect(await message.content.toPlainText()).toEqual("Hello world");
   });
 
@@ -83,7 +85,7 @@ describe("ActionText::ModelTest", () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
     const message = await Messages.createBang({
       subject: "Greetings",
-      content: await new Content("Hello world").appendAttachables(blob),
+      content: await (await Content.new("Hello world")).appendAttachables(blob),
     });
     const embeds = (await (message.content as unknown as { embeds: { blobs: unknown } }).embeds
       .blobs) as Array<{ filename: { toString(): string } }>;
@@ -94,7 +96,7 @@ describe("ActionText::ModelTest", () => {
     const remoteImageHtml =
       '<action-text-attachment content-type="image" url="http://example.com/cat.jpg"></action-text-attachment>';
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
-    const content = await new Content(remoteImageHtml).appendAttachables(blob);
+    const content = await (await Content.new(remoteImageHtml)).appendAttachables(blob);
     const message = await Messages.createBang({ subject: "Greetings", content: content });
     expect(
       (await message.content.body!.attachables()).map((attachable) => attachable!.constructor),
@@ -106,7 +108,7 @@ describe("ActionText::ModelTest", () => {
 
   it("embed extraction deduplicates file attachments", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
-    const content = await new Content("Hello world").appendAttachables([blob, blob]);
+    const content = await (await Content.new("Hello world")).appendAttachables([blob, blob]);
 
     await assertNothingRaised(async () => {
       await Messages.createBang({ subject: "Greetings", content: content });
@@ -230,23 +232,19 @@ describe("ActionText::ModelTest", () => {
   });
 
   it("if disallowing blanks, can still validate presence", async () => {
-    const message1 = new MessagesWithoutBlanksWithContentValidation({
-      subject: "Greetings",
-      content: "",
-    });
+    const message1 = new MessagesWithoutBlanksWithContentValidation();
+    await message1.setAttributes({ subject: "Greetings", content: "" });
     await message1.content.toPlainText();
     expect(await message1.isValid()).toBeFalsy();
-    message1.content = "content" as never;
+    await (message1 as unknown as { setContent(b: unknown): Promise<void> }).setContent("content");
     await message1.content.toPlainText();
     expect(await message1.isValid()).toBeTruthy();
 
-    const message2 = new MessagesWithoutBlanksWithContentValidation({
-      subject: "Greetings",
-      content: "content",
-    });
+    const message2 = new MessagesWithoutBlanksWithContentValidation();
+    await message2.setAttributes({ subject: "Greetings", content: "content" });
     await message2.content.toPlainText();
     expect(await message2.isValid()).toBeTruthy();
-    message2.content = "" as never;
+    await (message2 as unknown as { setContent(b: unknown): Promise<void> }).setContent("");
     await message2.content.toPlainText();
     expect(await message2.isValid()).toBeFalsy();
   });

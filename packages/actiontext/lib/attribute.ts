@@ -47,29 +47,29 @@ function hasRichText(
     return isPresent(richText);
   } as never);
 
-  let writer: (this: RichTextHost, body: unknown) => void;
+  let writer: (this: RichTextHost, body: unknown) => Promise<void>;
   if (storeIfBlank) {
-    writer = function (body) {
-      reader.call(this).body = body as never;
+    writer = async function (body) {
+      await reader.call(this).setBody(body);
     };
   } else {
-    writer = function (body) {
+    writer = async function (body) {
       if (isPresent(body)) {
-        reader.call(this).body = body as never;
+        await reader.call(this).setBody(body);
       } else {
         const richText = loadedRichText(this, associationName);
         if (isPresent(richText)) {
-          reader.call(this).body = body as never;
+          await reader.call(this).setBody(body);
           reader.call(this).markForDestruction();
         }
       }
     };
   }
+  mixin.defineMethod(`set${camelize(name)}`, writer as never);
 
   mixin.moduleEval((m) => {
     Object.defineProperty(m, name, {
       get: reader,
-      set: writer,
       configurable: true,
       enumerable: true,
     });

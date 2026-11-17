@@ -39,7 +39,8 @@ describe("ActionText::MailerRenderTest", () => {
       };
 
       const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
-      const message = new Message({ content: await new Content().appendAttachables(blob) });
+      const message = new Message();
+      await message.setAttributes({ content: await (await Content.new()).appendAttachables(blob) });
 
       await (MessagesMailer.with({ recipient: "test", message: message }) as unknown as Notifier)
         .notification()

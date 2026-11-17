@@ -1,8 +1,16 @@
-import { Mutable, ValueType, BinaryData } from "@blazetrails/activemodel";
+import {
+  Mutable,
+  ValueType,
+  BinaryData,
+  type Attribute,
+  type AttributeSet,
+} from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
 import { DelegateClass, rbEqual, rbObjInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
-import type { ColumnSerializer } from "../coders/column-serializer.js";
+import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
+import { ColumnSerializer } from "../coders/column-serializer.js";
+import { JSON } from "../coders/json.js";
 
 type Coder = Pick<ColumnSerializer, "dump" | "load"> &
   Partial<Pick<ColumnSerializer, "objectClass" | "assertValidValue">>;
@@ -22,7 +30,9 @@ export class Serialized extends DelegateClass(ValueType) {
     return IndifferentHashAccessor;
   }
 
+  /** @inventedArm then — PERMANENT */
   deserialize(value: unknown): unknown {
+    if (value instanceof Promise) return value.then((v) => this.deserialize(v));
     if (this.isDefaultValue(value)) {
       return value;
     } else {
@@ -30,10 +40,13 @@ export class Serialized extends DelegateClass(ValueType) {
     }
   }
 
+  /** @inventedArm then — PERMANENT */
   serialize(value: unknown): unknown {
     if (value == null) return null;
     if (!this.isDefaultValue(value)) {
-      return super.serialize(this.coder.dump(value));
+      const dumped: unknown = this.coder.dump(value);
+      if (dumped instanceof Promise) return dumped.then((d) => super.serialize(d));
+      return super.serialize(dumped);
     }
     return null;
   }
@@ -84,3 +97,32 @@ export class Serialized extends DelegateClass(ValueType) {
 export interface Serialized extends Mutable {}
 
 include(Serialized, Mutable);
+
+/** @noRailsEquivalent PERMANENT */
+export async function _loadSerializedAttributes(record: {
+  _attributes: AttributeSet;
+}): Promise<void> {
+  const attributes = record._attributes;
+  for (const name of attributes.keys()) {
+    const attribute = attributes.getAttribute(name) as Attribute & {
+      _value?: unknown;
+      typeCast(value: unknown): unknown;
+    };
+    const type = attribute.type;
+    const castType = type instanceof EncryptedAttributeType ? type.castType : type;
+    if (!(castType instanceof Serialized)) continue;
+    if (castType.coder instanceof ColumnSerializer || castType.coder === JSON) continue;
+
+    let value: unknown;
+    if (Object.hasOwn(attribute, "_value")) {
+      value = attribute._value;
+    } else {
+      try {
+        value = attribute.typeCast(attribute.valueBeforeTypeCast);
+      } catch {
+        continue;
+      }
+    }
+    if (value instanceof Promise) attribute._value = await value;
+  }
+}

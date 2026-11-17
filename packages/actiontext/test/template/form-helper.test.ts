@@ -68,7 +68,8 @@ describe("ActionText::FormHelperTest", () => {
   });
 
   it("#rich_textarea helper renders the :value argument into the hidden field", async () => {
-    const message = new Message({ content: "<h1>hello world</h1>" } as any);
+    const message = new Message();
+    await message.setAttributes({ content: "<h1>hello world</h1>" });
 
     tc.concat(
       await tc.richTextarea("message", "title", {

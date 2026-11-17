@@ -1,4 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { _loadSerializedAttributes } from "./type/serialized.js";
 import { isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
@@ -739,6 +740,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       }
       if (token !== this._loadToken) return [];
       const records = this.instantiateRecords(rows, block);
+      for (const record of records) await _loadSerializedAttributes(record);
 
       if (!this.skipPreloadingValue) {
         await this.preloadAssociations(records);

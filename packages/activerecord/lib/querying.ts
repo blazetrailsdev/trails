@@ -1,4 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
+import { _loadSerializedAttributes } from "./type/serialized.js";
 import { hasKey, toI } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "./timestamp.js";
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
@@ -155,7 +156,13 @@ export async function findBySql<T extends typeof Base>(
         allowRetry,
       }) as Promise<Result>,
   );
-  return _loadFromSql.call<T, [Result, typeof block], InstanceType<T>[]>(this, result, block);
+  const records = _loadFromSql.call<T, [Result, typeof block], InstanceType<T>[]>(
+    this,
+    result,
+    block,
+  );
+  for (const record of records) await _loadSerializedAttributes(record);
+  return records;
 }
 
 export async function asyncFindBySql<T extends typeof Base>(
@@ -175,9 +182,15 @@ export async function asyncFindBySql<T extends typeof Base>(
         allowRetry,
         async: true,
       }) as Promise<Result>,
-  ).then((result) =>
-    _loadFromSql.call<T, [Result, typeof block], InstanceType<T>[]>(this, result, block),
-  );
+  ).then(async (result) => {
+    const records = _loadFromSql.call<T, [Result, typeof block], InstanceType<T>[]>(
+      this,
+      result,
+      block,
+    );
+    for (const record of records) await _loadSerializedAttributes(record);
+    return records;
+  });
 }
 
 export async function countBySql(

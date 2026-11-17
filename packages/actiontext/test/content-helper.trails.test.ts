@@ -56,7 +56,7 @@ describe("ContentHelper rendering", () => {
     return String(
       await (
         view as unknown as { renderActionTextContent(c: Content): Promise<unknown> }
-      ).renderActionTextContent(await new Content(html).canonicalized),
+      ).renderActionTextContent(await Content.new(html)),
     );
   };
 
@@ -89,7 +89,7 @@ describe("ContentHelper rendering", () => {
     }
     lookupContext.appendViewPaths([new FixtureResolver(files)]);
     const view = new View(lookupContext, {}, null);
-    const content = await new Content("<p>hello</p>").canonicalized;
+    const content = await Content.new("<p>hello</p>");
     const html = String(
       await view.render({
         partial: content.toPartialPath(),

@@ -2,23 +2,24 @@ import { Concern, extend, type Extended } from "@blazetrails/activesupport";
 import { ActionText } from "./action-text.js";
 
 interface SerializationHost {
-  new (content: unknown): { toHtml(): string };
+  prototype: { toHtml(): string };
+  "new"(content: unknown): Promise<{ toHtml(): string }>;
 }
 
 function load(this: SerializationHost, content: unknown): unknown {
-  if (content != null && content !== false) return new this(content);
+  if (content != null && content !== false) return this.new(content);
   return null;
 }
 
-function dump(this: SerializationHost, content: unknown): string | null {
+function dump(this: SerializationHost, content: unknown): string | null | Promise<string | null> {
   if (content == null) {
     return null;
-  } else if (content instanceof this) {
+  } else if (content instanceof (this as unknown as abstract new () => { toHtml(): string })) {
     return content.toHtml();
   } else if (content instanceof ActionText.RichText!) {
     return content.body!.toHtml();
   } else {
-    return new this(content).toHtml();
+    return this.new(content).then((content_) => content_.toHtml());
   }
 }
 

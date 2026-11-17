@@ -4,7 +4,7 @@ import { Content } from "../../lib/content.js";
 import { Fragment } from "../../lib/fragment.js";
 
 async function assertConvertedTo(plainText: string, html: string | Fragment): Promise<void> {
-  expect(await new Content(html).toPlainText()).toBe(plainText);
+  expect(await (await Content.new(html)).toPlainText()).toBe(plainText);
 }
 
 describe("ActionText::PlainTextConversionTest", () => {
