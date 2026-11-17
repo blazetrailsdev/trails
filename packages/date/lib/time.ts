@@ -213,14 +213,13 @@ function isTimeNewOptions(arg: unknown): arg is TimeNewOptions {
   return (
     typeof arg === "object" &&
     arg !== null &&
-    !(arg instanceof Rational) &&
-    !(arg instanceof Timezone)
+    [Object.prototype, null].includes(Object.getPrototypeOf(arg))
   );
 }
 
 /** @noRailsEquivalent PERMANENT */
 export interface TimeAtOptions {
-  in?: string | number | Timezone | null;
+  in?: string | number | Timezone | object | null;
 }
 
 function getScale(unit: string): number {
@@ -348,7 +347,7 @@ function timeInitParse(
 
 /** @noRailsEquivalent PERMANENT */
 export interface TimeNewOptions {
-  in?: string | number | Timezone | null;
+  in?: string | number | Timezone | object | null;
   precision?: number | null;
 }
 
@@ -562,15 +561,15 @@ export function rbTimeZoneAbbreviation(zone: unknown, time: Time): string {
 export class Time extends rbCTime {
   #vtmMemo: Vtm | null;
   /** @internal */
-  #instantMemo: Temporal.Instant | null;
+  #instantMemo!: Temporal.Instant | null;
   /** @internal */
-  #timeZoneId: string | null;
+  #timeZoneId!: string | null;
   /** @internal */
-  #tzmodeUtc: boolean;
+  #tzmodeUtc!: boolean;
   /** @internal */
-  #localZone: boolean;
+  #localZone!: boolean;
   /** @internal */
-  #utcOffsetMemo: number | null;
+  #utcOffsetMemo!: number | null;
   /** @internal */
   #subnano: Rational;
   /** @internal */
@@ -620,7 +619,9 @@ export class Time extends rbCTime {
         : zoneOffsetAt(this.#timeZoneId!, this.#epochNs, this.#localZone));
   }
 
-  static now({ in: inZone = null }: { in?: string | number | Timezone | null } = {}): Time {
+  static now({
+    in: inZone = null,
+  }: { in?: string | number | Timezone | object | null } = {}): Time {
     return Time.#atInstant(Temporal.Instant.fromEpochNanoseconds(systemEpochNs()), inZone);
   }
 
@@ -631,7 +632,7 @@ export class Time extends rbCTime {
     hour: number | string | TimeNewOptions | null = 0,
     min: number | string | TimeNewOptions | null = 0,
     sec: number | string | Rational | TimeNewOptions | null = 0,
-    zone: string | number | Rational | Timezone | TimeNewOptions | null = null,
+    zone: string | number | Rational | Timezone | object | TimeNewOptions | null = null,
     options: TimeNewOptions = {},
   ): Time {
     const given = [year, month, day, hour, min, sec, zone];
@@ -666,7 +667,7 @@ export class Time extends rbCTime {
       hour as number | string | null,
       min as number | string | null,
       sec as number | string | Rational | null,
-      zone as string | number | Rational | Timezone | null,
+      zone as string | number | Rational | Timezone | object | null,
       options,
     );
   }
@@ -1446,7 +1447,7 @@ export class Time extends rbCTime {
     hour: number | string | null = 0,
     min: number | string | null = 0,
     sec: number | string | Rational | null = 0,
-    zone: string | number | Rational | Timezone | null = null,
+    zone: string | number | Rational | Timezone | object | null = null,
     options: TimeNewOptions = {},
   ) {
     super();
@@ -1489,6 +1490,12 @@ export class Time extends rbCTime {
     d.setUTCHours(hour, min, wholeSec);
     this.#vtmMemo = vtmFromDate(d, nsec);
     const zoneArgument = zone ?? options.in ?? null;
+    if (
+      maybeTzobjP(zoneArgument) &&
+      !(zoneArgument instanceof Timezone) &&
+      this.#zoneTimelocal(zoneArgument)
+    )
+      return;
     const zoneObject =
       zoneArgument instanceof Timezone
         ? zoneArgument.identifier
@@ -1533,6 +1540,35 @@ export class Time extends rbCTime {
         }
       }
     }
+  }
+
+  /**
+   * `zone_timelocal` (`vendor/ruby/v3.3.11/time.c:2387-2411`).
+   *
+   * @internal
+   */
+  #zoneTimelocal(zone: object): boolean {
+    if (!rbObjRespondTo(zone, "localToUtc")) return false;
+    const nsec = BigInt(this.#vtm.nsec);
+    const t = utcEpochNanoseconds(this.#vtm) - nsec;
+    const tm = Time.#atInstant(t, "UTC", false);
+    const utc = (zone as { localToUtc(tm: Time): unknown }).localToUtc(tm);
+    const s =
+      utc instanceof Time
+        ? utc.#epochNs
+        : (utc as Temporal.ZonedDateTime | Temporal.Instant).epochNanoseconds;
+    this.#utcOffsetMemo = Number(t - s) / 1_000_000_000;
+    this.#epochNsMemo = s + nsec;
+    this.#instantMemo = null;
+    this.#timeZoneId = null;
+    this.#tzmodeUtc = false;
+    this.#localZone = false;
+    this.#zoneObject = zone;
+    const dst = rbObjRespondTo(zone, "isDst")
+      ? (zone as { isDst(tm: Time): unknown }).isDst(tm)
+      : undefined;
+    this.#isdstMemo = dst !== undefined && dst != null && dst !== false;
+    return true;
   }
 
   get year(): number {
