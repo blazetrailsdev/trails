@@ -25,7 +25,6 @@ import {
 import { Recurrable } from "./job/recurrable.js";
 import { Batchable, type ClassMethods as BatchableClassMethods } from "./job/batchable.js";
 import type { Retryable } from "./job/retryable.js";
-import type { Duration } from "@blazetrails/activesupport";
 
 export class EnqueueError extends StandardError {}
 
@@ -70,13 +69,15 @@ export class Job extends Record {
     className?: string | null;
   }) => Relation<Job>;
   declare static clearFinishedInBatches: typeof ClearableClassMethods.clearFinishedInBatches;
-  declare static releaseAllConcurrencyLocks: typeof ConcurrencyControlsClassMethods.releaseAllConcurrencyLocks;
+  declare static unblockNextBlockedJobs: typeof ConcurrencyControlsClassMethods.unblockNextBlockedJobs;
   declare claimedExecution: Promise<Base | null>;
   declare failedExecution: Promise<FailedExecution | null>;
   declare recurringExecution: Promise<import("./recurring-execution.js").RecurringExecution | null>;
   declare blockedExecution: Promise<Base | null>;
-  declare concurrencyLimit: number | null;
-  declare concurrencyDuration: Duration;
+  declare concurrencyLimit: typeof ConcurrencyControls.prototype.concurrencyLimit;
+  declare concurrencyDuration: typeof ConcurrencyControls.prototype.concurrencyDuration;
+  declare acquiredSemaphoreId: typeof ConcurrencyControls.prototype.acquiredSemaphoreId;
+  declare acquiredConcurrencyLimit: typeof ConcurrencyControls.prototype.acquiredConcurrencyLimit;
   declare unblockNextBlockedJob: typeof ConcurrencyControls.prototype.unblockNextBlockedJob;
   declare isConcurrencyLimited: typeof ConcurrencyControls.prototype.isConcurrencyLimited;
   declare acquireConcurrencyLock: typeof ConcurrencyControls.prototype.acquireConcurrencyLock;

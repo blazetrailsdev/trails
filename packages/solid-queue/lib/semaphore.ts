@@ -3,7 +3,6 @@ import { RecordNotUnique, type Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
 import { constSet, Range } from "@blazetrails/ruby-compat";
 import { Record } from "./record.js";
-import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import type { Job } from "./job.js";
 
 export class Semaphore extends Record {
@@ -24,16 +23,12 @@ export class Semaphore extends Record {
     });
   }
 
-  static async wait(job: Job | ActiveJobBase): Promise<boolean> {
+  static async wait(job: Job): Promise<number | null> {
     return await new Proxy(job).wait();
   }
 
-  static async signal(job: Job | ActiveJobBase): Promise<boolean> {
+  static async signal(job: Job): Promise<boolean> {
     return await new Proxy(job).signal();
-  }
-
-  static async signalAll(jobs: Job[]): Promise<number> {
-    return await Proxy.signalAll(jobs);
   }
 
   static async createUniqueBy(attributes: { [key: string]: unknown }): Promise<unknown> {
@@ -51,23 +46,19 @@ export class Semaphore extends Record {
 }
 
 export class Proxy {
-  static async signalAll(jobs: Job[]): Promise<number> {
-    return await Semaphore.where({ key: jobs.map((job) => job.concurrency_key) }).updateAll(
-      "value = value + 1",
-    );
-  }
-
   /** @internal */
-  private job: Job | ActiveJobBase;
+  private job: Job;
 
-  constructor(job: Job | ActiveJobBase) {
+  constructor(job: Job) {
     this.job = job;
   }
 
-  async wait(): Promise<boolean> {
-    const semaphore = await Semaphore.findBy({ key: this.key() });
+  async wait(): Promise<number | null> {
+    const semaphore = await Semaphore.lock().findBy({ key: this.key() });
     if (semaphore) {
-      return semaphore.value > 0 && (await this.attemptDecrement());
+      return semaphore.value > 0 && (await this.attemptDecrement())
+        ? (semaphore.id as number)
+        : null;
     } else {
       return await this.attemptCreation();
     }
@@ -75,26 +66,6 @@ export class Proxy {
 
   async signal(): Promise<boolean> {
     return await this.attemptIncrement();
-  }
-
-  /** @internal */
-  private async attemptCreation(): Promise<boolean> {
-    if (
-      await Semaphore.createUniqueBy({
-        key: this.key(),
-        value: this.limit() - 1,
-        expires_at: this.expiresAt(),
-      })
-    ) {
-      return true;
-    } else {
-      return await this.checkLimitOrDecrement();
-    }
-  }
-
-  /** @internal */
-  private async checkLimitOrDecrement(): Promise<boolean> {
-    return this.limit() === 1 ? false : await this.attemptDecrement();
   }
 
   /** @internal */
@@ -107,30 +78,67 @@ export class Proxy {
   }
 
   /** @internal */
+  private async attemptCreation(): Promise<number | null> {
+    if (
+      await Semaphore.createUniqueBy({
+        key: this.key(),
+        value: this.limit() - 1,
+        expires_at: this.expiresAt(),
+      })
+    ) {
+      return await this.acquiredSemaphoreId();
+    } else {
+      return await this.checkLimitOrDecrement();
+    }
+  }
+
+  /** @internal */
+  private async acquiredSemaphoreId(): Promise<number | null> {
+    return (await Semaphore.lock().where({ key: this.key() }).pick("id")) as number | null;
+  }
+
+  /** @internal */
+  private async checkLimitOrDecrement(): Promise<number | null> {
+    return this.limit() > 1 && (await this.attemptDecrement())
+      ? await this.acquiredSemaphoreId()
+      : null;
+  }
+
+  /** @internal */
   private async attemptIncrement(): Promise<boolean> {
     return (
-      (await Semaphore.where({
-        key: this.key(),
-        value: new Range(null, this.limit(), true),
-      }).updateAll(["value = value + 1, expires_at = ?", this.expiresAt()])) > 0
+      (await this.semaphoreToRelease()
+        .where({ value: new Range(null, this.limitToRelease(), true) })
+        .updateAll(["value = value + 1, expires_at = ?", this.expiresAt()])) > 0
     );
   }
 
-  /**
-   * @internal
-   * @inventedArm concurrencyKey — PERMANENT
-   */
+  /** @internal */
+  private semaphoreToRelease(): Relation<Semaphore> {
+    if (this.job.acquiredSemaphoreId() != null) {
+      return Semaphore.where({ id: this.job.acquiredSemaphoreId() });
+    } else {
+      return Semaphore.where({ key: this.key() });
+    }
+  }
+
+  /** @internal */
+  private limitToRelease(): number {
+    return this.job.acquiredConcurrencyLimit() ?? this.limit();
+  }
+
+  /** @internal */
   private key(): string | null {
-    return "concurrency_key" in this.job ? this.job.concurrency_key : this.job.concurrencyKey();
+    return this.job.concurrency_key;
   }
 
   /** @internal */
   private expiresAt(): unknown {
-    return this.job.concurrencyDuration.fromNow();
+    return this.job.concurrencyDuration().fromNow();
   }
 
   /** @internal */
   private limit(): number {
-    return this.job.concurrencyLimit ?? 1;
+    return this.job.concurrencyLimit()!;
   }
 }

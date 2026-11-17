@@ -199,9 +199,9 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("rely on dispatcher to unblock blocked executions with an available semaphore", async () => {
-    const job = (await SequentialUpdateResultJob.performLater(result, {
-      name: "A",
-    })) as SequentialUpdateResultJob;
+    const job = await Job.findByBang({
+      active_job_id: (await SequentialUpdateResultJob.performLater(result, { name: "A" }))!.jobId,
+    });
 
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
@@ -239,9 +239,9 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("rely on dispatcher to unblock blocked executions with an expired semaphore", async () => {
-    const job = (await SequentialUpdateResultJob.performLater(result, {
-      name: "A",
-    })) as SequentialUpdateResultJob;
+    const job = await Job.findByBang({
+      active_job_id: (await SequentialUpdateResultJob.performLater(result, { name: "A" }))!.jobId,
+    });
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
 
@@ -263,7 +263,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       },
     );
 
-    await Semaphore.where({ key: job.concurrencyKey() }).updateAll({
+    await Semaphore.where({ key: job.concurrency_key }).updateAll({
       expires_at: minutes(15).ago(),
     });
     await BlockedExecution.updateAll({ expires_at: minutes(15).ago() });

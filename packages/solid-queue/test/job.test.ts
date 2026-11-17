@@ -294,7 +294,7 @@ describe("SolidQueue::JobTest", () => {
 
     const acquired: [string, number][] = [];
     vi.spyOn(Semaphore, "wait").mockImplementation(async (job) => {
-      acquired.push([(job as Job).concurrency_key!, (job as Job).id as number]);
+      acquired.push([job.concurrency_key!, job.id as number]);
       return true;
     });
 
@@ -476,13 +476,13 @@ describe("SolidQueue::JobTest", () => {
       performAllLater(activeJobs),
     );
 
+    await assertJobCounts({ blocked: -2 }, () => BlockedExecution.discardAllFromJobs(Job.all()));
+
     await assertJobCounts({ ready: -5 }, () => ReadyExecution.discardAllFromJobs(Job.all()));
 
     await assertJobCounts({ scheduled: -2 }, () =>
       ScheduledExecution.discardAllFromJobs(Job.all()),
     );
-
-    await assertJobCounts({ blocked: -2 }, () => BlockedExecution.discardAllFromJobs(Job.all()));
   });
 
   it("enqueue successfully inside a rolled-back transaction in the app DB", async () => {
