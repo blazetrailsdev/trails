@@ -22,6 +22,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 import * as prettier from "prettier";
 import {
@@ -973,24 +974,18 @@ async function checkConstantResidue(
   else stale.push(`${path.relative(ROOT_DIR, RECORD)} (run with --check --record)`);
 }
 
-const RAILS_INPUTS = [
-  "vendor/sources.lock.json",
-  "vendor/sources.ts",
-  "scripts/api-compare/extract-ruby-api.rb",
-];
-
 async function requireRailsManifest(): Promise<void> {
   const file = path.join(OUTPUT_DIR, "rails-api.json");
-  const built = await fs.stat(file).then(
-    (s) => s.mtimeMs,
-    () => null,
+  const source = await fs.readFile(file, "utf8").catch(() => null);
+  const extractor = await fs.readFile(
+    path.join(ROOT_DIR, "scripts/api-compare/extract-ruby-api.rb"),
   );
-  const inputs = await Promise.all(
-    RAILS_INPUTS.map((p) => fs.stat(path.join(ROOT_DIR, p)).then((s) => s.mtimeMs)),
-  );
-  if (built !== null && inputs.every((m) => built >= m)) return;
+  const current = createHash("sha256").update(extractor).digest("hex").slice(0, 16);
+  const built =
+    source === null ? null : (JSON.parse(source) as { extractorHash?: string }).extractorHash;
+  if (built === current) return;
   throw new globalThis.Error(
-    `${path.relative(ROOT_DIR, file)} is ${built === null ? "missing" : "stale"}: run \`pnpm parity:api\` before \`pnpm parity:class-paths\``,
+    `${path.relative(ROOT_DIR, file)} is ${source === null ? "missing" : "stale"}: run \`pnpm parity:api\` before \`pnpm parity:class-paths\``,
   );
 }
 
