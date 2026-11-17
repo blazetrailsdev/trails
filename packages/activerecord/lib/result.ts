@@ -2,7 +2,10 @@ import { isPlainObject } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   block,
+  eachKey,
   fetch,
+  hasKey,
+  keys as hashKeys,
   type Hash,
   hashAref,
   KeyError,
@@ -20,10 +23,10 @@ export type ColumnTypes = Record<string | number, ColumnType>;
 const EMPTY_COLUMN_TYPES: ColumnTypes = Object.freeze({}) as ColumnTypes;
 
 export class IndexedRow {
-  private readonly columnIndexes: Record<string, number>;
+  private readonly columnIndexes: Record<string, number> | Hash<string, number>;
   private readonly row: unknown[];
 
-  constructor(columnIndexes: Record<string, number>, row: unknown[]) {
+  constructor(columnIndexes: Record<string, number> | Hash<string, number>, row: unknown[]) {
     this.columnIndexes = columnIndexes;
     this.row = row;
   }
@@ -37,15 +40,15 @@ export class IndexedRow {
   }
 
   keys(): string[] {
-    return Object.keys(this.columnIndexes);
+    return hashKeys(this.columnIndexes);
   }
 
   eachKey(block: (key: string) => void): void {
-    for (const key of Object.keys(this.columnIndexes)) block(key);
+    eachKey(this.columnIndexes, block);
   }
 
   isKey(column: string): boolean {
-    return Object.hasOwn(this.columnIndexes, column);
+    return hasKey(this.columnIndexes, column);
   }
 
   fetch(column: string, block?: () => unknown): unknown {
