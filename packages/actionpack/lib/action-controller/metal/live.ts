@@ -14,6 +14,7 @@ import {
   SizedQueue,
   Thread,
   ThreadError,
+  each,
   excBacktrace,
   isSymbol,
   rbCallSuper,
@@ -210,9 +211,9 @@ export class Response extends DispatchResponse {
    */
   buildBuffer(response: DispatchResponse, body: Iterable<string>): Buffer {
     const buf = new Buffer(response);
-    new Thread(async () => {
-      for (const part of body) await buf.write(part);
-    });
+    const writes: Promise<void>[] = [];
+    each(body, (part) => writes.push(buf.write(part)));
+    new Thread(() => Promise.all(writes));
     return buf;
   }
 }
