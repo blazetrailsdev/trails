@@ -324,13 +324,13 @@ export class Trailtie extends BaseTrailtie {
       await initializeDatabase;
     });
 
+    let activeRecord: typeof Base | undefined;
+    onLoad("active_record", (base: typeof Base) => {
+      activeRecord = base;
+    });
     /** @noRailsEquivalent PERMANENT */
     this.config.toPrepare(async () => {
       if (Trails.env["test?"]()) return;
-      let activeRecord: typeof Base | undefined;
-      onLoad("active_record", (base: typeof Base) => {
-        activeRecord = base;
-      });
       if (activeRecord === undefined) return;
       for (const pool of activeRecord.connectionHandler.connectionPoolList("all")) {
         try {
