@@ -1,6 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { File, RuntimeError } from "@blazetrails/ruby-compat";
 import { Application } from "../lib/application.js";
+import { FileTask } from "../lib/file-task.js";
 import { FileList } from "../lib/file-list.js";
 import { Rake } from "../lib/rake-module.js";
 import { Task, type TaskAction } from "../lib/task.js";
@@ -154,5 +155,19 @@ describe("Rake::Task", () => {
     let ran = false;
     await task("t", [], () => void (ran = true)).invoke();
     expect(ran).toBe(false);
+  });
+
+  it("judges a file task out of date against a plain task in the mtime's millisecond", async () => {
+    const mtime = new Date(1_700_000_000_123);
+    const mtimeSpy = vi.spyOn(File, "mtimeAsync").mockResolvedValue(mtime);
+    vi.useFakeTimers({ now: mtime, toFake: ["Date"] });
+    try {
+      task("prepare");
+      const file = app.intern(FileTask, "scopedep.rb").enhance(["prepare"]);
+      expect(await file.isNeeded()).toBe(true);
+    } finally {
+      mtimeSpy.mockRestore();
+      vi.useRealTimers();
+    }
   });
 });

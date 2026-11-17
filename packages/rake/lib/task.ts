@@ -289,6 +289,7 @@ export class Task {
     return true;
   }
 
+  /** @inventedArm + — CONVERGEABLE rake-timestamps-nanosecond-precision */
   async timestamp(): Promise<Timestamp> {
     return new Date(Date.now() + 1);
   }
