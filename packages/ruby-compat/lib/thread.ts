@@ -29,20 +29,23 @@ let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
 const _threads = new Set<Thread>();
 /** @perf 3x — PERMANENT */
-const _locations = new WeakMap<object, Error>();
+const _locations = new WeakMap<object, { stack?: string }>();
 
 /** @perf 2x — PERMANENT */
-function _creationFrame(): Error {
-  const v8 = Error as { stackTraceLimit?: number };
+function _creationFrame(ctor: unknown): { stack?: string } {
+  const v8 = Error as {
+    stackTraceLimit?: number;
+    captureStackTrace?: (exc: object, fn: unknown) => void;
+  };
   const limit = v8.stackTraceLimit;
-  v8.stackTraceLimit = 3;
-  let error: Error;
+  const frame: { stack?: string } = {};
+  v8.stackTraceLimit = 1;
   try {
-    error = new Error();
+    v8.captureStackTrace?.(frame, ctor);
   } finally {
     v8.stackTraceLimit = limit;
   }
-  return error;
+  return frame;
 }
 
 const _wakeups = new WeakMap<object, (() => void) | true>();
@@ -216,7 +219,7 @@ export class Thread<R = unknown> {
     this.id = ++_threadIdCounter;
     _threads.add(this as Thread);
     this.status = "run";
-    _locations.set(this, _creationFrame());
+    _locations.set(this, _creationFrame(new.target));
     try {
       this.#value = currentSlot().run(this as Thread, () => block(...args));
     } catch (error) {
@@ -479,7 +482,7 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#to_s` (`vendor/ruby/v3.3.11/thread.c:3473`).
    */
   toString(): string {
-    const frame = _locations.get(this)?.stack?.split("\n")[3] ?? "";
+    const frame = _locations.get(this)?.stack?.split("\n")[1] ?? "";
     const at = /\(?((?:file:\/\/)?[^\s()]+):(\d+):\d+\)?$/.exec(frame);
     const location = at ? ` ${at[1]}:${at[2]}` : "";
     const name = this.name != null ? `@${this.name}` : "";
