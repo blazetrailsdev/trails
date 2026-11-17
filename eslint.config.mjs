@@ -1261,14 +1261,11 @@ export default defineConfig(
     },
   },
   {
-    files: ["packages/**/*.{ts,mts,js,mjs}", "scripts/**/*.{ts,mts,js,mjs}"],
-    ignores: [
-      "packages/vite-assets/**",
-      "packages/vite-trails/**",
-      "packages/turbo/**",
-      "packages/stimulus/**",
-      "packages/trailties/lib/generators/**",
+    files: [
+      "packages/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
+      "scripts/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
     ],
+    ignores: ["packages/vite-assets/**", "packages/vite-trails/**"],
     rules: {
       "no-restricted-imports": [
         "error",
@@ -1303,7 +1300,9 @@ export default defineConfig(
             {
               group: [
                 "**/trailties/lib/server/vite-plugin*",
+                "**/trailties/dist/server/vite-plugin*",
                 "**/trailties/lib/server/dev-server*",
+                "**/trailties/dist/server/dev-server*",
                 "@blazetrails/trailties/server/vite-plugin*",
                 "@blazetrails/trailties/server/dev-server*",
                 "@blazetrails/trailties/lib/server/vite-plugin*",
