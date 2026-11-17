@@ -567,9 +567,9 @@ class TestExtractor
   # (actioncable's `subscription_adapter/common.rb` and `channel_prefix.rb`):
   # Minitest runs its `test_*` once per including class, so each including file
   # owns the cases and its TS twin ports them. Enrolled by module name, as
-  # `LIB_TEST_MODULES` is: activesupport's cache `behaviors/` modules take the
-  # same shape and are not yet ported to match.
-  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests FileUpdateCheckerSharedTests CacheStoreBehavior CacheStoreVersionBehavior CacheStoreCoderBehavior CacheStoreCompressionBehavior CacheStoreFormatVersionBehavior CacheStoreSerializerBehavior CacheDeleteMatchedBehavior CacheIncrementDecrementBehavior CacheInstrumentationBehavior CacheLoggingBehavior EncodedKeyCacheBehavior FailureSafetyBehavior FailureRaisingBehavior LocalCacheBehavior ConnectionPoolBehavior].freeze
+  # `LIB_TEST_MODULES` is. activesupport's `ConnectionPoolBehavior` has no TS
+  # twin yet and stays unenrolled.
+  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests FileUpdateCheckerSharedTests CacheStoreBehavior CacheStoreVersionBehavior CacheStoreCoderBehavior CacheStoreCompressionBehavior CacheStoreFormatVersionBehavior CacheStoreSerializerBehavior CacheDeleteMatchedBehavior CacheIncrementDecrementBehavior CacheInstrumentationBehavior CacheLoggingBehavior EncodedKeyCacheBehavior FailureSafetyBehavior FailureRaisingBehavior LocalCacheBehavior].freeze
 
   def collect_required_modules(sexp, filepath)
     missing = @module_includes.keys.select do |name|
@@ -581,7 +581,7 @@ class TestExtractor
 
   def collect_required_modules_from(sexp, filepath, missing, seen, nested = false)
     paths = if nested
-      sexp[1].select { |stmt| stmt.is_a?(Array) && stmt[0] == :command }.flat_map { |stmt| required_relative_paths(stmt) }
+      Array(sexp[1]).select { |stmt| stmt.is_a?(Array) && stmt[0] == :command }.flat_map { |stmt| required_relative_paths(stmt) }
     else
       required_relative_paths(sexp)
     end
