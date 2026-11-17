@@ -79,6 +79,7 @@ export function indexBy<T, K>(
     } else {
       for (const elem of collection as Iterable<T>) block(elem);
     }
+    if (result.size === 0) return result;
     for (const key of result.keys()) if (typeof key !== "string") return result;
     return Object.assign(Object.create(null), Object.fromEntries(result)) as Record<string, T>;
   } else {
