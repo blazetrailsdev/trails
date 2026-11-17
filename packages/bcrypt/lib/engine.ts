@@ -121,13 +121,12 @@ export class Engine {
     if (key.includes("\0") || setting.includes("\0")) {
       throw new ArgumentError("string contains null byte");
     }
-    let value: string;
     try {
-      value = _bcHashSync(key, setting);
-    } catch {
+      return _bcHashSync(key, setting);
+    } catch (e) {
+      if (!(e instanceof Error) || e.constructor !== Error) throw e;
       return null;
     }
-    return value;
   }
 
   static calibrate(upperTimeLimitInMs: number): number | Range<number> {
