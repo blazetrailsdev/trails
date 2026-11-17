@@ -46,7 +46,7 @@ pinned_actions() {
         if [[ "$ref" =~ ^[0-9a-f]{40}$ ]]; then
           echo "$repo@$ref"
         else
-          sha=$(git ls-remote "https://github.com/$repo" "refs/tags/$ref^{}" "refs/tags/$ref" "refs/heads/$ref" | head -1 | cut -f1)
+          sha=$(git ls-remote "https://github.com/$repo" "refs/tags/$ref^{}" "refs/tags/$ref" "refs/heads/$ref" | awk 'NR==1{f=$1} /\^\{\}$/{p=$1} END{print (p ? p : f)}')
           [ -n "$sha" ] && echo "$repo@$sha"
         fi
       done
