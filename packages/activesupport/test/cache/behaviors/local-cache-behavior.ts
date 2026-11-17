@@ -13,6 +13,7 @@ import { travelTo } from "../../../lib/testing/time-helpers.js";
 /** @internal */
 export interface LocalCacheBehaviorHost {
   lookupStore(options?: StoreOptions): Store;
+  overriddenTests?: string[];
 }
 
 interface LocalCacheStore {
@@ -27,7 +28,9 @@ function alphanumeric(): string {
 }
 
 export function localCacheBehavior(host?: LocalCacheBehaviorHost): void {
-  const it = host ? vitestIt : vitestIt.skip;
+  const base = host ? vitestIt : vitestIt.skip;
+  const it = (name: string, fn: () => Promise<void>) =>
+    host?.overriddenTests?.includes(name) ? undefined : base(name, fn);
   let cache: Store & LocalCacheStore;
   let peek: Store;
 

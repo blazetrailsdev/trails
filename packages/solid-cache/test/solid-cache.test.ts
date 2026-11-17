@@ -31,7 +31,7 @@ describe("SolidCacheTest", () => {
   cacheStoreCompressionBehavior(host);
   cacheStoreFormatVersionBehavior(host);
   cacheStoreSerializerBehavior(host);
-  localCacheBehavior(host);
+  localCacheBehavior({ ...host, overriddenTests: ["local cache of fetch multi"] });
   solidCacheLocalCacheBehavior(host);
   cacheIncrementDecrementBehavior(host);
   cacheInstrumentationBehavior({ ...host, storeName: "Store" });

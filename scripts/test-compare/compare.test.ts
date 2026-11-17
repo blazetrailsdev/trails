@@ -20,6 +20,7 @@ import {
   parseMinExtra,
   rejectsSiblingClassCandidate,
   rubyToConventionTs,
+  SHARED_CACHE_BEHAVIORS_DIR,
   type ConventionFileResult,
 } from "./compare.js";
 
@@ -513,6 +514,59 @@ describe("main cross-file credit", () => {
     ) as { results: { files: ConventionFileResult[] }[] };
     const timeExt = results[0].files.find((f) => f.rubyFile === "core_ext/time_ext_test.rb")!;
     expect([timeExt.matched, timeExt.misplaced, timeExt.missing]).toEqual([0, 0, 1]);
+    await fs.rm(dir, { recursive: true });
+  });
+});
+
+describe("main own behavior copy", () => {
+  it("replaces a same-named shared behavior test and credits both files to one path", async () => {
+    const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
+    const pkg = "solid-cache";
+    const tc = (description: string, assertionCount: number) => ({
+      ancestors: ["SolidCacheTest"],
+      description,
+      assertionCount,
+    });
+    const ruby = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        [pkg]: {
+          files: [
+            {
+              file: "unit/behaviors_rails_8_0/local_cache_behavior.rb",
+              testCases: [tc("local cache of fetch multi", 2), tc("local cache of read", 1)],
+            },
+          ],
+        },
+      },
+    };
+    const ts = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        [pkg]: {
+          files: [
+            {
+              file: `${SHARED_CACHE_BEHAVIORS_DIR}local-cache-behavior.ts`,
+              testCases: [tc("local cache of fetch multi", 3), tc("local cache of read", 1)],
+            },
+            {
+              file: `${PKG_SRC_DIRS[pkg]}behaviors/local-cache-behavior.ts`,
+              testCases: [tc("local cache of fetch multi", 2)],
+            },
+          ],
+        },
+      },
+    };
+    await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
+    await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify(ts));
+    main(["--package", pkg, "--json"], dir);
+    const { results } = JSON.parse(
+      await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
+    ) as { results: { files: ConventionFileResult[] }[] };
+    const behavior = results[0].files.find((f) => f.rubyFile.endsWith("local_cache_behavior.rb"))!;
+    expect([behavior.matched, behavior.missing, behavior.extra]).toEqual([2, 0, 0]);
     await fs.rm(dir, { recursive: true });
   });
 });
