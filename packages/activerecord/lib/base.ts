@@ -1977,12 +1977,6 @@ extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
 extend(Base, _Persistence.ClassMethods);
 extend(Base, _Core.ClassMethods);
-include(Base, _Core.Core);
-include(Base, _Persistence.Persistence);
-include(Base, Inheritance.Inheritance);
-include(Base, ActiveRecord.Scoping);
-include(Base, _Integration);
-include(Base, SignedId.SignedId);
 extend(Base, QueryCacheClassMethods.ClassMethods);
 
 Object.defineProperty(Base, "connection", {
@@ -2038,9 +2032,7 @@ extend(Base, {
 });
 extend(Base, Translation.Translation);
 extend(Base, Sanitization.ClassMethods);
-include(Base, ReadonlyAttributes.ReadonlyAttributes);
 extend(Base, ReadonlyAttributes.ClassMethods);
-include(Base, CounterCache.CounterCache);
 extend(Base, CounterCache.ClassMethods);
 {
   const superUpdateCounters = CounterCache.updateCounters;
@@ -2062,12 +2054,7 @@ extend(Base, _PresenceClassMethods);
 extend(Base, _AbsenceClassMethods);
 extend(Base, _LengthClassMethods);
 extend(Base, _NumericalityClassMethods);
-include(Base, LockingOptimistic.Optimistic);
-include(Base, _Callbacks.Callbacks);
-include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
-include(Base, Normalization.Normalization);
-include(Base, Marshalling.Methods);
 extend(Base, _EnumModule.Enum);
 extend(Base, DelegatedType);
 extend(Base, {
@@ -2087,12 +2074,127 @@ classAttribute.call(Base, "defaultScopeOverride", {
   instancePredicate: false,
   default: null,
 });
-include(Base, _EncryptableRecord);
 extend(Base, {
   encrypts: _encrypts,
   deterministicEncryptedAttributes: _deterministicEncryptedAttributes,
   sourceAttributeFromPreservedAttribute: _sourceAttributeFromPreservedAttribute,
 });
+extend(Base, {
+  defaultScope: _defaultScope,
+  unscoped: _unscoped,
+});
+extend(Base, ModelSchema.ClassMethods);
+
+include(Base, _Core.Core);
+include(Base, { initAttributes: _Core.initAttributes });
+include(Base, {
+  initWith: _Core.initWith,
+  initWithAttributes: _Core.initWithAttributes,
+  encodeWith: _Core.encodeWith,
+  fullInspect: _Core.fullInspect,
+  isCustomInspectMethodDefined: _Core.isCustomInspectMethodDefined,
+  inspectionFilter: _Core.inspectionFilter,
+  inspectWithAttributes: _Core.inspectWithAttributes,
+  attributesForInspect: _Core.attributesForInspect,
+  allAttributesForInspect: _Core.allAttributesForInspect,
+});
+include(Base, {
+  slice: Access.prototype.slice,
+  valuesAt: Access.prototype.valuesAt,
+  clone: _Core.clone,
+  inspect: _inspect,
+  prettyPrint: _Core.prettyPrint,
+  equals: _equals,
+  eql: _eql,
+  compare: _compare,
+  hash: _hash,
+  isPresent: _isPresent,
+  isBlank: _isBlank,
+  isReadonly: _Core.isReadonly,
+  readonlyBang: _Core.readonlyBang,
+  isStrictLoading: _Core.isStrictLoading,
+  strictLoadingBang: _Core.strictLoadingBang,
+  strictLoadingMode: _Core.strictLoadingMode,
+  isStrictLoadingAll: _Core.isStrictLoadingAll,
+  isStrictLoadingNPlusOneOnly: _Core.isStrictLoadingNPlusOneOnly,
+  isFrozen: _Core.isFrozen,
+  freeze: _Core.freeze,
+});
+include(Base, _Persistence.Persistence);
+include(Base, {
+  isNewRecord: _Persistence.isNewRecord,
+  isPersisted: _Persistence.isPersisted,
+  isDestroyed: _Persistence.isDestroyed,
+  isPreviouslyNewRecord: _Persistence.isPreviouslyNewRecord,
+  isPreviouslyPersisted: _Persistence.isPreviouslyPersisted,
+  increment: _Persistence.increment,
+  decrement: _Persistence.decrement,
+  toggle: _Persistence.toggle,
+  decrementBang: _Persistence.decrementBang,
+  toggleBang: _Persistence.toggleBang,
+  destroyBang: _Persistence.destroyBang,
+  update: _Persistence.update,
+  updateBang: _Persistence.updateBang,
+  delete: _Persistence.delete,
+  _updateRow: _Persistence._updateRow,
+  updateAttribute: _Persistence.updateAttribute,
+  updateAttributeBang: _Persistence.updateAttributeBang,
+  updateColumn: _Persistence.updateColumn,
+  updateColumns: _Persistence.updateColumns,
+  becomes: _Persistence.becomes,
+  becomesBang: _Persistence.becomesBang,
+});
+include(Base, {
+  strictLoadedAssociations: _Persistence.strictLoadedAssociations,
+  _findRecord: _Persistence._findRecord,
+  _inMemoryQueryConstraintsHash: _Persistence._inMemoryQueryConstraintsHash,
+  isApplyScoping: _Persistence.isApplyScoping,
+  destroyAssociations: _Persistence.destroyAssociations,
+  _deleteRow: _Persistence._deleteRow,
+  verifyReadonlyAttribute: _Persistence.verifyReadonlyAttribute,
+  _raiseRecordNotDestroyed: _Persistence._raiseRecordNotDestroyed,
+  _raiseReadonlyRecordError: _Persistence._raiseReadonlyRecordError,
+  _raiseRecordNotTouchedError: _Persistence._raiseRecordNotTouchedError,
+});
+include(Base, ReadonlyAttributes.ReadonlyAttributes);
+include(Base, ModelSchema.ModelSchema);
+include(Base, {
+  _inheritanceColumn: ModelSchema._inheritanceColumn,
+});
+include(Base, Inheritance.Inheritance);
+include(Base, {
+  ensureProperType: _ensureProperType,
+});
+include(Base, ActiveRecord.Scoping);
+include(Base, {
+  populateWithCurrentScopeAttributes: _populateWithCurrentScopeAttributes,
+});
+include(Base, _AttributeAssignment.AttributeAssignment);
+include(Base, _Integration);
+include(Base, {
+  toParam: _toParam,
+  cacheKey: _cacheKey,
+  cacheKeyWithVersion: _cacheKeyWithVersion,
+  cacheVersion: _cacheVersion,
+});
+include(Base, {
+  canUseFastCacheVersion: _canUseFastCacheVersion,
+  rawTimestampToCacheVersion: _rawTimestampToCacheVersion,
+});
+include(Base, _Validations.Validations);
+include(Base, {
+  defaultValidationContext,
+  raiseValidationError: _Validations.raiseValidationError,
+  performValidations: _Validations.performValidations,
+});
+include(Base, CounterCache.CounterCache);
+include(Base, {
+  _foreignKeysEqual: CounterCache._foreignKeysEqual,
+});
+include(Base, AttributeRegistration);
+include(Base, LockingOptimistic.Optimistic);
+include(Base, LockingPessimistic.Pessimistic);
+include(Base, _EncryptableRecord);
 include(Base, {
   isEncryptedAttribute: _isEncryptedAttribute,
   ciphertextFor: _ciphertextFor,
@@ -2100,15 +2202,126 @@ include(Base, {
   decrypt: _decrypt,
   cantModifyEncryptedAttributesWhenFrozen: _cantModifyEncryptedAttributesWhenFrozen,
 });
-include(Base, _TokenFor);
-extend(Base, {
-  defaultScope: _defaultScope,
-  unscoped: _unscoped,
-});
-extend(Base, ModelSchema.ClassMethods);
-include(Base, AttributeRegistration);
 include(Base, AMAttributeMethods.AttributeMethods);
-
+include(Base, {
+  attributeForInspect: _attributeForInspect,
+  isRespondTo: _isRespondTo,
+  respondToMissing: _respondToMissing,
+  methodMissing: _methodMissing,
+  hasAttribute: _hasAttribute,
+  attributePresent: _attributePresent,
+  accessedFields: _accessedFields,
+  get: _get,
+  set: _set,
+});
+include(Base, {
+  _hasAttribute: _privateHasAttribute,
+  isAttributeMethod: _isAttributeMethod,
+  attributesWithValues: _attributesWithValues,
+  attributesForCreate: _attributesForCreate,
+  attributesForUpdate: _attributesForUpdate,
+  formatForInspect: _formatForInspect,
+  pkAttribute: _pkAttribute,
+});
+include(Base, _Read);
+include(Base, _Write);
+include(Base, {
+  writeAttribute: _writeAttributeMethod,
+  _writeAttribute: _writeAttributeLowLevel,
+  "attribute=": _writeAttributeLowLevel,
+});
+include(Base, _BeforeTypeCast);
+include(Base, {
+  readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
+});
+include(Base, {
+  readAttributeForDatabase: _readAttributeForDatabase,
+  attributesBeforeTypeCast: _attributesBeforeTypeCast,
+  attributesForDatabase: _attributesForDatabase,
+  attributeBeforeTypeCast: _attributeBeforeTypeCast,
+  attributeForDatabase: _attributeForDatabase,
+  attributeCameFromUser: _attributeCameFromUser,
+});
+include(Base, _Query);
+include(Base, _PrimaryKey);
+include(Base, {
+  toKey: _toKey,
+});
+include(Base, _TimeZoneConversion);
+include(Base, AMDirty);
+include(Base, _Dirty);
+include(Base, {
+  isSavedChangeToAttribute: _isSavedChangeToAttribute,
+  isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,
+  savedChangeToAttribute: _savedChangeToAttribute,
+  attributeBeforeLastSave: _attributeBeforeLastSave,
+  attributeChangeToBeSaved: _attributeChangeToBeSaved,
+  attributeInDatabase: _attributeInDatabase,
+  attributeNamesForPartialUpdates: _attributeNamesForPartialUpdates,
+  attributeNamesForPartialInserts: _attributeNamesForPartialInserts,
+  isSavedChanges: _isSavedChanges,
+});
+include(Base, _AttrSerialization);
+include(Base, _Callbacks.Callbacks);
+include(Base, Timestamp.Timestamp);
+include(Base, ActiveRecord.Associations);
+include(Base, { association: _association });
+include(Base, {
+  isAssociationCached: _isAssociationCached,
+  associationInstanceGet: _associationInstanceGet,
+  associationInstanceSet: _associationInstanceSet,
+});
+include(Base, AutosaveAssociation);
+include(Base, {
+  computePrimaryKey: _computePrimaryKey,
+  _ensureNoDuplicateErrors: _autosaveEnsureNoDuplicateErrors,
+});
+include(Base, _NestedAttributes.NestedAttributes);
+include(Base, _Transactions.Transactions);
+include(Base, {
+  committedBang: _committedBang,
+  rolledbackBang: _rolledbackBang,
+  isTriggerTransactionalCallbacks: _isTriggerTransactionalCallbacks,
+  withTransactionReturningStatus: _withTransactionReturningStatus,
+  addToTransaction: _addToTransaction,
+  hasTransactionalCallbacks: _hasTransactionalCallbacks,
+  _newRecordBeforeLastCommit: _txNewRecordBeforeLastCommit,
+  _committedAlreadyCalled: _txCommittedAlreadyCalled,
+  _triggerUpdateCallback: _txTriggerUpdateCallback,
+  _triggerDestroyCallback: _txTriggerDestroyCallback,
+  clearTransactionRecordState: _clearTransactionRecordState,
+  rememberTransactionRecordState: _rememberTransactionRecordState,
+  restoreTransactionRecordState: _restoreTransactionRecordState,
+  isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
+});
+include(Base, _TouchLater.TouchLater);
+include(Base, {
+  hasDeferTouchAttrs(this: Base) {
+    return _TouchLater.hasDeferTouchAttrs(this);
+  },
+  surreptitiouslyTouch: _TouchLater.surreptitiouslyTouch,
+  touchDeferredAttributes: _TouchLater.touchDeferredAttributes,
+});
+include(Base, _NoTouching.NoTouching);
+include(Base, {
+  isNoTouching: _isNoTouching,
+});
+include(Base, _Reflection.Reflection);
+include(Base, JSONSerializer);
+Base.includeRootInJson = false;
+include(Base, { serializableHash: Serialization.serializableHash });
+include(Base, {
+  attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
+});
+include(Base, {
+  readStoreAttribute: _readStoreAttribute,
+  writeStoreAttribute: _writeStoreAttribute,
+  storeAccessorFor: _storeAccessorFor,
+});
+include(Base, _TokenFor);
+include(Base, SignedId.SignedId);
+include(Base, Normalization.Normalization);
+include(Base, Marshalling.Methods);
 extend(Base, {
   defineAttribute: _defineAttribute,
   defineAttributeMethods: _defineAttributeMethods,
@@ -2148,179 +2361,9 @@ extend(Base, {
 
 extend(Base, _StoreClassMethods);
 extend(Base, _AggregationsClassMethods);
-
-include(Base, {
-  writeAttribute: _writeAttributeMethod,
-  isNewRecord: _Persistence.isNewRecord,
-  isPersisted: _Persistence.isPersisted,
-  isDestroyed: _Persistence.isDestroyed,
-  isPreviouslyNewRecord: _Persistence.isPreviouslyNewRecord,
-  isPreviouslyPersisted: _Persistence.isPreviouslyPersisted,
-  increment: _Persistence.increment,
-  decrement: _Persistence.decrement,
-  toggle: _Persistence.toggle,
-  decrementBang: _Persistence.decrementBang,
-  toggleBang: _Persistence.toggleBang,
-  destroyBang: _Persistence.destroyBang,
-  update: _Persistence.update,
-  updateBang: _Persistence.updateBang,
-  delete: _Persistence.delete,
-  _updateRow: _Persistence._updateRow,
-  slice: Access.prototype.slice,
-  valuesAt: Access.prototype.valuesAt,
-  updateAttribute: _Persistence.updateAttribute,
-  updateAttributeBang: _Persistence.updateAttributeBang,
-  updateColumn: _Persistence.updateColumn,
-  updateColumns: _Persistence.updateColumns,
-  clone: _Core.clone,
-  becomes: _Persistence.becomes,
-  becomesBang: _Persistence.becomesBang,
-  inspect: _inspect,
-  prettyPrint: _Core.prettyPrint,
-  attributeForInspect: _attributeForInspect,
-  equals: _equals,
-  eql: _eql,
-  compare: _compare,
-  hash: _hash,
-  isPresent: _isPresent,
-  isBlank: _isBlank,
-  isReadonly: _Core.isReadonly,
-  readonlyBang: _Core.readonlyBang,
-  isStrictLoading: _Core.isStrictLoading,
-  strictLoadingBang: _Core.strictLoadingBang,
-  strictLoadingMode: _Core.strictLoadingMode,
-  isStrictLoadingAll: _Core.isStrictLoadingAll,
-  isStrictLoadingNPlusOneOnly: _Core.isStrictLoadingNPlusOneOnly,
-  isFrozen: _Core.isFrozen,
-  freeze: _Core.freeze,
-  isNoTouching: _isNoTouching,
-  toParam: _toParam,
-  cacheKey: _cacheKey,
-  cacheKeyWithVersion: _cacheKeyWithVersion,
-  cacheVersion: _cacheVersion,
-  readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
-  isRespondTo: _isRespondTo,
-  respondToMissing: _respondToMissing,
-  methodMissing: _methodMissing,
-  hasAttribute: _hasAttribute,
-  attributePresent: _attributePresent,
-  accessedFields: _accessedFields,
-  get: _get,
-  set: _set,
-  _writeAttribute: _writeAttributeLowLevel,
-  "attribute=": _writeAttributeLowLevel,
-  toKey: _toKey,
-  readStoreAttribute: _readStoreAttribute,
-  writeStoreAttribute: _writeStoreAttribute,
-  storeAccessorFor: _storeAccessorFor,
-});
-include(Base, _Read);
-include(Base, _Write);
-include(Base, _BeforeTypeCast);
-include(Base, _Query);
-include(Base, _PrimaryKey);
-include(Base, ModelSchema.ModelSchema);
-include(Base, _TimeZoneConversion);
-include(Base, { initAttributes: _Core.initAttributes });
-include(Base, AMDirty);
-include(Base, _Dirty);
-include(Base, _AttrSerialization);
-include(Base, LockingPessimistic.Pessimistic);
-include(Base, Timestamp.Timestamp);
-include(Base, ActiveRecord.Associations);
-include(Base, _TouchLater.TouchLater);
-include(Base, _NoTouching.NoTouching);
-include(Base, _Reflection.Reflection);
-include(Base, JSONSerializer);
-Base.includeRootInJson = false;
-include(Base, { serializableHash: Serialization.serializableHash });
-include(Base, _AttributeAssignment.AttributeAssignment);
-include(Base, AutosaveAssociation);
 extend(Base, { loadSchemaBang: CounterCache.loadSchemaBang });
 extend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
-include(Base, _NestedAttributes.NestedAttributes);
-include(Base, { association: _association });
-include(Base, _Validations.Validations);
-include(Base, {
-  attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
-});
-include(Base, {
-  initWith: _Core.initWith,
-  initWithAttributes: _Core.initWithAttributes,
-  encodeWith: _Core.encodeWith,
-  fullInspect: _Core.fullInspect,
-  isCustomInspectMethodDefined: _Core.isCustomInspectMethodDefined,
-  inspectionFilter: _Core.inspectionFilter,
-  inspectWithAttributes: _Core.inspectWithAttributes,
-  attributesForInspect: _Core.attributesForInspect,
-  allAttributesForInspect: _Core.allAttributesForInspect,
-  strictLoadedAssociations: _Persistence.strictLoadedAssociations,
-  _findRecord: _Persistence._findRecord,
-  _inMemoryQueryConstraintsHash: _Persistence._inMemoryQueryConstraintsHash,
-  isApplyScoping: _Persistence.isApplyScoping,
-  destroyAssociations: _Persistence.destroyAssociations,
-  _deleteRow: _Persistence._deleteRow,
-  verifyReadonlyAttribute: _Persistence.verifyReadonlyAttribute,
-  _raiseRecordNotDestroyed: _Persistence._raiseRecordNotDestroyed,
-  _raiseReadonlyRecordError: _Persistence._raiseReadonlyRecordError,
-  _raiseRecordNotTouchedError: _Persistence._raiseRecordNotTouchedError,
-  _inheritanceColumn: ModelSchema._inheritanceColumn,
-  ensureProperType: _ensureProperType,
-  populateWithCurrentScopeAttributes: _populateWithCurrentScopeAttributes,
-  canUseFastCacheVersion: _canUseFastCacheVersion,
-  rawTimestampToCacheVersion: _rawTimestampToCacheVersion,
-  defaultValidationContext,
-  raiseValidationError: _Validations.raiseValidationError,
-  performValidations: _Validations.performValidations,
-  _hasAttribute: _privateHasAttribute,
-  isAttributeMethod: _isAttributeMethod,
-  attributesWithValues: _attributesWithValues,
-  attributesForCreate: _attributesForCreate,
-  attributesForUpdate: _attributesForUpdate,
-  formatForInspect: _formatForInspect,
-  pkAttribute: _pkAttribute,
-  readAttributeForDatabase: _readAttributeForDatabase,
-  attributesBeforeTypeCast: _attributesBeforeTypeCast,
-  attributesForDatabase: _attributesForDatabase,
-  attributeBeforeTypeCast: _attributeBeforeTypeCast,
-  attributeForDatabase: _attributeForDatabase,
-  attributeCameFromUser: _attributeCameFromUser,
-  isSavedChangeToAttribute: _isSavedChangeToAttribute,
-  isWillSaveChangeToAttribute: _isWillSaveChangeToAttribute,
-  savedChangeToAttribute: _savedChangeToAttribute,
-  attributeBeforeLastSave: _attributeBeforeLastSave,
-  attributeChangeToBeSaved: _attributeChangeToBeSaved,
-  attributeInDatabase: _attributeInDatabase,
-  attributeNamesForPartialUpdates: _attributeNamesForPartialUpdates,
-  attributeNamesForPartialInserts: _attributeNamesForPartialInserts,
-  isSavedChanges: _isSavedChanges,
-  hasDeferTouchAttrs(this: Base) {
-    return _TouchLater.hasDeferTouchAttrs(this);
-  },
-  _foreignKeysEqual: CounterCache._foreignKeysEqual,
-  isAssociationCached: _isAssociationCached,
-  associationInstanceGet: _associationInstanceGet,
-  associationInstanceSet: _associationInstanceSet,
-  computePrimaryKey: _computePrimaryKey,
-  _ensureNoDuplicateErrors: _autosaveEnsureNoDuplicateErrors,
-  committedBang: _committedBang,
-  rolledbackBang: _rolledbackBang,
-  isTriggerTransactionalCallbacks: _isTriggerTransactionalCallbacks,
-  withTransactionReturningStatus: _withTransactionReturningStatus,
-  addToTransaction: _addToTransaction,
-  hasTransactionalCallbacks: _hasTransactionalCallbacks,
-  _newRecordBeforeLastCommit: _txNewRecordBeforeLastCommit,
-  _committedAlreadyCalled: _txCommittedAlreadyCalled,
-  _triggerUpdateCallback: _txTriggerUpdateCallback,
-  _triggerDestroyCallback: _txTriggerDestroyCallback,
-  clearTransactionRecordState: _clearTransactionRecordState,
-  rememberTransactionRecordState: _rememberTransactionRecordState,
-  restoreTransactionRecordState: _restoreTransactionRecordState,
-  isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
-  surreptitiouslyTouch: _TouchLater.surreptitiouslyTouch,
-  touchDeferredAttributes: _TouchLater.touchDeferredAttributes,
-});
 
 for (const [name, fn] of [
   [
