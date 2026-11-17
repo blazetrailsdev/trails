@@ -268,7 +268,9 @@ export interface SSLSocketIO {
 /**
  * `OpenSSL::SSL::Session` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl_session.c:301-330`):
  * the host's serialized session, with the time it was established and its
- * lifetime in seconds.
+ * lifetime in seconds. The host reports neither, so `time` is the moment the
+ * session arrived and `timeout` is OpenSSL's TLS default, `tls1_default_timeout`'s
+ * 7200 seconds.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -279,7 +281,7 @@ export class Session {
     /** @noRailsEquivalent PERMANENT */
     readonly time: Date = new Date(),
     /** @noRailsEquivalent PERMANENT */
-    readonly timeout: number = 300,
+    readonly timeout: number = 7200,
   ) {}
 }
 
