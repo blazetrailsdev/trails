@@ -14,6 +14,14 @@ type ActionHelperHost = {
 
 describe("Turbo::ActionHelperTest", () => {
   let tc: ActionHelperHost;
+  const appendTemplate = (attributes: Record<string, unknown>) =>
+    String(
+      tc.turboStreamActionTag("append", {
+        target: "message_1",
+        template: "Template",
+        ...attributes,
+      }),
+    );
 
   beforeAll(async () => {
     await Message.loadSchema();
@@ -78,122 +86,56 @@ describe("Turbo::ActionHelperTest", () => {
     const stream =
       '<turbo-stream hello="world" foo="bar" action="append" target="message_1"><template>Template</template></turbo-stream>';
 
-    expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          hello: "world",
-          foo: "bar",
-        }),
-      ),
-    ).toBe(stream);
+    expect(appendTemplate({ hello: "world", foo: "bar" })).toBe(stream);
   });
 
   it("additional nil attributes", () => {
     const stream =
       '<turbo-stream action="append" target="message_1"><template>Template</template></turbo-stream>';
 
-    expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          hello: null,
-          foo: null,
-        }),
-      ),
-    ).toBe(stream);
+    expect(appendTemplate({ hello: null, foo: null })).toBe(stream);
   });
 
   it("additional boolean attributes", () => {
     const stream =
       '<turbo-stream checked="checked" action="append" target="message_1"><template>Template</template></turbo-stream>';
 
-    expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          checked: true,
-        }),
-      ),
-    ).toBe(stream);
+    expect(appendTemplate({ checked: true })).toBe(stream);
   });
 
   it("additional dashed attributes", () => {
     const stream =
       '<turbo-stream hello-world="foo" action="append" target="message_1"><template>Template</template></turbo-stream>';
 
-    expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          "hello-world": "foo",
-        }),
-      ),
-    ).toBe(stream);
+    expect(appendTemplate({ "hello-world": "foo" })).toBe(stream);
   });
 
   it("additional underscore attributes", () => {
     const stream =
       '<turbo-stream hello_world="foo" action="append" target="message_1"><template>Template</template></turbo-stream>';
 
-    expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          hello_world: "foo",
-        }),
-      ),
-    ).toBe(stream);
+    expect(appendTemplate({ hello_world: "foo" })).toBe(stream);
   });
 
   it("additional data attributes", () => {
     const stream =
       '<turbo-stream data-value="foo" data-hello-world="bar" action="append" target="message_1"><template>Template</template></turbo-stream>';
 
-    expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          data: { value: "foo", hello_world: "bar" },
-        }),
-      ),
-    ).toBe(stream);
+    expect(appendTemplate({ data: { value: "foo", hello_world: "bar" } })).toBe(stream);
   });
 
   it("additional aria attributes", () => {
     const stream =
       '<turbo-stream aria-label="foo" aria-checked="true" action="append" target="message_1"><template>Template</template></turbo-stream>';
 
-    expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          aria: { label: "foo", checked: true },
-        }),
-      ),
-    ).toBe(stream);
+    expect(appendTemplate({ aria: { label: "foo", checked: true } })).toBe(stream);
   });
 
   it("additional class attribute", () => {
     const stream =
       '<turbo-stream class="stream" action="append" target="message_1"><template>Template</template></turbo-stream>';
 
-    expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          class: "stream",
-        }),
-      ),
-    ).toBe(stream);
+    expect(appendTemplate({ class: "stream" })).toBe(stream);
   });
 
   it("additional class conditional attribute", () => {
@@ -201,13 +143,7 @@ describe("Turbo::ActionHelperTest", () => {
       '<turbo-stream class="stream another-stream" action="append" target="message_1"><template>Template</template></turbo-stream>';
 
     expect(
-      String(
-        tc.turboStreamActionTag("append", {
-          target: "message_1",
-          template: "Template",
-          class: { stream: true, "another-stream": true, "no-stream": false },
-        }),
-      ),
+      appendTemplate({ class: { stream: true, "another-stream": true, "no-stream": false } }),
     ).toBe(stream);
   });
 
