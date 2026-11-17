@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rbFloatTypeP, rbIntegerTypeP } from "@blazetrails/ruby-compat";
+import { Hash, rbFloatTypeP, rbIntegerTypeP } from "@blazetrails/ruby-compat";
 import { ExtensionValue, MessagePack, Unpacker } from "../lib/index.js";
 
 describe("MessagePack::Unpacker", () => {
@@ -18,7 +18,9 @@ describe("MessagePack::Unpacker", () => {
     const map = read([0x82, 0xa1, 0x61, ...float32, 0xa1, 0x62, 0x02]) as Record<string, unknown>;
     expect(rbFloatTypeP(map.a)).toBe(true);
     expect(rbFloatTypeP(map.b)).toBe(false);
-    expect(read([0x81, ...float64, 0x01])).toEqual({ 3: 1 });
+    const floatKeyed = read([0x81, ...float64, 0x01]) as Hash<unknown, unknown>;
+    expect(floatKeyed).toBeInstanceOf(Hash);
+    expect([...floatKeyed.keys()].map(rbFloatTypeP)).toEqual([true]);
     expect(read([0xcb, 0x3f, 0xf8, 0, 0, 0, 0, 0, 0])).toBe(1.5);
   });
 

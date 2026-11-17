@@ -570,7 +570,8 @@ export class Buffer {
     return concat(string);
   }
 
-  private topReadableSize(): number {
+  /** @internal */
+  topReadableSize(): number {
     return this.chunks.length === 0 ? 0 : this.chunks[0].length;
   }
 
@@ -623,7 +624,8 @@ export class Buffer {
     }
   }
 
-  private readToString(string: Uint8Array[], length: number): number {
+  /** @internal */
+  readToString(string: Uint8Array[], length: number): number {
     if (length === 0) {
       return 0;
     }

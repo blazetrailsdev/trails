@@ -6,8 +6,6 @@ const bytes = (string: string) => Uint8Array.from(string, (c) => c.charCodeAt(0)
 const utf8enc = (str: string) => str;
 const asciienc = (str: string) => bytes(str);
 
-const BLOCKED_DECODES = ["hashes with mixed keys and values", "hashes of hashes"];
-
 describe("MessagePack", () => {
   const tests: Record<string, [string, unknown, string][]> = {
     "constant values": [
@@ -90,12 +88,6 @@ describe("MessagePack", () => {
           expect(MessagePack.pack(unpacked)).toEqual(bytes(packed));
         });
 
-        if (BLOCKED_DECODES.includes(desc)) {
-          // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-          it.skip(`decodes ${desc}`, () => {});
-          continue;
-        }
-
         it(`decodes ${desc}`, () => {
           expect(MessagePack.unpack(bytes(packed))).toEqual(unpacked);
         });
@@ -114,8 +106,9 @@ describe("MessagePack", () => {
   });
 
   describe("with symbols", () => {
-    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-    it.skip("encodes symbols as strings", () => {});
+    it("encodes symbols as strings", () => {
+      expect(MessagePack.pack(":symbol")).toEqual(bytes("\xA6symbol"));
+    });
   });
 
   describe("with different external encoding", () => {

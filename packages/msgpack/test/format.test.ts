@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Hash, rbFSend } from "@blazetrails/ruby-compat";
+import { Hash, rbFSend, stringToSym } from "@blazetrails/ruby-compat";
 import { MessagePack } from "../lib/index.js";
 
 const bytes = (string: string) => Uint8Array.from(string, (c) => c.charCodeAt(0));
@@ -124,11 +124,17 @@ describe("MessagePack", () => {
   // PERMANENT-SKIP: a JS string has no encoding to transcode from (CLAUDE.md, "A String has no encoding tag either").
   it.skip("str transcode EUC-JP 7bit unsafe", () => {});
 
-  // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-  it.skip("symbol to str", () => {});
+  it("symbol to str", () => {
+    const v = packUnpack(":a");
+    expect(v).toBe("a");
+  });
 
-  // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-  it.skip("symbol to str with encoding", () => {});
+  it("symbol to str with encoding", () => {
+    const a = "\u3042";
+    const v = packUnpack(stringToSym(a));
+    expect(typeof v).toBe("string");
+    expect(v).toBe(a);
+  });
 
   // PERMANENT-SKIP: a Symbol is a JS string and cannot hold ASCII-8BIT bytes (CLAUDE.md, "A String has no encoding tag either").
   it.skip("symbol to bin", () => {});

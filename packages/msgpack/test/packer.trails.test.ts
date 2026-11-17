@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   ArgumentError,
-  EOFError,
   Hash,
   defineModule,
   NoMethodError,
@@ -267,9 +266,11 @@ describe("MessagePack::Unpacker", () => {
   it("reads one object per call and resumes once the rest of an object is fed", () => {
     const unpacker = new Unpacker();
     unpacker.feed(Uint8Array.of(0xcc, 0x80, 0x92, 1));
-    expect(unpacker.read()).toBe(128);
-    expect(() => unpacker.read()).toThrow(EOFError);
+    const objects: unknown[] = [];
+    unpacker.each((obj) => objects.push(obj));
+    expect(objects).toEqual([128]);
     unpacker.feed(Uint8Array.of(2));
-    expect(unpacker.fullUnpack()).toEqual([1, 2]);
+    unpacker.each((obj) => objects.push(obj));
+    expect(objects).toEqual([128, [1, 2]]);
   });
 });

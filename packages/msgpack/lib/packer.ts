@@ -128,6 +128,8 @@ export class Packer<Io = unknown> {
   write(v: unknown): this {
     if (v == null || typeof v === "boolean" || Number.isSafeInteger(v)) {
       this.buffer.write(encoder.encodeSharedRef(v));
+    } else if (isSymbol(v)) {
+      this.writeSymbolValue(v);
     } else if (typeof v === "string") {
       this.writeStringValue(v);
     } else if (v instanceof Uint8Array) {

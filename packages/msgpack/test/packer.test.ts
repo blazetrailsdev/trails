@@ -7,6 +7,7 @@ import {
   extend,
   include,
   rbCString,
+  rbCSymbol,
   rbFSend,
   rbObjClass,
   rbObjRespondTo,
@@ -455,23 +456,32 @@ describe("MessagePack::Packer", () => {
       });
     });
 
-    for (const klass of [Hash, Array] as (new () => object)[]) {
+    for (const [name, klass] of [
+      ["Hash", Hash],
+      ["Array", Array],
+      ["String", Uint8Array],
+    ] as [string, new () => object][]) {
       const Value = class extends klass {};
       const subject = () => packer.pack(new Value()).toS();
 
-      it(`defaults to ${klass.name} packer if no extension is present`, () => {
+      it(`defaults to ${name} packer if no extension is present`, () => {
         expect(subject()).toEqual(MessagePack.dump(new klass()));
       });
 
-      it(`uses core type extension for ${klass.name}`, () => {
+      it(`uses core type extension for ${name}`, () => {
         packer.registerType(0x01, Value, null, () => "value_msgpacked");
         expect(subject()).toEqual(bin("\xC7\x0F\x01value_msgpacked"));
       });
     }
 
     describe("when registering a type for symbols", () => {
-      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-      it.skip("packs symbols in an ext type", () => {});
+      beforeEach(() => {
+        packer.registerType(0x00, rbCSymbol, "toMsgpackExt");
+      });
+
+      it("packs symbols in an ext type", () => {
+        expect(packer.pack(":symbol").toS()).toEqual(bin("\xc7\x06\x00symbol"));
+      });
     });
   });
 

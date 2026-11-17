@@ -25,6 +25,23 @@ const pack = (...c: number[]) => Uint8Array.from(c);
 const bytes = (string: string) => Uint8Array.from(string, (c) => c.charCodeAt(0));
 const cat = (a: Uint8Array, s: string) => Uint8Array.from([...a, ...bytes(s)]);
 
+const sampleObject = () => [
+  1024,
+  new Hash<unknown, unknown>().set(["a", "b"], ["c", "d"]),
+  ["e", "f"],
+  "d",
+  70000,
+  4.12,
+  1.5,
+  1.5,
+  1.5,
+];
+const sampleRaw = (times: number) => {
+  const raw = rbFSend(sampleObject(), "toMsgpack") as Uint8Array;
+  return Uint8Array.from(Array.from({ length: times }, () => [...raw]).flat());
+};
+const split = (raw: Uint8Array) => Array.from(raw, (b) => Uint8Array.of(b));
+
 class DummyIO {
   private buf = new Uint8Array(0);
   private pos = 0;
@@ -182,17 +199,54 @@ describe("MessagePack::Unpacker", () => {
     expect(() => unpacker.read()).toThrow(EOFError);
   });
 
-  // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-  it.skip("feed and each continue internal state", () => {});
+  it("feed and each continue internal state", () => {
+    const raw = sampleRaw(4);
+    const objects: unknown[] = [];
 
-  // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-  it.skip("feed and each empty string", () => {});
+    for (const b of split(raw)) {
+      unpacker.feed(b);
+      unpacker.each((c) => {
+        objects.push(c);
+      });
+    }
 
-  // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-  it.skip("feed_each continues internal state", () => {});
+    expect(objects).toEqual(Array.from({ length: 4 }, sampleObject));
+  });
 
-  // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-  it.skip("feed_each enumerator", () => {});
+  it("feed and each empty string", () => {
+    const raw = sampleRaw(1);
+    const objects: unknown[] = [];
+
+    unpacker.feed("");
+    unpacker.feed(raw);
+    unpacker.feed("");
+
+    unpacker.each((c) => {
+      objects.push(c);
+    });
+    expect(objects).toEqual([sampleObject()]);
+  });
+
+  it("feed_each continues internal state", () => {
+    const raw = sampleRaw(4);
+    const objects: unknown[] = [];
+
+    for (const b of split(raw)) {
+      unpacker.feedEach(b, (c) => {
+        objects.push(c);
+      });
+    }
+
+    expect(objects).toEqual(Array.from({ length: 4 }, sampleObject));
+  });
+
+  it("feed_each enumerator", () => {
+    const raw = sampleRaw(4);
+
+    const enumerator = unpacker.feedEach(raw);
+    expect(enumerator).toBeInstanceOf(Iterator);
+    expect([...enumerator]).toEqual(Array.from({ length: 4 }, sampleObject));
+  });
 
   it("reset clears internal buffer", () => {
     unpacker.feed(Uint8Array.of(0x91));
@@ -212,19 +266,38 @@ describe("MessagePack::Unpacker", () => {
     expect([...unpacker.each()]).toEqual([1]);
   });
 
-  // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-  it.skip("frozen short strings", () => {});
+  it("frozen short strings", () => {
+    const raw = sampleRaw(1);
+    expect(() => {
+      unpacker.feedEach(raw, () => {});
+    }).not.toThrow();
+  });
 
-  // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-  it.skip("frozen long strings", () => {});
+  it("frozen long strings", () => {
+    const raw = sampleRaw(10240);
+    expect(() => {
+      unpacker.feedEach(raw, () => {});
+    }).not.toThrow();
+  });
 
   it("read raises invalid byte error", () => {
     unpacker.feed(Uint8Array.of(0xc1));
     expect(() => unpacker.read()).toThrow(MalformedFormatError);
   });
 
-  // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-  it.skip("gc mark", () => {});
+  it("gc mark", () => {
+    const raw = sampleRaw(4);
+
+    let n = 0;
+    for (const b of split(raw)) {
+      unpacker.feedEach(b, (o) => {
+        expect(o).toEqual(sampleObject());
+        n += 1;
+      });
+    }
+
+    expect(n).toBe(4);
+  });
 
   it("buffer", () => {
     const orig = "a".repeat(32 * 1024 * 4);
@@ -680,11 +753,40 @@ describe("MessagePack::Unpacker", () => {
     });
 
     describe("binary encoding", () => {
-      // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-      it.skip("decodes binary as ascii-8bit when using #feed", () => {});
+      const buffer = MessagePack.pack(
+        new Hash<unknown, unknown>()
+          .set(bytes("hello"), bytes("world"))
+          .set(bytes("nested"), [bytes("object"), new Hash().set(bytes("structure"), true)]),
+      );
 
-      // BLOCKED: msgpack-unpacker-read-loop-the-engine-hides
-      it.skip("decodes binary as ascii-8bit when using #feed_each", () => {});
+      beforeEach(() => {
+        unpacker = new Unpacker();
+      });
+
+      it("decodes binary as ascii-8bit when using #feed", () => {
+        const objs: unknown[] = [];
+        unpacker.feed(buffer);
+        unpacker.each((obj) => {
+          objs.push(obj);
+        });
+        const strings = flatten(objs).filter(
+          (s) => typeof s === "string" || s instanceof Uint8Array,
+        );
+        expect(strings).toEqual(["hello", "world", "nested", "object", "structure"].map(bytes));
+        expect([...new Set(strings.map((s) => s instanceof Uint8Array))]).toEqual([true]);
+      });
+
+      it("decodes binary as ascii-8bit when using #feed_each", () => {
+        const objs: unknown[] = [];
+        unpacker.feedEach(buffer, (obj) => {
+          objs.push(obj);
+        });
+        const strings = flatten(objs).filter(
+          (s) => typeof s === "string" || s instanceof Uint8Array,
+        );
+        expect(strings).toEqual(["hello", "world", "nested", "object", "structure"].map(bytes));
+        expect([...new Set(strings.map((s) => s instanceof Uint8Array))]).toEqual([true]);
+      });
     });
 
     describe("string encoding", () => {
@@ -750,6 +852,8 @@ describe("MessagePack::Unpacker", () => {
 function flatten(struct: unknown, results: unknown[] = []): unknown[] {
   if (Array.isArray(struct)) {
     for (const v of struct) flatten(v, results);
+  } else if (struct instanceof Hash) {
+    for (const [k, v] of struct) flatten(v, flatten(k, results));
   } else if (struct !== null && typeof struct === "object" && !(struct instanceof Uint8Array)) {
     for (const [k, v] of Object.entries(struct)) flatten(v, flatten(k, results));
   } else {
