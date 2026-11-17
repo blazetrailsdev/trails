@@ -525,11 +525,16 @@ export class Around {
   }
 }
 
+const EMPTY_ARRAY: readonly CallbackCondition[] = Object.freeze([]);
+
 export class Callback {
   kind: CallbackKind;
   name: string;
   readonly filter: AnyCallback | string | symbol | CallbackObject;
-  readonly options: CallbackOptions;
+  /** @internal */
+  private readonly if: readonly CallbackCondition[];
+  /** @internal */
+  private readonly unless: readonly CallbackCondition[];
   readonly chainConfig: DefineCallbacksOptions;
   readonly originalObject?: CallbackObject;
 
@@ -546,19 +551,18 @@ export class Callback {
     this.name = name;
     this.filter = filter;
     this.kind = kind;
-    this.options = {
-      ...options,
-      if: this.checkConditionals(options.if),
-      unless: this.checkConditionals(options.unless),
-    };
+    this.if = this.checkConditionals(options.if);
+    this.unless = this.checkConditionals(options.unless);
     this.chainConfig = chainConfig;
     this.originalObject = originalObject;
     void this.compiled;
   }
 
   /** @internal */
-  private checkConditionals(conditionals: CallbackOptions["if"] | undefined): CallbackCondition[] {
-    if (isBlank(conditionals)) return [];
+  private checkConditionals(
+    conditionals: CallbackOptions["if"] | undefined,
+  ): readonly CallbackCondition[] {
+    if (isBlank(conditionals)) return EMPTY_ARRAY;
 
     conditionals = kernelArray(conditionals as CallbackCondition | CallbackCondition[]);
     if (conditionals.some((c) => typeof c === "string" && !c.startsWith(":"))) {
@@ -571,7 +575,7 @@ export class Callback {
       );
     }
 
-    return Object.freeze(conditionals) as CallbackCondition[];
+    return Object.freeze(conditionals);
   }
 
   static build(
@@ -612,20 +616,15 @@ export class Callback {
     chain: { name: string; config: DefineCallbacksOptions },
     { ifOption, unlessOption }: { ifOption?: unknown; unlessOption?: unknown },
   ): Callback {
-    const existingIf = Array.isArray(this.options.if)
-      ? this.options.if
-      : this.options.if
-        ? [this.options.if]
-        : [];
-    const existingUnless = Array.isArray(this.options.unless)
-      ? this.options.unless
-      : this.options.unless
-        ? [this.options.unless]
-        : [];
-    return Callback.build(chain, this.filter, this.kind, {
-      if: [...existingIf, ...kernelArray(unlessOption as CallbackCondition)],
-      unless: [...existingUnless, ...kernelArray(ifOption as CallbackCondition)],
-    });
+    const options = {
+      if: [...this.if],
+      unless: [...this.unless],
+    };
+
+    options.if.push(...kernelArray(unlessOption as CallbackCondition));
+    options.unless.push(...kernelArray(ifOption as CallbackCondition));
+
+    return Callback.build(chain, this.filter, this.kind, options);
   }
 
   /** @missingRailsCall matches? — PERMANENT */
@@ -639,12 +638,10 @@ export class Callback {
   /** @internal */
   conditionsLambdas(): Array<(target: object, value: unknown) => boolean> {
     const conditions = [
-      ...kernelArray(this.options.if as CallbackCondition | CallbackCondition[]).map(
+      ...this.if.map(
         (c) => CallTemplate.build(c, this).makeLambda() as (t: object, v: unknown) => boolean,
       ),
-      ...kernelArray(this.options.unless as CallbackCondition | CallbackCondition[]).map((c) =>
-        CallTemplate.build(c, this).invertedLambda(),
-      ),
+      ...this.unless.map((c) => CallTemplate.build(c, this).invertedLambda()),
     ];
     return conditions;
   }
