@@ -191,21 +191,16 @@ export namespace Delegation {
         continue;
       }
 
-      let pending: { self: unknown; _: unknown } | null = null;
-      const body = function (this: Record<string, unknown>, ...args: unknown[]) {
-        let _: unknown;
-        if (pending && pending.self === this) {
-          _ = pending._;
-          pending = null;
-        } else {
-          _ = resolve(this);
-        }
+      const send = function (_: unknown, args: unknown[]) {
         if (_ == null && nilable !== false)
           return Object.hasOwn(NilClass, method) ? NilClass[method].apply(null, args) : undefined;
         if (!(method in Object(_))) {
           throw new NoMethodError(`undefined method '${method}' for ${nameErrMesgReceiver(_)}`);
         }
         return sendOrRead(_, method, args);
+      };
+      const body = function (this: Record<string, unknown>, ...args: unknown[]) {
+        return send(resolve(this), args);
       };
       let descriptor: PropertyDescriptor | undefined;
       if (signature == null && receiverClass != null) {
@@ -287,8 +282,11 @@ export namespace Delegation {
                 : { configurable: true, enumerable, writable: true, value },
             );
           }
-          pending = { self: this, _ };
-          return set ? value.call(this) : value;
+          if (!target && _ != null && !set) return value;
+          if (set || !target) return send(_, []);
+          const first = (...args: unknown[]) => send(_, args);
+          iseqLocationSetup(first, file, line);
+          return first;
         };
         iseqLocationSetup(decide, file, line);
         Object.defineProperty(owner, methodName, {

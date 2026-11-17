@@ -129,6 +129,7 @@ export function iseqLocationSetup(
  * (`vendor/ruby/v3.3.11/symbol.c:1096`) takes it.
  *
  * @noRailsEquivalent PERMANENT
+ * @inventedArm if — PERMANENT
  */
 export function rbObjMethod(obj: unknown, vid: unknown): Method {
   const name = rbCheckStringType(vid);
@@ -189,6 +190,7 @@ function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
  * class's alone, as `public_methods(false)` does (`class.c:2042`).
  *
  * @noRailsEquivalent PERMANENT
+ * @inventedArm if — PERMANENT
  */
 export function rbObjMethods(obj: unknown, recur = true): string[] {
   return classInstanceMethodList(obj, recur);

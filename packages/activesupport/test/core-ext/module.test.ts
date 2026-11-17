@@ -223,8 +223,8 @@ describe("ModuleTest", () => {
   });
 
   it("delegation to methods", () => {
-    expect(david.street()).toEqual("Paulina");
-    expect(david.city()).toEqual("Chicago");
+    expect(david.street).toEqual("Paulina");
+    expect(david.city).toEqual("Chicago");
   });
 
   it("delegation to assignment method", () => {
@@ -282,21 +282,21 @@ describe("ModuleTest", () => {
 
   it("delegation prefix", () => {
     const invoice = new Invoice(david) as Invoice & Record<string, any>;
-    expect(invoice.client_name()).toEqual("David");
-    expect(invoice.client_street()).toEqual("Paulina");
-    expect(invoice.client_city()).toEqual("Chicago");
+    expect(invoice.client_name).toEqual("David");
+    expect(invoice.client_street).toEqual("Paulina");
+    expect(invoice.client_city).toEqual("Chicago");
   });
 
   it("delegation custom prefix", () => {
     const invoice = new Invoice(david) as Invoice & Record<string, any>;
-    expect(invoice.customer_name()).toEqual("David");
-    expect(invoice.customer_street()).toEqual("Paulina");
-    expect(invoice.customer_city()).toEqual("Chicago");
+    expect(invoice.customer_name).toEqual("David");
+    expect(invoice.customer_street).toEqual("Paulina");
+    expect(invoice.customer_city).toEqual("Chicago");
   });
 
   it("delegation prefix with nil or false", () => {
-    expect((new Developer(david) as any).name()).toEqual("David");
-    expect((new Tester(david) as any).name()).toEqual("David");
+    expect((new Developer(david) as any).name).toEqual("David");
+    expect((new Tester(david) as any).name).toEqual("David");
   });
 
   it("delegation prefix with instance variable", async () => {
@@ -312,12 +312,12 @@ describe("ModuleTest", () => {
 
   it("delegation with allow nil", () => {
     const trails = new Project("Rails", new Someone("David")) as Project & Record<string, any>;
-    expect(trails.name()).toEqual("David");
+    expect(trails.name).toEqual("David");
   });
 
   it("delegation with allow nil and nil value", () => {
     const trails = new Project("Rails") as Project & Record<string, any>;
-    expect(trails.name()).toBeUndefined();
+    expect(trails.name).toBeUndefined();
   });
 
   it("delegation with allow nil and false value", async () => {
@@ -327,28 +327,28 @@ describe("ModuleTest", () => {
 
   it("delegation with allow nil and invalid value", async () => {
     const trails = new Project("Rails", 42) as Project & Record<string, any>;
-    await assertRaise([NoMethodError], {}, () => trails.name());
+    await assertRaise([NoMethodError], {}, () => trails.name);
   });
 
   it("delegation with allow nil and nil value and prefix", () => {
     delegate.call(Project.prototype, "name", { to: "person", allowNil: true, prefix: true });
     const trails = new Project("Rails") as Project & Record<string, any>;
-    expect(trails.person_name()).toBeUndefined();
+    expect(trails.person_name).toBeUndefined();
   });
 
   it("delegation without allow nil and nil value", async () => {
     const david = new Someone("David") as Someone & Record<string, any>;
-    await assertRaise([DelegationError], {}, () => david.street());
+    await assertRaise([DelegationError], {}, () => david.street);
   });
 
   it("delegation to method that exists on nil", () => {
     const nilPerson = new Someone(null) as Someone & Record<string, any>;
-    expect(nilPerson.toF()).toEqual(0.0);
+    expect(nilPerson.toF).toEqual(0.0);
   });
 
   it("delegation to method that exists on nil when allowing nil", () => {
     const nilProject = new Project(null) as Project & Record<string, any>;
-    expect(nilProject.toF()).toEqual(0.0);
+    expect(nilProject.toF).toEqual(0.0);
   });
 
   it("delegation does not raise error when removing singleton instance methods", async () => {

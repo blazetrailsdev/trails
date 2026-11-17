@@ -96,7 +96,7 @@ export class BlockedExecution extends Execution {
 
   /** @internal */
   private async setExpiresAt(): Promise<void> {
-    this.expires_at = (await this.job).concurrencyDuration().fromNow() as Time;
+    this.expires_at = (await this.job).concurrencyDuration.fromNow() as Time;
   }
 
   /** @internal */

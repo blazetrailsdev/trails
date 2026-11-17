@@ -124,29 +124,13 @@ export class Proxy {
     return "concurrency_key" in this.job ? this.job.concurrency_key : this.job.concurrencyKey();
   }
 
-  /**
-   * @internal
-   * @inventedArm concurrencyDuration — PERMANENT
-   */
+  /** @internal */
   private expiresAt(): unknown {
-    const job = this.job;
-    return (
-      typeof job.concurrencyDuration === "function"
-        ? job.concurrencyDuration()
-        : job.concurrencyDuration
-    ).fromNow();
+    return this.job.concurrencyDuration.fromNow();
   }
 
-  /**
-   * @internal
-   * @inventedArm concurrencyLimit — PERMANENT
-   */
+  /** @internal */
   private limit(): number {
-    const job = this.job;
-    return (
-      (typeof job.concurrencyLimit === "function"
-        ? job.concurrencyLimit()
-        : job.concurrencyLimit) ?? 1
-    );
+    return this.job.concurrencyLimit ?? 1;
   }
 }
