@@ -504,6 +504,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   /**
    * @inventedArm synchronize — CONVERGEABLE load-async-null-executor-arm-floats-its-load-under-the-adapter-lock
    * @inventedArm if — CONVERGEABLE load-async-null-executor-arm-floats-its-load-under-the-adapter-lock
+   * @inventedArm _loadSerializedAttributes — PERMANENT
    */
   loadAsync(): Relation<T, G> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
@@ -525,7 +526,15 @@ export class Relation<T extends Base, G extends boolean = false> {
       if (!this.isLoaded) {
         const result = this.execMainQuery(!c.currentTransaction().joinable);
         if (result instanceof Result) {
-          this.loadRecords(this.instantiateRecords(result));
+          const records = this.instantiateRecords(result);
+          this.loadRecords(records);
+          const prewarm: Promise<T[]> = (async () => {
+            for (const record of records) await _loadSerializedAttributes(record);
+            return records;
+          })().finally(() => {
+            if (this._loadResult === prewarm) this._loadResult = undefined;
+          });
+          this._loadResult = prewarm;
         } else if (result instanceof Promise) {
           this._futureResult = result.then(
             (rows) => ({ rows }),

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { constSet, TopLevel } from "@blazetrails/ruby-compat";
 import { Base, _loadSerializedAttributes } from "../../lib/index.js";
 import { fixtures } from "../support/use-fixtures.js";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -37,10 +38,27 @@ const AsyncCoder = {
 
 class AsyncCoderTopic extends Base {
   declare content: Loaded | null;
+  declare parent_id: number | null;
   static {
     this.tableName = "topics";
     this.serialize("content", { coder: AsyncCoder });
+    constSet(TopLevel, "AsyncCoderTopic", this);
+    this.hasMany("replies", { className: "AsyncCoderTopic", foreignKey: "parent_id" });
+    this.belongsTo("parent", { className: "AsyncCoderTopic", foreignKey: "parent_id" });
   }
+}
+
+async function createTopicWithReply(): Promise<AsyncCoderTopic> {
+  const topic = new AsyncCoderTopic();
+  topic.content = new Loaded("parent");
+  await _loadSerializedAttributes(topic);
+  await topic.saveBang();
+  const reply = new AsyncCoderTopic();
+  reply.content = new Loaded("reply");
+  reply.parent_id = topic.id as number;
+  await _loadSerializedAttributes(reply);
+  await reply.saveBang();
+  return topic;
 }
 
 const AsyncDumpCoder = {
@@ -59,6 +77,26 @@ class AsyncDumpTopic extends Base {
   static {
     this.tableName = "topics";
     this.serialize("content", { coder: AsyncDumpCoder });
+  }
+}
+
+const CountingCoder = {
+  loads: 0,
+  load(value: unknown): string | null {
+    if (value == null) return null;
+    CountingCoder.loads += 1;
+    return String(value);
+  },
+  dump(value: unknown): string | null {
+    return value == null ? null : String(value);
+  },
+};
+
+class CountingCoderTopic extends Base {
+  declare content: string | null;
+  static {
+    this.tableName = "topics";
+    this.serialize("content", { coder: CountingCoder });
   }
 }
 
@@ -106,5 +144,43 @@ describe("SerializedAttributeTest with an async coder", () => {
     const found = await AsyncDumpTopic.find(topic.id);
     expect(found.content).toEqual(new Loaded("SHOUT"));
     expect(found.content!.text).toBe("SHOUT");
+  });
+
+  it("loads an async coder's value on preloaded association targets", async () => {
+    const topic = await createTopicWithReply();
+    const [found] = await AsyncCoderTopic.where({ id: topic.id }).preload("replies");
+    const replies = await (
+      found as unknown as { replies: { toArray(): Promise<AsyncCoderTopic[]> } }
+    ).replies.toArray();
+    expect(replies.map((r) => r.content)).toEqual([new Loaded("reply")]);
+  });
+
+  it("loads an async coder's value on JOIN eager-loaded association targets", async () => {
+    const topic = await createTopicWithReply();
+    const [found] = await AsyncCoderTopic.where({ id: topic.id }).eagerLoad("replies");
+    expect(found.content).toEqual(new Loaded("parent"));
+    const replies = found.association("replies").target as AsyncCoderTopic[];
+    expect(replies.map((r) => r.content)).toEqual([new Loaded("reply")]);
+  });
+
+  it("loads an async coder's value on an association load", async () => {
+    const topic = await createTopicWithReply();
+    const [reply] = await (
+      topic as unknown as { replies: { toArray(): Promise<AsyncCoderTopic[]> } }
+    ).replies.toArray();
+    expect(reply.content).toEqual(new Loaded("reply"));
+    const parent = await (reply as unknown as { parent: Promise<AsyncCoderTopic> }).parent;
+    expect(parent.content).toEqual(new Loaded("parent"));
+  });
+
+  it("probes a sync user coder once per type and leaves later reads lazy", async () => {
+    const topic = await CountingCoderTopic.createBang({ content: "once" });
+    await CountingCoderTopic.find(topic.id);
+    CountingCoder.loads = 0;
+
+    const found = await CountingCoderTopic.find(topic.id);
+    expect(CountingCoder.loads).toBe(0);
+    expect(found.content).toBe("once");
+    expect(CountingCoder.loads).toBe(1);
   });
 });

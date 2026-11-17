@@ -27,6 +27,8 @@ type Coder = Pick<ColumnSerializer, "dump" | "load"> &
 export class Serialized extends DelegateClass(ValueType) {
   readonly subtype: ValueType | null;
   readonly coder: Coder;
+  /** @internal */
+  _coderLoadsAsync?: boolean;
 
   constructor(subtype: ValueType | null, coder: Coder) {
     super(subtype);
@@ -106,11 +108,12 @@ export interface Serialized extends Mutable {}
 
 include(Serialized, Mutable);
 
-/** @noRailsEquivalent PERMANENT */
-export async function _loadSerializedAttributes(record: {
-  _attributes: AttributeSet;
-  constructor: unknown;
-}): Promise<void> {
+export async function _loadSerializedAttributes(
+  record: { _attributes: AttributeSet; constructor: unknown },
+  seen: Set<object> = new Set(),
+): Promise<void> {
+  if (seen.has(record)) return;
+  seen.add(record);
   const attributeTypes = (
     record.constructor as { attributeTypes(): Record<string, unknown> | Hash<string, unknown> }
   ).attributeTypes();
@@ -119,6 +122,7 @@ export async function _loadSerializedAttributes(record: {
     const castType = type instanceof EncryptedAttributeType ? type.castType : type;
     if (!(castType instanceof Serialized)) continue;
     if (castType.coder instanceof ColumnSerializer || castType.coder === JSON) continue;
+    if (castType._coderLoadsAsync === false) continue;
     if (!record._attributes.isKey(name)) continue;
 
     const attribute = record._attributes.getAttribute(name) as Attribute & {
@@ -134,7 +138,20 @@ export async function _loadSerializedAttributes(record: {
       } catch {
         continue;
       }
+      if (attribute.valueBeforeTypeCast != null) {
+        castType._coderLoadsAsync = value instanceof Promise;
+      }
     }
     if (value instanceof Promise) attribute._value = await value;
+  }
+
+  const associationCache = (record as { _associationCache?: Map<string, { target: unknown }> })
+    ._associationCache;
+  if (!associationCache) return;
+  for (const association of associationCache.values()) {
+    const target = association.target;
+    for (const child of Array.isArray(target) ? target : target == null ? [] : [target]) {
+      await _loadSerializedAttributes(child as typeof record, seen);
+    }
   }
 }
