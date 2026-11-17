@@ -167,7 +167,7 @@ describe("UrlHelperTest", () => {
     Object.defineProperties(view, {
       isProtectAgainstForgery: { value: () => requestForgery, configurable: true },
       formAuthenticityToken: { value: () => "secret" },
-      requestForgeryProtectionToken: { value: () => "form_token" },
+      requestForgeryProtectionToken: { value: "form_token" },
     });
     UrlHelper.setButtonToGeneratesButtonTag(true);
   });

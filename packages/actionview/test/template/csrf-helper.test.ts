@@ -17,7 +17,7 @@ class CsrfHelperTest {
     return "secret";
   }
 
-  requestForgeryProtectionToken(): string {
+  get requestForgeryProtectionToken(): string {
     return "form_token";
   }
 }

@@ -96,9 +96,9 @@ describe("Delegation.generate", () => {
       greeter: null = null;
     }
     Delegation.generate(Person.prototype, ["greet"], { to: "greeter", allowNil: true });
-    const p = new Person() as Person & { greet: () => unknown };
-    expect(() => p.greet()).not.toThrow();
-    expect(p.greet()).toBeUndefined();
+    const p = new Person() as Person & { greet: unknown };
+    expect(() => p.greet).not.toThrow();
+    expect(p.greet).toBeUndefined();
   });
 
   it("supports prefix option", () => {

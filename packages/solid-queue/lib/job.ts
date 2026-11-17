@@ -75,8 +75,8 @@ export class Job extends Record {
   declare failedExecution: Promise<FailedExecution | null>;
   declare recurringExecution: Promise<import("./recurring-execution.js").RecurringExecution | null>;
   declare blockedExecution: Promise<Base | null>;
-  declare concurrencyLimit: () => number | null;
-  declare concurrencyDuration: () => Duration;
+  declare concurrencyLimit: number | null;
+  declare concurrencyDuration: Duration;
   declare unblockNextBlockedJob: typeof ConcurrencyControls.prototype.unblockNextBlockedJob;
   declare isConcurrencyLimited: typeof ConcurrencyControls.prototype.isConcurrencyLimited;
   declare acquireConcurrencyLock: typeof ConcurrencyControls.prototype.acquireConcurrencyLock;

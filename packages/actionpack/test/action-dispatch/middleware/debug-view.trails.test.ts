@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { rbObjIvarDefined, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { DelegationError } from "@blazetrails/activesupport";
 import { DebugView } from "../../../lib/action-dispatch/middleware/debug-view.js";
 
 describe("DebugView", () => {
@@ -16,7 +17,7 @@ describe("DebugView", () => {
     });
     expect(rbObjIvarDefined(view, "@response")).toBe(true);
     expect(rbObjIvarGet(view, "@response")).toBe(response);
-    expect(typeof (view as unknown as Record<string, unknown>).response).toBe("function");
+    expect(() => (view as unknown as Record<string, unknown>).response).toThrow(DelegationError);
     const out = String(
       await view.render({ partial: "rescues/request_and_response", formats: [":text"] }),
     );

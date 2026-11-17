@@ -26,7 +26,7 @@ export interface ThroughAssociationHost {
   /** @internal */
   ensureMutable(): void;
   /** @internal */
-  sourceReflection(): any;
+  readonly sourceReflection: any;
 }
 
 /** @internal */
@@ -83,9 +83,7 @@ export function constructJoinAttributes(
 ): Record<string, unknown> {
   this.ensureMutable();
 
-  const associationPrimaryKey = this.sourceReflection().associationPrimaryKey(
-    this.reflection.klass,
-  );
+  const associationPrimaryKey = this.sourceReflection.associationPrimaryKey(this.reflection.klass);
 
   let joinAttributes: Record<string, unknown>;
   if (
@@ -95,16 +93,16 @@ export function constructJoinAttributes(
     ) &&
     this.options.sourceType == null
   ) {
-    joinAttributes = { [this.sourceReflection().name]: records };
+    joinAttributes = { [this.sourceReflection.name]: records };
   } else {
     const assocPkValues = records.map((record) =>
       record._readAttribute(associationPrimaryKey as string),
     );
-    joinAttributes = { [this.sourceReflection().foreignKey() as string]: assocPkValues };
+    joinAttributes = { [this.sourceReflection.foreignKey() as string]: assocPkValues };
   }
 
   if (this.options.sourceType != null) {
-    joinAttributes[this.sourceReflection().foreignType] = [this.options.sourceType];
+    joinAttributes[this.sourceReflection.foreignType] = [this.options.sourceType];
   }
 
   if (records.length === 1) {
@@ -142,7 +140,7 @@ export function foreignKeyPresent(this: ThroughAssociationHost): boolean {
 
 /** @internal */
 export function ensureMutable(this: ThroughAssociationHost): void {
-  if (!this.sourceReflection().isBelongsTo()) {
+  if (!this.sourceReflection.isBelongsTo()) {
     const ownerName = (this.owner.constructor as { name: string }).name;
     if (this.reflection.isHasOne()) {
       throw new HasOneThroughCantAssociateThroughHasOneOrManyReflection(
@@ -175,8 +173,8 @@ export function buildRecord(
   attributes: Record<string, unknown>,
   block?: (record: Base) => void,
 ): Base | null {
-  if (this.sourceReflection().isCollection()) {
-    const inverse = this.sourceReflection().inverseOf();
+  if (this.sourceReflection.isCollection()) {
+    const inverse = this.sourceReflection.inverseOf();
     const target = this.throughAssociation().target;
 
     if (inverse != null && target != null && !globalThis.Array.isArray(target)) {

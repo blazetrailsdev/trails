@@ -185,7 +185,7 @@ class TestController extends ActionController.Base {
   }
 
   async accessingActionNameInTemplate(): Promise<void> {
-    await this.render({ inline: "<%= actionName() %>" });
+    await this.render({ inline: "<%= actionName %>" });
   }
 
   async renderCustomCode(): Promise<void> {
@@ -229,7 +229,7 @@ class TestController extends ActionController.Base {
   }
 
   async accessingParamsInTemplateWithLayout(): Promise<void> {
-    await this.render({ layout: true, inline: "Hello: <%= params().get('name') %>" });
+    await this.render({ layout: true, inline: "Hello: <%= params.get('name') %>" });
   }
 
   async renderWithExplicitTemplate(): Promise<void> {
@@ -268,7 +268,7 @@ class TestController extends ActionController.Base {
   }
 
   async accessingParamsInTemplate(): Promise<void> {
-    await this.render({ inline: "Hello: <%= params().get('name') %>" });
+    await this.render({ inline: "Hello: <%= params.get('name') %>" });
   }
 
   async accessingLocalAssignsInInlineTemplate(): Promise<void> {

@@ -24,8 +24,8 @@ describe("ModuleTest", () => {
     }
     delegate.call(Person.prototype, "street", "city", { to: "place" });
     const p = new Person(new Place()) as Person & { street(): string; city(): string };
-    expect(p.street()).toBe("Paulina");
-    expect(p.city()).toBe("Chicago");
+    expect(p.street).toBe("Paulina");
+    expect(p.city).toBe("Chicago");
   });
 
   it("delegate with prefix true — prepends target name", () => {
@@ -40,7 +40,7 @@ describe("ModuleTest", () => {
     }
     delegate.call(Invoice.prototype, "label", { to: "client", prefix: true });
     const inv = new Invoice(new Client()) as Invoice & { client_label(): string };
-    expect(inv.client_label()).toBe("David");
+    expect(inv.client_label).toBe("David");
   });
 
   it("delegate with custom prefix — prepends custom prefix", () => {
@@ -55,7 +55,7 @@ describe("ModuleTest", () => {
     }
     delegate.call(Invoice.prototype, "label", { to: "client", prefix: "customer" });
     const inv = new Invoice(new Client()) as Invoice & { customer_label(): string };
-    expect(inv.customer_label()).toBe("David");
+    expect(inv.customer_label).toBe("David");
   });
 
   it("delegate with allowNil true — returns undefined when target is nil", () => {
@@ -64,7 +64,7 @@ describe("ModuleTest", () => {
     }
     delegate.call(Project.prototype, "title", { to: "person", allowNil: true });
     const proj = new Project() as Project & { title(): string | undefined };
-    expect(proj.title()).toBeUndefined();
+    expect(proj.title).toBeUndefined();
   });
 
   it("delegate without allowNil — throws when target is nil", () => {

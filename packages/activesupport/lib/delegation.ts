@@ -191,14 +191,16 @@ export namespace Delegation {
         continue;
       }
 
-      const body = function (this: Record<string, unknown>, ...args: unknown[]) {
-        const _ = resolve(this);
+      const send = function (_: unknown, args: unknown[]) {
         if (_ == null && nilable !== false)
           return Object.hasOwn(NilClass, method) ? NilClass[method].apply(null, args) : undefined;
         if (!(method in Object(_))) {
           throw new NoMethodError(`undefined method '${method}' for ${nameErrMesgReceiver(_)}`);
         }
         return sendOrRead(_, method, args);
+      };
+      const body = function (this: Record<string, unknown>, ...args: unknown[]) {
+        return send(resolve(this), args);
       };
       let descriptor: PropertyDescriptor | undefined;
       if (signature == null && receiverClass != null) {
@@ -213,14 +215,16 @@ export namespace Delegation {
           );
         }
       }
+      const read = function (this: Record<string, unknown>, _: unknown) {
+        if (_ == null && nilable !== false) return undefined;
+        if (!(method in Object(_))) {
+          throw new NoMethodError(`undefined method '${method}' for ${nameErrMesgReceiver(_)}`);
+        }
+        return (_ as Record<string, unknown>)[method];
+      };
       if (descriptor?.get) {
         const get = function (this: Record<string, unknown>) {
-          const _ = resolve(this);
-          if (_ == null && nilable !== false) return undefined;
-          if (!(method in Object(_))) {
-            throw new NoMethodError(`undefined method '${method}' for ${nameErrMesgReceiver(_)}`);
-          }
-          return (_ as Record<string, unknown>)[method];
+          return read.call(this, resolve(this));
         };
         iseqLocationSetup(get, file, line);
         Object.defineProperty(owner, methodName, {
@@ -244,6 +248,59 @@ export namespace Delegation {
       }
       iseqLocationSetup(value, file, line);
       const writer = Object.getOwnPropertyDescriptor(owner, methodName)?.set;
+      if (typeof to === "string" && receiverClass == null && signature == null) {
+        const get = function (this: Record<string, unknown>) {
+          return read.call(this, resolve(this));
+        };
+        iseqLocationSetup(get, file, line);
+        const decide = function (this: Record<string, unknown>) {
+          if (this === owner) return value;
+          const _ = resolve(this);
+          let target: PropertyDescriptor | undefined;
+          for (let o: object | null = _ == null ? null : Object(_); o && !target; ) {
+            target = Object.getOwnPropertyDescriptor(o, method);
+            o = Object.getPrototypeOf(o);
+          }
+          const set = Object.getOwnPropertyDescriptor(owner, methodName)?.set;
+          if (target && typeof target.value !== "function") {
+            Object.defineProperty(owner, methodName, { configurable: true, enumerable, get, set });
+            return read.call(this, _);
+          }
+          if (target) {
+            Object.defineProperty(
+              owner,
+              methodName,
+              set
+                ? {
+                    configurable: true,
+                    enumerable,
+                    get(this: Record<string, unknown>) {
+                      return value.call(this);
+                    },
+                    set,
+                  }
+                : { configurable: true, enumerable, writable: true, value },
+            );
+          }
+          if (!target && _ != null && !set) return value;
+          if (set || !target) return send(_, []);
+          const first = (...args: unknown[]) => send(_, args);
+          iseqLocationSetup(first, file, line);
+          return first;
+        };
+        iseqLocationSetup(decide, file, line);
+        Object.defineProperty(owner, methodName, {
+          configurable: true,
+          enumerable,
+          get: writer
+            ? function (this: Record<string, unknown>) {
+                return value.call(this);
+              }
+            : decide,
+          set: writer,
+        });
+        continue;
+      }
       Object.defineProperty(
         owner,
         methodName,

@@ -128,6 +128,7 @@ export function iseqLocationSetup(
  * a Symbol (`":name"`) or a String, as `rb_check_id`
  * (`vendor/ruby/v3.3.11/symbol.c:1096`) takes it.
  *
+ * @inventedArm if — PERMANENT
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjMethod(obj: unknown, vid: unknown): Method {
@@ -139,6 +140,7 @@ export function rbObjMethod(obj: unknown, vid: unknown): Method {
     if (entry && typeof entry.value === "function") {
       return new Method(obj, id, entry.value as (...args: unknown[]) => unknown);
     }
+    if (entry?.get) return new Method(obj, id, entry.get as (...args: unknown[]) => unknown);
     if (entry) break;
   }
   if (id === "new" && rbObjClass(obj) === rbCClass) {
@@ -187,6 +189,7 @@ function classInstanceMethodList(obj: unknown, recur: boolean): string[] {
  * also `public_methods`, and a false `recur` lists the singleton's and its own
  * class's alone, as `public_methods(false)` does (`class.c:2042`).
  *
+ * @inventedArm if — PERMANENT
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjMethods(obj: unknown, recur = true): string[] {

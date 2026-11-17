@@ -102,11 +102,11 @@ describe("Delegation.generate", () => {
     }
     class Order {
       customer = new Customer();
-      declare job: () => unknown;
+      declare job: unknown;
     }
     Delegation.generate(Order.prototype, ["job"], { to: "customer" });
 
-    expect(new Order().job()).toBe(Job);
+    expect(new Order().job).toBe(Job);
   });
 
   it("looks the method up on a module named by as", () => {
@@ -225,6 +225,88 @@ describe("delegate", () => {
       "name",
     ]);
     expect(new Order().name()).toBe("Ada");
+  });
+
+  it("reads a String target's accessor as a property and its method as a method", () => {
+    class Customer {
+      get name() {
+        return "Ada";
+      }
+      greet(who: string) {
+        return `hi ${who}`;
+      }
+    }
+    class Order {
+      customer = new Customer();
+      declare name: string;
+      declare greet: (who: string) => string;
+    }
+    Delegation.generate(Order.prototype, ["name", "greet"], { to: "customer" });
+
+    expect(new Order().name).toBe("Ada");
+    expect(new Order().greet("Bo")).toBe("hi Bo");
+    expect(new Order().name).toBe("Ada");
+  });
+
+  it("keeps the shape the first read decided for a later receiver", () => {
+    class Order {
+      customer: unknown;
+      constructor(customer: unknown) {
+        this.customer = customer;
+      }
+      declare name: unknown;
+    }
+    Delegation.generate(Order.prototype, ["name"], { to: "customer" });
+
+    expect(new Order({ name: "Ada" }).name).toBe("Ada");
+    expect(new Order({ name: () => "Bo" }).name).toBeTypeOf("function");
+  });
+
+  it("resolves the target again on a call after a read that was not called", () => {
+    class Customer {
+      constructor(public label: string) {}
+      greet() {
+        return this.label;
+      }
+    }
+    class Order {
+      customer = new Customer("first");
+      declare greet: () => string;
+    }
+    Delegation.generate(Order.prototype, ["greet"], { to: "customer" });
+
+    const order = new Order();
+    expect(typeof order.greet).toBe("function");
+    order.customer = new Customer("second");
+    expect(order.greet()).toBe("second");
+  });
+
+  it("reads nil for an allow_nil delegate whose target is nil", () => {
+    class Order {
+      customer: unknown = null;
+      declare name: unknown;
+    }
+    Delegation.generate(Order.prototype, ["name"], { to: "customer", allowNil: true });
+
+    expect(new Order().name).toBeUndefined();
+  });
+
+  it("raises DelegationError on a property read whose target is nil", () => {
+    class Customer {
+      get name() {
+        return "Ada";
+      }
+    }
+    class Order {
+      customer: unknown = new Customer();
+      declare name: unknown;
+    }
+    Delegation.generate(Order.prototype, ["name"], { to: "customer" });
+
+    expect(new Order().name).toBe("Ada");
+    const order = new Order();
+    order.customer = null;
+    expect(() => order.name).toThrow(DelegationError);
   });
 
   it("gives a reader and writer pair one accessor", () => {
