@@ -1146,7 +1146,7 @@
     }
   },
   "solid-queue": {
-    "rows": 72,
+    "rows": 83,
     "excluded": [
       "active-job/concurrency-controls.ts::ClassMethods",
       "active-job/concurrency-controls.ts::ConcurrencyControls",
