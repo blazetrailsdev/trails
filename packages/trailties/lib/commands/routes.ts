@@ -12,11 +12,6 @@ import { invoke } from "../command.js";
 import { Base } from "../command/base.js";
 import { Trails } from "../trails.js";
 
-interface RoutesOptions {
-  controller?: string;
-  grep?: string;
-}
-
 export class RoutesCommand extends Base {
   static {
     const klass = this as unknown as ThorClass;
@@ -72,10 +67,10 @@ export class RoutesCommand extends Base {
 
   /** @internal */
   private routesFilter(): RoutesFilter {
-    const options = this.options as unknown as RoutesOptions;
     const filter: RoutesFilter = {};
-    if (this.options.hasKey("controller")) filter.controller = options.controller;
-    if (this.options.hasKey("grep")) filter.grep = options.grep;
+    if (this.options.hasKey("controller"))
+      filter.controller = this.options.get("controller") as string;
+    if (this.options.hasKey("grep")) filter.grep = this.options.get("grep") as string;
     return filter;
   }
 }

@@ -23,11 +23,6 @@ interface ControllerClass {
   viewPaths?: () => Iterable<unknown>;
 }
 
-interface UnusedRoutesOptions {
-  controller?: string;
-  grep?: string;
-}
-
 export class RouteInfo {
   /** @internal */
   private controllerName: string | undefined;
@@ -136,10 +131,10 @@ export class UnusedRoutesCommand extends Base {
 
   /** @internal */
   private routesFilter(): RoutesFilter {
-    const options = this.options as unknown as UnusedRoutesOptions;
     const filter: RoutesFilter = {};
-    if (this.options.hasKey("controller")) filter.controller = options.controller;
-    if (this.options.hasKey("grep")) filter.grep = options.grep;
+    if (this.options.hasKey("controller"))
+      filter.controller = this.options.get("controller") as string;
+    if (this.options.hasKey("grep")) filter.grep = this.options.get("grep") as string;
     return filter;
   }
 }
