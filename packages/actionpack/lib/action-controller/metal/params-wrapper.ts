@@ -6,6 +6,7 @@ import {
   flatten,
   rbFArray,
   rbObjDup,
+  rbFSend,
   rbObjRespondTo,
   rbStrSend,
   rtest,
@@ -95,18 +96,22 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
           );
         }
 
-        const aliases = _classValue(m, "attributeAliases");
-        if (aliases && any(Object.keys(aliases))) {
-          this.include = this.include.concat(Object.keys(aliases));
+        if (
+          rbObjRespondTo(m, "attributeAliases") &&
+          any(Object.keys(rbFSend(m, "attributeAliases") as Record<string, unknown>))
+        ) {
+          this.include = this.include.concat(
+            Object.keys(rbFSend(m, "attributeAliases") as Record<string, unknown>),
+          );
         }
 
         if (
-          _classValue(m, "nestedAttributesOptions") &&
-          any(Object.keys(_classValue(m, "nestedAttributesOptions")!))
+          rbObjRespondTo(m, "nestedAttributesOptions") &&
+          any(Object.keys(rbFSend(m, "nestedAttributesOptions") as Record<string, unknown>))
         ) {
           this.include = this.include.concat(
-            Object.keys(_classValue(m, "nestedAttributesOptions")!).map((key) =>
-              toS(key).concat("_attributes"),
+            Object.keys(rbFSend(m, "nestedAttributesOptions") as Record<string, unknown>).map(
+              (key) => toS(key).concat("_attributes"),
             ),
           );
         }
@@ -164,19 +169,8 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
 export interface WrapModel {
   attributeNames?(): string[];
   storedAttributes?(): Record<string, unknown[]>;
-  attributeAliases?: Record<string, unknown> | (() => Record<string, unknown>);
-  nestedAttributesOptions?: Record<string, unknown> | (() => Record<string, unknown>);
-}
-
-/** @internal */
-export function _classValue(
-  m: WrapModel | null | undefined,
-  name: "attributeAliases" | "nestedAttributesOptions",
-): Record<string, unknown> | null {
-  if (m == null || !(name in m)) return null;
-  const value = m[name];
-  const resolved = typeof value === "function" ? value.call(m) : value;
-  return resolved && typeof resolved === "object" ? resolved : null;
+  attributeAliases?(): Record<string, unknown>;
+  nestedAttributesOptions?(): Record<string, unknown>;
 }
 
 /** @internal */

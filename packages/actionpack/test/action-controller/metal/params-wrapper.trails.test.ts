@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { classAttribute } from "@blazetrails/activesupport";
 import { API } from "../../../lib/action-controller/api.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import {
-  _classValue,
   _wrapperKey,
   Options,
   type ParamsWrapperHost,
@@ -88,31 +88,20 @@ describe("ParamsWrapper::Options", () => {
   });
 });
 
-describe("ParamsWrapper::Options#include over a model's class attributes", () => {
-  it("reads attributeAliases and nestedAttributesOptions as class attribute values", () => {
+describe("ParamsWrapper::Options#include", () => {
+  it("adds a model's attribute aliases and nested attributes declared with class_attribute", () => {
     class Post {
       static attributeNames(): string[] {
         return ["title"];
       }
-      static attributeAliases: Record<string, string> = { headline: "title" };
-      static nestedAttributesOptions: Record<string, unknown> = { comments: {} };
     }
-    const options = new Options("post", [":json"], null, null, null, Post);
+    classAttribute.call(Post, "attributeAliases", { default: { headline: "title" } });
+    classAttribute.call(Post, "nestedAttributesOptions", { default: { comments: {} } });
 
-    expect(options.include).toEqual(["title", "headline", "comments_attributes"]);
-  });
-
-  it("still reads them from methods", () => {
-    class Post {
-      static attributeNames(): string[] {
-        return ["title"];
-      }
-      static attributeAliases(): Record<string, string> {
-        return { headline: "title" };
-      }
-    }
-
-    expect(_classValue(Post, "attributeAliases")).toEqual({ headline: "title" });
-    expect(_classValue(Post, "nestedAttributesOptions")).toBeNull();
+    expect(new Options("post", [":json"], null, null, null, Post).include).toEqual([
+      "title",
+      "headline",
+      "comments_attributes",
+    ]);
   });
 });
