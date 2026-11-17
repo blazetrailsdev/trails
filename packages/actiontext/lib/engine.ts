@@ -99,27 +99,29 @@ export class Engine extends TrailsEngine {
       onLoad("active_storage_blob", function (this: { prototype: object }) {
         include(this, Attachable);
 
-        const methods = {
-          isPreviewableAttachable(this: BlobHost): boolean {
+        Object.defineProperty(this.prototype, "isPreviewableAttachable", {
+          value: function (this: BlobHost): boolean {
             return this.isRepresentable();
           },
+          writable: true,
+          configurable: true,
+        });
 
-          attachablePlainTextRepresentation(this: BlobHost, caption: unknown = null): string {
+        Object.defineProperty(this.prototype, "attachablePlainTextRepresentation", {
+          value: function (this: BlobHost, caption: unknown = null): string {
             return `[${String(caption ?? this.filename)}]`;
           },
+          writable: true,
+          configurable: true,
+        });
 
-          toTrixContentAttachmentPartialPath(): null {
+        Object.defineProperty(this.prototype, "toTrixContentAttachmentPartialPath", {
+          value: function (): null {
             return null;
           },
-        };
-        for (const [name, value] of Object.entries(methods)) {
-          Object.defineProperty(this.prototype, name, {
-            value,
-            writable: true,
-            configurable: true,
-            enumerable: false,
-          });
-        }
+          writable: true,
+          configurable: true,
+        });
       });
     });
 

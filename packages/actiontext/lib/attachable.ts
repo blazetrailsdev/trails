@@ -112,46 +112,44 @@ export const Attachable = {
 };
 extend(Attachable, Concern);
 
-Object.defineProperties(Attachable, {
-  LOCATOR_NAME: { value: "attachable", enumerable: false },
+Object.defineProperty(Attachable, "LOCATOR_NAME", { value: "attachable", enumerable: false });
 
-  fromNode: {
-    enumerable: false,
-    async value(node: Html5Node): Promise<unknown> {
-      let attachable: unknown;
-      if ((attachable = await Attachable.attachableFromSgid(node.get("sgid")))) {
-        return attachable;
-      } else if ((attachable = await ContentAttachment.fromNode(node))) {
-        return attachable;
-      } else if ((attachable = RemoteImage.fromNode(node))) {
-        return attachable;
-      } else {
-        return new MissingAttachable(node.get("sgid"));
-      }
-    },
+Object.defineProperty(Attachable, "fromNode", {
+  enumerable: false,
+  value: async function (node: Html5Node): Promise<unknown> {
+    let attachable: unknown;
+    if ((attachable = await Attachable.attachableFromSgid(node.get("sgid")))) {
+      return attachable;
+    } else if ((attachable = await ContentAttachment.fromNode(node))) {
+      return attachable;
+    } else if ((attachable = RemoteImage.fromNode(node))) {
+      return attachable;
+    } else {
+      return new MissingAttachable(node.get("sgid"));
+    }
   },
+});
 
-  fromAttachableSgid: {
-    enumerable: false,
-    async value(sgid: unknown, options: Record<string, unknown> = {}): Promise<unknown> {
-      const record = Array.isArray(sgid)
-        ? await Locator.locateManySigned(sgid, { ...options, for: Attachable.LOCATOR_NAME })
-        : await Locator.locateSigned(sgid as string, { ...options, for: Attachable.LOCATOR_NAME });
-      if (record == null) throw new RecordNotFound();
-      return record;
-    },
+Object.defineProperty(Attachable, "fromAttachableSgid", {
+  enumerable: false,
+  value: async function (sgid: unknown, options: Record<string, unknown> = {}): Promise<unknown> {
+    const record = Array.isArray(sgid)
+      ? await Locator.locateManySigned(sgid, { ...options, for: Attachable.LOCATOR_NAME })
+      : await Locator.locateSigned(sgid as string, { ...options, for: Attachable.LOCATOR_NAME });
+    if (record == null) throw new RecordNotFound();
+    return record;
   },
+});
 
-  attachableFromSgid: {
-    enumerable: false,
-    async value(sgid: unknown): Promise<unknown> {
-      try {
-        return await Attachable.fromAttachableSgid(sgid);
-      } catch (error) {
-        if (error instanceof RecordNotFound) return null;
-        throw error;
-      }
-    },
+Object.defineProperty(Attachable, "attachableFromSgid", {
+  enumerable: false,
+  value: async function (sgid: unknown): Promise<unknown> {
+    try {
+      return await Attachable.fromAttachableSgid(sgid);
+    } catch (error) {
+      if (error instanceof RecordNotFound) return null;
+      throw error;
+    }
   },
 });
 
