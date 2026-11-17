@@ -579,10 +579,6 @@ class TestExtractor
     collect_required_modules_from(sexp, filepath, missing, {})
   end
 
-  # A required file may itself only `require_relative` the module files
-  # (`activesupport/test/cache/behaviors.rb`), so follow its unconditional
-  # top-level requires too. A require under a version branch
-  # (solid_cache `test/unit/behaviors.rb`) is not followed: every arm would be.
   def collect_required_modules_from(sexp, filepath, missing, seen, nested = false)
     paths = if nested
       sexp[1].select { |stmt| stmt.is_a?(Array) && stmt[0] == :command }.flat_map { |stmt| required_relative_paths(stmt) }
