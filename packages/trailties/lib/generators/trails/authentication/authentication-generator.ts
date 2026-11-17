@@ -91,13 +91,10 @@ export class AuthenticationGenerator extends Base {
   async enableBcrypt(): Promise<void> {
     const json = JSON.parse(await File.readAsync(File.join(this.destinationRoot, "package.json")));
     const executor = getPackageManager(this.destinationRoot).name;
-    if (
-      json.dependencies?.["bcryptjs"] != null &&
-      json.dependencies?.["@blazetrails/bcrypt"] != null
-    ) {
+    if (json.dependencies?.["@blazetrails/bcrypt"] != null) {
       await this.executeCommand(executor, "install --silent");
     } else {
-      await this.executeCommand(executor, "add bcryptjs @blazetrails/bcrypt", { capture: true });
+      await this.executeCommand(executor, "add @blazetrails/bcrypt", { capture: true });
     }
 
     const application = "config/application.ts";

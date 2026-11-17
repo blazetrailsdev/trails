@@ -86,6 +86,15 @@ export function mergeTsconfig(existingText: string): TsconfigMergeResult {
     }
   }
 
+  const types = cfg.compilerOptions["types"];
+  if (!Array.isArray(types)) {
+    cfg.compilerOptions["types"] = ["node"];
+    added.push("types");
+  } else if (!types.includes("node")) {
+    types.push("node");
+    added.push("types");
+  }
+
   let pluginAdded = false;
   const plugins = cfg.compilerOptions["plugins"];
   if (!Array.isArray(plugins)) {

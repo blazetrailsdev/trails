@@ -232,6 +232,32 @@ describe("Application server blocks", () => {
   });
 });
 
+describe("Application generators, runner and console blocks", () => {
+  for (const kind of ["generators", "runner", "console"] as const) {
+    it(`run_${kind}_blocks runs every railtie's blocks, then the application's`, async () => {
+      class BlocksApp extends Application {}
+      Application.register(BlocksApp);
+      const app = BlocksApp.instance();
+      const ran: string[] = [];
+      const runner =
+        kind === "generators"
+          ? "runGeneratorsBlocks"
+          : kind === "runner"
+            ? "runRunnerBlocks"
+            : "runConsoleBlocks";
+      vi.spyOn(app, "railties").mockReturnValue([
+        { [runner]: (given: unknown) => ran.push(given === app ? "railtie" : "wrong app") },
+      ] as never);
+      app[kind](() => {
+        ran.push("application");
+      });
+      expect(BlocksApp.registeredBlocksFor(kind)).toHaveLength(1);
+      await app[runner](app);
+      expect(ran).toEqual(["railtie", "application"]);
+    });
+  }
+});
+
 describe("Application#messageVerifiers", () => {
   it("derives a rotation from its secretKeyBase keyword", () => {
     class RotationApp extends Application {}

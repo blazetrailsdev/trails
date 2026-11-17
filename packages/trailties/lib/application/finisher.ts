@@ -31,7 +31,7 @@ export interface FinisherReloader {
   afterClassUnload(block: () => unknown): void;
   toRun(block: (this: FinisherReloaderInstance) => unknown, options?: { prepend?: boolean }): void;
   toComplete(block: (this: FinisherReloaderInstance) => unknown): void;
-  prepareBang(): void;
+  prepareBang(): void | Promise<void>;
 }
 
 export interface FinisherExecutor {
@@ -138,8 +138,8 @@ Finisher.initializer("add_to_prepare_blocks", function (this: FinisherHost) {
   }
 });
 
-Finisher.initializer("run_prepare_callbacks", function (this: FinisherHost) {
-  this.reloader.prepareBang();
+Finisher.initializer("run_prepare_callbacks", async function (this: FinisherHost) {
+  await this.reloader.prepareBang();
 });
 
 /** @inventedArm if — PERMANENT */

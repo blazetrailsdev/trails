@@ -48,7 +48,7 @@ export class SessionsController extends ApplicationController {
     this.rateLimit({
       to: 10, within: minutes(3), only: "create",
       with: function (this: SessionsController) {
-        this.redirectTo("/session/new", { alert: "Try again later." });
+        this.redirectTo(this.newSessionUrl(), { alert: "Try again later." });
       },
     });
   }
@@ -61,13 +61,13 @@ export class SessionsController extends ApplicationController {
       await this.startNewSessionFor(user);
       this.redirectTo(this.afterAuthenticationUrl());
     } else {
-      this.redirectTo("/session/new", { alert: "Try another email address or password." });
+      this.redirectTo(this.newSessionPath(), { alert: "Try another email address or password." });
     }
   }
 
   async destroy(): Promise<void> {
     await this.terminateSession();
-    this.redirectTo("/session/new");
+    this.redirectTo(this.newSessionPath());
   }
 }
 
@@ -112,7 +112,7 @@ export const Authentication = defineModule(
 
     requestAuthentication(this: any): void {
       this.session["return_to_after_authenticating"] = this.request.url;
-      this.redirectTo("/session/new");
+      this.redirectTo(this.newSessionPath());
     },
 
     afterAuthenticationUrl(this: any): string {
@@ -164,7 +164,7 @@ export class PasswordsController extends ApplicationController {
       await PasswordsMailer.reset(user).deliverLater();
     }
 
-    this.redirectTo("/session/new", {
+    this.redirectTo(this.newSessionPath(), {
       notice: "Password reset instructions sent (if user with that email address exists).",
     });
   }
@@ -173,9 +173,9 @@ export class PasswordsController extends ApplicationController {
 
   async update(): Promise<void> {
     if (await this.user.update(this.params.permit("password", "password_confirmation"))) {
-      this.redirectTo("/session/new", { notice: "Password has been reset." });
+      this.redirectTo(this.newSessionPath(), { notice: "Password has been reset." });
     } else {
-      this.redirectTo(\`/passwords/\${this.params.get("token")}/edit\`, { alert: "Passwords did not match." });
+      this.redirectTo(this.editPasswordPath(this.params.get("token")), { alert: "Passwords did not match." });
     }
   }
 
@@ -184,7 +184,7 @@ export class PasswordsController extends ApplicationController {
       this.user = await User.findByPasswordResetTokenBang(this.params.get("token"));
     } catch (error) {
       if (!(error instanceof InvalidSignature)) throw error;
-      this.redirectTo("/passwords/new", {
+      this.redirectTo(this.newPasswordPath(), {
         alert: "Password reset link is invalid or has expired.",
       });
     }

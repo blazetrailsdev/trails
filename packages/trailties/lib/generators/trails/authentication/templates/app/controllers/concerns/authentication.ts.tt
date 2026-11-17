@@ -38,7 +38,7 @@ export const Authentication = defineModule(
 
     requestAuthentication(this: any): void {
       this.session["return_to_after_authenticating"] = this.request.url;
-      this.redirectTo("/session/new");
+      this.redirectTo(this.newSessionPath());
     },
 
     afterAuthenticationUrl(this: any): string {

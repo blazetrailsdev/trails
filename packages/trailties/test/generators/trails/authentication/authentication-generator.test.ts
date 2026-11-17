@@ -205,6 +205,23 @@ describe("AuthenticationGenerator", () => {
     expect(read("app/controllers/concerns/authentication.ts")).toContain("Session.findBy(");
   });
 
+  it("redirects through the route helpers, never a hand-built path", async () => {
+    await withActionCableEngine(() => makeGen().run());
+    for (const rel of [
+      "app/controllers/sessions-controller.ts",
+      "app/controllers/concerns/authentication.ts",
+      "app/controllers/passwords-controller.ts",
+    ]) {
+      expect(read(rel), rel).not.toMatch(/redirectTo\(\s*["`]/);
+    }
+    expect(read("app/controllers/concerns/authentication.ts")).toContain(
+      "this.redirectTo(this.newSessionPath())",
+    );
+    expect(read("app/controllers/passwords-controller.ts")).toContain(
+      'this.editPasswordPath(this.params.get("token"))',
+    );
+  });
+
   it("runs the create_users and create_sessions migration generators in line", async () => {
     await makeGen().run();
     const commands = spawned.map((command) => command.join(" "));
@@ -214,7 +231,7 @@ describe("AuthenticationGenerator", () => {
   });
 
   it("adds bcryptjs to the application's dependencies and installs it", async () => {
-    write("package.json", '{ "dependencies": { "bcryptjs": "*", "@blazetrails/bcrypt": "*" } }');
+    write("package.json", '{ "dependencies": { "@blazetrails/bcrypt": "*" } }');
     await makeGen().run();
     const commands = spawned.map((command) => command.join(" "));
     expect(commands.some((c) => c.endsWith("bin/pnpm install --silent"))).toBe(true);
@@ -223,9 +240,7 @@ describe("AuthenticationGenerator", () => {
   it("authentication_generator_without_bcrypt_in_gemfile", async () => {
     await makeGen().run();
     const commands = spawned.map((command) => command.join(" "));
-    expect(commands.some((c) => c.endsWith("bin/pnpm add bcryptjs @blazetrails/bcrypt"))).toBe(
-      true,
-    );
+    expect(commands.some((c) => c.endsWith("bin/pnpm add @blazetrails/bcrypt"))).toBe(true);
   });
 
   it("does not silently overwrite an existing file", async () => {

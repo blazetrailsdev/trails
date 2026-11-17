@@ -9,7 +9,7 @@ export type RouteSetClass = { newWithConfig(config: EngineConfiguration): RouteS
 
 export class EngineConfiguration extends RailtieConfiguration {
   private _root: string | null;
-  private _paths?: Root;
+  protected _paths?: Root;
   private _generators?: Generators;
 
   middleware: MiddlewareStackProxy | MiddlewareStack = new MiddlewareStackProxy();

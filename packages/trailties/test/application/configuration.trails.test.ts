@@ -48,3 +48,23 @@ describe("prototype-chain method_missing", () => {
     expect(Object.getPrototypeOf(sub)).toBe(Sub.prototype);
   });
 });
+
+describe("Application::Configuration#paths", () => {
+  it("adds the application paths once, in configuration.rb:399-406 order", () => {
+    const c = new Configuration("/app");
+    const keys = c.paths().keys();
+    const appKeys = keys.slice(keys.indexOf("config/database"));
+    expect(appKeys).toEqual([
+      "config/database",
+      "config/environment",
+      "lib/templates",
+      "log",
+      "public",
+      "public/javascripts",
+      "public/stylesheets",
+      "tmp",
+    ]);
+    expect(c.paths()).toBe(c.paths());
+    expect(c.paths().keys()).toEqual(keys);
+  });
+});

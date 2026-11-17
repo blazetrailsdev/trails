@@ -572,15 +572,17 @@ export class Configuration extends EngineConfiguration {
   }
 
   override paths(): Root {
+    if (this._paths) return this._paths;
     const paths = super.paths();
-    if (!paths.get("config/database")) paths.add("config/database", { with: "config/database.ts" });
-    if (!paths.get("config/environment"))
-      paths.add("config/environment", { with: "config/environment.ts" });
-    if (!paths.get("lib/templates")) paths.add("lib/templates");
-    if (!paths.get("log")) paths.add("log", { with: `log/${Trails.env}.log` });
-    if (!paths.get("public")) paths.add("public");
-    if (!paths.get("public/javascripts")) paths.add("public/javascripts");
-    if (!paths.get("public/stylesheets")) paths.add("public/stylesheets");
+    paths.add("config/database", { with: "config/database.ts" });
+    paths.add("config/environment", { with: "config/environment.ts" });
+    paths.add("lib/templates");
+    paths.add("log", { with: `log/${Trails.env}.log` });
+    paths.add("public");
+    paths.add("public/javascripts");
+    paths.add("public/stylesheets");
+    paths.add("tmp");
+    this._paths = paths;
     return paths;
   }
 
