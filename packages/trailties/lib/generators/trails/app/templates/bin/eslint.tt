@@ -10,10 +10,12 @@ const { status } = spawnSync(
   ["--config", join(root, "eslint.config.mjs"), ...args],
   { stdio: "inherit" },
 );
-const fix = args.includes("--fix");
+if (status === null) process.exit(1);
+const valued = ["-c", "--config", "-f", "--format", "-o", "--output-file", "--rule", "--ext"];
+const paths = args.filter((arg, i) => !arg.startsWith("-") && !valued.includes(args[i - 1]));
 const prettier = spawnSync(
   join(root, "node_modules", ".bin", "prettier"),
-  [fix ? "--write" : "--check", root],
+  [args.includes("--fix") ? "--write" : "--check", ...(paths.length > 0 ? paths : [root])],
   { stdio: "inherit" },
 );
-process.exit((status ?? 1) || (prettier.status ?? 1));
+process.exit(status || (prettier.status ?? 1));

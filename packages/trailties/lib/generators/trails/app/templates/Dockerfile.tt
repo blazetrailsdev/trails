@@ -23,14 +23,26 @@ RUN npm install -g corepack && corepack enable && corepack prepare pnpm@$PNPM_VE
 RUN npm install -g pnpm@$PNPM_VERSION
 <% } -%>
 
-# Install node modules
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+<% } -%>
+<% if (this.usingBun()) { -%>
+ENV BUN_INSTALL=/usr/local/bun
+ENV PATH=/usr/local/bun/bin:$PATH
+ARG BUN_VERSION=<%= await this.dockerfileBunVersion() %>
+RUN curl -fsSL https://bun.sh/install | bash -s -- "bun-v${BUN_VERSION}"
 
 <% } -%>
+# Install application packages
+<% if (this.usingBun()) { -%>
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
+<% } else { -%>
+COPY package.json pnpm-lock.yaml ./
+RUN <%= this.usingNode() ? "" : "npm install -g pnpm && " %>pnpm install --frozen-lockfile
+<% } -%>
 
+# Copy application code
 COPY . .
-RUN <%= this.packageManager %> run build
+RUN <%= this.usingBun() ? "bun" : "pnpm" %> run build
 
 FROM base
 
