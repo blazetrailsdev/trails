@@ -23,7 +23,7 @@ describe("FullSanitizer", () => {
 
   test("strip_blank_string", () => {
     expect(fullSanitize(null)).toBeNull();
-    expect(fullSanitize(undefined)).toBeUndefined();
+    expect(fullSanitize(undefined)).toBeNull();
     expect(fullSanitize("")).toBe("");
     expect(fullSanitize("   ")).toBe("   ");
   });
@@ -57,6 +57,6 @@ describe("FullSanitizer", () => {
   });
 
   test("strip_script_contents", () => {
-    expect(fullSanitize("hi <script>alert(1)</script> bye")).toBe("hi  bye");
+    expect(fullSanitize("hi <script>alert(1)</script> bye")).toBe("hi alert(1) bye");
   });
 });

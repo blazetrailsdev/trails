@@ -38,13 +38,13 @@ describe("LinkSanitizer", () => {
 
   test("strip_blank_string", () => {
     expect(linkSanitize(null)).toBeNull();
-    expect(linkSanitize(undefined)).toBeUndefined();
+    expect(linkSanitize(undefined)).toBeNull();
     expect(linkSanitize("")).toBe("");
   });
 
   test("preserves_common_multimedia_tags", () => {
     expect(linkSanitize('<p>see <img src="x" alt="y"></p>')).toBe(
-      '<p>see <img src="x" alt="y" /></p>',
+      '<p>see <img src="x" alt="y"></p>',
     );
     expect(linkSanitize('<video src="v.mp4"></video>')).toBe('<video src="v.mp4"></video>');
     expect(linkSanitize("<details><summary>more</summary>info</details>")).toBe(

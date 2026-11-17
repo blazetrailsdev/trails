@@ -5,7 +5,9 @@ import {
   type Sanitizer as HtmlSanitizer,
 } from "@blazetrails/html-sanitizer";
 
-export type Sanitizer = Pick<HtmlSanitizer, "sanitize"> & { sanitizeCss?(style: string): string };
+export type Sanitizer = Pick<HtmlSanitizer, "sanitize">;
+
+type SafeListSanitizer = Sanitizer & { sanitizeCss(style: string): string };
 
 export interface SanitizerClass {
   new (): Sanitizer;
@@ -14,7 +16,7 @@ export interface SanitizerClass {
 export interface SanitizerVendor {
   fullSanitizer: SanitizerClass;
   linkSanitizer: SanitizerClass;
-  safeListSanitizer: SanitizerClass & {
+  safeListSanitizer: (new () => SafeListSanitizer) & {
     allowedTags: Iterable<string>;
     allowedAttributes: Iterable<string>;
   };
@@ -24,10 +26,10 @@ export interface SanitizeHelperClass {
   readonly sanitizerVendor: SanitizerVendor;
   fullSanitizer: Sanitizer;
   linkSanitizer: Sanitizer;
-  safeListSanitizer: Sanitizer;
+  safeListSanitizer: SafeListSanitizer;
   _fullSanitizer?: Sanitizer;
   _linkSanitizer?: Sanitizer;
-  _safeListSanitizer?: Sanitizer;
+  _safeListSanitizer?: SafeListSanitizer;
 }
 
 type SanitizeHelperHost = { constructor: unknown };
@@ -45,7 +47,7 @@ export function sanitize(
 }
 
 export function sanitizeCss(this: SanitizeHelperHost, style: string): string {
-  return (this.constructor as SanitizeHelperClass).safeListSanitizer.sanitizeCss!(style);
+  return (this.constructor as SanitizeHelperClass).safeListSanitizer.sanitizeCss(style);
 }
 
 export function stripTags(
@@ -72,7 +74,7 @@ export const ClassMethods = {
     (this as unknown as SanitizeHelperClass)._linkSanitizer = value;
   },
 
-  set safeListSanitizer(value: Sanitizer) {
+  set safeListSanitizer(value: SafeListSanitizer) {
     (this as unknown as SanitizeHelperClass)._safeListSanitizer = value;
   },
 
@@ -104,7 +106,7 @@ export const ClassMethods = {
     return self._linkSanitizer;
   },
 
-  get safeListSanitizer(): Sanitizer {
+  get safeListSanitizer(): SafeListSanitizer {
     const self = this as unknown as SanitizeHelperClass;
     if (!Object.hasOwn(self, "_safeListSanitizer") || self._safeListSanitizer == null) {
       self._safeListSanitizer = new self.sanitizerVendor.safeListSanitizer();

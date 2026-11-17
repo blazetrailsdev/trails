@@ -8,9 +8,7 @@ import {
   assertRespondTo,
 } from "@blazetrails/activesupport/testing/assertions";
 
-declare const Loofah: unknown;
-declare const Trails: unknown;
-import { HTML4, HTML5, Html } from "@blazetrails/html-sanitizer";
+import { HTML4, HTML5, Html, Loofah } from "@blazetrails/html-sanitizer";
 import { SanitizeHelper } from "../../lib/helpers/sanitize-helper.js";
 import type {
   SanitizeHelperClass,
@@ -46,10 +44,7 @@ function newMockVendor(): SanitizerVendor & { newMockSanitizer: (name: string) =
   return {
     fullSanitizer: newMockSanitizer("full_sanitizer"),
     linkSanitizer: newMockSanitizer("link_sanitizer"),
-    safeListSanitizer: safeListClass as SanitizerClass & {
-      allowedTags: string[];
-      allowedAttributes: string[];
-    },
+    safeListSanitizer: safeListClass as unknown as SanitizerVendor["safeListSanitizer"],
     newMockSanitizer,
   };
 }
@@ -114,7 +109,7 @@ describe("SanitizeHelperTest", () => {
 
   it("safe_list_sanitizer is settable", () => {
     const saved = klass.safeListSanitizer;
-    const mock = new (mockVendor.newMockSanitizer("walrus"))();
+    const mock = new (mockVendor.newMockSanitizer("walrus"))() as typeof saved;
     klass.safeListSanitizer = mock;
     expect(klass.safeListSanitizer).toBe(mock);
     klass.safeListSanitizer = saved;
@@ -286,19 +281,17 @@ function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
     );
   });
 
-  // BLOCKED: html-sanitizer-port-scrubbers
-  it.skip("sanitize with loofah scrubber option", () => {
+  it("sanitize with loofah scrubber option", () => {
     const input = `<div>hello</div>`;
-    const scrubber = new (Loofah as any).Scrubber((node: any) => {
+    const scrubber = new Loofah.Scrubber({}, (node) => {
       node.content = "scrubbed";
     });
 
     expect(String(subject.sanitize(input, { scrubber }))).toBe(`<div>scrubbed</div>`);
   });
 
-  // BLOCKED: html-sanitizer-port-scrubbers
-  it.skip("sanitize with custom scrubber option", () => {
-    const scrubber = new (class extends (Trails as any).HTML.PermitScrubber {
+  it("sanitize with custom scrubber option", () => {
+    const scrubber = new (class extends Html.PermitScrubber {
       constructor() {
         super();
         this.tags = ["div"];
@@ -310,8 +303,7 @@ function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
     expect(String(subject.sanitize(input, { scrubber }))).toBe(`<div>hello</div>world`);
   });
 
-  // BLOCKED: html-sanitizer-safe-list-sanitize-css
-  it.skip("sanitize css", () => {
+  it("sanitize css", () => {
     const input = `width: 100%; background-image:url("http://www.example.com/"); height: 100%;`;
     const result = String(subject.sanitizeCss(input));
 
@@ -334,10 +326,10 @@ function sanitizeHelperVendorTests(vendor: SanitizerVendor): void {
     expect(String(result)).toBe("<div>Example of a fragment</div>");
   });
 
-  // BLOCKED: html-sanitizer-port-scrubbers
-  it.skip("we get the expected HTML parser", () => {
+  // PERMANENT-SKIP: HTML4 parses through libxml2, which trails does not ship; only the HTML5 vendor runs.
+  it.skipIf(vendor !== HTML5.Sanitizer)("we get the expected HTML parser", () => {
     const input = `<p>1<b>2<i>3</b>4</i>5</p>`;
-    const scrubber = new (Loofah as any).Scrubber(() => {});
+    const scrubber = new Loofah.Scrubber({}, () => {});
 
     const expected =
       vendor === Html.Sanitizer || vendor === HTML4.Sanitizer

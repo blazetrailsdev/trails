@@ -898,17 +898,26 @@
     }
   },
   "html-sanitizer": {
-    "rows": 11,
+    "rows": 23,
     "excluded": [],
     "unwalked": [],
     "residue": {
+      "loofah/concerns.ts::ScrubBehavior": "Loofah::ScrubBehavior",
+      "loofah/html5/libxml2-workarounds.ts::LibxmlWorkarounds": "Loofah::LibxmlWorkarounds",
+      "loofah/html5/safelist.ts::SafeList": "Loofah::HTML5::SafeList",
+      "loofah/html5/scrub.ts::Scrub": "Loofah::HTML5::Scrub",
+      "loofah/metahelpers.ts::MetaHelpers": "Loofah::MetaHelpers",
+      "loofah/scrubber.ts::ScrubberNotFound": "Loofah::ScrubberNotFound",
       "sanitizer.ts::HTML4FullSanitizer": "Trails::HTML4::FullSanitizer",
       "sanitizer.ts::HTML4LinkSanitizer": "Trails::HTML4::LinkSanitizer",
       "sanitizer.ts::HTML4SafeListSanitizer": "Trails::HTML4::SafeListSanitizer",
       "sanitizer.ts::HTML5FullSanitizer": "Trails::HTML5::FullSanitizer",
       "sanitizer.ts::HTML5LinkSanitizer": "Trails::HTML5::LinkSanitizer",
       "sanitizer.ts::HTML5SafeListSanitizer": "Trails::HTML5::SafeListSanitizer",
-      "sanitizer.ts::Sanitizer": "Trails::HTML::Sanitizer"
+      "sanitizer.ts::Sanitizer": "Trails::HTML::Sanitizer",
+      "scrubbers.ts::PermitScrubber": "Trails::HTML::PermitScrubber",
+      "scrubbers.ts::TargetScrubber": "Trails::HTML::TargetScrubber",
+      "scrubbers.ts::TextOnlyScrubber": "Trails::HTML::TextOnlyScrubber"
     }
   },
   "i18n": {

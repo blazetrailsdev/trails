@@ -93,6 +93,10 @@ export class Node extends XmlNode {
     return this.type === Node.CDATA_SECTION_NODE;
   }
 
+  isComment(): boolean {
+    return this.type === Node.COMMENT_NODE;
+  }
+
   isBlank(): boolean {
     if (this.type !== Node.TEXT_NODE && this.type !== Node.CDATA_SECTION_NODE) return false;
     return /^[ \t\n\r]*$/.test(this.content);
@@ -107,6 +111,11 @@ export class Node extends XmlNode {
   }
 
   set content(string: unknown) {
+    if (!("childNodes" in this._node)) {
+      (this._node as { value?: string; data?: string })["value" in this._node ? "value" : "data"] =
+        String(string);
+      return;
+    }
     for (const child of [...(this._node as Parse5Parent).childNodes]) {
       defaultTreeAdapter.detachNode(child);
     }
@@ -118,6 +127,7 @@ export class Node extends XmlNode {
   }
 
   get children(): Node[] {
+    if (!("childNodes" in this._node)) return [];
     return childNodes(this._node as Parse5Parent, this.document);
   }
 

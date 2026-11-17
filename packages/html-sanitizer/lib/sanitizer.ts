@@ -1,7 +1,11 @@
 import * as Nokogiri from "@blazetrails/nokogiri";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import type { Html5DocumentFragment } from "@blazetrails/nokogiri";
 import { HTML, HTML4, HTML5, type VendorMethods } from "./namespaces.js";
-import { safeListSanitize, stripAllTags, unwrapTagsAndStripAttributes } from "./engine.js";
+import { Loofah } from "./loofah.js";
+import { ScrubBehavior } from "./loofah/concerns.js";
+import { Scrub } from "./loofah/html5/scrub.js";
+import type { Scrubber } from "./loofah/scrubber.js";
+import { PermitScrubber, TargetScrubber, TextOnlyScrubber } from "./scrubbers.js";
 import { DEFAULT_ALLOWED_ATTRIBUTES, DEFAULT_ALLOWED_TAGS } from "./config.js";
 
 export abstract class Sanitizer {
@@ -30,26 +34,64 @@ export abstract class Sanitizer {
 export interface SanitizeOptions {
   tags?: Iterable<string>;
   attributes?: Iterable<string>;
-}
-
-/** @internal */
-export function isTrivialInput(html: string | null | undefined): boolean {
-  return html == null || html.length === 0;
+  scrubber?: Scrubber;
 }
 
 HTML.Sanitizer = Sanitizer;
 
 export class HTML4FullSanitizer extends Sanitizer {
   sanitize(html: string | null | undefined): string | null | undefined {
-    if (isTrivialInput(html)) return html;
-    return stripAllTags(html as string);
+    if (html == null) return null;
+    if (html.length === 0) return html;
+
+    return this.serialize(this.scrub(this.parseFragment(html)));
+  }
+
+  /** @internal */
+  protected parseFragment(html: string): Html5DocumentFragment {
+    return Loofah.html4Fragment(html);
+  }
+
+  scrub(fragment: Html5DocumentFragment, _options: SanitizeOptions = {}): Html5DocumentFragment {
+    return ScrubBehavior.Node.scrubBang(fragment, new TextOnlyScrubber());
+  }
+
+  /** @internal */
+  protected serialize(fragment: Html5DocumentFragment): string {
+    return fragment.toHtml();
   }
 }
 
 export class HTML4LinkSanitizer extends Sanitizer {
+  /** @internal */
+  private readonly linkScrubber: TargetScrubber;
+
+  constructor() {
+    super();
+    this.linkScrubber = new TargetScrubber();
+    this.linkScrubber.tags = ["a"];
+    this.linkScrubber.attributes = ["href"];
+  }
+
   sanitize(html: string | null | undefined): string | null | undefined {
-    if (isTrivialInput(html)) return html;
-    return unwrapTagsAndStripAttributes(html as string, ["a"], ["href"]);
+    if (html == null) return null;
+    if (html.length === 0) return html;
+
+    return this.serialize(this.scrub(this.parseFragment(html)));
+  }
+
+  /** @internal */
+  protected parseFragment(html: string): Html5DocumentFragment {
+    return Loofah.html4Fragment(html);
+  }
+
+  scrub(fragment: Html5DocumentFragment, _options: SanitizeOptions = {}): Html5DocumentFragment {
+    return ScrubBehavior.Node.scrubBang(fragment, this.linkScrubber);
+  }
+
+  /** @internal */
+  protected serialize(fragment: Html5DocumentFragment): string {
+    return fragment.toHtml();
   }
 }
 
@@ -58,25 +100,49 @@ export class HTML4SafeListSanitizer extends Sanitizer {
 
   static allowedAttributes: Set<string> = new Set(DEFAULT_ALLOWED_ATTRIBUTES);
 
-  private readonly prune: boolean;
+  /** @internal */
+  private readonly permitScrubber: PermitScrubber;
 
-  /** @missingRailsCall new — CONVERGEABLE html-sanitizer-port-scrubbers */
-  constructor(options: { prune?: boolean } = {}) {
+  constructor({ prune = false }: { prune?: boolean } = {}) {
     super();
-    this.prune = options.prune ?? false;
+    this.permitScrubber = new PermitScrubber({ prune });
   }
 
   sanitize(
     html: string | null | undefined,
     options: SanitizeOptions = {},
   ): string | null | undefined {
-    if (isTrivialInput(html)) return html;
+    if (html == null) return null;
+    if (html.length === 0) return html;
 
-    return safeListSanitize(html as string, {
-      allowedTags: [...validateBang(this.allowedTags(options), "tags")],
-      allowedAttributes: [...validateBang(this.allowedAttributes(options), "attributes")],
-      prune: this.prune,
-    });
+    return this.serialize(this.scrub(this.parseFragment(html), options));
+  }
+
+  /** @internal */
+  protected parseFragment(html: string): Html5DocumentFragment {
+    return Loofah.html4Fragment(html);
+  }
+
+  scrub(fragment: Html5DocumentFragment, options: SanitizeOptions = {}): Html5DocumentFragment {
+    const scrubber = options.scrubber;
+    if (scrubber) {
+      return ScrubBehavior.Node.scrubBang(fragment, scrubber);
+    } else if (this.allowedTags(options) || this.allowedAttributes(options)) {
+      this.permitScrubber.tags = this.allowedTags(options);
+      this.permitScrubber.attributes = this.allowedAttributes(options);
+      return ScrubBehavior.Node.scrubBang(fragment, this.permitScrubber);
+    } else {
+      return ScrubBehavior.Node.scrubBang(fragment, "strip");
+    }
+  }
+
+  sanitizeCss(styleString: string): string {
+    return Scrub.scrubCss(styleString);
+  }
+
+  /** @internal */
+  protected serialize(fragment: Html5DocumentFragment): string {
+    return fragment.toHtml();
   }
 
   /** @internal */
@@ -96,15 +162,57 @@ export class HTML4SafeListSanitizer extends Sanitizer {
 
 export class HTML5FullSanitizer extends Sanitizer {
   sanitize(html: string | null | undefined): string | null | undefined {
-    if (isTrivialInput(html)) return html;
-    return stripAllTags(html as string);
+    if (html == null) return null;
+    if (html.length === 0) return html;
+
+    return this.serialize(this.scrub(this.parseFragment(html)));
+  }
+
+  /** @internal */
+  protected parseFragment(html: string): Html5DocumentFragment {
+    return Loofah.html5Fragment(html);
+  }
+
+  scrub(fragment: Html5DocumentFragment, _options: SanitizeOptions = {}): Html5DocumentFragment {
+    return ScrubBehavior.Node.scrubBang(fragment, new TextOnlyScrubber());
+  }
+
+  /** @internal */
+  protected serialize(fragment: Html5DocumentFragment): string {
+    return fragment.toHtml();
   }
 }
 
 export class HTML5LinkSanitizer extends Sanitizer {
+  /** @internal */
+  private readonly linkScrubber: TargetScrubber;
+
+  constructor() {
+    super();
+    this.linkScrubber = new TargetScrubber();
+    this.linkScrubber.tags = ["a"];
+    this.linkScrubber.attributes = ["href"];
+  }
+
   sanitize(html: string | null | undefined): string | null | undefined {
-    if (isTrivialInput(html)) return html;
-    return unwrapTagsAndStripAttributes(html as string, ["a"], ["href"]);
+    if (html == null) return null;
+    if (html.length === 0) return html;
+
+    return this.serialize(this.scrub(this.parseFragment(html)));
+  }
+
+  /** @internal */
+  protected parseFragment(html: string): Html5DocumentFragment {
+    return Loofah.html5Fragment(html);
+  }
+
+  scrub(fragment: Html5DocumentFragment, _options: SanitizeOptions = {}): Html5DocumentFragment {
+    return ScrubBehavior.Node.scrubBang(fragment, this.linkScrubber);
+  }
+
+  /** @internal */
+  protected serialize(fragment: Html5DocumentFragment): string {
+    return fragment.toHtml();
   }
 }
 
@@ -113,25 +221,49 @@ export class HTML5SafeListSanitizer extends Sanitizer {
 
   static allowedAttributes: Set<string> = new Set(DEFAULT_ALLOWED_ATTRIBUTES);
 
-  private readonly prune: boolean;
+  /** @internal */
+  private readonly permitScrubber: PermitScrubber;
 
-  /** @missingRailsCall new — CONVERGEABLE html-sanitizer-port-scrubbers */
-  constructor(options: { prune?: boolean } = {}) {
+  constructor({ prune = false }: { prune?: boolean } = {}) {
     super();
-    this.prune = options.prune ?? false;
+    this.permitScrubber = new PermitScrubber({ prune });
   }
 
   sanitize(
     html: string | null | undefined,
     options: SanitizeOptions = {},
   ): string | null | undefined {
-    if (isTrivialInput(html)) return html;
+    if (html == null) return null;
+    if (html.length === 0) return html;
 
-    return safeListSanitize(html as string, {
-      allowedTags: [...validateBang(this.allowedTags(options), "tags")],
-      allowedAttributes: [...validateBang(this.allowedAttributes(options), "attributes")],
-      prune: this.prune,
-    });
+    return this.serialize(this.scrub(this.parseFragment(html), options));
+  }
+
+  /** @internal */
+  protected parseFragment(html: string): Html5DocumentFragment {
+    return Loofah.html5Fragment(html);
+  }
+
+  scrub(fragment: Html5DocumentFragment, options: SanitizeOptions = {}): Html5DocumentFragment {
+    const scrubber = options.scrubber;
+    if (scrubber) {
+      return ScrubBehavior.Node.scrubBang(fragment, scrubber);
+    } else if (this.allowedTags(options) || this.allowedAttributes(options)) {
+      this.permitScrubber.tags = this.allowedTags(options);
+      this.permitScrubber.attributes = this.allowedAttributes(options);
+      return ScrubBehavior.Node.scrubBang(fragment, this.permitScrubber);
+    } else {
+      return ScrubBehavior.Node.scrubBang(fragment, "strip");
+    }
+  }
+
+  sanitizeCss(styleString: string): string {
+    return Scrub.scrubCss(styleString);
+  }
+
+  /** @internal */
+  protected serialize(fragment: Html5DocumentFragment): string {
+    return fragment.toHtml();
   }
 
   /** @internal */
@@ -147,12 +279,4 @@ export class HTML5SafeListSanitizer extends Sanitizer {
       ? options.attributes
       : (this.constructor as typeof HTML5SafeListSanitizer).allowedAttributes;
   }
-}
-
-/** @noRailsEquivalent CONVERGEABLE html-sanitizer-port-scrubbers */
-function validateBang(variable: Iterable<string>, name: string): Iterable<string> {
-  if (typeof variable === "string" || typeof variable[Symbol.iterator] !== "function") {
-    throw new ArgumentError(`You should pass :${name} as an Enumerable`);
-  }
-  return variable;
 }
