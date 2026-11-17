@@ -604,9 +604,9 @@ export default defineConfig({
     // job whose sole purpose is to emit numbers. Ignore it ONLY in this isolated,
     // reporting-only run; the gating AR suite (`sqlite-tests`) runs without
     // coverage and keeps unhandled errors as a real signal.
+    dangerouslyIgnoreUnhandledErrors: TRAILS_TSC_COVERAGE || AR_CLI_COVERAGE || AR_COVERAGE,
     // Balances `--shard` by ar-shard-durations.json when VITEST_SHARD_DURATIONS is set.
     sequence: { sequencer: DurationSequencer },
-    dangerouslyIgnoreUnhandledErrors: TRAILS_TSC_COVERAGE || AR_CLI_COVERAGE || AR_COVERAGE,
     coverage: {
       provider: "v8",
       // text-summary → CI log; json-summary → parsed into the step summary;

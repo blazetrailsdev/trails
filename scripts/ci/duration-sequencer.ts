@@ -35,12 +35,15 @@ export class DurationSequencer extends BaseSequencer {
     return (this.table = table);
   }
 
+  private key(spec: TestSpecification): string {
+    return relative(this.ctx.config.root, spec.moduleId).split("\\").join("/");
+  }
+
   private weigher(table: Record<string, number>): (spec: TestSpecification) => number {
     const known = Object.values(table).sort((a, b) => a - b);
     const median = known[Math.floor(known.length / 2)] ?? 0;
-    const root = this.ctx.config.root;
     return (spec) => {
-      const key = relative(root, spec.moduleId).split("\\").join("/");
+      const key = this.key(spec);
       return (Object.hasOwn(table, key) ? table[key] : median) + FILE_OVERHEAD_MS;
     };
   }
@@ -50,9 +53,8 @@ export class DurationSequencer extends BaseSequencer {
     if (!table) return super.shard(files);
     const { index, count } = this.ctx.config.shard!;
     const weigh = this.weigher(table);
-    const root = this.ctx.config.root;
     const weighed = files
-      .map((spec) => ({ spec, weight: weigh(spec), key: relative(root, spec.moduleId) }))
+      .map((spec) => ({ spec, weight: weigh(spec), key: this.key(spec) }))
       .sort((a, b) => b.weight - a.weight || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0));
     const loads = Array.from({ length: count }, (_, i) =>
       i === 0 ? Number(process.env.VITEST_SHARD_ONE_EXTRA_MS ?? 0) : 0,
