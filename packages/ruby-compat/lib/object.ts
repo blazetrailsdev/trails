@@ -780,7 +780,7 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
           obj instanceof rbCDate ||
           temporalTag(obj) !== null ||
           isPlainHash(obj);
-  if (obj instanceof String && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
+  if (obj instanceof String && mid === "actsLikeString") return true;
   if (core) {
     if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
     if (Array.isArray(obj) && mid === "toAry") return true;
@@ -1419,11 +1419,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   const bound = temporalMethod(recv, mid);
   if (bound !== undefined) return bound(recv, ...args);
-  if (
-    (typeof recv === "string" || recv instanceof String) &&
-    Object.hasOwn(STRING_METHOD_TABLE, mid)
-  ) {
-    return rbStrSend(recv.valueOf(), mid, ...args)[0];
+  if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
+    return rbStrSend(recv, mid, ...args)[0];
   }
   if (recv instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
@@ -2065,7 +2062,6 @@ export function rbObjAsString(value: unknown): string;
 export function rbObjAsString(value: unknown): string | Uint8Array {
   if (value == null) return "";
   if (typeof value === "string") return value;
-  if (value instanceof String) return value.valueOf();
   if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map || value instanceof Set) return rbInspect(value);

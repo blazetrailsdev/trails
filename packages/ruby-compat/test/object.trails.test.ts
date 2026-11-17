@@ -1865,3 +1865,10 @@ describe("rbFSend method cache", () => {
     expect(() => rbFSend(new (class {})(), "visitMissing")).toThrow(NoMethodError);
   });
 });
+
+describe("basicObjRespondTo on a String instance", () => {
+  it("answers no STRING_METHOD_TABLE name it cannot dispatch", () => {
+    expect(rbObjRespondTo(new String("x"), "toS")).toBe(false);
+    expect(toS(new String("x"))).toBe("x");
+  });
+});
