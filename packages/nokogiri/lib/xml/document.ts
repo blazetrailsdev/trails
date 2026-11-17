@@ -19,7 +19,7 @@ export class XmlDocument {
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
 
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE html5-document-extends-xml-document-chain */
   static [Symbol.hasInstance](other: unknown): boolean {
     return (
       Function.prototype[Symbol.hasInstance].call(this, other) ||

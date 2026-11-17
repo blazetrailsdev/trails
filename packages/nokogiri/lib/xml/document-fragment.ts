@@ -1,7 +1,7 @@
 import { XmlDocument as LibXmlDocument } from "libxml2-wasm";
 import { defaultTreeAdapter } from "parse5";
 
-import { HTML5, XML } from "../namespaces.js";
+import { XML } from "../namespaces.js";
 
 import { XmlDocument } from "./document.js";
 import { XmlNode } from "./node.js";
@@ -33,7 +33,7 @@ export class DocumentFragment extends XmlNode {
     block?: (options: ParseOptions) => void,
   ) {
     super(
-      document instanceof XmlDocument && !(document instanceof HTML5.Document)
+      !(document instanceof XmlNode)
         ? LibXmlDocument.create().createRoot("root")
         : defaultTreeAdapter.createDocumentFragment(),
       document,
