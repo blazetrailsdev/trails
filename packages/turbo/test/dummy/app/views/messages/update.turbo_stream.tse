@@ -1,0 +1,11 @@
+<%= turboStream.removeAll(this.message) %>
+<%= turboStream.replaceAll(this.message) %>
+<%= turboStream.replaceAll(this.message, "Something else") %>
+<%= turboStream.replaceAll("#message_4", "Something fourth") %>
+<%= turboStream.replaceAll("#message_5", "Something fifth", { method: "morph" }) %>
+<%= turboStream.updateAll("#message_5", "Something fifth", { method: "morph" }) %>
+<%= turboStream.replaceAll("#message_5", { partial: "messages/message", locals: { message: new Message({ id: 5, content: "OLLA!" }) } }) %>
+<%= turboStream.appendAll("#messages", this.message) %>
+<%= turboStream.appendAll("#messages", { partial: "messages/message", locals: { message: new Message({ id: 5, content: "OLLA!" }) } }) %>
+<%= turboStream.prependAll("#messages", this.message) %>
+<%= turboStream.prependAll("#messages", { partial: "messages/message", locals: { message: new Message({ id: 5, content: "OLLA!" }) } }) %>

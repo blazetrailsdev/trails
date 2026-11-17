@@ -1,0 +1,1 @@
+<%= turboStream.replace("message_1", () => { %>Goodbye!<% }) %>

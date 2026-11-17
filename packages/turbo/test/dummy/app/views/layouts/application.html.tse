@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Dummy</title>
+    <%= csrfMetaTags() %>
+
+    <%= stylesheetLinkTag("application", { media: "all" }) %>
+    <%= yield("head") %>
+  </head>
+
+  <body class="<%= turboNativeApp() ? "turbo-native" : "" %>">
+    <%= yield %>
+  </body>
+</html>

@@ -1152,6 +1152,7 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [
       {
         name: "turbo-rails",
+        portedBy: "turbo",
         libPath: "lib/turbo",
         libEntryFile: "lib/turbo-rails.rb",
         extraLibPaths: [
@@ -1166,10 +1167,10 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "test",
         compareApi: false,
         apiExcludedReason:
-          "packages/turbo-rails does not exist yet; story turbo-rails-package-helpers-and-turbo-stream-format creates it and enrolls it.",
+          "packages/turbo holds only the dummy test app; story turbo-rails-package-helpers-and-turbo-stream-format ports lib/ and enrolls it.",
         compareTests: false,
         testsExcludedReason:
-          "packages/turbo-rails does not exist yet; story turbo-rails-package-helpers-and-turbo-stream-format creates it and enrolls it.",
+          "packages/turbo holds only the dummy test app; story turbo-rails-package-helpers-and-turbo-stream-format ports lib/ and enrolls it.",
       },
     ],
   },

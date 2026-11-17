@@ -1,0 +1,11 @@
+<%= turboStream.remove(this.message) %>
+<%= turboStream.replace(this.message) %>
+<%= turboStream.replace(this.message, "Something else") %>
+<%= turboStream.replace(this.otherMessage, "Something fifth") %>
+<%= turboStream.replace(this.otherMessage, "Something fifth", { method: "morph" }) %>
+<%= turboStream.update(this.otherMessage, "Something fifth", { method: "morph" }) %>
+<%= turboStream.replace(this.otherMessage, { partial: "messages/message", locals: { message: this.otherMessage } }) %>
+<%= turboStream.append("messages", this.message) %>
+<%= turboStream.append("messages", { partial: "messages/message", locals: { message: this.otherMessage } }) %>
+<%= turboStream.prepend("messages", this.message) %>
+<%= turboStream.prepend("messages", { partial: "messages/message", locals: { message: this.otherMessage } }) %>

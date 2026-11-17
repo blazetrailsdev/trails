@@ -1,0 +1,7 @@
+<h1>Message #<%= this.message.id %></h1>
+
+<%= turboStreamFrom(this.message, { style: "display: none" }) %>
+
+<div id="<%= domId(this.message) %>">
+  <%= await render(this.message) %>
+</div>

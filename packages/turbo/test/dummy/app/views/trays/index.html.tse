@@ -1,0 +1,5 @@
+<% turboExemptsPageFromCache() %>
+<% turboPageRequiresReload() %>
+<%= turboRefreshesWith({ method: "morph", scroll: "preserve" }) %>
+
+<p>Not in the cache!</p>

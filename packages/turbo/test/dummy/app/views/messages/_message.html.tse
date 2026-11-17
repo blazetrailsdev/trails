@@ -1,0 +1,3 @@
+<%# locals: (message:, profile: null) %>
+
+<p><%= message %></p>

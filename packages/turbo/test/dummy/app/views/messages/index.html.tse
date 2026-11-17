@@ -1,0 +1,6 @@
+<h1>Messages</h1>
+
+<%= turboStreamFrom("messages") %>
+
+<div id="messages">
+</div>

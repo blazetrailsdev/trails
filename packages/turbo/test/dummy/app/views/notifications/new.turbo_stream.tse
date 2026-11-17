@@ -1,0 +1,3 @@
+<%= turboStream.append("notifications", new NotificationComponent(), () => { %>
+  <p>Example notification</p>
+<% }) %>
