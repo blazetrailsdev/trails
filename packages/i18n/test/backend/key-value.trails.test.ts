@@ -46,3 +46,13 @@ describe("Backend::KeyValue", () => {
     expect(typeof new KeyValue(null).transliterate).toBe("function");
   });
 });
+
+describe("KeyValue#storeTranslations data contract", () => {
+  it("takes Hash data: a plain-object subtree is written over, not merged", () => {
+    const store = new Map<string, string>();
+    const backend = new KeyValue(store as never, true);
+    backend.storeTranslations("en", { foo: { bar: "bar", baz: "baz" } });
+    backend.storeTranslations("en", { foo: { baz: "BAZ" } });
+    expect(JSON.parse(store.get("en.foo")!)).toEqual({ baz: "BAZ" });
+  });
+});

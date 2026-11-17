@@ -1,4 +1,10 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { isStruct, type StructInstance } from "@blazetrails/ruby-compat";
+import {
+  Date as RubyDate,
+  DateTime as RubyDateTime,
+  Temporal,
+  Time as RubyTime,
+} from "@blazetrails/date";
 
 import { ActiveSupportJSON } from "../../json.js";
 import { Encoding, type EncodeOptions } from "../../json/encoding.js";
@@ -273,7 +279,17 @@ export class Time {
 }
 
 export class Date {
-  static asJson(value: Temporal.PlainDate, options: EncodeOptions | null = null): string {
+  static asJson(
+    value: Temporal.PlainDate | RubyDate,
+    options: EncodeOptions | null = null,
+  ): string {
+    if (value instanceof RubyDate) {
+      if (Encoding.useStandardJsonTimeFormat) {
+        return value.strftime("%Y-%m-%d");
+      } else {
+        return value.strftime("%Y/%m/%d");
+      }
+    }
     if (Encoding.useStandardJsonTimeFormat) {
       return value.toString();
     } else {
@@ -283,7 +299,17 @@ export class Date {
 }
 
 export class DateTime {
-  static asJson(value: Temporal.PlainDateTime, options: EncodeOptions | null = null): string {
+  static asJson(
+    value: Temporal.PlainDateTime | RubyDateTime,
+    options: EncodeOptions | null = null,
+  ): string {
+    if (value instanceof RubyDateTime) {
+      if (Encoding.useStandardJsonTimeFormat) {
+        return value.xmlschema(Encoding.timePrecision);
+      } else {
+        return value.strftime("%Y/%m/%d %H:%M:%S %z");
+      }
+    }
     const digits =
       Encoding.timePrecision as Temporal.ToStringPrecisionOptions["fractionalSecondDigits"];
 
@@ -298,6 +324,12 @@ export class DateTime {
 export class Generic {
   static asJson(value: URL, options: EncodeOptions | null = null): string {
     return value.toString();
+  }
+}
+
+export class Struct {
+  static asJson(value: StructInstance, options: EncodeOptions | null = null): unknown {
+    return Hash.asJson(value.toH(), options);
   }
 }
 
@@ -349,9 +381,12 @@ export function asJson(value: unknown, options?: EncodeOptions | null): unknown 
   ) {
     return Time.asJson(value, options);
   }
+  if (value instanceof RubyDateTime) return DateTime.asJson(value, options);
+  if (value instanceof RubyDate) return Date.asJson(value, options);
   if (value instanceof Temporal.PlainDate) return Date.asJson(value, options);
   if (value instanceof Temporal.PlainDateTime) return DateTime.asJson(value, options);
   if (value instanceof BigDecimalValue) return BigDecimal.asJson(value, options);
+  if (isStruct(value)) return Struct.asJson(value, options);
   if (value instanceof RegExp) return Regexp.asJson(value, options);
   if (value instanceof Error) return Exception.asJson(value, options);
   if (value instanceof URL) return Generic.asJson(value, options);
