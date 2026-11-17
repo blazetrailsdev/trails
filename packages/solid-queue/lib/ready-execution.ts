@@ -1,5 +1,5 @@
 import { SolidQueue } from "./solid-queue.js";
-import { constSet } from "@blazetrails/ruby-compat";
+import { constSet, valuesAt } from "@blazetrails/ruby-compat";
 import { type Relation } from "@blazetrails/activerecord";
 import { indexBy } from "@blazetrails/activesupport";
 import { Execution } from "./execution.js";
@@ -81,11 +81,10 @@ export class ReadyExecution extends Execution {
       records.map((execution) => execution.job_id),
       processId,
       async (claimed) => {
-        const byJobId = indexBy(records, (execution) => execution.job_id);
-        const idsToDelete = claimed
-          .map((execution) => execution.job_id)
-          .map((jobId) => byJobId[jobId] ?? null)
-          .map((execution) => execution.id);
+        const idsToDelete = valuesAt(
+          indexBy(records, (execution) => execution.job_id),
+          ...claimed.map((execution) => execution.job_id),
+        ).map((execution) => execution!.id);
         await this.where({ id: idsToDelete }).deleteAll();
       },
     );

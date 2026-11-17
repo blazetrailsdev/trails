@@ -59,26 +59,29 @@ export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): 
   return Enumerable.prototype.sum.call({ each }, ...args);
 }
 
-export function indexBy<T, K extends string | number>(
+export function indexBy<T, K extends string>(
   collection: Iterable<T> | Each<T>,
   fn: (item: T) => K,
 ): Record<K, T>;
+export function indexBy<T, K>(collection: Iterable<T> | Each<T>, fn: (item: T) => K): Hash<K, T>;
 export function indexBy<T>(collection: Iterable<T> | Each<T>): Enumerator<T>;
-export function indexBy<T, K extends string | number>(
+export function indexBy<T, K>(
   collection: Iterable<T> | Each<T>,
   fn?: (item: T) => K,
-): Record<K, T> | Enumerator<T> {
+): Record<string, T> | Hash<K, T> | Enumerator<T> {
   if (fn !== undefined) {
-    const result = Object.create(null) as Record<K, T>;
+    const result = new Hash<K, T>();
     const block = (elem: T): void => {
-      result[fn(elem)] = elem;
+      result.set(fn(elem), elem);
     };
     if (typeof (collection as Partial<Each<T>>).each === "function") {
       (collection as Each<T>).each(block);
     } else {
       for (const elem of collection as Iterable<T>) block(elem);
     }
-    return result;
+    if (result.size === 0) return result;
+    for (const key of result.keys()) if (typeof key !== "string") return result;
+    return Object.assign(Object.create(null), Object.fromEntries(result)) as Record<string, T>;
   } else {
     return toEnum<T>(
       collection as object,

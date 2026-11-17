@@ -19,7 +19,7 @@ import { compactBlank as hashCompactBlank, compactBlankBang } from "../../lib/ha
 import {
   Complex,
   Enumerator,
-  type Hash,
+  Hash,
   TypeError,
   complex,
   rational,
@@ -457,7 +457,8 @@ describe("EnumerableTests", () => {
 
   it("index by", () => {
     const payments = new GenericEnumerable([new Payment(5), new Payment(15), new Payment(10)]);
-    const expected = { 5: new Payment(5), 15: new Payment(15), 10: new Payment(10) };
+    const expected = new Hash<number, Payment>();
+    for (const price of [5, 15, 10]) expected.set(price, new Payment(price));
     expect(indexBy(payments, (p) => p.price!)).toEqual(expected);
     expect(indexBy(payments).constructor).toBe(Enumerator);
     expect(indexBy(payments).size()).toBeNull();

@@ -440,10 +440,10 @@ describe("indexBy", () => {
       { id: 1, name: "a" },
       { id: 2, name: "b" },
     ];
-    expect(indexBy(items, (x) => x.id)).toEqual({
-      1: { id: 1, name: "a" },
-      2: { id: 2, name: "b" },
-    });
+    expect([...indexBy(items, (x) => x.id)]).toEqual([
+      [1, { id: 1, name: "a" }],
+      [2, { id: 2, name: "b" }],
+    ]);
   });
 
   it("last value wins for duplicates", () => {
@@ -451,9 +451,7 @@ describe("indexBy", () => {
       { id: 1, name: "a" },
       { id: 1, name: "b" },
     ];
-    expect(indexBy(items, (x) => x.id)).toEqual({
-      1: { id: 1, name: "b" },
-    });
+    expect([...indexBy(items, (x) => x.id)]).toEqual([[1, { id: 1, name: "b" }]]);
   });
 });
 
