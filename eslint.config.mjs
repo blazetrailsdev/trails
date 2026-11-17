@@ -1280,6 +1280,8 @@ export default defineConfig(
                 "@blazetrails/vite-trails/*",
                 "**/vite-assets/lib/**",
                 "**/vite-trails/lib/**",
+                "**/vite-assets/dist/**",
+                "**/vite-trails/dist/**",
               ],
               message: VITE_APP_ASSETS_MESSAGE,
             },
