@@ -42,6 +42,12 @@ export class Engine extends TrailsEngine {
       if (SolidQueue.connectsTo) await Record.connectsTo(SolidQueue.connectsTo);
     });
 
+    this.initializer("solid_queue.time_zone", (app: { config: { timeZone: unknown } }) => {
+      if (!this.config.solidQueue.isKey("timeZone")) {
+        SolidQueue.setTimeZone(app.config.timeZone);
+      }
+    });
+
     this.initializer(
       "solid_queue.app_executor",
       { before: "run_prepare_callbacks" },

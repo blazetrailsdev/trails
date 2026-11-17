@@ -2,6 +2,7 @@ import { type Relation } from "@blazetrails/activerecord";
 import type { Base as ActiveJobBase } from "@blazetrails/activejob";
 import { Arguments as ActiveJobArguments } from "@blazetrails/activejob";
 import {
+  ActiveSupport,
   inquiry,
   isPresent,
   mattrAccessor,
@@ -43,6 +44,7 @@ export class RecurringTask extends Record {
   declare description: string | null;
   declare recurringExecutions: Relation<RecurringExecution>;
   declare private _parsedSchedule: ReturnType<typeof Fugit.parse> | undefined;
+  declare private _parsedScheduleWithTimeZone: ReturnType<typeof Fugit.parse> | undefined;
   declare private _jobClass: JobClass | null | undefined;
 
   static Arguments = Arguments;
@@ -87,6 +89,17 @@ export class RecurringTask extends Record {
     });
   }
 
+  static async createDynamicTask(
+    key: string,
+    options: { [key: string]: unknown } = {},
+  ): Promise<unknown> {
+    return await this.fromConfiguration(key, { ...options, static: false }).saveBang();
+  }
+
+  static async deleteDynamicTask(key: string): Promise<unknown> {
+    return await (await RecurringTask.dynamic().findByBang({ key: key })).destroy();
+  }
+
   static async createOrUpdateAll(tasks: RecurringTask[]): Promise<unknown> {
     if (await (await this.connection)!.supportsInsertConflictTarget()) {
       return await this.upsertAll(
@@ -99,15 +112,15 @@ export class RecurringTask extends Record {
   }
 
   nextTimeAfter(time: Time): Time {
-    return (this.parsedSchedule() as Cron).nextTime(time).utc();
+    return (this.parsedScheduleWithTimeZone() as Cron).nextTime(time).utc();
   }
 
   nextTime(): Time {
-    return (this.parsedSchedule() as Cron).nextTime().utc();
+    return (this.parsedScheduleWithTimeZone() as Cron).nextTime().utc();
   }
 
   previousTime(): Time {
-    return (this.parsedSchedule() as Cron).previousTime().utc();
+    return (this.parsedScheduleWithTimeZone() as Cron).previousTime().utc();
   }
 
   async lastEnqueuedTime(): Promise<unknown> {
@@ -136,6 +149,7 @@ export class RecurringTask extends Record {
 
             activeJob = await this.performLater();
             if (!activeJob.isSuccessfullyEnqueued()) {
+              this.reportEnqueueError(activeJob.enqueueError as Error | null, { at: at });
               payload.enqueue_error = (activeJob.enqueueError as Error | null)?.message;
             }
           }
@@ -147,6 +161,7 @@ export class RecurringTask extends Record {
             payload.skipped = true;
             return false;
           } else if (error instanceof EnqueueError) {
+            this.reportEnqueueError(error, { at: at });
             payload.enqueue_error = error.message;
             return false;
           }
@@ -252,6 +267,13 @@ export class RecurringTask extends Record {
   }
 
   /** @internal */
+  parsedScheduleWithTimeZone(): ReturnType<typeof Fugit.parse> {
+    return (this._parsedScheduleWithTimeZone ??= this.applyDefaultTimeZoneTo(
+      this.parsedSchedule(),
+    ));
+  }
+
+  /** @internal */
   parsedSchedule(): ReturnType<typeof Fugit.parse> {
     return (this._parsedSchedule ??= Fugit.parse(this.schedule, { multi: ":fail" }));
   }
@@ -264,11 +286,48 @@ export class RecurringTask extends Record {
   }
 
   /** @internal */
+  applyDefaultTimeZoneTo(schedule: ReturnType<typeof Fugit.parse>): ReturnType<typeof Fugit.parse> {
+    try {
+      if (
+        schedule != null &&
+        "zone" in schedule &&
+        schedule.zone == null &&
+        isPresent(this.defaultTimeZone())
+      ) {
+        return Fugit.parse(`${(schedule as Cron).toCronS()} ${this.defaultTimeZone()}`, {
+          multi: ":fail",
+        });
+      } else {
+        return schedule;
+      }
+    } catch (error) {
+      if (!(error instanceof ArgumentError)) throw error;
+      return schedule;
+    }
+  }
+
+  /** @internal */
   enqueueOptions(): { [key: string]: unknown } {
     return Object.fromEntries(
       Object.entries({ queue: this.queue_name, priority: this.priority }).filter(
         ([, value]) => value != null,
       ),
     );
+  }
+
+  /** @internal */
+  defaultTimeZone(): string | null {
+    return SolidQueue.timeZone;
+  }
+
+  /** @internal */
+  reportEnqueueError(error: Error | null, { at }: { at: unknown }): void {
+    if (error != null) {
+      ActiveSupport.errorReporter.report(error, {
+        handled: true,
+        source: "application.solid_queue",
+        context: { task: this.key, at: at },
+      });
+    }
   }
 }

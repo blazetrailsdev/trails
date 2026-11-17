@@ -7,9 +7,12 @@ import {
   mattrAccessor,
   minutes,
   seconds,
+  TimeZone,
   type Duration,
 } from "@blazetrails/activesupport";
 import { STDOUT, TopLevel, constSet } from "@blazetrails/ruby-compat";
+
+let _timeZone: string | null = null;
 
 export const SolidQueue = {
   name: "SolidQueue",
@@ -40,6 +43,33 @@ export const SolidQueue = {
 
   onSchedulerStop(block: () => unknown): void {
     SolidQueue.Scheduler!.onStop(block);
+  },
+
+  get timeZone(): string | null {
+    return _timeZone;
+  },
+
+  setTimeZone(zone: unknown): void {
+    if (zone != null && zone !== false) {
+      const resolved =
+        typeof (zone as { tzinfo?: unknown }).tzinfo !== "undefined"
+          ? (zone as TimeZone)
+          : TimeZone.find(zone);
+      _timeZone = resolved?.tzinfo?.name ?? String(zone);
+    } else {
+      _timeZone = null;
+    }
+  },
+
+  async scheduleRecurringTask(
+    key: string,
+    options: { [key: string]: unknown } = {},
+  ): Promise<unknown> {
+    return await SolidQueue.RecurringTask!.createDynamicTask(key, options);
+  },
+
+  async unscheduleRecurringTask(key: string): Promise<unknown> {
+    return await SolidQueue.RecurringTask!.deleteDynamicTask(key);
   },
 
   isSupervisor(): boolean {
@@ -95,6 +125,11 @@ export const SolidQueue = {
   onSchedulerStop(block: () => unknown): void;
   onDispatcherStart(block: () => unknown): void;
   onDispatcherStop(block: () => unknown): void;
+  readonly timeZone: string | null;
+  setTimeZone(zone: unknown): void;
+  scheduleRecurringTask(key: string, options?: { [key: string]: unknown }): Promise<unknown>;
+  unscheduleRecurringTask(key: string): Promise<unknown>;
+  RecurringTask?: typeof import("./recurring-task.js").RecurringTask;
   isSupervisor(): boolean;
   isSilencePolling(): boolean;
   isPreserveFinishedJobs(): boolean;

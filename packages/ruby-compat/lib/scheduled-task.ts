@@ -43,6 +43,7 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
   private time: number | null = null;
   private readonly executor: Executor;
   private timer: ReturnType<typeof setTimeout> | undefined;
+  private _reason: unknown = null;
   /** @noRailsEquivalent PERMANENT */
   readonly observers: Observer[] = [];
 
@@ -70,11 +71,22 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  get initialDelay(): number {
+    return this.delay;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get reason(): unknown {
+    return this._reason;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   cancel(): boolean {
     if (this.state === "pending" || this.state === "unscheduled") {
       this.state = "cancelled";
       clearTimeout(this.timer);
       const reason = new CancelledOperationError();
+      this._reason = reason;
       for (const observer of this.observers) observer(new Date(), null, reason);
       return true;
     } else {
@@ -105,6 +117,7 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
     } catch (error) {
       reason = error;
     }
+    this._reason = reason;
     for (const observer of this.observers) observer(new Date(), value, reason);
   }
 

@@ -38,6 +38,7 @@ type ActiveJob = ActiveJobBase & { concurrencyKey(): string | null; batchId?: nu
 
 export class Job extends Record {
   static ClassMissingError = ClassMissingError;
+  static EnqueueError = EnqueueError;
   declare static prepareAllForExecution: typeof ExecutableClassMethods.prepareAllForExecution;
   declare static dispatchAll: typeof ExecutableClassMethods.dispatchAll;
   declare static scheduleAll: typeof SchedulableClassMethods.scheduleAll;
