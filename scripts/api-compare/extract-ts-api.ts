@@ -8135,6 +8135,9 @@ function collectCalls(
       if (invoked?.has(propertyAccessKey(n)) === true && isGuardConditionRead(n)) {
         return;
       }
+      //   - in the ORDER stream only, a read off an options-object parameter
+      //     (`opts.all`) — see isOptionsHashRead.
+      if (skipHoistedClosures && isOptionsHashRead(n)) return;
       if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
         tally(occurrences, n.name.text);
@@ -8721,6 +8724,21 @@ function isForeignReadReceiver(receiver: ts.Node): boolean {
   }
   if (ts.isIdentifier(receiver)) return !/^[A-Z]/.test(receiver.text);
   return true;
+}
+
+/**
+ * Whether a property read is a key read off an options-hash parameter — a
+ * parameter the checker types as a plain object literal or interface
+ * (`opts.all`, raabro.rb's `opts[:all]`). Ruby's `opts[:all]` is a Hash read,
+ * not a send, so it holds no position in Ruby's call order; letting the read
+ * claim one reorders a body that matches Rails.
+ */
+function isOptionsHashRead(access: ts.PropertyAccessExpression): boolean {
+  const receiver = access.expression;
+  if (!ts.isIdentifier(receiver)) return false;
+  const decl = currentChecker?.getSymbolAtLocation(receiver)?.valueDeclaration;
+  if (decl === undefined || !ts.isParameter(decl)) return false;
+  return checkerProvenKind(receiver) === "object";
 }
 
 /**
