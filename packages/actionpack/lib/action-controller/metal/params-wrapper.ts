@@ -105,7 +105,9 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
           any(Object.keys(_classValue(m, "nestedAttributesOptions")!))
         ) {
           this.include = this.include.concat(
-            Object.keys(_classValue(m, "nestedAttributesOptions")!).map((key) => toS(key).concat("_attributes")),
+            Object.keys(_classValue(m, "nestedAttributesOptions")!).map((key) =>
+              toS(key).concat("_attributes"),
+            ),
           );
         }
 
