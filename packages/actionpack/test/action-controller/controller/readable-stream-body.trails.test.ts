@@ -38,11 +38,11 @@ describe("a ReadableStream response body", () => {
     expect(response.body).toBe("hi café");
   });
 
-  it("is streamed chunk by chunk through the rack body, and cancelled on an early return", async () => {
+  it("is cancelled by the rack body's close while a read is parked", async () => {
     let cancelled = false;
     const res = new Response();
     res.body = new ReadableStream<Uint8Array>({
-      pull(controller) {
+      start(controller) {
         controller.enqueue(new Uint8Array([1]));
       },
       cancel() {
@@ -52,13 +52,14 @@ describe("a ReadableStream response body", () => {
     const [, , body] = res.toA() as [
       number,
       unknown,
-      AsyncIterable<unknown> & { toAry(): unknown },
+      AsyncIterable<unknown> & { toAry(): unknown; close(): unknown },
     ];
     expect(Array.isArray(body.toAry())).toBe(false);
-    for await (const chunk of body) {
-      expect(chunk).toEqual(new Uint8Array([1]));
-      break;
-    }
+    const chunks = body[Symbol.asyncIterator]();
+    expect((await chunks.next()).value).toEqual(new Uint8Array([1]));
+    const parked = chunks.next();
+    await body.close();
+    expect((await parked).done).toBe(true);
     expect(cancelled).toBe(true);
   });
 });

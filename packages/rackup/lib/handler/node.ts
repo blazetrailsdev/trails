@@ -136,20 +136,28 @@ export class Node {
             return;
           }
           res.writeHead(status, sentHeaders(headers));
-          let disconnected = false;
+          let closing: Promise<void> | null = null;
+          let wake: (() => void) | null = null;
           const onClose = (): void => {
-            disconnected = true;
+            closing ??= closeBody(body);
+            wake?.();
           };
+          const onDrain = (): void => wake?.();
           socket?.on("close", onClose);
+          socket?.on("drain", onDrain);
           try {
             for await (const chunk of body) {
               if (hijacked) return;
-              if (disconnected) break;
-              res.write(rbObjAsString(chunk));
+              if (closing) break;
+              if (res.write(rbObjAsString(chunk)) === false && socket)
+                await new Promise<void>((resolve) => (wake = resolve));
+              wake = null;
             }
           } finally {
             socket?.removeListener("close", onClose);
+            socket?.removeListener("drain", onDrain);
           }
+          if (closing) return await closing;
           res.end();
         } finally {
           await closeBody(body);
@@ -386,10 +394,10 @@ function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]
 /** @noRailsEquivalent PERMANENT */
 async function closeBody(body: RackResponse[2]): Promise<void> {
   const { close, return: finish } = body as {
-    close?: () => void;
+    close?: () => unknown;
     return?: () => Promise<unknown>;
   };
-  if (close) close.call(body);
+  if (close) await close.call(body);
   else if (finish) await finish.call(body);
 }
 

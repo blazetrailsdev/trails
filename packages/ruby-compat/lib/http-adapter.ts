@@ -37,7 +37,7 @@ export interface HttpSocket {
   on(event: "close" | "end" | "drain", listener: () => void): unknown;
   on(event: "error", listener: (error: Error) => void): unknown;
   removeListener(event: "data", listener: (chunk: Uint8Array) => void): unknown;
-  removeListener(event: "close" | "end", listener: () => void): unknown;
+  removeListener(event: "close" | "end" | "drain", listener: () => void): unknown;
   removeListener(event: "error", listener: (error: Error) => void): unknown;
 }
 

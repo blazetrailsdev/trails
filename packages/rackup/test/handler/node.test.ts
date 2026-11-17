@@ -214,40 +214,74 @@ describe("Rack::Handler::Node", () => {
     expect(closed).toBe(true);
   });
 
-  it("stops reading a streamed body, and cancels it, once the client disconnects", async () => {
-    let cancelled = false;
-    let pulls = 0;
-    const body = new ReadableStream<Uint8Array>({
-      pull(controller) {
-        pulls += 1;
-        controller.enqueue(new Uint8Array([pulls]));
-      },
-      cancel() {
-        cancelled = true;
-      },
-    });
-    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
-    const listeners: (() => void)[] = [];
-    const written: Uint8Array[] = [];
+  function streamingRes() {
+    const listeners: Record<string, (() => void)[]> = {};
+    const written: unknown[] = [];
     const socket = {
-      on(_event: string, listener: () => void) {
-        listeners.push(listener);
+      on(event: string, listener: () => void) {
+        (listeners[event] ??= []).push(listener);
       },
       removeListener() {},
+      emit(event: string) {
+        for (const listener of listeners[event] ?? []) listener();
+      },
     };
     const res = {
       socket,
+      writable: true,
       writeHead() {},
-      write(chunk: Uint8Array) {
+      write(chunk: unknown) {
         written.push(chunk);
-        for (const listener of listeners) listener();
+        return res.writable;
       },
       end() {},
     };
+    return { res, socket, written };
+  }
 
-    await new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
-    expect(written).toEqual([new Uint8Array([1])]);
-    expect(cancelled).toBe(true);
+  it("closes a stalled streamed body once the client disconnects", async () => {
+    let closed = false;
+    let release: () => void = () => {};
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        yield "first";
+        await new Promise<void>((resolve) => (release = resolve));
+      },
+      close() {
+        closed = true;
+        release();
+      },
+    };
+    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const { res, socket, written } = streamingRes();
+    const serving = new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
+    await vi.waitFor(() => expect(written).toEqual(["first"]));
+    socket.emit("close");
+    await serving;
+    expect(closed).toBe(true);
+  });
+
+  it("waits for drain before reading the next chunk of a streamed body", async () => {
+    let pulled = 0;
+    const body = {
+      async *[Symbol.asyncIterator]() {
+        for (const chunk of ["a", "b"]) {
+          pulled += 1;
+          yield chunk;
+        }
+      },
+    };
+    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const { res, socket, written } = streamingRes();
+    res.writable = false;
+    const serving = new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
+    await vi.waitFor(() => expect(written).toEqual(["a"]));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(pulled).toBe(1);
+    res.writable = true;
+    socket.emit("drain");
+    await serving;
+    expect(written).toEqual(["a", "b"]);
   });
 
   function captureStderr(): { lines: string[]; restore: () => void } {
