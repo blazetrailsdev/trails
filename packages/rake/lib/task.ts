@@ -290,7 +290,7 @@ export class Task {
   }
 
   async timestamp(): Promise<Timestamp> {
-    return new Date();
+    return new Date(Date.now() + 1);
   }
 
   addDescription(description: string | null): void {
