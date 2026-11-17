@@ -112,6 +112,7 @@ import {
   applyTokenRenames,
   isArityOverridden,
   isRubyOnlyClass,
+  isInheritanceSkipClass,
   isScopedSkip,
   scopedSkipMirrorCandidates,
   scopedSkipMirrorName,
@@ -3362,7 +3363,7 @@ export function primaryClassesPerFile(classes: Record<string, ClassInfo>): Map<s
 
   for (const [fqn, cls] of Object.entries(classes)) {
     if (!cls.file) continue;
-    if (isRubyOnlyClass(fqn)) continue;
+    if (isRubyOnlyClass(fqn) || isInheritanceSkipClass(fqn)) continue;
     if (shorter(fqn, inheritance.get(cls.file))) inheritance.set(cls.file, fqn);
   }
   return inheritance;

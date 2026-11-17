@@ -1446,6 +1446,13 @@ describe("primaryClassesPerFile", () => {
     expect(inheritance.get("backend/key_value.rb")).toBe("I18n::Backend::KeyValue");
   });
 
+  it("keeps an inheritance-skip class out of the inheritance selection", () => {
+    const inheritance = primaryClassesPerFile({
+      "ActionView::DependencyTracker::RubyTracker": cls("dependency_tracker/ruby_tracker.rb"),
+    });
+    expect(inheritance.has("dependency_tracker/ruby_tracker.rb")).toBe(false);
+  });
+
   it("ignores classes with no file", () => {
     const inheritance = primaryClassesPerFile({
       "A::B": { ...cls(""), file: undefined },

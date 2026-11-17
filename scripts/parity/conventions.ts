@@ -1444,6 +1444,29 @@ export const RUBY_ONLY_CLASSES: RubyOnlyClass[] = [
 
 const RUBY_ONLY_CLASS_FQNS = new Set(RUBY_ONLY_CLASSES.map((c) => c.fqn));
 
+/**
+ * A Ruby class whose methods are credited to a TS class of another name, so
+ * the inheritance check must not look for a TS class under the Ruby name.
+ * Unlike {@link RUBY_ONLY_CLASSES}, the method comparison still scores it.
+ */
+export const INHERITANCE_SKIP_CLASSES: RubyOnlyClass[] = [
+  {
+    fqn: "ActionView::DependencyTracker::RubyTracker",
+    reason:
+      'packages/actionview/CLAUDE.md, "`TSETracker` answers what `RubyTracker` ' +
+      'answers": by operator ruling (2026-10-18) there is no `RubyTracker`; ' +
+      "`ruby_tracker.rb` maps onto `dependency-tracker/tse-tracker.ts`, whose " +
+      "`TSETracker` carries its methods.",
+  },
+];
+
+const INHERITANCE_SKIP_CLASS_FQNS = new Set(INHERITANCE_SKIP_CLASSES.map((c) => c.fqn));
+
+/** True when `fqn` names an {@link INHERITANCE_SKIP_CLASSES} entry. */
+export function isInheritanceSkipClass(fqn: string): boolean {
+  return INHERITANCE_SKIP_CLASS_FQNS.has(fqn);
+}
+
 /** True when `fqn` names a {@link RUBY_ONLY_CLASSES} entry. */
 export function isRubyOnlyClass(fqn: string): boolean {
   return RUBY_ONLY_CLASS_FQNS.has(fqn);
