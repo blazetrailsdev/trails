@@ -163,6 +163,8 @@ export class SSLContext {
   verifyCallback: unknown = null;
   /** @noRailsEquivalent PERMANENT */
   verifyDepth: number | null = null;
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2722` */
+  sessionNewCb: ((sock: SSLSocket, sess: Session) => unknown) | null = null;
 
   /**
    * `ssl_timeout=`, the alias of `timeout=` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2880`).
@@ -260,6 +262,140 @@ export interface SSLSocketIO {
   close(): void;
   startSsl(options: HttpSslOptions): Promise<void>;
   peeraddr?(): [string, number, string, string];
+  readonly cipher?: string[] | null;
+}
+
+/**
+ * `OpenSSL::SSL::Session` (`vendor/ruby/v3.3.11/ext/openssl/ossl_ssl_session.c:301-330`):
+ * the host's serialized session, with the time it was established and its
+ * lifetime in seconds.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class Session {
+  constructor(
+    /** @internal */
+    readonly _der: Uint8Array,
+    /** @noRailsEquivalent PERMANENT */
+    readonly time: Date = new Date(),
+    /** @noRailsEquivalent PERMANENT */
+    readonly timeout: number = 300,
+  ) {}
+}
+
+/**
+ * `OpenSSL::SSL.verify_certificate_identity` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:275-306`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+function verifyCertificateIdentity(cert: Certificate, hostname: string): boolean {
+  let shouldVerifyCommonName = true;
+  for (const ext of cert.extensions) {
+    if (ext.oid !== "subjectAltName") continue;
+    for (const san of _derChildren(ext._value)) {
+      switch (san.tag & 0x1f) {
+        case 2:
+          shouldVerifyCommonName = false;
+          if (verifyHostname(hostname, new TextDecoder().decode(san.value))) return true;
+          break;
+        case 7:
+          shouldVerifyCommonName = false;
+          if (san.value.length === 4 || san.value.length === 16) {
+            const hton = _ipaddrHton(hostname);
+            if (hton !== null && hton.length === san.value.length) {
+              if (hton.every((b, i) => b === san.value[i])) return true;
+            }
+          }
+          break;
+      }
+    }
+  }
+  if (shouldVerifyCommonName) {
+    for (const [oid, value] of cert.subject._entries) {
+      if (oid === "CN") {
+        if (verifyHostname(hostname, value)) return true;
+      }
+    }
+  }
+  return false;
+}
+
+/** `OpenSSL::SSL.verify_hostname` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:308-338`). @noRailsEquivalent PERMANENT */
+function verifyHostname(hostname: string, san: string): boolean {
+  if (!_isAsciiOnly(san)) return false;
+  if (!_isAsciiOnly(hostname)) return false;
+
+  const sanParts = san.toLowerCase().split(".");
+
+  if (sanParts.length < 2) return san === hostname;
+
+  const hostParts = hostname.toLowerCase().split(".");
+
+  if (sanParts.length !== hostParts.length) return false;
+
+  if (!verifyWildcard(hostParts.shift()!, sanParts.shift()!)) return false;
+
+  return sanParts.join(".") === hostParts.join(".");
+}
+
+/** `OpenSSL::SSL.verify_wildcard` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:341-357`). @noRailsEquivalent PERMANENT */
+function verifyWildcard(domainComponent: string, sanComponent: string): boolean {
+  const parts = sanComponent.split("*");
+
+  if (parts.length > 2) return false;
+  if (parts.length === 1) return sanComponent === domainComponent;
+
+  if (domainComponent.startsWith("xn--") && sanComponent !== "*") return false;
+
+  return (
+    parts[0].length + parts[1].length < domainComponent.length &&
+    domainComponent.startsWith(parts[0]) &&
+    domainComponent.endsWith(parts[1])
+  );
+}
+
+function _isAsciiOnly(str: string): boolean {
+  return [...str].every((c) => c.charCodeAt(0) < 0x80);
+}
+
+function _ipaddrHton(hostname: string): number[] | null {
+  const v4 = hostname.split(".");
+  if (v4.length === 4 && v4.every((p) => /^\d{1,3}$/.test(p) && Number(p) < 256)) {
+    return v4.map(Number);
+  }
+  if (!hostname.includes(":")) return null;
+  const [head, tail = null, ...rest] = hostname.split("::");
+  if (rest.length > 0) return null;
+  const words = (part: string) => (part === "" ? [] : part.split(":"));
+  const h = words(head);
+  const t = tail === null ? [] : words(tail);
+  const fill = 8 - h.length - t.length;
+  if (tail === null ? fill !== 0 : fill < 1) return null;
+  const all = [...h, ...Array<string>(fill).fill("0"), ...t];
+  if (!all.every((w) => /^[0-9a-f]{1,4}$/i.test(w))) return null;
+  return all.flatMap((w) => [parseInt(w, 16) >> 8, parseInt(w, 16) & 0xff]);
+}
+
+function _derChildren(der: Uint8Array): { tag: number; value: Uint8Array }[] {
+  const children: { tag: number; value: Uint8Array }[] = [];
+  const read = (at: number): [number, number] => {
+    let length = der[at];
+    let start = at + 1;
+    if (length & 0x80) {
+      const n = length & 0x7f;
+      length = 0;
+      for (let i = 0; i < n; i++) length = length * 256 + der[start + i];
+      start += n;
+    }
+    return [length, start];
+  };
+  const [outer, first] = read(1);
+  for (let at = first; at < first + outer; ) {
+    const [length, start] = read(at + 1);
+    children.push({ tag: der[at], value: der.subarray(start, start + length) });
+    at = start + length;
+  }
+  return children;
 }
 
 /**
@@ -277,6 +413,10 @@ export class SSLSocket<IO extends SSLSocketIO = SSLSocketIO> {
   _verifyResult: number = X509_VERIFY_RESULTS.V_OK;
   /** @internal */
   _closed = false;
+  /** @internal */
+  _session: Session | null = null;
+  /** @internal */
+  _peerCert: Certificate | null = null;
 
   constructor(
     /** @noRailsEquivalent PERMANENT */
@@ -314,6 +454,13 @@ export class SSLSocket<IO extends SSLSocketIO = SSLSocketIO> {
         verifyPeer: this.context.verifyMode !== OpenSSL.SSL.VERIFY_NONE,
         verifyHostname: this.context.verifyHostname,
         options: this.context.options,
+        session: this._session?._der ?? null,
+        sessionNewCb: (der) => {
+          if (this.context.sessionNewCb !== null) this.context.sessionNewCb(this, new Session(der));
+        },
+        peerCertCb: (subject, subjectaltname) => {
+          this._peerCert = _peerCertificate(subject, subjectaltname);
+        },
         ca,
         defaultPaths,
         ...(minVersion !== undefined && { minVersion }),
@@ -324,6 +471,50 @@ export class SSLSocket<IO extends SSLSocketIO = SSLSocketIO> {
       throw _osslStartSslError(e, this.io);
     }
     return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2336-2348` */
+  set session(sess: Session) {
+    this._session = sess;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/ossl_ssl.c:2977` */
+  get peerCert(): Certificate | null {
+    return this._peerCert;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  get cipher(): string[] | null {
+    return this.io.cipher ?? null;
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:396-410` */
+  postConnectionCheck(hostname: string): true {
+    if (this.peerCert === null) {
+      let msg = "Peer verification enabled, but no certificate received.";
+      if (this.isUsingAnonCipher()) {
+        msg +=
+          ` Anonymous cipher suite ${this.cipher![0]} was negotiated. ` +
+          "Anonymous suites must be disabled to use peer verification.";
+      }
+      throw new SSLError(msg);
+    }
+
+    if (!verifyCertificateIdentity(this.peerCert, hostname)) {
+      throw new SSLError(`hostname "${hostname}" does not match the server certificate`);
+    }
+    return true;
+  }
+
+  /**
+   * `using_anon_cipher?` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/ssl.rb:425-429`):
+   * the `aNULL` cipher list, OpenSSL's `ADH-` and `AECDH-` suites.
+   *
+   * @internal
+   */
+  private isUsingAnonCipher(): boolean {
+    const name = this.cipher?.[0];
+    return name != null && /^A(EC)?DH-/.test(name);
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -854,6 +1045,24 @@ export class Certificate {
   }
 }
 
+function _peerCertificate(
+  subject: Record<string, string> | null,
+  subjectaltname: string | null,
+): Certificate | null {
+  if (subject === null) return null;
+  const cert = new Certificate();
+  cert.subject = new Name(Object.entries(subject));
+  if (subjectaltname != null) {
+    const names = subjectaltname.split(", ").flatMap((item) => {
+      if (item.startsWith("DNS:")) return [_der(0x82, _utf8(item.slice(4)))];
+      const hton = item.startsWith("IP Address:") ? _ipaddrHton(item.slice(11)) : null;
+      return hton === null ? [] : [_der(0x87, Uint8Array.from(hton))];
+    });
+    cert.extensions.push(new Extension("subjectAltName", _der(0x30, ...names)));
+  }
+  return cert;
+}
+
 /**
  * `OpenSSL` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl.rb:16`), so a ported body
  * spells `OpenSSL::HMAC.digest` the way the Ruby does.
@@ -875,6 +1084,10 @@ export const OpenSSL = {
     SSL_VERIFY_CODES,
     SSLContext,
     SSLSocket,
+    Session,
+    verifyCertificateIdentity,
+    verifyHostname,
+    verifyWildcard,
   },
   X509: { Store, Name, Certificate, Extension, ExtensionFactory, ...X509_VERIFY_RESULTS },
   PKey: { RSA },

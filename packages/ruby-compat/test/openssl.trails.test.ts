@@ -59,3 +59,85 @@ describe("OpenSSL::X509::Name", () => {
     expect(der.at(-3)).toBe(0x0c);
   });
 });
+
+describe("OpenSSL::SSL::SSLSocket", () => {
+  function fakeIo(
+    peer: { subject: Record<string, string> | null; subjectaltname: string | null },
+    seen: { session?: Uint8Array | null } = {},
+  ) {
+    return {
+      cipher: ["TLS_AES_128_GCM_SHA256", "TLSv1.3", 128, 128],
+      close() {},
+      async startSsl(options: import("../lib/http-adapter.js").HttpSslOptions) {
+        seen.session = options.session;
+        options.sessionNewCb!(Uint8Array.of(1, 2, 3));
+        options.peerCertCb!(peer.subject, peer.subjectaltname);
+      },
+    } as never;
+  }
+
+  it("post_connection_check matches a subjectAltName dNSName, wildcard and iPAddress", async () => {
+    const context = new OpenSSL.SSL.SSLContext();
+    context.setParams({ verifyMode: OpenSSL.SSL.VERIFY_NONE });
+    const ssl = new OpenSSL.SSL.SSLSocket(
+      fakeIo({
+        subject: { CN: "ignored" },
+        subjectaltname: "DNS:*.example.com, IP Address:10.0.0.1",
+      }),
+      context,
+    );
+    await ssl.connect();
+    expect(ssl.postConnectionCheck("www.example.com")).toBe(true);
+    expect(ssl.postConnectionCheck("10.0.0.1")).toBe(true);
+    expect(() => ssl.postConnectionCheck("ignored")).toThrow(
+      'hostname "ignored" does not match the server certificate',
+    );
+    expect(() => ssl.postConnectionCheck("a.b.example.com")).toThrow(OpenSSL.SSL.SSLError);
+  });
+
+  it("post_connection_check falls back to the subject CN and raises without a peer cert", async () => {
+    const context = new OpenSSL.SSL.SSLContext();
+    context.setParams({ verifyMode: OpenSSL.SSL.VERIFY_NONE });
+    const ssl = new OpenSSL.SSL.SSLSocket(
+      fakeIo({ subject: { CN: "Host.Example" }, subjectaltname: null }),
+      context,
+    );
+    await ssl.connect();
+    expect(ssl.postConnectionCheck("host.example")).toBe(true);
+
+    const none = new OpenSSL.SSL.SSLSocket(
+      fakeIo({ subject: null, subjectaltname: null }),
+      context,
+    );
+    await none.connect();
+    expect(() => none.postConnectionCheck("host.example")).toThrow(
+      "Peer verification enabled, but no certificate received.",
+    );
+  });
+
+  it("session= resumes the session the context's session_new_cb received", async () => {
+    const context = new OpenSSL.SSL.SSLContext();
+    context.setParams({ verifyMode: OpenSSL.SSL.VERIFY_NONE });
+    let cached: InstanceType<typeof OpenSSL.SSL.Session> | null = null;
+    context.sessionNewCb = (_sock, sess) => (cached = sess);
+    const peer = { subject: null, subjectaltname: null };
+    await new OpenSSL.SSL.SSLSocket(fakeIo(peer), context).connect();
+    expect(cached!._der).toEqual(Uint8Array.of(1, 2, 3));
+
+    const seen: { session?: Uint8Array | null } = {};
+    const ssl = new OpenSSL.SSL.SSLSocket(fakeIo(peer, seen), context);
+    ssl.session = cached!;
+    await ssl.connect();
+    expect(seen.session).toEqual(Uint8Array.of(1, 2, 3));
+  });
+
+  it("verify_hostname and verify_wildcard follow RFC 6125", () => {
+    const { verifyHostname, verifyWildcard } = OpenSSL.SSL;
+    expect(verifyHostname("www.example.com", "*.example.com")).toBe(true);
+    expect(verifyHostname("example.com", "*.example.com")).toBe(false);
+    expect(verifyHostname("foo.example.com", "f*.example.com")).toBe(true);
+    expect(verifyHostname("xn--abc.example.com", "x*.example.com")).toBe(false);
+    expect(verifyWildcard("foo", "*")).toBe(true);
+    expect(verifyWildcard("foo", "f*o*")).toBe(false);
+  });
+});

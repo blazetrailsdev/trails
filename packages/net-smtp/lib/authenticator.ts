@@ -44,7 +44,7 @@ export abstract class Authenticator {
 
   async finish(arg: string): Promise<Response> {
     const res = await this.smtp.getResponse(arg);
-    if (!res.isSuccess()) throw new Net.SMTPAuthenticationError!(res);
+    if (!res.isSuccess()) throw new Net.SMTPAuthenticationError(res);
     return res;
   }
 

@@ -97,6 +97,9 @@ export interface HttpSslOptions {
   defaultPaths?: boolean;
   minVersion?: "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3";
   maxVersion?: "TLSv1" | "TLSv1.1" | "TLSv1.2" | "TLSv1.3";
+  session?: Uint8Array | null;
+  sessionNewCb?: (session: Uint8Array) => void;
+  peerCertCb?: (subject: Record<string, string> | null, subjectaltname: string | null) => void;
 }
 
 export interface HttpAdapter {
@@ -154,6 +157,7 @@ type NodeSocket = {
   readonly remoteFamily?: string | undefined;
   getProtocol?(): string | null;
   getCipher?(): { name: string };
+  getPeerCertificate?(): { subject?: Record<string, string>; subjectaltname?: string } | null;
 };
 
 type NodeHttp = {
@@ -250,12 +254,23 @@ class _NodeClientSocket implements HttpClientSocket {
         }),
         ...(options.minVersion !== undefined && { minVersion: options.minVersion }),
         ...(options.maxVersion !== undefined && { maxVersion: options.maxVersion }),
+        ...(options.session != null && { session: options.session }),
       });
+      if (options.sessionNewCb)
+        this.io.on("session", (session?: Uint8Array) => options.sessionNewCb!(session!));
       this.ssl = true;
       this.bind("on");
       this.io.once("error", reject);
       this.io.once("secureConnect", () => {
         this.io.removeListener("error", reject as never);
+        if (options.peerCertCb) {
+          const cert = this.io.getPeerCertificate!();
+          const present = cert != null && Object.keys(cert).length > 0;
+          options.peerCertCb(
+            present ? { ...cert.subject } : null,
+            present ? (cert.subjectaltname ?? null) : null,
+          );
+        }
         resolve();
       });
     });

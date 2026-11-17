@@ -1,7 +1,7 @@
-import { Protocol, TopLevel } from "@blazetrails/ruby-compat";
 import type { SMTP, SMTPAuthenticationError } from "./smtp.js";
 
 export {
+  Net,
   Protocol,
   ProtocolError,
   ProtoSyntaxError,
@@ -13,18 +13,11 @@ export {
   ReadTimeout,
 } from "@blazetrails/ruby-compat";
 
-/** @noRailsEquivalent PERMANENT */
-export const Net: {
-  Protocol?: typeof Protocol;
-  SMTP?: typeof SMTP;
-  SMTPAuthenticationError?: typeof SMTPAuthenticationError;
-} = {};
-TopLevel.Net = Net;
-
 declare module "@blazetrails/ruby-compat" {
-  interface TopLevelConstants {
-    Net?: typeof Net;
+  interface NetModule {
+    /** @noRailsEquivalent PERMANENT */
+    SMTP: typeof SMTP;
+    /** @noRailsEquivalent PERMANENT */
+    SMTPAuthenticationError: typeof SMTPAuthenticationError;
   }
 }
-
-Net.Protocol = Protocol;

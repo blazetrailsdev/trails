@@ -150,6 +150,7 @@ export class HTTP extends Protocol {
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/net/http.rb:1205`. */
   localPort: number | null = null;
   private _sslContext: InstanceType<typeof OpenSSL.SSL.SSLContext> | null = null;
+  private _sslSession: InstanceType<typeof OpenSSL.SSL.Session> | null = null;
   private _writeTimeout: number | null = 60;
   private _debugOutput: HttpDebugOutput | null = null;
   private _readTimeout: number | null = 60;
@@ -574,11 +575,27 @@ export class HTTP extends Protocol {
           if (value != null) sslParameters[HTTP.SSL_ATTRIBUTES[i]] = value;
         });
         this._sslContext!.setParams(sslParameters);
+        this._sslContext!.sessionNewCb = (sock, sess) => {
+          this._sslSession = sess;
+        };
         this.debug(`starting SSL for ${connAddr}:${connPort}...`);
         const ssl = new OpenSSL.SSL.SSLSocket(s, this._sslContext!);
         ssl.syncClose = true;
         if (sslHostAddress) ssl.hostname = sslHostAddress;
+        if (
+          this._sslSession &&
+          Date.now() / 1000 < this._sslSession.time.getTime() / 1000 + this._sslSession.timeout
+        ) {
+          ssl.session = this._sslSession;
+        }
         await this.sslSocketConnect(ssl, this.openTimeout);
+        if (
+          this._sslContext!.verifyMode !== OpenSSL.SSL.VERIFY_NONE &&
+          this.verifyHostname != null &&
+          this.verifyHostname !== false
+        ) {
+          ssl.postConnectionCheck(this.address);
+        }
         this.debug(`SSL established, protocol: ${s.sslVersion}, cipher: ${s.cipher![0]}`);
       }
       this._socket = new BufferedIO(s, {

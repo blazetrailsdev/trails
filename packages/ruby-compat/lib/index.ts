@@ -562,6 +562,7 @@ export {
 export { Addrinfo, BasicSocket, IPSocket, Socket, SocketError, TCPSocket } from "./socket.js";
 export {
   Net,
+  type NetModule,
   Protocol,
   ProtocolError,
   ProtoSyntaxError,
