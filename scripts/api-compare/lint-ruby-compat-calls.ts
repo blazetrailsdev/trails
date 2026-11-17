@@ -135,6 +135,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "sqlite3",
   "thor",
   "trailties",
+  "turbo-rails",
   "tzinfo",
   "vite-assets",
   "vite-trails",
