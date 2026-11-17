@@ -355,9 +355,9 @@ export class Trailtie extends BaseTrailtie {
       AsynchronousQueriesTracker.installExecutorHooks();
       ConnectionPool.installExecutorHooks();
       /** @noRailsEquivalent PERMANENT */
-      Trails.application!.executor.toRun(() =>
-        coldPools.size === 0 ? undefined : warmSchemaCache(coldPools),
-      );
+      this.config.afterInitialize((app) => {
+        app.executor.toRun(() => (coldPools.size === 0 ? undefined : warmSchemaCache(coldPools)));
+      });
     });
 
     this.initializer("active_record.clear_active_connections", () => {

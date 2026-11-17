@@ -178,6 +178,6 @@ rm app/models/check.ts
 
 echo "== pnpm test"
 tested=$(pnpm --silent test 2>&1) || fail "pnpm test failed: $tested"
-grep -qE "Tests +7 passed \| 1 todo \(8\)" <<<"$tested" || fail "unexpected test counts: $tested"
+sed -E 's/\x1b\[[0-9;]*m//g' <<<"$tested" | grep -qE "Tests +7 passed \| 1 todo \(8\)" || fail "unexpected test counts: $tested"
 
 echo "quickstart: ok"
