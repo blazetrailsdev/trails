@@ -8,6 +8,7 @@ type Counted = RouteSetLike & { calls: string[]; draw(block: DrawCallback): void
 const makeRouteSet = (): Counted => {
   const r: Counted = {
     disableClearAndFinalize: false,
+    drawPaths: [],
     calls: [],
     clearBang: () => void r.calls.push("clear"),
     finalizeBang: () => void r.calls.push("finalize"),

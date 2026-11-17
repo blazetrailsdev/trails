@@ -14,7 +14,7 @@ export interface RouteSetLike {
   finalizeBang(): void;
   eagerLoadBang(): void;
   draw(block: DrawCallback): void;
-  drawPaths?: string[];
+  drawPaths: string[];
 }
 
 export class RoutesReloader {
@@ -91,7 +91,7 @@ export class RoutesReloader {
     try {
       for (const path of this.paths) await rbFLoad(path);
       for (const routes of this.routeSets) {
-        for (const dir of routes.drawPaths ?? []) {
+        for (const dir of routes.drawPaths) {
           const files = new Set([
             ...(await Dir.globAsync(`${dir}/**/*.ts`)),
             ...compiledFilesIn(dir),

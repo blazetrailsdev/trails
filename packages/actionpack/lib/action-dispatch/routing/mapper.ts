@@ -1386,10 +1386,6 @@ export class Mapper {
     }
   }
 
-  /**
-   * @missingRailsCall find — PERMANENT
-   * @missingRailsCall read — PERMANENT
-   */
   /** @missingRailsCall read — PERMANENT */
   draw(name: string): void {
     const path = this._drawPaths.find(
