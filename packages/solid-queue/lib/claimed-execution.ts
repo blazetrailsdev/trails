@@ -1,6 +1,7 @@
 import { type Base, type Relation } from "@blazetrails/activerecord";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
 import {
+  StandardError,
   Struct,
   constSet,
   excBacktrace,
@@ -148,6 +149,7 @@ export class ClaimedExecution extends Execution {
     try {
       await block();
     } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
       if (await this.isStillClaimed()) {
         throw excSetupMessage(new FinalizationError(this, { cause: error as Error }), error);
       }
@@ -203,7 +205,8 @@ export class ClaimedExecution extends Execution {
   private async isStillClaimed(): Promise<boolean> {
     try {
       return await ClaimedExecution.isExists(this.id);
-    } catch {
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
       return true;
     }
   }

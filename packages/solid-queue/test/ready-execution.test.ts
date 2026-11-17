@@ -312,11 +312,10 @@ describe("SolidQueue::ReadyExecutionTest", () => {
         .order("job_id")
         .pluck("job_id"),
     ).toEqual(throttledJobs.slice(2, 5).map((job) => job.id));
-    let allBlocked = true;
-    for (const job of throttledJobs.slice(-2)) {
-      if (!(await (await job.reload()).isBlocked())) allBlocked = false;
-    }
-    expect(allBlocked).toBeTruthy();
+    const lastBlocked = await Promise.all(
+      throttledJobs.slice(-2).map(async (job) => (await job.reload()).isBlocked()),
+    );
+    expect(lastBlocked.every(Boolean)).toBeTruthy();
     expect((await Semaphore.findByBang({ key: throttledJobs[0].concurrency_key })).value).toEqual(
       0,
     );

@@ -289,9 +289,8 @@ export class RecurringTask extends Record {
   applyDefaultTimeZoneTo(schedule: ReturnType<typeof Fugit.parse>): ReturnType<typeof Fugit.parse> {
     try {
       if (
-        schedule != null &&
-        "zone" in schedule &&
-        schedule.zone == null &&
+        "zone" in (schedule as object) &&
+        (schedule as Cron).zone == null &&
         isPresent(this.defaultTimeZone())
       ) {
         return Fugit.parse(`${(schedule as Cron).toCronS()} ${this.defaultTimeZone()}`, {
