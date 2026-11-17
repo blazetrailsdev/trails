@@ -12,6 +12,8 @@ import {
   last,
   rbEqual,
   rbInspect,
+  size,
+  transformValues,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { FutureResult, type Complete } from "./future-result.js";
@@ -32,7 +34,7 @@ export class IndexedRow {
   }
 
   get size(): number {
-    return Object.keys(this.columnIndexes).length;
+    return size(this.columnIndexes);
   }
 
   get length(): number {
@@ -71,9 +73,10 @@ export class IndexedRow {
   }
 
   toH(): Record<string, unknown> {
-    return Object.fromEntries(
-      Object.entries(this.columnIndexes).map(([key, index]) => [key, this.row[index]]),
-    );
+    return transformValues(this.columnIndexes, (index) => this.row[index]) as Record<
+      string,
+      unknown
+    >;
   }
 
   toHash(): Record<string, unknown> {
