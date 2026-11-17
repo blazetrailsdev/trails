@@ -1,4 +1,7 @@
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
+import "@blazetrails/date";
+import "../../../lib/core-ext/string/behavior.js";
 import { actsLike } from "../../../lib/core-ext/object/acts-like.js";
 
 class Stringish extends String {}
@@ -17,5 +20,9 @@ describe("actsLike", () => {
     expect(actsLike.call({}, "string")).toBeFalsy();
     expect(actsLike.call(null, "string")).toBeFalsy();
     expect(actsLike.call(duck, "string")).toBeTruthy();
+  });
+
+  it("dispatches acts_like_string? on a String subclass instance", () => {
+    expect(rbFSend(new Stringish(), "actsLikeString")).toBe(true);
   });
 });

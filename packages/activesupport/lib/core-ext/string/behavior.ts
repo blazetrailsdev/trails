@@ -1,3 +1,3 @@
-export function actsLikeString(self: unknown): boolean {
-  return typeof self === "string" || self instanceof String;
-}
+import { STRING_METHOD_TABLE } from "@blazetrails/ruby-compat";
+
+STRING_METHOD_TABLE.actsLikeString = () => true;

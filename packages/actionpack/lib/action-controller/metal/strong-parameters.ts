@@ -1,7 +1,7 @@
 /** @internal */
 
 import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
-import { Time, actsLikeDate, actsLikeTime } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
 import {
   block as rbBlock,
@@ -50,6 +50,7 @@ import {
   Notifications,
   cattrAccessor,
   ToJsonWithActiveSupportEncoder,
+  actsLike,
   asJson,
   deepDup,
   deepTransformKeys,
@@ -119,8 +120,8 @@ const PERMITTED_SCALAR_TYPES: ((value: unknown) => boolean)[] = [
     value instanceof Rational,
   (value) => value === true,
   (value) => value === false,
-  (value) => actsLikeDate(value),
-  (value) => value instanceof Time || actsLikeTime(value),
+  (value) => actsLike.call(value, "date"),
+  (value) => value instanceof Time || actsLike.call(value, "time"),
   (value) => value instanceof StringIO,
   (value) => value instanceof IO,
   (value) => value instanceof UploadedFile,

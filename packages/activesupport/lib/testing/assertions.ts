@@ -17,9 +17,12 @@ import {
   rbAnyToS,
   rbEqual,
   rbModToS,
+  rbFArray,
   rbObjClass,
   rbFSend,
   rbObjClassname,
+  rbObjRespondTo,
+  rbProcCall,
   rbStrRespondTo,
   regexpEscape,
   SignalException,
@@ -363,50 +366,57 @@ export async function assertNothingRaised<T>(block: () => T | Promise<T>): Promi
   }
 }
 
-/** @missingRailsCall map — PERMANENT */
 export async function assertDifference<T>(
-  expression: Map<Expression<number>, number>,
+  expression: Map<Expression<number> | string, number>,
   ...args: [message?: string | null, block?: () => T | Promise<T>]
 ): Promise<T | undefined>;
 export async function assertDifference<T>(
-  expression: Expression<number> | Expression<number>[],
+  expression: Expression<number> | string | (Expression<number> | string)[],
   ...args: [difference?: number, message?: string | null, block?: () => T | Promise<T>]
 ): Promise<T | undefined>;
 export async function assertDifference<T>(
-  expression: Expression<number> | Expression<number>[],
+  expression: Expression<number> | string | (Expression<number> | string)[],
   difference: number,
   block: () => T | Promise<T>,
 ): Promise<T | undefined>;
 export async function assertDifference<T>(
-  expression: Expression<number> | Expression<number>[] | Map<Expression<number>, number>,
+  expression:
+    | Expression<number>
+    | string
+    | (Expression<number> | string)[]
+    | Map<Expression<number> | string, number>,
   ...args: unknown[]
 ): Promise<T | undefined> {
   const block =
     typeof args[args.length - 1] === "function" ? (args.pop() as () => T | Promise<T>) : undefined;
 
   let message: string | null | undefined;
-  let expressions: Map<Expression<number>, number> | Record<string, number>;
+  let expressions: Map<Expression<number> | string, number> | Record<string, number>;
   if (expression instanceof Map) {
     message = args[0] as string | null | undefined;
     expressions = expression;
   } else {
     const difference = (args[0] as number | undefined) ?? 1;
     message = args[1] as string | null | undefined;
-    expressions = indexWith(Array.isArray(expression) ? expression : [expression], difference);
+    expressions = indexWith(rbFArray(expression) as (Expression<number> | string)[], difference);
   }
 
-  const exps = keys(expressions);
+  const exps = keys(expressions).map((e) =>
+    rbObjRespondTo(e, "call") ? (e as Expression<number>) : () => (0, eval)(e as string) as number,
+  );
   const before: number[] = [];
-  for (const exp of exps) before.push(await exp());
+  for (const exp of exps) before.push((await rbProcCall(exp)) as number);
 
   const retval = await _assertNothingRaisedOrWarn("assert_difference", block);
 
-  for (const [index, exp] of exps.entries()) {
-    const diff = hashAref(expressions, exp) as number;
+  for (const [index, code] of keys(expressions).entries()) {
+    const diff = hashAref(expressions, code) as number;
+    const exp = exps[index];
     const beforeValue = before[index];
-    const actual = await exp();
+    const actual = (await rbProcCall(exp)) as number;
     const richMessage = () => {
-      let error = `\`${_callableToSourceString(exp)}\` didn't change by ${diff}, but by ${actual - beforeValue}`;
+      const codeString = rbObjRespondTo(code, "call") ? _callableToSourceString(code) : code;
+      let error = `\`${codeString}\` didn't change by ${diff}, but by ${actual - beforeValue}`;
       if (message) error = `${message}.\n${error}`;
       return error;
     };
@@ -434,14 +444,16 @@ export async function assertNoDifference<T>(
 }
 
 export async function assertChanges<T>(
-  expression: Expression<unknown>,
+  expression: Expression<unknown> | string,
   message: string | null = null,
   { from = UNTRACKED, to = UNTRACKED }: { from?: unknown; to?: unknown } = {},
   block?: () => T | Promise<T>,
 ): Promise<T | undefined> {
-  const exp = expression as unknown as { call(): unknown };
+  const exp = rbObjRespondTo(expression, "call")
+    ? (expression as unknown as { call(): unknown })
+    : () => (0, eval)(String(expression)) as unknown;
 
-  const before = await exp.call();
+  const before = await rbProcCall(exp);
   const retval = await _assertNothingRaisedOrWarn("assert_changes", block);
 
   if (from !== UNTRACKED) {
@@ -453,10 +465,13 @@ export async function assertChanges<T>(
     assert(caseEqual(from, before), richMessage);
   }
 
-  const after = await exp.call();
+  const after = await rbProcCall(exp);
 
   const richMessage = () => {
-    let error = `\`${_callableToSourceString(expression)}\` didn't change`;
+    const codeString = rbObjRespondTo(expression, "call")
+      ? _callableToSourceString(expression)
+      : expression;
+    let error = `\`${codeString}\` didn't change`;
     if (Object.is(before, to)) error = `${error}. It was already ${inspect(to)}`;
     if (message) error = `${message}.\n${error}`;
     return error;
@@ -476,14 +491,16 @@ export async function assertChanges<T>(
 }
 
 export async function assertNoChanges<T>(
-  expression: Expression<unknown>,
+  expression: Expression<unknown> | string,
   message: string | null = null,
   { from = UNTRACKED }: { from?: unknown } = {},
   block?: () => T | Promise<T>,
 ): Promise<T | undefined> {
-  const exp = expression as unknown as { call(): unknown };
+  const exp = rbObjRespondTo(expression, "call")
+    ? (expression as unknown as { call(): unknown })
+    : () => (0, eval)(String(expression)) as unknown;
 
-  const before = await exp.call();
+  const before = await rbProcCall(exp);
   const retval = await _assertNothingRaisedOrWarn("assert_no_changes", block);
 
   if (from !== UNTRACKED) {
@@ -495,15 +512,18 @@ export async function assertNoChanges<T>(
     assert(caseEqual(from, before), richMessage);
   }
 
-  const after = await exp.call();
+  const after = await rbProcCall(exp);
 
   const richMessage = () => {
-    let error = `\`${_callableToSourceString(expression)}\` changed`;
+    const codeString = rbObjRespondTo(expression, "call")
+      ? _callableToSourceString(expression)
+      : expression;
+    let error = `\`${codeString}\` changed`;
     if (message) error = `${message}.\n${error}`;
     return error;
   };
 
-  if (before === null || before === undefined) {
+  if (before == null) {
     assertNil(after, richMessage);
   } else {
     assertEqual(before, after, richMessage);

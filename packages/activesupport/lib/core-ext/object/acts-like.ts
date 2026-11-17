@@ -1,28 +1,15 @@
-import { actsLikeDate, actsLikeTime } from "@blazetrails/date";
-import { actsLikeString } from "../string/behavior.js";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { camelize } from "../../inflector.js";
 
 export function actsLike(this: unknown, duck: string): boolean {
   switch (duck) {
     case "time":
-      return actsLikeTime(this) || respondTo.call(this, "acts_like_time?");
+      return rbObjRespondTo(this, "actsLikeTime");
     case "date":
-      return actsLikeDate(this) || respondTo.call(this, "acts_like_date?");
+      return rbObjRespondTo(this, "actsLikeDate");
     case "string":
-      return actsLikeString(this) || respondTo.call(this, "acts_like_string?");
+      return rbObjRespondTo(this, "actsLikeString");
     default:
-      return respondTo.call(this, `acts_like_${duck}?`);
+      return rbObjRespondTo(this, camelize(`acts_like_${duck}`, false));
   }
-}
-
-/** @perf 627ns — PERMANENT */
-const _tsNames = new Map<string, string>();
-
-function respondTo(this: unknown, rubyName: string): boolean {
-  if (this == null) return false;
-  let tsName = _tsNames.get(rubyName);
-  if (tsName === undefined) {
-    tsName = rubyName.replace(/\?$/, "").replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
-    _tsNames.set(rubyName, tsName);
-  }
-  return typeof (this as Record<string, unknown>)[tsName] === "function";
 }
