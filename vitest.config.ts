@@ -760,7 +760,10 @@ export default defineConfig({
           include: ["packages/*/test/**/*.system.test.ts"],
           exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
           setupFiles: otherSetupFiles,
-          globalSetup: ["./packages/activerecord/test/support/template-global-setup.ts"],
+          globalSetup: [
+            "./packages/activerecord/test/support/template-global-setup.ts",
+            "./packages/actiontext/test/support/local-secret.ts",
+          ],
           pool: "forks",
           browser: { enabled: false, screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
           provide: { screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
