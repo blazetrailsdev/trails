@@ -50,7 +50,7 @@ describe("AppGenerator (trails-only)", () => {
       const root = File.join(tmpDir, version);
       const generator = new AppGenerator(
         ["my-app"],
-        { skipInstall: true, javascript: "vite" },
+        { skipInstall: true, javascript: "esbuild" },
         { destinationRoot: root },
       );
       Object.assign(generator, { dockerfilePnpmVersion: async () => version });
@@ -60,6 +60,31 @@ describe("AppGenerator (trails-only)", () => {
       expect(dockerfile).toContain(
         "COPY package.json pnpm-lock.yaml ./\nRUN pnpm install --frozen-lockfile\n",
       );
+    }
+  });
+
+  it("ships Prettier beside ESLint unless --skip-eslint is passed", async () => {
+    for (const [skipEslint, present] of [
+      [false, true],
+      [true, false],
+    ]) {
+      const root = File.join(tmpDir, String(skipEslint));
+      await new AppGenerator(
+        ["my-app"],
+        { skipInstall: true, skipEslint },
+        { destinationRoot: root },
+      ).invokeAll();
+      const app = File.join(root, "my-app");
+      const pkg = JSON.parse(await File.readAsync(File.join(app, "package.json")));
+      expect(pkg.devDependencies.prettier != null).toBe(present);
+      expect(pkg.devDependencies["eslint-config-prettier"] != null).toBe(present);
+      expect(await File.isExistAsync(File.join(app, ".prettierrc.json"))).toBe(present);
+      expect(await File.isExistAsync(File.join(app, ".prettierignore"))).toBe(present);
+      const eslintConfig = File.join(app, "eslint.config.mjs");
+      expect(
+        (await File.isExistAsync(eslintConfig)) &&
+          /eslintConfigPrettier,\n\]\);/.test(await File.readAsync(eslintConfig)),
+      ).toBe(present);
     }
   });
 
