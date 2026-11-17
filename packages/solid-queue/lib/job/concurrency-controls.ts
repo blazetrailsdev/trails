@@ -80,10 +80,12 @@ export class ConcurrencyControls {
       : SolidQueue.defaultConcurrencyControlPeriod;
   }
 
+  /** @missingRailsCall dig — PERMANENT */
   acquiredSemaphoreId(): number | null {
     return this.concurrencyLock()?.semaphore_id ?? null;
   }
 
+  /** @missingRailsCall dig — PERMANENT */
   acquiredConcurrencyLimit(): number | null {
     return this.concurrencyLock()?.limit ?? null;
   }

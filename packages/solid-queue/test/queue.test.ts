@@ -10,7 +10,10 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import { freezeTime, travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import type { Time } from "@blazetrails/date";
-import { Job, Pause, Queue, ReadyExecution, SolidQueueAdapter } from "../lib/index.js";
+import { Job, Pause, Queue, ReadyExecution, Semaphore, SolidQueueAdapter } from "../lib/index.js";
+import { JobResult } from "./support/job-result.js";
+import { loadAppSchema } from "./support/queue-schema.js";
+import { NonOverlappingUpdateResultJob } from "./support/non-overlapping-update-result-job.js";
 import { ApplicationJob } from "./support/application-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 
@@ -19,6 +22,7 @@ describe("QueueTest", () => {
   let defaultQueue: Queue;
 
   beforeAll(async () => {
+    await loadAppSchema();
     ApplicationJob.queueAdapter = new SolidQueueAdapter();
   });
 
@@ -35,6 +39,8 @@ describe("QueueTest", () => {
     travelBack();
     await Job.destroyAll();
     await Pause.deleteAll();
+    await Semaphore.deleteAll();
+    await JobResult.deleteAll();
   });
 
   it("count jobs currently in a queue", async () => {
@@ -52,6 +58,31 @@ describe("QueueTest", () => {
       defaultQueue.clear(),
     );
   });
+
+  for (const nextQueue of ["default", "background"]) {
+    it(`clear queue unblocks the next job in ${nextQueue}`, async () => {
+      const result = await JobResult.createBang({});
+      for (const queue of ["default", nextQueue, nextQueue]) {
+        await NonOverlappingUpdateResultJob.set({ queue: queue }).performLater(result, {
+          name: "A",
+        });
+      }
+      const [readyJob, nextJob, blockedJob] = await Job.last(3);
+
+      await assertDifference(
+        () => Job.count(),
+        -1,
+        null,
+        () => defaultQueue.clear(),
+      );
+
+      expect(await Job.isExists(readyJob.id)).toBeFalsy();
+      expect(await (await nextJob.reload()).isReady()).toBeTruthy();
+      expect(await nextJob.isBlocked()).toBeFalsy();
+      expect(await (await blockedJob.reload()).isBlocked()).toBeTruthy();
+      expect((await Semaphore.findByBang({ key: readyJob.concurrency_key })).value).toEqual(0);
+    });
+  }
 
   it("all existing queues", async () => {
     expect(await Queue.all()).toEqualRuby([backgroundQueue]);

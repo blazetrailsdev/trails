@@ -1,4 +1,4 @@
-import { constSet } from "@blazetrails/ruby-compat";
+import { StandardError, constSet } from "@blazetrails/ruby-compat";
 import { type Relation } from "@blazetrails/activerecord";
 import { include, isPresent, type HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
@@ -60,10 +60,16 @@ export class Process extends Record {
   }
 
   async heartbeat(): Promise<void> {
-    this.restoreAttributes();
-    await this.withLock(async () => {
-      await this.touch("last_heartbeat_at");
-    });
+    try {
+      this.restoreAttributes();
+      await this.withLock(async () => {
+        await this.touch("last_heartbeat_at");
+      });
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
+      this.restoreAttributes();
+      throw error;
+    }
   }
 
   async deregister({ pruned = false }: { pruned?: boolean } = {}): Promise<void> {
