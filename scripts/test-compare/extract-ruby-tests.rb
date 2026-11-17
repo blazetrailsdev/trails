@@ -546,7 +546,7 @@ class TestExtractor
     @module_includes[name] ||= @gate_stack.dup
   end
 
-  LIB_TEST_MODULES = %w[ActiveModel::Lint::Tests].freeze
+  LIB_TEST_MODULES = %w[ActiveModel::Lint::Tests I18n::Tests::Basics I18n::Tests::Defaults I18n::Tests::Interpolation I18n::Tests::Link I18n::Tests::Lookup I18n::Tests::Pluralization I18n::Tests::Procs I18n::Tests::Localization::Date I18n::Tests::Localization::DateTime I18n::Tests::Localization::Time I18n::Tests::Localization::Procs].freeze
 
   def collect_lib_modules(filepath)
     @module_includes.keys.each do |name|

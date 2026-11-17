@@ -146,6 +146,10 @@ export const REQUIRED_TEST_MODULES: Record<string, string> = {
   failureRaisingBehavior: "packages/activesupport/test/cache/behaviors/failure-raising-behavior.ts",
   failureSafetyBehavior: "packages/activesupport/test/cache/behaviors/failure-safety-behavior.ts",
   localCacheBehavior: "packages/activesupport/test/cache/behaviors/local-cache-behavior.ts",
+  testsBasics: "packages/i18n/test/support/tests/basics.ts",
+  testsDefaults: "packages/i18n/test/support/tests/defaults.ts",
+  testsLookup: "packages/i18n/test/support/tests/lookup.ts",
+  testsPluralization: "packages/i18n/test/support/tests/pluralization.ts",
 };
 
 /** The top-level function `name` declared in a required test-module file. */
