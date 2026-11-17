@@ -114,6 +114,7 @@ export class Node {
       env[RACK_IS_HIJACK] = socket != null;
       if (env[RACK_IS_HIJACK]) env[RACK_HIJACK] = release;
 
+      let closing: Promise<void> | null = null;
       try {
         const [status, headers, body] = await (rbProcCall(this.app, env) as Promise<RackResponse>);
         try {
@@ -136,31 +137,30 @@ export class Node {
             return;
           }
           res.writeHead(status, sentHeaders(headers));
-          let closing: Promise<void> | null = null;
           let wake: (() => void) | null = null;
           const onClose = (): void => {
             closing ??= closeBody(body);
             wake?.();
           };
           const onDrain = (): void => wake?.();
-          socket?.on("close", onClose);
-          socket?.on("drain", onDrain);
+          res.on("close", onClose);
+          res.on("drain", onDrain);
           try {
             for await (const chunk of body) {
               if (hijacked) return;
               if (closing) break;
-              if (res.write(rbObjAsString(chunk)) === false && socket)
+              if (res.write(rbObjAsString(chunk)) === false)
                 await new Promise<void>((resolve) => (wake = resolve));
               wake = null;
             }
           } finally {
-            socket?.removeListener("close", onClose);
-            socket?.removeListener("drain", onDrain);
+            res.removeListener("close", onClose);
+            res.removeListener("drain", onDrain);
           }
           if (closing) return await closing;
           res.end();
         } finally {
-          await closeBody(body);
+          await (closing ?? closeBody(body));
         }
       } catch (error) {
         if (!hijacked) throw error;

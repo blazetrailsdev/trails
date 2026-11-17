@@ -19,6 +19,8 @@ export interface HttpResponse {
   writeHead(status: number, headers?: Record<string, string | string[]>): unknown;
   write(chunk: string | Uint8Array): unknown;
   end(chunk?: string | Uint8Array): unknown;
+  on(event: "close" | "drain", listener: () => void): unknown;
+  removeListener(event: "close" | "drain", listener: () => void): unknown;
   socket?: HttpSocket | null;
 }
 

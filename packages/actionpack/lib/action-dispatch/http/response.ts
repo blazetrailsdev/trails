@@ -228,9 +228,17 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   protected eachChunk(block?: (chunk: unknown) => unknown): unknown {
     if (this._buf instanceof ReadableStream) {
       if (!block) return toEnum(this, "each");
+      const reader = (this._reader = (this._buf as unknown as ReadableStream<unknown>).getReader());
       return (async () => {
-        for await (const chunk of this._buf as unknown as ReadableStream<unknown>)
-          await block(chunk);
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) return;
+            await block(value);
+          }
+        } finally {
+          await reader.cancel();
+        }
       })();
     }
     return rbFSend(this._buf, "each", block);

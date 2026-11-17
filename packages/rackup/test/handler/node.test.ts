@@ -217,7 +217,14 @@ describe("Rack::Handler::Node", () => {
   function streamingRes() {
     const listeners: Record<string, (() => void)[]> = {};
     const written: unknown[] = [];
-    const socket = {
+    const res = {
+      writable: true,
+      writeHead() {},
+      write(chunk: unknown) {
+        written.push(chunk);
+        return res.writable;
+      },
+      end() {},
       on(event: string, listener: () => void) {
         (listeners[event] ??= []).push(listener);
       },
@@ -226,17 +233,7 @@ describe("Rack::Handler::Node", () => {
         for (const listener of listeners[event] ?? []) listener();
       },
     };
-    const res = {
-      socket,
-      writable: true,
-      writeHead() {},
-      write(chunk: unknown) {
-        written.push(chunk);
-        return res.writable;
-      },
-      end() {},
-    };
-    return { res, socket, written };
+    return { res, written };
   }
 
   it("closes a stalled streamed body once the client disconnects", async () => {
@@ -253,10 +250,10 @@ describe("Rack::Handler::Node", () => {
       },
     };
     const app: RackApp = async () => [200, {}, body as unknown as RackBody];
-    const { res, socket, written } = streamingRes();
+    const { res, written } = streamingRes();
     const serving = new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
     await vi.waitFor(() => expect(written).toEqual(["first"]));
-    socket.emit("close");
+    res.emit("close");
     await serving;
     expect(closed).toBe(true);
   });
@@ -272,14 +269,14 @@ describe("Rack::Handler::Node", () => {
       },
     };
     const app: RackApp = async () => [200, {}, body as unknown as RackBody];
-    const { res, socket, written } = streamingRes();
+    const { res, written } = streamingRes();
     res.writable = false;
     const serving = new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
     await vi.waitFor(() => expect(written).toEqual(["a"]));
     await new Promise((resolve) => setTimeout(resolve, 10));
     expect(pulled).toBe(1);
     res.writable = true;
-    socket.emit("drain");
+    res.emit("drain");
     await serving;
     expect(written).toEqual(["a", "b"]);
   });

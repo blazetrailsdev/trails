@@ -1,8 +1,13 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import type { HttpRequest, HttpResponse } from "@blazetrails/ruby-compat";
+import type { RackApp } from "@blazetrails/rack";
+import { Handler } from "@blazetrails/rackup";
 import "../../support/abstract-unit.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import { TestCase } from "../../../lib/action-controller/test-case.js";
 import { Response } from "../../../lib/action-dispatch/http/response.js";
+
+await Handler.get("node");
 
 class RelayController extends Base {
   relay() {
@@ -60,6 +65,57 @@ describe("a ReadableStream response body", () => {
     const parked = chunks.next();
     await body.close();
     expect((await parked).done).toBe(true);
+    expect(cancelled).toBe(true);
+  });
+});
+
+describe("a ReadableStream response body served by Rackup::Handler::Node", () => {
+  it("cancels a source stalled after its first chunk when the client disconnects", async () => {
+    let cancelled = false;
+    const app = async () => {
+      const res = new Response();
+      res.body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(new Uint8Array([1]));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+      return res.toA();
+    };
+    const listeners: Record<string, (() => void)[]> = {};
+    const written: unknown[] = [];
+    const res = {
+      writeHead() {},
+      write(chunk: unknown) {
+        written.push(chunk);
+        return true;
+      },
+      end() {},
+      on(event: string, listener: () => void) {
+        (listeners[event] ??= []).push(listener);
+      },
+      removeListener() {},
+    };
+    const req = {
+      method: "GET",
+      url: "/",
+      httpVersion: "1.1",
+      headers: { host: "localhost:3000" },
+      socket: { remoteAddress: "127.0.0.1" },
+      on(event: string, listener: () => void) {
+        if (event === "end") setTimeout(listener, 0);
+      },
+      destroy() {},
+    };
+    const serving = new Handler.Node(app as unknown as RackApp).service(
+      req as unknown as HttpRequest,
+      res as unknown as HttpResponse,
+    );
+    await vi.waitFor(() => expect(written).toHaveLength(1));
+    for (const listener of listeners["close"] ?? []) listener();
+    await serving;
     expect(cancelled).toBe(true);
   });
 });
