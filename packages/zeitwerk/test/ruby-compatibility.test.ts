@@ -1,17 +1,30 @@
 import {
   Dir,
   File,
+  Kernel,
   LOADED_FEATURES,
   NameError,
   TopLevel,
   constDefined,
+  rbAutoloadLoad,
+  rbAutoloadP,
+  rbAutoloadStr,
+  rbModRemoveConst,
 } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "../lib/cref.js";
 import type { Loader } from "../lib/loader.js";
-import { get, newLoader, teardown, withFiles, withSetup } from "./support/loader-test.js";
+import {
+  get,
+  newLoader,
+  teardown,
+  withFiles,
+  withLoadPath,
+  withSetup,
+} from "./support/loader-test.js";
 
 const g = globalThis as Record<string, unknown>;
+
 const failureMessage = (fn: () => unknown) => {
   try {
     return String(fn());
@@ -19,13 +32,27 @@ const failureMessage = (fn: () => unknown) => {
     return (error as Error).message;
   }
 };
-const GLOBALS = ["$isDefinedX", "$constDefinedForX", "$ensureMIsAutoloaded"];
+const GLOBALS = [
+  "$isDefinedX",
+  "$constDefinedForX",
+  "$ensureMIsAutoloaded",
+  "$autoload",
+  "$autoloadP",
+  "$require",
+  "$expandPath",
+  "$trc_inception",
+  "$remove_const_does_not_trigger_autoload",
+];
 
 describe("TestRubyCompatibility", () => {
   let loader: Loader;
 
   beforeEach(async () => {
     loader = await newLoader({ setup: false });
+    g.$autoload = rbAutoloadStr;
+    g.$autoloadP = rbAutoloadP;
+    g.$require = (feature: string) => Kernel.require(feature);
+    g.$expandPath = (path: string) => File.expandPath(path);
   });
   afterEach(async () => {
     for (const name of GLOBALS) delete g[name];
@@ -102,11 +129,30 @@ describe("TestRubyCompatibility", () => {
     expect(failureMessage(invalid)).toContain("wrong constant name Foo-Bar");
   });
 
-  // PERMANENT-SKIP: an autoload set outside a loader: `Cref#autoload` records the path, but `require` loads only a file registered with a loader (`core-ext/kernel.ts`), so the body cannot reach the Ruby behavior it asserts.
-  it.skip("remove_const does not trigger an autoload", () => {});
+  it("remove_const does not trigger an autoload", async () => {
+    const files: [string, string][] = [
+      ["x.ts", "globalThis.$remove_const_does_not_trigger_autoload = false; export const X = 1;"],
+    ];
+    await withFiles(files, async () => {
+      g.$remove_const_does_not_trigger_autoload = true;
+      rbAutoloadStr(Object, "X", File.expandPath("x.ts"));
 
-  // PERMANENT-SKIP: an autoload set outside a loader: `Cref#autoload` records the path, but `require` loads only a file registered with a loader (`core-ext/kernel.ts`), so the body cannot reach the Ruby behavior it asserts.
-  it.skip("autoloading removes the autoload configuration in the parent", () => {});
+      rbModRemoveConst(Object, "X");
+      expect(g.$remove_const_does_not_trigger_autoload).toBeTruthy();
+    });
+  });
+
+  it("autoloading removes the autoload configuration in the parent", async () => {
+    const files: [string, string][] = [["x.ts", "export const X = true;"]];
+    await withFiles(files, async () => {
+      rbAutoloadStr(Object, "X", File.expandPath("x.ts"));
+
+      expect(rbAutoloadP(Object, "X")).toBeTruthy();
+      await rbAutoloadLoad(Object, "X");
+      expect((TopLevel as unknown as Record<string, unknown>).X).toBeTruthy();
+      expect(!rbAutoloadP(Object, "X")).toBeTruthy();
+    });
+  });
 
   it("autoload configuration can be deleted with remove_const", () => {
     const cref = new Cref(Object, "X");
@@ -116,11 +162,54 @@ describe("TestRubyCompatibility", () => {
     expect(!cref.isAutoload()).toBeTruthy();
   });
 
-  // PERMANENT-SKIP: this edge case is what `Registry::Inceptions` exists for, and it has no port (`scripts/parity/conventions.ts`, `unregister_inceptions`).
-  it.skip("an autoload on yourself is ignored", () => {});
+  it("an autoload on yourself is ignored", async () => {
+    const files: [string, string][] = [
+      [
+        "foo.ts",
+        `globalThis.$autoload(Object, "Foo", import.meta.filename);
+        globalThis.$trc_inception = !globalThis.$autoloadP(Object, "Foo");
+        export const Foo = 1;`,
+      ],
+    ];
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      await loader.setup();
 
-  // PERMANENT-SKIP: this edge case is what `Registry::Inceptions` exists for, and it has no port (`scripts/parity/conventions.ts`, `unregister_inceptions`).
-  it.skip("an autoload on a file being required at some point up in the call chain is also ignored", () => {});
+      await withLoadPath(loader.dirs() as readonly string[], async () => {
+        g.$trc_inception = false;
+        await Kernel.require("foo");
+      });
+
+      expect(g.$trc_inception).toBeTruthy();
+    });
+  });
+
+  it("an autoload on a file being required at some point up in the call chain is also ignored", async () => {
+    const files: [string, string][] = [
+      [
+        "foo.ts",
+        `await globalThis.$require("bar");
+        export const Foo = 1;`,
+      ],
+      [
+        "bar.ts",
+        `export const Bar = true;
+        globalThis.$autoload(Object, "Foo", globalThis.$expandPath("foo.ts"));
+        globalThis.$trc_inception = !globalThis.$autoloadP(Object, "Foo");`,
+      ],
+    ];
+    await withFiles(files, async () => {
+      await loader.pushDir(".");
+      await loader.setup();
+
+      await withLoadPath(loader.dirs() as readonly string[], async () => {
+        g.$trc_inception = false;
+        await Kernel.require("foo");
+      });
+
+      expect(g.$trc_inception).toBeTruthy();
+    });
+  });
 
   // PERMANENT-SKIP: names the `Kernel#require` decoration, a scoped skip on `core_ext/kernel.rb` in `scripts/parity/conventions.ts`; an ES `import` does not pass through it (CLAUDE.md, "`Module#autoload` is a build step").
   it.skip("required pathnames end up as strings in $LOADED_FEATURES", () => {});

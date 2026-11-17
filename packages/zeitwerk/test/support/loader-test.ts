@@ -1,5 +1,12 @@
 import { expect } from "vitest";
-import { Dir, File, FileUtils, LOADED_FEATURES, TopLevel } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  FileUtils,
+  LOAD_PATH,
+  LOADED_FEATURES,
+  TopLevel,
+} from "@blazetrails/ruby-compat";
 import { autoloadGet } from "../../lib/core-ext/kernel.js";
 import { Cref } from "../../lib/cref.js";
 import { SetupRequired } from "../../lib/error.js";
@@ -90,6 +97,19 @@ export async function withFiles(files: [string, string?][], block: () => unknown
     globalThis.$get = undefined;
     Dir.chdir(pwd);
     FileUtils.rmRf(tmp);
+  }
+}
+
+export async function withLoadPath(
+  dirs: string | readonly string[],
+  block: () => unknown,
+): Promise<void> {
+  const expanded = [dirs].flat().map((dir) => File.expandPath(dir));
+  for (const dir of expanded) LOAD_PATH.push(dir);
+  try {
+    await block();
+  } finally {
+    for (const dir of expanded) LOAD_PATH.splice(LOAD_PATH.indexOf(dir), 1);
   }
 }
 

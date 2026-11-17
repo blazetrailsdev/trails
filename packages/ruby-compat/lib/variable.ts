@@ -13,6 +13,7 @@ import { FrozenError } from "./frozen-error.js";
 import { IndexError } from "./index-error.js";
 import { KeyError } from "./key-error.js";
 import { LoadError } from "./load-error.js";
+import { rbFeatureProvided } from "./loaded-features.js";
 import { NoMethodError } from "./no-method-error.js";
 import { NotImplementedError } from "./not-implemented-error.js";
 import { RangeError } from "./range-error.js";
@@ -64,13 +65,18 @@ export function rbGvSet<T>(name: string, val: T): T {
  * `Module#remove_const`: removes the constant from `mod`'s own table and
  * answers its value. `rb_const_remove` (`vendor/ruby/v3.3.11/variable.c:3313`)
  * raises `NameError` through `undefined_constant` for a name `mod` does not
- * hold. `rb_cObject`'s table is `TopLevel`.
+ * hold. A name only an autoload holds is `UNDEF_P(val)`: the autoload is
+ * deleted and `nil` answered (`:3342-3345`). `rb_cObject`'s table is `TopLevel`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModRemoveConst(mod: object, name: string): unknown {
   const modTbl = mod as Record<string, unknown>;
   if (mod === Object ? !Object.hasOwn(tbl, name) : !Object.hasOwn(mod, name)) {
+    if (autoloadTbl.get(mod)?.has(name)) {
+      autoloadDelete(mod, name);
+      return null;
+    }
     throw new NameError(`constant ${rbModName(mod)}::${name} not defined`, name);
   }
   const val = mod === Object ? tbl[name] : modTbl[name];
@@ -433,11 +439,20 @@ export function autoloadDelete(module: object, name: string): void {
 /**
  * `Module#autoload?` (`rb_autoload_p`, `vendor/ruby/v3.3.11/variable.c:3083`)
  * with `recur` false: the feature still pending for `name`, or `null`.
+ * `check_autoload_required` (`vendor/ruby/v3.3.11/variable.c:2787`) answers
+ * `null` for a feature already provided or being required. Its
+ * `autoload_by_someone_else` arm, which keeps the feature while another
+ * thread holds the autoload's mutex, has no port: the loading table is
+ * process-wide, and zeitwerk's `autoloadGet` waits on an in-flight load
+ * before it reads `autoload?`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbAutoloadP(mod: object, id: string): string | null {
-  return autoloadTbl.get(mod)?.get(id) ?? null;
+  const feature = autoloadTbl.get(mod)?.get(id);
+  if (feature === undefined) return null;
+  if (rbFeatureProvided(feature)) return null;
+  return feature;
 }
 
 /**

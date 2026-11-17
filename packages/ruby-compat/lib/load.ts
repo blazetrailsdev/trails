@@ -4,6 +4,9 @@ import { getPath } from "./fs-adapter.js";
 import { LoadError } from "./load-error.js";
 import { constSet } from "./include.js";
 import { TopLevel } from "./object.js";
+import { LOADED_FEATURES, loadingTable, rbFeatureProvided } from "./loaded-features.js";
+
+export { LOADED_FEATURES, loadingTable, rbFeatureProvided };
 
 let loads = 0;
 const compiledFiles = new Map<string, () => Promise<unknown>>();
@@ -134,8 +137,6 @@ export async function loadIseqEval(fname: string, fresh = false): Promise<Record
 
 /** @noRailsEquivalent PERMANENT — `$LOAD_PATH`, `vendor/ruby/v3.3.11/load.c:1593`. */
 export const LOAD_PATH: string[] = [];
-/** @noRailsEquivalent PERMANENT — `$"`, `vendor/ruby/v3.3.11/load.c:1606`. */
-export const LOADED_FEATURES: string[] = [];
 
 const loadableExt = [".js", ".ts"];
 
@@ -156,8 +157,13 @@ export async function rbFRequireFile(feature: string): Promise<boolean> {
     for (const ext of hasExt ? [""] : loadableExt) {
       const full = File.expandPath(`${feature}${ext}`, path);
       if (!isCompiledFile(full) && !(await File.isExistAsync(full))) continue;
-      if (LOADED_FEATURES.includes(full)) return false;
-      await rbFLoad(full);
+      if (rbFeatureProvided(full)) return false;
+      loadingTable.add(full);
+      try {
+        await rbFLoad(full);
+      } finally {
+        loadingTable.delete(full);
+      }
       LOADED_FEATURES.push(full);
       return true;
     }

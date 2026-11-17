@@ -1,11 +1,19 @@
 import { autoloadGet } from "../lib/core-ext/kernel.js";
-import { TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
+import { Kernel, TopLevel, rbModRemoveConst } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "../lib/cref.js";
 import { NameError, SetupRequired } from "../lib/error.js";
-import type { Loader } from "../lib/loader.js";
+import { Loader } from "../lib/loader.js";
+import { Inceptions } from "../lib/registry/inceptions.js";
 import { ExplicitNamespaces } from "../lib/registry/explicit-namespaces.js";
-import { isRequired, newLoader, teardown, withFiles, withSetup } from "./support/loader-test.js";
+import {
+  isRequired,
+  newLoader,
+  teardown,
+  withFiles,
+  withLoadPath,
+  withSetup,
+} from "./support/loader-test.js";
 
 const get = (mod: object, cname: string) => autoloadGet(new Cref(mod, cname)) as Promise<object>;
 const defined = (mod: object, cname: string) => new Cref(mod, cname).isDefined();
@@ -15,13 +23,19 @@ const USERS: [string, string][] = [
   ["admin/root.ts", "export class Root {}"],
 ];
 
+const g = globalThis as unknown as Record<string, unknown>;
+const LOADER = new URL("../lib/loader.ts", import.meta.url).pathname;
+
 describe("TestUnload", () => {
   let loader: Loader;
 
   beforeEach(async () => {
     loader = await newLoader({ setup: false });
   });
-  afterEach(teardown);
+  afterEach(async () => {
+    for (const name of ["$loader", "$loader1", "$loader2"]) delete g[name];
+    await teardown();
+  });
 
   for (const [name, namespace] of [
     ["Object", Object],
@@ -62,28 +76,50 @@ describe("TestUnload", () => {
   });
 
   it("unload clears internal caches", async () => {
+    g.$loader = null;
     const files: [string, string][] = [
+      [
+        "my_gem.ts",
+        `import { Loader } from "${LOADER}";
+        const loader = new Loader();
+        globalThis.$loader = loader;
+        await loader.pushDir(import.meta.dirname);
+        await loader.pushDir("rd1");
+        await loader.pushDir("rd2");
+
+        loader.enableReloading();
+        await loader.setup();
+
+        export class MyGem {}`,
+      ],
       ["rd1/user.ts", "export class User {}"],
       ["rd1/api/v1/users-controller.ts", "export class UsersController {}"],
       ["rd1/admin/root.ts", "export class Root {}"],
       ["rd2/user.ts", "export class User {}"],
     ];
-    await withSetup(loader, files, {}, async () => {
+    await withFiles(files, async () => {
+      await withLoadPath(".", async () => {
+        await Kernel.require("my_gem");
+      });
+      const $loader = g.$loader as Loader;
+
       expect(await get(Object, "User")).toBeTruthy();
       const api = await get(Object, "Api");
       expect(await get(await get(api, "V1"), "UsersController")).toBeTruthy();
 
-      expect(Object.keys(loader.autoloads).length !== 0).toBeTruthy();
-      expect(loader.autoloadedDirs.length !== 0).toBeTruthy();
-      expect(Object.keys(loader.toUnload).length !== 0).toBeTruthy();
-      expect(!loader.namespaceDirs.isEmpty()).toBeTruthy();
+      expect(Object.keys($loader.autoloads).length !== 0).toBeTruthy();
+      expect($loader.autoloadedDirs.length !== 0).toBeTruthy();
+      expect(Object.keys($loader.toUnload).length !== 0).toBeTruthy();
+      expect(!$loader.namespaceDirs.isEmpty()).toBeTruthy();
+      expect(!$loader.inceptions.isEmpty()).toBeTruthy();
 
-      await loader.unload();
+      await $loader.unload();
 
-      expect(Object.keys(loader.autoloads).length === 0).toBeTruthy();
-      expect(loader.autoloadedDirs.length === 0).toBeTruthy();
-      expect(Object.keys(loader.toUnload).length === 0).toBeTruthy();
-      expect(loader.namespaceDirs.isEmpty()).toBeTruthy();
+      expect(Object.keys($loader.autoloads).length === 0).toBeTruthy();
+      expect($loader.autoloadedDirs.length === 0).toBeTruthy();
+      expect(Object.keys($loader.toUnload).length === 0).toBeTruthy();
+      expect($loader.namespaceDirs.isEmpty()).toBeTruthy();
+      expect($loader.inceptions.isEmpty()).toBeTruthy();
     });
   });
 
@@ -149,8 +185,51 @@ describe("TestUnload", () => {
     });
   });
 
-  // PERMANENT-SKIP: `Registry::Inceptions` has no port (RFC 0213 § "What is ported").
-  it.skip("unload clears associated inceptions", () => {});
+  it("unload clears associated inceptions", async () => {
+    const files: [string, string][] = [];
+
+    files.push([
+      "gem1/my_gem1.ts",
+      `import { Loader } from "${LOADER}";
+        const loader = new Loader();
+      await loader.pushDir(import.meta.dirname);
+      loader.enableReloading();
+      await loader.setup();
+      globalThis.$loader1 = loader;
+      export class MyGem1 {}`,
+    ]);
+
+    files.push([
+      "gem2/my_gem2.ts",
+      `import { Loader } from "${LOADER}";
+        const loader = new Loader();
+      await loader.pushDir(import.meta.dirname);
+      await loader.setup();
+      globalThis.$loader2 = loader;
+      export class MyGem2 {}`,
+    ]);
+
+    await withFiles(files, async () => {
+      await withLoadPath(".", async () => {
+        await Kernel.require("gem1/my_gem1");
+        await Kernel.require("gem2/my_gem2");
+      });
+
+      expect(await get(Object, "MyGem1")).toBeTruthy();
+      expect(await get(Object, "MyGem2")).toBeTruthy();
+
+      const cref1 = new Cref(Object, "MyGem1");
+      const cref2 = new Cref(Object, "MyGem2");
+
+      expect(Inceptions.isRegistered(cref1)).toBeTruthy();
+      expect(Inceptions.isRegistered(cref2)).toBeTruthy();
+
+      await (g.$loader1 as Loader).unload();
+
+      expect(!Inceptions.isRegistered(cref1)).toBeTruthy();
+      expect(Inceptions.isRegistered(cref2)).toBeTruthy();
+    });
+  });
 
   it("unload clears state even if the autoload failed and the exception was rescued", async () => {
     const files: [string, string][] = [["x.ts", "export const X_IS_NOT_DEFINED = true;"]];

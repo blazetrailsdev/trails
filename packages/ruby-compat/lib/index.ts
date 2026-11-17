@@ -348,6 +348,7 @@ export {
   loadIseqEval,
   rbFRequire,
   rbFRequireFile,
+  loadingTable,
   registerCompiledFiles,
   setLoadImporter,
   rbRequireLoaded,

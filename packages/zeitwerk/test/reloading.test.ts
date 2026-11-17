@@ -1,5 +1,5 @@
 import { autoloadGet } from "../lib/core-ext/kernel.js";
-import { File, FileUtils, TopLevel } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Kernel, TopLevel } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Cref } from "../lib/cref.js";
 import {
@@ -10,7 +10,7 @@ import {
 } from "../lib/error.js";
 import { Loader } from "../lib/loader.js";
 import { Registry } from "../lib/registry.js";
-import { newLoader, teardown, withFiles, withSetup } from "./support/loader-test.js";
+import { newLoader, teardown, withFiles, withLoadPath, withSetup } from "./support/loader-test.js";
 
 const get = (mod: object, cname: string) => autoloadGet(new Cref(mod, cname)) as Promise<never>;
 
@@ -20,6 +20,8 @@ const FILES: [string, string][] = [
   ["y/a.ts", "export const A = 1;"],
   ["z/a.ts", "export const A = 1;"],
 ];
+
+const LOADER = new URL("../lib/loader.ts", import.meta.url).pathname;
 
 describe("TestReloading", () => {
   let loader: Loader;
@@ -88,8 +90,35 @@ describe("TestReloading", () => {
     });
   });
 
-  // PERMANENT-SKIP: `Registry::Inceptions` has no port (RFC 0213 § "What is ported").
-  it.skip("reloading namespaces that are inceptions in other projects", () => {});
+  it("reloading namespaces that are inceptions in other projects", async () => {
+    const gemFiles: [string, string][] = [
+      [
+        "lib/my_gem.ts",
+        `import { Loader } from "${LOADER}";
+        const loader = new Loader();
+        await loader.pushDir(import.meta.dirname);
+        await loader.setup();
+        export class MyGem {}`,
+      ],
+    ];
+
+    const appFiles: [string, string][] = [["app/my_gem/foo.ts", "export const Foo = true;"]];
+
+    await withFiles([...gemFiles, ...appFiles], async () => {
+      await withLoadPath("lib", async () => {
+        await Kernel.require("my_gem");
+
+        await loader.pushDir("app");
+        loader.enableReloading();
+        await loader.setup();
+
+        const myGem = (TopLevel as unknown as Record<string, object>).MyGem;
+        expect(await get(myGem, "Foo")).toBeTruthy();
+        await loader.reload();
+        expect(await get(myGem, "Foo")).toBeTruthy();
+      });
+    });
+  });
 
   it("reloading raises if the flag is not set", async () => {
     const other = new Loader();

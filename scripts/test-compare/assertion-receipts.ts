@@ -29,7 +29,6 @@ import { solidQueue } from "./assertion-receipts/solid-queue.js";
 import { trailties } from "./assertion-receipts/trailties.js";
 import { tzinfo } from "./assertion-receipts/tzinfo.js";
 import { viteTrails } from "./assertion-receipts/vite-trails.js";
-import { zeitwerk } from "./assertion-receipts/zeitwerk.js";
 
 /** One Rails assertion the port cannot make. */
 export interface AssertionReceipt {
@@ -75,7 +74,6 @@ export const ASSERTION_RECEIPTS_BY_PACKAGE: Record<string, Record<string, Assert
   trailties,
   tzinfo,
   "vite-trails": viteTrails,
-  zeitwerk,
 };
 
 /**

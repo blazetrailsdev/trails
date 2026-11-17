@@ -788,14 +788,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "`Registry::Inceptions` is not ported: it exists for a `Module#autoload?` edge case with no " +
-      "JS counterpart (RFC 0213). PERMANENT.",
-    names: ["unregister_inceptions"],
-    rubyFiles: ["loader.rb"],
-    packages: ["zeitwerk"],
-  },
-  {
-    reason:
       "`Loader.for_gem`, `for_gem_extension` and `Registry.loader_for_gem` are not ported: trails " +
       "has no Ruby packaging concept, and `Registry.loaderForPackage` reads a `package.json` " +
       '(RFC 0213 § "Non-goals", owner decision on trails#9619). PERMANENT.',

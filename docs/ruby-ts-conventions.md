@@ -221,8 +221,6 @@ a genuine gap:
   - `legacy_yarn_version?` (only in: `commands.rb`)
 - Zeitwerk's `Module#autoload` and `Kernel#require` decorations are not ported: JS has no hook on an unresolved identifier and no synchronous `import()` (CLAUDE.md, "`Module#autoload` is a build step"). PERMANENT.
   - `require`, `const_added` (only in: `core_ext/kernel.rb`, `core_ext/module.rb`)
-- `Registry::Inceptions` is not ported: it exists for a `Module#autoload?` edge case with no JS counterpart (RFC 0213). PERMANENT.
-  - `unregister_inceptions` (only in: `loader.rb`)
 - `Loader.for_gem`, `for_gem_extension` and `Registry.loader_for_gem` are not ported: trails has no Ruby packaging concept, and `Registry.loaderForPackage` reads a `package.json` (RFC 0213 § "Non-goals", owner decision on trails#9619). PERMANENT.
   - `for_gem`, `for_gem_extension`, `loader_for_gem`, `gem_loaders_by_root_file` (only in: `loader.rb`, `registry.rb`)
 - `Testing::Isolation::Forking#run_in_isolation` is not ported: Ruby's `fork` has no Node counterpart (CLAUDE.md, "Runtime facts Node does not expose"), so only the Subprocess arm's `runInIsolation` exists. PERMANENT.
