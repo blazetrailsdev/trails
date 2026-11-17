@@ -653,7 +653,6 @@ export default defineConfig({
             "./packages/activesupport/lib/testing/autorun.ts",
             "./packages/activerecord/test/cases/helper.ts",
             "./packages/bcrypt/lib/index.ts",
-            "./packages/actiontext/lib/app/helpers/action-text/tag-helper.ts",
             "./packages/actionview/test/support/setup-compile-template.ts",
             ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/test/support/test-setup-mysql.ts"]
@@ -760,10 +759,7 @@ export default defineConfig({
           globals: true,
           include: ["packages/*/test/**/*.system.test.ts"],
           exclude: SHARED_EXCLUDE.filter((glob) => glob !== "**/*.system.test.ts"),
-          setupFiles: [
-            "./packages/actiontext/lib/app/helpers/action-text/tag-helper.ts",
-            ...otherSetupFiles,
-          ],
+          setupFiles: otherSetupFiles,
           globalSetup: ["./packages/activerecord/test/support/template-global-setup.ts"],
           pool: "forks",
           browser: { enabled: false, screenshotDirectory: SYSTEM_SCREENSHOT_DIRECTORY },
