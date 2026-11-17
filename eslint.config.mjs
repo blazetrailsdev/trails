@@ -1290,8 +1290,8 @@ export default defineConfig(
   },
   {
     files: [
-      "packages/vite-assets/**/*.{ts,mts,js,mjs}",
-      "packages/vite-trails/**/*.{ts,mts,js,mjs}",
+      "packages/vite-assets/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
+      "packages/vite-trails/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
     ],
     rules: {
       "no-restricted-imports": [
