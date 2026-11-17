@@ -23,8 +23,44 @@ export default {
 <% } -%>
     port: <%= this.database.port %>,
   },
+<% if (this.options.skipSolid) { -%>
   production: {
     adapter: "postgresql",
-    url: process.env.DATABASE_URL,
+    database: "<%= this.appName() %>_production",
+    username: "<%= this.appName() %>",
+    password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
   },
+<% } else { -%>
+  production: {
+    primary: {
+      adapter: "postgresql",
+      database: "<%= this.appName() %>_production",
+      username: "<%= this.appName() %>",
+      password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
+    },
+    cache: {
+      adapter: "postgresql",
+      database: "<%= this.appName() %>_production_cache",
+      username: "<%= this.appName() %>",
+      password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
+      migrationsPaths: "db/cache_migrate",
+    },
+    queue: {
+      adapter: "postgresql",
+      database: "<%= this.appName() %>_production_queue",
+      username: "<%= this.appName() %>",
+      password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
+      migrationsPaths: "db/queue_migrate",
+    },
+<% if (!this.options.skipActionCable) { -%>
+    cable: {
+      adapter: "postgresql",
+      database: "<%= this.appName() %>_production_cable",
+      username: "<%= this.appName() %>",
+      password: process.env.<%= this.appName().toUpperCase() %>_DATABASE_PASSWORD,
+      migrationsPaths: "db/cable_migrate",
+    },
+<% } -%>
+  },
+<% } -%>
 };

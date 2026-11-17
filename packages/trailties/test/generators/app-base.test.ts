@@ -166,9 +166,7 @@ describe("AppBase run tasks", () => {
     expect(await commandsFor({ javascript: "esbuild" }, "runJavascript")).toEqual([
       "javascript:install:esbuild",
     ]);
-    expect(await commandsFor({ javascript: "importmap" }, "runJavascript")).toEqual([
-      "importmap:install",
-    ]);
+    expect(await commandsFor({ javascript: "vite" }, "runJavascript")).toEqual(["vite:install"]);
   });
 
   it("run_css picks the standalone installer without a JS runtime", async () => {

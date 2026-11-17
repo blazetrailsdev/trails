@@ -8,8 +8,75 @@ export default {
     adapter: "<%= adapter %>",
     database: "storage/test.sqlite3",
   },
+<% if (this.options.skipKamal) { -%>
+  // SQLite3 write its data on the local filesystem, as such it requires
+  // persistent disks. If you are deploying to a managed service, you should
+  // make sure it provides disk persistence, as many don't.
+  //
+  // Similarly, if you deploy your application as a Docker container, you must
+  // ensure the database is located in a persisted volume.
+<% if (this.options.skipSolid) { -%>
+  production: {
+    adapter: "<%= adapter %>",
+    // database: "path/to/persistent/storage/production.sqlite3",
+  },
+<% } else { -%>
+  production: {
+    primary: {
+      adapter: "<%= adapter %>",
+      // database: "path/to/persistent/storage/production.sqlite3",
+    },
+    cache: {
+      adapter: "<%= adapter %>",
+      // database: "path/to/persistent/storage/production_cache.sqlite3",
+      migrationsPaths: "db/cache_migrate",
+    },
+    queue: {
+      adapter: "<%= adapter %>",
+      // database: "path/to/persistent/storage/production_queue.sqlite3",
+      migrationsPaths: "db/queue_migrate",
+    },
+<% if (!this.options.skipActionCable) { -%>
+    cable: {
+      adapter: "<%= adapter %>",
+      // database: "path/to/persistent/storage/production_cable.sqlite3",
+      migrationsPaths: "db/cable_migrate",
+    },
+<% } -%>
+  },
+<% } -%>
+<% } else { -%>
+  // Store production database in the storage/ directory, which by default
+  // is mounted as a persistent Docker volume in config/deploy.yml.
+<% if (this.options.skipSolid) { -%>
   production: {
     adapter: "<%= adapter %>",
     database: "storage/production.sqlite3",
   },
+<% } else { -%>
+  production: {
+    primary: {
+      adapter: "<%= adapter %>",
+      database: "storage/production.sqlite3",
+    },
+    cache: {
+      adapter: "<%= adapter %>",
+      database: "storage/production_cache.sqlite3",
+      migrationsPaths: "db/cache_migrate",
+    },
+    queue: {
+      adapter: "<%= adapter %>",
+      database: "storage/production_queue.sqlite3",
+      migrationsPaths: "db/queue_migrate",
+    },
+<% if (!this.options.skipActionCable) { -%>
+    cable: {
+      adapter: "<%= adapter %>",
+      database: "storage/production_cable.sqlite3",
+      migrationsPaths: "db/cable_migrate",
+    },
+<% } -%>
+  },
+<% } -%>
+<% } -%>
 };

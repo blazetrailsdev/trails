@@ -35,6 +35,57 @@ export const trailties: Record<string, AssertionReceipt[]> = {
         "api_app_generator_test.rb:109 sits in a block assert_no_file never yields; the port's assertNoFile takes no block",
     },
   ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › inclusion of kamal storage volume":
+    [
+      {
+        kind: "assert_equal",
+        value: "n:1",
+        as: null,
+        reason:
+          "app_generator_test.rb:709 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+      {
+        kind: "assert_equal",
+        value: "n:1",
+        as: null,
+        reason:
+          "app_generator_test.rb:710 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+    ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › inclusion of kamal storage volume if only skip active storage is given":
+    [
+      {
+        kind: "assert_equal",
+        value: "n:1",
+        as: null,
+        reason:
+          "app_generator_test.rb:719 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+      {
+        kind: "assert_equal",
+        value: "n:1",
+        as: null,
+        reason:
+          "app_generator_test.rb:720 counts the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+    ],
+  "trailties:generators/app_generator_test.rb › AppGeneratorTest › kamal files are skipped if required":
+    [
+      {
+        kind: "assert_empty",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:688 greps the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+      {
+        kind: "assert_empty",
+        value: null,
+        as: null,
+        reason:
+          "app_generator_test.rb:689 greps the generator's bundle_command calls; run_kamal's bundle_command has no port (app_base.rb:739-740)",
+      },
+    ],
   "trailties:generators/plugin_generator_test.rb › PluginGeneratorTest › invalid plugin name raises an error":
     [
       {
