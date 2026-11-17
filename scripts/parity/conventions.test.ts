@@ -20,6 +20,8 @@ import {
   scopedSkipMirrorCandidates,
   scopedSkipMirrorName,
   isRubyOnlyClass,
+  INHERITANCE_SKIP_CLASSES,
+  isInheritanceSkipClass,
   isScopedSkip,
   ALREADY_PREDICATE_PREFIXES,
   TOKEN_RENAMES,
@@ -690,6 +692,23 @@ describe("RUBY_ONLY_CLASSES", () => {
   it("recognises only the listed classes", () => {
     for (const c of RUBY_ONLY_CLASSES) expect(isRubyOnlyClass(c.fqn)).toBe(true);
     expect(isRubyOnlyClass("I18n::Backend::KeyValue")).toBe(false);
+  });
+});
+
+describe("INHERITANCE_SKIP_CLASSES", () => {
+  it("requires a fully-qualified name and a non-empty reason per entry", () => {
+    for (const c of INHERITANCE_SKIP_CLASSES) {
+      expect(c.fqn).toContain("::");
+      expect(c.reason.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it("recognises only the listed classes and never a RUBY_ONLY_CLASSES entry", () => {
+    for (const c of INHERITANCE_SKIP_CLASSES) {
+      expect(isInheritanceSkipClass(c.fqn)).toBe(true);
+      expect(isRubyOnlyClass(c.fqn)).toBe(false);
+    }
+    expect(isInheritanceSkipClass("ActionView::DependencyTracker::ERBTracker")).toBe(false);
   });
 });
 
