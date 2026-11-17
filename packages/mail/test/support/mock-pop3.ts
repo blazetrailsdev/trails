@@ -84,14 +84,15 @@ export class MockPOP3 {
   }
 }
 
-export class NetPOP3 {
+export class NetPOP3 extends MockPOP3 {
   static new(..._args: unknown[]): MockPOP3 {
     return new MockPOP3();
   }
 
   constructor(..._args: unknown[]) {
+    super();
     return NetPOP3.new(..._args);
   }
 }
 
-(TopLevel.Net as { POP3?: unknown }).POP3 = NetPOP3;
+TopLevel.Net!.POP3 = NetPOP3;

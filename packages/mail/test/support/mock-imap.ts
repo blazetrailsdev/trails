@@ -98,7 +98,7 @@ export class MockIMAP {
   }
 }
 
-export class NetIMAP {
+export class NetIMAP extends MockIMAP {
   static DELETED = "Deleted";
 
   static new(..._args: unknown[]): MockIMAP {
@@ -106,6 +106,7 @@ export class NetIMAP {
   }
 
   constructor(..._args: unknown[]) {
+    super();
     return NetIMAP.new(..._args);
   }
 
@@ -130,4 +131,4 @@ export class NetIMAP {
   }
 }
 
-(TopLevel.Net as { IMAP?: unknown }).IMAP = NetIMAP;
+TopLevel.Net!.IMAP = NetIMAP;

@@ -4,7 +4,7 @@ import { Mail } from "../../../lib/index.js";
 import type { RetrieverOptions } from "../../../lib/network/retriever-methods/base.js";
 import { NetIMAP } from "../../support/mock-imap.js";
 
-const Net = TopLevel.Net as { IMAP?: unknown };
+const Net = TopLevel.Net!;
 
 describe("IMAP Retriever", () => {
   beforeEach(() => {

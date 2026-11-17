@@ -34,7 +34,12 @@ interface NetIMAPClass {
   encodeUtf7(s: string): string;
 }
 
-type NetWithIMAP = { IMAP?: NetIMAPClass };
+declare module "@blazetrails/ruby-compat" {
+  interface NetModule {
+    /** @noRailsEquivalent PERMANENT */
+    IMAP?: NetIMAPClass;
+  }
+}
 
 type ImapBlock = (message: Message, imap?: unknown, uid?: number, flags?: unknown) => unknown;
 
@@ -92,7 +97,7 @@ export class IMAP extends Retriever {
           }
 
           if (opts.deleteAfterFind && newMessage.isMarkedForDelete()) {
-            imap.uidStore(uid, "+FLAGS", [(TopLevel.Net as NetWithIMAP).IMAP!.DELETED]);
+            imap.uidStore(uid, "+FLAGS", [TopLevel.Net!.IMAP!.DELETED]);
           }
           if (opts.uid != null) break;
         }
@@ -103,8 +108,7 @@ export class IMAP extends Retriever {
           if (opts.uid != null) uid = toI(opts.uid) as number;
           const fetchdata = imap.uidFetch(uid, ["RFC822"])[0];
           emails.push(Mail.new(fetchdata.attr["RFC822"]));
-          if (opts.deleteAfterFind)
-            imap.uidStore(uid, "+FLAGS", [(TopLevel.Net as NetWithIMAP).IMAP!.DELETED]);
+          if (opts.deleteAfterFind) imap.uidStore(uid, "+FLAGS", [TopLevel.Net!.IMAP!.DELETED]);
           if (opts.uid != null) break;
         }
         if (opts.deleteAfterFind) imap.expunge();
@@ -115,12 +119,12 @@ export class IMAP extends Retriever {
 
   deleteAll(mailbox: string | null = "INBOX"): unknown {
     mailbox ??= "INBOX";
-    mailbox = (TopLevel.Net as NetWithIMAP).IMAP!.encodeUtf7(mailbox);
+    mailbox = TopLevel.Net!.IMAP!.encodeUtf7(mailbox);
 
     return this.start(undefined, (imap) => {
       imap.select(mailbox);
       for (const uid of imap.uidSearch(["ALL"])) {
-        imap.uidStore(uid, "+FLAGS", [(TopLevel.Net as NetWithIMAP).IMAP!.DELETED]);
+        imap.uidStore(uid, "+FLAGS", [TopLevel.Net!.IMAP!.DELETED]);
       }
       return imap.expunge();
     });
@@ -142,7 +146,7 @@ export class IMAP extends Retriever {
     if (options.keys == null || options.keys === false) options.keys = "ALL";
     if (options.uid == null || options.uid === false) options.uid = null;
     options.deleteAfterFind ??= false;
-    options.mailbox = (TopLevel.Net as NetWithIMAP).IMAP!.encodeUtf7(options.mailbox as string);
+    options.mailbox = TopLevel.Net!.IMAP!.encodeUtf7(options.mailbox as string);
     options.readOnly ??= false;
 
     return options;
@@ -164,7 +168,7 @@ export class IMAP extends Retriever {
         );
       }
 
-      imap = new (TopLevel.Net as NetWithIMAP).IMAP!(
+      imap = new TopLevel.Net!.IMAP!(
         this.settings.address,
         this.settings.port,
         this.settings.enableSsl,
