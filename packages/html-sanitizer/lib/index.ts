@@ -5,3 +5,5 @@ export { type VendorMethods } from "./namespaces.js";
 export { DEFAULT_ALLOWED_TAGS, DEFAULT_ALLOWED_ATTRIBUTES } from "./config.js";
 export { ActionView } from "./rails-html-sanitizer.js";
 export { Crass } from "./crass.js";
+export { Loofah } from "./loofah.js";
+export { PermitScrubber, TargetScrubber, TextOnlyScrubber } from "./scrubbers.js";

@@ -8,6 +8,7 @@ import type {
   HTML5SafeListSanitizer,
   Sanitizer,
 } from "./sanitizer.js";
+import type { PermitScrubber, TargetScrubber, TextOnlyScrubber } from "./scrubbers.js";
 
 export interface VendorMethods {
   readonly fullSanitizer: typeof HTML4FullSanitizer | typeof HTML5FullSanitizer;
@@ -22,6 +23,9 @@ export const HTML = {} as {
   LinkSanitizer: typeof HTML4LinkSanitizer;
   SafeListSanitizer: typeof HTML4SafeListSanitizer;
   WhiteListSanitizer: typeof HTML4SafeListSanitizer;
+  PermitScrubber: typeof PermitScrubber;
+  TargetScrubber: typeof TargetScrubber;
+  TextOnlyScrubber: typeof TextOnlyScrubber;
 };
 
 export const HTML4 = {} as {

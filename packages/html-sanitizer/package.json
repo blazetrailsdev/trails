@@ -21,12 +21,10 @@
   "dependencies": {
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*",
-    "@blazetrails/ruby-compat": "workspace:*",
-    "sanitize-html": "^2.13.0"
+    "@blazetrails/ruby-compat": "workspace:*"
   },
   "devDependencies": {
-    "@blazetrails/vitest-matchers": "workspace:*",
-    "@types/sanitize-html": "^2.13.0"
+    "@blazetrails/vitest-matchers": "workspace:*"
   },
   "engines": {
     "node": ">=26"

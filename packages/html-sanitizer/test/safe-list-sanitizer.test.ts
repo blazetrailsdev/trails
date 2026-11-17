@@ -1,12 +1,16 @@
 import { afterEach, describe, expect, test } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { HTML4SafeListSanitizer as SafeListSanitizer } from "../lib/sanitizer.js";
+import {
+  HTML4SafeListSanitizer as SafeListSanitizer,
+  type SanitizeOptions,
+} from "../lib/sanitizer.js";
+import { Loofah } from "../lib/loofah.js";
 import { DEFAULT_ALLOWED_ATTRIBUTES, DEFAULT_ALLOWED_TAGS } from "../lib/config.js";
 
 const sanitize = (
   input: string | null | undefined,
-  options?: { tags?: Iterable<string>; attributes?: Iterable<string> },
-) => new SafeListSanitizer().sanitize(input, options);
+  options?: { tags?: Iterable<string>; attributes?: Iterable<string>; scrubber?: unknown },
+) => new SafeListSanitizer().sanitize(input, options as SanitizeOptions);
 
 const assertSanitized = (raw: string, expected?: string) => {
   expect(sanitize(raw)).toBe(expected ?? raw);
@@ -58,7 +62,7 @@ describe("SafeListSanitizer", () => {
 
   for (const attr of ["src", "width", "height", "alt"]) {
     test(`should_allow_image_${attr}_attribute`, () => {
-      assertSanitized(`<img ${attr}="foo" onclick="bar" />`, `<img ${attr}="foo" />`);
+      assertSanitized(`<img ${attr}="foo" onclick="bar" />`, `<img ${attr}="foo">`);
     });
   }
 
@@ -72,7 +76,7 @@ describe("SafeListSanitizer", () => {
 
   test("should_handle_blank_text", () => {
     expect(sanitize(null)).toBeNull();
-    expect(sanitize(undefined)).toBeUndefined();
+    expect(sanitize(undefined)).toBeNull();
     expect(sanitize("")).toBe("");
     expect(sanitize("   ")).toBe("   ");
   });
@@ -172,5 +176,68 @@ describe("SafeListSanitizer", () => {
     expect(sanitize(`a b c<script/XSS src="http://ha.ckers.org/xss.js"></script>d e f`)).toBe(
       "a b cd e f",
     );
+  });
+
+  test("should_not_accept_non_loofah_inheriting_scrubber", () => {
+    const scrubber = {
+      scrub(node: { name: string }) {
+        node.name = "h1";
+      },
+    };
+
+    expect(() => sanitize("<a>some html</a>", { scrubber })).toThrow(Loofah.ScrubberNotFound);
+  });
+
+  test("should_accept_loofah_inheriting_scrubber", () => {
+    const scrubber = new Loofah.Scrubber();
+    scrubber.scrub = (node) => node.replace(`<h1>${node.innerHtml()}</h1>`);
+
+    const html = "<script>hello!</script>";
+    expect(sanitize(html, { scrubber })).toBe("<h1>hello!</h1>");
+  });
+
+  test("should_accept_loofah_scrubber_that_wraps_a_block", () => {
+    const scrubber = new Loofah.Scrubber({}, (node) =>
+      node.replace(`<h1>${node.innerHtml()}</h1>`),
+    );
+    const html = "<script>hello!</script>";
+    expect(sanitize(html, { scrubber })).toBe("<h1>hello!</h1>");
+  });
+
+  test("custom_scrubber_takes_precedence_over_other_options", () => {
+    const scrubber = new Loofah.Scrubber({}, (node) =>
+      node.replace(`<h1>${node.innerHtml()}</h1>`),
+    );
+    const html = "<script>hello!</script>";
+    expect(sanitize(html, { scrubber, tags: ["foo"] })).toBe("<h1>hello!</h1>");
+  });
+
+  const sanitizeCss = (input: string) => new SafeListSanitizer().sanitizeCss(input);
+
+  test("should_sanitize_illegal_style_properties", () => {
+    const raw = `display:block; position:absolute; left:0; top:0; width:100%; height:100%; z-index:1; background-color:black; background-image:url(http://www.ragingplatypus.com/i/cam-full.jpg); background-x:center; background-y:center; background-repeat:repeat;`;
+    const expected = `display:block;width:100%;height:100%;background-color:black;background-x:center;background-y:center;`;
+    expect(sanitizeCss(raw)).toBe(expected);
+  });
+
+  test("should_sanitize_with_trailing_space", () => {
+    const raw = "display:block; ";
+    const expected = "display:block;";
+    expect(sanitizeCss(raw)).toBe(expected);
+  });
+
+  test("should_sanitize_xul_style_attributes", () => {
+    const raw = `-moz-binding:url('http://ha.ckers.org/xssmoz.xml#xss')`;
+    expect(sanitizeCss(raw)).toBe("");
+  });
+
+  test("should_sanitize_div_style_expression", () => {
+    const raw = `width: expression(alert('XSS'));`;
+    expect(sanitizeCss(raw)).toBe("");
+  });
+
+  test("should_sanitize_across_newlines", () => {
+    const raw = `\nwidth:\nexpression(alert('XSS'));\n`;
+    expect(sanitizeCss(raw)).toBe("");
   });
 });

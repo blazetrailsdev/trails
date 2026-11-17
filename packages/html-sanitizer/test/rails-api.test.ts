@@ -7,6 +7,13 @@ describe("RailsApiTest", () => {
     expect(Html).toBe(HTML);
   });
 
+  test("html_scrubber_class_names", () => {
+    expect(Html.PermitScrubber).toBeTruthy();
+    expect(Html.TargetScrubber).toBeTruthy();
+    expect(Html.TextOnlyScrubber).toBeTruthy();
+    expect(Html.Sanitizer).toBeTruthy();
+  });
+
   test("best_supported_vendor_when_html5_is_not_supported_returns_html4", () => {
     const stub = vi.spyOn(HTML.Sanitizer, "isHtml5Support").mockReturnValue(false);
     try {
