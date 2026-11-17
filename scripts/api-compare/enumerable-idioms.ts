@@ -119,9 +119,14 @@ export const FS_ADAPTER_ALIASES = new Map<string, string[]>([
   ["stat", ["statSync"]],
   ["rename", ["renameSync"]],
   ["unlink", ["unlinkSync"]],
-  ["realpath", ["realpathSync"]],
+  ["realpath", ["realpathSync", "realpathAsync"]],
   ["mkdir_p", ["mkdirPAsync"]],
   ["rm_rf", ["rmRfAsync"]],
+  ["rm_r", ["rmRAsync"]],
+  ["children", ["childrenAsync"]],
+  ["delete", ["deleteAsync"]],
+  ["binread", ["binreadAsync"]],
+  ["makedirs", ["makedirsAsync"]],
 ]);
 
 /** JS call names that count as making Ruby call `rubyCall`. The Ruby-core tail

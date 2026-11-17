@@ -185,7 +185,16 @@ function extractPackageTests(
   for (const file of files) {
     const content = fs.readFileSync(file, "utf-8");
     pkgInfo.files.push(
-      extractTestsFromSource(content, path.relative(ROOT_DIR, file), libTests, requiredTests),
+      extractTestsFromSource(
+        content,
+        path.relative(ROOT_DIR, file),
+        libTests,
+        requiredTests,
+        (relPath) => {
+          const abs = path.join(ROOT_DIR, relPath);
+          return fs.existsSync(abs) ? fs.readFileSync(abs, "utf-8") : null;
+        },
+      ),
     );
   }
 

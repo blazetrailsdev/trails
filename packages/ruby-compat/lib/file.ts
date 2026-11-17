@@ -977,6 +977,19 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.realpath} over the backend's async `realpath`, resolving
+   * lexically where the backend has none.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.realpath`
+   * (`vendor/ruby/v3.3.11/file.c:4559`).
+   */
+  static async realpathAsync(pathname: string): Promise<string> {
+    const fs = getFs();
+    if (fs.realpath) return await fs.realpath(pathname);
+    return File.expandPath(pathname);
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:4580` `rb_file_s_realdirpath`, {@link File.realpath}
    * with the last component allowed to be missing, following a broken symlink
    * to its target.

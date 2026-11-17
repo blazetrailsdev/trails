@@ -500,6 +500,19 @@ export class Dir {
   }
 
   /**
+   * {@link Dir.delete} over the backend's async `rmdir`, or its `rmdirSync`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Dir.delete`
+   * (`vendor/ruby/v3.3.11/dir.c:1535`).
+   */
+  static async deleteAsync(dirname: string): Promise<number> {
+    const fs = getFs();
+    if (fs.rmdir) await fs.rmdir(dirname);
+    else fs.rmdirSync(dirname);
+    return 0;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/dir.c:3227` `dir_s_glob`. Three things node's globbers get
    * wrong. `**` matching ZERO directories is tried on each entry before that
    * entry is descended into, so the two depths interleave rather than a
