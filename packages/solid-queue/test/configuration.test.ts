@@ -162,7 +162,7 @@ describe("ConfigurationTest", () => {
         skipRecurring: true,
       });
 
-      expect(await configuration.isValid()).toBe(true);
+      expect(await configuration.isValid()).toBeTruthy();
       await assertProcesses(configuration, "worker", 2, {
         fibers: [10, undefined],
         threads: [undefined, 3],
@@ -178,7 +178,7 @@ describe("ConfigurationTest", () => {
         skipRecurring: true,
       });
 
-      expect(await configuration.isValid()).toBe(false);
+      expect(await configuration.isValid()).toBeFalsy();
       expect(configuration.errors.fullMessages[0]).toMatch(/either `threads` or `fibers`/);
     });
   });

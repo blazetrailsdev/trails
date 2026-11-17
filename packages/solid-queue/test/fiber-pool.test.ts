@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
-import { Fiber, Queue, Thread, rbFSleep, rbObjId } from "@blazetrails/ruby-compat";
+import { Fiber, Queue, Thread, constSet, rbFSleep, rbObjId } from "@blazetrails/ruby-compat";
 import { FiberPool, Pool, SolidQueue, type ClaimedExecution } from "../lib/index.js";
 
 class Execution {
@@ -67,10 +67,18 @@ describe("FiberPoolTest", () => {
   });
 
   it("builds a fiber pool", () => {
-    const built = Pool.build({ type: "fiber", size: 5 });
+    const pool = {};
 
-    expect(built).toBeInstanceOf(FiberPool);
-    expect(built.size).toBe(5);
+    const expects = vi.fn(function () {
+      return pool;
+    });
+    constSet(SolidQueue, "FiberPool", expects);
+    try {
+      expect(Pool.build({ type: "fiber", size: 5 })).toEqual(pool);
+      expect(expects).toHaveBeenCalledWith(5, { onIdle: null, onUnrecoverableError: null });
+    } finally {
+      constSet(SolidQueue, "FiberPool", FiberPool);
+    }
   });
 
   it("executes jobs as fibers on a single reactor thread", async () => {
@@ -89,7 +97,7 @@ describe("FiberPoolTest", () => {
     });
   });
 
-  it("waits for in-flight executions during shutdown", async () => {
+  it("waits for in flight executions during shutdown", async () => {
     await withExecutionIsolation("fiber", async () => {
       pool = new FiberPool(1);
       const started = new Queue<boolean>();
