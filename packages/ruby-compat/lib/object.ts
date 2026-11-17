@@ -780,7 +780,13 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
           obj instanceof rbCDate ||
           temporalTag(obj) !== null ||
           isPlainHash(obj);
-  if (obj instanceof String && mid === "actsLikeString") return true;
+  if (
+    obj instanceof String &&
+    mid === "actsLikeString" &&
+    Object.hasOwn(STRING_METHOD_TABLE, mid)
+  ) {
+    return true;
+  }
   if (core) {
     if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
     if (Array.isArray(obj) && mid === "toAry") return true;
@@ -1421,6 +1427,13 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (bound !== undefined) return bound(recv, ...args);
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
+  }
+  if (
+    recv instanceof String &&
+    mid === "actsLikeString" &&
+    Object.hasOwn(STRING_METHOD_TABLE, mid)
+  ) {
+    return rbStrSend(recv.valueOf(), mid, ...args)[0];
   }
   if (recv instanceof Uint8Array && Object.hasOwn(BINARY_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
