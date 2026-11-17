@@ -1977,12 +1977,6 @@ extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
 extend(Base, _Persistence.ClassMethods);
 extend(Base, _Core.ClassMethods);
-include(Base, _Core.Core);
-include(Base, _Persistence.Persistence);
-include(Base, Inheritance.Inheritance);
-include(Base, ActiveRecord.Scoping);
-include(Base, _Integration);
-include(Base, SignedId.SignedId);
 extend(Base, QueryCacheClassMethods.ClassMethods);
 
 Object.defineProperty(Base, "connection", {
@@ -2038,9 +2032,7 @@ extend(Base, {
 });
 extend(Base, Translation.Translation);
 extend(Base, Sanitization.ClassMethods);
-include(Base, ReadonlyAttributes.ReadonlyAttributes);
 extend(Base, ReadonlyAttributes.ClassMethods);
-include(Base, CounterCache.CounterCache);
 extend(Base, CounterCache.ClassMethods);
 {
   const superUpdateCounters = CounterCache.updateCounters;
@@ -2062,12 +2054,7 @@ extend(Base, _PresenceClassMethods);
 extend(Base, _AbsenceClassMethods);
 extend(Base, _LengthClassMethods);
 extend(Base, _NumericalityClassMethods);
-include(Base, LockingOptimistic.Optimistic);
-include(Base, _Callbacks.Callbacks);
-include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
-include(Base, Normalization.Normalization);
-include(Base, Marshalling.Methods);
 extend(Base, _EnumModule.Enum);
 extend(Base, DelegatedType);
 extend(Base, {
@@ -2087,7 +2074,6 @@ classAttribute.call(Base, "defaultScopeOverride", {
   instancePredicate: false,
   default: null,
 });
-include(Base, _EncryptableRecord);
 extend(Base, {
   encrypts: _encrypts,
   deterministicEncryptedAttributes: _deterministicEncryptedAttributes,
@@ -2100,54 +2086,11 @@ include(Base, {
   decrypt: _decrypt,
   cantModifyEncryptedAttributesWhenFrozen: _cantModifyEncryptedAttributesWhenFrozen,
 });
-include(Base, _TokenFor);
 extend(Base, {
   defaultScope: _defaultScope,
   unscoped: _unscoped,
 });
 extend(Base, ModelSchema.ClassMethods);
-include(Base, AttributeRegistration);
-include(Base, AMAttributeMethods.AttributeMethods);
-
-extend(Base, {
-  defineAttribute: _defineAttribute,
-  defineAttributeMethods: _defineAttributeMethods,
-  undefineAttributeMethods: _undefineAttributeMethods,
-  aliasAttribute: _aliasAttribute,
-  initializeGeneratedModules: _initializeGeneratedModules,
-  generatedAttributeMethods: _generatedAttributeMethods,
-  generatedAssociationMethods: _Core.generatedAssociationMethods,
-  generateAliasAttributes: _generateAliasAttributes,
-  eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,
-  generateAliasAttributeMethods: _generateAliasAttributeMethods,
-  aliasAttributeMethodDefinition: _aliasAttributeMethodDefinition,
-  _defaultAttributes: _arDefaultAttributes,
-  resolveTypeName: _resolveTypeName,
-  resetDefaultAttributes: _resetDefaultAttributes,
-  reloadSchemaFromCache: Timestamp.reloadSchemaFromCache,
-});
-extend(Base, {
-  touchAttributesWithTime: Timestamp.touchAttributesWithTime,
-  timestampAttributesForCreateInModel: Timestamp.timestampAttributesForCreateInModel,
-  timestampAttributesForUpdateInModel: Timestamp.timestampAttributesForUpdateInModel,
-  allTimestampAttributesInModel: Timestamp.allTimestampAttributesInModel,
-  currentTimeFromProperTimezone: Timestamp.currentTimeFromProperTimezone,
-  timestampAttributesForCreate: Timestamp.timestampAttributesForCreate,
-  timestampAttributesForUpdate: Timestamp.timestampAttributesForUpdate,
-});
-extend(Base, { isDangerousAttributeMethod: _pkIsDangerousAttributeMethod });
-extend(Base, { isInstanceMethodAlreadyImplemented: _pkIsInstanceMethodAlreadyImplemented });
-extend(Base, {
-  defineMethodAttribute: _defineMethodAttribute,
-  setDefineMethodAttribute: _setDefineMethodAttribute,
-});
-extend(Base, {
-  resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
-  localStoredAttributes: _localStoredAttributes,
-});
-
-extend(Base, _StoreClassMethods);
-extend(Base, _AggregationsClassMethods);
 
 include(Base, {
   writeAttribute: _writeAttributeMethod,
@@ -2214,34 +2157,90 @@ include(Base, {
   writeStoreAttribute: _writeStoreAttribute,
   storeAccessorFor: _storeAccessorFor,
 });
+include(Base, _Core.Core);
+include(Base, { initAttributes: _Core.initAttributes });
+include(Base, _Persistence.Persistence);
+include(Base, ReadonlyAttributes.ReadonlyAttributes);
+include(Base, ModelSchema.ModelSchema);
+include(Base, Inheritance.Inheritance);
+include(Base, ActiveRecord.Scoping);
+include(Base, _AttributeAssignment.AttributeAssignment);
+include(Base, _Integration);
+include(Base, _Validations.Validations);
+include(Base, CounterCache.CounterCache);
+include(Base, AttributeRegistration);
+include(Base, LockingOptimistic.Optimistic);
+include(Base, LockingPessimistic.Pessimistic);
+include(Base, _EncryptableRecord);
+include(Base, AMAttributeMethods.AttributeMethods);
 include(Base, _Read);
 include(Base, _Write);
 include(Base, _BeforeTypeCast);
 include(Base, _Query);
 include(Base, _PrimaryKey);
-include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
-include(Base, { initAttributes: _Core.initAttributes });
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
-include(Base, LockingPessimistic.Pessimistic);
+include(Base, _Callbacks.Callbacks);
 include(Base, Timestamp.Timestamp);
 include(Base, ActiveRecord.Associations);
+include(Base, AutosaveAssociation);
+include(Base, _NestedAttributes.NestedAttributes);
+include(Base, _Transactions.Transactions);
 include(Base, _TouchLater.TouchLater);
 include(Base, _NoTouching.NoTouching);
 include(Base, _Reflection.Reflection);
 include(Base, JSONSerializer);
 Base.includeRootInJson = false;
 include(Base, { serializableHash: Serialization.serializableHash });
-include(Base, _AttributeAssignment.AttributeAssignment);
-include(Base, AutosaveAssociation);
+include(Base, _TokenFor);
+include(Base, SignedId.SignedId);
+include(Base, Normalization.Normalization);
+include(Base, Marshalling.Methods);
+extend(Base, {
+  defineAttribute: _defineAttribute,
+  defineAttributeMethods: _defineAttributeMethods,
+  undefineAttributeMethods: _undefineAttributeMethods,
+  aliasAttribute: _aliasAttribute,
+  initializeGeneratedModules: _initializeGeneratedModules,
+  generatedAttributeMethods: _generatedAttributeMethods,
+  generatedAssociationMethods: _Core.generatedAssociationMethods,
+  generateAliasAttributes: _generateAliasAttributes,
+  eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,
+  generateAliasAttributeMethods: _generateAliasAttributeMethods,
+  aliasAttributeMethodDefinition: _aliasAttributeMethodDefinition,
+  _defaultAttributes: _arDefaultAttributes,
+  resolveTypeName: _resolveTypeName,
+  resetDefaultAttributes: _resetDefaultAttributes,
+  reloadSchemaFromCache: Timestamp.reloadSchemaFromCache,
+});
+extend(Base, {
+  touchAttributesWithTime: Timestamp.touchAttributesWithTime,
+  timestampAttributesForCreateInModel: Timestamp.timestampAttributesForCreateInModel,
+  timestampAttributesForUpdateInModel: Timestamp.timestampAttributesForUpdateInModel,
+  allTimestampAttributesInModel: Timestamp.allTimestampAttributesInModel,
+  currentTimeFromProperTimezone: Timestamp.currentTimeFromProperTimezone,
+  timestampAttributesForCreate: Timestamp.timestampAttributesForCreate,
+  timestampAttributesForUpdate: Timestamp.timestampAttributesForUpdate,
+});
+extend(Base, { isDangerousAttributeMethod: _pkIsDangerousAttributeMethod });
+extend(Base, { isInstanceMethodAlreadyImplemented: _pkIsInstanceMethodAlreadyImplemented });
+extend(Base, {
+  defineMethodAttribute: _defineMethodAttribute,
+  setDefineMethodAttribute: _setDefineMethodAttribute,
+});
+extend(Base, {
+  resolveConfigForConnection: ConnectionHandling.resolveConfigForConnection,
+  localStoredAttributes: _localStoredAttributes,
+});
+
+extend(Base, _StoreClassMethods);
+extend(Base, _AggregationsClassMethods);
 extend(Base, { loadSchemaBang: CounterCache.loadSchemaBang });
 extend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
-include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
-include(Base, _Validations.Validations);
 include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });
