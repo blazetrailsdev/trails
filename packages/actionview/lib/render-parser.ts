@@ -32,10 +32,7 @@ export class Base {
     return File.dirname(this._name);
   }
 
-  /**
-   * @inventedArm dasherize — PERMANENT
-   * @internal
-   */
+  /** @internal */
   protected partialToVirtualPath(renderType: string, partialPath: string): string {
     if (renderType === "partial" || renderType === "layout") {
       const directoryEnd = partialPath.lastIndexOf("/");
