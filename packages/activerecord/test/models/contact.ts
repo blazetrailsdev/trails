@@ -45,7 +45,6 @@ async function extended(base: ContactFakeColumnsHost): Promise<void> {
   base.serialize("preferences");
 
   base.belongsTo("alternative", { className: "Contact" });
-  await base.connectionPool().schemaCache.columnsHash(base.tableName!);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -66,6 +65,7 @@ export interface Contact {
 }
 
 await extended(Contact);
+await Contact.connectionPool().schemaCache.columnsHash(Contact.tableName!);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ContactSti extends Base {
@@ -85,5 +85,4 @@ export interface ContactSti {
 
 await extended(ContactSti);
 await ContactSti.column("type", "string");
-await ContactSti.connectionPool().schemaCache.clearDataSourceCacheBang(ContactSti.tableName!);
 await ContactSti.connectionPool().schemaCache.columnsHash(ContactSti.tableName!);
