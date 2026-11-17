@@ -38,12 +38,12 @@ describe("MessagePackCacheSerializerTest", () => {
   const dump = (object: unknown) => MessagePack.CacheSerializer.dump(object);
   const load = (dumped: Uint8Array) => MessagePack.CacheSerializer.load(dumped);
 
-  const assertRoundtrip = (object: HasValue) => {
+  const assertRoundtrip = (object: unknown) => {
     const serialized = dump(object);
     expect(serialized).toBeInstanceOf(Uint8Array);
 
     const deserialized = load(serialized);
-    expect(deserialized).toBeInstanceOf(object.constructor);
+    expect((deserialized as object).constructor).toBe((object as object).constructor);
     expect(deserialized).toEqual(object);
   };
 
@@ -56,12 +56,7 @@ describe("MessagePackCacheSerializerTest", () => {
     const originalEnv = { ...ENV };
     setEnv("TRAILS_MAX_THREADS", "1");
     try {
-      const serialized = dump("value");
-      expect(serialized).toBeInstanceOf(Uint8Array);
-
-      const deserialized = load(serialized);
-      expect(typeof deserialized).toBe("string");
-      expect(deserialized).toBe("value");
+      assertRoundtrip("value");
     } finally {
       for (const name of Object.keys(ENV)) if (!(name in originalEnv)) setEnv(name, undefined);
       for (const [name, value] of Object.entries(originalEnv)) setEnv(name, value);

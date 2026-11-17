@@ -569,7 +569,7 @@ class TestExtractor
   # owns the cases and its TS twin ports them. Enrolled by module name, as
   # `LIB_TEST_MODULES` is: activesupport's cache `behaviors/` modules take the
   # same shape and are not yet ported to match.
-  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest].freeze
+  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests].freeze
 
   def collect_required_modules(sexp, filepath)
     missing = @module_includes.keys.select do |name|
@@ -852,6 +852,19 @@ class TestExtractor
 
     line = extract_line(node)
     assertion_kinds, assertion_values = collect_assertion_kinds(node)
+
+    # A `test "…"` in an enrolled required module's body (its `included do`
+    # block, shared_serializer_tests.rb:6) is stashed like a `def test_*`.
+    if @module_collect && REQUIRED_TEST_MODULES.include?(@class_stack.last)
+      @module_collect << {
+        description: desc, line: line, assertions: assertion_kinds.uniq,
+        assertion_count: assertion_kinds.length, assertion_kinds: assertion_kinds,
+        assertion_values: assertion_values,
+        gates: @gate_stack.drop(@module_gate_base),
+        body_gate: body_skip_gate(node)
+      }
+      return
+    end
 
     path = (@describe_stack + [desc]).join(" > ")
 
