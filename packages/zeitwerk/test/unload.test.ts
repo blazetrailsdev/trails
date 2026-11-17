@@ -23,6 +23,7 @@ const USERS: [string, string][] = [
   ["admin/root.ts", "export class Root {}"],
 ];
 
+const g = globalThis as unknown as Record<string, unknown>;
 const LOADER = new URL("../lib/loader.ts", import.meta.url).pathname;
 
 describe("TestUnload", () => {
@@ -31,7 +32,10 @@ describe("TestUnload", () => {
   beforeEach(async () => {
     loader = await newLoader({ setup: false });
   });
-  afterEach(teardown);
+  afterEach(async () => {
+    for (const name of ["$loader", "$loader1", "$loader2"]) delete g[name];
+    await teardown();
+  });
 
   for (const [name, namespace] of [
     ["Object", Object],
@@ -72,7 +76,6 @@ describe("TestUnload", () => {
   });
 
   it("unload clears internal caches", async () => {
-    const g = globalThis as unknown as Record<string, unknown>;
     g.$loader = null;
     const files: [string, string][] = [
       [
@@ -94,34 +97,30 @@ describe("TestUnload", () => {
       ["rd1/admin/root.ts", "export class Root {}"],
       ["rd2/user.ts", "export class User {}"],
     ];
-    try {
-      await withFiles(files, async () => {
-        await withLoadPath(".", async () => {
-          await Kernel.require("my_gem");
-        });
-        const $loader = g.$loader as Loader;
-
-        expect(await get(Object, "User")).toBeTruthy();
-        const api = await get(Object, "Api");
-        expect(await get(await get(api, "V1"), "UsersController")).toBeTruthy();
-
-        expect(Object.keys($loader.autoloads).length !== 0).toBeTruthy();
-        expect($loader.autoloadedDirs.length !== 0).toBeTruthy();
-        expect(Object.keys($loader.toUnload).length !== 0).toBeTruthy();
-        expect(!$loader.namespaceDirs.isEmpty()).toBeTruthy();
-        expect(!$loader.inceptions.isEmpty()).toBeTruthy();
-
-        await $loader.unload();
-
-        expect(Object.keys($loader.autoloads).length === 0).toBeTruthy();
-        expect($loader.autoloadedDirs.length === 0).toBeTruthy();
-        expect(Object.keys($loader.toUnload).length === 0).toBeTruthy();
-        expect($loader.namespaceDirs.isEmpty()).toBeTruthy();
-        expect($loader.inceptions.isEmpty()).toBeTruthy();
+    await withFiles(files, async () => {
+      await withLoadPath(".", async () => {
+        await Kernel.require("my_gem");
       });
-    } finally {
-      delete g.$loader;
-    }
+      const $loader = g.$loader as Loader;
+
+      expect(await get(Object, "User")).toBeTruthy();
+      const api = await get(Object, "Api");
+      expect(await get(await get(api, "V1"), "UsersController")).toBeTruthy();
+
+      expect(Object.keys($loader.autoloads).length !== 0).toBeTruthy();
+      expect($loader.autoloadedDirs.length !== 0).toBeTruthy();
+      expect(Object.keys($loader.toUnload).length !== 0).toBeTruthy();
+      expect(!$loader.namespaceDirs.isEmpty()).toBeTruthy();
+      expect(!$loader.inceptions.isEmpty()).toBeTruthy();
+
+      await $loader.unload();
+
+      expect(Object.keys($loader.autoloads).length === 0).toBeTruthy();
+      expect($loader.autoloadedDirs.length === 0).toBeTruthy();
+      expect(Object.keys($loader.toUnload).length === 0).toBeTruthy();
+      expect($loader.namespaceDirs.isEmpty()).toBeTruthy();
+      expect($loader.inceptions.isEmpty()).toBeTruthy();
+    });
   });
 
   it("unload does not assume autoloaded constants are still there", async () => {
@@ -187,7 +186,6 @@ describe("TestUnload", () => {
   });
 
   it("unload clears associated inceptions", async () => {
-    const g = globalThis as unknown as Record<string, unknown>;
     const files: [string, string][] = [];
 
     files.push([
@@ -211,31 +209,26 @@ describe("TestUnload", () => {
       export class MyGem2 {}`,
     ]);
 
-    try {
-      await withFiles(files, async () => {
-        await withLoadPath(".", async () => {
-          await Kernel.require("gem1/my_gem1");
-          await Kernel.require("gem2/my_gem2");
-        });
-
-        expect(await get(Object, "MyGem1")).toBeTruthy();
-        expect(await get(Object, "MyGem2")).toBeTruthy();
-
-        const cref1 = new Cref(Object, "MyGem1");
-        const cref2 = new Cref(Object, "MyGem2");
-
-        expect(Inceptions.isRegistered(cref1)).toBeTruthy();
-        expect(Inceptions.isRegistered(cref2)).toBeTruthy();
-
-        await (g.$loader1 as Loader).unload();
-
-        expect(!Inceptions.isRegistered(cref1)).toBeTruthy();
-        expect(Inceptions.isRegistered(cref2)).toBeTruthy();
+    await withFiles(files, async () => {
+      await withLoadPath(".", async () => {
+        await Kernel.require("gem1/my_gem1");
+        await Kernel.require("gem2/my_gem2");
       });
-    } finally {
-      delete g.$loader1;
-      delete g.$loader2;
-    }
+
+      expect(await get(Object, "MyGem1")).toBeTruthy();
+      expect(await get(Object, "MyGem2")).toBeTruthy();
+
+      const cref1 = new Cref(Object, "MyGem1");
+      const cref2 = new Cref(Object, "MyGem2");
+
+      expect(Inceptions.isRegistered(cref1)).toBeTruthy();
+      expect(Inceptions.isRegistered(cref2)).toBeTruthy();
+
+      await (g.$loader1 as Loader).unload();
+
+      expect(!Inceptions.isRegistered(cref1)).toBeTruthy();
+      expect(Inceptions.isRegistered(cref2)).toBeTruthy();
+    });
   });
 
   it("unload clears state even if the autoload failed and the exception was rescued", async () => {
