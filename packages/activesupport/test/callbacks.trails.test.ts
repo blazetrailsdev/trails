@@ -1360,3 +1360,25 @@ describe("around callback proceed (trails)", () => {
     expect(proceeded).toBeInstanceOf(Promise);
   });
 });
+
+describe("thenable callback conditions (trails)", () => {
+  it("awaits an if: condition that answers a promise", async () => {
+    class Host extends Model {}
+    Host.defineCallbacks("save");
+    Host.setCallback("save", "before", (r: Host) => r.log.push("before-yes"), {
+      if: async () => true,
+    });
+    Host.setCallback("save", "before", (r: Host) => r.log.push("before-no"), {
+      if: async () => false,
+    });
+    Host.setCallback("save", "after", (r: Host) => r.log.push("after-yes"), {
+      if: [() => true, async () => true],
+    });
+    Host.setCallback("save", "after", (r: Host) => r.log.push("after-no"), {
+      if: [async () => true, () => false],
+    });
+    const host = new Host();
+    await host.runCallbacks("save", () => host.log.push("save"));
+    expect(host.log).toEqual(["before-yes", "save", "after-yes"]);
+  });
+});

@@ -2930,10 +2930,6 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
 
   if pkg_name == "solid-cache"
     test_files.reject! { |f| f.include?("/unit/behaviors/") }
-    # A behavior counts only where a test class `include`s it
-    # (`test/unit/solid_cache_test.rb:11-29,71,93`): solid_cache vendors
-    # `connection_pool_behavior.rb` and `cache_delete_matched_behavior.rb`
-    # but never runs them.
     included = test_files.flat_map { |f| File.read(f).scan(/^\s*include\s+(\w+Behavior)\b/).flatten }
     behaviors = Dir.glob(File.join(pkg_dir, "unit", "behaviors_rails_8_0", "*_behavior.rb"))
     test_files.concat(behaviors.select { |f| included.include?(File.basename(f, ".rb").split("_").map(&:capitalize).join) })
@@ -2946,10 +2942,6 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
   test_files
 end
 
-# Gem copies of a Rails cache behavior that rename a test, gem name => Rails
-# name. solid_cache's `behaviors_rails_8_0/cache_increment_decrement_behavior.rb:34`
-# is Rails' `test_ttl_isnt_updated`
-# (`vendor/rails/v8.0.2/activesupport/test/cache/behaviors/cache_increment_decrement_behavior.rb:34`).
 GEM_BEHAVIOR_TEST_RENAMES = {
   "solid-cache" => { "ttl is not updated" => "ttl isnt updated" },
 }.freeze
@@ -3023,8 +3015,6 @@ def run
       extractor.process_file(filepath, pkg_dir)
     end
 
-    # trails runs activesupport's own behavior modules, so a test the gem's
-    # copy renamed is compared under Rails' name.
     renames = GEM_BEHAVIOR_TEST_RENAMES.fetch(pkg_name, {})
     extractor.test_files.each do |f|
       f[:testCases].each { |tc| tc[:description] = renames.fetch(tc[:description], tc[:description]) }
