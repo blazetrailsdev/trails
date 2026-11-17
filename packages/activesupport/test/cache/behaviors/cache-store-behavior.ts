@@ -715,7 +715,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     };
     const time = (await internals.readEntry(await internals.normalizeKey(key, {}), {}))!.expiresAt!;
 
-    await stub(Time, "now", Time.at(time / 1000), [], async () => {
+    await stub(Time, "now", Time.at(time), [], async () => {
       const result = await cache.fetch(key, async () => {
         assertNil(await cache.read(key));
         return "baz";

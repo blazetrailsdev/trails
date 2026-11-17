@@ -751,8 +751,8 @@ export abstract class Store {
   ): Promise<Entry | null> {
     if (entry && entry.isExpired()) {
       const raceTtl = typeof options.raceConditionTtl === "number" ? options.raceConditionTtl : 0;
-      if (raceTtl > 0 && Time.now().toF() * 1000 - (entry.expiresAt ?? 0) <= raceTtl * 1000) {
-        entry.expiresAt = Time.now().toF() * 1000 + raceTtl * 1000;
+      if (raceTtl > 0 && Time.now().toF() - (entry.expiresAt ?? 0) <= raceTtl) {
+        entry.expiresAt = Time.now().toF() + raceTtl;
         await this.writeEntry(key, entry, { ...options, expiresIn: raceTtl * 2 });
       } else {
         await this.deleteEntry(key, options);
