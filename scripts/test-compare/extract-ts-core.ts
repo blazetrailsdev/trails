@@ -613,13 +613,14 @@ export function extractTestsFromSource(
   relativePath: string,
   libTests: HelperMap = new Map(),
   requiredTests: HelperMap = new Map(),
+  readModule: (relPath: string) => string | null = () => null,
 ): TestFileInfo {
   const fileSourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
   let sourceFile = fileSourceFile;
   const helpers = collectHelpers(sourceFile);
   for (const [name, defs] of libTests) helpers.set(name, defs);
   for (const [name, defs] of requiredTests) if (!helpers.has(name)) helpers.set(name, defs);
-  const constDecls = collectConstDeclarations(sourceFile);
+  const constDecls = collectConstDeclarations(sourceFile, relativePath, readModule);
   const bindings = new Map<string, BoundValue>();
 
   const fileInfo: TestFileInfo = {
@@ -1549,8 +1550,33 @@ function continueGuards(statement: ts.Statement): ts.Expression[] {
  * Every `const NAME = <expr>` in the file, keyed by name. A name declared more
  * than once is dropped rather than guessed at.
  */
-function collectConstDeclarations(sourceFile: ts.SourceFile): ReadonlyMap<string, ts.Expression> {
+/**
+ * Same-file `const` initializers, plus the named imports a relative import
+ * pulls from a sibling module, so a loop over an imported constant table
+ * expands as the Ruby extractor expands a `require_relative`d constant.
+ */
+function collectConstDeclarations(
+  sourceFile: ts.SourceFile,
+  relativePath = "",
+  readModule: (relPath: string) => string | null = () => null,
+): ReadonlyMap<string, ts.Expression> {
   const decls = new Map<string, ts.Expression>();
+  for (const stmt of sourceFile.statements) {
+    if (!ts.isImportDeclaration(stmt) || !ts.isStringLiteral(stmt.moduleSpecifier)) continue;
+    const spec = stmt.moduleSpecifier.text;
+    const bindings = stmt.importClause?.namedBindings;
+    if (!spec.startsWith(".") || !bindings || !ts.isNamedImports(bindings)) continue;
+    const target = path.join(path.dirname(relativePath), spec.replace(/\.js$/, ".ts"));
+    const content = readModule(target);
+    if (content === null) continue;
+    const imported = collectConstDeclarations(
+      ts.createSourceFile(target, content, ts.ScriptTarget.ESNext, false),
+    );
+    for (const el of bindings.elements) {
+      const value = imported.get((el.propertyName ?? el.name).text);
+      if (value) decls.set(el.name.text, value);
+    }
+  }
   const seen = new Set<string>();
   function walk(node: ts.Node) {
     if (

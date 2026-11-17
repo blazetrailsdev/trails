@@ -30,6 +30,10 @@ import {
   assertNothingRaised,
 } from "../lib/testing/assertions.js";
 import {
+  MixtureToTitleCase,
+  MixtureToTitleCaseWithKeepIdSuffix,
+} from "../lib/inflector-test-cases.js";
+import {
   registerConstantizeFixtures,
   runConstantizeTestsOn,
   runSafeConstantizeTestsOn,
@@ -941,15 +945,22 @@ describe("InflectorTest", () => {
     });
   }
 
-  describe("titleize", () => {
-    it("titleize mixture to title case", () => {
-      expect(titleize("active_record")).toBe("Active Record");
-      expect(titleize("ActiveRecord")).toBe("Active Record");
-      expect(titleize("action web service")).toBe("Action Web Service");
-      expect(titleize("Action Web Service")).toBe("Action Web Service");
-      expect(titleize("actionwebservice")).toBe("Actionwebservice");
+  for (const [index, [before, titleized]] of Object.entries(MixtureToTitleCase).entries()) {
+    it(`titleize mixture to title case ${index}`, () => {
+      expect(titleize(before), `mixture to TitleCase failed for ${before}`).toBe(titleized);
     });
-  });
+  }
+
+  for (const [index, [before, titleized]] of Object.entries(
+    MixtureToTitleCaseWithKeepIdSuffix,
+  ).entries()) {
+    it(`titleize with keep id suffix mixture to title case ${index}`, () => {
+      expect(
+        titleize(before, { keepIdSuffix: true }),
+        `mixture to TitleCase with keep_id_suffix failed for ${before}`,
+      ).toBe(titleized);
+    });
+  }
 
   it("humanize with international characters", () => {
     expect(humanize("é_employee")).toBe("É employee");
