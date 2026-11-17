@@ -1,6 +1,7 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 import os from "os";
+import { DurationSequencer } from "./scripts/ci/duration-sequencer.js";
 import { resolveForkCount } from "./packages/activerecord/test/support/ar-db-forks-default.js";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) requests a vitest worker
@@ -604,6 +605,8 @@ export default defineConfig({
     // reporting-only run; the gating AR suite (`sqlite-tests`) runs without
     // coverage and keeps unhandled errors as a real signal.
     dangerouslyIgnoreUnhandledErrors: TRAILS_TSC_COVERAGE || AR_CLI_COVERAGE || AR_COVERAGE,
+    // Balances `--shard` by ar-shard-durations.json when VITEST_SHARD_DURATIONS is set.
+    sequence: { sequencer: DurationSequencer },
     coverage: {
       provider: "v8",
       // text-summary → CI log; json-summary → parsed into the step summary;
