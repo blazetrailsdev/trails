@@ -1,4 +1,4 @@
-import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
+import { dasherize, Notifications, type SafeBuffer } from "@blazetrails/activesupport";
 
 import type { LookupContext } from "../lookup-context.js";
 import { AbstractRenderer, RenderedTemplate } from "./abstract-renderer.js";
@@ -106,8 +106,13 @@ export class PartialRenderer extends AbstractRenderer {
     );
   }
 
-  /** @internal */
+  /**
+   * @inventedArm dasherize — PERMANENT
+   * @internal
+   */
   protected findTemplate(path: string, locals: readonly string[]): RenderableTemplate {
+    const directoryEnd = path.lastIndexOf("/");
+    if (directoryEnd >= 0) path = dasherize(path.slice(0, directoryEnd)) + path.slice(directoryEnd);
     const prefixes = path.includes("/") ? [] : this.lookupContext.prefixes;
     return this.lookupContext.find(
       path,

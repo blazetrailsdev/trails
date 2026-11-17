@@ -117,8 +117,7 @@ describe("ActionText::AttachmentTest", () => {
     expect(trixAttachment.attributes["content"]).toBe("abc");
   });
 
-  // BLOCKED: content-attachment-partial-path-resolves
-  it.skip("renders content attachment", async () => {
+  it("renders content attachment", async () => {
     const html =
       '<action-text-attachment content-type="text/html" content="&lt;p&gt;abc&lt;/p&gt;"></action-text-attachment>';
     const attachment = await attachmentFromHtml(html);
@@ -129,8 +128,7 @@ describe("ActionText::AttachmentTest", () => {
     });
   });
 
-  // BLOCKED: content-attachment-sanitized-void-element-no-slash
-  it.skip("to_trix_html sanitizes action-text HTML content attachment", async () => {
+  it("to_trix_html sanitizes action-text HTML content attachment", async () => {
     const attachment = await Content.new(
       '<action-text-attachment content-type="text/html" content="<img src=. onerror=\'alert(location)\' />"></action-text-attachment>',
     );

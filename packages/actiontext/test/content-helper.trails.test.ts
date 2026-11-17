@@ -39,7 +39,7 @@ describe("ContentHelper rendering", () => {
     "action-text/attachment-galleries/_attachment_gallery.html.tse",
     "action-text/attachables/_content_attachment.html.tse",
     "action-text/attachables/_missing_attachable.html.tse",
-    "action_text/contents/_content.html.tse",
+    "action-text/contents/_content.html.tse",
   ];
 
   const renderContent = async (html: string): Promise<string> => {
