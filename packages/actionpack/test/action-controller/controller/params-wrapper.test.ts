@@ -1,4 +1,4 @@
-import { Inflections, inflections } from "@blazetrails/activesupport";
+import { classAttribute, Inflections, inflections } from "@blazetrails/activesupport";
 import { assertCalled } from "@blazetrails/activesupport/testing/method-call-assertions";
 import { assertEqual } from "@blazetrails/activesupport/testing/assertions";
 import {
@@ -368,7 +368,7 @@ describe("ParamsWrapperTest", () => {
   });
 
   it("derived wrapped keys from nested attributes", async () => {
-    (User as unknown as Record<string, unknown>).nestedAttributesOptions = () => ({ person: {} });
+    classAttribute.call(User, "nestedAttributesOptions", { default: { person: {} } });
 
     await assertCalled(User, "attributeNames", null, { times: 2, returns: ["username"] }, () =>
       withDefaultWrapperOptions(async () => {
@@ -408,8 +408,8 @@ describe("NamespacedParamsWrapperTest", () => {
       return ["username"];
     }
 
-    static attributeAliases(): Record<string, string> {
-      return { nick: "username" };
+    static {
+      classAttribute.call(this, "attributeAliases", { default: { nick: "username" } });
     }
   }
 
