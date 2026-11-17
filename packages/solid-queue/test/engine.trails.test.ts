@@ -25,6 +25,7 @@ describe("SolidQueue::Engine", () => {
   it("runs its initializers in engine.rb order", () => {
     expect(Engine.initializers.tsort().map((initializer) => initializer.name)).toEqual([
       "solid_queue.config",
+      "solid_queue.time_zone",
       "solid_queue.app_executor",
       "solid_queue.logger",
       "solid_queue.active_job.extensions",

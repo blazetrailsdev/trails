@@ -7,9 +7,12 @@ import {
   mattrAccessor,
   minutes,
   seconds,
+  TimeZone,
   type Duration,
 } from "@blazetrails/activesupport";
 import { STDOUT, TopLevel, constSet } from "@blazetrails/ruby-compat";
+
+let _timeZone: string | null = null;
 
 export const SolidQueue = {
   name: "SolidQueue",
@@ -26,6 +29,10 @@ export const SolidQueue = {
     SolidQueue.Worker!.onStop(block);
   },
 
+  onWorkerExit(block: () => unknown): void {
+    SolidQueue.Worker!.onExit(block);
+  },
+
   onDispatcherStart(block: () => unknown): void {
     SolidQueue.Dispatcher!.onStart(block);
   },
@@ -34,12 +41,47 @@ export const SolidQueue = {
     SolidQueue.Dispatcher!.onStop(block);
   },
 
+  onDispatcherExit(block: () => unknown): void {
+    SolidQueue.Dispatcher!.onExit(block);
+  },
+
   onSchedulerStart(block: () => unknown): void {
     SolidQueue.Scheduler!.onStart(block);
   },
 
   onSchedulerStop(block: () => unknown): void {
     SolidQueue.Scheduler!.onStop(block);
+  },
+
+  onSchedulerExit(block: () => unknown): void {
+    SolidQueue.Scheduler!.onExit(block);
+  },
+
+  get timeZone(): string | null {
+    return _timeZone;
+  },
+
+  setTimeZone(zone: unknown): void {
+    if (zone != null && zone !== false) {
+      const resolved =
+        typeof (zone as { tzinfo?: unknown }).tzinfo !== "undefined"
+          ? (zone as TimeZone)
+          : TimeZone.find(zone);
+      _timeZone = resolved?.tzinfo?.name ?? String(zone);
+    } else {
+      _timeZone = null;
+    }
+  },
+
+  async scheduleRecurringTask(
+    key: string,
+    options: { [key: string]: unknown } = {},
+  ): Promise<unknown> {
+    return await SolidQueue.RecurringTask!.createDynamicTask(key, options);
+  },
+
+  async unscheduleRecurringTask(key: string): Promise<unknown> {
+    return await SolidQueue.RecurringTask!.deleteDynamicTask(key);
   },
 
   isSupervisor(): boolean {
@@ -79,14 +121,30 @@ export const SolidQueue = {
   preserveFinishedJobs: boolean;
   clearFinishedJobsAfter: Duration;
   defaultConcurrencyControlPeriod: Duration;
-  Worker?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  Worker?: {
+    onStart(block: () => unknown): void;
+    onStop(block: () => unknown): void;
+    onExit(block: () => unknown): void;
+  };
+  onWorkerExit(block: () => unknown): void;
   onWorkerStart(block: () => unknown): void;
   onWorkerStop(block: () => unknown): void;
-  Dispatcher?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
-  Scheduler?: { onStart(block: () => unknown): void; onStop(block: () => unknown): void };
+  Dispatcher?: {
+    onStart(block: () => unknown): void;
+    onStop(block: () => unknown): void;
+    onExit(block: () => unknown): void;
+  };
+  onDispatcherExit(block: () => unknown): void;
+  Scheduler?: {
+    onStart(block: () => unknown): void;
+    onStop(block: () => unknown): void;
+    onExit(block: () => unknown): void;
+  };
+  onSchedulerExit(block: () => unknown): void;
   Supervisor?: typeof import("./supervisor.js").Supervisor;
   onStart(block: () => unknown): void;
   onStop(block: () => unknown): void;
+  onExit(block: () => unknown): void;
   Process?: typeof import("./process.js").Process;
   Job?: typeof import("./job.js").Job;
   Batch?: typeof import("./batch.js").Batch;
@@ -95,6 +153,11 @@ export const SolidQueue = {
   onSchedulerStop(block: () => unknown): void;
   onDispatcherStart(block: () => unknown): void;
   onDispatcherStop(block: () => unknown): void;
+  readonly timeZone: string | null;
+  setTimeZone(zone: unknown): void;
+  scheduleRecurringTask(key: string, options?: { [key: string]: unknown }): Promise<unknown>;
+  unscheduleRecurringTask(key: string): Promise<unknown>;
+  RecurringTask?: typeof import("./recurring-task.js").RecurringTask;
   isSupervisor(): boolean;
   isSilencePolling(): boolean;
   isPreserveFinishedJobs(): boolean;
@@ -120,7 +183,7 @@ mattrAccessor.call(SolidQueue, "preserveFinishedJobs", { default: true });
 mattrAccessor.call(SolidQueue, "clearFinishedJobsAfter", { default: days(1) });
 mattrAccessor.call(SolidQueue, "defaultConcurrencyControlPeriod", { default: minutes(3) });
 
-delegate.call(SolidQueue, "onStart", "onStop", { to: "Supervisor" });
+delegate.call(SolidQueue, "onStart", "onStop", "onExit", { to: "Supervisor" });
 
 constSet(TopLevel, "SolidQueue", SolidQueue);
 

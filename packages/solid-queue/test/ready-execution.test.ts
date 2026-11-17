@@ -6,6 +6,7 @@ import {
 } from "@blazetrails/activesupport/testing/assertions";
 import type { Relation } from "@blazetrails/activerecord";
 import {
+  BlockedExecution,
   ClaimedExecution,
   Job,
   Queue,
@@ -14,6 +15,9 @@ import {
   SolidQueueAdapter,
 } from "../lib/index.js";
 import { ApplicationJob } from "./support/application-job.js";
+import { JobResult } from "./support/job-result.js";
+import { loadAppSchema } from "./support/queue-schema.js";
+import { ThrottledUpdateResultJob } from "./support/throttled-update-result-job.js";
 import { AddToBufferJob } from "./support/add-to-buffer-job.js";
 import { Pause } from "../lib/pause.js";
 
@@ -21,6 +25,7 @@ describe("SolidQueue::ReadyExecutionTest", () => {
   let jobs: Relation<Job>;
 
   beforeAll(async () => {
+    await loadAppSchema();
     ApplicationJob.queueAdapter = new SolidQueueAdapter();
   });
 
@@ -41,6 +46,7 @@ describe("SolidQueue::ReadyExecutionTest", () => {
     await Job.destroyAll();
     await Semaphore.deleteAll();
     await Pause.deleteAll();
+    await JobResult.deleteAll();
   });
 
   async function assertClaimedJobs(count: number, block: () => Promise<unknown>): Promise<void> {
@@ -278,6 +284,40 @@ describe("SolidQueue::ReadyExecutionTest", () => {
       (
         ReadyExecution.queuedAs("backend") as unknown as typeof ReadyExecution
       ).discardAllInBatches(),
+    );
+  });
+
+  it("bulk discard unblocks one job for each released concurrency slot", async () => {
+    const result = await JobResult.createBang({});
+    for (let i = 0; i < 7; i++) {
+      await ThrottledUpdateResultJob.performLater(result, { name: String(i) });
+    }
+    const throttledJobs = await Job.where({ class_name: "ThrottledUpdateResultJob" })
+      .order("id")
+      .toArray();
+
+    expect(await BlockedExecution.count()).toEqual(4);
+
+    await assertDifference(
+      new Map([
+        [() => Job.count(), -2],
+        [() => BlockedExecution.count(), -2],
+      ]),
+      null,
+      () => ReadyExecution.discardAllFromJobs(throttledJobs.slice(0, 2)),
+    );
+
+    expect(
+      await ReadyExecution.where({ job_id: throttledJobs.map((job) => job.id) })
+        .order("job_id")
+        .pluck("job_id"),
+    ).toEqual(throttledJobs.slice(2, 5).map((job) => job.id));
+    const lastBlocked = await Promise.all(
+      throttledJobs.slice(-2).map(async (job) => (await job.reload()).isBlocked()),
+    );
+    expect(lastBlocked.every(Boolean)).toBeTruthy();
+    expect((await Semaphore.findByBang({ key: throttledJobs[0].concurrency_key })).value).toEqual(
+      0,
     );
   });
 });

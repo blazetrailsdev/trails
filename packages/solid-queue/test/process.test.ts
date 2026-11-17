@@ -5,6 +5,7 @@ import { assertChanges, assertDifference } from "@blazetrails/activesupport/test
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import type { Time } from "@blazetrails/date";
 import { Socket } from "@blazetrails/ruby-compat";
+import { StatementInvalid } from "@blazetrails/activerecord";
 import {
   ClaimedExecution,
   FailedExecution,
@@ -153,5 +154,23 @@ describe("SolidQueue::ProcessTest", () => {
       {},
       () => process.heartbeat(),
     );
+  });
+
+  it("a heartbeat that fails to persist doesn't leave a fresh in-memory timestamp", async () => {
+    const process = await Process.register({ kind: "Worker", pid: 42, name: "worker-42" });
+    const persistedHeartbeatAt = process.last_heartbeat_at;
+
+    vi.spyOn(process as never, "_updateRow").mockRejectedValue(
+      new StatementInvalid("no connection"),
+    );
+
+    travelTo(minutes(1).fromNow() as Time);
+    try {
+      await expect(process.heartbeat()).rejects.toThrow(StatementInvalid);
+    } finally {
+      travelBack();
+    }
+
+    expect(process.last_heartbeat_at).toEqual(persistedHeartbeatAt);
   });
 });

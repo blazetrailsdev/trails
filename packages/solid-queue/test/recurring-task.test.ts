@@ -1,29 +1,32 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
-import { Deadlocked } from "@blazetrails/activerecord";
+import { Deadlocked, RecordNotFound, RecordNotUnique } from "@blazetrails/activerecord";
 import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
 import { Base, EnqueueError } from "@blazetrails/activejob";
 import { AsyncAdapter } from "@blazetrails/activejob/queue-adapters/async-adapter";
-import { isPresent } from "@blazetrails/activesupport";
+import { ActiveSupport, isPresent } from "@blazetrails/activesupport";
 import {
   assertDifference,
   assertNoDifference,
 } from "@blazetrails/activesupport/testing/assertions";
 import { Time } from "@blazetrails/date";
+import { Fugit, type Cron } from "@blazetrails/fugit";
 import { constGet, constSet } from "@blazetrails/ruby-compat";
 import {
   Job,
   Process,
   ReadyExecution,
   RecurringTask,
+  SolidQueue,
   SolidQueueAdapter,
   Worker,
 } from "../lib/index.js";
 import { ApplicationJob } from "./support/application-job.js";
 import { JobBuffer } from "./support/add-to-buffer-job.js";
+import { ErrorBuffer } from "./support/error-buffer.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 
 class JobWithoutArguments extends ApplicationJob {
@@ -62,6 +65,16 @@ class JobWithPriority extends ApplicationJob {
   }
 }
 
+class JobWithConcurrencyControlsAndDiscard extends ApplicationJob {
+  static {
+    this.limitsConcurrency({ key: () => true, onConflict: "discard" });
+  }
+
+  perform(): void {
+    JobBuffer.add("job_with_concurrency_controls");
+  }
+}
+
 class JobUsingAsyncAdapter extends ApplicationJob {
   static {
     this.queueAdapter = "async";
@@ -83,6 +96,7 @@ for (const job of [
   JobWithKeywordArgument,
   JobWithMultipleTypeArguments,
   JobWithPriority,
+  JobWithConcurrencyControlsAndDiscard,
   JobUsingAsyncAdapter,
 ]) {
   constSet(RecurringTaskTest, job.name, job);
@@ -140,6 +154,34 @@ describe("SolidQueue::RecurringTaskTest", () => {
     );
 
     expect(JobBuffer.lastValue()).toEqual(result);
+  }
+
+  async function withTimeZone(zone: string | null, block: () => Promise<void>): Promise<void> {
+    const previous = SolidQueue.timeZone;
+    SolidQueue.setTimeZone(zone);
+    try {
+      await block();
+    } finally {
+      SolidQueue.setTimeZone(previous);
+    }
+  }
+
+  async function runAllJobsInline(): Promise<void> {
+    const worker = new Worker({ queues: "*" });
+    worker.mode = "inline";
+    await worker.start();
+  }
+
+  async function withErrorSubscriber(
+    subscriber: ErrorBuffer,
+    block: () => Promise<unknown>,
+  ): Promise<void> {
+    ActiveSupport.errorReporter.subscribe(subscriber);
+    try {
+      await block();
+    } finally {
+      ActiveSupport.errorReporter.unsubscribe(subscriber);
+    }
   }
 
   function recurringTaskWith({
@@ -216,6 +258,21 @@ describe("SolidQueue::RecurringTaskTest", () => {
       null,
       () => task.enqueue({ at: Time.now() }),
     );
+  });
+
+  it("error when enqueuing job because of concurrency controls and discard", async () => {
+    await JobWithConcurrencyControlsAndDiscard.performLater();
+
+    const task = recurringTaskWith({ class_name: "JobWithConcurrencyControlsAndDiscard" });
+    await assertNoDifference(
+      () => Job.count(),
+      null,
+      () => task.enqueue({ at: Time.now() }),
+    );
+
+    await runAllJobsInline();
+
+    await enqueueAndAssertPerformedWithResult(task, "job_with_concurrency_controls");
   });
 
   it("error when enqueuing job using another adapter that raises ActiveJob::EnqueueError", async () => {
@@ -334,6 +391,16 @@ describe("SolidQueue::RecurringTaskTest", () => {
     expect(job.priority).toBe(4);
   });
 
+  it("next_time_after returns the next occurrence after the given time", async () => {
+    const task = recurringTaskWith({ class_name: "JobWithoutArguments", schedule: "every minute" });
+
+    let time = Time.utc(2026, 3, 12, 1, 28, 0);
+    expect(task.nextTimeAfter(time)).toEqual(Time.utc(2026, 3, 12, 1, 29, 0));
+
+    time = Time.utc(2026, 3, 12, 1, 27, 59);
+    expect(task.nextTimeAfter(time)).toEqual(Time.utc(2026, 3, 12, 1, 28, 0));
+  });
+
   it("task configured with a command", async () => {
     const task = recurringTaskWith({
       command: `${import.meta.dirname}/support/dummy/lib/from-a-command.ts`,
@@ -341,5 +408,185 @@ describe("SolidQueue::RecurringTaskTest", () => {
     await enqueueAndAssertPerformedWithResult(task, "from_a_command");
 
     expect(((await Job.last()) as Job).class_name).toBe("SolidQueue::RecurringJob");
+  });
+
+  it("schedule recurring tasks dynamically", async () => {
+    await RecurringTask.createDynamicTask("test 1", { command: "puts 1", schedule: "every hour" });
+    await RecurringTask.createDynamicTask("test 2", {
+      command: "puts 2",
+      schedule: "every minute",
+      static: true,
+    });
+
+    expect(
+      await RecurringTask.isExists({
+        key: "test 1",
+        command: "puts 1",
+        schedule: "every hour",
+        static: false,
+      }),
+    ).toBeTruthy();
+    expect(
+      await RecurringTask.isExists({
+        key: "test 2",
+        command: "puts 2",
+        schedule: "every minute",
+        static: false,
+      }),
+    ).toBeTruthy();
+  });
+
+  it("schedule recurring tasks dynamically with class and args (same keys as YAML config)", async () => {
+    await RecurringTask.createDynamicTask("test 3", {
+      class: "AddToBufferJob",
+      args: [42],
+      schedule: "every hour",
+    });
+
+    const task = await RecurringTask.findByBang({ key: "test 3" });
+    expect(task.class_name).toEqual("AddToBufferJob");
+    expect(task.arguments).toEqual([42]);
+    expect(task.static).toBeFalsy();
+  });
+
+  it("unschedule recurring tasks dynamically", async () => {
+    const dynamicTask = await RecurringTask.createBang({
+      key: "dynamic",
+      command: "puts 'd'",
+      schedule: "every day",
+      static: false,
+    });
+
+    const staticTask = await RecurringTask.createBang({
+      key: "static",
+      command: "puts 's'",
+      schedule: "every week",
+      static: true,
+    });
+
+    await RecurringTask.deleteDynamicTask(dynamicTask.key);
+
+    await expect(RecurringTask.deleteDynamicTask(staticTask.key)).rejects.toThrow(RecordNotFound);
+
+    expect(await RecurringTask.isExists({ key: "dynamic", static: false })).toBeFalsy();
+    expect(await RecurringTask.isExists({ key: "static", static: true })).toBeTruthy();
+  });
+
+  it("scheduling dynamic recurring task with duplicate key raises error", async () => {
+    await RecurringTask.createDynamicTask("duplicate_test", {
+      command: "puts 1",
+      schedule: "every hour",
+    });
+
+    await expect(
+      RecurringTask.createDynamicTask("duplicate_test", {
+        command: "puts 2",
+        schedule: "every minute",
+      }),
+    ).rejects.toThrow(RecordNotUnique);
+  });
+
+  it("unscheduling dynamic recurring task with nonexistent key raises RecordNotFound", async () => {
+    await expect(RecurringTask.deleteDynamicTask("nonexistent_key")).rejects.toThrow(
+      RecordNotFound,
+    );
+  });
+
+  it("schedule without a time zone uses the configured default time zone", async () => {
+    await withTimeZone("America/New_York", async () => {
+      const task = recurringTaskWith({
+        class_name: "JobWithoutArguments",
+        schedule: "every day at 9am",
+      });
+      expect(task.nextTime()).toEqual(
+        (Fugit.parse("0 9 * * * America/New_York") as Cron).nextTime().utc(),
+      );
+    });
+  });
+
+  it("schedule with an explicit time zone ignores the configured default time zone", async () => {
+    await withTimeZone("America/New_York", async () => {
+      const task = recurringTaskWith({
+        class_name: "JobWithoutArguments",
+        schedule: "0 9 * * * Europe/Madrid",
+      });
+      expect(task.nextTime()).toEqual(
+        (Fugit.parse("0 9 * * * Europe/Madrid") as Cron).nextTime().utc(),
+      );
+    });
+  });
+
+  it("schedule falls back to local time when no default time zone is configured", async () => {
+    await withTimeZone(null, async () => {
+      const task = recurringTaskWith({
+        class_name: "JobWithoutArguments",
+        schedule: "every day at 9am",
+      });
+      expect(task.nextTime()).toEqual((Fugit.parse("0 9 * * *") as Cron).nextTime().utc());
+    });
+  });
+
+  it("configured default time zone accepts Rails time zone names", async () => {
+    await withTimeZone("Eastern Time (US & Canada)", async () => {
+      const task = recurringTaskWith({
+        class_name: "JobWithoutArguments",
+        schedule: "every day at 9am",
+      });
+      expect(task.nextTime()).toEqual(
+        (Fugit.parse("0 9 * * * America/New_York") as Cron).nextTime().utc(),
+      );
+    });
+  });
+
+  it("default time zone doesn't change the displayed schedule", async () => {
+    await withTimeZone("America/New_York", async () => {
+      const task = recurringTaskWith({
+        class_name: "JobWithoutArguments",
+        schedule: "every day at 9am",
+      });
+      expect(task.toString().endsWith("[ 0 9 * * * ]")).toBeTruthy();
+    });
+  });
+
+  it("reports Job::EnqueueError to Rails.error when enqueuing via Solid Queue", async () => {
+    vi.spyOn(Job, "createBang").mockRejectedValue(new Deadlocked());
+    const subscriber = new ErrorBuffer();
+    const at = Time.now();
+
+    await withErrorSubscriber(subscriber, async () => {
+      const task = recurringTaskWith({ class_name: "JobWithoutArguments" });
+      await task.enqueue({ at: at });
+    });
+
+    expect(subscriber.errors.length).toEqual(1);
+    const [error, options] = subscriber.errors[0];
+    expect(error).toBeInstanceOf(Job.EnqueueError);
+    expect(error.message).toMatch("ActiveRecord::Deadlocked");
+    expect(options.handled).toEqual(true);
+    expect(options.source).toEqual("application.solid_queue");
+    expect((options.context as { task: unknown }).task).toEqual("task-id");
+    expect((options.context as { at: unknown }).at).toEqual(at);
+  });
+
+  it("reports enqueue error to Rails.error when using another adapter", async () => {
+    vi.spyOn(AsyncAdapter.prototype, "enqueue").mockImplementation(() => {
+      throw new EnqueueError("All is broken");
+    });
+    const subscriber = new ErrorBuffer();
+    const at = Time.now();
+
+    await withErrorSubscriber(subscriber, async () => {
+      const task = recurringTaskWith({ class_name: "JobUsingAsyncAdapter" });
+      await task.enqueue({ at: at });
+    });
+
+    expect(subscriber.errors.length).toEqual(1);
+    const [error, options] = subscriber.errors[0];
+    expect(error).toBeInstanceOf(EnqueueError);
+    expect(error.message).toEqual("All is broken");
+    expect(options.handled).toEqual(true);
+    expect(options.source).toEqual("application.solid_queue");
+    expect((options.context as { task: unknown }).task).toEqual("task-id");
+    expect((options.context as { at: unknown }).at).toEqual(at);
   });
 });

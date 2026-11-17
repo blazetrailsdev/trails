@@ -7,13 +7,14 @@ import {
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Time } from "@blazetrails/date";
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
-import { TopLevel, constSet } from "@blazetrails/ruby-compat";
+import { CancelledOperationError, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import {
   Job,
   Process,
   RecurringExecution,
   RecurringTask,
   Scheduler,
+  SolidQueue,
   SolidQueueAdapter,
 } from "../lib/index.js";
 import { ApplicationJob } from "./support/application-job.js";
@@ -260,6 +261,51 @@ describe("SchedulerTest", () => {
       expect(process.metadata).toBeEmpty();
     } finally {
       await scheduler.stop();
+    }
+  });
+
+  it("reschedules a dynamic task recreated with the same key", async () => {
+    let recurringSchedule: InstanceType<typeof Scheduler.RecurringSchedule> | null = null;
+    travelTo(Time.utc(2026, 8, 25, 10, 15));
+    try {
+      await SolidQueue.scheduleRecurringTask("dynamic_task", {
+        class: "AddToBufferJob",
+        schedule: "every hour",
+        args: [42],
+      });
+      const originalTask = await RecurringTask.findByBang({ key: "dynamic_task" });
+      recurringSchedule = new Scheduler.RecurringSchedule({}, { dynamicTasksEnabled: true });
+      await recurringSchedule.scheduleTasks();
+      const originalScheduledTask = recurringSchedule.scheduledTasks.get(originalTask.id)!;
+
+      await SolidQueue.unscheduleRecurringTask("dynamic_task");
+      await SolidQueue.scheduleRecurringTask("dynamic_task", {
+        class: "AddToBufferJob",
+        schedule: "every day",
+        args: [42],
+      });
+      const replacementTask = await RecurringTask.findByBang({
+        key: "dynamic_task",
+      });
+
+      await recurringSchedule.rescheduleDynamicTasks();
+      const replacementScheduledTask = recurringSchedule.scheduledTasks.get(replacementTask.id)!;
+
+      expect(originalScheduledTask.reason).toBeInstanceOf(CancelledOperationError);
+      expect(replacementScheduledTask).not.toBe(originalScheduledTask);
+      expect(replacementScheduledTask.initialDelay).toBeCloseTo(
+        Number(replacementTask.nextTime().minus(Time.current() as Time)),
+        1,
+      );
+
+      await recurringSchedule.scheduleNextRun(originalTask, { runAt: originalTask.nextTime() });
+      expect([...recurringSchedule.scheduledTasks.keys()]).toEqual([replacementTask.id]);
+      expect(recurringSchedule.scheduledTasks.get(replacementTask.id)).toBe(
+        replacementScheduledTask,
+      );
+    } finally {
+      travelBack();
+      await recurringSchedule?.unscheduleTasks();
     }
   });
 

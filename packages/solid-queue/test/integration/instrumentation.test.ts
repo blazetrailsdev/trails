@@ -39,7 +39,7 @@ import {
 } from "../support/processes-test-helper.js";
 import { loadAppSchema } from "../support/queue-schema.js";
 import { RaisingJob } from "../support/raising-job.js";
-import { SequentialUpdateResultJob } from "../support/sequential-update-result-job.js";
+import { NonOverlappingUpdateResultJob } from "../support/non-overlapping-update-result-job.js";
 
 type NotificationArgs = [string, unknown, unknown, unknown, { [key: string]: unknown }];
 
@@ -382,7 +382,8 @@ describe("InstrumentationTest", () => {
   it("discarding jobs in bulk emits a discard_all event", async () => {
     for (let i = 0; i < 5; i++) await AddToBufferJob.performLater("A");
     const result = await JobResult.createBang();
-    for (let i = 0; i < 4; i++) await SequentialUpdateResultJob.performLater(result, { name: "A" });
+    for (let i = 0; i < 4; i++)
+      await NonOverlappingUpdateResultJob.performLater(result, { name: "A" });
 
     const events = await subscribed("discard_all.solid_queue", async () => {
       await ReadyExecution.discardAllFromJobs(Job.all());
@@ -391,7 +392,7 @@ describe("InstrumentationTest", () => {
 
     expect(events.length).toEqual(2);
     assertEvent(events[0], "discard_all", { jobs_size: 9, status: "ready", size: 6 });
-    assertEvent(events[1], "discard_all", { jobs_size: 3, status: "ready", size: 0 });
+    assertEvent(events[1], "discard_all", { jobs_size: 3, status: "ready", size: 1 });
   });
 
   it("discarding jobs in batches emits a discard_all event", async () => {
@@ -412,7 +413,8 @@ describe("InstrumentationTest", () => {
 
   it("unblocking job emits release_blocked event", async () => {
     const result = await JobResult.createBang();
-    for (let i = 0; i < 3; i++) await SequentialUpdateResultJob.performLater(result, { name: "A" });
+    for (let i = 0; i < 3; i++)
+      await NonOverlappingUpdateResultJob.performLater(result, { name: "A" });
 
     travelTo(days(3).fromNow() as Time);
     await Semaphore.expired().deleteAll();
@@ -441,10 +443,12 @@ describe("InstrumentationTest", () => {
 
   it("unblocking jobs in bulk emits release_many_blocked event", async () => {
     let result = await JobResult.createBang();
-    for (let i = 0; i < 4; i++) await SequentialUpdateResultJob.performLater(result, { name: "A" });
+    for (let i = 0; i < 4; i++)
+      await NonOverlappingUpdateResultJob.performLater(result, { name: "A" });
 
     result = await JobResult.createBang();
-    for (let i = 0; i < 3; i++) await SequentialUpdateResultJob.performLater(result, { name: "B" });
+    for (let i = 0; i < 3; i++)
+      await NonOverlappingUpdateResultJob.performLater(result, { name: "B" });
 
     travelTo(days(3).fromNow() as Time);
     await Semaphore.expired().deleteAll();

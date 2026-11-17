@@ -20,7 +20,7 @@ export class Maintenance {
   /** @internal */
   launchMaintenanceTask(this: MaintenanceHost): void {
     this._maintenanceTask = new TimerTask(
-      { runNow: true, executionInterval: Number(SolidQueue.processAliveThreshold) },
+      { runNow: true, executionInterval: SolidQueue.processAliveThreshold.toF() },
       () => this.pruneDeadProcesses(),
     );
 

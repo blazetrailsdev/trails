@@ -1,8 +1,18 @@
 import { type Base, type Relation } from "@blazetrails/activerecord";
 import { Base as ActiveJobBase } from "@blazetrails/activejob";
-import { Struct, constSet, rbFArray } from "@blazetrails/ruby-compat";
+import {
+  StandardError,
+  Struct,
+  constSet,
+  excBacktrace,
+  excSetBacktrace,
+  excSetupMessage,
+  rbFArray,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { Execution, UndiscardableError } from "./execution.js";
 import { SolidQueue } from "./solid-queue.js";
+import { UnrecoverableError } from "./processes/unrecoverable-error.js";
 
 export class Result extends Struct.new("success", "error") {
   declare success: boolean;
@@ -13,8 +23,18 @@ export class Result extends Struct.new("success", "error") {
   }
 }
 
+export class FinalizationError extends UnrecoverableError {
+  constructor(claimedExecution: ClaimedExecution, { cause }: { cause: Error }) {
+    super(
+      `Failed to finalize claimed execution ${claimedExecution.id} (job ${claimedExecution.job_id}): ${rbModName(cause.constructor)}: ${cause.message}`,
+    );
+    if (excBacktrace(cause) != null) excSetBacktrace(this, excBacktrace(cause));
+  }
+}
+
 export class ClaimedExecution extends Execution {
   declare static Result: typeof Result;
+  declare static FinalizationError: typeof FinalizationError;
 
   declare static orphaned: () => Relation<ClaimedExecution>;
   declare process_id: unknown;
@@ -23,6 +43,7 @@ export class ClaimedExecution extends Execution {
   static {
     constSet(SolidQueue, "ClaimedExecution", this);
     constSet(this, "Result", Result);
+    constSet(this, "FinalizationError", FinalizationError);
 
     this.belongsTo("process");
 
@@ -65,16 +86,19 @@ export class ClaimedExecution extends Execution {
     });
   }
 
-  static async failAllWith(error: Error): Promise<ClaimedExecution[]> {
-    return await SolidQueue.instrument("fail_many_claimed", {}, async (payload) => {
-      const executions = await this.includes("job").toArray();
+  static async failAllWith(error: Error): Promise<ClaimedExecution[] | null> {
+    const executions = await this.includes("job").toArray();
+    if (executions.length === 0) return null;
+
+    await SolidQueue.instrument("fail_many_claimed", {}, async (payload) => {
       for (const execution of executions) await execution.failedWith(error);
 
       payload["process_ids"] = [...new Set(executions.map((execution) => execution.process_id))];
       payload["job_ids"] = [...new Set(executions.map((execution) => execution.job_id))];
       payload["size"] = executions.length;
-      return executions;
+      payload["error"] = error;
     });
+    return executions;
   }
 
   static override async discardAllInBatches(..._args: unknown[]): Promise<never> {
@@ -86,17 +110,13 @@ export class ClaimedExecution extends Execution {
   }
 
   async perform(): Promise<void> {
-    try {
-      const result = await this.execute();
+    const result = await this.execute();
 
-      if (result.isSuccess()) {
-        await this.finished();
-      } else {
-        await this.failedWith(result.error!);
-        throw result.error;
-      }
-    } finally {
-      await (await this.job).unblockNextBlockedJob();
+    if (result.isSuccess()) {
+      await this.finalizing(() => this.finished());
+    } else {
+      await this.finalizing(() => this.failedWith(result.error!));
+      throw result.error;
     }
   }
 
@@ -106,7 +126,7 @@ export class ClaimedExecution extends Execution {
       "release_claimed",
       { job_id: job.id, process_id: this.process_id },
       async () => {
-        await this.transaction(async () => {
+        await this.unlessAlreadyFinalized(async () => {
           await job.dispatchBypassingConcurrencyLimits();
           await this.destroyBang();
         });
@@ -119,10 +139,23 @@ export class ClaimedExecution extends Execution {
   }
 
   async failedWith(error: Error): Promise<void> {
-    await this.transaction(async () => {
+    await this.finalize(async () => {
       await (await this.job).failedWith(error);
-      await this.destroyBang();
     });
+  }
+
+  /** @internal */
+  private async finalizing(block: () => Promise<unknown>): Promise<void> {
+    try {
+      await block();
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
+      if (await this.isStillClaimed()) {
+        throw excSetupMessage(new FinalizationError(this, { cause: error as Error }), error);
+      }
+
+      throw error;
+    }
   }
 
   /** @internal */
@@ -143,9 +176,38 @@ export class ClaimedExecution extends Execution {
 
   /** @internal */
   private async finished(): Promise<void> {
-    await this.transaction(async () => {
+    await this.finalize(async () => {
       await (await this.job).finishedBang();
-      await this.destroyBang();
     });
+  }
+
+  /** @internal */
+  private async finalize(block: () => Promise<unknown>): Promise<void> {
+    const finalized = await this.unlessAlreadyFinalized(async () => {
+      await block();
+      await this.destroyBang();
+      return true;
+    });
+
+    if (finalized) await (await this.job).unblockNextBlockedJob();
+  }
+
+  /** @internal */
+  private async unlessAlreadyFinalized<T>(block: () => Promise<T>): Promise<T | false> {
+    return (await this.transaction(async () => {
+      if (!(await ClaimedExecution.unscoped().lock().findBy({ id: this.id }))) return false;
+
+      return await block();
+    })) as T | false;
+  }
+
+  /** @internal */
+  private async isStillClaimed(): Promise<boolean> {
+    try {
+      return await ClaimedExecution.isExists(this.id);
+    } catch (error) {
+      if (!(error instanceof StandardError)) throw error;
+      return true;
+    }
   }
 }

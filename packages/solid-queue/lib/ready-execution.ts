@@ -92,9 +92,7 @@ export class ReadyExecution extends Execution {
 
   /** @internal */
   protected static override async discardJobs(jobIds: unknown[]): Promise<number> {
-    await SolidQueue.Job!.releaseAllConcurrencyLocks(
-      await SolidQueue.Job!.where({ id: jobIds }).toArray(),
-    );
+    await SolidQueue.Job!.unblockNextBlockedJobs(SolidQueue.Job!.where({ id: jobIds }));
     return await super.discardJobs(jobIds);
   }
 }
