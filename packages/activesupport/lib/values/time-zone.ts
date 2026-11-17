@@ -762,9 +762,7 @@ export class TimeZone {
   }
 
   private timeNow(): Time {
-    const ns = currentTimeInstant().epochNanoseconds;
-    const sec = ns >= 0n ? ns / 1_000_000_000n : -((-ns + 999_999_999n) / 1_000_000_000n);
-    return Time.at(Number(sec), Number(ns - sec * 1_000_000_000n), "nanosecond");
+    return Time.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
   }
 
   toString(): string {
