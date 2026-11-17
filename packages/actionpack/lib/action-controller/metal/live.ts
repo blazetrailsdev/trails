@@ -208,7 +208,9 @@ export class Response extends DispatchResponse {
   /** @internal */
   buildBuffer(response: DispatchResponse, body: Iterable<string>): Buffer {
     const buf = new Buffer(response);
-    each(body, (part) => buf.write(part));
+    const writes: Promise<void>[] = [];
+    each(body, (part) => writes.push(buf.write(part)));
+    new Thread(() => Promise.all(writes));
     return buf;
   }
 }
