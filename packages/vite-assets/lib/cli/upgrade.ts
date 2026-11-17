@@ -12,10 +12,7 @@ export class Upgrade extends Install {
     this.upgradeNpmPackages();
   }
 
-  /**
-   * @internal
-   * @inventedArm switch — PERMANENT
-   */
+  /** @internal */
   protected async upgradeRubyGems(): Promise<void> {
     this.say("Updating gems");
 
