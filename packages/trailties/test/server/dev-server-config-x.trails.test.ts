@@ -8,10 +8,10 @@ import { Trails, _resetTrailsEnv } from "../../lib/trails.js";
 describe("the development server", () => {
   let savedEnv: string | undefined;
   let savedUrl: string | undefined;
-  let server: DevServer | undefined;
+  let httpServer: Awaited<ReturnType<typeof DevServer.run>> | undefined;
 
   afterEach(async () => {
-    await server?.stop();
+    await new Promise((resolve) => (httpServer ? httpServer.close(resolve) : resolve(undefined)));
     await Base.connectionHandler.clearAllConnectionsBang("all");
     setEnv("TRAILS_ENV", savedEnv);
     setEnv("DATABASE_URL", savedUrl);
@@ -33,11 +33,8 @@ describe("the development server", () => {
     Trails.application!.config.setRoot(root);
     await Trails.initialize();
 
-    server = new DevServer({ port: 0, host: "127.0.0.1", cwd: root, app: Trails.application! });
-    await server.start();
-    const address = (
-      server as unknown as { server: { httpServer: { address(): { port: number } } } }
-    ).server.httpServer.address();
+    httpServer = await DevServer.run(Trails.application!, { Port: 0, Host: "127.0.0.1" });
+    const address = httpServer.address() as { port: number };
 
     const response = await fetch(`http://127.0.0.1:${address.port}/setting`);
     expect(response.status).toBe(200);

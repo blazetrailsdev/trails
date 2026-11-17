@@ -331,9 +331,9 @@ export class Trailtie extends BaseTrailtie {
     const coldPools = new Set<ConnectionPool>();
     const warmSchemaCache = async (pools: Iterable<ConnectionPool>): Promise<void> => {
       for (const pool of [...pools]) {
+        coldPools.delete(pool);
         try {
           await pool.schemaReflection.loadAllBang(pool);
-          coldPools.delete(pool);
         } catch (error) {
           if (!(error instanceof ActiveRecordError)) throw error;
           coldPools.add(pool);
