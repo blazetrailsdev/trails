@@ -28,7 +28,3 @@ Object.setPrototypeOf(
     },
   }),
 );
-
-export function inquiry(this: string): StringInquirer & Record<string, () => boolean> {
-  return new StringInquirer(this) as any;
-}

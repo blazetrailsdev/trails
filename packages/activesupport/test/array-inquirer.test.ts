@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { ArrayInquirer, inquiry } from "../lib/array-inquirer.js";
+import { ArrayInquirer } from "../lib/array-inquirer.js";
+import { inquiry } from "../lib/core-ext/array/inquiry.js";
 import {
   assert,
   assertNot,

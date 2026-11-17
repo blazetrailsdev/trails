@@ -196,3 +196,21 @@ describe("stub with a value", () => {
     expect(yielded).toEqual([2, 3, 1]);
   });
 });
+
+describe("assertCalledWith kwargs", () => {
+  const target = { greet: (_name: string, _opts?: object) => "" };
+
+  it("passes when positional args and kwargs both match", () => {
+    assertCalledWith(target, "greet", ["a"], { returns: "ok", loud: true }, () => {
+      expect(target.greet("a", { loud: true })).toBe("ok");
+    });
+  });
+
+  it("fails on a kwargs mismatch while the positional args match", () => {
+    expect(() =>
+      assertCalledWith(target, "greet", ["a"], { loud: true }, () => {
+        target.greet("a", { loud: false });
+      }),
+    ).toThrow(MockExpectationError);
+  });
+});

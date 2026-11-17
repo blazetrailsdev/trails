@@ -23,7 +23,7 @@ import {
   assertRespondTo,
   assertNil,
 } from "../../lib/testing/assertions.js";
-import { inquiry } from "../../lib/string-inquirer.js";
+import { inquiry } from "../../lib/core-ext/string/inquiry.js";
 import {
   CamelToUnderscore,
   ClassNameToForeignKeyWithUnderscore,

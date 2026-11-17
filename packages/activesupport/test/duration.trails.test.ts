@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { Temporal, Time, resetLocalTimeZoneId } from "@blazetrails/date";
-import { Rational, rbCInteger, rbCNumeric, rbFloatTypeP } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Rational,
+  rbCInteger,
+  rbCNumeric,
+  rbFloatTypeP,
+} from "@blazetrails/ruby-compat";
 import { Duration, Scalar, days, hours, months, seconds } from "../lib/duration.js";
 
 describe("Scalar", () => {
@@ -191,5 +197,11 @@ describe("Duration#sum over a JS Date receiver", () => {
   it("keeps the sub-second part of a pre-epoch instant", () => {
     const t = Temporal.Instant.fromEpochNanoseconds(-1_500_000_123n);
     expect(seconds(1).since(t).epochNanoseconds).toBe(-500_000_123n);
+  });
+});
+
+describe("ISO8601Parser::ParsingError", () => {
+  it("is an ArgumentError, as iso8601_parser.rb:13 subclasses ::ArgumentError", () => {
+    expect(() => Duration.parse("")).toThrow(ArgumentError);
   });
 });

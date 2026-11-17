@@ -33,7 +33,7 @@ import {
 import type { DateParts } from "@blazetrails/date";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { instantFrom } from "../temporal.js";
-import { currentTime } from "../time-travel.js";
+import { currentTime, currentTimeInstant } from "../time-travel.js";
 import { utcToLocalReturnsUtcOffsetTimes } from "../core-ext/date-and-time/compatibility.js";
 
 const MAPPING: Record<string, string> = {
@@ -435,12 +435,8 @@ export class TimeZone {
     return zones;
   }
 
-  /**
-   * @missingRailsCall in_time_zone — PERMANENT
-   * @missingRailsCall utc — PERMANENT
-   */
   now(): TimeWithZone {
-    return new TimeWithZone(instantFrom(this.timeNow()), this);
+    return this.timeNow().utc().inTimeZone(this) as TimeWithZone;
   }
 
   local(
@@ -765,8 +761,10 @@ export class TimeZone {
     }
   }
 
-  private timeNow(): Date {
-    return currentTime();
+  private timeNow(): Time {
+    const ns = currentTimeInstant().epochNanoseconds;
+    const sec = ns >= 0n ? ns / 1_000_000_000n : -((-ns + 999_999_999n) / 1_000_000_000n);
+    return Time.at(Number(sec), Number(ns - sec * 1_000_000_000n), "nanosecond");
   }
 
   toString(): string {

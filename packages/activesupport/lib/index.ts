@@ -468,7 +468,8 @@ export {
 } from "./core-ext/object/duplicable.js";
 export { CurrentAttributes } from "./current-attributes.js";
 export { SecurityUtils } from "./security-utils.js";
-export { StringInquirer, inquiry } from "./string-inquirer.js";
+export { StringInquirer } from "./string-inquirer.js";
+export { inquiry } from "./core-ext/string/inquiry.js";
 export { stripThenable } from "./strip-thenable.js";
 export { StringIO } from "@blazetrails/ruby-compat";
 export { EnvironmentInquirer } from "./environment-inquirer.js";
@@ -486,7 +487,7 @@ export { Executor } from "./executor.js";
 export { objectWith } from "./core-ext/object/with.js";
 export { withOptions } from "./core-ext/object/with-options.js";
 export { OptionMerger } from "./option-merger.js";
-export { ArrayInquirer, inquiry as arrayInquiry } from "./array-inquirer.js";
+export { ArrayInquirer } from "./array-inquirer.js";
 export { tryCall, tryWith, tryBang } from "./try.js";
 export { OrderedOptions, InheritableOptions } from "./ordered-options.js";
 export { hexdigest } from "./hexdigest.js";

@@ -40,9 +40,3 @@ Object.setPrototypeOf(
     },
   }),
 );
-
-export function inquiry<T extends string | symbol>(
-  this: T[],
-): ArrayInquirer<T> & Record<string, () => boolean> {
-  return new ArrayInquirer<T>(...this) as any;
-}
