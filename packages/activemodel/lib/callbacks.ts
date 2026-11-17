@@ -86,7 +86,7 @@ export interface RunCallbacksOptions {
 }
 
 export type CallbackConditionFilter<TRecord = CallbackRecord> =
-  | { _(record: TRecord, value?: unknown): boolean }["_"]
+  | { _(record: TRecord, value?: unknown): boolean | PromiseLike<boolean> }["_"]
   | Value
   | string;
 
