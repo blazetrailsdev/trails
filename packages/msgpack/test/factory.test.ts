@@ -1,8 +1,9 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
   defineModule,
+  extend,
   FrozenError,
   Hash,
   include,
@@ -12,8 +13,10 @@ import {
   rbCInteger,
   rbCSymbol,
   rbEqual,
+  stringToSym,
   Struct,
   fetch,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 import {
   ExtensionValue,
@@ -24,6 +27,7 @@ import {
   Unpacker,
 } from "../lib/index.js";
 
+const toSym = (data: Uint8Array) => stringToSym(new TextDecoder().decode(data));
 const bin = (s: string) => Uint8Array.from(s, (c) => c.charCodeAt(0));
 
 class MyType {
@@ -189,11 +193,15 @@ describe("MessagePack::Factory", () => {
   });
 
   describe("#dump and #load", () => {
-    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-    it.skip("can be used like a standard coder", () => {});
+    it("can be used like a standard coder", () => {
+      subject.registerType(0x00, rbCSymbol);
+      expect(subject.load(subject.dump(":symbol"))).toBe(":symbol");
+    });
 
-    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-    it.skip("is alias as pack and unpack", () => {});
+    it("is alias as pack and unpack", () => {
+      subject.registerType(0x00, rbCSymbol);
+      expect(subject.unpack(subject.pack(":symbol"))).toBe(":symbol");
+    });
 
     it("accept options", () => {
       const hash = subject.unpack(MessagePack.pack({ k: "v" }), { symbolizeKeys: true });
@@ -376,15 +384,39 @@ describe("MessagePack::Factory", () => {
       expect(my.b).toEqual(2);
     });
 
-    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-    it.skip("handles Symbol type with `packer: nil`", () => {});
+    it("handles Symbol type with `packer: nil`", () => {
+      const factory = new Factory();
+      factory.registerType(0x00, rbCSymbol, { packer: null });
+      expect(factory.load(factory.dump(":foo"))).toBe("foo");
+    });
 
     describe("registering multiple ext type for the same class", () => {
-      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-      it.skip("select the type based on code for deserialization", () => {});
+      const payload = () => {
+        const factory = new Factory();
+        factory.registerType(0x01, rbCSymbol, { packer: "toS", unpacker: toSym });
+        return factory.dump(":foobar");
+      };
+      const raise = () => {
+        throw new NotImplementedError();
+      };
 
-      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-      it.skip("uses the last registered packer for serialization", () => {});
+      it("select the type based on code for deserialization", () => {
+        const factory = new Factory();
+        factory.registerType(0x00, rbCSymbol, { packer: raise, unpacker: raise });
+        factory.registerType(0x01, rbCSymbol, { packer: "toS", unpacker: toSym });
+        factory.registerType(0x02, rbCSymbol, { packer: raise, unpacker: raise });
+
+        expect(factory.load(payload())).toBe(":foobar");
+      });
+
+      it("uses the last registered packer for serialization", () => {
+        const factory = new Factory();
+        factory.registerType(0x00, rbCSymbol, { packer: raise, unpacker: raise });
+        factory.registerType(0x02, rbCSymbol, { packer: raise, unpacker: raise });
+        factory.registerType(0x01, rbCSymbol, { packer: "toS", unpacker: toSym });
+
+        expect(factory.dump(":foobar")).toEqual(payload());
+      });
     });
 
     describe("registering an ext type for a module", () => {
@@ -414,8 +446,10 @@ describe("MessagePack::Factory", () => {
       });
 
       describe("packing an object which has been extended by the module", () => {
-        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-        it.skip('is expected to eq "\\xC7\\x0F\\x01value_msgpacked".force_encoding(Encoding::BINARY)', () => {});
+        it('is expected to eq "\\xC7\\x0F\\x01value_msgpacked".force_encoding(Encoding::BINARY)', () => {
+          const object = extend({}, Mod);
+          expect(factory.packer().pack(object).toS()).toEqual(bin("\xC7\x0F\x01value_msgpacked"));
+        });
       });
 
       describe("unpacking with the module", () => {
@@ -611,49 +645,106 @@ describe("MessagePack::Factory", () => {
   });
 
   describe("the special treatment of symbols with ext type", () => {
+    const roundtrip = (object: unknown, options: object | null = null) =>
+      subject.load(subject.dump(object), options);
+
     describe("using the optimized symbol unpacker", () => {
-      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-      it.skip("lets symbols survive a roundtrip", () => {});
+      beforeEach(() => {
+        subject.registerType(0x00, rbCSymbol, {
+          packer: "toMsgpackExt",
+          unpacker: "fromMsgpackExt",
+          optimizedSymbolsParsing: true,
+        });
+      });
 
-      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-      it.skip("works with empty symbol", () => {});
+      it("lets symbols survive a roundtrip", () => {
+        expect(roundtrip(":symbol")).toBe(":symbol");
+      });
 
-      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-      it.skip("preserves encoding for ASCII symbols", () => {});
+      it("works with empty symbol", () => {
+        expect(roundtrip(":")).toBe(":");
+      });
 
-      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-      it.skip("preserves encoding for UTF-8 symbols", () => {});
+      it("preserves encoding for ASCII symbols", () => {
+        expect(roundtrip(":symbol")).toBe(":symbol");
+      });
+
+      it("preserves encoding for UTF-8 symbols", () => {
+        expect(roundtrip(":fée")).toBe(":fée");
+      });
     });
 
     describe("if no ext type is registered for symbols", () => {
-      // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-      it.skip("converts symbols to string", () => {});
+      it("converts symbols to string", () => {
+        expect(roundtrip(":symbol")).toEqual("symbol");
+      });
     });
 
     describe("if an ext type is registered for symbols", () => {
       describe("if using the default serializer", () => {
-        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-        it.skip("lets symbols survive a roundtrip", () => {});
+        beforeEach(() => {
+          subject.registerType(0x00, rbCSymbol);
+        });
 
-        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-        it.skip("works with hash keys", () => {});
+        it("lets symbols survive a roundtrip", () => {
+          expect(roundtrip(":symbol")).toBe(":symbol");
+        });
 
-        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-        it.skip("works with frozen: true option", () => {});
+        it("works with hash keys", () => {
+          expect(roundtrip({ ":symbol": 1 })).toEqual({ ":symbol": 1 });
+        });
 
-        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-        it.skip("preserves encoding for ASCII symbols", () => {});
+        it("works with frozen: true option", () => {
+          expect(roundtrip(":symbol", { freeze: true })).toBe(":symbol");
+        });
 
-        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-        it.skip("preserves encoding for UTF-8 symbols", () => {});
+        it("preserves encoding for ASCII symbols", () => {
+          expect(roundtrip(":symbol")).toBe(":symbol");
+        });
 
-        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
+        it("preserves encoding for UTF-8 symbols", () => {
+          expect(roundtrip(":fée")).toBe(":fée");
+        });
+
+        // PERMANENT-SKIP: a Symbol is a JS string and carries no ISO-8859-1 encoding to lose (CLAUDE.md, "A String has no encoding tag either").
         it.skip("does not handle symbols in other encodings", () => {});
       });
 
       describe("if using a custom serializer", () => {
-        // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-        it.skip("lets symbols survive a roundtrip", () => {});
+        const proto = rbCSymbol.prototype as { toMsgpackExt(this: string): unknown };
+        const klass = rbCSymbol as unknown as { fromMsgpackExt(data: Uint8Array): string };
+        let toMsgpackExtOrig: typeof proto.toMsgpackExt;
+        let fromMsgpackExtOrig: typeof klass.fromMsgpackExt;
+
+        beforeEach(() => {
+          toMsgpackExtOrig = proto.toMsgpackExt;
+          proto.toMsgpackExt = function (this: string) {
+            const codepoints = Array.from(symbolToS(this), (c) => c.codePointAt(0)!);
+            return Uint8Array.from(codepoints.flatMap((c) => [c >> 8, c & 0xff]));
+          };
+
+          fromMsgpackExtOrig = klass.fromMsgpackExt;
+          klass.fromMsgpackExt = (data: Uint8Array) => {
+            const chars: string[] = [];
+            for (let i = 0; i < data.length; i += 2) {
+              chars.push(String.fromCharCode((data[i] << 8) | data[i + 1]));
+            }
+            return stringToSym(chars.join(""));
+          };
+        });
+
+        beforeEach(() => {
+          subject.registerType(0x00, rbCSymbol);
+        });
+
+        it("lets symbols survive a roundtrip", () => {
+          expect(roundtrip(":symbol")).toBe(":symbol");
+        });
+
+        afterEach(() => {
+          proto.toMsgpackExt = toMsgpackExtOrig;
+          klass.fromMsgpackExt = fromMsgpackExtOrig;
+        });
       });
     });
   });
@@ -758,8 +849,11 @@ describe("MessagePack::Factory", () => {
       }).toThrow(new FrozenError("can't modify frozen MessagePack::Unpacker"));
     });
 
-    // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-    it.skip("types can be registered before the pool is created", () => {});
+    it("types can be registered before the pool is created", () => {
+      factory.registerType(0x00, rbCSymbol);
+      const pool = factory.pool(1);
+      expect(pool.load(pool.dump(":foo"))).toBe(":foo");
+    });
 
     it("types cannot be registered after the pool is created", () => {
       const pool = factory.pool(1);

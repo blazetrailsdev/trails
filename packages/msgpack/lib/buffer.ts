@@ -623,7 +623,8 @@ export class Buffer {
     }
   }
 
-  private readToString(string: Uint8Array[], length: number): number {
+  /** @internal */
+  readToString(string: Uint8Array[], length: number): number {
     if (length === 0) {
       return 0;
     }

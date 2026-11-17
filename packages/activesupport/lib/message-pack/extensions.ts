@@ -341,9 +341,9 @@ export const Extensions = {
 
   writeIpaddr(ipaddr: IPAddr, packer: Packer): void {
     if (ipaddr.prefix < 32 || (ipaddr.isIpv6() && ipaddr.prefix < 128)) {
-      packer.write(`${ipaddr}/${ipaddr.prefix}`);
+      packer.writeString(`${ipaddr}/${ipaddr.prefix}`);
     } else {
-      packer.write(ipaddr.toString());
+      packer.writeString(ipaddr.toString());
     }
   },
 
