@@ -61,7 +61,6 @@ export class FileStore extends Store implements CacheStore {
     this._cachePath = String(cachePath);
   }
 
-  /** @missingRailsName collect — PERMANENT */
   override async clear(): Promise<void> {
     try {
       const rootDirs = (await Dir.childrenAsync(this.cachePath)).filter(
