@@ -329,22 +329,21 @@ export class Trailtie extends BaseTrailtie {
       { after: "setup_main_autoloader" },
       async () => {
         if (Trails.env["test?"]()) return;
-        let loadSchemaCache: Promise<unknown> | undefined;
+        let activeRecord: typeof Base | undefined;
         onLoad("active_record", (base: typeof Base) => {
-          loadSchemaCache = (async () => {
-            for (const pool of base.connectionHandler.connectionPoolList("all")) {
-              try {
-                await pool.schemaReflection.loadAllBang(pool);
-              } catch (error) {
-                if (!(error instanceof ActiveRecordError)) throw error;
-                console.warn(
-                  `Failed to load the schema cache because of ${error.constructor.name}: ${error.message}`,
-                );
-              }
-            }
-          })();
+          activeRecord = base;
         });
-        await loadSchemaCache;
+        if (activeRecord === undefined) return;
+        for (const pool of activeRecord.connectionHandler.connectionPoolList("all")) {
+          try {
+            await pool.schemaReflection.loadAllBang(pool);
+          } catch (error) {
+            if (!(error instanceof ActiveRecordError)) throw error;
+            console.warn(
+              `Failed to load the schema cache because of ${error.constructor.name}: ${error.message}`,
+            );
+          }
+        }
       },
     );
 
