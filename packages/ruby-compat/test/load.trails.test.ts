@@ -8,6 +8,7 @@ import {
   rbFLoad,
   rbFRequireFile,
   registerCompiledFiles,
+  setLoadImporter,
 } from "../lib/load.js";
 import { TopLevel } from "../lib/object.js";
 import { constGet, rbModRemoveConst } from "../lib/variable.js";
@@ -28,6 +29,28 @@ describe("rbFLoad", () => {
       expect(rbModRemoveConst(Object, "RbFLoadProbe")).toBe(2);
       expect(() => rbModRemoveConst(Object, "RbFLoadProbe")).toThrow(/not defined/);
     } finally {
+      await rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("setLoadImporter", () => {
+  it("loads a file through the host's import when one is set", async () => {
+    const root = await mkdtemp(join(tmpdir(), "trails-load-importer-"));
+    const fname = join(root, "probe.mjs");
+    const seen: string[] = [];
+    setLoadImporter((url) => {
+      seen.push(url);
+      return import(url);
+    });
+    try {
+      await writeFile(fname, `export const LoadImporterProbe = 1;\n`);
+      await rbFLoad(fname);
+      expect(seen).toHaveLength(1);
+      expect(seen[0]).toContain("probe.mjs");
+      expect(rbModRemoveConst(Object, "LoadImporterProbe")).toBe(1);
+    } finally {
+      setLoadImporter(null);
       await rm(root, { recursive: true, force: true });
     }
   });

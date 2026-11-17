@@ -8,6 +8,19 @@ import { TopLevel } from "./object.js";
 let loads = 0;
 const compiledFiles = new Map<string, () => Promise<unknown>>();
 const loadedFiles = new Set<string>();
+let importer: ((url: string) => Promise<unknown>) | null = null;
+
+/**
+ * Sets the import {@link loadIseqEval} (`load_iseq_eval`, `vendor/ruby/v3.3.11/load.c:744`) uses for a file no compiled build
+ * registered, as `Zeitwerk::Loader#importer` is for an autoloaded file: under
+ * vitest an application's own `import()` resolves in vite's graph, where this
+ * package's resolves in Node's (zeitwerk CLAUDE.md, "Module#autoload is a build step").
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function setLoadImporter(fn: ((url: string) => Promise<unknown>) | null): void {
+  importer = fn;
+}
 
 /**
  * Registers the modules a compiled build bundled for files it cannot reach
@@ -85,7 +98,10 @@ export async function loadIseqEval(fname: string, fresh = false): Promise<Record
     if (pathToFileURL === undefined) throw new LoadError(`cannot load such file -- ${fname}`);
     const path = pathToFileURL(fname);
     if (fresh) path.search = `?${(loads += 1)}`;
-    exports = (await import(path.href)) as Record<string, unknown>;
+    exports = (await (importer !== null ? importer(path.href) : import(path.href))) as Record<
+      string,
+      unknown
+    >;
   }
   loadedFiles.add(full);
   return exports;
