@@ -521,7 +521,6 @@ export class AppGenerator extends AppBase {
       desc: "Preconfigure smaller stack for API only apps",
     });
     this.classOption("minimal", { type: "boolean", desc: "Preconfigure a minimal trails app" });
-    /** @missingRailsArgs class_option — PERMANENT */
     this.classOption("javascript", {
       type: "string",
       aliases: ["-j", "--js"],

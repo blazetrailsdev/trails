@@ -45,7 +45,6 @@ export type AppBaseOptions = GeneratorOptions & {
 export const NODE_LTS_VERSION = "20.11.1";
 export const BUN_VERSION = "1.0.1";
 
-/** @inventedArm vite — PERMANENT */
 export const JAVASCRIPT_OPTIONS = ["vite", "bun", "webpack", "esbuild", "rollup"];
 export const CSS_OPTIONS = ["tailwind", "bootstrap", "bulma", "postcss", "sass"];
 
