@@ -23,9 +23,7 @@ export class FailedExecution extends Execution {
 
     this.serialize("error", { coder: JSON });
 
-    this.beforeCreate(function (this: FailedExecution) {
-      return this.expandErrorDetailsFromException();
-    });
+    this.beforeSave(":expandErrorDetailsFromException", { if: ":exception" });
   }
 
   get exception(): Error | null {
@@ -42,7 +40,12 @@ export class FailedExecution extends Execution {
       { jobs_size: Array.isArray(jobs) ? jobs.length : await jobs.size() },
       async (payload) => {
         return await this.transaction(async () => {
-          return (payload["size"] = await this.dispatchJobs(await this.lockAllFromJobs(jobs)));
+          const jobIds = await this.lockAllFromJobs(jobs);
+          await SolidQueue.Job!.where({ id: jobIds }).findEach({}, async (job) => {
+            await job.resetExecutionCounters();
+          });
+
+          return (payload["size"] = await this.dispatchJobs(jobIds));
         });
       },
     );

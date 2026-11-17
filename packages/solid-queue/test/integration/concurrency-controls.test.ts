@@ -28,7 +28,7 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 import { Range, TopLevel, constSet } from "@blazetrails/ruby-compat";
 import { loadAppSchema } from "../support/queue-schema.js";
 import { DiscardableUpdateResultJob } from "../support/discardable-update-result-job.js";
-import { SequentialUpdateResultJob } from "../support/sequential-update-result-job.js";
+import { NonOverlappingUpdateResultJob } from "../support/non-overlapping-update-result-job.js";
 import { ThrottledUpdateResultJob } from "../support/throttled-update-result-job.js";
 import { UpdateResultJob } from "../support/update-result-job.js";
 import {
@@ -110,11 +110,11 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
   it("run several conflicting jobs over the same record sequentially", async () => {
     for (const name of new Range("A", "F").toA()) {
-      await SequentialUpdateResultJob.performLater(result, { name, pause: 0.2 });
+      await NonOverlappingUpdateResultJob.performLater(result, { name, pause: 0.2 });
     }
 
     for (const name of new Range("G", "K").toA()) {
-      await SequentialUpdateResultJob.performLater(result, { name });
+      await NonOverlappingUpdateResultJob.performLater(result, { name });
     }
 
     await waitForJobsToFinishFor(5);
@@ -130,16 +130,22 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     });
 
     for (const [i, name] of new Range("A", "F").toA().entries()) {
-      await SequentialUpdateResultJob.set({ wait: seconds(0.2 + i * 0.01) }).performLater(result, {
-        name,
-        pause: 0.3,
-      });
+      await NonOverlappingUpdateResultJob.set({ wait: seconds(0.2 + i * 0.01) }).performLater(
+        result,
+        {
+          name,
+          pause: 0.3,
+        },
+      );
     }
 
     for (const [i, name] of new Range("G", "K").toA().entries()) {
-      await SequentialUpdateResultJob.set({ wait: seconds(0.3 + i * 0.01) }).performLater(result, {
-        name,
-      });
+      await NonOverlappingUpdateResultJob.set({ wait: seconds(0.3 + i * 0.01) }).performLater(
+        result,
+        {
+          name,
+        },
+      );
     }
 
     await waitForJobsToFinishFor(5);
@@ -181,7 +187,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
   it("run several jobs over the same record sequentially, with some of them failing", async () => {
     for (const [i, name] of new Range("A", "F").toA().entries()) {
-      await SequentialUpdateResultJob.performLater(result, {
+      await NonOverlappingUpdateResultJob.performLater(result, {
         name,
         pause: 0.2,
         exception: i % 2 === 0 ? ExpectedTestError : null,
@@ -189,7 +195,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
     }
 
     for (const name of new Range("G", "K").toA()) {
-      await SequentialUpdateResultJob.performLater(result, { name });
+      await NonOverlappingUpdateResultJob.performLater(result, { name });
     }
 
     await waitForJobsToFinishFor(5);
@@ -200,7 +206,8 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
   it("rely on dispatcher to unblock blocked executions with an available semaphore", async () => {
     const job = await Job.findByBang({
-      active_job_id: (await SequentialUpdateResultJob.performLater(result, { name: "A" }))!.jobId,
+      active_job_id: (await NonOverlappingUpdateResultJob.performLater(result, { name: "A" }))!
+        .jobId,
     });
 
     await waitForJobsToFinishFor(5);
@@ -219,7 +226,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       null,
       async () => {
         for (const name of new Range("B", "K").toA()) {
-          await SequentialUpdateResultJob.performLater(result, { name });
+          await NonOverlappingUpdateResultJob.performLater(result, { name });
         }
       },
     );
@@ -240,7 +247,8 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
   it("rely on dispatcher to unblock blocked executions with an expired semaphore", async () => {
     const job = await Job.findByBang({
-      active_job_id: (await SequentialUpdateResultJob.performLater(result, { name: "A" }))!.jobId,
+      active_job_id: (await NonOverlappingUpdateResultJob.performLater(result, { name: "A" }))!
+        .jobId,
     });
     await waitForJobsToFinishFor(5);
     await assertNoUnfinishedJobs();
@@ -258,7 +266,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
       null,
       async () => {
         for (const name of new Range("B", "K").toA()) {
-          await SequentialUpdateResultJob.performLater(result, { name });
+          await NonOverlappingUpdateResultJob.performLater(result, { name });
         }
       },
     );
@@ -280,7 +288,7 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
   });
 
   it("don't block claimed executions that get released", async () => {
-    await SequentialUpdateResultJob.performLater(result, {
+    await NonOverlappingUpdateResultJob.performLater(result, {
       name: "I'll be released to ready",
       pause: Number(SolidQueue.shutdownTimeout) + 10,
     });
@@ -299,8 +307,8 @@ describe("ConcurrencyControlsTest", { timeout: 30_000 }, () => {
 
   it("verify transactions remain valid after Job creation conflicts via limits_concurrency", async () => {
     await Base.transaction(async () => {
-      await SequentialUpdateResultJob.performLater(result, { name: "A", pause: 0.2 });
-      await SequentialUpdateResultJob.performLater(result, { name: "B" });
+      await NonOverlappingUpdateResultJob.performLater(result, { name: "A", pause: 0.2 });
+      await NonOverlappingUpdateResultJob.performLater(result, { name: "B" });
 
       try {
         expect(await Job.count()).toBe(2);

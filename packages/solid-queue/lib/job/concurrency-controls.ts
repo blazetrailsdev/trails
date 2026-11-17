@@ -93,7 +93,7 @@ export class ConcurrencyControls {
   }
 
   jobClass(): unknown {
-    return (this._jobClass ??= safeConstantize(this.class_name));
+    return (this._jobClass ??= safeConstantize(this.class_name) ?? null);
   }
 
   /** @internal */

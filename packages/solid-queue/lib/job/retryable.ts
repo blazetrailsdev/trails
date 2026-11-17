@@ -1,5 +1,5 @@
 import { Concern, extend } from "@blazetrails/activesupport";
-import type { Base, Relation } from "@blazetrails/activerecord";
+import { RecordNotUnique, type Relation } from "@blazetrails/activerecord";
 import { classModule } from "@blazetrails/ruby-compat";
 import type { Job } from "../job.js";
 import { FailedExecution } from "../failed-execution.js";
@@ -16,8 +16,22 @@ export class Retryable {
     return await (await this.failedExecution)?.retry();
   }
 
-  async failedWith(exception: unknown): Promise<Base> {
-    return (await FailedExecution.createOrFindByBang({ job_id: this.id, exception }))!;
+  async failedWith(exception: Error): Promise<unknown> {
+    try {
+      return await FailedExecution.transaction(
+        async () => await FailedExecution.createBang({ job_id: this.id, exception: exception }),
+        { requiresNew: true },
+      );
+    } catch (e) {
+      if (!(e instanceof RecordNotUnique)) throw e;
+      let failedExecution: FailedExecution | null;
+      if ((failedExecution = await FailedExecution.findBy({ job_id: this.id }))) {
+        failedExecution.exception = exception;
+        return await failedExecution.saveBang();
+      } else {
+        return await this.retry();
+      }
+    }
   }
 
   async resetExecutionCounters(): Promise<unknown> {
