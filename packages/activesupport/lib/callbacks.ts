@@ -67,30 +67,6 @@ function isThenable(v: unknown): v is PromiseLike<unknown> {
   );
 }
 
-/** @noRailsEquivalent PERMANENT */
-function _conditionsPass(
-  conditions: Array<(target: object, value: unknown) => unknown>,
-  target: object,
-  value: unknown,
-  syncChain: string | undefined,
-  from = 0,
-): boolean | Promise<boolean> {
-  for (let i = from; i < conditions.length; i++) {
-    const r = conditions[i](target, value);
-    if (isThenable(r)) {
-      if (syncChain !== undefined) {
-        new Thread(() => r);
-        throw new RuntimeError(`Async condition on sync chain "${syncChain}" — returned a Promise`);
-      }
-      return Promise.resolve(r).then((ok) =>
-        ok ? _conditionsPass(conditions, target, value, syncChain, i + 1) : false,
-      );
-    }
-    if (!r) return false;
-  }
-  return true;
-}
-
 export class Value {
   private readonly block: (value: unknown) => unknown;
 
@@ -372,9 +348,20 @@ export class Before {
   call(env: Environment): Environment | Promise<Environment> {
     const { target, value, halted, syncChain } = env;
     if (halted) return env;
-    const passed = _conditionsPass(this.userConditions, target, value, syncChain);
-    if (isThenable(passed)) return passed.then((ok) => (ok ? this._callFilter(env) : env));
-    return passed ? this._callFilter(env) : env;
+    const pending: PromiseLike<unknown>[] = [];
+    const passed = this.userConditions.every((c) => {
+      const r = c(target, value);
+      if (!isThenable(r)) return r;
+      pending.push(r);
+      return true;
+    });
+    if (!passed) return env;
+    if (pending.length === 0) return this._callFilter(env);
+    if (syncChain !== undefined) {
+      new Thread(() => Promise.all(pending));
+      throw new RuntimeError(`Async condition on sync chain "${syncChain}" — returned a Promise`);
+    }
+    return Promise.all(pending).then((rs) => (rs.every(Boolean) ? this._callFilter(env) : env));
   }
 
   private _callFilter(env: Environment): Environment | Promise<Environment> {
@@ -507,9 +494,20 @@ export class After {
   call(env: Environment): Environment | Promise<Environment> {
     const { target, value, halted, syncChain } = env;
     if (halted && this.halting) return env;
-    const passed = _conditionsPass(this.userConditions, target, value, syncChain);
-    if (isThenable(passed)) return passed.then((ok) => (ok ? this._callFilter(env) : env));
-    return passed ? this._callFilter(env) : env;
+    const pending: PromiseLike<unknown>[] = [];
+    const passed = this.userConditions.every((c) => {
+      const r = c(target, value);
+      if (!isThenable(r)) return r;
+      pending.push(r);
+      return true;
+    });
+    if (!passed) return env;
+    if (pending.length === 0) return this._callFilter(env);
+    if (syncChain !== undefined) {
+      new Thread(() => Promise.all(pending));
+      throw new RuntimeError(`Async condition on sync chain "${syncChain}" — returned a Promise`);
+    }
+    return Promise.all(pending).then((rs) => (rs.every(Boolean) ? this._callFilter(env) : env));
   }
 
   private _callFilter(env: Environment): Environment | Promise<Environment> {
