@@ -33,7 +33,7 @@ export class DocumentFragment extends XmlNode {
     block?: (options: ParseOptions) => void,
   ) {
     super(
-      document instanceof XmlDocument
+      !(document instanceof XmlNode)
         ? LibXmlDocument.create().createRoot("root")
         : defaultTreeAdapter.createDocumentFragment(),
       document,

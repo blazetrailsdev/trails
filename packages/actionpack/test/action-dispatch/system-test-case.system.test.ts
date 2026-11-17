@@ -21,7 +21,11 @@ TopLevel.Trails = {
 afterAll(() => {
   TopLevel.Trails = trails;
 });
-await SystemTestCase.startApplication(await import("vitest"), await import("vite"));
+await SystemTestCase.startApplication(
+  await import("vitest"),
+  await import("vite"),
+  await import("playwright"),
+);
 
 class PostsTest extends SystemTestCase {
   async testVisitingThePosts(): Promise<void> {

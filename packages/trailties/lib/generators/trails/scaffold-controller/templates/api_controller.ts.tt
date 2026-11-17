@@ -1,7 +1,7 @@
 <% const modelClassName = this.className().split("::").pop(); -%>
 <% const singular = this.singularTableName(); -%>
 <% const plural = this.pluralTableName(); -%>
-<% const params = `this.${ActiveSupport.Inflector.camelize(singular, false)}Params()`; -%>
+<% const params = `this._${ActiveSupport.Inflector.camelize(singular, false)}Params()`; -%>
 <% const ts = this.isTypeScript(); -%>
 import { <%= modelClassName %> } from "<%= "../".repeat(this.controllerClassPath().length + 1) %>models/<%= this.filePath() %><%= this.ext() %>";
 import { ApplicationController } from "<%= "../".repeat(this.controllerClassPath().length) || "./" %>application-controller<%= this.ext() %>";
@@ -9,7 +9,7 @@ import { ApplicationController } from "<%= "../".repeat(this.controllerClassPath
 export class <%= this.controllerClassName().split("::").pop() %>Controller extends ApplicationController {
 <% const sig = ts ? ": Promise<void>" : ""; -%>
   static {
-    this.beforeAction(":set<%= ActiveSupport.Inflector.camelize(singular) %>", { only: ["show", "update", "destroy"] });
+    this.beforeAction(":_set<%= ActiveSupport.Inflector.camelize(singular) %>", { only: ["show", "update", "destroy"] });
   }
 <% if (ts) { -%>
 
@@ -56,17 +56,17 @@ export class <%= this.controllerClassName().split("::").pop() %>Controller exten
   }
 
   // Use callbacks to share common setup or constraints between actions.
-  <%= ts ? "private " : "" %>async set<%= ActiveSupport.Inflector.camelize(singular) %>()<%= sig %> {
+  <%= ts ? "private " : "" %>async _set<%= ActiveSupport.Inflector.camelize(singular) %>()<%= sig %> {
     this.<%= singular %> = await <%= this.ormClass().find(modelClassName, 'this.params.expect("id")') %>;
   }
 
   // Only allow a list of trusted parameters through.
 <% if (this.attributesNames().length === 0) { -%>
-  <%= ts ? "private " : "" %><%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
+  <%= ts ? "private " : "" %>_<%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
     return this.params.fetch("<%= singular %>", {});
   }
 <% } else { -%>
-  <%= ts ? "private " : "" %><%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
+  <%= ts ? "private " : "" %>_<%= ActiveSupport.Inflector.camelize(singular, false) %>Params() {
     return this.params.expect({ <%= singular %>: [<%= this.permittedParams() %>] });
   }
 <% } -%>

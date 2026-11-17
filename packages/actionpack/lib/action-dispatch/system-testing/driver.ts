@@ -20,21 +20,12 @@ export interface DriverOptions {
   options?: Record<string, unknown>;
 }
 
-/** @internal */
-let playwrightModule: Record<string, unknown> | undefined;
-const PLAYWRIGHT_MODULE = "playwright";
-
 /** @noRailsEquivalent PERMANENT */
 export async function requirePlaywright(): Promise<Record<string, unknown>> {
-  if (playwrightModule) return playwrightModule;
-  try {
-    playwrightModule = (await import(PLAYWRIGHT_MODULE)) as Record<string, unknown>;
-    return playwrightModule;
-  } catch {
-    throw new Error(
-      "Playwright is required for system tests. Install it with: pnpm add playwright",
-    );
-  }
+  if (vite.playwright) return vite.playwright;
+  throw new Error(
+    "Playwright is required for system tests. Pass it to SystemTestCase.startApplication.",
+  );
 }
 
 interface BrowserType {

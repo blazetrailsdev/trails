@@ -1,5 +1,5 @@
 import type { RackHeaders } from "./index.js";
-import { File, rbStrSub, rbProcCall, regexpEscape } from "@blazetrails/ruby-compat";
+import { File, rbObjRespondTo, rbStrSub, rbProcCall, regexpEscape } from "@blazetrails/ruby-compat";
 import { RACK_ERRORS } from "./constants.js";
 import type { RackApp } from "./mock-request.js";
 import { BodyProxy } from "./body-proxy.js";
@@ -28,7 +28,7 @@ export class Sendfile {
     const response = await (rbProcCall(this.app, env) as ReturnType<RackApp>);
     const [, headers, body] = response;
 
-    if (body && typeof body.toPath === "function") {
+    if (rbObjRespondTo(body, "toPath")) {
       const type = this.variation(env);
       if (type != null && /x-accel-redirect/i.test(type)) {
         const path = File.expandPath(body.toPath());
@@ -38,7 +38,7 @@ export class Sendfile {
           headers[type.toLowerCase()] = escapePath(url).replace(/\?/g, "%3F");
           const obody = body;
           response[2] = new BodyProxy([], () => {
-            if (typeof obody.close === "function") obody.close();
+            if (rbObjRespondTo(obody, "close")) obody.close();
           });
         } else {
           env[RACK_ERRORS].puts("x-accel-mapping header missing");
@@ -49,7 +49,7 @@ export class Sendfile {
         headers[type.toLowerCase()] = path;
         const obody = body;
         response[2] = new BodyProxy([], () => {
-          if (typeof obody.close === "function") obody.close();
+          if (rbObjRespondTo(obody, "close")) obody.close();
         });
       } else if (type === "" || type == null) {
         /** @empty */

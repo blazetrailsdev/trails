@@ -5,6 +5,8 @@ import { requirePlaywright } from "../../lib/action-dispatch/system-testing/driv
 import { SystemTestCase } from "../../lib/action-dispatch/system-test-case.js";
 import { Server, vite } from "../../lib/action-dispatch/system-testing/server.js";
 
+vite.playwright ??= await import("playwright");
+
 const trails = TopLevel.Trails;
 TopLevel.Trails = {
   ...trails,
@@ -24,7 +26,11 @@ afterAll(() => {
   TopLevel.Trails = trails;
 });
 try {
-  await SystemTestCase.startApplication(await import("vitest"), await import("vite"));
+  await SystemTestCase.startApplication(
+    await import("vitest"),
+    await import("vite"),
+    await import("playwright"),
+  );
 } finally {
   Server.silencePuma = false;
 }

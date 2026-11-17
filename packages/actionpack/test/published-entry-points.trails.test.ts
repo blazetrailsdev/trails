@@ -1,11 +1,11 @@
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 
-const FORBIDDEN_PACKAGES = new Set(["vite", "vitest"]);
+const FORBIDDEN_PACKAGES = new Set(["vite", "vitest", "playwright"]);
 const SPECIFIER =
   /^\s*(?:import|export)\b(?!\s+type\b)[^;]*?from\s+"([^"]+)"|^\s*import\s+"([^"]+)"|(?<!typeof\s+)\bimport\(\s*"([^"]+)"\s*\)/gm;
 
-const FORBIDDEN_CONSTANT = /\bconst\s+\w+\s*=\s*"(vite|vitest)"/g;
+const FORBIDDEN_CONSTANT = /\bconst\s+\w+\s*=\s*"(vite|vitest|playwright)"/g;
 
 const packageRoot = getPath().resolve(import.meta.dirname, "..");
 

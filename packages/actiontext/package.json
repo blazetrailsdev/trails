@@ -50,6 +50,7 @@
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*",
     "@rails/actiontext": "8.0.200",
+    "playwright": "^1.60.0",
     "trix": "2.1.19",
     "vite": "^7.0.0"
   },

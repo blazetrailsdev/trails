@@ -1,7 +1,7 @@
 import { XmlDocument as LibXmlDocument, XmlParseError } from "libxml2-wasm";
 import { include } from "@blazetrails/ruby-compat";
 
-import { XML } from "../namespaces.js";
+import { HTML5, XML } from "../namespaces.js";
 
 import type { NodeSet } from "./node-set.js";
 import * as Searchable from "./searchable.js";
@@ -18,6 +18,14 @@ export class XmlDocument {
   declare atXpath: (...args: unknown[]) => XmlNode | undefined;
 
   static readonly IMPLIED_XPATH_CONTEXTS = ["//"] as const;
+
+  /** @noRailsEquivalent CONVERGEABLE html5-document-extends-xml-document-chain */
+  static [Symbol.hasInstance](other: unknown): boolean {
+    return (
+      Function.prototype[Symbol.hasInstance].call(this, other) ||
+      (this === XmlDocument && other instanceof HTML5.Document)
+    );
+  }
 
   errors: SyntaxError[] = [];
   encoding: string | null = null;

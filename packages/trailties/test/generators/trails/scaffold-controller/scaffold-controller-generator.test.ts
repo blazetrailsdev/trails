@@ -63,13 +63,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
       await t.assertInstanceMethod("edit", content);
 
       await t.assertInstanceMethod("create", content, (m) => {
-        assertMatch(/this\.user = new User\(this\.userParams\(\)\)/, m);
+        assertMatch(/this\.user = new User\(this\._userParams\(\)\)/, m);
         assertMatch(/this\.user\.save\(\)/, m);
         assertMatch(/this\.redirectTo\(this\.user/, m);
       });
 
       await t.assertInstanceMethod("update", content, (m) => {
-        assertMatch(/this\.user\.update\(this\.userParams\(\)\)/, m);
+        assertMatch(/this\.user\.update\(this\._userParams\(\)\)/, m);
         assertMatch(/this\.redirectTo\(this\.user/, m);
         assertMatch(/status: ":see_other"/, m);
       });
@@ -81,7 +81,7 @@ describe("ScaffoldControllerGeneratorTest", () => {
         assertMatch(/status: ":see_other"/, m);
       });
 
-      await t.assertInstanceMethod("setUser", content, (m) => {
+      await t.assertInstanceMethod("_setUser", content, (m) => {
         assertMatch(/this\.user = await User\.find\(this\.params\.expect\("id"\)\)/, m);
       });
 
@@ -351,13 +351,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
       });
 
       await t.assertInstanceMethod("create", content, (m) => {
-        assertMatch(/this\.user = new User\(this\.userParams\(\)\)/, m);
+        assertMatch(/this\.user = new User\(this\._userParams\(\)\)/, m);
         assertMatch(/this\.user\.save\(\)/, m);
         assertMatch(/this\.user\.errors/, m);
       });
 
       await t.assertInstanceMethod("update", content, (m) => {
-        assertMatch(/this\.user\.update\(this\.userParams\(\)\)/, m);
+        assertMatch(/this\.user\.update\(this\._userParams\(\)\)/, m);
         assertMatch(/this\.user\.errors/, m);
       });
 

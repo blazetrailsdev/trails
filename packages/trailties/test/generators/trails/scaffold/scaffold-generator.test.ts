@@ -71,19 +71,19 @@ describe("ScaffoldGeneratorTest", () => {
       await t.assertInstanceMethod("edit", content);
 
       await t.assertInstanceMethod("create", content, (m) => {
-        expect(m).toMatch(/this\.product_line = new ProductLine\(this\.productLineParams\(\)\)/);
+        expect(m).toMatch(/this\.product_line = new ProductLine\(this\._productLineParams\(\)\)/);
         expect(m).toMatch(/this\.product_line\.save\(\)/);
       });
 
       await t.assertInstanceMethod("update", content, (m) => {
-        expect(m).toMatch(/this\.product_line\.update\(this\.productLineParams\(\)\)/);
+        expect(m).toMatch(/this\.product_line\.update\(this\._productLineParams\(\)\)/);
       });
 
       await t.assertInstanceMethod("destroy", content, (m) => {
         expect(m).toMatch(/this\.product_line\.destroyBang\(\)/);
       });
 
-      await t.assertInstanceMethod("setProductLine", content, (m) => {
+      await t.assertInstanceMethod("_setProductLine", content, (m) => {
         expect(m).toMatch(
           /this\.product_line = await ProductLine\.find\(this\.params\.expect\("id"\)\)/,
         );
@@ -148,7 +148,7 @@ describe("ScaffoldGeneratorTest", () => {
       expect(content).not.toMatch(/respondTo/);
 
       expect(content).toMatch(
-        /this\.beforeAction\(":setProductLine", \{ only: \["show", "update", "destroy"\] \}\)/,
+        /this\.beforeAction\(":_setProductLine", \{ only: \["show", "update", "destroy"\] \}\)/,
       );
 
       await t.assertInstanceMethod("index", content, (m) => {
@@ -161,13 +161,13 @@ describe("ScaffoldGeneratorTest", () => {
       });
 
       await t.assertInstanceMethod("create", content, (m) => {
-        expect(m).toMatch(/this\.product_line = new ProductLine\(this\.productLineParams\(\)\)/);
+        expect(m).toMatch(/this\.product_line = new ProductLine\(this\._productLineParams\(\)\)/);
         expect(m).toMatch(/this\.product_line\.save\(\)/);
         expect(m).toMatch(/this\.product_line\.errors/);
       });
 
       await t.assertInstanceMethod("update", content, (m) => {
-        expect(m).toMatch(/this\.product_line\.update\(this\.productLineParams\(\)\)/);
+        expect(m).toMatch(/this\.product_line\.update\(this\._productLineParams\(\)\)/);
         expect(m).toMatch(/this\.product_line\.errors/);
       });
 
@@ -270,19 +270,19 @@ describe("ScaffoldGeneratorTest", () => {
       await t.assertInstanceMethod("edit", content);
 
       await t.assertInstanceMethod("create", content, (m) => {
-        expect(m).toMatch(/this\.admin_role = new Role\(this\.adminRoleParams\(\)\)/);
+        expect(m).toMatch(/this\.admin_role = new Role\(this\._adminRoleParams\(\)\)/);
         expect(m).toMatch(/this\.admin_role\.save\(\)/);
       });
 
       await t.assertInstanceMethod("update", content, (m) => {
-        expect(m).toMatch(/this\.admin_role\.update\(this\.adminRoleParams\(\)\)/);
+        expect(m).toMatch(/this\.admin_role\.update\(this\._adminRoleParams\(\)\)/);
       });
 
       await t.assertInstanceMethod("destroy", content, (m) => {
         expect(m).toMatch(/this\.admin_role\.destroyBang\(\)/);
       });
 
-      await t.assertInstanceMethod("setAdminRole", content, (m) => {
+      await t.assertInstanceMethod("_setAdminRole", content, (m) => {
         expect(m).toMatch(/this\.admin_role = await Role\.find\(this\.params\.expect\("id"\)\)/);
       });
     });
@@ -446,7 +446,7 @@ describe("ScaffoldGeneratorTest", () => {
     });
 
     await t.assertFile("app/controllers/accounts-controller.ts", async (content) => {
-      await t.assertInstanceMethod("accountParams", content, (m) => {
+      await t.assertInstanceMethod("_accountParams", content, (m) => {
         expect(m).toMatch(/expect\(\{ account: \["name", "currency_id", "user_id"\] \}\)/);
       });
     });
@@ -482,7 +482,7 @@ describe("ScaffoldGeneratorTest", () => {
     await t.assertFile("app/models/message.ts", /hasManyAttached\("photos"\)/);
 
     await t.assertFile("app/controllers/messages-controller.ts", async (content) => {
-      await t.assertInstanceMethod("messageParams", content, (m) => {
+      await t.assertInstanceMethod("_messageParams", content, (m) => {
         expect(m).toMatch(/expect\(\{ message: \["video", \{ photos: \[\], images: \[\] \}\] \}\)/);
       });
     });
@@ -506,7 +506,7 @@ describe("ScaffoldGeneratorTest", () => {
     await t.assertFile("app/models/message.ts", /hasRichText\("content"\)/);
 
     await t.assertFile("app/controllers/messages-controller.ts", async (content) => {
-      await t.assertInstanceMethod("messageParams", content, (m) => {
+      await t.assertInstanceMethod("_messageParams", content, (m) => {
         expect(m).toMatch(/expect\(\{ message: \["content"\] \}\)/);
       });
     });
@@ -550,7 +550,7 @@ describe("ScaffoldGeneratorTest", () => {
     });
 
     await t.assertFile("app/controllers/users-controller.ts", async (content) => {
-      await t.assertInstanceMethod("userParams", content, (m) => {
+      await t.assertInstanceMethod("_userParams", content, (m) => {
         expect(m).toMatch(/expect\(\{ user: \["name", "password", "password_confirmation"\] \}\)/);
       });
     });
