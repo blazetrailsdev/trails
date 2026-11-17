@@ -12,8 +12,9 @@
  *   ... --check --record              # rewrite constant-residue.json from the pairing
  *   ... --check --package <pkg>       # one api-compare package, for the scoped CI driver
  *
- * The rows are written from `walkConstants` and `constant-residue.json`
- * alone. `rails-api.json` is read only under `--check`, whose pairing is
+ * The rows are written from `walkConstants`, `constant-residue.json` and
+ * `rails-api.json`, which every run requires current. Under `--check` the
+ * manifest also drives the pairing, which is
  * compare.ts's own: `rubyFileToTs` for the file and
  * `resolveTsClassForRuby` for the class, so a class gets a path exactly where
  * the inheritance check finds its counterpart.
@@ -972,17 +973,24 @@ async function checkConstantResidue(
   else stale.push(`${path.relative(ROOT_DIR, RECORD)} (run with --check --record)`);
 }
 
+const RAILS_INPUTS = [
+  "vendor/sources.lock.json",
+  "vendor/sources.ts",
+  "scripts/api-compare/extract-ruby-api.rb",
+];
+
 async function requireRailsManifest(): Promise<void> {
   const file = path.join(OUTPUT_DIR, "rails-api.json");
-  if (
-    await fs.access(file).then(
-      () => true,
-      () => false,
-    )
-  )
-    return;
+  const built = await fs.stat(file).then(
+    (s) => s.mtimeMs,
+    () => null,
+  );
+  const inputs = await Promise.all(
+    RAILS_INPUTS.map((p) => fs.stat(path.join(ROOT_DIR, p)).then((s) => s.mtimeMs)),
+  );
+  if (built !== null && inputs.every((m) => built >= m)) return;
   throw new globalThis.Error(
-    `${path.relative(ROOT_DIR, file)} is missing: run \`pnpm parity:api\` before \`pnpm parity:class-paths\``,
+    `${path.relative(ROOT_DIR, file)} is ${built === null ? "missing" : "stale"}: run \`pnpm parity:api\` before \`pnpm parity:class-paths\``,
   );
 }
 
