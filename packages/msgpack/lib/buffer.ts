@@ -570,7 +570,8 @@ export class Buffer {
     return concat(string);
   }
 
-  private topReadableSize(): number {
+  /** @internal */
+  topReadableSize(): number {
     return this.chunks.length === 0 ? 0 : this.chunks[0].length;
   }
 

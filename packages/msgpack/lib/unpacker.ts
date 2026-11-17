@@ -533,7 +533,7 @@ export class Unpacker {
     }
 
     const length = this.uk.readingRawRemaining;
-    if (length <= this.buffer.size()) {
+    if (length <= this.buffer.topReadableSize()) {
       const bytes = this.buffer.readAll(length);
       let ret: number;
       if (this.optimizedSymbolExtType && this.symbolExtType === rawType) {
@@ -562,19 +562,6 @@ export class Unpacker {
     return this.readRawBodyCont();
   }
 
-  private readRaw(rawType: number, count: number): number {
-    this.uk.readingRawRemaining = count;
-    return this.readRawBodyBegin(rawType);
-  }
-
-  private readExt(length: number, extType: number): number {
-    if (length === 0) {
-      return this.objectCompleteExt(extType, null);
-    }
-    this.uk.readingRawRemaining = length;
-    return this.readRawBodyBegin(extType);
-  }
-
   private readPrimitive(): number {
     if (this.uk.readingRawRemaining > 0) {
       return this.readRawBodyCont();
@@ -590,7 +577,8 @@ export class Unpacker {
     } else if (0xe0 <= b && b <= 0xff) {
       return this.objectComplete((b << 24) >> 24);
     } else if (0xa0 <= b && b <= 0xbf) {
-      return this.readRaw(RAW_TYPE_STRING, b & 0x1f);
+      this.uk.readingRawRemaining = b & 0x1f;
+      return this.readRawBodyBegin(RAW_TYPE_STRING);
     } else if (0x90 <= b && b <= 0x9f) {
       const count = b & 0x0f;
       if (count === 0) {
@@ -614,17 +602,35 @@ export class Unpacker {
         case 0xc7: {
           const cb = this.readCastBlock(2);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readExt(cb.getUint8(0), cb.getInt8(1));
+          const length = cb.getUint8(0);
+          const extType = cb.getInt8(1);
+          if (length === 0) {
+            return this.objectCompleteExt(extType, null);
+          }
+          this.uk.readingRawRemaining = length;
+          return this.readRawBodyBegin(extType);
         }
         case 0xc8: {
           const cb = this.readCastBlock(3);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readExt(cb.getUint16(0), cb.getInt8(2));
+          const length = cb.getUint16(0);
+          const extType = cb.getInt8(2);
+          if (length === 0) {
+            return this.objectCompleteExt(extType, null);
+          }
+          this.uk.readingRawRemaining = length;
+          return this.readRawBodyBegin(extType);
         }
         case 0xc9: {
           const cb = this.readCastBlock(5);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readExt(cb.getUint32(0), cb.getInt8(4));
+          const length = cb.getUint32(0);
+          const extType = cb.getInt8(4);
+          if (length === 0) {
+            return this.objectCompleteExt(extType, null);
+          }
+          this.uk.readingRawRemaining = length;
+          return this.readRawBodyBegin(extType);
         }
         case 0xca: {
           const cb = this.readCastBlock(4);
@@ -676,61 +682,108 @@ export class Unpacker {
           if (cb == null) return PRIMITIVE_EOF;
           return this.objectComplete(rbIntegerFromBigint(cb.getBigInt64(0)));
         }
-        case 0xd4:
-        case 0xd5:
-        case 0xd6:
-        case 0xd7:
+        case 0xd4: {
+          const cb = this.readCastBlock(1);
+          if (cb == null) return PRIMITIVE_EOF;
+          const extType = cb.getInt8(0);
+          this.uk.readingRawRemaining = 1;
+          return this.readRawBodyBegin(extType);
+        }
+        case 0xd5: {
+          const cb = this.readCastBlock(1);
+          if (cb == null) return PRIMITIVE_EOF;
+          const extType = cb.getInt8(0);
+          this.uk.readingRawRemaining = 2;
+          return this.readRawBodyBegin(extType);
+        }
+        case 0xd6: {
+          const cb = this.readCastBlock(1);
+          if (cb == null) return PRIMITIVE_EOF;
+          const extType = cb.getInt8(0);
+          this.uk.readingRawRemaining = 4;
+          return this.readRawBodyBegin(extType);
+        }
+        case 0xd7: {
+          const cb = this.readCastBlock(1);
+          if (cb == null) return PRIMITIVE_EOF;
+          const extType = cb.getInt8(0);
+          this.uk.readingRawRemaining = 8;
+          return this.readRawBodyBegin(extType);
+        }
         case 0xd8: {
           const cb = this.readCastBlock(1);
           if (cb == null) return PRIMITIVE_EOF;
-          this.uk.readingRawRemaining = 1 << (b - 0xd4);
-          return this.readRawBodyBegin(cb.getInt8(0));
+          const extType = cb.getInt8(0);
+          this.uk.readingRawRemaining = 16;
+          return this.readRawBodyBegin(extType);
         }
         case 0xd9: {
           const cb = this.readCastBlock(1);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readRaw(RAW_TYPE_STRING, cb.getUint8(0));
+          this.uk.readingRawRemaining = cb.getUint8(0);
+          return this.readRawBodyBegin(RAW_TYPE_STRING);
         }
         case 0xda: {
           const cb = this.readCastBlock(2);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readRaw(RAW_TYPE_STRING, cb.getUint16(0));
+          this.uk.readingRawRemaining = cb.getUint16(0);
+          return this.readRawBodyBegin(RAW_TYPE_STRING);
         }
         case 0xdb: {
           const cb = this.readCastBlock(4);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readRaw(RAW_TYPE_STRING, cb.getUint32(0));
+          this.uk.readingRawRemaining = cb.getUint32(0);
+          return this.readRawBodyBegin(RAW_TYPE_STRING);
         }
         case 0xc4: {
           const cb = this.readCastBlock(1);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readRaw(RAW_TYPE_BINARY, cb.getUint8(0));
+          this.uk.readingRawRemaining = cb.getUint8(0);
+          return this.readRawBodyBegin(RAW_TYPE_BINARY);
         }
         case 0xc5: {
           const cb = this.readCastBlock(2);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readRaw(RAW_TYPE_BINARY, cb.getUint16(0));
+          this.uk.readingRawRemaining = cb.getUint16(0);
+          return this.readRawBodyBegin(RAW_TYPE_BINARY);
         }
         case 0xc6: {
           const cb = this.readCastBlock(4);
           if (cb == null) return PRIMITIVE_EOF;
-          return this.readRaw(RAW_TYPE_BINARY, cb.getUint32(0));
+          this.uk.readingRawRemaining = cb.getUint32(0);
+          return this.readRawBodyBegin(RAW_TYPE_BINARY);
         }
-        case 0xdc:
-        case 0xdd: {
-          const cb = this.readCastBlock(b === 0xdc ? 2 : 4);
+        case 0xdc: {
+          const cb = this.readCastBlock(2);
           if (cb == null) return PRIMITIVE_EOF;
-          const count = b === 0xdc ? cb.getUint16(0) : cb.getUint32(0);
+          const count = cb.getUint16(0);
           if (count === 0) {
             return this.objectComplete([]);
           }
           return this.stackPush(STACK_TYPE_ARRAY, count, []);
         }
-        case 0xde:
-        case 0xdf: {
-          const cb = this.readCastBlock(b === 0xde ? 2 : 4);
+        case 0xdd: {
+          const cb = this.readCastBlock(4);
           if (cb == null) return PRIMITIVE_EOF;
-          const count = b === 0xde ? cb.getUint16(0) : cb.getUint32(0);
+          const count = cb.getUint32(0);
+          if (count === 0) {
+            return this.objectComplete([]);
+          }
+          return this.stackPush(STACK_TYPE_ARRAY, count, []);
+        }
+        case 0xde: {
+          const cb = this.readCastBlock(2);
+          if (cb == null) return PRIMITIVE_EOF;
+          const count = cb.getUint16(0);
+          if (count === 0) {
+            return this.objectComplete({});
+          }
+          return this.stackPush(STACK_TYPE_MAP_KEY, count * 2, {});
+        }
+        case 0xdf: {
+          const cb = this.readCastBlock(4);
+          if (cb == null) return PRIMITIVE_EOF;
+          const count = cb.getUint32(0);
           if (count === 0) {
             return this.objectComplete({});
           }
