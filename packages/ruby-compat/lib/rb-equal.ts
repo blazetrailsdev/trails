@@ -51,8 +51,6 @@ export function rbEql(a: unknown, b: unknown): boolean {
 function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
-  /* `Set#==` (`vendor/ruby/v3.3.11/lib/set.rb:674-684`): same size, and every
-     member of the other found in this one's hash, which keys on `eql?`. */
   if (a instanceof Set && b instanceof Set) {
     return a.size === b.size && [...b].every((o) => [...a].some((m) => equalOrEql(m, o, true)));
   }

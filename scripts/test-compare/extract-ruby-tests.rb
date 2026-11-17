@@ -853,8 +853,6 @@ class TestExtractor
     line = extract_line(node)
     assertion_kinds, assertion_values = collect_assertion_kinds(node)
 
-    # A `test "…"` in an enrolled required module's body (its `included do`
-    # block, shared_serializer_tests.rb:6) is stashed like a `def test_*`.
     if @module_collect && REQUIRED_TEST_MODULES.include?(@class_stack.last)
       @module_collect << {
         description: desc, line: line, assertions: assertion_kinds.uniq,
