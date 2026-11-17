@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { assertEqual, assertKindOf } from "@blazetrails/activesupport/testing/assertions";
 import { Range } from "@blazetrails/ruby-compat";
-import type { Html5Document } from "@blazetrails/nokogiri";
+import { XML, type Html5Document } from "@blazetrails/nokogiri";
 import { TestResponse } from "../../../lib/action-dispatch/testing/test-response.js";
 
 describe("TestResponseTest", () => {
@@ -50,6 +50,7 @@ describe("TestResponseTest", () => {
 </html>
 `,
     );
+    assertKindOf(XML.Document, response.parsedBody);
     assertEqual("Content", (response.parsedBody as Html5Document).atXpath("/html/body/div")!.text);
   });
 
