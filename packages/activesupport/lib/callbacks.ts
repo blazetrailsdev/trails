@@ -347,23 +347,41 @@ export class Before {
 
   call(env: Environment): Environment | Promise<Environment> {
     const { target, value, halted, syncChain } = env;
-    if (halted) return env;
-    const pending: PromiseLike<unknown>[] = [];
-    const passed = this.userConditions.every((c) => {
-      const r = c(target, value);
-      if (!isThenable(r)) return r;
-      pending.push(r);
-      return true;
-    });
-    if (!passed) return env;
-    if (pending.length === 0) return this._callFilter(env);
-    if (syncChain !== undefined) {
-      new Thread(() => Promise.all(pending));
-      throw new RuntimeError(`Async condition on sync chain "${syncChain}" — returned a Promise`);
+    let pending: PromiseLike<unknown> | null = null;
+    let rest = 0;
+    if (
+      !halted &&
+      this.userConditions.every((c, i) => {
+        const r = c(target, value);
+        if (!isThenable(r)) return r != null && r !== false;
+        pending = r;
+        rest = i + 1;
+        return false;
+      })
+    ) {
+      return this._callFilter(env);
     }
-    return Promise.all(pending).then((rs) => (rs.every(Boolean) ? this._callFilter(env) : env));
+    if (pending === null) return env;
+    /** @inventedArm throw — PERMANENT */
+    if (syncChain !== undefined) {
+      new Thread(() => pending);
+      throw new RuntimeError(
+        `Async callback on sync chain "${syncChain}" — before condition returned a Promise`,
+      );
+    }
+    const awaited: PromiseLike<unknown> = pending;
+    return (async () => {
+      const first = await awaited;
+      if (first == null || first === false) return env;
+      for (const c of this.userConditions.slice(rest)) {
+        const r = await c(target, value);
+        if (r == null || r === false) return env;
+      }
+      return await this._callFilter(env);
+    })();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private _callFilter(env: Environment): Environment | Promise<Environment> {
     const { target, value, syncChain } = env;
     const terminatorFn = this.terminator;
@@ -493,23 +511,41 @@ export class After {
 
   call(env: Environment): Environment | Promise<Environment> {
     const { target, value, halted, syncChain } = env;
-    if (halted && this.halting) return env;
-    const pending: PromiseLike<unknown>[] = [];
-    const passed = this.userConditions.every((c) => {
-      const r = c(target, value);
-      if (!isThenable(r)) return r;
-      pending.push(r);
-      return true;
-    });
-    if (!passed) return env;
-    if (pending.length === 0) return this._callFilter(env);
-    if (syncChain !== undefined) {
-      new Thread(() => Promise.all(pending));
-      throw new RuntimeError(`Async condition on sync chain "${syncChain}" — returned a Promise`);
+    let pending: PromiseLike<unknown> | null = null;
+    let rest = 0;
+    if (
+      (!halted || !this.halting) &&
+      this.userConditions.every((c, i) => {
+        const r = c(target, value);
+        if (!isThenable(r)) return r != null && r !== false;
+        pending = r;
+        rest = i + 1;
+        return false;
+      })
+    ) {
+      return this._callFilter(env);
     }
-    return Promise.all(pending).then((rs) => (rs.every(Boolean) ? this._callFilter(env) : env));
+    if (pending === null) return env;
+    /** @inventedArm throw — PERMANENT */
+    if (syncChain !== undefined) {
+      new Thread(() => pending);
+      throw new RuntimeError(
+        `Async callback on sync chain "${syncChain}" — after condition returned a Promise`,
+      );
+    }
+    const awaited: PromiseLike<unknown> = pending;
+    return (async () => {
+      const first = await awaited;
+      if (first == null || first === false) return env;
+      for (const c of this.userConditions.slice(rest)) {
+        const r = await c(target, value);
+        if (r == null || r === false) return env;
+      }
+      return await this._callFilter(env);
+    })();
   }
 
+  /** @noRailsEquivalent PERMANENT */
   private _callFilter(env: Environment): Environment | Promise<Environment> {
     const { target, value, syncChain } = env;
     const r = this.userCallback(target, value);

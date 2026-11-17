@@ -2932,7 +2932,7 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
     test_files.reject! { |f| f.include?("/unit/behaviors/") }
     included = test_files.flat_map { |f| File.read(f).scan(/^\s*include\s+(\w+Behavior)\b/).flatten }
     behaviors = Dir.glob(File.join(pkg_dir, "unit", "behaviors_rails_8_0", "*_behavior.rb"))
-    test_files.concat(behaviors.select { |f| included.include?(File.basename(f, ".rb").split("_").map(&:capitalize).join) })
+    test_files.concat(behaviors.select { |f| File.read(f).scan(/^\s*module\s+(\w+Behavior)\b/).flatten.intersect?(included) })
   end
 
   if pkg_name == "tzinfo"

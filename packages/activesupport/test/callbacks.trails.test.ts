@@ -1382,3 +1382,27 @@ describe("thenable callback conditions (trails)", () => {
     expect(host.log).toEqual(["before-yes", "save", "after-yes"]);
   });
 });
+
+describe("thenable callback conditions short-circuit (trails)", () => {
+  it("stops at the first falsy condition and reads values with Ruby truthiness", async () => {
+    class Host extends Model {}
+    Host.defineCallbacks("save");
+    let called = false;
+    Host.setCallback("save", "before", (r: Host) => r.log.push("skipped"), {
+      if: [
+        async () => false,
+        () => {
+          called = true;
+          return true;
+        },
+      ],
+    });
+    Host.setCallback("save", "after", (r: Host) => r.log.push("zero"), {
+      if: (async () => 0) as unknown as () => boolean,
+    });
+    const host = new Host();
+    await host.runCallbacks("save", () => host.log.push("save"));
+    expect(called).toBe(false);
+    expect(host.log).toEqual(["save", "zero"]);
+  });
+});
