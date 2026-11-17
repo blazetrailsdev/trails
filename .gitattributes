@@ -22,3 +22,5 @@ packages/actionpack/test/fixtures/公共/**/*.gz binary
 packages/actionpack/test/fixtures/公共/**/*.br binary
 # Byte-for-byte copies of vendor/mail/2.8.1/spec/fixtures: the CRLF and LF emails differ only in line endings.
 packages/mail/test/fixtures/** binary
+# Byte-for-byte copy of vendor/mail/2.8.1/lib/mail/values/unicode_tables.dat: Marshal.load reads it.
+packages/mail/lib/values/unicode_tables.dat binary

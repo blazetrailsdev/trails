@@ -27,7 +27,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && pnpm build:values",
+    "build:values": "mkdir -p dist/values && cp lib/values/unicode_tables.dat dist/values/"
   },
   "license": "MIT",
   "dependencies": {
