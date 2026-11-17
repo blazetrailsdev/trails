@@ -37,6 +37,6 @@ extend(Retryable, Concern);
   this.scope("failed", function () {
     return this.includes("failedExecution")
       .where()
-      .not({ failed_execution: { id: null } });
+      .not({ failedExecution: { id: null } });
   });
 });

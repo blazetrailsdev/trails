@@ -63,7 +63,9 @@ export async function loadQueueSchema(): Promise<void> {
         t.string("concurrency_key");
         t.datetime("created_at", { null: false });
         t.datetime("updated_at", { null: false });
+        t.bigint("batch_id");
         t.index(["active_job_id"], { name: "index_solid_queue_jobs_on_active_job_id" });
+        t.index(["batch_id"], { name: "index_solid_queue_jobs_on_batch_id" });
         t.index(["class_name"], { name: "index_solid_queue_jobs_on_class_name" });
         t.index(["finished_at"], { name: "index_solid_queue_jobs_on_finished_at" });
         t.index(["queue_name", "finished_at"], { name: "index_solid_queue_jobs_for_filtering" });
@@ -160,6 +162,44 @@ export async function loadQueueSchema(): Promise<void> {
         t.index(["key"], { name: "index_solid_queue_semaphores_on_key", unique: true });
       });
 
+      await schema.createTable("solid_queue_batches", { force: "cascade" }, (t) => {
+        t.string("active_job_batch_id");
+        t.string("description");
+        t.text("on_finish");
+        t.text("on_success");
+        t.text("on_failure");
+        t.text("metadata");
+        t.integer("total_jobs", { default: 0, null: false });
+        t.integer("completed_jobs", { default: 0, null: false });
+        t.integer("failed_jobs", { default: 0, null: false });
+        t.datetime("enqueued_at");
+        t.datetime("finished_at");
+        t.datetime("failed_at");
+        t.datetime("created_at", { null: false });
+        t.datetime("updated_at", { null: false });
+        t.index(["active_job_batch_id"], {
+          name: "index_solid_queue_batches_on_active_job_batch_id",
+          unique: true,
+        });
+        t.index(["finished_at"], { name: "index_solid_queue_batches_on_finished_at" });
+      });
+
+      await schema.createTable("solid_queue_batch_executions", { force: "cascade" }, (t) => {
+        t.bigint("job_id", { null: false });
+        t.bigint("batch_id", { null: false });
+        t.datetime("created_at", { null: false });
+        t.index(["job_id"], { name: "index_solid_queue_batch_executions_on_job_id", unique: true });
+        t.index(["batch_id"], { name: "index_solid_queue_batch_executions_on_batch_id" });
+      });
+
+      await schema.addForeignKey("solid_queue_batch_executions", "solid_queue_batches", {
+        column: "batch_id",
+        onDelete: "cascade",
+      });
+      await schema.addForeignKey("solid_queue_batch_executions", "solid_queue_jobs", {
+        column: "job_id",
+        onDelete: "cascade",
+      });
       await schema.addForeignKey("solid_queue_blocked_executions", "solid_queue_jobs", {
         column: "job_id",
         onDelete: "cascade",

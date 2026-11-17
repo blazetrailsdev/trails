@@ -89,6 +89,8 @@ export const SolidQueue = {
   onStop(block: () => unknown): void;
   Process?: typeof import("./process.js").Process;
   Job?: typeof import("./job.js").Job;
+  Batch?: typeof import("./batch.js").Batch;
+  BatchExecution?: typeof import("./batch-execution.js").BatchExecution;
   onSchedulerStart(block: () => unknown): void;
   onSchedulerStop(block: () => unknown): void;
   onDispatcherStart(block: () => unknown): void;

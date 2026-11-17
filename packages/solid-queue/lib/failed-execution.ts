@@ -7,6 +7,7 @@ import {
 } from "./execution/dispatching.js";
 import { SolidQueue } from "./solid-queue.js";
 import type { Job } from "./job.js";
+import { Batchable } from "./failed-execution/batchable.js";
 import type { Relation } from "@blazetrails/activerecord";
 
 export class FailedExecution extends Execution {
@@ -18,6 +19,7 @@ export class FailedExecution extends Execution {
   static {
     constSet(SolidQueue, "FailedExecution", this);
     include(this, Dispatching);
+    include(this, Batchable);
 
     this.serialize("error", { coder: JSON });
 
