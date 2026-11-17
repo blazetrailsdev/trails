@@ -864,7 +864,32 @@ export function main(
     const pathToFileCounts = new Map<string, Map<string, number>>();
     const descToFileCounts = new Map<string, Map<string, number>>();
 
+    const ownBehaviorFiles = new Map<string, (typeof pkgInfo.files)[number]>();
     for (const file of pkgInfo.files) {
+      if (file.file.startsWith(SHARED_CACHE_BEHAVIORS_DIR)) continue;
+      ownBehaviorFiles.set(extractRelativeTsPath(file.file, pkg), file);
+    }
+    const mergedFiles = new Map<string, (typeof pkgInfo.files)[number]>();
+    for (const file of pkgInfo.files) {
+      const own = file.file.startsWith(SHARED_CACHE_BEHAVIORS_DIR)
+        ? ownBehaviorFiles.get(extractRelativeTsPath(file.file, pkg))
+        : undefined;
+      if (!own) {
+        mergedFiles.set(file.file, mergedFiles.get(file.file) ?? file);
+        continue;
+      }
+      const ownNames = new Set(own.testCases.map((tc) => tc.description));
+      const prior = mergedFiles.get(own.file) ?? own;
+      mergedFiles.set(own.file, {
+        ...prior,
+        testCases: [
+          ...prior.testCases,
+          ...file.testCases.filter((tc) => !ownNames.has(tc.description)),
+        ],
+      });
+    }
+
+    for (const file of mergedFiles.values()) {
       const relPath = extractRelativeTsPath(file.file, pkg);
       allFiles.add(relPath);
 
@@ -875,11 +900,7 @@ export function main(
       const pathAliasIdx = new Map<string, number[]>();
       const descAliasIdx = new Map<string, number[]>();
 
-      const testCases = file.file.startsWith(SHARED_CACHE_BEHAVIORS_DIR)
-        ? file.testCases.filter(
-            (tc) => !UNCREDITED_SHARED_BEHAVIOR_TESTS[pkg]?.includes(tc.description),
-          )
-        : file.testCases;
+      const testCases = file.testCases;
       for (let i = 0; i < testCases.length; i++) {
         const tc = testCases[i];
         const description = tc.dynamic ? collapseDynamicTitle(tc.description) : tc.description;
@@ -1797,16 +1818,6 @@ function formatGate(g?: TestGate): string {
  * copy. Their tests are credited to that package's `behaviors/<name>.ts`.
  */
 export const SHARED_CACHE_BEHAVIORS_DIR = "packages/activesupport/test/cache/behaviors/";
-
-/**
- * Shared behavior tests a package does not get credit for, because its gem's
- * copy of the test is a different revision from the Rails body that the
- * shared behavior ports.
- */
-export const UNCREDITED_SHARED_BEHAVIOR_TESTS: Record<string, string[]> = {
-  /** CONVERGEABLE solid-cache-local-cache-of-fetch-multi-rails-8-0-body */
-  "solid-cache": ["local cache of fetch multi"],
-};
 
 /**
  * Extract the relative path of a TS test file within its package src dir.

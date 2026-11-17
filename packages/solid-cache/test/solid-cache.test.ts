@@ -15,6 +15,7 @@ import { seconds } from "@blazetrails/activesupport";
 import { travel, travelBack } from "@blazetrails/activesupport/testing/time-helpers";
 import { afterEach, describe, expect, it } from "vitest";
 import { StatementTimeout } from "@blazetrails/activerecord";
+import { localCacheBehavior as solidCacheLocalCacheBehavior } from "./behaviors/local-cache-behavior.js";
 import { emulatingTimeouts, useSolidCache, waitForBackgroundTasks } from "./support/test-helper.js";
 
 describe("SolidCacheTest", () => {
@@ -30,7 +31,8 @@ describe("SolidCacheTest", () => {
   cacheStoreCompressionBehavior(host);
   cacheStoreFormatVersionBehavior(host);
   cacheStoreSerializerBehavior(host);
-  localCacheBehavior(host);
+  localCacheBehavior({ ...host, overriddenTests: ["local cache of fetch multi"] });
+  solidCacheLocalCacheBehavior(host);
   cacheIncrementDecrementBehavior(host);
   cacheInstrumentationBehavior({ ...host, storeName: "Store" });
   cacheLoggingBehavior(host);
