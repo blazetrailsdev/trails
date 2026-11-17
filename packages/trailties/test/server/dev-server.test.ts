@@ -139,7 +139,14 @@ describe("DevServer", () => {
     expect(emitted.filter((file) => !file.startsWith(".vite/"))).toEqual([
       expect.stringMatching(/^application-[^/]*\.css$/),
     ]);
-    for (const copied of ["404.html", "422.html", "500.html", "robots.txt", "favicon.ico"]) {
+    for (const copied of [
+      "400.html",
+      "404.html",
+      "422.html",
+      "500.html",
+      "robots.txt",
+      "icon.png",
+    ]) {
       expect(emitted).not.toContain(copied);
       expect(fs.existsSync(path.join(root, "public", copied))).toBe(true);
     }

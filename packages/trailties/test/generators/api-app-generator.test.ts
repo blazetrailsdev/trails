@@ -69,7 +69,10 @@ const skippedFiles = [
   "public/400.html",
   "public/404.html",
   "public/422.html",
+  "public/406-unsupported-browser.html",
   "public/500.html",
+  "public/icon.png",
+  "public/icon.svg",
 ];
 
 describe("ApiAppGeneratorTest", () => {
