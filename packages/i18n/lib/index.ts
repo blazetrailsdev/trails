@@ -81,6 +81,7 @@ export { Simple } from "./backend/simple.js";
 export { LazyLoadable, LocaleExtractor } from "./backend/lazy-loadable.js";
 export * as Backend from "./backend.js";
 export { Pluralization } from "./backend/pluralization.js";
+export { Middleware } from "./middleware.js";
 export { Fallbacks, fallbacks, setFallbacks } from "./backend/fallbacks.js";
 export type { FallbacksLike, FallbacksMethods } from "./backend/fallbacks.js";
 export { Fallbacks as LocaleFallbacks, Tag } from "./locale.js";
