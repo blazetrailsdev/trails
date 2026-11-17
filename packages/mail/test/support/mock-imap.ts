@@ -98,11 +98,7 @@ export class MockIMAP {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface NetIMAP extends MockIMAP {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class NetIMAP {
+export class NetIMAP extends MockIMAP {
   static DELETED = "Deleted";
 
   static new(..._args: unknown[]): MockIMAP {
@@ -110,6 +106,7 @@ export class NetIMAP {
   }
 
   constructor(..._args: unknown[]) {
+    super();
     return NetIMAP.new(..._args);
   }
 

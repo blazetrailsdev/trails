@@ -84,16 +84,13 @@ export class MockPOP3 {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging
-export interface NetPOP3 extends MockPOP3 {}
-
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export class NetPOP3 {
+export class NetPOP3 extends MockPOP3 {
   static new(..._args: unknown[]): MockPOP3 {
     return new MockPOP3();
   }
 
   constructor(..._args: unknown[]) {
+    super();
     return NetPOP3.new(..._args);
   }
 }
