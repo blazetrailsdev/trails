@@ -2,13 +2,18 @@ import { isPlainObject } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   block,
+  eachKey,
   fetch,
-  type Hash,
+  hasKey,
+  keys as hashKeys,
+  Hash,
   hashAref,
   KeyError,
   last,
   rbEqual,
   rbInspect,
+  size,
+  transformValues,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import { FutureResult, type Complete } from "./future-result.js";
@@ -20,16 +25,16 @@ export type ColumnTypes = Record<string | number, ColumnType>;
 const EMPTY_COLUMN_TYPES: ColumnTypes = Object.freeze({}) as ColumnTypes;
 
 export class IndexedRow {
-  private readonly columnIndexes: Record<string, number>;
+  private readonly columnIndexes: Record<string, number> | Hash<string, number>;
   private readonly row: unknown[];
 
-  constructor(columnIndexes: Record<string, number>, row: unknown[]) {
+  constructor(columnIndexes: Record<string, number> | Hash<string, number>, row: unknown[]) {
     this.columnIndexes = columnIndexes;
     this.row = row;
   }
 
   get size(): number {
-    return Object.keys(this.columnIndexes).length;
+    return size(this.columnIndexes);
   }
 
   get length(): number {
@@ -37,15 +42,15 @@ export class IndexedRow {
   }
 
   keys(): string[] {
-    return Object.keys(this.columnIndexes);
+    return hashKeys(this.columnIndexes);
   }
 
   eachKey(block: (key: string) => void): void {
-    for (const key of Object.keys(this.columnIndexes)) block(key);
+    eachKey(this.columnIndexes, block);
   }
 
   isKey(column: string): boolean {
-    return Object.hasOwn(this.columnIndexes, column);
+    return hasKey(this.columnIndexes, column);
   }
 
   fetch(column: string, block?: () => unknown): unknown {
@@ -68,9 +73,10 @@ export class IndexedRow {
   }
 
   toH(): Record<string, unknown> {
-    return Object.fromEntries(
-      Object.entries(this.columnIndexes).map(([key, index]) => [key, this.row[index]]),
-    );
+    return transformValues(this.columnIndexes, (index) => this.row[index]) as Record<
+      string,
+      unknown
+    >;
   }
 
   toHash(): Record<string, unknown> {
@@ -78,7 +84,7 @@ export class IndexedRow {
   }
 
   equals(other: unknown): boolean {
-    if (isPlainObject(other)) {
+    if (isPlainObject(other) || other instanceof Hash) {
       return rbEqual(this.toHash(), other);
     } else {
       return this === other;

@@ -83,6 +83,7 @@ export class LazyAttributeSet extends AttributeSet {
   /**
    * @inventedArm if — PERMANENT
    * @inventedArm hasKey — PERMANENT
+   * @perf 26% — PERMANENT
    */
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
     const attr = hashAref(this._attributes, name) as Attribute | null;
@@ -94,32 +95,25 @@ export class LazyAttributeSet extends AttributeSet {
       return hashAref(this.castedValues, name);
     }
 
-    return fetch<unknown>(
-      this.castedValues,
-      name,
-      rbBlock(() => {
-        let valuePresent: boolean = true;
-        const value = fetch<unknown>(
-          this.values,
-          name,
-          rbBlock(() => {
-            valuePresent = false;
-          }),
-        );
+    let valuePresent: boolean = true;
+    let value: unknown = null;
+    if (hasKey(this.values, name)) {
+      value = fetch<unknown>(this.values, name);
+    } else {
+      valuePresent = false;
+    }
 
-        if (valuePresent) {
-          const type = fetch<ValueType>(
-            this.additionalTypes,
-            name,
-            hashAref(this.types, name) as ValueType,
-          );
-          return hashAset(this.castedValues, name, type.deserialize(value));
-        } else {
-          const attr = this.defaultAttribute(name, valuePresent, value);
-          return attr.value(block);
-        }
-      }),
-    );
+    if (valuePresent) {
+      const type = fetch<ValueType>(
+        this.additionalTypes,
+        name,
+        hashAref(this.types, name) as ValueType,
+      );
+      return hashAset(this.castedValues, name, type.deserialize(value));
+    } else {
+      const attr = this.defaultAttribute(name, valuePresent, value);
+      return attr.value(block);
+    }
   }
 
   protected override attributes(): RbHash<Attribute> {
