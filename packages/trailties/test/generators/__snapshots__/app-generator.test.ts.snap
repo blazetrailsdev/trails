@@ -3,15 +3,12 @@
 exports[`AppGenerator > snapshots emitted TypeScript sources > application-controller.ts 1`] = `
 "import { ActionController } from "@blazetrails/actionpack";
 
-export class ApplicationController extends ActionController.Base {
-
-}
+export class ApplicationController extends ActionController.Base {}
 "
 `;
 
 exports[`AppGenerator > snapshots emitted TypeScript sources > application-helper.ts 1`] = `
-"export const ApplicationHelper = {
-};
+"export const ApplicationHelper = {};
 "
 `;
 
@@ -21,7 +18,6 @@ exports[`AppGenerator > snapshots emitted TypeScript sources > application-job.t
 export class ApplicationJob extends ActiveJob.Base {
   // Automatically retry jobs that encountered a deadlock
   // static { this.retryOn(ActiveRecord.Deadlocked); }
-
   // Most jobs are safe to ignore if the underlying records are no longer available
   // static { this.discardOn(ActiveJob.DeserializationError); }
 }

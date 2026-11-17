@@ -4,9 +4,17 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // explicit eslint config increases performance slightly while avoiding config confusion.
+const args = process.argv.slice(2);
 const { status } = spawnSync(
   join(root, "node_modules", ".bin", "eslint"),
-  ["--config", join(root, "eslint.config.mjs"), ...process.argv.slice(2)],
+  ["--config", join(root, "eslint.config.mjs"), ...args],
   { stdio: "inherit" },
 );
-process.exit(status ?? 1);
+// Prettier is the layout half of the omakase style, as rubocop -a corrects Layout cops.
+const fix = args.includes("--fix");
+const prettier = spawnSync(
+  join(root, "node_modules", ".bin", "prettier"),
+  [fix ? "--write" : "--check", root],
+  { stdio: "inherit" },
+);
+process.exit((status ?? 1) || (prettier.status ?? 1));

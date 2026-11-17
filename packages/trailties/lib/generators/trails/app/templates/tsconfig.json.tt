@@ -10,9 +10,7 @@
     "allowArbitraryExtensions": true,
     "rewriteRelativeImportExtensions": true,
     "erasableSyntaxOnly": true,
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "rootDir": ".",
     "outDir": "dist",
     "plugins": [
