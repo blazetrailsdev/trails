@@ -972,11 +972,6 @@ async function checkConstantResidue(
   else stale.push(`${path.relative(ROOT_DIR, RECORD)} (run with --check --record)`);
 }
 
-/**
- * The plain regenerate reads `rails-api.json` too (`rubyAnswered`,
- * `topLevelRubyConstants`), and with it missing those answer nothing, so every
- * top-level Ruby module and reopened namespace is written as a row.
- */
 async function requireRailsManifest(): Promise<void> {
   const file = path.join(OUTPUT_DIR, "rails-api.json");
   if (
