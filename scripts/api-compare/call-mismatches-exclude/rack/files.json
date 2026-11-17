@@ -2,13 +2,6 @@
   {
     "package": "rack",
     "tsFile": "files.ts",
-    "rubyName": "initialize",
-    "call": "order:constructor,get",
-    "reason": "Ruby records the lambda literal's get at its definition, ahead of Head.new; the TS arrow is an argument the gate reads as a deferred block, after the constructor."
-  },
-  {
-    "package": "rack",
-    "tsFile": "files.ts",
     "rubyName": "serving",
     "call": "order:constructor,fail",
     "reason": "Ruby's [0..size - 1] is a Range literal with no call; JS has no range literal, so it is new Range(0, size - 1), which the gate reads as a constructor ahead of fail."

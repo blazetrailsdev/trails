@@ -18,6 +18,7 @@ import { TimeZone } from "../../lib/values/time-zone.js";
 import { Factory } from "@blazetrails/msgpack";
 import { extend } from "@blazetrails/ruby-compat/include";
 import { Serializer } from "../../lib/message-pack/serializer.js";
+import { MessagePack } from "../../lib/message-pack.js";
 
 describe("MessagePackSerializerTrailsTest", () => {
   it("dumps Duration bytes identical to real Rails MessagePack", () => {
@@ -265,5 +266,29 @@ describe("MessagePackSerializerTrailsTest", () => {
     const serializer = extend({} as Serializer, Serializer);
     const dumped = Uint8Array.from([204, 128, 199, 11, 0, ...Buffer.from("some_symbol")]);
     expect(serializer.load(dumped)).toBe(":some_symbol");
+  });
+
+  describe("roundtrips beyond the shared tests' values", () => {
+    const roundtrip = (object: unknown) => MessagePack.load(MessagePack.dump(object));
+
+    it("roundtrips a negative very large Integer", () => {
+      expect(roundtrip(-(2n ** 512n))).toBe(-(2n ** 512n));
+    });
+
+    it("roundtrips BigDecimal special and signed values", () => {
+      for (const value of ["1", "-1.5", "0.1e-19", "-0", "Infinity"]) {
+        const object = new BigDecimal(value);
+        expect((roundtrip(object) as BigDecimal).toString("E")).toBe(object.toString("E"));
+      }
+      expect((roundtrip(new BigDecimal("NaN")) as BigDecimal).isNan()).toBe(true);
+    });
+
+    it("roundtrips a TimeWithZone's zone name", () => {
+      const twz = new TimeWithZone(
+        Temporal.Instant.from("1999-12-31T12:34:56.789Z"),
+        TimeZone.find("Australia/Lord_Howe")!,
+      );
+      expect((roundtrip(twz) as TimeWithZone).timeZone.name).toBe("Australia/Lord_Howe");
+    });
   });
 });

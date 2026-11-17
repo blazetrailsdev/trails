@@ -75,16 +75,19 @@ export class GID extends Generic {
     return new GID(...genericComponents);
   }
 
+  /** @inventedArm underscore — PERMANENT */
   static create(
     app: string,
     model: { id: unknown; constructor: object },
     params: Record<string, unknown> | null = null,
   ): GID {
     const name = rbModName(model.constructor)!;
+    if (params != null) {
+      params = Object.fromEntries(Object.entries(params).map(([k, v]) => [underscore(k), v]));
+    }
     return GID.build({ app, modelName: name, modelId: model.id, params });
   }
 
-  /** @inventedArm underscore — PERMANENT */
   static override build(args: {
     app: string;
     modelName: string;
@@ -100,9 +103,7 @@ export class GID extends Generic {
 
     const params = parts["params"] as Record<string, unknown> | null | undefined;
     if (params != null && Object.keys(params).length > 0) {
-      parts["query"] = URI.encodeWwwForm(
-        Object.fromEntries(Object.entries(params).map(([k, v]) => [underscore(k), v])),
-      );
+      parts["query"] = URI.encodeWwwForm(params);
     }
 
     return super.build(parts) as GID;

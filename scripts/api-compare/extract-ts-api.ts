@@ -8729,6 +8729,9 @@ function isOptionsHashRead(access: ts.PropertyAccessExpression): boolean {
   if (!ts.isIdentifier(receiver)) return false;
   const decl = currentChecker?.getSymbolAtLocation(receiver)?.valueDeclaration;
   if (decl === undefined || !ts.isParameter(decl)) return false;
+  if (decl.initializer === undefined || !ts.isObjectLiteralExpression(decl.initializer)) {
+    return false;
+  }
   return checkerProvenKind(receiver) === "object";
 }
 
