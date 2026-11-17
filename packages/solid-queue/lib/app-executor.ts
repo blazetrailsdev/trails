@@ -1,3 +1,4 @@
+import { Thread } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "./solid-queue.js";
 
 export const AppExecutor = {
@@ -15,5 +16,20 @@ export const AppExecutor = {
     if (SolidQueue.onThreadError) {
       SolidQueue.onThreadError.call(undefined, error);
     }
+  },
+
+  createThread<R>(
+    this: { name: string; handleThreadError(error: unknown): void },
+    block: () => R,
+  ): Thread<Promise<R>> {
+    return new Thread(async () => {
+      Thread.current().name = this.name;
+      try {
+        return await block();
+      } catch (exception) {
+        this.handleThreadError(exception);
+        throw exception;
+      }
+    });
   },
 };

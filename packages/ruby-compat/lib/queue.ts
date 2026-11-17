@@ -7,6 +7,7 @@ interface QueueData<T> {
   waitq: Array<() => void>;
   max: number;
   pushq: Array<() => void>;
+  closed: boolean;
 }
 
 const QUEUE_DATA = new WeakMap<object, QueueData<unknown>>();
@@ -52,10 +53,13 @@ function queueDoPop<T>(
       return null;
     }
 
+    if (q.closed) return null;
+
     const end = timeout == null ? null : Date.now() + timeout * 1000;
     const th = Thread.current();
     return (async () => {
       while (q.que.length === 0) {
+        if (q.closed) return null;
         await queueSleep(q.waitq, end);
         if (!th.isAlive()) {
           if (q.que.length > 0) wakeupOne(q.waitq);
@@ -75,9 +79,9 @@ function queueDoPop<T>(
  * `vendor/ruby/v3.3.11/thread_sync.c:1677` `rb_cQueue`, `Thread::Queue`. A thread
  * blocked in `pop` sleeps until a `push` wakes it; here `pop` is a promise that
  * the waking `push` resolves. Only the members trails calls are ported
- * (`packages/ruby-compat/README.md` rule 1): there is no `close`, `closed?`,
- * `num_waiting` or `SizedQueue#max=`, so no queue is ever
- * closed and `push` never raises `ClosedQueueError`. A thread killed while it
+ * (`packages/ruby-compat/README.md` rule 1): there is no `num_waiting` or
+ * `SizedQueue#max=`, and `push` on a closed queue does not raise
+ * `ClosedQueueError`. A thread killed while it
  * waits in `pop` never resumes, as MRI interrupts it in its sleep.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue`
@@ -85,7 +89,7 @@ function queueDoPop<T>(
  */
 export class Queue<T = unknown> {
   constructor() {
-    QUEUE_DATA.set(this, { que: [], waitq: [], max: Infinity, pushq: [] });
+    QUEUE_DATA.set(this, { que: [], waitq: [], max: Infinity, pushq: [], closed: false });
   }
 
   /**
@@ -144,6 +148,33 @@ export class Queue<T = unknown> {
    */
   isEmpty(): boolean {
     return queuePtr<T>(this).que.length === 0;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/thread_sync.c:1031` `rb_queue_close`: a blocked `pop`
+   * on the drained queue answers `null`, as `queue_closed_result` (`:904`) does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue#close`
+   * (`vendor/ruby/v3.3.11/thread_sync.c:1031`).
+   */
+  close(): this {
+    const q = queuePtr<T>(this);
+
+    if (!q.closed) {
+      q.closed = true;
+
+      while (q.waitq.length > 0) wakeupOne(q.waitq);
+    }
+
+    return this;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue#closed?`
+   * (`vendor/ruby/v3.3.11/thread_sync.c:1052`).
+   */
+  isClosed(): boolean {
+    return queuePtr<T>(this).closed;
   }
 
   /**

@@ -36,3 +36,26 @@ defines on `SolidQueue`
 `NoMethodError` in the `solid_queue.config` initializer, and there is no
 configured prefix to honour. The walk needs the models named `SolidQueue::…`,
 filed as `solid-queue-models-named-under-solid-queue-namespace`.
+
+## `FiberPool` inlines the `async` gem (`fiber_pool.rb`)
+
+`SolidQueue::FiberPool` (`vendor/solid_queue/v1.7.2/lib/solid_queue/fiber_pool.rb`)
+runs its executions under the `async` gem. trails does not port `async`; by
+operator ruling on 2026-11-17 its two uses are inlined into `FiberPool`:
+
+- **`Async { |task| ... }` and `Async::Semaphore.new(size, parent: task)`**
+  (`fiber_pool.rb:79-94`) are the reactor `Thread`'s own body, a
+  ruby-compat `Concurrent::Semaphore`, and a set of child promises the body
+  awaits before it exits. `semaphore.async(execution) { ... }`
+  (`fiber_pool.rb:101-105`) acquires a permit, runs `perform_execution` in a
+  ruby-compat `Fiber`, and releases the permit when it ends, as
+  `Async::Semaphore#async` does.
+- **`rescue Async::Stop`** (`fiber_pool.rb:110-112`) is dropped. Nothing in
+  trails raises `Async::Stop`, so `FiberPool` does not override
+  `perform_execution`, and `register_fatal_error` is reached only from the
+  reactor's own rescue. "marks the pool as fatal when an execution is
+  cancelled" (`test/unit/fiber_pool_test.rb`) is parked as `it.skip` under a
+  `PERMANENT-SKIP:` line citing this section.
+
+`ensure_fiber_workers_have_required_dependency` (`configuration.rb:136-143`)
+is not ported: its `require "async"` has no npm analogue.

@@ -7,6 +7,7 @@ import {
 } from "./lifecycle-hooks.js";
 import { Pool } from "./pool.js";
 import "./thread-pool.js";
+import "./fiber-pool.js";
 import { Poller } from "./processes/poller.js";
 import { ReadyExecution } from "./ready-execution.js";
 import { SolidQueue } from "./solid-queue.js";

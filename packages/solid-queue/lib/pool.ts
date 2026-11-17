@@ -3,6 +3,7 @@ import {
   Mutex,
   NotImplementedError,
   RuntimeError,
+  type Thread,
   constGet,
   rbModName,
 } from "@blazetrails/ruby-compat";
@@ -58,7 +59,7 @@ export class Pool {
     await this.reserveCapacityBang();
 
     try {
-      this.schedule(execution);
+      await this.schedule(execution);
     } catch (error) {
       await this.restoreCapacity();
       throw error;
@@ -89,7 +90,7 @@ export class Pool {
   }
 
   /** @internal */
-  protected schedule(_execution: ClaimedExecution): void {
+  protected schedule(_execution: ClaimedExecution): void | Promise<void> {
     throw new NotImplementedError();
   }
 
@@ -136,7 +137,8 @@ export class Pool {
 export interface Pool {
   shutdown(): unknown;
   isShutdown(): boolean;
-  waitForTermination(timeout?: number | null): Promise<boolean>;
+  waitForTermination(timeout?: number | null): Promise<unknown>;
+  createThread<R>(block: () => R | Promise<R>): Thread<Promise<R>>;
   wrapInAppExecutor<T>(block: () => T): T;
   handleThreadError(error: unknown): void;
 }

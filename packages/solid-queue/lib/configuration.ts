@@ -1,5 +1,6 @@
 import { BooleanType, Model } from "@blazetrails/activemodel";
 import {
+  IsolatedExecutionState,
   TopLevel,
   camelize,
   include,
@@ -56,6 +57,8 @@ export class Configuration {
 
     this.validate(":ensureConfiguredProcesses");
     this.validate(":ensureValidRecurringTasks");
+    this.validate(":ensureValidWorkerExecutionOptions");
+    this.validate(":ensureFiberWorkersUseSupportedIsolationLevel");
     this.validate(":ensureCorrectlySizedThreadPool");
 
     constSet(this, "Process", Process);
@@ -151,6 +154,29 @@ export class Configuration {
   }
 
   /** @internal */
+  private async ensureValidWorkerExecutionOptions(): Promise<void> {
+    for (const options of await this.workersOptions()) {
+      if (Object.hasOwn(options, "threads") && Object.hasOwn(options, "fibers")) {
+        this.errors.add("base", "Workers can specify either `threads` or `fibers`, but not both.");
+      }
+    }
+  }
+
+  /** @internal */
+  private async ensureFiberWorkersUseSupportedIsolationLevel(): Promise<void> {
+    if (!(await this.workersOptions()).some((options) => this.isFiberWorker(options))) return;
+
+    if (IsolatedExecutionState.isolationLevel !== "fiber") {
+      this.errors.add(
+        "base",
+        "Fiber workers require fiber-scoped isolated execution state. " +
+          "Set `config.active_support.isolation_level = :fiber` in your Rails configuration " +
+          "(or `ActiveSupport::IsolatedExecutionState.isolation_level = :fiber` outside Rails).",
+      );
+    }
+  }
+
+  /** @internal */
   private async ensureCorrectlySizedThreadPool(): Promise<void> {
     const dbPoolSize = Record.connectionPool()?.size;
     if (dbPoolSize != null && dbPoolSize < (await this.estimatedNumberOfThreads())) {
@@ -216,9 +242,10 @@ export class Configuration {
           ? workerOptions.processes
           : Configuration.WORKER_DEFAULTS.processes
       ) as number;
+      const defaults = this.workerDefaultsFor(workerOptions);
       return Array.from(
         { length: processes },
-        () => new Process("worker", reverseMerge(workerOptions, Configuration.WORKER_DEFAULTS)),
+        () => new Process("worker", reverseMerge(workerOptions, defaults)),
       );
     });
   }
@@ -378,5 +405,20 @@ export class Configuration {
     );
     const threadCount = threadCounts.length > 0 ? Math.max(...threadCounts) : null;
     return (threadCount ?? 1) + 2;
+  }
+
+  /** @internal */
+  private isFiberWorker(options: Options): boolean {
+    return Object.hasOwn(options, "fibers");
+  }
+
+  /** @internal */
+  private workerDefaultsFor(options: Options): Options {
+    if (this.isFiberWorker(options)) {
+      const { threads: _threads, ...defaults } = Configuration.WORKER_DEFAULTS;
+      return defaults;
+    } else {
+      return Configuration.WORKER_DEFAULTS;
+    }
   }
 }
