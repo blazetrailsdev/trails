@@ -166,10 +166,22 @@ const FormHelperRichTextarea = {
     ).render();
   },
 };
-FormHelper._defineMethods({
+const formHelperMembers: Record<string, unknown> = {
   ...FormHelperRichTextarea,
   richTextArea: FormHelperRichTextarea.richTextarea,
-});
+};
+for (const ref of FormHelper._includers) {
+  const proto = ref.deref() as Record<string, unknown> | undefined;
+  if (!proto) {
+    FormHelper._includers.delete(ref);
+    continue;
+  }
+  for (const [name, method] of Object.entries(formHelperMembers)) {
+    const previous = Object.getOwnPropertyDescriptor(FormHelper.prototype, name)?.value;
+    if (!Object.hasOwn(proto, name) || proto[name] === previous) proto[name] = method;
+  }
+}
+Object.assign(FormHelper.prototype, formHelperMembers);
 
 const FormBuilderRichTextarea = {
   richTextarea(this: FormBuilderHost, method: unknown, options: Options = {}): Promise<unknown> {
