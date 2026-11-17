@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { Fiber, Queue, Thread, rbFSleep, rbObjId } from "@blazetrails/ruby-compat";
-import { FiberPool, Pool, type ClaimedExecution } from "../lib/index.js";
+import { FiberPool, Pool, SolidQueue, type ClaimedExecution } from "../lib/index.js";
 
 class Execution {
   constructor(
@@ -36,13 +36,31 @@ function timeout<T>(seconds: number, promise: Promise<T>): Promise<T> {
   ]);
 }
 
-const asExecution = (execution: Execution) => execution as unknown as ClaimedExecution;
+declare const AsyncStop: new () => Error;
+declare function fork(block: () => Promise<void>): Promise<number>;
+declare function waitpid2(pid: number): Promise<[number, { exitstatus: number }]>;
+declare function exitBang(status: number): never;
+
+class CancelledExecution {
+  constructor(readonly started: Queue<boolean> | null) {}
+
+  perform(): void {
+    if (this.started) this.started.push(true);
+    throw new AsyncStop();
+  }
+}
+
+const asExecution = (execution: Execution | CancelledExecution) =>
+  execution as unknown as ClaimedExecution;
 
 describe("FiberPoolTest", () => {
   let pool: FiberPool | null = null;
 
+  const originalOnThreadError = SolidQueue.onThreadError;
+
   afterEach(async () => {
     vi.restoreAllMocks();
+    SolidQueue.onThreadError = originalOnThreadError;
     pool?.shutdown();
     await pool?.waitForTermination(1);
     pool = null;
@@ -101,8 +119,43 @@ describe("FiberPoolTest", () => {
   });
 
   // PERMANENT-SKIP: CLAUDE.md, "Runtime facts Node does not expose" (`fork`).
-  it.skip("starts the reactor lazily so the pool can be built before forking", () => {});
+  it.skip("starts the reactor lazily so the pool can be built before forking", async () => {
+    await withExecutionIsolation("fiber", async () => {
+      pool = new FiberPool(1);
+
+      const pid = await fork(async () => {
+        const results = new Queue<[number, number]>();
+        await pool!.post(asExecution(new Execution(null, results, null)));
+        await timeout(1, results.pop());
+        pool!.shutdown();
+        await pool!.waitForTermination(1);
+        exitBang(0);
+      });
+
+      const [, status] = await waitpid2(pid);
+      expect(status.exitstatus).toBe(0);
+    });
+  });
 
   // PERMANENT-SKIP: packages/solid-queue/CLAUDE.md, "`FiberPool` inlines the `async` gem".
-  it.skip("marks the pool as fatal when an execution is cancelled", () => {});
+  it.skip("marks the pool as fatal when an execution is cancelled", async () => {
+    await withExecutionIsolation("fiber", async () => {
+      const notifications = new Queue<string>();
+      const started = new Queue<boolean>();
+      const reportedErrors: string[] = [];
+      SolidQueue.onThreadError = (error) => {
+        reportedErrors.push((error as Error).constructor.name);
+      };
+
+      pool = new FiberPool(1, { onIdle: () => notifications.push("changed") });
+
+      await pool.post(asExecution(new CancelledExecution(started)));
+      await timeout(1, started.pop());
+      await timeout(1, notifications.pop());
+
+      const error = await pool.availableCapacity().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(AsyncStop);
+      expect(reportedErrors).toEqual([(error as Error).constructor.name]);
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { BooleanType, Model } from "@blazetrails/activemodel";
+import { gemVersion } from "@blazetrails/activerecord";
 import {
   IsolatedExecutionState,
   TopLevel,
@@ -18,6 +19,7 @@ import {
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 import {
   File,
+  Gem,
   Pathname,
   RuntimeError,
   Struct,
@@ -85,6 +87,7 @@ export class Configuration {
 
   static readonly DEFAULT_CONFIG_FILE_PATH = "config/queue.yml";
   static readonly DEFAULT_RECURRING_SCHEDULE_FILE_PATH = "config/recurring.yml";
+  static readonly FIBER_QUERY_SCOPED_CONNECTIONS_VERSION = new Gem.Version("7.2.0");
 
   private options: Options;
   private _workersOptions?: Options[];
@@ -397,14 +400,33 @@ export class Configuration {
 
   /** @internal */
   private async estimatedNumberOfThreads(): Promise<number> {
-    const threadCounts = (await this.workersOptions()).map(
-      (options) =>
-        (Object.hasOwn(options, "threads")
-          ? options.threads
-          : Configuration.WORKER_DEFAULTS.threads) as number,
+    const threadCounts = (await this.workersOptions()).map((options) =>
+      this.estimatedExecutionConnectionsForWorker(options),
     );
     const threadCount = threadCounts.length > 0 ? Math.max(...threadCounts) : null;
     return (threadCount ?? 1) + 2;
+  }
+
+  /** @internal */
+  private workerCapacity(options: Options): number {
+    return (options.fibers ?? options.threads ?? Configuration.WORKER_DEFAULTS.threads) as number;
+  }
+
+  /** @internal */
+  private estimatedExecutionConnectionsForWorker(options: Options): number {
+    return this.isFiberWorker(options)
+      ? this.fiberExecutionConnectionsForWorker(options)
+      : this.workerCapacity(options);
+  }
+
+  /** @internal */
+  private fiberExecutionConnectionsForWorker(options: Options): number {
+    return this.isFiberJobsReleaseConnectionsBetweenQueries() ? 1 : this.workerCapacity(options);
+  }
+
+  /** @internal */
+  private isFiberJobsReleaseConnectionsBetweenQueries(): boolean {
+    return gemVersion().compare(Configuration.FIBER_QUERY_SCOPED_CONNECTIONS_VERSION)! >= 0;
   }
 
   /** @internal */

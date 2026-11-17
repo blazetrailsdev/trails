@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { ClosedQueueError } from "./closed-queue-error.js";
 import { Thread } from "./thread.js";
 import { ThreadError } from "./thread-error.js";
 
@@ -34,6 +35,9 @@ function wakeupOne(waitq: Array<() => void>): void {
 }
 
 function queueDoPush<T>(self: Queue<T>, q: QueueData<T>, obj: T): Queue<T> {
+  if (q.closed) {
+    throw new ClosedQueueError("queue closed");
+  }
   q.que.push(obj);
   wakeupOne(q.waitq);
   return self;
@@ -80,8 +84,7 @@ function queueDoPop<T>(
  * blocked in `pop` sleeps until a `push` wakes it; here `pop` is a promise that
  * the waking `push` resolves. Only the members trails calls are ported
  * (`packages/ruby-compat/README.md` rule 1): there is no `num_waiting` or
- * `SizedQueue#max=`, and `push` on a closed queue does not raise
- * `ClosedQueueError`. A thread killed while it
+ * `SizedQueue#max=`. A thread killed while it
  * waits in `pop` never resumes, as MRI interrupts it in its sleep.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Thread::Queue`

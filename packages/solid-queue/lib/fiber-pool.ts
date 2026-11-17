@@ -69,8 +69,8 @@ export class FiberPool extends Pool {
     return this.stateMutex.synchronize(() => this._shutdown) as boolean;
   }
 
-  async waitForTermination(timeout: number | null = null): Promise<Thread | null> {
-    return (await this.reactorThread?.join(timeout as number)) ?? null;
+  async waitForTermination(timeout: number | null): Promise<Thread | null> {
+    return (await this.reactorThread?.join(timeout)) ?? null;
   }
 
   /** @internal */

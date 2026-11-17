@@ -267,8 +267,8 @@ export class Thread<R = unknown> {
    * guide ratifies for `serializable_hash` and `Relation`.
    */
   join(): this | Promise<this>;
-  join(limit: number): this | null | Promise<this | null>;
-  join(limit?: number): this | null | Promise<this | null> {
+  join(limit: number | null): this | null | Promise<this | null>;
+  join(limit?: number | null): this | null | Promise<this | null> {
     if (this.#error) throw this.#error.raised;
     const value = this.#value as unknown;
     if (value && typeof (value as PromiseLike<unknown>).then === "function") {
