@@ -64,6 +64,7 @@ interface StackEntry {
 
 const utf8 = new TextDecoder("utf-8");
 
+/** @noRailsEquivalent PERMANENT */
 function concatBytes(chunks: Uint8Array[]): Uint8Array {
   if (chunks.length === 1) return chunks[0].slice();
   const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
@@ -75,10 +76,12 @@ function concatBytes(chunks: Uint8Array[]): Uint8Array {
   return out;
 }
 
+/** @noRailsEquivalent PERMANENT */
 function rbIntegerFromBigint(n: bigint): number | bigint {
   return Number.isSafeInteger(Number(n)) ? Number(n) : n;
 }
 
+/** @noRailsEquivalent PERMANENT */
 function rbHashAset(hash: object, key: unknown, value: unknown): object {
   if (hash instanceof Hash) {
     hash.set(key, value);
@@ -300,6 +303,7 @@ export class Unpacker {
 
     if (this.uk.stack != null) this.uk.stack.length = 0;
     this.uk.lastObject = null;
+    this.uk.lastObjectSymbol = false;
     this.uk.readingRaw = null;
     this.uk.readingRawRemaining = 0;
     return null;
@@ -389,6 +393,7 @@ export class Unpacker {
     this.uk.headByte = HEAD_BYTE_REQUIRED;
   }
 
+  /** @inventedArm if — PERMANENT */
   private objectComplete(object: unknown): number {
     if (
       this.freeze &&
