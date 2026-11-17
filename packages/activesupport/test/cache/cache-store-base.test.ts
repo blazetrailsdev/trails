@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { Time } from "@blazetrails/date";
 import { Store, ArgumentError, type StoreOptions } from "../../lib/cache/store.js";
 import { Entry } from "../../lib/cache/entry.js";
 
@@ -71,41 +72,41 @@ describe("CacheStoreTest", () => {
   });
 
   it("expire_in is aliased to expires_in", () => {
-    const result = Store.normalizeOptions({ expire_in: 5000 });
+    const result = Store.normalizeOptions({ expireIn: 5000 });
     expect(result.expiresIn).toBe(5000);
-    expect(result.expire_in).toBeUndefined();
+    expect(result.expireIn).toBeUndefined();
   });
 
   it("expired_in is aliased to expires_in", () => {
-    const result = Store.normalizeOptions({ expired_in: 3000 });
+    const result = Store.normalizeOptions({ expiredIn: 3000 });
     expect(result.expiresIn).toBe(3000);
-    expect(result.expired_in).toBeUndefined();
+    expect(result.expiredIn).toBeUndefined();
   });
 
   it("alias does not override an explicit expires_in", () => {
-    const result = Store.normalizeOptions({ expiresIn: 1000, expire_in: 5000 });
+    const result = Store.normalizeOptions({ expiresIn: 1000, expireIn: 5000 });
     expect(result.expiresIn).toBe(1000);
-    expect(result.expire_in).toBeUndefined();
+    expect(result.expireIn).toBeUndefined();
   });
 
   it("expires_at is converted to expires_in", () => {
-    const future = Date.now() + 10_000;
+    const future = Time.at(Time.now().toF() + 10);
     const result = store.callMergedOptions({}, { expiresAt: future });
     expect(result.expiresIn).toBeGreaterThan(0);
-    expect(result.expiresIn).toBeLessThanOrEqual(10_000);
+    expect(result.expiresIn).toBeLessThanOrEqual(10);
     expect(result.expiresAt).toBeUndefined();
   });
 
   it("raises when both expires_in and expires_at are supplied", () => {
     expect(() =>
-      store.callMergedOptions({}, { expiresIn: 1000, expiresAt: Date.now() + 5000 }),
+      store.callMergedOptions({}, { expiresIn: 1000, expiresAt: Time.at(Time.now().toF() + 5) }),
     ).toThrow("Either :expires_in or :expires_at can be supplied, but not both");
   });
 
   it("raises when expires_in is a Date object", () => {
     expect(() =>
-      store.callMergedOptions({}, { expiresIn: new Date() as unknown as number }),
-    ).toThrow("expires_in parameter should not be a Date. Did you mean to use expiresAt?");
+      store.callMergedOptions({}, { expiresIn: Time.now() as unknown as number }),
+    ).toThrow("expires_in parameter should not be a Time. Did you mean to use expires_at?");
   });
 
   it("raises on negative expires_in when raiseOnInvalidCacheExpirationTime is true", () => {
@@ -136,15 +137,15 @@ describe("CacheStoreTest", () => {
   });
 
   it("mergedOptions normalizes aliases from call options", () => {
-    const result = store.callMergedOptions({}, { expire_in: 2000 });
+    const result = store.callMergedOptions({}, { expireIn: 2000 });
     expect(result.expiresIn).toBe(2000);
-    expect(result.expire_in).toBeUndefined();
+    expect(result.expireIn).toBeUndefined();
   });
 
   it("past expires_at results in negative expires_in which is removed and logged", () => {
     const errors: string[] = [];
     Store.logger = { warn: () => {}, error: (msg) => errors.push(msg) };
-    const past = Date.now() - 5000;
+    const past = Time.at(Time.now().toF() - 5);
     const result = store.callMergedOptions({}, { expiresAt: past });
     expect(result.expiresIn).toBeUndefined();
     expect(errors.length).toBe(1);
@@ -152,7 +153,7 @@ describe("CacheStoreTest", () => {
 
   it("handleInvalidExpiresIn raises when raiseOnInvalidCacheExpirationTime is true", () => {
     Store.raiseOnInvalidCacheExpirationTime = true;
-    expect(() => store.callMergedOptions({}, { expiresAt: Date.now() - 5000 })).toThrow(
+    expect(() => store.callMergedOptions({}, { expiresAt: Time.at(Time.now().toF() - 5) })).toThrow(
       ArgumentError,
     );
   });

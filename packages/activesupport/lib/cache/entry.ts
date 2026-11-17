@@ -38,7 +38,7 @@ export class Entry {
     } else if (options.expiresIn != null) {
       const expiresIn =
         typeof options.expiresIn === "number" ? options.expiresIn : options.expiresIn.toF();
-      this._expiresIn = expiresIn * 1000 + Time.now().toF() * 1000;
+      this._expiresIn = expiresIn + Time.now().toF();
     } else {
       this._expiresIn = null;
     }
@@ -59,7 +59,7 @@ export class Entry {
   }
 
   isExpired(): boolean {
-    return this._expiresIn != null && this._createdAt + this._expiresIn <= Time.now().toF() * 1000;
+    return this._expiresIn != null && this._createdAt + this._expiresIn <= Time.now().toF();
   }
 
   isMismatched(version: string | Uint8Array | null | undefined): boolean {

@@ -1,6 +1,7 @@
 import { Time } from "@blazetrails/date";
 import { Entry } from "./entry.js";
 import type { Duration } from "../duration.js";
+import type { TimeWithZone } from "../time-with-zone.js";
 import {
   ArgumentError,
   Hash,
@@ -33,6 +34,10 @@ export function setFormatVersion(value: number): void {
 
 const DEFAULT_COMPRESS_LIMIT = 1024;
 
+export const OPTION_ALIASES: Readonly<Record<string, readonly string[]>> = Object.freeze({
+  expiresIn: Object.freeze(["expireIn", "expiredIn"]),
+});
+
 const DEFAULT_POOL_OPTIONS: StoreOptions = { size: 5, timeout: 5 };
 
 const Zlib: CoderCompressor = { deflate, inflate };
@@ -62,16 +67,16 @@ export interface CacheCoder {
 export class WriteOptions {
   constructor(private _opts: StoreOptions) {}
   get expiresIn() {
-    return this._opts.expiresIn as number | undefined;
+    return this._opts.expiresIn as number | Duration | undefined;
   }
-  set expiresIn(v: number | undefined) {
+  set expiresIn(v: number | Duration | undefined) {
     delete this._opts.expiresAt;
     this._opts.expiresIn = v;
   }
   get expiresAt() {
-    return this._opts.expiresAt as number | undefined;
+    return this._opts.expiresAt as Time | TimeWithZone | undefined;
   }
-  set expiresAt(v: number | undefined) {
+  set expiresAt(v: Time | TimeWithZone | undefined) {
     delete this._opts.expiresIn;
     this._opts.expiresAt = v;
   }
@@ -576,16 +581,16 @@ export abstract class Store {
       throw new ArgumentError("Either :expires_in or :expires_at can be supplied, but not both");
     }
 
-    const expiresAt = callOptions.expiresAt as number | undefined;
+    const expiresAt = callOptions.expiresAt as Time | TimeWithZone | undefined;
+    delete callOptions.expiresAt;
     if (expiresAt != null) {
-      callOptions.expiresIn = (expiresAt - Time.now().toF() * 1000) / 1000;
-      delete callOptions.expiresAt;
+      callOptions.expiresIn = expiresAt.toF() - Time.now().toF();
     }
 
-    // boundary: mirrors cache.rb:871–874 — raises when expires_in is accidentally a Time/Date object.
-    if (callOptions.expiresIn instanceof Date) {
+    if (callOptions.expiresIn instanceof Time) {
+      const expiresIn = callOptions.expiresIn;
       throw new ArgumentError(
-        `expires_in parameter should not be a Date. Did you mean to use expiresAt? Got: ${callOptions.expiresIn}`,
+        `expires_in parameter should not be a Time. Did you mean to use expires_at? Got: ${expiresIn}`,
       );
     }
 
@@ -605,15 +610,19 @@ export abstract class Store {
   }
 
   static normalizeOptions(options: StoreOptions): StoreOptions {
-    const opts = { ...options };
-    const aliasKey =
-      opts.expire_in != null ? "expire_in" : opts.expired_in != null ? "expired_in" : null;
-    if (aliasKey != null) {
-      if (opts.expiresIn == null) opts.expiresIn = opts[aliasKey];
-      delete opts.expire_in;
-      delete opts.expired_in;
+    options = { ...options };
+    for (const [canonicalName, aliases] of Object.entries(OPTION_ALIASES)) {
+      const aliasKey = aliases.find((key) => Object.hasOwn(options, key));
+      if (
+        aliasKey !== undefined &&
+        (options[canonicalName] == null || options[canonicalName] === false)
+      ) {
+        options[canonicalName] = options[aliasKey];
+      }
+      for (const key of aliases) delete options[key];
     }
-    return opts;
+
+    return options;
   }
 
   private validateOptions(options: StoreOptions): StoreOptions {
@@ -742,8 +751,8 @@ export abstract class Store {
   ): Promise<Entry | null> {
     if (entry && entry.isExpired()) {
       const raceTtl = typeof options.raceConditionTtl === "number" ? options.raceConditionTtl : 0;
-      if (raceTtl > 0 && Time.now().toF() * 1000 - (entry.expiresAt ?? 0) <= raceTtl * 1000) {
-        entry.expiresAt = Time.now().toF() * 1000 + raceTtl * 1000;
+      if (raceTtl > 0 && Time.now().toF() - (entry.expiresAt ?? 0) <= raceTtl) {
+        entry.expiresAt = Time.now().toF() + raceTtl;
         await this.writeEntry(key, entry, { ...options, expiresIn: raceTtl * 2 });
       } else {
         await this.deleteEntry(key, options);
