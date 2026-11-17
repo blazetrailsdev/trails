@@ -15,6 +15,8 @@ type ExecutableClass = typeof Job;
 
 export class ClassMethods {
   static async prepareAllForExecution(this: ExecutableClass, jobs: Job[]): Promise<Base[]> {
+    await this.batchAll(jobs);
+
     const due = jobs.filter((job) => job.isDue());
     const notYetDue = jobs.filter((job) => !job.isDue());
     return [...(await this.dispatchAll(due)), ...(await this.scheduleAll(notYetDue))];
@@ -87,7 +89,7 @@ export class Executable {
   declare isDue: () => boolean;
   declare schedule: () => Promise<Base>;
   declare execution: () => Promise<Execution | null>;
-  declare touch: (...names: string[]) => Promise<boolean>;
+  declare updateBang: (attributes: { [key: string]: unknown }) => Promise<boolean>;
   declare destroyBang: () => Promise<unknown>;
 
   async isReady(): Promise<boolean> {
@@ -122,7 +124,7 @@ export class Executable {
 
   async finishedBang(): Promise<unknown> {
     if (SolidQueue.isPreserveFinishedJobs()) {
-      return await this.touch("finished_at");
+      return await this.updateBang({ finished_at: Time.current() });
     } else {
       return await this.destroyBang();
     }

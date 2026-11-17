@@ -23,6 +23,7 @@ import {
   type ClassMethods as ConcurrencyControlsClassMethods,
 } from "./job/concurrency-controls.js";
 import { Recurrable } from "./job/recurrable.js";
+import { Batchable, type ClassMethods as BatchableClassMethods } from "./job/batchable.js";
 import type { Retryable } from "./job/retryable.js";
 import type { Duration } from "@blazetrails/activesupport";
 
@@ -34,7 +35,7 @@ export class ClassMissingError extends NameError {
   }
 }
 
-type ActiveJob = ActiveJobBase & { concurrencyKey(): string | null };
+type ActiveJob = ActiveJobBase & { concurrencyKey(): string | null; batchId?: number | null };
 
 export class Job extends Record {
   static ClassMissingError = ClassMissingError;
@@ -84,6 +85,10 @@ export class Job extends Record {
   declare retry: typeof Retryable.prototype.retry;
   declare failedWith: typeof Retryable.prototype.failedWith;
   declare resetExecutionCounters: typeof Retryable.prototype.resetExecutionCounters;
+  declare batch_id: number | null;
+  declare batchExecution: Promise<import("./batch-execution.js").BatchExecution | null>;
+  declare isBatched: typeof Batchable.prototype.isBatched;
+  declare static batchAll: typeof BatchableClassMethods.batchAll;
 
   static {
     constSet(SolidQueue, "Job", this);
@@ -91,11 +96,18 @@ export class Job extends Record {
     include(this, Recurrable);
     include(this, Clearable);
     include(this, Executable);
+    include(this, Batchable);
 
     this.serialize("arguments", { coder: JSON });
   }
 
   static async enqueueAll(activeJobs: ActiveJob[]): Promise<number> {
+    const currentBatchId = SolidQueue.Batch!.currentBatchId();
+
+    for (const job of activeJobs) {
+      job.scheduledAt ??= Time.current();
+      job.batchId = currentBatchId ?? job.batchId;
+    }
     const activeJobsByJobId = indexBy(activeJobs, (activeJob) => activeJob.jobId!);
 
     await this.transaction(async () => {
@@ -131,7 +143,7 @@ export class Job extends Record {
   /** @internal */
   private static async createFromActiveJob(activeJob: ActiveJob): Promise<Job> {
     try {
-      return await this.createBang(this.attributesFromActiveJob(activeJob));
+      return await this.createBang(await this.attributesFromActiveJob(activeJob));
     } catch (e) {
       if (!(e instanceof ActiveRecordError)) throw e;
       const enqueueError = new EnqueueError(`${rbModName(e.constructor)}: ${e.message}`);
@@ -142,7 +154,8 @@ export class Job extends Record {
 
   /** @internal */
   private static async createAllFromActiveJobs(activeJobs: ActiveJob[]): Promise<Base[]> {
-    const jobRows = activeJobs.map((job) => this.attributesFromActiveJob(job));
+    const jobRows = [];
+    for (const job of activeJobs) jobRows.push(await this.attributesFromActiveJob(job));
     await this.insertAll(jobRows);
     return await this.where({ active_job_id: activeJobs.map((job) => job.jobId) })
       .order({ id: "asc" })
@@ -150,8 +163,10 @@ export class Job extends Record {
   }
 
   /** @internal */
-  private static attributesFromActiveJob(activeJob: ActiveJob): { [key: string]: unknown } {
-    return {
+  private static async attributesFromActiveJob(
+    activeJob: ActiveJob,
+  ): Promise<{ [key: string]: unknown }> {
+    const attributes: { [key: string]: unknown } = {
       queue_name: activeJob.queueName ?? Job.DEFAULT_QUEUE_NAME,
       active_job_id: activeJob.jobId,
       priority: activeJob.priority ?? Job.DEFAULT_PRIORITY,
@@ -160,6 +175,8 @@ export class Job extends Record {
       arguments: activeJob.serialize(),
       concurrency_key: activeJob.concurrencyKey(),
     };
+    if (await SolidQueue.Batch!.isMigrated()) attributes["batch_id"] = activeJob.batchId;
+    return attributes;
   }
 
   /**

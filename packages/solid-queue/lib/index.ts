@@ -3,6 +3,8 @@ export { SolidQueue } from "./solid-queue.js";
 export { Record } from "./record.js";
 export { Job, EnqueueError, ClassMissingError } from "./job.js";
 export { Execution, UndiscardableError } from "./execution.js";
+export { Batch, AlreadyFinished, PendingMigrations } from "./batch.js";
+export { BatchExecution } from "./batch-execution.js";
 export { ReadyExecution } from "./ready-execution.js";
 export { ScheduledExecution } from "./scheduled-execution.js";
 export { BlockedExecution } from "./blocked-execution.js";
