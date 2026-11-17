@@ -85,7 +85,9 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     this._buf = buf;
   }
 
+  /** @inventedArm ReadableStream — PERMANENT */
   toAry(): unknown {
+    if (this._buf instanceof ReadableStream) return this._buf;
     return rbObjRespondTo(this._buf, "toAry")
       ? rbCheckArrayType(this._buf)
       : (this._buf as unknown as { each(): unknown }).each();
@@ -121,7 +123,10 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
       return (this._strBody = buf());
     }
     let buf = "";
-    for await (const chunk of this) buf += String(chunk);
+    for await (const chunk of this) {
+      const str = rbObjAsString(chunk) as string | Uint8Array;
+      buf += str instanceof Uint8Array ? strNew(Array.from(str)) : str;
+    }
     this._strBody = buf;
     return this._strBody;
   }
@@ -149,6 +154,8 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   async *[Symbol.asyncIterator](): AsyncIterableIterator<unknown> {
     if (this._strBody !== null) {
       yield this._strBody;
+    } else if (this._buf instanceof ReadableStream) {
+      yield* this._buf as unknown as ReadableStream<unknown>;
     } else {
       const yielded: Array<{ chunk: unknown; resume: () => void }> = [];
       let wake: (() => void) | null = null;
@@ -196,8 +203,16 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     return this._closed;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm ReadableStream — PERMANENT
+   */
   protected eachChunk(block?: (chunk: unknown) => unknown): unknown {
+    if (this._buf instanceof ReadableStream)
+      return (async () => {
+        for await (const chunk of this._buf as unknown as ReadableStream<unknown>)
+          await block!(chunk);
+      })();
     return rbFSend(this._buf, "each", block);
   }
 }
@@ -489,8 +504,8 @@ export class Response {
   declare readonly isEtag: string | undefined;
   declare weakEtag: (validators: unknown) => void;
   declare strongEtag: (validators: unknown) => void;
-  declare isWeakEtag: () => boolean;
-  declare isStrongEtag: () => boolean;
+  declare isWeakEtag: () => boolean | undefined;
+  declare isStrongEtag: () => boolean | undefined;
   /** @internal */
   declare handleConditionalGetBang: () => void;
   /** @internal */
@@ -649,9 +664,12 @@ export class Response {
     return new Buffer(response as Response, body as { push(obj: unknown): unknown });
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm ReadableStream — PERMANENT
+   */
   mungeBodyObject(body: unknown): unknown {
-    return rbObjRespondTo(body, "each") ? body : [body];
+    return rbObjRespondTo(body, "each") || body instanceof ReadableStream ? body : [body];
   }
 
   /** @internal */

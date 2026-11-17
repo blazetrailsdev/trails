@@ -149,7 +149,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
 
     it("prepareSession wraps in ActionDispatch::Request::Session", async () => {
       const store = new AbstractStore() as unknown as {
-        prepareSession: (req: { env: Record<string, unknown> }) => RequestSession;
+        prepareSession: (req: Request) => RequestSession;
         sessionExists: (env: Record<string, unknown>) => boolean;
         loadSession: (env: Record<string, unknown>) => [unknown, Record<string, unknown>];
         deleteSession: (
@@ -161,7 +161,7 @@ describe("ActionDispatch::Session::AbstractStore", () => {
       store.sessionExists = () => false;
       store.loadSession = () => [null, {}];
       store.deleteSession = () => null;
-      const session = await store.prepareSession({ env: {} });
+      const session = await store.prepareSession(new Request({}));
       expect(session).toBeInstanceOf(RequestSession);
     });
   });

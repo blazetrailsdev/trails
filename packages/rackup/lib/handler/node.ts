@@ -136,9 +136,19 @@ export class Node {
             return;
           }
           res.writeHead(status, sentHeaders(headers));
-          for await (const chunk of body) {
-            if (hijacked) return;
-            res.write(rbObjAsString(chunk));
+          let disconnected = false;
+          const onClose = (): void => {
+            disconnected = true;
+          };
+          socket?.on("close", onClose);
+          try {
+            for await (const chunk of body) {
+              if (hijacked) return;
+              if (disconnected) break;
+              res.write(rbObjAsString(chunk));
+            }
+          } finally {
+            socket?.removeListener("close", onClose);
           }
           res.end();
         } finally {

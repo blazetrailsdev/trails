@@ -1,3 +1,4 @@
+import { Request } from "../../../../lib/action-dispatch/http/request.js";
 import { describe, it, expect } from "vitest";
 import {
   Options,
@@ -35,8 +36,8 @@ function makeStore(opts: { exists?: boolean; data?: Record<string, unknown> } = 
   };
 }
 
-function makeReq(): { env: Record<string, unknown> } {
-  return { env: {} };
+function makeReq(): Request {
+  return new Request({});
 }
 
 describe("Request", () => {

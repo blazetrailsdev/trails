@@ -214,6 +214,42 @@ describe("Rack::Handler::Node", () => {
     expect(closed).toBe(true);
   });
 
+  it("stops reading a streamed body, and cancels it, once the client disconnects", async () => {
+    let cancelled = false;
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue(new Uint8Array([pulls]));
+      },
+      cancel() {
+        cancelled = true;
+      },
+    });
+    const app: RackApp = async () => [200, {}, body as unknown as RackBody];
+    const listeners: (() => void)[] = [];
+    const written: Uint8Array[] = [];
+    const socket = {
+      on(_event: string, listener: () => void) {
+        listeners.push(listener);
+      },
+      removeListener() {},
+    };
+    const res = {
+      socket,
+      writeHead() {},
+      write(chunk: Uint8Array) {
+        written.push(chunk);
+        for (const listener of listeners) listener();
+      },
+      end() {},
+    };
+
+    await new Node(app).service(await mockReq({}), res as unknown as HttpResponse);
+    expect(written).toEqual([new Uint8Array([1])]);
+    expect(cancelled).toBe(true);
+  });
+
   function captureStderr(): { lines: string[]; restore: () => void } {
     const lines: string[] = [];
     const spy = vi.spyOn(stderr, "write").mockImplementation((chunk) => {

@@ -7,6 +7,7 @@ import {
   generateStrongEtag,
   generateWeakEtag,
   handleConditionalGetBang,
+  isStrongEtag,
   isWeakEtag,
   mergeAndNormalizeCacheControlBang,
   notModified,
@@ -83,6 +84,14 @@ describe("Cache::Response", () => {
     r.etag = "foo";
     expect(r.getHeader("ETag")?.startsWith('W/"')).toBe(true);
     expect(isWeakEtag.call(r)).toBe(true);
+  });
+
+  it("weak_etag? and strong_etag? answer nil with no ETag, as etag? && ... does", () => {
+    const r = res();
+    expect(isWeakEtag.call(r)).toBeUndefined();
+    expect(isStrongEtag.call(r)).toBeUndefined();
+    r.strongEtag("x");
+    expect(isStrongEtag.call(r)).toBe(true);
   });
 
   it("generate_weak_etag wraps generate_strong_etag; arrays expand by '/'", () => {
