@@ -237,9 +237,4 @@ describe("AppBase run tasks", () => {
       setEnv("NODE_VERSION", before);
     }
   });
-
-  it("node_version is nil without a JS runtime", async () => {
-    const generator = new T(["app"]) as unknown as Record<string, any>;
-    expect(await generator.nodeVersion()).toBeUndefined();
-  });
 });

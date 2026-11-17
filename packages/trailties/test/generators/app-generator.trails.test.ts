@@ -3,7 +3,15 @@ import { spawnSync } from "node:child_process";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Dir, File, FileUtils, SecureRandom, getProcessAdapter } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  FileUtils,
+  SecureRandom,
+  env,
+  getProcessAdapter,
+  setEnv,
+} from "@blazetrails/ruby-compat";
 import { AppBuilder, AppGenerator } from "../../lib/generators/trails/app/app-generator.js";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Generators } from "../../lib/generators.js";
@@ -86,6 +94,23 @@ describe("AppGenerator (trails-only)", () => {
           /eslintConfigPrettier,\n\]\);/.test(await File.readAsync(eslintConfig)),
       ).toBe(present);
     }
+  });
+
+  it("templates read the generator's node version", async () => {
+    const before = env.NODE_VERSION;
+    setEnv("NODE_VERSION", "1.2.3");
+    try {
+      await new AppGenerator(
+        ["my-app"],
+        { skipInstall: true },
+        { destinationRoot: tmpDir },
+      ).invokeAll();
+    } finally {
+      setEnv("NODE_VERSION", before);
+    }
+    const read = (file: string) => File.readAsync(File.join(tmpDir, "my-app", file));
+    expect(await read(".node-version")).toBe("1.2.3\n");
+    expect(await read("Dockerfile")).toContain("ARG NODE_VERSION=1.2.3\n");
   });
 
   it("generates action cable files by default", async () => {

@@ -547,13 +547,11 @@ ${requireStatements.join("\n")}`;
 
   /** @internal */
   protected async nodeVersion(): Promise<string | null | undefined> {
-    if (this.usingNode()) {
-      if (env.NODE_VERSION != null) return env.NODE_VERSION;
-      try {
-        return (await rbFBackquote("node --version")).match(/\d+\.\d+\.\d+/)?.[0];
-      } catch {
-        return NODE_LTS_VERSION;
-      }
+    if (env.NODE_VERSION != null) return env.NODE_VERSION;
+    try {
+      return (await rbFBackquote("node --version")).match(/\d+\.\d+\.\d+/)?.[0];
+    } catch {
+      return NODE_LTS_VERSION;
     }
   }
 

@@ -94,7 +94,7 @@ builder:
   #
   # # Pass arguments and secrets to the Docker build process
   # args:
-  #   NODE_VERSION: <%= nodeVersion() %>
+  #   NODE_VERSION: <%= await this.nodeVersion() %>
   # secrets:
   #   - GITHUB_TOKEN
   #   - TRAILS_MASTER_KEY
