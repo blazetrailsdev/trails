@@ -57,7 +57,10 @@ function assertNoGem(name: string): Promise<void> {
   });
 }
 
-async function runGeneratorInstance(args: string[]): Promise<string[]> {
+async function runGeneratorInstance(
+  args: string[],
+  bundleCommands: string[] = [],
+): Promise<string[]> {
   const railsCommands: string[] = [];
   const proto = AppGenerator.prototype as unknown as {
     isInstall(): boolean;
@@ -65,7 +68,9 @@ async function runGeneratorInstance(args: string[]): Promise<string[]> {
   };
   const stubs = [
     vi.spyOn(proto, "isInstall").mockReturnValue(true),
-    vi.spyOn(proto, "installCommand").mockImplementation(() => {}),
+    vi.spyOn(proto, "installCommand").mockImplementation((command: string) => {
+      bundleCommands.push(command);
+    }),
     vi.spyOn(Actions, "trailsCommand").mockImplementation(async (command: string) => {
       railsCommands.push(command);
     }),
@@ -544,11 +549,14 @@ describe("AppGenerator", () => {
       "test/helpers/.keep",
       "test/integration/.keep",
       "test/fixtures/files/.keep",
+      "public/400.html",
       "public/404.html",
+      "public/406-unsupported-browser.html",
       "public/422.html",
       "public/500.html",
+      "public/icon.png",
+      "public/icon.svg",
       "public/robots.txt",
-      "public/favicon.ico",
       "lib/tasks/.keep",
       "log/.keep",
       "tmp/.keep",
@@ -908,6 +916,29 @@ describe("AppGenerator", () => {
     await assertNoGem("@blazetrails/solid-cache");
     await assertNoGem("@blazetrails/solid-queue");
     await assertNoGem("@blazetrails/solid-cable");
+  });
+
+  it("after bundle callback", async () => {
+    const bundleCommands: string[] = [];
+    let bundleCommandsBeforeCallback: string[] = [];
+    const proto = AppGenerator.prototype as unknown as { runAfterBundleCallbacks(): Promise<void> };
+    const original = proto.runAfterBundleCallbacks;
+    const stub = vi
+      .spyOn(proto, "runAfterBundleCallbacks")
+      .mockImplementation(async function (this: { afterBundle(block: () => void): void }) {
+        this.afterBundle(() => {
+          bundleCommandsBeforeCallback = [...bundleCommands];
+        });
+        return original.call(this);
+      });
+    try {
+      await runGeneratorInstance([t.destinationRoot], bundleCommands);
+    } finally {
+      stub.mockRestore();
+    }
+
+    expect(bundleCommandsBeforeCallback).not.toBeEmpty();
+    expect(bundleCommandsBeforeCallback).toEqual(bundleCommands);
   });
 
   it("default generator executes all trails commands", async () => {

@@ -257,6 +257,8 @@ export class AppBuilder extends ActionMethods {
   /** @missingRailsArgs template — PERMANENT */
   async eslint(): Promise<void> {
     await this.template("eslint.config.mjs");
+    await this.template("prettierrc.json", ".prettierrc.json");
+    await this.template("prettierignore", ".prettierignore");
   }
 
   async versionControl(): Promise<void> {

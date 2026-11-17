@@ -9,7 +9,7 @@ export interface TSECompiler {
   postCmd?: string[];
 }
 
-type Compiled = { default: (this: object) => string };
+type Compiled = { default: (this: object) => Promise<string> };
 
 let loads = 0;
 const loaded = new Set<string>();

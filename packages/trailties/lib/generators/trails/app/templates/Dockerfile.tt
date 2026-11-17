@@ -14,11 +14,35 @@ FROM base AS build
 
 RUN apt-get update -qq && apt-get install --no-install-recommends -y build-essential node-gyp pkg-config python-is-python3
 
-COPY package.json <%= this.packageManager === "pnpm" ? "pnpm-lock.yaml" : "package-lock.json" %>* ./
-RUN <%= this.packageManager === "pnpm" ? "npm install -g corepack && corepack enable pnpm && pnpm install" : `${this.packageManager} install` %>
+<% if (this.usingNode()) { -%>
+# Install JavaScript dependencies
+ARG PNPM_VERSION=<%= await this.dockerfilePnpmVersion() %>
+<% if (await this.isPnpmThroughCorepack()) { -%>
+RUN npm install -g corepack && corepack enable && corepack prepare pnpm@$PNPM_VERSION --activate
+<% } else { -%>
+RUN npm install -g pnpm@$PNPM_VERSION
+<% } -%>
 
+<% } -%>
+<% if (this.usingBun()) { -%>
+ENV BUN_INSTALL=/usr/local/bun
+ENV PATH=/usr/local/bun/bin:$PATH
+ARG BUN_VERSION=<%= await this.dockerfileBunVersion() %>
+RUN curl -fsSL https://bun.sh/install | bash -s -- "bun-v${BUN_VERSION}"
+
+<% } -%>
+# Install application packages
+<% if (this.usingBun()) { -%>
+COPY package.json bun.lockb ./
+RUN bun install --frozen-lockfile
+<% } else { -%>
+COPY package.json pnpm-lock.yaml ./
+RUN <%= this.usingNode() ? "" : "npm install -g pnpm && " %>pnpm install --frozen-lockfile
+<% } -%>
+
+# Copy application code
 COPY . .
-RUN <%= this.packageManager %> run build
+RUN <%= this.usingBun() ? "bun" : "pnpm" %> run build
 
 FROM base
 

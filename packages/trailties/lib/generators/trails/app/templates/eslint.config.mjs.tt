@@ -1,6 +1,7 @@
 // Recommended JavaScript and TypeScript styling for trails
 import js from "@eslint/js";
 import { defineConfig } from "eslint/config";
+import eslintConfigPrettier from "eslint-config-prettier/flat";
 import tseslint from "typescript-eslint";
 
 export default defineConfig([
@@ -12,4 +13,5 @@ export default defineConfig([
   //
   // // Allow `let` for bindings that are never reassigned
   // { rules: { "prefer-const": "off" } },
+  eslintConfigPrettier,
 ]);

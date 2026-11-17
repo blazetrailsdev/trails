@@ -4,9 +4,18 @@ import { dirname, join } from "node:path";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 // explicit eslint config increases performance slightly while avoiding config confusion.
+const args = process.argv.slice(2);
 const { status } = spawnSync(
   join(root, "node_modules", ".bin", "eslint"),
-  ["--config", join(root, "eslint.config.mjs"), ...process.argv.slice(2)],
+  ["--config", join(root, "eslint.config.mjs"), ...args],
   { stdio: "inherit" },
 );
-process.exit(status ?? 1);
+if (status === null) process.exit(1);
+const valued = ["-c", "--config", "-f", "--format", "-o", "--output-file", "--rule", "--ext"];
+const paths = args.filter((arg, i) => !arg.startsWith("-") && !valued.includes(args[i - 1]));
+const prettier = spawnSync(
+  join(root, "node_modules", ".bin", "prettier"),
+  [args.includes("--fix") ? "--write" : "--check", ...(paths.length > 0 ? paths : [root])],
+  { stdio: "inherit" },
+);
+process.exit(status || (prettier.status ?? 1));

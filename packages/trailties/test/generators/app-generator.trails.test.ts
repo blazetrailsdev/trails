@@ -39,6 +39,55 @@ describe("AppGenerator (trails-only)", () => {
     );
   });
 
+  it("installs pnpm in the Dockerfile through corepack or npm by the pnpm version", async () => {
+    for (const [version, install] of [
+      [
+        "9.15.0",
+        "RUN npm install -g corepack && corepack enable && corepack prepare pnpm@$PNPM_VERSION --activate",
+      ],
+      ["1.9.0", "RUN npm install -g pnpm@$PNPM_VERSION"],
+    ]) {
+      const root = File.join(tmpDir, version);
+      const generator = new AppGenerator(
+        ["my-app"],
+        { skipInstall: true, javascript: "esbuild" },
+        { destinationRoot: root },
+      );
+      Object.assign(generator, { dockerfilePnpmVersion: async () => version });
+      await generator.invokeAll();
+      const dockerfile = await File.readAsync(File.join(root, "my-app/Dockerfile"));
+      expect(dockerfile).toContain(`ARG PNPM_VERSION=${version}\n${install}\n`);
+      expect(dockerfile).toContain(
+        "COPY package.json pnpm-lock.yaml ./\nRUN pnpm install --frozen-lockfile\n",
+      );
+    }
+  });
+
+  it("ships Prettier beside ESLint unless --skip-eslint is passed", async () => {
+    for (const [skipEslint, present] of [
+      [false, true],
+      [true, false],
+    ]) {
+      const root = File.join(tmpDir, String(skipEslint));
+      await new AppGenerator(
+        ["my-app"],
+        { skipInstall: true, skipEslint },
+        { destinationRoot: root },
+      ).invokeAll();
+      const app = File.join(root, "my-app");
+      const pkg = JSON.parse(await File.readAsync(File.join(app, "package.json")));
+      expect(pkg.devDependencies.prettier != null).toBe(present);
+      expect(pkg.devDependencies["eslint-config-prettier"] != null).toBe(present);
+      expect(await File.isExistAsync(File.join(app, ".prettierrc.json"))).toBe(present);
+      expect(await File.isExistAsync(File.join(app, ".prettierignore"))).toBe(present);
+      const eslintConfig = File.join(app, "eslint.config.mjs");
+      expect(
+        (await File.isExistAsync(eslintConfig)) &&
+          /eslintConfigPrettier,\n\]\);/.test(await File.readAsync(eslintConfig)),
+      ).toBe(present);
+    }
+  });
+
   it("generates action cable files by default", async () => {
     await new AppGenerator(
       ["my-app"],

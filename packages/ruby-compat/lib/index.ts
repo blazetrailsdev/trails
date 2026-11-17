@@ -347,6 +347,7 @@ export {
   rbFRequire,
   rbFRequireFile,
   registerCompiledFiles,
+  setLoadImporter,
   rbRequireLoaded,
 } from "./load.js";
 export { OptionParser } from "./optparse.js";

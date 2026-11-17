@@ -1,0 +1,7 @@
+.trails/
+dist/
+log/
+node_modules/
+public/assets/
+storage/
+tmp/
