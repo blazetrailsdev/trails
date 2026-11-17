@@ -325,28 +325,24 @@ export class Trailtie extends BaseTrailtie {
     });
 
     /** @noRailsEquivalent PERMANENT */
-    this.initializer(
-      "active_record.load_schema_cache",
-      { after: "setup_main_autoloader" },
-      async () => {
-        if (Trails.env["test?"]()) return;
-        let activeRecord: typeof Base | undefined;
-        onLoad("active_record", (base: typeof Base) => {
-          activeRecord = base;
-        });
-        if (activeRecord === undefined) return;
-        for (const pool of activeRecord.connectionHandler.connectionPoolList("all")) {
-          try {
-            await pool.schemaReflection.loadAllBang(pool);
-          } catch (error) {
-            if (!(error instanceof ActiveRecordError)) throw error;
-            console.warn(
-              `Failed to load the schema cache because of ${error.constructor.name}: ${error.message}`,
-            );
-          }
+    this.config.toPrepare(async () => {
+      if (Trails.env["test?"]()) return;
+      let activeRecord: typeof Base | undefined;
+      onLoad("active_record", (base: typeof Base) => {
+        activeRecord = base;
+      });
+      if (activeRecord === undefined) return;
+      for (const pool of activeRecord.connectionHandler.connectionPoolList("all")) {
+        try {
+          await pool.schemaReflection.loadAllBang(pool);
+        } catch (error) {
+          if (!(error instanceof ActiveRecordError)) throw error;
+          console.warn(
+            `Failed to load the schema cache because of ${error.constructor.name}: ${error.message}`,
+          );
         }
-      },
-    );
+      }
+    });
 
     this.initializer("active_record.set_executor_hooks", () => {
       QueryCache.installExecutorHooks();
