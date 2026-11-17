@@ -3942,8 +3942,6 @@ function readClassAttributeCall(
   return {
     ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
     ...(enclosing?.seatsModule === true ? { enclosingSeatsModule: true } : {}),
-    // `mattr_*` / `cattr_*` define through `class_eval` (`attribute_accessors.rb:55-59`), so the
-    // visibility in effect at the call applies; `class_attribute` redefines on the singleton.
     ...(macro.predicate === false && internalStatement(node) ? { internal: true } : {}),
     ...(ts.isIdentifier(recv) ? { receiver: recv.text } : {}),
     names,
@@ -7319,8 +7317,6 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         }
         if (isKwargsCapture(n as ts.ConditionalExpression)) return;
         if (isOwnIvarRead(n as ts.ConditionalExpression)) return;
-        // `Object.hasOwn(h, "k") ? h.k : default` is `h.fetch(:k, default)`'s native form
-        // (CLAUDE.md, "`fetch` vs `??`"), which takes no arm in Ruby.
         if (nativeHashForms(n).some(([form]) => form === "fetch")) break;
         const fallback = rtestFallback(n as ts.ConditionalExpression);
         if (fallback !== undefined) {
