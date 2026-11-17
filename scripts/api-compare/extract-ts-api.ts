@@ -7317,7 +7317,13 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         }
         if (isKwargsCapture(n as ts.ConditionalExpression)) return;
         if (isOwnIvarRead(n as ts.ConditionalExpression)) return;
-        if (nativeHashForms(n).some(([form]) => form === "fetch")) break;
+        if (
+          nativeHashForms(n).some(
+            ([form, receiver]) => form === "fetch" && receiver?.kind !== ts.SyntaxKind.ThisKeyword,
+          )
+        ) {
+          break;
+        }
         const fallback = rtestFallback(n as ts.ConditionalExpression);
         if (fallback !== undefined) {
           visit((n as ts.ConditionalExpression).condition);
