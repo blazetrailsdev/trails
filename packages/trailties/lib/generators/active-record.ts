@@ -39,7 +39,6 @@ export class Base extends NamedBase {
   }
 }
 
-include(Base, Generators.Migration);
 include(Base, Migration);
 extend(Base, Generators.ClassMethods);
 extend(Base, ClassMethods);

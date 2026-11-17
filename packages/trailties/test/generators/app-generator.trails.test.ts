@@ -39,6 +39,30 @@ describe("AppGenerator (trails-only)", () => {
     );
   });
 
+  it("installs pnpm in the Dockerfile through corepack or npm by the pnpm version", async () => {
+    for (const [version, install] of [
+      [
+        "9.15.0",
+        "RUN npm install -g corepack && corepack enable && corepack prepare pnpm@$PNPM_VERSION --activate",
+      ],
+      ["1.9.0", "RUN npm install -g pnpm@$PNPM_VERSION"],
+    ]) {
+      const root = File.join(tmpDir, version);
+      const generator = new AppGenerator(
+        ["my-app"],
+        { skipInstall: true, javascript: "vite" },
+        { destinationRoot: root },
+      );
+      Object.assign(generator, { dockerfilePnpmVersion: async () => version });
+      await generator.invokeAll();
+      const dockerfile = await File.readAsync(File.join(root, "my-app/Dockerfile"));
+      expect(dockerfile).toContain(`ARG PNPM_VERSION=${version}\n${install}\n`);
+      expect(dockerfile).toContain(
+        "COPY package.json pnpm-lock.yaml ./\nRUN pnpm install --frozen-lockfile\n",
+      );
+    }
+  });
+
   it("generates action cable files by default", async () => {
     await new AppGenerator(
       ["my-app"],

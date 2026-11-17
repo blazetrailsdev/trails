@@ -60,10 +60,10 @@ function compileTemplate(source: string, base: string): string {
   const { outputText, sourceMapText } = ts.transpileModule(
     [
       'import { StringIO, rbObjAsString, NameError, rbObjClassname, TopLevel } from "@blazetrails/ruby-compat";',
-      body.replace(/^export default /u, ""),
-      "export default function () {",
+      body.replace(/^export default function render/mu, "async function render"),
+      "export default async function () {",
       "  this.outputBuffer = new StringIO();",
-      "  render.call(this);",
+      "  await render.call(this);",
       "  return this.outputBuffer.string();",
       "}",
       "",
