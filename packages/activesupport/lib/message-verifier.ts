@@ -1,4 +1,6 @@
-import { getCrypto, OpenSSL, prepend, type Bytes } from "@blazetrails/ruby-compat";
+import { DigestInstance, OpenSSL, prepend, type Bytes } from "@blazetrails/ruby-compat";
+import { isPresent } from "./core-ext/object/blank.js";
+import { SecurityUtils } from "./security-utils.js";
 import { Codec, type MessageSerializer } from "./messages/codec.js";
 import type { ExpectedMetadataOptions, MetadataOptions } from "./messages/metadata.js";
 import {
@@ -31,6 +33,7 @@ type GenerateOptions = MetadataOptions;
 type VerifyOptions = ExpectedMetadataOptions & RotatableOptions;
 
 const SEPARATOR = "--";
+const SEPARATOR_LENGTH = SEPARATOR.length;
 
 export class MessageVerifier extends Codec {
   static override defaultSerializer: Format | MessageSerializer = "json";
@@ -109,38 +112,51 @@ export class MessageVerifier extends Codec {
   }
 
   private extractEncoded(signed: string): string {
-    if (!signed || typeof signed !== "string") {
+    if (signed == null || typeof signed !== "string") {
       throw new Thrown("invalid_message_format", "invalid message string");
     }
 
-    const parts = signed.split(SEPARATOR);
-    const signature = parts.length < 2 ? undefined : parts[parts.length - 1];
-    const encoded = parts.slice(0, -1).join(SEPARATOR);
-
-    if (!encoded || !signature) {
-      throw new Thrown("invalid_message_format", "missing message digest");
+    let encoded: string | undefined;
+    let digest: string | undefined;
+    const separatorIndex = this.separatorIndexFor(signed);
+    if (separatorIndex != null) {
+      encoded = signed.slice(0, separatorIndex);
+      digest = signed.substr(separatorIndex + SEPARATOR_LENGTH, this.digestLengthInHex());
     }
 
-    if (!this.digestMatches(encoded, signature)) {
+    if (!this.isDigestMatchesData(digest, encoded)) {
       throw new Thrown("invalid_message_format", "mismatched digest");
     }
 
-    return encoded;
-  }
-
-  private digestMatches(encoded: string, signature: string): boolean {
-    try {
-      const sigBuf = Buffer.from(signature, "hex");
-      const expectedBuf = Buffer.from(this.generateDigest(encoded), "hex");
-      if (sigBuf.length !== expectedBuf.length) return false;
-      return getCrypto().timingSafeEqual(sigBuf, expectedBuf);
-    } catch {
-      return false;
-    }
+    return encoded!;
   }
 
   private generateDigest(data: string): string {
     return OpenSSL.HMAC.hexdigest(this.digest, this.secret, data);
+  }
+
+  private _digestLengthInHex?: number;
+
+  private digestLengthInHex(): number {
+    return (this._digestLengthInHex ??= new DigestInstance(this.digest).digestLength() * 2);
+  }
+
+  private isSeparatorAt(signedMessage: string, index: number): boolean {
+    return signedMessage.substr(index, SEPARATOR_LENGTH) === SEPARATOR;
+  }
+
+  private separatorIndexFor(signedMessage: string): number | undefined {
+    const index = signedMessage.length - this.digestLengthInHex() - SEPARATOR_LENGTH;
+    if (!(index < 0 || !this.isSeparatorAt(signedMessage, index))) return index;
+    return undefined;
+  }
+
+  private isDigestMatchesData(digest: string | undefined, data: string | undefined): boolean {
+    return (
+      isPresent(data) &&
+      isPresent(digest) &&
+      SecurityUtils.secureCompare(digest!, this.generateDigest(data!))
+    );
   }
 
   protected override decode(

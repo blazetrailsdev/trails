@@ -123,6 +123,11 @@ export class DigestInstance {
   digest(): Bytes {
     return this.impl.digest();
   }
+
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_digest.c:279 */
+  digestLength(): number {
+    return getCrypto().createHash(this.algorithm).digest().length;
+  }
 }
 
 /**
