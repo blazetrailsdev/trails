@@ -42,7 +42,8 @@ export class MockLogger {
   declare static readonly UNKNOWN: number;
 
   private _flushCount: number;
-  private _level: unknown;
+  /** @internal */
+  _level: unknown;
   private _logged: Hash<LogLevel, unknown[]>;
 
   /** @noRailsEquivalent PERMANENT */
