@@ -123,6 +123,29 @@ export function collectLibTests(content: string, file: string, namespace: string
 export const REQUIRED_TEST_MODULES: Record<string, string> = {
   commonSubscriptionAdapterTest: "packages/actioncable/test/support/subscription-adapter/common.ts",
   channelPrefixTest: "packages/actioncable/test/support/subscription-adapter/channel-prefix.ts",
+  cacheDeleteMatchedBehavior:
+    "packages/activesupport/test/cache/behaviors/cache-delete-matched-behavior.ts",
+  cacheIncrementDecrementBehavior:
+    "packages/activesupport/test/cache/behaviors/cache-increment-decrement-behavior.ts",
+  cacheInstrumentationBehavior:
+    "packages/activesupport/test/cache/behaviors/cache-instrumentation-behavior.ts",
+  cacheLoggingBehavior: "packages/activesupport/test/cache/behaviors/cache-logging-behavior.ts",
+  cacheStoreBehavior: "packages/activesupport/test/cache/behaviors/cache-store-behavior.ts",
+  cacheStoreCoderBehavior:
+    "packages/activesupport/test/cache/behaviors/cache-store-coder-behavior.ts",
+  cacheStoreCompressionBehavior:
+    "packages/activesupport/test/cache/behaviors/cache-store-compression-behavior.ts",
+  cacheStoreFormatVersionBehavior:
+    "packages/activesupport/test/cache/behaviors/cache-store-format-version-behavior.ts",
+  cacheStoreSerializerBehavior:
+    "packages/activesupport/test/cache/behaviors/cache-store-serializer-behavior.ts",
+  cacheStoreVersionBehavior:
+    "packages/activesupport/test/cache/behaviors/cache-store-version-behavior.ts",
+  encodedKeyCacheBehavior:
+    "packages/activesupport/test/cache/behaviors/encoded-key-cache-behavior.ts",
+  failureRaisingBehavior: "packages/activesupport/test/cache/behaviors/failure-raising-behavior.ts",
+  failureSafetyBehavior: "packages/activesupport/test/cache/behaviors/failure-safety-behavior.ts",
+  localCacheBehavior: "packages/activesupport/test/cache/behaviors/local-cache-behavior.ts",
 };
 
 /** The top-level function `name` declared in a required test-module file. */

@@ -567,17 +567,28 @@ class TestExtractor
   # (actioncable's `subscription_adapter/common.rb` and `channel_prefix.rb`):
   # Minitest runs its `test_*` once per including class, so each including file
   # owns the cases and its TS twin ports them. Enrolled by module name, as
-  # `LIB_TEST_MODULES` is: activesupport's cache `behaviors/` modules take the
-  # same shape and are not yet ported to match.
-  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests FileUpdateCheckerSharedTests].freeze
+  # `LIB_TEST_MODULES` is. activesupport's `ConnectionPoolBehavior` has no TS
+  # twin yet and stays unenrolled.
+  REQUIRED_TEST_MODULES = %w[CommonSubscriptionAdapterTest ChannelPrefixTest MessagePackSharedSerializerTests FileUpdateCheckerSharedTests CacheStoreBehavior CacheStoreVersionBehavior CacheStoreCoderBehavior CacheStoreCompressionBehavior CacheStoreFormatVersionBehavior CacheStoreSerializerBehavior CacheDeleteMatchedBehavior CacheIncrementDecrementBehavior CacheInstrumentationBehavior CacheLoggingBehavior EncodedKeyCacheBehavior FailureSafetyBehavior FailureRaisingBehavior LocalCacheBehavior].freeze
 
   def collect_required_modules(sexp, filepath)
     missing = @module_includes.keys.select do |name|
       !@modules.key?(name) && REQUIRED_TEST_MODULES.include?(name)
     end
     return if missing.empty?
-    required_relative_paths(sexp).each do |required|
+    collect_required_modules_from(sexp, filepath, missing, {})
+  end
+
+  def collect_required_modules_from(sexp, filepath, missing, seen, nested = false)
+    paths = if nested
+      Array(sexp[1]).select { |stmt| stmt.is_a?(Array) && stmt[0] == :command }.flat_map { |stmt| required_relative_paths(stmt) }
+    else
+      required_relative_paths(sexp)
+    end
+    paths.each do |required|
       path = File.expand_path("#{required}.rb", File.dirname(filepath))
+      next if seen[path]
+      seen[path] = true
       required_sexp = File.file?(path) && Ripper.sexp(File.read(path))
       next unless required_sexp
       own = [@modules, @test_cases, @module_includes, @module_def_gates]
@@ -589,6 +600,7 @@ class TestExtractor
       found = @modules
       @modules, @test_cases, @module_includes, @module_def_gates = own
       missing.each { |name| @modules[name] ||= found[name] if found[name] }
+      collect_required_modules_from(required_sexp, path, missing, seen, true)
     end
   end
 

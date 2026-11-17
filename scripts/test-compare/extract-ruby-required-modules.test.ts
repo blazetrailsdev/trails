@@ -7,17 +7,18 @@ import { describe, expect, it } from "vitest";
 
 const RUBY_SCRIPT = path.join(__dirname, "extract-ruby-tests.rb");
 
-async function extractRuby(moduleName: string): Promise<string[]> {
+async function extractRuby(moduleName: string, via: string | null = null): Promise<string[]> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "required-modules-"));
   try {
     await fs.writeFile(
       path.join(dir, "common.rb"),
       `module ${moduleName}\n  def test_basic_broadcast\n    assert true\n  end\nend\n`,
     );
+    if (via !== null) await fs.writeFile(path.join(dir, "behaviors.rb"), via);
     const testFile = path.join(dir, "async_test.rb");
     await fs.writeFile(
       testFile,
-      `require_relative "common"\nclass AsyncAdapterTest < ActionCable::TestCase\n  include ${moduleName}\nend\n`,
+      `require_relative "${via === null ? "common" : "behaviors"}"\nclass AsyncAdapterTest < ActionCable::TestCase\n  include ${moduleName}\nend\n`,
     );
     const driver = `
       require_relative ${JSON.stringify(RUBY_SCRIPT)}
@@ -36,6 +37,21 @@ async function extractRuby(moduleName: string): Promise<string[]> {
 describe("a test case that includes a module from a require_relative sibling", () => {
   it("emits the enrolled module's tests for the including file", async () => {
     expect(await extractRuby("CommonSubscriptionAdapterTest")).toEqual(["basic broadcast"]);
+  });
+
+  it("follows a required file's own top-level require_relative", async () => {
+    expect(await extractRuby("CacheStoreBehavior", `require_relative "common"\n`)).toEqual([
+      "basic broadcast",
+    ]);
+  });
+
+  it("does not follow a require_relative under a branch of the required file", async () => {
+    expect(
+      await extractRuby(
+        "CacheStoreBehavior",
+        `if RUBY_VERSION\n  require_relative "common"\nend\n`,
+      ),
+    ).toEqual([]);
   });
 
   it("leaves a module outside the enrollment set alone", async () => {
