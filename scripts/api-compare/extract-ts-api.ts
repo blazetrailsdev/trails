@@ -8135,6 +8135,7 @@ function collectCalls(
       if (invoked?.has(propertyAccessKey(n)) === true && isGuardConditionRead(n)) {
         return;
       }
+      if (skipHoistedClosures && isOptionsHashRead(n)) return;
       if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
         tally(occurrences, n.name.text);
@@ -8721,6 +8722,17 @@ function isForeignReadReceiver(receiver: ts.Node): boolean {
   }
   if (ts.isIdentifier(receiver)) return !/^[A-Z]/.test(receiver.text);
   return true;
+}
+
+function isOptionsHashRead(access: ts.PropertyAccessExpression): boolean {
+  const receiver = access.expression;
+  if (!ts.isIdentifier(receiver)) return false;
+  const decl = currentChecker?.getSymbolAtLocation(receiver)?.valueDeclaration;
+  if (decl === undefined || !ts.isParameter(decl)) return false;
+  if (decl.initializer === undefined || !ts.isObjectLiteralExpression(decl.initializer)) {
+    return false;
+  }
+  return checkerProvenKind(receiver) === "object";
 }
 
 /**

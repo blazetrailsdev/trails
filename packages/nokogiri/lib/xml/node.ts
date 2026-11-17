@@ -117,6 +117,14 @@ export class XmlNode {
     if (this._node instanceof LibXmlElement) this._node.setAttr(name, value);
   }
 
+  values(): string[] {
+    return this.attributeNodes.map((a) => a.value);
+  }
+
+  isValue(value: string): boolean {
+    return this.values().includes(value);
+  }
+
   get attributeNodes(): AttrNode[] {
     if (!(this._node instanceof LibXmlElement)) return [];
     return this._node.attrs.map((a: LibXmlAttribute) => ({

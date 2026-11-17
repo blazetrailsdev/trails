@@ -1,4 +1,4 @@
-import { HashWithIndifferentAccess, isBlank } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, isBlank, underscore } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   BadURIError,
@@ -75,12 +75,16 @@ export class GID extends Generic {
     return new GID(...genericComponents);
   }
 
+  /** @inventedArm underscore — PERMANENT */
   static create(
     app: string,
     model: { id: unknown; constructor: object },
     params: Record<string, unknown> | null = null,
   ): GID {
     const name = rbModName(model.constructor)!;
+    if (params != null) {
+      params = Object.fromEntries(Object.entries(params).map(([k, v]) => [underscore(k), v]));
+    }
     return GID.build({ app, modelName: name, modelId: model.id, params });
   }
 

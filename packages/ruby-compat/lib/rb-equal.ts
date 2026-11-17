@@ -51,6 +51,11 @@ export function rbEql(a: unknown, b: unknown): boolean {
 function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  if (a instanceof Set && b instanceof Set) {
+    if (a.size !== b.size) return false;
+    const members = [...a];
+    return [...b].every((o) => a.has(o) || members.some((m) => equalOrEql(m, o, true)));
+  }
   if (a instanceof String || b instanceof String) {
     return equalOrEql(
       a instanceof String ? a.valueOf() : a,

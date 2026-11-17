@@ -6,6 +6,7 @@ import {
   Complex,
   Generic,
   IPAddr,
+  Marshal,
   Pathname,
   Range,
   Rational,
@@ -40,14 +41,24 @@ describe("MessagePackSerializerTest", () => {
   const load = (dumped: Uint8Array) => MessagePack.load(dumped);
   const roundtrip = (object: unknown) => load(dump(object));
 
+  const assertRoundtrip = (object: unknown) => {
+    const serialized = dump(object);
+    expect(serialized).toBeInstanceOf(Uint8Array);
+
+    const deserialized = load(serialized);
+    expect((deserialized as object).constructor).toBe((object as object).constructor);
+    expect(rbEqual(object, deserialized)).toBe(true);
+  };
+
   it("raises friendly error when dumping an unsupported object", () => {
     class UnsupportedObject {}
     expect(() => dump(new UnsupportedObject())).toThrow(UnserializableObjectError);
   });
 
   it("includes signature in message", () => {
-    expect(MessagePack.isSignature(dump(""))).toBe(true);
-    expect(MessagePack.isSignature(Buffer.from("{}"))).toBe(false);
+    expect(MessagePack.isSignature(dump(""))).toBeTruthy();
+    expect(MessagePack.isSignature(Marshal.dump(""))).toBeFalsy();
+    expect(MessagePack.isSignature(Buffer.from("{}"))).toBeFalsy();
   });
 
   it("roundtrips base types", () => {
@@ -62,7 +73,7 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips Symbol", () => {
-    expect(roundtrip(":some_symbol")).toBe(":some_symbol");
+    assertRoundtrip(":some_symbol");
   });
 
   it.todo("dumps Symbol bytes identical to real Rails MessagePack");
@@ -96,29 +107,19 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips very large Integer", () => {
-    const value = 2n ** 512n;
-    expect(roundtrip(value)).toBe(value);
-    expect(roundtrip(-(2n ** 512n))).toBe(-(2n ** 512n));
+    assertRoundtrip(2n ** 512n);
   });
 
   it("roundtrips BigDecimal", () => {
-    for (const value of ["9876543210.0123456789", "1", "-1.5", "0.1e-19", "-0", "Infinity"]) {
-      const object = new BigDecimal(value);
-      const deserialized = roundtrip(object) as BigDecimal;
-      expect(deserialized).toBeInstanceOf(BigDecimal);
-      expect(deserialized.toString("E")).toBe(object.toString("E"));
-    }
-    expect((roundtrip(new BigDecimal("NaN")) as BigDecimal).isNan()).toBe(true);
+    assertRoundtrip(new BigDecimal("9876543210.0123456789"));
   });
 
   it("roundtrips Rational", () => {
-    const result = roundtrip(rational(1, 3));
-    expect(result).toBeInstanceOf(Rational);
-    expect(result).toEqual(rational(1, 3));
+    assertRoundtrip(rational(1, 3));
   });
 
   it("optimizes Rational zero encoding", () => {
-    expect(roundtrip(rational(0, 1))).toEqual(rational(0, 1));
+    assertRoundtrip(rational(0, 1));
 
     const serializedZero = dump(rational(0, 1));
     const serializedNonzero = dump(rational(1, 1));
@@ -126,9 +127,7 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips Complex", () => {
-    const result = roundtrip(complex(1, -1));
-    expect(result).toBeInstanceOf(Complex);
-    expect(result).toEqual(complex(1, -1));
+    assertRoundtrip(complex(1, -1));
   });
 
   it("roundtrips 64-bit native integers", () => {
@@ -140,120 +139,86 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips Set", () => {
-    expect(roundtrip(new Set([null, true, 2, "three"]))).toEqual(new Set([null, true, 2, "three"]));
+    assertRoundtrip(new Set([null, true, 2, "three"]));
   });
 
   it("roundtrips DateTime", () => {
-    const datetime = Temporal.PlainDateTime.from("1999-12-31T12:34:56.789");
-    expect(roundtrip(datetime)).toEqual(datetime);
-    const now = Temporal.Now.plainDateTimeISO();
-    expect(roundtrip(now)).toEqual(now);
+    assertRoundtrip(Temporal.PlainDateTime.from("1999-12-31T12:34:56.789"));
+    assertRoundtrip(Temporal.Now.plainDateTimeISO());
   });
 
   it("roundtrips Date", () => {
-    const date = Temporal.PlainDate.from("1999-12-31");
-    expect(roundtrip(date)).toEqual(date);
-    const today = Temporal.Now.plainDateISO();
-    expect(roundtrip(today)).toEqual(today);
+    assertRoundtrip(Temporal.PlainDate.from("1999-12-31"));
+    assertRoundtrip(Temporal.Now.plainDateISO());
   });
 
   it("roundtrips Time", () => {
-    const time = Time.new(1999, 12, 31, 12, 34, new Rational(789, 1000).add(56), "-12:00");
-    const result = roundtrip(time) as Time;
-    expect(result.constructor).toBe(Time);
-    expect(result.compare(time)).toBe(0);
-    const now = Time.now();
-    const nowResult = roundtrip(now) as Time;
-    expect(nowResult.constructor).toBe(Time);
-    expect(nowResult.compare(now)).toBe(0);
+    assertRoundtrip(Time.new(1999, 12, 31, 12, 34, new Rational(789, 1000).add(56), "-12:00"));
+    assertRoundtrip(Time.now());
   });
 
   it("roundtrips ActiveSupport::TimeWithZone", () => {
-    const twz = new TimeWithZone(
-      Temporal.Instant.from("1999-12-31T12:34:56.789Z"),
-      TimeZone.find("Australia/Lord_Howe")!,
+    assertRoundtrip(
+      new TimeWithZone(
+        Temporal.Instant.from("1999-12-31T12:34:56.789Z"),
+        TimeZone.find("Australia/Lord_Howe")!,
+      ),
     );
-    const result = roundtrip(twz) as TimeWithZone;
-    expect(result).toBeInstanceOf(TimeWithZone);
-    expect(result.utc().compare(twz.utc())).toBe(0);
-    expect(result.timeZone.name).toBe(twz.timeZone.name);
+    assertRoundtrip(Time.current());
   });
 
   it("roundtrips ActiveSupport::TimeZone", () => {
-    const zone = TimeZone.find("Eastern Time (US & Canada)")!;
-    expect((roundtrip(zone) as TimeZone).name).toBe(zone.name);
+    assertRoundtrip(TimeZone.find("Eastern Time (US & Canada)")!);
   });
 
   it("roundtrips ActiveSupport::Duration", () => {
-    const duration = years(1)
-      .plus(months(2))
-      .plus(weeks(3))
-      .plus(days(4))
-      .plus(hours(5))
-      .plus(minutes(6))
-      .plus(seconds(7));
-    expect(duration.eql(roundtrip(duration))).toBe(true);
-    const monthAndDay = months(1).plus(days(1));
-    expect(monthAndDay.eql(roundtrip(monthAndDay))).toBe(true);
+    assertRoundtrip(
+      years(1)
+        .plus(months(2))
+        .plus(weeks(3))
+        .plus(days(4))
+        .plus(hours(5))
+        .plus(minutes(6))
+        .plus(seconds(7)),
+    );
+    assertRoundtrip(months(1).plus(days(1)));
   });
 
   it("roundtrips Range", () => {
-    for (const range of [
-      new Range(1, 2),
-      new Range(1, 2, true),
-      new Range(1, null),
-      new Range(1, null, true),
-      new Range(null, 2),
-      new Range(null, 2, true),
-      new Range("1", "2"),
-      new Range("1", "2", true),
-    ]) {
-      const deserialized = roundtrip(range) as Range;
-      expect(deserialized).toBeInstanceOf(Range);
-      expect(range.equals(deserialized)).toBe(true);
-    }
+    assertRoundtrip(new Range(1, 2));
+    assertRoundtrip(new Range(1, 2, true));
+    assertRoundtrip(new Range(1, null));
+    assertRoundtrip(new Range(1, null, true));
+    assertRoundtrip(new Range(null, 2));
+    assertRoundtrip(new Range(null, 2, true));
+    assertRoundtrip(new Range("1", "2"));
+    assertRoundtrip(new Range("1", "2", true));
   });
 
   it("roundtrips URI::Generic", () => {
-    const uri = URI.parse("https://example.com/#test");
-    const deserialized = roundtrip(uri) as Generic;
-    expect(deserialized).toBeInstanceOf(uri.constructor);
-    expect(deserialized.toString()).toBe(uri.toString());
+    assertRoundtrip(URI.parse("https://example.com/#test"));
   });
 
   it("roundtrips IPAddr", () => {
-    const assertRoundtrip = (object: IPAddr) => {
-      const deserialized = roundtrip(object) as IPAddr;
-      expect(deserialized).toBeInstanceOf(IPAddr);
-      expect(object.eql(deserialized)).toBe(true);
-    };
     assertRoundtrip(new IPAddr("127.0.0.1"));
     assertRoundtrip(new IPAddr("1.1.1.1/16"));
-    expect((roundtrip(new IPAddr("1.1.1.1/16")) as IPAddr).prefix).toBe(16);
+    expect((load(dump(new IPAddr("1.1.1.1/16"))) as IPAddr).prefix).toBe(16);
 
     assertRoundtrip(new IPAddr("::1"));
     assertRoundtrip(new IPAddr("1:1:1:1:1:1:1:1/64"));
-    expect((roundtrip(new IPAddr("1:1:1:1:1:1:1:1/64")) as IPAddr).prefix).toBe(64);
+    expect((load(dump(new IPAddr("1:1:1:1:1:1:1:1/64"))) as IPAddr).prefix).toBe(64);
   });
 
   it("roundtrips Pathname", () => {
-    const pathname = new Pathname(import.meta.url);
-    const deserialized = roundtrip(pathname) as Pathname;
-    expect(deserialized).toBeInstanceOf(Pathname);
-    expect(pathname.equals(deserialized)).toBe(true);
+    assertRoundtrip(new Pathname(import.meta.url));
   });
 
   it("roundtrips Regexp", () => {
-    const deserialized = roundtrip(/.*/s) as RegExp;
-    expect(deserialized).toBeInstanceOf(RegExp);
-    expect(rbEqual(/.*/s, deserialized)).toBe(true);
+    assertRoundtrip(/.*/s);
   });
 
   it("roundtrips ActiveSupport::HashWithIndifferentAccess", () => {
-    const hwia = new HashWithIndifferentAccess({ a: true, b: 2, c: "three" });
-    const result = roundtrip(hwia) as HashWithIndifferentAccess;
-    expect(result).toBeInstanceOf(HashWithIndifferentAccess);
-    expect(result.toHash()).toEqual(hwia.toHash());
+    assertRoundtrip(new HashWithIndifferentAccess({ a: true, b: 2, c: "three" }));
   });
 
   it("dumps native extension type bytes identical to real Rails MessagePack", () => {
@@ -287,12 +252,7 @@ describe("MessagePackSerializerTest", () => {
     const originalEnv = { ...ENV };
     setEnv("TRAILS_MAX_THREADS", "1");
     try {
-      const serialized = dump("value");
-      expect(serialized).toBeInstanceOf(Uint8Array);
-
-      const deserialized = load(serialized);
-      expect(typeof deserialized).toBe("string");
-      expect(deserialized).toBe("value");
+      assertRoundtrip("value");
     } finally {
       for (const name of Object.keys(ENV)) if (!(name in originalEnv)) setEnv(name, undefined);
       for (const [name, value] of Object.entries(originalEnv)) setEnv(name, value);

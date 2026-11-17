@@ -235,6 +235,11 @@ describe("Mysql2::Client#initialize", () => {
     },
   );
 
+  it("turns on the driver's compress option for a COMPRESS flag", async () => {
+    expect((await driverConfig({ host: "db", flags: ["COMPRESS"] })).compress).toBe(true);
+    expect((await driverConfig({ host: "db" })).compress).toBeUndefined();
+  });
+
   it("parse_flags_array adds a named flag, clears a negated one, and warns of an unknown one", () => {
     expect(parseFlagsArray(["FOUND_ROWS"], connectFlags)).toBe(connectFlags | 0x2);
     expect(parseFlagsArray(["-LONG_FLAG"], connectFlags)).toBe(connectFlags & ~0x4);

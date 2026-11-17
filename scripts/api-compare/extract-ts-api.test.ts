@@ -686,6 +686,20 @@ describe("body call capture", () => {
     expect(m.calls).toContain("pushTags");
   });
 
+  it("gives an options-hash key read no position (raabro.rb parse's opts[:all])", () => {
+    const info = extractFromFiles("/p", {
+      "a.ts": `interface ParseOptions { all?: boolean }
+      export class A {
+        parse(input: string, opts: ParseOptions = {}) {
+          return opts.all === false ? this.run(new Input(input)) : this.all(input);
+        }
+      }`,
+    });
+    const m = info.classes["a.ts:A"].instanceMethods.find((x) => x.name === "parse")!;
+    expect(m.callSeq).toEqual(["constructor", "run", "all"]);
+    expect(m.calls).toContain("all");
+  });
+
   it("keeps a guard read's position when the body never calls that name", () => {
     const cls = extractFromSource(
       `class Foo {
