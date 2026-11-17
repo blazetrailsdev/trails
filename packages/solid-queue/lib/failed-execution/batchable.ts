@@ -30,10 +30,9 @@ extend(Batchable, Concern);
     included(base: null, block: (this: typeof FailedExecution) => void): void;
   }
 ).included(null, function (this: typeof FailedExecution) {
-  /** @inventedArm if — CONVERGEABLE solid-queue-batchable-callback-guards-async-migrated */
-  this.afterCreate(async function (this: Batchable) {
-    if ((await SolidQueue.Batch!.isMigrated()) && (await this.job).queryAttribute("batch_id")) {
-      await this.destroyJobBatchExecution();
-    }
+  this.afterCreate(":destroyJobBatchExecution", {
+    if: async function (this: Batchable) {
+      return (await SolidQueue.Batch!.isMigrated()) && (await this.job).queryAttribute("batch_id");
+    },
   });
 });

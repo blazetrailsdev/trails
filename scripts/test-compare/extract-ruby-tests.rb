@@ -2930,7 +2930,9 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
 
   if pkg_name == "solid-cache"
     test_files.reject! { |f| f.include?("/unit/behaviors/") }
-    test_files.concat(Dir.glob(File.join(pkg_dir, "unit", "behaviors_rails_8_0", "*_behavior.rb")))
+    included = test_files.flat_map { |f| File.read(f).scan(/^\s*include\s+(\w+Behavior)\b/).flatten }
+    behaviors = Dir.glob(File.join(pkg_dir, "unit", "behaviors_rails_8_0", "*_behavior.rb"))
+    test_files.concat(behaviors.select { |f| File.read(f).scan(/^\s*module\s+(\w+Behavior)\b/).flatten.intersect?(included) })
   end
 
   if pkg_name == "tzinfo"
@@ -2939,6 +2941,10 @@ def select_package_test_files!(pkg_name, pkg_dir, test_files)
   end
   test_files
 end
+
+GEM_BEHAVIOR_TEST_RENAMES = {
+  "solid-cache" => { "ttl is not updated" => "ttl isnt updated" },
+}.freeze
 
 def run
   package_dirs = package_test_dirs
@@ -3007,6 +3013,11 @@ def run
     shared, callers = test_files.partition { |f| f.include?("#{File::SEPARATOR}shared#{File::SEPARATOR}") }
     (shared + callers).each do |filepath|
       extractor.process_file(filepath, pkg_dir)
+    end
+
+    renames = GEM_BEHAVIOR_TEST_RENAMES.fetch(pkg_name, {})
+    extractor.test_files.each do |f|
+      f[:testCases].each { |tc| tc[:description] = renames.fetch(tc[:description], tc[:description]) }
     end
 
     total_tests = extractor.test_files.sum { |f| f[:testCount] }

@@ -64,16 +64,7 @@ Object.defineProperty(Batchable, "ClassMethods", { value: ClassMethods });
   this.belongsTo("batch", { optional: true });
   this.hasOne("batchExecution");
 
-  /** @inventedArm if — CONVERGEABLE solid-queue-batchable-callback-guards-async-migrated */
-  this.afterCreate(async function (this: Batchable) {
-    if (await this.isBatched()) await this.createBatchExecution();
-  });
-  /** @inventedArm if — CONVERGEABLE solid-queue-batchable-callback-guards-async-migrated */
-  this.afterUpdate(async function (this: Batchable) {
-    if (await this.isBatched()) await this.updateBatchProgress();
-  });
-  /** @inventedArm if — CONVERGEABLE solid-queue-batchable-callback-guards-async-migrated */
-  this.beforeDestroy(async function (this: Batchable) {
-    if (await this.isBatched()) await this.destroyBatchExecution();
-  });
+  this.afterCreate(":createBatchExecution", { if: ":isBatched" });
+  this.afterUpdate(":updateBatchProgress", { if: ":isBatched" });
+  this.beforeDestroy(":destroyBatchExecution", { if: ":isBatched" });
 });
