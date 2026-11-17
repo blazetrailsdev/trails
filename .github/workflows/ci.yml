@@ -1458,7 +1458,7 @@ jobs:
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: sqlite3
-          VITEST_SHARD_ONE_EXTRA_MS: "220000"
+          VITEST_SHARD_ONE_EXTRA_MS: "110000"
       - if: needs.changes.outputs.ar_scope != ''
         env:
           AR_SCOPE: ${{ needs.changes.outputs.ar_scope }}
@@ -1809,7 +1809,7 @@ jobs:
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: postgresql
-          VITEST_SHARD_ONE_EXTRA_MS: "220000"
+          VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: postgresql
           PGHOST: localhost
           PGPORT: "5432"
@@ -2050,7 +2050,7 @@ jobs:
         run: pnpm vitest run packages/activerecord/ packages/solid-queue/ packages/solid-cable/ packages/solid-cache/ packages/activestorage/ packages/actionmailbox/ packages/actiontext/ packages/turbo/ --project '!system' --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         env:
           VITEST_SHARD_DURATIONS: mysql2
-          VITEST_SHARD_ONE_EXTRA_MS: "220000"
+          VITEST_SHARD_ONE_EXTRA_MS: "110000"
           ARCONN: mysql2
           MYSQL_HOST: localhost
           MYSQL_PORT: "3306"
