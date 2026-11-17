@@ -63,16 +63,16 @@ export interface CacheCoder {
 export class WriteOptions {
   constructor(private _opts: StoreOptions) {}
   get expiresIn() {
-    return this._opts.expiresIn as number | undefined;
+    return this._opts.expiresIn as number | Duration | undefined;
   }
-  set expiresIn(v: number | undefined) {
+  set expiresIn(v: number | Duration | undefined) {
     delete this._opts.expiresAt;
     this._opts.expiresIn = v;
   }
   get expiresAt() {
-    return this._opts.expiresAt as number | Time | TimeWithZone | undefined;
+    return this._opts.expiresAt as Time | TimeWithZone | undefined;
   }
-  set expiresAt(v: number | Time | TimeWithZone | undefined) {
+  set expiresAt(v: Time | TimeWithZone | undefined) {
     delete this._opts.expiresIn;
     this._opts.expiresAt = v;
   }
@@ -577,13 +577,10 @@ export abstract class Store {
       throw new ArgumentError("Either :expires_in or :expires_at can be supplied, but not both");
     }
 
-    const expiresAt = callOptions.expiresAt as number | Time | TimeWithZone | undefined;
+    const expiresAt = callOptions.expiresAt as Time | TimeWithZone | undefined;
     delete callOptions.expiresAt;
     if (expiresAt != null) {
-      callOptions.expiresIn =
-        typeof expiresAt !== "number"
-          ? expiresAt.toF() - Time.now().toF()
-          : (expiresAt - Time.now().toF() * 1000) / 1000;
+      callOptions.expiresIn = expiresAt.toF() - Time.now().toF();
     }
 
     if (callOptions.expiresIn instanceof Time) {

@@ -90,16 +90,16 @@ describe("CacheStoreTest", () => {
   });
 
   it("expires_at is converted to expires_in", () => {
-    const future = Date.now() + 10_000;
+    const future = Time.at(Time.now().toF() + 10);
     const result = store.callMergedOptions({}, { expiresAt: future });
     expect(result.expiresIn).toBeGreaterThan(0);
-    expect(result.expiresIn).toBeLessThanOrEqual(10_000);
+    expect(result.expiresIn).toBeLessThanOrEqual(10);
     expect(result.expiresAt).toBeUndefined();
   });
 
   it("raises when both expires_in and expires_at are supplied", () => {
     expect(() =>
-      store.callMergedOptions({}, { expiresIn: 1000, expiresAt: Date.now() + 5000 }),
+      store.callMergedOptions({}, { expiresIn: 1000, expiresAt: Time.at(Time.now().toF() + 5) }),
     ).toThrow("Either :expires_in or :expires_at can be supplied, but not both");
   });
 
@@ -145,7 +145,7 @@ describe("CacheStoreTest", () => {
   it("past expires_at results in negative expires_in which is removed and logged", () => {
     const errors: string[] = [];
     Store.logger = { warn: () => {}, error: (msg) => errors.push(msg) };
-    const past = Date.now() - 5000;
+    const past = Time.at(Time.now().toF() - 5);
     const result = store.callMergedOptions({}, { expiresAt: past });
     expect(result.expiresIn).toBeUndefined();
     expect(errors.length).toBe(1);
@@ -153,7 +153,7 @@ describe("CacheStoreTest", () => {
 
   it("handleInvalidExpiresIn raises when raiseOnInvalidCacheExpirationTime is true", () => {
     Store.raiseOnInvalidCacheExpirationTime = true;
-    expect(() => store.callMergedOptions({}, { expiresAt: Date.now() - 5000 })).toThrow(
+    expect(() => store.callMergedOptions({}, { expiresAt: Time.at(Time.now().toF() - 5) })).toThrow(
       ArgumentError,
     );
   });

@@ -847,7 +847,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
       {},
       async () => {
         await cache.fetch(key, (_key, options) => {
-          options.expiresIn = Duration.minutes(5) as unknown as number;
+          options.expiresIn = Duration.minutes(5);
           return "bar";
         });
       },

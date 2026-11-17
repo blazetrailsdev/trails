@@ -5,7 +5,7 @@ export { DeserializationError } from "./deserialization-error.js";
 
 export interface CacheOptions {
   expiresIn?: number | Duration;
-  expiresAt?: number | Time | TimeWithZone;
+  expiresAt?: Time | TimeWithZone;
   expireIn?: number;
   expiredIn?: number;
   namespace?: string;
