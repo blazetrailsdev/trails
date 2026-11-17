@@ -1,13 +1,4 @@
 #!/usr/bin/env bash
-# Cancels and re-runs ci.yml runs whose jobs sit queued on the self-hosted
-# debian-arm64 labels while no matching runner is online. The `changes` job's
-# `self_hosted` step checks a runner is idle before routing; if every runner
-# goes offline before pickup, the job waits up to 24h and `CI` never reports.
-# A re-run repeats that check and falls back to hosted.
-#
-#   self-hosted-watchdog.sh [--dry-run]   live (GH_TOKEN lists runners,
-#                                         ACTIONS_TOKEN cancels / re-runs)
-#   self-hosted-watchdog.sh --self-test   selection logic on recorded responses
 set -euo pipefail
 
 STUCK_MINUTES=${STUCK_MINUTES:-15}
@@ -18,7 +9,6 @@ online_runners() {
     '[.runners[] | select(.status == "online" and ([.labels[].name] as $l | $want | all(IN($l[]))))] | length' "$1"
 }
 
-# $1: a JSON array of jobs (the `jobs` arrays of every candidate run, concatenated).
 stuck_runs() {
   jq -r --argjson want "$LABELS" --argjson now "$2" --argjson mins "$STUCK_MINUTES" \
     '[.[] | select(.status == "queued"
@@ -45,12 +35,8 @@ if [ "${1:-}" = --self-test ]; then
       exit 1
     fi
   }
-  # 101: queued 30 min on the self-hosted labels. 102: queued 5 min.
-  # 103: queued 30 min on a hosted label. 104: in progress on self-hosted.
   expect runners-offline.json "101 "
-  # A busy online runner means the job is waiting its turn, not stranded.
   expect runners-online-busy.json ""
-  # An online runner with other labels does not serve the job.
   expect runners-other-labels.json "101 "
   echo "self-hosted-watchdog self-test: ok"
   exit 0

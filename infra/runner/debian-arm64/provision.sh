@@ -1,12 +1,4 @@
 #!/usr/bin/env bash
-# Provisions a Debian 13 arm64 VM as a trails self-hosted runner host
-# (`debian-arm64`, `debian-arm64-2`). Idempotent: re-run either part at any time.
-#
-#   sudo infra/runner/debian-arm64/provision.sh root <runner-user>
-#   infra/runner/debian-arm64/provision.sh runner [instance-dir ...]
-#
-# Registration (`config.sh --url ... --token ...`) is NOT done here: it takes a
-# registration token and is what grants this host code execution. See README.md.
 set -euo pipefail
 
 NODE_VERSION=${NODE_VERSION:-24.11.1}
@@ -18,7 +10,6 @@ repo_root=$(cd "$here/../../.." && pwd)
 root_part() {
   local user="${1:?runner user}"
   [ "$(id -u)" -eq 0 ] || { echo "root part must run as root" >&2; exit 1; }
-  # Netinst images ship with only a cdrom source.
   if ! grep -qs '^deb .*deb.debian.org' /etc/apt/sources.list /etc/apt/sources.list.d/*.list \
     && ! grep -qs 'deb.debian.org' /etc/apt/sources.list.d/*.sources; then
     sed -i 's/^deb cdrom/# deb cdrom/' /etc/apt/sources.list
@@ -39,7 +30,6 @@ SRC
   apt-get update
   DEBIAN_FRONTEND=noninteractive apt-get install -y "${APT_PACKAGES[@]}"
   loginctl enable-linger "$user"
-  # A slow first nameserver makes better-sqlite3 build from source; see README.md.
   local start end
   start=$(date +%s%N)
   getent hosts github.com >/dev/null
@@ -49,7 +39,6 @@ SRC
   fi
 }
 
-# owner/repo@sha for every SHA-pinned `uses:` under .github, a tag ref resolved to its sha.
 pinned_actions() {
   grep -rhoE 'uses: *[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(/[^@ ]+)?@[^ #]+' "$repo_root/.github" \
     | sed -E 's/uses: *//; s#^([^/]+/[^/@]+)(/[^@]*)?@#\1@#' | sort -u \
@@ -78,8 +67,6 @@ runner_part() {
     npm install -g --prefix "$prefix" "pnpm@$PNPM_VERSION"
   fi
 
-  # The runner reads this cache before downloading an action tarball. A pin
-  # bump shows up here as a new missing file, not as silent per-job downloads.
   pinned_actions | while IFS=@ read -r repo sha; do
     local file="$cache/${repo/\//_}/$sha.tar.gz"
     [ -s "$file" ] && continue
@@ -92,7 +79,6 @@ runner_part() {
   for dir in "${instances[@]}"; do
     n=$((n + 1))
     [ -d "$dir" ] || { echo "skipping $dir: not unpacked/registered yet (README.md)"; continue; }
-    # `.path` alone does not reach job steps; `.env` does.
     {
       echo "PATH=$prefix/bin:/usr/local/bin:/usr/bin:/bin"
       echo "ACTIONS_RUNNER_ACTION_ARCHIVE_CACHE=$cache"
@@ -123,5 +109,5 @@ case "${1:-}" in
   root) shift; root_part "$@" ;;
   runner) shift; runner_part "$@" ;;
   pinned-actions) pinned_actions ;;
-  *) sed -n '2,9p' "$0" >&2; exit 2 ;;
+  *) echo "usage: sudo $0 root <runner-user> | $0 runner [instance-dir ...] | $0 pinned-actions" >&2; exit 2 ;;
 esac
