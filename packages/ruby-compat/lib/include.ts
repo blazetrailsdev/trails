@@ -27,7 +27,7 @@ import type { kernelRand, kernelSrand } from "./kernel-rand.js";
 import type { rbFRequireFile } from "./load.js";
 import { NameError } from "./name-error.js";
 import { NoMethodError } from "./no-method-error.js";
-import { constGet } from "./variable.js";
+import { autoloadDelete, constGet } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { classModule } from "./class-module.js";
 import { rbClassPath, markModuleObject } from "./classpath.js";
@@ -101,6 +101,8 @@ type ModuleHooks = {
  * whose `prototype` is non-writable, which holds for `class` syntax and the
  * built-in constructors and for no arrow, bound or `function` function — the
  * test `rbInspect` applies before rendering a value through `rbModToS`.
+ * Setting a name an autoload holds deletes the autoload, as
+ * `const_tbl_update` does (vendor/ruby/v3.3.11/variable.c:3710-3724).
  *
  * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
  */
@@ -118,6 +120,7 @@ export function constSet<T>(
     throw new NameError(`wrong constant name ${id}`, id);
   }
   Object.defineProperty(mod, id, { value, writable: true, enumerable: true, configurable: true });
+  autoloadDelete(mod === TopLevel ? Object : mod, id);
   if (
     value instanceof Module ||
     isPlainHash(value) ||

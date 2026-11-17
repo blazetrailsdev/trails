@@ -82,7 +82,6 @@ export function rbModRemoveConst(mod: object, name: string): unknown {
   const val = mod === Object ? tbl[name] : modTbl[name];
   if (mod === Object) delete tbl[name];
   else delete modTbl[name];
-  autoloadDelete(mod, name);
   return val;
 }
 

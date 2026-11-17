@@ -23,6 +23,8 @@ const USERS: [string, string][] = [
   ["admin/root.ts", "export class Root {}"],
 ];
 
+const LOADER = new URL("../lib/loader.ts", import.meta.url).pathname;
+
 describe("TestUnload", () => {
   let loader: Loader;
 
@@ -71,12 +73,12 @@ describe("TestUnload", () => {
 
   it("unload clears internal caches", async () => {
     const g = globalThis as unknown as Record<string, unknown>;
-    g.$Loader = Loader;
     g.$loader = null;
     const files: [string, string][] = [
       [
         "my_gem.ts",
-        `const loader = new globalThis.$Loader();
+        `import { Loader } from "${LOADER}";
+        const loader = new Loader();
         globalThis.$loader = loader;
         await loader.pushDir(import.meta.dirname);
         await loader.pushDir("rd1");
@@ -118,7 +120,6 @@ describe("TestUnload", () => {
         expect($loader.inceptions.isEmpty()).toBeTruthy();
       });
     } finally {
-      delete g.$Loader;
       delete g.$loader;
     }
   });
@@ -187,12 +188,12 @@ describe("TestUnload", () => {
 
   it("unload clears associated inceptions", async () => {
     const g = globalThis as unknown as Record<string, unknown>;
-    g.$Loader = Loader;
     const files: [string, string][] = [];
 
     files.push([
       "gem1/my_gem1.ts",
-      `const loader = new globalThis.$Loader();
+      `import { Loader } from "${LOADER}";
+        const loader = new Loader();
       await loader.pushDir(import.meta.dirname);
       loader.enableReloading();
       await loader.setup();
@@ -202,7 +203,8 @@ describe("TestUnload", () => {
 
     files.push([
       "gem2/my_gem2.ts",
-      `const loader = new globalThis.$Loader();
+      `import { Loader } from "${LOADER}";
+        const loader = new Loader();
       await loader.pushDir(import.meta.dirname);
       await loader.setup();
       globalThis.$loader2 = loader;
@@ -231,7 +233,6 @@ describe("TestUnload", () => {
         expect(Inceptions.isRegistered(cref2)).toBeTruthy();
       });
     } finally {
-      delete g.$Loader;
       delete g.$loader1;
       delete g.$loader2;
     }

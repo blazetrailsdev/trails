@@ -21,6 +21,8 @@ const FILES: [string, string][] = [
   ["z/a.ts", "export const A = 1;"],
 ];
 
+const LOADER = new URL("../lib/loader.ts", import.meta.url).pathname;
+
 describe("TestReloading", () => {
   let loader: Loader;
 
@@ -89,13 +91,11 @@ describe("TestReloading", () => {
   });
 
   it("reloading namespaces that are inceptions in other projects", async () => {
-    const g = globalThis as unknown as Record<string, unknown>;
-    g.$Loader = Loader;
-
     const gemFiles: [string, string][] = [
       [
         "lib/my_gem.ts",
-        `const loader = new globalThis.$Loader();
+        `import { Loader } from "${LOADER}";
+        const loader = new Loader();
         await loader.pushDir(import.meta.dirname);
         await loader.setup();
         export class MyGem {}`,
@@ -104,24 +104,20 @@ describe("TestReloading", () => {
 
     const appFiles: [string, string][] = [["app/my_gem/foo.ts", "export const Foo = true;"]];
 
-    try {
-      await withFiles([...gemFiles, ...appFiles], async () => {
-        await withLoadPath("lib", async () => {
-          await Kernel.require("my_gem");
+    await withFiles([...gemFiles, ...appFiles], async () => {
+      await withLoadPath("lib", async () => {
+        await Kernel.require("my_gem");
 
-          await loader.pushDir("app");
-          loader.enableReloading();
-          await loader.setup();
+        await loader.pushDir("app");
+        loader.enableReloading();
+        await loader.setup();
 
-          const myGem = (TopLevel as unknown as Record<string, object>).MyGem;
-          expect(await get(myGem, "Foo")).toBeTruthy();
-          await loader.reload();
-          expect(await get(myGem, "Foo")).toBeTruthy();
-        });
+        const myGem = (TopLevel as unknown as Record<string, object>).MyGem;
+        expect(await get(myGem, "Foo")).toBeTruthy();
+        await loader.reload();
+        expect(await get(myGem, "Foo")).toBeTruthy();
       });
-    } finally {
-      delete g.$Loader;
-    }
+    });
   });
 
   it("reloading raises if the flag is not set", async () => {
