@@ -1302,12 +1302,16 @@ it("rejects excessive data before boundary", () => {
   };
 
   const env = MockRequest.envFor("/", fixture);
-  expect(() => parseMultipart(env)).toThrow(
-    expect.objectContaining({
-      constructor: MultipartError,
-      message: "multipart boundary not found within limit",
-    }),
-  );
+  let error!: Error;
+  expect(() => {
+    try {
+      parseMultipart(env);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(MultipartError);
+  expect(error.message).toBe("multipart boundary not found within limit");
   rd.close();
 
   const err = rd.threadValue();
@@ -1341,12 +1345,16 @@ it("rejects excessive mime header size", () => {
   };
 
   const env = MockRequest.envFor("/", fixture);
-  expect(() => parseMultipart(env)).toThrow(
-    expect.objectContaining({
-      constructor: MultipartError,
-      message: "multipart mime part header too large",
-    }),
-  );
+  let error!: Error;
+  expect(() => {
+    try {
+      parseMultipart(env);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(MultipartError);
+  expect(error.message).toBe("multipart mime part header too large");
   rd.close();
 
   const err = rd.threadValue();
@@ -1445,12 +1453,16 @@ it("rejects excessive buffered mime data size in a single parameter", () => {
   };
 
   const env = MockRequest.envFor("/", fixture);
-  expect(() => parseMultipart(env)).toThrow(
-    expect.objectContaining({
-      constructor: MultipartError,
-      message: "multipart data over retained size limit",
-    }),
-  );
+  let error!: Error;
+  expect(() => {
+    try {
+      parseMultipart(env);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(MultipartError);
+  expect(error.message).toBe("multipart data over retained size limit");
   rd.close();
 
   expect(rd.threadValue()).toBe(true);
@@ -1486,12 +1498,16 @@ it("rejects excessive buffered mime data size when split into multiple parameter
   };
 
   const env = MockRequest.envFor("/", fixture);
-  expect(() => Object.keys(parseMultipart(env)!)).toThrow(
-    expect.objectContaining({
-      constructor: MultipartError,
-      message: "multipart data over retained size limit",
-    }),
-  );
+  let error!: Error;
+  expect(() => {
+    try {
+      Object.keys(parseMultipart(env)!);
+    } catch (e) {
+      error = e as Error;
+      throw e;
+    }
+  }).toThrow(MultipartError);
+  expect(error.message).toBe("multipart data over retained size limit");
   rd.close();
 
   expect(rd.threadValue()).toBe(true);
