@@ -145,15 +145,18 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
       new StatementInvalid("transient DB glitch"),
     );
 
-    const error = await claimedExecution.perform().then(
-      () => null,
-      (e: unknown) => e as Error,
-    );
-    expect(error).toBeInstanceOf(ClaimedExecution.FinalizationError);
+    let error: Error | null = null;
+    await expect(
+      claimedExecution.perform().catch((e: Error) => {
+        error = e;
+        throw e;
+      }),
+    ).rejects.toThrow(ClaimedExecution.FinalizationError);
 
     expect(error!.message).toMatch(/transient DB glitch/);
-    expect(await ClaimedExecution.isExists(claimedExecution.id)).toBe(true);
-    expect((await (await claimedExecution.job).reload()).isFinished()).toBe(false);
+    expect((error!.cause as Error).constructor).toEqual(StatementInvalid);
+    expect(await ClaimedExecution.isExists(claimedExecution.id)).toBeTruthy();
+    expect((await (await claimedExecution.job).reload()).isFinished()).toBeFalsy();
   });
 
   it("raises FinalizationError when failing the job fails while the claim remains", async () => {
@@ -165,15 +168,17 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
       new StatementInvalid("transient DB glitch"),
     );
 
-    const error = await claimedExecution.perform().then(
-      () => null,
-      (e: unknown) => e as Error,
-    );
-    expect(error).toBeInstanceOf(ClaimedExecution.FinalizationError);
+    let error: Error | null = null;
+    await expect(
+      claimedExecution.perform().catch((e: Error) => {
+        error = e;
+        throw e;
+      }),
+    ).rejects.toThrow(ClaimedExecution.FinalizationError);
 
     expect(error!.message).toMatch(/transient DB glitch/);
-    expect(await ClaimedExecution.isExists(claimedExecution.id)).toBe(true);
-    expect(await (await (await claimedExecution.job).reload()).isFailed()).toBe(false);
+    expect(await ClaimedExecution.isExists(claimedExecution.id)).toBeTruthy();
+    expect(await (await (await claimedExecution.job).reload()).isFailed()).toBeFalsy();
   });
 
   it("stale performer cannot release a concurrency lock after its claim is pruned", async () => {
@@ -190,14 +195,14 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
     const claimedExecution = await claimJob(firstJob);
     await process.prune();
 
-    expect(await (await firstJob.reload()).isFailed()).toBe(true);
+    expect(await (await firstJob.reload()).isFailed()).toBeTruthy();
     expect(await ReadyExecution.count()).toEqual(1);
     expect(await BlockedExecution.count()).toEqual(1);
 
     await claimedExecution.perform();
 
-    expect((await firstJob.reload()).isFinished()).toBe(false);
-    expect(await firstJob.isFailed()).toBe(true);
+    expect((await firstJob.reload()).isFinished()).toBeFalsy();
+    expect(await firstJob.isFailed()).toBeTruthy();
     expect(await ReadyExecution.count()).toEqual(1);
     expect(await BlockedExecution.count()).toEqual(1);
     expect((await Semaphore.findByBang({ key: firstJob.concurrency_key })).value).toEqual(0);
@@ -322,7 +327,7 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
       () => expect(claimedExecution.perform()).rejects.toThrow(Job.ClassMissingError),
     );
 
-    expect(await (await job.reload()).isFailed()).toBe(true);
+    expect(await (await job.reload()).isFailed()).toBeTruthy();
   });
 
   it("perform concurrency-controlled job with missing class fails gracefully", async () => {
@@ -338,7 +343,7 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
       () => expect(claimedExecution.perform()).rejects.toThrow(Job.ClassMissingError),
     );
 
-    expect(await (await job.reload()).isFailed()).toBe(true);
+    expect(await (await job.reload()).isFailed()).toBeTruthy();
   });
 
   it("dispatch job with missing class and concurrency key skips concurrency controls", async () => {
@@ -348,7 +353,7 @@ describe("SolidQueue::ClaimedExecutionTest", () => {
 
     await job.prepareForExecution();
 
-    expect(await (await job.reload()).isReady()).toBe(true);
+    expect(await (await job.reload()).isReady()).toBeTruthy();
     expect(await BlockedExecution.where({ job_id: job.id }).count()).toEqual(0);
     expect(await Semaphore.where({ key: "test_key" }).count()).toEqual(0);
   });

@@ -4,7 +4,7 @@ import {
   permanentConnectionCheckout,
   setPermanentConnectionCheckout,
 } from "@blazetrails/activerecord/active-record";
-import { minutes } from "@blazetrails/activesupport";
+import { isPresent, minutes } from "@blazetrails/activesupport";
 import { travelBack, travelTo } from "@blazetrails/activesupport/testing/time-helpers";
 import { TestCase } from "@blazetrails/activesupport/test-case";
 import { performAllLater } from "@blazetrails/activejob";
@@ -99,12 +99,12 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
 
     const b = await claim(await NonOverlappingJob.performLater("B"));
     const c = await jobFor(await NonOverlappingJob.performLater("C"));
-    expect(await c.isBlocked()).toBe(true);
+    expect(await c.isBlocked()).toBeTruthy();
 
     await a.perform();
 
-    expect(await (await (await b.job).reload()).isClaimed()).toBe(true);
-    expect(await (await c.reload()).isBlocked()).toBe(true);
+    expect(await (await (await b.job).reload()).isClaimed()).toBeTruthy();
+    expect(await (await c.reload()).isBlocked()).toBeTruthy();
   });
 
   it("a job that outlived its lock does not leave the key over its limit", async () => {
@@ -121,20 +121,20 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
     await b.perform();
     await claimJob(c);
 
-    expect(await (await d.reload()).isBlocked()).toBe(true);
+    expect(await (await d.reload()).isBlocked()).toBeTruthy();
   });
 
   it("a job that got its slot gives it back even if its class is missing when it runs", async () => {
     let a = await claim(await NonOverlappingJob.performLater("A"));
     const b = await jobFor(await NonOverlappingJob.performLater("B"));
-    expect(await b.isBlocked()).toBe(true);
+    expect(await b.isBlocked()).toBeTruthy();
 
     await (await a.job).updateColumn("class_name", "RemovedJobClass");
     a = await ClaimedExecution.find(a.id);
 
     await expect(a.perform()).rejects.toThrow(Job.ClassMissingError);
 
-    expect(await (await b.reload()).isReady()).toBe(true);
+    expect(await (await b.reload()).isReady()).toBeTruthy();
     expect((await semaphore()).value).toEqual(0);
   });
 
@@ -149,7 +149,7 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
       arguments: { job_class: "RemovedJobClass", arguments: ["X"] },
       concurrency_key: (await a.job).concurrency_key,
     });
-    expect(await x.isReady()).toBe(true);
+    expect(await x.isReady()).toBeTruthy();
 
     await x.updateColumns({
       class_name: rbModName(NonOverlappingJob),
@@ -157,8 +157,8 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
     });
     await (await claimJob(x)).perform();
 
-    expect(await (await (await a.job).reload()).isClaimed()).toBe(true);
-    expect(await (await b.reload()).isBlocked()).toBe(true);
+    expect(await (await (await a.job).reload()).isClaimed()).toBeTruthy();
+    expect(await (await b.reload()).isBlocked()).toBeTruthy();
   });
 
   it("a job dispatched before Solid Queue recorded its semaphore gives back its slot by key", async () => {
@@ -172,18 +172,18 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
 
     await a.perform();
 
-    expect(await (await b.reload()).isReady()).toBe(true);
+    expect(await (await b.reload()).isReady()).toBeTruthy();
   });
 
   it("a blocked job records the semaphore it gets when it's released", async () => {
     const a = await claim(await NonOverlappingJob.performLater("A"));
     const b = await jobFor(await NonOverlappingJob.performLater("B"));
-    expect((await a.job).acquiredSemaphoreId()).not.toBeNull();
+    expect(isPresent((await a.job).acquiredSemaphoreId())).toBeTruthy();
     expect(b.acquiredSemaphoreId()).toBeNull();
 
     await a.perform();
 
-    expect(await (await b.reload()).isReady()).toBe(true);
+    expect(await (await b.reload()).isReady()).toBeTruthy();
     expect(b.acquiredSemaphoreId()).toEqual((await semaphore()).id);
     expect(b.acquiredConcurrencyLimit()).toEqual(1);
   });
@@ -194,9 +194,9 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
       .order("id")
       .toArray();
 
-    expect(await a.isReady()).toBe(true);
+    expect(await a.isReady()).toBeTruthy();
     expect(a.acquiredSemaphoreId()).toEqual((await semaphore()).id);
-    expect(await b.isBlocked()).toBe(true);
+    expect(await b.isBlocked()).toBeTruthy();
     expect(b.acquiredSemaphoreId()).toBeNull();
   });
 
@@ -211,11 +211,11 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
       semaphoreId,
     ]);
     expect((await a.job).acquiredConcurrencyLimit()).toEqual(2);
-    expect(await c.isBlocked()).toBe(true);
+    expect(await c.isBlocked()).toBeTruthy();
 
     await a.perform();
 
-    expect(await (await c.reload()).isReady()).toBe(true);
+    expect(await (await c.reload()).isReady()).toBeTruthy();
     expect((await semaphore()).value).toEqual(0);
   });
 
@@ -225,7 +225,7 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
 
     await a.discard();
 
-    expect(await (await b.reload()).isReady()).toBe(true);
+    expect(await (await b.reload()).isReady()).toBeTruthy();
   });
 
   it("discarding ready jobs in bulk gives their slots back", async () => {
@@ -234,7 +234,7 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
 
     await ReadyExecution.discardAllFromJobs([a]);
 
-    expect(await (await b.reload()).isReady()).toBe(true);
+    expect(await (await b.reload()).isReady()).toBeTruthy();
   });
 
   it("a retried job records the semaphore it gets on the retry", async () => {
@@ -248,7 +248,7 @@ describe("SolidQueue::ConcurrencyLockTest", () => {
     await ((await (await a.job).failedExecution) as FailedExecution).retry();
 
     const job = await (await a.job).reload();
-    expect(await job.isReady()).toBe(true);
+    expect(await job.isReady()).toBeTruthy();
     expect(job.acquiredSemaphoreId()).not.toEqual(firstSemaphoreId);
     expect(job.acquiredSemaphoreId()).toEqual((await semaphore()).id);
   });

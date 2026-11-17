@@ -425,7 +425,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
         schedule: "every hour",
         static: false,
       }),
-    ).toBe(true);
+    ).toBeTruthy();
     expect(
       await RecurringTask.isExists({
         key: "test 2",
@@ -433,7 +433,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
         schedule: "every minute",
         static: false,
       }),
-    ).toBe(true);
+    ).toBeTruthy();
   });
 
   it("schedule recurring tasks dynamically with class and args (same keys as YAML config)", async () => {
@@ -446,7 +446,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
     const task = await RecurringTask.findByBang({ key: "test 3" });
     expect(task.class_name).toEqual("AddToBufferJob");
     expect(task.arguments).toEqual([42]);
-    expect(task.static).toBe(false);
+    expect(task.static).toBeFalsy();
   });
 
   it("unschedule recurring tasks dynamically", async () => {
@@ -468,8 +468,8 @@ describe("SolidQueue::RecurringTaskTest", () => {
 
     await expect(RecurringTask.deleteDynamicTask(staticTask.key)).rejects.toThrow(RecordNotFound);
 
-    expect(await RecurringTask.isExists({ key: "dynamic", static: false })).toBe(false);
-    expect(await RecurringTask.isExists({ key: "static", static: true })).toBe(true);
+    expect(await RecurringTask.isExists({ key: "dynamic", static: false })).toBeFalsy();
+    expect(await RecurringTask.isExists({ key: "static", static: true })).toBeTruthy();
   });
 
   it("scheduling dynamic recurring task with duplicate key raises error", async () => {
@@ -544,7 +544,7 @@ describe("SolidQueue::RecurringTaskTest", () => {
         class_name: "JobWithoutArguments",
         schedule: "every day at 9am",
       });
-      expect(task.toString().endsWith("[ 0 9 * * * ]")).toBe(true);
+      expect(task.toString().endsWith("[ 0 9 * * * ]")).toBeTruthy();
     });
   });
 

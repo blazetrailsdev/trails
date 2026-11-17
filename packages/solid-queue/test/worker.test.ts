@@ -213,13 +213,13 @@ describe("WorkerTest", () => {
     await worker.start();
 
     await waitWhileWithTimeout(2, async () => !worker.pool.isShutdown());
-    expect(worker.pool.isShutdown()).toBe(true);
+    expect(worker.pool.isShutdown()).toBeTruthy();
 
     await waitForRegisteredProcesses(0, { timeout: 1 });
     await assertNoRegisteredProcesses();
 
     expect(await ClaimedExecution.count()).toEqual(0);
-    expect(await (await ((await Job.last()) as Job).reload()).isReady()).toBe(true);
+    expect(await (await ((await Job.last()) as Job).reload()).isReady()).toBeTruthy();
   });
 
   it("worker keeps running after a regular job failure", async () => {
@@ -231,7 +231,7 @@ describe("WorkerTest", () => {
     await waitForJobsToFinishFor(2);
     await worker.wakeUp();
 
-    expect(worker.pool.isShutdown()).toBe(false);
+    expect(worker.pool.isShutdown()).toBeFalsy();
     expect(JobBuffer.values).toContain("ok");
     expect(await ClaimedExecution.count()).toEqual(0);
   });
@@ -249,10 +249,10 @@ describe("WorkerTest", () => {
       await worker.start();
       await waitForRegisteredProcesses(1, { timeout: 1 });
 
-      expect(worker.pool.isShutdown()).toBe(false);
+      expect(worker.pool.isShutdown()).toBeFalsy();
 
       await waitWhileWithTimeout(3, async () => !worker.pool.isShutdown());
-      expect(worker.pool.isShutdown()).toBe(true);
+      expect(worker.pool.isShutdown()).toBeTruthy();
     } finally {
       SolidQueue.processHeartbeatInterval = oldHeartbeatInterval;
       SolidQueue.processAliveThreshold = oldAliveThreshold;

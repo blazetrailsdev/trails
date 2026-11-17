@@ -5,6 +5,7 @@ import {
   constSet,
   excBacktrace,
   excSetBacktrace,
+  excSetupMessage,
   rbFArray,
   rbModName,
 } from "@blazetrails/ruby-compat";
@@ -148,7 +149,7 @@ export class ClaimedExecution extends Execution {
       await block();
     } catch (error) {
       if (await this.isStillClaimed()) {
-        throw new FinalizationError(this, { cause: error as Error });
+        throw excSetupMessage(new FinalizationError(this, { cause: error as Error }), error);
       }
 
       throw error;
