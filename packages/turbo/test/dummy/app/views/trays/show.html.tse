@@ -1,0 +1,8 @@
+<% contentFor("head", () => { %>
+  <meta name="test" content="present" />
+<% }) %>
+
+<turbo-frame id="tray">
+  <div>This is a tray!</div>
+  <div><%= turboFrameRequestId() %></div>
+</turbo-frame>

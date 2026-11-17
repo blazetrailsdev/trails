@@ -1,0 +1,6 @@
+<h1>Users::Profiles</h1>
+
+<%= turboStreamFrom("users_profiles") %>
+
+<div id="users_profiles">
+</div>

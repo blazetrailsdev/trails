@@ -1,0 +1,2 @@
+<%= turboStream.replace(this.profile) %>
+<%= turboStream.update(this.profile) %>

@@ -1,0 +1,18 @@
+<h1>Edit Article</h1>
+
+<form action="<%= articlesPath() %>">
+  <button>articles#index</button>
+</form>
+
+<%= await formWith({ model: this.article, url: articlePath(this.article.id) }, async (form) => { %>
+  <%= form.label("body") %>
+  <%= form.textArea("body") %>
+
+  <button>Submit as PATCH</button>
+  <button formmethod="post" formaction="<%= articlesPath() %>">Submit as POST</button>
+
+  <button name="_method" type="submit" formaction="<%= destroyAllArticlesPath() %>" formmethod="post" value="delete">Delete all articles</button>
+
+<% }) %>
+
+<%= linkTo("Submit as DELETE", articlePath(this.article.id), { data: { turboMethod: "delete" } }) %>
