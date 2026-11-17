@@ -187,4 +187,9 @@ describe("Duration#sum over a JS Date receiver", () => {
     const d = new Date(2026, 0, 1);
     expect(new Duration(5, {}).since(d).epochMilliseconds).toBe(d.getTime() + 5000);
   });
+
+  it("keeps the sub-second part of a pre-epoch instant", () => {
+    const t = Temporal.Instant.fromEpochNanoseconds(-1_500_000_123n);
+    expect(seconds(1).since(t).epochNanoseconds).toBe(-500_000_123n);
+  });
 });
