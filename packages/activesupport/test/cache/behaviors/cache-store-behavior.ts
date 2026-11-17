@@ -6,11 +6,17 @@ import {
   type StoreOptions,
 } from "../../../lib/cache/store.js";
 import { assertErrorReported } from "../../../lib/testing/error-reporter-assertions.js";
-import { assertCalled } from "../../../lib/testing/method-call-assertions.js";
+import {
+  assertCalled,
+  assertCalledWith,
+  stub,
+} from "../../../lib/testing/method-call-assertions.js";
 import { travel, travelTo } from "../../../lib/testing/time-helpers.js";
 import { plusWithDuration } from "../../../lib/core-ext/time/calculations.js";
 import { Duration } from "../../../lib/duration.js";
 import { Time } from "@blazetrails/date";
+import { Notifications } from "../../../lib/notifications.js";
+import type { Event } from "../../../lib/notifications/instrumenter.js";
 import {
   assert,
   assertIncludes,
@@ -19,7 +25,12 @@ import {
   assertSame,
   assertNil,
   assertNothingRaised,
+  assertNoChanges,
 } from "../../../lib/testing/assertions.js";
+
+function alphanumeric(): string {
+  return crypto.randomUUID().replaceAll("-", "");
+}
 
 /** @internal */
 export interface CacheStoreBehaviorHost {
@@ -30,7 +41,7 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
   let cache: Store;
 
   beforeEach(async () => {
-    cache = host.lookupStore();
+    cache = host.lookupStore({ expiresIn: 60 });
   });
 
   it("should read and write strings", async () => {
@@ -88,6 +99,31 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
       }),
     ).toBe(10);
     assertNot(cacheMiss);
+  });
+
+  it("fetch with dynamic options", async () => {
+    const key = crypto.randomUUID();
+    const expiry = Duration.minutes(10).fromNow();
+    const expectedOptions: StoreOptions = { ...cache.options };
+    delete expectedOptions.expiresIn;
+    Object.assign(expectedOptions, { expiresAt: expiry, version: "v42" });
+
+    await assertCalledWith(cache, "write", [key, "bar", expectedOptions], {}, async () => {
+      await cache.fetch(key, (key, options) => {
+        expect(options.expiresIn).toBe(cache.options.expiresIn);
+        assertNil(options.expiresAt);
+        assertNil(options.version);
+
+        options.expiresAt = expiry;
+        options.version = "v42";
+
+        assertNil(options.expiresIn);
+        expect(options.expiresAt).toBe(expiry);
+        expect(options.version).toBe("v42");
+
+        return "bar";
+      });
+    });
   });
 
   it("fetch with forced cache miss", async () => {
@@ -519,6 +555,119 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
     expect(await cache.deleteMulti([])).toBe(0);
   });
 
+  // PERMANENT-SKIP: CLAUDE.md, "Ruby Strings are JS string primitives (no mutable String carrier)"
+  it.skip("original store objects should not be immutable", async () => {
+    const bar = "bar";
+    const key = alphanumeric();
+    await cache.write(key, bar);
+    await assertNothingRaised(() => bar.replace(/.*/, "baz"));
+  });
+
+  it("expires in", async () => {
+    const time = Time.local(2008, 4, 24);
+
+    const key = alphanumeric();
+    const otherKey = alphanumeric();
+
+    await stub(Time, "now", time, [], async () => {
+      await cache.write(key, "bar", { expiresIn: Duration.minutes(1) });
+      await cache.write(otherKey, "spam", { expiresIn: Duration.minutes(2) });
+      expect(await cache.read(key)).toBe("bar");
+      expect(await cache.read(otherKey)).toBe("spam");
+    });
+
+    await stub(Time, "now", plusWithDuration.call(time, 30), [], async () => {
+      expect(await cache.read(key)).toBe("bar");
+      expect(await cache.read(otherKey)).toBe("spam");
+    });
+
+    await stub(
+      Time,
+      "now",
+      plusWithDuration.call(time, Duration.minutes(1).plus(Duration.seconds(1))),
+      [],
+      async () => {
+        assertNil(await cache.read(key));
+        expect(await cache.read(otherKey)).toBe("spam");
+      },
+    );
+
+    await stub(
+      Time,
+      "now",
+      plusWithDuration.call(time, Duration.minutes(2).plus(Duration.seconds(1))),
+      [],
+      async () => {
+        assertNil(await cache.read(key));
+        assertNil(await cache.read(otherKey));
+      },
+    );
+  });
+
+  it("expires at", async () => {
+    const time = Time.local(2008, 4, 24);
+
+    const key = alphanumeric();
+    await stub(Time, "now", time, [], async () => {
+      await cache.write(key, "bar", {
+        expiresAt: plusWithDuration.call(time, Duration.seconds(15)),
+      });
+      expect(await cache.read(key)).toBe("bar");
+    });
+
+    await stub(Time, "now", plusWithDuration.call(time, 10), [], async () => {
+      expect(await cache.read(key)).toBe("bar");
+    });
+
+    await stub(Time, "now", plusWithDuration.call(time, 30), [], async () => {
+      assertNil(await cache.read(key));
+    });
+  });
+
+  it("expire in is alias for expires in", async () => {
+    const time = Time.local(2008, 4, 24);
+
+    const key = alphanumeric();
+    await stub(Time, "now", time, [], async () => {
+      await cache.write(key, "bar", { expireIn: 20 });
+      expect(await cache.read(key)).toBe("bar");
+    });
+
+    await stub(Time, "now", plusWithDuration.call(time, 10), [], async () => {
+      expect(await cache.read(key)).toBe("bar");
+    });
+
+    await stub(Time, "now", plusWithDuration.call(time, 21), [], async () => {
+      assertNil(await cache.read(key));
+    });
+  });
+
+  it("expired in is alias for expires in", async () => {
+    const time = Time.local(2008, 4, 24);
+
+    const key = alphanumeric();
+    await stub(Time, "now", time, [], async () => {
+      await cache.write(key, "bar", { expiredIn: 20 });
+      expect(await cache.read(key)).toBe("bar");
+    });
+
+    await stub(Time, "now", plusWithDuration.call(time, 10), [], async () => {
+      expect(await cache.read(key)).toBe("bar");
+    });
+
+    await stub(Time, "now", plusWithDuration.call(time, 21), [], async () => {
+      assertNil(await cache.read(key));
+    });
+  });
+
+  it("expires in and expires at", async () => {
+    const key = crypto.randomUUID();
+    const error = await assertRaises([ArgumentError], {}, async () => {
+      await cache.write(key, "bar", { expireIn: 60, expiresAt: Duration.minutes(1).fromNow() });
+    });
+    expect(error.message).toBe("Either :expires_in or :expires_at can be supplied, but not both");
+  });
+
   it("invalid expiration time raises an error when raise on invalid cache expiration time is true", async () => {
     await withRaiseOnInvalidCacheExpirationTime(true, async () => {
       const key = crypto.randomUUID();
@@ -543,6 +692,166 @@ export function cacheStoreBehavior(host: CacheStoreBehaviorHost): void {
       });
       assertIncludes(report!.error.message, errorMessage);
     });
+  });
+  it("expires in from now raises an error", async () => {
+    const time = Duration.minutes(1).fromNow();
+
+    const key = crypto.randomUUID();
+    const error = await assertRaises([ArgumentError], {}, async () => {
+      await cache.write(key, "bar", { expiresIn: time as unknown as number });
+    });
+    expect(error.message).toBe(
+      `expires_in parameter should not be a Time. Did you mean to use expires_at? Got: ${time}`,
+    );
+    assertNil(await cache.read(key));
+  });
+
+  it("race condition protection skipped if not defined", async () => {
+    const key = alphanumeric();
+    await cache.write(key, "bar");
+    const internals = cache as unknown as {
+      readEntry(key: unknown, options: StoreOptions): Promise<{ expiresAt: number | null } | null>;
+      normalizeKey(key: string, options: StoreOptions): Promise<unknown>;
+    };
+    const time = (await internals.readEntry(await internals.normalizeKey(key, {}), {}))!.expiresAt!;
+
+    await stub(Time, "now", Time.at(time / 1000), [], async () => {
+      const result = await cache.fetch(key, async () => {
+        assertNil(await cache.read(key));
+        return "baz";
+      });
+      expect(result).toBe("baz");
+    });
+  });
+
+  it("race condition protection is limited", async () => {
+    const time = Time.now();
+    const key = crypto.randomUUID();
+    await cache.write(key, "bar", { expiresIn: 60 });
+    await stub(Time, "now", plusWithDuration.call(time, 71), [], async () => {
+      const result = await cache.fetch(key, { raceConditionTtl: 10 }, async () => {
+        assertNil(await cache.read(key));
+        return "baz";
+      });
+      expect(result).toBe("baz");
+    });
+  });
+
+  it("race condition protection is safe", async () => {
+    const time = Time.now();
+    const key = crypto.randomUUID();
+    await cache.write(key, "bar", { expiresIn: 60 });
+    await stub(Time, "now", plusWithDuration.call(time, 61), [], async () => {
+      try {
+        await cache.fetch(key, { raceConditionTtl: 10 }, async () => {
+          expect(await cache.read(key)).toBe("bar");
+          throw new ArgumentError();
+        });
+      } catch (e) {
+        if (!(e instanceof ArgumentError)) throw e;
+      }
+      expect(await cache.read(key)).toBe("bar");
+    });
+    await stub(Time, "now", plusWithDuration.call(time, 91), [], async () => {
+      assertNil(await cache.read(key));
+    });
+  });
+
+  it("race condition protection", async () => {
+    const time = Time.now();
+    const key = crypto.randomUUID();
+    await cache.write(key, "bar", { expiresIn: 60 });
+    await stub(Time, "now", plusWithDuration.call(time, 61), [], async () => {
+      const result = await cache.fetch(key, { raceConditionTtl: 10 }, async () => {
+        expect(await cache.read(key)).toBe("bar");
+        return "baz";
+      });
+      expect(result).toBe("baz");
+    });
+  });
+
+  it("fetch multi race condition protection", async () => {
+    const time = Time.now();
+    const key = crypto.randomUUID();
+    const otherKey = crypto.randomUUID();
+    await cache.write(key, "foo", { expiresIn: 60 });
+    await cache.write(otherKey, "bar", { expiresIn: 100 });
+    await stub(Time, "now", plusWithDuration.call(time, 71), [], async () => {
+      const result = await cache.fetchMulti(key, otherKey, { raceConditionTtl: 10 }, async () => {
+        assertNil(await cache.read(key));
+        expect(await cache.read(otherKey)).toBe("bar");
+        return "baz";
+      });
+      expect(Object.fromEntries(result)).toEqual({ [key]: "baz", [otherKey]: "bar" });
+    });
+  });
+
+  it("absurd key characters", async () => {
+    const absurdKey = "#/:*(<+=> )&$%@?;'\"'`~-";
+    assert(await cache.write(absurdKey, "1", { raw: true }));
+    expect(await cache.read(absurdKey, { raw: true })).toBe("1");
+    expect(await cache.fetch(absurdKey, { raw: true })).toBe("1");
+    assert(await cache.delete(absurdKey));
+    expect(await cache.fetch(absurdKey, { raw: true }, () => "2")).toBe("2");
+    expect(await cache.increment(absurdKey)).toBe(3);
+    expect(await cache.decrement(absurdKey)).toBe(2);
+  });
+
+  it("really long keys", async () => {
+    const key = alphanumeric().repeat(2048);
+    assert(await cache.write(key, "bar"));
+    expect(await cache.read(key)).toBe("bar");
+    expect(await cache.fetch(key)).toBe("bar");
+    assertNil(await cache.read(`${key}x`));
+    expect(Object.fromEntries(await cache.readMulti(key))).toEqual({ [key]: "bar" });
+  });
+
+  it("cache hit instrumentation", async () => {
+    const key = "test_key";
+    const events: Event[] = [];
+    try {
+      Notifications.subscribe("cache_read.active_support", (event) => events.push(event));
+      assert(await cache.write(key, "1", { raw: true }));
+      assert(await cache.fetch(key, { raw: true }, () => {}));
+      expect(events.length).toBe(1);
+      expect(events[0].name).toBe("cache_read.active_support");
+      expect(events[0].payload.super_operation).toBe("fetch");
+      assert(events[0].payload.hit);
+    } finally {
+      Notifications.unsubscribe("cache_read.active_support");
+    }
+  });
+
+  it("cache miss instrumentation", async () => {
+    const events: Event[] = [];
+    try {
+      Notifications.subscribe(/^cache_(.*)\.active_support$/, (event) => events.push(event));
+      assertNot(await cache.fetch(crypto.randomUUID(), () => {}));
+      expect(events.length).toBe(3);
+      expect(events[0].name).toBe("cache_read.active_support");
+      expect(events[1].name).toBe("cache_generate.active_support");
+      expect(events[2].name).toBe("cache_write.active_support");
+      expect(events[0].payload.super_operation).toBe("fetch");
+      assertNot(events[0].payload.hit);
+    } finally {
+      Notifications.unsubscribe("cache_read.active_support");
+    }
+  });
+
+  it("setting options in fetch block does not change cache options", async () => {
+    const key = crypto.randomUUID();
+
+    await assertNoChanges(
+      () => ({ ...cache.options }),
+      null,
+      {},
+      async () => {
+        await cache.fetch(key, (_key, options) => {
+          options.expiresIn = Duration.minutes(5) as unknown as number;
+          return "bar";
+        });
+      },
+    );
   });
 }
 

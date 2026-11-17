@@ -1,11 +1,13 @@
+import type { Time } from "@blazetrails/date";
 import type { Duration } from "../duration.js";
+import type { TimeWithZone } from "../time-with-zone.js";
 export { DeserializationError } from "./deserialization-error.js";
 
 export interface CacheOptions {
   expiresIn?: number | Duration;
-  expiresAt?: number;
-  expire_in?: number;
-  expired_in?: number;
+  expiresAt?: number | Time | TimeWithZone;
+  expireIn?: number;
+  expiredIn?: number;
   namespace?: string;
   compress?: boolean;
   compressThreshold?: number;

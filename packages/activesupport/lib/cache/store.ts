@@ -1,6 +1,7 @@
 import { Time } from "@blazetrails/date";
 import { Entry } from "./entry.js";
 import type { Duration } from "../duration.js";
+import type { TimeWithZone } from "../time-with-zone.js";
 import {
   ArgumentError,
   Hash,
@@ -69,9 +70,9 @@ export class WriteOptions {
     this._opts.expiresIn = v;
   }
   get expiresAt() {
-    return this._opts.expiresAt as number | undefined;
+    return this._opts.expiresAt as number | Time | TimeWithZone | undefined;
   }
-  set expiresAt(v: number | undefined) {
+  set expiresAt(v: number | Time | TimeWithZone | undefined) {
     delete this._opts.expiresIn;
     this._opts.expiresAt = v;
   }
@@ -576,16 +577,19 @@ export abstract class Store {
       throw new ArgumentError("Either :expires_in or :expires_at can be supplied, but not both");
     }
 
-    const expiresAt = callOptions.expiresAt as number | undefined;
+    const expiresAt = callOptions.expiresAt as number | Time | TimeWithZone | undefined;
+    delete callOptions.expiresAt;
     if (expiresAt != null) {
-      callOptions.expiresIn = (expiresAt - Time.now().toF() * 1000) / 1000;
-      delete callOptions.expiresAt;
+      callOptions.expiresIn =
+        typeof expiresAt !== "number"
+          ? expiresAt.toF() - Time.now().toF()
+          : (expiresAt - Time.now().toF() * 1000) / 1000;
     }
 
-    // boundary: mirrors cache.rb:871–874 — raises when expires_in is accidentally a Time/Date object.
-    if (callOptions.expiresIn instanceof Date) {
+    if (callOptions.expiresIn instanceof Time) {
+      const expiresIn = callOptions.expiresIn;
       throw new ArgumentError(
-        `expires_in parameter should not be a Date. Did you mean to use expiresAt? Got: ${callOptions.expiresIn}`,
+        `expires_in parameter should not be a Time. Did you mean to use expires_at? Got: ${expiresIn}`,
       );
     }
 
@@ -606,13 +610,10 @@ export abstract class Store {
 
   static normalizeOptions(options: StoreOptions): StoreOptions {
     const opts = { ...options };
-    const aliasKey =
-      opts.expire_in != null ? "expire_in" : opts.expired_in != null ? "expired_in" : null;
-    if (aliasKey != null) {
-      if (opts.expiresIn == null) opts.expiresIn = opts[aliasKey];
-      delete opts.expire_in;
-      delete opts.expired_in;
-    }
+    const aliasKey = "expireIn" in opts ? "expireIn" : "expiredIn" in opts ? "expiredIn" : null;
+    if (aliasKey != null && opts.expiresIn == null) opts.expiresIn = opts[aliasKey];
+    delete opts.expireIn;
+    delete opts.expiredIn;
     return opts;
   }
 
