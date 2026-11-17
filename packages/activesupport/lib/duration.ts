@@ -28,7 +28,6 @@ import {
   rbFSend,
   rbObjClassname,
 } from "@blazetrails/ruby-compat";
-import { instantFrom } from "./temporal.js";
 import { advance as dateAdvance, since as dateSince } from "./core-ext/date/calculations.js";
 import {
   advance as datetimeAdvance,
@@ -479,7 +478,12 @@ export class Duration {
       if (isDateTime(time)) return datetimeSince(time, sign * this.inSeconds());
       if (!(time instanceof Date || time instanceof Temporal.Instant))
         return time.since(sign * this.inSeconds());
-      return applyDurationPreservingNs(time, this.parts, PARTS, sign);
+      return applyDurationPreservingNs(
+        time,
+        { ...this.parts, seconds: this.inSeconds() },
+        ["seconds"],
+        sign,
+      );
     }
 
     if (isDateTime(time) || !(time instanceof Date || time instanceof Temporal.Instant))
@@ -648,56 +652,15 @@ function applyDurationPreservingNs(
   date: Date | Temporal.Instant,
   parts: DurationParts,
   partKeys: readonly (keyof DurationParts)[],
-  direction: 1 | -1,
+  sign: 1 | -1,
 ): Temporal.Instant {
-  const nsRemainder = date instanceof Temporal.Instant ? date.epochNanoseconds % 1_000_000n : 0n;
-  const result = instantFrom(applyDuration(toDateInput(date), parts, partKeys, direction));
-  return nsRemainder === 0n ? result : result.add({ nanoseconds: Number(nsRemainder) });
-}
-
-function applyDuration(
-  date: Date,
-  parts: DurationParts,
-  partKeys: readonly (keyof DurationParts)[],
-  direction: 1 | -1,
-): Date {
-  if (!(date instanceof Date)) {
-    throw new TypeError(`expected a time or date, got ${JSON.stringify(date)}`);
-  }
-
-  let time = new Date(date.getTime());
-
-  for (const type of partKeys) {
-    const number = direction * parts[type];
-    const t = time;
-    if (type === "seconds") {
-      time = new Date(t.getTime() + number * 1000);
-    } else if (type === "minutes") {
-      time = new Date(t.getTime() + number * SECONDS_PER_MINUTE * 1000);
-    } else if (type === "hours") {
-      time = new Date(t.getTime() + number * SECONDS_PER_HOUR * 1000);
-    } else if (number === 0) {
-      continue;
-    } else if (type === "years" && !Number.isInteger(number)) {
-      time = new Date(t.getTime() + number * SECONDS_PER_YEAR * 1000);
-    } else if (type === "years") {
-      time = new Date(t.getTime());
-      time.setFullYear(t.getFullYear() + number);
-    } else if (type === "months" && !Number.isInteger(number)) {
-      time = new Date(t.getTime() + number * SECONDS_PER_MONTH * 1000);
-    } else if (type === "months") {
-      time = new Date(t.getTime());
-      time.setMonth(t.getMonth() + number);
-    } else {
-      const days = type === "weeks" ? number * 7 : number;
-      const intDays = Math.trunc(days);
-      time = new Date(t.getTime());
-      time.setDate(t.getDate() + intDays);
-      time = new Date(time.getTime() + (days - intDays) * SECONDS_PER_DAY * 1000);
-    }
-  }
-
-  return time;
+  const ns =
+    date instanceof Temporal.Instant ? date.epochNanoseconds : BigInt(date.getTime()) * 1_000_000n;
+  const time = RubyTime.at(ns / 1_000_000_000n, ns % 1_000_000_000n, "nanosecond");
+  const result = applyDurationToDate(time, parts, partKeys, sign) as RubyTime;
+  return Temporal.Instant.fromEpochNanoseconds(
+    BigInt(result.toI()) * 1_000_000_000n + BigInt(result.nsec),
+  );
 }
 
 export class Scalar {

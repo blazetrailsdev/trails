@@ -118,7 +118,7 @@ describe("NumericExtTimeAndDateTimeTest", () => {
     const leapDay = new Date(2004, 1, 29, 15, 15, 10);
     const result = Duration.years(1).since(leapDay);
     expect(asDate(result).getFullYear()).toBe(2005);
-    expect(asDate(result).getMonth()).toBe(2);
+    expect(asDate(result).getMonth()).toBe(1);
   });
 
   it("in milliseconds", () => {
