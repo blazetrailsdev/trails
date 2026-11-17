@@ -675,7 +675,9 @@ export class Relation<T extends Base, G extends boolean = false> {
     return groupBy(await this.toArray(), fn);
   }
 
-  async indexBy<K extends string | number>(fn: (record: T) => K): Promise<Record<K, T>> {
+  async indexBy<K extends string>(fn: (record: T) => K): Promise<Record<K, T>>;
+  async indexBy<K>(fn: (record: T) => K): Promise<Hash<K, T>>;
+  async indexBy<K>(fn: (record: T) => K): Promise<Record<string, T> | Hash<K, T>> {
     return ENUMERABLE_DELEGATES.indexBy(await this.toArray(), fn);
   }
 

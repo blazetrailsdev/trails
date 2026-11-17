@@ -48,9 +48,10 @@ describe("EnumerableTests", () => {
   it("index_by", () => {
     const payments = [pay(5), pay(15), pay(10)];
     const indexed = indexBy(payments, (p) => p.price);
-    expect(indexed[5]).toEqual(pay(5));
-    expect(indexed[15]).toEqual(pay(15));
-    expect(indexed[10]).toEqual(pay(10));
+    expect(indexed.get(5)).toEqual(pay(5));
+    expect(indexed.get(15)).toEqual(pay(15));
+    expect(indexed.get(10)).toEqual(pay(10));
+    expect([...indexed.keys()]).toEqual([5, 15, 10]);
   });
 
   it("any — false when empty", () => {
@@ -190,8 +191,8 @@ describe("EnumerableTests", () => {
   it("index with", () => {
     const payments = [pay(5), pay(15), pay(10)];
     const indexed = indexBy(payments, (p) => p.price);
-    expect(indexed[5]).toEqual({ price: 5 });
-    expect(indexed[15]).toEqual({ price: 15 });
+    expect(indexed.get(5)).toEqual({ price: 5 });
+    expect(indexed.get(15)).toEqual({ price: 15 });
   });
 
   it("many", () => {

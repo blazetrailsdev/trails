@@ -868,7 +868,7 @@ describe("Relation Enumerable surface (trails)", () => {
 
     const indexed = await posts.indexBy((post: any) => post.id as number);
     const first = (await posts)[0] as any;
-    expect((indexed[first.id] as any).id).toBe(first.id);
+    expect((indexed.get(first.id) as any).id).toBe(first.id);
 
     const loaded = await posts;
     expect(await posts.compactBlank()).toEqual(loaded);

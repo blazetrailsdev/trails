@@ -1,7 +1,7 @@
-import { Concern, extend, include, isPresent } from "@blazetrails/activesupport";
+import { Concern, extend, include, indexBy, isPresent } from "@blazetrails/activesupport";
 import type { Base, Relation } from "@blazetrails/activerecord";
 import { Time } from "@blazetrails/date";
-import { classModule, sortBy } from "@blazetrails/ruby-compat";
+import { classModule, type Hash, sortBy } from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import type { Job } from "../job.js";
 import type { Execution } from "../execution.js";
@@ -47,7 +47,7 @@ export class ClassMethods {
     this: ExecutableClass,
     jobs: Base[],
   ): Promise<Base[]> {
-    const jobsById = new Map(jobs.map((job) => [job.id as number, job]));
+    const jobsById = indexBy(jobs, (job) => job.id as number);
     return [
       ...(await ClassMethods.dispatchedAndReady.call(this, jobsById)),
       ...(await ClassMethods.dispatchedAndBlocked.call(this, jobsById)),
@@ -57,7 +57,7 @@ export class ClassMethods {
   /** @internal */
   private static async dispatchedAndReady(
     this: ExecutableClass,
-    jobsById: Map<number, Base>,
+    jobsById: Hash<number, Base>,
   ): Promise<Base[]> {
     return (await ReadyExecution.where({ job_id: [...jobsById.keys()] }).pluck("job_id")).map(
       (id) => jobsById.get(id)!,
@@ -67,7 +67,7 @@ export class ClassMethods {
   /** @internal */
   private static async dispatchedAndBlocked(
     this: ExecutableClass,
-    jobsById: Map<number, Base>,
+    jobsById: Hash<number, Base>,
   ): Promise<Base[]> {
     return (await BlockedExecution.where({ job_id: [...jobsById.keys()] }).pluck("job_id")).map(
       (id) => jobsById.get(id)!,
