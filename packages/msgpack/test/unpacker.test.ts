@@ -244,9 +244,7 @@ describe("MessagePack::Unpacker", () => {
     const raw = sampleRaw(4);
 
     const enumerator = unpacker.feedEach(raw);
-    expect(enumerator).toBeInstanceOf(
-      (globalThis as unknown as { Iterator: new () => object }).Iterator,
-    );
+    expect(enumerator).toBeInstanceOf(Iterator);
     expect([...enumerator]).toEqual(Array.from({ length: 4 }, sampleObject));
   });
 
