@@ -79,8 +79,8 @@ function isZoneIdentifier(zone: string): boolean {
   return !/^([+-]|[A-IK-Z]$)/.test(zone);
 }
 
-function utcOffsetArgument(zone: string | number | Rational): "UTC" | number {
-  if (zone instanceof Rational) zone = zone.toF();
+function utcOffsetArgument(zone: string | number | Rational | object): "UTC" | number {
+  if (typeof zone === "object") zone = numExact(zone).toF();
   if (typeof zone === "number") {
     if (!Number.isFinite(zone) || Math.abs(zone) >= 86400) {
       throw new ArgumentError("utc_offset out of range");
@@ -1500,10 +1500,7 @@ export class Time extends rbCTime {
           ? zoneArgument
           : null;
     const utcOffset =
-      zoneObject ??
-      (zoneArgument == null
-        ? nowTimeZoneId()
-        : utcOffsetArgument(zoneArgument as string | number | Rational));
+      zoneObject ?? (zoneArgument == null ? nowTimeZoneId() : utcOffsetArgument(zoneArgument));
     this.#timeZoneId = typeof utcOffset === "number" ? null : utcOffset;
     this.#tzmodeUtc = zoneArgument != null && this.#timeZoneId === "UTC";
     this.#localZone = zoneArgument == null;
@@ -1554,7 +1551,9 @@ export class Time extends rbCTime {
       utc instanceof Time
         ? utc.#epochNs
         : (utc as Temporal.ZonedDateTime | Temporal.Instant).epochNanoseconds;
-    this.#utcOffsetMemo = Number(t - s) / 1_000_000_000;
+    const off = Number(t - s) / 1_000_000_000;
+    if (off <= -86400 || off >= 86400) throw new ArgumentError("utc_offset out of range");
+    this.#utcOffsetMemo = off;
     this.#epochNsMemo = s + nsec;
     this.#instantMemo = null;
     this.#timeZoneId = null;

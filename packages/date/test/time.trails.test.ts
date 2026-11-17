@@ -590,6 +590,16 @@ describe("Time", () => {
       expect(Time.at(0, { in: tz }).zone).toBe(tz);
       expect(Time.at(0, { in: tz }).hour).toBe(9);
     });
+
+    it("raises for a zone object out of range or answering neither protocol (`time_init_vtm`)", () => {
+      const far = new (class {
+        localToUtc = (tm: Time) => Time.at(tm.toI() - 90000, { in: "UTC" });
+      })();
+      expect(() => Time.new(2020, 1, 1, 0, 0, 0, far)).toThrow(
+        expect.objectContaining({ name: "ArgumentError", message: "utc_offset out of range" }),
+      );
+      expect(() => Time.new(2020, 1, 1, 0, 0, 0, new (class {})())).toThrow(TypeError);
+    });
   });
   describe("Time.new given a String", () => {
     it("parses MRI's `time_init_parse` grammar", () => {
