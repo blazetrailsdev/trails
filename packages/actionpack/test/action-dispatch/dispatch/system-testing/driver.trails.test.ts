@@ -9,6 +9,8 @@ import {
 } from "../../../../lib/action-dispatch/system-testing/driver.js";
 import { vite } from "../../../../lib/action-dispatch/system-testing/server.js";
 
+vite.playwright ??= await import("playwright");
+
 describe("ActionDispatch::SystemTesting::Driver", () => {
   it("initializes with default options", () => {
     const driver = new Driver("playwright");

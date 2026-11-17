@@ -12,6 +12,8 @@ import {
 } from "../../../../lib/action-dispatch/system-testing/browser.js";
 import { vite } from "../../../../lib/action-dispatch/system-testing/server.js";
 
+vite.playwright ??= await import("playwright");
+
 const foundExecutable = new URL(import.meta.url).pathname;
 let chromium: BrowserType;
 let firefox: BrowserType;

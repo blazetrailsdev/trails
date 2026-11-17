@@ -22,6 +22,9 @@ import {
 } from "../../../../lib/action-dispatch/system-testing/test-helpers/screenshot-helper.js";
 import type { BrowserType } from "playwright";
 import { requirePlaywright } from "../../../../lib/action-dispatch/system-testing/driver.js";
+import { vite } from "../../../../lib/action-dispatch/system-testing/server.js";
+
+vite.playwright ??= await import("playwright");
 
 const foundExecutable = new URL(import.meta.url).pathname;
 const { chromium, firefox } = (await requirePlaywright()) as {

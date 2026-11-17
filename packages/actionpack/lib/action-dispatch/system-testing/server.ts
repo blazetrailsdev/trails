@@ -10,6 +10,7 @@ export const vite: {
   config: InlineConfig & { server: NonNullable<InlineConfig["server"]> };
   server: ViteDevServer | undefined;
   createServer: typeof createServer | undefined;
+  playwright: Record<string, unknown> | undefined;
   url: string | undefined;
   drivers: Record<string, (app: RackMiddleware | undefined) => Promise<unknown>>;
   currentDriver: string;
@@ -19,6 +20,7 @@ export const vite: {
   config: { server: { host: "127.0.0.1", port: 0 } },
   server: undefined,
   createServer: undefined,
+  playwright: undefined,
   url: undefined,
   drivers: {},
   currentDriver: "rack_test",

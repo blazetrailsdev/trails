@@ -72,8 +72,10 @@ export class SystemTestCase extends TestCase {
   static async startApplication(
     vitest: Pick<typeof import("vitest"), "afterAll" | "expect" | "inject">,
     viteModule: Pick<typeof import("vite"), "createServer">,
+    playwright: Record<string, unknown>,
   ): Promise<void> {
     vite.createServer = viteModule.createServer;
+    vite.playwright = playwright;
     vite.app = new Builder(null, {}, (builder) => {
       builder.map("/", (builder) => {
         builder.run(TopLevel.Trails!.application!);

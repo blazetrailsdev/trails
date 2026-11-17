@@ -10,6 +10,9 @@ vi.mock("playwright", () => ({
   chromium: { executablePath: () => paths.chromium },
   firefox: { executablePath: () => paths.firefox },
 }));
+import { vite } from "../../../lib/action-dispatch/system-testing/server.js";
+
+vite.playwright ??= await import("playwright");
 
 describe("Browser", () => {
   beforeEach(() => {

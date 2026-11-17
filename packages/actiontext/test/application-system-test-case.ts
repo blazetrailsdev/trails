@@ -8,7 +8,11 @@ import "../../activerecord/test/cases/helper.js";
 import "./test-helper.js";
 
 vite.config.root = File.expandPath("dummy", import.meta.dirname);
-await SystemTestCase.startApplication(await import("vitest"), await import("vite"));
+await SystemTestCase.startApplication(
+  await import("vitest"),
+  await import("vite"),
+  await import("playwright"),
+);
 
 export class ApplicationSystemTestCase extends SystemTestCase {
   declare fillInRichTextarea: (typeof SystemTestHelper)["fillInRichTextarea"];
