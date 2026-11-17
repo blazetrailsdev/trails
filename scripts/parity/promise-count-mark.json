@@ -7,7 +7,6 @@
   },
   "blazetrails/constructor-creates-no-promise": {
     "actioncable": 1,
-    "actiontext": 2,
     "activerecord": 1,
     "ruby-compat": 1
   },
