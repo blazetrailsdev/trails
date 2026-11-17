@@ -249,6 +249,27 @@ function enumFindAll<T, E = unknown>(
   );
 }
 export { enumFindAll as findAll, enumFindAll as select };
+
+/**
+ * Mirrors: Ruby's Enumerable#grep — `vendor/ruby/v3.3.11/enum.c:173` `enum_grep`: each
+ * element for which `pattern === elem` holds (`grep_i`), mapped through the block when
+ * one is given (`grep_iter_i`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function grep<T, E = unknown>(
+  obj: Iterable<T> | Each<T, E>,
+  pattern: unknown,
+  block?: (i: T) => unknown,
+): Enumerated<E, unknown[]> {
+  const ary: unknown[] = [];
+  return rbBlockCall(
+    obj,
+    (i) => {
+      if (rbEqq(pattern, i)) ary.push(block ? rbYield(block, i) : i);
+    },
+    () => ary,
+  );
+}
 export { enumToA as toA };
 
 /**
@@ -1338,6 +1359,10 @@ export class Enumerable<T = unknown, E = unknown> {
   /** @noRailsEquivalent PERMANENT */
   findAll<T, E = unknown>(this: Each<T, E>, block?: (i: T) => unknown): Enumerated<E, T[]> {
     return enumFindAll(this, block);
+  }
+
+  grep<T, E = unknown>(this: Each<T, E>, pattern: unknown, block?: (i: T) => unknown) {
+    return grep(this, pattern, block);
   }
 
   map<T, E = unknown>(this: Each<T, E>): Enumerator<T, E>;

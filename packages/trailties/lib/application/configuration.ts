@@ -1,3 +1,4 @@
+import type { MiddlewareFactory } from "@blazetrails/actionpack";
 import {
   ActionDispatch,
   ContentSecurityPolicy,
@@ -500,6 +501,8 @@ export class Configuration extends EngineConfiguration {
     }
   }
 
+  sessionStore(): MiddlewareFactory | null;
+  sessionStore(newSessionStore: unknown, options?: Record<string, unknown>): unknown;
   sessionStore(newSessionStore?: unknown, options?: Record<string, unknown>): unknown {
     if (newSessionStore != null && newSessionStore !== false) {
       this._sessionStore = newSessionStore;

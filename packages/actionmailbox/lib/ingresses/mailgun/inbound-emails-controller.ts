@@ -7,6 +7,7 @@ import {
   env,
   greaterThanOrEqual,
   kernelInteger,
+  rbStrPlus,
   type Comparable,
 } from "@blazetrails/ruby-compat";
 import { ActionMailbox } from "../../action-mailbox.js";
@@ -23,10 +24,13 @@ export class InboundEmailsController extends BaseController {
   }
 
   /** @internal */
-  private mail(): string {
-    let rawEmail = this.params.require("body-mime") as string;
+  private mail(): Uint8Array {
+    let rawEmail = this.params.require("body-mime") as Uint8Array;
     if (this.params.isKey("recipient"))
-      rawEmail = `X-Original-To: ${this.params.require("recipient") as string}\n${rawEmail}`;
+      rawEmail = rbStrPlus(
+        new TextEncoder().encode(`X-Original-To: ${this.params.require("recipient") as string}\n`),
+        rawEmail,
+      ) as Uint8Array;
     return rawEmail;
   }
 

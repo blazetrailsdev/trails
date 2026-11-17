@@ -2,7 +2,7 @@ import {
   bytes,
   forceEncoding,
   isValidEncoding,
-  type Encoding,
+  Encoding,
   type Hash,
 } from "@blazetrails/ruby-compat";
 import { cattrAccessor } from "@blazetrails/activesupport";
@@ -112,7 +112,10 @@ export class ParamBuilder {
     return hash;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   storeNestedParam(
     params: ParamHash,
     name: string | null,
@@ -180,18 +183,23 @@ export class ParamBuilder {
       let designatedEncoding: Encoding | string | undefined;
       let validEncoding: boolean;
       if (encodingTemplate && (designatedEncoding = encodingTemplate.get(k))) {
-        v = bytes(v)
-          .map((b) => String.fromCharCode(b))
-          .join("");
-        validEncoding = isValidEncoding(v, designatedEncoding);
-        v = forceEncoding(v, designatedEncoding);
+        if (Encoding.find(designatedEncoding) === Encoding.ASCII_8BIT) {
+          v = forceEncoding(Uint8Array.from(bytes(v)), designatedEncoding);
+          validEncoding = isValidEncoding(v, designatedEncoding);
+        } else {
+          v = bytes(v)
+            .map((b) => String.fromCharCode(b))
+            .join("");
+          validEncoding = isValidEncoding(v, designatedEncoding);
+          v = forceEncoding(v, designatedEncoding);
+        }
       } else {
         validEncoding = !/\p{Cs}/u.test(v);
       }
 
       if (!validEncoding) {
         throw new InvalidParameterError(
-          `Invalid encoding for parameter: ${v.replace(/\p{Cs}/gu, "\uFFFD")}`,
+          `Invalid encoding for parameter: ${typeof v === "string" ? v.replace(/\p{Cs}/gu, "\uFFFD") : new TextDecoder().decode(v)}`,
         );
       }
     }

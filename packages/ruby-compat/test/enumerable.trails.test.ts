@@ -4,6 +4,7 @@ import {
   AsyncEnumerable,
   Enumerable,
   eachCons,
+  grep,
   eachWithIndex,
   eachWithObject,
   eachSlice,
@@ -837,5 +838,17 @@ describe("Enumerable#take and #take_while", () => {
     expect(takeWhile(endless, (i) => i < 4)).toEqual([0, 1, 2, 3]);
     expect(takeWhile([1, 2, null, 4], (i) => i)).toEqual([1, 2]);
     expect(new Enumerable([0, 1, 2]).takeWhile((i) => i === 0)).toEqual([0]);
+  });
+});
+
+describe("Enumerable#grep", () => {
+  it("selects by === and maps through the block", () => {
+    class A {}
+    class B extends A {}
+    const a = new A();
+    const b = new B();
+    expect(grep([a, b, 1], B)).toEqual([b]);
+    expect(grep(["foo", "bar", 3], /o/)).toEqual(["foo"]);
+    expect(grep([1, 2, 1], 1, (x: number) => x * 10)).toEqual([10, 10]);
   });
 });
