@@ -2035,6 +2035,7 @@ export function extractFromProgram(
         extractDefinePropertyAccessorForOf(node, info, checker, srcDir, program);
       } else if (ts.isExpressionStatement(node)) {
         extractDefinePropertyAccessorDirect(node.expression, info, checker, srcDir, program);
+        extractOnLoadDefineProperty(node.expression, info, srcDir);
       }
       ts.forEachChild(node, walk);
     };
@@ -2215,6 +2216,54 @@ function extractDefinePropertyDirect(
     line,
     paramsOfDescriptorValue(value, checker),
   );
+}
+
+/**
+ * `Object.defineProperty(this.prototype, "name", { value: fn })` inside an
+ * `onLoad(hook, function () { ... })` callback: the port of a `def` written in
+ * an `ActiveSupport.on_load` block (actiontext/lib/action_text/engine.rb:45-55).
+ * `extract-ruby-api.rb` files such a `def` under the class lexically around the
+ * block, so it is credited to the enclosing TS class.
+ */
+function extractOnLoadDefineProperty(expr: ts.Expression, info: PackageInfo, srcDir: string): void {
+  if (!ts.isCallExpression(expr) || !ts.isPropertyAccessExpression(expr.expression)) return;
+  const pa = expr.expression;
+  if (!ts.isIdentifier(pa.expression) || pa.expression.text !== "Object") return;
+  if (pa.name.text !== "defineProperty" || expr.arguments.length < 3) return;
+  const [target, propNameExpr, descriptor] = expr.arguments;
+  if (!ts.isStringLiteral(propNameExpr) || !ts.isObjectLiteralExpression(descriptor)) return;
+  if (!ts.isPropertyAccessExpression(target) || target.name.text !== "prototype") return;
+  if (target.expression.kind !== ts.SyntaxKind.ThisKeyword) return;
+  const value = definePropertyValue(descriptor);
+  if (!value || !(ts.isFunctionExpression(value) || ts.isArrowFunction(value))) return;
+  let inOnLoad = false;
+  let klass: ts.ClassDeclaration | undefined;
+  for (let cur: ts.Node | undefined = expr.parent; cur; cur = cur.parent) {
+    if (
+      !inOnLoad &&
+      ts.isCallExpression(cur) &&
+      ts.isIdentifier(cur.expression) &&
+      cur.expression.text === "onLoad"
+    ) {
+      inOnLoad = true;
+    }
+    if (ts.isClassDeclaration(cur) && cur.name) {
+      klass = cur;
+      break;
+    }
+  }
+  if (!inOnLoad || !klass?.name) return;
+  const file = path.relative(srcDir, expr.getSourceFile().fileName).replace(/\\/g, "/");
+  const classInfo = info.classes[`${file}:${klass.name.text}`];
+  if (!classInfo || classInfo.instanceMethods.some((m) => m.name === propNameExpr.text)) return;
+  const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
+  classInfo.instanceMethods.push({
+    name: propNameExpr.text,
+    visibility: "public",
+    params: extractParameters(value.parameters),
+    line,
+    file: classInfo.file,
+  });
 }
 
 /**

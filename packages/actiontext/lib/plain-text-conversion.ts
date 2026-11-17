@@ -41,9 +41,21 @@ export const PlainTextConversion = {
   },
 
   /** @internal */
+  plainTextForH1Node: undefined as unknown as PlainTextMethod,
+
+  /** @internal */
+  plainTextForPNode: undefined as unknown as PlainTextMethod,
+
+  /** @internal */
   plainTextForList(node: Html5Node, _index: number): string {
     return `${this.breakIfNestedList(node, this.plainTextForBlock(node))}`;
   },
+
+  /** @internal */
+  plainTextForUlNode: undefined as unknown as PlainTextMethod,
+
+  /** @internal */
+  plainTextForOlNode: undefined as unknown as PlainTextMethod,
 
   /** @internal */
   plainTextForBrNode(_node: Html5Node, _index: number): string {
@@ -137,14 +149,10 @@ export const PlainTextConversion = {
 
 type PlainTextMethod = (node: never, index: number) => string;
 
-for (const element of ["h1", "p"]) {
-  (PlainTextConversion as Record<string, unknown>)[`plainTextFor${camelize(element)}Node`] =
-    PlainTextConversion.plainTextForBlock;
-}
+PlainTextConversion.plainTextForH1Node = PlainTextConversion.plainTextForBlock;
+PlainTextConversion.plainTextForPNode = PlainTextConversion.plainTextForBlock;
 
-for (const element of ["ul", "ol"]) {
-  (PlainTextConversion as Record<string, unknown>)[`plainTextFor${camelize(element)}Node`] =
-    PlainTextConversion.plainTextForList;
-}
+PlainTextConversion.plainTextForUlNode = PlainTextConversion.plainTextForList;
+PlainTextConversion.plainTextForOlNode = PlainTextConversion.plainTextForList;
 
 ActionText.PlainTextConversion = PlainTextConversion;
