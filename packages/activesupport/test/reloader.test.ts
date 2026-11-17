@@ -16,7 +16,7 @@ describe("ReloaderTest", () => {
     reloader = newReloader(() => true);
   });
 
-  it("prepare callback", () => {
+  it("prepare callback", async () => {
     let prepared = false;
     let completed = false;
     reloader.toPrepare(() => (prepared = true));
@@ -24,7 +24,7 @@ describe("ReloaderTest", () => {
 
     assertNot(prepared);
     assertNot(completed);
-    reloader.prepareBang();
+    await reloader.prepareBang();
     expect(prepared).toBeTruthy();
     assertNot(completed);
 
@@ -36,12 +36,12 @@ describe("ReloaderTest", () => {
     assertNot(prepared);
   });
 
-  it("prepend prepare callback", () => {
+  it("prepend prepare callback", async () => {
     let i = 10;
     reloader.toPrepare(() => (i += 1));
     reloader.toPrepare(() => (i = 0), { prepend: true });
 
-    reloader.prepareBang();
+    await reloader.prepareBang();
     expect(i).toBe(1);
   });
 
