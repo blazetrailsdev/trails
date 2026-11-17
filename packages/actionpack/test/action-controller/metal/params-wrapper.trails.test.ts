@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { classAttribute } from "@blazetrails/activesupport";
 import { API } from "../../../lib/action-controller/api.js";
 import { Base } from "../../../lib/action-controller/base.js";
 import {
   _wrapperKey,
+  Options,
   type ParamsWrapperHost,
 } from "../../../lib/action-controller/metal/params-wrapper.js";
 
@@ -83,5 +85,23 @@ describe("ParamsWrapper::Options", () => {
     UsersController.wrapParameters({ format: [":json"], name: false });
 
     expect(UsersController._wrapperOptions.name).toBe("user");
+  });
+});
+
+describe("ParamsWrapper::Options#include", () => {
+  it("adds a model's attribute aliases and nested attributes declared with class_attribute", () => {
+    class Post {
+      static attributeNames(): string[] {
+        return ["title"];
+      }
+    }
+    classAttribute.call(Post, "attributeAliases", { default: { headline: "title" } });
+    classAttribute.call(Post, "nestedAttributesOptions", { default: { comments: {} } });
+
+    expect(new Options("post", [":json"], null, null, null, Post).include).toEqual([
+      "title",
+      "headline",
+      "comments_attributes",
+    ]);
   });
 });

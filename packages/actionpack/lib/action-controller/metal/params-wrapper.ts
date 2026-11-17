@@ -95,16 +95,16 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
           );
         }
 
-        if (rbObjRespondTo(m, "attributeAliases") && any(Object.keys(m!.attributeAliases!()))) {
-          this.include = this.include.concat(Object.keys(m!.attributeAliases!()));
+        if (rbObjRespondTo(m, "attributeAliases") && any(Object.keys(m!.attributeAliases!))) {
+          this.include = this.include.concat(Object.keys(m!.attributeAliases!));
         }
 
         if (
           rbObjRespondTo(m, "nestedAttributesOptions") &&
-          any(Object.keys(m!.nestedAttributesOptions!()))
+          any(Object.keys(m!.nestedAttributesOptions!))
         ) {
           this.include = this.include.concat(
-            Object.keys(m!.nestedAttributesOptions!()).map((key) => toS(key).concat("_attributes")),
+            Object.keys(m!.nestedAttributesOptions!).map((key) => toS(key).concat("_attributes")),
           );
         }
 
@@ -161,8 +161,8 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
 export interface WrapModel {
   attributeNames?(): string[];
   storedAttributes?(): Record<string, unknown[]>;
-  attributeAliases?(): Record<string, unknown>;
-  nestedAttributesOptions?(): Record<string, unknown>;
+  attributeAliases?: Record<string, unknown>;
+  nestedAttributesOptions?: Record<string, unknown>;
 }
 
 /** @internal */
