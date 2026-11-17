@@ -1,24 +1,20 @@
 import { defineConstants } from "@blazetrails/ruby-compat";
-import * as m0 from "./crass.js";
-import * as m1 from "./crass/parser.js";
-import * as m2 from "./crass/scanner.js";
-import * as m3 from "./crass/token-scanner.js";
-import * as m4 from "./crass/tokenizer.js";
-import * as m5 from "./rails-html-sanitizer.js";
-import * as m6 from "./sanitizer.js";
+import * as m0 from "./crass/parser.js";
+import * as m1 from "./crass/scanner.js";
+import * as m2 from "./crass/token-scanner.js";
+import * as m3 from "./crass/tokenizer.js";
+import * as m4 from "./sanitizer.js";
 
 defineConstants([
-  [() => m0.Crass, "Crass"],
-  [() => m1.Parser, "Crass::Parser"],
-  [() => m2.Scanner, "Crass::Scanner"],
-  [() => m4.Tokenizer, "Crass::Tokenizer"],
-  [() => m3.TokenScanner, "Crass::TokenScanner"],
-  [() => m5.ActionView, "RailsHtmlSanitizer::ActionView"],
-  [() => m6.Sanitizer, "Trails::HTML::Sanitizer"],
-  [() => m6.HTML4FullSanitizer, "Trails::HTML4::FullSanitizer"],
-  [() => m6.HTML4LinkSanitizer, "Trails::HTML4::LinkSanitizer"],
-  [() => m6.HTML4SafeListSanitizer, "Trails::HTML4::SafeListSanitizer"],
-  [() => m6.HTML5FullSanitizer, "Trails::HTML5::FullSanitizer"],
-  [() => m6.HTML5LinkSanitizer, "Trails::HTML5::LinkSanitizer"],
-  [() => m6.HTML5SafeListSanitizer, "Trails::HTML5::SafeListSanitizer"],
+  [() => m0.Parser, "Crass::Parser"],
+  [() => m1.Scanner, "Crass::Scanner"],
+  [() => m3.Tokenizer, "Crass::Tokenizer"],
+  [() => m2.TokenScanner, "Crass::TokenScanner"],
+  [() => m4.Sanitizer, "Trails::HTML::Sanitizer"],
+  [() => m4.HTML4FullSanitizer, "Trails::HTML4::FullSanitizer"],
+  [() => m4.HTML4LinkSanitizer, "Trails::HTML4::LinkSanitizer"],
+  [() => m4.HTML4SafeListSanitizer, "Trails::HTML4::SafeListSanitizer"],
+  [() => m4.HTML5FullSanitizer, "Trails::HTML5::FullSanitizer"],
+  [() => m4.HTML5LinkSanitizer, "Trails::HTML5::LinkSanitizer"],
+  [() => m4.HTML5SafeListSanitizer, "Trails::HTML5::SafeListSanitizer"],
 ]);
