@@ -255,14 +255,14 @@ describe("CodeStatisticsTest", () => {
   });
 
   it("ignores directories that happen to have source files extensions", async () => {
-    await expect(CodeStatistics.create(["tmp dir", tmpPath])).resolves.not.toThrow();
+    await expect(CodeStatistics.new(["tmp dir", tmpPath])).resolves.not.toThrow();
   });
 
   it("renders a Rails-shaped table with totals and Code-to-Test ratio", async () => {
     fs.writeFileSync(path.join(tmpPath, "a.ts"), "export class A {\n  run() {}\n}\n");
     fs.mkdirSync(path.join(tmpPath, "t"), { recursive: true });
     fs.writeFileSync(path.join(tmpPath, "t", "a_test.ts"), "function t() {}\n");
-    const stats = await CodeStatistics.create(
+    const stats = await CodeStatistics.new(
       ["Models", tmpPath],
       ["Model tests", path.join(tmpPath, "t")],
     );
@@ -289,6 +289,6 @@ describe("CodeStatisticsTest", () => {
       path.join(tmpPath, ".example.rb"),
       "      def foo\n        puts 'foo'\n      end\n",
     );
-    await expect(CodeStatistics.create(["hidden file", tmpPath])).resolves.not.toThrow();
+    await expect(CodeStatistics.new(["hidden file", tmpPath])).resolves.not.toThrow();
   });
 });

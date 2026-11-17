@@ -12,7 +12,6 @@ export class StatsCommand extends Base {
     klass.methodAdded("perform");
   }
 
-  /** @missingRailsCall new — CONVERGEABLE code-statistics-create-stands-in-for-new */
   async perform(): Promise<void> {
     await this.bootApplicationBang();
 
@@ -20,6 +19,6 @@ export class StatsCommand extends Base {
       .map(([name, dir]): DirectoryPair => [name, applicationRoot()!.join(dir).toString()])
       .filter(([, dir]) => File.isDirectory(dir));
 
-    (await CodeStatistics.create(...statDirectories)).toString();
+    (await CodeStatistics.new(...statDirectories)).toString();
   }
 }

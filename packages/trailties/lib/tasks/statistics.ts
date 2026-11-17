@@ -34,6 +34,6 @@ DSL.task(
       ) ?? null,
     );
 
-    stdout.write(`${(await CodeStatistics.create(...statDirectories)).toString()}\n`);
+    stdout.write(`${(await CodeStatistics.new(...statDirectories)).toString()}\n`);
   }),
 );

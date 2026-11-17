@@ -972,7 +972,27 @@ async function checkConstantResidue(
   else stale.push(`${path.relative(ROOT_DIR, RECORD)} (run with --check --record)`);
 }
 
+/**
+ * The plain regenerate reads `rails-api.json` too (`rubyAnswered`,
+ * `topLevelRubyConstants`), and with it missing those answer nothing, so every
+ * top-level Ruby module and reopened namespace is written as a row.
+ */
+async function requireRailsManifest(): Promise<void> {
+  const file = path.join(OUTPUT_DIR, "rails-api.json");
+  if (
+    await fs.access(file).then(
+      () => true,
+      () => false,
+    )
+  )
+    return;
+  throw new globalThis.Error(
+    `${path.relative(ROOT_DIR, file)} is missing: run \`pnpm parity:api\` before \`pnpm parity:class-paths\``,
+  );
+}
+
 async function main(): Promise<void> {
+  await requireRailsManifest();
   const check = process.argv.includes("--check");
   const at = process.argv.indexOf("--package");
   const only = at === -1 ? undefined : process.argv[at + 1];
@@ -1089,4 +1109,9 @@ async function main(): Promise<void> {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) void main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof globalThis.Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}
