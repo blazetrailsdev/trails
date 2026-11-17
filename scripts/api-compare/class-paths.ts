@@ -12,8 +12,9 @@
  *   ... --check --record              # rewrite constant-residue.json from the pairing
  *   ... --check --package <pkg>       # one api-compare package, for the scoped CI driver
  *
- * The rows are written from `walkConstants` and `constant-residue.json`
- * alone. `rails-api.json` is read only under `--check`, whose pairing is
+ * The rows are written from `walkConstants`, `constant-residue.json` and
+ * `rails-api.json`, which every run requires current. Under `--check` the
+ * manifest also drives the pairing, which is
  * compare.ts's own: `rubyFileToTs` for the file and
  * `resolveTsClassForRuby` for the class, so a class gets a path exactly where
  * the inheritance check finds its counterpart.
@@ -21,6 +22,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 import * as prettier from "prettier";
 import {
@@ -980,7 +982,26 @@ async function checkConstantResidue(
   else stale.push(`${path.relative(ROOT_DIR, RECORD)} (run with --check --record)`);
 }
 
+async function requireRailsManifest(): Promise<void> {
+  const file = path.join(OUTPUT_DIR, "rails-api.json");
+  const source = await fs.readFile(file, "utf8").catch(() => null);
+  const inputs = await Promise.all(
+    [
+      "vendor/sources.lock.json",
+      "vendor/sources.ts",
+      "scripts/api-compare/extract-ruby-api.rb",
+    ].map((p) => fs.readFile(path.join(ROOT_DIR, p))),
+  );
+  const current = createHash("sha256").update(Buffer.concat(inputs)).digest("hex").slice(0, 16);
+  const built = source === null ? null : (JSON.parse(source) as { inputsHash?: string }).inputsHash;
+  if (built === current) return;
+  throw new globalThis.Error(
+    `${path.relative(ROOT_DIR, file)} is ${source === null ? "missing" : "stale"}: run \`pnpm parity:api\` before \`pnpm parity:class-paths\``,
+  );
+}
+
 async function main(): Promise<void> {
+  await requireRailsManifest();
   const check = process.argv.includes("--check");
   const at = process.argv.indexOf("--package");
   const only = at === -1 ? undefined : process.argv[at + 1];
@@ -1097,4 +1118,9 @@ async function main(): Promise<void> {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) void main();
+if (import.meta.url === `file://${process.argv[1]}`) {
+  main().catch((error: unknown) => {
+    console.error(error instanceof globalThis.Error ? error.message : error);
+    process.exitCode = 1;
+  });
+}

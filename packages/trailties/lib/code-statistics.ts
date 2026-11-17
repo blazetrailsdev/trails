@@ -1,5 +1,5 @@
 import { classAttribute } from "@blazetrails/activesupport";
-import { File, STDOUT, getFs, sprintf } from "@blazetrails/ruby-compat";
+import { File, STDOUT, getFs, rbClassNewInstance, sprintf } from "@blazetrails/ruby-compat";
 import { CodeStatisticsCalculator } from "./code-statistics-calculator.js";
 
 export type DirectoryPair = readonly [label: string, path: string];
@@ -71,12 +71,12 @@ export class CodeStatistics {
   private total: CodeStatisticsCalculator | null = null;
   private pairs: DirectoryPair[];
 
-  private constructor(...pairs: DirectoryPair[]) {
+  protected constructor(...pairs: DirectoryPair[]) {
     this.pairs = pairs;
   }
 
-  static async create(...pairs: DirectoryPair[]): Promise<CodeStatistics> {
-    const inst = new CodeStatistics(...pairs);
+  static async new(...pairs: DirectoryPair[]): Promise<CodeStatistics> {
+    const inst = rbClassNewInstance(this, ...pairs);
     inst.statistics = await inst.calculateStatistics();
     if (pairs.length > 1) inst.total = inst.calculateTotal();
     return inst;

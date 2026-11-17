@@ -194,6 +194,27 @@ describe("ConsoleCommand (trails)", () => {
       await rm(root, { recursive: true, force: true });
     }
   });
+
+  it("evaluates a piped line after the previous line's top-level await settles", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    io.piped =
+      "const consoleAwaited = await new Promise((r) => setTimeout(() => r({ title: 'Hello' }), 20))\n" +
+      "globalThis.consoleAwaitedTitle = consoleAwaited.title\n";
+    const g = globalThis as Record<string, unknown>;
+    io.server = null;
+    const started = startConsole();
+    try {
+      await vi.waitFor(() => expect(io.server).not.toBeNull());
+      await vi.waitFor(() => expect(g.consoleAwaitedTitle).toBeDefined());
+      expect(g.consoleAwaitedTitle).toBe("Hello");
+    } finally {
+      io.piped = "";
+      io.server!.close();
+      await started;
+      delete g.consoleAwaitedTitle;
+      vi.restoreAllMocks();
+    }
+  });
 });
 
 describe("Console.new", () => {
