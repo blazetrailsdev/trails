@@ -960,7 +960,7 @@ export async function executeGroupedCalculation(
       connection.selectAll(relation.arel(), `${this.model.name} ${opName}`),
     );
 
-    let keyRecords: Hash<string | number, Base> | undefined;
+    let keyRecords: Hash<string | number, Base> | Record<string, Base> | undefined;
     if (association) {
       const keyIds = calculatedData.toArray().map((row) => row[groupAliases[0]]);
       keyRecords = await (association.klass.baseClass as typeof Base)
