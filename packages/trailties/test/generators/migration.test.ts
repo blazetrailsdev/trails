@@ -4,7 +4,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import * as fs from "node:fs";
 import * as nodePath from "node:path";
 import * as os from "node:os";
-import { ClassMethods, Migration, NotImplementedError } from "../../lib/generators/migration.js";
+import {
+  ClassMethods,
+  Migration,
+  NotImplementedError,
+  type MigrationTemplateHost,
+} from "../../lib/generators/migration.js";
 
 let tmpDir: string;
 
@@ -45,19 +50,18 @@ describe("migration", () => {
       `${tmpDir}/migration.ts.tt.js`,
       "export default function () { return `class ${this.migrationClassName} {}`; }",
     );
-    const host = {
-      findInSourcePaths: async (file: string) => `${tmpDir}/${file}.tt`,
-      shell: new Basic(),
-      options: {},
-      migrationNumber: "",
-      migrationFileName: "",
-      migrationClassName: "",
-      destinationRoot: tmpDir,
-      relativeToOriginalDestinationRoot: (p: string) => p,
-      constructor: { ...ClassMethods, nextMigrationNumber: () => "20260101000000" },
-      action,
-      ...Migration,
-    };
+    const host = Object.assign(
+      Object.create(Migration) as typeof Migration & MigrationTemplateHost,
+      {
+        findInSourcePaths: async (file: string) => `${tmpDir}/${file}.tt`,
+        shell: new Basic(),
+        options: {},
+        destinationRoot: tmpDir,
+        relativeToOriginalDestinationRoot: (p: string) => p,
+        constructor: { ...ClassMethods, nextMigrationNumber: () => "20260101000000" },
+        action,
+      },
+    );
     const dest = await host.migrationTemplate("migration.ts", "db/migrate/create_articles.rb");
     expect(dest).toBe("db/migrate/20260101000000_create_articles.rb");
     expect(host.migrationFileName).toBe("create_articles");

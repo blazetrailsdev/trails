@@ -6,7 +6,7 @@ import { Error } from "../base.js";
 
 export interface CreateMigrationHost extends EmptyDirectoryBase {
   behavior?: "invoke" | "revoke";
-  migrationFileName: string;
+  readonly migrationFileName: string;
   constructor: { isMigrationExists(dirname: string, fileName: string): string | undefined };
 }
 

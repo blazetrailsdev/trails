@@ -23,9 +23,6 @@ export interface Base
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Base extends NamedBase {
   declare options: NamedBase["options"] & { primaryKeyType?: string; timestamps?: boolean };
-  migrationNumber = "";
-  migrationFileName = "";
-  migrationClassName = "";
 
   declare static migrationLookupAt: Extended<typeof Generators.ClassMethods>["migrationLookupAt"];
   declare static isMigrationExists: Extended<typeof Generators.ClassMethods>["isMigrationExists"];

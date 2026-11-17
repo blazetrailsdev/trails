@@ -809,6 +809,25 @@ export function extractFromProgram(
           fileFunctions.push(harvestDefineMethodSeat(node, checker, relPath));
           return;
         }
+        const classMethodsBlock = concernClassMethodsBlock(node.expression);
+        if (classMethodsBlock) {
+          const methods = harvestModuleBlockMethods(classMethodsBlock.block, checker, relPath);
+          if (methods.length === 0) return;
+          const seat = `${classMethodsBlock.host}.ClassMethods`;
+          const prior = info.modules[`${relPath}:${seat}`];
+          if (prior) prior.instanceMethods.push(...methods);
+          else
+            info.modules[`${relPath}:${seat}`] = {
+              name: "ClassMethods",
+              file: relPath,
+              includes: [],
+              extends: [],
+              instanceMethods: methods,
+              classMethods: [],
+            };
+          fileHasClassOrModule = true;
+          return;
+        }
         const seated = seatedClassExpression(node);
         if (!seated) return;
         const classInfo = extractClass(seated.cls, checker, relPath, srcDir);
@@ -3752,12 +3771,18 @@ function attributeMacro(
       return { reader: true, writer: true, predicate: true };
     case "mattrAccessor":
     case "cattrAccessor":
+    case "threadMattrAccessor":
+    case "threadCattrAccessor":
       return { reader: true, writer: true, predicate: false };
     case "mattrReader":
     case "cattrReader":
+    case "threadMattrReader":
+    case "threadCattrReader":
       return { reader: true, writer: false, predicate: false };
     case "mattrWriter":
     case "cattrWriter":
+    case "threadMattrWriter":
+    case "threadCattrWriter":
       return { reader: false, writer: true, predicate: false };
     default:
       return undefined;
@@ -4479,12 +4504,74 @@ export function harvestModuleInstanceMethods(
   const out = literals.flatMap((literal) => harvestObjectLiteralMethods(literal, checker, file));
 
   const block = cur.arguments?.[0];
-  if (!block || !(ts.isArrowFunction(block) || ts.isFunctionExpression(block))) return out;
+  if (!block) return out;
+  return [...out, ...harvestModuleBlockMethods(block, checker, file)];
+}
+
+function blockMethodInfo(
+  node: ts.Node,
+  name: string,
+  body: ts.Expression,
+  checker: ts.TypeChecker,
+  file: string,
+): MethodInfo | undefined {
+  const fn = unwrapAssertions(body);
+  const inline = ts.isFunctionExpression(fn) || ts.isArrowFunction(fn);
+  const params = inline ? extractParameters(fn.parameters) : paramsOfCallableRef(fn, checker);
+  if (!params) return undefined;
+  const optionKeys = inline ? extractOptionKeys(fn.parameters, checker) : undefined;
+  const calls = inline ? extractCalls(fn.body) : undefined;
+  const callSeq = inline ? extractCallSeq(fn.body) : undefined;
+  const callArgs = inline ? extractCallArgs(fn.body) : undefined;
+  const statement = ts.isExpressionStatement(node.parent) ? node.parent : undefined;
+  const noRailsEquivalent = statement ? noRailsEquivalentReason(statement) : undefined;
+  const internal = statement ? internalJsDocTagApplies(statement) : false;
+  return {
+    name,
+    visibility: "public",
+    params,
+    ...(internal ? { internal: true } : {}),
+    line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+    file,
+    ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
+    ...(optionKeys !== undefined ? { optionKeys } : {}),
+    ...(calls !== undefined ? { calls } : {}),
+    ...(callSeq !== undefined ? { callSeq } : {}),
+    ...(callArgs !== undefined ? { callArgs } : {}),
+    ...(inline ? {} : { bodyless: true }),
+  };
+}
+
+/**
+ * The methods a module block defines on its `mod` parameter: the block of
+ * `new Module((mod) => …)` and of a Concern's `X.classMethods((mod) => …)`
+ * (Ruby's `class_methods do … end`). Each of `mod.defineMethod("m", fn)`,
+ * `mod.m = fn`, `mod.include({ … })` and `delegate.call(mod, "m", …)` is one
+ * Ruby `def` (or `delegate`) inside the module body.
+ */
+export function harvestModuleBlockMethods(
+  block: ts.Expression,
+  checker: ts.TypeChecker,
+  file: string,
+): MethodInfo[] {
+  const out: MethodInfo[] = [];
+  if (!(ts.isArrowFunction(block) || ts.isFunctionExpression(block))) return out;
   const mod = block.parameters[0]?.name;
   if (!mod || !ts.isIdentifier(mod)) return out;
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionLike(node) && node !== block) return;
     ts.forEachChild(node, visit);
+    if (
+      ts.isBinaryExpression(node) &&
+      node.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+      ts.isPropertyAccessExpression(node.left) &&
+      ts.isIdentifier(node.left.expression) &&
+      node.left.expression.text === mod.text
+    ) {
+      const method = blockMethodInfo(node, node.left.name.text, node.right, checker, file);
+      if (method) out.push(method);
+      return;
+    }
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return;
     const receiver = node.expression.expression;
     if (
@@ -4507,32 +4594,17 @@ export function harvestModuleInstanceMethods(
       return;
     }
     if (!ts.isIdentifier(receiver) || receiver.text !== mod.text) return;
+    if (node.expression.name.text === "include") {
+      const literal =
+        node.arguments[0] && sameFileObjectLiteral(unwrapAssertions(node.arguments[0]));
+      if (literal) out.push(...harvestObjectLiteralMethods(literal, checker, file));
+      return;
+    }
     if (node.expression.name.text !== "defineMethod") return;
     const [name, body] = node.arguments;
     if (!name || !ts.isStringLiteralLike(name) || !body) return;
-    const inline = ts.isFunctionExpression(body) || ts.isArrowFunction(body);
-    const params = inline ? extractParameters(body.parameters) : paramsOfCallableRef(body, checker);
-    if (!params) return;
-    const optionKeys = inline ? extractOptionKeys(body.parameters, checker) : undefined;
-    const calls = inline ? extractCalls(body.body) : undefined;
-    const callSeq = inline ? extractCallSeq(body.body) : undefined;
-    const callArgs = inline ? extractCallArgs(body.body) : undefined;
-    const noRailsEquivalent = ts.isExpressionStatement(node.parent)
-      ? noRailsEquivalentReason(node.parent)
-      : undefined;
-    out.push({
-      name: name.text,
-      visibility: "public",
-      params,
-      line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
-      file,
-      ...(noRailsEquivalent !== undefined ? { noRailsEquivalent } : {}),
-      ...(optionKeys !== undefined ? { optionKeys } : {}),
-      ...(calls !== undefined ? { calls } : {}),
-      ...(callSeq !== undefined ? { callSeq } : {}),
-      ...(callArgs !== undefined ? { callArgs } : {}),
-      ...(inline ? {} : { bodyless: true }),
-    });
+    const method = blockMethodInfo(node, name.text, body, checker, file);
+    if (method) out.push(method);
   };
   visit(block.body);
   return out;
@@ -4548,6 +4620,23 @@ function importedModuleBinding(receiver: ts.Identifier, checker: ts.TypeChecker)
       d.initializer !== undefined &&
       /^\(?new Module\b/.test(unwrapAssertions(d.initializer).getText()),
   );
+}
+
+/**
+ * A top-level `Host.classMethods((mod) => { … })`: a Concern's
+ * `class_methods do … end` (`active_support/concern.rb`), which defines
+ * `Host::ClassMethods`.
+ */
+export function concernClassMethodsBlock(
+  expr: ts.Expression,
+): { host: string; block: ts.Expression } | undefined {
+  if (!ts.isCallExpression(expr) || !ts.isPropertyAccessExpression(expr.expression))
+    return undefined;
+  if (expr.expression.name.text !== "classMethods") return undefined;
+  const host = unwrapAssertions(expr.expression.expression);
+  const block = expr.arguments[0];
+  if (!ts.isIdentifier(host) || !block) return undefined;
+  return { host: host.text, block };
 }
 
 /**

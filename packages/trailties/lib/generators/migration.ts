@@ -1,7 +1,15 @@
 import "../constants.migration.generated.js";
 import { NotImplementedError, toS } from "@blazetrails/ruby-compat";
 import { camelize } from "@blazetrails/activesupport";
-import { Dir, File, rbFBinding, rbStrToI, strNew, TSE } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  rbFBinding,
+  rbModAttrReader,
+  rbStrToI,
+  strNew,
+  TSE,
+} from "@blazetrails/ruby-compat";
 import {
   CreateMigration,
   type CreateMigrationConfig,
@@ -48,8 +56,11 @@ export interface MigrationTemplateHost extends CreateMigrationHost {
     nextMigrationNumber(dirname: string): string;
     isMigrationExists(dirname: string, fileName: string): string | undefined;
   };
-  migrationNumber: string;
-  migrationClassName: string;
+  readonly migrationNumber: string;
+  readonly migrationClassName: string;
+  _migrationNumber: string;
+  _migrationFileName: string;
+  _migrationClassName: string;
   createMigration(
     destination: string,
     data: unknown,
@@ -78,9 +89,9 @@ export const Migration = {
     destination = File.expandPath(destination, this.destinationRoot);
 
     const migrationDir = File.dirname(destination);
-    this.migrationNumber = this.constructor.nextMigrationNumber(migrationDir);
-    this.migrationFileName = File.basename(destination, File.extname(destination));
-    this.migrationClassName = camelize(this.migrationFileName);
+    this._migrationNumber = this.constructor.nextMigrationNumber(migrationDir);
+    this._migrationFileName = File.basename(destination, File.extname(destination));
+    this._migrationClassName = camelize(this.migrationFileName);
   },
 
   async migrationTemplate(
@@ -107,3 +118,9 @@ export const Migration = {
     return Generators.addGeneratedFile(file!);
   },
 };
+rbModAttrReader(
+  { prototype: Migration },
+  "migrationNumber",
+  "migrationFileName",
+  "migrationClassName",
+);
