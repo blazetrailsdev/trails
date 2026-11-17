@@ -1,5 +1,5 @@
 import { ActiveSupport } from "../namespaces.js";
-import { Dir, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, type Pathname } from "@blazetrails/ruby-compat";
 import type { CacheOptions, CacheStore } from "./index.js";
 import { Entry } from "./entry.js";
 import { ArgumentError, Store, inspectOptions, type StoreOptions } from "./store.js";
@@ -53,7 +53,7 @@ export class FileStore extends Store implements CacheStore {
 
   private _cachePath: string;
 
-  constructor(cachePath: string, options?: CacheOptions) {
+  constructor(cachePath: string | Pathname, options?: CacheOptions) {
     super(options ?? {});
     if (cachePath === undefined) {
       throw new ArgumentError("wrong number of arguments (given 0, expected 1)");

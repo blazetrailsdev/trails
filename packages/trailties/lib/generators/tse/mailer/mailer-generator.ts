@@ -44,7 +44,10 @@ export class MailerGenerator extends Base {
       this._action = action;
 
       for (const format of this.formats()) {
-        this._path = File.join(viewBasePath, this.filenameWithExtensions(action, format));
+        this._path = File.join(
+          viewBasePath,
+          this.filenameWithExtensions(dasherize(action), format),
+        );
         await this.template(this.filenameWithExtensions("view", format), this._path);
       }
     }

@@ -318,21 +318,30 @@ export class Trailtie extends BaseTrailtie {
             >[0],
           );
 
-          const pool = await base.establishConnection();
-
-          if (!Trails.env["test?"]()) {
-            try {
-              await pool.schemaReflection.loadAllBang(pool);
-            } catch (error) {
-              if (!(error instanceof ActiveRecordError)) throw error;
-              console.warn(
-                `Failed to load the schema cache because of ${error.constructor.name}: ${error.message}`,
-              );
-            }
-          }
+          await base.establishConnection();
         })();
       });
       await initializeDatabase;
+    });
+
+    let activeRecord: typeof Base | undefined;
+    onLoad("active_record", (base: typeof Base) => {
+      activeRecord = base;
+    });
+    /** @noRailsEquivalent PERMANENT */
+    this.config.toPrepare(async () => {
+      if (Trails.env["test?"]()) return;
+      if (activeRecord === undefined) return;
+      for (const pool of activeRecord.connectionHandler.connectionPoolList("all")) {
+        try {
+          await pool.schemaReflection.loadAllBang(pool);
+        } catch (error) {
+          if (!(error instanceof ActiveRecordError)) throw error;
+          console.warn(
+            `Failed to load the schema cache because of ${error.constructor.name}: ${error.message}`,
+          );
+        }
+      }
     });
 
     this.initializer("active_record.set_executor_hooks", () => {
