@@ -1,8 +1,8 @@
-import { ActiveRecord } from "@blazetrails/activerecord";
+import { ActiveRecord, StatementTimeout } from "@blazetrails/activerecord";
 import { EnvironmentInquirer, TopLevel } from "@blazetrails/activesupport";
 import { env as ENV, regexpEscape } from "@blazetrails/ruby-compat";
 import type { StoreOptions } from "@blazetrails/activesupport/cache";
-import { afterAll, afterEach, beforeAll, beforeEach } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { Configuration, Entry, Record, SolidCache, Store } from "../../lib/index.js";
 import { loadCacheSchema } from "./cache-schema.js";
 
@@ -109,4 +109,19 @@ export function useSolidCache(): {
       );
     },
   };
+}
+
+export async function emulatingTimeouts<T>(block: () => Promise<T>): Promise<T> {
+  const arMethods = ["selectAll", "delete", "execInsertAll"] as const;
+  const stubMatcher = (await ActiveRecord.Base.leaseConnection()).constructor.prototype;
+  const stubs = arMethods.map((method) =>
+    vi.spyOn(stubMatcher, method).mockImplementation(() => {
+      throw new StatementTimeout();
+    }),
+  );
+  try {
+    return await block();
+  } finally {
+    for (const stub of stubs) stub.mockRestore();
+  }
 }

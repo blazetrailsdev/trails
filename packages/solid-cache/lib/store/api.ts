@@ -39,8 +39,8 @@ export const Api = {
     throw new NotImplementedError(`${this.constructor.name} does not support cleanup`);
   },
 
-  async clear(this: StoreHost, _options?: Options): Promise<void> {
-    await this.entryClear();
+  async clear(this: StoreHost, _options?: Options): Promise<unknown> {
+    return await this.entryClear();
   },
 
   /** @internal */
