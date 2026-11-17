@@ -2,6 +2,7 @@ import { HTML5, type Html5DocumentFragment, type Html5Node } from "@blazetrails/
 import { rbInspect } from "@blazetrails/ruby-compat";
 
 import { Scrubber, ScrubberNotFound } from "./scrubber.js";
+import { Scrubbers } from "./scrubbers.js";
 
 export const ScrubBehavior = {
   Node: {
@@ -17,6 +18,9 @@ export const ScrubBehavior = {
   },
 
   resolveScrubber(scrubber: unknown): Scrubber {
+    if (typeof scrubber === "string" && Object.hasOwn(Scrubbers.MAP, scrubber)) {
+      scrubber = new Scrubbers.MAP[scrubber]();
+    }
     if (!(scrubber instanceof Scrubber)) {
       throw new ScrubberNotFound(`not a Scrubber or a scrubber name: ${rbInspect(scrubber)}`);
     }

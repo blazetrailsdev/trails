@@ -1,3 +1,4 @@
+import "./constants.generated.js";
 export { Sanitizer, type SanitizeOptions } from "./sanitizer.js";
 export { HTML, HTML as Html, HTML4 } from "./html4.js";
 export { HTML5 } from "./html5.js";

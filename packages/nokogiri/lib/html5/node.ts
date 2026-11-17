@@ -93,6 +93,10 @@ export class Node extends XmlNode {
     return this.type === Node.CDATA_SECTION_NODE;
   }
 
+  isComment(): boolean {
+    return this.type === Node.COMMENT_NODE;
+  }
+
   isBlank(): boolean {
     if (this.type !== Node.TEXT_NODE && this.type !== Node.CDATA_SECTION_NODE) return false;
     return /^[ \t\n\r]*$/.test(this.content);

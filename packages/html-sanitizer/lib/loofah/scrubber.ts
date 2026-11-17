@@ -1,5 +1,7 @@
-import type { Html5Node } from "@blazetrails/nokogiri";
-import { ArgumentError, RuntimeError } from "@blazetrails/ruby-compat";
+import { HTML5, type Html5Node } from "@blazetrails/nokogiri";
+import { ArgumentError, RuntimeError, rbModName } from "@blazetrails/ruby-compat";
+
+import { Scrub } from "./html5/scrub.js";
 
 export class ScrubberNotFound extends RuntimeError {}
 
@@ -36,7 +38,9 @@ export class Scrubber {
   }
 
   scrub(_node: Html5Node): unknown {
-    throw new ScrubberNotFound(`No scrub method has been defined on ${this.constructor.name}`);
+    throw new ScrubberNotFound(
+      `No scrub method has been defined on ${rbModName(this.constructor)}`,
+    );
   }
 
   appendAttribute(node: Html5Node, attribute: string, value: string): void {
@@ -44,6 +48,26 @@ export class Scrubber {
     const currentValues = currentValue.split(/\s+/);
     const updatedValue = [...new Set([...currentValues, value])];
     node.set(attribute, updatedValue.join(" "));
+  }
+
+  /** @internal */
+  protected html5libSanitize(node: Html5Node): unknown {
+    switch (node.type) {
+      case HTML5.Node.ELEMENT_NODE:
+        if (Scrub.isAllowedElement(node.name)) {
+          Scrub.scrubAttributes(node);
+          return Scrubber.CONTINUE;
+        }
+        break;
+      case HTML5.Node.TEXT_NODE:
+      case HTML5.Node.CDATA_SECTION_NODE:
+        if (Scrub.isCdataNeedsEscaping(node)) {
+          node.before(Scrub.cdataEscape(node));
+          return Scrubber.STOP;
+        }
+        return Scrubber.CONTINUE;
+    }
+    return Scrubber.STOP;
   }
 
   /** @internal */

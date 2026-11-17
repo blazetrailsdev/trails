@@ -1,5 +1,5 @@
-import type { Html5Node } from "@blazetrails/nokogiri";
-import { ArgumentError, aryDelete, rbObjDup, warn } from "@blazetrails/ruby-compat";
+import { XML, type Html5Node } from "@blazetrails/nokogiri";
+import { ArgumentError, aryDelete, rbObjDup, rbObjRespondTo, warn } from "@blazetrails/ruby-compat";
 
 import { Scrub } from "./loofah/html5/scrub.js";
 import { SafeList } from "./loofah/html5/safelist.js";
@@ -8,8 +8,6 @@ import { HTML } from "./namespaces.js";
 
 type Attr = Html5Node["attributeNodes"][number];
 type Enumerable = Set<string> | string[];
-
-const COMMENT_NODE = 8;
 
 export class PermitScrubber extends Scrubber {
   /** @internal */
@@ -50,7 +48,7 @@ export class PermitScrubber extends Scrubber {
     }
     if (this.isSkipNode(node)) return Scrubber.CONTINUE;
 
-    if (!((node.isElement() || node.type === COMMENT_NODE) && this.isKeepNode(node))) {
+    if (!((node.isElement() || node.isComment()) && this.isKeepNode(node))) {
       if (this.scrubNode(node) !== Scrubber.CONTINUE) return Scrubber.STOP;
     }
 
@@ -85,7 +83,7 @@ export class PermitScrubber extends Scrubber {
   /** @internal */
   protected scrubNode(node: Html5Node): unknown {
     if (!(this.prune || node.namespace)) {
-      for (const child of node.children) node.before(child);
+      node.before(new XML.NodeSet(node.document, node.children));
     }
     return node.remove();
   }
@@ -109,7 +107,12 @@ export class PermitScrubber extends Scrubber {
 
   /** @internal */
   protected scrubCssAttribute(node: Html5Node): void {
-    Scrub.scrubCssAttribute(node);
+    if (rbObjRespondTo(Scrub, "scrubCssAttribute")) {
+      Scrub.scrubCssAttribute(node);
+    } else {
+      const style = node.attributes["style"];
+      if (style) style.value = Scrub.scrubCss(style.value);
+    }
   }
 
   /** @internal */
@@ -191,7 +194,7 @@ export class TextOnlyScrubber extends Scrubber {
     if (node.isText()) {
       return Scrubber.CONTINUE;
     } else {
-      for (const child of node.children) node.before(child);
+      node.before(new XML.NodeSet(node.document, node.children));
       return node.remove();
     }
   }

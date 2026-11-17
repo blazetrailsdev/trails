@@ -49,7 +49,7 @@ export class HTML4FullSanitizer extends Sanitizer {
 
   /** @internal */
   protected parseFragment(html: string): Html5DocumentFragment {
-    return Loofah.html5Fragment(html);
+    return Loofah.html4Fragment(html);
   }
 
   scrub(fragment: Html5DocumentFragment, _options: SanitizeOptions = {}): Html5DocumentFragment {
@@ -82,7 +82,7 @@ export class HTML4LinkSanitizer extends Sanitizer {
 
   /** @internal */
   protected parseFragment(html: string): Html5DocumentFragment {
-    return Loofah.html5Fragment(html);
+    return Loofah.html4Fragment(html);
   }
 
   scrub(fragment: Html5DocumentFragment, _options: SanitizeOptions = {}): Html5DocumentFragment {
@@ -120,7 +120,7 @@ export class HTML4SafeListSanitizer extends Sanitizer {
 
   /** @internal */
   protected parseFragment(html: string): Html5DocumentFragment {
-    return Loofah.html5Fragment(html);
+    return Loofah.html4Fragment(html);
   }
 
   scrub(fragment: Html5DocumentFragment, options: SanitizeOptions = {}): Html5DocumentFragment {
