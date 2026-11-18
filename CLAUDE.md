@@ -523,7 +523,7 @@ neither is an error.
 9. **`pnpm parity:changed`** is the one-command local check: it runs CI's
    comparison gate stack scoped to each changed package (~20–30s each). When
    `ruby-compat` or `activesupport` changed, `--full` adds the unscoped
-   `pnpm parity:api` compare; the gate stack still runs scoped.
+   `pnpm parity:api` compare; it does not run the gate stack unscoped.
 
 ## Module mixins (Ruby `include` → TypeScript)
 
