@@ -21,7 +21,8 @@ tester.run("no-class-expression-shadowing-aliased-import", rule, {
       code: `import { Other as O } from "x";\nconst B = class BacktraceCleaner extends O {};\n`,
     },
     { code: `import * as NS from "x";\nconst B = class NS {};\n` },
-    { code: `import type { Foo as F } from "x";\nclass Foo {}\n` },
+    { code: `import type { Foo as F } from "x";\nconst B = class Foo {};\n` },
+    { code: `import { type Foo as F } from "x";\nconst B = class Foo {};\n` },
   ],
   invalid: [
     {

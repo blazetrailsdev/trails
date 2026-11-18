@@ -30,6 +30,7 @@ export default {
     const classExpressions = [];
     return {
       ImportSpecifier(node) {
+        if (node.importKind === "type" || node.parent.importKind === "type") return;
         const imported =
           node.imported.type === "Identifier" ? node.imported.name : node.imported.value;
         if (imported !== node.local.name) aliased.set(imported, node.local.name);
