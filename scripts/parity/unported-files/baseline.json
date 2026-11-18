@@ -257,17 +257,6 @@
     "reason": "Pre-1.0: optional backend mixin — pluralization via per-locale rule procs in the data."
   },
   {
-    "pattern": "gettext",
-    "testFile": "gettext/",
-    "package": "i18n",
-    "reason": "Pre-1.0: gettext .po support — the catalogue parser, the `_`/`n_`/`s_` helpers, and the backend mixin that loads .po files. A Ruby toolchain concern with no trails consumer; Rails' own I18n usage never touches it."
-  },
-  {
-    "testFile": "gettext_plural_keys_test.rb",
-    "package": "i18n",
-    "reason": "Pre-1.0: gettext .po support — exercises `I18n::Gettext.plural_keys`. Sits at test/i18n/, outside the `gettext/` prefix above."
-  },
-  {
     "testFile": "backend/transliterator_test.rb",
     "tests": ["default transliterator raises errors for invalid UTF-8"],
     "reason": "PERMANENT: CLAUDE.md \u00a7 \"A String has no encoding tag either\"."

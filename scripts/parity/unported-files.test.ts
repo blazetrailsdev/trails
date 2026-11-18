@@ -71,6 +71,8 @@ describe("isSourceUnported package scoping", () => {
       "backend/transliterator.rb",
       "config.rb",
       "exceptions.rb",
+      "gettext.rb",
+      "gettext/helpers.rb",
       "interpolate/ruby.rb",
       "locale.rb",
       "locale/fallbacks.rb",
