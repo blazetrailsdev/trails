@@ -1,5 +1,6 @@
 import { Logger as RubyLogger } from "@blazetrails/ruby-compat";
 import { include, included } from "@blazetrails/ruby-compat/include";
+import { cattrAccessor } from "./module-ext.js";
 import { LoggerThreadSafeLevel } from "./logger-thread-safe-level.js";
 import type { LogLevel } from "./logger.js";
 
@@ -9,30 +10,8 @@ interface LoggerSilenceHost {
 }
 
 export const LoggerSilence = {
-  [included](base: {
-    silencer?: boolean;
-    setSilencer?(silencer: boolean): void;
-    prototype: object;
-  }): void {
-    base.silencer = true;
-    base.setSilencer = function (this: { silencer: boolean }, silencer: boolean): void {
-      this.silencer = silencer;
-    };
-    Object.defineProperty(base.prototype, "silencer", {
-      configurable: true,
-      get(this: object) {
-        return (this.constructor as unknown as { silencer: boolean }).silencer;
-      },
-    });
-    Object.defineProperty(base.prototype, "setSilencer", {
-      configurable: true,
-      writable: true,
-      value(this: object, silencer: boolean): void {
-        (this.constructor as unknown as { setSilencer(silencer: boolean): void }).setSilencer(
-          silencer,
-        );
-      },
-    });
+  [included](base: object): void {
+    cattrAccessor.call(base, "silencer", { default: true });
     include(base, LoggerThreadSafeLevel);
   },
 

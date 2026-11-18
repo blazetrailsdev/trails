@@ -8,7 +8,6 @@ import { ActiveSupport } from "./namespaces.js";
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include LoggerSilence` (`broadcast_logger.rb:75`); the class/interface merge is how `include()` surfaces on the type side.
 export class BroadcastLogger {
   declare static silencer: boolean;
-  declare static setSilencer: (silencer: boolean) => void;
 
   public broadcasts: (Logger | BroadcastLogger)[];
 
@@ -198,8 +197,7 @@ export class BroadcastLogger {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- the class/interface merge is how `include()` surfaces on the type side. */
 export interface BroadcastLogger {
-  get silencer(): boolean;
-  setSilencer(silencer: boolean): void;
+  silencer: boolean;
   logAt<T>(level: number | LogLevel, fn: () => T): T;
   silence<T>(severity?: number | LogLevel, fn?: (logger: this) => T): T | undefined;
 }

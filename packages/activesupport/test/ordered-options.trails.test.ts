@@ -72,4 +72,20 @@ describe("OrderedOptions Hash#==", () => {
     expect(rbEqual({ a: 1, nested: { b: 3 } }, options)).toBe(false);
     expect(rbEqual(options, { a: 1, nested: { b: 3 } })).toBe(false);
   });
+
+  it("compares equal to another OrderedOptions and to a HashWithIndifferentAccess", () => {
+    const left = new OrderedOptions();
+    left.set("a", 1);
+    const right = new OrderedOptions();
+    right.set("a", 1);
+    const other = new OrderedOptions();
+    other.set("a", 2);
+    expect(rbEqual(left, right)).toBe(true);
+    expect(rbEqual(left, other)).toBe(false);
+    const hwia = new HashWithIndifferentAccess({ a: 1 });
+    expect(rbEqual(left, hwia)).toBe(true);
+    expect(rbEqual(hwia, left)).toBe(true);
+    expect(rbEqual(other, hwia)).toBe(false);
+    expect(rbEqual(hwia, other)).toBe(false);
+  });
 });

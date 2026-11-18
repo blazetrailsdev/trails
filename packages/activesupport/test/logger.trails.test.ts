@@ -66,13 +66,13 @@ describe("LoggerSilence", () => {
     const output: string[] = [];
     const logger = new Logger({ write: (s) => void output.push(s) });
 
-    logger.setSilencer(false);
+    logger.silencer = false;
     try {
       logger.silence(Logger.ERROR, () => {
         logger.debug("THIS IS HERE");
       });
     } finally {
-      logger.setSilencer(true);
+      logger.silencer = true;
     }
 
     expect(output.join("")).toContain("THIS IS HERE");
