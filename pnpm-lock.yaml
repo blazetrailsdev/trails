@@ -1332,6 +1332,9 @@ importers:
       '@blazetrails/mail':
         specifier: workspace:*
         version: link:../mail
+      '@blazetrails/rack-cors':
+        specifier: workspace:*
+        version: link:../rack-cors
       '@blazetrails/rack-test':
         specifier: workspace:*
         version: link:../rack-test
