@@ -218,13 +218,17 @@ describe("Notifications (trails)", () => {
     });
 
     it("publish delivers the same payload object", () => {
-      const events: Event[] = [];
-      Notifications.subscribe("ident", (e) => events.push(e));
+      const payloads: unknown[] = [];
+      Notifications.subscribe(
+        "ident",
+        (_name: string, _start: unknown, _finish: unknown, _id: unknown, payload: unknown) =>
+          payloads.push(payload),
+      );
 
       const payload = { a: 1 };
-      Notifications.publish("ident", payload);
+      Notifications.publish("ident", null, null, "id", payload);
 
-      expect(events[0].payload).toBe(payload);
+      expect(payloads[0]).toBe(payload);
     });
 
     it("a multi-argument callable object is subscribed as a timed listener", () => {

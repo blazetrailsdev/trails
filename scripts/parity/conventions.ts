@@ -4,6 +4,7 @@
  */
 
 import * as path from "path";
+import { PLURAL_PREDICATE_ALIAS_ROWS } from "../../packages/ruby-compat/lib/symbol.js";
 
 /**
  * The words TS cannot spell as a binding name (`arguments` / `eval` are
@@ -1694,26 +1695,7 @@ const HAS_PREDICATE_ALIASES = new Map<string, string>([
  *
  * Appended as a LAST candidate, so it only widens what counts.
  */
-const PLURAL_PREDICATE_ALIASES = new Map<string, string>([
-  ["active_connections?", "hasActiveConnections"],
-  ["active_workers?", "hasActiveWorkers"],
-  ["any_changes?", "hasAnyChanges"],
-  ["attachments?", "hasAttachments"],
-  ["database_tasks?", "hasDatabaseTasks"],
-  ["default_scopes?", "hasDefaultScopes"],
-  ["duplicates?", "hasDuplicates"],
-  ["eligible_waiters?", "hasEligibleWaiters"],
-  ["grouped_choices?", "hasGroupedChoices"],
-  ["many_workers?", "hasManyWorkers"],
-  ["nested_attributes?", "hasNestedAttributes"],
-  ["prepared_statements?", "hasPreparedStatements"],
-  ["record_timestamps?", "hasRecordTimestamps"],
-  ["resources?", "hasResources"],
-  ["routes?", "hasRoutes"],
-  ["saved_changes?", "hasSavedChanges"],
-  ["scope_attributes?", "hasScopeAttributes"],
-  ["seeds?", "hasSeeds"],
-]);
+const PLURAL_PREDICATE_ALIASES = new Map<string, string>(PLURAL_PREDICATE_ALIAS_ROWS);
 
 const CONTAINMENT_PREDICATE_ALIASES = new Map<string, string>([
   // `member?` is a Ruby alias of `include?` in Rails (finder_methods.rb,

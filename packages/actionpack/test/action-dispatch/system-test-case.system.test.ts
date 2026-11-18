@@ -52,8 +52,9 @@ describe("SystemTestCase driven by playwright", () => {
   }, 60_000);
 
   it("takes a screenshot of a failed test into the screenshot directory", async () => {
-    const test = await new PostsTest("testHeadingIsComments").run();
-    expect(test.isPassed()).toBe(false);
+    const test = new PostsTest("testHeadingIsComments");
+    const result = await test.run();
+    expect(result.isPassed()).toBe(false);
     const path = imagePath.call(test as never);
     expect(path).toContain(`${inject("screenshotDirectory")}/failures_`);
     expect((await getFs().stat!(path)).size).toBeGreaterThan(0);

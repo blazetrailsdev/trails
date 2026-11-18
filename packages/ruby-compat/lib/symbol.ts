@@ -51,6 +51,32 @@ export function stringToSym(value: string): string {
   return value.startsWith(":") ? value : `:${value}`;
 }
 
+/** @noRailsEquivalent PERMANENT */
+export const PLURAL_PREDICATE_ALIAS_ROWS: ReadonlyArray<readonly [string, string]> = [
+  ["active_connections?", "hasActiveConnections"],
+  ["active_workers?", "hasActiveWorkers"],
+  ["any_changes?", "hasAnyChanges"],
+  ["attachments?", "hasAttachments"],
+  ["database_tasks?", "hasDatabaseTasks"],
+  ["default_scopes?", "hasDefaultScopes"],
+  ["duplicates?", "hasDuplicates"],
+  ["eligible_waiters?", "hasEligibleWaiters"],
+  ["grouped_choices?", "hasGroupedChoices"],
+  ["many_workers?", "hasManyWorkers"],
+  ["nested_attributes?", "hasNestedAttributes"],
+  ["prepared_statements?", "hasPreparedStatements"],
+  ["record_timestamps?", "hasRecordTimestamps"],
+  ["resources?", "hasResources"],
+  ["routes?", "hasRoutes"],
+  ["saved_changes?", "hasSavedChanges"],
+  ["scope_attributes?", "hasScopeAttributes"],
+  ["seeds?", "hasSeeds"],
+];
+
+const PLURAL_PREDICATE_RUBY_NAMES = new Map(
+  PLURAL_PREDICATE_ALIAS_ROWS.map(([ruby, ts]) => [ts, ruby] as const),
+);
+
 const OPERATOR_METHOD_NAMES: Record<string, string> = {
   compareTo: "<=>",
   equals: "==",
@@ -73,6 +99,8 @@ const OPERATOR_METHOD_NAMES: Record<string, string> = {
 export function rbMethodName(name: string): string {
   const operator = OPERATOR_METHOD_NAMES[name];
   if (operator !== undefined) return operator;
+  const plural = PLURAL_PREDICATE_RUBY_NAMES.get(name);
+  if (plural !== undefined) return plural;
   const snake = (camel: string): string =>
     camel.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`).replace(/^_/, "");
   if (/^is[A-Z]/.test(name)) return `${snake(name.slice(2))}?`;
