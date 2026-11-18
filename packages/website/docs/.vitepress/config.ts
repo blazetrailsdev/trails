@@ -1,6 +1,6 @@
 import { defineConfig } from "vitepress";
 
-const siteRoot = process.env.SITE_ROOT || "https://frontiers.deanoftech.com";
+const siteRoot = process.env.SITE_ROOT || "https://blazetrails.dev";
 
 export default defineConfig({
   title: "BlazeTrails",
