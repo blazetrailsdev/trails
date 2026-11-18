@@ -161,7 +161,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
     if (this._strBody !== null) {
       yield this._strBody;
     } else if (this._buf instanceof ReadableStream) {
-      const reader = (this._reader = (this._buf as unknown as ReadableStream<unknown>).getReader());
+      const reader = (this._reader = (this._buf as ReadableStream<unknown>).getReader());
       try {
         for (;;) {
           const { done, value } = await reader.read();
@@ -209,7 +209,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
 
   abort(): unknown {
     if (this._buf instanceof ReadableStream)
-      return (this._reader ?? (this._buf as unknown as ReadableStream<unknown>)).cancel();
+      return (this._reader ?? (this._buf as ReadableStream<unknown>)).cancel();
   }
 
   close(): void {
@@ -225,7 +225,7 @@ export class Buffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>
   protected eachChunk(block?: (chunk: unknown) => unknown): unknown {
     if (this._buf instanceof ReadableStream) {
       if (!block) return toEnum(this, "each");
-      const reader = (this._reader = (this._buf as unknown as ReadableStream<unknown>).getReader());
+      const reader = (this._reader = (this._buf as ReadableStream<unknown>).getReader());
       return (async () => {
         try {
           for (;;) {
@@ -272,7 +272,7 @@ export class RackBody {
   }
 
   toAry(): unknown {
-    return (this._response.stream as unknown as { toAry(): unknown }).toAry();
+    return (this._response.stream as { toAry(): unknown }).toAry();
   }
 
   each(...args: RubyArgs): unknown {

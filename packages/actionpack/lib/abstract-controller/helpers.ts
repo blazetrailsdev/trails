@@ -265,7 +265,7 @@ export const Helpers = new Module((mod) => {
   });
 }).include({
   get _helpers(): HelperMethodsModule {
-    return (this as unknown as HelpersHost).constructor._helpers;
+    return (this as HelpersHost).constructor._helpers;
   },
 }) as Module<{ readonly _helpers: HelperMethodsModule }> & {
   ClassMethods: typeof ClassMethods;

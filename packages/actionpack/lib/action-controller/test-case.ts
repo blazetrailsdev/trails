@@ -35,13 +35,7 @@ import {
   verbose,
   warn,
 } from "@blazetrails/ruby-compat";
-import {
-  DEFAULT_OPTIONS,
-  Persisted,
-  SecureSessionHash,
-  SessionId,
-  type PersistedRequest,
-} from "@blazetrails/rack-session";
+import { DEFAULT_OPTIONS, SecureSessionHash, SessionId } from "@blazetrails/rack-session";
 import {
   MULTIPART_BOUNDARY,
   UploadedFile as RackTestUploadedFile,
@@ -444,7 +438,7 @@ async function processControllerResponse(
 
     if (this.request.isHaveCookieJar()) {
       if (!this.request.cookieJar().isCommitted()) {
-        this.request.cookieJar().write(this.response as unknown as CookieResponse);
+        this.request.cookieJar().write(this.response as CookieResponse);
         cookies.update(this.request.cookieJar().toHash());
         cookies.update(this.response.cookies as Record<string, string>);
       }
@@ -776,7 +770,7 @@ export class TestSession extends SecureSessionHash {
     session: Record<string, unknown> = {},
     id: SessionId = new SessionId(SecureRandom.hex(16)),
   ) {
-    super(null as unknown as Persisted, null as unknown as PersistedRequest);
+    super(null, null);
     this.setId(id);
     this.data = this.stringifyKeys(session);
     this.loaded = true;

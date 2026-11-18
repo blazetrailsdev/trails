@@ -70,7 +70,7 @@ export class Router {
       return response;
     }
 
-    return [404, { [X_CASCADE]: "pass" }, ["Not Found"]] as unknown as RackishResponse;
+    return [404, { [X_CASCADE]: "pass" }, ["Not Found"]] as RackishResponse;
   }
 
   recognize(

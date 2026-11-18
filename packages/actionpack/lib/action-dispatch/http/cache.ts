@@ -167,9 +167,9 @@ export function parseHttpDate(s: string | undefined): Date | undefined {
 type R = ResponseCacheHost;
 
 export class Response {
-  declare protected getHeader: ResponseCacheHost["getHeader"];
-  declare protected setHeader: ResponseCacheHost["setHeader"];
-  declare protected hasHeader: ResponseCacheHost["hasHeader"];
+  declare getHeader: ResponseCacheHost["getHeader"];
+  declare setHeader: ResponseCacheHost["setHeader"];
+  declare hasHeader: ResponseCacheHost["hasHeader"];
   /** @internal */
   declare _cacheControlHash: CacheControlHash;
 
@@ -204,7 +204,7 @@ export class Response {
   }
 
   set etag(v: unknown) {
-    weakEtag.call(this as unknown as R, v);
+    weakEtag.call(this, v);
   }
 }
 

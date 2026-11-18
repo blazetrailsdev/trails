@@ -26,7 +26,7 @@ export async function inherited(klass: HelpersPathControllerClass): Promise<void
 
   klass.helpersPath = paths;
 
-  const base = Base as unknown as HelpersPathControllerClass;
+  const base = Base as HelpersPathControllerClass;
   if (Object.getPrototypeOf(klass) === base && base.includeAllHelpers) {
     (klass as HelpersClass).helper(":all");
   }

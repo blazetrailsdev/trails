@@ -77,8 +77,8 @@ export class SessionHash implements PersistedSession {
 
   static Unspecified: unknown = {};
 
-  private _store: Persisted;
-  private req: PersistedRequest;
+  private _store: Persisted | null;
+  private req: PersistedRequest | null;
   protected loaded: boolean;
   protected _id: unknown;
   protected idDefined = false;
@@ -98,7 +98,7 @@ export class SessionHash implements PersistedSession {
     req.setHeader(RACK_SESSION_OPTIONS, { ...options });
   }
 
-  constructor(store: Persisted, req: PersistedRequest) {
+  constructor(store: Persisted | null, req: PersistedRequest | null) {
     this._store = store;
     this.req = req;
     this.loaded = false;
@@ -106,12 +106,12 @@ export class SessionHash implements PersistedSession {
 
   id(): unknown {
     if (this.loaded || this.idDefined) return this._id;
-    this.setId(this._store.extractSessionId(this.req));
+    this.setId(this._store!.extractSessionId(this.req!));
     return this._id;
   }
 
   options(): Record<string, unknown> {
-    return this.req.sessionOptions;
+    return this.req!.sessionOptions;
   }
 
   each(block: (key: string, value: unknown) => void): Record<string, unknown> {
@@ -190,7 +190,7 @@ export class SessionHash implements PersistedSession {
 
   async destroy(): Promise<void> {
     this.clear();
-    this.setId(await this._store.deleteSession(this.req, this.id(), this.options()));
+    this.setId(await this._store!.deleteSession(this.req!, this.id(), this.options()));
   }
 
   toHash(): Record<string, unknown> {
@@ -235,7 +235,7 @@ export class SessionHash implements PersistedSession {
   isExists(): boolean {
     if (this.existsDefined) return this._exists;
     this.data = {};
-    this._exists = this._store.sessionExists(this.req);
+    this._exists = this._store!.sessionExists(this.req!);
     this.existsDefined = true;
     return this._exists;
   }
@@ -271,7 +271,7 @@ export class SessionHash implements PersistedSession {
 
   /** @internal */
   loadBang(): void {
-    const [id, session] = this._store.loadSession(this.req) as [unknown, Record<string, unknown>];
+    const [id, session] = this._store!.loadSession(this.req!) as [unknown, Record<string, unknown>];
     this.setId(id);
     this.data = this.stringifyKeys(session);
     this.loaded = true;
