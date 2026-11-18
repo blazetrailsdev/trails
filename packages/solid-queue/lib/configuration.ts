@@ -55,6 +55,7 @@ export interface Configuration extends Model {}
 export class Configuration {
   declare static Process: typeof Process;
   declare static validate: typeof Model.validate;
+  declare static setCallback: (name: string, ...filterList: unknown[]) => void;
   declare static beforeValidation: (typeof ValidationsCallbacks.ClassMethods)["beforeValidation"];
 
   static {
@@ -69,8 +70,8 @@ export class Configuration {
     this.validate(":warnAboutIncorrectlySizedDatabasePool");
     this.validate(":warnAboutMissingConfigFiles");
 
-    (this as unknown as typeof Model & typeof Configuration).beforeValidation((configuration) => {
-      (configuration as Configuration).warnings.clear();
+    this.beforeValidation((configuration) => {
+      configuration.warnings.clear();
     });
 
     constSet(this, "Process", Process);

@@ -2,18 +2,14 @@ import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import { IsolatedExecutionState, TopLevel } from "@blazetrails/activesupport";
-import { capture } from "@blazetrails/activesupport/testing/stream";
 import { gemVersion } from "@blazetrails/activerecord";
-import { Pathname, env, setEnv } from "@blazetrails/ruby-compat";
+import { Pathname } from "@blazetrails/ruby-compat";
 import { Configuration, RecurringTask, type Scheduler } from "../lib/index.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import "./support/job-result.js";
+import { captureIo, configFilePath, withEnv } from "./support/configuration-test-helper.js";
 
 const dummyRoot = `${import.meta.dirname}/support/dummy`;
-
-function configFilePath(name: string): string {
-  return `${dummyRoot}/config/${name}.yml`;
-}
 
 async function assertProcesses(
   configuration: Configuration,
@@ -41,24 +37,6 @@ async function withExecutionIsolation(level: "thread" | "fiber", block: () => Pr
   } finally {
     if (previousLevel != null) IsolatedExecutionState.isolationLevel = previousLevel;
   }
-}
-
-async function withEnv(vars: { [key: string]: string | undefined }, block: () => Promise<void>) {
-  const previous = Object.fromEntries(Object.keys(vars).map((key) => [key, env[key]]));
-  for (const [key, value] of Object.entries(vars)) setEnv(key, value);
-  try {
-    await block();
-  } finally {
-    for (const [key, value] of Object.entries(previous)) setEnv(key, value);
-  }
-}
-
-async function captureIo(block: () => Promise<void>): Promise<[string, string]> {
-  let err = "";
-  const out = await capture("stdout", async () => {
-    err = await capture("stderr", block);
-  });
-  return [out, err];
 }
 
 function isFiberWorkersReleaseConnectionsBetweenQueries(): boolean {

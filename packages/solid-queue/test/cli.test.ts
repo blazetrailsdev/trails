@@ -2,36 +2,14 @@ import type {} from "@blazetrails/vitest-matchers";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import "./support/dummy-application.js";
 import { TopLevel, camelize } from "@blazetrails/activesupport";
-import { capture } from "@blazetrails/activesupport/testing/stream";
-import { SystemExit, env, setEnv } from "@blazetrails/ruby-compat";
+import { SystemExit } from "@blazetrails/ruby-compat";
 import { Configuration, RecurringTask } from "../lib/index.js";
 import { Cli } from "../lib/cli.js";
 import { loadAppSchema } from "./support/queue-schema.js";
 import "./support/job-result.js";
+import { captureIo, configFilePath, withEnv } from "./support/configuration-test-helper.js";
 
 const dummyRoot = `${import.meta.dirname}/support/dummy`;
-
-function configFilePath(name: string): string {
-  return `${dummyRoot}/config/${name}.yml`;
-}
-
-async function withEnv(vars: { [key: string]: string | undefined }, block: () => Promise<void>) {
-  const previous = Object.fromEntries(Object.keys(vars).map((key) => [key, env[key]]));
-  for (const [key, value] of Object.entries(vars)) setEnv(key, value);
-  try {
-    await block();
-  } finally {
-    for (const [key, value] of Object.entries(previous)) setEnv(key, value);
-  }
-}
-
-async function captureIo(block: () => Promise<void>): Promise<[string, string]> {
-  let err = "";
-  const out = await capture("stdout", async () => {
-    err = await capture("stderr", block);
-  });
-  return [out, err];
-}
 
 function configurationFromCli(cliOptions: { [key: string]: unknown } = {}): Configuration {
   const cli = new (Cli as unknown as new (
