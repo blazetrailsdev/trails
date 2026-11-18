@@ -30,16 +30,16 @@ const self = {
   response: { headers: new Map<string, string | string[]>() },
 };
 
-function newResponse(): Response {
-  const response = Response.create();
+async function newResponse(): Promise<Response> {
+  const response = await Response.create();
   response.request = Request.empty();
   return response;
 }
 
 describe("ResponseTest", () => {
-  it("simple output", () => {
-    const response = newResponse();
-    response.body = "Hello, World!";
+  it("simple output", async () => {
+    const response = await newResponse();
+    await response.setBody("Hello, World!");
 
     const [status, headers, body] = response.toA();
     assertEqual(200, status);
@@ -51,12 +51,12 @@ describe("ResponseTest", () => {
     assertEqual(["Hello, World!"], parts);
   });
 
-  it("status handled properly in initialize", () => {
-    assertEqual(200, new Response("200 OK").status);
+  it("status handled properly in initialize", async () => {
+    assertEqual(200, (await Response.new("200 OK")).status);
   });
 
-  it("response code", () => {
-    const response = newResponse();
+  it("response code", async () => {
+    const response = await newResponse();
     response.status = "200 OK";
     assertEqual(200, response.responseCode);
 
@@ -67,8 +67,8 @@ describe("ResponseTest", () => {
     assertEqual(200, response.responseCode);
   });
 
-  it("message", () => {
-    const response = newResponse();
+  it("message", async () => {
+    const response = await newResponse();
     response.status = "200 OK";
     assertEqual("OK", response.message);
 
@@ -79,25 +79,25 @@ describe("ResponseTest", () => {
     assertEqual("OK", response.message);
   });
 
-  it("only set charset still defaults to text html", () => {
-    const response = new Response();
+  it("only set charset still defaults to text html", async () => {
+    const response = await Response.new();
     response.charset = "utf-16";
     const [, headers] = response.toA();
     assertEqual("text/html; charset=utf-16", headers["content-type"]);
   });
 
-  it("utf8 output", () => {
-    const response = newResponse();
-    response.body = String.fromCodePoint(1090, 1077, 1089, 1090);
+  it("utf8 output", async () => {
+    const response = await newResponse();
+    await response.setBody(String.fromCodePoint(1090, 1077, 1089, 1090));
 
     const [status, headers] = response.toA();
     assertEqual(200, status);
     self.assertHeaders({ "content-type": "text/html; charset=utf-8" }, headers);
   });
 
-  it("content length", () => {
+  it("content length", async () => {
     for (const c of [100, 101, 102, 103, 204]) {
-      const response = new Response();
+      const response = await Response.new();
       response.status = String(c);
       response.setHeader("Content-Length", "0");
       const [, headers] = response.toA();
@@ -108,61 +108,61 @@ describe("ResponseTest", () => {
     }
   });
 
-  it("does not contain a message-body", () => {
+  it("does not contain a message-body", async () => {
     for (const c of [100, 101, 102, 103, 204, 304]) {
-      const response = new Response();
+      const response = await Response.new();
       response.status = String(c);
-      response.body = "Body must not be included";
+      await response.setBody("Body must not be included");
       const [, , body] = response.toA();
       assertEmpty(body, `${c} must not have a message-body but actually contains ${body}`);
     }
   });
 
-  it("content type", () => {
+  it("content type", async () => {
     for (const c of [204, 304]) {
-      const response = new Response();
+      const response = await Response.new();
       response.status = String(c);
       const [, headers] = response.toA();
       assertNot(Object.hasOwn(headers, "content-type"), `${c} should not have Content-Type header`);
     }
 
     for (const c of [200, 302, 404, 500]) {
-      const response = new Response();
+      const response = await Response.new();
       response.status = String(c);
       const [, headers] = response.toA();
       assert(Object.hasOwn(headers, "content-type"), `${c} did not have Content-Type header`);
     }
   });
 
-  it("empty content type returns nil", () => {
-    const res = new Response();
+  it("empty content type returns nil", async () => {
+    const res = await Response.new();
     expect(res.contentType).toBeNull();
   });
 
-  it("setting content type header impacts content type method", () => {
-    const response = newResponse();
+  it("setting content type header impacts content type method", async () => {
+    const response = await newResponse();
     response.headers.set("Content-Type", "application/aaron");
     assertEqual("application/aaron", response.contentType);
   });
 
-  it("response charset writer", () => {
-    const response = newResponse();
+  it("response charset writer", async () => {
+    const response = await newResponse();
     response.charset = "utf-16";
     assertEqual("utf-16", response.charset);
     response.charset = null;
     assertEqual("utf-8", response.charset);
   });
 
-  it("cookies", () => {
-    const res = new Response();
+  it("cookies", async () => {
+    const res = await Response.new();
     res.setCookie("user_name", { value: "david", path: "/" });
     const [, headers] = res.toA();
     self.assertSetCookieHeader("user_name=david; path=/", headers["set-cookie"]);
     expect(res.cookies).toEqual({ user_name: "david" });
   });
 
-  it("multiple cookies", () => {
-    const res = new Response();
+  it("multiple cookies", async () => {
+    const res = await Response.new();
     res.setCookie("user_name", { value: "david", path: "/" });
     res.setCookie("login", {
       value: "foo&bar",
@@ -177,8 +177,8 @@ describe("ResponseTest", () => {
     expect(res.cookies).toEqual({ login: "foo&bar", user_name: "david" });
   });
 
-  it("delete cookies", () => {
-    const res = new Response();
+  it("delete cookies", async () => {
+    const res = await Response.new();
     res.setCookie("user_name", { value: "david", path: "/" });
     res.setCookie("login", {
       value: "foo&bar",
@@ -189,11 +189,11 @@ describe("ResponseTest", () => {
     expect(res.cookies).toStrictEqual({ user_name: "david", login: null });
   });
 
-  it("read ETag and Cache-Control", () => {
-    const resp = new Response();
+  it("read ETag and Cache-Control", async () => {
+    const resp = await Response.new();
     resp.cacheControl.public = true;
     resp.etag = "123";
-    resp.body = "Hello";
+    await resp.setBody("Hello");
     resp.toA();
 
     assert(resp.isEtag);
@@ -206,11 +206,11 @@ describe("ResponseTest", () => {
     assertEqual('W/"202cb962ac59075b964b07152d234b70"', resp.headers.get("ETag"));
   });
 
-  it("read strong ETag", () => {
-    const resp = new Response();
+  it("read strong ETag", async () => {
+    const resp = await Response.new();
     resp.cacheControl.public = true;
     resp.strongEtag("123");
-    resp.body = "Hello";
+    await resp.setBody("Hello");
     resp.toA();
 
     assert(resp.isEtag);
@@ -219,11 +219,11 @@ describe("ResponseTest", () => {
     assertEqual('"202cb962ac59075b964b07152d234b70"', resp.etag);
   });
 
-  it("read charset and content type", () => {
-    const resp = new Response();
+  it("read charset and content type", async () => {
+    const resp = await Response.new();
     resp.charset = "utf-16";
     resp.contentType = Mime.get(":xml")!;
-    resp.body = "Hello";
+    await resp.setBody("Hello");
     resp.toA();
 
     assertEqual("utf-16", resp.charset);
@@ -232,27 +232,27 @@ describe("ResponseTest", () => {
     assertEqual("application/xml; charset=utf-16", resp.headers.get("Content-Type"));
   });
 
-  it("respect no-store cache-control", () => {
-    const res = new Response();
+  it("respect no-store cache-control", async () => {
+    const res = await Response.new();
     res._cacheControl = "no-store";
     expect(res._cacheControl).toBe("no-store");
   });
 
-  it("respect private, no-store cache-control", () => {
-    const res = new Response();
+  it("respect private, no-store cache-control", async () => {
+    const res = await Response.new();
     res._cacheControl = "private, no-store";
     expect(res._cacheControl).toBe("private, no-store");
   });
 
-  it("does not include Status header", () => {
-    const response = newResponse();
+  it("does not include Status header", async () => {
+    const response = await newResponse();
     response.status = "200 OK";
     const [, headers] = response.toA();
     assertNot(Object.hasOwn(headers, "status"));
   });
 
   it("can wait until commit", async () => {
-    const response = newResponse();
+    const response = await newResponse();
     const t = response.awaitCommit();
     response.commitBang();
     assert(response.committed);
@@ -261,15 +261,15 @@ describe("ResponseTest", () => {
     );
   });
 
-  it("stream close", () => {
-    const response = newResponse();
+  it("stream close", async () => {
+    const response = await newResponse();
     const stream = response.stream as { close(): void; isClosed: boolean };
     stream.close();
     assert(stream.isClosed);
   });
 
-  it("stream write", () => {
-    const response = newResponse();
+  it("stream write", async () => {
+    const response = await newResponse();
     const stream = response.stream as { write(s: string): void; close(): void };
     stream.write("foo");
     stream.close();
@@ -277,7 +277,7 @@ describe("ResponseTest", () => {
   });
 
   it("write after close", async () => {
-    const res = new Response();
+    const res = await Response.new();
     res.close();
 
     const e = await assertRaises([IOError], {}, () => {
@@ -286,15 +286,15 @@ describe("ResponseTest", () => {
     expect(e.message).toBe("closed stream");
   });
 
-  it("each isnt called if str body is written", () => {
-    const response = newResponse();
+  it("each isnt called if str body is written", async () => {
+    const response = await newResponse();
     let eachCounter = 0;
-    response.body = {
+    await response.setBody({
       each(block: (chunk: string) => void) {
         eachCounter += 1;
         block("foo");
       },
-    };
+    });
     response.setHeader("X-Foo", response.body);
 
     assertEqual(1, eachCounter, "#each was not called once");
@@ -310,15 +310,15 @@ describe("ResponseTest", () => {
     assertEqual(1, eachCounter, "#each was not called once");
   });
 
-  it("response body encoding", () => {
+  it("response body encoding", async () => {
     const body = ["hello"];
-    const response = new Response(200, {}, body);
+    const response = await Response.new(200, {}, body);
     response.request = Request.empty();
     assertEqual("hello", response.body);
   });
 
-  it("set header after read body during action", () => {
-    const response = newResponse();
+  it("set header after read body during action", async () => {
+    const response = await newResponse();
     void response.body;
 
     response.setHeader("x-header", "Best of all possible worlds.");
@@ -330,9 +330,9 @@ describe("ResponseTest", () => {
     assertEqual("Best of all possible worlds.", headers["x-header"]);
   });
 
-  it("read body during action", () => {
-    const response = newResponse();
-    response.body = "Hello, World!";
+  it("read body during action", async () => {
+    const response = await newResponse();
+    await response.setBody("Hello, World!");
 
     assertNil(response.contentType);
 
@@ -347,8 +347,8 @@ describe("ResponseTest", () => {
     assertEqual(["Hello, World!"], parts);
   });
 
-  it("code", () => {
-    const response = newResponse();
+  it("code", async () => {
+    const response = await newResponse();
     response.status = "200 OK";
     assertEqual("200", response.code);
 
@@ -359,23 +359,23 @@ describe("ResponseTest", () => {
     assertEqual("200", response.code);
   });
 
-  it("read content type with default charset utf-8", () => {
-    const res = new Response(200, { "Content-Type": "text/xml" });
+  it("read content type with default charset utf-8", async () => {
+    const res = await Response.new(200, { "Content-Type": "text/xml" });
     expect(res.charset).toBe("utf-8");
   });
 
-  it("read content type with charset utf-16", () => {
+  it("read content type with charset utf-16", async () => {
     const original = Response.defaultCharset;
     try {
       Response.defaultCharset = "utf-16";
-      const res = new Response(200, { "Content-Type": "text/xml" });
+      const res = await Response.new(200, { "Content-Type": "text/xml" });
       expect(res.charset).toBe("utf-16");
     } finally {
       Response.defaultCharset = original;
     }
   });
 
-  it("read x_frame_options, x_content_type_options, x_xss_protection, x_permitted_cross_domain_policies and referrer_policy", () => {
+  it("read x_frame_options, x_content_type_options, x_xss_protection, x_permitted_cross_domain_policies and referrer_policy", async () => {
     const original = Response.defaultHeaders;
     try {
       Response.defaultHeaders = {
@@ -385,8 +385,8 @@ describe("ResponseTest", () => {
         "X-Permitted-Cross-Domain-Policies": "none",
         "Referrer-Policy": "strict-origin-when-cross-origin",
       };
-      const resp = Response.create();
-      resp.body = "Hello";
+      const resp = await Response.create();
+      await resp.setBody("Hello");
       resp.toA();
       expect(resp.headers.get("X-Frame-Options")).toBe("DENY");
       expect(resp.headers.get("X-Content-Type-Options")).toBe("nosniff");
@@ -398,14 +398,14 @@ describe("ResponseTest", () => {
     }
   });
 
-  it("read custom default_header", () => {
+  it("read custom default_header", async () => {
     const original = Response.defaultHeaders;
     try {
       Response.defaultHeaders = {
         "X-XX-XXXX": "Here is my phone number",
       };
-      const resp = Response.create();
-      resp.body = "Hello";
+      const resp = await Response.create();
+      await resp.setBody("Hello");
       resp.toA();
       expect(resp.headers.get("X-XX-XXXX")).toBe("Here is my phone number");
     } finally {
@@ -417,8 +417,8 @@ describe("ResponseTest", () => {
     assertNotRespondTo(newResponse(), "methodMissing");
   });
 
-  it("can be explicitly destructured into status, headers and an enumerable body", () => {
-    const res = new Response(404, { "Content-Type": "text/plain" }, ["Not Found"]);
+  it("can be explicitly destructured into status, headers and an enumerable body", async () => {
+    const res = await Response.new(404, { "Content-Type": "text/plain" }, ["Not Found"]);
     const [status, headers, body] = res.toA() as [
       number,
       Record<string, string>,
@@ -429,8 +429,8 @@ describe("ResponseTest", () => {
     expect([...body]).toEqual(["Not Found"]);
   });
 
-  it("[response.to_a].flatten does not recurse infinitely", () => {
-    const response = newResponse();
+  it("[response.to_a].flatten does not recurse infinitely", async () => {
+    const response = await newResponse();
     const [status, headers, body] = flatten([response.toA()]);
     assertEqual(200, status);
     assertEqual(headers, response.headers.toHash());
@@ -438,8 +438,8 @@ describe("ResponseTest", () => {
   });
 
   it("compatibility with Rack::ContentLength", async () => {
-    const response = newResponse();
-    response.body = "Hello";
+    const response = await newResponse();
+    await response.setBody("Hello");
     const app = (_env: RackEnv) => response.toA() as unknown as RackResponse;
     const env = MockRequest.envFor("/");
 
@@ -452,22 +452,22 @@ describe("ResponseTest", () => {
 });
 
 describe("ResponseHeadersTest", () => {
-  it("has_header?", () => {
-    const response = Response.create();
+  it("has_header?", async () => {
+    const response = await Response.create();
     response.setHeader("Foo", "1");
     assert(response.hasHeader("Foo"));
     assert(response.hasHeader("foo"));
   });
 
-  it("get_header", () => {
-    const res = Response.create();
+  it("get_header", async () => {
+    const res = await Response.create();
     res.setHeader("Foo", "1");
     expect(res.getHeader("Foo")).toBe("1");
     expect(res.getHeader("foo")).toBe("1");
   });
 
-  it("set_header", () => {
-    const response = Response.create();
+  it("set_header", async () => {
+    const response = await Response.create();
     response.setHeader("Foo", "1");
     assertEqual("2", response.setHeader("Foo", "2"));
     assert(response.hasHeader("Foo"));
@@ -478,15 +478,15 @@ describe("ResponseHeadersTest", () => {
     assertNil(response.getHeader("Foo"));
   });
 
-  it("delete_header", () => {
-    const response = Response.create();
+  it("delete_header", async () => {
+    const response = await Response.create();
     response.setHeader("Foo", "1");
     assertEqual("1", response.deleteHeader("Foo"));
     assertNot(response.hasHeader("Foo"));
   });
 
-  it("add_header", () => {
-    const response = Response.create();
+  it("add_header", async () => {
+    const response = await Response.create();
     response.setHeader("Foo", "1");
 
     self.assertHeaderValue("1,2", response.addHeader("Foo", "2"));
@@ -512,8 +512,8 @@ describe("ResponseIntegrationTest", () => {
   });
 
   function trailsishApp(block: (resp: Response) => void) {
-    return () => {
-      const resp = new Response();
+    return async () => {
+      const resp = await Response.new();
       block(resp);
       resp.request = Request.empty();
       return resp.toA();
@@ -525,10 +525,10 @@ describe("ResponseIntegrationTest", () => {
   }
 
   it("response cache control from railsish app", async () => {
-    testCase.app = trailsishApp((resp) => {
+    testCase.app = trailsishApp(async (resp) => {
       resp.cacheControl.public = true;
       resp.etag = "123";
-      resp.body = "Hello";
+      await resp.setBody("Hello");
     });
 
     await testCase.get("/");
@@ -558,10 +558,10 @@ describe("ResponseIntegrationTest", () => {
   });
 
   it("response charset and content type from railsish app", async () => {
-    testCase.app = trailsishApp((resp) => {
+    testCase.app = trailsishApp(async (resp) => {
       resp.charset = "utf-16";
       resp.contentType = Mime.get("xml")!;
-      resp.body = "Hello";
+      await resp.setBody("Hello");
     });
 
     await testCase.get("/");
@@ -586,9 +586,9 @@ describe("ResponseIntegrationTest", () => {
   });
 
   it("strong ETag validator", async () => {
-    testCase.app = trailsishApp((resp) => {
+    testCase.app = trailsishApp(async (resp) => {
       resp.strongEtag("123");
-      resp.body = "Hello";
+      await resp.setBody("Hello");
     });
 
     await testCase.get("/");

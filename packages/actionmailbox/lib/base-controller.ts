@@ -34,9 +34,9 @@ export class BaseController extends ActionController.Base {
   }
 
   /** @internal */
-  private ensureConfigured(): void {
+  private async ensureConfigured(): Promise<void> {
     if (!(ActionMailbox.ingress === this.ingressName())) {
-      this.head(":not_found");
+      await this.head(":not_found");
     }
   }
 
@@ -90,7 +90,7 @@ Trails.Conductor.BaseController = class BaseController extends ActionController.
   }
 
   /** @internal */
-  private ensureDevelopmentEnv(): void {
-    if (!Trails.env["development?"]()) this.head(":forbidden");
+  private async ensureDevelopmentEnv(): Promise<void> {
+    if (!Trails.env["development?"]()) await this.head(":forbidden");
   }
 };

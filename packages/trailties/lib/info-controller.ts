@@ -26,8 +26,8 @@ export class InfoController extends ApplicationController {
     });
   }
 
-  index(): void {
-    this.redirectTo({ action: "routes" });
+  async index(): Promise<void> {
+    await this.redirectTo({ action: "routes" });
   }
 
   properties(): void {

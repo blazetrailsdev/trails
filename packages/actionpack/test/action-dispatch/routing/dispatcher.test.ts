@@ -34,8 +34,8 @@ function makeControllerClass(
     static actionEncodingTemplate(): null {
       return null;
     }
-    static makeResponseBang(request: Request): Response {
-      const res = new Response();
+    static async makeResponseBang(request: Request): Promise<Response> {
+      const res = await Response.new();
       res.request = request;
       return res;
     }
@@ -203,8 +203,8 @@ describe("Dispatcher over the controller constant table", () => {
     static actionEncodingTemplate(): null {
       return null;
     }
-    static makeResponseBang(request: Request): Response {
-      const res = new Response();
+    static async makeResponseBang(request: Request): Promise<Response> {
+      const res = await Response.new();
       res.request = request;
       return res;
     }

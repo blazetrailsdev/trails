@@ -75,8 +75,8 @@ describe("ActionController::Railtie action_controller.set_configs", () => {
 
 describe("ActionController::Railtie action_controller.request_forgery_protection", () => {
   class PostsController extends ActionController.Base {
-    create() {
-      this.head(":created");
+    async create() {
+      await this.head(":created");
     }
   }
 
@@ -91,7 +91,7 @@ describe("ActionController::Railtie action_controller.request_forgery_protection
       HTTP_HOST: "localhost",
       "rack.session": new TestSession(),
     });
-    await controller.dispatch("create", request, new Response());
+    await controller.dispatch("create", request, await Response.new());
     return controller;
   }
 

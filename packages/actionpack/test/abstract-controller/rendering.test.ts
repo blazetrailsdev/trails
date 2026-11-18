@@ -22,6 +22,9 @@ import { Error as AbstractControllerError } from "../../lib/abstract-controller/
 function makeHost(opts: Partial<RenderingHost> = {}): RenderingHost {
   return {
     responseBody: null,
+    setResponseBody(this: { responseBody: unknown }, responseBody: unknown) {
+      this.responseBody = responseBody;
+    },
     renderToBody: (o: RenderOptions) => (o.html != null ? String(o.html) : "<body>"),
     _normalizeRender,
     _normalizeArgs,

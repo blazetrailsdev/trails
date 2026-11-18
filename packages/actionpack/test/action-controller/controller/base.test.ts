@@ -33,8 +33,8 @@ function makeRequest(opts: Record<string, string> = {}): Request {
   });
 }
 
-function makeResponse(): Response {
-  return new Response();
+async function makeResponse(): Promise<Response> {
+  return await Response.new();
 }
 
 class Comment {
@@ -60,20 +60,20 @@ class EmptyController extends Base {}
 
 class SimpleController extends Base {
   // @ts-expect-error -- Ruby lets an action shadow an inherited method (base_test.rb:16-18)
-  status(): void {
-    this.head(":ok");
+  async status(): Promise<void> {
+    await this.head(":ok");
   }
 
-  hello(): void {
-    this.responseBody = "hello";
+  async hello(): Promise<void> {
+    await this.setResponseBody("hello");
   }
 }
 
 class ChildController extends SimpleController {}
 
 class NonEmptyController extends Base {
-  publicAction(): void {
-    this.head(":ok");
+  async publicAction(): Promise<void> {
+    await this.head(":ok");
   }
 }
 
@@ -93,8 +93,8 @@ Object.defineProperty(DefaultUrlOptionsController.prototype, "defaultUrlOptions"
 });
 
 class OptionalDefaultUrlOptionsController extends Base {
-  show(): void {
-    this.head(":ok");
+  async show(): Promise<void> {
+    await this.head(":ok");
   }
 }
 Object.defineProperty(OptionalDefaultUrlOptionsController.prototype, "defaultUrlOptions", {
@@ -160,13 +160,13 @@ describe("ControllerClassTests", () => {
 });
 
 describe("ControllerInstanceTests", () => {
-  it("performed?", () => {
+  it("performed?", async () => {
     class EmptyController extends Base {}
     const empty = new EmptyController();
     empty.setRequestBang(Request.empty());
-    empty.setResponseBang(EmptyController.makeResponseBang(empty.request));
+    empty.setResponseBang(await EmptyController.makeResponseBang(empty.request));
     assertNot(empty.performed);
-    empty.responseBody = ["sweet"];
+    await empty.setResponseBody(["sweet"]);
     assert(empty.performed);
   });
 
@@ -230,8 +230,8 @@ describe("ControllerInstanceTests", () => {
 describe("PerformActionTest", () => {
   it("process should be precise", async () => {
     const c = new EmptyController();
-    const exception = await assertRaise([ActionNotFound], {}, () =>
-      c.dispatch("non_existent", makeRequest(), makeResponse()),
+    const exception = await assertRaise([ActionNotFound], {}, async () =>
+      c.dispatch("non_existent", makeRequest(), await makeResponse()),
     );
     assertEqual(
       "The action 'non_existent' could not be found for EmptyController",
@@ -246,7 +246,7 @@ describe("PerformActionTest", () => {
       }
     }
     const c = new ActionMissingController();
-    await c.dispatch("arbitrary_action", makeRequest(), makeResponse());
+    await c.dispatch("arbitrary_action", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("Response for arbitrary_action");
   });
 

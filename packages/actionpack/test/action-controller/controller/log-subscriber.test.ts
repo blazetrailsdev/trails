@@ -43,8 +43,8 @@ class LogSubscribersController extends Base {
 
     this.rescueFrom(
       SpecialException,
-      block(function (this: LogSubscribersController) {
-        this.head(406);
+      block(async function (this: LogSubscribersController) {
+        await this.head(406);
       }),
     );
 
@@ -55,32 +55,32 @@ class LogSubscribersController extends Base {
 
   neverExecuted() {}
 
-  show() {
-    this.head(":ok");
+  async show() {
+    await this.head(":ok");
   }
 
-  redirector() {
-    this.redirectTo("http://foo.bar/");
+  async redirector() {
+    await this.redirectTo("http://foo.bar/");
   }
 
-  filterableRedirector() {
-    this.redirectTo("http://secret.foo.bar/");
+  async filterableRedirector() {
+    await this.redirectTo("http://secret.foo.bar/");
   }
 
-  filterableRedirectorWithParams() {
-    this.redirectTo("http://secret.foo.bar?username=repinel&password=1234");
+  async filterableRedirectorWithParams() {
+    await this.redirectTo("http://secret.foo.bar?username=repinel&password=1234");
   }
 
-  filterableRedirectorBadUri() {
-    this.redirectTo(" s:/invalid-string0uri");
+  async filterableRedirectorBadUri() {
+    await this.redirectTo(" s:/invalid-string0uri");
   }
 
   async dataSender() {
     await this.sendData("cool data", { filename: "file.txt" });
   }
 
-  fileSender() {
-    this.sendFile(File.expandPath("company.rb", FIXTURE_LOAD_PATH));
+  async fileSender() {
+    await this.sendFile(File.expandPath("company.rb", FIXTURE_LOAD_PATH));
   }
 
   async withFragmentCache() {

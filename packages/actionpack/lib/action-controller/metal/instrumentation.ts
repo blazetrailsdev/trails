@@ -114,12 +114,12 @@ export function sendData(
 export function redirectTo(
   this: InstrumentationHost,
   ...args: Parameters<typeof flashRedirectTo>
-): number {
+): Promise<number> {
   return Notifications.instrument(
     "redirect_to.action_controller",
     { request: this.request },
-    (payload) => {
-      const result = rbCallSuper(this, redirectTo, ...args) as number;
+    async (payload) => {
+      const result = await (rbCallSuper(this, redirectTo, ...args) as Promise<number>);
       payload.status = this.response.status;
       payload.location = this.response.filteredLocation();
       return result;

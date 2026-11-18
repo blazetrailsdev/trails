@@ -49,7 +49,7 @@ import {
 } from "@blazetrails/rack-test";
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
-import { Buffer } from "../action-dispatch/http/response.js";
+import { Buffer, type Response } from "../action-dispatch/http/response.js";
 import { Assertions } from "../action-dispatch/testing/assertions.js";
 import { Assertions as DomTestingAssertions } from "@blazetrails/actionview/rails-dom-testing/assertions";
 import type { Html5Document, XmlDocument } from "@blazetrails/nokogiri";
@@ -280,7 +280,7 @@ async function process(
       this.controller.constructor as typeof Metal,
     ),
   );
-  rbObjIvarSet(this, "@response", this.buildResponse(this._responseKlass));
+  rbObjIvarSet(this, "@response", await this.buildResponse(this._responseKlass));
   this.response.request = this.request;
   this.controller.recycleBang();
 
@@ -321,7 +321,7 @@ function queryParameterNames(this: Behavior, generatedExtras: [string, string[]]
 }
 
 /** @missingRailsName responseKlass — PERMANENT */
-function setupControllerRequestAndResponse(this: Behavior): void {
+async function setupControllerRequestAndResponse(this: Behavior): Promise<void> {
   if (this.controller === undefined) this.controller = null!;
 
   this._responseKlass = TestResponse;
@@ -346,7 +346,7 @@ function setupControllerRequestAndResponse(this: Behavior): void {
     "@request",
     TestRequest.create(this.controller == null ? null : this.controller.constructor),
   );
-  rbObjIvarSet(this, "@response", this.buildResponse(this._responseKlass));
+  rbObjIvarSet(this, "@response", await this.buildResponse(this._responseKlass));
   this.response.request = this.request;
 
   if (this.controller) {
@@ -356,8 +356,11 @@ function setupControllerRequestAndResponse(this: Behavior): void {
 }
 
 /** @internal */
-function buildResponse(this: Behavior, klass: Behavior["_responseKlass"]): Behavior["response"] {
-  return klass.create();
+function buildResponse(
+  this: Behavior,
+  klass: Behavior["_responseKlass"],
+): Promise<Behavior["response"]> {
+  return (klass as typeof Response).create() as Promise<Behavior["response"]>;
 }
 
 /** @internal */

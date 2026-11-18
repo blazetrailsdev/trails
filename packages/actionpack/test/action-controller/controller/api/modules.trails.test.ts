@@ -6,8 +6,8 @@ import { Base } from "../../../../lib/action-controller/base.js";
 import { TestCase } from "../../../../lib/action-controller/test-case.js";
 
 class ModulesApiController extends API {
-  one() {
-    this.redirectTo({ action: "two" });
+  async one() {
+    await this.redirectTo({ action: "two" });
   }
 
   async two() {
@@ -82,9 +82,9 @@ describe("AbstractController::Callbacks#process_action", () => {
       });
     }
 
-    index() {
+    async index() {
       calls.push("index");
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 
@@ -97,9 +97,9 @@ describe("AbstractController::Callbacks#process_action", () => {
       });
     }
 
-    index() {
+    async index() {
       calls.push("index");
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 

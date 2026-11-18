@@ -22,7 +22,7 @@ export class InboundEmailsController extends Trails.Conductor.BaseController {
 
   async create(): Promise<void> {
     const inboundEmail = await this.createInboundEmail(await this.newMail());
-    this.redirectTo(this.mainApp.trailsConductorInboundEmailUrl(inboundEmail));
+    await this.redirectTo(this.mainApp.trailsConductorInboundEmailUrl(inboundEmail));
   }
 
   /** @internal */

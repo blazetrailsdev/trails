@@ -53,10 +53,10 @@ describe("redirect()", () => {
 });
 
 describe("PathRedirect", () => {
-  it("interpolates %{key} placeholders with escaped path values", () => {
+  it("interpolates %{key} placeholders with escaped path values", async () => {
     const r = new PathRedirect(301, "/wiki/%{article}");
     const req = makeRequest();
-    const res = r.buildResponse(
+    const res = await r.buildResponse(
       new Request({
         ...req.env,
         "action_dispatch.request.path_parameters": { article: "hello world" },
@@ -65,7 +65,7 @@ describe("PathRedirect", () => {
     expect(res.headers.get("Location")).toBe("http://example.com/wiki/hello%20world");
   });
 
-  it("preserves query and fragment, interpolating each part separately", () => {
+  it("preserves query and fragment, interpolating each part separately", async () => {
     const r = new PathRedirect(301, "/baz?id=%{id}&foo=?&bar=1#id-%{id}");
     const req = new Request({
       REQUEST_METHOD: "GET",
@@ -74,7 +74,7 @@ describe("PathRedirect", () => {
       "rack.url_scheme": "http",
       "action_dispatch.request.path_parameters": { id: "42" },
     });
-    const res = r.buildResponse(req);
+    const res = await r.buildResponse(req);
     expect(res.headers.get("Location")).toBe("http://example.com/baz?id=42&foo=?&bar=1#id-42");
   });
 
@@ -84,7 +84,7 @@ describe("PathRedirect", () => {
 });
 
 describe("Redirect", () => {
-  it("prepends SCRIPT_NAME for relative paths", () => {
+  it("prepends SCRIPT_NAME for relative paths", async () => {
     const r = new Redirect(301, () => "relative");
     const req = new Request({
       REQUEST_METHOD: "GET",
@@ -93,13 +93,13 @@ describe("Redirect", () => {
       SCRIPT_NAME: "/mount",
       "rack.url_scheme": "http",
     });
-    const res = r.buildResponse(req);
+    const res = await r.buildResponse(req);
     expect(res.headers.get("Location")).toBe("http://example.com/mount/relative");
   });
 
-  it("call() returns a rack triple", () => {
+  it("call() returns a rack triple", async () => {
     const r = new Redirect(302, () => "/x");
-    const [status, headers] = r.call({
+    const [status, headers] = await r.call({
       REQUEST_METHOD: "GET",
       SERVER_NAME: "example.com",
       SERVER_PORT: "80",
@@ -115,10 +115,10 @@ describe("Redirect", () => {
 });
 
 describe("OptionRedirect", () => {
-  it("builds a URL from options merged into the request defaults", () => {
+  it("builds a URL from options merged into the request defaults", async () => {
     const r = new OptionRedirect(301, { path: "/documentation/new" });
     const req = makeRequest({ PATH_INFO: "/new_documentation" });
-    const res = r.buildResponse(req);
+    const res = await r.buildResponse(req);
     expect(res.headers.get("Location")).toContain("/documentation/new");
   });
 

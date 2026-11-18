@@ -8,8 +8,8 @@ import { Response } from "../../../lib/action-dispatch/http/response.js";
 
 describe("MetalControllerInstanceTests", () => {
   class SimpleController extends Metal {
-    hello(): void {
-      this.responseBody = "hello";
+    async hello(): Promise<void> {
+      await this.setResponseBody("hello");
     }
   }
   Object.defineProperty(SimpleController, "name", {

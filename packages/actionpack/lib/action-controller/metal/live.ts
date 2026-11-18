@@ -14,7 +14,6 @@ import {
   SizedQueue,
   Thread,
   ThreadError,
-  each,
   excBacktrace,
   isSymbol,
   rbCallSuper,
@@ -208,11 +207,9 @@ export class Response extends DispatchResponse {
   }
 
   /** @internal */
-  buildBuffer(response: DispatchResponse, body: Iterable<string>): Buffer {
+  async buildBuffer(response: DispatchResponse, body: Iterable<string>): Promise<Buffer> {
     const buf = new Buffer(response);
-    const writes: Promise<void>[] = [];
-    each(body, (part) => writes.push(buf.write(part)));
-    new Thread(() => Promise.all(writes));
+    for (const part of body) await buf.write(part);
     return buf;
   }
 }
@@ -270,9 +267,9 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
   if (errorSet) throw error;
 }
 
-export function responseBody(this: LiveControllerHost, body: unknown): void {
-  rbCallSuper(this, responseBody, body);
-  if (this.response) this.response.close();
+export async function setResponseBody(this: LiveControllerHost, body: unknown): Promise<void> {
+  await rbCallSuper(this, setResponseBody, body);
+  if (this.response) await this.response.close();
 }
 
 export interface SendStreamOptions {
@@ -338,11 +335,11 @@ export function liveThreadPoolExecutor(): CachedThreadPool {
   return (_liveThreadPoolExecutor ??= new CachedThreadPool({ name: "action_controller.live" }));
 }
 
-export function makeResponseBang(this: object, request: Request): DispatchResponse {
+export async function makeResponseBang(this: object, request: Request): Promise<DispatchResponse> {
   if ((request.getHeader("SERVER_PROTOCOL") ?? request.getHeader("HTTP_VERSION")) === "HTTP/1.0") {
-    return rbCallSuper(this, makeResponseBang, request) as DispatchResponse;
+    return rbCallSuper(this, makeResponseBang, request) as Promise<DispatchResponse>;
   } else {
-    const res = new Response();
+    const res = await Response.new();
     res.request = request;
     return res;
   }
@@ -367,10 +364,6 @@ export function logError(this: LiveControllerHost, exception: Error): void {
   });
 }
 
-function _responseBodyReader(this: LiveControllerHost): unknown {
-  return rbCallSuper(this, _responseBodyReader);
-}
-
 export const Live = {
   ClassMethods,
   process,
@@ -378,11 +371,6 @@ export const Live = {
   newControllerThread,
   cleanUpThreadLocals,
   logError,
+  setResponseBody,
 };
-Object.defineProperty(Live, "responseBody", {
-  configurable: true,
-  enumerable: true,
-  get: _responseBodyReader,
-  set: responseBody,
-});
 extend(Live, Concern);

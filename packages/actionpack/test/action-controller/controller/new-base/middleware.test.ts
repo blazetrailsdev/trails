@@ -49,8 +49,8 @@ class BlockMiddleware {
 }
 
 class MyController extends Metal {
-  index(): void {
-    this.responseBody = "Hello World";
+  async index(): Promise<void> {
+    await this.setResponseBody("Hello World");
   }
 }
 MyController.use(
@@ -65,11 +65,11 @@ MyController.middleware().insertBefore(MyMiddleware, ExclaimerMiddleware, { kw: 
 class InheritedController extends MyController {}
 
 class ActionsController extends Metal {
-  index(): void {
-    this.responseBody = "index";
+  async index(): Promise<void> {
+    await this.setResponseBody("index");
   }
-  show(): void {
-    this.responseBody = "show";
+  async show(): Promise<void> {
+    await this.setResponseBody("show");
   }
 }
 ActionsController.use(MyMiddleware, { only: "show", kw: 1 });

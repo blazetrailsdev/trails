@@ -616,7 +616,7 @@ describe("ContentSecurityPolicyMiddlewareTest", () => {
 describe("DefaultContentSecurityPolicyIntegrationTest", () => {
   class PolicyController extends Base {
     async index() {
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 
@@ -733,31 +733,31 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
     }
 
     async index() {
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async inline() {
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async conditional() {
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async reportOnly() {
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async scriptSrc() {
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async styleSrc() {
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async noPolicy() {
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async api() {
@@ -765,7 +765,7 @@ describe("ContentSecurityPolicyIntegrationTest", () => {
     }
 
     async notModified() {
-      this.head(":not_modified");
+      await this.head(":not_modified");
     }
 
     private isCondition() {
@@ -898,11 +898,11 @@ describe("DisabledContentSecurityPolicyIntegrationTest", () => {
     }
 
     async index() {
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async inline() {
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 
@@ -958,7 +958,7 @@ describe("DisabledContentSecurityPolicyIntegrationTest", () => {
 describe("NonceDirectiveContentSecurityPolicyIntegrationTest", () => {
   class PolicyController extends Base {
     async index() {
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 
@@ -1051,7 +1051,7 @@ describe("HelpersContentSecurityPolicyIntegrationTest", () => {
     }
 
     async index() {
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 

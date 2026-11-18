@@ -46,8 +46,8 @@ function makeRequest(userAgent: string): Request {
   });
 }
 
-function makeResponse(): Response {
-  return new Response();
+async function makeResponse(): Promise<Response> {
+  return await Response.new();
 }
 
 function createController(
@@ -57,19 +57,19 @@ function createController(
 ) {
   class AllowBrowserController extends Base {
     async hello() {
-      this.head(200);
+      await this.head(200);
     }
 
     async helloMethodName() {
-      this.head(200);
+      await this.head(200);
     }
 
     async modern() {
-      this.head(200);
+      await this.head(200);
     }
 
-    private headUpgradeRequired() {
-      this.head(426);
+    private async headUpgradeRequired() {
+      await this.head(426);
     }
   }
 
@@ -86,13 +86,13 @@ describe("AllowBrowserTest", () => {
   it("blocked browser below version limit with callable", async () => {
     const C = createController(
       SPECIFIC_VERSIONS,
-      function (this: Base) {
-        this.head(426);
+      async function (this: Base) {
+        await this.head(426);
       },
       { only: ["hello"] },
     );
     const c = new C();
-    await c.dispatch("hello", makeRequest(FIREFOX_114), makeResponse());
+    await c.dispatch("hello", makeRequest(FIREFOX_114), await makeResponse());
     assertResponse.call(c, ":upgrade_required");
   });
 
@@ -101,92 +101,92 @@ describe("AllowBrowserTest", () => {
       only: ["helloMethodName"],
     });
     const c = new C();
-    await c.dispatch("helloMethodName", makeRequest(FIREFOX_114), makeResponse());
+    await c.dispatch("helloMethodName", makeRequest(FIREFOX_114), await makeResponse());
     assertResponse.call(c, ":upgrade_required");
   });
 
   it("blocked browser by name", async () => {
     const C = createController(
       SPECIFIC_VERSIONS,
-      function (this: Base) {
-        this.head(426);
+      async function (this: Base) {
+        await this.head(426);
       },
       { only: ["hello"] },
     );
     const c = new C();
-    await c.dispatch("hello", makeRequest(IE_11), makeResponse());
+    await c.dispatch("hello", makeRequest(IE_11), await makeResponse());
     assertResponse.call(c, ":upgrade_required");
   });
 
   it("allowed browsers above specific version limit", async () => {
     const C = createController(
       SPECIFIC_VERSIONS,
-      function (this: Base) {
-        this.head(426);
+      async function (this: Base) {
+        await this.head(426);
       },
       { only: ["hello"] },
     );
 
     let c = new C();
-    await c.dispatch("hello", makeRequest(SAFARI_17_2_0), makeResponse());
+    await c.dispatch("hello", makeRequest(SAFARI_17_2_0), await makeResponse());
     assertResponse.call(c, ":ok");
 
     c = new C();
-    await c.dispatch("hello", makeRequest(CHROME_120), makeResponse());
+    await c.dispatch("hello", makeRequest(CHROME_120), await makeResponse());
     assertResponse.call(c, ":ok");
 
     c = new C();
-    await c.dispatch("hello", makeRequest(OPERA_106), makeResponse());
+    await c.dispatch("hello", makeRequest(OPERA_106), await makeResponse());
     assertResponse.call(c, ":ok");
   });
 
   it("browsers against modern limit", async () => {
     const C = createController(
       "modern",
-      function (this: Base) {
-        this.head(426);
+      async function (this: Base) {
+        await this.head(426);
       },
       { only: ["modern"] },
     );
 
     let c = new C();
-    await c.dispatch("modern", makeRequest(SAFARI_17_2_0), makeResponse());
+    await c.dispatch("modern", makeRequest(SAFARI_17_2_0), await makeResponse());
     assertResponse.call(c, ":ok");
 
     c = new C();
-    await c.dispatch("modern", makeRequest(CHROME_118), makeResponse());
+    await c.dispatch("modern", makeRequest(CHROME_118), await makeResponse());
     assertResponse.call(c, ":upgrade_required");
 
     c = new C();
-    await c.dispatch("modern", makeRequest(CHROME_120), makeResponse());
+    await c.dispatch("modern", makeRequest(CHROME_120), await makeResponse());
     assertResponse.call(c, ":ok");
 
     c = new C();
-    await c.dispatch("modern", makeRequest(OPERA_106), makeResponse());
+    await c.dispatch("modern", makeRequest(OPERA_106), await makeResponse());
     assertResponse.call(c, ":ok");
   });
 
   it("bots", async () => {
     const C = createController(
       SPECIFIC_VERSIONS,
-      function (this: Base) {
-        this.head(426);
+      async function (this: Base) {
+        await this.head(426);
       },
       { only: ["hello"] },
     );
     const c = new C();
-    await c.dispatch("hello", makeRequest(GOOGLE_BOT), makeResponse());
+    await c.dispatch("hello", makeRequest(GOOGLE_BOT), await makeResponse());
     assertResponse.call(c, ":ok");
 
     const C2 = createController(
       "modern",
-      function (this: Base) {
-        this.head(426);
+      async function (this: Base) {
+        await this.head(426);
       },
       { only: ["modern"] },
     );
     const c2 = new C2();
-    await c2.dispatch("modern", makeRequest(GOOGLE_BOT), makeResponse());
+    await c2.dispatch("modern", makeRequest(GOOGLE_BOT), await makeResponse());
     assertResponse.call(c2, ":ok");
   });
 
@@ -201,14 +201,14 @@ describe("AllowBrowserTest", () => {
 
     const C = createController(
       "modern",
-      function (this: Base) {
-        this.head(426);
+      async function (this: Base) {
+        await this.head(426);
       },
       { only: ["modern"] },
     );
     const c = new C();
     const request = makeRequest(CHROME_118);
-    await c.dispatch("modern", request, makeResponse());
+    await c.dispatch("modern", request, await makeResponse());
 
     const [event, ...rest] = events;
 

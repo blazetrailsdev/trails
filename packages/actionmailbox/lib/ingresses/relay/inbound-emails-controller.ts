@@ -17,9 +17,9 @@ export class InboundEmailsController extends BaseController {
   }
 
   /** @internal */
-  private requireValidRfc822Message(): void {
+  private async requireValidRfc822Message(): Promise<void> {
     if (!(this.request.mediaType === "message/rfc822")) {
-      this.head(":unsupported_media_type");
+      await this.head(":unsupported_media_type");
     }
   }
 }

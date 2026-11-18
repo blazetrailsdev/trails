@@ -8,11 +8,11 @@ export class TestResponse<ParsedBody = HashWithIndifferentAccess> extends Respon
   private _parsedBody?: ParsedBody;
   private _responseParser?: ResponseParser;
 
-  static fromResponse(response: {
+  static async fromResponse(response: {
     status: number;
     headers: Headers | Record<string, unknown>;
     body: unknown;
-  }): TestResponse {
+  }): Promise<TestResponse> {
     const headers =
       response.headers instanceof Headers
         ? (response.headers.toH() as Record<string, string>)
@@ -20,7 +20,7 @@ export class TestResponse<ParsedBody = HashWithIndifferentAccess> extends Respon
     const body = Array.isArray(response.body)
       ? (response.body as string[])
       : [String(response.body)];
-    return new TestResponse(response.status, headers, body);
+    return TestResponse.new(response.status, headers, body);
   }
 
   get parsedBody(): ParsedBody {

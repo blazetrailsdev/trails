@@ -22,13 +22,13 @@ import {
 import "../../../support/abstract-unit.js";
 
 class TestController extends Base {
-  noSessionAccess(): void {
-    this.head(":ok");
+  async noSessionAccess(): Promise<void> {
+    await this.head(":ok");
   }
 
-  setSessionValue(): void {
+  async setSessionValue(): Promise<void> {
     this.session.set("foo", "bar");
-    this.head(":ok");
+    await this.head(":ok");
   }
 
   async getSessionValue(): Promise<void> {
@@ -43,7 +43,7 @@ class TestController extends Base {
     this.session.get("bar");
     await this.resetSession();
     this.session.set("bar", "baz");
-    this.head(":ok");
+    await this.head(":ok");
   }
 }
 

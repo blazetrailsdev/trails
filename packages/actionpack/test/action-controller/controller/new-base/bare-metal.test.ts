@@ -18,8 +18,8 @@ import { Request } from "../../../../lib/action-dispatch/http/request.js";
 import "../../../support/abstract-unit.js";
 
 class BareController extends Metal {
-  index(): void {
-    this.responseBody = "Hello world";
+  async index(): Promise<void> {
+    await this.setResponseBody("Hello world");
   }
 
   assignResponseArray(): void {
@@ -34,10 +34,10 @@ class BareController extends Metal {
     this.response = new RackResponseObject("Hello world", 200, { "content-type": "text/html" });
   }
 
-  assignResponseBodyProc(): void {
-    this.responseBody = ((stream: { close(): void }) => {
+  async assignResponseBodyProc(): Promise<void> {
+    await this.setResponseBody(((stream: { close(): void }) => {
       stream.close();
-    }) as unknown as string;
+    }) as unknown as string);
   }
 }
 Object.defineProperty(BareController, "name", { value: "BareMetalTest::BareController" });
@@ -65,11 +65,11 @@ describe("BareTest", () => {
     assertEqual("Hello world", string);
   });
 
-  it("response_body value is wrapped in an array when the value is a String", () => {
+  it("response_body value is wrapped in an array when the value is a String", async () => {
     const controller = new BareController();
     controller.setRequestBang(Request.empty());
-    controller.setResponseBang(BareController.makeResponseBang(controller.request));
-    controller.index();
+    controller.setResponseBang(await BareController.makeResponseBang(controller.request));
+    await controller.index();
 
     assertPredicate(controller, (c) => c.performed);
     assertEqual(["Hello world"], controller.responseBody);
@@ -100,11 +100,11 @@ describe("BareTest", () => {
     );
   });
 
-  it("can assign response body streamable object as part of the controller execution", () => {
+  it("can assign response body streamable object as part of the controller execution", async () => {
     const controller = new BareController();
     controller.setRequestBang(Request.empty());
-    controller.setResponseBang(BareController.makeResponseBang(controller.request));
-    controller.assignResponseBodyProc();
+    controller.setResponseBang(await BareController.makeResponseBang(controller.request));
+    await controller.assignResponseBodyProc();
 
     assertPredicate(controller, (c) => c.performed);
     assert(typeof controller.responseBody === "function");
@@ -121,17 +121,17 @@ describe("BareTest", () => {
 });
 
 class BareEmptyController extends Metal {
-  index(): void {
-    this.responseBody = null;
+  async index(): Promise<void> {
+    await this.setResponseBody(null);
   }
 }
 
 describe("BareEmptyTest", () => {
-  it("response body is nil", () => {
+  it("response body is nil", async () => {
     const controller = new BareEmptyController();
     controller.setRequestBang(Request.empty());
-    controller.setResponseBang(BareController.makeResponseBang(controller.request));
-    controller.index();
+    controller.setResponseBang(await BareController.makeResponseBang(controller.request));
+    await controller.index();
     assertNil(controller.responseBody);
   });
 });
@@ -139,43 +139,43 @@ describe("BareEmptyTest", () => {
 class HeadController extends Metal {
   declare head: Included<typeof Head>["head"];
 
-  index(): void {
-    this.head(":not_found");
+  async index(): Promise<void> {
+    await this.head(":not_found");
   }
 
-  continue(): void {
+  async continue(): Promise<void> {
     this.contentType = "text/html";
-    this.head(100);
+    await this.head(100);
   }
 
-  switchingProtocols(): void {
+  async switchingProtocols(): Promise<void> {
     this.contentType = "text/html";
-    this.head(101);
+    await this.head(101);
   }
 
-  processing(): void {
+  async processing(): Promise<void> {
     this.contentType = "text/html";
-    this.head(102);
+    await this.head(102);
   }
 
-  earlyHints(): void {
+  async earlyHints(): Promise<void> {
     this.contentType = "text/html";
-    this.head(103);
+    await this.head(103);
   }
 
-  noContent(): void {
+  async noContent(): Promise<void> {
     this.contentType = "text/html";
-    this.head(204);
+    await this.head(204);
   }
 
-  resetContent(): void {
+  async resetContent(): Promise<void> {
     this.contentType = "text/html";
-    this.head(205);
+    await this.head(205);
   }
 
-  notModified(): void {
+  async notModified(): Promise<void> {
     this.contentType = "text/html";
-    this.head(304);
+    await this.head(304);
   }
 }
 include(HeadController, Head);

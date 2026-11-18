@@ -29,7 +29,7 @@ export class MessagesController extends ActionController.Base {
     await this.message.setAttributes(this.messageParams());
 
     if (await this.message.save()) {
-      this.redirectTo(this.message, { notice: "Message was successfully created." });
+      await this.redirectTo(this.message, { notice: "Message was successfully created." });
     } else {
       await this.render("new", { status: ":unprocessable_entity" });
     }
@@ -37,7 +37,7 @@ export class MessagesController extends ActionController.Base {
 
   async update(): Promise<void> {
     if (await this.message.update(this.messageParams())) {
-      this.redirectTo(this.message, { notice: "Message was successfully updated." });
+      await this.redirectTo(this.message, { notice: "Message was successfully updated." });
     } else {
       await this.render("edit", { status: ":unprocessable_entity" });
     }
@@ -45,7 +45,7 @@ export class MessagesController extends ActionController.Base {
 
   async destroy(): Promise<void> {
     await this.message.destroy();
-    this.redirectTo((this as unknown as { messagesUrl(): string }).messagesUrl(), {
+    await this.redirectTo((this as unknown as { messagesUrl(): string }).messagesUrl(), {
       notice: "Message was successfully destroyed.",
     });
   }

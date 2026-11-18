@@ -28,7 +28,7 @@ describe("ActionView::Rendering::ClassMethods#build_view_context_class", () => {
     await controller.dispatch(
       "other",
       new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/other", HTTP_HOST: "example.com" }),
-      new Response(),
+      await Response.new(),
     );
 
     const view = controller.viewContext() as unknown as {

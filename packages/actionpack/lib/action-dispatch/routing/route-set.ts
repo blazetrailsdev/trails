@@ -269,7 +269,7 @@ export class Dispatcher extends Endpoint {
     try {
       const params = req.pathParameters;
       const controller = this._controller(req);
-      const res = controller.makeResponseBang(req as unknown as AdRequest);
+      const res = await controller.makeResponseBang(req as unknown as AdRequest);
       return await this._dispatch(controller, params["action"] as string, req, res);
     } catch (error) {
       if (error instanceof RoutingError) {

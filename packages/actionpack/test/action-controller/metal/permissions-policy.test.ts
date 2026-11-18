@@ -19,12 +19,12 @@ class PolicyController extends Base {
 
   seen: PermissionsPolicy | null = null;
 
-  index(): void {
-    this.head(":ok");
+  async index(): Promise<void> {
+    await this.head(":ok");
   }
 
-  bare(): void {
-    this.head(":ok");
+  async bare(): Promise<void> {
+    await this.head(":ok");
   }
 }
 
@@ -32,7 +32,7 @@ async function process(action: string, policy = POLICY): Promise<PolicyControlle
   const request = new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" });
   request.permissionsPolicy = policy;
   const controller = new PolicyController();
-  await controller.dispatch(action, request, new Response());
+  await controller.dispatch(action, request, await Response.new());
   return controller;
 }
 

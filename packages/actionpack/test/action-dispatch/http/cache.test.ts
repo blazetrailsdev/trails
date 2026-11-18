@@ -18,7 +18,7 @@ const req = (h: Record<string, string> = {}): RequestCacheHost => ({
   getHeader: (n) => h[n],
   strictFreshness: false,
 });
-const res = (h: Record<string, string> = {}): Response => new Response(200, h);
+const res = async (h: Record<string, string> = {}): Promise<Response> => await Response.new(200, h);
 
 describe("Cache::Request", () => {
   it("not_modified? compares If-Modified-Since to modified_at", () => {
@@ -60,34 +60,42 @@ describe("Cache::Request", () => {
 });
 
 describe("Cache::Response", () => {
-  it("last_modified parses strict RFC 1123 (Time.httpdate parity)", () => {
-    expect(res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 GMT" }).lastModified).toEqual(
+  it("last_modified parses strict RFC 1123 (Time.httpdate parity)", async () => {
+    expect((await res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 GMT" })).lastModified).toEqual(
       new Date("1994-11-06T08:49:37Z"),
     );
   });
 
-  it("last_modified rejects RFC 850 / asctime / numeric-zone forms (httpdate is strict)", () => {
-    expect(res({ "Last-Modified": "Sunday, 06-Nov-94 08:49:37 GMT" }).lastModified).toBeUndefined();
-    expect(res({ "Last-Modified": "Sun Nov  6 08:49:37 1994" }).lastModified).toBeUndefined();
+  it("last_modified rejects RFC 850 / asctime / numeric-zone forms (httpdate is strict)", async () => {
     expect(
-      res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 -0500" }).lastModified,
+      (await res({ "Last-Modified": "Sunday, 06-Nov-94 08:49:37 GMT" })).lastModified,
+    ).toBeUndefined();
+    expect(
+      (await res({ "Last-Modified": "Sun Nov  6 08:49:37 1994" })).lastModified,
+    ).toBeUndefined();
+    expect(
+      (await res({ "Last-Modified": "Sun, 06 Nov 1994 08:49:37 -0500" })).lastModified,
     ).toBeUndefined();
   });
 
-  it("last_modified rejects out-of-range and impossible-calendar values", () => {
-    expect(res({ "Last-Modified": "Sun, 99 Nov 1994 08:49:37 GMT" }).lastModified).toBeUndefined();
-    expect(res({ "Last-Modified": "Tue, 31 Feb 2015 08:49:37 GMT" }).lastModified).toBeUndefined();
+  it("last_modified rejects out-of-range and impossible-calendar values", async () => {
+    expect(
+      (await res({ "Last-Modified": "Sun, 99 Nov 1994 08:49:37 GMT" })).lastModified,
+    ).toBeUndefined();
+    expect(
+      (await res({ "Last-Modified": "Tue, 31 Feb 2015 08:49:37 GMT" })).lastModified,
+    ).toBeUndefined();
   });
 
-  it("etag= sets weak validator", () => {
-    const r = res();
+  it("etag= sets weak validator", async () => {
+    const r = await res();
     r.etag = "foo";
     expect(r.getHeader("ETag")?.startsWith('W/"')).toBe(true);
     expect(isWeakEtag.call(r)).toBe(true);
   });
 
-  it("weak_etag? and strong_etag? answer nil with no ETag, as etag? && ... does", () => {
-    const r = res();
+  it("weak_etag? and strong_etag? answer nil with no ETag, as etag? && ... does", async () => {
+    const r = await res();
     expect(isWeakEtag.call(r)).toBeUndefined();
     expect(isStrongEtag.call(r)).toBeUndefined();
     r.strongEtag("x");
@@ -99,34 +107,34 @@ describe("Cache::Response", () => {
     expect(generateStrongEtag(["a", "b"])).toBe(generateStrongEtag("a/b"));
   });
 
-  it("handle_conditional_get! sets default only when validator present and header missing", () => {
-    const r = res();
+  it("handle_conditional_get! sets default only when validator present and header missing", async () => {
+    const r = await res();
     r.etag = "x";
     handleConditionalGetBang.call(r);
     expect(r.getHeader("Cache-Control")).toBe("max-age=0, private, must-revalidate");
 
-    const r2 = res({ "Cache-Control": "public" });
+    const r2 = await res({ "Cache-Control": "public" });
     r2.etag = "x";
     handleConditionalGetBang.call(r2);
     expect(r2.getHeader("Cache-Control")).toBe("public");
   });
 
-  it("merge_and_normalize_cache_control! emits directives in Rails order", () => {
-    const r = res();
+  it("merge_and_normalize_cache_control! emits directives in Rails order", async () => {
+    const r = await res();
     mergeAndNormalizeCacheControlBang.call(r, { maxAge: 60, public: true });
     expect(r.getHeader("Cache-Control")).toBe("max-age=60, public");
 
-    const r2 = res();
+    const r2 = await res();
     mergeAndNormalizeCacheControlBang.call(r2, { noStore: true, private: true });
     expect(r2.getHeader("Cache-Control")).toBe("private, no-store");
 
-    const r3 = res({ "Cache-Control": "no-cache, community=internal" });
+    const r3 = await res({ "Cache-Control": "no-cache, community=internal" });
     mergeAndNormalizeCacheControlBang.call(r3, { maxAge: 10, public: true });
     expect(r3.getHeader("Cache-Control")).toBe("max-age=10, public, community=internal");
   });
 
-  it("last_modified= writes httpdate", () => {
-    const r = res();
+  it("last_modified= writes httpdate", async () => {
+    const r = await res();
     r.lastModified = new Date(Date.UTC(1994, 10, 6, 8, 49, 37));
     expect(r.getHeader("Last-Modified")).toBe("Sun, 06 Nov 1994 08:49:37 GMT");
   });

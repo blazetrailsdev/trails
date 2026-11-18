@@ -124,34 +124,35 @@ describe("Collector#initialize", () => {
 });
 
 describe("Base#respondTo", () => {
-  function controller(format: string): Base {
+  async function controller(format: string): Promise<Base> {
     const base = new Base();
     base.request = new Request({ HTTP_ACCEPT: format }) as unknown as Base["request"];
-    base.setResponseBang(new Response());
+    base.setResponseBang(await Response.new());
     return base;
   }
 
-  it("raises when given both types and a block", () => {
+  it("raises when given both types and a block", async () => {
+    const c = await controller("text/html");
     expect(() =>
-      controller("text/html").respondTo("html", (format) => {
+      c.respondTo("html", (format) => {
         format.html(() => undefined);
       }),
     ).toThrow("respond_to takes either types or a block, never both");
   });
 
-  it("negotiates a mime passed without a block", () => {
-    expect(() => controller("application/json").respondTo("json")).not.toThrow(UnknownFormat);
+  it("negotiates a mime passed without a block", async () => {
+    const c = await controller("application/json");
+    expect(() => c.respondTo("json")).not.toThrow(UnknownFormat);
   });
 
-  it("raises UnknownFormat for an unregistered format", () => {
-    expect(() => controller("application/json").respondTo("unregistered_format")).toThrow(
-      UnknownFormat,
-    );
+  it("raises UnknownFormat for an unregistered format", async () => {
+    const c = await controller("application/json");
+    expect(() => c.respondTo("unregistered_format")).toThrow(UnknownFormat);
   });
 
-  it("registers each mime it was called with", () => {
+  it("registers each mime it was called with", async () => {
     let called = false;
-    controller("application/json").respondTo((format) => {
+    (await controller("application/json")).respondTo((format) => {
       format.json(() => {
         called = true;
       });
@@ -160,8 +161,8 @@ describe("Base#respondTo", () => {
     expect(called).toBe(true);
   });
 
-  it("raises RespondToMismatchError when the response media type differs from the negotiated format", () => {
-    const base = controller("application/json");
+  it("raises RespondToMismatchError when the response media type differs from the negotiated format", async () => {
+    const base = await controller("application/json");
     base.contentType = "text/html";
 
     expect(() =>
@@ -171,8 +172,8 @@ describe("Base#respondTo", () => {
     ).toThrow(RespondToMismatchError);
   });
 
-  it("sets the rendered content type from the negotiated format", () => {
-    const base = controller("application/json");
+  it("sets the rendered content type from the negotiated format", async () => {
+    const base = await controller("application/json");
     base.respondTo((format) => {
       format.json(() => undefined);
     });
@@ -184,18 +185,18 @@ describe("Base#respondTo", () => {
 describe("Collector#response", () => {
   type Variants = VariantCollector & Record<string, (block?: () => unknown) => void>;
 
-  function controller(variant?: string | string[]): Base {
+  async function controller(variant?: string | string[]): Promise<Base> {
     const base = new Base();
     const request = new Request({ HTTP_ACCEPT: "text/html" });
     if (variant !== undefined) request.variant = variant;
     base.request = request as unknown as Base["request"];
-    base.setResponseBang(new Response());
+    base.setResponseBang(await Response.new());
     return base;
   }
 
-  it("calls the variant block for the inline variant syntax", () => {
+  it("calls the variant block for the inline variant syntax", async () => {
     const rendered: string[] = [];
-    controller(":phone").respondTo((format) => {
+    (await controller(":phone")).respondTo((format) => {
       (format.html() as Variants).none(() => rendered.push("none"));
       (format.html() as Variants).phone(() => rendered.push("phone"));
     });
@@ -203,9 +204,9 @@ describe("Collector#response", () => {
     expect(rendered).toEqual(["phone"]);
   });
 
-  it("calls the none variant for the inline variant syntax when no variant is set", () => {
+  it("calls the none variant for the inline variant syntax when no variant is set", async () => {
     const rendered: string[] = [];
-    controller().respondTo((format) => {
+    (await controller()).respondTo((format) => {
       (format.html() as Variants).none(() => rendered.push("none"));
       (format.html() as Variants).phone(() => rendered.push("phone"));
     });
@@ -213,9 +214,9 @@ describe("Collector#response", () => {
     expect(rendered).toEqual(["none"]);
   });
 
-  it("yields a variant collector to a format block that takes one", () => {
+  it("yields a variant collector to a format block that takes one", async () => {
     const rendered: string[] = [];
-    controller(":tablet").respondTo((format) => {
+    (await controller(":tablet")).respondTo((format) => {
       format.html((variant: VariantCollector) => {
         variant.any(":tablet", ":phablet", () => rendered.push("any"));
         (variant as Variants).phone(() => rendered.push("phone"));
@@ -225,9 +226,9 @@ describe("Collector#response", () => {
     expect(rendered).toEqual(["any"]);
   });
 
-  it("falls back to the any variant for an unmatched variant", () => {
+  it("falls back to the any variant for an unmatched variant", async () => {
     const rendered: string[] = [];
-    controller(":yolo").respondTo((format) => {
+    (await controller(":yolo")).respondTo((format) => {
       format.html((variant: VariantCollector) => {
         variant.any(() => rendered.push("any"));
         (variant as Variants).phone(() => rendered.push("phone"));
@@ -237,9 +238,9 @@ describe("Collector#response", () => {
     expect(rendered).toEqual(["any"]);
   });
 
-  it("reuses the catch-all variant collector across blockless any calls", () => {
+  it("reuses the catch-all variant collector across blockless any calls", async () => {
     const rendered: string[] = [];
-    controller(":phone").respondTo((format) => {
+    (await controller(":phone")).respondTo((format) => {
       (format.any() as Variants).phone(() => rendered.push("phone"));
       (format.any() as Variants).tablet(() => rendered.push("tablet"));
     });
@@ -282,7 +283,7 @@ describe("ActionView::Rendering#_process_format", () => {
       HTTP_HOST: "localhost",
       HTTP_ACCEPT: "*/*",
     });
-    await controller.dispatch("jsonOrHtml", request, new Response());
+    await controller.dispatch("jsonOrHtml", request, await Response.new());
 
     expect(controller.lookupContext.formats).toEqual([":json"]);
     expect(controller.response.mediaType).toBe("application/json");

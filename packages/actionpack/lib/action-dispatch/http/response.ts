@@ -10,6 +10,7 @@ import {
   rbCheckArrayType,
   rbObjAsString,
   rbFSend,
+  rbClassNewInstance,
   rbObjRespondTo,
   strNew,
   stringSplit,
@@ -356,7 +357,7 @@ export class Response {
   stream!: Buffer<{ push(obj: unknown): unknown }> | FileBody | { toPath(): string };
   request: Request | null = null;
 
-  constructor(
+  protected constructor(
     status: number | string = 200,
     headers: Record<string, string> = {},
     body: unknown = [],
@@ -366,11 +367,22 @@ export class Response {
     for (const [key, value] of Object.entries(headers)) {
       this._headers.set(key, value);
     }
-    this.body = body;
-    this.status = status;
-    this.prepareCacheControlBang();
+  }
 
-    if (block) block(this);
+  static async new<T extends Response>(
+    this: { prototype: T },
+    status: number | string = 200,
+    headers: Record<string, string> = {},
+    body: unknown = [],
+    block?: (response: T) => void,
+  ): Promise<T> {
+    const response = rbClassNewInstance(this, status, headers, body, block);
+    await response.setBody(body);
+    response.status = status;
+    response.prepareCacheControlBang();
+
+    if (block) block(response);
+    return response;
   }
 
   get status(): number {
@@ -442,12 +454,12 @@ export class Response {
     return (this.stream as { body: string }).body;
   }
 
-  set body(value: unknown) {
-    if (rbObjRespondTo(value, "toPath")) {
-      this.stream = value as { toPath(): string };
-      return;
+  async setBody(body: unknown): Promise<void> {
+    if (rbObjRespondTo(body, "toPath")) {
+      this.stream = body as { toPath(): string };
+    } else {
+      this.stream = await this.buildBuffer(this, this.mungeBodyObject(body));
     }
-    this.stream = this.buildBuffer(this, this.mungeBodyObject(value));
   }
 
   get contentLength(): number | undefined {
@@ -569,8 +581,8 @@ export class Response {
     this.stream = new FileBody(path);
   }
 
-  resetBodyBang(): void {
-    this.stream = this.buildBuffer(this, []);
+  async resetBodyBang(): Promise<void> {
+    this.stream = await this.buildBuffer(this, []);
   }
 
   each(block?: (chunk: unknown) => unknown): unknown {
@@ -616,7 +628,10 @@ export class Response {
   }
 
   async awaitCommit(): Promise<void> {
+    if (this._committed) return;
     while (!this._committed) await new Promise<void>((broadcast) => this.cv.push(broadcast));
+    /** @inventedArm setTimeout — PERMANENT */
+    await new Promise<void>((resume) => setTimeout(resume, 0));
   }
 
   async awaitSent(): Promise<void> {
@@ -684,7 +699,10 @@ export class Response {
   }
 
   /** @internal */
-  buildBuffer(response: unknown, body: unknown): Buffer<{ push(obj: unknown): unknown }> {
+  buildBuffer(
+    response: unknown,
+    body: unknown,
+  ): Buffer<{ push(obj: unknown): unknown }> | Promise<Buffer<{ push(obj: unknown): unknown }>> {
     return new Buffer(response as Response, body as { push(obj: unknown): unknown });
   }
 
@@ -741,15 +759,15 @@ export class Response {
     return { ...defaults, ...original };
   }
 
-  static create<T extends typeof Response>(
-    this: T,
+  static async create<T extends Response>(
+    this: typeof Response & { prototype: T },
     status = 200,
     headers: Record<string, string> = {},
     body: unknown = [],
     { defaultHeaders }: { defaultHeaders?: Record<string, string> } = {},
-  ): InstanceType<T> {
+  ): Promise<T> {
     headers = this.mergeDefaultHeaders(headers, defaultHeaders ?? this.defaultHeaders);
-    return new this(status, headers, body) as InstanceType<T>;
+    return this.new(status, headers, body) as Promise<T>;
   }
 }
 

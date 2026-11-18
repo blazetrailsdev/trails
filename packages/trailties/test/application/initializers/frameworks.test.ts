@@ -261,8 +261,8 @@ describe("FrameworksTest", { timeout: 120_000 }, () => {
       `
         import { ApplicationController } from "./application-controller.ts";
         export class OmgController extends ApplicationController {
-          show() {
-            this.render({ json: { omg: "omg" } });
+          async show() {
+            await this.render({ json: { omg: "omg" } });
           }
         }
 `,

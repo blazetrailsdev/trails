@@ -68,107 +68,110 @@ class RedirectController extends Base {
     super.location = value;
   }
 
-  simpleRedirect() {
-    this.redirectTo({ action: "hello_world" });
+  async simpleRedirect() {
+    await this.redirectTo({ action: "hello_world" });
   }
 
-  redirectWithStatus() {
-    this.redirectTo({ action: "hello_world", status: 301 });
+  async redirectWithStatus() {
+    await this.redirectTo({ action: "hello_world", status: 301 });
   }
 
-  redirectWithStatusHash() {
-    this.redirectTo({ action: "hello_world" }, { status: 301 });
+  async redirectWithStatusHash() {
+    await this.redirectTo({ action: "hello_world" }, { status: 301 });
   }
 
-  redirectWithProtocol() {
-    this.redirectTo({ action: "hello_world", protocol: "https" });
+  async redirectWithProtocol() {
+    await this.redirectTo({ action: "hello_world", protocol: "https" });
   }
 
-  urlRedirectWithStatus() {
-    this.redirectTo("http://www.example.com", { status: ":moved_permanently" });
+  async urlRedirectWithStatus() {
+    await this.redirectTo("http://www.example.com", { status: ":moved_permanently" });
   }
 
-  urlRedirectWithStatusHash() {
-    this.redirectTo("http://www.example.com", { status: 301 });
+  async urlRedirectWithStatusHash() {
+    await this.redirectTo("http://www.example.com", { status: 301 });
   }
 
-  relativeUrlRedirectWithStatus() {
-    this.redirectTo("/things/stuff", { status: ":found" });
+  async relativeUrlRedirectWithStatus() {
+    await this.redirectTo("/things/stuff", { status: ":found" });
   }
 
-  relativeUrlRedirectWithStatusHash() {
-    this.redirectTo("/things/stuff", { status: 301 });
+  async relativeUrlRedirectWithStatusHash() {
+    await this.redirectTo("/things/stuff", { status: 301 });
   }
 
-  redirectBackWithStatus() {
-    this.redirectBackOrTo("/things/stuff", { status: 307 });
+  async redirectBackWithStatus() {
+    await this.redirectBackOrTo("/things/stuff", { status: 307 });
   }
 
-  redirectBackWithStatusAndFallbackLocationToAnotherHost() {
-    this.redirectBackOrTo("http://www.rubyonrails.org/", { status: 307 });
+  async redirectBackWithStatusAndFallbackLocationToAnotherHost() {
+    await this.redirectBackOrTo("http://www.rubyonrails.org/", { status: 307 });
   }
 
-  safeRedirectBackWithStatus() {
-    this.redirectBackOrTo("/things/stuff", { status: 307, allowOtherHost: false });
+  async safeRedirectBackWithStatus() {
+    await this.redirectBackOrTo("/things/stuff", { status: 307, allowOtherHost: false });
   }
 
-  safeRedirectBackWithStatusAndFallbackLocationToAnotherHost() {
-    this.redirectBackOrTo("http://www.rubyonrails.org/", { status: 307, allowOtherHost: false });
+  async safeRedirectBackWithStatusAndFallbackLocationToAnotherHost() {
+    await this.redirectBackOrTo("http://www.rubyonrails.org/", {
+      status: 307,
+      allowOtherHost: false,
+    });
   }
 
-  safeRedirectToRoot() {
-    this.redirectTo(this.urlFrom("/"));
+  async safeRedirectToRoot() {
+    await this.redirectTo(this.urlFrom("/"));
   }
 
-  unsafeRedirect() {
-    this.redirectTo("http://www.rubyonrails.org/");
+  async unsafeRedirect() {
+    await this.redirectTo("http://www.rubyonrails.org/");
   }
 
-  unsafeRedirectBack() {
-    this.redirectBackOrTo("http://www.rubyonrails.org/");
+  async unsafeRedirectBack() {
+    await this.redirectBackOrTo("http://www.rubyonrails.org/");
   }
 
-  unsafeRedirectMalformed() {
-    this.redirectTo("http:///www.rubyonrails.org/");
+  async unsafeRedirectMalformed() {
+    await this.redirectTo("http:///www.rubyonrails.org/");
   }
 
-  unsafeRedirectProtocolRelativeDoubleSlash() {
-    this.redirectTo("//www.rubyonrails.org/");
+  async unsafeRedirectProtocolRelativeDoubleSlash() {
+    await this.redirectTo("//www.rubyonrails.org/");
   }
 
-  unsafeRedirectProtocolRelativeTripleSlash() {
-    this.redirectTo("///www.rubyonrails.org/");
+  async unsafeRedirectProtocolRelativeTripleSlash() {
+    await this.redirectTo("///www.rubyonrails.org/");
   }
 
-  unsafeRedirectWithIllegalHttpHeaderValueCharacter() {
-    this.redirectTo("javascript:alert(document.domain)\b", { allowOtherHost: true });
+  async unsafeRedirectWithIllegalHttpHeaderValueCharacter() {
+    await this.redirectTo("javascript:alert(document.domain)\b", { allowOtherHost: true });
   }
 
-  onlyPathRedirect() {
-    this.redirectTo({ action: "other_host", onlyPath: true });
+  async onlyPathRedirect() {
+    await this.redirectTo({ action: "other_host", onlyPath: true });
   }
 
-  safeRedirectWithFallback() {
-    this.redirectTo(this.urlFrom(this.params.get("redirect_url") as string) || "/fallback");
+  async safeRedirectWithFallback() {
+    await this.redirectTo(this.urlFrom(this.params.get("redirect_url") as string) || "/fallback");
   }
 
-  redirectBackWithExplicitFallbackKwarg() {
-    this.redirectBack({ fallbackLocation: "/things/stuff", status: 307 });
+  async redirectBackWithExplicitFallbackKwarg() {
+    await this.redirectBack({ fallbackLocation: "/things/stuff", status: 307 });
   }
 
-  hostRedirect() {
-    this.redirectTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
+  async hostRedirect() {
+    await this.redirectTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
   }
 
-  moduleRedirect() {
-    this.redirectTo({ controller: "module_test/module_redirect", action: "hello_world" });
+  async moduleRedirect() {
+    await this.redirectTo({ controller: "module_test/module_redirect", action: "hello_world" });
   }
 
-  redirectToUrl() {
-    this.redirectTo("http://www.rubyonrails.org/");
+  async redirectToUrl() {
+    await this.redirectTo("http://www.rubyonrails.org/");
   }
 
-  redirectToUrlWithStringlike() {
+  async redirectToUrlWithStringlike() {
     const stringlike = {};
 
     Object.assign(rbObjSingletonClass(stringlike).prototype, {
@@ -177,75 +180,77 @@ class RedirectController extends Base {
       },
     });
 
-    this.redirectTo(stringlike);
+    await this.redirectTo(stringlike);
   }
 
-  redirectToUrlWithUnescapedQueryString() {
-    this.redirectTo("http://example.com/query?status=new");
+  async redirectToUrlWithUnescapedQueryString() {
+    await this.redirectTo("http://example.com/query?status=new");
   }
 
-  redirectToUrlWithComplexScheme() {
-    this.redirectTo("x-test+scheme.complex:redirect");
+  async redirectToUrlWithComplexScheme() {
+    await this.redirectTo("x-test+scheme.complex:redirect");
   }
 
-  redirectToUrlWithNetworkPathReference() {
-    this.redirectTo("//www.rubyonrails.org/");
+  async redirectToUrlWithNetworkPathReference() {
+    await this.redirectTo("//www.rubyonrails.org/");
   }
 
-  redirectToExistingRecord() {
-    this.redirectTo(new Workshop(5));
+  async redirectToExistingRecord() {
+    await this.redirectTo(new Workshop(5));
   }
 
-  redirectToNewRecord() {
-    this.redirectTo(new Workshop(null));
+  async redirectToNewRecord() {
+    await this.redirectTo(new Workshop(null));
   }
 
-  redirectToNil() {
-    this.redirectTo(null);
+  async redirectToNil() {
+    await this.redirectTo(null);
   }
 
-  redirectToPolymorphic() {
-    this.redirectTo([":internal", new Workshop(5)]);
+  async redirectToPolymorphic() {
+    await this.redirectTo([":internal", new Workshop(5)]);
   }
 
-  redirectToPolymorphicStringArgs() {
-    this.redirectTo(["internal", new Workshop(5)]);
+  async redirectToPolymorphicStringArgs() {
+    await this.redirectTo(["internal", new Workshop(5)]);
   }
 
-  redirectToParams() {
-    this.redirectTo(new Parameters({ status: 200, protocol: "javascript", f: "%0Aeval(name)" }));
+  async redirectToParams() {
+    await this.redirectTo(
+      new Parameters({ status: 200, protocol: "javascript", f: "%0Aeval(name)" }),
+    );
   }
 
-  redirectToWithBlock() {
-    this.redirectTo(() => "http://www.rubyonrails.org/");
+  async redirectToWithBlock() {
+    await this.redirectTo(() => "http://www.rubyonrails.org/");
   }
 
-  redirectToWithBlockAndAssigns() {
+  async redirectToWithBlockAndAssigns() {
     this.url = "http://www.rubyonrails.org/";
-    this.redirectTo(function (this: RedirectController) {
+    await this.redirectTo(function (this: RedirectController) {
       return this.url;
     });
   }
 
-  redirectToWithBlockAndOptions() {
-    this.redirectTo(() => ({ action: "hello_world" }));
+  async redirectToWithBlockAndOptions() {
+    await this.redirectTo(() => ({ action: "hello_world" }));
   }
 
-  redirectToOutOfScopeBlock() {
-    this.redirectTo(Workshop.OUT_OF_SCOPE_BLOCK);
+  async redirectToOutOfScopeBlock() {
+    await this.redirectTo(Workshop.OUT_OF_SCOPE_BLOCK);
   }
 
-  redirectWithHeaderBreak() {
-    this.redirectTo("/lol\r\nwat");
+  async redirectWithHeaderBreak() {
+    await this.redirectTo("/lol\r\nwat");
   }
 
-  redirectWithNullBytes() {
-    this.redirectTo("\0/lol\r\nwat");
+  async redirectWithNullBytes() {
+    await this.redirectTo("\0/lol\r\nwat");
   }
 
   async redirectToExternalWithRescue() {
     try {
-      this.redirectTo("http://www.rubyonrails.org/", { allowOtherHost: false });
+      await this.redirectTo("http://www.rubyonrails.org/", { allowOtherHost: false });
     } catch (e) {
       if (!(e instanceof UnsafeRedirectError)) throw e;
       await this.render({ plain: "caught error" });
@@ -724,8 +729,8 @@ constSet(
   ModuleTest,
   "ModuleRedirectController",
   class ModuleRedirectController extends RedirectController {
-    override moduleRedirect() {
-      this.redirectTo({ controller: "/redirect", action: "hello_world" });
+    override async moduleRedirect() {
+      await this.redirectTo({ controller: "/redirect", action: "hello_world" });
     }
   },
 );

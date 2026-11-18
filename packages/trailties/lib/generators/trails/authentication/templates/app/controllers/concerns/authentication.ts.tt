@@ -36,9 +36,9 @@ export const Authentication = defineModule(
       return sessionId ? await Session.findBy({ id: sessionId }) : null;
     },
 
-    requestAuthentication(this: any): void {
+    async requestAuthentication(this: any): Promise<void> {
       this.session["return_to_after_authenticating"] = this.request.url;
-      this.redirectTo(this.newSessionPath());
+      await this.redirectTo(this.newSessionPath());
     },
 
     afterAuthenticationUrl(this: any): string {

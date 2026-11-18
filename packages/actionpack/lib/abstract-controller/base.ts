@@ -75,8 +75,8 @@ export class Base {
   get responseBody(): unknown {
     return this._responseBody;
   }
-  set responseBody(value: unknown) {
-    this._responseBody = value;
+  setResponseBody(responseBody: unknown): void {
+    this._responseBody = responseBody;
   }
 
   protected _formats: unknown = null;

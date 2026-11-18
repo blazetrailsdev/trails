@@ -190,7 +190,7 @@ describe("TestCase::Behavior", () => {
 describe("TestCase#wrap_execution", () => {
   class HeadController extends Base {
     async index() {
-      this.head(":ok");
+      await this.head(":ok");
     }
   }
 
@@ -320,11 +320,11 @@ describe("TestCase over a PostsController", () => {
     }
 
     async destroy() {
-      this.head(204);
+      await this.head(204);
     }
 
     async redirectAction() {
-      this.redirectTo("/posts");
+      await this.redirectTo("/posts");
     }
 
     async renderPlain() {
@@ -345,7 +345,7 @@ describe("TestCase over a PostsController", () => {
     }
 
     async forbidden() {
-      this.head(":forbidden");
+      await this.head(":forbidden");
     }
   }
   class PostsControllerTest extends TestCase {}
@@ -484,7 +484,7 @@ describe("TestCase over a PostsController", () => {
     it("works with Metal controllers", async ({ task }) => {
       class SimpleMetal extends Metal {
         async index() {
-          this.responseBody = "metal response";
+          await this.setResponseBody("metal response");
           this.contentType = "text/plain";
         }
       }
@@ -593,11 +593,11 @@ describe("TestCase class helpers", () => {
     );
   });
 
-  it("controllerClassName returns the controller's path", ({ task }) => {
+  it("controllerClassName returns the controller's path", async ({ task }) => {
     class Sub extends TestCase {}
     Sub.tests(PostsController);
     const tc = new Sub(task.name);
-    tc.setupControllerRequestAndResponse();
+    await tc.setupControllerRequestAndResponse();
     expect(tc.controllerClassName()).toBe("posts");
   });
 
@@ -718,20 +718,20 @@ describe("ActionController::TestRequest helpers", () => {
 });
 
 describe("ActionController::LiveTestResponse predicates", () => {
-  it("isSuccess is true for 2xx responses", () => {
-    const r = new LiveTestResponse(200);
+  it("isSuccess is true for 2xx responses", async () => {
+    const r = await LiveTestResponse.new(200);
     expect(r.isSuccess).toBe(true);
-    const r4 = new LiveTestResponse(404);
+    const r4 = await LiveTestResponse.new(404);
     expect(r4.isSuccess).toBe(false);
   });
 
-  it("isMissing is true only for 404", () => {
-    expect(new LiveTestResponse(404).isMissing).toBe(true);
-    expect(new LiveTestResponse(403).isMissing).toBe(false);
+  it("isMissing is true only for 404", async () => {
+    expect((await LiveTestResponse.new(404)).isMissing).toBe(true);
+    expect((await LiveTestResponse.new(403)).isMissing).toBe(false);
   });
 
-  it("isError is true for 5xx responses", () => {
-    expect(new LiveTestResponse(500).isError).toBe(true);
-    expect(new LiveTestResponse(200).isError).toBe(false);
+  it("isError is true for 5xx responses", async () => {
+    expect((await LiveTestResponse.new(500)).isError).toBe(true);
+    expect((await LiveTestResponse.new(200)).isError).toBe(false);
   });
 });

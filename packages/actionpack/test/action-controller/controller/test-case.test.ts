@@ -197,7 +197,7 @@ class TestController extends Base {
   }
 
   async create() {
-    this.head(201, { location: "/resource" });
+    await this.head(201, { location: "/resource" });
   }
 }
 Object.defineProperty(TestController, "name", { value: "TestCaseTest::TestController" });
@@ -1188,11 +1188,11 @@ describe("TestCaseTest", () => {
 class ResponseDefaultHeadersTestController extends Base {
   async removeHeader() {
     this.headers.delete(this.params.get("header") as string);
-    this.head(":ok", { C: "3" });
+    await this.head(":ok", { C: "3" });
   }
 
   async leaveAlone() {
-    this.head(":ok");
+    await this.head(":ok");
   }
 }
 Object.defineProperty(ResponseDefaultHeadersTestController, "name", {

@@ -28,37 +28,37 @@ class ActionPackAssertionsController extends Base {
   declare routeTwoUrl: () => string;
 
   async nothing() {
-    this.head(200);
+    await this.head(200);
   }
   async redirectInternal() {
-    this.redirectTo("http://test.host/nothing");
+    await this.redirectTo("http://test.host/nothing");
   }
   async redirectExternal() {
-    this.redirectTo("http://www.rubyonrails.org");
+    await this.redirectTo("http://www.rubyonrails.org");
   }
   async redirectExternalProtocolRelative() {
-    this.redirectTo("//www.rubyonrails.org");
+    await this.redirectTo("//www.rubyonrails.org");
   }
   async redirectToNamedRoute() {
-    this.redirectTo(this.routeOneUrl());
+    await this.redirectTo(this.routeOneUrl());
   }
   async redirectToPath() {
-    this.redirectTo("http://test.host/some/path");
+    await this.redirectTo("http://test.host/some/path");
   }
   async redirectInvalidExternalRoute() {
-    this.redirectTo("ht_tp://www.rubyonrails.org");
+    await this.redirectTo("ht_tp://www.rubyonrails.org");
   }
   async redirectPermanently() {
-    this.redirectTo("http://test.host/some/path", { status: 301 });
+    await this.redirectTo("http://test.host/some/path", { status: 301 });
   }
   async response404() {
-    this.head(404);
+    await this.head(404);
   }
   async response500() {
-    this.head(500);
+    await this.head(500);
   }
   async response599() {
-    this.head(599);
+    await this.head(599);
   }
   async flashMe() {
     this.flash.set("hello", "my name is inigo montoya...");
@@ -94,13 +94,13 @@ class ActionPackAssertionsController extends Base {
     await this.render({ body: "Hello!", contentType: "application/rss+xml" });
   }
   async redirectToController() {
-    this.redirectTo("http://test.host/elsewhere/flash_me");
+    await this.redirectTo("http://test.host/elsewhere/flash_me");
   }
   async redirectToControllerWithSymbol() {
-    this.redirectTo("http://test.host/elsewhere/flash_me");
+    await this.redirectTo("http://test.host/elsewhere/flash_me");
   }
   async redirectToAction() {
-    this.redirectTo("http://test.host/action_pack_assertions/flash_me?id=1&panda=fun");
+    await this.redirectTo("http://test.host/action_pack_assertions/flash_me?id=1&panda=fun");
   }
 }
 
@@ -118,24 +118,24 @@ class InnerModuleController extends Base {
   declare topLevelUrl: (options: { id: string }) => string;
   declare topLevelPath: (id: string) => string;
 
-  index() {
-    this.head(":ok");
+  async index() {
+    await this.head(":ok");
   }
 
-  redirectToIndex() {
-    this.redirectTo(this.adminInnerModulePath());
+  async redirectToIndex() {
+    await this.redirectTo(this.adminInnerModulePath());
   }
 
-  redirectToAbsoluteController() {
-    this.redirectTo({ controller: "/content" });
+  async redirectToAbsoluteController() {
+    await this.redirectTo({ controller: "/content" });
   }
 
-  redirectToFellowController() {
-    this.redirectTo({ controller: "user" });
+  async redirectToFellowController() {
+    await this.redirectTo({ controller: "user" });
   }
 
-  redirectToTopLevelNamedRoute() {
-    this.redirectTo(this.topLevelUrl({ id: "foo" }));
+  async redirectToTopLevelNamedRoute() {
+    await this.redirectTo(this.topLevelUrl({ id: "foo" }));
   }
 }
 Object.defineProperty(InnerModuleController, "name", { value: "Admin::InnerModuleController" });
@@ -377,7 +377,7 @@ describe("ActionPackAssertionsControllerTest", () => {
 
   it("response object", async () => {
     await tc.get("nothing");
-    assertKindOf(TestResponse, tc.response);
+    assertKindOf(TestResponse as unknown as abstract new () => unknown, tc.response);
   });
 
   it("render based on parameters", async () => {

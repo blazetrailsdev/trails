@@ -15,13 +15,13 @@ import "../../support/abstract-unit.js";
 
 describe("ServerTimingTest", () => {
   class TestController extends Base {
-    index(): void {
-      this.head(":ok");
+    async index(): Promise<void> {
+      await this.head(":ok");
     }
 
     async show(): Promise<void> {
       await Notifications.instrument("custom.event", {}, () => true);
-      this.head(":ok");
+      await this.head(":ok");
     }
 
     async create(): Promise<void> {
