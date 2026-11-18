@@ -2161,7 +2161,7 @@ jobs:
       - name: Unit-test docs build scripts
         run: pnpm --filter @blazetrails/website exec vitest run scripts/
       - name: Build SvelteKit
-        run: pnpm --filter @blazetrails/website run build:sw && pnpm --filter @blazetrails/website exec vite build
+        run: pnpm --filter @blazetrails/website exec vite build
       - name: Build docs (typedoc + VitePress)
         run: pnpm --filter @blazetrails/website run docs:build
 
