@@ -155,9 +155,7 @@ describe("AppGenerator (trails-only)", () => {
     );
     const [, names] = source.match(/import \{ (\w+) \} from "@blazetrails\/activesupport"/)!;
     const activesupport: Record<string, unknown> = await import("@blazetrails/activesupport");
-    expect(typeof activesupport[names]).toBe("function");
-    const inflect = (activesupport[names] as (l: string) => { plurals: unknown })("en");
-    expect(inflect).toBeDefined();
+    expect(activesupport[names]).toBe(activesupport.inflections);
   });
 
   it("writes config/boot.ts and imports it first from config/application.ts", async () => {
