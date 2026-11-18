@@ -1,4 +1,4 @@
-import { Hash, StandardError, isSymbol, toSym } from "@blazetrails/ruby-compat";
+import { Hash, StandardError, toSym } from "@blazetrails/ruby-compat";
 import {
   EMPTY_HASH,
   loadPath,
@@ -33,12 +33,12 @@ class FilenameIncorrect extends StandardError {
 export class LazyLoadable extends Simple {
   static readonly FilenameIncorrect = FilenameIncorrect;
 
-  private lazyLoad: boolean;
+  private _lazyLoad: boolean;
   declare private _initializedLocales: Hash<Locale, boolean> | null | undefined;
 
   constructor({ lazyLoad = false }: { lazyLoad?: boolean } = {}) {
     super();
-    this.lazyLoad = lazyLoad;
+    this._lazyLoad = lazyLoad;
   }
 
   override initialized(): boolean {
@@ -93,6 +93,7 @@ export class LazyLoadable extends Simple {
     }
   }
 
+  /** @internal */
   protected override initTranslations(): void {
     let fileErrors: Error[];
     if (this.isLazyLoad()) {
@@ -106,14 +107,17 @@ export class LazyLoadable extends Simple {
     if (fileErrors.length !== 0) throw new InvalidFilenames(fileErrors);
   }
 
+  /** @internal */
   protected initializedLocales(): Hash<Locale, boolean> {
     return (this._initializedLocales ??= new Hash<Locale, boolean>(false));
   }
 
+  /** @internal */
   private isLazyLoad(): boolean {
-    return this.lazyLoad;
+    return this._lazyLoad;
   }
 
+  /** @internal */
   private loadTranslationsAndCollectFileErrors(files: unknown[]): Error[] {
     const errors: Error[] = [];
 
@@ -135,23 +139,23 @@ export class LazyLoadable extends Simple {
     return errors;
   }
 
+  /** @internal */
   private filenamesForCurrentLocale(): string[] {
     return loadPath()
       .flat()
       .filter((path) => LocaleExtractor.localeFromPath(path) === currentLocale());
   }
 
+  /** @internal */
   private assertFileNamedCorrectlyBang(
     file: string,
     translations: TranslationData | Record<string, unknown>,
   ): void {
     const loadedLocales = [
       ...(translations instanceof Map ? translations.keys() : Object.keys(translations)),
-    ].map((locale) => (isSymbol(locale) ? locale : toSym(locale)));
+    ].map((locale) => toSym(locale));
     const expectedLocale = LocaleExtractor.localeFromPath(file);
-    const unexpectedLocales = loadedLocales.filter(
-      (locale) => expectedLocale == null || locale !== toSym(expectedLocale),
-    );
+    const unexpectedLocales = loadedLocales.filter((locale) => locale !== toSym(expectedLocale));
 
     if (unexpectedLocales.length !== 0)
       throw new FilenameIncorrect(file, expectedLocale, unexpectedLocales);
