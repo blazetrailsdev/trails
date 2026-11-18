@@ -1,11 +1,7 @@
 import { Model } from "@blazetrails/activemodel";
 import type { Html5Node } from "@blazetrails/nokogiri";
 import { ActionText } from "../action-text.js";
-
-interface ContentInstance {
-  fragment: { source: unknown };
-  render(...args: unknown[]): string;
-}
+import type { Content } from "../content.js";
 
 export class ContentAttachment extends Model {
   static async fromNode(node: Html5Node): Promise<ContentAttachment | null> {
@@ -22,9 +18,9 @@ export class ContentAttachment extends Model {
   /** @internal */
   declare private _content: unknown;
   /** @internal */
-  declare private _toHtml?: string;
+  declare private _toHtml?: unknown;
   /** @internal */
-  declare private _contentInstance?: ContentInstance;
+  declare private _contentInstance?: Content;
 
   get contentType(): unknown {
     return this._contentType;
@@ -47,15 +43,17 @@ export class ContentAttachment extends Model {
     this.validatesPresenceOf("content");
   }
 
-  attachablePlainTextRepresentation(_caption: string | null): unknown {
-    return this.contentInstance().fragment.source;
+  async attachablePlainTextRepresentation(_caption: string | null): Promise<unknown> {
+    return (await this.contentInstance()).fragment.source;
   }
 
-  toHtml(): string {
-    return (this._toHtml ??= this.contentInstance().render(this.contentInstance()));
+  async toHtml(): Promise<unknown> {
+    return (this._toHtml ??= await (
+      await this.contentInstance()
+    ).render(await this.contentInstance()));
   }
 
-  toString(): string {
+  toString(): Promise<unknown> {
     return this.toHtml();
   }
 
@@ -64,10 +62,8 @@ export class ContentAttachment extends Model {
   }
 
   /** @internal */
-  private contentInstance(): ContentInstance {
-    return (this._contentInstance ??= new (ActionText.Content as unknown as new (
-      content: unknown,
-    ) => ContentInstance)(this.content));
+  private async contentInstance(): Promise<Content> {
+    return (this._contentInstance ??= await ActionText.Content!.new(this.content));
   }
 }
 

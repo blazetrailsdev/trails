@@ -158,10 +158,12 @@ export class Attachment {
     );
   }
 
-  toPlainText(): string {
+  async toPlainText(): Promise<string> {
     if (rbObjRespondTo(this, "attachablePlainTextRepresentation")) {
       return (
-        this as unknown as { attachablePlainTextRepresentation(caption: string | null): string }
+        this as unknown as {
+          attachablePlainTextRepresentation(caption: string | null): string | Promise<string>;
+        }
       ).attachablePlainTextRepresentation(this.caption);
     } else {
       return toS(this.caption);

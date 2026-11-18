@@ -1,4 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
+import { dasherize } from "@blazetrails/activesupport";
 
 export const ALL_KNOWN_KEYS = [
   "partial",
@@ -34,6 +35,10 @@ export class Base {
   /** @internal */
   protected partialToVirtualPath(renderType: string, partialPath: string): string {
     if (renderType === "partial" || renderType === "layout") {
+      const directoryEnd = partialPath.lastIndexOf("/");
+      if (directoryEnd >= 0)
+        partialPath =
+          dasherize(partialPath.slice(0, directoryEnd)) + partialPath.slice(directoryEnd);
       return partialPath.replace(/(\/|^)([^/]*)$/, "$1_$2");
     } else {
       return partialPath;
