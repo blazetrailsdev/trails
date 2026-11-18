@@ -75,6 +75,7 @@ export function main(argv: string[]): number {
   for (const pkg of p.skipped) {
     console.log(`parity:changed: skip ${pkg} (no vendored lib path, not enrolled)`);
   }
+  const failed: string[] = [];
   if (p.shared.length > 0 && !full) {
     console.error(
       `parity:changed: ${p.shared.join(", ")} changed. Other packages call into it, and a ` +
@@ -82,9 +83,9 @@ export function main(argv: string[]): number {
         "pnpm parity:api compare.",
     );
     if (p.run.length === 0) return 1;
+    failed.push(`${p.shared.join(", ")} (needs --full)`);
   }
 
-  const failed: string[] = [];
   for (const pkg of p.run) {
     console.log(`\nparity:changed: scoped comparison for ${pkg}`);
     if (sh("bash", ["scripts/ci/scoped-comparison.sh", pkg]) !== 0) failed.push(pkg);
