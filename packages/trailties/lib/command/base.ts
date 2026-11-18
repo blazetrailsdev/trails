@@ -9,6 +9,7 @@ import {
   rbObjMethod,
   TSE,
   type Included,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import type { Basic } from "@blazetrails/thor/shell/basic";
@@ -20,7 +21,6 @@ import { ENGINE_ROOT } from "../app-path.js";
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
 import { Actions } from "./actions.js";
 import { subclasses } from "./behavior.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/thor" {
   interface Thor {

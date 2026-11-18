@@ -9,12 +9,11 @@ import {
 } from "@blazetrails/activesupport";
 
 import { ActiveRecord } from "@blazetrails/activerecord";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { Base as GeneratorBase, type GeneratorConfig } from "./base.js";
 import { Generators } from "../generators.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 import { ENGINE_ROOT } from "../app-path.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class NamedBase extends GeneratorBase {
   static {

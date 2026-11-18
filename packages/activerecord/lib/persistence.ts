@@ -11,6 +11,7 @@ import {
   rtest,
   eachWithObject,
   eachWithIndex,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
@@ -35,7 +36,6 @@ import { withTransactionReturningStatus } from "./transactions.js";
 import { isDefaultScopes } from "./scoping/default.js";
 import { RecordInvalid } from "./validations.js";
 import { ActiveRecord } from "./namespaces.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown> | PermittedAttributes, block?: (record: any) => void): any;

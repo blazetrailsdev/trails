@@ -1,6 +1,10 @@
-import { ArgumentError, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  rbModName,
+  rbObjRespondTo,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { NameError } from "@blazetrails/ruby-compat/name-error";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat/name-error" {
   interface NameError {

@@ -12,6 +12,7 @@ import {
   isModuleIncluded,
   rbFSend,
   TopLevel,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { safeConstantize } from "../inflector.js";
 import { TestCase } from "../test-case.js";
@@ -19,7 +20,6 @@ import { Isolation } from "./isolation.js";
 import { TestHelper as ExecutorTestHelper } from "../executor/test-helper.js";
 import type { CompletableExecution } from "../execution-wrapper.js";
 import { Assertion, Skip, Test, UnexpectedError, _takeAssertions } from "./assertions.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "vitest" {
   interface TestContext {

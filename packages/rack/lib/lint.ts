@@ -19,6 +19,7 @@ import {
   Encoding,
   toEnum,
   rbProcCall,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { RackApp } from "./mock-request.js";
 import { URI_PARSER } from "./utils.js";
@@ -49,7 +50,6 @@ import {
   CONNECT,
 } from "./constants.js";
 import { Rack } from "./namespaces.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class LintError extends RuntimeError {}
 

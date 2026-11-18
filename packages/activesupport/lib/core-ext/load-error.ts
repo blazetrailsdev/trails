@@ -1,5 +1,4 @@
-import { LoadError } from "@blazetrails/ruby-compat";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { LoadError, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat" {
   interface LoadError {

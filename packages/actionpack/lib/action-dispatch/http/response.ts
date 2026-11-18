@@ -15,6 +15,7 @@ import {
   stringSplit,
   Struct,
   toEnum,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
@@ -52,7 +53,6 @@ import {
   locationFilters as _locationFilters,
   parameterFilteredLocation as _parameterFilteredLocation,
 } from "./filter-redirect.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 const CONTENT_TYPE = "Content-Type";
 const SET_COOKIE = "set-cookie";

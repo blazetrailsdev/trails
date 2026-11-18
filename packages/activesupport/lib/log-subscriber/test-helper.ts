@@ -1,9 +1,8 @@
-import { Hash, strip, toS } from "@blazetrails/ruby-compat";
+import { Hash, strip, toS, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LOG_LEVELS, type Logger, type LogLevel } from "../logger.js";
 import { Notifications } from "../notifications.js";
 import { Fanout } from "../notifications/fanout.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 interface TestHelperHost {
   logger: MockLogger;

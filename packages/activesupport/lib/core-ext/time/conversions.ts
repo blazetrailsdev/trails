@@ -1,9 +1,9 @@
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { formattedOffset as dateTimeFormattedOffset } from "../date-time/conversions.js";
 import { ordinalize } from "../../inflector.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type DateFormatsReceiver =
   | RubyTime

@@ -12,9 +12,9 @@ import {
   rbObjSingletonClass,
   stringToSym,
   symbolToS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { XChar } from "./xchar.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class IllegalBlockError extends RuntimeError {}
 

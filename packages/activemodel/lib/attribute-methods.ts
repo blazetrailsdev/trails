@@ -617,7 +617,6 @@ export function completeHalfAccessor(
   if (desc == null || "value" in desc || desc[half] != null) return;
   Object.defineProperty(proto, name, { ...desc, [half]: fn, configurable: true });
   rbClearMethodCache();
-  rbClearMethodCache();
 }
 
 /** @noRailsEquivalent PERMANENT */

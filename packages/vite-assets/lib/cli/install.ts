@@ -8,13 +8,13 @@ import {
   stderr,
   StringIO,
   STDOUT as $stdout,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { Config } from "../config.js";
 import { IO } from "../io.js";
 import { ViteAssets } from "../vite-assets.js";
 import { Command } from "./command.js";
 import { FileUtils } from "./file-utils.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class Install extends Command {
   static {

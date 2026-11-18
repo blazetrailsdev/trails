@@ -9,6 +9,7 @@ import {
   rbModName,
   shadowsIncluded,
   toS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { NotImplementedError } from "./errors.js";
@@ -2505,7 +2506,6 @@ for (const [name, fn] of [
 import "@blazetrails/globalid/wire";
 
 import { type LocatorModel as _LocatorModel } from "@blazetrails/globalid";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 type _ARBaseUnscopedWire =
   typeof Base extends Pick<Required<_LocatorModel>, "unscoped"> ? true : never;
 const _arBaseUnscopedWire: _ARBaseUnscopedWire = true;

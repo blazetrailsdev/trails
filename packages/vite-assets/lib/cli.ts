@@ -1,5 +1,5 @@
 import { camelize } from "@blazetrails/activesupport";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { Thor, type ThorClass } from "@blazetrails/thor";
 import type { GroupClass } from "@blazetrails/thor/group.js";
 import { ViteAssets } from "./vite-assets.js";
@@ -14,7 +14,6 @@ import { Upgrade } from "./cli/upgrade.js";
 import { UpgradePackages } from "./cli/upgrade-packages.js";
 import { Version } from "./cli/version.js";
 import { Vite } from "./cli/vite.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class CLI extends Thor {
   declare static Build: typeof Build;

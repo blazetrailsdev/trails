@@ -18,6 +18,7 @@ import {
   constGet,
   constDefined,
   rbModName,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { rubyCommand } from "@blazetrails/thor/util";
 import { Generators, type GeneratorClass } from "../generators.js";
@@ -32,7 +33,6 @@ import type { Argument, ArgumentOptions } from "@blazetrails/thor/parser/argumen
 import type { Option, OptionOptions } from "@blazetrails/thor/parser/option";
 import type { Shell as ShellHost } from "@blazetrails/thor/shell";
 import type { Basic } from "@blazetrails/thor/shell/basic";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface GeneratorOptions {
   force?: boolean;

@@ -17,6 +17,7 @@ import {
   hashDelete,
   isModuleIncluded,
   rbFSend,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } from "./base.js";
 import { Actions, type ActionsHost } from "./actions.js";
@@ -28,7 +29,6 @@ import type { Option } from "./parser/option.js";
 import { Options } from "./parser/options.js";
 import type { Shell } from "./shell.js";
 import type { Basic } from "./shell/basic.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type InvokeOptions = Record<string, unknown>;
 

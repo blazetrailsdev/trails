@@ -34,6 +34,7 @@ import {
   update,
   RFC2396_PARSER,
   classModule,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Routing } from "../../namespaces.js";
 import { Mapper, type Mapping } from "./mapper.js";
@@ -82,7 +83,6 @@ import {
   type MissingRoute,
   type RouteWithParams,
 } from "../journey/formatter.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 /** @internal */
 function toS(v: unknown): string {

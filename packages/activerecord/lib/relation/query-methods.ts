@@ -26,6 +26,7 @@ import {
   filterMap,
   rbObjIsKindOf,
   toA,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -68,7 +69,6 @@ import {
   transformKeys,
   wrap,
 } from "@blazetrails/activesupport";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class WhereChain<R = any> {
   private _scope: R;

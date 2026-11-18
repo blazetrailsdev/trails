@@ -33,6 +33,7 @@ import {
   classModule,
   included,
   include,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import { ModelNaming, convertToModel, modelNameFromRecordOrClass } from "../model-naming.js";
@@ -73,7 +74,6 @@ import { RangeField } from "./tags/range-field.js";
 import { SearchField } from "./tags/search-field.js";
 import { TextField } from "./tags/text-field.js";
 import { UrlHelper } from "./url-helper.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 const __FILE__ = import.meta.url;
 const __LINE__ = 0;

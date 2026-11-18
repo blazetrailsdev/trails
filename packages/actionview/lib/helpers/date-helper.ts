@@ -28,13 +28,13 @@ import {
   numStep,
   sprintf,
   defineModule,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import "../action-view.js";
 import { Tags } from "../namespaces.js";
 import { FormBuilder } from "./form-helper.js";
 import { TagHelper } from "./tag-helper.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 const MINUTES_IN_YEAR = 525600;
 const MINUTES_IN_QUARTER_YEAR = 131400;

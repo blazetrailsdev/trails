@@ -88,7 +88,6 @@ function readerMethod(
     configurable: true,
   });
   rbClearMethodCache();
-  rbClearMethodCache();
 }
 
 /** @internal */
@@ -144,7 +143,6 @@ function writerMethod(
     },
     configurable: true,
   });
-  rbClearMethodCache();
   rbClearMethodCache();
 }
 

@@ -8,6 +8,7 @@ import {
   rbRegMatchP,
   slice,
   symbolToS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import type { SchemaStatementsLike } from "./schema-statements-like.js";
@@ -26,7 +27,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { ActiveRecord } from "../../namespaces.js";
 import { wrap } from "@blazetrails/activesupport";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export type ColumnType =
   | "string"

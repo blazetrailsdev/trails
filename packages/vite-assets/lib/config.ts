@@ -9,8 +9,8 @@ import {
   rbFLoad,
   TopLevel,
   stderr as $stderr,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface ConfigOptions {
   additionalEntrypoints: string[];

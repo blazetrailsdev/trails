@@ -1,5 +1,12 @@
 import { Date as RubyDate, Temporal, Time as RubyTime } from "@blazetrails/date";
-import { fetch, Rational, rbObjClassname, rbObjRespondTo, rbPlus } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  Rational,
+  rbObjClassname,
+  rbObjRespondTo,
+  rbPlus,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { deprecator } from "../../deprecator.js";
 import { Duration } from "../../duration.js";
 import { ArgumentError } from "../../hash-utils.js";
@@ -9,7 +16,6 @@ import { zone as timeZone } from "../../time-zone-config.js";
 import { advance as dateAdvance } from "../date/calculations.js";
 import { compare as dateTimeCompare, since as dateTimeSince } from "../date-time/calculations.js";
 import { toF } from "../date-time/conversions.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export const COMMON_YEAR_DAYS_IN_MONTH = [null, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 

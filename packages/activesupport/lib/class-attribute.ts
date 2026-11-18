@@ -114,7 +114,6 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     }
     if (methods.get || methods.set) Object.defineProperty(this.prototype, name, methods);
     rbClearMethodCache();
-    rbClearMethodCache();
 
     if (instancePredicate) {
       const lead = /^_*/.exec(name)![0];

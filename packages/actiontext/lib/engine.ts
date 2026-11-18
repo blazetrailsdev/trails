@@ -4,7 +4,7 @@ import "@blazetrails/trailties/trailties/action-controller";
 import "@blazetrails/trailties/trailties/active-record";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import "@blazetrails/activestorage/engine";
-import { File, include, prepend, rbFRequire } from "@blazetrails/ruby-compat";
+import { File, include, prepend, rbFRequire, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
 import { Attachable } from "./attachable.js";
 import { Attachment } from "./attachment.js";
@@ -14,7 +14,6 @@ import { ContentHelper } from "./app/helpers/action-text/content-helper.js";
 import { Encryption } from "./encryption.js";
 import "./app/helpers/action-text/tag-helper.js";
 import "./deprecator.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface ActionTextConfig extends OrderedOptions {
   attachmentTagName?: string;

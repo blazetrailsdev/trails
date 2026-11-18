@@ -23,11 +23,11 @@ import {
   stringDelete,
   toEnum,
   toS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
 import { Base } from "../base.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class ClientDisconnected extends RuntimeError {}
 

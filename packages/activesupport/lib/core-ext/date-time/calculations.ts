@@ -1,5 +1,10 @@
 import { Date as RubyDate, DateTime as RubyDateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational, rational, TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import {
+  Rational,
+  rational,
+  TEMPORAL_METHOD_TABLE,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../../hash-utils.js";
 import { instantFrom } from "../../temporal.js";
 import { currentTime } from "../../time-travel.js";
@@ -9,7 +14,6 @@ import { secFraction } from "../../time-ext.js";
 import * as date from "../date/calculations.js";
 import { toDatetime as stringToDatetime } from "../string/conversions.js";
 import { nsec, toI } from "./conversions.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type DateTime = Temporal.PlainDateTime | Temporal.ZonedDateTime;
 

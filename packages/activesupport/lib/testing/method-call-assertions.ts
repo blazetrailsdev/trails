@@ -1,6 +1,11 @@
-import { ArgumentError, NameError, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NameError,
+  rbEqual,
+  rbInspect,
+  rbClearMethodCache,
+} from "@blazetrails/ruby-compat";
 import { assert } from "./assertions.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export class MockExpectationError extends Error {

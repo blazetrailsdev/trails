@@ -1,6 +1,5 @@
 import { Message } from "@blazetrails/mail";
-import { rbFArray, rbObjAsString } from "@blazetrails/ruby-compat";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { rbFArray, rbObjAsString, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/mail/message" {
   interface Message {

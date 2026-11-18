@@ -19,6 +19,7 @@ import {
   rbStrMatch,
   rbStrSend,
   classModule,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, TypeError } from "./attribute-assignment.js";
 
@@ -101,7 +102,6 @@ export class Naming {
 }
 import { I18n } from "./i18n.js";
 import type { TranslateOptions } from "@blazetrails/i18n";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 /** @internal */
 const MISSING_TRANSLATION = -(2 ** 60);

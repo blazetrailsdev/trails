@@ -17,10 +17,10 @@ import {
   rbCallSuper,
   rtest,
   symbolToS,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import type { UrlHelperHost } from "./helpers/url-helper.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface RoutingUrlForHost {
   controller: unknown;

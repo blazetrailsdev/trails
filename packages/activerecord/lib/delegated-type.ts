@@ -1,7 +1,6 @@
 import type { Base } from "./base.js";
 import { camelize, constantize, inquiry, singularize, tableize } from "@blazetrails/activesupport";
-import { hashDelete, rbFSend } from "@blazetrails/ruby-compat";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { hashDelete, rbFSend, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface DelegatedTypeOptions {
   types: string[];

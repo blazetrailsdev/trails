@@ -1,8 +1,7 @@
 import { Range } from "@blazetrails/ruby-compat/range";
-import { rbFSend } from "@blazetrails/ruby-compat";
+import { rbFSend, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import "../time/conversions.js";
 import "../date/conversions.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/ruby-compat/range" {
   interface Range<T> {

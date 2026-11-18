@@ -30,6 +30,7 @@ import {
   hashDelete,
   isModuleIncluded,
   TopLevel,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, type Relations } from "./base.js";
 import type { Invocation } from "./invocation.js";
@@ -859,7 +860,6 @@ include(Thor, Base);
 (Thor as ThorClass).methodAdded("help");
 
 import "./constants.generated.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 TopLevel.Thor = Thor;
 

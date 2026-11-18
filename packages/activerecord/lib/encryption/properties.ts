@@ -15,9 +15,9 @@ import {
   rbObjClassname,
   rbObjIsKindOf,
   type Bytes,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Properties {

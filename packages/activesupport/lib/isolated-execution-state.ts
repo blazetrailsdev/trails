@@ -6,8 +6,8 @@ import {
   rbObjDup,
   type AsyncContext,
   type AsyncContextAdapter,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type IsolatedKey = string | symbol | object;
 

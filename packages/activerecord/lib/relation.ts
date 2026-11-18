@@ -20,7 +20,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
-import { ARRAY_METHOD_TABLE, fetch } from "@blazetrails/ruby-compat";
+import { ARRAY_METHOD_TABLE, fetch, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { toYaml } from "@blazetrails/ruby-compat/yaml";
 import type { Psych } from "@blazetrails/ruby-compat/psych";
 import * as Arel from "@blazetrails/arel";
@@ -97,7 +97,6 @@ import {
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
 import type { Hash } from "@blazetrails/ruby-compat";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export type LoadedRelation<R> = Omit<R, "then">;
 

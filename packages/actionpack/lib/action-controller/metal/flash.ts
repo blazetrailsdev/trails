@@ -1,10 +1,9 @@
 import { ActionController } from "../../namespaces.js";
-import { rbCallSuper } from "@blazetrails/ruby-compat";
+import { rbCallSuper, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import type { RedirectToOptions, RedirectToResponseOptions } from "./redirecting.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export type RedirectToResponseOptionsAndFlash<FlashType extends string = never> =
   RedirectToResponseOptions & {

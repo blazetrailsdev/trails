@@ -8,10 +8,10 @@ import {
   rbIntegerTypeP,
   rbPlus,
   TopLevel,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { exclude, indexBy, indexWith, sum as enumerableSum } from "../enumerable-utils.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class SoleItemExpectedError extends StandardError {}
 

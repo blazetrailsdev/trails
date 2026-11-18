@@ -85,7 +85,6 @@ export namespace Configurable {
               configurable: true,
             });
             rbClearMethodCache();
-            rbClearMethodCache();
           }
           if (instanceWriter) {
             Object.defineProperty(this.prototype, name, {
@@ -93,7 +92,6 @@ export namespace Configurable {
               set: writer,
               configurable: true,
             });
-            rbClearMethodCache();
             rbClearMethodCache();
           }
         }

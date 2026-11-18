@@ -50,10 +50,10 @@ import {
   strGsub,
   tally,
   uniq,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import { Cloneable } from "./cloneable.js";
 import { ext as stringExt, pathmap as stringPathmap } from "./ext/string.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type Items = unknown[];
 type ElementBlock = (fn: string) => unknown;

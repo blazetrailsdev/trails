@@ -33,6 +33,7 @@ import {
   TypeError,
   warn,
   rbGvGet,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 import type { Command } from "./command.js";
 import { Invocation } from "./invocation.js";
@@ -47,7 +48,6 @@ import { Option, type OptionOptions } from "./parser/option.js";
 import { Base as ThorBase, Shell } from "./shell.js";
 import type { Basic } from "./shell/basic.js";
 import { namespaceFromThorClass } from "./util.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export const HELP_MAPPINGS = ["-h", "-?", "--help", "-D"];
 

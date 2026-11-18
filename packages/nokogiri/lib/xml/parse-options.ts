@@ -1,7 +1,6 @@
-import { rbObjInspect } from "@blazetrails/ruby-compat";
+import { rbObjInspect, rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 import { XML } from "../namespaces.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type ParseOptionsFlag =
   | "recover"

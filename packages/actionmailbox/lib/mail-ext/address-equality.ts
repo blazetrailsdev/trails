@@ -1,5 +1,5 @@
-import { Address } from "@blazetrails/mail";
 import { rbClearMethodCache } from "@blazetrails/ruby-compat";
+import { Address } from "@blazetrails/mail";
 
 declare module "@blazetrails/mail/elements/address" {
   interface Address {

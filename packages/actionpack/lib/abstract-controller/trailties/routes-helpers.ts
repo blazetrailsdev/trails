@@ -6,13 +6,13 @@ import {
   includedModules,
   isModuleIncluded,
   constSet,
+  rbClearMethodCache,
 } from "@blazetrails/ruby-compat";
 
 import { AbstractController } from "../../namespaces.js";
 
 import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import type { HelpersClassMethods } from "../helpers.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
 type ClassModule = { prototype: object };

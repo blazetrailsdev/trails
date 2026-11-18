@@ -1,6 +1,6 @@
 import type { PermittedAttributes } from "@blazetrails/activemodel";
 import type { PluckColumn, PluckedRow } from "../relation/calculations.js";
-import { NoMethodError, extend } from "@blazetrails/ruby-compat";
+import { NoMethodError, extend, rbClearMethodCache } from "@blazetrails/ruby-compat";
 import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -31,7 +31,6 @@ import {
 } from "@blazetrails/activesupport";
 import type { AssociationDefinition } from "../associations.js";
 import { Associations } from "../namespaces.js";
-import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
 export interface CollectionProxy<T extends Base = Base> {
