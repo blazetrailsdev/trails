@@ -5,6 +5,9 @@
     "noEmit": true,
     "paths": {
       "@blazetrails/actionpack": ["../lib/index.ts"],
+      "@blazetrails/actionview/rails-dom-testing/*": [
+        "../../actionview/lib/rails-dom-testing/*.ts"
+      ],
       "@blazetrails/actionview": ["../../actionview/lib/index.ts"],
       "@blazetrails/rack-session": ["../../rack-session/lib/index.ts"],
       "@blazetrails/activesupport": ["../../activesupport/lib/index.ts"],

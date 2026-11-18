@@ -34,18 +34,18 @@ type ConfigReceiver = { config(): Configuration & { cacheStore: CacheStore | nul
 
 export const ConfigMethods = {
   get cacheStore(): CacheStore | null {
-    return this.config().cacheStore;
+    return (this as unknown as ConfigReceiver).config().cacheStore;
   },
 
   set cacheStore(store: LookupStoreArgument) {
-    this.config().cacheStore = lookupStore(store);
+    (this as unknown as ConfigReceiver).config().cacheStore = lookupStore(store);
   },
 
   /** @internal */
   isCacheConfigured(this: Omit<CachingHost, "constructor" | "isCacheConfigured">) {
     return this.performCaching && this.cacheStore;
   },
-} satisfies ThisType<ConfigReceiver>;
+};
 
 export function viewCacheDependency(
   this: CachingClassMethods,

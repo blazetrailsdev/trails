@@ -34,6 +34,6 @@ describe("ActionController::Rendering#render", () => {
 
   it("an unknown render option is rejected", () => {
     // @ts-expect-error — `plian` is not a render option
-    controller.render({ plian: "hello" });
+    expectTypeOf(controller.render({ plian: "hello" })).not.toBeAny();
   });
 });
