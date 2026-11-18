@@ -96,9 +96,9 @@ function shallowEqual(a: Record<string, unknown>, b: Record<string, unknown>): b
   return true;
 }
 
-/** @internal */
 type CustomUrlHelperHost = PolymorphicHost & Record<string, unknown>;
 
+/** @internal */
 export class CustomUrlHelper implements PolymorphicMappingEntry {
   readonly name: string;
   readonly defaults: Record<string, unknown>;
