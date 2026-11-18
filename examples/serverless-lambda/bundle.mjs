@@ -4,8 +4,7 @@
 import { build } from "esbuild";
 
 const UNUSED_DRIVERS = (
-  process.env.STUB_DRIVERS ??
-  "better-sqlite3,mysql2,mysql2/promise,pg,pg-native,libsql,@libsql/client"
+  process.env.STUB_DRIVERS ?? "better-sqlite3,mysql2,mysql2/promise,pg-native,libsql,@libsql/client"
 ).split(",");
 const stubDrivers = {
   name: "stub-unused-drivers",

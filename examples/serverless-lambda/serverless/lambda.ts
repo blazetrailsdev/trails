@@ -19,6 +19,11 @@ function boot() {
     // @ts-ignore
     await import("../.trails/entry.generated.js");
     bootTiming.initDone = performance.now();
+    // Boot flushes idle connections, and a model's first synchronous attribute read then leases an
+    // unconnected one whose type map is unloaded; verify one here so that lease finds it warm.
+    const { Base } = await import("@blazetrails/activerecord");
+    await Base.connectionPool().withConnection((conn) => conn.verifyBang());
+    bootTiming.connected = performance.now();
     return Trails.application;
   })());
 }
@@ -51,7 +56,24 @@ interface LambdaResult {
   isBase64Encoded: boolean;
 }
 
-export async function handler(event: LambdaEvent): Promise<LambdaResult> {
+const SEED_SQL = [
+  "CREATE TABLE IF NOT EXISTS posts (id bigserial PRIMARY KEY, title varchar, created_at timestamp(6) NOT NULL DEFAULT now(), updated_at timestamp(6) NOT NULL DEFAULT now())",
+  "INSERT INTO posts (title) SELECT 'Post ' || i FROM generate_series(1, 10) i WHERE NOT EXISTS (SELECT 1 FROM posts)",
+];
+
+/** A direct `aws lambda invoke` with `{"seed": true}`; a Function URL event cannot carry a top-level `seed`. */
+async function seed(): Promise<{ posts: unknown }> {
+  await boot();
+  const { Base } = await import("@blazetrails/activerecord");
+  const conn = await Base.leaseConnection();
+  for (const sql of SEED_SQL) await conn.execute(sql);
+  return { posts: await conn.selectValue("SELECT count(*) FROM posts") };
+}
+
+export async function handler(
+  event: LambdaEvent & { seed?: boolean },
+): Promise<LambdaResult | { posts: unknown }> {
+  if (event.seed === true) return seed();
   const host = event.headers?.host ?? "lambda.local";
   const qs = event.rawQueryString ? `?${event.rawQueryString}` : "";
   const method = event.requestContext?.http?.method ?? "GET";
