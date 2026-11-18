@@ -51,8 +51,14 @@ type Attachable = Extended<typeof ClassMethods>;
 type FirstBlob = { first(): Promise<Blob> };
 type Delegated = { reload(): Promise<unknown>; count(): Promise<number> };
 
-const attachmentAt = async (many: Many, index: number): Promise<Attachment> =>
-  (await many.attachments)[index];
+const NTH = ["first", "second", "third"] as const;
+const attachmentAt = async (many: Many, index: number): Promise<Attachment> => {
+  const attachments = many.attachments;
+  if (Array.isArray(attachments)) return attachments[index];
+  return (attachments as unknown as Record<(typeof NTH)[number], () => Promise<Attachment>>)[
+    NTH[index]
+  ]();
+};
 const blobAt = async (many: Many, index: number): Promise<Blob> =>
   (await (
     await attachmentAt(many, index)
