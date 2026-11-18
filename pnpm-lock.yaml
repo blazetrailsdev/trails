@@ -1347,6 +1347,9 @@ importers:
       '@blazetrails/activerecord':
         specifier: workspace:*
         version: link:../activerecord
+      '@blazetrails/trails-tsc':
+        specifier: workspace:*
+        version: link:../trails-tsc
 
   packages/tzinfo:
     dependencies:

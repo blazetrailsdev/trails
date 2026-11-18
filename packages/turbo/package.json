@@ -23,7 +23,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc"
+    "build": "tsc && pnpm build:templates",
+    "build:templates": "rm -rf dist/app && mkdir -p dist/app && cp -R app/views dist/app/ && trails-tsc-views build --views dist/app/views --in-place"
   },
   "dependencies": {
     "@blazetrails/actioncable": "workspace:*",
@@ -39,7 +40,8 @@
   "devDependencies": {
     "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
-    "@blazetrails/activerecord": "workspace:*"
+    "@blazetrails/activerecord": "workspace:*",
+    "@blazetrails/trails-tsc": "workspace:*"
   },
   "mirrors": [
     {

@@ -1,1 +1,1 @@
-<%= turboStream.replace(this.company) %>
+<%= await turboStream.replace(this.company) %>

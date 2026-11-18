@@ -1,5 +1,5 @@
 import { ActionController, Mime, MimeType } from "@blazetrails/actionpack";
-import { OrderedOptions, TopLevel, onLoad } from "@blazetrails/activesupport";
+import { OrderedOptions, TopLevel, include, onLoad } from "@blazetrails/activesupport";
 import "@blazetrails/trailties/trailties/action-controller";
 import { Trails, type Application } from "@blazetrails/trailties";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
@@ -11,6 +11,11 @@ import "./app/helpers/turbo/frames-helper.js";
 import "./app/helpers/turbo/includes-helper.js";
 import "./app/helpers/turbo/streams-helper.js";
 import "./app/helpers/turbo/streams/action-helper.js";
+import { RequestIdTracking } from "./app/controllers/concerns/turbo/request-id-tracking.js";
+import { FrameRequest } from "./app/controllers/turbo/frames/frame-request.js";
+import { Navigation } from "./app/controllers/turbo/native/navigation.js";
+import "./app/controllers/turbo/native/navigation-controller.js";
+import { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
 
 export interface TurboConfig extends OrderedOptions {
   testConnectAfterActions?: string[];
@@ -43,6 +48,10 @@ export class Engine extends TrailsEngine {
     this.config.eagerLoadNamespaces.push(Turbo);
     this.config.set("turbo", new OrderedOptions());
     this.config.turbo.testConnectAfterActions = ["visit"];
+
+    this.config.paths().add("config/routes.ts", {
+      with: File.join(import.meta.dirname, "config", `routes${File.extname(import.meta.filename)}`),
+    });
 
     /** @inventedArm add — PERMANENT */
     this.config.paths().add("app/helpers", {
@@ -93,7 +102,16 @@ export class Engine extends TrailsEngine {
     this.initializer("turbo.helpers", { before: "load_config_initializers" }, async () => {
       const helpers = await Engine.instance().helpers();
       onLoad("action_controller_base", function (this: HelperHost) {
+        include(this, Navigation);
+        include(this, FrameRequest);
+        include(this, TurboStreamsTagBuilder);
         this.helper(helpers);
+      });
+    });
+
+    this.initializer("turbo.request_id_tracking", () => {
+      onLoad("action_controller", function (this: object) {
+        include(this, RequestIdTracking);
       });
     });
 

@@ -1,3 +1,3 @@
-<%= await turboStream.update("form-area", async () => { %>
+<%= await turboStream.update("form-area", null, {}, async () => { %>
   <%= await render({ partial: "form" }) -%>
 <% }) %>
