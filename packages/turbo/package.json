@@ -30,6 +30,7 @@
     "@blazetrails/actioncable": "workspace:*",
     "@blazetrails/actionpack": "workspace:*",
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activesupport": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@blazetrails/trailties": "workspace:*"
@@ -38,7 +39,6 @@
     "node": ">=26"
   },
   "devDependencies": {
-    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/trails-tsc": "workspace:*"

@@ -738,9 +738,9 @@ export class TagBuilder {
   }
 
   private methodMissing(called: string, ...args: unknown[]): SafeBuffer | Promise<SafeBuffer> {
-    const block = (typeof args[args.length - 1] === "function" ? args.pop() : undefined) as
-      | TagBlock
-      | undefined;
+    const last = args.length > 0 ? args[args.length - 1] : null;
+    if (last === undefined) args.pop();
+    const block = (typeof last === "function" ? args.pop() : undefined) as TagBlock | undefined;
     const { escape = true, ...options } = extractOptionsBang(args);
     const name = dasherize(called);
 

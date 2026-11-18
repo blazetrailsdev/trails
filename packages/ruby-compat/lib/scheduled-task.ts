@@ -36,7 +36,8 @@ export class CancelledOperationError extends StandardError {}
  * @noRailsEquivalent PERMANENT
  */
 export class ScheduledTask<A extends unknown[] = unknown[]> {
-  private state: "unscheduled" | "pending" | "processing" | "cancelled" = "unscheduled";
+  private state: "unscheduled" | "pending" | "processing" | "cancelled" | "complete" =
+    "unscheduled";
   private readonly args: A;
   private delay: number;
   private readonly task: (...args: A) => unknown;
@@ -95,6 +96,24 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  isComplete(): boolean {
+    return this.state === "complete" || this.state === "cancelled";
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  wait(timeout: number | null = null): Promise<this> {
+    if (this.isComplete()) return Promise.resolve(this);
+    return new Promise((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      this.addObserver(() => {
+        clearTimeout(timer);
+        resolve(this);
+      });
+      if (timeout != null) timer = setTimeout(() => resolve(this), timeout * 1000);
+    });
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   execute(): this {
     if (this.state === "unscheduled") {
       this.state = "pending";
@@ -118,6 +137,7 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
       reason = error;
     }
     this._reason = reason;
+    this.state = "complete";
     for (const observer of this.observers) observer(new Date(), value, reason);
   }
 

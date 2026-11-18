@@ -15,6 +15,8 @@ import { RequestIdTracking } from "./app/controllers/concerns/turbo/request-id-t
 import { FrameRequest } from "./app/controllers/turbo/frames/frame-request.js";
 import { Navigation } from "./app/controllers/turbo/native/navigation.js";
 import "./app/controllers/turbo/native/navigation-controller.js";
+import { ImmediateDebouncer } from "./app/models/turbo/immediate-debouncer.js";
+import { ThreadDebouncer } from "./app/models/turbo/thread-debouncer.js";
 import { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
 
 export interface TurboConfig extends OrderedOptions {
@@ -137,6 +139,12 @@ export class Engine extends TrailsEngine {
               .keyGenerator()
               .generateKey("turbo/signed_stream_verifier_key"),
         );
+      });
+    });
+
+    this.initializer("turbo.test_assertions", () => {
+      onLoad("active_support_test_case", () => {
+        ThreadDebouncer.debouncerClass = ImmediateDebouncer;
       });
     });
   }
