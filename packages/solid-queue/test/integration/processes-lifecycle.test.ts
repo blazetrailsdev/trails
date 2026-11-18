@@ -78,7 +78,11 @@ async function assertJobStatus(
   });
 }
 
-async function assertRegisteredWorkersFor(queues: string[], supervisorPid: number | null = null) {
+async function assertRegisteredWorkersFor(
+  ...args: [...queues: string[], options: { supervisorPid?: number | null }]
+) {
+  const { supervisorPid = null } = args.at(-1) as { supervisorPid?: number | null };
+  const queues = args.slice(0, -1) as string[];
   const workers = await findProcessesRegisteredAs("Worker").toArray();
   const registeredQueues = workers
     .map((process) => process.metadata.get("queues") as string | null)
@@ -136,7 +140,7 @@ describe("ProcessesLifecycleTest", () => {
       "background",
       "default",
     ]);
-    await assertRegisteredWorkersFor(["background", "default"], RbProcess.pid);
+    await assertRegisteredWorkersFor("background", "default", { supervisorPid: RbProcess.pid });
   });
 
   afterEach(async () => {
@@ -383,7 +387,7 @@ describe("ProcessesLifecycleTest", () => {
     await assertCompletedJobResults("pause", "default");
 
     await waitForRegisteredProcesses(3, { timeout: 3 });
-    await assertRegisteredWorkersFor(["background", "default"], RbProcess.pid);
+    await assertRegisteredWorkersFor("background", "default", { supervisorPid: RbProcess.pid });
 
     await enqueueStoreResultJob("no_pause");
     await enqueueStoreResultJob("no_pause", "default");
