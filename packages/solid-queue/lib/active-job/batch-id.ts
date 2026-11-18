@@ -56,6 +56,9 @@ function isSolidQueueJob(this: BatchIdHost): boolean {
   return this.constructor.queueAdapterName === "solid_queue";
 }
 
-/** @missingRailsCall currentBatchId — CONVERGEABLE solid-queue-batch-id-initialize-seeds-membership */
+/**
+ * @missingRailsCall currentBatchId — CONVERGEABLE solid-queue-batch-id-initialize-seeds-membership
+ * @noRailsEquivalent CONVERGEABLE solid-queue-extract-lib-active-job-for-parity
+ */
 export const BatchId = { enqueue, serialize, deserialize, batch, isSolidQueueJob };
 extend(BatchId, Concern);

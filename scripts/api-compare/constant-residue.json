@@ -1162,8 +1162,9 @@
     }
   },
   "solid-queue": {
-    "rows": 85,
+    "rows": 87,
     "excluded": [
+      "active-job/batch-id.ts::BatchId",
       "active-job/concurrency-controls.ts::ClassMethods",
       "active-job/concurrency-controls.ts::ConcurrencyControls",
       "active-job/queue-adapters/solid-queue-adapter.ts::SolidQueueAdapter"
