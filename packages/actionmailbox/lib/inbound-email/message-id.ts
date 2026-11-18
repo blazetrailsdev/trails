@@ -30,7 +30,7 @@ export async function createAndExtractMessageIdBang(
 }
 
 /** @internal */
-export function extractMessageId(source: string | Uint8Array): string | null {
+function extractMessageId(source: string | Uint8Array): string | null {
   try {
     return Mail.fromSource(source).messageId() as string | null;
   } catch {
@@ -39,7 +39,7 @@ export function extractMessageId(source: string | Uint8Array): string | null {
 }
 
 /** @internal */
-export function generateMissingMessageId(this: MessageIdHost, messageChecksum: string): string {
+function generateMissingMessageId(this: MessageIdHost, messageChecksum: string): string {
   const messageId = new MessageIdField(
     `<${messageChecksum}@${Socket.gethostname()}.mail>`,
   ).messageId()!;
@@ -50,7 +50,7 @@ export function generateMissingMessageId(this: MessageIdHost, messageChecksum: s
 }
 
 /** @internal */
-export async function createAndUploadRawEmailBang(source: string | Uint8Array): Promise<Blob> {
+async function createAndUploadRawEmailBang(source: string | Uint8Array): Promise<Blob> {
   return await Blob.createAndUploadBang({
     io: new StringIO(source),
     filename: "message.eml",
