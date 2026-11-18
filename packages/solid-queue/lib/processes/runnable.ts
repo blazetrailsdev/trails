@@ -2,6 +2,7 @@ import { include, inquiry, type StringInquirer } from "@blazetrails/activesuppor
 import {
   Errno,
   IO,
+  rbObjId,
   NotImplementedError,
   type PipeIO,
   Thread,
@@ -76,7 +77,7 @@ export class Runnable {
     } else if (this.isRunningAsync()) {
       this._bootGuard = new NullGuard();
       this._thread = this.createThread(block);
-      return this._thread;
+      return rbObjId(this._thread);
     } else {
       this._bootGuard = new NullGuard();
       return await block();

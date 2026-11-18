@@ -124,7 +124,7 @@ export class Base {
     if (timeZone === false) throw new NoMethodError("undefined method `name' for false", "name");
     this.timezone = timeZone?.name ?? null;
     /** @inventedArm if — PERMANENT */
-    if (ActiveJob.BatchId !== undefined && isModuleIncluded(new.target, ActiveJob.BatchId)) {
+    if (isModuleIncluded(new.target, ActiveJob.BatchId as never)) {
       const host = this as this & { batchId?: unknown; isSolidQueueJob(): boolean };
       if (host.isSolidQueueJob()) {
         host.batchId = (

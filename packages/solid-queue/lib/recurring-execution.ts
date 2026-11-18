@@ -21,7 +21,7 @@ export class RecurringExecution extends Execution {
 
   static async createOrInsertBang(attributes: { [key: string]: unknown }): Promise<unknown> {
     try {
-      if (await (await this.connection)!.supportsInsertConflictTarget()) {
+      if (await this.isSupportsInsertConflictTarget()) {
         if ((await this.insert(attributes, { uniqueBy: ["task_key", "run_at"] })).isEmpty()) {
           throw new AlreadyRecorded();
         }

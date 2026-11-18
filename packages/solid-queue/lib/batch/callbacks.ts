@@ -88,7 +88,7 @@ extend(Callbacks, Concern);
       set(this: Batch, callback: unknown) {
         if (callbackType === "finish") this.setOnFinish(callback);
         else if (callbackType === "success") this.setOnSuccess(callback);
-        else this.setOnFailure(callback);
+        else if (callbackType === "failure") this.setOnFailure(callback);
       },
       configurable: true,
     });
