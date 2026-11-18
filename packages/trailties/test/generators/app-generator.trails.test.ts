@@ -129,6 +129,37 @@ describe("AppGenerator (trails-only)", () => {
     expect(pkg.dependencies["@blazetrails/solid-queue"]).toBeDefined();
   });
 
+  it("writes environment files with no node: import and no process reference", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    for (const name of ["development", "test", "production"]) {
+      const source = await File.readAsync(
+        File.join(tmpDir, `my-app/config/environments/${name}.ts`),
+      );
+      expect(source).not.toMatch(/from "node:/);
+      expect(source).not.toMatch(/\bprocess\./);
+    }
+  });
+
+  it("writes an inflections initializer whose commented example imports a real export", async () => {
+    await new AppGenerator(
+      ["my-app"],
+      { skipInstall: true },
+      { destinationRoot: tmpDir },
+    ).invokeAll();
+    const source = await File.readAsync(
+      File.join(tmpDir, "my-app/config/initializers/inflections.ts"),
+    );
+    const [, names] = source.match(/import \{ (\w+) \} from "@blazetrails\/activesupport"/)!;
+    const activesupport: Record<string, unknown> = await import("@blazetrails/activesupport");
+    expect(typeof activesupport[names]).toBe("function");
+    const inflect = (activesupport[names] as (l: string) => { plurals: unknown })("en");
+    expect(inflect).toBeDefined();
+  });
+
   it("writes config/boot.ts and imports it first from config/application.ts", async () => {
     await new AppGenerator(
       ["my-app"],

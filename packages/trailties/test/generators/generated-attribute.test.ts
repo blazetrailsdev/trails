@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { assertMatch, assertRaise } from "@blazetrails/activesupport/testing/assertions";
 import { toFs } from "@blazetrails/activesupport/core-ext/date/conversions";
+import { toFs as dateTimeToFs } from "@blazetrails/activesupport/core-ext/date-time/conversions";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { GeneratedAttribute } from "../../lib/generators/generated-attribute.js";
 import { Error } from "../../lib/generators/base.js";
@@ -7,12 +9,13 @@ import {
   assertFieldDefaultValue,
   assertFieldType,
 } from "../../lib/generators/testing/assertions.js";
+import { createGeneratedAttribute } from "../../lib/generators/testing/behavior.js";
 
 describe("GeneratedAttribute", () => {
-  it("test_field_name_with_dangerous_attribute_raises_error", () => {
+  it("test_field_name_with_dangerous_attribute_raises_error", async () => {
+    const e = await assertRaise([Error], {}, () => createGeneratedAttribute("string", "save"));
     const message = "Could not generate field 'save', as it is already defined by Active Record.";
-    expect(() => GeneratedAttribute.parse("save:string")).toThrow(Error);
-    expect(() => GeneratedAttribute.parse("save:string")).toThrow(message);
+    assertMatch(message, e.message);
   });
 
   it("test_field_type_returns_number_field", () => {
@@ -82,9 +85,20 @@ describe("GeneratedAttribute", () => {
     expect([a.singularName(), a.pluralName()]).toEqual(["post", "posts"]);
   });
 
-  it("test_field_type_with_unknown_type_raises_error", () => {
-    expect(() => GeneratedAttribute.parse("title:bogus")).toThrow(Error);
-    expect(() => GeneratedAttribute.parse("title:string:bogus")).toThrow(Error);
+  it("test_field_type_with_unknown_type_raises_error", async () => {
+    const fieldType = "unknown";
+    const e = await assertRaise([Error], {}, () => createGeneratedAttribute(fieldType));
+    const message = "Could not generate field 'test' with unknown type 'unknown'";
+    assertMatch(message, e.message);
+  });
+
+  it("test_field_type_with_unknown_index_type_raises_error", async () => {
+    const indexType = "unknown";
+    const e = await assertRaise([Error], {}, () =>
+      createGeneratedAttribute("string", "name", indexType),
+    );
+    const message = "Could not generate field 'name' with unknown index 'unknown'";
+    assertMatch(message, e.message);
   });
 
   it("test_human_name", () => {
@@ -116,10 +130,8 @@ describe("GeneratedAttribute", () => {
   });
 
   it("test_default_value_is_datetime", () => {
-    for (const t of ["datetime", "timestamp", "time"]) {
-      const val = GeneratedAttribute.parse(`at:${t}`).default();
-      expect(typeof val).toBe("string");
-      expect(val).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    for (const attributeType of ["datetime", "timestamp", "time"]) {
+      assertFieldDefaultValue(attributeType, dateTimeToFs(Temporal.Now.plainDateTimeISO(), "db"));
     }
   });
 

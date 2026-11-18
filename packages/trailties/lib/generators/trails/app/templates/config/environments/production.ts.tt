@@ -1,4 +1,5 @@
 import { TaggedLogging } from "@blazetrails/activesupport";
+import { env, STDOUT } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {
@@ -40,10 +41,10 @@ Trails.application.configure(function () {
 
   // Log to STDOUT with the current request id as a default log tag.
   this.config.logTags = [":request_id"];
-  this.config.logger = TaggedLogging.logger(process.stdout);
+  this.config.logger = TaggedLogging.logger(STDOUT);
 
   // Change to "debug" to log everything (including potentially personally-identifiable information!)
-  this.config.logLevel = process.env.TRAILS_LOG_LEVEL ?? "info";
+  this.config.logLevel = env.TRAILS_LOG_LEVEL ?? "info";
 
   // Prevent health checks from clogging up the logs.
   this.config.silenceHealthcheckPath = "/up";

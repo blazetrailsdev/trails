@@ -1,7 +1,8 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
 import { days } from "@blazetrails/activesupport";
+import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
+
+const cachingDev = await getFs().exists(getPath().join(Trails.root()!, "tmp/caching-dev.txt"));
 
 Trails.application.configure(function () {
   // Settings specified here will take precedence over those in config/application.ts.
@@ -20,7 +21,7 @@ Trails.application.configure(function () {
 
   // Enable/disable Action Controller caching. By default Action Controller caching is disabled.
   // Run trails dev:cache to toggle Action Controller caching.
-  if (existsSync(join(this.config.root!, "tmp/caching-dev.txt"))) {
+  if (cachingDev) {
 <% if (!this.options.api) { -%>
     this.config.actionController.performCaching = true;
     this.config.actionController.enableFragmentCacheLogging = true;

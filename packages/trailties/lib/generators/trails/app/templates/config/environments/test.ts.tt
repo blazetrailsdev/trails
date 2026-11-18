@@ -4,6 +4,7 @@
 // and recreated between test runs. Don't rely on the data there!
 
 import { isPresent } from "@blazetrails/activesupport";
+import { env } from "@blazetrails/ruby-compat";
 import { Trails } from "@blazetrails/trailties";
 
 Trails.application.configure(function () {
@@ -16,7 +17,7 @@ Trails.application.configure(function () {
   // this is usually not necessary, and can slow down your test suite. However, it's
   // recommended that you enable it in continuous integration systems to ensure eager
   // loading is working properly before deploying your code.
-  this.config.eagerLoad = isPresent(process.env.CI);
+  this.config.eagerLoad = isPresent(env.CI);
 
   // Configure public file server for tests with cache-control for performance.
   this.config.publicFileServer.headers = { "cache-control": "public, max-age=3600" };
