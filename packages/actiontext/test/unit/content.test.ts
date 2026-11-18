@@ -201,8 +201,7 @@ describe("ActionText::ContentTest", () => {
     }
   });
 
-  // BLOCKED: html4-sanitizer-uri-escapes-attributes-like-libxml2
-  it.skip("sanitizes attachment markup for Trix", async () => {
+  it("sanitizes attachment markup for Trix", async () => {
     const html =
       '<action-text-attachment content="<img src=\\&quot;.\\&quot; onerror=alert>"></action-text-attachment>';
     const trixHtml =
