@@ -122,6 +122,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "pg",
   "racc",
   "rack",
+  "rack-cors",
   "rack-proxy",
   "rack-session",
   "rack-test",

@@ -1829,6 +1829,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   activerecord: "packages/activerecord/test/cases/",
   activesupport: "packages/activesupport/test/",
   rack: "packages/rack/test/",
+  "rack-cors": "packages/rack-cors/test/",
   "rack-proxy": "packages/rack-proxy/test/",
   "rack-session": "packages/rack-session/test/",
   "rack-test": "packages/rack-test/test/",

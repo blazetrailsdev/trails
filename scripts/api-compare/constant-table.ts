@@ -73,6 +73,7 @@ export const PACKAGE_LAYOUTS: Record<string, PackageLayout> = {
   msgpack: { root: "MessagePack" },
   "net-smtp": { root: "Net::SMTP" },
   rack: { root: "Rack" },
+  "rack-cors": { root: "Rack", siblings: true },
   "rack-proxy": { root: "Rack", siblings: true },
   "rack-session": { root: "Rack::Session", siblings: true },
   "rack-test": { root: "Rack::Test", siblings: true },

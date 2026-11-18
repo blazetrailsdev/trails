@@ -270,6 +270,24 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "rack-cors",
+    origin: {
+      type: "git",
+      url: "https://github.com/cyu/rack-cors.git",
+      // vendor/rails/v8.0.2/railties/lib/rails/generators/rails/app/templates/Gemfile.tt:50
+      // lists `rack-cors`; v3.0.0 is the latest release on rubygems.org.
+      ref: "v3.0.0",
+    },
+    packages: [
+      {
+        name: "rack-cors",
+        libPath: "lib/rack",
+        libEntryFile: "lib/rack/cors.rb",
+        testPath: "test",
+      },
+    ],
+  },
+  {
     name: "rack-proxy",
     origin: {
       type: "git",

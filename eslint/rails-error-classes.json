@@ -1382,6 +1382,16 @@
       }
     },
     "msgpack": {},
+    "rack-cors": {
+      "cors/resource.ts": {
+        "*": {
+          "constructor": ["CorsMisconfigurationError"]
+        },
+        "Resource": {
+          "constructor": ["CorsMisconfigurationError"]
+        }
+      }
+    },
     "rack-proxy": {},
     "rack-session": {},
     "rack-test": {},
@@ -1420,6 +1430,7 @@
     "globalid": [],
     "i18n": [],
     "msgpack": [],
+    "rack-cors": [],
     "rack-proxy": [],
     "rack-session": [],
     "rack-test": [],
