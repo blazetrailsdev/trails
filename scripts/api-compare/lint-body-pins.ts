@@ -90,6 +90,21 @@ async function main(scope: string | null): Promise<number> {
     }
   }
 
+  // A pin can be credited from another package (`@inlinedFrom
+  // ActiveModel::API#initialize` on activerecord's `Base`), so under a scope a
+  // STALE pin is only a warning locally: the unscoped run decides it. CI's
+  // scoped lanes stand in for the full job, so they stay strict.
+  if (scope !== null && !process.env.CI && stale.length > 0 && drift.length === 0) {
+    console.log(
+      `body-pins gate: OK (${pins.length} pinned); ${stale.length} pin(s) not seen in ` +
+        `scope ${scope}, left to the unscoped run:`,
+    );
+    for (const s of stale.sort((a, b) => keyOf(a).localeCompare(keyOf(b)))) {
+      console.log(`  ? ${s.package}  ${s.rubyFile}:${s.rubyName}`);
+    }
+    return 0;
+  }
+
   if (drift.length === 0 && stale.length === 0) {
     console.log(`body-pins gate: OK (${pins.length} pinned)`);
     return 0;

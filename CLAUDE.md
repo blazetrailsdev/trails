@@ -520,6 +520,9 @@ neither is an error.
    raises elsewhere: trails#8307 made 106 casts redundant and left `main`
    red until trails#8316.
 8. **`pnpm parity:api` / `pnpm parity:test`** deltas must be non-negative.
+9. **`pnpm parity:changed`** is the one-command local check: it runs CI's
+   comparison gate stack scoped to each changed package (~20–30s each). When
+   `ruby-compat` or `activesupport` changed, run `pnpm parity:changed --full`.
 
 ## Module mixins (Ruby `include` → TypeScript)
 
