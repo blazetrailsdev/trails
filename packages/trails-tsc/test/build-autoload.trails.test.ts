@@ -8,7 +8,9 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Loader, Registry } from "@blazetrails/zeitwerk";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Template } from "@blazetrails/actionview";
 import { buildAutoload } from "../lib/build-autoload.js";
+import { buildViews } from "../lib/build-views.js";
 
 describe("buildAutoload", () => {
   const seats = TopLevel as Record<string, unknown>;
@@ -335,6 +337,57 @@ describe("buildAutoload", () => {
     } finally {
       delete seats.Drawn;
       delete (globalThis as Record<string, unknown>).__routesEvaluated;
+      Dir.chdir(pwd);
+      FileUtils.rmRf(tmp);
+    }
+  });
+
+  it("renders a view from the boot map with app/views absent", async () => {
+    const tmp = Dir.mktmpdir("build-autoload");
+    Dir.chdir(tmp);
+    try {
+      FileUtils.mkdirP("app/views/posts");
+      FileUtils.mkdirP("config");
+      File.write("config/application.ts", "export {};\n");
+      File.write("config/environment.ts", "export default null;\n");
+      File.write("app/views/posts/index.html.tse", "<%# locals: (title:) %><h1><%= title %></h1>");
+      const root = Dir.pwd();
+      await buildViews({ cwd: root });
+      seats.Trails = {
+        application: {
+          config: { root },
+          paths: () => ({
+            get: (key: string) => ({
+              toAry: () => [key],
+              extensions: () => undefined,
+              existent: async () => {
+                const full = File.expandPath(key, root);
+                return File.isExist(full) ? [full] : [];
+              },
+            }),
+          }),
+          initializers: { tsort: () => [] },
+        },
+      };
+
+      await buildAutoload();
+
+      expect(File.read(".trails/boot.generated.js")).toContain(
+        '"app/views/posts/index.html.tse": async () => ({ ...(await import("./views/posts/index.html.tse.js")), source: ',
+      );
+      await import(File.expandPath(".trails/boot.generated.js"));
+      FileUtils.rmRf("app/views");
+      const { Base, FileSystemResolver, LookupContext } = await import("@blazetrails/actionview");
+
+      const ctx = new LookupContext(null, {}, []);
+      ctx.appendViewPaths([new FileSystemResolver(File.expandPath("app/views"))]);
+      const template = ctx.findTemplate("index", ["posts"], false, ["title"]) as Template;
+      const html = await template.render(new (Base.withEmptyTemplateCache())(null, {}, null), {
+        title: "Posts",
+      });
+
+      expect(String(html)).toBe("<h1>Posts</h1>");
+    } finally {
       Dir.chdir(pwd);
       FileUtils.rmRf(tmp);
     }

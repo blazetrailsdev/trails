@@ -1,6 +1,12 @@
 import { ActionView } from "../namespaces.js";
 import { I18n, cattrAccessor } from "@blazetrails/activesupport";
-import { Dir, File, NotImplementedError, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  compiledFilesIn,
+  Dir,
+  File,
+  NotImplementedError,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import type { LookupDetails, PathSetResolver } from "../path-set.js";
 import { Requested, TemplateDetails, type DetailKey } from "../template-details.js";
 import { UnboundTemplate } from "../unbound-template.js";
@@ -233,6 +239,12 @@ export class FileSystemResolver extends Resolver {
   protected templateGlob(glob: string): string[] {
     const query = File.join(this.escapeEntry(this._path), glob);
     const pathWithSlash = File.join(this._path, "");
+
+    const compiled = compiledFilesIn(this._path).filter((filename) =>
+      File.fnmatch(query, filename, File.FNM_PATHNAME),
+    );
+    // @inventedArm if — PERMANENT
+    if (compiled.length > 0) return compiled.sort();
 
     return Dir.glob(query).flatMap((filename) => {
       filename = File.expandPath(filename);
