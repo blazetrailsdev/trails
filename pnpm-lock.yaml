@@ -1183,6 +1183,21 @@ importers:
         specifier: workspace:*
         version: link:../vitest-matchers
 
+  packages/stimulus:
+    dependencies:
+      '@blazetrails/activesupport':
+        specifier: workspace:*
+        version: link:../activesupport
+      '@blazetrails/rake':
+        specifier: workspace:*
+        version: link:../rake
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
+      '@blazetrails/trailties':
+        specifier: workspace:*
+        version: link:../trailties
+
   packages/thor:
     dependencies:
       '@blazetrails/did-you-mean':
@@ -1431,6 +1446,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/stimulus':
+        specifier: workspace:*
+        version: link:../stimulus
       '@blazetrails/vitest-matchers':
         specifier: workspace:*
         version: link:../vitest-matchers
@@ -1651,6 +1669,9 @@ importers:
       '@blazetrails/solid-queue':
         specifier: workspace:*
         version: link:../../packages/solid-queue
+      '@blazetrails/stimulus':
+        specifier: workspace:*
+        version: link:../../packages/stimulus
       '@blazetrails/thor':
         specifier: workspace:*
         version: link:../../packages/thor

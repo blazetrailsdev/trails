@@ -128,6 +128,25 @@ export class Pathname {
     return File.isFileAsync(this._path);
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:891` `path_directory_p` */
+  async isDirectory(): Promise<boolean> {
+    return File.isDirectoryAsync(this._path);
+  }
+
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/lib/pathname.rb:449` `children` */
+  async children(withDirectory = true): Promise<Pathname[]> {
+    if (this._path === ".") withDirectory = false;
+    const result: Pathname[] = [];
+    for (const e of await Dir.childrenAsync(this._path)) {
+      if (withDirectory) {
+        result.push(new (this.constructor as typeof Pathname)(File.join(this._path, e)));
+      } else {
+        result.push(new (this.constructor as typeof Pathname)(e));
+      }
+    }
+    return result;
+  }
+
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:981` `path_size` */
   size(): number {
     return File.size(this._path);

@@ -81,6 +81,8 @@
     { "path": "packages/actionmailbox/tsconfig.test.json" },
     { "path": "packages/actiontext" },
     { "path": "packages/actiontext/tsconfig.test.json" },
+    { "path": "packages/stimulus" },
+    { "path": "packages/stimulus/tsconfig.test.json" },
     { "path": "packages/turbo" },
     { "path": "packages/turbo/tsconfig.test.json" },
     { "path": "packages/did-you-mean" },

@@ -269,6 +269,8 @@ export abstract class Base extends (Group as unknown as (abstract new (
   declare gsubFile: OmitThisParameter<typeof ThorActions.Actions.gsubFile>;
   declare createFile: OmitThisParameter<typeof ThorActions.Actions.createFile>;
   declare appendToFile: OmitThisParameter<typeof ThorActions.Actions.appendToFile>;
+  declare copyFile: OmitThisParameter<typeof ThorActions.Actions.copyFile>;
+  declare run: OmitThisParameter<typeof ThorActions.run>;
   /** @internal */
   declare protected _cleanupOptionsAndSet: ThorActions.ActionsHost["_cleanupOptionsAndSet"];
 

@@ -386,6 +386,8 @@ const alias = {
   "@blazetrails/actionmailbox": path.resolve(__dirname, "packages/actionmailbox/lib/index.ts"),
   "@blazetrails/actiontext/": path.resolve(__dirname, "packages/actiontext/lib") + "/",
   "@blazetrails/actiontext": path.resolve(__dirname, "packages/actiontext/lib/index.ts"),
+  "@blazetrails/stimulus/": path.resolve(__dirname, "packages/stimulus/lib") + "/",
+  "@blazetrails/stimulus": path.resolve(__dirname, "packages/stimulus/lib/stimulus-trails.ts"),
   "@blazetrails/turbo/": path.resolve(__dirname, "packages/turbo/lib") + "/",
   "@blazetrails/turbo": path.resolve(__dirname, "packages/turbo/lib/turbo-trails.ts"),
   "@blazetrails/solid-queue/": path.resolve(__dirname, "packages/solid-queue/lib") + "/",
@@ -745,6 +747,7 @@ export default defineConfig({
             "packages/zeitwerk/**",
             "packages/vite-assets/**",
             "packages/vite-trails/**",
+            "packages/stimulus/**",
             "packages/fugit/**",
             ...(ARCONN === "postgresql"
               ? []
@@ -858,6 +861,19 @@ export default defineConfig({
           name: "vite-trails",
           globals: true,
           include: ["packages/vite-trails/test/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: [
+            "./packages/ruby-compat/test-setup/class-paths.ts",
+            "./packages/vitest-matchers/lib/setup.ts",
+          ],
+        },
+      },
+      {
+        resolve: otherResolve,
+        test: {
+          name: "stimulus",
+          globals: true,
+          include: ["packages/stimulus/test/**/*.test.ts"],
           exclude: SHARED_EXCLUDE,
           setupFiles: [
             "./packages/ruby-compat/test-setup/class-paths.ts",

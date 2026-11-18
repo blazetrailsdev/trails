@@ -1198,16 +1198,13 @@ export const SOURCES: readonly UpstreamSource[] = [
     packages: [
       {
         name: "stimulus-rails",
+        portedBy: "stimulus",
         libPath: "lib/stimulus",
         libEntryFile: "lib/stimulus-rails.rb",
-        extraLibPaths: ["lib/generators/stimulus"],
+        extraLibPaths: ["lib/generators/stimulus", "lib/tasks"],
         testPath: "test",
-        compareApi: false,
-        apiExcludedReason:
-          "packages/stimulus-rails does not exist yet; story stimulus-rails-package-and-install creates it and enrolls it.",
-        compareTests: false,
-        testsExcludedReason:
-          "packages/stimulus-rails does not exist yet; story stimulus-rails-package-and-install creates it and enrolls it.",
+        compareApi: true,
+        compareTests: true,
       },
     ],
   },
