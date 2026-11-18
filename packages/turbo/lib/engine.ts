@@ -123,7 +123,7 @@ export class Engine extends TrailsEngine {
 
     this.initializer("turbo.broadcastable", () => {
       onLoad("active_record", function (this: object) {
-        if (TopLevel.ActiveJob !== undefined) {
+        if ("ActiveJob" in TopLevel) {
           include(this, Broadcastable);
         }
       });
@@ -163,9 +163,3 @@ export class Engine extends TrailsEngine {
   }
 }
 Turbo.Engine = Engine;
-
-declare module "@blazetrails/ruby-compat" {
-  interface TopLevelConstants {
-    ActiveJob?: object;
-  }
-}

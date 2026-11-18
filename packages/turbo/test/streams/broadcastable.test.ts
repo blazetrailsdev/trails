@@ -6,7 +6,6 @@ import { assertNoChanges } from "@blazetrails/activesupport/testing/assertions";
 import { domId } from "@blazetrails/actionview/record-identifier.js";
 import { Thread, constSet, include } from "@blazetrails/ruby-compat";
 import { withProductionDebouncer } from "../test-helper.js";
-import type { Broadcasts } from "../../lib/app/channels/turbo/streams/broadcasts.js";
 import { StreamsChannel } from "../../lib/app/channels/turbo/streams-channel.js";
 import { ActionHelper } from "../../lib/app/helpers/turbo/streams/action-helper.js";
 import { Turbo } from "../../lib/turbo-trails.js";
@@ -27,8 +26,7 @@ class MessageThatRendersError extends Message {
 
 type Ctx = { testCase: any };
 
-const render = (...args: unknown[]): Promise<unknown> =>
-  (ApplicationController.render as (...a: unknown[]) => Promise<unknown>)(...args);
+const render = ApplicationController.render.bind(ApplicationController);
 
 describe("Turbo::BroadcastableTest", () => {
   let message: any;
@@ -237,9 +235,7 @@ describe("Turbo::BroadcastableTest", () => {
               {},
               async () => {
                 for (let i = 0; i < 3; i++) await message.broadcastRefreshLater();
-                await (StreamsChannel as unknown as typeof Broadcasts)
-                  .refreshDebouncerFor(message)
-                  .wait();
+                await StreamsChannel.refreshDebouncerFor(message).wait();
               },
             ),
           ),

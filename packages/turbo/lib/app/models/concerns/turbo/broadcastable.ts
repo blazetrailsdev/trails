@@ -8,12 +8,8 @@ import {
   threadMattrAccessor,
 } from "@blazetrails/activesupport";
 import { Turbo } from "../../../../turbo-trails.js";
-import { StreamsChannel } from "../../../channels/turbo/streams-channel.js";
-import type { Broadcasts } from "../../../channels/turbo/streams/broadcasts.js";
 
 type Options = Record<string, unknown>;
-
-const channel = (): typeof Broadcasts => StreamsChannel as unknown as typeof Broadcasts;
 
 /** @internal */
 export interface BroadcastableClassHost {
@@ -51,8 +47,7 @@ export const Broadcastable = {
   async broadcastRemoveTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const { target = this, ...rendering } = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastRemoveTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastRemoveTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: target }),
       );
@@ -66,8 +61,7 @@ export const Broadcastable = {
   async broadcastReplaceTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const rendering = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastReplaceTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastReplaceTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: this }),
       );
@@ -81,8 +75,7 @@ export const Broadcastable = {
   async broadcastUpdateTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const rendering = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastUpdateTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastUpdateTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: this }),
       );
@@ -99,8 +92,7 @@ export const Broadcastable = {
       throw new ArgumentError("at least one of target or targets is required");
 
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastBeforeTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastBeforeTo(
         ...streamables,
         this.extractOptionsAndAddTarget({ ...rendering, target: target, targets: targets }),
       );
@@ -113,8 +105,7 @@ export const Broadcastable = {
       throw new ArgumentError("at least one of target or targets is required");
 
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastAfterTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastAfterTo(
         ...streamables,
         this.extractOptionsAndAddTarget({ ...rendering, target: target, targets: targets }),
       );
@@ -125,8 +116,7 @@ export const Broadcastable = {
     const { target = this.broadcastTargetDefault(), ...rendering } =
       extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastAppendTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastAppendTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: target }),
       );
@@ -144,8 +134,7 @@ export const Broadcastable = {
     const { target = this.broadcastTargetDefault(), ...rendering } =
       extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastPrependTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastPrependTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: target }),
       );
@@ -162,11 +151,7 @@ export const Broadcastable = {
   async broadcastRefreshTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const attributes = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastRefreshTo.call(
-        StreamsChannel as never,
-        ...streamables,
-        attributes,
-      );
+      return await Turbo.StreamsChannel!.broadcastRefreshTo(...streamables, attributes);
     return null;
   },
 
@@ -182,7 +167,7 @@ export const Broadcastable = {
       ...rendering
     } = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastActionTo.call(StreamsChannel as never, ...streamables, {
+      return await Turbo.StreamsChannel!.broadcastActionTo(...streamables, {
         action: action,
         attributes: attributes,
         ...this.extractOptionsAndAddTarget(rendering, { target: target }),
@@ -206,8 +191,7 @@ export const Broadcastable = {
   async broadcastReplaceLaterTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const rendering = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastReplaceLaterTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastReplaceLaterTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: this }),
       );
@@ -221,8 +205,7 @@ export const Broadcastable = {
   async broadcastUpdateLaterTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const rendering = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastUpdateLaterTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastUpdateLaterTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: this }),
       );
@@ -237,8 +220,7 @@ export const Broadcastable = {
     const { target = this.broadcastTargetDefault(), ...rendering } =
       extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastAppendLaterTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastAppendLaterTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: target }),
       );
@@ -256,8 +238,7 @@ export const Broadcastable = {
     const { target = this.broadcastTargetDefault(), ...rendering } =
       extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastPrependLaterTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastPrependLaterTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: target }),
       );
@@ -274,7 +255,7 @@ export const Broadcastable = {
   async broadcastRefreshLaterTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const attributes = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastRefreshLaterTo.call(StreamsChannel as never, ...streamables, {
+      return await Turbo.StreamsChannel!.broadcastRefreshLaterTo(...streamables, {
         requestId: Turbo.currentRequestId,
         ...attributes,
       });
@@ -293,7 +274,7 @@ export const Broadcastable = {
       ...rendering
     } = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastActionLaterTo.call(StreamsChannel as never, ...streamables, {
+      return await Turbo.StreamsChannel!.broadcastActionLaterTo(...streamables, {
         action: action,
         attributes: attributes,
         ...this.extractOptionsAndAddTarget(rendering, { target: target }),
@@ -320,8 +301,7 @@ export const Broadcastable = {
   async broadcastRenderTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const rendering = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastRenderTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastRenderTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering, { target: this }),
       );
@@ -335,8 +315,7 @@ export const Broadcastable = {
   async broadcastRenderLaterTo(this: Host, ...streamables: unknown[]): Promise<unknown> {
     const rendering = extractOptionsBang(streamables);
     if (!this.isSuppressedTurboBroadcasts())
-      return await channel().broadcastRenderLaterTo.call(
-        StreamsChannel as never,
+      return await Turbo.StreamsChannel!.broadcastRenderLaterTo(
         ...streamables,
         this.extractOptionsAndAddTarget(rendering),
       );
@@ -376,7 +355,7 @@ export const Broadcastable = {
     } else if (o.render === false) {
       return o;
     } else {
-      o.partial ??= this.toPartialPath();
+      if (o.partial == null || o.partial === false) o.partial = this.toPartialPath();
     }
     return o;
   },
