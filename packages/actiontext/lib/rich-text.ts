@@ -1,6 +1,7 @@
 import "./constants.rich-text.generated.js";
 import { runLoadHooks } from "@blazetrails/activesupport";
 import { ActiveStorage } from "@blazetrails/activestorage";
+import { _loadSerializedAttributes } from "@blazetrails/activerecord";
 import { isBlank, isPresent } from "@blazetrails/activesupport";
 import { RuntimeError, uniq } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
@@ -23,23 +24,24 @@ export class RichText extends Record {
 
     (this as unknown as { hasManyAttached(name: string): void }).hasManyAttached("embeds");
 
-    /**
-     * @inventedArm canonicalized — PERMANENT
-     * @inventedArm toPlainText — PERMANENT
-     */
+    /** @inventedArm toPlainText — PERMANENT */
     this.beforeSave(async (record: RichText) => {
       if (record.body != null && record.body.isPresent()) {
-        const body = await record.body.canonicalized;
         await record.toPlainText();
         await (record as unknown as { setEmbeds(attachables: unknown): Promise<void> }).setEmbeds(
           uniq(
-            (await body.attachables()).filter(
+            (await record.body.attachables()).filter(
               (attachable) => attachable instanceof ActiveStorage.Blob!,
             ),
           ),
         );
       }
     });
+  }
+
+  async setBody(body: unknown): Promise<void> {
+    this.body = body as Content | null;
+    await _loadSerializedAttributes(this);
   }
 
   override toString(): string {

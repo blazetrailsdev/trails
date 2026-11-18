@@ -11,7 +11,7 @@ import {
   type Included,
 } from "@blazetrails/activesupport";
 import type { Html5Node } from "@blazetrails/nokogiri";
-import { rbInspect, rbModName } from "@blazetrails/ruby-compat";
+import { rbClassNewInstance, rbInspect, rbModName } from "@blazetrails/ruby-compat";
 import { ActionText } from "./action-text.js";
 import { Attachable } from "./attachable.js";
 import { Attachment } from "./attachment.js";
@@ -38,7 +38,7 @@ export class Content {
   declare static withRenderer: RenderingClassMethods["withRenderer"];
   declare static render: RenderingClassMethods["render"];
   declare static load: (content: unknown) => unknown;
-  declare static dump: (content: unknown) => string | null;
+  declare static dump: (content: unknown) => string | null | Promise<string | null>;
   declare static _load: (content: unknown) => unknown;
 
   static {
@@ -54,8 +54,6 @@ export class Content {
   }
 
   declare fragment: Fragment;
-  /** @noRailsEquivalent PERMANENT */
-  readonly canonicalized: Promise<this>;
   /** @internal */
   private _links?: string[];
   /** @internal */
@@ -71,21 +69,18 @@ export class Content {
   /** @internal */
   private _attachmentGalleryNodes?: Html5Node[];
 
-  constructor(content: unknown = null, options: ContentOptions = {}) {
+  protected constructor() {}
+
+  static async new(content: unknown = null, options: ContentOptions = {}): Promise<Content> {
+    const content_ = rbClassNewInstance(this);
     withDefaultsBang(options, { canonicalize: true });
 
     if (options.canonicalize) {
-      this.fragment = Fragment.wrap(content);
-      this.canonicalized = (this.constructor as typeof Content)
-        .fragmentByCanonicalizingContent(content)
-        .then((fragment) => {
-          this.fragment = fragment;
-          return this;
-        });
+      content_.fragment = await this.fragmentByCanonicalizingContent(content);
     } else {
-      this.fragment = Fragment.wrap(content);
-      this.canonicalized = Promise.resolve(this);
+      content_.fragment = Fragment.wrap(content);
     }
+    return content_;
   }
 
   links(): string[] {
@@ -127,9 +122,9 @@ export class Content {
 
   async appendAttachables(attachables: unknown): Promise<Content> {
     const attachments = Attachment.fromAttachables(attachables);
-    return new (this.constructor as typeof Content)(
+    return (this.constructor as typeof Content).new(
       [presence(await this.toString()), ...attachments].filter((x) => x != null).join("\n"),
-    ).canonicalized;
+    );
   }
 
   async renderAttachments(
@@ -145,7 +140,7 @@ export class Content {
       }
       return block(await this.attachmentForNode(node, options));
     });
-    return new (this.constructor as typeof Content)(content, { canonicalize: false });
+    return (this.constructor as typeof Content).new(content, { canonicalize: false });
   }
 
   async renderAttachmentGalleries(
@@ -155,7 +150,7 @@ export class Content {
       this.fragment,
       (node) => block(this.attachmentGalleryForNode(node)),
     );
-    return new (this.constructor as typeof Content)(content, { canonicalize: false });
+    return (this.constructor as typeof Content).new(content, { canonicalize: false });
   }
 
   async toPlainText(): Promise<string> {

@@ -25,7 +25,8 @@ export class MessagesController extends ActionController.Base {
   edit(): void {}
 
   async create(): Promise<void> {
-    this.message = new Message(this.messageParams());
+    this.message = new Message();
+    await this.message.setAttributes(this.messageParams());
 
     if (await this.message.save()) {
       this.redirectTo(this.message, { notice: "Message was successfully created." });

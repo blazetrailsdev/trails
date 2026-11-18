@@ -12,6 +12,7 @@ export {
   type AutoFilteredParametersApp,
 } from "./encryption/auto-filtered-parameters.js";
 export type { ColumnType as ResultColumnType, ColumnTypes as ResultColumnTypes } from "./result.js";
+export { _loadSerializedAttributes } from "./type/serialized.js";
 export * as Type from "./type.js";
 import * as TypeModule from "./type.js";
 

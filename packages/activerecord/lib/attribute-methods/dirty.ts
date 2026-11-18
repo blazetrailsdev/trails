@@ -1,3 +1,4 @@
+import { _loadSerializedAttributes } from "../type/serialized.js";
 import { RuntimeError, rbObjAsString, rbCallSuper } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
@@ -142,7 +143,10 @@ export async function reload<T extends DirtyPrivateHost>(this: T, ...args: unkno
   return record;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm _loadSerializedAttributes — PERMANENT
+ */
 export async function _touchRow(
   this: DirtyPrivateHost,
   attributeNames: string[],
@@ -172,6 +176,7 @@ export async function _touchRow(
     }
 
     this.changesApplied();
+    await _loadSerializedAttributes(this as never);
     for (const [attrName, value] of changes) {
       this._writeAttribute(attrName, value);
     }
@@ -183,7 +188,10 @@ export async function _touchRow(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm _loadSerializedAttributes — PERMANENT
+ */
 export async function _updateRecord(
   this: DirtyPrivateHost,
   attributeNames: string[] | undefined,
@@ -192,10 +200,14 @@ export async function _updateRecord(
   attributeNames ??= attributeNamesForPartialUpdates.call(this);
   const affectedRows = await superFn(attributeNames);
   this.changesApplied();
+  await _loadSerializedAttributes(this as never);
   return affectedRows;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm _loadSerializedAttributes — PERMANENT
+ */
 export async function _createRecord(
   this: DirtyPrivateHost,
   attributeNames: string[] | undefined,
@@ -204,6 +216,7 @@ export async function _createRecord(
   attributeNames ??= attributeNamesForPartialInserts.call(this);
   const id = await superFn(attributeNames);
   this.changesApplied();
+  await _loadSerializedAttributes(this as never);
   return id;
 }
 

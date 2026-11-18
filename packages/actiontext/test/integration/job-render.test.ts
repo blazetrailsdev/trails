@@ -44,7 +44,7 @@ describe("ActionText::JobRenderTest", () => {
   it("uses app default_url_options", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
     const message = await Message.createBang({
-      content: await new Content().appendAttachables(blob),
+      content: await (await Content.new()).appendAttachables(blob),
     });
 
     await Dir.mktmpdir(null, null, {}, async (dir: string) => {

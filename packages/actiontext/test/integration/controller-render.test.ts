@@ -31,7 +31,7 @@ describe("ActionText::ControllerRenderTest", () => {
   it("uses current request environment", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
     const message = await Message.createBang({
-      content: await new Content().appendAttachables(blob),
+      content: await (await Content.new()).appendAttachables(blob),
     });
 
     t.hostBang("loocalhoost");
@@ -47,7 +47,7 @@ describe("ActionText::ControllerRenderTest", () => {
   it("renders as HTML when the request format is not HTML", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
     const message = await Message.createBang({
-      content: await new Content().appendAttachables(blob),
+      content: await (await Content.new()).appendAttachables(blob),
     });
 
     t.hostBang("loocalhoost");
@@ -70,7 +70,7 @@ describe("ActionText::ControllerRenderTest", () => {
   it("resolves partials when controller is namespaced", async () => {
     const blob = await createFileBlob({ filename: "racecar.jpg", contentType: "image/jpeg" });
     const message = await Message.createBang({
-      content: await new Content().appendAttachables(blob),
+      content: await (await Content.new()).appendAttachables(blob),
     });
 
     await t.get(urlHelpers().adminMessagePath(message));

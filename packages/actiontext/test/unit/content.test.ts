@@ -9,7 +9,7 @@ import { MissingAttachable } from "../../lib/attachables/missing-attachable.js";
 import { RemoteImage } from "../../lib/attachables/remote-image.js";
 
 async function contentFromHtml(html: string): Promise<Content> {
-  const content = await new Content(html).canonicalized;
+  const content = await Content.new(html);
   await expect(Promise.resolve().then(() => content.toString())).resolves.not.toThrow();
   return content;
 }
@@ -36,7 +36,7 @@ describe("ActionText::ContentTest", () => {
 
   it("marshal serialization", async () => {
     const content = await contentFromHtml("Hello!");
-    expect(content.equals(Marshal.load(Marshal.dump(content)))).toBe(true);
+    expect(content.equals(await Marshal.load(Marshal.dump(content)))).toBe(true);
   });
 
   it("roundtrips HTML without additional newlines", async () => {

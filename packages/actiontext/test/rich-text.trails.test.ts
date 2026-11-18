@@ -24,12 +24,12 @@ beforeAll(async () => {
 });
 
 describe("ActionText::Serialization (trails)", () => {
-  it("round-trips a body through Content.load and Content.dump", () => {
+  it("round-trips a body through Content.load and Content.dump", async () => {
     const html = "<div>Hello <strong>world</strong></div>";
-    const loaded = Content.load(html) as Content;
+    const loaded = (await Content.load(html)) as Content;
     expect(loaded).toBeInstanceOf(Content);
     expect(Content.dump(loaded)).toBe(html);
-    expect(Content.dump(html)).toBe(html);
+    expect(await Content.dump(html)).toBe(html);
     expect(Content.dump(null)).toBeNull();
     expect(Content.load(null)).toBeNull();
     expect(loaded._dump()).toBe(html);
@@ -41,7 +41,9 @@ describe("ActionText::Attribute (trails)", () => {
     const message = new Message({ subject: "Greetings" }) as RichTextMessage;
     expect(message.content).toBeInstanceOf(RichText);
     expect(await message.isContent()).toBe(false);
-    message.content = "<h1>Hello world</h1>" as never;
+    await (message as unknown as { setContent(b: unknown): Promise<void> }).setContent(
+      "<h1>Hello world</h1>",
+    );
     expect(message.content.body).toBeInstanceOf(Content);
     expect(await message.isContent()).toBe(true);
     expect(await message.content.toPlainText()).toBe("Hello world");
@@ -56,7 +58,9 @@ describe("ActionText::Attribute (trails)", () => {
   it("answers blank? and present? from a loaded plain text", async () => {
     const message = new Message({ subject: "Greetings" }) as RichTextMessage;
     expect(message.content.isBlank()).toBe(true);
-    message.content = "<h1>Hello</h1>" as never;
+    await (message as unknown as { setContent(b: unknown): Promise<void> }).setContent(
+      "<h1>Hello</h1>",
+    );
     expect(() => message.content.isPresent()).toThrow(/to_plain_text is not loaded/);
     await message.content.toPlainText();
     expect(message.content.isPresent()).toBe(true);
@@ -68,7 +72,7 @@ describe("ActionText::Attribute (trails)", () => {
       subject: "Greetings",
       content: "<p>content</p>",
     })) as unknown as RichTextMessage;
-    message.content = "" as never;
+    await (message as unknown as { setContent(b: unknown): Promise<void> }).setContent("");
     expect(message.content.markedForDestruction()).toBe(true);
     const before = await RichText.count();
     await message.save();
@@ -105,7 +109,7 @@ describe("ActionText::Attribute (trails)", () => {
       filename: "racecar.jpg",
       contentType: "image/jpeg",
     });
-    const content = new Content(
+    const content = await Content.new(
       `Hello world${Attachment.fromAttachables([blob, blob])
         .map((attachment) => attachment.toHtml())
         .join("")}`,

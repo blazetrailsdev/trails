@@ -29,7 +29,7 @@ describe("ActionText::AttachmentTest", () => {
   });
 
   async function attachmentFromHtml(html: string): Promise<Attachment> {
-    return (await new Content(html).attachments())[0]!;
+    return (await (await Content.new(html)).attachments())[0]!;
   }
 
   async function attachable(): Promise<BlobAttachable> {
@@ -131,7 +131,7 @@ describe("ActionText::AttachmentTest", () => {
 
   // BLOCKED: content-attachment-sanitized-void-element-no-slash
   it.skip("to_trix_html sanitizes action-text HTML content attachment", async () => {
-    const attachment = new Content(
+    const attachment = await Content.new(
       '<action-text-attachment content-type="text/html" content="<img src=. onerror=\'alert(location)\' />"></action-text-attachment>',
     );
 

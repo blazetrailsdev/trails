@@ -1,8 +1,24 @@
-import { Mutable, ValueType, BinaryData } from "@blazetrails/activemodel";
+import {
+  Mutable,
+  ValueType,
+  BinaryData,
+  type Attribute,
+  type AttributeSet,
+} from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual, rbObjInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  DelegateClass,
+  type Hash,
+  hashAref,
+  keys,
+  rbEqual,
+  rbObjInspect,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
-import type { ColumnSerializer } from "../coders/column-serializer.js";
+import { EncryptedAttributeType } from "../encryption/encrypted-attribute-type.js";
+import { ColumnSerializer } from "../coders/column-serializer.js";
+import { JSON } from "../coders/json.js";
 
 type Coder = Pick<ColumnSerializer, "dump" | "load"> &
   Partial<Pick<ColumnSerializer, "objectClass" | "assertValidValue">>;
@@ -11,6 +27,8 @@ type Coder = Pick<ColumnSerializer, "dump" | "load"> &
 export class Serialized extends DelegateClass(ValueType) {
   readonly subtype: ValueType | null;
   readonly coder: Coder;
+  /** @internal */
+  _coderLoadsAsync?: boolean;
 
   constructor(subtype: ValueType | null, coder: Coder) {
     super(subtype);
@@ -22,7 +40,9 @@ export class Serialized extends DelegateClass(ValueType) {
     return IndifferentHashAccessor;
   }
 
+  /** @inventedArm then — PERMANENT */
   deserialize(value: unknown): unknown {
+    if (value instanceof Promise) return value.then((v) => this.deserialize(v));
     if (this.isDefaultValue(value)) {
       return value;
     } else {
@@ -30,10 +50,13 @@ export class Serialized extends DelegateClass(ValueType) {
     }
   }
 
+  /** @inventedArm then — PERMANENT */
   serialize(value: unknown): unknown {
     if (value == null) return null;
     if (!this.isDefaultValue(value)) {
-      return super.serialize(this.coder.dump(value));
+      const dumped: unknown = this.coder.dump(value);
+      if (dumped instanceof Promise) return dumped.then((d) => super.serialize(d));
+      return super.serialize(dumped);
     }
     return null;
   }
@@ -84,3 +107,52 @@ export class Serialized extends DelegateClass(ValueType) {
 export interface Serialized extends Mutable {}
 
 include(Serialized, Mutable);
+
+export async function _loadSerializedAttributes(
+  record: { _attributes: AttributeSet; constructor: unknown },
+  seen: Set<object> = new Set(),
+): Promise<void> {
+  if (seen.has(record)) return;
+  seen.add(record);
+  const attributeTypes = (
+    record.constructor as { attributeTypes(): Record<string, unknown> | Hash<string, unknown> }
+  ).attributeTypes();
+  for (const name of keys(attributeTypes)) {
+    const type = hashAref(attributeTypes, name);
+    const castType = type instanceof EncryptedAttributeType ? type.castType : type;
+    if (!(castType instanceof Serialized)) continue;
+    if (castType.coder instanceof ColumnSerializer || castType.coder === JSON) continue;
+    if (castType._coderLoadsAsync === false) continue;
+    if (!record._attributes.isKey(name)) continue;
+
+    const attribute = record._attributes.getAttribute(name) as Attribute & {
+      _value?: unknown;
+      typeCast(value: unknown): unknown;
+    };
+    let value: unknown;
+    if (Object.hasOwn(attribute, "_value")) {
+      value = attribute._value;
+    } else {
+      try {
+        value = attribute.typeCast(attribute.valueBeforeTypeCast);
+      } catch {
+        castType._coderLoadsAsync = false;
+        continue;
+      }
+      if (attribute.valueBeforeTypeCast != null) {
+        castType._coderLoadsAsync = value instanceof Promise;
+      }
+    }
+    if (value instanceof Promise) attribute._value = await value;
+  }
+
+  const associationCache = (record as { _associationCache?: Map<string, { target: unknown }> })
+    ._associationCache;
+  if (!associationCache) return;
+  for (const association of associationCache.values()) {
+    const target = association.target;
+    for (const child of Array.isArray(target) ? target : target == null ? [] : [target]) {
+      await _loadSerializedAttributes(child as typeof record, seen);
+    }
+  }
+}
