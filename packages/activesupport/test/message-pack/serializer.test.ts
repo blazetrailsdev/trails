@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { MessagePack, UnserializableObjectError } from "../../lib/message-pack.js";
-import { Temporal, Time } from "@blazetrails/date";
+import { DateTime, Temporal, Time } from "@blazetrails/date";
 import {
   BigDecimal,
   Complex,
@@ -143,8 +143,18 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("roundtrips DateTime", () => {
-    assertRoundtrip(Temporal.PlainDateTime.from("1999-12-31T12:34:56.789"));
-    assertRoundtrip(Temporal.Now.plainDateTimeISO());
+    assertRoundtrip(
+      DateTime.civil(
+        1999,
+        12,
+        31,
+        12,
+        34,
+        rational(56, 1).add(rational(789, 1000)),
+        rational(-1, 2),
+      ),
+    );
+    assertRoundtrip(DateTime.now());
   });
 
   it("roundtrips Date", () => {

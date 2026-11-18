@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { EncryptedFile, InvalidKeyLengthError, MissingKeyError } from "../lib/encrypted-file.js";
+import { Codec } from "../lib/messages/codec.js";
+import { objectWith } from "../lib/core-ext/object/with.js";
 import { getFs, getPath, getOsAsync, env, setEnv } from "@blazetrails/ruby-compat";
 import {
   assert,
@@ -186,8 +188,10 @@ describe("EncryptedFileTest", () => {
   });
 
   it("can read encrypted file after changing default_serializer", async () => {
-    const ef = make();
-    await ef.write(CONTENT);
-    expect(await ef.read()).toBe(CONTENT);
+    await objectWith(Codec, { defaultSerializer: "marshal" }, () => make().write(CONTENT));
+
+    await objectWith(Codec, { defaultSerializer: "json" }, async () => {
+      expect(await make().read()).toBe(CONTENT);
+    });
   });
 });

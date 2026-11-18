@@ -662,4 +662,46 @@ describe("AttrNames.defineAttributeAccessorMethod (attribute_methods.rb:577-589)
     expect(odd["foo-bar"]).toBe("b");
     expect(odd["\u00e9"]).toBe(7);
   });
+
+  it("generated accessors do not depend on the order colliding classes are defined in", () => {
+    const define = (prefix: string, aliasTarget: string, type: string) => {
+      class Klass extends Model {
+        declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+        declare static attribute: AttributesClassHalf["attribute"];
+
+        static {
+          include(this, Attributes);
+          this.attribute(`${prefix}Shared`, type);
+          this.attribute(`${prefix}Other`, "string");
+          this.aliasAttribute(`${prefix}Alias`, `${prefix}${aliasTarget}`);
+        }
+      }
+      return Klass as unknown as new (attrs?: Record<string, unknown>) => Record<string, unknown>;
+    };
+
+    for (const [prefix, order] of [
+      ["ab", ["a", "b"]],
+      ["ba", ["b", "a"]],
+    ] as const) {
+      const classes: Record<string, ReturnType<typeof define>> = {};
+      for (const which of order) {
+        classes[which] =
+          which === "a" ? define(prefix, "Shared", "integer") : define(prefix, "Other", "string");
+      }
+
+      const a = new classes.a({ [`${prefix}Shared`]: "12", [`${prefix}Other`]: "x" });
+      const b = new classes.b({ [`${prefix}Shared`]: "12", [`${prefix}Other`]: "y" });
+
+      expect(a[`${prefix}Shared`]).toBe(12);
+      expect(a[`${prefix}Alias`]).toBe(12);
+      expect(b[`${prefix}Shared`]).toBe("12");
+      expect(b[`${prefix}Alias`]).toBe("y");
+
+      a[`${prefix}Alias`] = "34";
+      b[`${prefix}Alias`] = "z";
+      expect(a[`${prefix}Shared`]).toBe(34);
+      expect(b[`${prefix}Other`]).toBe("z");
+      expect(b[`${prefix}Shared`]).toBe("12");
+    }
+  });
 });
