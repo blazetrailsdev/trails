@@ -361,7 +361,6 @@ export class Response {
     status: number | string = 200,
     headers: Record<string, string> = {},
     body: unknown = [],
-    block?: (response: Response) => void,
   ) {
     this._headers = new Headers();
     for (const [key, value] of Object.entries(headers)) {
@@ -376,7 +375,7 @@ export class Response {
     body: unknown = [],
     block?: (response: T) => void,
   ): Promise<T> {
-    const response = rbClassNewInstance(this, status, headers, body, block);
+    const response = rbClassNewInstance(this, status, headers, body);
     await response.setBody(body);
     response.status = status;
     response.prepareCacheControlBang();
@@ -628,6 +627,7 @@ export class Response {
   }
 
   async awaitCommit(): Promise<void> {
+    if (this._committed) return;
     while (!this._committed) await new Promise<void>((broadcast) => this.cv.push(broadcast));
     /** @inventedArm setTimeout — PERMANENT */
     await new Promise<void>((resume) => setTimeout(resume, 0));

@@ -1,3 +1,4 @@
+import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { QUERY_STRING } from "@blazetrails/rack";
 import {
   ActiveSupportJSON,
@@ -162,7 +163,7 @@ export interface Behavior extends Included<typeof TestProcess> {
   /** @internal */
   _cookieJar?: CookieJar;
   /** @internal */
-  _responseKlass: typeof TestResponse | typeof LiveTestResponse;
+  _responseKlass: typeof TestResponse<HashWithIndifferentAccess> | typeof LiveTestResponse;
   /** @internal */
   _htmlDocument?: XmlDocument | Html5Document | null;
   readonly htmlDocument: XmlDocument | Html5Document;
