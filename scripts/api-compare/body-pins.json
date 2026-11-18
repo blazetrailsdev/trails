@@ -57329,13 +57329,6 @@
   {
     "package": "activesupport",
     "rubyFile": "broadcast_logger.rb",
-    "rubyName": "silence",
-    "digest": "73c0d5249989a190",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "broadcast_logger.rb",
     "rubyName": "stop_broadcasting_to",
     "digest": "a1764fb1322a5a40",
     "ref": "v8.0.2"
@@ -63194,13 +63187,6 @@
   },
   {
     "package": "activesupport",
-    "rubyFile": "logger.rb",
-    "rubyName": "silence",
-    "digest": "73c0d5249989a190",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
     "rubyFile": "logger_silence.rb",
     "rubyName": "level",
     "digest": "17c099156dfffe45",
@@ -63218,13 +63204,6 @@
     "rubyFile": "logger_silence.rb",
     "rubyName": "local_level=",
     "digest": "206fcc58518555f9",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "logger_silence.rb",
-    "rubyName": "silence",
-    "digest": "73c0d5249989a190",
     "ref": "v8.0.2"
   },
   {
