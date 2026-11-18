@@ -37,22 +37,12 @@ const JD_UNIX_EPOCH = 2440588;
 
 const UNIX_EPOCH_DATE = Temporal.PlainDate.from("1970-01-01");
 
-const NANOS_PER_SECOND = 1_000_000_000;
-
 function julianDay(date: Temporal.PlainDate): number {
   return JD_UNIX_EPOCH + date.since(UNIX_EPOCH_DATE, { largestUnit: "day" }).days;
 }
 
 function dateFromJulianDay(jd: number): Temporal.PlainDate {
   return UNIX_EPOCH_DATE.add({ days: jd - JD_UNIX_EPOCH });
-}
-
-function nanosecondOfSecond(time: {
-  millisecond: number;
-  microsecond: number;
-  nanosecond: number;
-}): number {
-  return time.millisecond * 1_000_000 + time.microsecond * 1_000 + time.nanosecond;
 }
 
 export class UnserializableObjectError extends Error {}
@@ -226,6 +216,7 @@ export const Extensions = {
     return complex(unpacker.read(), unpacker.read());
   },
 
+  /** @inventedArm if — CONVERGEABLE date-parse-returns-temporal-not-the-owned-date-class */
   writeDatetime(
     datetime: DateTime | Temporal.PlainDateTime | Temporal.ZonedDateTime,
     packer: Packer,
