@@ -6,6 +6,9 @@ import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { File, constDefined } from "@blazetrails/ruby-compat";
 import { Turbo } from "./turbo-trails.js";
 import "./app/channels/turbo/streams-channel.js";
+import "./app/jobs/turbo/streams/action-broadcast-job.js";
+import "./app/jobs/turbo/streams/broadcast-job.js";
+import "./app/jobs/turbo/streams/broadcast-stream-job.js";
 import "./app/helpers/turbo/drive-helper.js";
 import "./app/helpers/turbo/frames-helper.js";
 import "./app/helpers/turbo/includes-helper.js";
@@ -15,6 +18,8 @@ import { RequestIdTracking } from "./app/controllers/concerns/turbo/request-id-t
 import { FrameRequest } from "./app/controllers/turbo/frames/frame-request.js";
 import { Navigation } from "./app/controllers/turbo/native/navigation.js";
 import "./app/controllers/turbo/native/navigation-controller.js";
+import { ImmediateDebouncer } from "./app/models/turbo/immediate-debouncer.js";
+import { ThreadDebouncer } from "./app/models/turbo/thread-debouncer.js";
 import { TurboStreamsTagBuilder } from "./app/controllers/turbo/streams/turbo-streams-tag-builder.js";
 
 export interface TurboConfig extends OrderedOptions {
@@ -137,6 +142,13 @@ export class Engine extends TrailsEngine {
               .keyGenerator()
               .generateKey("turbo/signed_stream_verifier_key"),
         );
+      });
+    });
+
+    /** @missingRailsCall include — CONVERGEABLE turbo-test-helpers */
+    this.initializer("turbo.test_assertions", () => {
+      onLoad("active_support_test_case", () => {
+        ThreadDebouncer.debouncerClass = ImmediateDebouncer;
       });
     });
   }

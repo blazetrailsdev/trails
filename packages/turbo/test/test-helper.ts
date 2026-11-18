@@ -3,7 +3,10 @@ import { Logger, TopLevel, setTrailsRoot } from "@blazetrails/activesupport";
 import { ActiveRecord, Base, DatabaseTasks, Migrator } from "@blazetrails/activerecord";
 import { Trails } from "@blazetrails/trailties";
 import { ActionController } from "@blazetrails/actionpack";
-import { File } from "@blazetrails/ruby-compat";
+import { File, Thread } from "@blazetrails/ruby-compat";
+import { expect } from "vitest";
+import { Debouncer } from "../lib/app/models/turbo/debouncer.js";
+import { ThreadDebouncer } from "../lib/app/models/turbo/thread-debouncer.js";
 
 const configurations = Base.configurations();
 Trails.env = "test";
@@ -30,3 +33,19 @@ afterAll(async () => {
   await Base.establishConnection(configurations.configsFor({ envName: "arunit", name: "primary" }));
   Base.configurations(configurations);
 });
+
+export async function withProductionDebouncer(block: () => Promise<unknown>): Promise<void> {
+  const old = ThreadDebouncer.debouncerClass;
+  ThreadDebouncer.debouncerClass = Debouncer;
+  try {
+    await block();
+  } finally {
+    ThreadDebouncer.debouncerClass = old;
+    await new Promise((resolve) => setTimeout(resolve, (Debouncer.DEFAULT_DELAY + 0.2) * 1000));
+
+    const turboKeys = Thread.current()
+      .keys()
+      .filter((k) => k.startsWith("turbo-"));
+    expect(turboKeys, "Thread-locals were not cleaned up").toEqual([]);
+  }
+}

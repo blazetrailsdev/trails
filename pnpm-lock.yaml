@@ -1344,6 +1344,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/activejob':
+        specifier: workspace:*
+        version: link:../activejob
       '@blazetrails/activesupport':
         specifier: workspace:*
         version: link:../activesupport
@@ -1354,9 +1357,6 @@ importers:
         specifier: workspace:*
         version: link:../trailties
     devDependencies:
-      '@blazetrails/activejob':
-        specifier: workspace:*
-        version: link:../activejob
       '@blazetrails/activemodel':
         specifier: workspace:*
         version: link:../activemodel
