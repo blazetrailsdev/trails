@@ -73,6 +73,7 @@ import { RangeField } from "./tags/range-field.js";
 import { SearchField } from "./tags/search-field.js";
 import { TextField } from "./tags/text-field.js";
 import { UrlHelper } from "./url-helper.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 const __FILE__ = import.meta.url;
 const __LINE__ = 0;
@@ -798,6 +799,7 @@ export class FormBuilder {
       }
     });
     this.prototype.textArea = this.prototype.textarea;
+    rbClearMethodCache();
   }
 
   fieldsFor(
@@ -906,6 +908,7 @@ export class FormBuilder {
   declare checkBox: FormBuilder["checkbox"];
   static {
     this.prototype.checkBox = this.prototype.checkbox;
+    rbClearMethodCache();
   }
 
   radioButton(method: unknown, tagValue: unknown, options: Record<string, unknown> = {}): unknown {

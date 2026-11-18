@@ -19,6 +19,7 @@ import { Isolation } from "./isolation.js";
 import { TestHelper as ExecutorTestHelper } from "../executor/test-helper.js";
 import type { CompletableExecution } from "../execution-wrapper.js";
 import { Assertion, Skip, Test, UnexpectedError, _takeAssertions } from "./assertions.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "vitest" {
   interface TestContext {
@@ -67,6 +68,7 @@ function children(klass: SpecClass): SpecClass[] {
 function nukeTestMethodsBang(klass: SpecClass): void {
   for (const name of publicInstanceMethods(klass).filter((n) => /^test_/.test(n))) {
     Object.defineProperty(klass.prototype, name, { value: undefined, configurable: true });
+    rbClearMethodCache();
   }
 }
 

@@ -82,6 +82,7 @@ import {
   type MissingRoute,
   type RouteWithParams,
 } from "../journey/formatter.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 /** @internal */
 function toS(v: unknown): string {
@@ -661,6 +662,7 @@ export class NamedRouteCollection {
     ) {
       return helper.call(this as unknown as PolymorphicHost, args, true);
     };
+    rbClearMethodCache();
     this._appendToIncluders(pathName, this.pathHelpersModule.prototype[pathName], true);
 
     this.urlHelpersModule.prototype[urlName] = function (
@@ -669,6 +671,7 @@ export class NamedRouteCollection {
     ) {
       return helper.call(this as unknown as PolymorphicHost, args, false);
     };
+    rbClearMethodCache();
     this._appendToIncluders(urlName, this.urlHelpersModule.prototype[urlName], false);
 
     this.pathHelpers.add(pathName);
@@ -760,6 +763,7 @@ export class NamedRouteCollection {
         !below.some((included) => isIncludedMember(proto, name, included));
       includer.installed.set(name, descriptor);
       if (!isOutranked) Object.defineProperty(proto, name, descriptor);
+      rbClearMethodCache();
     }
   }
 
@@ -777,6 +781,7 @@ export class NamedRouteCollection {
         .reverse()
         .find((included) => included.has(name));
       if (below) Object.defineProperty(proto, name, below.get(name)!);
+      rbClearMethodCache();
     }
   }
 }
@@ -1099,6 +1104,7 @@ export class RouteSet {
       writable: true,
       configurable: true,
     });
+    rbClearMethodCache();
 
     Object.defineProperty(MountedHelpers.prototype, name, {
       configurable: true,
@@ -1112,6 +1118,7 @@ export class RouteSet {
         return proxy;
       },
     });
+    rbClearMethodCache();
 
     rbDeclareIvar(MountedHelpers, `@_${name}`, `__${name}`);
     for (const includer of mountedHelpersIncluders) {
@@ -1128,6 +1135,7 @@ export class RouteSet {
           key,
           Object.getOwnPropertyDescriptor(MountedHelpers.prototype, key)!,
         );
+        rbClearMethodCache();
       }
     }
   }

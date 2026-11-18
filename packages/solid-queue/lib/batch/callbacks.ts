@@ -4,6 +4,7 @@ import { Time } from "@blazetrails/date";
 import { classModule } from "@blazetrails/ruby-compat";
 import type { Batch } from "../batch.js";
 import { SolidQueue } from "../solid-queue.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type CallbackName = "on_finish" | "on_success" | "on_failure";
 type BatchedActiveJob = ActiveJobBase & {
@@ -77,5 +78,6 @@ extend(Callbacks, Concern);
       },
       configurable: true,
     });
+    rbClearMethodCache();
   }
 });

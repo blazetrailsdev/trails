@@ -776,17 +776,9 @@ export function basicObjRespondTo(obj: unknown, mid: string): boolean {
   return ret != null && ret !== false;
 }
 
-/**
- * The method-entry half of `basic_obj_respond_to` (`method_boundp`,
- * `vendor/ruby/v3.3.11/vm_method.c:1788`), memoized per prototype and name
- * until {@link methodCacheSerial} moves, as MRI's call cache is. A receiver
- * holding its own entry for the name is looked up afresh. `null` is no entry
- * either way, where `respond_to_missing?` decides.
- *
- * @perf 3.5% — PERMANENT
- */
+/** @perf 2.8x — PERMANENT */
 function _methodBound(obj: unknown, mid: string): boolean | null {
-  if (typeof obj !== "object" || obj === null) return _methodBoundUncached(obj, mid);
+  if (typeof obj !== "object" || obj === null) return methodBoundp(obj, mid);
   const proto = Object.getPrototypeOf(obj) as object | null;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
@@ -798,7 +790,7 @@ function _methodBound(obj: unknown, mid: string): boolean | null {
     (attr !== undefined && Object.hasOwn(obj, attr)) ||
     (writer !== undefined && Object.hasOwn(obj, writer))
   ) {
-    return _methodBoundUncached(obj, mid);
+    return methodBoundp(obj, mid);
   }
   let entries = _boundEntries.get(proto);
   if (entries === undefined || entries.serial !== methodCacheSerial) {
@@ -806,15 +798,21 @@ function _methodBound(obj: unknown, mid: string): boolean | null {
     _boundEntries.set(proto, entries);
   }
   let bound = entries.bound.get(mid);
-  if (bound === undefined) entries.bound.set(mid, (bound = _methodBoundUncached(obj, mid)));
+  if (bound === undefined) entries.bound.set(mid, (bound = methodBoundp(obj, mid)));
   return bound;
 }
 
-/** @perf 3.5% — PERMANENT */
+/** @perf 2.8x — PERMANENT */
 const _boundEntries = new WeakMap<object, { serial: number; bound: Map<string, boolean | null> }>();
 
-/** @perf 3.5% — PERMANENT */
-function _methodBoundUncached(obj: unknown, mid: string): boolean | null {
+/**
+ * `method_boundp` (`vendor/ruby/v3.3.11/vm_method.c:1788-1818`): whether the
+ * receiver's method entry for `mid` is bound, unbound (`false`, an undef
+ * entry) or absent (`null`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `method_boundp`.
+ */
+function methodBoundp(obj: unknown, mid: string): boolean | null {
   const core =
     obj === null || obj === undefined
       ? false

@@ -17,6 +17,7 @@ import { Module } from "@blazetrails/ruby-compat/include";
 import { constantize, safeConstantize } from "./inflector.js";
 import { callerLocations, type CallerLocation } from "./deprecation.js";
 import { KERNEL_METHODS, PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class DelegationError extends Error {
   constructor(message: string) {
@@ -362,6 +363,7 @@ export namespace Delegation {
         return typeof sup === "function" ? sup.call(this, name, includePrivate) : false;
       },
     });
+    rbClearMethodCache();
 
     const layer = new Proxy(Object.create(parent) as object, {
       get(obj, prop, receiver) {

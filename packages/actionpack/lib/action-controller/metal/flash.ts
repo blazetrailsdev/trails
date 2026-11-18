@@ -4,6 +4,7 @@ import { classAttribute, Concern, extend } from "@blazetrails/activesupport";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import type { RedirectToOptions, RedirectToResponseOptions } from "./redirecting.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export type RedirectToResponseOptionsAndFlash<FlashType extends string = never> =
   RedirectToResponseOptions & {
@@ -57,6 +58,7 @@ export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
       },
       configurable: true,
     });
+    rbClearMethodCache();
     this.methodAdded(type);
     if (typeof this.helperMethod === "function") this.helperMethod(type);
 
@@ -85,6 +87,7 @@ extend(Flash, Concern);
   classAttribute.call(this, "_flashTypes", { instanceAccessor: false, default: [] });
 
   Object.defineProperty(this.prototype, "flash", { get: flash, configurable: true });
+  rbClearMethodCache();
   this.addFlashTypes("alert", "notice");
 });
 

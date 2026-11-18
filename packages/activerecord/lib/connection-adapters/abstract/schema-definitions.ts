@@ -26,6 +26,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { ActiveRecord } from "../../namespaces.js";
 import { wrap } from "@blazetrails/activesupport";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export type ColumnType =
   | "string"
@@ -556,7 +557,9 @@ ColumnMethods[included] = function (base: ColumnMethodsBase): void {
   );
 
   base.prototype.blob = base.prototype.binary;
+  rbClearMethodCache();
   base.prototype.numeric = base.prototype.decimal;
+  rbClearMethodCache();
 };
 
 /** @internal */

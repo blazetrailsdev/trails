@@ -12,6 +12,7 @@ import { AbstractController } from "../../namespaces.js";
 
 import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import type { HelpersClassMethods } from "../helpers.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
 type ClassModule = { prototype: object };
@@ -102,6 +103,7 @@ Object.defineProperty(RoutesHelpers, "with", {
         }
         const wrapped = inherited(key, descriptor);
         Object.defineProperty(proto, key, wrapped);
+        rbClearMethodCache();
         installed.set(key, wrapped);
       }
       const moduleRoutes = (mod as { _routes?: Partial<RouteSet> })._routes;

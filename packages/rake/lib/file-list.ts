@@ -53,6 +53,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Cloneable } from "./cloneable.js";
 import { ext as stringExt, pathmap as stringPathmap } from "./ext/string.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type Items = unknown[];
 type ElementBlock = (fn: string) => unknown;
@@ -1052,6 +1053,7 @@ for (const sym of FileList.DELEGATING_METHODS) {
       return result === items ? this : result;
     },
   });
+  rbClearMethodCache();
 }
 
 export function eachDirParent(dir: string, block: (dir: string) => unknown): void {

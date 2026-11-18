@@ -47,6 +47,7 @@ import { Option, type OptionOptions } from "./parser/option.js";
 import { Base as ThorBase, Shell } from "./shell.js";
 import type { Basic } from "./shell/basic.js";
 import { namespaceFromThorClass } from "./util.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export const HELP_MAPPINGS = ["-h", "-?", "--help", "-D"];
 
@@ -473,6 +474,7 @@ export const ClassMethods = {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       this.methodAdded(name);
     });
   },

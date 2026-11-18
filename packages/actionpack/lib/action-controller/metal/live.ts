@@ -27,6 +27,7 @@ import {
 import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
 import { Base } from "../base.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class ClientDisconnected extends RuntimeError {}
 
@@ -37,6 +38,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
 
   static {
     Object.defineProperty(this.prototype, "toAry", { value: undefined, configurable: true });
+    rbClearMethodCache();
   }
 
   ignoreDisconnect: boolean;

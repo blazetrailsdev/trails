@@ -14,6 +14,7 @@ import {
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import { XChar } from "./xchar.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class IllegalBlockError extends RuntimeError {}
 
@@ -199,6 +200,7 @@ export abstract class XmlBase {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
     }
   }
 }

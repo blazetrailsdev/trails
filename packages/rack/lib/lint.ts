@@ -49,6 +49,7 @@ import {
   CONNECT,
 } from "./constants.js";
 import { Rack } from "./namespaces.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class LintError extends RuntimeError {}
 
@@ -170,6 +171,7 @@ for (const methodName of StreamWrapper.REQUIRED_METHODS) {
     writable: true,
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 export class Wrapper {

@@ -16,6 +16,7 @@ export function removePossibleMethod(this: Module | RbModule, method: string): v
       enumerable: false,
     });
     rbClearMethodCache();
+    rbClearMethodCache();
   }
 }
 

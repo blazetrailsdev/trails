@@ -20,6 +20,7 @@ import { ENGINE_ROOT } from "../app-path.js";
 import { HELP_MAPPINGS, hiddenCommands } from "../command.js";
 import { Actions } from "./actions.js";
 import { subclasses } from "./behavior.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 declare module "@blazetrails/thor" {
   interface Thor {
@@ -208,6 +209,7 @@ export class Base extends Thor {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       klass.methodAdded(this.commandName());
       return true;
     } else {

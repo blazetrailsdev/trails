@@ -31,6 +31,7 @@ import {
 } from "@blazetrails/activesupport";
 import type { AssociationDefinition } from "../associations.js";
 import { Associations } from "../namespaces.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
 export interface CollectionProxy<T extends Base = Base> {
@@ -503,6 +504,7 @@ for (const name of valueAccessorNames) {
     },
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 for (const name of delegateMethods) {
@@ -514,6 +516,7 @@ for (const name of delegateMethods) {
     writable: true,
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 Associations.CollectionProxy = CollectionProxy;

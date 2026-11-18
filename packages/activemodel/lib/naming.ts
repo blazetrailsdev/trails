@@ -44,6 +44,7 @@ export class Naming {
       },
       configurable: true,
     });
+    rbClearMethodCache();
   }
 
   get modelName(): ModelName {
@@ -100,6 +101,7 @@ export class Naming {
 }
 import { I18n } from "./i18n.js";
 import type { TranslateOptions } from "@blazetrails/i18n";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 /** @internal */
 const MISSING_TRANSLATION = -(2 ** 60);

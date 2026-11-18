@@ -32,6 +32,7 @@ import type { Argument, ArgumentOptions } from "@blazetrails/thor/parser/argumen
 import type { Option, OptionOptions } from "@blazetrails/thor/parser/option";
 import type { Shell as ShellHost } from "@blazetrails/thor/shell";
 import type { Basic } from "@blazetrails/thor/shell/basic";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface GeneratorOptions {
   force?: boolean;
@@ -171,6 +172,7 @@ export abstract class Base extends (Group as unknown as (abstract new (
           return this._shebang;
         },
       });
+      rbClearMethodCache();
     });
   }
 

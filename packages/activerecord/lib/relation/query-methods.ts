@@ -68,6 +68,7 @@ import {
   transformKeys,
   wrap,
 } from "@blazetrails/activesupport";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class WhereChain<R = any> {
   private _scope: R;
@@ -1706,6 +1707,7 @@ Object.defineProperty(QueryMethods, included, {
           this._values[name] = value;
         },
       });
+      rbClearMethodCache();
     }
 
     Object.defineProperty(ActiveRecord.Relation.prototype, "extensions", {
@@ -1714,6 +1716,7 @@ Object.defineProperty(QueryMethods, included, {
         return this.extendingValues;
       },
     });
+    rbClearMethodCache();
   },
 });
 

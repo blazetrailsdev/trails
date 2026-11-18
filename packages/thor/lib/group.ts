@@ -28,6 +28,7 @@ import type { Option } from "./parser/option.js";
 import { Options } from "./parser/options.js";
 import type { Shell } from "./shell.js";
 import type { Basic } from "./shell/basic.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 type InvokeOptions = Record<string, unknown>;
 
@@ -118,6 +119,7 @@ export class Group {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       this.methodAdded(meth);
     });
   }
@@ -162,6 +164,7 @@ export class Group {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       this.methodAdded(meth);
     });
   }

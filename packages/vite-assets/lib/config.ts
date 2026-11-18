@@ -10,6 +10,7 @@ import {
   TopLevel,
   stderr as $stderr,
 } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface ConfigOptions {
   additionalEntrypoints: string[];
@@ -298,4 +299,5 @@ for (const option of [...Config.CONFIGURABLE_WITH_ENV, ...Config.NOT_CONFIGURABL
     },
     configurable: true,
   });
+  rbClearMethodCache();
 }

@@ -6,6 +6,7 @@ import { UnrecognizedCommandError, root } from "../command.js";
 import { RakeCommand } from "./rake.js";
 import { TestUnitReporter } from "../test-unit/reporter.js";
 import { Runner } from "../test-unit/runner.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class TestCommand extends Base {
   static {
@@ -24,6 +25,7 @@ export class TestCommand extends Base {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       klass.methodAdded(name);
     }
 

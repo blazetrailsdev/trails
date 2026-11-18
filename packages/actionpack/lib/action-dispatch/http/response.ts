@@ -52,6 +52,7 @@ import {
   locationFilters as _locationFilters,
   parameterFilteredLocation as _parameterFilteredLocation,
 } from "./filter-redirect.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 const CONTENT_TYPE = "Content-Type";
 const SET_COOKIE = "set-cookie";
@@ -757,6 +758,7 @@ for (const name of ["lastModified", "date", "etag"] as const) {
     ...Object.getOwnPropertyDescriptor(CacheResponse.prototype, name)!,
     configurable: true,
   });
+  rbClearMethodCache();
 }
 Object.defineProperty(Response.prototype, "isLastModified", {
   get(this: Response) {

@@ -14,6 +14,7 @@ import { ContentHelper } from "./app/helpers/action-text/content-helper.js";
 import { Encryption } from "./encryption.js";
 import "./app/helpers/action-text/tag-helper.js";
 import "./deprecator.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface ActionTextConfig extends OrderedOptions {
   attachmentTagName?: string;
@@ -106,6 +107,7 @@ export class Engine extends TrailsEngine {
           writable: true,
           configurable: true,
         });
+        rbClearMethodCache();
 
         Object.defineProperty(this.prototype, "attachablePlainTextRepresentation", {
           value: function (this: BlobHost, caption: unknown = null): string {
@@ -114,6 +116,7 @@ export class Engine extends TrailsEngine {
           writable: true,
           configurable: true,
         });
+        rbClearMethodCache();
 
         Object.defineProperty(this.prototype, "toTrixContentAttachmentPartialPath", {
           value: function (): null {
@@ -122,6 +125,7 @@ export class Engine extends TrailsEngine {
           writable: true,
           configurable: true,
         });
+        rbClearMethodCache();
       });
     });
 

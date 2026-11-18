@@ -146,6 +146,7 @@ export class Thor {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
       this.methodAdded(subcommandName);
     } else {
       this.desc(usage, description, options);
@@ -352,6 +353,7 @@ export class Thor {
       writable: true,
       configurable: true,
     });
+    rbClearMethodCache();
     this.methodAdded(subcommand);
     for (const [, command] of Object.entries(subcommandClass.commands())) {
       command.ancestorName = subcommand;
@@ -692,6 +694,7 @@ export class Thor {
       writable: true,
       configurable: true,
     });
+    rbClearMethodCache();
     this.methodAdded("help");
   }
   /** @internal */
@@ -856,6 +859,7 @@ include(Thor, Base);
 (Thor as ThorClass).methodAdded("help");
 
 import "./constants.generated.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 TopLevel.Thor = Thor;
 

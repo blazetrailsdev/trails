@@ -14,6 +14,7 @@ import { Upgrade } from "./cli/upgrade.js";
 import { UpgradePackages } from "./cli/upgrade-packages.js";
 import { Version } from "./cli/version.js";
 import { Vite } from "./cli/vite.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class CLI extends Thor {
   declare static Build: typeof Build;
@@ -63,6 +64,7 @@ export class CLI extends Thor {
       writable: true,
       configurable: true,
     });
+    rbClearMethodCache();
     this.methodAdded(name);
     if (aliases.length > 0) this.map(Object.fromEntries(aliases.map((alias) => [alias, name])));
   }

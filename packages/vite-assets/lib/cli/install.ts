@@ -14,6 +14,7 @@ import { IO } from "../io.js";
 import { ViteAssets } from "../vite-assets.js";
 import { Command } from "./command.js";
 import { FileUtils } from "./file-utils.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class Install extends Command {
   static {
@@ -115,6 +116,7 @@ export class Install extends Command {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
     }
   }
 

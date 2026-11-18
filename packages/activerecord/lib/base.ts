@@ -2485,6 +2485,7 @@ for (const [name, fn] of [
     writable: true,
     enumerable: false,
   });
+  rbClearMethodCache();
 }
 
 {
@@ -2498,11 +2499,13 @@ for (const [name, fn] of [
     configurable: true,
     enumerable: false,
   });
+  rbClearMethodCache();
 }
 
 import "@blazetrails/globalid/wire";
 
 import { type LocatorModel as _LocatorModel } from "@blazetrails/globalid";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 type _ARBaseUnscopedWire =
   typeof Base extends Pick<Required<_LocatorModel>, "unscoped"> ? true : never;
 const _arBaseUnscopedWire: _ARBaseUnscopedWire = true;

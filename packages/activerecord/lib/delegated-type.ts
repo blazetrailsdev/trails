@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { camelize, constantize, inquiry, singularize, tableize } from "@blazetrails/activesupport";
 import { hashDelete, rbFSend } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export interface DelegatedTypeOptions {
   types: string[];
@@ -55,6 +56,7 @@ export function defineDelegatedTypeMethods(
     },
     configurable: true,
   });
+  rbClearMethodCache();
 
   Object.defineProperty(this.prototype, `${role}Name`, {
     get(this: Base) {
@@ -62,6 +64,7 @@ export function defineDelegatedTypeMethods(
     },
     configurable: true,
   });
+  rbClearMethodCache();
 
   defineMethod(
     this.prototype,
@@ -97,6 +100,7 @@ export function defineDelegatedTypeMethods(
       },
       configurable: true,
     });
+    rbClearMethodCache();
 
     Object.defineProperty(this.prototype, camelize(`${singularSnake}_${primaryKey}`, false), {
       get(this: Base) {
@@ -105,5 +109,6 @@ export function defineDelegatedTypeMethods(
       },
       configurable: true,
     });
+    rbClearMethodCache();
   }
 }

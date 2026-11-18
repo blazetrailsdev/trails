@@ -3,6 +3,7 @@ import { LogSubscriber } from "../log-subscriber.js";
 import { LOG_LEVELS, type Logger, type LogLevel } from "../logger.js";
 import { Notifications } from "../notifications.js";
 import { Fanout } from "../notifications/fanout.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 interface TestHelperHost {
   logger: MockLogger;
@@ -123,12 +124,14 @@ for (const [severity, value] of Object.entries(LOG_LEVELS) as [LogLevel, number]
     writable: true,
     configurable: true,
   });
+  rbClearMethodCache();
   Object.defineProperty(MockLogger.prototype, `${severity.slice(1)}?`, {
     get(this: MockLogger): boolean {
       return value >= (this._level as number);
     },
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 export function wait(this: TestHelperHost): void {

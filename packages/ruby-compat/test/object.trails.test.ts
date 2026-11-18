@@ -1882,6 +1882,46 @@ describe("rbObjRespondTo method cache", () => {
     expect(rbObjRespondTo(widget, "spin")).toBe(true);
   });
 
+  it("keeps an undefined method unbound until it is defined again", () => {
+    class Widget {
+      spin(): string {
+        return "spun";
+      }
+    }
+    class Gadget extends Widget {}
+    rbModDefineMethod(Gadget, "spin", { value: undefined });
+    const gadget = new Gadget();
+    expect(rbObjRespondTo(gadget, "spin")).toBe(false);
+    expect(rbObjRespondTo(gadget, "spin")).toBe(false);
+    rbModDefineMethod(Gadget, "spin", () => "spun again");
+    expect(rbObjRespondTo(gadget, "spin")).toBe(true);
+  });
+
+  it("answers an own method after a negative answer for its prototype", () => {
+    class Widget {}
+    expect(rbObjRespondTo(new Widget(), "spin")).toBe(false);
+    const widget = Object.assign(new Widget(), { spin: () => "spun" });
+    expect(rbObjRespondTo(widget, "spin")).toBe(true);
+    expect(rbObjRespondTo(new Widget(), "spin")).toBe(false);
+  });
+
+  it("answers per object for an own Symbol.toStringTag on a shared prototype", () => {
+    class Seat {}
+    expect(rbObjRespondTo(new Seat(), "toDate")).toBe(false);
+    const date = Object.assign(new Seat(), { [Symbol.toStringTag]: "Temporal.PlainDate" });
+    expect(rbObjRespondTo(date, "toDate")).toBe(true);
+    expect(rbObjRespondTo(new Seat(), "toDate")).toBe(false);
+  });
+
+  it("answers a method a raw prototype write defines after rbClearMethodCache", () => {
+    class Widget {}
+    const widget = new Widget();
+    expect(rbObjRespondTo(widget, "spin")).toBe(false);
+    Object.defineProperty(Widget.prototype, "spin", { value: () => "spun", configurable: true });
+    rbClearMethodCache();
+    expect(rbObjRespondTo(widget, "spin")).toBe(true);
+  });
+
   it("consults respondToMissing on every call", () => {
     let answer = false;
     class Ghost {

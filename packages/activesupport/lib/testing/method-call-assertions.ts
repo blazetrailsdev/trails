@@ -1,5 +1,6 @@
 import { ArgumentError, NameError, rbEqual, rbInspect } from "@blazetrails/ruby-compat";
 import { assert } from "./assertions.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 /** @noRailsEquivalent PERMANENT */
 export class MockExpectationError extends Error {
@@ -237,9 +238,11 @@ export function assertCalledOnInstanceOf<T>(
       ? { configurable: true, get: stubbed, set: inherited.set }
       : { configurable: true, writable: true, value: stubbed },
   );
+  rbClearMethodCache();
   const ensure = () => {
     if (original) Object.defineProperty(proto, methodName, original);
     else delete (proto as Record<string, unknown>)[methodName];
+    rbClearMethodCache();
   };
 
   const check = () => {

@@ -14,6 +14,7 @@ import { Base as GeneratorBase, type GeneratorConfig } from "./base.js";
 import { Generators } from "../generators.js";
 import { GeneratedAttribute } from "./generated-attribute.js";
 import { ENGINE_ROOT } from "../app-path.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export class NamedBase extends GeneratorBase {
   static {
@@ -259,6 +260,7 @@ export class NamedBase extends GeneratorBase {
       configurable: true,
       writable: true,
     });
+    rbClearMethodCache();
     this.methodAdded("checkClassCollision");
   }
 }

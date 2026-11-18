@@ -97,6 +97,7 @@ import {
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { AliasTracker } from "./associations/alias-tracker.js";
 import type { Hash } from "@blazetrails/ruby-compat";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export type LoadedRelation<R> = Omit<R, "then">;
 
@@ -2221,6 +2222,7 @@ for (const name of ["updateAll", "deleteAll"] as const) {
     writable: true,
     configurable: true,
   });
+  rbClearMethodCache();
 }
 
 applyThenable(Relation.prototype);

@@ -18,6 +18,7 @@ import { ArgumentError, extractOptionsBang } from "./hash-utils.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { camelize } from "./inflector.js";
 import { isBlank, squish } from "./string-utils.js";
+import { rbClearMethodCache } from "@blazetrails/ruby-compat";
 
 export type CallbackKind = "before" | "after" | "around";
 
@@ -1208,6 +1209,7 @@ export const ClassMethods = {
         writable: true,
         configurable: true,
       });
+      rbClearMethodCache();
 
       Object.defineProperty(this, `_${camelize(name, false)}Callbacks`, {
         get(this: CallbacksClass) {
@@ -1225,6 +1227,7 @@ export const ClassMethods = {
         },
         configurable: true,
       });
+      rbClearMethodCache();
     });
   },
 
