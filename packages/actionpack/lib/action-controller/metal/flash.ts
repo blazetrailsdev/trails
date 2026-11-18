@@ -25,11 +25,11 @@ export function flash(this: { request: { flash: FlashHash | null } }): FlashHash
   return this.request.flash;
 }
 
-export function redirectTo<FlashType extends string = never>(
+export async function redirectTo<FlashType extends string = never>(
   this: { constructor: unknown; flash: FlashHash },
   options: RedirectToOptions = {},
   responseOptionsAndFlash: RedirectToResponseOptionsAndFlash<FlashType> = {},
-): number {
+): Promise<number> {
   for (const flashType of (this.constructor as FlashClassHost)._flashTypes) {
     const type = (responseOptionsAndFlash as Record<string, unknown>)[flashType];
     delete (responseOptionsAndFlash as Record<string, unknown>)[flashType];
@@ -44,7 +44,7 @@ export function redirectTo<FlashType extends string = never>(
     this.flash.update(otherFlashes);
   }
 
-  return rbCallSuper(this, redirectTo, options, responseOptionsAndFlash) as number;
+  return rbCallSuper(this, redirectTo, options, responseOptionsAndFlash) as Promise<number>;
 }
 
 export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {

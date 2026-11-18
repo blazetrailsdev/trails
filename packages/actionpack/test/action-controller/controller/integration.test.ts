@@ -316,7 +316,7 @@ class IntegrationController extends Base {
 
   async setCookie(): Promise<void> {
     this.cookies().set("foo", "bar");
-    this.head(":ok");
+    await this.head(":ok");
   }
 
   async getCookie(): Promise<void> {
@@ -324,20 +324,20 @@ class IntegrationController extends Base {
   }
 
   async redirect(): Promise<void> {
-    this.redirectTo(this.actionUrl("get"));
+    await this.redirectTo(this.actionUrl("get"));
   }
 
   async redirect307(): Promise<void> {
-    this.redirectTo(this.actionUrl("post"), { status: 307 });
+    await this.redirectTo(this.actionUrl("post"), { status: 307 });
   }
 
   async redirect308(): Promise<void> {
-    this.redirectTo(this.actionUrl("post"), { status: 308 });
+    await this.redirectTo(this.actionUrl("post"), { status: 308 });
   }
 
   async removeHeader(): Promise<void> {
     this.response.headers.delete(this.params.get("header") as string);
-    this.head(":ok", { c: "3" });
+    await this.head(":ok", { c: "3" });
   }
 }
 
@@ -1177,7 +1177,7 @@ describe("HeadWithStatusActionIntegrationTest", () => {
     static {
       Object.defineProperty(this.prototype, "status", {
         async value(this: Base): Promise<void> {
-          this.head(":ok");
+          await this.head(":ok");
         },
         configurable: true,
         writable: true,

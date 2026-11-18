@@ -25,7 +25,7 @@ describe("Controller JSON rendering integration", () => {
     }
 
     const c = new PostsController();
-    await c.dispatch("index", new Request(), new Response());
+    await c.dispatch("index", new Request(), await Response.new());
     const [status, headers, body] = c.toA();
 
     expect(status).toBe(200);
@@ -55,7 +55,7 @@ describe("Controller JSON rendering integration", () => {
           id: "42",
         },
       }),
-      new Response(),
+      await Response.new(),
     );
 
     expect(JSON.parse(c.response.body)).toEqual({ id: "42" });
@@ -77,7 +77,7 @@ describe("Controller JSON rendering integration", () => {
         PATH_INFO: "/posts",
         QUERY_STRING: "page=3",
       }),
-      new Response(),
+      await Response.new(),
     );
 
     expect(JSON.parse(c.response.body)).toEqual({ page: "3" });
@@ -101,7 +101,7 @@ describe("Controller JSON rendering integration", () => {
         CONTENT_LENGTH: "20",
         "rack.input": new StringIO(JSON.stringify({ title: "New Post" })),
       }),
-      new Response(),
+      await Response.new(),
     );
 
     expect(c.status).toBe(201);
@@ -158,7 +158,7 @@ describe("Controller JSON rendering integration", () => {
     }
 
     const c = new ApiPostsController();
-    await c.dispatch("index", new Request(), new Response());
+    await c.dispatch("index", new Request(), await Response.new());
 
     expect(c.status).toBe(200);
     expect(JSON.parse(c.response.body)).toEqual([{ id: 1 }, { id: 2 }]);
@@ -170,16 +170,16 @@ describe("Controller JSON rendering integration", () => {
         await this.render({ json: { created: true }, status: 201 });
       }
       async destroy() {
-        this.head(":no_content");
+        await this.head(":no_content");
       }
     }
 
     const c1 = new PostsController();
-    await c1.dispatch("create", new Request(), new Response());
+    await c1.dispatch("create", new Request(), await Response.new());
     expect(c1.status).toBe(201);
 
     const c2 = new PostsController();
-    await c2.dispatch("destroy", new Request(), new Response());
+    await c2.dispatch("destroy", new Request(), await Response.new());
     expect(c2.status).toBe(204);
     expect(c2.response.body).toBe("");
   });
@@ -213,7 +213,7 @@ describe("Controller JSON rendering integration", () => {
           id: "5",
         },
       }),
-      new Response(),
+      await Response.new(),
     );
 
     expect(JSON.parse(c.response.body)).toEqual({
@@ -243,7 +243,7 @@ describe("Controller JSON rendering integration", () => {
           id: "5",
         },
       }),
-      new Response(),
+      await Response.new(),
     );
 
     expect(JSON.parse(c.response.body)).toEqual({ id: "5" });
@@ -265,7 +265,7 @@ describe("Controller JSON rendering integration", () => {
         PATH_INFO: "/posts",
         QUERY_STRING: "user[name]=dean&user[role]=admin",
       }),
-      new Response(),
+      await Response.new(),
     );
 
     expect(JSON.parse(c.response.body)).toEqual({

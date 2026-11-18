@@ -100,7 +100,7 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows 404 when 404 asserted for success", async () => {
-    self.response = new Response();
+    self.response = await Response.new();
     self.response.status = 404;
 
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(":success"));
@@ -109,7 +109,7 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows 404 when asserted for 200", async () => {
-    self.response = new Response();
+    self.response = await Response.new();
     self.response.status = 404;
 
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
@@ -118,7 +118,7 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows 302 redirect when 302 asserted for success", async () => {
-    self.response = new Response();
+    self.response = await Response.new();
     self.response.status = 302;
     self.response.location = "http://test.host/posts/redirect/1";
 
@@ -130,7 +130,7 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows 302 redirect when 302 asserted for 301", async () => {
-    self.response = new Response();
+    self.response = await Response.new();
     self.response.status = 302;
     self.response.location = "http://test.host/posts/redirect/2";
 
@@ -142,9 +142,9 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message shows short response body", async () => {
-    self.response = new Response();
+    self.response = await Response.new();
     self.response.status = 400;
-    self.response.body = "not too long";
+    await self.response.setBody("not too long");
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
     const expected =
       "Expected response to be a <200: OK>, but was a <400: Bad Request>" +
@@ -153,16 +153,16 @@ describe("ResponseAssertionsTest", () => {
   });
 
   it("error message does not show long response body", async () => {
-    self.response = new Response();
+    self.response = await Response.new();
     self.response.status = 400;
-    self.response.body = "not too long".repeat(50);
+    await self.response.setBody("not too long".repeat(50));
     const error = await assertRaises([Assertion], {}, () => self.assertResponse(200));
     const expected = "Expected response to be a <200: OK>, but was a <400: Bad Request>";
     assertMatch(expected, error.message);
   });
 
   it("error message shows rescued exception", async () => {
-    self.response = new Response();
+    self.response = await Response.new();
     self.response.status = 500;
 
     const ex = new Error("example error");

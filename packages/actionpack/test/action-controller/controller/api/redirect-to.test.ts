@@ -5,8 +5,8 @@ import { API } from "../../../../lib/action-controller/api.js";
 import { TestCase } from "../../../../lib/action-controller/test-case.js";
 
 class RedirectToApiController extends API {
-  one() {
-    this.redirectTo({ action: "two" });
+  async one() {
+    await this.redirectTo({ action: "two" });
   }
 
   two() {}

@@ -35,7 +35,7 @@ class SimpleController extends AbstractController.Base {}
 
 class Me extends SimpleController {
   index(): string {
-    this.responseBody = "Hello world";
+    this.setResponseBody("Hello world");
     return "Something else";
   }
 }
@@ -82,7 +82,7 @@ class Me2 extends RenderingController {
   }
 
   async indexToString(): Promise<void> {
-    this.responseBody = (await this.renderToString("index")) as string;
+    this.setResponseBody((await this.renderToString("index")) as string);
   }
 
   actionWithIvars(): unknown {
@@ -95,11 +95,11 @@ class Me2 extends RenderingController {
   }
 
   async renderingToBody(): Promise<void> {
-    this.responseBody = (await this.renderToBody({ template: "naked-render" })) as string;
+    this.setResponseBody((await this.renderToBody({ template: "naked-render" })) as string);
   }
 
   async renderingToString(): Promise<void> {
-    this.responseBody = (await this.renderToString({ template: "naked-render" })) as string;
+    this.setResponseBody((await this.renderToString({ template: "naked-render" })) as string);
   }
 }
 
@@ -289,24 +289,24 @@ describe("TestLayouts", () => {
 
 class DefaultRespondToActionController extends AbstractController.Base {
   index(): void {
-    this.responseBody = "success";
+    this.setResponseBody("success");
   }
 }
 
 class ActionMissingRespondToActionController extends AbstractController.Base {
   /** @internal */
   actionMissing(_actionName: string): void {
-    this.responseBody = "success";
+    this.setResponseBody("success");
   }
 }
 
 class RespondToActionController extends AbstractController.Base {
   index(): void {
-    this.responseBody = "success";
+    this.setResponseBody("success");
   }
 
   fail(): void {
-    this.responseBody = "fail";
+    this.setResponseBody("fail");
   }
 
   /** @internal */

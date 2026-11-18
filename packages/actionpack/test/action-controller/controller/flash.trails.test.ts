@@ -15,7 +15,7 @@ import "../../support/abstract-unit.js";
 
 class NoticesController extends Base {
   async create(): Promise<void> {
-    this.redirectTo("/notices", { notice: "Post was successfully created." });
+    await this.redirectTo("/notices", { notice: "Post was successfully created." });
   }
 
   async index(): Promise<void> {

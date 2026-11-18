@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   Buffer,
@@ -19,8 +19,8 @@ import { IsolatedExecutionState, Notifications } from "@blazetrails/activesuppor
 import { Request } from "../../../lib/action-dispatch/http/request.js";
 import { Base } from "../../../lib/action-controller/base.js";
 
-function makeResponse() {
-  const response = new Response();
+async function makeResponse() {
+  const response = await Response.new();
   response.request = new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" });
   return response;
 }
@@ -33,24 +33,24 @@ async function drain(stream: AsyncIterable<unknown>): Promise<unknown[]> {
 
 describe("ActionController::Live::Buffer", () => {
   it("write pushes chunks and sets Cache-Control/Content-Length on uncommitted response", async () => {
-    const res = makeResponse();
+    const res = await makeResponse();
     res.setHeader("content-length", "42");
-    const buf = new Buffer(res);
+    const buf = new Buffer(await res);
     await buf.write("hello");
     expect(res.headers.get("cache-control")).toBe("no-cache");
     expect(res.headers.get("content-length")).toBeUndefined();
   });
 
   it("write does not touch headers once response is committed", async () => {
-    const res = makeResponse();
+    const res = await makeResponse();
     res.close();
-    const buf = new Buffer(res);
+    const buf = new Buffer(await res);
     await buf.write("x");
     expect(res.headers.get("cache-control")).toBeUndefined();
   });
 
   it("writeln appends a newline only when missing", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     await buf.writeln("a");
     await buf.writeln("b\n");
     await buf.close();
@@ -58,7 +58,7 @@ describe("ActionController::Live::Buffer", () => {
   });
 
   it("close pushes a null sentinel; eachChunk stops there", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     await buf.write("one");
     await buf.write("two");
     await buf.close();
@@ -67,20 +67,20 @@ describe("ActionController::Live::Buffer", () => {
   });
 
   it("write after close raises (matches Rails IOError-on-closed-stream)", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     await buf.close();
     await expect(buf.write("x")).rejects.toThrow(IOError);
   });
 
   it("close commits the underlying response", async () => {
-    const res = makeResponse();
-    const buf = new Buffer(res);
+    const res = await makeResponse();
+    const buf = new Buffer(await res);
     await buf.close();
     expect(res.committed).toBe(true);
   });
 
   it("abort clears the queue, isConnected flips to false", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     await buf.write("a");
     buf.abort();
     expect(buf.isConnected).toBe(false);
@@ -89,7 +89,7 @@ describe("ActionController::Live::Buffer", () => {
   });
 
   it("ClientDisconnected is a RuntimeError, not an IOError", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     buf.abort();
     let raised: unknown;
     try {
@@ -102,33 +102,33 @@ describe("ActionController::Live::Buffer", () => {
   });
 
   it("write after abort raises ClientDisconnected by default", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     buf.abort();
     await expect(buf.write("x")).rejects.toThrow(ClientDisconnected);
   });
 
   it("ignoreDisconnect=true silently swallows writes after abort", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     buf.ignoreDisconnect = true;
     buf.abort();
     await expect(buf.write("x")).resolves.toBeUndefined();
   });
 
-  it("onError + callOnError fires the registered callback", () => {
-    const buf = new Buffer(makeResponse());
+  it("onError + callOnError fires the registered callback", async () => {
+    const buf = new Buffer(await makeResponse());
     const cb = vi.fn();
     buf.onError(cb);
     buf.callOnError();
     expect(cb).toHaveBeenCalledOnce();
   });
 
-  it("default error callback is a no-op", () => {
-    const buf = new Buffer(makeResponse());
+  it("default error callback is a no-op", async () => {
+    const buf = new Buffer(await makeResponse());
     expect(() => buf.callOnError()).not.toThrow();
   });
 
   it("eachChunk awaits chunks written after the reader starts, until close", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     const read = drain(buf);
     await buf.write("one");
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -142,7 +142,7 @@ describe("ActionController::Live::Buffer", () => {
     class SmallBuffer extends Buffer {
       static override queueSize: number | null = 1;
     }
-    const buf = new SmallBuffer(makeResponse());
+    const buf = new SmallBuffer(await makeResponse());
     const queue = (buf as unknown as { _buf: SizedQueue<string | null> })._buf;
     expect(queue).toBeInstanceOf(SizedQueue);
     expect(queue.max).toBe(1);
@@ -158,7 +158,7 @@ describe("ActionController::Live::Buffer", () => {
     class SmallBuffer extends Buffer {
       static override queueSize: number | null = 1;
     }
-    const buf = new SmallBuffer(makeResponse());
+    const buf = new SmallBuffer(await makeResponse());
     const queue = (buf as unknown as { _buf: SizedQueue<string | null> })._buf;
     const writes = [buf.write("one"), buf.write("two"), buf.write("three")];
     const reader = buf[Symbol.asyncIterator]();
@@ -173,7 +173,7 @@ describe("ActionController::Live::Buffer", () => {
     class SmallBuffer extends Buffer {
       static override queueSize: number | null = 2;
     }
-    const buf = new SmallBuffer(makeResponse());
+    const buf = new SmallBuffer(await makeResponse());
     const writes = [buf.write("one"), buf.write("two"), buf.write("three")];
     const closed = buf.close();
     const parts: unknown[] = [];
@@ -183,7 +183,7 @@ describe("ActionController::Live::Buffer", () => {
   });
 
   it("a sync read of a live buffer raises rather than blocking before close", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     await buf.write("one");
     expect(() => buf.each(() => {})).toThrow(ThreadError);
   });
@@ -257,13 +257,13 @@ describe("ActionController::Live::SSE", () => {
 });
 
 describe("ActionController::Live::Response", () => {
-  it("constructs a Buffer as its stream", () => {
-    const res = new Response();
+  it("constructs a Buffer as its stream", async () => {
+    const res = await Response.new();
     expect(res.stream).toBeInstanceOf(Buffer);
   });
 
   it("stream writes flow through the live Buffer", async () => {
-    const res = makeResponse();
+    const res = await makeResponse();
     await (res.stream as Buffer).write("a");
     await (res.stream as Buffer).write("b");
     await (res.stream as Buffer).close();
@@ -271,8 +271,8 @@ describe("ActionController::Live::Response", () => {
   });
 
   it("inherits DispatchResponse.create factory shape (status/headers/body args)", async () => {
-    const res = new Response(201, { "x-test": "1" }, []);
-    res.request = makeResponse().request;
+    const res = await Response.new(201, { "x-test": "1" }, []);
+    res.request = (await makeResponse()).request;
     await (res.stream as Buffer).write("seed");
     await (res.stream as Buffer).close();
     expect(res.status).toBe(201);
@@ -282,7 +282,7 @@ describe("ActionController::Live::Response", () => {
   });
 
   it("before_committed writes the request's cookie jar onto the response", async () => {
-    const res = makeResponse();
+    const res = await makeResponse();
     res.request!.cookieJar().set("hello", "world");
     await (res.stream as Buffer).write("a");
     await (res.stream as Buffer).close();
@@ -291,7 +291,7 @@ describe("ActionController::Live::Response", () => {
   });
 
   it("await_sent waits on sent!'s broadcast", async () => {
-    const res = makeResponse();
+    const res = await makeResponse();
     let sent = false;
     const waiting = res.awaitSent().then(() => (sent = true));
     await Promise.resolve();
@@ -302,16 +302,16 @@ describe("ActionController::Live::Response", () => {
   });
 });
 
-function makeHost() {
+async function makeHost() {
   return {
     request: { getHeader: () => undefined as string | undefined },
-    response: makeResponse(),
+    response: await makeResponse(),
   } as unknown as LiveControllerHost;
 }
 
 class Host {
   request = { getHeader: () => undefined as string | undefined, format: () => ({}) };
-  response = makeResponse();
+  response!: Response;
   body: unknown = undefined;
   action: (name: string) => void | Promise<void> = () => {};
 
@@ -322,7 +322,7 @@ class Host {
   get responseBody(): unknown {
     return this.body;
   }
-  set responseBody(body: unknown) {
+  setResponseBody(body: unknown): void {
     this.body = body;
   }
 }
@@ -332,6 +332,7 @@ include(LiveHost, Live);
 describe("ActionController::Live#process", () => {
   it("awaits the action and commits the response", async () => {
     const host = new LiveHost();
+    host.response = await makeResponse();
     const seen: string[] = [];
     host.action = async (n) => {
       seen.push(n);
@@ -344,12 +345,15 @@ describe("ActionController::Live#process", () => {
 
   it("re-raises pre-commit errors; routes post-commit errors through onError", async () => {
     const raising = new LiveHost();
+    raising.response = await makeResponse();
     raising.action = () => {
       throw new Error("boom");
     };
     await expect(raising.process("show")).rejects.toThrow("boom");
 
     const host = new LiveHost();
+
+    host.response = await makeResponse();
     const fired = vi.fn();
     (host.response.stream as Buffer).onError(fired);
     host.action = async () => {
@@ -368,6 +372,8 @@ describe("ActionController::Live#process", () => {
       IsolatedExecutionState.set("live_state", "shared");
 
       const host = new LiveHost();
+
+      host.response = await makeResponse();
       Object.assign(host, { newControllerThread, cleanUpThreadLocals });
       let t2!: Thread;
       const seen: unknown[] = [];
@@ -389,6 +395,7 @@ describe("ActionController::Live#process", () => {
 
   it("dispatches new_controller_thread on the receiver", async () => {
     const host = new LiveHost() as LiveHost & LiveControllerHost;
+    host.response = await makeResponse();
     const threads: string[] = [];
     host.newControllerThread = async (block) => {
       threads.push("own");
@@ -400,9 +407,10 @@ describe("ActionController::Live#process", () => {
 });
 
 describe("ActionController::Live#response_body=", () => {
-  it("assigns the body through super and closes the response", () => {
+  it("assigns the body through super and closes the response", async () => {
     const host = new LiveHost();
-    host.responseBody = "payload";
+    host.response = await makeResponse();
+    await host.setResponseBody("payload");
     expect(host.body).toBe("payload");
     expect(host.responseBody).toBe("payload");
     expect(host.response.committed).toBe(true);
@@ -411,19 +419,19 @@ describe("ActionController::Live#response_body=", () => {
 
 describe("ActionController::Live#send_stream", () => {
   it("sets headers from filename, yields the stream, falls back to octet-stream", async () => {
-    const a = makeHost();
+    const a = await makeHost();
     await sendStream.call(a, { filename: "subscribers.csv" }, (s) => s.write("x\n"));
     expect(a.response.headers.get("content-type")).toMatch(/csv/);
     expect(a.response.headers.get("content-disposition")).toContain("subscribers.csv");
     expect(a.response.headers.get("content-disposition")).toContain("attachment");
 
-    const b = makeHost();
+    const b = await makeHost();
     await sendStream.call(b, { filename: "blob.zzz" }, () => {});
     expect(b.response.headers.get("content-type")).toBe("application/octet-stream");
   });
 
   it("accepts an explicit type string", async () => {
-    const host = makeHost();
+    const host = await makeHost();
     await sendStream.call(host, { filename: "data.bin", type: "application/x-foo" }, () => {});
     expect(host.response.headers.get("content-type")).toBe("application/x-foo");
   });
@@ -434,7 +442,7 @@ describe("ActionController::Live#send_stream", () => {
       payloads.push(event.payload);
     });
     try {
-      const host = makeHost();
+      const host = await makeHost();
       await sendStream.call(host, { filename: "export.csv", type: ":csv" }, () => {});
       expect(host.response.headers.get("content-type")).toBe("text/csv");
       expect(payloads).toEqual([
@@ -446,7 +454,7 @@ describe("ActionController::Live#send_stream", () => {
   });
 
   it("closes the stream even when the block throws", async () => {
-    const host = makeHost();
+    const host = await makeHost();
     await expect(
       sendStream.call(host, { filename: "x.csv" }, () => {
         throw new Error("write failed");
@@ -458,7 +466,7 @@ describe("ActionController::Live#send_stream", () => {
 
 describe("ActionController::Live private helpers", () => {
   it("newControllerThread invokes the block on the next microtask", async () => {
-    const host = makeHost();
+    const host = await makeHost();
     const order: string[] = [];
     const p = newControllerThread.call(host, () => {
       order.push("inside");
@@ -472,7 +480,7 @@ describe("ActionController::Live private helpers", () => {
 
   it("newControllerThread runs the block on a thread of its own, aborting on exception", async () => {
     let t2: Thread | undefined;
-    await newControllerThread.call(makeHost(), () => {
+    await newControllerThread.call(await makeHost(), () => {
       t2 = Thread.current();
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -480,17 +488,17 @@ describe("ActionController::Live private helpers", () => {
     expect(t2!.abortOnException).toBe(true);
   });
 
-  it("cleanUpThreadLocals clears the copied locals; pool is a singleton", () => {
+  it("cleanUpThreadLocals clears the copied locals; pool is a singleton", async () => {
     const thread = new Thread(() => null);
     thread.set("copied", 1);
     thread.set("kept", 2);
-    cleanUpThreadLocals.call(makeHost(), [["copied", 1]], thread);
+    cleanUpThreadLocals.call(await makeHost(), [["copied", 1]], thread);
     expect(thread.keys()).toEqual(["kept"]);
     expect(liveThreadPoolExecutor()).toBe(liveThreadPoolExecutor());
   });
 
   it("a body read before the stream closes keeps the chunks it popped", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     await buf.write("a");
     await buf.write("b");
     expect(() => buf.body).toThrow(ThreadError);
@@ -499,7 +507,7 @@ describe("ActionController::Live private helpers", () => {
   });
 
   it("awaitBody waits for the stream to close", async () => {
-    const buf = new Buffer(makeResponse());
+    const buf = new Buffer(await makeResponse());
     await buf.write("a");
     const body = buf.awaitBody();
     await buf.write("b");
@@ -508,7 +516,7 @@ describe("ActionController::Live private helpers", () => {
     expect(buf.body).toBe("ab");
   });
 
-  it("logError writes the class, the annotated source and the joined backtrace to Base.logger", () => {
+  it("logError writes the class, the annotated source and the joined backtrace to Base.logger", async () => {
     const fatal = vi.fn();
     const oldLogger = Base.logger;
     Base.logger = { fatal } as unknown as typeof Base.logger;
@@ -516,7 +524,7 @@ describe("ActionController::Live private helpers", () => {
       const exception = Object.assign(new ClientDisconnected("oops"), {
         annotatedSourceCode: () => "source\n",
       });
-      logError.call(makeHost(), exception);
+      logError.call(await makeHost(), exception);
     } finally {
       Base.logger = oldLogger;
     }
@@ -528,11 +536,12 @@ describe("ActionController::Live private helpers", () => {
     expect(rendered.endsWith("\n\n")).toBe(true);
   });
 
-  it("logError silently no-ops when no logger is configured", () => {
+  it("logError silently no-ops when no logger is configured", async () => {
     const oldLogger = Base.logger;
     Base.logger = null;
+    const host = await makeHost();
     try {
-      expect(() => logError.call(makeHost(), new Error("oops"))).not.toThrow();
+      expect(() => logError.call(host, new Error("oops"))).not.toThrow();
     } finally {
       Base.logger = oldLogger;
     }
@@ -540,7 +549,10 @@ describe("ActionController::Live private helpers", () => {
 });
 
 describe("ActionController::Live::ClassMethods#make_response!", () => {
-  const sentinel = new Response();
+  let sentinel: Response;
+  beforeAll(async () => {
+    sentinel = await Response.new();
+  });
   class Parent {
     static makeResponseBang(_request: Request): unknown {
       return sentinel;
@@ -555,14 +567,14 @@ describe("ActionController::Live::ClassMethods#make_response!", () => {
     } as unknown as Request;
   }
 
-  it("returns a Live::Response for HTTP/1.1+ requests", () => {
-    const res = LiveController.makeResponseBang(mkReq("HTTP/1.1"));
+  it("returns a Live::Response for HTTP/1.1+ requests", async () => {
+    const res = await LiveController.makeResponseBang(mkReq("HTTP/1.1"));
     expect(res).toBeInstanceOf(Response);
     expect((res as Response).stream).toBeInstanceOf(Buffer);
     expect(res).not.toBe(sentinel);
   });
 
-  it("defers to the parent factory for HTTP/1.0 requests", () => {
-    expect(LiveController.makeResponseBang(mkReq("HTTP/1.0"))).toBe(sentinel);
+  it("defers to the parent factory for HTTP/1.0 requests", async () => {
+    expect(await LiveController.makeResponseBang(mkReq("HTTP/1.0"))).toBe(sentinel);
   });
 });

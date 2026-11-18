@@ -86,27 +86,27 @@ class TestController extends Base {
     await this.render({ inline: "hello" });
   }
 
-  stdAction(): void {
+  async stdAction(): Promise<void> {
     this.flashCopy = { ...this.flash.toHash() };
-    this.head(":ok");
+    await this.head(":ok");
   }
 
   filterHaltingAction(): void {
     this.flashCopy = { ...this.flash.toHash() };
   }
 
-  haltAndRedir(): void {
+  async haltAndRedir(): Promise<void> {
     this.flash.set("foo", "bar");
-    this.redirectTo({ action: "stdAction" });
+    await this.redirectTo({ action: "stdAction" });
     this.flashCopy = { ...this.flash.toHash() };
   }
 
   async redirectWithAlert(): Promise<void> {
-    this.redirectTo("/nowhere", { alert: "Beware the nowheres!" });
+    await this.redirectTo("/nowhere", { alert: "Beware the nowheres!" });
   }
 
   async redirectWithNotice(): Promise<void> {
-    this.redirectTo("/somewhere", { notice: "Good luck in the somewheres!" });
+    await this.redirectTo("/somewhere", { notice: "Good luck in the somewheres!" });
   }
 
   async renderWithFlashNowAlert(): Promise<void> {
@@ -120,11 +120,11 @@ class TestController extends Base {
   }
 
   async redirectWithOtherFlashes(): Promise<void> {
-    this.redirectTo("/wonderland", { flash: { joyride: "Horses!" } });
+    await this.redirectTo("/wonderland", { flash: { joyride: "Horses!" } });
   }
 
   async redirectWithFooFlash(): Promise<void> {
-    this.redirectTo<"foo">("/wonderland", { foo: "for great justice" });
+    await this.redirectTo<"foo">("/wonderland", { foo: "for great justice" });
   }
 }
 
@@ -134,7 +134,7 @@ async function get(
 ): Promise<TestController> {
   const controller = new controllerClass();
   const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "test.host" };
-  await controller.dispatch(action, new Request(env), new Response());
+  await controller.dispatch(action, new Request(env), await Response.new());
   return controller;
 }
 
@@ -314,14 +314,14 @@ class FlashIntegrationTestController extends Base {
     this.addFlashTypes("bar");
   }
 
-  setFlash(): void {
+  async setFlash(): Promise<void> {
     this.flash.set("that", "hello");
-    this.head(":ok");
+    await this.head(":ok");
   }
 
-  setFlashNow(): void {
+  async setFlashNow(): Promise<void> {
     this.flash.now.set("that", "hello");
-    this.head(":ok");
+    await this.head(":ok");
   }
 
   async useFlash(): Promise<void> {
@@ -337,7 +337,7 @@ class FlashIntegrationTestController extends Base {
 
   async setBar(): Promise<void> {
     this.flash.set("bar", "for great justice");
-    this.head(":ok");
+    await this.head(":ok");
   }
 }
 

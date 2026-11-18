@@ -55,10 +55,10 @@ export class Redirect<B = unknown> extends Endpoint {
     return true;
   }
 
-  call(env: RackEnv): [number, Record<string, string>, unknown] {
-    return Notifications.instrument("redirect.action_dispatch", undefined, (payload) => {
+  call(env: RackEnv): Promise<[number, Record<string, string>, unknown]> {
+    return Notifications.instrument("redirect.action_dispatch", undefined, async (payload) => {
       const request = new Request(env);
-      const response = this.buildResponse(request);
+      const response = await this.buildResponse(request);
       payload.status = this.status;
       payload.location = response.headers.get("Location");
       payload.request = request;
@@ -66,7 +66,7 @@ export class Redirect<B = unknown> extends Endpoint {
     });
   }
 
-  buildResponse(req: Request): Response {
+  buildResponse(req: Request): Promise<Response> {
     const uri = URI.parse(this.path(req.pathParameters as Record<string, string>, req));
 
     if (!uri.host) {
@@ -89,7 +89,7 @@ export class Redirect<B = unknown> extends Endpoint {
       "Content-Type": `text/html; charset=${Response.defaultCharset}`,
       "Content-Length": String(body.length),
     };
-    return new Response(this.status, headers, [body]);
+    return Response.new(this.status, headers, [body]);
   }
 
   path(params: Record<string, string>, request: Request): string {

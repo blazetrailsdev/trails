@@ -8,7 +8,7 @@ export class ReroutesController extends Trails.Conductor.BaseController {
     const inboundEmail = await ActionMailbox.InboundEmail.find(this.params.get("inbound_email_id"));
     await this.reroute(inboundEmail);
 
-    this.redirectTo(this.mainApp.trailsConductorInboundEmailUrl(inboundEmail));
+    await this.redirectTo(this.mainApp.trailsConductorInboundEmailUrl(inboundEmail));
   }
 
   /** @internal */

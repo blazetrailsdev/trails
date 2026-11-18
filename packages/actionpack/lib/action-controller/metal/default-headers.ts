@@ -3,8 +3,8 @@ import { Concern, extend } from "@blazetrails/activesupport";
 import { Response } from "../../action-dispatch/http/response.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 
-export function makeResponseBang(request: Request): Response {
-  const res = Response.create();
+export async function makeResponseBang(request: Request): Promise<Response> {
+  const res = await Response.create();
   res.request = request;
   return res;
 }

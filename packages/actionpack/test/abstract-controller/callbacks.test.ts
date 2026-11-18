@@ -44,7 +44,7 @@ class Callback1 extends ControllerWithCallbacks {
     this.text = "Hello world";
   }
   async index() {
-    this.responseBody = this.text ?? null;
+    this.setResponseBody(this.text ?? null);
   }
 }
 Callback1.beforeAction((c) => (c as Callback1).first());
@@ -73,7 +73,7 @@ class Callback2 extends ControllerWithCallbacks {
     this._aroundzIvar += "SECOND";
   }
   async index() {
-    this.responseBody = this.text ?? "";
+    this.setResponseBody(this.text ?? "");
   }
 }
 Callback2.beforeAction(":first");
@@ -115,7 +115,7 @@ class Callback3 extends ControllerWithCallbacks {
   text?: string;
   second?: string;
   async index() {
-    this.responseBody = this.text ?? null;
+    this.setResponseBody(this.text ?? null);
   }
 }
 Callback3.beforeAction((c) => {
@@ -153,10 +153,10 @@ class CallbacksWithConditions extends ControllerWithCallbacks {
     this.authenticated = "true";
   }
   async index() {
-    this.responseBody = (this.list ?? []).join(", ");
+    this.setResponseBody((this.list ?? []).join(", "));
   }
   async sekrit_data() {
-    this.responseBody = [...(this.list ?? []), this.authenticated].join(", ");
+    this.setResponseBody([...(this.list ?? []), this.authenticated].join(", "));
   }
 }
 CallbacksWithConditions.beforeAction(":_list", { only: "index" });
@@ -195,11 +195,11 @@ class CallbacksWithReusedConditions extends ControllerWithCallbacks {
     this.authenticated = "true";
   }
   async index() {
-    this.responseBody = (this.list ?? []).join(", ");
+    this.setResponseBody((this.list ?? []).join(", "));
   }
   async public_data() {
     this.authenticated = "false";
-    this.responseBody = this.authenticated;
+    this.setResponseBody(this.authenticated);
   }
 }
 const reusedOpts = { only: ["index"] };
@@ -241,10 +241,10 @@ class CallbacksWithArrayConditions extends ControllerWithCallbacks {
     this.authenticated = "true";
   }
   async index() {
-    this.responseBody = (this.list ?? []).join(", ");
+    this.setResponseBody((this.list ?? []).join(", "));
   }
   async sekrit_data() {
-    this.responseBody = [...(this.list ?? []), this.authenticated].join(", ");
+    this.setResponseBody([...(this.list ?? []), this.authenticated].join(", "));
   }
 }
 CallbacksWithArrayConditions.beforeAction(":_list", { only: ["index", "listy"] });
@@ -274,7 +274,7 @@ describe("TestCallbacksWithArrayConditions", () => {
 
 class ChangedConditions extends Callback2 {
   async not_index() {
-    this.responseBody = this.text ?? "";
+    this.setResponseBody(this.text ?? "");
   }
 }
 ChangedConditions.beforeAction(":first", { only: "index" });
@@ -298,10 +298,10 @@ describe("TestCallbacksWithChangedConditions", () => {
 
 class SetsResponseBody extends ControllerWithCallbacks {
   async index() {
-    this.responseBody = "Fail";
+    this.setResponseBody("Fail");
   }
   setBody() {
-    this.responseBody = "Success";
+    this.setResponseBody("Success");
   }
 }
 SetsResponseBody.beforeAction(":setBody");
@@ -320,7 +320,7 @@ class CallbacksWithArgs extends ControllerWithCallbacks {
     this.text = "Hello world";
   }
   async index(extra: string) {
-    this.responseBody = (this.text ?? "") + extra;
+    this.setResponseBody((this.text ?? "") + extra);
   }
 }
 CallbacksWithArgs.beforeAction((c) => (c as CallbacksWithArgs).first());
@@ -425,7 +425,7 @@ describe("AbstractController::Base — trails-only", () => {
 
   it("response body can be set", () => {
     const c = new (class extends ControllerWithCallbacks {})();
-    c.responseBody = "hello";
+    c.setResponseBody("hello");
     expect(c.responseBody).toBe("hello");
   });
 

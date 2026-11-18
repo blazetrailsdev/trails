@@ -254,7 +254,7 @@ class TestController extends ActionController.Base {
 
   async renderAndRedirect(): Promise<void> {
     await this.render({ plain: "hello" });
-    this.redirectTo({ action: "doubleRender" });
+    await this.redirectTo({ action: "doubleRender" });
   }
 
   async renderToStringAndRender(): Promise<void> {
@@ -419,8 +419,8 @@ class TestController extends ActionController.Base {
   }
 
   async doubleRedirect(): Promise<void> {
-    this.redirectTo({ action: "doubleRender" });
-    this.redirectTo({ action: "doubleRender" });
+    await this.redirectTo({ action: "doubleRender" });
+    await this.redirectTo({ action: "doubleRender" });
   }
 
   async renderToStringWithInlineAndRender(): Promise<void> {

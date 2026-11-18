@@ -20,16 +20,16 @@ export class InboundEmailsController extends BaseController {
       for (const rawEmail of this.rawEmails()) {
         await ActionMailbox.InboundEmail.createAndExtractMessageIdBang(rawEmail);
       }
-      this.head(":ok");
+      await this.head(":ok");
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       (this as unknown as { logger?: Logger }).logger?.error(error.message);
-      this.head(":unprocessable_entity");
+      await this.head(":unprocessable_entity");
     }
   }
 
-  healthCheck(): void {
-    this.head(":ok");
+  async healthCheck(): Promise<void> {
+    await this.head(":ok");
   }
 
   /** @internal */
@@ -49,7 +49,7 @@ export class InboundEmailsController extends BaseController {
 
   /** @internal */
   private async authenticate(): Promise<void> {
-    if (!(await this.isAuthenticated())) this.head(":unauthorized");
+    if (!(await this.isAuthenticated())) await this.head(":unauthorized");
   }
 
   /** @internal */

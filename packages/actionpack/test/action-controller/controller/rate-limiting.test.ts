@@ -13,8 +13,8 @@ class RateLimitedController extends Base {
     this.rateLimit({ to: 5, within: Duration.minutes(1), name: "long-term", only: "limited" });
   }
 
-  limited(): void {
-    this.head(":ok");
+  async limited(): Promise<void> {
+    await this.head(":ok");
   }
 
   static {
@@ -24,15 +24,15 @@ class RateLimitedController extends Base {
       by(this: RateLimitedController) {
         return this.params.get("rate_limit_key") as string | undefined;
       },
-      with(this: RateLimitedController) {
-        this.head(":forbidden");
+      async with(this: RateLimitedController) {
+        await this.head(":forbidden");
       },
       only: "limitedWith",
     });
   }
 
-  limitedWith(): void {
-    this.head(":ok");
+  async limitedWith(): Promise<void> {
+    await this.head(":ok");
   }
 }
 

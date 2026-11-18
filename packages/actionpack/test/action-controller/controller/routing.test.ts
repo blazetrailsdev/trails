@@ -36,8 +36,8 @@ type NamedRoutes = Record<string, (...args: unknown[]) => string>;
 class MilestonesController extends Base {
   declare show: () => void;
 
-  index(): void {
-    this.head(":ok");
+  async index(): Promise<void> {
+    await this.head(":ok");
   }
 
   static {

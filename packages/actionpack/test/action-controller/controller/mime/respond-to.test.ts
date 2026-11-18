@@ -717,7 +717,7 @@ describe("RespondToControllerTest", () => {
       if (args.length > 0) this.action = (args[0] as { action?: string }).action;
       this.action ??= this.actionName;
 
-      this.response.body = `${this.action} - ${rbInspect(this.formats)}`;
+      await this.response.setBody(`${this.action} - ${rbInspect(this.formats)}`);
     };
 
     await tc.get("usingDefaults");

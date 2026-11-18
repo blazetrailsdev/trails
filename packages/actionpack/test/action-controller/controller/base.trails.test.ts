@@ -17,8 +17,8 @@ function makeRequest(opts: Record<string, string> = {}): Request {
   });
 }
 
-function makeResponse(): Response {
-  return new Response();
+async function makeResponse(): Promise<Response> {
+  return await Response.new();
 }
 
 describe("ControllerInstanceTests", () => {
@@ -29,7 +29,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new JsonController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe('{"hello":"world"}');
     expect(c.contentType).toBe("application/json; charset=utf-8");
   });
@@ -41,7 +41,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new JsonStringController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe('{"raw":true}');
   });
 
@@ -52,7 +52,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new PlainController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("hello");
     expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
@@ -64,7 +64,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new HtmlController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("<h1>Hi</h1>");
     expect(c.contentType).toBe("text/html; charset=utf-8");
   });
@@ -76,7 +76,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new BodyController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("raw body");
     expect(c.contentType).toBe("text/plain; charset=utf-8");
   });
@@ -88,7 +88,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new StatusController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.status).toBe(201);
   });
 
@@ -99,7 +99,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new StatusSymController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.status).toBe(201);
   });
 
@@ -110,7 +110,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new CustomCtController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.contentType).toBe("text/csv; charset=utf-8");
   });
 
@@ -122,7 +122,7 @@ describe("ControllerInstanceTests", () => {
     }
     ImplicitController.prependViewPath(new FixtureResolver({ "implicit/index.html.tse": "" }));
     const c = new ImplicitController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.contentType).toBe("text/html; charset=utf-8");
   });
 
@@ -139,7 +139,7 @@ describe("ControllerInstanceTests", () => {
     );
 
     const c = new TemplateController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("<p>template#index</p>");
   });
 
@@ -151,7 +151,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new DoubleController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+    await expect(c.dispatch("index", makeRequest(), await makeResponse())).rejects.toThrow(
       DoubleRenderError,
     );
   });
@@ -165,7 +165,7 @@ describe("ControllerInstanceTests", () => {
       }
     }
     const c = new RtsController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.result).toBe("preview");
     expect(c.response.body).toBe("final");
   });
@@ -175,11 +175,11 @@ describe("ActionController::Base redirecting", () => {
   it("redirectTo sets location and 302", async () => {
     class RedirectController extends Base {
       async index() {
-        this.redirectTo("/other");
+        await this.redirectTo("/other");
       }
     }
     const c = new RedirectController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.status).toBe(302);
     expect(c.headers.get("location")).toBe("http://localhost/other");
     expect(c.performed).toBe(true);
@@ -188,34 +188,34 @@ describe("ActionController::Base redirecting", () => {
   it("redirectTo with custom status", async () => {
     class RedirectStatusController extends Base {
       async index() {
-        this.redirectTo("/moved", { status: 301 });
+        await this.redirectTo("/moved", { status: 301 });
       }
     }
     const c = new RedirectStatusController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.status).toBe(301);
   });
 
   it("redirectTo with symbol status", async () => {
     class RedirectSymController extends Base {
       async index() {
-        this.redirectTo("/see", { status: ":see_other" });
+        await this.redirectTo("/see", { status: ":see_other" });
       }
     }
     const c = new RedirectSymController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.status).toBe(303);
   });
 
   it("redirect then render throws DoubleRenderError", async () => {
     class DoubleRedirectController extends Base {
       async index() {
-        this.redirectTo("/a");
+        await this.redirectTo("/a");
         await this.render({ plain: "oops" });
       }
     }
     const c = new DoubleRedirectController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+    await expect(c.dispatch("index", makeRequest(), await makeResponse())).rejects.toThrow(
       DoubleRenderError,
     );
   });
@@ -223,23 +223,23 @@ describe("ActionController::Base redirecting", () => {
   it("redirectBack uses referer", async () => {
     class RedirectBackController extends Base {
       async index() {
-        this.redirectBack({ fallbackLocation: "/fallback" });
+        await this.redirectBack({ fallbackLocation: "/fallback" });
       }
     }
     const c = new RedirectBackController();
     const req = makeRequest({ HTTP_REFERER: "/previous" });
-    await c.dispatch("index", req, makeResponse());
+    await c.dispatch("index", req, await makeResponse());
     expect(c.headers.get("location")).toBe("http://localhost/previous");
   });
 
   it("redirectBack uses fallback when no referer", async () => {
     class RedirectBackFallController extends Base {
       async index() {
-        this.redirectBack({ fallbackLocation: "/fallback" });
+        await this.redirectBack({ fallbackLocation: "/fallback" });
       }
     }
     const c = new RedirectBackFallController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.headers.get("location")).toBe("http://localhost/fallback");
   });
 });
@@ -267,7 +267,7 @@ describe("ActionController::Base rescue_from", () => {
     });
 
     const c = new RescueController2();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(rescued).toBe(true);
   });
 
@@ -286,7 +286,9 @@ describe("ActionController::Base rescue_from", () => {
     NoRescueController.rescueFrom(SpecificError, { with: () => {} });
 
     const c = new NoRescueController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(OtherError);
+    await expect(c.dispatch("index", makeRequest(), await makeResponse())).rejects.toThrow(
+      OtherError,
+    );
   });
 
   it("child inherits rescue handlers", async () => {
@@ -308,7 +310,7 @@ describe("ActionController::Base rescue_from", () => {
     class ChildRescue extends ParentRescue {}
 
     const c = new ChildRescue();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(handled).toBe(true);
   });
 });
@@ -324,7 +326,7 @@ describe("ActionController::Base conditional GET", () => {
       }
     }
     const c = new FreshController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.headers.get("etag")).toMatch(/^W\/"[a-f0-9]+"/);
   });
 
@@ -339,7 +341,7 @@ describe("ActionController::Base conditional GET", () => {
       }
     }
     const c = new LmController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.headers.get("last-modified")).toBe(date.toUTCString());
   });
 
@@ -353,7 +355,7 @@ describe("ActionController::Base conditional GET", () => {
       }
     }
     const c1 = new Match304Controller();
-    await c1.dispatch("index", makeRequest(), makeResponse());
+    await c1.dispatch("index", makeRequest(), await makeResponse());
     const etag = c1.headers.get("etag")!;
 
     const c2 = new Match304Controller();
@@ -363,7 +365,7 @@ describe("ActionController::Base conditional GET", () => {
       HTTP_HOST: "localhost",
       HTTP_IF_NONE_MATCH: etag,
     });
-    await c2.dispatch("index", req, makeResponse());
+    await c2.dispatch("index", req, await makeResponse());
     expect(c2.status).toBe(304);
   });
 
@@ -378,13 +380,13 @@ describe("ActionController::Base conditional GET", () => {
       }
     }
     const c = new StaleController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(staleResult).toBe(true);
   });
 
-  it("expiresIn sets cache-control header", () => {
+  it("expiresIn sets cache-control header", async () => {
     const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
+    c.setResponseBang(await makeResponse());
     c.expiresIn(3600, { public: true, mustRevalidate: true });
     expect(c.response.cacheControl).toMatchObject({
       maxAge: 3600,
@@ -393,9 +395,9 @@ describe("ActionController::Base conditional GET", () => {
     });
   });
 
-  it("expiresNow sets no-cache", () => {
+  it("expiresNow sets no-cache", async () => {
     const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
+    c.setResponseBang(await makeResponse());
     c.expiresNow();
     expect(c.response.cacheControl).toEqual({ noCache: true });
   });
@@ -405,7 +407,7 @@ describe("ActionController::Base sendData", () => {
   it("sends data with filename", async () => {
     const c = new (class extends Base {})();
     c.setRequestBang(makeRequest());
-    c.setResponseBang(makeResponse());
+    c.setResponseBang(await makeResponse());
     await c.sendData("csv,data", { filename: "export.csv", type: "text/csv" });
     expect(c.response.body).toBe("csv,data");
     expect(c.contentType).toBe("text/csv");
@@ -418,7 +420,7 @@ describe("ActionController::Base sendData", () => {
   it("sends data with custom disposition", async () => {
     const c = new (class extends Base {})();
     c.setRequestBang(makeRequest());
-    c.setResponseBang(makeResponse());
+    c.setResponseBang(await makeResponse());
     await c.sendData("inline-data", { disposition: "inline", filename: "doc.pdf" });
     expect(c.headers.get("content-disposition")).toBe(
       "inline; filename=\"doc.pdf\"; filename*=UTF-8''doc.pdf",
@@ -428,7 +430,7 @@ describe("ActionController::Base sendData", () => {
   it("sends data without filename", async () => {
     const c = new (class extends Base {})();
     c.setRequestBang(makeRequest());
-    c.setResponseBang(makeResponse());
+    c.setResponseBang(await makeResponse());
     await c.sendData("raw");
     expect(c.response.body).toBe("raw");
     expect(c.contentType).toBe("application/octet-stream");
@@ -443,7 +445,7 @@ describe("ActionController::API", () => {
       }
     }
     const c = new ApiController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe('{"status":"ok"}');
     expect(c.contentType).toBe("application/json; charset=utf-8");
   });
@@ -455,7 +457,7 @@ describe("ActionController::API", () => {
       }
     }
     const c = new ApiPlainController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("hello api");
   });
 
@@ -466,7 +468,7 @@ describe("ActionController::API", () => {
       }
     }
     const c = new ApiBodyController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("raw");
   });
 
@@ -477,7 +479,7 @@ describe("ActionController::API", () => {
       }
     }
     const c = new ApiStatusController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.status).toBe(201);
   });
 
@@ -489,7 +491,7 @@ describe("ActionController::API", () => {
       }
     }
     const c = new ApiDoubleController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+    await expect(c.dispatch("index", makeRequest(), await makeResponse())).rejects.toThrow(
       DoubleRenderError,
     );
   });
@@ -497,11 +499,11 @@ describe("ActionController::API", () => {
   it("redirectTo sets location and empty body", async () => {
     class ApiRedirectController extends API {
       async index() {
-        this.redirectTo("/api/v2");
+        await this.redirectTo("/api/v2");
       }
     }
     const c = new ApiRedirectController();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.status).toBe(302);
     expect(c.headers.get("location")).toBe("http://localhost/api/v2");
     expect(c.response.body).toBe("");
@@ -510,23 +512,23 @@ describe("ActionController::API", () => {
   it("redirectTo with custom status", async () => {
     class ApiRedirect301Controller extends API {
       async index() {
-        this.redirectTo("/api/v2", { status: 301 });
+        await this.redirectTo("/api/v2", { status: 301 });
       }
     }
     const c = new ApiRedirect301Controller();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(c.status).toBe(301);
   });
 
   it("redirect then render throws", async () => {
     class ApiDoubleRedController extends API {
       async index() {
-        this.redirectTo("/a");
+        await this.redirectTo("/a");
         await this.render({ json: {} });
       }
     }
     const c = new ApiDoubleRedController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
+    await expect(c.dispatch("index", makeRequest(), await makeResponse())).rejects.toThrow(
       DoubleRenderError,
     );
   });

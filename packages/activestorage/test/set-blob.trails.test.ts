@@ -35,13 +35,17 @@ describe("ActiveStorage::SetBlob", () => {
 });
 
 describe("ActiveStorage::FileServer", () => {
-  it("serves a file with the given content type and disposition", () => {
+  it("serves a file with the given content type and disposition", async () => {
     const headers = new Map<string, string>();
     const host = {
       request: { isOptions: () => false, getHeader: () => null, isHead: () => false },
       response: { headers },
+      setResponseBody(body: unknown) {
+        this.responseBody = body;
+      },
+      responseBody: undefined as unknown,
     };
-    FileServer.serveFile.call(host as never, import.meta.filename, {
+    await FileServer.serveFile.call(host as never, import.meta.filename, {
       contentType: null,
       disposition: "inline",
     });
@@ -49,7 +53,7 @@ describe("ActiveStorage::FileServer", () => {
     expect(headers.get("Content-Disposition")).toBe("inline");
   });
 
-  it("drops the cascade headers from a 416 response", () => {
+  it("drops the cascade headers from a 416 response", async () => {
     const headers = new Map([["x-cascade", "pass"]]);
     const host = {
       request: {
@@ -58,8 +62,12 @@ describe("ActiveStorage::FileServer", () => {
         getHeader: (name: string) => (name === "HTTP_RANGE" ? "bytes=999999999-" : null),
       },
       response: { headers },
+      setResponseBody(body: unknown) {
+        this.responseBody = body;
+      },
+      responseBody: undefined as unknown,
     };
-    FileServer.serveFile.call(host as never, import.meta.filename, {
+    await FileServer.serveFile.call(host as never, import.meta.filename, {
       contentType: "text/plain",
       disposition: null,
     });

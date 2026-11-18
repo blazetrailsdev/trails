@@ -13,8 +13,8 @@ function makeRequest(opts: Record<string, string> = {}): Request {
     ...opts,
   });
 }
-function makeResponse(): Response {
-  return new Response();
+async function makeResponse(): Promise<Response> {
+  return await Response.new();
 }
 
 describe("RescueControllerTest", () => {
@@ -35,7 +35,7 @@ describe("RescueControllerTest", () => {
     });
 
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(rescued).toBe(true);
   });
 
@@ -56,7 +56,7 @@ describe("RescueControllerTest", () => {
     });
 
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(message).toBe("specific message");
   });
 
@@ -75,7 +75,9 @@ describe("RescueControllerTest", () => {
     C.rescueFrom(KnownError, { with: () => {} });
 
     const c = new C();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(UnknownError);
+    await expect(c.dispatch("index", makeRequest(), await makeResponse())).rejects.toThrow(
+      UnknownError,
+    );
   });
 
   it("rescues subclass errors", async () => {
@@ -98,7 +100,7 @@ describe("RescueControllerTest", () => {
     });
 
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(rescued).toBe(true);
   });
 
@@ -120,7 +122,7 @@ describe("RescueControllerTest", () => {
 
     class Child extends Parent {}
     const c = new Child();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(handled).toBe(true);
   });
 
@@ -147,7 +149,7 @@ describe("RescueControllerTest", () => {
     });
 
     const c = new Child();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(childRescued).toBe(true);
   });
 
@@ -174,7 +176,7 @@ describe("RescueControllerTest", () => {
       },
     });
     const c = new C2();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(rescued).toBe(true);
   });
 
@@ -196,7 +198,7 @@ describe("RescueControllerTest", () => {
     });
 
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(handled).toBe(true);
   });
 
@@ -225,7 +227,7 @@ describe("RescueControllerTest", () => {
     });
 
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(which).toBe("specific");
   });
 
@@ -243,7 +245,7 @@ describe("RescueControllerTest", () => {
     });
 
     const c = new C();
-    await c.dispatch("index", makeRequest(), makeResponse());
+    await c.dispatch("index", makeRequest(), await makeResponse());
     expect(rescued).toBe(true);
   });
 
@@ -255,12 +257,12 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(NotAuthorized, {
-      with: function (this: Base) {
-        this.head(403);
+      with: async function (this: Base) {
+        await this.head(403);
       },
     });
     const c = new C();
-    await c.dispatch("notAuthorized", makeRequest(), makeResponse());
+    await c.dispatch("notAuthorized", makeRequest(), await makeResponse());
     assertResponse.call(c, ":forbidden");
   });
 
@@ -272,12 +274,12 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(NotAuthorizedString, {
-      with: function (this: Base) {
-        this.head(403);
+      with: async function (this: Base) {
+        await this.head(403);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":forbidden");
   });
 
@@ -293,7 +295,7 @@ describe("RescueControllerTest", () => {
     C.rescueFrom(RecordInvalid, { with: "showErrors" });
     const c = new C();
     await assertCalledWith(c, "showErrors", [Error], {}, async () => {
-      await c.dispatch("action", makeRequest(), makeResponse());
+      await c.dispatch("action", makeRequest(), await makeResponse());
     });
   });
 
@@ -309,7 +311,7 @@ describe("RescueControllerTest", () => {
     C.rescueFrom(RecordInvalidStr, { with: "showErrors" });
     const c = new C();
     await assertCalledWith(c, "showErrors", [Error], {}, async () => {
-      await c.dispatch("action", makeRequest(), makeResponse());
+      await c.dispatch("action", makeRequest(), await makeResponse());
     });
   });
 
@@ -321,12 +323,12 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(NotAllowed, {
-      with: function (this: Base) {
-        this.head(403);
+      with: async function (this: Base) {
+        await this.head(403);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":forbidden");
   });
 
@@ -338,12 +340,12 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(NotAllowedStr, {
-      with: function (this: Base) {
-        this.head(403);
+      with: async function (this: Base) {
+        await this.head(403);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":forbidden");
   });
 
@@ -364,7 +366,7 @@ describe("RescueControllerTest", () => {
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("RescueController::InvalidRequest");
   });
 
@@ -385,7 +387,7 @@ describe("RescueControllerTest", () => {
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("RescueController::InvalidRequestToRescueAsString");
   });
 
@@ -397,12 +399,12 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(BadGateway, {
-      with: function (this: Base) {
-        this.head(502);
+      with: async function (this: Base) {
+        await this.head(502);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, 502);
   });
 
@@ -414,12 +416,12 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(BadGatewayStr, {
-      with: function (this: Base) {
-        this.head(502);
+      with: async function (this: Base) {
+        await this.head(502);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, 502);
   });
 
@@ -440,7 +442,7 @@ describe("RescueControllerTest", () => {
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("RescueController::ResourceUnavailable");
   });
 
@@ -461,7 +463,7 @@ describe("RescueControllerTest", () => {
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("RescueController::ResourceUnavailableToRescueAsString");
   });
 
@@ -474,17 +476,17 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(CauseError, {
-      with: function (this: Base) {
-        this.head(422);
+      with: async function (this: Base) {
+        await this.head(422);
       },
     });
     C.rescueFrom(WrapperError, {
-      with: function (this: Base) {
-        this.head(403);
+      with: async function (this: Base) {
+        await this.head(403);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":forbidden");
   });
 
@@ -497,17 +499,17 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(GenericError, {
-      with: function (this: Base) {
-        this.head(403);
+      with: async function (this: Base) {
+        await this.head(403);
       },
     });
     C.rescueFrom(SpecificCause, {
-      with: function (this: Base) {
-        this.head(422);
+      with: async function (this: Base) {
+        await this.head(422);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":forbidden");
   });
 
@@ -520,12 +522,12 @@ describe("RescueControllerTest", () => {
       }
     }
     C.rescueFrom(HandledCause, {
-      with: function (this: Base) {
-        this.head(422);
+      with: async function (this: Base) {
+        await this.head(422);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":unprocessable_entity");
   });
 
@@ -546,7 +548,7 @@ describe("RescueControllerTest", () => {
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":bad_request");
     expect(c.response.body).toBe("parse error");
   });
@@ -563,17 +565,17 @@ describe("ExceptionInheritanceRescueControllerTest", () => {
       }
     }
     C.rescueFrom(ParentException, {
-      with: function (this: Base) {
-        this.head(201);
+      with: async function (this: Base) {
+        await this.head(201);
       },
     });
     C.rescueFrom(GrandchildException, {
-      with: function (this: Base) {
-        this.head(204);
+      with: async function (this: Base) {
+        await this.head(204);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":no_content");
   });
 
@@ -586,12 +588,12 @@ describe("ExceptionInheritanceRescueControllerTest", () => {
       }
     }
     C.rescueFrom(ParentException, {
-      with: function (this: Base) {
-        this.head(201);
+      with: async function (this: Base) {
+        await this.head(201);
       },
     });
     const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":created");
   });
 });
@@ -606,18 +608,18 @@ describe("ControllerInheritanceRescueControllerTest", () => {
       }
     }
     Parent.rescueFrom(ParentException, {
-      with: function (this: Base) {
-        this.head(201);
+      with: async function (this: Base) {
+        await this.head(201);
       },
     });
     class Child extends Parent {}
     Child.rescueFrom(FirstChildException, {
-      with: function (this: Base) {
-        this.head(410);
+      with: async function (this: Base) {
+        await this.head(410);
       },
     });
     const c = new Child();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":gone");
   });
 
@@ -630,18 +632,18 @@ describe("ControllerInheritanceRescueControllerTest", () => {
       }
     }
     Parent.rescueFrom(ParentException, {
-      with: function (this: Base) {
-        this.head(201);
+      with: async function (this: Base) {
+        await this.head(201);
       },
     });
     class Child extends Parent {}
     Child.rescueFrom(SecondChildException, {
-      with: function (this: Base) {
-        this.head(410);
+      with: async function (this: Base) {
+        await this.head(410);
       },
     });
     const c = new Child();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":gone");
   });
 
@@ -653,13 +655,13 @@ describe("ControllerInheritanceRescueControllerTest", () => {
       }
     }
     Parent.rescueFrom(ParentException, {
-      with: function (this: Base) {
-        this.head(201);
+      with: async function (this: Base) {
+        await this.head(201);
       },
     });
     class Child extends Parent {}
     const c = new Child();
-    await c.dispatch("action", makeRequest(), makeResponse());
+    await c.dispatch("action", makeRequest(), await makeResponse());
     assertResponse.call(c, ":created");
   });
 });
@@ -672,7 +674,7 @@ describe("RescueTest", () => {
       }
     }
     const c = new C();
-    await c.dispatch("foo", makeRequest(), makeResponse());
+    await c.dispatch("foo", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("foo");
   });
 
@@ -693,7 +695,7 @@ describe("RescueTest", () => {
       },
     });
     const c = new C();
-    await c.dispatch("invalid", makeRequest(), makeResponse());
+    await c.dispatch("invalid", makeRequest(), await makeResponse());
     expect(c.response.body).toBe("invalid");
   });
 });

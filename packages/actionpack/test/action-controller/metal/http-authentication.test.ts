@@ -20,14 +20,14 @@ class TestController extends Base {}
 
 const req = (auth?: string) => new Request(auth === undefined ? {} : { HTTP_AUTHORIZATION: auth });
 
-function controllerFor(request: Request): TestController {
+async function controllerFor(request: Request): Promise<TestController> {
   const controller = new TestController();
   controller.setRequestBang(request);
-  controller.setResponseBang(TestController.makeResponseBang(request));
+  controller.setResponseBang(await TestController.makeResponseBang(request));
   return controller;
 }
 
-const ctrl = (auth?: string): TestController => controllerFor(req(auth));
+const ctrl = (auth?: string): Promise<TestController> => controllerFor(req(auth));
 
 describe("HttpAuthentication::Basic", () => {
   it("encode/decode round-trip, including colons in password", () => {
@@ -68,9 +68,9 @@ describe("HttpAuthentication::Basic", () => {
     expect(() => authenticate(noColon, (_u, p) => p.length)).toThrow(TypeError);
   });
 
-  it("authenticationRequest writes 401 + WWW-Authenticate and strips realm quotes", () => {
-    const c = ctrl();
-    authenticationRequest(c, 'Evil"Realm', null);
+  it("authenticationRequest writes 401 + WWW-Authenticate and strips realm quotes", async () => {
+    const c = await ctrl();
+    await authenticationRequest(c, 'Evil"Realm', null);
     expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="EvilRealm"');
     expect(c.status).toBe(401);
     expect(c.response.body).toBe("HTTP Basic: Access denied.\n");
@@ -78,49 +78,49 @@ describe("HttpAuthentication::Basic", () => {
 });
 
 describe("HttpAuthentication::Basic::ControllerMethods", () => {
-  it("authenticateWithHttpBasic delegates to authenticate using this.request", () => {
-    const c = ctrl(encodeCredentials("u", "p"));
+  it("authenticateWithHttpBasic delegates to authenticate using this.request", async () => {
+    const c = await ctrl(encodeCredentials("u", "p"));
     expect(authenticateWithHttpBasic.call(c, (u, p) => ({ u, p }))).toEqual({ u: "u", p: "p" });
   });
 
-  it("authenticateOrRequestWithHttpBasic returns login result, else issues 401", () => {
-    const ok = ctrl(encodeCredentials("u", "p"));
-    expect(authenticateOrRequestWithHttpBasic.call(ok, null, null, () => "OK")).toBe("OK");
-    const fail = ctrl();
-    expect(authenticateOrRequestWithHttpBasic.call(fail, null, null, () => "OK")).toBe(
+  it("authenticateOrRequestWithHttpBasic returns login result, else issues 401", async () => {
+    const ok = await ctrl(encodeCredentials("u", "p"));
+    expect(await authenticateOrRequestWithHttpBasic.call(ok, null, null, () => "OK")).toBe("OK");
+    const fail = await ctrl();
+    expect(await authenticateOrRequestWithHttpBasic.call(fail, null, null, () => "OK")).toBe(
       "HTTP Basic: Access denied.\n",
     );
     expect(fail.status).toBe(401);
     expect(fail.headers.get("WWW-Authenticate")).toBe('Basic realm="Application"');
   });
 
-  it("requestHttpBasicAuthentication uses provided realm + message", () => {
-    const c = ctrl();
-    requestHttpBasicAuthentication.call(c, "Zone", "nope");
+  it("requestHttpBasicAuthentication uses provided realm + message", async () => {
+    const c = await ctrl();
+    await requestHttpBasicAuthentication.call(c, "Zone", "nope");
     expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="Zone"');
     expect(c.response.body).toBe("nope");
   });
 
-  it("httpBasicAuthenticateOrRequestWith succeeds only on matching credentials", () => {
-    const ok = ctrl(encodeCredentials("dhh", "secret"));
-    expect(httpBasicAuthenticateOrRequestWith.call(ok, { name: "dhh", password: "secret" })).toBe(
-      true,
-    );
-    const bad = ctrl(encodeCredentials("dhh", "wrong"));
-    expect(httpBasicAuthenticateOrRequestWith.call(bad, { name: "dhh", password: "secret" })).toBe(
-      "HTTP Basic: Access denied.\n",
-    );
+  it("httpBasicAuthenticateOrRequestWith succeeds only on matching credentials", async () => {
+    const ok = await ctrl(encodeCredentials("dhh", "secret"));
+    expect(
+      await httpBasicAuthenticateOrRequestWith.call(ok, { name: "dhh", password: "secret" }),
+    ).toBe(true);
+    const bad = await ctrl(encodeCredentials("dhh", "wrong"));
+    expect(
+      await httpBasicAuthenticateOrRequestWith.call(bad, { name: "dhh", password: "secret" }),
+    ).toBe("HTTP Basic: Access denied.\n");
     expect(bad.status).toBe(401);
   });
 });
 
 describe("HttpAuthentication::Basic::ControllerMethods::ClassMethods", () => {
-  it("httpBasicAuthenticateWith registers a beforeAction filter and forwards filter options", () => {
+  it("httpBasicAuthenticateWith registers a beforeAction filter and forwards filter options", async () => {
     const beforeAction = vi.fn();
     httpBasicAuthenticateWith.call({ beforeAction }, { name: "dhh", password: "s", only: "edit" });
     const [cb, opts] = beforeAction.mock.calls[0];
     expect(opts).toEqual({ only: "edit" });
-    expect(cb(ctrl(encodeCredentials("dhh", "s")))).toBe(true);
+    expect(await cb(await ctrl(encodeCredentials("dhh", "s")))).toBe(true);
   });
 
   it("httpBasicAuthenticateWith rejects non-string name/password", () => {
@@ -154,7 +154,7 @@ function makeDigestRequest(auth?: string): Request {
   return new Request(env);
 }
 
-function makeDigestCtrl(auth?: string): TestController {
+function makeDigestCtrl(auth?: string): Promise<TestController> {
   return controllerFor(makeDigestRequest(auth));
 }
 
@@ -239,25 +239,25 @@ describe("HttpAuthentication::Digest", () => {
     expect(encoded).toMatch(/response=/);
   });
 
-  it("authentication_request sets 401 + WWW-Authenticate Digest header", () => {
-    const c = makeDigestCtrl();
-    Digest.authenticationRequest(c, "SuperSecret", null);
+  it("authentication_request sets 401 + WWW-Authenticate Digest header", async () => {
+    const c = await makeDigestCtrl();
+    await Digest.authenticationRequest(c, "SuperSecret", null);
     expect(c.status).toBe(401);
     expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
     expect(c.response.body).toBe("HTTP Digest: Access denied.\n");
   });
 
-  it("authentication_request uses provided message", () => {
-    const c = makeDigestCtrl();
-    Digest.authenticationRequest(c, "SuperSecret", "Authentication Failed");
+  it("authentication_request uses provided message", async () => {
+    const c = await makeDigestCtrl();
+    await Digest.authenticationRequest(c, "SuperSecret", "Authentication Failed");
     expect(c.response.body).toBe("Authentication Failed");
   });
 });
 
 describe("HttpAuthentication::Digest::ControllerMethods", () => {
-  it("requestHttpDigestAuthentication sets 401 + Digest WWW-Authenticate header", () => {
-    const c = makeDigestCtrl();
-    requestHttpDigestAuthentication.call(c, "SuperSecret", "Auth Failed");
+  it("requestHttpDigestAuthentication sets 401 + Digest WWW-Authenticate header", async () => {
+    const c = await makeDigestCtrl();
+    await requestHttpDigestAuthentication.call(c, "SuperSecret", "Auth Failed");
     expect(c.status).toBe(401);
     expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
     expect(c.response.body).toBe("Auth Failed");
@@ -265,17 +265,17 @@ describe("HttpAuthentication::Digest::ControllerMethods", () => {
 });
 
 describe("HttpAuthentication::Token::ControllerMethods", () => {
-  it("authenticateWithHttpToken yields the token and its options", () => {
-    const c = ctrl(Token.encodeCredentials("lifo", { algorithm: "test" }));
+  it("authenticateWithHttpToken yields the token and its options", async () => {
+    const c = await ctrl(Token.encodeCredentials("lifo", { algorithm: "test" }));
     expect(
       c.authenticateWithHttpToken((token, options) => [token, options.get("algorithm")]),
     ).toEqual(["lifo", "test"]);
-    expect(ctrl("Bearer lifo").authenticateWithHttpToken((token) => token)).toBe("lifo");
-    expect(ctrl("Basic lifo").authenticateWithHttpToken((token) => token)).toBeUndefined();
+    expect((await ctrl("Bearer lifo")).authenticateWithHttpToken((token) => token)).toBe("lifo");
+    expect((await ctrl("Basic lifo")).authenticateWithHttpToken((token) => token)).toBeUndefined();
   });
 
   it("authenticateOrRequestWithHttpToken renders 401 with the Token challenge", async () => {
-    const c = ctrl('Token token="nope"');
+    const c = await ctrl('Token token="nope"');
     await c.authenticateOrRequestWithHttpToken(
       'Super"Secret',
       "Authentication Failed\n",

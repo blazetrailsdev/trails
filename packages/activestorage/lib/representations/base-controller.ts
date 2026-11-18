@@ -30,7 +30,7 @@ export class BaseController extends ActiveStorageBaseController {
         .processed();
     } catch (error) {
       if (!(error instanceof InvalidSignature)) throw error;
-      this.head(":not_found");
+      await this.head(":not_found");
     }
   }
 }

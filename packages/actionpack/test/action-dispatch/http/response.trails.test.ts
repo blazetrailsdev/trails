@@ -3,8 +3,8 @@ import { RackBody, Response } from "../../../lib/action-dispatch/http/response.j
 import { bytes } from "@blazetrails/ruby-compat";
 
 describe("ActionDispatch::Response#location", () => {
-  it("is nil when no Location header is set, as Rack's get_header answers", () => {
-    const response = new Response();
+  it("is nil when no Location header is set, as Rack's get_header answers", async () => {
+    const response = await Response.new();
     expect(response.location).toBeUndefined();
     response.location = "http://example.com/";
     expect(response.location).toBe("http://example.com/");
@@ -12,32 +12,32 @@ describe("ActionDispatch::Response#location", () => {
 });
 
 describe("ActionDispatch::Response#body=", () => {
-  it("keeps a binary String as one body part", () => {
+  it("keeps a binary String as one body part", async () => {
     const bytes = Buffer.from([0x89, 0x00, 0xff, 0xc3, 0x28]);
-    const response = new Response();
-    response.body = bytes;
+    const response = await Response.new();
+    await response.setBody(bytes);
     expect(response.bodyParts()).toEqual([bytes]);
   });
 });
 
 describe("ActionDispatch::Response::Buffer#body", () => {
-  it("appends a binary String chunk byte for byte", () => {
-    const response = new Response();
-    response.body = Buffer.from([0x89, 0x50, 0xff, 0xc3, 0x28]);
+  it("appends a binary String chunk byte for byte", async () => {
+    const response = await Response.new();
+    await response.setBody(Buffer.from([0x89, 0x50, 0xff, 0xc3, 0x28]));
     expect(bytes(response.body)).toEqual([0x89, 0x50, 0xff, 0xc3, 0x28]);
   });
 });
 
 describe("ActionDispatch::Response::Buffer#to_ary", () => {
-  it("answers the Array buffer itself", () => {
-    const response = new Response(200, {}, ["a", "b"]);
+  it("answers the Array buffer itself", async () => {
+    const response = await Response.new(200, {}, ["a", "b"]);
     expect((response.toA()[2] as RackBody).toAry()).toEqual(["a", "b"]);
   });
 });
 
 describe("ActionDispatch::Response::RackBody#call", () => {
-  it("forwards a hijacked stream unchanged, as Rails' call(*arguments, &block) does", () => {
-    const response = new Response();
+  it("forwards a hijacked stream unchanged, as Rails' call(*arguments, &block) does", async () => {
+    const response = await Response.new();
     const received: unknown[][] = [];
     response.stream = {
       toPath: () => "",
@@ -50,8 +50,8 @@ describe("ActionDispatch::Response::RackBody#call", () => {
 });
 
 describe("ActionDispatch::Response::RackBody#each", () => {
-  it("passes its block through to Response#each", () => {
-    const response = new Response(200, {}, ["a", "b"]);
+  it("passes its block through to Response#each", async () => {
+    const response = await Response.new(200, {}, ["a", "b"]);
     const parts: unknown[] = [];
     (response.toA()[2] as RackBody).each((part: unknown) => parts.push(part));
     expect(parts).toEqual(["a", "b"]);

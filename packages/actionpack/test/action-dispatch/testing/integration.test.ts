@@ -74,16 +74,16 @@ class PostsController extends Base {
   }
 
   async destroy() {
-    this.head(204);
+    await this.head(204);
   }
 
   async redirectToIndex() {
-    this.redirectTo("/posts");
+    await this.redirectTo("/posts");
   }
 
   async createAndRedirect() {
     this.flash.set("notice", "Post created!");
-    this.redirectTo("/posts/flash");
+    await this.redirectTo("/posts/flash");
   }
 
   async showFlash() {
@@ -160,7 +160,7 @@ class AdminPostsController extends Base {
 class SessionsController extends Base {
   async create() {
     this.session.set("userId", 42);
-    this.redirectTo("/posts");
+    await this.redirectTo("/posts");
   }
 
   async show() {
@@ -170,7 +170,7 @@ class SessionsController extends Base {
 
   async destroy() {
     this.session.set("userId", undefined);
-    this.head(204);
+    await this.head(204);
   }
 }
 
@@ -657,7 +657,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("follow_redirect! sets HTTP_REFERER even when redirect target is a 404", async () => {
       class RedirectToMissingController extends Base {
         async index() {
-          this.redirectTo("/this-path-does-not-exist");
+          await this.redirectTo("/this-path-does-not-exist");
         }
       }
       redirectApp.routes.draw(function () {
@@ -679,7 +679,7 @@ describe("ActionDispatch::IntegrationTest", () => {
     it("follow_redirect! merges options.headers into 404 env", async () => {
       class RedirectToMissing2Controller extends Base {
         async index() {
-          this.redirectTo("/no-route-here");
+          await this.redirectTo("/no-route-here");
         }
       }
       redirectApp.routes.draw(function () {

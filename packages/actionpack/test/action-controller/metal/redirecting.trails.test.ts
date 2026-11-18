@@ -7,7 +7,7 @@ import type { RedirectingHost } from "../../../lib/action-controller/metal/redir
 describe("Redirecting#redirect_back_or_to", () => {
   const redirects: string[] = [];
   class RedirectBackController extends Base {
-    override redirectTo(location: string): number {
+    override async redirectTo(location: string): Promise<number> {
       return redirects.push(location);
     }
   }
@@ -24,28 +24,28 @@ describe("Redirecting#redirect_back_or_to", () => {
 
 describe("Redirecting#redirect_to types", () => {
   it("accepts redirecting.rb's option forms and rejects unknown response options", () => {
-    const typed = (controller: Base, post: ToModel): void => {
-      controller.redirectTo("/posts");
-      controller.redirectTo(post, {
+    const typed = async (controller: Base, post: ToModel): Promise<void> => {
+      await controller.redirectTo("/posts");
+      await controller.redirectTo(post, {
         notice: "Post was successfully updated.",
         status: ":see_other",
       });
-      controller.redirectTo({ action: "index", status: 303 });
-      controller.redirectTo({ action: "show", id: 5, onlyPath: true, anchor: "comments" });
+      await controller.redirectTo({ action: "index", status: 303 });
+      await controller.redirectTo({ action: "show", id: 5, onlyPath: true, anchor: "comments" });
       // @ts-expect-error a url_for option of the wrong type
-      controller.redirectTo({ action: "index", onlyPath: "yes" });
-      controller.redirectTo(() => "/posts", { alert: "Watch it, mister!", status: ":found" });
-      controller.redirectTo("/posts", { status: 301, flash: { updatedPostId: 1 } });
-      controller.redirectTo("/posts", { status: ":unprocessable_entity" });
-      controller.redirectTo("https://rubyonrails.org", { allowOtherHost: true });
-      controller.redirectTo<"warning">("/posts", { warning: "Careful" });
+      await controller.redirectTo({ action: "index", onlyPath: "yes" });
+      await controller.redirectTo(() => "/posts", { alert: "Watch it, mister!", status: ":found" });
+      await controller.redirectTo("/posts", { status: 301, flash: { updatedPostId: 1 } });
+      await controller.redirectTo("/posts", { status: ":unprocessable_entity" });
+      await controller.redirectTo("https://rubyonrails.org", { allowOtherHost: true });
+      await controller.redirectTo<"warning">("/posts", { warning: "Careful" });
       // @ts-expect-error a misspelled response option
-      controller.redirectTo("/posts", { statsu: "see_other" });
+      await controller.redirectTo("/posts", { statsu: "see_other" });
       // @ts-expect-error not a Rack status symbol
-      controller.redirectTo("/posts", { status: "see_another" });
+      await controller.redirectTo("/posts", { status: "see_another" });
       // @ts-expect-error a flash type the controller did not name
-      controller.redirectTo("/posts", { warning: "Careful" });
-      expectTypeOf(controller.redirectTo).returns.toEqualTypeOf<number>();
+      await controller.redirectTo("/posts", { warning: "Careful" });
+      expectTypeOf(controller.redirectTo).returns.toEqualTypeOf<Promise<number>>();
       const flash = controller as unknown as { redirectTo: typeof flashRedirectTo; flash: never };
       // @ts-expect-error a misspelled response option on Flash#redirect_to itself
       flash.redirectTo("/posts", { statsu: "see_other" });

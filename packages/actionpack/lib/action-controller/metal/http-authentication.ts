@@ -92,7 +92,7 @@ export namespace HttpAuthentication {
         realm: string | null | undefined,
         message: string | null | undefined,
         loginProcedure: (userName: string | undefined, password: string | undefined) => T,
-      ): T | string {
+      ): T | Promise<string> {
         const authenticated = this.authenticateWithHttpBasic(loginProcedure) as T | undefined;
         return authenticated != null && authenticated !== false
           ? authenticated
@@ -110,7 +110,7 @@ export namespace HttpAuthentication {
         this: BasicController,
         realm: string = "Application",
         message: string | null | undefined = null,
-      ): string {
+      ): Promise<string> {
         return HttpAuthentication.Basic.authenticationRequest(this, realm, message);
       }
     }
@@ -149,29 +149,30 @@ export namespace HttpAuthentication {
       return `Basic ${Base64.strictEncode64(`${userName}:${password}`)}`;
     }
 
-    export function authenticationRequest(
+    export async function authenticationRequest(
       controller: Metal,
       realm: string,
       message: string | null | undefined,
-    ): string {
+    ): Promise<string> {
       message ??= "HTTP Basic: Access denied.\n";
       controller.headers.set("WWW-Authenticate", `Basic realm="${realm.replace(/"/g, "")}"`);
       controller.status = 401;
-      return (controller.responseBody = message);
+      await controller.setResponseBody(message);
+      return message;
     }
   }
 
   export namespace Digest {
     export namespace ControllerMethods {
-      export function authenticateOrRequestWithHttpDigest(
+      export async function authenticateOrRequestWithHttpDigest(
         this: DigestController,
         realm = "Application",
         message: string | null | undefined,
         passwordProcedure: (username: string) => string | null | undefined,
-      ): boolean | string {
+      ): Promise<boolean | Promise<string>> {
         return (
           this.authenticateWithHttpDigest(realm, passwordProcedure) ||
-          this.requestHttpDigestAuthentication(realm, message)
+          (await this.requestHttpDigestAuthentication(realm, message))
         );
       }
 
@@ -187,7 +188,7 @@ export namespace HttpAuthentication {
         this: DigestController,
         realm = "Application",
         message: string | null | undefined = null,
-      ): string {
+      ): Promise<string> {
         return HttpAuthentication.Digest.authenticationRequest(this, realm, message);
       }
     }
@@ -317,15 +318,16 @@ export namespace HttpAuthentication {
       );
     }
 
-    export function authenticationRequest(
+    export async function authenticationRequest(
       controller: Metal,
       realm: string,
       message: string | null | undefined = null,
-    ): string {
+    ): Promise<string> {
       message ??= "HTTP Digest: Access denied.\n";
       authenticationHeader(controller, realm);
       controller.status = 401;
-      return (controller.responseBody = message);
+      await controller.setResponseBody(message);
+      return message;
     }
 
     export function secretToken(request: Request): string {
@@ -457,11 +459,11 @@ export namespace HttpAuthentication {
       return `Token ${values.join(", ")}`;
     }
 
-    export function authenticationRequest(
+    export async function authenticationRequest(
       controller: Metal,
       realm: string,
       message: string | null | undefined = null,
-    ): unknown {
+    ): Promise<unknown> {
       message ??= "HTTP Token: Access denied.\n";
       controller.headers.set("WWW-Authenticate", `Token realm="${realm.replace(/"/g, "")}"`);
       return rbFSend(controller, "render", { plain: message, status: ":unauthorized" });

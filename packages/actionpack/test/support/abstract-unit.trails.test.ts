@@ -36,7 +36,7 @@ FixtureLoadPathController.helper(GamesHelper);
 async function dispatch(action: string): Promise<unknown> {
   const controller = new FixtureLoadPathController();
   const env = { REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" };
-  await controller.dispatch(action, new Request(env), new Response());
+  await controller.dispatch(action, new Request(env), await Response.new());
   return controller.response.body;
 }
 
@@ -123,7 +123,7 @@ describe("RoutingTestHelpers", () => {
 });
 
 class AssertionsHost {
-  response = new Response();
+  response!: Response;
 }
 interface AssertionsHost
   extends Included<typeof CookieAssertions>, Included<typeof HeadersAssertions> {}
@@ -133,8 +133,9 @@ include(AssertionsHost, HeadersAssertions);
 describe("CookieAssertions", () => {
   let tc: AssertionsHost;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tc = new AssertionsHost();
+    tc.response = await Response.new();
     tc.response.setHeader(
       "Set-Cookie",
       "user_name=david; path=/; SameSite=Lax\nlogin=XJ-122; path=/; HttpOnly",
@@ -173,8 +174,9 @@ describe("CookieAssertions", () => {
 describe("HeadersAssertions", () => {
   let tc: AssertionsHost;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     tc = new AssertionsHost();
+    tc.response = await Response.new();
     tc.response.setHeader("Content-Type", "text/html");
   });
 

@@ -198,12 +198,12 @@ describe("ActiveStorage::Blobs::ProxyControllerTest", () => {
     });
   });
 
-  it("uses a Live::Response", () => {
+  it("uses a Live::Response", async () => {
     const request = ControllerTestRequest.create({} as never);
     expect(
-      (ProxyController as unknown as { makeResponseBang(r: unknown): unknown }).makeResponseBang(
-        request,
-      ),
+      await (
+        ProxyController as unknown as { makeResponseBang(r: unknown): unknown }
+      ).makeResponseBang(request),
     ).toBeInstanceOf(ActionController.LiveResponse);
   });
 });

@@ -279,8 +279,8 @@ export default { development: env("development"), test: env("test"), production:
       `
         import { ApplicationController } from "./application-controller.ts";
         export class FooController extends ApplicationController {
-          index() {
-            this.render({ plain: "foo" });
+          async index() {
+            await this.render({ plain: "foo" });
           }
         }
 `,

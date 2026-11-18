@@ -27,8 +27,8 @@ class ControllerWithBeforeActionAndDefaultUrlOptions extends Base {
     await this.render({ plain: "final response" });
   }
 
-  redirect() {
-    this.redirectTo({ action: "target" });
+  async redirect() {
+    await this.redirectTo({ action: "target" });
   }
 }
 

@@ -74,14 +74,15 @@ interface PrivateHost extends RedirectingHost {
 interface RedirectToHost extends PrivateHost {
   location: string;
   responseBody: unknown;
+  setResponseBody(responseBody: unknown): void | Promise<void>;
   status: number | string;
 }
 
-export function redirectTo(
+export async function redirectTo(
   this: RedirectToHost,
   options: RedirectToOptions = {},
   responseOptions: RedirectToResponseOptions = {},
-): number {
+): Promise<number> {
   if (options == null || (options as unknown) === false) {
     throw new ActionControllerError("Cannot redirect to nil!");
   }
@@ -100,7 +101,7 @@ export function redirectTo(
   this.location = this._enforceOpenRedirectProtection(redirectToLocation, {
     allowOtherHost,
   });
-  this.responseBody = "";
+  await this.setResponseBody("");
   return (this.status = proposedStatus);
 }
 

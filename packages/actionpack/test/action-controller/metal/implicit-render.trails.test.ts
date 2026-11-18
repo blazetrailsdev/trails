@@ -35,7 +35,7 @@ beforeAll(() => {
 describe("RenderImplicitActionTest", () => {
   it("render a simple action with new explicit call to render", async () => {
     const c = new ImplicitRenderTestController();
-    await c.dispatch("helloWorld", makeRequest(), new Response());
+    await c.dispatch("helloWorld", makeRequest(), await Response.new());
     expect(c.response.body).toBe("Hello world!");
     expect(c.status).toBe(200);
   });

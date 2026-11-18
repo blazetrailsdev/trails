@@ -36,7 +36,7 @@ export class InboundEmailsController extends BaseController {
 
   /** @internal */
   private async authenticate(): Promise<void> {
-    if (!(await this.isAuthenticated())) this.head(":unauthorized");
+    if (!(await this.isAuthenticated())) await this.head(":unauthorized");
   }
 
   /** @internal */

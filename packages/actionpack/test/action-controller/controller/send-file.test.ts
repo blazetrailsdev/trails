@@ -52,8 +52,8 @@ class SendFileController extends Base {
     return (this._options ||= {});
   }
 
-  file() {
-    this.sendFile(this.filePath(), this.options);
+  async file() {
+    await this.sendFile(this.filePath(), this.options);
   }
 
   fileFromBeforeAction() {

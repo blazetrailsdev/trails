@@ -76,7 +76,7 @@ function engineClass(name: string): MountableApp & { routes(): RouteSet } {
 
 interface Host {
   routes?: RouteSet;
-  beforeSetup(): void;
+  beforeSetup(): unknown;
   setup(): void;
   assertions: number;
   failures: Error[];
@@ -91,9 +91,9 @@ type HostClass = (typeof TestCase | typeof IntegrationTest<RoutesApp>) &
 
 function runTest<T extends Host>(klass: new (name: string) => T): () => T {
   let t: T;
-  beforeEach(({ task }) => {
+  beforeEach(async ({ task }) => {
     t = new klass(task.name);
-    t.beforeSetup();
+    await t.beforeSetup();
     t.setup();
   });
   afterEach(() => {
@@ -428,13 +428,13 @@ function WithRoutingSharedTests(klass: HostClass, t: () => Host): void {
   const assertRouting = (...args: Parameters<Host["assertRouting"]>) => t().assertRouting(...args);
 
   const beforeSetup = klass.prototype.beforeSetup;
-  klass.prototype.beforeSetup = function (this: Host): void {
+  klass.prototype.beforeSetup = function (this: Host): unknown {
     this.routes = new RouteSet();
     this.routes.draw(function () {
       this.resources("articles");
     });
 
-    beforeSetup.call(this);
+    return beforeSetup.call(this);
   };
 
   klass.withRouting((routes: RouteSet) => {

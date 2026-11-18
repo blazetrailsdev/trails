@@ -27,6 +27,7 @@ import {
   rbModMethodDefined,
   rbObjClassname,
   rbObjInstanceVariables,
+  rbClassNewInstance,
   rbObjIsKindOf,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -93,14 +94,19 @@ export class TestController extends ActionController.Base {
     return "test";
   }
 
-  constructor() {
+  protected constructor() {
     super();
     (this.constructor as typeof TestController).setControllerPath("");
     this.request = ControllerTestRequest.create(this.constructor);
-    this.response = new ActionDispatch.TestResponse();
+  }
 
-    delete this.request.env["PATH_INFO"];
-    this.params = new ActionController.Parameters();
+  static async new<T extends TestController>(this: { prototype: T }): Promise<T> {
+    const controller = rbClassNewInstance(this);
+    controller.response = await ActionDispatch.TestResponse.new();
+
+    delete controller.request.env["PATH_INFO"];
+    controller.params = new ActionController.Parameters();
+    return controller;
   }
 }
 
@@ -310,9 +316,9 @@ Behavior.ClassMethods = ClassMethods;
 });
 
 /** @missingRailsArgs new — PERMANENT */
-function setupWithController(this: Behavior): void {
+async function setupWithController(this: Behavior): Promise<void> {
   const controllerClass = (() => class extends TestController {})();
-  this.controller = new controllerClass();
+  this.controller = await controllerClass.new();
   this.request = this.controller.request;
   this.viewFlow = new OutputFlow();
   this.outputBuffer = new OutputBuffer();

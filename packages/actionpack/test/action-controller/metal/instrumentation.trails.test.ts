@@ -42,12 +42,12 @@ describe("ActionController::Instrumentation#process_action", () => {
 
     class WidgetsController extends Base {
       static actions = ["index"];
-      index(): void {
-        this.head(204);
+      async index(): Promise<void> {
+        await this.head(204);
       }
     }
     const request = newRequest();
-    await new WidgetsController().dispatch("index", request, new Response());
+    await new WidgetsController().dispatch("index", request, await Response.new());
 
     expect(events).toHaveLength(1);
     expect(Object.keys(events[0])).toEqual([
@@ -76,11 +76,11 @@ describe("ActionController::Instrumentation#process_action", () => {
 
     class WidgetsController extends Base {
       static actions = ["index"];
-      index(): void {
-        this.head(204);
+      async index(): Promise<void> {
+        await this.head(204);
       }
     }
-    const response = new Response();
+    const response = await Response.new();
     await new WidgetsController().dispatch("index", newRequest(), response);
 
     expect(events).toHaveLength(1);
@@ -99,7 +99,7 @@ describe("ActionController::Instrumentation#process_action", () => {
       }
     }
     await expect(
-      new WidgetsController().dispatch("index", newRequest(), new Response()),
+      new WidgetsController().dispatch("index", newRequest(), await Response.new()),
     ).rejects.toThrow(ParseError);
 
     expect(events).toHaveLength(1);
@@ -116,7 +116,7 @@ describe("ActionController::Instrumentation#process_action", () => {
         await this.render({ plain: "hello" });
       }
     }
-    await new WidgetsController().dispatch("index", newRequest(), new Response());
+    await new WidgetsController().dispatch("index", newRequest(), await Response.new());
 
     expect(events).toHaveLength(1);
     expect(typeof events[0].view_runtime).toBe("number");
@@ -145,7 +145,7 @@ describe("ActionController::Instrumentation#process_action", () => {
       new FixtureResolver({ "slow_widgets/index.html.html": "hello" }),
     );
 
-    await new SlowWidgetsController().dispatch("index", newRequest(), new Response());
+    await new SlowWidgetsController().dispatch("index", newRequest(), await Response.new());
 
     expect(events).toHaveLength(1);
     expect(events[0].view_runtime).toBeGreaterThanOrEqual(20);
@@ -170,11 +170,11 @@ describe("ActionController::API process_action chain (api.rb:139-143)", () => {
 
     class WidgetsController extends API {
       static actions = ["index"];
-      index(): void {
-        this.head(204);
+      async index(): Promise<void> {
+        await this.head(204);
       }
     }
-    await new WidgetsController().dispatch("index", newRequest(), new Response());
+    await new WidgetsController().dispatch("index", newRequest(), await Response.new());
 
     expect(events).toHaveLength(1);
     expect(events[0].controller).toBe("WidgetsController");
@@ -187,11 +187,11 @@ describe("ActionController::API process_action chain (api.rb:139-143)", () => {
 
     class WidgetsController extends API {
       static actions = ["index"];
-      index(): void {
-        this.sendData("hello", { filename: "hello.txt" });
+      async index(): Promise<void> {
+        await this.sendData("hello", { filename: "hello.txt" });
       }
     }
-    const response = new Response();
+    const response = await Response.new();
     await new WidgetsController().dispatch("index", newRequest(), response);
 
     expect(events).toHaveLength(1);
@@ -210,11 +210,11 @@ describe("ActionController::API process_action chain (api.rb:139-143)", () => {
       }
     }
     (WidgetsController as unknown as typeof Base).rescueFrom(ParseError, {
-      with(this: API) {
-        this.head(400);
+      async with(this: API) {
+        await this.head(400);
       },
     });
-    const response = new Response();
+    const response = await Response.new();
     await new WidgetsController().dispatch("index", newRequest(), response);
 
     expect(response.status).toBe(400);
@@ -233,8 +233,8 @@ describe("ActionController::Instrumentation#redirect_to", () => {
     const events: Record<string, unknown>[] = [];
     teardown.push(subscribeOnce("redirect_to.action_controller", events));
     class RedirectorController extends Base {
-      filterableRedirector(): void {
-        this.redirectTo("http://secret.foo.bar/", { status: 301 });
+      async filterableRedirector(): Promise<void> {
+        await this.redirectTo("http://secret.foo.bar/", { status: 301 });
       }
     }
     const request = newRequest();
@@ -243,7 +243,7 @@ describe("ActionController::Instrumentation#redirect_to", () => {
     await controller.dispatch(
       "filterableRedirector",
       request,
-      RedirectorController.makeResponseBang(request),
+      await RedirectorController.makeResponseBang(request),
     );
 
     expect(events).toHaveLength(1);
@@ -255,11 +255,11 @@ describe("ActionController::Instrumentation#redirect_to", () => {
   it("returns the status redirect_to assigns", async () => {
     let result: unknown;
     class RedirectorController extends Base {
-      redirector(): void {
-        result = this.redirectTo("http://foo.bar/");
+      async redirector(): Promise<void> {
+        result = await this.redirectTo("http://foo.bar/");
       }
     }
-    await new RedirectorController().dispatch("redirector", newRequest(), new Response());
+    await new RedirectorController().dispatch("redirector", newRequest(), await Response.new());
     expect(result).toBe(302);
   });
 });
@@ -273,12 +273,12 @@ describe("ActionController::Instrumentation#send_file / #send_data (instrumentat
     try {
       const c = new (class extends Base {})();
       c.setRequestBang(newRequest());
-      c.setResponseBang(new Response());
+      c.setResponseBang(await Response.new());
       await c.sendData("hi", { filename: "a.txt" });
       expect(data).toEqual([{ filename: "a.txt" }]);
 
       const missing = new (class extends Base {})();
-      missing.setResponseBang(new Response());
+      missing.setResponseBang(await Response.new());
       expect(() => missing.sendFile("/nonexistent/file", { type: "text/plain" })).toThrow(
         /Cannot read file/,
       );

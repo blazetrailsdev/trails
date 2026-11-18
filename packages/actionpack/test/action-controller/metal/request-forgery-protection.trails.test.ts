@@ -162,8 +162,8 @@ describe("ActionController::Base#verify_authenticity_token", () => {
   const token = Buffer.from("railstestrailstestrailstestrails").toString("base64url");
 
   class PostsController extends Base {
-    create(): void {
-      this.head(":created");
+    async create(): Promise<void> {
+      await this.head(":created");
     }
   }
   PostsController.protectFromForgery({ with: "exception" });
@@ -218,8 +218,8 @@ describe("ActionController::Base#verify_authenticity_token", () => {
 
   it("reset_session delegates to the controller and drops the CSRF token", async ({ task }) => {
     class ResetController extends Base {
-      create(): void {
-        this.head(":created");
+      async create(): Promise<void> {
+        await this.head(":created");
       }
     }
     ResetController.protectFromForgery({ with: "reset_session" });

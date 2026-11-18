@@ -6,8 +6,8 @@ import { TestCase } from "../../../lib/action-controller/test-case.js";
 import "../../support/abstract-unit.js";
 
 class UsersController extends Base {
-  create(): void {
-    this.head(":ok");
+  async create(): Promise<void> {
+    await this.head(":ok");
   }
 }
 
