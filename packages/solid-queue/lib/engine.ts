@@ -1,6 +1,7 @@
 import { include, onLoad, OrderedOptions, TopLevel } from "@blazetrails/activesupport";
 import { Record } from "./record.js";
-import type { Base as ActiveJobBase } from "@blazetrails/activejob";
+import { Base as ActiveJobBase } from "@blazetrails/activejob";
+import { BatchId } from "./active-job/batch-id.js";
 import { File, rbFLoad, rbFSend } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { ConcurrencyControls } from "./active-job/concurrency-controls.js";
@@ -72,6 +73,10 @@ export class Engine extends TrailsEngine {
     this.initializer("solid_queue.active_job.extensions", () => {
       onLoad("active_job", function (this: typeof ActiveJobBase) {
         include(this, ConcurrencyControls);
+
+        onLoad("active_record", () => {
+          include(ActiveJobBase, BatchId);
+        });
       });
     });
 

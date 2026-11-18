@@ -20,6 +20,7 @@ import { SolidQueue } from "./solid-queue.js";
 import { Callbacks } from "./batch/callbacks.js";
 import { Status } from "./batch/status.js";
 import { Clearable, type ClassMethods as ClearableClassMethods } from "./batch/clearable.js";
+import { Sweepable, type ClassMethods as SweepableClassMethods } from "./batch/sweepable.js";
 
 export class AlreadyFinished extends StandardError {}
 
@@ -40,7 +41,6 @@ interface EnqueueOptions {
   [extraMetadata: string]: unknown;
 }
 
-/** @missingRailsCall include — CONVERGEABLE solid-queue-batch-callbacks-and-lifecycle-v1-7-2 */
 export class Batch extends Record {
   static AlreadyFinished = AlreadyFinished;
   static PendingMigrations = PendingMigrations;
@@ -48,6 +48,8 @@ export class Batch extends Record {
   declare active_job_batch_id: string | null;
   declare description: string | null;
   declare total_jobs: number;
+  declare completed_jobs: number;
+  declare failed_jobs: number;
   declare enqueued_at: Time | null;
   declare finished_at: Time | null;
   declare failed_at: Time | null;
@@ -75,6 +77,7 @@ export class Batch extends Record {
   declare static withoutExecutions: () => Relation<Batch>;
   declare static clearable: (options?: { finishedBefore?: unknown }) => Relation<Batch>;
   declare static clearFinishedInBatches: typeof ClearableClassMethods.clearFinishedInBatches;
+  declare static sweepStalled: typeof SweepableClassMethods.sweepStalled;
   /** @internal */
   static _migrated: boolean | null = null;
 
@@ -84,6 +87,7 @@ export class Batch extends Record {
     include(this, Callbacks);
     include(this, Status);
     include(this, Clearable);
+    include(this, Sweepable);
 
     this.hasMany("jobs");
     this.hasMany("batchExecutions", { dependent: "destroy" });
