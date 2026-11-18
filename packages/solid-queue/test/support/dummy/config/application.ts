@@ -2,7 +2,7 @@ import { Executor, OrderedOptions } from "@blazetrails/activesupport";
 
 class AppExecutor extends Executor {}
 
-const activeJob = new OrderedOptions();
+const activeJob: OrderedOptions & { queueAdapter?: string } = new OrderedOptions();
 activeJob.queueAdapter = "solid_queue";
 
 export const app: {

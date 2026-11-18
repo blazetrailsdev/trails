@@ -1422,7 +1422,12 @@ export function libExtraPathsManifest(): Record<string, string[]> {
     for (const pkg of source.packages) {
       if (pkg.compareApi === false) continue;
       if (!pkg.extraLibPaths) continue;
-      out[pkg.name] = pkg.extraLibPaths.map((p) => resolve(sourceRoot(source), p));
+      out[pkg.name] = pkg.extraLibPaths.map((p) => {
+        const [root, kept] = p.split("/./");
+        return kept === undefined
+          ? resolve(sourceRoot(source), p)
+          : `${resolve(sourceRoot(source), root)}/./${kept}`;
+      });
     }
   }
   return out;

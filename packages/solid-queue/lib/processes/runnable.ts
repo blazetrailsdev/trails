@@ -1,5 +1,12 @@
 import { include, inquiry, type StringInquirer } from "@blazetrails/activesupport";
-import { Errno, IO, NotImplementedError, Thread, classModule } from "@blazetrails/ruby-compat";
+import {
+  Errno,
+  IO,
+  NotImplementedError,
+  type PipeIO,
+  Thread,
+  classModule,
+} from "@blazetrails/ruby-compat";
 import { SolidQueue } from "../solid-queue.js";
 import { Timer } from "../timer.js";
 import { Supervised } from "./supervised.js";
@@ -175,8 +182,8 @@ export class NullGuard {
 }
 
 export class ForkGuard {
-  private _reader: IO;
-  private _writer: IO;
+  private _reader: PipeIO;
+  private _writer: PipeIO;
   private _createdAt: number;
   private _completed?: boolean;
 
@@ -221,12 +228,12 @@ export class ForkGuard {
   }
 
   /** @internal */
-  private get reader(): IO {
+  private get reader(): PipeIO {
     return this._reader;
   }
 
   /** @internal */
-  private get writer(): IO {
+  private get writer(): PipeIO {
     return this._writer;
   }
 
