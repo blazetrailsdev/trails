@@ -493,8 +493,9 @@ and the synchronous body peeks at the warmed value.**
   `active_record.clear_active_connections` (`railtie.rb:299-311`) flushes the
   boot connection, and a model read then peeks the warm schema cache through
   a fresh lease with no async step before it. So each executor run verifies
-  a connection on every pool that holds none. A failed connect is dropped
-  there, and the request sees the `TypeError` above, as it did before.
+  a connection on every pool that holds a loaded schema cache and no
+  connection, and a failed connect is raised from that await. A pool with no
+  loaded cache cannot reach the peek, and stays unconnected as Rails leaves it.
 - `mismatchedForeignKey` has no fact to warm, because the table and column are
   only known once the failed statement is in hand. It is the one member here
   that answers a value or a promise of it: the `sql` arm returns a promise of
