@@ -19,7 +19,8 @@ constSet(Turbo, "StreamsChannelTest", StreamsChannelTest);
 
 type Ctx = { testCase: any };
 
-const render = (options: object): Promise<unknown> => ApplicationController.render(options);
+const render = (options: object): Promise<unknown> =>
+  ApplicationController.render(options) as Promise<unknown>;
 
 async function withProductionDebouncer(t: any, block: () => Promise<unknown>): Promise<void> {
   const old = ThreadDebouncer.debouncerClass;
