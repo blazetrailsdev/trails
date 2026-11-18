@@ -1083,6 +1083,14 @@
       "urlmap.ts::URLMap": "Rack::URLMap"
     }
   },
+  "rack-cors": {
+    "rows": 5,
+    "excluded": [],
+    "unwalked": [],
+    "residue": {
+      "cors/resources/cors-misconfiguration-error.ts::CorsMisconfigurationError": "Rack::Cors::Resource::CorsMisconfigurationError"
+    }
+  },
   "rack-proxy": {
     "rows": 6,
     "excluded": [],

@@ -95,4 +95,4 @@ export { Mime } from "./mime.js";
 export * as Utils from "./utils.js";
 
 import "./constants.generated.js";
-export { Rack } from "./namespaces.js";
+export { Rack, type RackNamespace } from "./namespaces.js";

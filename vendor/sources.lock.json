@@ -120,6 +120,10 @@
       "ref": "v3.2.8",
       "sha": "5f511d7d3d9d62becddcbd403dde813a67e10c81"
     },
+    "rack-cors": {
+      "ref": "v3.0.0",
+      "sha": "f73bcd39b91c19ffa3d059dccc5d6ae62f24340a"
+    },
     "rack-proxy": {
       "ref": "v2.0.1",
       "sha": "1ca3d3dc9a2aaf730ed25aa9685924d3d12450f3"
