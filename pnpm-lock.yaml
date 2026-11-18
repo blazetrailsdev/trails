@@ -1197,6 +1197,10 @@ importers:
       '@blazetrails/trailties':
         specifier: workspace:*
         version: link:../trailties
+    devDependencies:
+      '@types/node':
+        specifier: 25.3.5
+        version: 25.3.5
 
   packages/thor:
     dependencies:

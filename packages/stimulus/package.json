@@ -41,5 +41,8 @@
       "ref": "v1.3.4",
       "sha": "8e34f2e4dd7716224317b635db1e5d9ed58324b1"
     }
-  ]
+  ],
+  "devDependencies": {
+    "@types/node": "25.3.5"
+  }
 }
