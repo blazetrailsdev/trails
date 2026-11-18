@@ -96,9 +96,13 @@ describe("ActionText::AttachmentTest", () => {
 
   it("converts to plain text", async () => {
     expect(
-      Attachment.fromAttachable(await attachable(), { caption: "Vroom vroom" })!.toPlainText(),
+      await Attachment.fromAttachable(await attachable(), {
+        caption: "Vroom vroom",
+      })!.toPlainText(),
     ).toBe("[Vroom vroom]");
-    expect(Attachment.fromAttachable(await attachable())!.toPlainText()).toBe("[racecar.jpg]");
+    expect(await Attachment.fromAttachable(await attachable())!.toPlainText()).toBe(
+      "[racecar.jpg]",
+    );
   });
 
   it("converts HTML content attachment", async () => {

@@ -25,11 +25,11 @@ describe("ActionText::Attachment", () => {
     expect(attachment.caption).toBe("Captioned");
   });
 
-  it("delegates toParam and missing methods to the attachable", () => {
+  it("delegates toParam and missing methods to the attachable", async () => {
     const attachment = Attachment.fromAttachable(new Racecar())!;
     expect(attachment.toParam()).toBe("7");
     expect((attachment as unknown as Racecar).proxied()).toBe("proxied");
-    expect(attachment.toPlainText()).toBe("[racecar.jpg]");
+    expect(await attachment.toPlainText()).toBe("[racecar.jpg]");
   });
 
   it("converts to a TrixAttachment without content", async () => {
