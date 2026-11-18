@@ -173,7 +173,7 @@ const fixtures: Record<string, string> = {
     "<%= render({ layout: 'test/layout_for_partial', locals: { name: 'Bar!' } }, {}, () => { %>\n  Content from inside layout!\n<% }) %>\npartial with layout\n",
   "test/_partial_with_only_html_version.html.tse": "partial with only HTML version",
   "test/template.tse": "<%= template.path %>",
-  "test/_directory/_partial_with_locales.html.tse": "Hello <%= name %>",
+  "test/-directory/_partial_with_locales.html.tse": "Hello <%= name %>",
   "test/nested_layout.tse":
     '<% contentFor("title", "title") -%>\n<% contentFor(":column", () => { -%>column<% }) -%>\n<%= render({ layout: \'layouts/column\' }, {}, () => { -%>content<% }) -%>',
   "layouts/_column.html.tse":
