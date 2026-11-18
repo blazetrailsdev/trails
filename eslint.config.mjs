@@ -171,7 +171,7 @@ export default defineConfig(
       "packages/mini-magick/test/fixtures/**",
       // Byte-for-byte copies of vendor/stimulus-rails/v1.3.4/test/fixtures/controllers.
       "packages/stimulus/test/fixtures/**",
-      // Byte-for-byte copies of vendor/stimulus-rails/v1.3.4/lib/install/app.
+      // Copies of vendor/stimulus-rails/v1.3.4/lib/install/app, bin/rails spelled bin/trails.
       "packages/stimulus/lib/install/app/**",
       // Byte-for-byte copies of vendor/rails/v8.0.2/activestorage/test/fixtures/files.
       "packages/activestorage/test/fixtures/files/**",

@@ -1,4 +1,4 @@
-import { TopLevel } from "@blazetrails/activesupport";
+import { Trails } from "@blazetrails/trailties";
 import { File } from "@blazetrails/ruby-compat";
 import { Engine as TrailsEngine } from "@blazetrails/trailties/engine";
 import { Stimulus } from "./stimulus-trails.js";
@@ -22,10 +22,7 @@ export class Engine extends TrailsEngine {
     });
 
     this.initializer("stimulus.assets", () => {
-      const config = TopLevel.Trails!.application!.config as unknown as {
-        isRespondTo(name: string): boolean;
-        get(name: string): unknown;
-      };
+      const config = Trails.application!.config;
       if (config.isRespondTo("assets")) {
         const assets = config.get("assets") as { precompile: string[] };
         assets.precompile = [...assets.precompile, ...Engine.PRECOMPILE_ASSETS];

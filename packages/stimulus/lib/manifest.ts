@@ -1,5 +1,5 @@
 import { camelize, remove, underscore } from "@blazetrails/activesupport";
-import type { Pathname } from "@blazetrails/ruby-compat";
+import { sort, type Pathname } from "@blazetrails/ruby-compat";
 import { Stimulus } from "./stimulus-trails.js";
 
 export const Manifest = {
@@ -34,9 +34,12 @@ application.register("${tagName}", ${controllerClassName})
     for (const d of children) {
       if (await d.isDirectory()) directories.push(await this.extractControllersFrom(d));
     }
-    return [...children.filter((e) => /_controller(\.\w+)+$/m.test(e.toString())), ...directories]
-      .flat()
-      .sort((a, b) => (a.toString() < b.toString() ? -1 : a.toString() > b.toString() ? 1 : 0));
+    return sort(
+      [
+        ...children.filter((e) => /_controller(\.\w+)+$/m.test(e.toString())),
+        ...directories,
+      ].flat(),
+    );
   },
 };
 
