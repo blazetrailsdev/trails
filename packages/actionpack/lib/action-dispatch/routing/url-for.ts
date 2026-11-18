@@ -24,7 +24,6 @@ import type { UrlOptions } from "../http/url.js";
 import {
   HelperMethodBuilder,
   isModelClass,
-  type PolymorphicHost,
   type PolymorphicMappingEntry,
   type ModelClass,
   type ToModel,
@@ -116,7 +115,7 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     return options;
   }
   if (isSymbol(options)) {
-    return HelperMethodBuilder.url().handleStringCall(this as unknown as PolymorphicHost, options);
+    return HelperMethodBuilder.url().handleStringCall(this, options);
   }
   if (Array.isArray(options)) {
     const components = [...options];
@@ -124,9 +123,9 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     return this.polymorphicUrl!(components, opts);
   }
   if (isModelClass(options)) {
-    return HelperMethodBuilder.url().handleClassCall(this as unknown as PolymorphicHost, options);
+    return HelperMethodBuilder.url().handleClassCall(this, options);
   }
-  return HelperMethodBuilder.url().handleModelCall(this as unknown as PolymorphicHost, options);
+  return HelperMethodBuilder.url().handleModelCall(this, options);
 }
 
 export function routeFor(this: UrlForHost, name: string, ...args: unknown[]): string {

@@ -10,7 +10,6 @@ export interface RouterRequest extends VerbRequest {
   scriptName: string;
   pathParameters: Record<string, unknown>;
   routeUriPattern?: string | null;
-  [key: string]: unknown;
 }
 
 export interface RackishResponse {
