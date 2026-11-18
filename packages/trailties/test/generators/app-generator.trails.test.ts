@@ -276,9 +276,7 @@ describe("AppGenerator (trails-only)", () => {
     }
     expect(read("development")).toMatch(/actionController\.performCaching = false/);
     expect(read("production")).toMatch(/this\.config\.i18n\.fallbacks = true;/);
-    expect(read("production")).toMatch(
-      /this\.config\.logger = TaggedLogging\.logger\(process\.stdout\);/,
-    );
+    expect(read("production")).toMatch(/this\.config\.logger = TaggedLogging\.logger\(STDOUT\);/);
   });
 
   it("generates an app with Active Job on unless --skip-active-job is passed", async () => {
