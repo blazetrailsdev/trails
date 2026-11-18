@@ -258,7 +258,7 @@ const ACTIONPACK_SCENARIOS: Record<string, (view: Base) => unknown> = {
     collection: [customer("david"), customer("mary")],
     as: "customer",
   }),
-  "test/_directory/_partial_with_locales": template("test/render_partial_inside_directory"),
+  "test/-directory/_partial_with_locales": template("test/render_partial_inside_directory"),
   "test/dot.directory/render_template_with_ivar": (view) =>
     assigns(
       view,
